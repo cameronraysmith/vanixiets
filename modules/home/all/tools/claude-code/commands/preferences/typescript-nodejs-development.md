@@ -4,6 +4,8 @@
 
 See @~/.claude/commands/preferences/architectural-patterns.md for overarching principles.
 
+For React UI development with TanStack ecosystem, see @~/.claude/commands/preferences/react-tanstack-ui-development.md.
+
 TypeScript with Effect-TS provides excellent support for functional programming and effect management in the JavaScript ecosystem.
 
 ### Recommended libraries for functional programming
