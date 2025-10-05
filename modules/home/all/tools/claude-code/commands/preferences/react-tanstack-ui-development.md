@@ -114,6 +114,318 @@ const useUIStore = create<UIState>((set) => ({
 }))
 ```
 
+## Pragmatic exceptions for specialized use cases
+
+### Client-side analytics with DuckDB WASM
+
+For applications performing client-side data analysis with DuckDB WASM (e.g., using SQLRooms), **Zustand is acceptable** instead of TanStack Store when:
+- The application architecture follows vertical slices isolating analytics concerns
+- Type-safe data source configuration uses Zod schemas (ADT alignment maintained)
+- Query execution and state updates are confined to dedicated slices
+- The imperative state patterns do not leak into general application logic
+
+**Rationale**: DuckDB WASM analytics applications require fine-grained control over query execution, caching, and result streaming.
+Zustand's imperative API provides ergonomic access to these patterns without the overhead of TanStack Store's reactive primitives.
+The vertical slice architecture ensures analytics state remains isolated from general UI state.
+
+#### SQLRooms vertical slice pattern
+
+SQLRooms implements a composable slice architecture where each feature is self-contained:
+
+```typescript
+// Vertical slice contains: state + actions + UI + config schema
+import { createRoomStore, createRoomShellSlice } from '@sqlrooms/room-shell'
+import { createSqlEditorSlice } from '@sqlrooms/sql-editor'
+import { createWasmDuckDbConnector } from '@sqlrooms/duckdb'
+import { z } from 'zod'
+import { persist } from 'zustand/middleware'
+
+// Type-safe configuration with Zod (ADT pattern)
+const RoomConfig = BaseRoomConfig.merge(SqlEditorSliceConfig)
+type RoomConfig = z.infer<typeof RoomConfig>
+
+// Compose slices into unified store
+const { roomStore, useRoomStore } = createRoomStore<RoomConfig, RoomState>(
+  persist(
+    (set, get, store) => ({
+      // DuckDB connector slice
+      ...createRoomShellSlice({
+        connector: createWasmDuckDbConnector(),
+        config: { layout: {...}, dataSources: [...] },
+        room: { panels: {...} }
+      })(set, get, store),
+
+      // SQL editor slice
+      ...createSqlEditorSlice()(set, get, store),
+
+      // Custom application slice
+      customAnalytics: {
+        filters: {},
+        applyFilter: (filter) => set({ customAnalytics: {...} })
+      }
+    }),
+    {
+      name: 'analytics-app-storage',
+      // Only persist configuration, not runtime state
+      partialize: (state) => ({
+        config: RoomConfig.parse(state.config)
+      })
+    }
+  )
+)
+```
+
+#### Type-safe S3/HTTPFS data sources with Zod
+
+Use discriminated unions for data source configuration (matches ADT patterns from @~/.claude/commands/preferences/algebraic-data-types.md):
+
+```typescript
+// From @sqlrooms/room-config - Zod schemas for type safety
+const DataSourceTypes = z.enum(['file', 'url', 'sql'])
+
+const BaseDataSource = z.object({
+  type: DataSourceTypes,
+  tableName: z.string()
+})
+
+// Discriminated union for different source types
+const UrlDataSource = BaseDataSource.extend({
+  type: z.literal('url'),
+  url: z.string(),
+  loadOptions: z.object({
+    method: z.enum(['read_csv', 'read_parquet']),
+    select: z.array(z.string()).optional(),
+    where: z.string().optional()
+  }).optional(),
+  httpMethod: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional()
+})
+
+const DataSource = z.discriminatedUnion('type', [
+  FileDataSource,
+  UrlDataSource,
+  SqlQueryDataSource
+])
+
+// S3 data source configuration for public ducklake data
+const s3DataSource: UrlDataSource = {
+  type: 'url',
+  tableName: 'public_ducklake_data',
+  // DuckDB WASM with httpfs extension supports direct S3 access
+  url: 's3://ducklake-public/data/events.parquet',
+  loadOptions: {
+    method: 'read_parquet',
+    // Push-down filters to parquet reader (performance optimization)
+    select: ['user_id', 'event_type', 'created_at', 'payload'],
+    where: "created_at >= '2024-01-01' AND event_type = 'UserCreated'"
+  }
+}
+
+// Configuration validated at runtime and compile-time
+const config = {
+  dataSources: [s3DataSource]
+}
+RoomConfig.parse(config) // Runtime validation
+```
+
+#### Railway-oriented programming for query error handling
+
+Apply Result types to query execution for explicit error handling.
+
+See @~/.claude/commands/preferences/railway-oriented-programming.md for Result patterns and error composition.
+
+```typescript
+import { z } from 'zod'
+
+// Result type for query operations
+type Result<T, E> =
+  | { ok: true; value: T }
+  | { ok: false; error: E }
+
+const success = <T, E>(value: T): Result<T, E> =>
+  ({ ok: true, value })
+
+const failure = <T, E>(error: E): Result<T, E> =>
+  ({ ok: false, error })
+
+// Error types as discriminated union
+type QueryError =
+  | { type: 'connection'; message: string }
+  | { type: 'syntax'; message: string; line?: number }
+  | { type: 'data_source'; message: string; source: string }
+  | { type: 'network'; message: string; status?: number }
+
+// Query execution with Result type
+const executeQuery = async (
+  sql: string,
+  db: DuckDB
+): Promise<Result<QueryResult, QueryError>> => {
+  try {
+    // Validate SQL syntax (applicative validation)
+    const syntaxResult = validateSqlSyntax(sql)
+    if (!syntaxResult.ok) return syntaxResult
+
+    // Execute query
+    const result = await db.query(sql)
+    return success(result)
+  } catch (error) {
+    // Map exceptions to typed errors
+    if (error.message.includes('Catalog Error')) {
+      return failure({
+        type: 'data_source',
+        message: 'Table not found or data source not loaded',
+        source: extractTableName(error.message)
+      })
+    }
+    if (error.message.includes('Syntax error')) {
+      return failure({
+        type: 'syntax',
+        message: error.message,
+        line: extractLineNumber(error.message)
+      })
+    }
+    return failure({
+      type: 'connection',
+      message: error.message
+    })
+  }
+}
+
+// Zustand slice with railway-oriented query actions
+const createQuerySlice = () => (set, get, store) => ({
+  query: {
+    sql: '',
+    result: null as QueryResult | null,
+    error: null as QueryError | null,
+    isExecuting: false,
+
+    // Action with explicit error handling
+    executeQuery: async (sql: string) => {
+      set({ query: { ...get().query, isExecuting: true, error: null } })
+
+      const result = await executeQuery(sql, get().db.connection)
+
+      // Railway tracks: success or failure
+      if (result.ok) {
+        set({
+          query: {
+            ...get().query,
+            result: result.value,
+            isExecuting: false
+          }
+        })
+      } else {
+        set({
+          query: {
+            ...get().query,
+            error: result.error,
+            isExecuting: false
+          }
+        })
+      }
+    }
+  }
+})
+
+// UI component with pattern matching on error type
+function QueryErrorDisplay({ error }: { error: QueryError }) {
+  switch (error.type) {
+    case 'syntax':
+      return (
+        <div className="text-destructive">
+          <p>Syntax error{error.line ? ` at line ${error.line}` : ''}</p>
+          <p className="text-sm">{error.message}</p>
+        </div>
+      )
+    case 'data_source':
+      return (
+        <div className="text-destructive">
+          <p>Data source error: {error.source}</p>
+          <p className="text-sm">{error.message}</p>
+          <button onClick={loadDataSource}>Load data source</button>
+        </div>
+      )
+    case 'network':
+      return (
+        <div className="text-destructive">
+          <p>Network error{error.status ? ` (${error.status})` : ''}</p>
+          <p className="text-sm">{error.message}</p>
+          <button onClick={retry}>Retry</button>
+        </div>
+      )
+    case 'connection':
+      return (
+        <div className="text-destructive">
+          <p>Connection error</p>
+          <p className="text-sm">{error.message}</p>
+        </div>
+      )
+  }
+}
+```
+
+#### S3/HTTPFS configuration requirements
+
+For browser-based S3 queries with DuckDB WASM httpfs extension:
+
+**CORS configuration**: S3 bucket must allow browser origins
+
+```json
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": ["https://your-app.com"],
+      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": ["ETag", "Content-Length"]
+    }
+  ]
+}
+```
+
+**DuckDB httpfs extension**: Automatically loaded by @sqlrooms/duckdb
+
+```typescript
+// Extension loads transparently when using s3:// URLs
+const connector = createWasmDuckDbConnector({
+  // Optional: Initialize additional extensions
+  initializationQuery: `
+    INSTALL httpfs;
+    LOAD httpfs;
+    SET s3_region='us-east-1';
+  `
+})
+```
+
+**Direct parquet queries**: No table creation needed for one-off queries
+
+```typescript
+// Query parquet files directly from S3
+const adhocQuery = `
+  SELECT
+    event_type,
+    COUNT(*) as count
+  FROM read_parquet('s3://ducklake-public/data/events/*.parquet')
+  WHERE created_at >= '2024-01-01'
+  GROUP BY event_type
+`
+
+const result = await executeQuery(adhocQuery, db)
+```
+
+#### When to use this pattern
+
+Use SQLRooms with Zustand for:
+- **Client-side analytics applications**: User-facing data exploration tools
+- **Privacy-preserving analytics**: Data never leaves the user's device
+- **Offline-first data tools**: Full query capabilities without server
+- **Local-first dashboards**: Real-time visualization of local/remote data
+
+Return to TanStack Store for:
+- **General application state**: Non-analytics UI state
+- **Server state management**: Use TanStack Query + tRPC instead
+- **Real-time collaboration**: Use TanStack DB for live queries
+
 ### TanStack DB for reactive collections
 
 Use TanStack DB when you need multiple live views of the same data:
