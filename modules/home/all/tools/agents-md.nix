@@ -29,6 +29,7 @@
       - rust development: ~/.claude/commands/preferences/rust-development.md
       - haskell development: ~/.claude/commands/preferences/haskell-development.md
       - typescript/node.js development: ~/.claude/commands/preferences/typescript-nodejs-development.md
+      - react/ui development: ~/.claude/commands/preferences/react-tanstack-ui-development.md
       - git history cleanup: ~/.claude/commands/preferences/git-history-cleanup.md
 
       Always remember to fallback to practical features and architectural
