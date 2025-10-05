@@ -1,12 +1,13 @@
-{ ... }:
+{ config, ... }:
+let
+  # Base path for preference documents (without @ prefix)
+  # The @ prefix must be added when referencing to enable auto-loading
+  prefsPath = "${config.home.homeDirectory}/.claude/commands/preferences";
+in
 {
   # https://github.com/mirkolenz/nixos/blob/0911e2e/home/options/agents-md.nix#L22-L31
   #
-  # What precisely do you understand from your user memory file?
-  #
-  # Based on our current project, at what point might you decide to
-  # reference the relevant document(s) from the claude commands
-  # preferences directory pointed to from the user-level memory file?
+  # Auto-loading requires @ prefix on full paths in generated CLAUDE.md
   programs.agents-md = {
     enable = true;
     settings.body = ''
@@ -16,23 +17,23 @@
       the corresponding document, without pausing to ask if you should, to ensure
       you are aware of our ideal guidelines and conventions:
 
-      - preferences: @~/.claude/commands/preferences/preferences.md
-      - general development practices: @~/.claude/commands/preferences/general-practices.md
-      - git version control: @~/.claude/commands/preferences/git-version-control.md
-      - documentation: ~/.claude/commands/preferences/documentation.md
-      - change management: ~/.claude/commands/preferences/change-management.md
-      - architectural patterns: ~/.claude/commands/preferences/architectural-patterns.md
-      - data modeling: ~/.claude/commands/preferences/data-modeling.md
-      - schema versioning: ~/.claude/commands/preferences/schema-versioning.md
-      - web application deployment: ~/.claude/commands/preferences/web-application-deployment.md
-      - cloudflare wrangler configuration: ~/.claude/commands/preferences/cloudflare-wrangler-reference.md
-      - nix development: ~/.claude/commands/preferences/nix-development.md
-      - python development: ~/.claude/commands/preferences/python-development.md
-      - rust development: ~/.claude/commands/preferences/rust-development.md
-      - haskell development: ~/.claude/commands/preferences/haskell-development.md
-      - typescript/node.js development: ~/.claude/commands/preferences/typescript-nodejs-development.md
-      - react/ui development: ~/.claude/commands/preferences/react-tanstack-ui-development.md
-      - git history cleanup: ~/.claude/commands/preferences/git-history-cleanup.md
+      - preferences: @${prefsPath}/preferences.md
+      - general development practices: @${prefsPath}/general-practices.md
+      - git version control: @${prefsPath}/git-version-control.md
+      - documentation: ${prefsPath}/documentation.md
+      - change management: ${prefsPath}/change-management.md
+      - architectural patterns: ${prefsPath}/architectural-patterns.md
+      - data modeling: ${prefsPath}/data-modeling.md
+      - schema versioning: ${prefsPath}/schema-versioning.md
+      - web application deployment: ${prefsPath}/web-application-deployment.md
+      - cloudflare wrangler configuration: ${prefsPath}/cloudflare-wrangler-reference.md
+      - nix development: ${prefsPath}/nix-development.md
+      - python development: ${prefsPath}/python-development.md
+      - rust development: ${prefsPath}/rust-development.md
+      - haskell development: ${prefsPath}/haskell-development.md
+      - typescript/node.js development: ${prefsPath}/typescript-nodejs-development.md
+      - react/ui development: ${prefsPath}/react-tanstack-ui-development.md
+      - git history cleanup: ${prefsPath}/git-history-cleanup.md
 
       Always remember to fallback to practical features and architectural
       patterns that emphasize type-safety and functional programming as is
