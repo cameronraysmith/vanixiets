@@ -986,50 +986,67 @@ export default defineConfig({
 
 ## Deployment
 
-### Cloudflare deployment
+See @~/.claude/commands/preferences/web-application-deployment.md for comprehensive deployment guidance including:
+- Cloudflare Workers/Pages deployment (preferred)
+- Database configuration (D1, PostgreSQL)
+- Wrangler configuration and platform bindings
+- Multi-environment strategies
+- Service bindings for microservices architecture
 
-For Cloudflare Pages/Workers deployment:
+### React-specific deployment patterns
+
+#### Vite configuration with Cloudflare plugin
 
 ```typescript
 // vite.config.ts
-import { cloudflare } from '@cloudflare/vite-plugin'
+import { defineConfig } from "vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import viteReact from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
+    tanstackStart({
+      srcDirectory: "src",
+      start: { entry: "./start.tsx" },
+      server: { entry: "./server.ts" }, // Custom Cloudflare Workers entry
+    }),
+    viteReact(),
     cloudflare({
-      experimental: {
-        remoteBindings: true
+      viteEnvironment: {
+        name: "ssr", // Enable SSR environment for Workers
       },
     }),
   ],
-})
+});
 ```
 
-**TanStack Start adapter**:
-
-```typescript
-// app.config.ts
-import { defineConfig } from '@tanstack/start/config'
-
-export default defineConfig({
-  server: {
-    preset: 'cloudflare-pages',
-  },
-})
-```
-
-### SSR considerations
+#### SSR hydration considerations
 
 **Environment variables**:
-- Server-only vars: Use `VITE_` prefix cautiously - they're bundled into client
-- Runtime vars: Access via context or server functions
-
-**Hydration**:
-- Ensure server and client render match
-- Use `suppressHydrationWarning` only when necessary (e.g., timestamps)
+- Avoid `VITE_` prefix for secrets - they bundle into client code
+- Access runtime environment via Cloudflare bindings in server functions
 
 ```typescript
-// Prevent hydration mismatch for dynamic content
+import { env } from "cloudflare:workers";
+
+// Server function with runtime access
+export const serverFunction = createServerFn()
+  .handler(async () => {
+    // Access Cloudflare bindings
+    const data = await env.DB.prepare("SELECT * FROM users").all();
+    return data;
+  });
+```
+
+**Hydration**:
+- Ensure server and client render identical markup
+- Use `suppressHydrationWarning` only for intentional mismatches (timestamps, randomness)
+
+```typescript
+// Prevent hydration mismatch for client-only content
 function ClientOnly({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
 
@@ -1039,6 +1056,37 @@ function ClientOnly({ children }: { children: React.ReactNode }) {
 
   if (!mounted) return null
   return <>{children}</>
+}
+
+// Usage: Wrap client-only components
+<ClientOnly>
+  <BrowserOnlyFeature />
+</ClientOnly>
+```
+
+**Common hydration issues**:
+- Different timestamps between server and client renders
+- Browser-specific APIs called during SSR (window, localStorage)
+- Random values generated server-side not matching client-side
+
+```typescript
+// ❌ Causes hydration mismatch
+function BadComponent() {
+  return <div>{Math.random()}</div>
+}
+
+// ✅ Use suppressHydrationWarning for intentional mismatch
+function GoodComponent() {
+  return <div suppressHydrationWarning>{Math.random()}</div>
+}
+
+// ✅ Or use ClientOnly wrapper
+function BestComponent() {
+  return (
+    <ClientOnly>
+      <div>{Math.random()}</div>
+    </ClientOnly>
+  )
 }
 ```
 
