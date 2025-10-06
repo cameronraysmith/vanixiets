@@ -130,7 +130,7 @@ just load-container
 just test-container fd
 ```
 
-**2. Multi-arch local validation (pre-registry testing)**
+**2. Multi-arch local validation (recommended for pre-registry testing)**
 
 Build both aarch64-linux and x86_64-linux, load native arch only:
 
@@ -149,23 +149,31 @@ just load-native                    # Loads native arch from result-{arch}
 just test-container fd
 ```
 
-**3. Manifest workflow (registry distribution)**
+**3. Manifest workflow (CI/CD registry distribution)**
 
-Build multi-arch manifest using flocken, then test locally:
+The `fdManifest` and `rgManifest` definitions use flocken to create multi-arch manifests for pushing to container registries. These require registry configuration (see `modules/flake-parts/containers.nix`).
 
-```bash
-just manifest-test fdManifest fd
-just manifest-test rgManifest rg
+For local multi-arch testing, use workflow #2 above instead.
+
+Example manifest definition:
+```nix
+fdManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
+  version = "latest";
+  imageFiles = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
+  registries = {
+    "ghcr.io" = {
+      username = "your-username";
+      repo = "your-repo";
+    };
+  };
+  tags = [ "latest" ];
+};
 ```
 
-This creates a manifest list for pushing to container registries (GHCR, DockerHub).
-
-Atomic steps:
-
+Once configured:
 ```bash
-just build-manifest fdManifest      # Uses flocken to build both + create manifest
-just load-native                    # Load native arch from manifest build
-just test-container fd
+nix run --impure .#fdManifest  # Builds + pushes to configured registries
+nix run --impure .#rgManifest
 ```
 
 ### Architecture auto-detection
@@ -262,10 +270,11 @@ just container-all myToolContainer mytool
 
 # Multi-arch local validation
 just container-all-multiarch myToolContainer mytool
-
-# Manifest for registry
-just manifest-test myToolManifest mytool
 ```
+
+**4. (Optional) Configure manifest for CI/CD registry push:**
+
+Add registry configuration to the manifest definition and use in CI/CD pipelines.
 
 ## Notes
 
