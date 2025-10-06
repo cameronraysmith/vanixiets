@@ -27,6 +27,7 @@ in
       - schema versioning: ${prefsPath}/schema-versioning.md
       - web application deployment: ${prefsPath}/web-application-deployment.md
       - cloudflare wrangler configuration: ${prefsPath}/cloudflare-wrangler-reference.md
+      - secrets management: ${prefsPath}/secrets.md
       - nix development: ${prefsPath}/nix-development.md
       - python development: ${prefsPath}/python-development.md
       - rust development: ${prefsPath}/rust-development.md
