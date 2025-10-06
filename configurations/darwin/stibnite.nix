@@ -16,17 +16,27 @@ in
 
   system.primaryUser = adminUser.username;
 
-  # Bootstrap: enable linux-builder for first build, then disable
+  # Bootstrap step 1: Enable linux-builder to build nix-rosetta-builder VM
   # See: docs/notes/containers/multi-arch-container-builds.md
-  nix.linux-builder.enable = true; # TODO: disable after first successful darwin-rebuild
-
-  nix-rosetta-builder = {
+  nix.linux-builder = {
     enable = true;
-    onDemand = true;
-    cores = 8;
-    memory = "6GiB";
-    diskSize = "100GiB";
+    # Explicit defaults (from nixpkgs#darwin.linux-builder.nixosConfig.virtualisation):
+    config.virtualisation = {
+      cores = 1; # default: 1 (increase if builds are slow)
+      memorySize = 3072; # default: 3072 (3GB)
+      diskSize = 20480; # default: 20480 (20GB)
+    };
   };
+
+  # Bootstrap step 2: Enable nix-rosetta-builder after first darwin-rebuild
+  # Then disable linux-builder above and rebuild again
+  # nix-rosetta-builder = {
+  #   enable = true;
+  #   onDemand = true;
+  #   cores = 8;
+  #   memory = "6GiB";
+  #   diskSize = "100GiB";
+  # };
 
   custom.homebrew = {
     enable = true;
