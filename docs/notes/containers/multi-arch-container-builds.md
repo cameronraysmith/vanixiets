@@ -12,32 +12,55 @@ This configuration enables building multi-architecture (aarch64-linux and x86_64
 
 ## Initial bootstrap
 
-nix-rosetta-builder requires an existing Linux builder for initial setup.
+nix-rosetta-builder requires an existing Linux builder for initial setup because the VM image itself is a Linux derivation that must be built on Linux (chicken-and-egg problem).
 
-### Option 1: Temporary built-in linux-builder
+### Why the bootstrap is necessary
 
-1. Comment out nix-rosetta-builder in `configurations/darwin/stibnite.nix`:
+The nix-rosetta-builder package is defined as:
+```nix
+packages."aarch64-linux".image = pkgs.callPackage ./package.nix { ... };
+```
+
+This is a Linux package that must be built on Linux, but nix-rosetta-builder **is** the Linux builder you're trying to create. The toggle sequence uses nix-darwin's built-in `linux-builder` (which can bootstrap from NixOS cache) to build the nix-rosetta-builder VM image.
+
+### Recommended: Concurrent enable with single toggle
+
+This approach runs both builders simultaneously during the first switch, then disables the built-in one:
+
+1. In `configurations/darwin/stibnite.nix`, enable both:
    ```nix
-   # nix-rosetta-builder = {
-   #   enable = true;
-   #   ...
-   # };
+   nix.linux-builder.enable = true;  # Temporary bootstrap
+
+   nix-rosetta-builder = {
+     enable = true;
+     onDemand = true;
+     cores = 8;
+     memory = "6GiB";
+     diskSize = "100GiB";
+   };
    ```
 
-2. Enable the built-in builder:
+2. Run `darwin-rebuild switch` (builds nix-rosetta-builder using linux-builder)
+
+3. Disable the built-in builder:
    ```nix
-   nix.linux-builder.enable = true;
+   nix.linux-builder.enable = false;
+   # nix-rosetta-builder stays enabled
    ```
 
-3. Run `darwin-rebuild switch`
+4. Run `darwin-rebuild switch` again (now using nix-rosetta-builder)
 
-4. Uncomment nix-rosetta-builder, remove linux-builder config
+### Alternative: Remote builder
 
-5. Run `darwin-rebuild switch` again
+If you have access to another Linux builder (cloud instance, remote server), configure it in `nix.buildMachines` before enabling nix-rosetta-builder to avoid the toggle entirely.
 
-### Option 2: Remote builder
+### Why not use Lima directly?
 
-If you have access to another Linux builder, configure it in `nix.buildMachines` before enabling nix-rosetta-builder.
+Lima is just a VM hypervisor. nix-rosetta-builder uses Lima internally but adds:
+- Nix remote builder configuration
+- SSH key management
+- Rosetta 2 integration
+- Automatic builder registration
 
 ## Building containers
 

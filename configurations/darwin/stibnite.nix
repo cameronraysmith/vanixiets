@@ -16,6 +16,10 @@ in
 
   system.primaryUser = adminUser.username;
 
+  # Bootstrap: enable linux-builder for first build, then disable
+  # See: docs/notes/containers/multi-arch-container-builds.md
+  nix.linux-builder.enable = true; # TODO: disable after first successful darwin-rebuild
+
   nix-rosetta-builder = {
     enable = true;
     onDemand = true;
