@@ -49,6 +49,11 @@
           name = "fd";
           package = pkgs.fd;
         };
+
+        rgContainer = mkToolContainer {
+          name = "rg";
+          package = pkgs.ripgrep;
+        };
       };
 
       legacyPackages = {
