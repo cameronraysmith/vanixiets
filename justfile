@@ -245,7 +245,7 @@ load-container:
 # Test a container by running the binary with --help
 [group('containers')]
 test-container binary:
-  docker run {{binary}}:latest --help
+  docker run --rm {{binary}}:latest --help
 
 # Complete workflow: build, load, and test a container
 [group('containers')]
