@@ -8,12 +8,21 @@ in
 {
   imports = [
     self.darwinModules.default
+    inputs.nix-rosetta-builder.darwinModules.default
   ];
 
   nixpkgs.hostPlatform = "aarch64-darwin";
   nixpkgs.config.allowUnfree = true;
 
   system.primaryUser = adminUser.username;
+
+  nix-rosetta-builder = {
+    enable = true;
+    onDemand = true;
+    cores = 8;
+    memory = "6GiB";
+    diskSize = "100GiB";
+  };
 
   custom.homebrew = {
     enable = true;
