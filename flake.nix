@@ -11,6 +11,12 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     nixos-unified.url = "github:srid/nixos-unified";
     omnix.url = "github:juspay/omnix";
+
+    flocken.url = "github:mirkolenz/flocken/v2";
+    flocken.inputs.nixpkgs.follows = "nixpkgs";
+
+    nix-rosetta-builder.url = "github:cpick/nix-rosetta-builder";
+    nix-rosetta-builder.inputs.nixpkgs.follows = "nixpkgs";
     # TODO: error: darwin.apple_sdk_11_0 has been removed
     # <https://nixos.org/manual/nixpkgs/stable/#sec-darwin-legacy-frameworks>
     # omnix.inputs.nixpkgs.follows = "nixpkgs";
