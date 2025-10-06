@@ -1,4 +1,9 @@
-{ flake, pkgs, ... }:
+{
+  flake,
+  pkgs,
+  lib,
+  ...
+}:
 
 let
   inherit (flake) config inputs;
@@ -20,11 +25,11 @@ in
   # See: docs/notes/containers/multi-arch-container-builds.md
   nix.linux-builder = {
     enable = true;
-    # Explicit defaults (from nixpkgs#darwin.linux-builder.nixosConfig.virtualisation):
+    # Override defaults (nix-builder-vm.nix sets: cores=1, memorySize=3072, diskSize=20480)
     config.virtualisation = {
-      cores = 4; # default: 4 (increase if builds are slow)
-      memorySize = 6144; # default: 6144 (6GB)
-      diskSize = 40960; # default: 40960 (40GB)
+      cores = lib.mkForce 4; # override default 1 core
+      memorySize = lib.mkForce 6144; # override default 3GB → 6GB
+      diskSize = lib.mkForce 40960; # override default 20GB → 40GB
     };
   };
 
