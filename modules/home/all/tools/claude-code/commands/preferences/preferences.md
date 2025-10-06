@@ -1,6 +1,7 @@
 # Strict Preferences
 
 - Avoid using emojis in code, comments, documentation, markdown files, etc unless explicitly requested to do so.
+- Never pollute the repository root or other working directory with markdown files. Always place these types of working notes in suitable paths like: `./docs/notes/[category]/[lower-kebab-case-filename.md]` where you may need to create the directory if it doesn't exist before creating the file.
 - Prefer lowercase except when replicating code conventions like PascalCase or camelCase, in acronyms, or in proper nouns.
 - Do prefer to capitalize the first letter of the first word of
     - complete sentences that end with punctuation marks
