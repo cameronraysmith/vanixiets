@@ -87,6 +87,21 @@ Lima is just a VM hypervisor. nix-rosetta-builder uses Lima internally but adds:
 - Rosetta 2 integration
 - Automatic builder registration
 
+## Caching to avoid rebuilds
+
+After system updates that change nixpkgs, the nix-rosetta-builder VM image may need rebuilding. Cache it to avoid rebuilding multiple times:
+
+```bash
+just cache-rosetta-builder
+```
+
+This command:
+- Automatically finds the VM image in your current system
+- Pushes it to your Cachix cache (~2GB upload)
+- Makes it available for future builds and CI
+
+Run this after `darwin-rebuild switch` when nixpkgs updates.
+
 ## Building containers
 
 ### Build multi-arch manifest
