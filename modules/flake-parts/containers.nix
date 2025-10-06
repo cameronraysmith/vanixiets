@@ -63,6 +63,13 @@
           registries = { };
           tags = [ "latest" ];
         };
+
+        rgManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
+          version = "latest";
+          imageFiles = map (sys: inputs.self.packages.${sys}.rgContainer) imageSystems;
+          registries = { };
+          tags = [ "latest" ];
+        };
       };
     };
 }
