@@ -230,6 +230,30 @@ update-package package="claude-code-bin":
   $UPDATE_SCRIPT
   echo "Update complete. Review changes with: git diff packages/{{ package }}/manifest.json"
 
+## containers
+
+# Build a container image for the specified architecture
+[group('containers')]
+build-container container arch="aarch64-linux":
+  nix build '.#packages.{{arch}}.{{container}}'
+
+# Load the container image from result into docker
+[group('containers')]
+load-container:
+  docker load < result
+
+# Test a container by running the binary with --help
+[group('containers')]
+test-container binary:
+  docker run {{binary}}:latest --help
+
+# Complete workflow: build, load, and test a container
+[group('containers')]
+container-all container binary arch="aarch64-linux":
+  just build-container {{container}} {{arch}}
+  just load-container
+  just test-container {{binary}}
+
 ## secrets
 
 # Define the project variable
