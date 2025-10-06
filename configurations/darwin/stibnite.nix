@@ -22,9 +22,9 @@ in
     enable = true;
     # Explicit defaults (from nixpkgs#darwin.linux-builder.nixosConfig.virtualisation):
     config.virtualisation = {
-      cores = 1; # default: 1 (increase if builds are slow)
-      memorySize = 3072; # default: 3072 (3GB)
-      diskSize = 20480; # default: 20480 (20GB)
+      cores = 4; # default: 4 (increase if builds are slow)
+      memorySize = 6144; # default: 6144 (6GB)
+      diskSize = 40960; # default: 40960 (40GB)
     };
   };
 
