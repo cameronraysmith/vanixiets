@@ -104,6 +104,29 @@ Run this after `darwin-rebuild switch` when nixpkgs updates.
 
 ## Building containers
 
+### Using justfile recipes (recommended)
+
+Build, load, and test a container in one command:
+
+```bash
+just container-all fdContainer fd
+just container-all rgContainer rg
+```
+
+Or use individual steps:
+
+```bash
+just build-container fdContainer
+just load-container
+just test-container fd
+```
+
+The recipes support different architectures (defaults to aarch64-linux):
+
+```bash
+just build-container fdContainer x86_64-linux
+```
+
 ### Build multi-arch manifest
 
 ```bash
@@ -113,18 +136,22 @@ nix run --impure .#fdManifest
 
 This builds both aarch64-linux and x86_64-linux images via nix-rosetta-builder.
 
-### Build single architecture
+### Build single architecture (manual)
+
+Use the proper flake path syntax (not --system flag):
 
 ```bash
-nix build .#fdContainer --system aarch64-linux
+nix build '.#packages.aarch64-linux.fdContainer'
 ```
 
-### Load and test
+Note: The `--system aarch64-linux` flag is known to cause issues where nix attempts local execution instead of delegating to the builder. Always use the explicit flake path syntax.
+
+### Load and test (manual)
 
 ```bash
-nix build .#fdContainer --system aarch64-linux
+nix build '.#packages.aarch64-linux.fdContainer'
 docker load < result
-docker run fd:latest --version
+docker run fd:latest --help
 ```
 
 ## VM configuration
@@ -141,6 +168,16 @@ To add a new tool container, edit `modules/flake-parts/containers.nix`:
 
 ```nix
 packages = lib.optionalAttrs isLinux {
+  fdContainer = mkToolContainer {
+    name = "fd";
+    package = pkgs.fd;
+  };
+
+  rgContainer = mkToolContainer {
+    name = "rg";
+    package = pkgs.ripgrep;  # Note: package name != binary name
+  };
+
   myToolContainer = mkToolContainer {
     name = "mytool";
     package = pkgs.mytool;
@@ -155,6 +192,12 @@ legacyPackages = {
     tags = [ "latest" ];
   };
 };
+```
+
+Then use the justfile recipes:
+
+```bash
+just container-all myToolContainer mytool
 ```
 
 ## Notes
