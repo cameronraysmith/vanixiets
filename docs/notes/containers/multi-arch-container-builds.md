@@ -27,20 +27,26 @@ This is a Linux package that must be built on Linux, but nix-rosetta-builder **i
 
 The configuration must be activated in two separate rebuilds:
 
-**Step 1: Build nix-rosetta-builder using linux-builder**
+**Step 1: Build linux-builder (bootstrap)**
 
 In `configurations/darwin/stibnite.nix`:
 ```nix
+imports = [
+  self.darwinModules.default
+  # Comment out nix-rosetta-builder import - it evaluates Linux packages!
+  # inputs.nix-rosetta-builder.darwinModules.default
+];
+
 nix.linux-builder = {
   enable = true;
   config.virtualisation = {
-    cores = 1;        # default (increase for faster builds)
-    memorySize = 3072; # 3GB default
-    diskSize = 20480;  # 20GB default
+    cores = lib.mkForce 4;         # default: 1 (increase for faster builds)
+    memorySize = lib.mkForce 6144; # default: 3GB
+    diskSize = lib.mkForce 40960;  # default: 20GB
   };
 };
 
-# nix-rosetta-builder commented out
+# nix-rosetta-builder config commented out
 ```
 
 Run `darwin-rebuild switch`
@@ -49,6 +55,11 @@ Run `darwin-rebuild switch`
 
 Update `configurations/darwin/stibnite.nix`:
 ```nix
+imports = [
+  self.darwinModules.default
+  inputs.nix-rosetta-builder.darwinModules.default  # Uncomment!
+];
+
 nix.linux-builder.enable = false;  # Disable bootstrap builder
 
 nix-rosetta-builder = {
@@ -61,6 +72,8 @@ nix-rosetta-builder = {
 ```
 
 Run `darwin-rebuild switch` again
+
+**Critical**: The nix-rosetta-builder module import must be commented out in step 1 because importing it evaluates the Linux VM image package, which requires a Linux builder to build.
 
 ### Alternative: Remote builder
 
