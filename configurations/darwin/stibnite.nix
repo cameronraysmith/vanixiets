@@ -13,7 +13,8 @@ in
 {
   imports = [
     self.darwinModules.default
-    inputs.nix-rosetta-builder.darwinModules.default
+    # Bootstrap step 1: Comment out nix-rosetta-builder import (requires Linux builder)
+    # inputs.nix-rosetta-builder.darwinModules.default
   ];
 
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -33,8 +34,11 @@ in
     };
   };
 
-  # Bootstrap step 2: Enable nix-rosetta-builder after first darwin-rebuild
-  # Then disable linux-builder above and rebuild again
+  # Bootstrap step 2: After first darwin-rebuild succeeds:
+  # 1. Uncomment the nix-rosetta-builder import at the top
+  # 2. Uncomment the config below
+  # 3. Set nix.linux-builder.enable = false
+  # 4. Run darwin-rebuild switch again
   # nix-rosetta-builder = {
   #   enable = true;
   #   onDemand = true;
