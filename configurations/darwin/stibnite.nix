@@ -30,6 +30,7 @@ in
   nix-rosetta-builder = {
     enable = true;
     onDemand = true; # VM powers off when idle to save resources
+    permitNonRootSshAccess = true; # Allow nix-daemon to read SSH key (safe for localhost-only VM)
     cores = 8;
     memory = "6GiB";
     diskSize = "100GiB";
