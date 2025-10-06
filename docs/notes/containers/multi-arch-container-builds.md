@@ -104,55 +104,95 @@ Run this after `darwin-rebuild switch` when nixpkgs updates.
 
 ## Building containers
 
-### Using justfile recipes (recommended)
+### Three workflows for different use cases
 
-Build, load, and test a container in one command:
+**1. Single-arch (default - fastest for local testing)**
+
+Auto-detects your native Linux architecture:
 
 ```bash
 just container-all fdContainer fd
 just container-all rgContainer rg
 ```
 
-Or use individual steps:
+Or specify an architecture explicitly:
 
 ```bash
-just build-container fdContainer
+just container-all fdContainer fd x86_64-linux
+```
+
+Atomic steps:
+
+```bash
+just build-container fdContainer        # Auto-detects native arch
+just build-container fdContainer aarch64-linux  # Explicit arch
 just load-container
 just test-container fd
 ```
 
-The recipes support different architectures (defaults to aarch64-linux):
+**2. Multi-arch local validation (pre-registry testing)**
+
+Build both aarch64-linux and x86_64-linux, load native arch only:
 
 ```bash
-just build-container fdContainer x86_64-linux
+just container-all-multiarch fdContainer fd
+just container-all-multiarch rgContainer rg
 ```
 
-### Build multi-arch manifest
+This proves both architectures build successfully before pushing to registry.
+
+Atomic steps:
 
 ```bash
-cd /Users/crs58/projects/nix-workspace/nix-config
-nix run --impure .#fdManifest
+just build-multiarch fdContainer    # Builds both, outputs result-aarch64-linux and result-x86_64-linux
+just load-native                    # Loads native arch from result-{arch}
+just test-container fd
 ```
 
-This builds both aarch64-linux and x86_64-linux images via nix-rosetta-builder.
+**3. Manifest workflow (registry distribution)**
 
-### Build single architecture (manual)
-
-Use the proper flake path syntax (not --system flag):
+Build multi-arch manifest using flocken, then test locally:
 
 ```bash
-nix build '.#packages.aarch64-linux.fdContainer'
+just manifest-test fdContainer fd
+just manifest-test rgContainer rg
 ```
 
-Note: The `--system aarch64-linux` flag is known to cause issues where nix attempts local execution instead of delegating to the builder. Always use the explicit flake path syntax.
+This creates a manifest list for pushing to container registries (GHCR, DockerHub).
 
-### Load and test (manual)
+Atomic steps:
 
 ```bash
+just build-manifest fdContainer     # Uses flocken to build both + create manifest
+just load-native                    # Load native arch from manifest build
+just test-container fd
+```
+
+### Architecture auto-detection
+
+The justfile recipes automatically detect your host architecture and map it to the corresponding Linux target:
+
+- **aarch64-darwin or aarch64-linux** → builds `aarch64-linux` containers
+- **x86_64-darwin or x86_64-linux** → builds `x86_64-linux` containers
+
+This means `just container-all fdContainer fd` does the right thing on any platform.
+
+### Manual nix commands (advanced)
+
+If you prefer to use nix commands directly:
+
+```bash
+# Single architecture
 nix build '.#packages.aarch64-linux.fdContainer'
 docker load < result
-docker run fd:latest --help
+docker run --rm fd:latest --help
+
+# Multi-arch manifest
+nix run --impure .#fdManifest
+nix run --impure .#rgManifest
 ```
+
+Note: Never use `--system aarch64-linux` flag - it causes nix to attempt local execution instead of delegating to the builder. Always use the explicit flake path syntax.
 
 ## VM configuration
 
@@ -165,6 +205,8 @@ The nix-rosetta-builder VM is configured with:
 ## Adding new containers
 
 To add a new tool container, edit `modules/flake-parts/containers.nix`:
+
+**1. Add the container package:**
 
 ```nix
 packages = lib.optionalAttrs isLinux {
@@ -183,8 +225,26 @@ packages = lib.optionalAttrs isLinux {
     package = pkgs.mytool;
   };
 };
+```
 
+**2. Add the manifest (optional, for multi-arch registry distribution):**
+
+```nix
 legacyPackages = {
+  fdManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
+    version = "latest";
+    imageFiles = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
+    registries = { };
+    tags = [ "latest" ];
+  };
+
+  rgManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
+    version = "latest";
+    imageFiles = map (sys: inputs.self.packages.${sys}.rgContainer) imageSystems;
+    registries = { };
+    tags = [ "latest" ];
+  };
+
   myToolManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
     version = "latest";
     imageFiles = map (sys: inputs.self.packages.${sys}.myToolContainer) imageSystems;
@@ -194,10 +254,17 @@ legacyPackages = {
 };
 ```
 
-Then use the justfile recipes:
+**3. Use the justfile workflows:**
 
 ```bash
+# Single-arch (fast local testing)
 just container-all myToolContainer mytool
+
+# Multi-arch local validation
+just container-all-multiarch myToolContainer mytool
+
+# Manifest for registry
+just manifest-test myToolContainer mytool
 ```
 
 ## Notes
