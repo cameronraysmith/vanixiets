@@ -232,26 +232,63 @@ update-package package="claude-code-bin":
 
 ## containers
 
-# Build a container image for the specified architecture
+# Architecture auto-detection: map host arch to target Linux arch
+_current_arch := arch()
+_native_linux_arch := if _current_arch == "aarch64" { "aarch64-linux" } else { "x86_64-linux" }
+
+# Build a container image for the specified architecture (auto-detects native by default)
 [group('containers')]
-build-container container arch="aarch64-linux":
+build-container container arch=_native_linux_arch:
   nix build '.#packages.{{arch}}.{{container}}'
+
+# Build container for both aarch64-linux and x86_64-linux
+[group('containers')]
+build-multiarch container:
+  @echo "Building aarch64-linux..."
+  nix build '.#packages.aarch64-linux.{{container}}' -o result-aarch64-linux
+  @echo "Building x86_64-linux..."
+  nix build '.#packages.x86_64-linux.{{container}}' -o result-x86_64-linux
+  @echo "✓ Both architectures built successfully"
 
 # Load the container image from result into docker
 [group('containers')]
 load-container:
   docker load < result
 
+# Load the native architecture from a multi-arch build
+[group('containers')]
+load-native:
+  docker load < result-{{_native_linux_arch}}
+
 # Test a container by running the binary with --help
 [group('containers')]
 test-container binary:
   docker run --rm {{binary}}:latest --help
 
-# Complete workflow: build, load, and test a container
+# Build flocken manifest for multi-arch distribution
 [group('containers')]
-container-all container binary arch="aarch64-linux":
+build-manifest container:
+  nix run --impure '.#{{container}}Manifest'
+
+# Complete workflow: build, load, and test a container (single-arch)
+[group('containers')]
+container-all container binary arch=_native_linux_arch:
   just build-container {{container}} {{arch}}
   just load-container
+  just test-container {{binary}}
+
+# Complete workflow: build both architectures, load native, and test
+[group('containers')]
+container-all-multiarch container binary:
+  just build-multiarch {{container}}
+  just load-native
+  just test-container {{binary}}
+
+# Manifest workflow: build manifest, load native arch, and test
+[group('containers')]
+manifest-test container binary:
+  just build-manifest {{container}}
+  just load-native
   just test-container {{binary}}
 
 ## secrets
