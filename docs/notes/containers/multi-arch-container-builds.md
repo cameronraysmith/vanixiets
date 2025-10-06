@@ -23,32 +23,44 @@ packages."aarch64-linux".image = pkgs.callPackage ./package.nix { ... };
 
 This is a Linux package that must be built on Linux, but nix-rosetta-builder **is** the Linux builder you're trying to create. The toggle sequence uses nix-darwin's built-in `linux-builder` (which can bootstrap from NixOS cache) to build the nix-rosetta-builder VM image.
 
-### Recommended: Concurrent enable with single toggle
+### Required: Two-step bootstrap process
 
-This approach runs both builders simultaneously during the first switch, then disables the built-in one:
+The configuration must be activated in two separate rebuilds:
 
-1. In `configurations/darwin/stibnite.nix`, enable both:
-   ```nix
-   nix.linux-builder.enable = true;  # Temporary bootstrap
+**Step 1: Build nix-rosetta-builder using linux-builder**
 
-   nix-rosetta-builder = {
-     enable = true;
-     onDemand = true;
-     cores = 8;
-     memory = "6GiB";
-     diskSize = "100GiB";
-   };
-   ```
+In `configurations/darwin/stibnite.nix`:
+```nix
+nix.linux-builder = {
+  enable = true;
+  config.virtualisation = {
+    cores = 1;        # default (increase for faster builds)
+    memorySize = 3072; # 3GB default
+    diskSize = 20480;  # 20GB default
+  };
+};
 
-2. Run `darwin-rebuild switch` (builds nix-rosetta-builder using linux-builder)
+# nix-rosetta-builder commented out
+```
 
-3. Disable the built-in builder:
-   ```nix
-   nix.linux-builder.enable = false;
-   # nix-rosetta-builder stays enabled
-   ```
+Run `darwin-rebuild switch`
 
-4. Run `darwin-rebuild switch` again (now using nix-rosetta-builder)
+**Step 2: Switch to nix-rosetta-builder**
+
+Update `configurations/darwin/stibnite.nix`:
+```nix
+nix.linux-builder.enable = false;  # Disable bootstrap builder
+
+nix-rosetta-builder = {
+  enable = true;
+  onDemand = true;
+  cores = 8;
+  memory = "6GiB";
+  diskSize = "100GiB";
+};
+```
+
+Run `darwin-rebuild switch` again
 
 ### Alternative: Remote builder
 
