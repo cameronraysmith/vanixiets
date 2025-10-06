@@ -13,8 +13,7 @@ in
 {
   imports = [
     self.darwinModules.default
-    # Bootstrap step 1: Comment out nix-rosetta-builder import (requires Linux builder)
-    # inputs.nix-rosetta-builder.darwinModules.default
+    inputs.nix-rosetta-builder.darwinModules.default
   ];
 
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -22,30 +21,19 @@ in
 
   system.primaryUser = adminUser.username;
 
-  # Bootstrap step 1: Enable linux-builder to build nix-rosetta-builder VM
+  # Bootstrap step 1 complete: linux-builder was used to build nix-rosetta-builder VM
+  # Now disabled in favor of nix-rosetta-builder
   # See: docs/notes/containers/multi-arch-container-builds.md
-  nix.linux-builder = {
-    enable = true;
-    # Override defaults (nix-builder-vm.nix sets: cores=1, memorySize=3072, diskSize=20480)
-    config.virtualisation = {
-      cores = lib.mkForce 4; # override default 1 core
-      memorySize = lib.mkForce 6144; # override default 3GB → 6GB
-      diskSize = lib.mkForce 40960; # override default 20GB → 40GB
-    };
-  };
+  nix.linux-builder.enable = false;
 
-  # Bootstrap step 2: After first darwin-rebuild succeeds:
-  # 1. Uncomment the nix-rosetta-builder import at the top
-  # 2. Uncomment the config below
-  # 3. Set nix.linux-builder.enable = false
-  # 4. Run darwin-rebuild switch again
-  # nix-rosetta-builder = {
-  #   enable = true;
-  #   onDemand = true;
-  #   cores = 8;
-  #   memory = "6GiB";
-  #   diskSize = "100GiB";
-  # };
+  # Bootstrap step 2: nix-rosetta-builder is now the primary Linux builder
+  nix-rosetta-builder = {
+    enable = true;
+    onDemand = true; # VM powers off when idle to save resources
+    cores = 8;
+    memory = "6GiB";
+    diskSize = "100GiB";
+  };
 
   custom.homebrew = {
     enable = true;
