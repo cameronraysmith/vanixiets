@@ -265,11 +265,6 @@ load-native:
 test-container binary:
   docker run --rm {{binary}}:latest --help
 
-# Build flocken manifest for multi-arch distribution
-[group('containers')]
-build-manifest manifest:
-  nix run --impure '.#{{manifest}}'
-
 # Complete workflow: build, load, and test a container (single-arch)
 [group('containers')]
 container-all container binary arch=_native_linux_arch:
@@ -281,13 +276,6 @@ container-all container binary arch=_native_linux_arch:
 [group('containers')]
 container-all-multiarch container binary:
   just build-multiarch {{container}}
-  just load-native
-  just test-container {{binary}}
-
-# Manifest workflow: build manifest, load native arch, and test
-[group('containers')]
-manifest-test manifest binary:
-  just build-manifest {{manifest}}
   just load-native
   just test-container {{binary}}
 

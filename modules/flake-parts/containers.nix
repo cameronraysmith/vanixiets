@@ -57,17 +57,32 @@
       };
 
       legacyPackages = {
+        # Multi-arch manifests for registry distribution
+        # Note: These require registry configuration to run
+        # For local multi-arch testing, use: just build-multiarch <container>
         fdManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
           version = "latest";
           imageFiles = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
-          registries = { };
+          registries = {
+            # Example registry configuration (uncomment and configure for your use):
+            # "ghcr.io" = {
+            #   username = "your-username";
+            #   repo = "your-repo";
+            # };
+          };
           tags = [ "latest" ];
         };
 
         rgManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
           version = "latest";
           imageFiles = map (sys: inputs.self.packages.${sys}.rgContainer) imageSystems;
-          registries = { };
+          registries = {
+            # Example registry configuration (uncomment and configure for your use):
+            # "ghcr.io" = {
+            #   username = "your-username";
+            #   repo = "your-repo";
+            # };
+          };
           tags = [ "latest" ];
         };
       };
