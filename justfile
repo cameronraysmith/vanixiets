@@ -267,8 +267,8 @@ test-container binary:
 
 # Build flocken manifest for multi-arch distribution
 [group('containers')]
-build-manifest container:
-  nix run --impure '.#{{container}}Manifest'
+build-manifest manifest:
+  nix run --impure '.#{{manifest}}'
 
 # Complete workflow: build, load, and test a container (single-arch)
 [group('containers')]
@@ -286,8 +286,8 @@ container-all-multiarch container binary:
 
 # Manifest workflow: build manifest, load native arch, and test
 [group('containers')]
-manifest-test container binary:
-  just build-manifest {{container}}
+manifest-test manifest binary:
+  just build-manifest {{manifest}}
   just load-native
   just test-container {{binary}}
 

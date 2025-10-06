@@ -154,8 +154,8 @@ just test-container fd
 Build multi-arch manifest using flocken, then test locally:
 
 ```bash
-just manifest-test fdContainer fd
-just manifest-test rgContainer rg
+just manifest-test fdManifest fd
+just manifest-test rgManifest rg
 ```
 
 This creates a manifest list for pushing to container registries (GHCR, DockerHub).
@@ -163,7 +163,7 @@ This creates a manifest list for pushing to container registries (GHCR, DockerHu
 Atomic steps:
 
 ```bash
-just build-manifest fdContainer     # Uses flocken to build both + create manifest
+just build-manifest fdManifest      # Uses flocken to build both + create manifest
 just load-native                    # Load native arch from manifest build
 just test-container fd
 ```
@@ -264,7 +264,7 @@ just container-all myToolContainer mytool
 just container-all-multiarch myToolContainer mytool
 
 # Manifest for registry
-just manifest-test myToolContainer mytool
+just manifest-test myToolManifest mytool
 ```
 
 ## Notes
