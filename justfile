@@ -535,6 +535,47 @@ ratchet-update:
     eval "{{ratchet_base}} update $workflow"; \
   done
 
+# Push nix-rosetta-builder VM image to Cachix (run after system updates)
+[group('CI/CD')]
+cache-rosetta-builder:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "Finding nix-rosetta-builder VM image in current system..."
+
+    # Find the rosetta-builder.yaml from current system
+    YAML_PATH=$(nix-store --query --requisites /run/current-system | grep 'rosetta-builder.yaml$' || true)
+
+    if [ -z "$YAML_PATH" ]; then
+        echo "❌ nix-rosetta-builder not found in current system"
+        echo "   Is nix-rosetta-builder.enable = true in your configuration?"
+        exit 1
+    fi
+
+    echo "Found config: $YAML_PATH"
+
+    # Extract VM image path from YAML (format: "- location: /path/to/image")
+    IMAGE_PATH=$(grep -A1 "images:" "$YAML_PATH" | grep "location:" | awk '{print $3}')
+
+    if [ -z "$IMAGE_PATH" ]; then
+        echo "❌ Could not extract image path from $YAML_PATH"
+        exit 1
+    fi
+
+    echo "VM image: $IMAGE_PATH"
+    IMAGE_SIZE=$(du -h "$IMAGE_PATH" | cut -f1)
+    echo "Size: $IMAGE_SIZE"
+
+    # Push to cachix
+    echo ""
+    echo "Pushing to Cachix (this may take a few minutes for ~2GB image)..."
+    sops exec-env secrets/shared.yaml "cachix push cameronraysmith $IMAGE_PATH"
+
+    echo ""
+    echo "✅ Successfully pushed nix-rosetta-builder to Cachix"
+    echo "   View at: https://app.cachix.org/cache/cameronraysmith"
+    echo "   Image: $IMAGE_PATH"
+
 # Test cachix push/pull with a simple derivation
 [group('CI/CD')]
 test-cachix:
