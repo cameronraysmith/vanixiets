@@ -569,11 +569,12 @@ cache-rosetta-builder:
     # Push to cachix
     echo ""
     echo "Pushing to Cachix (this may take a few minutes for ~2GB image)..."
-    sops exec-env secrets/shared.yaml "cachix push cameronraysmith $IMAGE_PATH"
+    sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $IMAGE_PATH"
 
     echo ""
     echo "✅ Successfully pushed nix-rosetta-builder to Cachix"
-    echo "   View at: https://app.cachix.org/cache/cameronraysmith"
+    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
+    echo "   View at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "   Image: $IMAGE_PATH"
 
 # Test cachix push/pull with a simple derivation
@@ -589,8 +590,9 @@ test-cachix:
 
     # Push to cachix
     echo "Pushing to cachix..."
-    sops exec-env secrets/shared.yaml "cachix push cameronraysmith $STORE_PATH"
+    sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $STORE_PATH"
 
     # Verify it's in the cache by trying to pull it from another location
-    echo "✅ Push completed. Verify at: https://app.cachix.org/cache/cameronraysmith"
+    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
+    echo "✅ Push completed. Verify at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "Store path: $STORE_PATH"
