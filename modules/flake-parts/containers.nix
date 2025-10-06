@@ -26,7 +26,7 @@
             package
           ];
           config = {
-            Cmd = [ "${package}/bin/${name}" ];
+            Entrypoint = [ "${package}/bin/${name}" ];
             Env = [
               "PATH=${package}/bin:${pkgs.coreutils}/bin:${pkgs.bashInteractive}/bin"
             ];
