@@ -36,15 +36,14 @@
     flocken.url = "github:mirkolenz/flocken/v2";
     flocken.inputs.nixpkgs.follows = "nixpkgs";
 
+    # Do not enable
+    # nix-rosetta-builder.inputs.nixpkgs.follows = "nixpkgs";
+    # It is pinned to the commit of nixpkgs e9f00bd8
+    # used to build the cached bootstrap image at
+    # /nix/store/c3bav8f2.../nixos.qcow2.
     nix-rosetta-builder.url = "github:cpick/nix-rosetta-builder";
     nix-rosetta-builder.inputs.nixpkgs.url = "github:nixos/nixpkgs/e9f00bd893984bc8ce46c895c3bf7cac95331127";
-    # nix-rosetta-builder.inputs.nixpkgs.follows = "nixpkgs";
-    # Pinned to nixpkgs e9f00bd8 used to build the cached bootstrap image at
-    # /nix/store/c3bav8f2.../nixos.qcow2. This ensures cache validity while
-    # allowing the VM to evolve independently from system nixpkgs updates.
-    # Commented follows: VM is a build tool (like linux-builder), not part of
-    # system config. Its runtime packages don't affect build outputs.
-    # See: docs/notes/nix-rosetta-builder/bootstrap-caching-analysis.md
+
     # TODO: error: darwin.apple_sdk_11_0 has been removed
     # <https://nixos.org/manual/nixpkgs/stable/#sec-darwin-legacy-frameworks>
     # omnix.inputs.nixpkgs.follows = "nixpkgs";
