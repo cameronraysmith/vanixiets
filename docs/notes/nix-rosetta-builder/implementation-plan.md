@@ -138,8 +138,8 @@ Update the cached image when:
 
 3. **When upstream changes affect the image** (detected during flake updates)
 
-Note: Regular nixpkgs updates do NOT require cache updates.
-The VM uses nix-rosetta-builder's own nixpkgs input, not nix-config's.
+Note: nix-config nixpkgs updates do NOT require cache updates.
+The VM uses pinned nixpkgs (`e9f00bd8`) and evolves independently from system updates.
 
 ### Checking cache status
 
