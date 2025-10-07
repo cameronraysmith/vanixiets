@@ -230,6 +230,87 @@ update-package package="claude-code-bin":
   $UPDATE_SCRIPT
   echo "Update complete. Review changes with: git diff packages/{{ package }}/manifest.json"
 
+## docs
+
+# Install workspace dependencies
+[group('docs')]
+install:
+  bun install
+
+# Start documentation development server
+[group('docs')]
+docs-dev:
+  cd packages/docs && bun run dev
+
+# Build the documentation site
+[group('docs')]
+docs-build:
+  cd packages/docs && bun run build
+
+# Preview the built documentation site
+[group('docs')]
+docs-preview:
+  cd packages/docs && bun run preview
+
+# Format documentation code with Biome
+[group('docs')]
+docs-format:
+  cd packages/docs && bun run format
+
+# Lint documentation code with Biome
+[group('docs')]
+docs-lint:
+  cd packages/docs && bun run lint
+
+# Check and fix documentation code with Biome
+[group('docs')]
+docs-check:
+  cd packages/docs && bun run check:fix
+
+# Run all documentation tests
+[group('docs')]
+docs-test:
+  cd packages/docs && bun run test
+
+# Run documentation unit tests
+[group('docs')]
+docs-test-unit:
+  cd packages/docs && bun run test:unit
+
+# Run documentation E2E tests
+[group('docs')]
+docs-test-e2e:
+  cd packages/docs && bun run test:e2e
+
+# Generate documentation test coverage report
+[group('docs')]
+docs-test-coverage:
+  cd packages/docs && bun run test:coverage
+
+# Deploy documentation to Cloudflare Workers (preview)
+[group('docs')]
+docs-deploy-preview branch=`git branch --show-current`:
+  #!/usr/bin/env bash
+  cd packages/docs
+  sops exec-env ../../secrets/shared.yaml "
+    echo 'Deploying preview for branch: {{branch}}'
+    echo 'Building...'
+    bun run build
+    echo 'Uploading version with preview alias...'
+    bunx wrangler versions upload --preview-alias b-{{branch}}
+  "
+
+# Deploy documentation to Cloudflare Workers (production)
+[group('docs')]
+docs-deploy-production:
+  #!/usr/bin/env bash
+  cd packages/docs
+  sops exec-env ../../secrets/shared.yaml "
+    echo 'Building and deploying to production...'
+    bun run build
+    bunx wrangler deploy
+  "
+
 ## containers
 
 # Architecture auto-detection: map host arch to target Linux arch
