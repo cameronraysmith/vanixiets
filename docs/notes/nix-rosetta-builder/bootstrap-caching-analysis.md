@@ -96,10 +96,11 @@ Changes to nix-rosetta-builder source files:
 - `module.nix` (darwin module and image overrides)
 - `constants.nix` (shared constants)
 
-### 4. Packages do NOT trigger rebuilds
+### 4. Nixpkgs pinning prevents unnecessary rebuilds
 
-Notable: Changes to nix-config's nixpkgs do **not** affect the nix-rosetta-builder image.
-The image uses nix-rosetta-builder's own nixpkgs input, not nix-config's.
+The VM image is now pinned to a specific nixpkgs commit (`e9f00bd893984bc8ce46c895c3bf7cac95331127`).
+This means nix-config nixpkgs updates do **not** affect the nix-rosetta-builder image.
+The VM evolves independently, only rebuilding when nix-rosetta-builder itself is updated.
 
 ## Existing caching infrastructure
 
@@ -125,6 +126,44 @@ nix.settings.trusted-public-keys = [
 ```
 
 **Limitation**: These settings only apply AFTER the system is built, not during initial flake evaluation.
+
+## Design decision: Pin nixpkgs for stability
+
+### Why pin instead of follow
+
+Originally, the flake had `nix-rosetta-builder.inputs.nixpkgs.follows = "nixpkgs"`.
+This caused the VM image to rebuild with every nix-config nixpkgs update, leading to:
+- Frequent cache invalidation (new image every few days)
+- Cache bloat (many nearly-identical VM versions)
+- Cached bootstrap image becoming stale quickly
+
+### The VM is a tool, not system configuration
+
+nix-rosetta-builder is a **build machine**:
+- Receives build requests via SSH
+- Builds derivations using the **derivation's nixpkgs**, not the VM's
+- VM runtime packages (openssh, kernel, nix) are separate from build outputs
+
+Like the official `linux-builder`, the VM should be a stable tool that evolves independently from system updates.
+
+### Current pinning strategy
+
+The VM is pinned to nixpkgs `e9f00bd893984bc8ce46c895c3bf7cac95331127` (short: `e9f00bd8`):
+- This is the commit that built the cached bootstrap image at `/nix/store/c3bav8f2.../nixos.qcow2`
+- Ensures cache validity indefinitely
+- VM only rebuilds when nix-rosetta-builder itself updates
+- Provides months of cache stability instead of days
+
+### Security considerations
+
+The VM:
+- Listens only on localhost (127.0.0.1)
+- Has managed SSH keys (no password auth)
+- Runs as non-admin service account
+- Is behind macOS firewall
+
+Even if VM packages lag system packages, the attack surface is minimal.
+The VM will still receive updates when cpick/nix-rosetta-builder updates its nixpkgs (typically monthly).
 
 ## Solution: nixConfig in flake
 
@@ -181,7 +220,8 @@ Update the cached image (by running `just cache-rosetta-builder`) when:
 3. **After upstream updates** to nix-rosetta-builder that change the image
    (this is detected automatically when you update the flake input)
 
-Note: Regular nixpkgs updates in nix-config do NOT require cache updates, since the image uses its own nixpkgs.
+Note: nix-config nixpkgs updates do NOT trigger cache updates.
+The VM uses a pinned nixpkgs (`e9f00bd8`) and evolves independently from system updates.
 
 ## Implementation plan
 
