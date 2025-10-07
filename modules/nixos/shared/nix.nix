@@ -23,6 +23,7 @@ in
     nixPath = [ "nixpkgs=${flake.inputs.nixpkgs}" ]; # Enables use of `nix-shell -p ...` etc
     registry.nixpkgs.flake = flake.inputs.nixpkgs; # Make `nix shell` etc use pinned nixpkgs
     settings = {
+      accept-flake-config = true;
       build-users-group = lib.mkDefault "nixbld";
       auto-optimise-store = false;
       experimental-features = "nix-command flakes auto-allocate-uids";
