@@ -163,7 +163,7 @@ in
         colima-restart
       ]
       ++ lib.optional (cfg.runtime == "docker" || cfg.runtime == "containerd") docker
-      ++ lib.optional (cfg.runtime == "incus") incus
+      # Note: incus package is Linux-only; incus CLI is available inside the VM
       ++ cfg.extraPackages;
 
     # Activation script to inform user about Colima state
