@@ -1,0 +1,10 @@
+{
+  "name": "nix-config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "NixOS and home-manager configuration",
+  "workspaces": [
+    "packages/*"
+  ],
+  "packageManager": "bun@1.1.38"
+}
