@@ -26,13 +26,13 @@ activate target="":
     set -euo pipefail
     if [ -n "{{target}}" ]; then
         echo "activating {{target}} ..."
-        nix run . {{target}}
+        nix run . {{target}} --accept-flake-config
     elif [ -f ./configurations/home/$USER@$(hostname).nix ]; then
         echo "activating home configuration $USER@$(hostname) ..."
-        nix run . $USER@$(hostname)
+        nix run . $USER@$(hostname) --accept-flake-config
     else
         echo "activating system configuration $(hostname) ..."
-        nix run . $(hostname)
+        nix run . $(hostname) --accept-flake-config
     fi
 
 # Print nix flake inputs and outputs
