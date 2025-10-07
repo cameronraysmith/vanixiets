@@ -242,6 +242,46 @@ just container-all-multiarch myToolContainer mytool
 
 Add registry configuration to the manifest definition and use in CI/CD pipelines.
 
+## Container management with Colima
+
+This setup focuses on **building** container images using nix-rosetta-builder.
+For **running** and **managing** OCI containers, see the complementary Colima configuration.
+
+### Complementary usage
+
+- **nix-rosetta-builder** (this document): Build Linux binaries and container images from Nix expressions
+- **Colima** (see [colima-container-management.md](./colima-container-management.md)): Run and manage OCI containers with Incus or Docker runtime
+
+Both can run simultaneously:
+- nix-rosetta-builder: 8 cores, 6GB RAM (on-demand)
+- Colima: 4 cores, 4GB RAM (manual control)
+
+### Example workflow
+
+Build a container image with nix-rosetta-builder, then run it with Colima:
+
+```bash
+# Build container using nix-rosetta-builder
+just container-all fdContainer fd
+
+# Load into Colima's Docker runtime
+# (requires services.colima.runtime = "docker")
+docker load < result
+docker run --rm fd:latest --help
+```
+
+Or use Incus for system containers:
+
+```bash
+# Launch a NixOS container with Colima's Incus runtime
+incus launch images:nixos/unstable builder
+
+# Use nix inside the container
+incus exec builder -- nix shell nixpkgs#fd -c fd --help
+```
+
+For full Colima usage guide, see [colima-container-management.md](./colima-container-management.md).
+
 ## Notes
 
 - Container images build on the Linux builder (via remote build)
