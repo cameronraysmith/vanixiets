@@ -68,6 +68,12 @@ in
   options.custom.homebrew = {
     enable = lib.mkEnableOption "homebrew package management";
 
+    additionalBrews = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Additional brew formulas to install";
+    };
+
     additionalCasks = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
@@ -115,7 +121,8 @@ in
         "pinentry-mac"
         # https://github.com/tailscale/tailscale/wiki/Tailscaled-on-macOS#installing-tailscaled-from-homebrew
         # "tailscale"
-      ];
+      ]
+      ++ cfg.additionalBrews;
 
       casks = baseCaskApps ++ cfg.additionalCasks ++ (lib.optionals cfg.manageFonts caskFonts);
 
