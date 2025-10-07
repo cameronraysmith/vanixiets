@@ -28,6 +28,9 @@ This configuration uses a hybrid approach for optimal container and VM managemen
 After activating the system configuration, initialize Colima:
 
 ```bash
+# Apply the configuration (installs Colima via nix, Incus via homebrew)
+darwin-rebuild switch --flake .#stibnite
+
 # Initialize Colima with configured settings
 colima-init
 
@@ -36,6 +39,8 @@ colima status
 ```
 
 The `colima-init` helper script reads your declarative configuration from `configurations/darwin/stibnite.nix` and starts Colima with those settings.
+
+Note: The Incus client is installed via Homebrew (not nixpkgs) since the nixpkgs Incus package is Linux-only (server + client), while macOS only needs the client.
 
 ### Test with incus
 
@@ -324,8 +329,10 @@ sudo incus config edit <container-name>
 
 - [Colima documentation](https://github.com/abiosoft/colima)
 - [Incus documentation](https://linuxcontainers.org/incus/docs/main/)
+- [Incus installation guide](https://linuxcontainers.org/incus/docs/main/installing/)
 - [Lima documentation](https://lima-vm.io/)
 - nixpkgs packages: `pkgs.colima`, `pkgs.docker`
+- Homebrew formulas: `incus` (macOS client only)
 - Architecture analysis: See evaluation comparing container runtimes
 
 ## Module options
