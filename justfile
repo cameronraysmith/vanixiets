@@ -626,6 +626,47 @@ cache-rosetta-builder:
     echo "   View at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "   Image: $IMAGE_PATH"
 
+# Check if nix-rosetta-builder image is in Cachix
+[group('CI/CD')]
+check-rosetta-cache:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "Checking if nix-rosetta-builder image is cached..."
+
+    # Find the image from current system
+    YAML_PATH=$(nix-store --query --requisites /run/current-system | grep 'rosetta-builder.yaml$' || true)
+
+    if [ -z "$YAML_PATH" ]; then
+        echo "⚠️  nix-rosetta-builder not enabled in current system"
+        exit 0
+    fi
+
+    echo "Found config: $YAML_PATH"
+
+    IMAGE_PATH=$(grep -A1 "images:" "$YAML_PATH" | grep "location:" | awk '{print $3}')
+
+    if [ -z "$IMAGE_PATH" ]; then
+        echo "❌ Could not extract image path"
+        exit 1
+    fi
+
+    echo "Checking cache for: $IMAGE_PATH"
+
+    # Check if the image is in cache
+    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
+
+    if nix path-info --store "https://$CACHE_NAME.cachix.org" "$IMAGE_PATH" &>/dev/null; then
+        echo "✅ Image is cached"
+        echo "   Cache: https://$CACHE_NAME.cachix.org"
+        echo "   Path: $IMAGE_PATH"
+    else
+        echo "❌ Image NOT in cache"
+        echo "   Path: $IMAGE_PATH"
+        echo "   Run: just cache-rosetta-builder"
+        exit 1
+    fi
+
 # Test cachix push/pull with a simple derivation
 [group('CI/CD')]
 test-cachix:
