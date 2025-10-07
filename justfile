@@ -584,7 +584,7 @@ ratchet-update:
     eval "{{ratchet_base}} update $workflow"; \
   done
 
-# Push nix-rosetta-builder VM image to Cachix (run after system updates)
+# Push nix-rosetta-builder VM image to Cachix and pin it (run after system updates)
 [group('CI/CD')]
 cache-rosetta-builder:
     #!/usr/bin/env bash
@@ -620,11 +620,19 @@ cache-rosetta-builder:
     echo "Pushing to Cachix (this may take a few minutes for ~2GB image)..."
     sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $IMAGE_PATH"
 
+    # Pin the image to prevent garbage collection
     echo ""
-    echo "✅ Successfully pushed nix-rosetta-builder to Cachix"
+    echo "Pinning image to prevent garbage collection..."
+    SHORT_HASH=$(echo "$IMAGE_PATH" | cut -d'/' -f4 | cut -d'-' -f1 | head -c8)
+    PIN_NAME="nix-rosetta-builder-$SHORT_HASH"
+    sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $IMAGE_PATH --keep-forever"
+
+    echo ""
+    echo "✅ Successfully pushed and pinned nix-rosetta-builder to Cachix"
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
     echo "   View at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "   Image: $IMAGE_PATH"
+    echo "   Pin: $PIN_NAME"
 
 # Check if nix-rosetta-builder image is in Cachix
 [group('CI/CD')]
