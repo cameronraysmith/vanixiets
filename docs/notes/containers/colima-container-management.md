@@ -58,6 +58,67 @@ incus exec test-container -- nixos-version
 incus delete test-container --force
 ```
 
+## Working alongside OrbStack
+
+Colima (with Incus runtime) works seamlessly alongside OrbStack's Docker runtime.
+Both tools use isolated state directories and separate sockets, allowing you to run Docker containers via OrbStack and system containers via Colima simultaneously.
+
+### Verify both tools work
+
+After initializing Colima, confirm both runtimes are operational:
+
+```bash
+# OrbStack Docker is still active
+docker ps
+docker context show  # Shows "orbstack"
+
+# Colima Incus is ready
+colima status
+incus list
+```
+
+### Using both simultaneously
+
+Run containers from both runtimes at the same time:
+
+```bash
+# Terminal 1: OrbStack Docker container
+docker run -it --rm alpine sh
+
+# Terminal 2: Colima Incus container
+incus launch images:alpine/edge colima-alpine
+incus exec colima-alpine -- sh
+```
+
+Both containers run concurrently without conflicts.
+
+### Tool selection guide
+
+| Use OrbStack when | Use Colima when |
+|-------------------|-----------------|
+| Docker Compose projects | System containers (full init) |
+| Standard OCI containers | NixOS/declarative containers |
+| Kubernetes workflows | Nested VMs (M3+ only) |
+| Docker Desktop compatibility | Testing different distros |
+
+### Managing Colima profiles
+
+Stop or remove Colima without affecting OrbStack:
+
+```bash
+# Stop Colima temporarily (OrbStack unaffected)
+colima stop
+
+# Restart later
+colima start
+
+# Remove profile completely (keeps binary installed)
+colima delete --profile default
+
+# Reinitialize if needed
+colima-init
+```
+
 ## Daily usage
 
 ### Starting and stopping
