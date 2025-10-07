@@ -1,5 +1,5 @@
 {
-  "name": "@typescript-nix-template/docs",
+  "name": "@nix-config/docs",
   "version": "0.0.0-development",
   "private": true,
   "description": "Documentation site built with Astro Starlight",
