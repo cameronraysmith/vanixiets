@@ -9,6 +9,7 @@
 {
   imports = [
     ./all/shell/zsh.nix
+    ./darwin-only/colima.nix
   ];
 
   # darwin-specific home-manager settings

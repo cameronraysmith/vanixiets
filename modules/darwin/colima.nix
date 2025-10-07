@@ -217,20 +217,8 @@ in
       };
     };
 
-    # Shell integration - completions at darwin level
-    programs.zsh.interactiveShellInit = lib.mkIf config.programs.zsh.enable ''
-      # Colima completions
-      if command -v colima &> /dev/null; then
-        eval "$(${pkgs.colima}/bin/colima completion zsh)"
-      fi
-    '';
-
-    programs.bash.interactiveShellInit = lib.mkIf config.programs.bash.enable ''
-      # Colima completions
-      if command -v colima &> /dev/null; then
-        eval "$(${pkgs.colima}/bin/colima completion bash)"
-      fi
-    '';
+    # Note: Shell completions are configured in home-manager
+    # See modules/home/darwin-only/colima.nix
 
     # Environment setup for Docker runtime
     environment.variables = lib.mkIf (cfg.runtime == "docker" || cfg.runtime == "containerd") {
