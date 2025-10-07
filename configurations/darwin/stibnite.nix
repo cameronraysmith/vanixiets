@@ -14,6 +14,7 @@ in
   imports = [
     self.darwinModules.default
     inputs.nix-rosetta-builder.darwinModules.default
+    self.darwinModules.colima
   ];
 
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -36,12 +37,32 @@ in
     diskSize = "100GiB";
   };
 
+  # Colima for OCI container management (complementary to nix-rosetta-builder)
+  services.colima = {
+    enable = true;
+    runtime = "incus";
+    profile = "default";
+    autoStart = false; # Manual control preferred
+
+    cpu = 4;
+    memory = 4;
+    disk = 60;
+
+    arch = "aarch64";
+    vmType = "vz"; # macOS Virtualization.framework
+    rosetta = true;
+    mountType = "virtiofs";
+
+    # Note: Incus CLI is available inside the VM, not needed on host
+    extraPackages = [ ];
+  };
+
   custom.homebrew = {
     enable = true;
     additionalCasks = [
       "codelayer-nightly"
       "dbeaver-community"
-      "docker-desktop"
+      # "docker-desktop" # Replaced by Colima for OCI container management
       "gpg-suite"
       "inkscape"
       "keycastr"
