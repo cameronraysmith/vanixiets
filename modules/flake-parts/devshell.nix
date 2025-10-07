@@ -27,7 +27,18 @@
           age
           ssh-to-age
           inputs'.agenix.packages.default
+
+          # TypeScript documentation tools
+          bun # JavaScript runtime and package manager
+          nodePackages.typescript # TypeScript compiler
+          playwright-driver.browsers # E2E testing browsers
         ];
+
+        shellHook = ''
+          # Playwright browser configuration
+          export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"
+          export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+        '';
       };
 
       pre-commit.settings = {
