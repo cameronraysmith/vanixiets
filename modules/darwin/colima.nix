@@ -26,13 +26,13 @@ let
     ${pkgs.colima}/bin/colima start \
       --profile "$PROFILE" \
       --runtime ${cfg.runtime} \
-      --cpu ${toString cfg.cpu} \
+      --cpus ${toString cfg.cpu} \
       --memory ${toString cfg.memory} \
       --disk ${toString cfg.disk} \
       --arch ${cfg.arch} \
       --vm-type ${cfg.vmType} \
       --mount-type ${cfg.mountType} \
-      ${lib.optionalString (cfg.rosetta && cfg.arch == "aarch64") "--rosetta"}
+      ${lib.optionalString (cfg.rosetta && cfg.arch == "aarch64") "--vz-rosetta"}
 
     echo ""
     echo "Colima initialized successfully!"
@@ -195,7 +195,7 @@ in
           cfg.profile
           "--runtime"
           cfg.runtime
-          "--cpu"
+          "--cpus"
           (toString cfg.cpu)
           "--memory"
           (toString cfg.memory)
@@ -208,7 +208,7 @@ in
           "--mount-type"
           cfg.mountType
         ]
-        ++ lib.optional (cfg.rosetta && cfg.arch == "aarch64") "--rosetta";
+        ++ lib.optional (cfg.rosetta && cfg.arch == "aarch64") "--vz-rosetta";
 
         RunAtLoad = true;
         KeepAlive = false; # Don't restart if Colima stops
