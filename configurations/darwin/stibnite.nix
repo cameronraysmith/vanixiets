@@ -69,6 +69,9 @@ in
       "meld"
       "postgres-unofficial"
     ];
+    additionalBrews = [
+      "incus" # Incus client for Colima incus runtime (not available in nixpkgs)
+    ];
     additionalMasApps = {
       save-to-raindrop-io = 1549370672;
     };
