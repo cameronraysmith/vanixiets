@@ -1,0 +1,99 @@
+---
+title: typescript-nix-template
+description: TypeScript monorepo template with Nix, Bun, and semantic-release automation
+template: splash
+hero:
+  tagline: Production-ready TypeScript monorepo with Nix development environments, Bun workspaces, and automated semantic versioning
+  image:
+    file: ../../assets/houston.webp
+  actions:
+    - text: Getting started
+      link: /guides/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/sciexp/typescript-nix-template
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+## Features
+
+<CardGrid stagger>
+  <Card title="Nix development environments" icon="puzzle">
+    Reproducible development environments with all tools managed by Nix flakes.
+    No manual installation needed.
+  </Card>
+  <Card title="Bun workspaces" icon="rocket">
+    Fast monorepo package management with Bun workspaces.
+    Shared dependencies and efficient builds.
+  </Card>
+  <Card title="Automated versioning" icon="approve-check">
+    Semantic-release automation with conventional commits.
+    Automated changelog generation and GitHub releases.
+  </Card>
+  <Card title="Comprehensive testing" icon="magnifier">
+    Vitest for unit tests, Playwright for E2E.
+    Type-safe testing patterns throughout.
+  </Card>
+  <Card title="CI/CD ready" icon="github">
+    GitHub Actions workflows for testing and deployment.
+    Cloudflare Workers deployment included.
+  </Card>
+  <Card title="Secrets management" icon="lock">
+    SOPS with age encryption for secure secrets.
+    Git-committed encrypted secrets with key rotation support.
+  </Card>
+</CardGrid>
+
+## Quick start
+
+```bash
+# Clone and setup
+git clone https://github.com/sciexp/typescript-nix-template.git
+cd typescript-nix-template
+nix develop
+bun install
+
+# Start development
+just dev
+```
+
+See [Getting started guide](/guides/getting-started/) for complete setup instructions.
+
+## Using as a template
+
+This repository serves dual purposes:
+
+1. **Working deployment** - Live example at ts-nix.scientistexperience.net
+2. **Forkable template** - Starting point for your TypeScript projects
+
+See [Template usage guide](/guides/template-usage/) for customization instructions.
+
+## Documentation structure
+
+- **Guides** - Step-by-step instructions for common tasks
+- **Reference** - Technical details and architecture decisions
+
+## Next steps
+
+<CardGrid>
+  <Card title="Set up CI/CD" icon="github">
+    Configure GitHub Actions for automated testing and deployment.
+    [CI/CD setup guide →](/guides/ci-cd-setup/)
+  </Card>
+  <Card title="Configure secrets" icon="lock">
+    Set up SOPS for encrypted secrets management.
+    [Secrets management guide →](/guides/secrets-management/)
+  </Card>
+  <Card title="Add tests" icon="magnifier">
+    Learn the testing stack and patterns.
+    [Testing guide →](/guides/testing/)
+  </Card>
+  <Card title="Understand architecture" icon="open-book">
+    Read about key design decisions and rationale.
+    [Architecture decisions →](/reference/architecture/)
+  </Card>
+</CardGrid>
