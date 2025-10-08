@@ -37,7 +37,7 @@ runs:
   steps:
     - name: reclaim space (linux)
       if: runner.os == 'Linux'
-      uses: wimpysworld/nothing-but-nix@main
+      uses: wimpysworld/nothing-but-nix@10c936d9e46521bf923f75458e0cbd4fa309300d # ratchet:wimpysworld/nothing-but-nix@main
       with:
         hatchet-protocol: carve
         nix-permission-edict: true
@@ -69,7 +69,7 @@ runs:
           /Users/runner/hostedtoolcache &
 
     - name: install nix
-      uses: nixbuild/nix-quick-install-action@v34
+      uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # ratchet:nixbuild/nix-quick-install-action@v34
       with:
         nix_conf: |
           sandbox = ${{ inputs.sandbox }}
@@ -80,7 +80,7 @@ runs:
     - name: setup cache
       if: runner.os == 'Linux'
       id: cache
-      uses: nix-community/cache-nix-action@v6
+      uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a # ratchet:nix-community/cache-nix-action@v6
       with:
         primary-key: ${{ inputs.cache-key != '' && inputs.cache-key || format('nix-{0}-{1}', runner.os, hashFiles('**/*.nix', '**/flake.lock')) }}
         restore-prefixes-first-match: ${{ format('nix-{0}-', runner.os) }}
@@ -94,7 +94,7 @@ runs:
 
     - name: post setup-nix
       if: runner.os == 'macOS'
-      uses: srz-zumix/post-run-action@v2
+      uses: srz-zumix/post-run-action@2bf288bc024acd0341914f792a811080ebd0f252 # ratchet:srz-zumix/post-run-action@v2
       with:
         shell: bash -e {0}
         post-run: |
