@@ -8,49 +8,59 @@ let
   cfg = config.services.colima;
 
   # Helper script to initialize Colima with configured settings
-  colima-init = pkgs.writeShellScriptBin "colima-init" ''
-    set -e
+  colima-init = pkgs.writeShellApplication {
+    name = "colima-init";
+    runtimeInputs = [ pkgs.colima ];
+    text = ''
+      PROFILE="${cfg.profile}"
 
-    PROFILE="${cfg.profile}"
+      echo "Initializing Colima profile: $PROFILE"
+      echo "Runtime: ${cfg.runtime}"
+      echo "CPU: ${toString cfg.cpu} cores"
+      echo "Memory: ${toString cfg.memory} GiB"
+      echo "Disk: ${toString cfg.disk} GiB"
+      echo "Architecture: ${cfg.arch}"
+      echo "VM Type: ${cfg.vmType}"
+      echo "Mount Type: ${cfg.mountType}"
+      echo ""
 
-    echo "Initializing Colima profile: $PROFILE"
-    echo "Runtime: ${cfg.runtime}"
-    echo "CPU: ${toString cfg.cpu} cores"
-    echo "Memory: ${toString cfg.memory} GiB"
-    echo "Disk: ${toString cfg.disk} GiB"
-    echo "Architecture: ${cfg.arch}"
-    echo "VM Type: ${cfg.vmType}"
-    echo "Mount Type: ${cfg.mountType}"
-    echo ""
+      colima start \
+        --profile "$PROFILE" \
+        --runtime ${cfg.runtime} \
+        --cpus ${toString cfg.cpu} \
+        --memory ${toString cfg.memory} \
+        --disk ${toString cfg.disk} \
+        --arch ${cfg.arch} \
+        --vm-type ${cfg.vmType} \
+        --mount-type ${cfg.mountType} \
+        ${lib.optionalString (cfg.rosetta && cfg.arch == "aarch64") "--vz-rosetta"}
 
-    ${pkgs.colima}/bin/colima start \
-      --profile "$PROFILE" \
-      --runtime ${cfg.runtime} \
-      --cpus ${toString cfg.cpu} \
-      --memory ${toString cfg.memory} \
-      --disk ${toString cfg.disk} \
-      --arch ${cfg.arch} \
-      --vm-type ${cfg.vmType} \
-      --mount-type ${cfg.mountType} \
-      ${lib.optionalString (cfg.rosetta && cfg.arch == "aarch64") "--vz-rosetta"}
-
-    echo ""
-    echo "Colima initialized successfully!"
-    echo "Profile: $PROFILE"
-    echo "Status:"
-    ${pkgs.colima}/bin/colima status --profile "$PROFILE"
-  '';
+      echo ""
+      echo "Colima initialized successfully!"
+      echo "Profile: $PROFILE"
+      echo "Status:"
+      colima status --profile "$PROFILE"
+    '';
+  };
 
   # Helper script to stop Colima
-  colima-stop = pkgs.writeShellScriptBin "colima-stop" ''
-    ${pkgs.colima}/bin/colima stop --profile "${cfg.profile}"
-  '';
+  colima-stop = pkgs.writeShellApplication {
+    name = "colima-stop";
+    runtimeInputs = [ pkgs.colima ];
+    text = ''
+      colima stop --profile "${cfg.profile}"
+    '';
+  };
 
   # Helper script to restart Colima
-  colima-restart = pkgs.writeShellScriptBin "colima-restart" ''
-    echo "Restarting Colima profile: ${cfg.profile}"
-    ${pkgs.colima}/bin/colima restart --profile "${cfg.profile}"
-  '';
+  colima-restart = pkgs.writeShellApplication {
+    name = "colima-restart";
+    runtimeInputs = [ pkgs.colima ];
+    text = ''
+      echo "Restarting Colima profile: ${cfg.profile}"
+      colima restart --profile "${cfg.profile}"
+    '';
+  };
 
 in
 {
