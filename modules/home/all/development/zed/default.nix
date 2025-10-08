@@ -32,6 +32,10 @@
     # ]
 
     userSettings = {
+      # Disable AI features to prevent .git/info/exclude pollution from checkpoints
+      # See: zed 38391
+      disable_ai = true;
+
       vim_mode = true;
       base_keymap = "VSCode";
       soft_wrap = "editor_width";
