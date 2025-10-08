@@ -1,51 +1,80 @@
 keys:
-  # admin recovery key
-  - &admin age1vy7wsnf8eg5229evq3ywup285jzk9cntsx5hhddjtwsjh0kf4c6s9fmalv
-  
-  # user key conventionally stored in
-  # ~/.config/sops/age/keys.txt
-  # "$HOME/Library/Application Support/sops/age/keys.txt"
-  - &crs58 age1whsxa8rlfm8c9hgjc2yafq5dvuvkz58pfd85nyuzdcjndufgfucs7ll3ke
-  
-  # Host key (from ssh-to-age)
-  # cat /etc/ssh/ssh_host_ed25519_key.pub | ssh-to-age
-  - &stibnite age18rgyca7ptr6djqn5h7rhgu4yuv9258v5wflg7tefgvxr06nz7cgsw7qgmy
-  # Generated age key for orb-nixos at /var/lib/sops-nix/key.txt
-  - &orb-nixos age1609ngcyxj8x5fyjkdctkzxdws9e38yy28l88lvs0echtv0kdy5aslcqm3w
+  # Repository-specific keys (working on nix-config source)
+  - &dev age1js028xag70wpwpp47elpq50mjjv7zn7sxuwuhk8yltkjzqzdvq5qq8w8cy      # from sops-dev-ssh in Bitwarden
+  - &ci age1ldx73kk4kvl3mycjdhngxrrv69wn7cvhreqwzl0gphuftnj5pulqaprgel        # from sops-ci-ssh in Bitwarden
 
-creation_rules: 
+  # Admin recovery key (offline, not in Bitwarden)
+  - &admin age1vy7wsnf8eg5229evq3ywup285jzk9cntsx5hhddjtwsjh0kf4c6s9fmalv
+
+  # User identity keys (from config.nix)
+  - &admin-user age198vjfvz54ua9q4tm0jd9jhnrgfe92j08mwc3vhlcwmqxmp2kjvgqaj8lw5  # from sops-admin-user-ssh (cameron/crs58/runner/jovyan)
+  - &raquel-user age12w0rmmskrds6m334w7qrcmpms5lpe3llah6wf8ry5jtatvuxku2sarl8ut  # from sops-raquel-user-ssh (raquel)
+
+  # Host keys (generated in Bitwarden, deployed to /etc/ssh/)
+  - &stibnite age1a696klqy0s36a2pzlk6kyckp60k88qxcrsdh829dtk3xtc7sfs4scg05k0     # from sops-stibnite-ssh
+  - &blackphos age1ez8lkukzdjn8vqj8ly4k5y9eql5gz00mwyz3h2qhkh5m5tdzmc3swxkmdq   # from sops-blackphos-ssh
+  - &orb-nixos age140evke8tz6a8k8h04rqfxvxvzkkz5wc9femda0xthwzlk227dpwqsl7zfc   # from sops-orb-nixos-ssh
+
+creation_rules:
+  # User-specific secrets
   - path_regex: users/crs58/.*\.yaml$
     key_groups:
       - age:
         - *admin
-        - *crs58
+        - *dev
+        - *admin-user
+
+  - path_regex: users/raquel/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *raquel-user
+
+  # Host-specific secrets
+  - path_regex: hosts/stibnite/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *admin-user
+        - *stibnite
+
+  - path_regex: hosts/blackphos/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *admin-user
+        - *blackphos
 
   - path_regex: hosts/orb-nixos/.*\.yaml$
     key_groups:
       - age:
         - *admin
-        - *crs58
+        - *dev
+        - *admin-user
         - *orb-nixos
-  
-  - path_regex: hosts/stibnite/.*\.yaml$
-    key_groups:
-      - age:
-        - *admin
-        - *crs58
-        - *stibnite
-  
-  - path_regex: services/.*\.yaml$
-    key_groups:
-      - age:
-        - *admin
-        - *crs58
-        - *orb-nixos
-        - *stibnite
 
+  # Shared secrets (services/, shared.yaml) - all hosts + CI for deployment
+  - path_regex: (services/.*\.yaml$|shared\.yaml$)
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *ci
+        - *admin-user
+        - *stibnite
+        - *blackphos
+        - *orb-nixos
+
+  # Fallback
   - path_regex: .*\.yaml$
     key_groups:
       - age:
         - *admin
-        - *crs58
-        - *orb-nixos
+        - *dev
+        - *admin-user
         - *stibnite
+        - *blackphos
+        - *orb-nixos
