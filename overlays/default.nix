@@ -11,10 +11,7 @@ let
       inherit directory;
     };
 
-  allPackages = fromDirectory ./packages;
-
-  # filter out debug packages
-  packageOverrides = lib.filterAttrs (name: _value: !(lib.hasSuffix "Debug" name)) allPackages;
+  packageOverrides = fromDirectory ./packages;
 in
 packageOverrides
 // {
