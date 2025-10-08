@@ -805,20 +805,42 @@ cache-linux-package package:
     # Build for aarch64-linux with watch-exec
     if [[ "$AARCH64_CACHED" != true ]]; then
         echo "Building for aarch64-linux..."
-        sops exec-env secrets/shared.yaml \
-            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.aarch64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0"
-        AARCH64_PATH=$(nix eval --raw .#packages.aarch64-linux.$PACKAGE.outPath)
-        echo "✓ Built and pushed: $AARCH64_PATH"
+        AARCH64_PATH=$(sops exec-env secrets/shared.yaml \
+            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.aarch64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0" | tail -1)
+
+        # Explicitly push the path and all its runtime dependencies
+        echo "Pushing $AARCH64_PATH and dependencies to cachix..."
+        nix-store --query --requisites --include-outputs "$AARCH64_PATH" | \
+            sops exec-env secrets/shared.yaml "xargs cachix push \$CACHIX_CACHE_NAME"
+
+        # Verify push succeeded
+        echo "Verifying $AARCH64_PATH is in cachix..."
+        if nix path-info --store "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH" &>/dev/null; then
+            echo "✓ Verified in cache: $AARCH64_PATH"
+        else
+            echo "⚠ Warning: Failed to verify path in cache, but push may still have succeeded"
+        fi
         echo ""
     fi
 
     # Build for x86_64-linux with watch-exec
     if [[ "$X86_64_CACHED" != true ]]; then
         echo "Building for x86_64-linux..."
-        sops exec-env secrets/shared.yaml \
-            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.x86_64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0"
-        X86_64_PATH=$(nix eval --raw .#packages.x86_64-linux.$PACKAGE.outPath)
-        echo "✓ Built and pushed: $X86_64_PATH"
+        X86_64_PATH=$(sops exec-env secrets/shared.yaml \
+            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.x86_64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0" | tail -1)
+
+        # Explicitly push the path and all its runtime dependencies
+        echo "Pushing $X86_64_PATH and dependencies to cachix..."
+        nix-store --query --requisites --include-outputs "$X86_64_PATH" | \
+            sops exec-env secrets/shared.yaml "xargs cachix push \$CACHIX_CACHE_NAME"
+
+        # Verify push succeeded
+        echo "Verifying $X86_64_PATH is in cachix..."
+        if nix path-info --store "https://$CACHE_NAME.cachix.org" "$X86_64_PATH" &>/dev/null; then
+            echo "✓ Verified in cache: $X86_64_PATH"
+        else
+            echo "⚠ Warning: Failed to verify path in cache, but push may still have succeeded"
+        fi
     fi
 
     # Summary
