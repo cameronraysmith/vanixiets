@@ -78,6 +78,7 @@ runs:
           keep-outputs = true
 
     - name: setup cache
+      if: runner.os == 'Linux'
       id: cache
       uses: nix-community/cache-nix-action@v6
       with:
