@@ -39,7 +39,8 @@ runs:
       if: runner.os == 'Linux'
       uses: wimpysworld/nothing-but-nix@main
       with:
-        hatchet-protocol: rampage
+        hatchet-protocol: carve
+        nix-permission-edict: true
 
     - name: reclaim space (darwin)
       if: runner.os == 'macOS'
@@ -71,15 +72,10 @@ runs:
       uses: nixbuild/nix-quick-install-action@v34
       with:
         nix_conf: |
-          build-dir = /nix/build
           sandbox = ${{ inputs.sandbox }}
           system = ${{ inputs.system }}
           keep-env-derivations = true
           keep-outputs = true
-
-    - name: create build-dir
-      shell: bash
-      run: sudo mkdir -p /nix/build
 
     - name: setup cache
       id: cache
