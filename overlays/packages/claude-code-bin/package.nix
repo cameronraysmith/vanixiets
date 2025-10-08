@@ -75,7 +75,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
         )
       }'
     )"
-    echo "$output" > "packages/claude-code-bin/manifest.json"
+    echo "$output" > "overlays/packages/claude-code-bin/manifest.json"
   '';
 
   meta = {
