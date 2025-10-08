@@ -813,12 +813,14 @@ cache-linux-package package:
         nix-store --query --requisites --include-outputs "$AARCH64_PATH" | \
             sops exec-env secrets/shared.yaml "xargs cachix push \$CACHIX_CACHE_NAME"
 
-        # Verify push succeeded
-        echo "Verifying $AARCH64_PATH is in cachix..."
-        if nix path-info --store "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH" &>/dev/null; then
-            echo "✓ Verified in cache: $AARCH64_PATH"
+        # Pin the path to prevent garbage collection and verify it exists
+        PIN_NAME="${PACKAGE}-aarch64-linux"
+        echo "Pinning $AARCH64_PATH as '$PIN_NAME'..."
+        if sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $AARCH64_PATH"; then
+            echo "✓ Pinned and verified in cache: $AARCH64_PATH"
         else
-            echo "⚠ Warning: Failed to verify path in cache, but push may still have succeeded"
+            echo "✗ Failed to pin path - it may not be in cache yet"
+            exit 1
         fi
         echo ""
     fi
@@ -834,12 +836,14 @@ cache-linux-package package:
         nix-store --query --requisites --include-outputs "$X86_64_PATH" | \
             sops exec-env secrets/shared.yaml "xargs cachix push \$CACHIX_CACHE_NAME"
 
-        # Verify push succeeded
-        echo "Verifying $X86_64_PATH is in cachix..."
-        if nix path-info --store "https://$CACHE_NAME.cachix.org" "$X86_64_PATH" &>/dev/null; then
-            echo "✓ Verified in cache: $X86_64_PATH"
+        # Pin the path to prevent garbage collection and verify it exists
+        PIN_NAME="${PACKAGE}-x86_64-linux"
+        echo "Pinning $X86_64_PATH as '$PIN_NAME'..."
+        if sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $X86_64_PATH"; then
+            echo "✓ Pinned and verified in cache: $X86_64_PATH"
         else
-            echo "⚠ Warning: Failed to verify path in cache, but push may still have succeeded"
+            echo "✗ Failed to pin path - it may not be in cache yet"
+            exit 1
         fi
     fi
 
