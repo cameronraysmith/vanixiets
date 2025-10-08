@@ -22,7 +22,7 @@ in
 
   system.primaryUser = adminUser.username;
 
-  # Bootstrap step 1 complete: linux-builder was used to build nix-rosetta-builder VM
+  # Bootstrap step 1 complete: linux-builder is used to build nix-rosetta-builder VM
   # Now disabled in favor of nix-rosetta-builder
   # See: docs/notes/containers/multi-arch-container-builds.md
   nix.linux-builder.enable = false;
@@ -32,9 +32,9 @@ in
     enable = true;
     onDemand = true; # VM powers off when idle to save resources
     permitNonRootSshAccess = true; # Allow nix-daemon to read SSH key (safe for localhost-only VM)
-    cores = 8;
-    memory = "6GiB";
-    diskSize = "100GiB";
+    cores = 12;
+    memory = "48GiB";
+    diskSize = "500GiB";
   };
 
   # Colima for OCI container management (complementary to nix-rosetta-builder)
@@ -44,16 +44,15 @@ in
     profile = "default";
     autoStart = false; # Manual control preferred
 
-    cpu = 4;
-    memory = 4;
-    disk = 60;
+    cpu = 12;
+    memory = 48;
+    disk = 500;
 
     arch = "aarch64";
     vmType = "vz"; # macOS Virtualization.framework
     rosetta = true;
     mountType = "virtiofs";
 
-    # Note: Incus CLI is available inside the VM, not needed on host
     extraPackages = [ ];
   };
 
