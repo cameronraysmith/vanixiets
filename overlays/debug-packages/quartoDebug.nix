@@ -115,6 +115,5 @@ stdenv.mkDerivation rec {
       binaryNativeCode
       binaryBytecode
     ];
-    broken = true;
   };
 }

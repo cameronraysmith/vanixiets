@@ -54,6 +54,5 @@ python3Packages.buildPythonApplication rec {
     homepage = "https://github.com/conda/conda-lock";
     license = licenses.mit;
     maintainers = with maintainers; [ cameronraysmith ];
-    broken = true;
   };
 }

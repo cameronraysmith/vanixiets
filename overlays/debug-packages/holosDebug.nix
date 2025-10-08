@@ -45,6 +45,5 @@ buildGoModule rec {
     license = licenses.asl20;
     maintainers = with maintainers; [ cameronraysmith ];
     mainProgram = "holos";
-    broken = true;
   };
 }
