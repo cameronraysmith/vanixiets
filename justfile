@@ -670,6 +670,13 @@ ratchet-update:
     eval "{{ratchet_base}} update $workflow"; \
   done
 
+# Upgrade GitHub Actions workflows across major versions (requires careful review)
+[group('CI/CD')]
+ratchet-upgrade:
+  @for workflow in {{gha_workflows}}; do \
+    eval "{{ratchet_base}} upgrade $workflow"; \
+  done
+
 # Push nix-rosetta-builder VM image to Cachix and pin it (run after system updates)
 [group('CI/CD')]
 cache-rosetta-builder:
