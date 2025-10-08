@@ -25,7 +25,7 @@ get_age_key() {
   local ssh_pub
   local age_pub
 
-  ssh_pub=$(bw get item "$bw_name" | jq -r '.login.username')
+  ssh_pub=$(bw get item "$bw_name" | jq -r '.sshKey.publicKey')
   age_pub=$(echo "$ssh_pub" | ssh-to-age)
 
   # Validate format
