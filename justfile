@@ -4,6 +4,7 @@
 
 ## nix
 ## secrets
+## sops
 ## CI/CD
 
 # Default command when 'just' is run without arguments
@@ -884,3 +885,70 @@ test-cachix:
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
     echo "✅ Push completed. Verify at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "Store path: $STORE_PATH"
+
+## sops
+
+# Extract key details from Bitwarden (all sops-* keys or specific key)
+[group('sops')]
+sops-extract-keys key="":
+  #!/usr/bin/env bash
+  if [ -n "{{key}}" ]; then
+    scripts/sops/extract-key-details.sh "{{key}}"
+  else
+    scripts/sops/extract-key-details.sh
+  fi
+
+# Update .sops.yaml with keys from Bitwarden
+[group('sops')]
+sops-update-yaml:
+  @scripts/sops/update-sops-yaml.sh
+
+# Deploy host key from Bitwarden to /etc/ssh/ (requires sudo)
+[group('sops')]
+sops-deploy-host-key host:
+  @scripts/sops/deploy-host-key.sh {{host}}
+
+# Validate all SOPS key correspondences (config.nix ↔ Bitwarden ↔ .sops.yaml)
+[group('sops')]
+sops-validate-correspondences:
+  @scripts/sops/validate-correspondences.sh
+
+# Regenerate ~/.config/sops/age/keys.txt from Bitwarden
+[group('sops')]
+sops-sync-keys *FLAGS:
+  @scripts/sops/sync-age-keys.sh {{FLAGS}}
+
+# Full key rotation workflow (interactive)
+[group('sops')]
+sops-rotate:
+  @echo "=== SOPS Key Rotation Workflow ==="
+  @echo ""
+  @echo "Prerequisites:"
+  @echo "  1. Generate new SSH keys in Bitwarden Web UI:"
+  @echo "     - sops-dev-ssh, sops-ci-ssh (repository keys)"
+  @echo "     - sops-admin-user-ssh, sops-raquel-user-ssh (user identity keys)"
+  @echo "     - sops-{hostname}-ssh for each host (host keys)"
+  @echo "  2. Ensure Bitwarden CLI is unlocked: export BW_SESSION=\$(bw unlock --raw)"
+  @echo ""
+  @echo "Press Enter to continue or Ctrl-C to abort..."
+  @read
+  @echo ""
+  @echo "Step 1: Extracting and validating keys from Bitwarden..."
+  @just sops-extract-keys
+  @echo ""
+  @echo "Step 2: Updating .sops.yaml..."
+  @just sops-update-yaml
+  @echo ""
+  @echo "Step 3: Re-encrypting secrets..."
+  @find secrets/ -name "*.yaml" -type f -exec sops updatekeys {} \;
+  @echo ""
+  @echo "Step 4: Validating correspondences..."
+  @just sops-validate-correspondences
+  @echo ""
+  @echo "=== Manual steps remaining ==="
+  @echo "1. Deploy host keys: just sops-deploy-host-key <hostname>"
+  @echo "2. Update GitHub CI secret: gh secret set SOPS_AGE_KEY --repo=\$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+  @echo "3. Test decryption: sops -d secrets/shared.yaml"
+  @echo "4. Commit and push changes"
+  @echo "5. Verify CI pipeline passes"
+
