@@ -761,12 +761,13 @@ check-rosetta-cache:
         exit 1
     fi
 
-# Build bitwarden-cli for Linux architectures and push to cachix to avoid CI disk space issues
+# Build a package for Linux architectures and push to cachix to avoid CI disk space issues
 [group('CI/CD')]
-cache-bitwarden-linux:
+cache-linux-package package:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "Building bitwarden-cli for Linux architectures using rosetta-builder..."
+    PACKAGE="{{ package }}"
+    echo "Building $PACKAGE for Linux architectures using rosetta-builder..."
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
     echo "Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo ""
@@ -776,14 +777,14 @@ cache-bitwarden-linux:
     AARCH64_CACHED=false
     X86_64_CACHED=false
 
-    if nix path-info --store "https://$CACHE_NAME.cachix.org" .#packages.aarch64-linux.bitwarden-cli &>/dev/null; then
+    if nix path-info --store "https://$CACHE_NAME.cachix.org" .#packages.aarch64-linux.$PACKAGE &>/dev/null; then
         echo "✓ aarch64-linux: Already in cache"
         AARCH64_CACHED=true
     else
         echo "  aarch64-linux: Need to build"
     fi
 
-    if nix path-info --store "https://$CACHE_NAME.cachix.org" .#packages.x86_64-linux.bitwarden-cli &>/dev/null; then
+    if nix path-info --store "https://$CACHE_NAME.cachix.org" .#packages.x86_64-linux.$PACKAGE &>/dev/null; then
         echo "✓ x86_64-linux: Already in cache"
         X86_64_CACHED=true
     else
@@ -797,7 +798,7 @@ cache-bitwarden-linux:
     fi
 
     echo ""
-    echo "Building and pushing to cachix (this may take 15-30 minutes)..."
+    echo "Building and pushing to cachix (this may take 15-30 minutes for large packages)..."
     echo "Using cachix watch-exec to push store paths as they're built..."
     echo ""
 
@@ -805,8 +806,8 @@ cache-bitwarden-linux:
     if [[ "$AARCH64_CACHED" != true ]]; then
         echo "Building for aarch64-linux..."
         sops exec-env secrets/shared.yaml \
-            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nix build .#packages.aarch64-linux.bitwarden-cli --no-link --print-out-paths --max-jobs 0"
-        AARCH64_PATH=$(nix eval --raw .#packages.aarch64-linux.bitwarden-cli.outPath)
+            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nix build .#packages.aarch64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0"
+        AARCH64_PATH=$(nix eval --raw .#packages.aarch64-linux.$PACKAGE.outPath)
         echo "✓ Built and pushed: $AARCH64_PATH"
         echo ""
     fi
@@ -815,17 +816,21 @@ cache-bitwarden-linux:
     if [[ "$X86_64_CACHED" != true ]]; then
         echo "Building for x86_64-linux..."
         sops exec-env secrets/shared.yaml \
-            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nix build .#packages.x86_64-linux.bitwarden-cli --no-link --print-out-paths --max-jobs 0"
-        X86_64_PATH=$(nix eval --raw .#packages.x86_64-linux.bitwarden-cli.outPath)
+            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nix build .#packages.x86_64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0"
+        X86_64_PATH=$(nix eval --raw .#packages.x86_64-linux.$PACKAGE.outPath)
         echo "✓ Built and pushed: $X86_64_PATH"
     fi
 
     # Summary
     echo ""
-    echo "✅ Successfully built and cached bitwarden-cli for Linux architectures"
+    echo "✅ Successfully built and cached $PACKAGE for Linux architectures"
     echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo ""
     echo "CI will now fetch from cachix instead of building, avoiding disk space issues."
+
+# Build bitwarden-cli for Linux architectures (convenience wrapper)
+[group('CI/CD')]
+cache-bitwarden-linux: (cache-linux-package "bitwarden-cli")
 
 # Test cachix push/pull with a simple derivation
 [group('CI/CD')]
