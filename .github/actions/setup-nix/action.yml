@@ -16,13 +16,13 @@ inputs:
     required: false
     default: ""
   gc-max-store-size-linux:
-    description: max nix store size on linux before garbage collection (e.g., 1G, 2G)
+    description: max nix store size on linux before garbage collection (e.g., 5G, 10G)
     type: string
-    default: "1G"
+    default: "5G"
   gc-max-store-size-macos:
-    description: max nix store size on macos before garbage collection (e.g., 2G, 3G)
+    description: max nix store size on macos before garbage collection (e.g., 5G, 10G)
     type: string
-    default: "2G"
+    default: "5G"
 
 outputs:
   cache-hit:
