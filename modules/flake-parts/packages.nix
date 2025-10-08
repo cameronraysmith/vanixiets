@@ -4,7 +4,7 @@
     { pkgs, system, ... }:
     let
       # read .nix files from packages directory
-      packagesDir = self + /packages;
+      packagesDir = self + /overlays/packages;
       packageFiles = builtins.readDir packagesDir;
 
       # extract package names from files (remove .nix extension) and directories
