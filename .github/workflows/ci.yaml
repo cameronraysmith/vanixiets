@@ -38,7 +38,7 @@ jobs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
       - id: skip_check
-        uses: fkirc/skip-duplicate-actions@v5
+        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # ratchet:fkirc/skip-duplicate-actions@v5
         with:
           skip_after_successful_duplicate: 'true'
           do_not_skip: '["schedule"]'
@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
 
       - name: run make bootstrap
         run: make bootstrap
@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
 
       - name: setup nix
         uses: ./.github/actions/setup-nix
@@ -115,7 +115,7 @@ jobs:
           system: x86_64-linux
 
       - name: setup cachix
-        uses: cachix/cachix-action@v16
+        uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # ratchet:cachix/cachix-action@v16
         continue-on-error: true
         with:
           name: ${{ env.CACHIX_BINARY_CACHE }}
@@ -168,7 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
 
       - name: setup nix
         uses: ./.github/actions/setup-nix
@@ -176,7 +176,7 @@ jobs:
           system: x86_64-linux
 
       - name: setup cachix
-        uses: cachix/cachix-action@v16
+        uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # ratchet:cachix/cachix-action@v16
         continue-on-error: true
         with:
           name: ${{ env.CACHIX_BINARY_CACHE }}
@@ -235,7 +235,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
 
       - name: setup nix
         uses: ./.github/actions/setup-nix
@@ -243,7 +243,7 @@ jobs:
           system: x86_64-linux
 
       - name: setup cachix
-        uses: cachix/cachix-action@v16
+        uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # ratchet:cachix/cachix-action@v16
         continue-on-error: true
         with:
           name: ${{ env.CACHIX_BINARY_CACHE }}
@@ -310,7 +310,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
 
       - name: setup nix
         uses: ./.github/actions/setup-nix
@@ -318,7 +318,7 @@ jobs:
           system: x86_64-linux
 
       - name: setup cachix
-        uses: cachix/cachix-action@v16
+        uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # ratchet:cachix/cachix-action@v16
         continue-on-error: true
         with:
           name: ${{ env.CACHIX_BINARY_CACHE }}
@@ -374,11 +374,11 @@ jobs:
        inputs.job == '' ||
        inputs.job == 'nix')
     strategy:
-      fail-fast: false  # allow each system to test independently
+      fail-fast: false # allow each system to test independently
       matrix:
         system:
-          - x86_64-linux    # standard linux (ubuntu-latest)
-          - aarch64-linux   # arm linux (ubuntu-24.04-arm)
+          - x86_64-linux # standard linux (ubuntu-latest)
+          - aarch64-linux # arm linux (ubuntu-24.04-arm)
           # - aarch64-darwin  # apple silicon macOS (macos-latest)
     # dynamic runner selection based on system architecture
     runs-on: >-
@@ -387,7 +387,7 @@ jobs:
       || (matrix.system == 'aarch64-darwin' && 'macos-latest') }}
     steps:
       - name: checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
 
       - name: setup nix
         uses: ./.github/actions/setup-nix
@@ -395,7 +395,7 @@ jobs:
           system: ${{ matrix.system }}
 
       - name: setup cachix
-        uses: cachix/cachix-action@v16
+        uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # ratchet:cachix/cachix-action@v16
         continue-on-error: true
         with:
           name: ${{ env.CACHIX_BINARY_CACHE }}
@@ -428,7 +428,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
 
       - name: setup nix
         uses: ./.github/actions/setup-nix
@@ -436,7 +436,7 @@ jobs:
           system: x86_64-linux
 
       - name: setup cachix
-        uses: cachix/cachix-action@v16
+        uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # ratchet:cachix/cachix-action@v16
         continue-on-error: true
         with:
           name: ${{ env.CACHIX_BINARY_CACHE }}
@@ -456,7 +456,7 @@ jobs:
 
       - name: upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
         with:
           name: docs-playwright-report
           path: packages/docs/playwright-report/
@@ -464,7 +464,7 @@ jobs:
 
       - name: upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
         with:
           name: docs-coverage
           path: packages/docs/coverage/
@@ -483,7 +483,7 @@ jobs:
       url: https://docs.example.com
     steps:
       - name: checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
 
       - name: setup nix
         uses: ./.github/actions/setup-nix
