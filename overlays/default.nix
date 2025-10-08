@@ -5,16 +5,21 @@ let
   inherit (inputs) self;
   packages = self + /packages;
 in
-self: super: {
-  # conda-lock = self.callPackage "${packages}/conda-lock.nix" { };
-  # holos = self.callPackage "${packages}/holos.nix" { };
-  bitwarden-cli = self.callPackage "${packages}/bitwarden-cli" { };
-  cc-statusline-rs = self.callPackage "${packages}/cc-statusline-rs.nix" { };
-  claude-code-bin = self.callPackage "${packages}/claude-code-bin" { };
-  markdown-tree-parser = self.callPackage "${packages}/markdown-tree-parser.nix" { };
+self: super:
+let
+  inherit (super) lib;
+
+  fromDirectory =
+    directory:
+    lib.packagesFromDirectoryRecursive {
+      callPackage = lib.callPackageWith self;
+      inherit directory;
+    };
+
+  packageOverrides = fromDirectory packages;
+in
+packageOverrides
+// {
+  # Additional overrides
   # omnix = inputs.omnix.packages.${self.system}.default;
-  # quarto = self.callPackage "${packages}/quarto.nix" { };
-  # star = self.callPackage "${packages}/star.nix" { };
-  starship-jj = self.callPackage "${packages}/starship-jj.nix" { };
-  # teller = self.callPackage "${packages}/teller.nix" { };
 }
