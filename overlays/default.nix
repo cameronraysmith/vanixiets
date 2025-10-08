@@ -8,6 +8,7 @@ in
 self: super: {
   # conda-lock = self.callPackage "${packages}/conda-lock.nix" { };
   # holos = self.callPackage "${packages}/holos.nix" { };
+  bitwarden-cli = self.callPackage "${packages}/bitwarden-cli" { };
   cc-statusline-rs = self.callPackage "${packages}/cc-statusline-rs.nix" { };
   claude-code-bin = self.callPackage "${packages}/claude-code-bin" { };
   markdown-tree-parser = self.callPackage "${packages}/markdown-tree-parser.nix" { };
