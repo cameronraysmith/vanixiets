@@ -115,7 +115,7 @@ in
       # sec
       age
       aws-vault
-      # bitwarden-cli <- see bw alias
+      bitwarden-cli
       # bitwarden-desktop <- via homebrew MAS on Darwin
       bws
       libfido2
