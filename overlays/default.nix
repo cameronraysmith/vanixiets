@@ -1,10 +1,5 @@
 { flake, ... }:
 
-let
-  inherit (flake) inputs;
-  inherit (inputs) self;
-  packages = self + /packages;
-in
 self: super:
 let
   inherit (super) lib;
@@ -16,7 +11,7 @@ let
       inherit directory;
     };
 
-  packageOverrides = fromDirectory packages;
+  packageOverrides = fromDirectory ./packages;
 in
 packageOverrides
 // {
