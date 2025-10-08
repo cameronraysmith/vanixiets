@@ -62,6 +62,11 @@ clean:
 build profile: lint check
   nix build --json --no-link --print-build-logs ".#{{ profile }}"
 
+# Build a debug package (not exposed in flake outputs, won't be built in CI)
+[group('nix')]
+build-debug package:
+  nix-build -E 'with import <nixpkgs> {}; callPackage ./overlays/debug-packages/{{ package }}.nix {}'
+
 # Check nix flake
 [group('nix')]
 check:
