@@ -228,7 +228,7 @@ update-package package="claude-code-bin":
   UPDATE_SCRIPT=$(nix build .#{{ package }}.updateScript --no-link --print-out-paths)
   echo "Running updateScript for {{ package }}..."
   $UPDATE_SCRIPT
-  echo "Update complete. Review changes with: git diff packages/{{ package }}/manifest.json"
+  echo "Update complete. Review changes with: git diff overlays/packages/{{ package }}/manifest.json"
 
 ## docs
 
