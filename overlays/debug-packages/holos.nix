@@ -1,25 +1,25 @@
-# TODO: remove after https://github.com/NixOS/nixpkgs/pull/384434
 {
   lib,
   buildGoModule,
   fetchFromGitHub,
   testers,
+  holos,
   kubectl,
   kustomize,
   kubernetes-helm,
 }:
 buildGoModule rec {
   pname = "holos";
-  version = "0.104.1";
+  version = "0.105.1";
 
   src = fetchFromGitHub {
     owner = "holos-run";
     repo = "holos";
     rev = "v${version}";
-    hash = "sha256-4LCNKPf+b7O9DHCmOzaI8clCbmikyAAG+6C3I0aQdMg=";
+    hash = "sha256-waQ08HJ7SjVX6qgAiMWNVf7VDhgF+uecEjus5wUc+18=";
   };
 
-  vendorHash = "sha256-FR3H2NS4sEYjGmzIyaUglby98AgDAgbIzl9de8h/cj8=";
+  vendorHash = "sha256-iK0jilQtbU+mlh6oxWTLgdMlTysGtusWe7jjrCYxN0M=";
 
   ldflags = [
     "-w"
@@ -32,12 +32,17 @@ buildGoModule rec {
 
   subPackages = [ "cmd/holos" ];
 
-  doCheck = false;
-  # nativeCheckInputs = [
-  #   kubectl
-  #   kustomize
-  #   kubernetes-helm
-  # ];
+  nativeCheckInputs = [
+    kubernetes-helm
+    kubectl
+    kustomize
+  ];
+
+  passthru.tests.version = testers.testVersion {
+    package = holos;
+    command = "holos --version || true";
+    version = "${version}";
+  };
 
   meta = with lib; {
     description = "Holos CLI tool";
