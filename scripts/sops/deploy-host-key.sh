@@ -62,13 +62,13 @@ echo ""
 
 # Deploy private key
 echo "Deploying private key from Bitwarden..."
-bw get item "$BW_KEY_NAME" | jq -r '.login.password' | sudo tee "$PRIVATE_KEY_PATH" > /dev/null
+bw get item "$BW_KEY_NAME" | jq -r '.sshKey.privateKey' | sudo tee "$PRIVATE_KEY_PATH" > /dev/null
 sudo chmod 600 "$PRIVATE_KEY_PATH"
 echo -e "${GREEN}✅ Private key deployed with permissions 600${NC}"
 
 # Deploy public key
 echo "Deploying public key from Bitwarden..."
-bw get item "$BW_KEY_NAME" | jq -r '.login.username' | sudo tee "$PUBLIC_KEY_PATH" > /dev/null
+bw get item "$BW_KEY_NAME" | jq -r '.sshKey.publicKey' | sudo tee "$PUBLIC_KEY_PATH" > /dev/null
 sudo chmod 644 "$PUBLIC_KEY_PATH"
 echo -e "${GREEN}✅ Public key deployed with permissions 644${NC}"
 echo ""

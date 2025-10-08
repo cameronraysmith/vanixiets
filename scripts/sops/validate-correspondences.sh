@@ -42,7 +42,7 @@ get_age_from_bw() {
     return 1
   fi
   local ssh_pub
-  ssh_pub=$(bw get item "$bw_name" | jq -r '.login.username')
+  ssh_pub=$(bw get item "$bw_name" | jq -r '.sshKey.publicKey')
   echo "$ssh_pub" | ssh-to-age
 }
 
@@ -68,7 +68,7 @@ BASE_SSH_KEY=$(grep 'sshKey =' config.nix | head -1 | cut -d'"' -f2)
 echo "  config.nix baseIdentity.sshKey: $BASE_SSH_KEY"
 
 # Get from Bitwarden
-ADMIN_USER_BW_SSH=$(bw get item "sops-admin-user-ssh" | jq -r '.login.username' 2>/dev/null || echo "NOT_FOUND")
+ADMIN_USER_BW_SSH=$(bw get item "sops-admin-user-ssh" | jq -r '.sshKey.publicKey' 2>/dev/null || echo "NOT_FOUND")
 echo "  Bitwarden sops-admin-user-ssh: $ADMIN_USER_BW_SSH"
 
 # Get age key from Bitwarden
@@ -100,7 +100,7 @@ RAQUEL_SSH_KEY=$(grep -A5 'raquel = {' config.nix | grep 'sshKey =' | cut -d'"' 
 echo "  config.nix raquel.sshKey: $RAQUEL_SSH_KEY"
 
 # Get from Bitwarden
-RAQUEL_USER_BW_SSH=$(bw get item "sops-raquel-user-ssh" | jq -r '.login.username' 2>/dev/null || echo "NOT_FOUND")
+RAQUEL_USER_BW_SSH=$(bw get item "sops-raquel-user-ssh" | jq -r '.sshKey.publicKey' 2>/dev/null || echo "NOT_FOUND")
 echo "  Bitwarden sops-raquel-user-ssh: $RAQUEL_USER_BW_SSH"
 
 # Get age key from Bitwarden

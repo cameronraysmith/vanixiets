@@ -41,7 +41,7 @@ extract_key_details() {
 
   # Get SSH Public key
   local ssh_pub
-  ssh_pub=$(bw get item "$key_name" | jq -r '.login.username')
+  ssh_pub=$(bw get item "$key_name" | jq -r '.sshKey.publicKey')
   echo "SSH Public: $ssh_pub"
 
   # Derive Age Public key

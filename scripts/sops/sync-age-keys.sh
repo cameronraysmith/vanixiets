@@ -57,7 +57,7 @@ get_age_private_key() {
     return 1
   fi
 
-  ssh_private=$(bw get item "$bw_name" | jq -r '.login.password')
+  ssh_private=$(bw get item "$bw_name" | jq -r '.sshKey.privateKey')
   age_private=$(echo "$ssh_private" | ssh-to-age -private-key)
 
   # Validate format
