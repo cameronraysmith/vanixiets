@@ -30,13 +30,30 @@ env:
   CACHIX_BINARY_CACHE: cameronraysmith
 
 jobs:
+  # job 0: skip-check
+  # prevents duplicate workflow runs on same commit hash
+  skip-check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          skip_after_successful_duplicate: 'true'
+          do_not_skip: '["schedule"]'
+          concurrent_skipping: 'never'
+          cancel_others: 'false'
+
   # job 1: bootstrap-verification
   # validates Makefile bootstrap workflow on clean ubuntu system
   bootstrap-verification:
+    needs: skip-check
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      inputs.job == '' ||
-      inputs.job == 'bootstrap-verification'
+      needs.skip-check.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'bootstrap-verification')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -81,10 +98,12 @@ jobs:
   # job 2: config-validation
   # tests config.nix user definitions (phase 1)
   config-validation:
+    needs: skip-check
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      inputs.job == '' ||
-      inputs.job == 'config-validation'
+      needs.skip-check.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'config-validation')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -140,10 +159,12 @@ jobs:
   # job 3: autowiring-validation
   # verifies nixos-unified automatic config discovery
   autowiring-validation:
+    needs: skip-check
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      inputs.job == '' ||
-      inputs.job == 'autowiring-validation'
+      needs.skip-check.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'autowiring-validation')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -205,10 +226,12 @@ jobs:
   # job 5: secrets-workflow
   # tests sops-nix mechanics with ephemeral test keys
   secrets-workflow:
+    needs: skip-check
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      inputs.job == '' ||
-      inputs.job == 'secrets-workflow'
+      needs.skip-check.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'secrets-workflow')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -278,10 +301,12 @@ jobs:
   # job 6: justfile-activation
   # tests activation workflow auto-detection
   justfile-activation:
+    needs: skip-check
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      inputs.job == '' ||
-      inputs.job == 'justfile-activation'
+      needs.skip-check.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'justfile-activation')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -337,15 +362,17 @@ jobs:
 
           echo "✅ all activation targets validated"
 
-  # job 6: nix
+  # job 7: nix
   # builds all flake outputs via omnix (nixos configs, home configs, checks, devshells)
   # matrix strategy: test all flake-supported systems on their native platforms
   # pattern adapted from: https://github.com/Defelo/nixpkgs-review-gha
   nix:
+    needs: skip-check
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      inputs.job == '' ||
-      inputs.job == 'nix'
+      needs.skip-check.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'nix')
     strategy:
       fail-fast: false  # allow each system to test independently
       matrix:
