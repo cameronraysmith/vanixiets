@@ -806,7 +806,7 @@ cache-linux-package package:
     if [[ "$AARCH64_CACHED" != true ]]; then
         echo "Building for aarch64-linux..."
         sops exec-env secrets/shared.yaml \
-            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nix build .#packages.aarch64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0"
+            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.aarch64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0"
         AARCH64_PATH=$(nix eval --raw .#packages.aarch64-linux.$PACKAGE.outPath)
         echo "✓ Built and pushed: $AARCH64_PATH"
         echo ""
@@ -816,7 +816,7 @@ cache-linux-package package:
     if [[ "$X86_64_CACHED" != true ]]; then
         echo "Building for x86_64-linux..."
         sops exec-env secrets/shared.yaml \
-            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nix build .#packages.x86_64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0"
+            "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.x86_64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0"
         X86_64_PATH=$(nix eval --raw .#packages.x86_64-linux.$PACKAGE.outPath)
         echo "✓ Built and pushed: $X86_64_PATH"
     fi
