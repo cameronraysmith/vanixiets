@@ -118,6 +118,7 @@ in
       bitwarden-cli
       # bitwarden-desktop <- via homebrew MAS on Darwin
       bws
+      gitleaks
       libfido2
       openssh
       sops
