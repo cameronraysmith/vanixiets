@@ -54,5 +54,6 @@ rustPlatform.buildRustPackage {
       cameronraysmith
       wahtique
     ];
+    broken = true;
   };
 }
