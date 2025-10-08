@@ -123,20 +123,10 @@ sops updatekeys secrets/common.yaml
 
 ## Host-Specific Notes
 
-### macbook-darwin
-- Personal development environment
-- Access to personal and shared secrets
-- Use for testing changes before deploying to other hosts
-
-### orb-nixos  
+### orb-nixos
 - NixOS container/VM environment
 - Good for testing NixOS-specific configurations
 - May need different secret access patterns than Darwin
-
-### MGB033059
-- Work environment with restricted access
-- Work-specific secrets only
-- May require VPN or special network access for some operations
 
 ## Development Workflow
 
