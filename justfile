@@ -761,6 +761,40 @@ check-rosetta-cache:
         exit 1
     fi
 
+# Build bitwarden-cli for Linux architectures and push to cachix to avoid CI disk space issues
+[group('CI/CD')]
+cache-bitwarden-linux:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Building bitwarden-cli for Linux architectures using rosetta-builder..."
+    echo ""
+
+    # Build for aarch64-linux
+    echo "Building for aarch64-linux..."
+    AARCH64_PATH=$(nix build .#packages.aarch64-linux.bitwarden-cli --no-link --print-out-paths --builders 'ssh-ng://rosetta-builder')
+    echo "✓ Built: $AARCH64_PATH"
+
+    # Build for x86_64-linux
+    echo ""
+    echo "Building for x86_64-linux..."
+    X86_64_PATH=$(nix build .#packages.x86_64-linux.bitwarden-cli --no-link --print-out-paths --builders 'ssh-ng://rosetta-builder')
+    echo "✓ Built: $X86_64_PATH"
+
+    # Push both to cachix
+    echo ""
+    echo "Pushing builds to cachix..."
+    sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH $X86_64_PATH"
+
+    # Summary
+    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
+    echo ""
+    echo "✅ Successfully built and cached bitwarden-cli for Linux architectures"
+    echo "   aarch64-linux: $AARCH64_PATH"
+    echo "   x86_64-linux:  $X86_64_PATH"
+    echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
+    echo ""
+    echo "CI will now fetch from cachix instead of building, avoiding disk space issues."
+
 # Test cachix push/pull with a simple derivation
 [group('CI/CD')]
 test-cachix:
