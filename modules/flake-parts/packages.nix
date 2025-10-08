@@ -18,8 +18,8 @@
           null
       ) packageFiles;
 
-      # filter out nulls and debug packages
-      allPackageNames = lib.filter (name: name != null && !(lib.hasSuffix "Debug" name)) packageNames;
+      # filter out nulls
+      allPackageNames = lib.filter (name: name != null) packageNames;
 
       # get packages from pkgs that exist and are derivations
       customPackagesPerSystem = lib.filterAttrs (
