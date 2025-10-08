@@ -2,8 +2,7 @@
   lib,
   buildGoModule,
   fetchFromGitHub,
-  testers,
-  holos,
+  versionCheckHook,
   kubectl,
   kustomize,
   kubernetes-helm,
@@ -38,11 +37,10 @@ buildGoModule rec {
     kustomize
   ];
 
-  passthru.tests.version = testers.testVersion {
-    package = holos;
-    command = "holos --version || true";
-    version = "${version}";
-  };
+  nativeInstallCheckInputs = [ versionCheckHook ];
+  versionCheckProgram = "${placeholder "out"}/bin/holos";
+  versionCheckProgramArg = [ "--version" ];
+  doInstallCheck = true;
 
   meta = with lib; {
     description = "Holos CLI tool";
