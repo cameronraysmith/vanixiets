@@ -469,14 +469,14 @@
       nix store optimise
     '';
 
-    # clean secrets from zsh history
-    clean-zsh-history-secrets = ''
+    # clean secrets from shell history
+    clean-shell-history-secrets = ''
       case "''${1:-}" in
         -h|--help)
           cat <<'HELP'
-      Clean secrets from zsh history using atuin and gitleaks
+      Clean secrets from shell history using atuin and gitleaks
 
-      Usage: clean-zsh-history-secrets
+      Usage: clean-shell-history-secrets
 
       Scans all command history via atuin for potential secrets using gitleaks,
       then removes any history entries containing detected secrets.
@@ -488,7 +488,7 @@
         4. Clean up temporary files
 
       Example:
-        clean-zsh-history-secrets    # Scan and clean history
+        clean-shell-history-secrets    # Scan and clean history
       HELP
           exit 0
           ;;
@@ -622,7 +622,7 @@
       gfork                        Create a private GitHub fork of current repository
       stash-staged                 Save staged changes to stash while keeping them staged
       ngc                          Nix garbage collection for system and user
-      clean-zsh-history-secrets    Clean secrets from zsh history using atuin and gitleaks
+      clean-shell-history-secrets  Clean secrets from shell history using atuin and gitleaks
       flakeup                      Update Nix flake and commit lock file
       dev                          Enter Nix development shell
       nsa-ref                      List all nix shell applications with descriptions
