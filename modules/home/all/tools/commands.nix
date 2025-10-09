@@ -721,6 +721,7 @@ in
           fi
         else
           # Use fzf to select from available sessions (newest first)
+          # shellcheck disable=SC2012
           session_file=$(ls -t "$resurrect_dir"/tmux_resurrect_*.txt 2>/dev/null | fzf --prompt='Select resurrect session: ' --height=40%)
 
           if [ -z "$session_file" ]; then
