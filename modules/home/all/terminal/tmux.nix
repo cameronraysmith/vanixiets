@@ -21,11 +21,7 @@
       set -g @catppuccin_status_fill 'icon'
       set -g @catppuccin_status_connect_separator 'no'
 
-      # Session module: terminal icon + session name
-      set -g @catppuccin_session_icon ' '
-
-      # Date/time module: calendar icon + time/date
-      set -g @catppuccin_date_time_icon '󰃰 '
+      # Date/time format: HH:MM DD-Mon-YY (icons use catppuccin defaults)
       set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
     '';
   };
