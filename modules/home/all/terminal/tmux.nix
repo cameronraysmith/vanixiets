@@ -1,4 +1,18 @@
 { pkgs, config, ... }:
+let
+  # Custom tmux plugin for kubernetes status display
+  # Uses kubectx/kubens commands to show current k8s context and namespace
+  tmux-kube = pkgs.tmuxPlugins.mkTmuxPlugin {
+    pluginName = "kube-tmux";
+    version = "unstable-2025-01-09";
+    src = pkgs.fetchFromGitHub {
+      owner = "jonmosco";
+      repo = "kube-tmux";
+      rev = "da04ab6b38e5dcb80e0edfc2c6895f8b0f52498e";
+      sha256 = "0wfsqlcs24jkm1szih0s5g0i17qj8laks0wbd9nnm77q92q77gb7";
+    };
+  };
+in
 {
   # Use catppuccin-nix module for proper integration
   catppuccin.tmux = {
@@ -13,13 +27,14 @@
       set -g @catppuccin_window_text ' #{b:pane_current_path}'
       set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
 
-      # Status bar modules - use default background (mantle) for proper separator rendering
+      # Status bar modules and separators
       set -g @catppuccin_status_modules_left 'session'
+      set -g @catppuccin_status_modules_right 'kube gitmux host date_time'
       set -g @catppuccin_status_left_separator ' '
       set -g @catppuccin_status_right_separator ' '
       set -g @catppuccin_status_right_separator_inverse 'no'
       set -g @catppuccin_status_fill 'icon'
-      set -g @catppuccin_status_connect_separator 'no'
+      set -g @catppuccin_status_connect_separator 'yes'
 
       # Module customizations
       set -g @catppuccin_host_text ' #(whoami)@#H'
@@ -122,6 +137,9 @@
         '';
       }
 
+      # Kubernetes context/namespace display (provides #{kubectx_context} and #{kubectx_namespace})
+      tmux-kube
+
       # Command palette and keybinding discovery (must load last to override Space)
       {
         plugin = tmuxPlugins.tmux-which-key;
@@ -136,22 +154,6 @@
     ];
 
     extraConfig = ''
-      # Build custom kubernetes status module (inline, no plugin dependency)
-      set -gF @_ctp_kube_icon_bg "#{E:@thm_blue}"
-      set -gF @_ctp_kube_text_bg "#{E:@thm_surface_0}"
-
-      # Build format matching catppuccin style with truncated kube names (max 12 chars using POSIX cut)
-      set -gF @catppuccin_status_kube "#[fg=#{@_ctp_kube_icon_bg}]#[bg=default]#{@catppuccin_status_left_separator}"
-      set -agF @catppuccin_status_kube "#[fg=#{@thm_crust},bg=#{@_ctp_kube_icon_bg}]󱃾 "
-      set -agF @catppuccin_status_kube "#[fg=#{@thm_fg},bg=#{@_ctp_kube_text_bg}]"
-      set -ag @catppuccin_status_kube "#[fg=#{@thm_red}]#(kubectx -c 2>/dev/null | cut -c1-12)#[fg=#{@thm_fg}]:#[fg=#{@thm_sky}]#(kubens -c 2>/dev/null | cut -c1-12)"
-      set -agF @catppuccin_status_kube "#[fg=#{@_ctp_kube_text_bg}]#[bg=default]#{@catppuccin_status_right_separator}"
-
-      # Apply catppuccin status line modules (must be set AFTER plugin loads)
-      set -g status-left "#{E:@catppuccin_status_session}"
-      set -g status-right "#{E:@catppuccin_status_kube}#{E:@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
-      set -g status-right-length 200
-
       # Session and client management
       bind ^X lock-server
       bind ^C new-window -c "#{pane_current_path}"
