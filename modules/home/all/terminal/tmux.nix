@@ -38,10 +38,10 @@ in
       set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
 
       # Status bar separators
-      # Use powerline separators with connect_separator='no' to create isolated
-      # pill-style modules with proper caps (bg=default is injected before separators)
-      set -g @catppuccin_status_left_separator ' '
-      set -g @catppuccin_status_right_separator ' '
+      # Use rounded style with reverse attribute (same technique as rounded windows)
+      # The  character with reverse creates perfect pill caps on both sides
+      set -g @catppuccin_status_left_separator '#[reverse]#[none]'
+      set -g @catppuccin_status_right_separator '#[reverse]#[none]'
       set -g @catppuccin_status_right_separator_inverse 'no'
       set -g @catppuccin_status_fill 'icon'
       set -g @catppuccin_status_connect_separator 'no'
