@@ -141,11 +141,11 @@
       set -gF @_ctp_kube_text_bg "#{E:@thm_surface_0}"
 
       # Build format matching catppuccin style with truncated kube names (max 12 chars using POSIX cut)
-      set -gF @catppuccin_status_kube "#[fg=#{@_ctp_kube_icon_bg}]#[bg=default] "
+      set -gF @catppuccin_status_kube "#[fg=#{@_ctp_kube_icon_bg}]#[bg=default]#{@catppuccin_status_left_separator}"
       set -agF @catppuccin_status_kube "#[fg=#{@thm_crust},bg=#{@_ctp_kube_icon_bg}]󱃾 "
       set -agF @catppuccin_status_kube "#[fg=#{@thm_fg},bg=#{@_ctp_kube_text_bg}]"
       set -ag @catppuccin_status_kube "#[fg=#{@thm_red}]#(kubectx -c 2>/dev/null | cut -c1-12)#[fg=#{@thm_fg}]:#[fg=#{@thm_sky}]#(kubens -c 2>/dev/null | cut -c1-12)"
-      set -agF @catppuccin_status_kube "#[fg=#{@_ctp_kube_text_bg}]#[bg=default] "
+      set -agF @catppuccin_status_kube "#[fg=#{@_ctp_kube_text_bg}]#[bg=default]#{@catppuccin_status_right_separator}"
 
       # Apply catppuccin status line modules (must be set AFTER plugin loads)
       set -g status-left "#{E:@catppuccin_status_session}"
