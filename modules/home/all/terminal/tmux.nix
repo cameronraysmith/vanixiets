@@ -27,9 +27,7 @@ in
       set -g @catppuccin_window_text ' #{b:pane_current_path}'
       set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
 
-      # Status bar modules and separators
-      set -g @catppuccin_status_modules_left 'session'
-      set -g @catppuccin_status_modules_right 'kube gitmux host date_time'
+      # Status bar separators
       set -g @catppuccin_status_left_separator ' '
       set -g @catppuccin_status_right_separator ' '
       set -g @catppuccin_status_right_separator_inverse 'no'
@@ -154,6 +152,11 @@ in
     ];
 
     extraConfig = ''
+      # Apply catppuccin status line modules (must be set AFTER plugins load)
+      set -g status-left "#{E:@catppuccin_status_session}"
+      set -g status-right "#{E:@catppuccin_status_kube}#{E:@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
+      set -g status-right-length 200
+
       # Session and client management
       bind ^X lock-server
       bind ^C new-window -c "#{pane_current_path}"
