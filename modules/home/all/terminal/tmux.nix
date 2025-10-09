@@ -14,7 +14,10 @@
     disableConfirmationPrompt = true;
 
     plugins = with pkgs; [
+      # Mouse support improvements
       tmuxPlugins.better-mouse-mode
+
+      # Theme configuration
       {
         plugin = tmuxPlugins.catppuccin;
         extraConfig = ''
@@ -41,17 +44,96 @@
           set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
         '';
       }
+
+      # URL selection and opening
       tmuxPlugins.fzf-tmux-url
+
+      # Copy to system clipboard
       tmuxPlugins.yank
+
+      # Highlight when prefix is active
       tmuxPlugins.prefix-highlight
+
+      # Fuzzy finder integration
       tmuxPlugins.tmux-fzf
+
+      # Hint-based text copying (vimium-style)
       tmuxPlugins.tmux-thumbs
-      tmuxPlugins.resurrect
-      tmuxPlugins.continuum
-      tmuxPlugins.tmux-floax
-      tmuxPlugins.tmux-sessionx
-      tmuxPlugins.session-wizard
-      tmuxPlugins.tmux-which-key
+
+      # Session persistence
+      {
+        plugin = tmuxPlugins.resurrect;
+        extraConfig = ''
+          # Restore nvim sessions
+          set -g @resurrect-strategy-nvim 'session'
+          # Capture and restore pane contents
+          set -g @resurrect-capture-pane-contents 'on'
+        '';
+      }
+
+      # Automatic session save/restore
+      {
+        plugin = tmuxPlugins.continuum;
+        extraConfig = ''
+          # Manual restore for explicit control
+          set -g @continuum-restore 'off'
+          set -g @continuum-boot 'off'
+          # Auto-save every 3 minutes
+          set -g @continuum-save-interval '3'
+        '';
+      }
+
+      # Floating window support
+      {
+        plugin = tmuxPlugins.tmux-floax;
+        extraConfig = ''
+          set -g @floax-width '80%'
+          set -g @floax-height '80%'
+          set -g @floax-border-color 'magenta'
+          set -g @floax-text-color 'blue'
+          # Bind to prefix + p
+          set -g @floax-bind 'p'
+          set -g @floax-change-path 'true'
+        '';
+      }
+
+      # Advanced session/window selector with zoxide integration
+      {
+        plugin = tmuxPlugins.tmux-sessionx;
+        extraConfig = ''
+          # Bind to prefix + o
+          set -g @sessionx-bind 'o'
+          set -g @sessionx-zoxide-mode 'on'
+          set -g @sessionx-window-height '85%'
+          set -g @sessionx-window-width '75%'
+          set -g @sessionx-filter-current 'false'
+          set -g @sessionx-preview-location 'right'
+          set -g @sessionx-preview-ratio '55%'
+        '';
+      }
+
+      # Session creation wizard
+      {
+        plugin = tmuxPlugins.session-wizard;
+        extraConfig = ''
+          # Bind to prefix + t
+          set -g @session-wizard 't'
+          set -g @session-wizard-height 80
+          set -g @session-wizard-width 80
+        '';
+      }
+
+      # Command palette and keybinding discovery (must load last to override Space)
+      {
+        plugin = tmuxPlugins.tmux-which-key;
+        extraConfig = ''
+          # Enable XDG-compliant configuration
+          set -g @tmux-which-key-xdg-enable 1
+
+          # Explicitly source the XDG init file to ensure it loads
+          run-shell "[ -f ${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux ] && tmux source-file ${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux"
+        '';
+      }
     ];
 
     extraConfig = ''
@@ -125,45 +207,6 @@
       # Visual styling
       set -g pane-active-border-style 'fg=magenta,bg=default'
       set -g pane-border-style 'fg=brightblack,bg=default'
-
-      # Plugin: tmux-floax (floating window)
-      set -g @floax-width '80%'
-      set -g @floax-height '80%'
-      set -g @floax-border-color 'magenta'
-      set -g @floax-text-color 'blue'
-      set -g @floax-bind 'p'
-      set -g @floax-change-path 'true'
-
-      # Plugin: session-wizard (session management)
-      set -g @session-wizard 't'
-      set -g @session-wizard-height 80
-      set -g @session-wizard-width 80
-
-      # Plugin: sessionx (advanced session/path management with zoxide)
-      set -g @sessionx-bind 'o'
-      set -g @sessionx-zoxide-mode 'on'
-      set -g @sessionx-window-height '85%'
-      set -g @sessionx-window-width '75%'
-      set -g @sessionx-filter-current 'false'
-      set -g @sessionx-preview-location 'right'
-      set -g @sessionx-preview-ratio '55%'
-
-      # Plugin: tmux-which-key (command palette / keybinding discovery)
-      # Shows hierarchical menu of available commands when prefix is pressed
-      # Default: prefix + Space (customizable via @tmux-which-key-disable-autobuild)
-      set -g @tmux-which-key-xdg-enable 1
-
-      # Explicitly source the XDG init file to ensure it loads
-      run-shell "[ -f ${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux ] && tmux source-file ${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux"
-
-      # Plugin: resurrect + continuum (session persistence)
-      # Keybindings: prefix + Ctrl-s (save), prefix + Ctrl-r (restore)
-      # Auto-saves every 3 minutes, manual restore for explicit control
-      set -g @resurrect-strategy-nvim 'session'
-      set -g @resurrect-capture-pane-contents 'on'
-      set -g @continuum-restore 'off'
-      set -g @continuum-boot 'off'
-      set -g @continuum-save-interval '3'
     '';
   };
 
