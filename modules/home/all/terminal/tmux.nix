@@ -1,16 +1,4 @@
 { pkgs, ... }:
-let
-  tmux-sessionx = pkgs.tmuxPlugins.mkTmuxPlugin {
-    pluginName = "tmux-sessionx";
-    version = "unstable-2025-01-07";
-    src = pkgs.fetchFromGitHub {
-      owner = "omerxx";
-      repo = "tmux-sessionx";
-      rev = "42c18389e73b80381d054dd1005b8c9a66942248";
-      sha256 = "sha256-SRKI4mliMSMp/Yd+oSn48ArbbRA+szaj70BQeTd8NhM=";
-    };
-  };
-in
 {
   programs.tmux = {
     enable = true;
@@ -21,7 +9,7 @@ in
     baseIndex = 1;
     historyLimit = 1000000;
     newSession = true;
-    escapeTime = 0;
+    escapeTime = 10;
     secureSocket = false;
     disableConfirmationPrompt = true;
 
@@ -40,47 +28,54 @@ in
     ];
 
     extraConfig = ''
+      # Session and client management
       bind ^X lock-server
       bind ^C new-window -c "#{pane_current_path}"
       bind ^D detach
-      bind * list-clients
+      bind S choose-session
 
+      # Window navigation
       bind H previous-window
       bind L next-window
-      bind ^T clock-mode
-
-      bind r command-prompt "rename-window %%"
-      bind R source-file ~/.config/tmux/tmux.conf
       bind ^A last-window
       bind ^W list-windows
       bind w list-windows
-      # swap-window -s SOURCE -t TARGET
       bind M move-window -t 0
-      bind z resize-pane -Z
-      bind ^L refresh-client
-      bind l refresh-client
-      bind | split-window
+      bind ^T clock-mode
+
+      # Window management
+      bind r command-prompt "rename-window %%"
+      bind R source-file ~/.config/tmux/tmux.conf
+      bind ^R send-keys "clear"\; send-keys "Enter"
+
+      # Pane splitting (keep current path)
+      bind | split-window -h -c "#{pane_current_path}"
       bind s split-window -v -c "#{pane_current_path}"
       bind v split-window -h -c "#{pane_current_path}"
 
-      # bind '"' choose-window
-      bind -n M-"'" choose-window
+      # Pane navigation (vim-style)
       bind h select-pane -L
       bind j select-pane -D
       bind k select-pane -U
       bind l select-pane -R
+
+      # Pane management
+      bind z resize-pane -Z
+      bind x swap-pane -D
+      bind c kill-pane
+      bind * setw synchronize-panes
+      bind P set pane-border-status
+
+      # Pane resizing (repeatable)
       bind -r -T prefix , resize-pane -L 20
       bind -r -T prefix . resize-pane -R 20
       bind -r -T prefix - resize-pane -D 7
       bind -r -T prefix = resize-pane -U 7
+
+      # Command and navigation helpers
       bind : command-prompt
-      bind * setw synchronize-panes
-      bind P set pane-border-status
-      bind c kill-pane
-      bind x swap-pane -D
-      bind S choose-session
-      bind R source-file ~/.config/tmux/tmux.conf
-      bind ^R send-keys "clear"\; send-keys "Enter"
+      bind ^L refresh-client
+      bind -n M-\' choose-window
       bind-key "K" display-popup -E -w 80% -h 80% "sesh connect \"$(sesh list -i | gum filter --limit 1 --placeholder 'Pick a sesh' --prompt='⚡')\""
       bind-key -T copy-mode-vi v send-keys -X begin-selection
 
@@ -89,14 +84,22 @@ in
       set -ga terminal-overrides ",*:Ss=\E[%p1%d q:Se=\E[ q"
       set-environment -g COLORTERM "truecolor"
 
+      # Modern tmux features
+      set -g focus-events on
+      setw -g aggressive-resize on
+
+      # User experience settings
       set-option -g mouse on
       set -g detach-on-destroy off
       set -g renumber-windows on
       set -g set-clipboard on
       set -g status-position top
+
+      # Visual styling
       set -g pane-active-border-style 'fg=magenta,bg=default'
       set -g pane-border-style 'fg=brightblack,bg=default'
 
+      # Plugin: tmux-floax (floating window)
       set -g @floax-width '80%'
       set -g @floax-height '80%'
       set -g @floax-border-color 'magenta'
@@ -104,21 +107,24 @@ in
       set -g @floax-bind 'p'
       set -g @floax-change-path 'true'
 
+      # Plugin: session-wizard (session management)
       set -g @session-wizard 't'
       set -g @session-wizard-height 80
       set -g @session-wizard-width 80
 
+      # Plugin: resurrect + continuum (session persistence)
       set -g @resurrect-strategy-nvim 'session'
       set -g @resurrect-capture-pane-contents 'on'
       set -g @continuum-restore 'on'
       set -g @continuum-boot 'on'
-      set -g @continuum-save-interval '3'
+      set -g @continuum-save-interval '15'
 
-      # Custom catppuccin separators using shell printf to preserve UTF-8
+      # Plugin: catppuccin (theme)
+      # Custom separators using shell printf to preserve UTF-8 encoding
       # Left: U+E0B6 (nf-ple-left_half_circle_thick) = \xee\x82\xb6
       # Right: U+E0B4 (nf-ple-right_half_circle_thick) = \xee\x82\xb4
       # Block: U+2588 (█) = \xe2\x96\x88
-      # Zoom icon: U+F531 (nf-oct-zoom_in) = \xef\x94\xb1
+      # Zoom: U+F531 (nf-oct-zoom_in) = \xef\x94\xb1
       set -g @catppuccin_window_status_style 'custom'
       set -g @catppuccin_window_left_separator "$(printf '\xee\x82\xb6')"
       set -g @catppuccin_window_right_separator "$(printf '\xee\x82\xb4 ')"
