@@ -2,6 +2,7 @@
 let
   # Tmux plugin for kubernetes context display (required by catppuccin kube module)
   # Provides #{kubectx_context} and #{kubectx_namespace} variables
+  # Patched to use yq-go (mikefarah/yq) instead of python-yq for correct YAML parsing
   tmux-kubectx = pkgs.tmuxPlugins.mkTmuxPlugin {
     pluginName = "tmux-kubectx";
     version = "unstable-2024-12-28";
@@ -11,6 +12,15 @@ let
       rev = "7913d57d72d7162f6b0e6050d4c9364b129d7215";
       sha256 = "0lymdzd5a8ycs6rqahn4yl2hyi5fy60w0jsg38wlxqa5ysa2mdqs";
     };
+
+    # Patch to use full paths to yq-go and kubectl, and fix tilde expansion bug
+    postPatch = ''
+      substituteInPlace scripts/utils/kube.sh \
+        --replace-fail 'command -v yq' 'command -v ${pkgs.lib.getExe pkgs.yq-go}' \
+        --replace-fail 'command yq' '${pkgs.lib.getExe pkgs.yq-go}' \
+        --replace-fail 'command kubectl' '${pkgs.lib.getExe pkgs.kubectl}' \
+        --replace-fail '~/.kube/config' '$HOME/.kube/config'
+    '';
   };
 in
 {
@@ -135,8 +145,8 @@ in
         '';
       }
 
-      # Kubernetes context/namespace display (provides #{kubectx_context} and #{kubectx_namespace})
-      tmux-kubectx
+      # Kubernetes context/namespace display - manually loaded in extraConfig due to nixpkgs naming issue
+      # (nixpkgs generates tmux_kubectx.tmux but the actual file is kubectx.tmux)
 
       # Command palette and keybinding discovery (must load last to override Space)
       {
@@ -152,10 +162,14 @@ in
     ];
 
     extraConfig = ''
-      # Apply catppuccin status line modules (must be set AFTER plugins load)
-      set -g status-left "#{E:@catppuccin_status_session}"
-      set -g status-right "#{E:@catppuccin_status_kube}#{E:@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
+      # Set status bar format with inline expansion so kubectx plugin can see placeholders
+      # We expand catppuccin variables inline instead of using #{E:...} so kubectx can interpolate #{kubectx_*}
+      set -gF status-left "#{E:@catppuccin_status_session}"
+      set -gF status-right "#{E:@catppuccin_status_kube}#{E:@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
       set -g status-right-length 200
+
+      # Initialize tmux-kubectx plugin AFTER setting status-right so it can interpolate #{kubectx_*} placeholders
+      run-shell ${tmux-kubectx}/share/tmux-plugins/tmux-kubectx/kubectx.tmux
 
       # Session and client management
       bind ^X lock-server
