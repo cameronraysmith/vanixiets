@@ -51,7 +51,8 @@ get_age_from_sops_yaml() {
   local anchor="$1"
   # Extract the age key from the same line as the anchor
   # Format: - &anchor age1... # comment
-  grep "- &${anchor} " .sops.yaml | awk '{print $3}'
+  # Use -- to prevent grep from treating - as an option
+  grep -- "- &${anchor} " .sops.yaml | awk '{print $3}'
 }
 
 print_header "SOPS Key Correspondence Validation"
@@ -68,8 +69,8 @@ echo "Checking baseIdentity.sshKey → sops-admin-user-ssh → &admin-user..."
 BASE_SSH_KEY=$(grep 'sshKey =' config.nix | head -1 | cut -d'"' -f2)
 echo "  config.nix baseIdentity.sshKey: $BASE_SSH_KEY"
 
-# Get from Bitwarden
-ADMIN_USER_BW_SSH=$(bw get item "sops-admin-user-ssh" | jq -r '.sshKey.publicKey' 2>/dev/null || echo "NOT_FOUND")
+# Get from Bitwarden (strip comment if present)
+ADMIN_USER_BW_SSH=$(bw get item "sops-admin-user-ssh" | jq -r '.sshKey.publicKey' 2>/dev/null | awk '{print $1" "$2}' || echo "NOT_FOUND")
 echo "  Bitwarden sops-admin-user-ssh: $ADMIN_USER_BW_SSH"
 
 # Get age key from Bitwarden
@@ -100,8 +101,8 @@ echo "Checking raquel.sshKey → sops-raquel-user-ssh → &raquel-user..."
 RAQUEL_SSH_KEY=$(grep -A5 'raquel = {' config.nix | grep 'sshKey =' | cut -d'"' -f2)
 echo "  config.nix raquel.sshKey: $RAQUEL_SSH_KEY"
 
-# Get from Bitwarden
-RAQUEL_USER_BW_SSH=$(bw get item "sops-raquel-user-ssh" | jq -r '.sshKey.publicKey' 2>/dev/null || echo "NOT_FOUND")
+# Get from Bitwarden (strip comment if present)
+RAQUEL_USER_BW_SSH=$(bw get item "sops-raquel-user-ssh" | jq -r '.sshKey.publicKey' 2>/dev/null | awk '{print $1" "$2}' || echo "NOT_FOUND")
 echo "  Bitwarden sops-raquel-user-ssh: $RAQUEL_USER_BW_SSH"
 
 # Get age key from Bitwarden
