@@ -116,7 +116,7 @@ in
       # Custom catppuccin separators using shell printf to preserve UTF-8
       # Rounded: U+E0B4 () = \xee\x82\xb4  U+E0B6 () = \xee\x82\xb6
       # Block: U+2588 (█) = \xe2\x96\x88
-      # Zoom icon: U+F002 () = \xef\x80\x82
+      # Zoom icon: U+F531 (nf-oct-zoom_in) = \xef\x94\xb1
       set -g @catppuccin_window_status_style 'custom'
       set -g @catppuccin_window_left_separator "$(printf '\xee\x82\xb4')"
       set -g @catppuccin_window_right_separator "$(printf '\xee\x82\xb6 ')"
@@ -125,7 +125,7 @@ in
       set -g @catppuccin_window_default_fill 'number'
       set -g @catppuccin_window_default_text '#W'
       set -g @catppuccin_window_current_fill 'number'
-      set -g @catppuccin_window_current_text "#W#{?window_zoomed_flag,$(printf '\xef\x80\x82'),}"
+      set -g @catppuccin_window_current_text "#W#{?window_zoomed_flag,$(printf '\xef\x94\xb1'),}"
 
       set -g @catppuccin_status_modules_right 'directory date_time'
       set -g @catppuccin_status_modules_left 'session'
