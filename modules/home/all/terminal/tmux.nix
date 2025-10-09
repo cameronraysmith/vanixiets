@@ -12,7 +12,7 @@
       set -g @catppuccin_window_text ' #{b:pane_current_path}'
       set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
 
-      # Status bar modules - only show time/date on right
+      # Status bar modules - session on left, date/time on right
       set -g @catppuccin_status_modules_right 'date_time'
       set -g @catppuccin_status_modules_left 'session'
       set -g @catppuccin_status_left_separator ' '
@@ -21,7 +21,11 @@
       set -g @catppuccin_status_fill 'icon'
       set -g @catppuccin_status_connect_separator 'no'
 
-      # Date/time format: HH:MM DD-Mon-YY
+      # Session module: terminal icon + session name
+      set -g @catppuccin_session_icon ' '
+
+      # Date/time module: calendar icon + time/date
+      set -g @catppuccin_date_time_icon '󰃰 '
       set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
     '';
   };
