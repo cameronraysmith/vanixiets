@@ -735,10 +735,10 @@ in
         # Update last symlink to selected session
         ln -sf "$session_file" "$resurrect_dir/last"
 
-        # Start tmux server if not running
+        # Start tmux server if not running (without creating a session)
         if ! tmux has-session 2>/dev/null; then
           echo "Starting new tmux server..."
-          tmux new-session -d
+          tmux start-server
         fi
 
         # Run resurrect restore script (path resolved at build time from Nix package)
