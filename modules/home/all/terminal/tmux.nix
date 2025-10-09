@@ -15,6 +15,9 @@
 
       # Status bar modules - use default background (mantle) for proper separator rendering
       set -g @catppuccin_status_modules_left 'session'
+      set -g @catppuccin_status_left_separator ' '
+      set -g @catppuccin_status_right_separator ' '
+      set -g @catppuccin_status_right_separator_inverse 'no'
       set -g @catppuccin_status_fill 'icon'
       set -g @catppuccin_status_connect_separator 'no'
 
@@ -147,7 +150,11 @@
       # Apply catppuccin status line modules (must be set AFTER plugin loads)
       set -g status-left "#{E:@catppuccin_status_session}"
       set -g status-right "#{E:@catppuccin_status_kube}#{E:@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
-      set -g status-right-length 150
+      set -g status-right-length 200
+
+      # Increase status bar height with padding (2 lines total for slightly taller bar)
+      set -g status 2
+      set -g status-format[1] ""
 
       # Session and client management
       bind ^X lock-server
