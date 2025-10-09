@@ -152,10 +152,6 @@
       set -g status-right "#{E:@catppuccin_status_kube}#{E:@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
       set -g status-right-length 200
 
-      # Increase status bar height with padding (2 lines total for slightly taller bar)
-      set -g status 2
-      set -g status-format[1] ""
-
       # Session and client management
       bind ^X lock-server
       bind ^C new-window -c "#{pane_current_path}"
