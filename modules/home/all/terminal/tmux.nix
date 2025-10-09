@@ -170,6 +170,21 @@
     enable = true;
   };
 
+  # Fix tmux-which-key XDG file permissions
+  # The plugin copies files from Nix store (read-only) to XDG dirs, breaking auto-rebuild
+  home.activation.fixTmuxWhichKeyPermissions = {
+    after = [ "writeBoundary" ];
+    before = [ ];
+    data = ''
+      if [ -f "$HOME/.local/share/tmux/plugins/tmux-which-key/init.tmux" ]; then
+        chmod u+w "$HOME/.local/share/tmux/plugins/tmux-which-key/init.tmux"
+      fi
+      if [ -f "$HOME/.config/tmux/plugins/tmux-which-key/config.yaml" ]; then
+        chmod u+w "$HOME/.config/tmux/plugins/tmux-which-key/config.yaml"
+      fi
+    '';
+  };
+
   home.packages = [
     (pkgs.writeShellApplication {
       name = "pux";
