@@ -113,19 +113,27 @@ in
       set -g @continuum-boot 'on'
       set -g @continuum-save-interval '3'
 
-      set -g @catppuccin_window_status_style 'rounded'
+      # Custom catppuccin separators using shell printf to preserve UTF-8
+      # U+E0B0 () = \xee\x82\xb0  U+E0B2 () = \xee\x82\xb2  U+2588 (█) = \xe2\x96\x88
+      set -g @catppuccin_window_status_style 'custom'
+      set -g @catppuccin_window_left_separator "$(printf '\xee\x82\xb0')"
+      set -g @catppuccin_window_right_separator "$(printf '\xee\x82\xb2 ')"
+      set -g @catppuccin_window_middle_separator " $(printf '\xe2\x96\x88')"
       set -g @catppuccin_window_number_position 'right'
-      # set -g @catppuccin_window_default_fill 'number'
-      # set -g @catppuccin_window_default_text '#{b:pane_current_path}'
-      # set -g @catppuccin_window_current_fill 'number'
-      # set -g @catppuccin_window_current_text '#{b:pane_current_path}'
-      # set -g @catppuccin_status_modules_right 'date_time'
-      # set -g @catppuccin_status_modules_left 'session'
-      # set -g @catppuccin_status_right_separator_inverse 'no'
-      # set -g @catppuccin_status_fill 'icon'
-      # set -g @catppuccin_status_connect_separator 'no'
-      # set -g @catppuccin_directory_text '#{b:pane_current_path}'
-      # set -g @catppuccin_date_time_text '%H:%M'
+      set -g @catppuccin_window_default_fill 'number'
+      set -g @catppuccin_window_default_text '#W'
+      set -g @catppuccin_window_current_fill 'number'
+      set -g @catppuccin_window_current_text '#W#{?window_zoomed_flag,(),}'
+
+      set -g @catppuccin_status_modules_right 'directory date_time'
+      set -g @catppuccin_status_modules_left 'session'
+      set -g @catppuccin_status_left_separator "$(printf '\xee\x82\xb0 ')"
+      set -g @catppuccin_status_right_separator "$(printf '\xee\x82\xb2')"
+      set -g @catppuccin_status_right_separator_inverse 'no'
+      set -g @catppuccin_status_fill 'icon'
+      set -g @catppuccin_status_connect_separator 'no'
+      set -g @catppuccin_directory_text '#{b:pane_current_path}'
+      set -g @catppuccin_date_time_text '%H:%M'
     '';
   };
 
