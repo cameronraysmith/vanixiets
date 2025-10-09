@@ -1,4 +1,9 @@
-{ pkgs, lib, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 let
   # Helper to create shell applications from either:
   # - Simple string (text only)
@@ -700,7 +705,7 @@ in
             ;;
         esac
 
-        resurrect_dir="$HOME/.tmux/resurrect"
+        resurrect_dir="${config.home.homeDirectory}/.tmux/resurrect"
 
         if [ ! -d "$resurrect_dir" ]; then
           echo "Error: Resurrect directory not found: $resurrect_dir" >&2
@@ -736,7 +741,7 @@ in
         fi
 
         # Run resurrect restore script
-        restore_script="$HOME/.local/share/tmux/plugins/tmux-resurrect/scripts/restore.sh"
+        restore_script="${config.xdg.dataHome}/tmux/plugins/tmux-resurrect/scripts/restore.sh"
 
         if [ ! -f "$restore_script" ]; then
           echo "Error: Resurrect restore script not found: $restore_script" >&2
