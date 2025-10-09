@@ -32,19 +32,22 @@ done
 CURRENT_USER=$(whoami)
 CURRENT_HOST=$(hostname -s)
 
-# Determine age keys directory (macOS vs Linux)
-if [ "$(uname)" = "Darwin" ]; then
-  AGE_KEYS_DIR="$HOME/Library/Application Support/sops/age"
-else
-  AGE_KEYS_DIR="$HOME/.config/sops/age"
-fi
-
+# Determine age keys directory
+# Use XDG_CONFIG_HOME if set, otherwise default to ~/.config
+# This matches sops.age.keyFile = "${config.xdg.configHome}/sops/age/keys.txt"
+XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+AGE_KEYS_DIR="$XDG_CONFIG_HOME/sops/age"
 AGE_KEYS_FILE="$AGE_KEYS_DIR/keys.txt"
 
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
 echo -e "${BLUE}  SOPS Age Keys Synchronization${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
 echo ""
+
+# Helper function
+check_pass() {
+  echo -e "${GREEN}✅ $1${NC}"
+}
 
 # Get SSH private key from Bitwarden and convert to age private key
 get_age_private_key() {
@@ -162,7 +165,3 @@ echo ""
 echo "Next steps:"
 echo "  1. Test decryption: sops -d secrets/shared.yaml"
 echo "  2. Keep backup until verified"
-
-check_pass() {
-  echo -e "${GREEN}✅ $1${NC}"
-}
