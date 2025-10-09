@@ -20,6 +20,7 @@
       tmuxPlugins.yank
       tmuxPlugins.prefix-highlight
       tmuxPlugins.tmux-fzf
+      tmuxPlugins.tmux-which-key
       tmuxPlugins.tmux-thumbs
       tmuxPlugins.resurrect
       tmuxPlugins.continuum
@@ -121,6 +122,11 @@
       set -g @sessionx-filter-current 'false'
       set -g @sessionx-preview-location 'right'
       set -g @sessionx-preview-ratio '55%'
+
+      # Plugin: tmux-which-key (command palette / keybinding discovery)
+      # Shows hierarchical menu of available commands when prefix is pressed
+      # Default: prefix + Space (customizable via @tmux-which-key-disable-autobuild)
+      set -g @tmux-which-key-xdg-enable 1
 
       # Plugin: resurrect + continuum (session persistence)
       set -g @resurrect-strategy-nvim 'session'
