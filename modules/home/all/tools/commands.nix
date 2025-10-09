@@ -674,7 +674,6 @@ in
       runtimeInputs = with pkgs; [
         tmux
         fzf
-        fd
         coreutils
       ];
       text = ''
@@ -722,7 +721,7 @@ in
           fi
         else
           # Use fzf to select from available sessions (newest first)
-          session_file=$(fd -t f '^tmux_resurrect_.*\.txt$' "$resurrect_dir" -X ls -t | fzf --prompt='Select resurrect session: ' --height=40%)
+          session_file=$(ls -t "$resurrect_dir"/tmux_resurrect_*.txt 2>/dev/null | fzf --prompt='Select resurrect session: ' --height=40%)
 
           if [ -z "$session_file" ]; then
             echo "No session file selected" >&2
@@ -730,9 +729,9 @@ in
           fi
         fi
 
-        echo "Selected session: $session_file"
+        echo "Restoring session: $(basename "$session_file")"
 
-        # Update last symlink
+        # Update last symlink to selected session
         ln -sf "$session_file" "$resurrect_dir/last"
 
         # Start tmux server if not running
@@ -741,24 +740,13 @@ in
           tmux new-session -d
         fi
 
-        # Get resurrect restore script path from tmux options
-        restore_script=$(tmux show-option -gv @resurrect-restore-script-path 2>/dev/null)
-
-        if [ -z "$restore_script" ] || [ ! -f "$restore_script" ]; then
-          echo "Error: Resurrect restore script not found" >&2
-          echo "Falling back to manual restore trigger..." >&2
-          echo "After attaching, press prefix + Ctrl-r to restore" >&2
-          tmux attach-session
-          exit 0
-        fi
-
-        echo "Restoring session from: $(basename "$(dirname "$session_file")")/$(basename "$session_file")"
-        tmux run-shell "$restore_script"
+        # Run resurrect restore script (path resolved at build time from Nix package)
+        tmux run-shell "${pkgs.tmuxPlugins.resurrect}/share/tmux-plugins/resurrect/scripts/restore.sh"
 
         # Small delay to let restore complete
         sleep 1
 
-        # Attach to session
+        # Attach to restored session
         exec tmux attach-session
       '';
     };
