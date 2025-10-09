@@ -20,13 +20,13 @@
       tmuxPlugins.yank
       tmuxPlugins.prefix-highlight
       tmuxPlugins.tmux-fzf
-      tmuxPlugins.tmux-which-key
       tmuxPlugins.tmux-thumbs
       tmuxPlugins.resurrect
       tmuxPlugins.continuum
       tmuxPlugins.tmux-floax
       tmuxPlugins.tmux-sessionx
       tmuxPlugins.session-wizard
+      tmuxPlugins.tmux-which-key
     ];
 
     extraConfig = ''
@@ -127,6 +127,9 @@
       # Shows hierarchical menu of available commands when prefix is pressed
       # Default: prefix + Space (customizable via @tmux-which-key-disable-autobuild)
       set -g @tmux-which-key-xdg-enable 1
+
+      # Explicitly source the XDG init file to ensure it loads
+      run-shell "[ -f ~/.local/share/tmux/plugins/tmux-which-key/init.tmux ] && tmux source-file ~/.local/share/tmux/plugins/tmux-which-key/init.tmux"
 
       # Plugin: resurrect + continuum (session persistence)
       # Keybindings: prefix + Ctrl-s (save), prefix + Ctrl-r (restore)
