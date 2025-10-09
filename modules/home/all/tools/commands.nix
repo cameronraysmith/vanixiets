@@ -674,6 +674,7 @@ in
       runtimeInputs = with pkgs; [
         tmux
         fzf
+        fd
         coreutils
       ];
       text = ''
@@ -721,8 +722,7 @@ in
           fi
         else
           # Use fzf to select from available sessions (newest first)
-          # shellcheck disable=SC2012
-          session_file=$(ls -t "$resurrect_dir"/tmux_resurrect_*.txt 2>/dev/null | fzf --prompt='Select resurrect session: ' --height=40%)
+          session_file=$(fd -t f '^tmux_resurrect_.*\.txt$' "$resurrect_dir" -X ls -t | fzf --prompt='Select resurrect session: ' --height=40%)
 
           if [ -z "$session_file" ]; then
             echo "No session file selected" >&2
