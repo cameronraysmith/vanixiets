@@ -38,10 +38,11 @@ in
       set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
 
       # Status bar separators
-      # Use rounded style with reverse attribute (same technique as rounded windows)
-      # The  character with reverse creates perfect pill caps on both sides
-      set -g @catppuccin_status_left_separator '#[reverse]#[none]'
-      set -g @catppuccin_status_right_separator '#[reverse]#[none]'
+      # Use rounded separators without reverse (status_module.conf sets colors correctly)
+      # Left:  (U+E0B6) right-pointing rounded, Right:  (U+E0B4) left-pointing rounded
+      # The module builder sets fg=module_color,bg=default before the separator character
+      set -g @catppuccin_status_left_separator ''
+      set -g @catppuccin_status_right_separator ''
       set -g @catppuccin_status_right_separator_inverse 'no'
       set -g @catppuccin_status_fill 'icon'
       set -g @catppuccin_status_connect_separator 'no'
