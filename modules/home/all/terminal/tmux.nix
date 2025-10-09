@@ -130,11 +130,11 @@
 
       # Plugin: resurrect + continuum (session persistence)
       # Keybindings: prefix + Ctrl-s (save), prefix + Ctrl-r (restore)
-      # Auto-saves every 15 minutes, auto-restores on server start
+      # Auto-saves every 15 minutes, manual restore for explicit control
       set -g @resurrect-strategy-nvim 'session'
       set -g @resurrect-capture-pane-contents 'on'
-      set -g @continuum-restore 'on'
-      set -g @continuum-boot 'on'
+      set -g @continuum-restore 'off'
+      set -g @continuum-boot 'off'
       set -g @continuum-save-interval '15'
 
       # Plugin: catppuccin (theme)
