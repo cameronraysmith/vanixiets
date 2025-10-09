@@ -40,7 +40,7 @@ rec {
     username = "raquel";
     fullname = "Someone Local";
     email = "raquel@localhost";
-    sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK7WyNT9pEl8JczNdl0rPzJPCB3cJaJL+Nq8b2z8h5xE";
+    sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAIBdSMsU0hZy7MPpnFmS+P7RlN/x6GwMPVp3g7BOUuf";
     isAdmin = false;
   };
 }
