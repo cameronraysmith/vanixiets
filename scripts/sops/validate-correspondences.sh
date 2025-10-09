@@ -49,8 +49,9 @@ get_age_from_bw() {
 # Get age key from .sops.yaml by anchor
 get_age_from_sops_yaml() {
   local anchor="$1"
-  # Extract the age key after the anchor definition
-  grep -A1 "- &${anchor} " .sops.yaml | tail -1 | awk '{print $NF}'
+  # Extract the age key from the same line as the anchor
+  # Format: - &anchor age1... # comment
+  grep "- &${anchor} " .sops.yaml | awk '{print $3}'
 }
 
 print_header "SOPS Key Correspondence Validation"
