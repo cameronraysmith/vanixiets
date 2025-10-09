@@ -72,6 +72,29 @@ get_age_private_key() {
   echo "$age_private"
 }
 
+# Get SSH public key from Bitwarden and convert to age public key
+get_age_public_key() {
+  local bw_name="$1"
+  local ssh_pub
+  local age_pub
+
+  if ! bw get item "$bw_name" &>/dev/null; then
+    echo -e "${RED}❌ ERROR: Key '$bw_name' not found in Bitwarden${NC}" >&2
+    return 1
+  fi
+
+  ssh_pub=$(bw get item "$bw_name" | jq -r '.sshKey.publicKey')
+  age_pub=$(echo "$ssh_pub" | ssh-to-age)
+
+  # Validate format
+  if [[ ! $age_pub =~ ^age1[a-z0-9]{58}$ ]]; then
+    echo -e "${RED}❌ ERROR: Invalid age public key format${NC}" >&2
+    return 1
+  fi
+
+  echo "$age_pub"
+}
+
 echo "Current environment:"
 echo "  User: $CURRENT_USER"
 echo "  Host: $CURRENT_HOST"
@@ -95,9 +118,11 @@ echo "" >> "$AGE_KEYS_FILE"
 
 # 1. Add repository development key (all developers need this)
 echo "Extracting repository development key..."
-DEV_KEY=$(get_age_private_key "sops-dev-ssh")
+DEV_KEY_PRIVATE=$(get_age_private_key "sops-dev-ssh")
+DEV_KEY_PUBLIC=$(get_age_public_key "sops-dev-ssh")
 echo "# Repository development key" >> "$AGE_KEYS_FILE"
-echo "$DEV_KEY" >> "$AGE_KEYS_FILE"
+echo "# public key: $DEV_KEY_PUBLIC" >> "$AGE_KEYS_FILE"
+echo "$DEV_KEY_PRIVATE" >> "$AGE_KEYS_FILE"
 echo "" >> "$AGE_KEYS_FILE"
 check_pass "Repository dev key added"
 
@@ -106,15 +131,19 @@ echo "Extracting user identity key for $CURRENT_USER..."
 
 case "$CURRENT_USER" in
   cameron|crs58|runner|jovyan)
-    USER_KEY=$(get_age_private_key "sops-admin-user-ssh")
+    USER_KEY_PRIVATE=$(get_age_private_key "sops-admin-user-ssh")
+    USER_KEY_PUBLIC=$(get_age_public_key "sops-admin-user-ssh")
     echo "# User identity key (admin-user)" >> "$AGE_KEYS_FILE"
-    echo "$USER_KEY" >> "$AGE_KEYS_FILE"
+    echo "# public key: $USER_KEY_PUBLIC" >> "$AGE_KEYS_FILE"
+    echo "$USER_KEY_PRIVATE" >> "$AGE_KEYS_FILE"
     check_pass "Admin user identity key added"
     ;;
   raquel)
-    USER_KEY=$(get_age_private_key "sops-raquel-user-ssh")
+    USER_KEY_PRIVATE=$(get_age_private_key "sops-raquel-user-ssh")
+    USER_KEY_PUBLIC=$(get_age_public_key "sops-raquel-user-ssh")
     echo "# User identity key (raquel-user)" >> "$AGE_KEYS_FILE"
-    echo "$USER_KEY" >> "$AGE_KEYS_FILE"
+    echo "# public key: $USER_KEY_PUBLIC" >> "$AGE_KEYS_FILE"
+    echo "$USER_KEY_PRIVATE" >> "$AGE_KEYS_FILE"
     check_pass "Raquel user identity key added"
     ;;
   *)
@@ -128,9 +157,11 @@ echo "Extracting host key for $CURRENT_HOST..."
 
 case "$CURRENT_HOST" in
   stibnite|blackphos|orb-nixos)
-    HOST_KEY=$(get_age_private_key "sops-${CURRENT_HOST}-ssh")
+    HOST_KEY_PRIVATE=$(get_age_private_key "sops-${CURRENT_HOST}-ssh")
+    HOST_KEY_PUBLIC=$(get_age_public_key "sops-${CURRENT_HOST}-ssh")
     echo "# Host key ($CURRENT_HOST)" >> "$AGE_KEYS_FILE"
-    echo "$HOST_KEY" >> "$AGE_KEYS_FILE"
+    echo "# public key: $HOST_KEY_PUBLIC" >> "$AGE_KEYS_FILE"
+    echo "$HOST_KEY_PRIVATE" >> "$AGE_KEYS_FILE"
     check_pass "Host key for $CURRENT_HOST added"
 
     # Deploy to /etc/ssh if requested
