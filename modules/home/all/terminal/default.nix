@@ -143,6 +143,7 @@ in
       gh
       git-filter-repo
       git-machete
+      gitmux
       graphite-cli
       graphviz
       jc
