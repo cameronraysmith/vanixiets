@@ -664,6 +664,99 @@ in
       '';
     };
 
+    # tmux resurrect session restore
+    tre = {
+      runtimeInputs = with pkgs; [
+        tmux
+        fzf
+        coreutils
+      ];
+      text = ''
+        case "''${1:-}" in
+          -h|--help)
+            cat <<'HELP'
+        Tmux resurrect restore with session selection
+
+        Usage: tre [SESSION_FILE]
+
+        Restores a specific tmux-resurrect session on new server startup.
+        If no session file is specified, uses fzf to interactively select one.
+
+        Arguments:
+          SESSION_FILE    Path to resurrect session file (optional)
+
+        Workflow:
+          1. Select or use specified session file
+          2. Update resurrect 'last' symlink
+          3. Start new tmux server if needed
+          4. Run resurrect restore script
+          5. Attach to restored session
+
+        Examples:
+          tre                                                # Interactive selection
+          tre ~/.tmux/resurrect/tmux_resurrect_20250908.txt  # Restore specific session
+        HELP
+            exit 0
+            ;;
+        esac
+
+        resurrect_dir="$HOME/.tmux/resurrect"
+
+        if [ ! -d "$resurrect_dir" ]; then
+          echo "Error: Resurrect directory not found: $resurrect_dir" >&2
+          exit 1
+        fi
+
+        # Select session file
+        if [ -n "''${1:-}" ]; then
+          session_file="$1"
+          if [ ! -f "$session_file" ]; then
+            echo "Error: Session file not found: $session_file" >&2
+            exit 1
+          fi
+        else
+          # Use fzf to select from available sessions (newest first)
+          session_file=$(ls -t "$resurrect_dir"/tmux_resurrect_*.txt 2>/dev/null | fzf --prompt='Select resurrect session: ' --height=40%)
+
+          if [ -z "$session_file" ]; then
+            echo "No session file selected" >&2
+            exit 1
+          fi
+        fi
+
+        echo "Selected session: $session_file"
+
+        # Update last symlink
+        ln -sf "$session_file" "$resurrect_dir/last"
+
+        # Start tmux server if not running
+        if ! tmux has-session 2>/dev/null; then
+          echo "Starting new tmux server..."
+          tmux new-session -d
+        fi
+
+        # Run resurrect restore script
+        restore_script="$HOME/.local/share/tmux/plugins/tmux-resurrect/scripts/restore.sh"
+
+        if [ ! -f "$restore_script" ]; then
+          echo "Error: Resurrect restore script not found: $restore_script" >&2
+          echo "Falling back to manual restore trigger..." >&2
+          echo "After attaching, press prefix + Ctrl-r to restore" >&2
+          tmux attach-session
+          exit 0
+        fi
+
+        echo "Restoring session..."
+        tmux run-shell "$restore_script"
+
+        # Small delay to let restore complete
+        sleep 1
+
+        # Attach to session
+        exec tmux attach-session
+      '';
+    };
+
     # nix shell app reference
     nsa-ref = {
       text = ''
@@ -701,6 +794,7 @@ in
         clean-shell-history-secrets  Clean secrets from shell history using atuin and gitleaks
         flakeup                      Update Nix flake and commit lock file
         dev                          Enter Nix development shell
+        tre                          Tmux resurrect restore with session selection
         nsa-ref                      List all nix shell applications with descriptions
         EOF
       '';
