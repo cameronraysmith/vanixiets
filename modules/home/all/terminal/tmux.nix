@@ -38,11 +38,14 @@ in
       set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
 
       # Status bar separators
+      # Use powerline separators with connect_separator='no' to create isolated
+      # pill-style modules with proper caps (bg=default is injected before separators)
       set -g @catppuccin_status_left_separator ' '
       set -g @catppuccin_status_right_separator ' '
       set -g @catppuccin_status_right_separator_inverse 'no'
       set -g @catppuccin_status_fill 'icon'
-      set -g @catppuccin_status_connect_separator 'yes'
+      set -g @catppuccin_status_connect_separator 'no'
+      set -g @catppuccin_status_middle_separator ' '
 
       # Module customizations
       set -g @catppuccin_host_text ' #(whoami)@#H'
