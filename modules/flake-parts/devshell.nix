@@ -28,6 +28,11 @@
           ssh-to-age
           inputs'.agenix.packages.default
 
+          # SOPS key management tools
+          bitwarden-cli # bw command for key extraction
+          jq # JSON processing for Bitwarden API
+          gh # GitHub CLI for secrets management
+
           # TypeScript documentation tools
           bun # JavaScript runtime and package manager
           nodePackages.typescript # TypeScript compiler
