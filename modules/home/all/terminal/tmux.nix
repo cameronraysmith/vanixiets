@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 {
   programs.tmux = {
     enable = true;
@@ -129,7 +129,7 @@
       set -g @tmux-which-key-xdg-enable 1
 
       # Explicitly source the XDG init file to ensure it loads
-      run-shell "[ -f ~/.local/share/tmux/plugins/tmux-which-key/init.tmux ] && tmux source-file ~/.local/share/tmux/plugins/tmux-which-key/init.tmux"
+      run-shell "[ -f ${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux ] && tmux source-file ${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux"
 
       # Plugin: resurrect + continuum (session persistence)
       # Keybindings: prefix + Ctrl-s (save), prefix + Ctrl-r (restore)
