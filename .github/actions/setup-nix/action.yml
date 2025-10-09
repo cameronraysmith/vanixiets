@@ -23,6 +23,22 @@ inputs:
     description: max nix store size on macos before garbage collection (e.g., 5G, 10G)
     type: string
     default: "5G"
+  enable-cachix:
+    description: enable cachix binary cache
+    type: boolean
+    default: false
+  cachix-name:
+    description: cachix cache name
+    type: string
+    required: false
+  cachix-auth-token:
+    description: cachix auth token
+    type: string
+    required: false
+  cachix-skip-push:
+    description: skip pushing to cachix (read-only)
+    type: boolean
+    default: false
 
 outputs:
   cache-hit:
@@ -78,7 +94,6 @@ runs:
           keep-outputs = true
 
     - name: setup cache
-      if: runner.os == 'Linux'
       id: cache
       uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a # ratchet:nix-community/cache-nix-action@v6
       with:
@@ -91,6 +106,15 @@ runs:
         purge-created: 0
         purge-last-accessed: 0
         purge-primary-key: never
+
+    - name: setup cachix
+      if: inputs.enable-cachix
+      uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # ratchet:cachix/cachix-action@v16
+      continue-on-error: true
+      with:
+        name: ${{ inputs.cachix-name }}
+        authToken: ${{ inputs.cachix-auth-token }}
+        skipPush: ${{ inputs.cachix-skip-push }}
 
     - name: post setup-nix
       if: runner.os == 'macOS'
