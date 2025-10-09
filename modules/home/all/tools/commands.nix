@@ -741,18 +741,18 @@ in
           tmux new-session -d
         fi
 
-        # Run resurrect restore script
-        restore_script="${config.xdg.dataHome}/tmux/plugins/tmux-resurrect/scripts/restore.sh"
+        # Get resurrect restore script path from tmux options
+        restore_script=$(tmux show-option -gv @resurrect-restore-script-path 2>/dev/null)
 
-        if [ ! -f "$restore_script" ]; then
-          echo "Error: Resurrect restore script not found: $restore_script" >&2
+        if [ -z "$restore_script" ] || [ ! -f "$restore_script" ]; then
+          echo "Error: Resurrect restore script not found" >&2
           echo "Falling back to manual restore trigger..." >&2
           echo "After attaching, press prefix + Ctrl-r to restore" >&2
           tmux attach-session
           exit 0
         fi
 
-        echo "Restoring session..."
+        echo "Restoring session from: $(basename "$(dirname "$session_file")")/$(basename "$session_file")"
         tmux run-shell "$restore_script"
 
         # Small delay to let restore complete
