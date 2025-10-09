@@ -13,14 +13,8 @@
       set -g @catppuccin_window_text ' #{b:pane_current_path}'
       set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
 
-      # Transparent status bar for clean terminal integration
-      set -g @catppuccin_status_background 'none'
-
-      # Status bar modules
+      # Status bar modules - use default background (mantle) for proper separator rendering
       set -g @catppuccin_status_modules_left 'session'
-      set -g @catppuccin_status_left_separator ' '
-      set -g @catppuccin_status_right_separator ' '
-      set -g @catppuccin_status_right_separator_inverse 'no'
       set -g @catppuccin_status_fill 'icon'
       set -g @catppuccin_status_connect_separator 'no'
 
