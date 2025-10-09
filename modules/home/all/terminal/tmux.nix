@@ -27,15 +27,6 @@
       # Module customizations
       set -g @catppuccin_host_text ' #(whoami)@#H'
       set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
-
-      # Custom kube module (uses kubectx/kubens without plugin dependency)
-      %hidden MODULE_NAME="kube"
-      set -g "@catppuccin_''${MODULE_NAME}_icon" "󱃾 "
-      set -gF "@catppuccin_''${MODULE_NAME}_color" "#{E:@thm_blue}"
-      set -g "@catppuccin_kube_context_color" "#{@thm_red}"
-      set -g "@catppuccin_kube_namespace_color" "#{@thm_sky}"
-      set -g "@catppuccin_''${MODULE_NAME}_text" " #[fg=#{@catppuccin_kube_context_color}]#(kubectx -c 2>/dev/null)#[fg=default]:#[fg=#{@catppuccin_kube_namespace_color}]#(kubens -c 2>/dev/null)"
-      source -F "#{d:current_file}/../share/tmux-plugins/catppuccin/utils/status_module.conf"
     '';
   };
 
@@ -148,6 +139,20 @@
     ];
 
     extraConfig = ''
+      # Build custom kubernetes status module (inline, no plugin dependency)
+      # Icon background color (blue)
+      set -gF @_ctp_kube_icon_bg "#{E:@thm_blue}"
+      # Text background color (surface_0)
+      set -gF @_ctp_kube_text_bg "#{E:@thm_surface_0}"
+
+      # Build the kube status format string manually
+      set -gF @catppuccin_status_kube "#[fg=#{@_ctp_kube_icon_bg}]#[bg=default] "
+      set -agF @catppuccin_status_kube "#[fg=#{@thm_crust},bg=#{@_ctp_kube_icon_bg}]󱃾 "
+      set -ag @catppuccin_status_kube " "
+      set -agF @catppuccin_status_kube "#[fg=#{@thm_fg},bg=#{@_ctp_kube_text_bg}] "
+      set -ag @catppuccin_status_kube "#[fg=#{@thm_red}]#(kubectx -c 2>/dev/null)#[fg=#{@thm_fg}]:#[fg=#{@thm_sky}]#(kubens -c 2>/dev/null)"
+      set -agF @catppuccin_status_kube "#[fg=#{@_ctp_kube_text_bg}]#[bg=default] "
+
       # Apply catppuccin status line modules (must be set AFTER plugin loads)
       set -g status-left "#{E:@catppuccin_status_session}"
       set -g status-right "#{E:@catppuccin_status_kube}#{E:@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
