@@ -1,5 +1,9 @@
 { pkgs, config, ... }:
 {
+  # Disable automatic catppuccin module to prevent duplicate plugin loading
+  # We configure catppuccin manually in plugins with custom extraConfig
+  catppuccin.tmux.enable = false;
+
   programs.tmux = {
     enable = true;
     shell = "${pkgs.zsh}/bin/zsh";
@@ -12,10 +16,6 @@
     escapeTime = 10;
     secureSocket = false;
     disableConfirmationPrompt = true;
-
-    # Disable automatic catppuccin module to prevent duplicate plugin loading
-    # We configure catppuccin manually in plugins with custom extraConfig
-    catppuccin.enable = false;
 
     plugins = with pkgs; [
       # Mouse support improvements
