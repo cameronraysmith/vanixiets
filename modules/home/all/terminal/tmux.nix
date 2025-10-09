@@ -114,12 +114,13 @@ in
       set -g @continuum-save-interval '3'
 
       # Custom catppuccin separators using shell printf to preserve UTF-8
-      # Rounded: U+E0B4 () = \xee\x82\xb4  U+E0B6 () = \xee\x82\xb6
+      # Left: U+E0B6 (nf-ple-left_half_circle_thick) = \xee\x82\xb6
+      # Right: U+E0B4 (nf-ple-right_half_circle_thick) = \xee\x82\xb4
       # Block: U+2588 (█) = \xe2\x96\x88
       # Zoom icon: U+F531 (nf-oct-zoom_in) = \xef\x94\xb1
       set -g @catppuccin_window_status_style 'custom'
-      set -g @catppuccin_window_left_separator "$(printf '\xee\x82\xb4')"
-      set -g @catppuccin_window_right_separator "$(printf '\xee\x82\xb6 ')"
+      set -g @catppuccin_window_left_separator "$(printf '\xee\x82\xb6')"
+      set -g @catppuccin_window_right_separator "$(printf '\xee\x82\xb4 ')"
       set -g @catppuccin_window_middle_separator " $(printf '\xe2\x96\x88')"
       set -g @catppuccin_window_number_position 'right'
       set -g @catppuccin_window_default_fill 'number'
@@ -129,8 +130,8 @@ in
 
       set -g @catppuccin_status_modules_right 'directory date_time'
       set -g @catppuccin_status_modules_left 'session'
-      set -g @catppuccin_status_left_separator "$(printf '\xee\x82\xb4 ')"
-      set -g @catppuccin_status_right_separator "$(printf '\xee\x82\xb6')"
+      set -g @catppuccin_status_left_separator "$(printf '\xee\x82\xb6 ')"
+      set -g @catppuccin_status_right_separator "$(printf '\xee\x82\xb4')"
       set -g @catppuccin_status_right_separator_inverse 'no'
       set -g @catppuccin_status_fill 'icon'
       set -g @catppuccin_status_connect_separator 'no'
