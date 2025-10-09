@@ -1,8 +1,30 @@
 { pkgs, config, ... }:
 {
-  # Disable automatic catppuccin module to prevent duplicate plugin loading
-  # We configure catppuccin manually in plugins with custom extraConfig
-  catppuccin.tmux.enable = false;
+  # Use catppuccin-nix module for proper integration
+  catppuccin.tmux = {
+    enable = true;
+    extraConfig = ''
+      # Window tab styling
+      set -g @catppuccin_window_status_style 'rounded'
+      set -g @catppuccin_window_number_position 'right'
+
+      # Use basename of current path for window names (CORRECT option names)
+      set -g @catppuccin_window_text ' #{b:pane_current_path}'
+      set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
+
+      # Status bar modules - only show time/date on right
+      set -g @catppuccin_status_modules_right 'date_time'
+      set -g @catppuccin_status_modules_left 'session'
+      set -g @catppuccin_status_left_separator ' '
+      set -g @catppuccin_status_right_separator ' '
+      set -g @catppuccin_status_right_separator_inverse 'no'
+      set -g @catppuccin_status_fill 'icon'
+      set -g @catppuccin_status_connect_separator 'no'
+
+      # Date/time format: HH:MM DD-Mon-YY
+      set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
+    '';
+  };
 
   programs.tmux = {
     enable = true;
@@ -20,34 +42,6 @@
     plugins = with pkgs; [
       # Mouse support improvements
       tmuxPlugins.better-mouse-mode
-
-      # Theme configuration
-      {
-        plugin = tmuxPlugins.catppuccin;
-        extraConfig = ''
-          # Window tab styling
-          set -g @catppuccin_window_status_style 'rounded'
-          set -g @catppuccin_window_number_position 'right'
-          set -g @catppuccin_window_default_fill 'number'
-          set -g @catppuccin_window_current_fill 'number'
-
-          # Use basename of current path for window names
-          set -g @catppuccin_window_default_text '#{b:pane_current_path}'
-          set -g @catppuccin_window_current_text '#{b:pane_current_path}'
-
-          # Status bar modules - only show time/date on right
-          set -g @catppuccin_status_modules_right 'date_time'
-          set -g @catppuccin_status_modules_left 'session'
-          set -g @catppuccin_status_left_separator ' '
-          set -g @catppuccin_status_right_separator ' '
-          set -g @catppuccin_status_right_separator_inverse 'no'
-          set -g @catppuccin_status_fill 'icon'
-          set -g @catppuccin_status_connect_separator 'no'
-
-          # Date/time format: HH:MM DD-Mon-YY
-          set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
-        '';
-      }
 
       # URL selection and opening
       tmuxPlugins.fzf-tmux-url
@@ -211,16 +205,6 @@
       # Visual styling
       set -g pane-active-border-style 'fg=magenta,bg=default'
       set -g pane-border-style 'fg=brightblack,bg=default'
-
-      # Override catppuccin formats that aren't being respected
-      # These run AFTER plugins load, ensuring our preferences take precedence
-
-      # Window naming: use basename of current directory for automatic rename
-      setw -g automatic-rename on
-      setw -g automatic-rename-format '#{b:pane_current_path}'
-
-      # Status-right: ONLY show time and date (remove pane_title and continuum indicator)
-      set -g status-right '%H:%M %d-%b-%y'
     '';
   };
 
