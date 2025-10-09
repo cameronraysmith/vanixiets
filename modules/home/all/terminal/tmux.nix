@@ -15,6 +15,7 @@ in
   programs.tmux = {
     enable = true;
     shell = "${pkgs.zsh}/bin/zsh";
+    terminal = "tmux-256color";
     shortcut = "a";
     keyMode = "vi";
     baseIndex = 1;
@@ -83,9 +84,9 @@ in
       bind-key "K" display-popup -E -w 80% -h 80% "sesh connect \"$(sesh list -i | gum filter --limit 1 --placeholder 'Pick a sesh' --prompt='⚡')\""
       bind-key -T copy-mode-vi v send-keys -X begin-selection
 
-      set -g default-terminal "xterm-256color"
-      set -ga terminal-overrides ",*256col*:Tc"
-      set -ga terminal-overrides '*:Ss=\E[%p1%d q:Se=\E[ q'
+      # Terminal capabilities for truecolor and cursor shapes
+      set -ga terminal-overrides ",*256col*:RGB"
+      set -ga terminal-overrides ",*:Ss=\E[%p1%d q:Se=\E[ q"
       set-environment -g COLORTERM "truecolor"
 
       set-option -g mouse on
