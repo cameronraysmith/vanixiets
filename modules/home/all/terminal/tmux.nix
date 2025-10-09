@@ -211,6 +211,16 @@
       # Visual styling
       set -g pane-active-border-style 'fg=magenta,bg=default'
       set -g pane-border-style 'fg=brightblack,bg=default'
+
+      # Override catppuccin formats that aren't being respected
+      # These run AFTER plugins load, ensuring our preferences take precedence
+
+      # Window naming: use basename of current directory for automatic rename
+      setw -g automatic-rename on
+      setw -g automatic-rename-format '#{b:pane_current_path}'
+
+      # Status-right: ONLY show time and date (remove pane_title and continuum indicator)
+      set -g status-right '%H:%M %d-%b-%y'
     '';
   };
 
