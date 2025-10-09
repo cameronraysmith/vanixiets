@@ -135,6 +135,10 @@
     ];
 
     extraConfig = ''
+      # Apply catppuccin status line modules (must be set AFTER plugin loads)
+      set -g status-left "#{E:@catppuccin_status_session}"
+      set -g status-right "#{E:@catppuccin_status_date_time}"
+
       # Session and client management
       bind ^X lock-server
       bind ^C new-window -c "#{pane_current_path}"
