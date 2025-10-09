@@ -1,16 +1,4 @@
 { pkgs, ... }:
-let
-  tmux-sessionx = pkgs.tmuxPlugins.mkTmuxPlugin {
-    pluginName = "tmux-sessionx";
-    version = "unstable-2025-01-30";
-    src = pkgs.fetchFromGitHub {
-      owner = "omerxx";
-      repo = "tmux-sessionx";
-      rev = "fe704934f8cec16f07fcb9e722ed868fd769c647";
-      sha256 = "0yfxinx6bdddila3svszpky9776afjprn26c8agj6sqh8glhiz3b";
-    };
-  };
-in
 {
   programs.tmux = {
     enable = true;
@@ -36,7 +24,7 @@ in
       tmuxPlugins.resurrect
       tmuxPlugins.continuum
       tmuxPlugins.tmux-floax
-      tmux-sessionx
+      tmuxPlugins.tmux-sessionx
       tmuxPlugins.session-wizard
     ];
 
