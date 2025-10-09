@@ -1,15 +1,15 @@
 { pkgs, config, ... }:
 let
-  # Custom tmux plugin for kubernetes status display
-  # Uses kubectx/kubens commands to show current k8s context and namespace
-  tmux-kube = pkgs.tmuxPlugins.mkTmuxPlugin {
-    pluginName = "kube-tmux";
-    version = "unstable-2025-01-09";
+  # Tmux plugin for kubernetes context display (required by catppuccin kube module)
+  # Provides #{kubectx_context} and #{kubectx_namespace} variables
+  tmux-kubectx = pkgs.tmuxPlugins.mkTmuxPlugin {
+    pluginName = "tmux-kubectx";
+    version = "unstable-2024-12-28";
     src = pkgs.fetchFromGitHub {
-      owner = "jonmosco";
-      repo = "kube-tmux";
-      rev = "da04ab6b38e5dcb80e0edfc2c6895f8b0f52498e";
-      sha256 = "0wfsqlcs24jkm1szih0s5g0i17qj8laks0wbd9nnm77q92q77gb7";
+      owner = "tony-sol";
+      repo = "tmux-kubectx";
+      rev = "7913d57d72d7162f6b0e6050d4c9364b129d7215";
+      sha256 = "0lymdzd5a8ycs6rqahn4yl2hyi5fy60w0jsg38wlxqa5ysa2mdqs";
     };
   };
 in
@@ -136,7 +136,7 @@ in
       }
 
       # Kubernetes context/namespace display (provides #{kubectx_context} and #{kubectx_namespace})
-      tmux-kube
+      tmux-kubectx
 
       # Command palette and keybinding discovery (must load last to override Space)
       {
