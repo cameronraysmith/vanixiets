@@ -7,13 +7,16 @@
       # Window tab styling
       set -g @catppuccin_window_status_style 'rounded'
       set -g @catppuccin_window_number_position 'right'
+      set -g @catppuccin_window_flags 'icon'
 
-      # Use basename of current path for window names (CORRECT option names)
+      # Use basename of current path for window names
       set -g @catppuccin_window_text ' #{b:pane_current_path}'
       set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
 
-      # Status bar modules - session on left, date/time on right
-      set -g @catppuccin_status_modules_right 'date_time'
+      # Transparent status bar for clean terminal integration
+      set -g @catppuccin_status_background 'none'
+
+      # Status bar modules
       set -g @catppuccin_status_modules_left 'session'
       set -g @catppuccin_status_left_separator ' '
       set -g @catppuccin_status_right_separator ' '
@@ -21,8 +24,18 @@
       set -g @catppuccin_status_fill 'icon'
       set -g @catppuccin_status_connect_separator 'no'
 
-      # Date/time format: HH:MM DD-Mon-YY (icons use catppuccin defaults)
+      # Module customizations
+      set -g @catppuccin_host_text ' #(whoami)@#H'
       set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
+
+      # Custom kube module (uses kubectx/kubens without plugin dependency)
+      %hidden MODULE_NAME="kube"
+      set -g "@catppuccin_''${MODULE_NAME}_icon" "󱃾 "
+      set -gF "@catppuccin_''${MODULE_NAME}_color" "#{E:@thm_blue}"
+      set -g "@catppuccin_kube_context_color" "#{@thm_red}"
+      set -g "@catppuccin_kube_namespace_color" "#{@thm_sky}"
+      set -g "@catppuccin_''${MODULE_NAME}_text" " #[fg=#{@catppuccin_kube_context_color}]#(kubectx -c 2>/dev/null)#[fg=default]:#[fg=#{@catppuccin_kube_namespace_color}]#(kubens -c 2>/dev/null)"
+      source -F "#{d:current_file}/../share/tmux-plugins/catppuccin/utils/status_module.conf"
     '';
   };
 
@@ -137,7 +150,8 @@
     extraConfig = ''
       # Apply catppuccin status line modules (must be set AFTER plugin loads)
       set -g status-left "#{E:@catppuccin_status_session}"
-      set -g status-right "#{E:@catppuccin_status_date_time}"
+      set -g status-right "#{E:@catppuccin_status_kube}#{E:@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
+      set -g status-right-length 150
 
       # Session and client management
       bind ^X lock-server
@@ -244,4 +258,23 @@
       '';
     })
   ];
+
+  # Configure gitmux with catppuccin colors for git status in tmux
+  home.file.".gitmux.conf".text = ''
+    tmux:
+      styles:
+        clear: "#[fg=#{@thm_fg}]"
+        state: "#[fg=#{@thm_red},bold]"
+        branch: "#[fg=#{@thm_fg},bold]"
+        remote: "#[fg=#{@thm_teal}]"
+        divergence: "#[fg=#{@thm_fg}]"
+        staged: "#[fg=#{@thm_green},bold]"
+        conflict: "#[fg=#{@thm_red},bold]"
+        modified: "#[fg=#{@thm_yellow},bold]"
+        untracked: "#[fg=#{@thm_mauve},bold]"
+        stashed: "#[fg=#{@thm_blue},bold]"
+        clean: "#[fg=#{@thm_rosewater},bold]"
+        insertions: "#[fg=#{@thm_green}]"
+        deletions: "#[fg=#{@thm_red}]"
+  '';
 }
