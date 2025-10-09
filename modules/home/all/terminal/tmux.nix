@@ -48,7 +48,7 @@
       # Window management
       bind r command-prompt "rename-window %%"
       bind R source-file ~/.config/tmux/tmux.conf
-      bind ^R send-keys "clear"\; send-keys "Enter"
+      bind C-l send-keys "clear"\; send-keys "Enter"
 
       # Pane splitting (keep current path)
       bind | split-window -h -c "#{pane_current_path}"
@@ -129,6 +129,8 @@
       set -g @tmux-which-key-xdg-enable 1
 
       # Plugin: resurrect + continuum (session persistence)
+      # Keybindings: prefix + Ctrl-s (save), prefix + Ctrl-r (restore)
+      # Auto-saves every 15 minutes, auto-restores on server start
       set -g @resurrect-strategy-nvim 'session'
       set -g @resurrect-capture-pane-contents 'on'
       set -g @continuum-restore 'on'
