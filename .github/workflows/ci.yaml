@@ -377,7 +377,7 @@ jobs:
         uses: ./.github/actions/setup-nix
         with:
           system: ${{ matrix.system }}
-          enable-cachix: true
+          enable-cachix: false  # testing cache-nix-action performance without cachix network overhead (toggle to true to re-enable)
           cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
