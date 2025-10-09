@@ -13,6 +13,10 @@
     secureSocket = false;
     disableConfirmationPrompt = true;
 
+    # Disable automatic catppuccin module to prevent duplicate plugin loading
+    # We configure catppuccin manually in plugins with custom extraConfig
+    catppuccin.enable = false;
+
     plugins = with pkgs; [
       # Mouse support improvements
       tmuxPlugins.better-mouse-mode
