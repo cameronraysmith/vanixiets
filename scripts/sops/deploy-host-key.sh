@@ -87,22 +87,37 @@ else
 fi
 echo ""
 
-# Restart SSH service
-echo "Restarting SSH service..."
+# Restart SSH service (if running)
+echo "Restarting SSH service (if running)..."
 if [ "$OS_TYPE" = "darwin" ]; then
-  sudo launchctl kickstart -kp system/com.openssh.sshd
-  echo -e "${GREEN}✅ SSH service restarted (Darwin)${NC}"
+  if sudo launchctl list | grep -q com.openssh.sshd; then
+    sudo launchctl kickstart -kp system/com.openssh.sshd
+    echo -e "${GREEN}✅ SSH service restarted (Darwin)${NC}"
+  else
+    echo -e "${YELLOW}⚠️  SSH service not running (sshd not loaded)${NC}"
+    echo -e "${YELLOW}   Host key deployed but SSH server not active${NC}"
+  fi
 elif [ "$OS_TYPE" = "nixos" ]; then
-  sudo systemctl restart sshd
-  echo -e "${GREEN}✅ SSH service restarted (NixOS)${NC}"
+  if sudo systemctl is-active --quiet sshd; then
+    sudo systemctl restart sshd
+    echo -e "${GREEN}✅ SSH service restarted (NixOS)${NC}"
+  else
+    echo -e "${YELLOW}⚠️  SSH service not running${NC}"
+    echo -e "${YELLOW}   Host key deployed but SSH server not active${NC}"
+  fi
 else
-  echo -e "${YELLOW}⚠️  Unknown OS type - please restart SSH manually${NC}"
+  echo -e "${YELLOW}⚠️  Unknown OS type - please restart SSH manually if needed${NC}"
 fi
 echo ""
 
 echo -e "${GREEN}=== Host key deployment complete ===${NC}"
 echo ""
-echo "Next steps:"
-echo "  1. Test SSH access from another terminal/machine"
-echo "  2. Verify host key fingerprint matches Bitwarden"
-echo "  3. Keep backups at ${PRIVATE_KEY_PATH}.old until verified"
+echo "Verification steps:"
+echo "  1. Host key deployed to ${PRIVATE_KEY_PATH}"
+echo "  2. Fingerprint: $(sudo ssh-keygen -lf ${PUBLIC_KEY_PATH} 2>/dev/null | awk '{print $2}')"
+echo "  3. Backups at ${PRIVATE_KEY_PATH}.old (safe to delete after verification)"
+if sudo launchctl list 2>/dev/null | grep -q com.openssh.sshd || sudo systemctl is-active --quiet sshd 2>/dev/null; then
+  echo "  4. Test SSH access from another terminal/machine"
+else
+  echo "  4. SSH server not active (key available for sops-nix/future use)"
+fi
