@@ -15,7 +15,32 @@
 
     plugins = with pkgs; [
       tmuxPlugins.better-mouse-mode
-      tmuxPlugins.catppuccin
+      {
+        plugin = tmuxPlugins.catppuccin;
+        extraConfig = ''
+          # Window tab styling
+          set -g @catppuccin_window_status_style 'rounded'
+          set -g @catppuccin_window_number_position 'right'
+          set -g @catppuccin_window_default_fill 'number'
+          set -g @catppuccin_window_current_fill 'number'
+
+          # Use basename of current path for window names
+          set -g @catppuccin_window_default_text '#{b:pane_current_path}'
+          set -g @catppuccin_window_current_text '#{b:pane_current_path}'
+
+          # Status bar modules - only show time/date on right
+          set -g @catppuccin_status_modules_right 'date_time'
+          set -g @catppuccin_status_modules_left 'session'
+          set -g @catppuccin_status_left_separator ' '
+          set -g @catppuccin_status_right_separator ' '
+          set -g @catppuccin_status_right_separator_inverse 'no'
+          set -g @catppuccin_status_fill 'icon'
+          set -g @catppuccin_status_connect_separator 'no'
+
+          # Date/time format: HH:MM DD-Mon-YY
+          set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
+        '';
+      }
       tmuxPlugins.fzf-tmux-url
       tmuxPlugins.yank
       tmuxPlugins.prefix-highlight
@@ -139,35 +164,6 @@
       set -g @continuum-restore 'off'
       set -g @continuum-boot 'off'
       set -g @continuum-save-interval '3'
-
-      # Plugin: catppuccin (theme)
-      # Custom separators with direct Unicode characters
-      # Protected by .gitattributes (*.nix text eol=lf)
-      # Left:  (U+E0B6 nf-ple-left_half_circle_thick)
-      # Right:  (U+E0B4 nf-ple-right_half_circle_thick)
-      # Block: █ (U+2588)
-      # Zoom:  (U+F531 nf-oct-zoom_in)
-      # Window tab styling
-      set -g @catppuccin_window_status_style 'rounded'
-      set -g @catppuccin_window_number_position 'right'
-      set -g @catppuccin_window_default_fill 'number'
-      set -g @catppuccin_window_current_fill 'number'
-
-      # Use basename of current path for window names
-      set -g @catppuccin_window_default_text '#{b:pane_current_path}'
-      set -g @catppuccin_window_current_text '#{b:pane_current_path}'
-
-      # Status bar modules - only show time/date on right
-      set -g @catppuccin_status_modules_right 'date_time'
-      set -g @catppuccin_status_modules_left 'session'
-      set -g @catppuccin_status_left_separator ' '
-      set -g @catppuccin_status_right_separator ' '
-      set -g @catppuccin_status_right_separator_inverse 'no'
-      set -g @catppuccin_status_fill 'icon'
-      set -g @catppuccin_status_connect_separator 'no'
-
-      # Date/time format: HH:MM DD-Mon-YY (e.g., 13:19 09-Oct-25)
-      set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
     '';
   };
 
