@@ -39,9 +39,6 @@ in
       # Module customizations
       set -g @catppuccin_host_text ' #(whoami)@#H'
       set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
-
-      # Kube module: remove lowercase conversion and keep original case
-      set -g @catppuccin_kube_text ' #[fg=#{@catppuccin_kube_context_color}]#{kubectx_context}#[fg=default]:#[fg=#{@catppuccin_kube_namespace_color}]#{kubectx_namespace}'
     '';
   };
 
