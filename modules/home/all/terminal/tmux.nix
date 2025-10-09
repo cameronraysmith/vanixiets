@@ -140,17 +140,14 @@
 
     extraConfig = ''
       # Build custom kubernetes status module (inline, no plugin dependency)
-      # Icon background color (blue)
       set -gF @_ctp_kube_icon_bg "#{E:@thm_blue}"
-      # Text background color (surface_0)
       set -gF @_ctp_kube_text_bg "#{E:@thm_surface_0}"
 
-      # Build the kube status format string manually
+      # Build format matching catppuccin style with truncated kube names (max 15 chars)
       set -gF @catppuccin_status_kube "#[fg=#{@_ctp_kube_icon_bg}]#[bg=default] "
       set -agF @catppuccin_status_kube "#[fg=#{@thm_crust},bg=#{@_ctp_kube_icon_bg}]󱃾 "
-      set -ag @catppuccin_status_kube " "
       set -agF @catppuccin_status_kube "#[fg=#{@thm_fg},bg=#{@_ctp_kube_text_bg}] "
-      set -ag @catppuccin_status_kube "#[fg=#{@thm_red}]#(kubectx -c 2>/dev/null)#[fg=#{@thm_fg}]:#[fg=#{@thm_sky}]#(kubens -c 2>/dev/null)"
+      set -ag @catppuccin_status_kube "#[fg=#{@thm_red}]#(ctx=$(kubectx -c 2>/dev/null); [ -n \"$ctx\" ] && echo \"$\{ctx:0:15}\")#[fg=#{@thm_fg}]#(ctx=$(kubectx -c 2>/dev/null); [ -n \"$ctx\" ] && echo ':')#[fg=#{@thm_sky}]#(ns=$(kubens -c 2>/dev/null); [ -n \"$ns\" ] && echo \"$\{ns:0:15}\")"
       set -agF @catppuccin_status_kube "#[fg=#{@_ctp_kube_text_bg}]#[bg=default] "
 
       # Apply catppuccin status line modules (must be set AFTER plugin loads)
@@ -264,7 +261,7 @@
     })
   ];
 
-  # Configure gitmux with catppuccin colors for git status in tmux
+  # Configure gitmux with catppuccin colors and concise layout for git status in tmux
   home.file.".gitmux.conf".text = ''
     tmux:
       styles:
@@ -281,5 +278,11 @@
         clean: "#[fg=#{@thm_rosewater},bold]"
         insertions: "#[fg=#{@thm_green}]"
         deletions: "#[fg=#{@thm_red}]"
+      layout: [branch, " ", flags]
+      options:
+        branch_max_len: 15
+        branch_trim: right
+        ellipsis: …
+        hide_clean: true
   '';
 }
