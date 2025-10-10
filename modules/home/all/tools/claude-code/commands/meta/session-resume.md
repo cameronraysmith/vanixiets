@@ -26,21 +26,10 @@ Examples of well-formed titles:
 - "Python Type System Refactor with Pydantic v2 Integration"
 - "Docker Multi-arch Build Setup and CI Pipeline Optimization"
 
-After generating the command:
-1. Output the formatted command
-2. Append it to `~/.zsh_history` in the format: `: <unix-timestamp>:0;<command>`
-3. Use current unix timestamp from `date +%s`
-4. Confirm the entry was added with a simple message: "Added to shell history"
+Implementation approach to avoid shell parse errors:
+1. Extract UUID in separate bash command: `readlink ~/.claude/debug/latest | grep -oE '[pattern]'`
+2. If user provided $ARGUMENTS, use that instead of extracted value
+3. Build and output the formatted command string
+4. Output only the command, nothing else
 
-Example bash to determine UUID and append to history:
-```bash
-# Use provided argument if available, otherwise extract from debug
-if [ -n "$ARGUMENTS" ]; then
-  SESSION_UUID="$ARGUMENTS"
-else
-  SESSION_UUID=$(readlink ~/.claude/debug/latest | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
-fi
-
-RESUME_CMD="ccds -r ${SESSION_UUID} # Title YYYYMMDD HH:MMa"
-echo ": $(date +%s):0;${RESUME_CMD}" >> ~/.zsh_history
-```
+To avoid parse errors, use multiple sequential bash commands rather than complex one-liners with command substitution.
