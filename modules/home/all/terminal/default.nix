@@ -28,6 +28,7 @@ in
       # unix tools
       b3sum
       coreutils # many (non-)overlapping tools in toybox
+      diskus
       fd
       findutils # mostly covered by alternatives in toybox
       gnugrep # alternative in toybox
