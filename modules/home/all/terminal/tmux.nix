@@ -172,11 +172,13 @@ in
     ];
 
     extraConfig = ''
-      # Set status bar format with inline expansion so kubectx plugin can see placeholders
+      # Set status bar format with expansion at display time (not set time)
+      # Use -g (not -gF) so #{E:...} expands at display time, allowing:
+      # - #S to show current session name (not session at config load time)
+      # - #{kubectx_*} placeholders to be populated by the kubectx plugin
       # Note: gitmux uses #{@...} without E: to allow shell command execution
-      # Other modules use #{E:@...} for variable expansion
-      set -gF status-left "#{E:@catppuccin_status_session}"
-      set -gF status-right "#{E:@catppuccin_status_kube}#{@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
+      set -g status-left "#{E:@catppuccin_status_session}"
+      set -g status-right "#{E:@catppuccin_status_kube}#{@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
       set -g status-right-length 200
 
       # Initialize tmux-kubectx plugin AFTER setting status-right so it can interpolate #{kubectx_*} placeholders
