@@ -55,8 +55,9 @@ in
       # Kubernetes module customizations (set BEFORE loading catppuccin)
       # Use sky (blue) instead of red for cluster name to match k8s branding
       set -gF @catppuccin_kube_context_color "#{E:@thm_sky}"
-      # Truncate cluster name to 12 chars to save space (#{l:...} for lowercase)
-      set -g @catppuccin_kube_text " #{l:#[fg=#{@catppuccin_kube_context_color}]#{=12:kubectx_context}#[fg=default]:#[fg=#{@catppuccin_kube_namespace_color}]#{kubectx_namespace}}"
+      # Note: kubectx plugin needs exact #{kubectx_context} placeholder (no modifiers)
+      # The plugin does simple string replacement and won't match #{=12:kubectx_context}
+      set -g @catppuccin_kube_text " #{l:#[fg=#{@catppuccin_kube_context_color}]#{kubectx_context}#[fg=default]:#[fg=#{@catppuccin_kube_namespace_color}]#{kubectx_namespace}}"
     '';
   };
 
@@ -172,21 +173,20 @@ in
     ];
 
     extraConfig = ''
-      # Build status bar using catppuccin's recommended pattern:
-      # - Use -agF (append with format expansion) for each module
-      # - This expands #{E:@catppuccin_status_*} once to insert module format
-      # - Preserves inner placeholders (#S, #(gitmux...), #{kubectx_*}) for runtime
-      # - Gitmux uses #{@...} without E: per catppuccin docs
+      # Build status bar using catppuccin's recommended pattern (see README.md:160-164):
+      # - Use -ag for modules with dynamic tmux vars (#S, #H, time formats)
+      # - Use -agF for modules with plugin-populated variables or shell commands
+      # - Gitmux uses #{@...} without E: per catppuccin docs (line 177)
       set -g status-left-length 100
       set -g status-left ""
-      set -agF status-left "#{E:@catppuccin_status_session}"
+      set -ag status-left "#{E:@catppuccin_status_session}"
 
       set -g status-right-length 200
       set -g status-right ""
       set -agF status-right "#{E:@catppuccin_status_kube}"
       set -agF status-right "#{@catppuccin_status_gitmux}"
-      set -agF status-right "#{E:@catppuccin_status_host}"
-      set -agF status-right "#{E:@catppuccin_status_date_time}"
+      set -ag status-right "#{E:@catppuccin_status_host}"
+      set -ag status-right "#{E:@catppuccin_status_date_time}"
 
       # Initialize tmux-kubectx plugin AFTER setting status-right so it can interpolate #{kubectx_*} placeholders
       run-shell ${tmux-kubectx}/share/tmux-plugins/tmux-kubectx/kubectx.tmux
