@@ -229,6 +229,9 @@ in
       bind * setw synchronize-panes
       bind P set pane-border-status
 
+      # Display toggles
+      bind b set-option -g status
+
       # Pane resizing (repeatable)
       bind -r -T prefix , resize-pane -L 20
       bind -r -T prefix . resize-pane -R 20
