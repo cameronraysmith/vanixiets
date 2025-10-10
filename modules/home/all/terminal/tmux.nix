@@ -131,6 +131,27 @@ in
       }
 
       # Advanced session/window selector with zoxide integration
+      # https://github.com/omerxx/tmux-sessionx
+      #
+      # Fuzzy session manager with preview, creation, deletion, and navigation.
+      # Bound to prefix+o for quick access.
+      #
+      # Default keybindings (within sessionx popup):
+      # - enter               : Switch to selected session (or create new if name doesn't exist)
+      # - alt-backspace       : Delete selected session
+      # - ctrl-r              : Rename selected session
+      # - ctrl-w              : Window mode - show all windows across all sessions
+      # - ctrl-x              : Browse ~/.config (or custom path) to create session from directory
+      # - ctrl-e              : Expand PWD - search local subdirectories to create sessions
+      # - ctrl-b              : Back - return to initial session list view
+      # - ctrl-t              : Tree mode - hierarchical view of sessions+windows
+      # - ctrl-/              : Tmuxinator - list tmuxinator project templates (if enabled)
+      # - ctrl-g              : fzf-marks - show bookmarked directories (if enabled)
+      # - ctrl-u / ctrl-d     : Scroll preview up/down
+      # - ctrl-n / ctrl-p     : Navigate selection up/down
+      # - ?                   : Toggle preview pane visibility
+      #
+      # With zoxide integration enabled, non-matching input queries zoxide for smart path matching.
       {
         plugin = tmuxPlugins.tmux-sessionx;
         extraConfig = ''
