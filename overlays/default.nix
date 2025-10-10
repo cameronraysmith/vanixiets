@@ -41,5 +41,19 @@ packageOverrides
       # _meta/parsers.lua is a type definition file that errors when required
       nvimSkipModules = [ "nvim-treesitter._meta.parsers" ];
     });
+
+    # nvim-treesitter-textobjects must also use main branch to be compatible
+    # Master branch uses define_modules API which was removed in main branch rewrite
+    nvim-treesitter-textobjects =
+      super.vimPlugins.nvim-treesitter-textobjects.overrideAttrs
+        (oldAttrs: {
+          src = super.fetchFromGitHub {
+            owner = "nvim-treesitter";
+            repo = "nvim-treesitter-textobjects";
+            rev = "main";
+            hash = "sha256-+KmOpRi4JAqm6UqYdtk80jwFrJhLCs0lZM/Liofq0R4=";
+          };
+          version = "unstable-2025-10-09";
+        });
   };
 }
