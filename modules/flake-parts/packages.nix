@@ -29,6 +29,9 @@
     in
     {
       # export packages as flake outputs
-      packages = customPackagesPerSystem;
+      packages = customPackagesPerSystem // {
+        # Test overlay overrides
+        nvim-treesitter-main = pkgs.vimPlugins.nvim-treesitter;
+      };
     };
 }
