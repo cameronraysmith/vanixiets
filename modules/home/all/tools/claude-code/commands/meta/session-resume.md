@@ -23,4 +23,14 @@ Examples of well-formed titles:
 - "Python Type System Refactor with Pydantic v2 Integration"
 - "Docker Multi-arch Build Setup and CI Pipeline Optimization"
 
-Output only the formatted command, nothing else.
+After generating the command:
+1. Output the formatted command
+2. Append it to `~/.zsh_history` in the format: `: <unix-timestamp>:0;<command>`
+3. Use current unix timestamp from `date +%s`
+4. Confirm the entry was added with a simple message: "Added to shell history"
+
+Example bash to append to history:
+```bash
+RESUME_CMD="ccds -r <uuid> # Title YYYYMMDD HH:MMa"
+echo ": $(date +%s):0;${RESUME_CMD}" >> ~/.zsh_history
+```
