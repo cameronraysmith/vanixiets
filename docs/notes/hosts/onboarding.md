@@ -164,13 +164,17 @@ You should see exactly 3 keys with public key comments.
 
 ### Step 9: Test secrets decryption
 
+On a fresh machine, explicitly tell SOPS where to find the age keys:
+
 ```bash
-sops -d secrets/shared.yaml | head -5
+SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml | head -5
 ```
 
 If this succeeds and displays decrypted secret values, the SOPS infrastructure is working correctly.
 
-If it fails with "no key could be found to decrypt the data key", check:
+After nix-config activation, the `SOPS_AGE_KEY_FILE` environment variable will be set automatically and you won't need to specify it.
+
+If decryption fails with "no key could be found to decrypt the data key", check:
 - Host key deployed: `ls -la /etc/ssh/ssh_host_ed25519_key`
 - Age keys present: `cat ~/.config/sops/age/keys.txt`
 - Host in `.sops.yaml`: `grep <hostname> .sops.yaml`
