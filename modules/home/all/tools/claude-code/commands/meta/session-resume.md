@@ -28,10 +28,13 @@ Examples of well-formed titles:
 - "Docker Multi-arch Build Setup and CI Pipeline Optimization"
 
 Implementation approach:
-1. Get current date/time: `date +"%Y%m%d %I:%M%p" | tr 'APM' 'apm'`
-2. Extract UUID from $ARGUMENTS or `readlink ~/.claude/debug/latest | grep -oE '[pattern]'`
-3. Construct the full command string with session title
-4. Add to atuin history using this EXACT pattern:
+1. Check if atuin is available: `command -v atuin >/dev/null 2>&1`
+   - If atuin is NOT available, skip steps 5-7 and just display the command to the user
+   - If atuin IS available, proceed with all steps
+2. Get current date/time: `date +"%Y%m%d %I:%M%p" | tr 'APM' 'apm'`
+3. Extract UUID from $ARGUMENTS or `readlink ~/.claude/debug/latest | grep -oE '[pattern]'`
+4. Construct the full command string with session title
+5. Add to atuin history using this EXACT pattern:
 
 CRITICAL: The command MUST be wrapped in SINGLE QUOTES after the `--` to preserve the `#` comment character.
 
@@ -43,12 +46,15 @@ atuin history end --exit 0 $id
 ```
 
 Step-by-step execution:
-1. First, construct the full command string (e.g., "ccds -r abc123 # My Session 20251010 01:04p")
-2. Execute: `id=$(atuin history start -- '<full-command-string>')`
-   - Note: Single quotes around the ENTIRE command after `--` are REQUIRED
-   - The single quotes prevent the shell from treating `#` as a comment
-3. Execute: `true` (just returns exit code 0, do NOT run the actual ccds command)
-4. Execute: `atuin history end --exit 0 $id`
+1. Check if atuin is available with: `command -v atuin >/dev/null 2>&1`
+2. Construct the full command string (e.g., "ccds -r abc123 # My Session 20251010 01:04p")
+3. If atuin is available, execute the following three commands:
+   a. Execute: `id=$(atuin history start -- '<full-command-string>')`
+      - Note: Single quotes around the ENTIRE command after `--` are REQUIRED
+      - The single quotes prevent the shell from treating `#` as a comment
+   b. Execute: `true` (just returns exit code 0, do NOT run the actual ccds command)
+   c. Execute: `atuin history end --exit 0 $id`
+4. If atuin is NOT available, skip the atuin commands and just display the command
 
 Example execution:
 ```bash
@@ -58,7 +64,12 @@ atuin history end --exit 0 $id
 ```
 
 Output for user:
-- Show a brief message confirming the command was added to atuin history
-- Display the command that was added (the full ccds -r ... line)
+- If atuin is available:
+  - Show a brief message confirming the command was added to atuin history
+  - Display the command that was added (the full ccds -r ... line)
+- If atuin is NOT available:
+  - Show a message that atuin is not available
+  - Display the command (the full ccds -r ... line) that would have been added
+  - Suggest the user can copy and paste it manually
 
 IMPORTANT: Do NOT actually execute `ccds -r` as it would create a recursive Claude session. Use `true` as a placeholder.
