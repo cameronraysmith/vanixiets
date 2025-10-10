@@ -247,7 +247,7 @@ in
 
       # Terminal capabilities for truecolor and cursor shapes
       set -ga terminal-overrides ",*256col*:RGB"
-      set -ga terminal-overrides ",*:Ss=\E[%p1%d q:Se=\E[ q"
+      set -ga terminal-overrides ",*:Ss=\\E[%p1%d q:Se=\\E[0 q"
       set-environment -g COLORTERM "truecolor"
 
       # Modern tmux features
