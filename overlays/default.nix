@@ -32,7 +32,7 @@ packageOverrides
         hash = "sha256-1zVgNJJiKVskWF+eLllLB51iwg10Syx9IDzp90fFDWU=";
       };
       version = "unstable-2025-10-09";
-      # Main branch has different structure: no parser/ directory
+      # main branch has different structure: no parser/ directory
       # Make postPatch conditional to avoid rm failing on non-existent directory
       postPatch = ''
         [ -d parser ] && rm -r parser || true
@@ -43,7 +43,7 @@ packageOverrides
     });
 
     # nvim-treesitter-textobjects must also use main branch to be compatible
-    # Master branch uses define_modules API which was removed in main branch rewrite
+    # master branch uses define_modules API which was removed in main branch rewrite
     nvim-treesitter-textobjects =
       super.vimPlugins.nvim-treesitter-textobjects.overrideAttrs
         (oldAttrs: {
