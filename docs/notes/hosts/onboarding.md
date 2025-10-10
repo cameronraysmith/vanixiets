@@ -219,8 +219,27 @@ On first activation, this will:
 - Set up home-manager for your user
 - Deploy secrets via sops-nix
 
-Monitor the output for any errors.
-If activation fails due to secrets, revisit steps 5-9.
+**Important: SOPS_AGE_KEY_FILE is not needed for activation**
+
+The `SOPS_AGE_KEY_FILE` environment variable is only for manual `sops` CLI commands.
+During activation, sops-nix uses its own configuration (`sops.age.keyFile` in `modules/home/all/core/sops.nix`) to find keys.
+The key file at `~/.config/sops/age/keys.txt` was created in Step 7 and will be found automatically by sops-nix.
+
+Note: After activation, you'll still need to set `SOPS_AGE_KEY_FILE` manually when using `sops` commands directly.
+You can add this to your shell profile or set it per-session:
+```bash
+export SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt
+```
+
+**Troubleshooting activation:**
+
+If activation fails with secrets-related errors, verify:
+- Host key exists: `ls -la /etc/ssh/ssh_host_ed25519_key`
+- Age keys exist: `cat ~/.config/sops/age/keys.txt`
+- Keys can decrypt: `SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml`
+
+If the manual decryption test works but activation still fails, this may indicate a sops-nix configuration issue rather than a key problem.
+Check the activation output for specific error messages.
 
 ## Platform-specific considerations
 
