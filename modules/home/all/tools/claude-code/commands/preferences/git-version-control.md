@@ -15,7 +15,7 @@ Do not commit if:
 - Current directory is not a git repository
 - User explicitly requests discussion or experimentation without committing
 
-## Branch management
+## Branch workflow
 
 Branch naming: NN-descriptor (00-docs, 01-refactor, 02-bugfix, 03-feature, etc)
 
@@ -42,7 +42,7 @@ If you encounter a file with multiple distinct logical changes already present:
 - Preferred: inform user and pause for them to stage interactively with `git add -p [file]`
 - Alternative: construct patch files manually using `git diff [file]` and `git apply --cached [patch]`, but only when hunks have clear boundaries, are semantically distinct, and you can confidently construct valid unified diff format
 
-## Commit conventions
+## Commit formatting
 
 - Succinct conventional commit messages for semantic versioning
 - Test locally before committing when reasonable
