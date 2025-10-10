@@ -17,11 +17,11 @@ Do not commit if:
 
 ## Branch workflow
 
-Branch naming: NN-descriptor (00-docs, 01-refactor, 02-bugfix, 03-feature, etc)
+Branch naming: N-descriptor where N is the issue/PR number (6-docs, 42-refactor, 142-bugfix, 1337-feature, etc)
 
-Create a new branch when your next commits won't match the current branch's NN-descriptor:
-- Example: current branch is "03-feature-auth" but you're fixing a bug in logging → create "04-bugfix-logging"
-- Branch off current HEAD: `git checkout -b NN-descriptor`
+Create a new branch when your next commits won't match the current branch's N-descriptor:
+- Example: current branch is "42-feature-auth" but you're fixing bug #58 in logging → create "58-bugfix-logging"
+- Branch off current HEAD: `git checkout -b N-descriptor`
 - When the unit of work is complete and tests pass, offer to merge back via fast-forward
 
 Default bias: if in doubt whether work is related, create a new branch - branches are cheap, tangled history is expensive.
