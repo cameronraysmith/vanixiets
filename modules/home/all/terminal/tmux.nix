@@ -49,8 +49,14 @@ in
       set -g @catppuccin_status_middle_separator ' '
 
       # Module customizations
-      set -g @catppuccin_host_text ' #(whoami)@#H'
+      set -g @catppuccin_host_text ' @#H'
       set -g @catppuccin_date_time_text '%H:%M %d-%b-%y'
+
+      # Kubernetes module customizations (set BEFORE loading catppuccin)
+      # Use sky (blue) instead of red for cluster name to match k8s branding
+      set -gF @catppuccin_kube_context_color "#{E:@thm_sky}"
+      # Truncate cluster name to 12 chars to save space
+      set -g @catppuccin_kube_text " #[fg=#{@catppuccin_kube_context_color}]#{=12:kubectx_context}#[fg=default]:#[fg=#{@catppuccin_kube_namespace_color}]#{kubectx_namespace}"
     '';
   };
 
@@ -167,9 +173,10 @@ in
 
     extraConfig = ''
       # Set status bar format with inline expansion so kubectx plugin can see placeholders
-      # We expand catppuccin variables inline instead of using #{E:...} so kubectx can interpolate #{kubectx_*}
+      # Note: gitmux uses #{@...} without E: to allow shell command execution
+      # Other modules use #{E:@...} for variable expansion
       set -gF status-left "#{E:@catppuccin_status_session}"
-      set -gF status-right "#{E:@catppuccin_status_kube}#{E:@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
+      set -gF status-right "#{E:@catppuccin_status_kube}#{@catppuccin_status_gitmux}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}"
       set -g status-right-length 200
 
       # Initialize tmux-kubectx plugin AFTER setting status-right so it can interpolate #{kubectx_*} placeholders
