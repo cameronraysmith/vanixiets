@@ -61,7 +61,7 @@
     nix-index-database.url = "github:nix-community/nix-index-database";
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
 
-    lazyvim.url = "github:cameronraysmith/LazyVim-module/main";
+    lazyvim.url = "github:cameronraysmith/LazyVim-module/35-venv";
     lazyvim.inputs.nixpkgs.follows = "nixpkgs";
     lazyvim.inputs.systems.follows = "systems";
     catppuccin.url = "github:catppuccin/nix";
