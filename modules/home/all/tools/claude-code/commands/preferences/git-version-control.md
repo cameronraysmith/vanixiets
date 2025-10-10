@@ -41,6 +41,15 @@ Do not commit if:
 - Stage one file per commit via `git add [file]` after verifying exactly one logical change
 - Never use `git add .`, `git add -A`, or interactive staging (`git add -p`, `git add -i`, `git add -e`) - interactive commands hang
 
+## Branch management
+
+Create a new branch when your next commits won't match the current branch's NN-descriptor:
+- Example: current branch is "03-feature-auth" but you're fixing a bug in logging → create "04-bugfix-logging"
+- Branch off current HEAD: `git checkout -b NN-descriptor`
+- When the unit of work is complete and tests pass, offer to merge back via fast-forward
+
+Default bias: if in doubt whether work is related, create a new branch - branches are cheap, tangled history is expensive.
+
 ## Session commit summary
 
 After creating commits, provide a git command listing session commits: `git log --oneline <start-hash>..<end-hash>` using the commit hash from gitStatus context as start and `git rev-parse HEAD` as end. Use explicit hashes, not symbolic references, to ensure command remains valid after subsequent commits.
