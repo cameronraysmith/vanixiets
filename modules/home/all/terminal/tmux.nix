@@ -277,11 +277,11 @@ in
     after = [ "writeBoundary" ];
     before = [ ];
     data = ''
-      if [ -f "$HOME/.local/share/tmux/plugins/tmux-which-key/init.tmux" ]; then
-        chmod u+w "$HOME/.local/share/tmux/plugins/tmux-which-key/init.tmux"
+      if [ -f "${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux" ]; then
+        chmod u+w "${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux"
       fi
-      if [ -f "$HOME/.config/tmux/plugins/tmux-which-key/config.yaml" ]; then
-        chmod u+w "$HOME/.config/tmux/plugins/tmux-which-key/config.yaml"
+      if [ -f "${config.xdg.configHome}/tmux/plugins/tmux-which-key/config.yaml" ]; then
+        chmod u+w "${config.xdg.configHome}/tmux/plugins/tmux-which-key/config.yaml"
       fi
     '';
   };
