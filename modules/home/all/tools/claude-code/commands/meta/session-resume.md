@@ -9,7 +9,8 @@ ccds -r [session-uuid] # Session Title YYYYMMDD HH:MM[a/p]
 ```
 
 Requirements:
-- Use actual session UUID from conversation context if available, otherwise use placeholder `<session-uuid>`
+- Extract session UUID from `~/.claude/debug/latest` symlink using: `readlink ~/.claude/debug/latest | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'`
+- If extraction fails, use placeholder `<session-uuid>`
 - Create concise title (max 80 chars) summarizing the session's key topics and outcomes
 - Use current date in YYYYMMDD format (today's date)
 - Use 12-hour time format with 'a' or 'p' suffix (e.g., "09:37a", "02:15p")
@@ -29,8 +30,9 @@ After generating the command:
 3. Use current unix timestamp from `date +%s`
 4. Confirm the entry was added with a simple message: "Added to shell history"
 
-Example bash to append to history:
+Example bash to extract UUID and append to history:
 ```bash
-RESUME_CMD="ccds -r <uuid> # Title YYYYMMDD HH:MMa"
+SESSION_UUID=$(readlink ~/.claude/debug/latest | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+RESUME_CMD="ccds -r ${SESSION_UUID} # Title YYYYMMDD HH:MMa"
 echo ": $(date +%s):0;${RESUME_CMD}" >> ~/.zsh_history
 ```
