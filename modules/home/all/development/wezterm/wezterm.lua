@@ -1,14 +1,17 @@
+local wezterm = require("wezterm")
+
 return {
 	font = wezterm.font("Monaspace Neon Nerd Font"),
 	color_scheme = "Catppuccin Mocha",
 	window_decorations = "RESIZE",
-	font_size = 13,
+	font_size = 14,
+	line_height = 1.1,
 	hide_tab_bar_if_only_one_tab = true,
 	keys = {
 		-- Emulate other programs (Zed, VSCode, ...)
 		{
 			key = "P",
-			mods = "CMD|SHIFT",
+			mods = "CTRL|SHIFT",
 			action = wezterm.action.ActivateCommandPalette,
 		},
 	},
