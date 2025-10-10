@@ -75,6 +75,17 @@ vimPlugins = super.vimPlugins // {
     # Skip Lua Language Server meta annotation files from require check
     nvimSkipModules = [ "nvim-treesitter._meta.parsers" ];
   });
+
+  # nvim-treesitter-textobjects must also use main branch to be compatible
+  nvim-treesitter-textobjects = super.vimPlugins.nvim-treesitter-textobjects.overrideAttrs (oldAttrs: {
+    src = super.fetchFromGitHub {
+      owner = "nvim-treesitter";
+      repo = "nvim-treesitter-textobjects";
+      rev = "main";
+      hash = "sha256-+KmOpRi4JAqm6UqYdtk80jwFrJhLCs0lZM/Liofq0R4=";
+    };
+    version = "unstable-2025-10-09";
+  });
 };
 ```
 
@@ -103,6 +114,18 @@ The main branch includes a `lua/nvim-treesitter/_meta/` directory containing Lua
 These files (like `_meta/parsers.lua`) are not meant to be required at runtime and will error if loaded.
 The nixpkgs `neovim-require-check-hook` auto-discovers all lua modules and tests them, but its exclusion pattern doesn't catch the `_meta` directory.
 We use `nvimSkipModules` to explicitly exclude these meta files from the require check.
+
+### nvim-treesitter-textobjects compatibility
+
+**Critical discovery**: The main branch rewrite removed the `define_modules` API that the master branch used for its module system.
+This means `nvim-treesitter-textobjects` from the master branch (which nixpkgs uses) is **incompatible** with main branch nvim-treesitter.
+
+When using main branch nvim-treesitter with master branch textobjects, you get:
+```
+Error: attempt to call field 'define_modules' (a nil value)
+```
+
+**Solution**: Both plugins must use the same branch. Since LazyVim requires main branch nvim-treesitter, we must also override nvim-treesitter-textobjects to use main branch.
 
 ### Why this works
 
