@@ -1,4 +1,5 @@
 ---
+argument-hint: [session-uuid]
 description: Generate annotated resume command for current session
 ---
 
@@ -8,9 +9,10 @@ Generate a resume session command for the current conversation in this exact for
 ccds -r [session-uuid] # Session Title YYYYMMDD HH:MM[a/p]
 ```
 
-Requirements:
-- Extract session UUID from `~/.claude/debug/latest` symlink using: `readlink ~/.claude/debug/latest | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'`
-- If extraction fails, use placeholder `<session-uuid>`
+Requirements for session UUID:
+- If user provides $ARGUMENTS (session UUID as argument), use that value
+- Otherwise, extract from `~/.claude/debug/latest` symlink using: `readlink ~/.claude/debug/latest | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'`
+- If extraction fails and no argument provided, use placeholder `<session-uuid>`
 - Create concise title (max 80 chars) summarizing the session's key topics and outcomes
 - Use current date in YYYYMMDD format (today's date)
 - Use 12-hour time format with 'a' or 'p' suffix (e.g., "09:37a", "02:15p")
@@ -30,9 +32,15 @@ After generating the command:
 3. Use current unix timestamp from `date +%s`
 4. Confirm the entry was added with a simple message: "Added to shell history"
 
-Example bash to extract UUID and append to history:
+Example bash to determine UUID and append to history:
 ```bash
-SESSION_UUID=$(readlink ~/.claude/debug/latest | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+# Use provided argument if available, otherwise extract from debug
+if [ -n "$ARGUMENTS" ]; then
+  SESSION_UUID="$ARGUMENTS"
+else
+  SESSION_UUID=$(readlink ~/.claude/debug/latest | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+fi
+
 RESUME_CMD="ccds -r ${SESSION_UUID} # Title YYYYMMDD HH:MMa"
 echo ": $(date +%s):0;${RESUME_CMD}" >> ~/.zsh_history
 ```
