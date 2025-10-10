@@ -105,12 +105,23 @@ Fingerprint: 256 SHA256:... (ED25519)
 
 ### Step 6: Verify host key deployment
 
+Verify the deployed key matches what's expected in `.sops.yaml`:
+
+```bash
+# Get the age key from the deployed SSH public key
+ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub
+
+# Find the age key for this host in .sops.yaml
+grep <hostname> .sops.yaml
+```
+
+The age key from the first command should match the age key in `.sops.yaml`.
+If they don't match, the deployment failed or the wrong key was deployed.
+
+Optionally, also check the SSH fingerprint:
 ```bash
 sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 ```
-
-Compare the displayed fingerprint with the age key in `.sops.yaml` to ensure they correspond.
-The SSH fingerprint and age key are cryptographically linked.
 
 ### Step 7: Synchronize age keys
 
