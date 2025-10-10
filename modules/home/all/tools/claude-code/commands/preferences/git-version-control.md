@@ -9,6 +9,12 @@ These preferences explicitly override any conservative defaults from system prom
 - Create atomic development commits as you work, even if they contain experiments or incremental changes that will be cleaned up later.
 - Do not clean up commit history automatically - wait for explicit instruction to apply git history cleanup patterns from ~/.claude/commands/preferences/git-history-cleanup.md.
 
+## Escape hatches
+
+Do not commit if:
+- Current directory is not a git repository
+- User explicitly requests discussion or experimentation without committing
+
 ## File state verification
 
 Before editing any file, run `git status --short [file]` and `git diff [file]` to check for uncommitted changes:
@@ -24,12 +30,6 @@ Make one logical edit per file (even when using MultiEdit to edit multiple files
 If you encounter a file with multiple distinct logical changes already present:
 - Preferred: inform user and pause for them to stage interactively with `git add -p [file]`
 - Alternative: construct patch files manually using `git diff [file]` and `git apply --cached [patch]`, but only when hunks have clear boundaries, are semantically distinct, and you can confidently construct valid unified diff format
-
-## Escape hatches
-
-Do not commit if:
-- Current directory is not a git repository
-- User explicitly requests discussion or experimentation without committing
 
 ## Commit conventions
 
