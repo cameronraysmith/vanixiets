@@ -17,7 +17,7 @@ Before editing any file, run `git status --short [file]` and `git diff [file]` t
 
 ## Atomic commit workflow
 
-Make one logical edit at a time: edit file → `git add [file]` → verify with `git diff --cached [file]` → commit with focused message. This eliminates mixed hunks by construction.
+Make one logical edit per file (even when using MultiEdit to edit multiple files in parallel), then commit each file separately: edit file → `git add [file]` → verify with `git diff --cached [file]` → commit with focused message. This eliminates mixed hunks by construction.
 
 ## Handling pre-existing mixed changes
 
