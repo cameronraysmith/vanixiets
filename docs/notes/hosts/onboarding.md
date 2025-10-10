@@ -257,12 +257,14 @@ The host key at `/etc/ssh/ssh_host_ed25519_key` is used for server identity, not
 
 After activation, verify:
 
-- [ ] Secrets decrypt: `sops -d secrets/shared.yaml`
+- [ ] Secrets decrypt: `SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml`
 - [ ] Host key present: `ls -la /etc/ssh/ssh_host_ed25519_key`
 - [ ] Age keys present: `cat ~/.config/sops/age/keys.txt`
 - [ ] System packages available: `which <expected-package>`
 - [ ] Home-manager active: check home directory for expected configs
 - [ ] No activation errors in system logs
+
+Note: After full activation, `SOPS_AGE_KEY_FILE` is set automatically and the prefix is unnecessary.
 
 ## Troubleshooting
 
@@ -290,8 +292,8 @@ export BW_SESSION=$(bw unlock --raw)
 just sops-sync-keys
 bw lock
 
-# Retry decryption
-sops -d secrets/shared.yaml
+# Retry decryption (on fresh machines, set key file path explicitly)
+SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml
 ```
 
 ### Host key deployment fails
