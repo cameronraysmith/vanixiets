@@ -32,6 +32,14 @@ packageOverrides
         hash = "sha256-1zVgNJJiKVskWF+eLllLB51iwg10Syx9IDzp90fFDWU=";
       };
       version = "unstable-2025-10-09";
+      # Main branch has different structure: no parser/ directory
+      # Make postPatch conditional to avoid rm failing on non-existent directory
+      postPatch = ''
+        [ -d parser ] && rm -r parser || true
+      '';
+      # Skip Lua Language Server meta annotation files from require check
+      # _meta/parsers.lua is a type definition file that errors when required
+      nvimSkipModules = [ "nvim-treesitter._meta.parsers" ];
     });
   };
 }
