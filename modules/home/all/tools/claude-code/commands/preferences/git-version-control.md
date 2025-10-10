@@ -33,7 +33,6 @@ If you encounter a file with multiple distinct logical changes already present:
 
 ## Commit conventions
 
-- Branch naming: NN-descriptor (00-docs, 01-refactor, 02-bugfix, 03-feature, etc)
 - Succinct conventional commit messages for semantic versioning
 - Test locally before committing when reasonable
 - Never use emojis or multiple authors in commit messages
@@ -42,6 +41,8 @@ If you encounter a file with multiple distinct logical changes already present:
 - Never use `git add .`, `git add -A`, or interactive staging (`git add -p`, `git add -i`, `git add -e`) - interactive commands hang
 
 ## Branch management
+
+Branch naming: NN-descriptor (00-docs, 01-refactor, 02-bugfix, 03-feature, etc)
 
 Create a new branch when your next commits won't match the current branch's NN-descriptor:
 - Example: current branch is "03-feature-auth" but you're fixing a bug in logging → create "04-bugfix-logging"
