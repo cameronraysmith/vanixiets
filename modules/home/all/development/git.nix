@@ -33,7 +33,10 @@ in
       diff.colorMoved = "zebra";
       fetch.prune = true;
       format.signoff = true;
-      init.defaultBranch = "main";
+      init = {
+        defaultBranch = "main";
+        templateDir = ""; # Explicitly disable legacy template directory
+      };
       merge.conflictstyle = "diff3";
       push = {
         autoSetupRemote = true;
