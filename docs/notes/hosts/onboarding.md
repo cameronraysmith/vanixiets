@@ -362,6 +362,40 @@ ls -la scripts/sops/deploy-host-key.sh
    - MacOS may require granting permissions to terminal
    - Try activation again after addressing prompts
 
+### SSH authorized keys migration error
+
+**Symptom:** Activation fails with error about `/etc/ssh/authorized_keys.d exists` and a security notice
+
+**Full error message:**
+```
+error: /etc/ssh/authorized_keys.d exists, aborting activation
+SECURITY NOTICE: The previous implementation of the
+`users.users.<name>.openssh.authorizedKeys.*` options would not delete
+authorized keys files when the setting for a given user was removed.
+[...]
+```
+
+**Cause:** This is a one-time nix-darwin security migration for systems that previously had nix-darwin installed.
+The old SSH key management implementation didn't properly clean up keys, so nix-darwin now requires manual cleanup before proceeding.
+
+**Solution:**
+```bash
+# 1. Inspect existing keys (optional but recommended)
+ls -la /etc/ssh/authorized_keys.d/
+cat /etc/ssh/authorized_keys.d/*
+
+# 2. Remove the directory
+sudo rm -rf /etc/ssh/authorized_keys.d
+
+# 3. Retry activation
+just activate <hostname>
+```
+
+This is safe - your SSH keys in `~/.ssh/authorized_keys` are unaffected, and nix-darwin will recreate the directory with correctly managed keys from your configuration.
+
+**Note:** This error typically occurs when re-onboarding a host that previously had nix-darwin installed.
+Fresh installations won't have this directory and won't encounter this error.
+
 ### Bitwarden session expires
 
 **Symptom:** Commands fail with "Unauthorized" or "Session expired"
