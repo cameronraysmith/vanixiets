@@ -396,6 +396,159 @@ This is safe - your SSH keys in `~/.ssh/authorized_keys` are unaffected, and nix
 **Note:** This error typically occurs when re-onboarding a host that previously had nix-darwin installed.
 Fresh installations won't have this directory and won't encounter this error.
 
+### Flake configuration trust prompts
+
+**Symptom:** During activation, prompted to allow and trust configuration settings
+
+**Prompts shown:**
+```
+do you want to allow configuration setting 'substituters' to be set to '...'? (y/N)
+do you want to permanently mark this value as trusted (y/N)?
+do you want to allow configuration setting 'trusted-public-keys' to be set to '...'? (y/N)
+do you want to permanently mark this value as trusted (y/N)?
+```
+
+**Cause:** Nix security feature verifying flake configuration settings (nixConfig in flake.nix).
+This ensures you trust the binary caches and their signing keys before using them.
+
+**Solution:**
+Answer `y` to all four prompts (allow both settings and permanently mark both as trusted).
+
+**Why this is safe:**
+- These are official Nix caches configured in the flake.nix
+- Includes cache.nixos.org, nix-community.cachix.org, and project-specific caches
+- Public keys ensure cache integrity (prevents tampered binaries)
+- "Permanently trust" saves your decision and prevents future prompts
+
+**Note:** This only happens once per machine per flake configuration.
+
+### Nix store corruption
+
+**Symptom:** Build failures with errors about linking in `/nix/store/.links/`
+
+**Error message:**
+```
+error: cannot link '/nix/store/.tmp-link-12345-67890' to '/nix/store/.links/abc123...': File exists
+error: some substitutes for the outputs of derivation '...' failed
+```
+
+**Cause:** Corruption in Nix's content-addressable deduplication system.
+The `/nix/store/.links/` directory manages hard links for identical files.
+Usually caused by interrupted builds or disk I/O issues.
+
+**Solution:**
+
+Step 1: Verify and repair the store
+```bash
+sudo nix-store --verify --check-contents --repair
+```
+
+This checks all store paths and repairs corruption (may take 5-15 minutes).
+
+Step 2: Retry activation
+```bash
+just activate <hostname>
+```
+
+**If still failing:**
+
+Step 3: Remove deduplication links (safe - will be recreated)
+```bash
+sudo rm -rf /nix/store/.links
+sudo nix-store --verify --check-contents
+just activate <hostname>
+```
+
+**Fallback option:**
+Build from source instead of using caches:
+```bash
+sudo darwin-rebuild switch --flake .#<hostname> --fallback
+```
+
+### Insufficient disk space
+
+**Symptom:** Build failures, downloads abort, or "No space left on device" errors during activation
+
+**Diagnosis:**
+```bash
+# Check available disk space
+df -h /nix
+
+# Check size of Nix store
+du -sh /nix/store
+```
+
+First activation typically requires 10-20GB of free space (downloads packages, builds derivations).
+
+**Solution:**
+
+Clean up old Nix store generations:
+```bash
+# Remove old user environment generations
+nix-collect-garbage -d
+
+# For system-level cleanup (nix-darwin)
+sudo nix-collect-garbage -d
+
+# Check space freed
+df -h /nix
+```
+
+**Prevention:**
+- Ensure at least 20GB free before first activation
+- Run garbage collection periodically: `nix-collect-garbage --delete-older-than 30d`
+- Subsequent activations require less space (only new/changed packages)
+
+**Note:** If disk is full, you may need to free space outside the Nix store first (clean up Downloads, caches, etc.).
+
+### Missing Xcode Command Line Tools (macOS only)
+
+**Symptom:** Build failures with compiler errors during activation
+
+**Error messages:**
+```
+xcrun: error: invalid active developer path
+xcrun: error: unable to find utility "clang"
+error: builder for '...' failed with exit code 1
+```
+
+**Cause:** Xcode Command Line Tools not installed or path not set correctly.
+Required for building native packages on macOS.
+
+**Solution:**
+
+Install Xcode Command Line Tools:
+```bash
+xcode-select --install
+```
+
+This opens a GUI installer. Follow the prompts to complete installation (may take 10-15 minutes).
+
+**If already installed but still failing:**
+
+Reset the developer directory path:
+```bash
+sudo xcode-select --reset
+```
+
+**Accept license if needed:**
+```bash
+sudo xcodebuild -license accept
+```
+
+**Verify installation:**
+```bash
+xcode-select -p
+# Should output: /Library/Developer/CommandLineTools
+```
+
+After installation, retry activation:
+```bash
+just activate <hostname>
+```
+
+**Note:** This is macOS-specific. NixOS hosts have build tools managed by Nix directly.
+
 ### Bitwarden session expires
 
 **Symptom:** Commands fail with "Unauthorized" or "Session expired"
