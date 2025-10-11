@@ -103,6 +103,7 @@ in
       kubernetes-helm
       kustomize
       lazydocker
+      lima
       ngrok
       skopeo
       step-cli
