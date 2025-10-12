@@ -11,7 +11,6 @@ in
   ];
 
   nixpkgs.hostPlatform = "aarch64-darwin";
-  nixpkgs.config.allowUnfree = true;
 
   system.primaryUser = adminUser.username;
 
