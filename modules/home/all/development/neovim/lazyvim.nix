@@ -15,6 +15,12 @@
       dap = {
         core.enable = true;
       };
+      editor = {
+        snacks_picker = {
+          enable = true;
+          db.sqlite3.enable = true;
+        };
+      };
       lang = {
         # docker.enable = true;
         json.enable = true;
@@ -41,10 +47,7 @@
     };
     plugins = with pkgs.vimPlugins; [
       dressing-nvim
-      mini-pick
       nvim-web-devicons
-      telescope-nvim
-      telescope-fzf-native-nvim
     ];
     pluginsFile = {
       "lazyvim.lua".source = ./lazyvim/lazyvim.lua;
