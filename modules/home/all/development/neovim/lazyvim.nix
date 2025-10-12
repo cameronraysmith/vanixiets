@@ -22,7 +22,9 @@
         };
       };
       lang = {
+        astro.enable = true;
         # docker.enable = true;
+        go.enable = true;
         json.enable = true;
         markdown.enable = true;
         nix.enable = true;
