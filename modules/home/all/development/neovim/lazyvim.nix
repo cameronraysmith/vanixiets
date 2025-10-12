@@ -45,10 +45,7 @@
         dot.enable = true;
       };
     };
-    plugins = with pkgs.vimPlugins; [
-      dressing-nvim
-      nvim-web-devicons
-    ];
+    plugins = with pkgs.vimPlugins; [ ];
     pluginsFile = {
       "lazyvim.lua".source = ./lazyvim/lazyvim.lua;
     };
