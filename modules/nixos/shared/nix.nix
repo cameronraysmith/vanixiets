@@ -16,7 +16,7 @@ in
       allowUnsupportedSystem = true;
       allowUnfree = true;
     };
-    overlays = lib.attrValues self.overlays;
+    overlays = lib.attrValues self.overlays ++ [ inputs.lazyvim.overlays.nvim-treesitter-main ];
   };
 
   nix = {
