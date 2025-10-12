@@ -37,22 +37,18 @@
       };
     };
     plugins = with pkgs.vimPlugins; [
-      avante-nvim
       blink-cmp-copilot
       copilot-lua
       dressing-nvim
-      img-clip-nvim
       mini-pick
       neotest-python
       nvim-dap-python
       nvim-web-devicons
-      render-markdown-nvim
       telescope-nvim
       telescope-fzf-native-nvim
     ];
     pluginsFile = {
       "lazyvim.lua".source = ./lazyvim/lazyvim.lua;
-      # "avante.lua".source = ./lazyvim/avante.lua;
     };
     lazySpecs = {
       extras.lang.python = [
