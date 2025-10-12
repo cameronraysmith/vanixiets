@@ -4,6 +4,9 @@
   programs.lazyvim = {
     enable = true;
     extras = {
+      ai = {
+        copilot.enable = true;
+      };
       coding = {
         blink.enable = true;
         mini-surround.enable = true;
@@ -37,8 +40,6 @@
       };
     };
     plugins = with pkgs.vimPlugins; [
-      blink-cmp-copilot
-      copilot-lua
       dressing-nvim
       mini-pick
       nvim-web-devicons
