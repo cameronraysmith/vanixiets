@@ -164,6 +164,7 @@ in
       starship-jj
       # step-ca
       tmate
+      tree-sitter
       yq
 
       # compression
