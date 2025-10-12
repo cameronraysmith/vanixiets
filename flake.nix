@@ -91,7 +91,7 @@
         {
           _module.args.pkgs = import inputs.nixpkgs {
             inherit system;
-            overlays = lib.attrValues self.overlays;
+            overlays = lib.attrValues self.overlays ++ [ inputs.lazyvim.overlays.nvim-treesitter-main ];
             config.allowUnfree = true;
           };
         };
