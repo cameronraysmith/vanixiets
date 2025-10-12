@@ -24,7 +24,7 @@
       lang = {
         # docker.enable = true;
         json.enable = true;
-        # markdown.enable = true; # render-markdown-nvim
+        markdown.enable = true;
         nix.enable = true;
         # nushell.enable = true;
         # ocaml.enable = true;
