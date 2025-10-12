@@ -366,9 +366,9 @@ in
 
     # npm claude code with dangerously skip permissions
     npmccds = {
-      runtimeInputs = with pkgs; [ pnpm ];
+      runtimeInputs = with pkgs; [ bun ];
       text = ''
-        exec pnpm --package=@anthropic-ai/claude-code dlx claude --dangerously-skip-permissions "$@"
+        exec bunx -p @anthropic-ai/claude-code claude --dangerously-skip-permissions "$@"
       '';
     };
 
