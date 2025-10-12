@@ -3,6 +3,7 @@
 {
   programs.lazyvim = {
     enable = true;
+    ai_cmp = false; # Disable blink-cmp-copilot; we'll provide blink-copilot instead
     extras = {
       ai = {
         copilot.enable = true;
@@ -47,10 +48,19 @@
         dot.enable = true;
       };
     };
-    plugins = with pkgs.vimPlugins; [ ];
+    plugins = with pkgs.vimPlugins; [ blink-copilot ];
     pluginsFile = {
       "lazyvim.lua".source = ./lazyvim/lazyvim.lua;
-      "blink.lua".source = ./lazyvim/blink.lua;
+    };
+    lazySpecs = {
+      nvim-treesitter = [
+        {
+          ref = "nvim-treesitter/nvim-treesitter";
+          opts = {
+            auto_install = false;
+          };
+        }
+      ];
     };
   };
 }
