@@ -41,8 +41,6 @@
       copilot-lua
       dressing-nvim
       mini-pick
-      neotest-python
-      nvim-dap-python
       nvim-web-devicons
       telescope-nvim
       telescope-fzf-native-nvim
