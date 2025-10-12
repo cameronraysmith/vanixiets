@@ -54,5 +54,27 @@
       "lazyvim.lua".source = ./lazyvim/lazyvim.lua;
       # "avante.lua".source = ./lazyvim/avante.lua;
     };
+    lazySpecs = {
+      extras.lang.python = [
+        {
+          ref = "linux-cultist/venv-selector.nvim";
+          cmd = "VenvSelect";
+          ft = "python";
+          keys = [
+            {
+              lhs = "<leader>cv";
+              rhs = "<cmd>VenvSelect<cr>";
+              desc = "Select VirtualEnv";
+              ft = "python";
+            }
+          ];
+          opts = {
+            options = {
+              notify_user_on_venv_activation = true;
+            };
+          };
+        }
+      ];
+    };
   };
 }
