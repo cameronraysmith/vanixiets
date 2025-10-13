@@ -3,6 +3,7 @@ let
   # Base path for preference documents (without @ prefix)
   # The @ prefix must be added when referencing to enable auto-loading
   prefsPath = "${config.home.homeDirectory}/.claude/commands/preferences";
+  commandsPath = "${config.home.homeDirectory}/.claude/commands";
 in
 {
   # https://github.com/mirkolenz/nixos/blob/0911e2e/home/options/agents-md.nix#L22-L31
@@ -20,6 +21,7 @@ in
       - preferences: @${prefsPath}/preferences.md
       - general development practices: @${prefsPath}/general-practices.md
       - git version control: @${prefsPath}/git-version-control.md
+      - jj version control: ${commandsPath}/jj/jj-version-control.md
       - documentation: ${prefsPath}/documentation.md
       - change management: ${prefsPath}/change-management.md
       - architectural patterns: ${prefsPath}/architectural-patterns.md
@@ -35,6 +37,7 @@ in
       - typescript/node.js development: ${prefsPath}/typescript-nodejs-development.md
       - react/ui development: ${prefsPath}/react-tanstack-ui-development.md
       - git history cleanup: ${prefsPath}/git-history-cleanup.md
+      - jj history cleanup: ${commandsPath}/jj/jj-history-cleanup.md
 
       Always remember to fallback to using practical features and architectural
       patterns that emphasize algebraic data types, type-safety, and functional
