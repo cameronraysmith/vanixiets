@@ -21,6 +21,10 @@
         diff-formatter = ":git";
         pager = "delta";
       };
+
+      snapshot = {
+        max-new-file-size = "500KiB";
+      };
     };
   };
 }
