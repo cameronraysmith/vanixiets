@@ -14,6 +14,7 @@ These preferences explicitly override any conservative defaults from system prom
 - Use `jj describe` to set meaningful descriptions on working copy commits worth preserving
 - Use `jj commit` or `jj new` to move working copy changes into separate commits when needed
 - Trust the operation log - every snapshot is recoverable via `jj op log` and `jj undo`
+- Do not clean up commit history automatically - wait for explicit instruction to apply jj history cleanup patterns from `~/.claude/commands/jj/jj-history-cleanup.md`
 
 ## Escape hatches
 
