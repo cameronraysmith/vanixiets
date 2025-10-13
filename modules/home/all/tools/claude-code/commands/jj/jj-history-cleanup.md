@@ -31,7 +31,7 @@ Use the operation log (`jj op log`) as your safety net instead of backup branche
 
 ## Operations
 
-For detailed command mappings from git interactive rebase, see `git-interactive-rebase-to-jj.md` in this directory.
+For detailed command mappings from git interactive rebase, see `~/.claude/commands/jj/git-interactive-rebase-to-jj.md`.
 
 ### Reorder commits
 
@@ -429,7 +429,7 @@ jj op log --limit 20
 - Use revsets to operate on multiple commits at once
 - `jj op restore <id>` returns to any prior state
 - Test incrementally instead of at the end
-- Reference `git-interactive-rebase-to-jj.md` for detailed command mappings
+- Reference `~/.claude/commands/jj/git-interactive-rebase-to-jj.md` for detailed command mappings
 
 ## Advanced patterns
 
