@@ -78,6 +78,16 @@ check:
 verify:
   @./scripts/verify-system.sh
 
+# Bisect nixpkgs commits to find which one broke the build (automatic mode)
+[group('nix')]
+bisect-nixpkgs:
+  @./scripts/bisect-nixpkgs.sh auto
+
+# Bisect nixpkgs commits (manual mode: start, step, status, reset)
+[group('nix')]
+bisect-nixpkgs-manual command="status":
+  @./scripts/bisect-nixpkgs.sh {{ command }}
+
 # Run nix flake to execute `nix run .#activate` for the current host.
 [group('nix')]
 switch:
