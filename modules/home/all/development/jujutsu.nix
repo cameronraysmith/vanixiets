@@ -28,7 +28,7 @@
       #   "none()" - require explicit `jj file track <file>` for each file (like git add)
       #   "glob:pattern" - only track files matching pattern
       snapshot = {
-        max-new-file-size = "500KiB"; # Reject new files larger than 500KiB (default: 1MiB)
+        max-new-file-size = "300KiB"; # Reject new files larger than 300KiB (default: 1MiB)
         auto-track = "all()"; # Explicit default: track all new files automatically
       };
     };
