@@ -495,6 +495,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-darwin-stable": {
+      "locked": {
+        "lastModified": 1760309387,
+        "narHash": "sha256-e0lvQ7+B1Y8zjykYHAj9tBv10ggLqK0nmxwvMU3J0Eo=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "6cd95994a9c8f7c6f8c1f1161be94119afdcb305",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixpkgs-25.05-darwin",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nixpkgs-lib": {
       "locked": {
         "lastModified": 1754788789,
@@ -520,6 +536,22 @@
       "original": {
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/e9b51731911566bbf7e4895475a87fe06961de0b.tar.gz"
+      }
+    },
+    "nixpkgs-linux-stable": {
+      "locked": {
+        "lastModified": 1760139962,
+        "narHash": "sha256-4xggC56Rub3WInz5eD7EZWXuLXpNvJiUPahGtMkwtuc=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "7e297ddff44a3cc93673bb38d0374df8d0ad73e4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-25.05",
+        "repo": "nixpkgs",
+        "type": "github"
       }
     },
     "nixpkgs_2": {
@@ -656,6 +688,8 @@
         "nix-rosetta-builder": "nix-rosetta-builder",
         "nixos-unified": "nixos-unified",
         "nixpkgs": "nixpkgs_2",
+        "nixpkgs-darwin-stable": "nixpkgs-darwin-stable",
+        "nixpkgs-linux-stable": "nixpkgs-linux-stable",
         "nuenv": "nuenv",
         "omnix": "omnix",
         "sops-nix": "sops-nix",
