@@ -98,10 +98,14 @@
           };
         };
 
-      flake.om.ci.default.ROOT = {
-        dir = ".";
-        steps.flake-check.enable = false;
-        steps.custom = { };
+      flake = {
+        lib = import ./lib { inherit inputs; };
+
+        om.ci.default.ROOT = {
+          dir = ".";
+          steps.flake-check.enable = false;
+          steps.custom = { };
+        };
       };
     };
 }
