@@ -3,6 +3,7 @@
 self: super:
 let
   inherit (super) lib;
+  inherit (flake) inputs;
 
   fromDirectory =
     directory:
@@ -17,6 +18,9 @@ packageOverrides
 // {
   # Additional overrides
   # omnix = inputs.omnix.packages.${self.system}.default;
+
+  # Expose nuenv for nushell script packaging (analogous to writeShellApplication for bash)
+  nuenv = (inputs.nuenv.overlays.nuenv self super).nuenv;
 
   # nvim-treesitter override is now provided by LazyVim-module's overlay
   # See: inputs.lazyvim.overlays.nvim-treesitter-main applied in flake.nix
