@@ -6,7 +6,7 @@
 #   hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 # }
 #
-# Usage: Applied in overlays/inputs.nix to create final.patched nixpkgs
+# Usage: Applied in overlays/inputs.nix to create final.patched nixpkgs (Phase 2)
 #
 # Example (when needed):
 # [
@@ -16,5 +16,5 @@
 #   }
 # ]
 #
-# Currently empty - infrastructure ready for future use
+# Phase 1: Empty list (infrastructure only)
 [ ]
