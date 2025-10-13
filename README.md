@@ -390,14 +390,15 @@ This demonstrates:
 </details>
 
 <details>
-<summary>standard workflow: updates and verification</summary>
+<summary>workflow to address breaking updates</summary>
 
-After initial setup, this is the typical workflow for keeping your system up to date:
+After initial setup, this is the workflow for managing system updates and addressing breakage:
 
-**Update and verify**:
+### Basic workflow (when updates work)
+
 ```bash
 # 1. Update flake inputs
-nix flake update
+nix flake update nixpkgs
 # or: just update
 
 # 2. Verify everything builds (catches issues before activation)
@@ -407,30 +408,70 @@ just verify
 just activate
 ```
 
-**What `just verify` does**:
+### Workflow to address breaking updates
+
+```bash
+# 1. Update nixpkgs
+nix flake update nixpkgs
+
+# 2. Test if it breaks
+just verify
+
+# --- If verify PASSES ✓ ---
+just activate
+
+# --- If verify FAILS ✗ ---
+
+# 3. Find which commit broke it
+just bisect-nixpkgs
+
+# 4. After bisect identifies breaking commit, apply fix
+# Option A: Use incident response prompt with Claude Code
+#   Copy error from step 2, use: @modules/home/all/tools/claude-code/commands/nixpkgs/incident-response.md
+# Option B: Manual troubleshooting
+#   See: docs/notes/nixpkgs-incident-response.md
+
+# 5. After applying fix, verify again
+just verify
+
+# 6. When verify passes, activate
+just activate
+
+# 7. Document the fix
+git commit -am "fix(overlays): add hotfix for [package] after nixpkgs [commit]"
+```
+
+### What each command does
+
+**`just verify`**:
 - Runs `nix flake check` to validate flake structure and configurations
 - Builds your full system configuration without activating it
 - Exits with clear error messages if anything fails
-- References incident response documentation for troubleshooting
+- Safe: never modifies your running system
 
-**If verification fails**:
+**`just bisect-nixpkgs`**:
+- Automatically finds the exact nixpkgs commit that broke your build
+- Uses git bisect in ~/projects/nix-workspace/nixpkgs
+- Tests each commit with `just verify`
+- Shows GitHub link to breaking commit
+- Takes ~15-50 minutes depending on commit range
+- See: [docs/notes/workflow/nixpkgs-bisect-guide.md](./docs/notes/workflow/nixpkgs-bisect-guide.md)
 
-When packages break after updates (common with nixpkgs-unstable):
+**Incident response**:
+- Systematic troubleshooting using hotfixes infrastructure
+- Three strategies: stable fallback, upstream patch, or build override
+- Documented in: [docs/notes/nixpkgs-incident-response.md](./docs/notes/nixpkgs-incident-response.md)
+- AI-assisted via: `@modules/home/all/tools/claude-code/commands/nixpkgs/incident-response.md`
 
-1. Review the error output from `just verify`
-2. Check [docs/notes/nixpkgs-incident-response.md](./docs/notes/nixpkgs-incident-response.md) for systematic troubleshooting
-3. Or use the incident response prompt at `modules/home/all/tools/claude-code/commands/nixpkgs/incident-response.md` with Claude Code
-4. Apply appropriate fix (hotfix, patch, or override)
-5. Re-run `just verify` until it passes
-6. Then run `just activate`
+### Benefits of this workflow
 
-**Benefits of this workflow**:
 - Catch build failures before breaking your current system
-- Test changes in isolation
+- Know exactly which commit caused the problem
+- Systematic approach to applying fixes
+- Test changes in isolation before activation
 - Easy rollback if needed (just don't activate)
-- Systematic approach to handling breakage
 
-See the "nixpkgs hotfixes infrastructure" section above for the multi-channel resilience system.
+See the "nixpkgs hotfixes infrastructure" section above for details on the multi-channel resilience system.
 
 </details>
 
