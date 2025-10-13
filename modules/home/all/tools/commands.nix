@@ -798,5 +798,6 @@ in
       };
     }
     # Nushell shell applications using nuenv.writeShellApplication
-    ++ [ pkgs.atuin-format ];
+    # Note: nuenv.writeShellApplication returns { default = <derivation>; } not a derivation directly
+    ++ [ pkgs.atuin-format.default ];
 }
