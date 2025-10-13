@@ -78,7 +78,7 @@ in
       imagemagick
       poppler_utils
       qpdf
-      (quarto.override { python3 = null; })
+      quarto
       repomix
       svg2pdf
 
