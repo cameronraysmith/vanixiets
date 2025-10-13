@@ -93,6 +93,46 @@ This enables supporting shared configuration:
 
 </details>
 
+## nixpkgs hotfixes infrastructure
+
+<details>
+<summary>multi-channel nixpkgs resilience</summary>
+
+This repository uses a multi-channel nixpkgs resilience system to handle unstable breakage gracefully.
+
+### Features
+
+- **Multi-channel access**: Stable, unstable, and patched nixpkgs variants available
+- **Platform-specific hotfixes**: Selective stable fallbacks without full rollbacks
+- **Upstream patch application**: Apply fixes before they reach your channel
+- **Organized overrides**: Per-package build modifications in dedicated files
+- **Composable architecture**: Six-layer overlay composition for flexibility
+
+### Quick example
+
+When nixpkgs unstable breaks a package:
+
+```bash
+# Option 1: Use stable version (fastest)
+# Edit overlays/infra/hotfixes.nix to inherit from final.stable
+
+# Option 2: Apply upstream patch
+# Add to overlays/infra/patches.nix
+
+# Option 3: Modify build (e.g., disable tests)
+# Create overlays/overrides/packageName.nix
+```
+
+### Documentation
+
+- Architecture: [./docs/notes/nixpkgs-hotfixes.md](./docs/notes/nixpkgs-hotfixes.md)
+- Incident response: [./docs/notes/nixpkgs-incident-response.md](./docs/notes/nixpkgs-incident-response.md)
+- Override guidelines: [./overlays/overrides/README.md](./overlays/overrides/README.md)
+
+See incident response documentation for detailed workflows.
+
+</details>
+
 ## usage
 
 <details>
