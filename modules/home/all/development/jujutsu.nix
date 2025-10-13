@@ -22,8 +22,14 @@
         pager = "delta";
       };
 
+      # Snapshot settings control automatic file tracking and size limits
+      # auto-track options:
+      #   "all()" - automatically track all new files (default, like git without .gitignore)
+      #   "none()" - require explicit `jj file track <file>` for each file (like git add)
+      #   "glob:pattern" - only track files matching pattern
       snapshot = {
-        max-new-file-size = "500KiB";
+        max-new-file-size = "500KiB"; # Reject new files larger than 500KiB (default: 1MiB)
+        auto-track = "all()"; # Explicit default: track all new files automatically
       };
     };
   };
