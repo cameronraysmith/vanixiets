@@ -8,41 +8,205 @@ use something like this repository or one of the credited examples below.
 <details>
 <summary>organization</summary>
 
-The configuration is structured using
-[hercules-ci/flake-parts](https://github.com/hercules-ci/flake-parts)
-based on [srid/nixos-unified](https://github.com/srid/nixos-unified).
+## Architecture overview
 
-Directory tree:
-- `configurations/`: System-specific configurations
-- `modules/`: Reusable nix modules
-- `overlays/`: Package modifications
-- `packages/`: Custom package definitions
-- `secrets/`: Protected configuration data
+This configuration uses [flake-parts](https://github.com/hercules-ci/flake-parts) with [nixos-unified](https://github.com/srid/nixos-unified) to provide a modular, multi-platform nix configuration supporting:
 
-This enables supporting shared configuration:
+- **darwin**: macOS systems via nix-darwin
+- **nixos**: Linux systems via NixOS
+- **home**: Standalone home-manager for non-admin users
 
-- Universal home-manager configurations for multiple users
-- MacOS configurations via nix-darwin
-- NixOS configurations for both local and remote VMs
+The key benefit of nixos-unified is **autowiring**: directory structure automatically maps to flake outputs without manual wiring in flake.nix.
+
+## Directory structure
+
+```
+nix-config/
+├── configurations/      # System and user configurations (autowired)
+│   ├── darwin/          # → darwinConfigurations.*
+│   ├── nixos/           # → nixosConfigurations.*
+│   └── home/            # → legacyPackages.${system}.homeConfigurations.*
+├── modules/             # Reusable nix modules (autowired)
+│   ├── flake-parts/     # → flakeModules.* (system-agnostic)
+│   ├── darwin/          # → darwinModules.* (macOS-specific)
+│   ├── nixos/           # → nixosModules.* (Linux-specific)
+│   └── home/            # home-manager modules (imported, not autowired)
+├── overlays/            # Package modifications (autowired)
+│   ├── default.nix      # → overlays.default (6-layer composition)
+│   ├── inputs.nix       # → overlays.inputs (multi-channel nixpkgs)
+│   ├── infra/           # Infrastructure files (not autowired)
+│   ├── overrides/       # Per-package build modifications
+│   ├── packages/        # Custom derivations (6 packages)
+│   └── debug-packages/  # Development packages (4 packages)
+├── lib/                 # Shared library functions
+│   └── default.nix      # → flake.lib (exported for external use)
+├── packages/            # Standalone packages (not currently used)
+├── scripts/             # Maintenance and utility scripts
+│   ├── bisect-nixpkgs.sh    # Find breaking nixpkgs commits
+│   ├── verify-system.sh     # Verify system configuration builds
+│   └── sops/                # Secrets management helpers
+├── secrets/             # Encrypted configuration data (sops-nix)
+│   ├── hosts/           # Host-specific secrets
+│   ├── users/           # User-specific secrets
+│   └── services/        # Service credentials
+├── docs/                # Documentation
+│   ├── notes/           # Technical notes and guides
+│   └── development/     # Development workflows
+├── tests/               # Integration tests
+└── disabled/            # Temporarily disabled configurations
+```
+
+## Directory-to-output mapping
+
+### Configurations (autowired by nixos-unified)
+
+| File | Flake output | Command |
+|------|--------------|---------|
+| `configurations/darwin/stibnite.nix` | `darwinConfigurations.stibnite` | `darwin-rebuild switch --flake .#stibnite` |
+| `configurations/darwin/blackphos.nix` | `darwinConfigurations.blackphos` | `darwin-rebuild switch --flake .#blackphos` |
+| `configurations/nixos/orb-nixos.nix` | `nixosConfigurations.orb-nixos` | `nixos-rebuild switch --flake .#orb-nixos` |
+| `configurations/nixos/stibnite-nixos.nix` | `nixosConfigurations.stibnite-nixos` | `nixos-rebuild switch --flake .#stibnite-nixos` |
+| `configurations/nixos/blackphos-nixos.nix` | `nixosConfigurations.blackphos-nixos` | `nixos-rebuild switch --flake .#blackphos-nixos` |
+| `configurations/home/runner@stibnite.nix` | `legacyPackages.${system}.homeConfigurations.runner@stibnite` | `nix run .#activate-home -- runner@stibnite` |
+| `configurations/home/runner@blackphos.nix` | `legacyPackages.${system}.homeConfigurations.runner@blackphos` | `nix run .#activate-home -- runner@blackphos` |
+| `configurations/home/raquel@blackphos.nix` | `legacyPackages.${system}.homeConfigurations.raquel@blackphos` | `nix run .#activate-home -- raquel@blackphos` |
+
+**Key insight**: File names become configuration names. No manual registration required.
+
+### Modules (autowired by nixos-unified)
+
+| Directory | Flake output | Usage |
+|-----------|--------------|-------|
+| `modules/flake-parts/*.nix` | `flakeModules.*` | Imported automatically in flake.nix |
+| `modules/darwin/*.nix` | `darwinModules.*` | Available for darwin configurations |
+| `modules/nixos/*.nix` | `nixosModules.*` | Available for nixos configurations |
+| `modules/home/` | (imported directly) | Not autowired; imported via `modules/home/default.nix` |
+
+**Example**: `modules/flake-parts/devshell.nix` defines the development shell, automatically available as `flakeModules.devshell`.
+
+### Overlays (autowired by nixos-unified)
+
+| File | Flake output | Purpose |
+|------|--------------|---------|
+| `overlays/default.nix` | `overlays.default` | 6-layer composition (inputs → hotfixes → packages → debugPackages → overrides → flakeInputs) |
+| `overlays/inputs.nix` | `overlays.inputs` | Multi-channel nixpkgs access (stable, unstable, patched) |
+| `overlays/overrides/default.nix` | `overlays.overrides` | Auto-imported per-package build modifications |
+
+**Custom packages** (defined in overlays, exposed via packages output):
+- From `overlays/packages/`: cc-statusline-rs, starship-jj, markdown-tree-parser, atuin-format, bitwarden-cli, claude-code-bin
+- From `overlays/debug-packages/`: nvim-treesitter-main, activate, update, default
+
+**Note**: The `overlays/infra/` subdirectory is intentionally excluded from autowiring to avoid conflicts. It contains:
+- `hotfixes.nix`: Platform-specific stable fallbacks
+- `patches.nix`: Upstream patch infrastructure
+
+### Library functions
+
+| File | Flake output | Exported functions |
+|------|--------------|-------------------|
+| `lib/default.nix` | `flake.lib` | `mdFormat`, `systemInput`, `systemOs`, `importOverlays` |
+
+**Usage in other files**:
+```nix
+# flake.lib is available throughout the configuration
+inherit (flake.lib) systemInput systemOs;
+```
+
+## Nixos-unified autowiring explained
+
+### What is autowiring?
+
+Instead of manually registering each configuration, module, and overlay in `flake.nix`, nixos-unified scans directories and automatically creates flake outputs based on file paths.
+
+### Without autowiring (manual approach):
+
+```nix
+# flake.nix (traditional approach)
+{
+  outputs = { nixpkgs, nix-darwin, home-manager, ... }: {
+    darwinConfigurations.stibnite = nix-darwin.lib.darwinSystem {
+      modules = [ ./configurations/darwin/stibnite.nix ];
+    };
+    darwinConfigurations.blackphos = nix-darwin.lib.darwinSystem {
+      modules = [ ./configurations/darwin/blackphos.nix ];
+    };
+    nixosConfigurations.orb-nixos = nixpkgs.lib.nixosSystem {
+      modules = [ ./configurations/nixos/orb-nixos.nix ];
+    };
+    # ... repeat for every configuration, module, and overlay
+  };
+}
+```
+
+**Problems**: Verbose, error-prone, requires manual maintenance for each new configuration.
+
+### With autowiring (nixos-unified approach):
+
+```nix
+# flake.nix (actual implementation)
+{
+  outputs = inputs@{ flake-parts, ... }:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
+      imports = with builtins;
+        map (fn: ./modules/flake-parts/${fn}) (attrNames (readDir ./modules/flake-parts));
+      # ... minimal configuration
+    };
+}
+```
+
+**Benefits**:
+- **Add a new host**: Create `configurations/darwin/newhostname.nix` → automatically available as `darwinConfigurations.newhostname`
+- **Add a new module**: Create `modules/nixos/mymodule.nix` → automatically available as `nixosModules.mymodule`
+- **Add an overlay**: Create `overlays/myoverlay.nix` → automatically available as `overlays.myoverlay`
+
+### How autowiring works
+
+1. **Directory scan**: nixos-unified scans specific directories (`configurations/`, `modules/`, `overlays/`)
+2. **Path parsing**: File paths become flake output names
+   - `configurations/darwin/stibnite.nix` → `darwinConfigurations.stibnite`
+   - `modules/nixos/common.nix` → `nixosModules.common`
+   - `overlays/default.nix` → `overlays.default`
+3. **Automatic import**: Files are imported and wired into appropriate flake outputs
+4. **Module composition**: System configurations automatically import relevant modules
+
+### Value proposition
+
+**Developer ergonomics**:
+- Focus on configuration content, not plumbing
+- Less boilerplate → more maintainable
+- Reduced cognitive load: file organization IS the flake structure
+
+**Scalability**:
+- Adding new machines/users is straightforward
+- No flake.nix modifications needed for new configurations
+- Consistent patterns across configurations
+
+**Error prevention**:
+- Typos in manual wiring are eliminated
+- Missing imports are caught by directory structure
+- Consistent naming conventions enforced by file paths
+
+## Current flake outputs
 
 ```zsh
 ❯ om show .
 
- Packages (nix build .#<name>)
-╭──────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ name                 │ description                                                                                               │
-├──────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ activate             │ Activate NixOS/nix-darwin/home-manager configurations                                                     │
-│ starship-jj          │ starship plugin for jj                                                                                    │
-│ markdown-tree-parser │ A powerful JavaScript library and CLI tool for parsing and manipulating markdown files as tree structures │
-│ update               │ Update the primary flake inputs                                                                           │
-│ holos                │ Holos CLI tool                                                                                            │
-│ default              │ Activate NixOS/nix-darwin/home-manager configurations                                                     │
-│ cc-statusline-rs     │ Claude Code statusline implementation in Rust                                                             │
-│ quarto               │ Open-source scientific and technical publishing system built on Pandoc                                    │
-│ teller               │ Cloud native secrets management for developers                                                            │
-│ claude-code-bin      │ Agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster     │
-╰──────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+📦 Packages (nix build .#<name>)
+╭──────────────────────┬──────────────────────────────────────────────────────────────────────────────────────╮
+│ name                 │ description                                                                          │
+├──────────────────────┼──────────────────────────────────────────────────────────────────────────────────────┤
+│ nvim-treesitter-main │ N/A                                                                                  │
+│ starship-jj          │ starship plugin for jj                                                               │
+│ bitwarden-cli        │ Secure and free password manager for all of your devices                            │
+│ atuin-format         │ Format atuin history with Catppuccin Mocha colored table output                     │
+│ claude-code-bin      │ Agentic coding tool that lives in your terminal                                     │
+│ activate             │ Activate NixOS/nix-darwin/home-manager configurations                               │
+│ cc-statusline-rs     │ Claude Code statusline implementation in Rust                                       │
+│ default              │ Activate NixOS/nix-darwin/home-manager configurations                               │
+│ markdown-tree-parser │ JavaScript library and CLI for parsing markdown as tree structures                  │
+│ update               │ Update the primary flake inputs                                                      │
+╰──────────────────────┴──────────────────────────────────────────────────────────────────────────────────────╯
 
 🐚 Devshells (nix develop .#<name>)
 ╭─────────┬────────────────────────────────╮
@@ -62,34 +226,111 @@ This enables supporting shared configuration:
 ╭─────────────────┬─────────────╮
 │ name            │ description │
 ├─────────────────┼─────────────┤
-│ stibnite-nixos  │ N/A         │
 │ blackphos-nixos │ N/A         │
 │ orb-nixos       │ N/A         │
+│ stibnite-nixos  │ N/A         │
 ╰─────────────────┴─────────────╯
 
 🍏 Darwin Configurations (darwin-rebuild switch --flake .#<name>)
 ╭───────────┬─────────────╮
 │ name      │ description │
 ├───────────┼─────────────┤
-│ blackphos │ N/A         │
 │ stibnite  │ N/A         │
+│ blackphos │ N/A         │
 ╰───────────┴─────────────╯
 
 🔧 NixOS Modules
 ╭─────────┬─────────────╮
 │ name    │ description │
 ├─────────┼─────────────┤
-│ common  │ N/A         │
 │ default │ N/A         │
+│ common  │ N/A         │
 ╰─────────┴─────────────╯
 
 🎨 Overlays
-╭─────────┬─────────────╮
-│ name    │ description │
-├─────────┼─────────────┤
-│ default │ N/A         │
-╰─────────┴─────────────╯
+╭───────────┬─────────────╮
+│ name      │ description │
+├───────────┼─────────────┤
+│ inputs    │ N/A         │
+│ overrides │ N/A         │
+│ default   │ N/A         │
+╰───────────┴─────────────╯
 ```
+
+**Mapping outputs to directories**:
+- **10 packages**: From `overlays/packages/` (6) + `overlays/debug-packages/` (4)
+- **3 NixOS configurations**: From `configurations/nixos/*.nix`
+- **2 Darwin configurations**: From `configurations/darwin/*.nix`
+- **3 Home configurations**: From `configurations/home/*.nix` (not shown in om output, but available)
+- **2 NixOS modules**: From `modules/nixos/*.nix`
+- **3 overlays**: From `overlays/*.nix` (default, inputs, overrides)
+- **1 devshell**: From `modules/flake-parts/devshell.nix`
+
+## Practical examples
+
+### Example 1: Adding a new darwin host
+
+**Task**: Add configuration for new macOS machine "newhostname"
+
+**Steps**:
+1. Create `configurations/darwin/newhostname.nix`
+2. Run `darwin-rebuild switch --flake .#newhostname`
+
+**What happens**:
+- nixos-unified detects new file
+- Automatically creates `darwinConfigurations.newhostname` output
+- Configuration becomes immediately available
+
+**No flake.nix modifications needed**.
+
+### Example 2: Adding a custom package
+
+**Task**: Package a new tool "mytool"
+
+**Steps**:
+1. Create `overlays/packages/mytool.nix` with package definition
+2. Run `nix build .#mytool`
+
+**What happens**:
+- `overlays/packages/` directory is scanned by `packagesFromDirectoryRecursive`
+- Package automatically merged into overlay composition (layer 3: packages)
+- Available as `packages.${system}.mytool` output
+
+**Package immediately available in all configurations** via overlay.
+
+### Example 3: Creating a reusable nixos module
+
+**Task**: Create module for common server configuration
+
+**Steps**:
+1. Create `modules/nixos/server-common.nix`
+2. Import in any nixos configuration: `imports = [ inputs.self.nixosModules.server-common ];`
+
+**What happens**:
+- nixos-unified scans `modules/nixos/`
+- Automatically exports as `nixosModules.server-common`
+- Available for import in any nixos configuration
+
+**Module reusable across all NixOS systems**.
+
+## Why this matters
+
+**For newcomers**:
+- Directory structure is self-documenting
+- File organization directly maps to functionality
+- Less nix language knowledge required to add configurations
+
+**For experts**:
+- Predictable patterns enable quick modifications
+- Directory-based organization scales to large configurations
+- Focus energy on configuration content, not structure
+
+**For maintenance**:
+- Adding new machines/users requires minimal changes
+- Configuration discovery is straightforward (just list directories)
+- Reduced surface area for errors
+
+The transparency of nixos-unified's autowiring means **the directory tree IS the API**. Understanding the file structure means understanding the entire configuration architecture.
 
 </details>
 
