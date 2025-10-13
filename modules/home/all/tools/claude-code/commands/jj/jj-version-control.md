@@ -253,6 +253,38 @@ Use explicit operation IDs from session start if you noted them, otherwise count
 
 ## Integration with git repositories
 
+### Initializing jj in existing git repository
+
+To use jj with an existing git repository in colocated mode:
+
+```bash
+# Navigate to git repository
+cd /path/to/git/repo
+
+# Initialize jj in colocated mode
+jj git init --colocate
+
+# Verify setup
+ls -la  # Should see both .git/ and .jj/ directories
+jj log  # Shows git history imported into jj
+```
+
+The `--colocate` flag creates `.jj/` alongside `.git/` so both tools work on the same repository.
+All git branches become jj bookmarks automatically.
+From this point forward, use jj commands for history editing and git features work normally.
+
+Alternative for new repositories:
+
+```bash
+# Clone git repo with jj (automatically colocated)
+jj git clone <url> <directory>
+
+# Or initialize new jj repo backed by git
+jj git init --git-repo=.  # Creates .jj/ and .git/ in current directory
+```
+
+### Working in colocated repos
+
 When working in colocated repos (`.git` and `.jj` siblings):
 
 Colocated workflow:
