@@ -22,7 +22,7 @@
           omnix
           cachix
           ratchet
-          teller # migrating to sops-nix
+          # teller removed: migration to sops-nix complete
           sops
           age
           ssh-to-age
