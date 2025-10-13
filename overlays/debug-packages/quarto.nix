@@ -16,6 +16,17 @@
 }:
 
 let
+  # Define pythonWithPackages for compatibility with nixpkgs quarto
+  pythonWithPackages = python3.withPackages (
+    ps:
+    with ps;
+    [
+      jupyter
+      ipython
+    ]
+    ++ (extraPythonPackages ps)
+  );
+
   platforms = {
     "x86_64-linux" = "linux-amd64";
     "aarch64-linux" = "linux-arm64";
@@ -64,19 +75,12 @@ stdenv.mkDerivation rec {
             }
           }/bin/R"
       } \
-      ${lib.optionalString (python3 != null)
-        "--prefix QUARTO_PYTHON : ${
-          python3.withPackages (
-            ps:
-            with ps;
-            [
-              jupyter
-              ipython
-            ]
-            ++ (extraPythonPackages ps)
-          )
-        }/bin/python3"
-      }
+      ${
+        lib.optionalString (python3 != null) "--prefix QUARTO_PYTHON : ${pythonWithPackages}/bin/python3"
+      } \
+      ${lib.optionalString (
+        rWrapper != null && python3 != null
+      ) "--prefix RETICULATE_PYTHON : ${pythonWithPackages.interpreter}"}
   '';
 
   installPhase = ''
