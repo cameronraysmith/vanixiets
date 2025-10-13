@@ -5,7 +5,7 @@ let
 
   # get mdFormat type for agents-md module
   lib' = {
-    self = import ../../lib lib;
+    self = import ../../lib { inherit inputs; };
   };
 in
 {
