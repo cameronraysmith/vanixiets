@@ -36,16 +36,16 @@ in
       - react/ui development: ${prefsPath}/react-tanstack-ui-development.md
       - git history cleanup: ${prefsPath}/git-history-cleanup.md
 
-      Always remember to fallback to practical features and architectural
-      patterns that emphasize type-safety and functional programming as is
-      feasible within a given programming language or framework's ecosystem
-      (possibly with the addition of relevant libraries, e.g. basedpyright,
-      beartype, and dbrattli/Expression in python) without losing sight of the
-      fact that, in the ideal case, the integration of all of our codebases,
-      regardless of language or framework, would correspond to a monad
-      transformer stack in the category of functional effects. Succinctly, side
-      effects should be explicit in type signatures and isolated at boundaries
-      to preserve compositionality.
+      Always remember to fallback to using practical features and architectural
+      patterns that emphasize algebraic data types, type-safety, and functional
+      programming as is feasible within a given programming language or
+      framework's ecosystem (possibly with the addition of relevant libraries,
+      e.g. basedpyright, beartype, and dbrattli/Expression in python) without
+      losing sight of the fact that, in the ideal case, the integration of all
+      of our codebases, regardless of language or framework, would correspond to
+      an indexed monad transformer stack in the category of effects. Succinctly,
+      side effects should be explicit in type signatures and isolated at
+      boundaries to preserve compositionality.
     '';
   };
 }
