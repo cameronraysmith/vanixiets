@@ -10,13 +10,125 @@ use something like this repository or one of the credited examples below.
 
 ## Architecture overview
 
-This configuration uses [flake-parts](https://github.com/hercules-ci/flake-parts) with [nixos-unified](https://github.com/srid/nixos-unified) to provide a modular, multi-platform nix configuration supporting:
+This configuration combines three complementary architectural patterns:
+
+### 1. Base framework: flake-parts
+
+Uses [flake-parts](https://github.com/hercules-ci/flake-parts) as the foundation for modular flake composition, enabling perSystem configurations and composable flake modules.
+
+### 2. Autowiring layer: nixos-unified
+
+Integrates [nixos-unified](https://github.com/srid/nixos-unified) as flake-parts modules (`modules/flake-parts/nixos-flake.nix:4-5`) to provide **directory-based autowiring**:
+
+- `configurations/` → darwinConfigurations, nixosConfigurations, homeConfigurations
+- `modules/` → darwinModules, nixosModules, flakeModules
+- `overlays/` → overlays.*
+
+This eliminates manual wiring in flake.nix - file paths become flake outputs automatically.
+
+### 3. Resilience layer: multi-channel nixpkgs patterns
+
+Adopts proven resilience patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos) for handling nixpkgs unstable breakage:
+
+- **Multi-channel inputs**: Stable, unstable, and patched nixpkgs variants
+- **Hotfixes infrastructure**: Platform-specific stable fallbacks (overlays/infra/hotfixes.nix)
+- **Upstream patches**: Apply fixes before they reach your channel (overlays/infra/patches.nix)
+- **Organized overrides**: Per-package build modifications (overlays/overrides/)
+- **6-layer overlay composition**: Structured package and overlay merging
+
+**Key distinction**: mirkolenz/nixos uses flake-parts alone; this configuration integrates mirkolenz's overlay patterns into nixos-unified's autowiring framework.
+
+**Adaptation**: mirkolenz patterns live in `overlays/` (autowired) with infrastructure files in `overlays/infra/` (excluded from autowiring to prevent conflicts). The overlay composition logic remains unchanged, only the directory organization adapted for nixos-unified compatibility.
+
+### Platform support
 
 - **darwin**: macOS systems via nix-darwin
 - **nixos**: Linux systems via NixOS
 - **home**: Standalone home-manager for non-admin users
 
-The key benefit of nixos-unified is **autowiring**: directory structure automatically maps to flake outputs without manual wiring in flake.nix.
+## Integration of mirkolenz patterns
+
+### What was adopted from mirkolenz/nixos
+
+The following patterns were adopted from [mirkolenz/nixos](https://github.com/mirkolenz/nixos) (commits: 6-sops-update..hotfixes-infra-phase3):
+
+**1. Multi-channel nixpkgs inputs** (flake.nix:28-29):
+
+```nix
+nixpkgs-darwin-stable.url = "github:nixos/nixpkgs/nixpkgs-25.05-darwin";
+nixpkgs-linux-stable.url = "github:nixos/nixpkgs/nixos-25.05";
+```
+
+**2. Library helpers** (lib/default.nix):
+
+- `systemInput`: Select OS-specific nixpkgs input (darwin-stable vs linux-stable)
+- `systemOs`: Extract OS from system string (aarch64-darwin → darwin)
+- `importOverlays`: Auto-import overlay directory
+
+**3. Multi-channel access layer** (overlays/inputs.nix):
+
+- Exports: `inputs`, `nixpkgs`, `patched`, `stable`, `unstable`
+- Uses `systemInput` to select appropriate stable channel per OS
+- Uses `applyPatches` to create patched nixpkgs variant
+
+**4. Hotfixes pattern** (overlays/infra/hotfixes.nix):
+
+- Platform-conditional stable fallbacks: `inherit (final.stable) packageName;`
+- Structured: cross-platform → darwin → darwin-arch-specific → linux
+- Documents hydra links and removal conditions
+
+**5. Patches pattern** (overlays/infra/patches.nix):
+
+- List of fetchpatch specifications for upstream fixes
+- Applied in inputs.nix via `applyPatches`
+
+**6. Organized overrides** (overlays/overrides/):
+
+- Per-package build modifications
+- Auto-imported via `lib.importOverlays`
+- Example: `ghc_filesystem.nix` with `enableParallelBuilding = false;`
+
+**7. 6-layer overlay composition** (overlays/default.nix):
+
+```nix
+lib.mergeAttrsList [
+  inputs'        # Multi-channel nixpkgs access
+  hotfixes       # Platform-specific stable fallbacks
+  packages       # Custom derivations
+  debugPackages  # Debug packages
+  overrides      # Build modifications
+  flakeInputs    # Overlays from flake inputs
+]
+```
+
+### How patterns were adapted for nixos-unified
+
+**Critical difference**: mirkolenz/nixos uses flake-parts directly without autowiring. Our integration required adapting patterns to work with nixos-unified's directory-based autowiring:
+
+| Aspect | mirkolenz/nixos | nix-config (adapted) | Reason |
+|--------|-----------------|---------------------|--------|
+| Directory | `pkgs/` | `overlays/` | nixos-unified autowires `overlays/` |
+| Infrastructure files | `pkgs/hotfixes.nix` | `overlays/infra/hotfixes.nix` | Exclude from autowiring (we don't want separate overlay outputs) |
+| | `pkgs/patches.nix` | `overlays/infra/patches.nix` | Same reason |
+| Composition file | `pkgs/default.nix` | `overlays/default.nix` | Autowired as `overlays.default` |
+| Lib argument | `args@{ lib', ... }` | `{ flake, ... }` | Access flake.lib instead of specialArgs |
+| Flake wiring | Manual in flake-modules | Autowired | nixos-unified scans `overlays/` directory |
+
+The overlay composition logic is identical (same merge order, same layer purposes). Only the organization changed to prevent nixos-unified from creating unwanted `overlays.hotfixes` and `overlays.patches` outputs.
+
+**Verification**: Compare these files to see identical patterns:
+
+- mirkolenz: `pkgs/inputs.nix` vs nix-config: `overlays/inputs.nix` (same structure)
+- mirkolenz: `pkgs/hotfixes.nix` vs nix-config: `overlays/infra/hotfixes.nix` (same pattern)
+- mirkolenz: `lib/default.nix` vs nix-config: `lib/default.nix` (systemInput, systemOs, importOverlays are identical)
+
+### Why this integration matters
+
+- nixos-unified eliminates configuration boilerplate (autowiring)
+- mirkolenz patterns provide operational resilience (multi-channel)
+- Together: ergonomic architecture + robust nixpkgs handling
+
+When nixpkgs unstable breaks, you can apply surgical fixes (stable fallback for one package) without rolling back your entire flake.lock (which affects `O(10^5)` packages). The directory structure remains clean and intuitive thanks to autowiring.
 
 ## Directory structure
 
@@ -40,7 +152,7 @@ nix-config/
 │   └── debug-packages/  # Development packages (4 packages)
 ├── lib/                 # Shared library functions
 │   └── default.nix      # → flake.lib (exported for external use)
-├── packages/            # Standalone packages (not currently used)
+├── packages/            # Standalone typescript packages (docs site, etc)
 ├── scripts/             # Maintenance and utility scripts
 │   ├── bisect-nixpkgs.sh    # Find breaking nixpkgs commits
 │   ├── verify-system.sh     # Verify system configuration builds
@@ -71,7 +183,7 @@ nix-config/
 | `configurations/home/runner@blackphos.nix` | `legacyPackages.${system}.homeConfigurations.runner@blackphos` | `nix run .#activate-home -- runner@blackphos` |
 | `configurations/home/raquel@blackphos.nix` | `legacyPackages.${system}.homeConfigurations.raquel@blackphos` | `nix run .#activate-home -- raquel@blackphos` |
 
-**Key insight**: File names become configuration names. No manual registration required.
+File names become configuration names. No manual registration required.
 
 ### Modules (autowired by nixos-unified)
 
@@ -93,10 +205,12 @@ nix-config/
 | `overlays/overrides/default.nix` | `overlays.overrides` | Auto-imported per-package build modifications |
 
 **Custom packages** (defined in overlays, exposed via packages output):
+
 - From `overlays/packages/`: cc-statusline-rs, starship-jj, markdown-tree-parser, atuin-format, bitwarden-cli, claude-code-bin
 - From `overlays/debug-packages/`: nvim-treesitter-main, activate, update, default
 
 **Note**: The `overlays/infra/` subdirectory is intentionally excluded from autowiring to avoid conflicts. It contains:
+
 - `hotfixes.nix`: Platform-specific stable fallbacks
 - `patches.nix`: Upstream patch infrastructure
 
@@ -107,6 +221,7 @@ nix-config/
 | `lib/default.nix` | `flake.lib` | `mdFormat`, `systemInput`, `systemOs`, `importOverlays` |
 
 **Usage in other files**:
+
 ```nix
 # flake.lib is available throughout the configuration
 inherit (flake.lib) systemInput systemOs;
@@ -118,7 +233,7 @@ inherit (flake.lib) systemInput systemOs;
 
 Instead of manually registering each configuration, module, and overlay in `flake.nix`, nixos-unified scans directories and automatically creates flake outputs based on file paths.
 
-### Without autowiring (manual approach):
+### Without autowiring (manual approach)
 
 ```nix
 # flake.nix (traditional approach)
@@ -140,7 +255,7 @@ Instead of manually registering each configuration, module, and overlay in `flak
 
 **Problems**: Verbose, error-prone, requires manual maintenance for each new configuration.
 
-### With autowiring (nixos-unified approach):
+### With autowiring (nixos-unified approach)
 
 ```nix
 # flake.nix (actual implementation)
@@ -156,6 +271,7 @@ Instead of manually registering each configuration, module, and overlay in `flak
 ```
 
 **Benefits**:
+
 - **Add a new host**: Create `configurations/darwin/newhostname.nix` → automatically available as `darwinConfigurations.newhostname`
 - **Add a new module**: Create `modules/nixos/mymodule.nix` → automatically available as `nixosModules.mymodule`
 - **Add an overlay**: Create `overlays/myoverlay.nix` → automatically available as `overlays.myoverlay`
@@ -169,23 +285,6 @@ Instead of manually registering each configuration, module, and overlay in `flak
    - `overlays/default.nix` → `overlays.default`
 3. **Automatic import**: Files are imported and wired into appropriate flake outputs
 4. **Module composition**: System configurations automatically import relevant modules
-
-### Value proposition
-
-**Developer ergonomics**:
-- Focus on configuration content, not plumbing
-- Less boilerplate → more maintainable
-- Reduced cognitive load: file organization IS the flake structure
-
-**Scalability**:
-- Adding new machines/users is straightforward
-- No flake.nix modifications needed for new configurations
-- Consistent patterns across configurations
-
-**Error prevention**:
-- Typos in manual wiring are eliminated
-- Missing imports are caught by directory structure
-- Consistent naming conventions enforced by file paths
 
 ## Current flake outputs
 
@@ -258,6 +357,7 @@ Instead of manually registering each configuration, module, and overlay in `flak
 ```
 
 **Mapping outputs to directories**:
+
 - **10 packages**: From `overlays/packages/` (6) + `overlays/debug-packages/` (4)
 - **3 NixOS configurations**: From `configurations/nixos/*.nix`
 - **2 Darwin configurations**: From `configurations/darwin/*.nix`
@@ -273,10 +373,12 @@ Instead of manually registering each configuration, module, and overlay in `flak
 **Task**: Add configuration for new macOS machine "newhostname"
 
 **Steps**:
+
 1. Create `configurations/darwin/newhostname.nix`
 2. Run `darwin-rebuild switch --flake .#newhostname`
 
 **What happens**:
+
 - nixos-unified detects new file
 - Automatically creates `darwinConfigurations.newhostname` output
 - Configuration becomes immediately available
@@ -288,10 +390,12 @@ Instead of manually registering each configuration, module, and overlay in `flak
 **Task**: Package a new tool "mytool"
 
 **Steps**:
+
 1. Create `overlays/packages/mytool.nix` with package definition
 2. Run `nix build .#mytool`
 
 **What happens**:
+
 - `overlays/packages/` directory is scanned by `packagesFromDirectoryRecursive`
 - Package automatically merged into overlay composition (layer 3: packages)
 - Available as `packages.${system}.mytool` output
@@ -303,10 +407,12 @@ Instead of manually registering each configuration, module, and overlay in `flak
 **Task**: Create module for common server configuration
 
 **Steps**:
+
 1. Create `modules/nixos/server-common.nix`
 2. Import in any nixos configuration: `imports = [ inputs.self.nixosModules.server-common ];`
 
 **What happens**:
+
 - nixos-unified scans `modules/nixos/`
 - Automatically exports as `nixosModules.server-common`
 - Available for import in any nixos configuration
@@ -316,16 +422,19 @@ Instead of manually registering each configuration, module, and overlay in `flak
 ## Why this matters
 
 **For newcomers**:
+
 - Directory structure is self-documenting
 - File organization directly maps to functionality
 - Less nix language knowledge required to add configurations
 
 **For experts**:
+
 - Predictable patterns enable quick modifications
 - Directory-based organization scales to large configurations
 - Focus energy on configuration content, not structure
 
 **For maintenance**:
+
 - Adding new machines/users requires minimal changes
 - Configuration discovery is straightforward (just list directories)
 - Reduced surface area for errors
@@ -397,6 +506,7 @@ nix run . user@hostname  # non-admin user (standalone home-manager, no sudo requ
 ```
 
 **What this does:**
+
 - `make bootstrap`: Installs nix and direnv using Determinate Systems installer
 - `make verify`: Checks nix installation, flakes support, and flake validity
 - `make setup-user`: Generates age key at `~/.config/sops/age/keys.txt` for secrets
@@ -410,18 +520,21 @@ nix run . user@hostname  # non-admin user (standalone home-manager, no sudo requ
 This config supports two user patterns:
 
 **1. admin users** (darwin/nixos): Integrated home-manager configuration
+
 - Define user in `config.nix` and `configurations/{darwin,nixos}/${hostname}.nix`
 - Activate with `nix run . hostname` (requires sudo for system changes)
 - Full system and home-manager configuration
 - One admin per host
 
 **2. non-admin users**: Standalone home-manager configuration
+
 - Define user in `config.nix` and `configurations/home/${user}@${host}.nix`
 - Activate with `nix run . user@hostname` (no sudo required)
 - Home environment only, independent of system config
 - Multiple users per host supported
 
 **Directory structure:**
+
 ```
 configurations/
 ├── darwin/          # darwin system configs (admin users)
@@ -442,6 +555,7 @@ configurations/
 **Step 1: Get host SSH key and convert to age**
 
 On the new host:
+
 ```bash
 # if host doesn't have ssh key, generate one
 sudo ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
@@ -492,6 +606,7 @@ nix run . hostname
 **Step 1: User generates age key**
 
 On the user's machine:
+
 ```bash
 make bootstrap && exec $SHELL  # if nix not installed
 make setup-user                 # generates ~/.config/sops/age/keys.txt
@@ -506,6 +621,7 @@ SSH keys (in Bitwarden) are for authentication; age keys are for secrets encrypt
 **Step 2: Admin adds user to config**
 
 1. Add user to `config.nix`:
+
 ```nix
 newuser = {
   username = "newuser";
@@ -521,6 +637,7 @@ newuser = {
 3. Update `.sops.yaml` with user's age public key
 
 4. Reencrypt secrets:
+
 ```bash
 sops updatekeys secrets/shared.yaml
 # repeat for any secrets the user needs access to
@@ -540,10 +657,12 @@ nix run . newuser@hostname  # no sudo required
 All secrets use sops-nix with age encryption.
 
 **Key generation:**
+
 - **Users**: `age-keygen -o ~/.config/sops/age/keys.txt` (via `make setup-user`)
 - **Hosts**: `ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub`
 
 **Daily operations:**
+
 ```bash
 # verify secrets access
 make check-secrets
@@ -562,6 +681,7 @@ sops updatekeys secrets/shared.yaml
 ```
 
 **See also:**
+
 - [docs/sops-quick-reference.md](docs/sops-quick-reference.md) - Commands and troubleshooting
 - [docs/sops-team-onboarding.md](docs/sops-team-onboarding.md) - Team collaboration workflow
 - [docs/new-user-host.md](docs/new-user-host.md) - Comprehensive onboarding guide
@@ -622,6 +742,7 @@ nix run . raquel@blackphos
 ```
 
 This demonstrates:
+
 - Multiple admin users across machines (crs58, cameron)
 - Same user on multiple machines (runner@stibnite, runner@blackphos)
 - Machine-specific users (raquel@blackphos)
@@ -685,12 +806,14 @@ git commit -am "fix(overlays): add hotfix for [package] after nixpkgs [commit]"
 ### What each command does
 
 **`just verify`**:
+
 - Runs `nix flake check` to validate flake structure and configurations
 - Builds your full system configuration without activating it
 - Exits with clear error messages if anything fails
 - Safe: never modifies your running system
 
 **`just bisect-nixpkgs`**:
+
 - Automatically finds the exact nixpkgs commit that broke your build
 - Uses git bisect in ~/projects/nix-workspace/nixpkgs
 - Tests each commit with `just verify`
@@ -699,6 +822,7 @@ git commit -am "fix(overlays): add hotfix for [package] after nixpkgs [commit]"
 - See: [docs/notes/workflow/nixpkgs-bisect-guide.md](./docs/notes/workflow/nixpkgs-bisect-guide.md)
 
 **Incident response**:
+
 - Systematic troubleshooting using hotfixes infrastructure
 - Three strategies: stable fallback, upstream patch, or build override
 - Documented in: [docs/notes/nixpkgs-incident-response.md](./docs/notes/nixpkgs-incident-response.md)
