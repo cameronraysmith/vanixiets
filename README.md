@@ -389,6 +389,51 @@ This demonstrates:
 
 </details>
 
+<details>
+<summary>standard workflow: updates and verification</summary>
+
+After initial setup, this is the typical workflow for keeping your system up to date:
+
+**Update and verify**:
+```bash
+# 1. Update flake inputs
+nix flake update
+# or: just update
+
+# 2. Verify everything builds (catches issues before activation)
+just verify
+
+# 3. If verification passes, activate
+just activate
+```
+
+**What `just verify` does**:
+- Runs `nix flake check` to validate flake structure and configurations
+- Builds your full system configuration without activating it
+- Exits with clear error messages if anything fails
+- References incident response documentation for troubleshooting
+
+**If verification fails**:
+
+When packages break after updates (common with nixpkgs-unstable):
+
+1. Review the error output from `just verify`
+2. Check [docs/notes/nixpkgs-incident-response.md](./docs/notes/nixpkgs-incident-response.md) for systematic troubleshooting
+3. Or use the incident response prompt at `modules/home/all/tools/claude-code/commands/nixpkgs/incident-response.md` with Claude Code
+4. Apply appropriate fix (hotfix, patch, or override)
+5. Re-run `just verify` until it passes
+6. Then run `just activate`
+
+**Benefits of this workflow**:
+- Catch build failures before breaking your current system
+- Test changes in isolation
+- Easy rollback if needed (just don't activate)
+- Systematic approach to handling breakage
+
+See the "nixpkgs hotfixes infrastructure" section above for the multi-channel resilience system.
+
+</details>
+
 ## developing
 
 Run `direnv allow` or `nix develop` and then `just` for a table of commands.

@@ -73,6 +73,11 @@ build-debug package:
 check:
   nix flake check
 
+# Verify system configuration builds after updates (run before activate)
+[group('nix')]
+verify:
+  @./scripts/verify-system.sh
+
 # Run nix flake to execute `nix run .#activate` for the current host.
 [group('nix')]
 switch:
