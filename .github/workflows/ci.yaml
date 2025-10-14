@@ -371,14 +371,12 @@ jobs:
         run: |
           echo "verifying all configurations are exposed in flake outputs..."
 
-          # get flake outputs
-          FLAKE_OUTPUTS=$(nix flake show --json 2>/dev/null | jq -r '
-            (.darwinConfigurations // {} | keys[] as $k | "darwin:\($k)"),
-            (.nixosConfigurations // {} | keys[] as $k | "nixos:\($k)")
-          ')
+          # get flake outputs using nix eval (nix flake show --json doesn't work with complex flake structures)
+          DARWIN_CONFIGS=$(nix eval .#darwinConfigurations --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]? // empty' || echo "")
+          NIXOS_CONFIGS=$(nix eval .#nixosConfigurations --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]? // empty' || echo "")
 
-          echo "flake outputs:"
-          echo "$FLAKE_OUTPUTS"
+          echo "darwin configs in flake: $(echo "$DARWIN_CONFIGS" | tr '\n' ' ')"
+          echo "nixos configs in flake: $(echo "$NIXOS_CONFIGS" | tr '\n' ' ')"
           echo ""
 
           # check each configuration file has corresponding output
@@ -388,7 +386,7 @@ jobs:
           for config_file in configurations/darwin/*.nix; do
             if [ -f "$config_file" ]; then
               config=$(basename "$config_file" .nix)
-              if echo "$FLAKE_OUTPUTS" | grep -q "^darwin:$config$"; then
+              if echo "$DARWIN_CONFIGS" | grep -q "^$config$"; then
                 echo "✅ darwin:$config"
               else
                 echo "❌ darwin:$config missing from flake outputs"
@@ -405,7 +403,7 @@ jobs:
               else
                 config=$(basename "$config_file" .nix)
               fi
-              if echo "$FLAKE_OUTPUTS" | grep -q "^nixos:$config$"; then
+              if echo "$NIXOS_CONFIGS" | grep -q "^$config$"; then
                 echo "✅ nixos:$config"
               else
                 echo "❌ nixos:$config missing from flake outputs"
