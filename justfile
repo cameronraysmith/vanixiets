@@ -901,6 +901,57 @@ test-cachix:
     echo "✅ Push completed. Verify at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "Store path: $STORE_PATH"
 
+# Build darwin system and push to cachix (run after just verify or just activate)
+[group('CI/CD')]
+cache-darwin-system:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    HOSTNAME=$(hostname)
+    echo "Building darwin system for $HOSTNAME..."
+    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
+    echo "Cache: https://app.cachix.org/cache/$CACHE_NAME"
+    echo ""
+
+    # Check if already cached
+    FLAKE_OUTPUT=".#darwinConfigurations.$HOSTNAME.system"
+    echo "Checking if system is already cached..."
+    if nix path-info --store "https://$CACHE_NAME.cachix.org" "$FLAKE_OUTPUT" &>/dev/null; then
+        CACHED_PATH=$(nix path-info --store "https://$CACHE_NAME.cachix.org" "$FLAKE_OUTPUT")
+        echo "✓ System already cached: $CACHED_PATH"
+        echo ""
+        read -p "Push again anyway? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Skipping. System is already in cachix."
+            exit 0
+        fi
+    fi
+
+    echo "Building system configuration..."
+    SYSTEM_PATH=$(nom build "$FLAKE_OUTPUT" --no-link --print-out-paths 2>&1 | tail -1)
+
+    if [ -z "$SYSTEM_PATH" ] || [ ! -e "$SYSTEM_PATH" ]; then
+        echo "❌ Failed to build system or get store path"
+        exit 1
+    fi
+
+    echo "Built: $SYSTEM_PATH"
+    echo ""
+
+    # Push the path and all its runtime dependencies
+    echo "Pushing system and all dependencies to cachix..."
+    echo "(This may take several minutes depending on what's not already cached)"
+    nix-store --query --requisites --include-outputs "$SYSTEM_PATH" | \
+        sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
+
+    echo ""
+    echo "✅ Successfully pushed darwin system to cachix"
+    echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
+    echo "   System: $SYSTEM_PATH"
+    echo ""
+    echo "Other machines can now pull from cachix instead of rebuilding."
+
 ## sops
 
 # Extract key details from Bitwarden (all sops-* keys or specific key)
