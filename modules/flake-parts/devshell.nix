@@ -12,7 +12,7 @@
     }:
     {
       devShells.default = pkgs.mkShell {
-        name = "nix-config-shell";
+        name = "dev";
         meta.description = "Dev environment for nix-config";
         inputsFrom = [ config.pre-commit.devShell ];
         packages = with pkgs; [
