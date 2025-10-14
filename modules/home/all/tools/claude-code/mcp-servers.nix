@@ -14,15 +14,15 @@ in
   # Define sops secrets for the 3 MCP servers requiring API keys
   sops.secrets = {
     "mcp-firecrawl-api-key" = {
-      sopsFile = ../../../../secrets/users/crs58/mcp-api-keys.yaml;
+      sopsFile = ../../../../../secrets/users/crs58/mcp-api-keys.yaml;
       key = "firecrawl-api-key";
     };
     "mcp-huggingface-token" = {
-      sopsFile = ../../../../secrets/users/crs58/mcp-api-keys.yaml;
+      sopsFile = ../../../../../secrets/users/crs58/mcp-api-keys.yaml;
       key = "huggingface-token";
     };
     "mcp-context7-api-key" = {
-      sopsFile = ../../../../secrets/users/crs58/mcp-api-keys.yaml;
+      sopsFile = ../../../../../secrets/users/crs58/mcp-api-keys.yaml;
       key = "context7-api-key";
     };
   };
