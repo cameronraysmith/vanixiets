@@ -17,7 +17,8 @@ final: prev:
 let
   inherit (prev.stdenv.hostPlatform) system;
   inherit (flake) inputs;
-  lib' = flake.lib;
+  # Access lib through inputs.self since nixos-unified's specialArgsFor.common doesn't include lib directly
+  lib' = inputs.self.lib;
   os = lib'.systemOs system;
 
   # Shared nixpkgs configuration
