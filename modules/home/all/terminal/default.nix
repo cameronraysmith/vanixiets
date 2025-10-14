@@ -94,7 +94,7 @@ in
       (google-cloud-sdk.withExtraComponents [
         google-cloud-sdk.components.gke-gcloud-auth-plugin
       ])
-      holos
+      holos # from nixpkgs (custom version available at .#debug.holos)
       # kcl
       kind
       krew
