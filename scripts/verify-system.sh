@@ -29,11 +29,21 @@ if [ $FAILED -eq 0 ]; then
     echo "Step 2/2: Building system configuration (without activation)..."
 
     if command -v darwin-rebuild &> /dev/null; then
-        if darwin-rebuild build --flake .; then
-            echo "✓ Darwin system builds successfully"
+        # Use nom (nix output manager) for better build output if available
+        if command -v nom &> /dev/null; then
+            if nom build '.#darwinConfigurations.'"$(hostname)"'.system'; then
+                echo "✓ Darwin system builds successfully"
+            else
+                echo "✗ Darwin build failed"
+                FAILED=1
+            fi
         else
-            echo "✗ Darwin build failed"
-            FAILED=1
+            if darwin-rebuild build --flake .; then
+                echo "✓ Darwin system builds successfully"
+            else
+                echo "✗ Darwin build failed"
+                FAILED=1
+            fi
         fi
     elif command -v nixos-rebuild &> /dev/null; then
         if nixos-rebuild build --flake .; then
