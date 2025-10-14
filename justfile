@@ -63,10 +63,16 @@ clean:
 build profile: lint check
   nix build --json --no-link --print-build-logs ".#{{ profile }}"
 
-# Build a debug package (not exposed in flake outputs, won't be built in CI)
+# Build an experimental debug package with nom (isolated from nixpkgs/CI builds)
 [group('nix')]
-build-debug package:
-  nix-build -E 'with import <nixpkgs> {}; callPackage ./overlays/debug-packages/{{ package }}.nix {}'
+debug-build package:
+  nom build '.#debug.{{ package }}'
+
+# List all available debug packages
+[group('nix')]
+debug-list:
+  @echo "Available debug packages:"
+  @nix eval .#debug --apply 'builtins.attrNames' --json | jq -r '.[]' | sort
 
 # Check nix flake
 [group('nix')]
