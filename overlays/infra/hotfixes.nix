@@ -23,11 +23,16 @@ final: prev:
 }
 // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
   # Darwin-wide hotfixes (both aarch64 and x86_64)
-  # Example:
-  # inherit (final.stable)
-  #   # https://hydra.nixos.org/job/nixpkgs/trunk/time.aarch64-darwin
-  #   time
-  #   ;
+  inherit (final.stable)
+    # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.aarch64-darwin
+    # Error: fmt library compatibility issue with clang 21.x
+    # - Formatter<fs::u8path> missing const qualifier on format method
+    # - Breaks in unstable after 2025-09-28 (last successful hydra build)
+    # - Pulls stable ghc_filesystem as dependency, solving both issues
+    # TODO: Remove when fmt/clang 21.x compatibility fixed upstream
+    # Added: 2025-10-13
+    micromamba
+    ;
 })
 // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "x86_64-darwin") {
   # x86_64-darwin specific hotfixes
