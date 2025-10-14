@@ -887,6 +887,79 @@ cache-linux-package package:
 [group('CI/CD')]
 cache-bitwarden-linux: (cache-linux-package "bitwarden-cli")
 
+# Cache bws (Bitwarden Secrets CLI) from nixpkgs for Linux (the one that fails in CI!)
+[group('CI/CD')]
+cache-bws-linux:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Caching bws (Bitwarden Secrets Manager CLI) for Linux architectures..."
+    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
+    echo "Cache: https://app.cachix.org/cache/$CACHE_NAME"
+    echo ""
+    echo "Note: bws is from nixpkgs, not custom package, so uses different build path"
+    echo ""
+
+    # Build and cache for aarch64-linux
+    echo "Building bws for aarch64-linux..."
+    AARCH64_PATH=$(nom build nixpkgs#bws --system aarch64-linux --no-link --print-out-paths --max-jobs 0)
+    echo "Built: $AARCH64_PATH"
+    echo ""
+
+    echo "Pushing to cachix with all dependencies..."
+    nix-store --query --requisites --include-outputs "$AARCH64_PATH" | \
+        sops exec-env secrets/shared.yaml "xargs cachix push \$CACHIX_CACHE_NAME"
+    echo ""
+
+    # Verify and pin
+    echo "Verifying path is in cache..."
+    sleep 5  # Allow CDN propagation
+    if nix path-info --store "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH" &>/dev/null; then
+        echo "✓ Path verified in cache"
+        echo "Pinning..."
+        sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME bws-aarch64-linux $AARCH64_PATH"
+        echo "✓ Pinned: bws-aarch64-linux"
+    else
+        echo "✗ Path not in cache after push, retrying..."
+        sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH"
+        sleep 5
+        sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME bws-aarch64-linux $AARCH64_PATH"
+    fi
+    echo ""
+
+    # Build and cache for x86_64-linux
+    echo "Building bws for x86_64-linux..."
+    X86_64_PATH=$(nom build nixpkgs#bws --system x86_64-linux --no-link --print-out-paths --max-jobs 0)
+    echo "Built: $X86_64_PATH"
+    echo ""
+
+    echo "Pushing to cachix with all dependencies..."
+    nix-store --query --requisites --include-outputs "$X86_64_PATH" | \
+        sops exec-env secrets/shared.yaml "xargs cachix push \$CACHIX_CACHE_NAME"
+    echo ""
+
+    # Verify and pin
+    echo "Verifying path is in cache..."
+    sleep 5  # Allow CDN propagation
+    if nix path-info --store "https://$CACHE_NAME.cachix.org" "$X86_64_PATH" &>/dev/null; then
+        echo "✓ Path verified in cache"
+        echo "Pinning..."
+        sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME bws-x86_64-linux $X86_64_PATH"
+        echo "✓ Pinned: bws-x86_64-linux"
+    else
+        echo "✗ Path not in cache after push, retrying..."
+        sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH"
+        sleep 5
+        sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME bws-x86_64-linux $X86_64_PATH"
+    fi
+
+    echo ""
+    echo "✅ Successfully cached bws for both Linux architectures"
+    echo "   aarch64-linux: $AARCH64_PATH"
+    echo "   x86_64-linux: $X86_64_PATH"
+    echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
+    echo ""
+    echo "CI should now fetch bws from cachix instead of building from source."
+
 # Test cachix push/pull with a simple derivation
 [group('CI/CD')]
 test-cachix:
