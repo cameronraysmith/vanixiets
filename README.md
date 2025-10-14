@@ -34,7 +34,7 @@ Adopts proven resilience patterns from [mirkolenz/nixos](https://github.com/mirk
 - **Hotfixes infrastructure**: Platform-specific stable fallbacks (overlays/infra/hotfixes.nix)
 - **Upstream patches**: Apply fixes before they reach your channel (overlays/infra/patches.nix)
 - **Organized overrides**: Per-package build modifications (overlays/overrides/)
-- **6-layer overlay composition**: Structured package and overlay merging
+- **5-layer overlay composition**: Structured package and overlay merging
 
 **Key distinction**: mirkolenz/nixos uses flake-parts alone; this configuration integrates mirkolenz's overlay patterns into nixos-unified's autowiring framework.
 
@@ -88,18 +88,19 @@ nixpkgs-linux-stable.url = "github:nixos/nixpkgs/nixos-25.05";
 - Auto-imported via `lib.importOverlays`
 - Example: `ghc_filesystem.nix` with `enableParallelBuilding = false;`
 
-**7. 6-layer overlay composition** (overlays/default.nix):
+**7. 5-layer overlay composition** (overlays/default.nix):
 
 ```nix
 lib.mergeAttrsList [
   inputs'        # Multi-channel nixpkgs access
   hotfixes       # Platform-specific stable fallbacks
   packages       # Custom derivations
-  debugPackages  # Debug packages
   overrides      # Build modifications
   flakeInputs    # Overlays from flake inputs
 ]
 ```
+
+Note: Debug/experimental packages are in `legacyPackages.debug` (not overlay) to prevent automatic builds and nixpkgs overrides.
 
 ### How patterns were adapted for nixos-unified
 
@@ -144,12 +145,12 @@ nix-config/
 │   ├── nixos/           # → nixosModules.* (Linux-specific)
 │   └── home/            # home-manager modules (imported, not autowired)
 ├── overlays/            # Package modifications (autowired)
-│   ├── default.nix      # → overlays.default (6-layer composition)
+│   ├── default.nix      # → overlays.default (5-layer composition)
 │   ├── inputs.nix       # → overlays.inputs (multi-channel nixpkgs)
 │   ├── infra/           # Infrastructure files (not autowired)
 │   ├── overrides/       # Per-package build modifications
 │   ├── packages/        # Custom derivations (6 packages)
-│   └── debug-packages/  # Development packages (4 packages)
+│   └── debug-packages/  # Experimental packages (see legacyPackages.debug)
 ├── lib/                 # Shared library functions
 │   └── default.nix      # → flake.lib (exported for external use)
 ├── packages/            # Standalone typescript packages (docs site, etc)
@@ -200,14 +201,18 @@ File names become configuration names. No manual registration required.
 
 | File | Flake output | Purpose |
 |------|--------------|---------|
-| `overlays/default.nix` | `overlays.default` | 6-layer composition (inputs → hotfixes → packages → debugPackages → overrides → flakeInputs) |
+| `overlays/default.nix` | `overlays.default` | 5-layer composition (inputs → hotfixes → packages → overrides → flakeInputs) |
 | `overlays/inputs.nix` | `overlays.inputs` | Multi-channel nixpkgs access (stable, unstable, patched) |
 | `overlays/overrides/default.nix` | `overlays.overrides` | Auto-imported per-package build modifications |
 
 **Custom packages** (defined in overlays, exposed via packages output):
 
 - From `overlays/packages/`: cc-statusline-rs, starship-jj, markdown-tree-parser, atuin-format, bitwarden-cli, claude-code-bin
-- From `overlays/debug-packages/`: nvim-treesitter-main, activate, update, default
+
+**Experimental packages** (not in overlay, manual build only):
+
+- From `overlays/debug-packages/` → `legacyPackages.debug`: conda-lock, holos, quarto, teller
+- Access: `nix build .#debug.<package>` or `just debug-build <package>`
 
 **Note**: The `overlays/infra/` subdirectory is intentionally excluded from autowiring to avoid conflicts. It contains:
 
@@ -358,7 +363,8 @@ Instead of manually registering each configuration, module, and overlay in `flak
 
 **Mapping outputs to directories**:
 
-- **10 packages**: From `overlays/packages/` (6) + `overlays/debug-packages/` (4)
+- **6 packages**: From `overlays/packages/`
+- **4 debug packages**: From `overlays/debug-packages/` → `legacyPackages.debug` (not auto-built)
 - **3 NixOS configurations**: From `configurations/nixos/*.nix`
 - **2 Darwin configurations**: From `configurations/darwin/*.nix`
 - **3 Home configurations**: From `configurations/home/*.nix` (not shown in om output, but available)
@@ -456,7 +462,7 @@ This repository uses a multi-channel nixpkgs resilience system to handle unstabl
 - **Platform-specific hotfixes**: Selective stable fallbacks without full rollbacks
 - **Upstream patch application**: Apply fixes before they reach your channel
 - **Organized overrides**: Per-package build modifications in dedicated files
-- **Composable architecture**: Six-layer overlay composition for flexibility
+- **Composable architecture**: Five-layer overlay composition for flexibility
 
 ### Quick example
 
