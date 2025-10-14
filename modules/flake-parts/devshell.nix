@@ -16,24 +16,29 @@
         meta.description = "Dev environment for nix-config";
         inputsFrom = [ config.pre-commit.devShell ];
         packages = with pkgs; [
-          just
-          nixd
-          nix-output-monitor
-          omnix
-          cachix
-          ratchet
-          # teller removed: migration to sops-nix complete
-          sops
-          age
-          ssh-to-age
-          inputs'.agenix.packages.default
+          # Core development tools
+          git # Version control (used in justfile recipes)
+          just # Task runner
 
-          # SOPS key management tools
-          bitwarden-cli # bw command for key extraction
-          jq # JSON processing for Bitwarden API
-          gh # GitHub CLI for secrets management
+          # Nix tooling
+          nixd # Nix language server
+          nix-output-monitor # Pretty nix build output (nom)
+          omnix # Nix CI orchestration (om)
+          cachix # Binary cache management
+          ratchet # GitHub Actions version pinning
 
-          # TypeScript documentation tools
+          # Secrets management
+          sops # Secrets encryption
+          age # Age encryption
+          ssh-to-age # SSH to age key conversion
+          inputs'.agenix.packages.default # Agenix CLI
+          bitwarden-cli # Bitwarden CLI (bw) for key extraction
+
+          # Utilities
+          jq # JSON processing
+          gh # GitHub CLI
+
+          # Documentation toolchain
           bun # JavaScript runtime and package manager
           nodePackages.typescript # TypeScript compiler
           playwright-driver.browsers # E2E testing browsers
