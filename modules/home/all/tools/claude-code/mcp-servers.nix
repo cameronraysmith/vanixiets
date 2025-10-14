@@ -43,7 +43,10 @@ in
           firecrawl = {
             type = "stdio";
             command = "npx";
-            args = ["-y" "firecrawl-mcp"];
+            args = [
+              "-y"
+              "firecrawl-mcp"
+            ];
             env = {
               FIRECRAWL_API_KEY = config.sops.placeholder."mcp-firecrawl-api-key";
             };
@@ -68,7 +71,7 @@ in
               "--api-key"
               config.sops.placeholder."mcp-context7-api-key"
             ];
-            env = {};
+            env = { };
           };
         };
       };
@@ -156,7 +159,7 @@ in
             type = "stdio";
             command = "npx";
             args = [ "claude-historian" ];
-            env = {};
+            env = { };
           };
         };
       };
@@ -207,7 +210,7 @@ in
               "@playwright/mcp@latest"
               "--extension"
             ];
-            env = {};
+            env = { };
           };
         };
       };
@@ -228,7 +231,7 @@ in
               "--rm"
               "hashicorp/terraform-mcp-server"
             ];
-            env = {};
+            env = { };
           };
         };
       };
@@ -237,9 +240,10 @@ in
 
   # Runtime dependencies for MCP servers
   home.packages = with pkgs; [
-    nodejs_22  # For npx: firecrawl, huggingface, chrome, cloudflare, historian, playwright
-               # Also provides node binary for mcp-prompt-server
-    uv         # For uvx: duckdb, nixos
-    docker     # For terraform container (requires OrbStack, Docker Desktop, or Colima on macOS)
+    nodejs_22
+    # For npx: firecrawl, huggingface, chrome, cloudflare, historian, playwright
+    # Also provides node binary for mcp-prompt-server
+    uv # For uvx: duckdb, nixos
+    docker # For terraform container (requires OrbStack, Docker Desktop, or Colima on macOS)
   ];
 }
