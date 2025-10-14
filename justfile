@@ -801,6 +801,40 @@ cache-linux-package package:
     echo "Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo ""
 
+    # Check if our package is identical to nixpkgs (redundant overlay)
+    echo "Checking if package is redundant with nixpkgs..."
+    OUR_DRV=$(nix eval --raw .#packages.aarch64-linux.$PACKAGE.drvPath 2>/dev/null || echo "none")
+    NIXPKGS_DRV=$(nix eval --raw nixpkgs#$PACKAGE.drvPath 2>/dev/null || echo "none")
+
+    if [[ "$OUR_DRV" != "none" && "$NIXPKGS_DRV" != "none" && "$OUR_DRV" == "$NIXPKGS_DRV" ]]; then
+        echo ""
+        echo "⚠️  WARNING: Your overlay package is IDENTICAL to nixpkgs!"
+        echo "   Your derivation: $OUR_DRV"
+        echo "   Nixpkgs version: $NIXPKGS_DRV"
+        echo ""
+        echo "This means:"
+        echo "  - Your overlay is redundant (same hash as upstream)"
+        echo "  - Package is already in cache.nixos.org"
+        echo "  - No need to cache in your personal cachix"
+        echo ""
+        echo "Recommendation: Remove overlays/packages/$PACKAGE/"
+        echo "                Use nixpkgs#$PACKAGE directly instead"
+        echo ""
+        echo "Continue anyway? (y/N): "
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            echo "Aborted. Consider cleaning up redundant overlay."
+            exit 0
+        fi
+        echo ""
+        echo "Continuing with force-copy from cache.nixos.org to your cachix..."
+        FORCE_COPY=true
+    else
+        echo "✓ Package differs from nixpkgs (custom overlay)"
+        FORCE_COPY=false
+    fi
+    echo ""
+
     # Check if already cached
     echo "Checking cache status..."
     AARCH64_CACHED=false
@@ -837,16 +871,27 @@ cache-linux-package package:
         AARCH64_PATH=$(sops exec-env secrets/shared.yaml \
             "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.aarch64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0" | tail -1)
 
-        # Push the path explicitly (not via xargs which may skip if in cache.nixos.org)
+        # Push the path to cachix
         echo "Pushing $AARCH64_PATH to cachix..."
-        sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH"
+        if [[ "$FORCE_COPY" == "true" ]]; then
+            # Use nix copy for packages identical to nixpkgs (cachix push won't work)
+            echo "  (using nix copy - package exists in cache.nixos.org)"
+            nix copy --to "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH"
+        else
+            # Normal cachix push for custom packages
+            sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH"
+        fi
 
         # Verify it's actually in our cachix before pinning
         echo "Verifying path is in cache..."
         sleep 3  # Allow CDN propagation
         if ! nix path-info --store "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH" &>/dev/null; then
             echo "✗ Path not in cache after push, retrying..."
-            sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH"
+            if [[ "$FORCE_COPY" == "true" ]]; then
+                nix copy --to "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH"
+            else
+                sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH"
+            fi
             sleep 3
         fi
 
@@ -868,16 +913,27 @@ cache-linux-package package:
         X86_64_PATH=$(sops exec-env secrets/shared.yaml \
             "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.x86_64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0" | tail -1)
 
-        # Push the path explicitly (not via xargs which may skip if in cache.nixos.org)
+        # Push the path to cachix
         echo "Pushing $X86_64_PATH to cachix..."
-        sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH"
+        if [[ "$FORCE_COPY" == "true" ]]; then
+            # Use nix copy for packages identical to nixpkgs (cachix push won't work)
+            echo "  (using nix copy - package exists in cache.nixos.org)"
+            nix copy --to "https://$CACHE_NAME.cachix.org" "$X86_64_PATH"
+        else
+            # Normal cachix push for custom packages
+            sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH"
+        fi
 
         # Verify it's actually in our cachix before pinning
         echo "Verifying path is in cache..."
         sleep 3  # Allow CDN propagation
         if ! nix path-info --store "https://$CACHE_NAME.cachix.org" "$X86_64_PATH" &>/dev/null; then
             echo "✗ Path not in cache after push, retrying..."
-            sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH"
+            if [[ "$FORCE_COPY" == "true" ]]; then
+                nix copy --to "https://$CACHE_NAME.cachix.org" "$X86_64_PATH"
+            else
+                sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH"
+            fi
             sleep 3
         fi
 
@@ -897,6 +953,12 @@ cache-linux-package package:
     echo "✅ Successfully built and cached $PACKAGE for Linux architectures"
     echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo ""
+    if [[ "$FORCE_COPY" == "true" ]]; then
+        echo "⚠️  REMINDER: This package is identical to nixpkgs."
+        echo "   Consider removing overlays/packages/$PACKAGE/ to simplify maintenance."
+        echo "   CI will fetch from cache.nixos.org anyway (no benefit from personal cache)."
+        echo ""
+    fi
     echo "CI will now fetch from cachix instead of building, avoiding disk space issues."
 
 # Test cachix push/pull with a simple derivation
