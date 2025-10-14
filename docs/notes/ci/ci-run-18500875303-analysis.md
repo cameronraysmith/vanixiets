@@ -271,7 +271,7 @@ FLAKE_OUTPUTS=$(printf "%s\n%s" \
 
 From previous commits, there's already a justfile recipe for this:
 ```bash
-just cache-bitwarden-linux
+just cache-linux-package bitwarden-cli
 ```
 
 This should be run to cache the bitwarden-cli build for both aarch64-linux and x86_64-linux.

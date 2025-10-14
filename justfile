@@ -883,10 +883,6 @@ cache-linux-package package:
     echo ""
     echo "CI will now fetch from cachix instead of building, avoiding disk space issues."
 
-# Cache bitwarden-cli (our custom derivation) for Linux architectures
-[group('CI/CD')]
-cache-bitwarden-linux: (cache-linux-package "bitwarden-cli")
-
 # Test cachix push/pull with a simple derivation
 [group('CI/CD')]
 test-cachix:

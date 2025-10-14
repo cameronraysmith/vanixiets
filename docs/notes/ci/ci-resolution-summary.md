@@ -103,7 +103,7 @@ bws was never integrated into our workflow, so removing it costs nothing.
 **Location**: `overlays/packages/bitwarden-cli/`
 **Purpose**: Password manager CLI for accessing Bitwarden vaults
 **Why Custom**: Kept up-to-date with our updateScript
-**Caching**: `just cache-bitwarden-linux` still works and is maintained
+**Caching**: `just cache-linux-package bitwarden-cli` (generic recipe)
 
 This is the bitwarden tool we actually use and want to keep current.
 
@@ -228,9 +228,9 @@ rg "^\s*bws" modules/home/all/terminal/default.nix
 rg "cache-bws-linux" justfile
 # Expected: (empty)
 
-# Verify bitwarden-cli support remains
-just cache-bitwarden-linux --dry-run
-# Expected: Recipe found and working
+# Verify bitwarden-cli caching works
+just cache-linux-package bitwarden-cli --dry-run
+# Expected: Generic recipe works
 
 # Trigger CI
 gh workflow run ci.yaml --ref beta
