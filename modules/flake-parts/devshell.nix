@@ -20,6 +20,17 @@
           git # Version control (used in justfile recipes)
           just # Task runner
 
+          # GNU tools (justfile dependencies)
+          # Provides consistent behavior across platforms, especially for:
+          # - cut: hash/field extraction (7+ uses)
+          # - grep: pattern matching
+          # - sed: text transformation and --in-place editing
+          # - head/tail/sort/basename: text processing
+          coreutils # cut, head, tail, basename, sort, echo, cat, tr, etc.
+          gnugrep # grep with PCRE2 support
+          gnused # sed with --in-place
+          findutils # find, xargs (rarely used but available)
+
           # Nix tooling
           nixd # Nix language server
           nix-output-monitor # Pretty nix build output (nom)
