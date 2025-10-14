@@ -4,14 +4,16 @@
 #   1. inputs       - Multi-channel nixpkgs access (stable, patched, etc.)
 #   2. hotfixes     - Platform-specific stable fallbacks for broken packages
 #   3. packages     - Custom derivations
-#   4. debugPackages - Development/debug packages
-#   5. overrides    - Per-package build modifications
-#   6. flakeInputs  - Overlays from flake inputs (nuenv, etc.)
+#   4. overrides    - Per-package build modifications
+#   5. flakeInputs  - Overlays from flake inputs (nuenv, etc.)
 #
 # Merge order matters: later layers can reference earlier layers
 #
 # Note: Infrastructure files are in infra/ subdirectory (Phase 1 design)
 #       to avoid nixos-unified autowiring conflicts
+#
+# Note: Debug/experimental packages are in legacyPackages.debug (not overlay)
+#       See modules/flake-parts/debug-packages.nix
 #
 { flake, ... }:
 let
@@ -32,7 +34,6 @@ let
     };
 
   packages = fromDirectory ./packages;
-  debugPackages = fromDirectory ./debug-packages;
 
   # Import overlay layers
   # Each layer gets overlayArgs for access to flake (inputs, lib, etc.)
@@ -61,7 +62,6 @@ lib.mergeAttrsList [
   inputs' # Multi-channel nixpkgs access
   hotfixes # Platform-specific stable fallbacks
   packages # Custom derivations from packages/
-  debugPackages # Debug/development packages
   overrides # Per-package build modifications (includes ghc_filesystem)
   flakeInputs # Overlays from flake inputs (nuenv, etc.)
 ]
