@@ -4,6 +4,10 @@
   ...
 }:
 {
+  imports = [
+    ./mcp-servers.nix
+  ];
+
   programs.claude-code = {
     enable = true;
     package = pkgs.claude-code-bin;
@@ -67,7 +71,7 @@
           "Bash(jq:*)"
           "Bash(test:*)"
           # mcps
-          "mcp__firecrawl__*"
+          "mcp__*"
         ];
         deny = [
           "Bash(sudo:*)"
