@@ -287,7 +287,7 @@ jobs:
           echo "✅ ephemeral test secrets cleaned up"
 
   # job 6: justfile-activation
-  # tests activation workflow auto-detection
+  # validates user experience: justfile recipes, configuration discovery, and activation workflows
   justfile-activation:
     needs: skip-check
     if: |
@@ -308,43 +308,120 @@ jobs:
           cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: test justfile recipes exist
+      - name: test justfile recipes
         run: |
-          nix develop --command just --list
+          # capture output once to avoid running nix develop twice
+          JUST_OUTPUT=$(nix develop --command just --list 2>&1)
+          echo "$JUST_OUTPUT"
 
-          # verify activation recipe exists
-          if nix develop --command just --list 2>&1 | grep -q "activate"; then
-            echo "✅ activate recipe found"
-          else
-            echo "❌ activate recipe not found"
-            exit 1
-          fi
-
-      - name: test dry-run builds
-        run: |
-          # test existing justfile recipes
-          echo "testing existing justfile recipes with dry-run..."
-
-          # these should work with current justfile
-          nix develop --command just -n check
-          nix develop --command just -n lint
-
-      - name: test activation targets (dry-run)
-        run: |
-          echo "testing activation targets with dry-run..."
-
-          # test standalone home configuration activation
-          for config in "runner@stibnite" "runner@blackphos" "raquel@blackphos"; do
-            echo "  testing: just -n activate $config"
-            if nix develop --command just -n activate "$config"; then
-              echo "  ✅ $config activation dry-run succeeds"
+          # verify core recipes exist
+          echo ""
+          echo "verifying core recipes..."
+          for recipe in activate verify check lint; do
+            if echo "$JUST_OUTPUT" | grep -q "\b$recipe\b"; then
+              echo "✅ $recipe recipe found"
             else
-              echo "  ❌ $config activation dry-run failed"
+              echo "❌ $recipe recipe not found"
               exit 1
             fi
           done
 
-          echo "✅ all activation targets validated"
+      - name: validate flake structure
+        run: |
+          echo "validating flake structure with nix flake check..."
+          nix develop --command just check
+
+      - name: test home configurations (dry-run)
+        run: |
+          echo "discovering home configurations..."
+
+          # find all home configs dynamically from filesystem
+          HOME_CONFIGS=$(find configurations/home -name "*.nix" -type f | \
+            sed 's|configurations/home/||' | \
+            sed 's|\.nix$||' | \
+            sort)
+
+          if [ -z "$HOME_CONFIGS" ]; then
+            echo "⚠️  no home configurations found"
+            exit 0
+          fi
+
+          echo "found configurations:"
+          echo "$HOME_CONFIGS" | while read config; do
+            echo "  - $config"
+          done
+          echo ""
+
+          # test each config with dry-run
+          echo "testing activation with dry-run..."
+          echo "$HOME_CONFIGS" | while read config; do
+            echo "testing: just -n activate $config"
+            if nix develop --command just -n activate "$config"; then
+              echo "  ✅ $config dry-run succeeds"
+            else
+              echo "  ❌ $config dry-run failed"
+              exit 1
+            fi
+          done
+
+          echo ""
+          echo "✅ all home configurations validated"
+
+      - name: verify configuration outputs
+        run: |
+          echo "verifying all configurations are exposed in flake outputs..."
+
+          # get flake outputs
+          FLAKE_OUTPUTS=$(nix flake show --json 2>/dev/null | jq -r '
+            (.darwinConfigurations // {} | keys[] as $k | "darwin:\($k)"),
+            (.nixosConfigurations // {} | keys[] as $k | "nixos:\($k)")
+          ')
+
+          echo "flake outputs:"
+          echo "$FLAKE_OUTPUTS"
+          echo ""
+
+          # check each configuration file has corresponding output
+          MISSING=0
+
+          # check darwin configs
+          for config_file in configurations/darwin/*.nix; do
+            if [ -f "$config_file" ]; then
+              config=$(basename "$config_file" .nix)
+              if echo "$FLAKE_OUTPUTS" | grep -q "^darwin:$config$"; then
+                echo "✅ darwin:$config"
+              else
+                echo "❌ darwin:$config missing from flake outputs"
+                MISSING=1
+              fi
+            fi
+          done
+
+          # check nixos configs (handles both direct .nix and directory/default.nix patterns)
+          for config_file in configurations/nixos/*/default.nix configurations/nixos/*.nix; do
+            if [ -f "$config_file" ]; then
+              if [[ "$config_file" =~ configurations/nixos/([^/]+)/default.nix ]]; then
+                config="${BASH_REMATCH[1]}"
+              else
+                config=$(basename "$config_file" .nix)
+              fi
+              if echo "$FLAKE_OUTPUTS" | grep -q "^nixos:$config$"; then
+                echo "✅ nixos:$config"
+              else
+                echo "❌ nixos:$config missing from flake outputs"
+                MISSING=1
+              fi
+            fi
+          done
+
+          if [ $MISSING -eq 1 ]; then
+            echo ""
+            echo "❌ some configurations are not exposed in flake outputs"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ all configurations properly exposed"
 
   # job 7: nix
   # builds all flake outputs via omnix (nixos configs, home configs, checks, devshells)
