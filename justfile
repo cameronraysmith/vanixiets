@@ -837,18 +837,26 @@ cache-linux-package package:
         AARCH64_PATH=$(sops exec-env secrets/shared.yaml \
             "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.aarch64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0" | tail -1)
 
-        # Explicitly push the path and all its runtime dependencies
-        echo "Pushing $AARCH64_PATH and dependencies to cachix..."
-        nix-store --query --requisites --include-outputs "$AARCH64_PATH" | \
-            sops exec-env secrets/shared.yaml "xargs cachix push \$CACHIX_CACHE_NAME"
+        # Push the path explicitly (not via xargs which may skip if in cache.nixos.org)
+        echo "Pushing $AARCH64_PATH to cachix..."
+        sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH"
 
-        # Pin the path to prevent garbage collection and verify it exists
+        # Verify it's actually in our cachix before pinning
+        echo "Verifying path is in cache..."
+        sleep 3  # Allow CDN propagation
+        if ! nix path-info --store "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH" &>/dev/null; then
+            echo "✗ Path not in cache after push, retrying..."
+            sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH"
+            sleep 3
+        fi
+
+        # Pin the path to prevent garbage collection
         PIN_NAME="${PACKAGE}-aarch64-linux"
         echo "Pinning $AARCH64_PATH as '$PIN_NAME'..."
         if sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $AARCH64_PATH"; then
-            echo "✓ Pinned and verified in cache: $AARCH64_PATH"
+            echo "✓ Pinned and verified: $AARCH64_PATH"
         else
-            echo "✗ Failed to pin path - it may not be in cache yet"
+            echo "✗ Failed to pin - path may not be in cache"
             exit 1
         fi
         echo ""
@@ -860,18 +868,26 @@ cache-linux-package package:
         X86_64_PATH=$(sops exec-env secrets/shared.yaml \
             "cachix watch-exec \$CACHIX_CACHE_NAME --jobs 8 -- nom build .#packages.x86_64-linux.$PACKAGE --no-link --print-out-paths --max-jobs 0" | tail -1)
 
-        # Explicitly push the path and all its runtime dependencies
-        echo "Pushing $X86_64_PATH and dependencies to cachix..."
-        nix-store --query --requisites --include-outputs "$X86_64_PATH" | \
-            sops exec-env secrets/shared.yaml "xargs cachix push \$CACHIX_CACHE_NAME"
+        # Push the path explicitly (not via xargs which may skip if in cache.nixos.org)
+        echo "Pushing $X86_64_PATH to cachix..."
+        sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH"
 
-        # Pin the path to prevent garbage collection and verify it exists
+        # Verify it's actually in our cachix before pinning
+        echo "Verifying path is in cache..."
+        sleep 3  # Allow CDN propagation
+        if ! nix path-info --store "https://$CACHE_NAME.cachix.org" "$X86_64_PATH" &>/dev/null; then
+            echo "✗ Path not in cache after push, retrying..."
+            sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH"
+            sleep 3
+        fi
+
+        # Pin the path to prevent garbage collection
         PIN_NAME="${PACKAGE}-x86_64-linux"
         echo "Pinning $X86_64_PATH as '$PIN_NAME'..."
         if sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $X86_64_PATH"; then
-            echo "✓ Pinned and verified in cache: $X86_64_PATH"
+            echo "✓ Pinned and verified: $X86_64_PATH"
         else
-            echo "✗ Failed to pin path - it may not be in cache yet"
+            echo "✗ Failed to pin - path may not be in cache"
             exit 1
         fi
     fi
