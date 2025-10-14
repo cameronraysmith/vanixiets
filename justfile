@@ -804,34 +804,54 @@ cache-linux-package package:
     # Check if our package is identical to nixpkgs (redundant overlay)
     echo "Checking if package is redundant with nixpkgs..."
     OUR_DRV=$(nix eval --raw .#packages.aarch64-linux.$PACKAGE.drvPath 2>/dev/null || echo "none")
-    NIXPKGS_DRV=$(nix eval --raw nixpkgs#$PACKAGE.drvPath 2>/dev/null || echo "none")
+    NIXPKGS_DRV=$(nix eval --raw nixpkgs#$PACKAGE.drvPath --system aarch64-linux 2>/dev/null || echo "none")
 
     if [[ "$OUR_DRV" != "none" && "$NIXPKGS_DRV" != "none" && "$OUR_DRV" == "$NIXPKGS_DRV" ]]; then
         echo ""
-        echo "⚠️  WARNING: Your overlay package is IDENTICAL to nixpkgs!"
-        echo "   Your derivation: $OUR_DRV"
-        echo "   Nixpkgs version: $NIXPKGS_DRV"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "⚠️  WARNING: Redundant Overlay Detected"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
-        echo "This means:"
-        echo "  - Your overlay is redundant (same hash as upstream)"
-        echo "  - Package is already in cache.nixos.org"
-        echo "  - No need to cache in your personal cachix"
+        echo "Your overlay package is IDENTICAL to nixpkgs:"
+        echo "  Package: $PACKAGE"
+        echo "  Derivation: $OUR_DRV"
         echo ""
-        echo "Recommendation: Remove overlays/packages/$PACKAGE/"
-        echo "                Use nixpkgs#$PACKAGE directly instead"
+        echo "This typically happens when:"
+        echo "  1. You copied a nixpkgs derivation to your overlay for upgrades"
+        echo "  2. Then updated your nixpkgs lockfile"
+        echo "  3. Now both are at the same version"
         echo ""
-        echo "Continue anyway? (y/N): "
+        echo "Implications:"
+        echo "  • Your overlay provides zero value (byte-for-byte identical)"
+        echo "  • Package is already available from cache.nixos.org"
+        echo "  • CI will fetch from cache.nixos.org automatically"
+        echo "  • Caching in personal cachix will likely fail (already exists elsewhere)"
+        echo ""
+        echo "Recommended action:"
+        echo "  rm -rf overlays/packages/$PACKAGE/"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo "Skip caching and exit? (Y/n): "
         read -r response
-        if [[ ! "$response" =~ ^[Yy]$ ]]; then
-            echo "Aborted. Consider cleaning up redundant overlay."
+        if [[ ! "$response" =~ ^[Nn]$ ]]; then
+            echo ""
+            echo "✓ Skipped caching - package available from cache.nixos.org"
+            echo ""
+            echo "Next steps:"
+            echo "  1. Remove the redundant overlay: rm -rf overlays/packages/$PACKAGE/"
+            echo "  2. Update any explicit references to use nixpkgs directly"
+            echo "  3. Commit the cleanup"
+            echo ""
             exit 0
         fi
         echo ""
-        echo "Continuing with force-copy from cache.nixos.org to your cachix..."
-        FORCE_COPY=true
+        echo "⚠️  Continuing anyway - expect push/pin failures..."
+        echo ""
+        REDUNDANT_OVERLAY=true
     else
         echo "✓ Package differs from nixpkgs (custom overlay)"
-        FORCE_COPY=false
+        REDUNDANT_OVERLAY=false
     fi
     echo ""
 
@@ -873,36 +893,36 @@ cache-linux-package package:
 
         # Push the path to cachix
         echo "Pushing $AARCH64_PATH to cachix..."
-        if [[ "$FORCE_COPY" == "true" ]]; then
-            # Use nix copy for packages identical to nixpkgs (cachix push won't work)
-            echo "  (using nix copy - package exists in cache.nixos.org)"
-            nix copy --to "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH"
+        if [[ "$REDUNDANT_OVERLAY" == "true" ]]; then
+            # Try to push but expect failure (package already in cache.nixos.org)
+            if sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH" 2>&1 | tee /tmp/cachix_push.log | grep -q "Nothing to push"; then
+                echo "⚠️  As expected: package already available (likely in cache.nixos.org)"
+                echo "   Skipping pin - remove overlay to avoid this workflow"
+            else
+                echo "✓ Push succeeded (unexpected for redundant overlay)"
+            fi
         else
             # Normal cachix push for custom packages
             sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH"
-        fi
 
-        # Verify it's actually in our cachix before pinning
-        echo "Verifying path is in cache..."
-        sleep 3  # Allow CDN propagation
-        if ! nix path-info --store "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH" &>/dev/null; then
-            echo "✗ Path not in cache after push, retrying..."
-            if [[ "$FORCE_COPY" == "true" ]]; then
-                nix copy --to "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH"
-            else
+            # Verify it's actually in our cachix before pinning
+            echo "Verifying path is in cache..."
+            sleep 3  # Allow CDN propagation
+            if ! nix path-info --store "https://$CACHE_NAME.cachix.org" "$AARCH64_PATH" &>/dev/null; then
+                echo "✗ Path not in cache after push, retrying..."
                 sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $AARCH64_PATH"
+                sleep 3
             fi
-            sleep 3
-        fi
 
-        # Pin the path to prevent garbage collection
-        PIN_NAME="${PACKAGE}-aarch64-linux"
-        echo "Pinning $AARCH64_PATH as '$PIN_NAME'..."
-        if sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $AARCH64_PATH"; then
-            echo "✓ Pinned and verified: $AARCH64_PATH"
-        else
-            echo "✗ Failed to pin - path may not be in cache"
-            exit 1
+            # Pin the path to prevent garbage collection
+            PIN_NAME="${PACKAGE}-aarch64-linux"
+            echo "Pinning $AARCH64_PATH as '$PIN_NAME'..."
+            if sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $AARCH64_PATH"; then
+                echo "✓ Pinned and verified: $AARCH64_PATH"
+            else
+                echo "✗ Failed to pin - path may not be in cache"
+                exit 1
+            fi
         fi
         echo ""
     fi
@@ -915,51 +935,54 @@ cache-linux-package package:
 
         # Push the path to cachix
         echo "Pushing $X86_64_PATH to cachix..."
-        if [[ "$FORCE_COPY" == "true" ]]; then
-            # Use nix copy for packages identical to nixpkgs (cachix push won't work)
-            echo "  (using nix copy - package exists in cache.nixos.org)"
-            nix copy --to "https://$CACHE_NAME.cachix.org" "$X86_64_PATH"
+        if [[ "$REDUNDANT_OVERLAY" == "true" ]]; then
+            # Try to push but expect failure (package already in cache.nixos.org)
+            if sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH" 2>&1 | tee /tmp/cachix_push.log | grep -q "Nothing to push"; then
+                echo "⚠️  As expected: package already available (likely in cache.nixos.org)"
+                echo "   Skipping pin - remove overlay to avoid this workflow"
+            else
+                echo "✓ Push succeeded (unexpected for redundant overlay)"
+            fi
         else
             # Normal cachix push for custom packages
             sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH"
-        fi
 
-        # Verify it's actually in our cachix before pinning
-        echo "Verifying path is in cache..."
-        sleep 3  # Allow CDN propagation
-        if ! nix path-info --store "https://$CACHE_NAME.cachix.org" "$X86_64_PATH" &>/dev/null; then
-            echo "✗ Path not in cache after push, retrying..."
-            if [[ "$FORCE_COPY" == "true" ]]; then
-                nix copy --to "https://$CACHE_NAME.cachix.org" "$X86_64_PATH"
-            else
+            # Verify it's actually in our cachix before pinning
+            echo "Verifying path is in cache..."
+            sleep 3  # Allow CDN propagation
+            if ! nix path-info --store "https://$CACHE_NAME.cachix.org" "$X86_64_PATH" &>/dev/null; then
+                echo "✗ Path not in cache after push, retrying..."
                 sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $X86_64_PATH"
+                sleep 3
             fi
-            sleep 3
-        fi
 
-        # Pin the path to prevent garbage collection
-        PIN_NAME="${PACKAGE}-x86_64-linux"
-        echo "Pinning $X86_64_PATH as '$PIN_NAME'..."
-        if sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $X86_64_PATH"; then
-            echo "✓ Pinned and verified: $X86_64_PATH"
-        else
-            echo "✗ Failed to pin - path may not be in cache"
-            exit 1
+            # Pin the path to prevent garbage collection
+            PIN_NAME="${PACKAGE}-x86_64-linux"
+            echo "Pinning $X86_64_PATH as '$PIN_NAME'..."
+            if sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $X86_64_PATH"; then
+                echo "✓ Pinned and verified: $X86_64_PATH"
+            else
+                echo "✗ Failed to pin - path may not be in cache"
+                exit 1
+            fi
         fi
     fi
 
     # Summary
     echo ""
-    echo "✅ Successfully built and cached $PACKAGE for Linux architectures"
-    echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
-    echo ""
-    if [[ "$FORCE_COPY" == "true" ]]; then
-        echo "⚠️  REMINDER: This package is identical to nixpkgs."
-        echo "   Consider removing overlays/packages/$PACKAGE/ to simplify maintenance."
-        echo "   CI will fetch from cache.nixos.org anyway (no benefit from personal cache)."
+    if [[ "$REDUNDANT_OVERLAY" == "true" ]]; then
+        echo "⚠️  Build completed (but caching skipped - package redundant with nixpkgs)"
         echo ""
+        echo "IMPORTANT: Remove the redundant overlay to avoid this issue:"
+        echo "  rm -rf overlays/packages/$PACKAGE/"
+        echo ""
+        echo "Your CI will fetch from cache.nixos.org automatically."
+    else
+        echo "✅ Successfully built and cached $PACKAGE for Linux architectures"
+        echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
+        echo ""
+        echo "CI will now fetch from cachix instead of building, avoiding disk space issues."
     fi
-    echo "CI will now fetch from cachix instead of building, avoiding disk space issues."
 
 # Test cachix push/pull with a simple derivation
 [group('CI/CD')]
