@@ -292,11 +292,10 @@ sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME bws-aarch64-li
    # Repeat for x86_64-linux
    ```
 
-2. **Update convenience recipe**:
-   ```diff
-   - cache-bitwarden-linux: (cache-linux-package "bitwarden-cli")
-   + cache-bitwarden-linux: (cache-linux-package "bitwarden-cli") (cache-nixpkgs-package "bws")
-   ```
+2. **Update documentation**:
+   - Use generic `just cache-linux-package bitwarden-cli` instead of wrappers
+   - Remove redundant convenience recipes that add no value
+   - Keep wrappers only for complex multi-step operations
 
 ### Short-Term (Improve Robustness)
 

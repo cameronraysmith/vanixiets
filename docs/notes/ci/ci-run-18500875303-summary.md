@@ -152,7 +152,7 @@ DARWIN_CONFIGS=$(nix eval .#darwinConfigurations --apply 'x: builtins.attrNames 
 
 **2. Cache bitwarden-cli for Linux**
 ```bash
-just cache-bitwarden-linux
+just cache-linux-package bitwarden-cli
 ```
 - Builds for both aarch64-linux and x86_64-linux
 - Pushes to cachix
