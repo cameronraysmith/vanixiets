@@ -11,7 +11,7 @@ This infrastructure provides:
 - **Platform-specific hotfixes**: Selective stable fallbacks for broken packages
 - **Upstream patch application**: Apply fixes before they reach your channel
 - **Organized per-package overrides**: Build modifications separate from hotfixes
-- **Composable architecture**: Six-layer overlay composition for flexibility
+- **Composable architecture**: Five-layer overlay composition for flexibility
 
 ## Architecture
 
@@ -29,7 +29,7 @@ overlays/
 │   ├── README.md        # When to use overrides vs hotfixes vs patches
 │   └── *.nix            # Individual package overrides
 ├── packages/            # Custom derivations
-└── debug-packages/      # Debug/development packages
+└── debug-packages/      # Experimental packages (not in overlay, see legacyPackages.debug)
 ```
 
 ### Composition layers (in order)
@@ -39,13 +39,14 @@ lib.mergeAttrsList [
   inputs'        # 1. Multi-channel nixpkgs access (stable, unstable, patched)
   hotfixes       # 2. Platform-specific stable fallbacks
   packages       # 3. Custom derivations from packages/
-  debugPackages  # 4. Debug/development packages
-  overrides      # 5. Per-package build modifications
-  flakeInputs    # 6. Overlays from flake inputs (nuenv, etc.)
+  overrides      # 4. Per-package build modifications
+  flakeInputs    # 5. Overlays from flake inputs (nuenv, etc.)
 ]
 ```
 
 Order matters: Later layers can reference packages from earlier layers.
+
+Note: Debug/experimental packages are in `legacyPackages.debug` (not overlay) to prevent automatic builds and nixpkgs overrides. See `modules/flake-parts/debug-packages.nix`.
 
 ## Component purposes
 
@@ -380,8 +381,9 @@ Prevents infinite recursion from nixos-unified's autowiring attempting to import
 - Created overlays/inputs.nix for multi-channel access
 - Reorganized overrides into overlays/overrides/
 - Migrated ghc_filesystem from inline to dedicated file
-- Refactored default.nix to 6-layer composition
+- Refactored default.nix to 5-layer composition
 - Resolved importOverlays recursion by inlining in overrides/default.nix
+- Moved debug packages to legacyPackages.debug to prevent automatic builds
 
 ### Phase 3 (Validation)
 
