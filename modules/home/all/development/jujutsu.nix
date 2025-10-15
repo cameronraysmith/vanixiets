@@ -1,4 +1,16 @@
-{ flake, ... }:
+{
+  flake,
+  config,
+  lib,
+  ...
+}:
+let
+  inherit (flake) inputs;
+
+  # TODO: Make hostname dynamic - currently hardcoded for stibnite (initial implementation)
+  # Future: Use config.networking.hostName or flake.config.hostname
+  hostname = "stibnite";
+in
 {
   programs.jujutsu = {
     enable = true;
@@ -10,9 +22,18 @@
       };
 
       signing = {
+        # Sign own commits, drop existing signatures
         behavior = "own";
-        backend = "gpg";
-        key = "FF043B368811DD1C";
+
+        # Use SSH backend (migrated from GPG)
+        backend = "ssh";
+
+        # Reuse Git's allowedSignersFile for signature verification
+        # This enables unified signature verification across Git and Jujutsu
+        backends.ssh.allowed-signers = config.programs.git.extraConfig.gpg.ssh.allowedSignersFile;
+
+        # Use same SOPS-deployed unified SSH key as Git
+        key = config.sops.secrets."radicle/ssh-private-key".path;
       };
 
       ui = {
@@ -20,6 +41,19 @@
         color = "auto";
         diff-formatter = ":git";
         pager = "delta";
+
+        # Show signature status in log output
+        show-cryptographic-signatures = true;
+      };
+
+      git = {
+        # Enable git colocate mode
+        colocate = true;
+
+        # Sign commits before pushing (upstream jujutsu supports revset syntax)
+        # Options: true, false, "mine()", "~signed()", "~signed() & mine()", etc.
+        # Using true for initial implementation (sign all commits)
+        sign-on-push = true;
       };
 
       # Snapshot settings control automatic file tracking and size limits
@@ -32,5 +66,12 @@
         auto-track = "all()"; # Explicit default: track all new files automatically
       };
     };
+  };
+
+  # Deploy unified SSH key via SOPS (same key as Git and Radicle)
+  # Following defelo-nixos pattern: each module explicitly declares its secret dependencies
+  sops.secrets."radicle/ssh-private-key" = {
+    sopsFile = inputs.secrets.secrets.${hostname}.radicle;
+    mode = "0400";
   };
 }
