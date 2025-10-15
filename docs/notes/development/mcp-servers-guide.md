@@ -51,7 +51,7 @@ claude --mcp-config ~/.mcp/nixos.json ~/.mcp/firecrawl.json ~/.mcp/playwright.js
    ```nix
    # If secrets needed:
    sops.secrets."mcp-new-service-api-key" = {
-     sopsFile = ../../../../../secrets/users/crs58/mcp-api-keys.yaml;
+     sopsFile = flake.inputs.self + "/secrets/users/crs58/mcp-api-keys.yaml";
      key = "new-service-api-key";
    };
 
