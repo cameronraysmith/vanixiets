@@ -107,7 +107,7 @@ in
       ngrok
       skopeo
       step-cli
-      terraform
+      tenv
       timoni
       vcluster
       # https://github.com/NixOS/nixpkgs/issues/381980
