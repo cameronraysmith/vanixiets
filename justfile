@@ -573,7 +573,7 @@ validate-secrets:
 
 # Trigger CI workflow and wait for result (blocking)
 [group('CI/CD')]
-test-ci-blocking workflow="ci.yaml":
+ci-run-watch workflow="ci.yaml":
     #!/usr/bin/env bash
     set -euo pipefail
 
