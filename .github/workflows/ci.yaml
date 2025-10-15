@@ -513,7 +513,7 @@ jobs:
 
   # Documentation testing
   docs-test:
-    needs: nix
+    needs: skip-check
     if: |
       !cancelled() &&
       (github.event_name != 'workflow_dispatch' ||
