@@ -21,6 +21,7 @@
           "nix-index-database"
           # "nixvim"  # defer to LazyVim-module
           "omnix"
+          "jj" # Upstream Jujutsu for latest SSH signing features
         ];
       };
     };
