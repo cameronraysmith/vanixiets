@@ -6,6 +6,7 @@
     ./bat.nix
     ./bottom.nix
     ./claude-code
+    ./claude-code-wrappers.nix
     ./commands.nix
     ./tealdeer.nix
     ./macchina.nix
