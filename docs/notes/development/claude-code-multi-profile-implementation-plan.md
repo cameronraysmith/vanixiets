@@ -2,11 +2,13 @@
 
 ## Overview
 
-Implementation plan for adding declarative, profile-based configuration to claude-code in nix-config, enabling seamless switching between multiple API providers (Anthropic official, GLM-4.6 via Z.ai, etc.) while maintaining full declarative reproducibility.
+Implementation plan for adding declarative, profile-based configuration to claude-code in nix-config, enabling seamless switching between multiple API providers (Anthropic official, GLM-4.6 via Z.ai, etc.) while maintaining full declarative reproducibility and complete profile isolation.
 
-**Status**: Phase 1 & 2 complete (Discovery & Planning) - awaiting approval for implementation
+**Status**: Phase 1 & 2 complete (Discovery & Planning) - ready for implementation
 
 **Date**: 2025-10-15
+
+**Revision**: 2 - Corrected architecture based on CLAUDE_CONFIG_DIR support verification
 
 ## Background
 
@@ -14,12 +16,14 @@ Implementation plan for adding declarative, profile-based configuration to claud
 
 User investigated whether mirkolenz-nixos contained any GLM-4.6/Z.ai configuration (it did not).
 A third party suggested creating multiple config directories via `CLAUDE_CONFIG_DIR` with shell wrapper functions.
+This approach is now confirmed to be the correct solution path.
 
 ### Current state
 
 - `~/.claude/settings.json` is managed by home-manager in `nix-config/modules/home/all/tools/claude-code/default.nix`
 - User's global Claude Code preferences are at `~/.claude/CLAUDE.md` and `~/.claude/commands/preferences/`
 - Reference implementation exists in `mirkolenz-nixos/home/mlenz/common/programs/claude.nix` (simpler, conditional enable only)
+- **No changes required** to existing claude-code configuration
 
 ## Phase 1: Discovery & Analysis
 
@@ -56,6 +60,37 @@ programs.claude-code = {
 };
 ```
 
+This configuration is **completely preserved** - no modifications required.
+
+### CLAUDE_CONFIG_DIR support verification
+
+**Critical discovery**: Claude Code CLI supports the `CLAUDE_CONFIG_DIR` environment variable for specifying alternate configuration directories.
+
+Evidence:
+1. **Anthropic's own devcontainer.json** uses it: [github.com/anthropics/claude-code/.devcontainer/devcontainer.json#L50](https://github.com/anthropics/claude-code/blob/main/.devcontainer/devcontainer.json#L50)
+2. **Experimental verification** confirms isolation:
+   ```bash
+   CLAUDE_CONFIG_DIR="$HOME/.claude-glm-test" claude --version
+   ls -la "$HOME/.claude-glm-test/"
+   # Creates: .claude.json, debug/, statsig/, settings.json
+   ```
+
+This enables **complete profile isolation**:
+- ✅ Separate config directories
+- ✅ Isolated chat history/sessions
+- ✅ Independent settings (or shared via symlink)
+- ✅ Zero interference between profiles
+
+### Home-manager module capabilities
+
+The upstream `home-manager/modules/programs/claude-code.nix` module:
+- Provides a **single** `programs.claude-code` option
+- Hardcodes output to `.claude/settings.json`
+- Does **not** support multiple profiles or config directories
+- Cannot be extended without `disabledModules` (fragile approach)
+
+Implication: We must create a **separate wrapper module** rather than extending the existing module.
+
 ### Secrets management integration
 
 Setup uses **sops-nix** with age encryption:
@@ -65,9 +100,9 @@ Setup uses **sops-nix** with age encryption:
 - `.sops.yaml` defines key groups for dev, ci, admin, users, and hosts
 
 For GLM API key:
-1. Add `GLM_API_KEY` to `secrets/shared.yaml` (sops-encrypted)
-2. Use `sops.secrets` to expose it at runtime
-3. Reference it in wrapper script environment
+1. Add `api-keys/glm` to `secrets/shared.yaml` (sops-encrypted)
+2. Expose via `sops.secrets."api-keys/glm"` in wrapper module
+3. Reference in wrapper script: `$(cat ${config.sops.secrets."api-keys/glm".path})`
 
 ### Module system patterns
 
@@ -75,321 +110,490 @@ nix-config follows these patterns:
 - **flake-parts** for modular flake structure
 - **Cross-platform modules** in `modules/home/all/`
 - **Type-safe module system** with proper options
-- **No existing profile/variant pattern** - this will be new
+- **Wrapper-based extensions** for profile-like behavior (new pattern)
 - **nixos-unified** for system configurations
 
-### Reference implementation analysis
+## Phase 2: Implementation Plan
 
-The mirkolenz-nixos implementation is simpler (conditional enable only).
-Our use case requires:
-- Multiple API provider configurations
-- Environment variable management
-- Separate config directories per profile
-- Secret resolution for API keys
+### Architectural decision: wrapper module approach
 
-## Phase 2: Implementation plan
+**Decision**: Create a standalone wrapper module that generates profile-specific wrapper scripts.
 
-### Architectural decision: extend vs. new module
+**Do NOT**:
+- ❌ Extend `programs.claude-code` module (requires `disabledModules`, fragile)
+- ❌ Modify existing claude-code configuration (unnecessary)
+- ❌ Duplicate settings manually (violates DRY)
 
-**Decision: Extend the existing module** rather than create a separate `claude-code-profiles` module.
+**Do**:
+- ✅ Create `modules/home/all/tools/claude-code-wrappers.nix`
+- ✅ Generate wrapper scripts with `CLAUDE_CONFIG_DIR` set
+- ✅ Reuse settings.json from existing configuration via nix store reference
+- ✅ Keep default `claude` command unchanged (managed by home-manager)
 
 Rationale:
-1. **Backward compatibility**: No profiles = current behavior preserved exactly
-2. **Single source of truth**: One module manages all claude-code configuration
-3. **Cleaner**: Avoids duplication between profile and non-profile setups
-4. **Aligned with architectural principles**: Extension over replacement
-5. **Co-location**: Keeps related configuration together
+1. **Zero modification** to working configuration
+2. **Single source of truth** for settings (reuse via symlink)
+3. **Simple and maintainable** (no module system hacks)
+4. **Clear separation** (wrappers are extensions, not replacements)
+5. **Complete isolation** via `CLAUDE_CONFIG_DIR`
 
 ### Proposed module structure
 
 ```nix
-# modules/home/all/tools/claude-code/default.nix (extended)
+# modules/home/all/tools/claude-code-wrappers.nix
+{ config, pkgs, lib, ... }:
+let
+  # Reference to the JSON format used by claude-code module
+  jsonFormat = pkgs.formats.json { };
+in
 {
-  programs.claude-code = {
-    enable = true;
-    package = pkgs.claude-code-bin;
+  # Generate wrapper script for GLM profile
+  home.packages = [
+    (pkgs.writeShellApplication {
+      name = "claude-glm";
+      runtimeInputs = [ config.programs.claude-code.finalPackage ];
+      text = ''
+        # Set isolated config directory
+        export CLAUDE_CONFIG_DIR="${config.xdg.configHome}/claude-glm"
 
-    # Existing single-profile config (preserved for backward compat)
-    commandsDir = ./commands;
-    agentsDir = ./agents;
-    settings = { /* ... */ };
+        # Create directory if needed (claude will also create it, but be explicit)
+        mkdir -p "$CLAUDE_CONFIG_DIR"
 
-    # NEW: Optional multi-profile support
-    profiles = {
-      anthropic = {
-        # Inherits base settings by default
-        # This becomes the default profile
-      };
+        # Load GLM API key from sops-managed secret
+        export GLM_API_KEY="$(cat ${config.sops.secrets."api-keys/glm".path})"
 
-      glm = {
-        settings = { /* same as anthropic */ };
-        env = {
-          ANTHROPIC_BASE_URL = "https://api.z.ai/api/anthropic";
-          ANTHROPIC_AUTH_TOKEN = "$GLM_API_KEY";  # resolved from sops
-          ANTHROPIC_DEFAULT_OPUS_MODEL = "glm-4.6";
-          ANTHROPIC_DEFAULT_SONNET_MODEL = "glm-4.6";
-          ANTHROPIC_DEFAULT_HAIKU_MODEL = "glm-4.5-air";
-        };
-      };
-    };
+        # Configure Z.ai API endpoint
+        export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
+        export ANTHROPIC_AUTH_TOKEN="$GLM_API_KEY"
+
+        # Configure GLM model defaults
+        export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-4.6"
+        export ANTHROPIC_DEFAULT_SONNET_MODEL="glm-4.6"
+        export ANTHROPIC_DEFAULT_HAIKU_MODEL="glm-4.5-air"
+
+        # Execute claude with isolated environment
+        exec claude "$@"
+      '';
+    })
+  ];
+
+  # Reuse settings.json from default profile (single source of truth)
+  xdg.configFile."claude-glm/settings.json" = {
+    source = config.home.file.".claude/settings.json".source;
+    # This references the SAME nix store path generated by programs.claude-code
+  };
+
+  # Share commands directory with default profile
+  xdg.configFile."claude-glm/commands" = lib.mkIf (config.programs.claude-code.commandsDir != null) {
+    source = config.programs.claude-code.commandsDir;
+    recursive = true;
+  };
+
+  # Share agents directory with default profile
+  xdg.configFile."claude-glm/agents" = lib.mkIf (config.programs.claude-code.agentsDir != null) {
+    source = config.programs.claude-code.agentsDir;
+    recursive = true;
+  };
+
+  # Expose GLM API key from sops
+  sops.secrets."api-keys/glm" = {
+    mode = "0400";
   };
 }
 ```
 
 Behavior:
-- `claude` → uses default (anthropic) settings
-- `claude-glm` → wrapper with GLM environment + Z.ai endpoint
-- Both share same commands/ and agents/ directories
+- `claude` → default profile (`~/.claude/`), Anthropic API
+- `claude-glm` → GLM profile (`~/.config/claude-glm/`), Z.ai API
+- Both share identical settings, commands, and agents (via symlinks)
+- Completely isolated sessions and chat history
+- Independent API endpoints and authentication
+
+### Settings.json sharing strategy
+
+**Key insight**: The home-manager module generates settings.json in the nix store:
+
+```nix
+home.file.".claude/settings.json" = {
+  source = jsonFormat.generate "claude-code-settings.json" (
+    cfg.settings // { "$schema" = "..."; }
+  );
+};
+```
+
+The `source` attribute is a **nix store path** (e.g., `/nix/store/abc123.../claude-code-settings.json`).
+
+**Reuse approach**:
+```nix
+xdg.configFile."claude-glm/settings.json" = {
+  source = config.home.file.".claude/settings.json".source;
+  # Both symlinks point to the SAME nix store file
+};
+```
+
+Benefits:
+- ✅ **Zero duplication**: Single source of truth
+- ✅ **Automatic updates**: Changes to `programs.claude-code.settings` propagate to all profiles
+- ✅ **Type-safe**: Uses the same JSON generation logic
+- ✅ **Efficient**: Same file in nix store, multiple symlinks
+
+Alternative (if per-profile customization needed later):
+```nix
+xdg.configFile."claude-glm/settings.json".source = jsonFormat.generate "claude-glm-settings.json" (
+  config.programs.claude-code.settings // {
+    "$schema" = "https://json.schemastore.org/claude-code-settings.json";
+    # Optional profile-specific overrides here
+  }
+);
+```
 
 ### Implementation files
 
-Will modify/create:
+Will create/modify:
 
-1. **`modules/home/all/tools/claude-code/default.nix`** (extend existing)
-   - Add optional `profiles` option with type-safe submodule
-   - Generate wrapper scripts for each profile
-   - Create separate `CLAUDE_CONFIG_DIR` for each profile
-   - Preserve current behavior when profiles not used
+1. **`modules/home/all/tools/claude-code-wrappers.nix`** (new)
+   - Wrapper script generation for GLM profile
+   - Settings, commands, agents symlinks
+   - sops secret exposure
 
-2. **`modules/home/all/tools/claude-code/profiles.nix`** (new, imported by default.nix)
-   - Profile type definition
-   - Wrapper script generation logic
-   - Config directory setup
+2. **`modules/home/all/tools/default.nix`** (modify)
+   - Add `./claude-code-wrappers.nix` to imports
 
-3. **`secrets/shared.yaml`** (add GLM_API_KEY)
-   - Encrypted GLM API key using sops
+3. **`secrets/shared.yaml`** (modify)
+   - Add encrypted `api-keys/glm` entry
 
-4. **`modules/home/all/core/sops.nix`** (minimal addition)
-   - Expose `GLM_API_KEY` secret for runtime access
-
-### Migration path
-
-**Phase 3a: Refactor existing module to support profiles**
-- Current single-profile setup becomes "anthropic" profile implicitly
-- All existing settings preserved exactly
-- No behavior change yet
-
-**Phase 3b: Add GLM profile**
-- Add GLM API key to sops secrets
-- Define `glm` profile with Z.ai configuration
-- Generate `claude-glm` wrapper script
-
-**Phase 3c: Testing & validation**
-- Verify `claude` behaves identically to current
-- Test `claude-glm` connects to Z.ai endpoint
-- Validate secrets resolution
-
-### Type-safe module schema
-
-```nix
-profileType = types.submodule {
-  options = {
-    settings = mkOption {
-      type = types.attrs;
-      default = baseSettings;  # inherit from base config
-      description = "Claude Code settings.json for this profile";
-    };
-
-    env = mkOption {
-      type = types.attrsOf types.str;
-      default = {};
-      description = "Environment variables for this profile";
-    };
-
-    configDir = mkOption {
-      type = types.str;
-      default = "~/.claude-${name}";
-      description = "Config directory for this profile";
-    };
-  };
-};
-```
+Will **NOT** modify:
+- `modules/home/all/tools/claude-code/default.nix` - unchanged
+- `modules/home/all/core/sops.nix` - unchanged (secret exposure in wrapper module)
 
 ### Secrets integration strategy
 
-**Chosen approach: Runtime environment variable**
+**Runtime resolution via wrapper script**:
 
 ```nix
-# sops.nix - expose secret
-sops.secrets."api-keys/glm" = {};
+sops.secrets."api-keys/glm" = {
+  mode = "0400";  # Read-only for owner
+};
 
-# claude-code wrapper
-pkgs.writeShellApplication {
-  name = "claude-glm";
-  text = ''
-    export GLM_API_KEY="$(cat ${config.sops.secrets."api-keys/glm".path})"
-    export ANTHROPIC_AUTH_TOKEN="$GLM_API_KEY"
-    export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
-    export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-4.6"
-    export ANTHROPIC_DEFAULT_SONNET_MODEL="glm-4.6"
-    export ANTHROPIC_DEFAULT_HAIKU_MODEL="glm-4.5-air"
-    export CLAUDE_CONFIG_DIR="${config.xdg.configHome}/claude-glm"
-    exec claude "$@"
-  '';
-}
+# In wrapper script:
+export GLM_API_KEY="$(cat ${config.sops.secrets."api-keys/glm".path})"
+export ANTHROPIC_AUTH_TOKEN="$GLM_API_KEY"
 ```
 
-Rationale: Clearer separation, easier debugging, explicit effect handling at boundaries.
+The sops-nix module:
+1. Decrypts `api-keys/glm` from `secrets/shared.yaml` at activation time
+2. Writes decrypted value to a runtime path (e.g., `/run/secrets/api-keys-glm`)
+3. Wrapper script reads this file at execution time
+4. Environment variable set for the claude process
 
-## Design decisions
+**Why this approach**:
+- ✅ Secrets never appear in nix store (derivations remain pure)
+- ✅ Runtime resolution (decryption happens at activation, not build)
+- ✅ Proper permissions (0400, owner-only read)
+- ✅ Explicit effect handling at boundary (wrapper script, not nix config)
+
+### Directory structure
+
+After implementation:
+
+```
+~/.claude/                          # Default profile (unchanged)
+├── settings.json → /nix/store/.../claude-code-settings.json
+├── commands/ → /nix/store/.../commands/
+├── agents/ → /nix/store/.../agents/
+├── .claude.json                    # Session data
+└── debug/                          # Logs
+
+~/.config/claude-glm/               # GLM profile (new)
+├── settings.json → /nix/store/.../claude-code-settings.json  (same file!)
+├── commands/ → /nix/store/.../commands/  (same directory!)
+├── agents/ → /nix/store/.../agents/  (same directory!)
+├── .claude.json                    # Separate session data
+└── debug/                          # Separate logs
+```
+
+Isolation points:
+- **Shared** (via symlinks): settings.json, commands/, agents/
+- **Isolated**: .claude.json (sessions), debug/ (logs), statsig/ (analytics)
+
+## Design Decisions
 
 ### Confirmed decisions
 
-1. **Extend existing module** (vs. new separate module)
-2. **`claude` = default**, `claude-glm` = wrapper
-3. **Share commands/agents directories** across profiles
+1. **Wrapper module approach** - standalone, doesn't extend existing module
+2. **`claude` = default** (unchanged), `claude-glm` = new wrapper
+3. **Share settings/commands/agents** via symlinks to same nix store paths
 4. **Use `secrets/shared.yaml`** for GLM key (path: `api-keys/glm`)
-5. **Runtime environment variable approach** for secrets
+5. **Runtime environment variables** for API endpoint and authentication
+6. **`CLAUDE_CONFIG_DIR` isolation** for session and history separation
 
-### Questions for clarification
+### Rationale for sharing vs. isolation
 
-1. **Naming convention**: Should wrappers be:
-   - `claude` (default) + `claude-glm` ✓ (recommended)
-   - `claude-anthropic` + `claude-glm` (explicit)
+**Shared** (via symlinks):
+- `settings.json` - Same permissions, theme, preferences make sense
+- `commands/` - Custom slash commands are API-agnostic
+- `agents/` - Agent definitions are API-agnostic
 
-2. **Shared vs. separate commands/agents**: Should each profile have its own commands/ and agents/ directories, or share them?
-   - **Share by default** ✓ (recommended) - less duplication, easier maintenance
-   - Allow override if needed
+**Isolated** (separate directories):
+- `.claude.json` - Session state, active conversations
+- `debug/` - Logs specific to API interactions
+- `statsig/` - Analytics data
 
-3. **GLM API Key location in secrets**:
-   - `secrets/shared.yaml` under `api-keys/glm` ✓ (recommended)
-   - New file `secrets/services/glm.yaml`
+This maximizes consistency while enabling independent usage tracking and history.
 
-4. **Should the default profile be configurable**, or always "anthropic"?
-   - **Always use current settings as default** ✓ (recommended)
-   - Add profiles as extensions
+## Phase 3: Implementation
 
-## Phase 3: Implementation (pending approval)
+### Phase 3a: Create wrapper module
 
-### Phase 3a: Refactor for profile support
+1. Create `modules/home/all/tools/claude-code-wrappers.nix`:
 
-1. Create `modules/home/all/tools/claude-code/profiles.nix`:
-   - Define `profileType` submodule
-   - Implement `mkProfileWrapper` function
-   - Export helper functions
+```nix
+{ config, pkgs, lib, ... }:
+{
+  # GLM wrapper script
+  home.packages = [
+    (pkgs.writeShellApplication {
+      name = "claude-glm";
+      runtimeInputs = [ config.programs.claude-code.finalPackage ];
+      text = ''
+        export CLAUDE_CONFIG_DIR="${config.xdg.configHome}/claude-glm"
+        mkdir -p "$CLAUDE_CONFIG_DIR"
 
-2. Modify `modules/home/all/tools/claude-code/default.nix`:
-   - Import `profiles.nix`
-   - Add `profiles` option (optional, default = {})
-   - Preserve all existing behavior when profiles = {}
+        export GLM_API_KEY="$(cat ${config.sops.secrets."api-keys/glm".path})"
+        export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
+        export ANTHROPIC_AUTH_TOKEN="$GLM_API_KEY"
+        export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-4.6"
+        export ANTHROPIC_DEFAULT_SONNET_MODEL="glm-4.6"
+        export ANTHROPIC_DEFAULT_HAIKU_MODEL="glm-4.5-air"
 
-3. Test with `nix build` and `nix flake check`
+        exec claude "$@"
+      '';
+    })
+  ];
 
-### Phase 3b: Add GLM profile
+  # Share settings from default profile
+  xdg.configFile."claude-glm/settings.json" = {
+    source = config.home.file.".claude/settings.json".source;
+  };
 
-1. Add GLM API key to secrets:
+  # Share commands directory
+  xdg.configFile."claude-glm/commands" = lib.mkIf (config.programs.claude-code.commandsDir != null) {
+    source = config.programs.claude-code.commandsDir;
+    recursive = true;
+  };
+
+  # Share agents directory
+  xdg.configFile."claude-glm/agents" = lib.mkIf (config.programs.claude-code.agentsDir != null) {
+    source = config.programs.claude-code.agentsDir;
+    recursive = true;
+  };
+
+  # Expose GLM API key
+  sops.secrets."api-keys/glm" = {
+    mode = "0400";
+  };
+}
+```
+
+2. Import in `modules/home/all/tools/default.nix`:
+
+```nix
+{
+  imports = [
+    # ... existing imports
+    ./claude-code-wrappers.nix
+  ];
+}
+```
+
+### Phase 3b: Add GLM API key to sops
+
+1. Edit secrets file:
    ```bash
+   cd ~/projects/nix-workspace/nix-config
    sops secrets/shared.yaml
-   # Add: api-keys/glm: "your-glm-api-key"
    ```
 
-2. Update `modules/home/all/core/sops.nix`:
-   ```nix
-   sops.secrets."api-keys/glm" = {
-     mode = "0400";
-   };
+2. Add GLM API key:
+   ```yaml
+   # secrets/shared.yaml
+   # ... existing secrets
+   api-keys:
+     glm: "your-glm-4.6-api-key-from-z.ai"
    ```
 
-3. Add GLM profile to claude-code configuration:
-   ```nix
-   programs.claude-code.profiles.glm = {
-     # settings inherited from base
-     env = {
-       ANTHROPIC_BASE_URL = "https://api.z.ai/api/anthropic";
-       ANTHROPIC_AUTH_TOKEN = "$GLM_API_KEY";
-       ANTHROPIC_DEFAULT_OPUS_MODEL = "glm-4.6";
-       ANTHROPIC_DEFAULT_SONNET_MODEL = "glm-4.6";
-       ANTHROPIC_DEFAULT_HAIKU_MODEL = "glm-4.5-air";
-     };
-   };
-   ```
-
-4. Build and test:
+3. Verify encryption:
    ```bash
+   sops -d secrets/shared.yaml | grep -A 2 "api-keys"
+   ```
+
+### Phase 3c: Build and test
+
+1. Build system configuration:
+   ```bash
+   cd ~/projects/nix-workspace/nix-config
    nix build .#darwinConfigurations.blackphos.system
-   # or
+   ```
+
+2. Apply configuration:
+   ```bash
    darwin-rebuild switch --flake .
    ```
 
-### Phase 3c: Generate wrapper scripts
+3. Verify wrapper script exists:
+   ```bash
+   which claude-glm
+   # Should show: /etc/profiles/per-user/crs58/bin/claude-glm
+   ```
 
-Wrapper generation logic:
-```nix
-mkProfileWrapper = name: profile: pkgs.writeShellApplication {
-  name = "claude-${name}";
-  runtimeInputs = [ pkgs.claude-code-bin ];
-  text = ''
-    # Load secret if needed
-    ${lib.optionalString (profile.env ? ANTHROPIC_AUTH_TOKEN &&
-                          profile.env.ANTHROPIC_AUTH_TOKEN == "$GLM_API_KEY") ''
-      export GLM_API_KEY="$(cat ${config.sops.secrets."api-keys/glm".path})"
-    ''}
+4. Check config directory creation:
+   ```bash
+   claude-glm --version
+   ls -la ~/.config/claude-glm/
+   # Should show: settings.json, commands/, agents/, .claude.json, etc.
+   ```
 
-    # Export environment variables
-    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v:
-      ''export ${k}="${v}"''
-    ) profile.env)}
-
-    # Set config directory
-    export CLAUDE_CONFIG_DIR="${profile.configDir}"
-
-    # Execute claude
-    exec claude "$@"
-  '';
-};
-```
-
-## Phase 4: Validation (pending approval)
+## Phase 4: Validation
 
 ### Validation checklist
 
 1. **Verify `claude` command unchanged**:
    ```bash
    claude --version
-   claude doctor
-   # Test basic conversation
+   # Should use ~/.claude/ directory
+   ls -la ~/.claude/.claude.json
    ```
 
-2. **Test `claude-glm` connects to Z.ai**:
+2. **Verify `claude-glm` uses separate directory**:
    ```bash
    claude-glm --version
-   # Should show GLM model when queried
-   claude-glm "What model are you?"
+   # Should use ~/.config/claude-glm/ directory
+   ls -la ~/.config/claude-glm/.claude.json
    ```
 
-3. **Confirm secrets resolution**:
+3. **Confirm settings are shared (same nix store path)**:
    ```bash
-   # Verify secret file exists and has correct permissions
-   ls -la $(nix eval --raw .#darwinConfigurations.blackphos.config.sops.secrets.\"api-keys/glm\".path)
-
-   # Test wrapper can read secret
-   claude-glm "test connection"
+   readlink ~/.claude/settings.json
+   readlink ~/.config/claude-glm/settings.json
+   # Should be identical nix store paths
    ```
 
-4. **Run formatting and checks**:
+4. **Test GLM API connection**:
+   ```bash
+   claude-glm "What model are you? Please identify yourself."
+   # Should respond as GLM-4.6 via Z.ai
+   ```
+
+5. **Test isolation (parallel usage)**:
+   ```bash
+   # Terminal 1
+   claude "Start conversation A with Anthropic"
+
+   # Terminal 2
+   claude-glm "Start conversation B with GLM"
+
+   # Verify sessions are separate:
+   # ~/.claude/.claude.json should only have conversation A
+   # ~/.config/claude-glm/.claude.json should only have conversation B
+   ```
+
+6. **Verify secrets resolution**:
+   ```bash
+   # Check secret file exists with correct permissions
+   ls -la $(nix eval --raw .#darwinConfigurations.blackphos.config.sops.secrets.\"api-keys/glm\".path)
+   # Should show: -r-------- (0400)
+   ```
+
+7. **Run nix checks**:
    ```bash
    nix fmt
    nix flake check
    ```
 
-5. **Test both profiles in parallel**:
-   ```bash
-   # Terminal 1
-   claude "anthropic test"
+### Expected outcomes
 
-   # Terminal 2
-   claude-glm "glm test"
-   ```
+✅ `claude` continues to work exactly as before
+✅ `claude-glm` creates isolated config directory
+✅ Both share settings, commands, agents (confirmed via readlink)
+✅ Sessions and history are completely separate
+✅ GLM profile connects to Z.ai endpoint
+✅ Anthropic profile connects to official Anthropic API
+✅ Secrets properly resolved at runtime
+✅ No nix evaluation errors
 
-## Key architectural principles applied
+## Key Architectural Principles Applied
 
 From `~/.claude/commands/preferences/architectural-patterns.md`:
 
-1. **Side effects explicit in type signatures**: Environment variables and config directories explicitly declared in profile type
-2. **Effects isolated at boundaries**: Secret resolution happens at wrapper script boundary, not in pure Nix config
-3. **Type-safe composition**: Module system enforces structure through `profileType` submodule
-4. **Declarative over imperative**: All configuration in Nix expressions, no manual file editing
-5. **Composable abstractions**: Profiles compose with base settings, can be arbitrarily extended
+1. **Side effects explicit in type signatures**: Environment variables declared explicitly in wrapper script
+2. **Effects isolated at boundaries**: Secret resolution and API configuration at wrapper boundary, not in pure Nix config
+3. **Declarative over imperative**: All configuration in Nix expressions, no manual file editing
+4. **Single source of truth**: Settings reused via symlink, not duplicated
+5. **Composable abstractions**: Wrapper approach allows arbitrary profile additions without modifying existing code
+
+From `~/.claude/commands/preferences/nix-development.md`:
+
+1. **Flake-based**: All configuration in flake, not channels
+2. **Modular structure**: Wrapper module in `modules/home/all/tools/`
+3. **Type-safe**: Uses module system options properly
+4. **Cross-platform**: Uses `xdg.configHome` for portability
+
+From `~/.claude/commands/preferences/secrets.md`:
+
+1. **sops-nix integration**: Secrets encrypted in git, decrypted at activation
+2. **Runtime resolution**: API keys loaded at execution time, not build time
+3. **Proper permissions**: Secret files restricted to owner-only read (0400)
+4. **Explicit handling**: Secret access explicit in wrapper script
+
+## Future Enhancements
+
+Potential extensions (not part of initial implementation):
+
+1. **Per-profile settings customization**:
+   ```nix
+   xdg.configFile."claude-glm/settings.json".source = jsonFormat.generate "..." (
+     config.programs.claude-code.settings // {
+       # Override specific settings for GLM
+       cleanupPeriodDays = 30;  # More aggressive cleanup for testing
+     }
+   );
+   ```
+
+2. **Additional profiles** (e.g., local LLM, different providers):
+   ```nix
+   home.packages = [
+     (mkClaudeWrapper {
+       name = "claude-local";
+       configDir = "${config.xdg.configHome}/claude-local";
+       env = {
+         ANTHROPIC_BASE_URL = "http://localhost:8000";
+         # ...
+       };
+     })
+   ];
+   ```
+
+3. **Profile-specific aliases**:
+   ```nix
+   home.shellAliases = {
+     cg = "claude-glm";
+     ca = "claude";  # anthropic
+   };
+   ```
+
+4. **Wrapper function abstraction** (if many profiles needed):
+   ```nix
+   let
+     mkClaudeProfile = { name, apiBase, apiKey, models }: {
+       # Generic wrapper generator
+     };
+   in {
+     home.packages = [
+       (mkClaudeProfile { name = "glm"; ... })
+       (mkClaudeProfile { name = "openrouter"; ... })
+     ];
+   }
+   ```
 
 ## References
 
@@ -399,21 +603,24 @@ From `~/.claude/commands/preferences/architectural-patterns.md`:
   - `~/.claude/commands/preferences/architectural-patterns.md`
 
 - Existing configuration:
-  - `modules/home/all/tools/claude-code/default.nix`
+  - `modules/home/all/tools/claude-code/default.nix` (unchanged)
   - `modules/home/all/core/sops.nix`
   - `.sops.yaml`
 
-- Reference implementation:
-  - `mirkolenz-nixos/home/mlenz/common/programs/claude.nix`
+- Upstream references:
+  - home-manager claude-code module: `home-manager/modules/programs/claude-code.nix`
+  - Anthropic devcontainer.json: [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code/blob/main/.devcontainer/devcontainer.json#L50)
 
-## Next steps
+## Summary
 
-Awaiting user approval of this plan before proceeding to Phase 3 implementation.
+This implementation provides:
 
-Once approved:
-1. Implement profiles.nix with type-safe profile definitions
-2. Extend default.nix with profile support
-3. Add GLM API key to sops secrets
-4. Generate wrapper scripts
-5. Test and validate
-6. Document usage
+✅ **Complete isolation**: Separate config directories via `CLAUDE_CONFIG_DIR`
+✅ **Zero duplication**: Settings shared via nix store symlinks
+✅ **Declarative**: Fully managed in Nix configuration
+✅ **Maintainable**: No modification to existing working configuration
+✅ **Extensible**: Easy to add more profiles following the same pattern
+✅ **Secure**: Secrets managed via sops-nix with proper permissions
+✅ **Type-safe**: Leverages module system and nix store guarantees
+
+Ready for Phase 3 implementation.
