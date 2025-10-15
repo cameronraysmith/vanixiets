@@ -918,14 +918,14 @@ Available recipes:
     validate-secrets                               # Validate all sops encrypted files can be decrypted
 
     [CI/CD]
-    test-ci-blocking workflow="ci.yaml"            # Trigger CI workflow and wait for result (blocking)
-    ci-status workflow="ci.yaml"                   # View latest CI run status and details
+    ci-build-local category="" system=""           # Build all flake outputs locally with nom (inefficient manual version of om ci for debugging builds)
+    ci-debug-job workflow="ci.yaml" job_name="nix (aarch64-darwin)" # Debug specific failed job from latest CI run
     ci-logs workflow="ci.yaml"                     # View latest CI run logs
     ci-logs-failed workflow="ci.yaml"              # View only failed logs from latest CI run
+    ci-run-watch workflow="ci.yaml"                # Trigger CI workflow and wait for result (blocking)
     ci-show-outputs system=""                      # List categorized flake outputs using nix eval
-    ci-build-local category="" system=""           # Build all flake outputs locally with nom (inefficient manual version of om ci for debugging builds)
+    ci-status workflow="ci.yaml"                   # View latest CI run status and details
     ci-validate workflow="ci.yaml" run_id=""       # Validate latest CI run comprehensively
-    ci-debug-job workflow="ci.yaml" job_name="nix (aarch64-darwin)" # Debug specific failed job from latest CI run
     ghsecrets repo="cameronraysmith/nix-config"    # Update github secrets for repo from environment variables
     list-workflows                                 # List available workflows and associated jobs.
     test-flake-workflow                            # Execute ci.yaml workflow locally via act.
