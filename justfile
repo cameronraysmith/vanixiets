@@ -1004,6 +1004,57 @@ test-cachix:
     echo "✅ Push completed. Verify at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "Store path: $STORE_PATH"
 
+# Build all CI outputs for a system and push to cachix (mimics CI workflow with caching)
+[group('CI/CD')]
+cache-ci-outputs system="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Determine target system (default to current system if not specified)
+    if [ -z "{{system}}" ]; then
+        TARGET_SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+    else
+        TARGET_SYSTEM="{{system}}"
+    fi
+
+    # Validate system is one of the three supported platforms
+    case "$TARGET_SYSTEM" in
+        x86_64-linux|aarch64-linux|aarch64-darwin)
+            echo "Building all CI outputs for $TARGET_SYSTEM..."
+            ;;
+        *)
+            echo "❌ Error: Unsupported system '$TARGET_SYSTEM'"
+            echo "Supported systems:"
+            echo "  • x86_64-linux   (Intel/AMD Linux)"
+            echo "  • aarch64-linux  (ARM Linux)"
+            echo "  • aarch64-darwin (Apple Silicon macOS)"
+            exit 1
+            ;;
+    esac
+
+    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
+    echo "Cache: https://app.cachix.org/cache/$CACHE_NAME"
+    echo ""
+    echo "This will:"
+    echo "  1. Build all flake outputs for $TARGET_SYSTEM via 'om ci run'"
+    echo "  2. Include all build dependencies (--include-all-dependencies)"
+    echo "  3. Stream output to console while pushing to cachix"
+    echo ""
+    echo "Starting build + push (this may take 10-30 minutes)..."
+    echo ""
+
+    # Run om ci with dependency tracking, show output, and push to cachix
+    # This matches the CI workflow for darwin builds (line 464 in ci.yaml)
+    om ci run --systems "$TARGET_SYSTEM" --include-all-dependencies 2>&1 | \
+        tee /dev/tty | \
+        sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
+
+    echo ""
+    echo "✅ Successfully built and cached all CI outputs for $TARGET_SYSTEM"
+    echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
+    echo ""
+    echo "Other machines can now pull from cachix instead of rebuilding."
+
 # Build darwin system and push to cachix (run after just verify or just activate)
 [group('CI/CD')]
 cache-darwin-system:
