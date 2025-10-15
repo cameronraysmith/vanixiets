@@ -7,6 +7,11 @@
 }:
 let
   package = pkgs.gitAndTools.git;
+  inherit (flake) inputs;
+
+  # TODO: Make hostname dynamic - currently hardcoded for stibnite (initial implementation)
+  # Future: Use config.networking.hostName or flake.config.hostname
+  hostname = "stibnite";
 in
 {
   programs.git = {
@@ -15,7 +20,8 @@ in
     userName = flake.config.me.fullname;
     userEmail = flake.config.me.email;
     signing = {
-      key = "~/.ssh/id_ed25519.pub";
+      # Use SOPS-deployed unified SSH key (same key for Radicle + Git + Jujutsu)
+      key = config.sops.secrets."radicle/ssh-private-key".path;
       format = "ssh";
       signByDefault = true;
     };
@@ -119,4 +125,11 @@ in
   home.file."${config.xdg.configHome}/git/allowed_signers".text = ''
     ${flake.config.me.email} namespaces="git" ${flake.config.me.sshKey}
   '';
+
+  # Deploy unified SSH key via SOPS
+  # This key is used for Git signing, Jujutsu signing, and Radicle identity
+  sops.secrets."radicle/ssh-private-key" = {
+    sopsFile = inputs.secrets.secrets.${hostname}.radicle;
+    mode = "0400";
+  };
 }
