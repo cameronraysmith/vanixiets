@@ -13,6 +13,12 @@
   # - macOS without xdg: ~/Library/Application Support/sops/age/keys.txt
   sops.age.keyFile = "${config.xdg.configHome}/sops/age/keys.txt";
 
-  # Set the default sops file location
-  sops.defaultSopsFile = ../../../../secrets/shared.yaml;
+  # Note: No defaultSopsFile set - each secret will specify its sopsFile
+  # Secrets are now sourced from the secrets flake input via:
+  # sops.secrets."secret-name" = {
+  #   sopsFile = inputs.secrets.secrets.<hostname>.<secret-name>;
+  # };
+  #
+  # This allows per-secret file specification and integration with the
+  # separate nix-secrets repository for the unified crypto infrastructure.
 }
