@@ -421,12 +421,49 @@ jobs:
           echo ""
           echo "✅ all configurations properly exposed"
 
-  # job 7: nix
+  # job 7: cache-overlay-packages
+  # pre-cache resource-intensive overlay packages before main build
+  # prevents disk space exhaustion during CI builds (especially rust packages)
+  cache-overlay-packages:
+    needs: skip-check
+    if: |
+      needs.skip-check.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'cache-overlay-packages' ||
+       inputs.job == 'nix')
+    strategy:
+      fail-fast: false # allow each system to cache independently
+      matrix:
+        system:
+          - x86_64-linux # standard linux (ubuntu-latest)
+          - aarch64-linux # arm linux (ubuntu-24.04-arm)
+    # dynamic runner selection based on system architecture
+    runs-on: >-
+      ${{ (matrix.system == 'x86_64-linux' && 'ubuntu-latest')
+      || (matrix.system == 'aarch64-linux' && 'ubuntu-24.04-arm') }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+
+      - name: setup nix
+        uses: ./.github/actions/setup-nix
+        with:
+          system: ${{ matrix.system }}
+          enable-cachix: true
+          cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: cache overlay packages
+        run: |
+          nix develop --command just cache-overlay-packages ${{ matrix.system }}
+
+  # job 8: nix
   # builds all flake outputs via omnix (nixos configs, home configs, checks, devshells)
   # matrix strategy: test all flake-supported systems on their native platforms
   # pattern adapted from: https://github.com/Defelo/nixpkgs-review-gha
   nix:
-    needs: skip-check
+    needs: [skip-check, cache-overlay-packages]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
