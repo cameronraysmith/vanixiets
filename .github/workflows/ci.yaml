@@ -515,7 +515,7 @@ jobs:
   docs-test:
     needs: skip-check
     if: |
-      !cancelled() &&
+      needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'docs-test')
