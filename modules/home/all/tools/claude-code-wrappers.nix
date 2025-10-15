@@ -26,7 +26,8 @@ in
         export CLAUDE_CONFIG_DIR="${config.xdg.configHome}/claude-glm"
         mkdir -p "$CLAUDE_CONFIG_DIR"
 
-        export GLM_API_KEY="$(cat ${config.sops.secrets."glm-api-key".path})"
+        GLM_API_KEY="$(cat ${config.sops.secrets."glm-api-key".path})"
+        export GLM_API_KEY
         export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
         export ANTHROPIC_AUTH_TOKEN="$GLM_API_KEY"
         export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-4.6"
