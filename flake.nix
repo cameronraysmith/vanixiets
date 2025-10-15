@@ -78,6 +78,10 @@
     git-hooks.flake = false;
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";
     nuenv.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Upstream Jujutsu for latest SSH signing features (revset-based sign-on-push)
+    jj.url = "github:martinvonz/jj";
+    jj.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
