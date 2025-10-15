@@ -21,6 +21,7 @@ in
       - preferences: @${prefsPath}/preferences.md
       - general development practices: @${prefsPath}/general-practices.md
       - git version control: @${prefsPath}/git-version-control.md
+      - git history cleanup: ${prefsPath}/git-history-cleanup.md
       - jj version control: ${commandsPath}/jj/jj-summary.md
       - jj workflow (full): ${commandsPath}/jj/jj-workflow.md
       - documentation: ${prefsPath}/documentation.md
@@ -37,7 +38,6 @@ in
       - haskell development: ${prefsPath}/haskell-development.md
       - typescript/node.js development: ${prefsPath}/typescript-nodejs-development.md
       - react/ui development: ${prefsPath}/react-tanstack-ui-development.md
-      - git history cleanup: ${prefsPath}/git-history-cleanup.md
 
       Always remember to fallback to using practical features and architectural
       patterns that emphasize algebraic data types, type-safety, and functional
