@@ -22,6 +22,7 @@ in
       - general development practices: @${prefsPath}/general-practices.md
       - git version control: @${prefsPath}/git-version-control.md
       - jj version control: @${commandsPath}/jj/jj-summary.md
+      - jj workflow (full): ${commandsPath}/jj/jj-workflow.md
       - documentation: ${prefsPath}/documentation.md
       - change management: ${prefsPath}/change-management.md
       - architectural patterns: ${prefsPath}/architectural-patterns.md
