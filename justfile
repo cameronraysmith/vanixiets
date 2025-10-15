@@ -1137,7 +1137,7 @@ cache-overlay-packages system:
     PACKAGE_TARGETS=$(echo "$PACKAGES" | sed "s|^|.#packages.$SYSTEM.|" | tr '\n' ' ')
 
     # Build and capture output paths
-    STORE_PATHS=$(nix build $PACKAGE_TARGETS --no-link --print-out-paths)
+    STORE_PATHS=$(nix build $PACKAGE_TARGETS -L --no-link --print-out-paths)
 
     if [ -z "$STORE_PATHS" ]; then
         echo "❌ No store paths produced from build"
