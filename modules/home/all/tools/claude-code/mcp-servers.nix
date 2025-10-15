@@ -7,6 +7,10 @@
 }:
 let
   home = config.home.homeDirectory;
+  # Construct user-specific secrets path
+  # Secrets file structure: secrets/users/{username}/mcp-api-keys.yaml
+  # Requires corresponding .sops.yaml rule: path_regex: users/{username}/.*\.yaml$
+  mcpSecretsFile = flake.inputs.self + "/secrets/users/${config.home.username}/mcp-api-keys.yaml";
 in
 {
   # Ensure ~/.mcp directory exists before templates are written
@@ -15,15 +19,15 @@ in
   # Define sops secrets for the 3 MCP servers requiring API keys
   sops.secrets = {
     "mcp-firecrawl-api-key" = {
-      sopsFile = flake.inputs.self + "/secrets/users/crs58/mcp-api-keys.yaml";
+      sopsFile = mcpSecretsFile;
       key = "firecrawl-api-key";
     };
     "mcp-huggingface-token" = {
-      sopsFile = flake.inputs.self + "/secrets/users/crs58/mcp-api-keys.yaml";
+      sopsFile = mcpSecretsFile;
       key = "huggingface-token";
     };
     "mcp-context7-api-key" = {
-      sopsFile = flake.inputs.self + "/secrets/users/crs58/mcp-api-keys.yaml";
+      sopsFile = mcpSecretsFile;
       key = "context7-api-key";
     };
   };
