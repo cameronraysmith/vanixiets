@@ -41,17 +41,18 @@ claude --mcp-config ~/.mcp/nixos.json ~/.mcp/firecrawl.json ~/.mcp/playwright.js
 ## Adding a new MCP server
 
 1. Determine if server requires secrets
-2. If yes, add to `secrets/users/crs58/mcp-api-keys.yaml`:
+2. If yes, add to your user's secrets file (`secrets/users/{username}/mcp-api-keys.yaml`):
    ```bash
-   sops secrets/users/crs58/mcp-api-keys.yaml
+   # Replace {username} with your actual username (e.g., crs58)
+   sops secrets/users/{username}/mcp-api-keys.yaml
    # Add: new-service-api-key: <value>
    ```
 
 3. Add to `modules/home/all/tools/claude-code/mcp-servers.nix`:
    ```nix
-   # If secrets needed:
+   # If secrets needed (uses config.home.username automatically):
    sops.secrets."mcp-new-service-api-key" = {
-     sopsFile = flake.inputs.self + "/secrets/users/crs58/mcp-api-keys.yaml";
+     sopsFile = mcpSecretsFile;  # Automatically resolves to secrets/users/{username}/
      key = "new-service-api-key";
    };
 
