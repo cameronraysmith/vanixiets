@@ -1114,14 +1114,7 @@ cache-overlay-packages system:
 
     SYSTEM="{{system}}"
     echo "Building all overlay packages for $SYSTEM..."
-
-    # Get cachix cache name (CI uses env var, local uses sops)
-    if [ -n "$CACHIX_BINARY_CACHE" ]; then
-        CACHE_NAME="$CACHIX_BINARY_CACHE"
-    else
-        CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
-    fi
-
+    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
     echo "Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo ""
 
@@ -1160,18 +1153,9 @@ cache-overlay-packages system:
     echo "Querying dependencies and pushing to cachix..."
     echo "(This includes all build dependencies for cache efficiency)"
 
-    # Push to cachix (CI already authenticated via cachix-action, local uses sops)
-    if [ -n "$CACHIX_BINARY_CACHE" ]; then
-        # CI context: cachix-action already configured authentication
-        echo "$STORE_PATHS" | while read path; do
-            nix-store --query --requisites --include-outputs "$path"
-        done | sort -u | cachix push "$CACHE_NAME"
-    else
-        # Local context: use sops for authentication
-        echo "$STORE_PATHS" | while read path; do
-            nix-store --query --requisites --include-outputs "$path"
-        done | sort -u | sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
-    fi
+    echo "$STORE_PATHS" | while read path; do
+        nix-store --query --requisites --include-outputs "$path"
+    done | sort -u | sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
 
     echo ""
     echo "✅ Successfully cached all overlay packages for $SYSTEM"
