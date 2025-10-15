@@ -60,6 +60,11 @@
     sops-nix.url = "github:mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
+    # SOPS-encrypted secrets repository (local for now, will move to Radicle)
+    # Exposes secret file paths per host via inputs.secrets.secrets.<hostname>
+    secrets.url = "git+file:///Users/crs58/projects/nix-workspace/nix-secrets";
+    secrets.flake = true;
+
     nix-index-database.url = "github:nix-community/nix-index-database";
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
 
