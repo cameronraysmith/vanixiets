@@ -457,6 +457,8 @@ jobs:
       - name: cache overlay packages
         run: |
           nix develop --command just cache-overlay-packages ${{ matrix.system }}
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
   # job 8: nix
   # builds all flake outputs via omnix (nixos configs, home configs, checks, devshells)
