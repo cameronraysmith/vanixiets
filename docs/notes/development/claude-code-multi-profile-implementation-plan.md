@@ -95,14 +95,25 @@ Implication: We must create a **separate wrapper module** rather than extending 
 
 Setup uses **sops-nix** with age encryption:
 - Keys at: `~/.config/sops/age/keys.txt`
-- Secrets in: `secrets/shared.yaml` (and other locations)
-- Configuration at: `modules/home/all/core/sops.nix`
+- Secrets in: `secrets/users/{username}/` (user-specific) and `secrets/shared.yaml` (shared)
+- Configuration pattern: User-specific secrets files with explicit `sopsFile` reference
 - `.sops.yaml` defines key groups for dev, ci, admin, users, and hosts
 
-For GLM API key:
-1. Add `api-keys/glm` to `secrets/shared.yaml` (sops-encrypted)
-2. Expose via `sops.secrets."api-keys/glm"` in wrapper module
-3. Reference in wrapper script: `$(cat ${config.sops.secrets."api-keys/glm".path})`
+**Established pattern** (from mcp-servers.nix):
+```nix
+mcpSecretsFile = flake.inputs.self + "/secrets/users/${config.home.username}/mcp-api-keys.yaml";
+
+sops.secrets."mcp-firecrawl-api-key" = {
+  sopsFile = mcpSecretsFile;
+  key = "firecrawl-api-key";
+};
+```
+
+For GLM API key (following established pattern):
+1. Create `secrets/users/crs58/llm-api-keys.yaml` (separate from MCP keys)
+2. Add `glm-api-key` entry (sops-encrypted)
+3. Expose via `sops.secrets."glm-api-key"` with explicit `sopsFile` and `key` in wrapper module
+4. Reference in wrapper script: `$(cat ${config.sops.secrets."glm-api-key".path})`
 
 ### Module system patterns
 
@@ -141,12 +152,20 @@ Rationale:
 
 ```nix
 # modules/home/all/tools/claude-code-wrappers.nix
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, flake, ... }:
 let
-  # Reference to the JSON format used by claude-code module
-  jsonFormat = pkgs.formats.json { };
+  home = config.home.homeDirectory;
+  # User-specific LLM API keys (separate from MCP server keys)
+  # Pattern: secrets/users/{username}/llm-api-keys.yaml
+  llmSecretsFile = flake.inputs.self + "/secrets/users/${config.home.username}/llm-api-keys.yaml";
 in
 {
+  # Define sops secret for GLM API key (following established pattern)
+  sops.secrets."glm-api-key" = {
+    sopsFile = llmSecretsFile;
+    key = "glm-api-key";
+  };
+
   # Generate wrapper script for GLM profile
   home.packages = [
     (pkgs.writeShellApplication {
@@ -160,7 +179,7 @@ in
         mkdir -p "$CLAUDE_CONFIG_DIR"
 
         # Load GLM API key from sops-managed secret
-        export GLM_API_KEY="$(cat ${config.sops.secrets."api-keys/glm".path})"
+        export GLM_API_KEY="$(cat ${config.sops.secrets."glm-api-key".path})"
 
         # Configure Z.ai API endpoint
         export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
@@ -193,11 +212,6 @@ in
   xdg.configFile."claude-glm/agents" = lib.mkIf (config.programs.claude-code.agentsDir != null) {
     source = config.programs.claude-code.agentsDir;
     recursive = true;
-  };
-
-  # Expose GLM API key from sops
-  sops.secrets."api-keys/glm" = {
-    mode = "0400";
   };
 }
 ```
@@ -254,43 +268,57 @@ Will create/modify:
 1. **`modules/home/all/tools/claude-code-wrappers.nix`** (new)
    - Wrapper script generation for GLM profile
    - Settings, commands, agents symlinks
-   - sops secret exposure
+   - sops secret exposure with explicit `sopsFile` and `key`
 
 2. **`modules/home/all/tools/default.nix`** (modify)
    - Add `./claude-code-wrappers.nix` to imports
 
-3. **`secrets/shared.yaml`** (modify)
-   - Add encrypted `api-keys/glm` entry
+3. **`secrets/users/crs58/llm-api-keys.yaml`** (new)
+   - Create new user-specific secrets file for LLM API keys
+   - Add encrypted `glm-api-key` entry
+   - Allows future addition of other LLM provider keys (OpenRouter, local models, etc.)
+
+4. **`.sops.yaml`** (verify/update if needed)
+   - Ensure `users/crs58/.*\.yaml$` rule exists for encrypting user-specific secrets
 
 Will **NOT** modify:
 - `modules/home/all/tools/claude-code/default.nix` - unchanged
 - `modules/home/all/core/sops.nix` - unchanged (secret exposure in wrapper module)
+- `secrets/shared.yaml` - unchanged (using user-specific secrets instead)
 
 ### Secrets integration strategy
 
-**Runtime resolution via wrapper script**:
+**Runtime resolution via wrapper script** (following established pattern from mcp-servers.nix):
 
 ```nix
-sops.secrets."api-keys/glm" = {
-  mode = "0400";  # Read-only for owner
+# User-specific secrets file reference
+llmSecretsFile = flake.inputs.self + "/secrets/users/${config.home.username}/llm-api-keys.yaml";
+
+# Explicit sops secret declaration with sopsFile and key
+sops.secrets."glm-api-key" = {
+  sopsFile = llmSecretsFile;
+  key = "glm-api-key";
+  # mode defaults to 0400 (read-only for owner)
 };
 
 # In wrapper script:
-export GLM_API_KEY="$(cat ${config.sops.secrets."api-keys/glm".path})"
+export GLM_API_KEY="$(cat ${config.sops.secrets."glm-api-key".path})"
 export ANTHROPIC_AUTH_TOKEN="$GLM_API_KEY"
 ```
 
 The sops-nix module:
-1. Decrypts `api-keys/glm` from `secrets/shared.yaml` at activation time
-2. Writes decrypted value to a runtime path (e.g., `/run/secrets/api-keys-glm`)
+1. Decrypts `glm-api-key` from `secrets/users/crs58/llm-api-keys.yaml` at activation time
+2. Writes decrypted value to a runtime path (e.g., `/run/user/501/secrets/glm-api-key`)
 3. Wrapper script reads this file at execution time
 4. Environment variable set for the claude process
 
 **Why this approach**:
 - ✅ Secrets never appear in nix store (derivations remain pure)
 - ✅ Runtime resolution (decryption happens at activation, not build)
-- ✅ Proper permissions (0400, owner-only read)
+- ✅ Proper permissions (0400, owner-only read by default)
 - ✅ Explicit effect handling at boundary (wrapper script, not nix config)
+- ✅ Consistent with established mcp-servers.nix pattern
+- ✅ User-specific secrets (encrypted for user keys, not all hosts)
 
 ### Directory structure
 
@@ -323,9 +351,10 @@ Isolation points:
 1. **Wrapper module approach** - standalone, doesn't extend existing module
 2. **`claude` = default** (unchanged), `claude-glm` = new wrapper
 3. **Share settings/commands/agents** via symlinks to same nix store paths
-4. **Use `secrets/shared.yaml`** for GLM key (path: `api-keys/glm`)
+4. **Use user-specific secrets file** `secrets/users/crs58/llm-api-keys.yaml` for GLM key (following mcp-servers.nix pattern)
 5. **Runtime environment variables** for API endpoint and authentication
 6. **`CLAUDE_CONFIG_DIR` isolation** for session and history separation
+7. **Explicit sops pattern** with `sopsFile` and `key` attributes (consistent with existing usage)
 
 ### Rationale for sharing vs. isolation
 
@@ -348,8 +377,19 @@ This maximizes consistency while enabling independent usage tracking and history
 1. Create `modules/home/all/tools/claude-code-wrappers.nix`:
 
 ```nix
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, flake, ... }:
+let
+  home = config.home.homeDirectory;
+  # User-specific LLM API keys (separate from MCP server keys)
+  llmSecretsFile = flake.inputs.self + "/secrets/users/${config.home.username}/llm-api-keys.yaml";
+in
 {
+  # Define sops secret for GLM API key (following mcp-servers.nix pattern)
+  sops.secrets."glm-api-key" = {
+    sopsFile = llmSecretsFile;
+    key = "glm-api-key";
+  };
+
   # GLM wrapper script
   home.packages = [
     (pkgs.writeShellApplication {
@@ -359,7 +399,7 @@ This maximizes consistency while enabling independent usage tracking and history
         export CLAUDE_CONFIG_DIR="${config.xdg.configHome}/claude-glm"
         mkdir -p "$CLAUDE_CONFIG_DIR"
 
-        export GLM_API_KEY="$(cat ${config.sops.secrets."api-keys/glm".path})"
+        export GLM_API_KEY="$(cat ${config.sops.secrets."glm-api-key".path})"
         export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
         export ANTHROPIC_AUTH_TOKEN="$GLM_API_KEY"
         export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-4.6"
@@ -387,11 +427,6 @@ This maximizes consistency while enabling independent usage tracking and history
     source = config.programs.claude-code.agentsDir;
     recursive = true;
   };
-
-  # Expose GLM API key
-  sops.secrets."api-keys/glm" = {
-    mode = "0400";
-  };
 }
 ```
 
@@ -408,23 +443,50 @@ This maximizes consistency while enabling independent usage tracking and history
 
 ### Phase 3b: Add GLM API key to sops
 
-1. Edit secrets file:
+1. Create new LLM secrets file:
    ```bash
    cd ~/projects/nix-workspace/nix-config
-   sops secrets/shared.yaml
+
+   # Create the file with sops (will encrypt on save)
+   sops secrets/users/crs58/llm-api-keys.yaml
    ```
 
-2. Add GLM API key:
+2. Add GLM API key (in editor that sops opens):
    ```yaml
-   # secrets/shared.yaml
-   # ... existing secrets
-   api-keys:
-     glm: "your-glm-4.6-api-key-from-z.ai"
+   # secrets/users/crs58/llm-api-keys.yaml
+   glm-api-key: "your-glm-4.6-api-key-from-z.ai"
+   ```
+
+   Or use a test value initially:
+   ```yaml
+   glm-api-key: "test-glm-api-key-replace-later"
    ```
 
 3. Verify encryption:
    ```bash
-   sops -d secrets/shared.yaml | grep -A 2 "api-keys"
+   # File should be encrypted
+   cat secrets/users/crs58/llm-api-keys.yaml | head -5
+   # Should show: glm-api-key: ENC[AES256_GCM,data:...
+
+   # Verify decryption works
+   sops -d secrets/users/crs58/llm-api-keys.yaml
+   # Should show plaintext: glm-api-key: your-glm-4.6-api-key-from-z.ai
+   ```
+
+4. Verify `.sops.yaml` rule exists:
+   ```bash
+   grep -A 5 "users/crs58/" .sops.yaml
+   # Should show encryption rule for users/crs58/*.yaml files
+   ```
+
+   Expected rule (already exists in your `.sops.yaml`):
+   ```yaml
+   - path_regex: users/crs58/.*\.yaml$
+     key_groups:
+       - age:
+         - *admin
+         - *dev
+         - *admin-user
    ```
 
 ### Phase 3c: Build and test
@@ -500,8 +562,12 @@ This maximizes consistency while enabling independent usage tracking and history
 6. **Verify secrets resolution**:
    ```bash
    # Check secret file exists with correct permissions
-   ls -la $(nix eval --raw .#darwinConfigurations.blackphos.config.sops.secrets.\"api-keys/glm\".path)
+   ls -la $(nix eval --raw .#darwinConfigurations.blackphos.config.sops.secrets.\"glm-api-key\".path)
    # Should show: -r-------- (0400)
+
+   # Verify secret can be read
+   cat $(nix eval --raw .#darwinConfigurations.blackphos.config.sops.secrets.\"glm-api-key\".path)
+   # Should show your GLM API key
    ```
 
 7. **Run nix checks**:
