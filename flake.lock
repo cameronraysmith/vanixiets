@@ -733,7 +733,6 @@
         "nixpkgs-linux-stable": "nixpkgs-linux-stable",
         "nuenv": "nuenv",
         "omnix": "omnix",
-        "secrets": "secrets",
         "sops-nix": "sops-nix",
         "systems": "systems_4"
       }
@@ -823,21 +822,6 @@
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "type": "github"
-      }
-    },
-    "secrets": {
-      "locked": {
-        "lastModified": 1760564074,
-        "narHash": "sha256-/vGcAxAu6rZ8KAbYPXeNHhsmX9gbnhxoKLyctJzWbGc=",
-        "owner": "cameronraysmith",
-        "repo": "nix-secrets",
-        "rev": "57eb38195095e9dd329309bf842aff9b74444d55",
-        "type": "github"
-      },
-      "original": {
-        "owner": "cameronraysmith",
-        "repo": "nix-secrets",
         "type": "github"
       }
     },
