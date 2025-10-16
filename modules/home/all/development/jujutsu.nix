@@ -54,6 +54,11 @@ in
         # Options: true, false, "mine()", "~signed()", "~signed() & mine()", etc.
         # Using true for initial implementation (sign all commits)
         sign-on-push = true;
+
+        # Write Jujutsu change IDs to Git commit headers for Radicle integration
+        # Enables Radicle to track change identity across patch revisions
+        # See: https://radicle.xyz/2025/08/14/jujutsu-with-radicle.html
+        write-change-id-header = true;
       };
 
       # Snapshot settings control automatic file tracking and size limits
