@@ -616,6 +616,11 @@ ci-show-outputs system="":
 ci-build-local category="" system="":
     @./scripts/ci/ci-build-local.sh "{{category}}" "{{system}}"
 
+# Build specific category for CI matrix jobs (optimized for disk space distribution)
+[group('CI/CD')]
+ci-build-category system category config="":
+    @./scripts/ci/ci-build-category.sh "{{system}}" "{{category}}" "{{config}}"
+
 # Validate latest CI run comprehensively
 [group('CI/CD')]
 ci-validate workflow="ci.yaml" run_id="":
