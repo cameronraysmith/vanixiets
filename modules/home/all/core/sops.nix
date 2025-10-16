@@ -2,7 +2,7 @@
   config,
   pkgs,
   lib,
-  self,
+  flake,
   ...
 }:
 {
@@ -13,12 +13,18 @@
   # - macOS without xdg: ~/Library/Application Support/sops/age/keys.txt
   sops.age.keyFile = "${config.xdg.configHome}/sops/age/keys.txt";
 
-  # Note: No defaultSopsFile set - each secret will specify its sopsFile
-  # Secrets are now sourced from the secrets flake input via:
-  # sops.secrets."secret-name" = {
-  #   sopsFile = inputs.secrets.secrets.<hostname>.<secret-name>;
+  # Default SOPS file for existing System 1 secrets (general secrets management)
+  # Uses flake.inputs.self to reference files in the current repository
+  sops.defaultSopsFile = flake.inputs.self + "/secrets/shared.yaml";
+
+  # Note: System 2 (unified crypto) secrets explicitly override with sopsFile:
+  # sops.secrets."radicle/ssh-private-key" = {
+  #   sopsFile = inputs.secrets.secrets.<hostname>.radicle;  # Overrides default
+  #   mode = "0400";
   # };
   #
-  # This allows per-secret file specification and integration with the
-  # separate nix-secrets repository for the unified crypto infrastructure.
+  # This allows:
+  # - System 1 (existing): Multi-key secrets in secrets/ directory (uses default)
+  # - System 2 (new): Unified crypto secrets from nix-secrets flake (explicit sopsFile)
+  # - Both systems use the same Age key from ~/.config/sops/age/keys.txt
 }
