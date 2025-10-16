@@ -492,10 +492,6 @@ jobs:
           - system: x86_64-linux
             runner: ubuntu-latest
             category: nixos
-            config: orb-nixos
-          - system: x86_64-linux
-            runner: ubuntu-latest
-            category: nixos
             config: stibnite-nixos
           # aarch64-linux builds
           - system: aarch64-linux
@@ -510,15 +506,7 @@ jobs:
           - system: aarch64-linux
             runner: ubuntu-24.04-arm
             category: nixos
-            config: blackphos-nixos
-          - system: aarch64-linux
-            runner: ubuntu-24.04-arm
-            category: nixos
             config: orb-nixos
-          - system: aarch64-linux
-            runner: ubuntu-24.04-arm
-            category: nixos
-            config: stibnite-nixos
     runs-on: ${{ matrix.runner }}
     steps:
       - name: checkout repository
