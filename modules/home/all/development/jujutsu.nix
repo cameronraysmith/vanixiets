@@ -5,11 +5,6 @@
   ...
 }:
 let
-  inherit (flake) inputs;
-
-  # TODO: Make hostname dynamic - currently hardcoded for stibnite (initial implementation)
-  # Future: Use config.networking.hostName or flake.config.hostname
-  hostname = "stibnite";
 in
 {
   programs.jujutsu = {
@@ -75,8 +70,9 @@ in
 
   # Deploy unified SSH key via SOPS (same key as Git and Radicle)
   # Following defelo-nixos pattern: each module explicitly declares its secret dependencies
+  # Using explicit sopsFile pattern (not defaultSopsFile) for future flexibility
   sops.secrets."radicle/ssh-private-key" = {
-    sopsFile = inputs.secrets.secrets.${hostname}.radicle;
+    sopsFile = flake.inputs.self + "/secrets/radicle.yaml";
     mode = "0400";
   };
 }
