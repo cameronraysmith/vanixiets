@@ -461,9 +461,9 @@ jobs:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
   # job 8: nix
-  # builds all flake outputs via omnix (nixos configs, home configs, checks, devshells)
-  # matrix strategy: test all flake-supported systems on their native platforms
-  # pattern adapted from: https://github.com/Defelo/nixpkgs-review-gha
+  # builds flake outputs via category-based matrix for disk space optimization
+  # distributes builds across multiple machines to avoid disk space exhaustion
+  # each job builds a specific category (packages, home configs, system configs)
   nix:
     needs: [skip-check, cache-overlay-packages]
     if: |
@@ -472,17 +472,54 @@ jobs:
        inputs.job == '' ||
        inputs.job == 'nix')
     strategy:
-      fail-fast: false # allow each system to test independently
+      fail-fast: false
       matrix:
-        system:
-          - x86_64-linux # standard linux (ubuntu-latest)
-          - aarch64-linux # arm linux (ubuntu-24.04-arm)
-          # - aarch64-darwin  # apple silicon macOS (macos-latest)
-    # dynamic runner selection based on system architecture
-    runs-on: >-
-      ${{ (matrix.system == 'x86_64-linux' && 'ubuntu-latest')
-      || (matrix.system == 'aarch64-linux' && 'ubuntu-24.04-arm')
-      || (matrix.system == 'aarch64-darwin' && 'macos-latest') }}
+        include:
+          # x86_64-linux builds
+          - system: x86_64-linux
+            runner: ubuntu-latest
+            category: packages
+          - system: x86_64-linux
+            runner: ubuntu-latest
+            category: checks-devshells
+          - system: x86_64-linux
+            runner: ubuntu-latest
+            category: home
+          - system: x86_64-linux
+            runner: ubuntu-latest
+            category: nixos
+            config: blackphos-nixos
+          - system: x86_64-linux
+            runner: ubuntu-latest
+            category: nixos
+            config: orb-nixos
+          - system: x86_64-linux
+            runner: ubuntu-latest
+            category: nixos
+            config: stibnite-nixos
+          # aarch64-linux builds
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+            category: packages
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+            category: checks-devshells
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+            category: home
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+            category: nixos
+            config: blackphos-nixos
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+            category: nixos
+            config: orb-nixos
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+            category: nixos
+            config: stibnite-nixos
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
@@ -495,17 +532,10 @@ jobs:
           cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: build all outputs via omnix
+      - name: build ${{ matrix.category }}${{ matrix.config && format(' - {0}', matrix.config) || '' }}
         run: |
-          echo "building all flake outputs for ${{ matrix.system }} via om ci..."
-          if [ "${{ matrix.system }}" = "aarch64-darwin" ]; then
-            # for darwin: build and push to cachix (including build deps for cache efficiency)
-            nix develop --command om ci run --systems "${{ matrix.system }}" --include-all-dependencies | tee /dev/stderr | cachix push ${{ env.CACHIX_BINARY_CACHE }}
-          else
-            # for linux: just build (we're happy to rebuild these)
-            nix develop --command om ci run --systems "${{ matrix.system }}"
-          fi
-          echo "✅ all outputs built successfully for ${{ matrix.system }}"
+          echo "building ${{ matrix.category }}${{ matrix.config && format(' {0}', matrix.config) || '' }} for ${{ matrix.system }}"
+          nix develop --command just ci-build-category "${{ matrix.system }}" "${{ matrix.category }}" "${{ matrix.config }}"
 
       - name: report disk usage
         if: always()
