@@ -46,13 +46,15 @@ let
     # Expose nuenv for nushell script packaging (analogous to writeShellApplication for bash)
     nuenv = (inputs.nuenv.overlays.nuenv self super).nuenv;
 
-    # Override jujutsu with upstream version for latest SSH signing features
-    # - Revset-based sign-on-push (e.g., "mine()" instead of just boolean)
-    # - Enhanced SSH signature verification with key fingerprints
-    # - Latest improvements before they reach nixpkgs stable
+    # NOTE: jujutsu overlay disabled due to disk space constraints in CI
+    # Building jujutsu from source (inputs.jj) causes "No space left on device" errors
+    # Using nixpkgs version instead until CI runners have more disk space
+    #
+    # Original overlay (disabled):
+    # jujutsu = inputs.jj.packages.${super.system}.jujutsu or super.jujutsu;
+    #
+    # To re-enable: uncomment above line and ensure sufficient disk space (~20GB+)
     # Reference: https://github.com/martinvonz/jj
-    # Based on: defelo-nixos pattern
-    jujutsu = inputs.jj.packages.${super.system}.jujutsu or super.jujutsu;
 
     # nvim-treesitter override is now provided by LazyVim-module's overlay
     # See: inputs.lazyvim.overlays.nvim-treesitter-main applied in flake.nix
