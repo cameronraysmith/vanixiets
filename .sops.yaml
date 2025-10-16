@@ -31,6 +31,18 @@ creation_rules:
         - *dev
         - *raquel-user
 
+  # Unified cryptographic identity (radicle/git/jujutsu signing key)
+  # User identity deployed to all hosts
+  - path_regex: secrets/radicle\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *admin-user
+        - *stibnite
+        - *blackphos
+        - *orb-nixos
+
   # Host-specific secrets
   - path_regex: hosts/stibnite/.*\.yaml$
     key_groups:
