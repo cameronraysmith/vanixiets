@@ -5,6 +5,7 @@
     ./helix.nix
     ./jujutsu.nix
     ./neovim
+    ./radicle.nix
     ./wezterm
     ./zed
   ];
