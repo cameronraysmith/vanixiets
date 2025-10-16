@@ -621,6 +621,11 @@ ci-build-local category="" system="":
 ci-build-category system category config="":
     @./scripts/ci/ci-build-category.sh "{{system}}" "{{category}}" "{{config}}"
 
+# Build and cache specific category with all dependencies pushed to cachix (local testing)
+[group('CI/CD')]
+ci-cache-category system category config="":
+    @./scripts/ci/ci-cache-category.sh "{{system}}" "{{category}}" "{{config}}"
+
 # Validate latest CI run comprehensively
 [group('CI/CD')]
 ci-validate workflow="ci.yaml" run_id="":
