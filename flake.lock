@@ -830,15 +830,15 @@
       "locked": {
         "lastModified": 1760564074,
         "narHash": "sha256-/vGcAxAu6rZ8KAbYPXeNHhsmX9gbnhxoKLyctJzWbGc=",
-        "ref": "refs/heads/main",
+        "owner": "cameronraysmith",
+        "repo": "nix-secrets",
         "rev": "57eb38195095e9dd329309bf842aff9b74444d55",
-        "revCount": 3,
-        "type": "git",
-        "url": "file:///Users/crs58/projects/nix-workspace/nix-secrets"
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "file:///Users/crs58/projects/nix-workspace/nix-secrets"
+        "owner": "cameronraysmith",
+        "repo": "nix-secrets",
+        "type": "github"
       }
     },
     "sops-nix": {
