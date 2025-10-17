@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "generated_at": "2025-10-17T12:00:00Z",
+  "source_host": "stibnite",
+  "workspaces": {
+    "nix-workspace": {
+      "path": "nix-workspace",
+      "repos": [
+        {
+          "path": "nix-config",
+          "default_branch": "main",
+          "remotes": {
+            "origin": "git@github.com:user/nix-config.git"
+          }
+        },
+        {
+          "path": "atuin",
+          "default_branch": "main",
+          "remotes": {
+            "origin": "https://github.com/atuinsh/atuin.git",
+            "upstream": "https://github.com/atuinsh/atuin.git"
+          }
+        }
+      ]
+    },
+    "planning-workspace": {
+      "path": "planning-workspace",
+      "repos": [
+        {
+          "path": "mcp-prompts-server",
+          "default_branch": "main",
+          "remotes": {
+            "origin": "https://github.com/cameronraysmith/mcp-prompts-server.git",
+            "upstream": "https://github.com/sciexp/mcp-prompts-server.git"
+          }
+        }
+      ]
+    }
+  }
+}
