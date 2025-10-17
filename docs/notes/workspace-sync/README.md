@@ -4,13 +4,14 @@ Documentation for the workspace synchronization system that manages migration of
 
 ## What is workspace synchronization?
 
-The workspace synchronization system captures the state of all git repositories across your `~/projects/*-workspace/` directories and provides tools to recreate that structure on new machines.
+The workspace synchronization system captures the state of all git repositories across your `~/projects/*-workspace/` directories in a type-safe CUE manifest and provides tools to recreate that structure on new machines.
 
 This enables:
 - Migrating development environments to new hardware
 - Setting up consistent workspace structures across multiple machines
 - Documenting project dependencies and remote configurations
 - Automating repository cloning and remote setup
+- Type-safe validation and schema enforcement via CUE
 
 ## Documentation structure
 
@@ -41,11 +42,11 @@ Quick lookup for:
 ```bash
 cd ~/projects/nix-workspace/nix-config
 
-# Generate manifest
+# Generate CUE manifest (also creates YAML for human reading)
 ./scripts/generate-workspace-manifest.sh
 
-# Commit to git
-git add manifests/workspace-manifest.yaml
+# Commit to git (only CUE file is tracked, YAML is auto-generated)
+git add manifests/workspace-manifest.cue
 git commit -m "feat(manifests): add workspace synchronization manifest"
 git push
 ```
@@ -65,13 +66,21 @@ cd ~/projects/nix-workspace/nix-config
 ## System components
 
 ### Scripts
-- `scripts/generate-workspace-manifest.sh` - Phase 1: Manifest generation
-- `scripts/sync-workspace-manifest.sh` - Phase 2: Synchronization
+- `scripts/generate-workspace-manifest.sh` - Phase 1: Manifest generation (outputs CUE + YAML)
+- `scripts/sync-workspace-manifest.sh` - Phase 2: Synchronization (reads CUE)
 
 ### Artifacts
-- `manifests/workspace-manifest.yaml` - Current workspace state (version controlled)
+- `manifests/workspace-manifest.cue` - Current workspace state (version controlled, source of truth)
+- `manifests/workspace-manifest.yaml` - Human-readable export (auto-generated, gitignored)
 - `schemas/workspace-manifest/schema.cue` - Validation schema
 - `schemas/workspace-manifest/test-fixture.json` - Schema test data
+
+### Architecture
+The system uses **CUE-first architecture**:
+- CUE provides type safety, schema validation, and computed fields
+- YAML is generated from CUE for human inspection
+- Only CUE files are tracked in version control
+- Sync script reads CUE and exports to JSON internally for querying
 
 ## When to use
 
