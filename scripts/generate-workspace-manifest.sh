@@ -107,7 +107,7 @@ log_success() {
 
 log_warn() {
   echo -e "${YELLOW}⚠${NC} $*" >&2
-  ((WARN_COUNT++))
+  WARN_COUNT=$((WARN_COUNT + 1))
 }
 
 log_error() {
@@ -260,7 +260,7 @@ scan_workspace() {
     fi
 
     # Skip bare repositories
-    if git -C "$dir" rev-parse --is-bare-repository &>/dev/null | grep -q "true"; then
+    if [[ $(git -C "$dir" rev-parse --is-bare-repository 2>/dev/null) == "true" ]]; then
       log_warn "$workspace_name/$(basename "$dir"): skipping bare repository"
       continue
     fi
@@ -299,8 +299,8 @@ scan_workspace() {
 EOF
 )
 
-    ((repo_count++))
-    ((TOTAL_REPOS++))
+    repo_count=$((repo_count + 1))
+    TOTAL_REPOS=$((TOTAL_REPOS + 1))
   done
 
   repos_json+="]"
@@ -345,7 +345,7 @@ collect_all_workspaces() {
       fi
 
       workspaces_json+=$(scan_workspace "$workspace_path")
-      ((TOTAL_WORKSPACES++))
+      TOTAL_WORKSPACES=$((TOTAL_WORKSPACES + 1))
     done
   fi
 
