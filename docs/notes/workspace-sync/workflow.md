@@ -6,8 +6,19 @@ Complete workflow for migrating development environments between machines using 
 
 The workspace synchronization system consists of two tools:
 
-1. **Generation** (`generate-workspace-manifest.sh`): Scans local workspace directories and creates a manifest capturing all repositories and their remote configurations
-2. **Synchronization** (`sync-workspace-manifest.sh`): Reads the manifest and syncs local machine state to match it
+1. **Generation** (`generate-workspace-manifest.sh`): Scans local workspace directories and creates a CUE manifest capturing all repositories and their remote configurations
+2. **Synchronization** (`sync-workspace-manifest.sh`): Reads the CUE manifest and syncs local machine state to match it
+
+### CUE-first architecture
+
+The system uses CUE as the source of truth for type safety and validation:
+- **Source of truth**: `manifests/workspace-manifest.cue` (version controlled, type-safe)
+- **Generated artifacts**: `manifests/workspace-manifest.yaml` (human-readable, gitignored)
+- **Benefits**: Schema validation, computed fields, type safety, structural guarantees
+
+The generation script outputs CUE files validated against a schema.
+The sync script reads CUE and exports to JSON internally for querying.
+YAML files are automatically generated for human inspection but are not tracked in version control.
 
 ## Quick reference
 
@@ -34,16 +45,19 @@ Source Machine (stibnite)              New Machine (target)
          │ generate-workspace-manifest.sh      │
          ▼                                     │
 ┌─────────────────────────┐                   │
-│ workspace-manifest.yaml │───────────────────┤
-│ (343 repos, 18 spaces)  │  copy via        │
-│ ├─ remotes              │  git/rsync       │
-│ ├─ default branches     │                  │
-│ └─ paths                │                  ▼
-└─────────────────────────┘           sync-workspace-manifest.sh
-         │                                     │
-         │ (commit to nix-config)              │ (reads manifest)
-         ▼                                     ▼
-    Version controlled                  Clones & configures
+│ workspace-manifest.cue  │───────────────────┤
+│ (source of truth)       │  copy via        │
+│ ├─ type-safe            │  git             │
+│ ├─ validated            │                  │
+│ └─ remotes/branches     │                  │
+│                         │                  ▼
+│ workspace-manifest.yaml │           sync-workspace-manifest.sh
+│ (generated, gitignored) │                  │
+└─────────────────────────┘           (reads CUE → exports JSON)
+         │                                     ▼
+         │ (commit .cue to nix-config)   Clones & configures
+         ▼
+    Version controlled
 ```
 
 ## Phase 1: Initial manifest generation
@@ -59,7 +73,7 @@ cd ~/projects/nix-workspace/nix-config
 # Generate manifest for all workspaces
 ./scripts/generate-workspace-manifest.sh
 
-# Output: manifests/workspace-manifest.yaml created
+# Output: manifests/workspace-manifest.cue (source) and .yaml (generated) created
 ```
 
 Expected output:
@@ -75,8 +89,9 @@ Scanning workspaces in /Users/crs58/projects/...
 Validating with CUE schema...
   ✓ Schema validation passed
 
-Exporting to YAML...
-  ✓ manifests/workspace-manifest.yaml
+Exporting to CUE...
+  ✓ CUE manifest written to manifests/workspace-manifest.cue
+  ✓ YAML export written to manifests/workspace-manifest.yaml
 
 === ✓ Generated manifest for 18 workspaces (343 repositories) ===
 ```
@@ -84,21 +99,30 @@ Exporting to YAML...
 ### Inspect the generated manifest
 
 ```bash
-# View manifest structure
+# View CUE manifest structure (source of truth)
+cue export manifests/workspace-manifest.cue --out yaml | head -50
+
+# Or view generated YAML directly (if present)
 head -50 manifests/workspace-manifest.yaml
 
-# Check specific workspace
-yq '.workspaces.nix-workspace' manifests/workspace-manifest.yaml
+# Check specific workspace (CUE → JSON → jq)
+cue export manifests/workspace-manifest.cue --out json | jq '.manifest.workspaces."nix-workspace"'
 
-# Count repositories
-yq '.workspaces | to_entries | map(.value.repos | length) | add' manifests/workspace-manifest.yaml
+# Or use yq on generated YAML
+yq '.manifest.workspaces."nix-workspace"' manifests/workspace-manifest.yaml
+
+# Count repositories (CUE workflow)
+cue export manifests/workspace-manifest.cue --out json | jq '.manifest.workspaces | to_entries | map(.value.repos | length) | add'
+
+# Or with yq on generated YAML
+yq '.manifest.workspaces | to_entries | map(.value.repos | length) | add' manifests/workspace-manifest.yaml
 ```
 
 ### Commit to version control
 
 ```bash
-# Stage and commit the manifest
-git add manifests/workspace-manifest.yaml
+# Stage and commit the CUE manifest (source of truth)
+git add manifests/workspace-manifest.cue
 git commit -m "feat(manifests): add workspace synchronization manifest
 
 Captures current state of 18 workspaces with 343 repositories.
@@ -309,11 +333,14 @@ When you've added or removed repositories on source machine:
 cd ~/projects/nix-workspace/nix-config
 ./scripts/generate-workspace-manifest.sh
 
-# Review changes
-git diff manifests/workspace-manifest.yaml
+# Review changes in CUE source
+git diff manifests/workspace-manifest.cue
 
-# Commit updates
-git add manifests/workspace-manifest.yaml
+# Or review YAML diff (if easier to read)
+git diff <(git show HEAD:manifests/workspace-manifest.cue | cue export --out yaml -) <(cue export manifests/workspace-manifest.cue --out yaml -)
+
+# Commit updates (only the CUE file is tracked)
+git add manifests/workspace-manifest.cue
 git commit -m "chore(manifests): update workspace manifest after adding new repos"
 git push
 ```
@@ -355,7 +382,13 @@ Investigate manifest generation issues:
 ./scripts/generate-workspace-manifest.sh --debug
 
 # Examine raw JSON
-cat manifests/workspace-manifest.json | jq '.workspaces.nix-workspace'
+cat manifests/workspace-manifest.json | jq '.workspaces."nix-workspace"'
+
+# Validate CUE syntax
+cue vet manifests/workspace-manifest.cue
+
+# Export and format CUE for inspection
+cue export manifests/workspace-manifest.cue --out yaml
 ```
 
 ### Custom manifest location
@@ -363,11 +396,13 @@ cat manifests/workspace-manifest.json | jq '.workspaces.nix-workspace'
 Use alternate manifest for testing:
 
 ```bash
-# Generate test manifest
-./scripts/generate-workspace-manifest.sh > /tmp/test-manifest.yaml
+# Generate test manifest to different location
+# (Note: output paths are hardcoded in script, so copy after generation)
+./scripts/generate-workspace-manifest.sh
+cp manifests/workspace-manifest.cue /tmp/test-manifest.cue
 
-# Sync from alternate manifest
-./scripts/sync-workspace-manifest.sh --manifest /tmp/test-manifest.yaml --dry-run
+# Sync from alternate CUE manifest
+./scripts/sync-workspace-manifest.sh --manifest /tmp/test-manifest.cue --dry-run
 ```
 
 ### Filter workspace generation
@@ -485,19 +520,71 @@ chmod 755 ~/projects/test-workspace
   workspaces.nix-workspace.repos.0.remotes: invalid URL format
 ```
 
-**Cause:** Manifest contains invalid data structure.
+**Cause:** Manifest contains invalid data structure or CUE syntax errors.
 
 **Resolution:**
 ```bash
-# Validate manually
+# Validate CUE syntax and schema manually
 cd ~/projects/nix-workspace/nix-config
-cue vet manifests/workspace-manifest.yaml schemas/workspace-manifest/schema.cue
+cue vet manifests/workspace-manifest.cue schemas/workspace-manifest/schema.cue
+
+# Check CUE syntax only
+cue vet manifests/workspace-manifest.cue
+
+# Export to see what CUE evaluates to
+cue export manifests/workspace-manifest.cue --out yaml
 
 # Regenerate manifest from scratch
 ./scripts/generate-workspace-manifest.sh
 
 # If regeneration fails, check for corrupted git repos
 fd -t d '^\.git$' ~/projects/nix-workspace/ -x git -C {//} fsck
+```
+
+### Issue: CUE syntax errors
+
+**Symptom:**
+```
+manifests/workspace-manifest.cue:42:15: invalid string escape
+```
+
+**Cause:** Manual edits introduced CUE syntax errors (strings, references, etc).
+
+**Resolution:**
+```bash
+# Check syntax
+cue vet manifests/workspace-manifest.cue
+
+# Format CUE file (auto-fixes some issues)
+cue fmt manifests/workspace-manifest.cue
+
+# If manual edits corrupted it, regenerate from scratch
+./scripts/generate-workspace-manifest.sh
+
+# Compare with last good version
+git diff HEAD^ manifests/workspace-manifest.cue
+```
+
+### Issue: Schema validation mismatch
+
+**Symptom:**
+```
+workspaces.test-workspace.repos.0.default_branch: conflicting values "main" and string
+```
+
+**Cause:** Data doesn't match expected schema types or constraints.
+
+**Resolution:**
+```bash
+# Review schema requirements
+cat schemas/workspace-manifest/schema.cue
+
+# Validate specific field
+cue export manifests/workspace-manifest.cue -e 'manifest.workspaces."test-workspace".repos[0]'
+
+# Check what generation script produced
+./scripts/generate-workspace-manifest.sh --debug
+cat manifests/workspace-manifest.json | jq '.workspaces."test-workspace".repos[0]'
 ```
 
 ### Issue: Network timeouts during sync
@@ -578,11 +665,17 @@ For automated sync in deployment scripts:
 
 set -euo pipefail
 
-MANIFEST="$HOME/projects/nix-workspace/nix-config/manifests/workspace-manifest.yaml"
+MANIFEST="$HOME/projects/nix-workspace/nix-config/manifests/workspace-manifest.cue"
 LOG_FILE="$HOME/.cache/workspace-sync-$(date +%Y%m%d-%H%M%S).log"
 
 if [ ! -f "$MANIFEST" ]; then
-  echo "Error: Manifest not found at $MANIFEST"
+  echo "Error: CUE manifest not found at $MANIFEST"
+  exit 1
+fi
+
+# Validate CUE syntax before syncing
+if ! cue vet "$MANIFEST" 2>/dev/null; then
+  echo "Error: CUE manifest has syntax errors"
   exit 1
 fi
 
@@ -610,8 +703,10 @@ fi
 
 - Regenerate manifest after significant workspace changes
 - Commit manifest updates with descriptive messages
-- Keep manifest in version control (never gitignore it)
+- Keep CUE manifest in version control (YAML is auto-generated and gitignored)
 - Review manifest diffs before committing
+- Use `cue fmt` to format CUE files consistently
+- Validate with `cue vet` before committing to catch errors early
 
 ### Safety practices
 
