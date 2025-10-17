@@ -3,7 +3,7 @@
 #
 # Scans ~/projects/*-workspace/ directories and captures git repository state
 # including remotes, default branches, and relative paths. Outputs validated
-# YAML manifest for use in nix-config synchronization.
+# CUE manifest (source of truth) with optional YAML export for human reading.
 #
 # Usage: generate-workspace-manifest.sh [OPTIONS]
 
@@ -15,7 +15,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCHEMA_DIR="$REPO_ROOT/schemas/workspace-manifest"
 MANIFEST_DIR="$REPO_ROOT/manifests"
 SCHEMA_FILE="$SCHEMA_DIR/schema.cue"
-OUTPUT_FILE="$MANIFEST_DIR/workspace-manifest.yaml"
+OUTPUT_FILE="$MANIFEST_DIR/workspace-manifest.cue"
+YAML_FILE="$MANIFEST_DIR/workspace-manifest.yaml"
 DEBUG_JSON_FILE="$MANIFEST_DIR/workspace-manifest.json"
 
 # Configuration
@@ -60,7 +61,8 @@ generates a structured manifest capturing:
   - All remote configurations (name → URL mappings)
   - Default branch names
 
-The manifest is validated against a CUE schema and exported as YAML.
+The manifest is validated against a CUE schema and output as CUE (source of truth)
+with optional YAML export for human reading.
 
 Options:
   --help              Show this help message
@@ -70,7 +72,8 @@ Options:
   --workspace NAME    Scan only the specified workspace (e.g., "nix-workspace")
 
 Output:
-  manifests/workspace-manifest.yaml    Final YAML manifest (default)
+  manifests/workspace-manifest.cue     CUE manifest (version controlled)
+  manifests/workspace-manifest.yaml    YAML export (generated, not tracked)
   manifests/workspace-manifest.json    Raw JSON data (only with --debug)
 
 Examples:
@@ -400,15 +403,16 @@ validate_with_cue() {
   return 0
 }
 
-# Export to YAML
-export_yaml() {
+# Export to CUE and YAML
+export_manifest() {
   local json_data="$1"
 
   log_info ""
-  log_info "Exporting to YAML..."
+  log_info "Exporting to CUE..."
 
   if [ "$DRY_RUN" = true ]; then
     log_success "Would write to $OUTPUT_FILE"
+    log_success "Would write to $YAML_FILE"
     return 0
   fi
 
@@ -421,13 +425,26 @@ export_yaml() {
     log_success "Debug JSON written to $DEBUG_JSON_FILE"
   fi
 
-  # Export to YAML
-  if ! echo "$json_data" | cue export --out yaml - > "$OUTPUT_FILE"; then
+  # Import JSON to CUE (source of truth)
+  # Write JSON to temp file for import (use .json extension for CUE recognition)
+  local temp_json="$MANIFEST_DIR/.workspace-manifest-temp.json"
+  echo "$json_data" > "$temp_json"
+
+  if ! cue import "$temp_json" -p manifest -l 'manifest:' -f -o "$OUTPUT_FILE"; then
+    log_error "CUE import failed"
+    rm -f "$temp_json"
+    return 1
+  fi
+  rm -f "$temp_json"
+  log_success "CUE manifest written to $OUTPUT_FILE"
+
+  # Export CUE to YAML for human reading
+  if ! cue export "$OUTPUT_FILE" --out yaml > "$YAML_FILE"; then
     log_error "YAML export failed"
     return 1
   fi
+  log_success "YAML export written to $YAML_FILE"
 
-  log_success "Manifest written to $OUTPUT_FILE"
   return 0
 }
 
@@ -461,8 +478,8 @@ main() {
     exit 1
   fi
 
-  # Export to YAML
-  if ! export_yaml "$json_data"; then
+  # Export to CUE and YAML
+  if ! export_manifest "$json_data"; then
     exit 1
   fi
 
@@ -470,12 +487,12 @@ main() {
   echo "" >&2
   log_info "=== Summary ==="
 
-  if [ "$DRY_RUN" = false ] && [ -f "$OUTPUT_FILE" ]; then
-    # Count workspaces and repos from YAML
+  if [ "$DRY_RUN" = false ] && [ -f "$YAML_FILE" ]; then
+    # Count workspaces and repos from generated YAML (account for manifest: wrapper)
     local workspace_count
     local repo_count
-    workspace_count=$(grep -c "^  [a-zA-Z0-9_-]*-workspace:" "$OUTPUT_FILE" || echo "0")
-    repo_count=$(grep -c "^      - path:" "$OUTPUT_FILE" || echo "0")
+    workspace_count=$(grep -c "^    [a-zA-Z0-9_-]*-workspace:" "$YAML_FILE" || echo "0")
+    repo_count=$(grep -c "^        - path:" "$YAML_FILE" || echo "0")
     log_success "Generated manifest for $workspace_count workspace(s) with $repo_count repositories"
   else
     log_success "Generated manifest for $TOTAL_WORKSPACES workspace(s) with $TOTAL_REPOS repositories"
@@ -488,7 +505,8 @@ main() {
   if [ "$DRY_RUN" = false ]; then
     echo "" >&2
     echo "Next steps:" >&2
-    echo "  - Review: cat $OUTPUT_FILE" >&2
+    echo "  - Review CUE: cue export $OUTPUT_FILE --out yaml | head -50" >&2
+    echo "  - Review YAML: cat $YAML_FILE | head -50" >&2
     echo "  - Commit: git add $OUTPUT_FILE && git commit -m 'chore: update workspace manifest'" >&2
   fi
 
