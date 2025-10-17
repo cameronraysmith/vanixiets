@@ -10,7 +10,7 @@ set -euo pipefail
 
 SCRIPT_NAME="sync-workspace-manifest"
 
-DEFAULT_MANIFEST="${HOME}/projects/nix-workspace/nix-config/manifests/workspace-manifest.yaml"
+DEFAULT_MANIFEST="${HOME}/projects/nix-workspace/nix-config/manifests/workspace-manifest.cue"
 DEFAULT_SCHEMA="${HOME}/projects/nix-workspace/nix-config/schemas/workspace-manifest/schema.cue"
 DEFAULT_PROJECTS_ROOT="${HOME}/projects"
 
@@ -147,7 +147,7 @@ Options:
   -v, --verbose           Show detailed progress information
   -w, --workspace NAME    Process only specified workspace
   --manifest FILE         Use alternate manifest file
-                          (default: ~/projects/nix-workspace/nix-config/manifests/workspace-manifest.yaml)
+                          (default: ~/projects/nix-workspace/nix-config/manifests/workspace-manifest.cue)
   --projects-root DIR     Base directory for workspaces
                           (default: ~/projects)
   --log-file FILE         Write detailed log to FILE
@@ -307,9 +307,9 @@ validate_manifest() {
     exit 2
   fi
 
-  # Validate YAML syntax by attempting to export to JSON
+  # Validate CUE syntax by attempting to export to JSON
   if ! cue export --out json "$MANIFEST_FILE" >/dev/null 2>&1; then
-    log_error "Invalid YAML syntax in manifest: $MANIFEST_FILE"
+    log_error "Invalid CUE syntax in manifest: $MANIFEST_FILE"
     exit 2
   fi
 
@@ -339,13 +339,14 @@ validate_projects_root() {
 }
 
 # ============================================================================
-# YAML Parsing Functions (using CUE export + jq)
+# Manifest Parsing Functions (CUE source → JSON via export → jq queries)
 # ============================================================================
 
 # Helper to get manifest JSON (cached for performance)
 get_manifest_json() {
   if [[ -z "$MANIFEST_JSON_CACHE" ]]; then
-    MANIFEST_JSON_CACHE=$(cue export --out json "$MANIFEST_FILE" 2>/dev/null)
+    # Export CUE to JSON and extract the 'manifest' field
+    MANIFEST_JSON_CACHE=$(cue export --out json "$MANIFEST_FILE" 2>/dev/null | jq '.manifest')
   fi
   echo "$MANIFEST_JSON_CACHE"
 }
