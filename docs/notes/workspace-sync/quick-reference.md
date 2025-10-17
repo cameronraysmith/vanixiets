@@ -2,12 +2,15 @@
 
 Fast reference for common workspace sync operations.
 
+The system uses **CUE as the source of truth** (`.cue` files tracked in git) and auto-generates YAML for human reading (`.yaml` files gitignored).
+
 ## Essential commands
 
 ### Generate manifest
 ```bash
 cd ~/projects/nix-workspace/nix-config
 ./scripts/generate-workspace-manifest.sh
+# Creates: workspace-manifest.cue (source) + workspace-manifest.yaml (generated)
 ```
 
 ### Verify local state
@@ -48,11 +51,11 @@ cd nix-config
 # 1. Regenerate
 ./scripts/generate-workspace-manifest.sh
 
-# 2. Review changes
-git diff manifests/workspace-manifest.yaml
+# 2. Review changes (CUE source)
+git diff manifests/workspace-manifest.cue
 
-# 3. Commit and push
-git add manifests/workspace-manifest.yaml
+# 3. Commit and push (only .cue is tracked)
+git add manifests/workspace-manifest.cue
 git commit -m "chore(manifests): update workspace manifest"
 git push
 ```
@@ -89,7 +92,7 @@ git push
 | `--quiet` | Suppress progress | `./sync-workspace-manifest.sh --quiet` |
 | `--verbose` | Detailed output | `./sync-workspace-manifest.sh --verbose` |
 | `--workspace NAME` | Single workspace | `./sync-workspace-manifest.sh -w nix-workspace` |
-| `--manifest FILE` | Custom manifest | `./sync-workspace-manifest.sh --manifest /tmp/test.yaml` |
+| `--manifest FILE` | Custom manifest | `./sync-workspace-manifest.sh --manifest /tmp/test.cue` |
 | `--log-file FILE` | Detailed logging | `./sync-workspace-manifest.sh --log-file ~/sync.log` |
 
 ## Troubleshooting shortcuts
@@ -97,7 +100,15 @@ git push
 ### Check manifest validity
 ```bash
 cd ~/projects/nix-workspace/nix-config
-cue vet manifests/workspace-manifest.yaml schemas/workspace-manifest/schema.cue
+
+# Validate CUE syntax and schema
+cue vet manifests/workspace-manifest.cue schemas/workspace-manifest/schema.cue
+
+# Check CUE syntax only
+cue vet manifests/workspace-manifest.cue
+
+# Format CUE file
+cue fmt manifests/workspace-manifest.cue
 ```
 
 ### Find repos with issues
@@ -110,18 +121,19 @@ cue vet manifests/workspace-manifest.yaml schemas/workspace-manifest/schema.cue
 ```
 
 ### Inspect manifest
+
 ```bash
-# Count workspaces
-yq '.workspaces | keys | length' manifests/workspace-manifest.yaml
+# Using CUE → JSON → jq workflow
+cue export manifests/workspace-manifest.cue --out json | jq '.manifest.workspaces | keys | length'  # Count workspaces
+cue export manifests/workspace-manifest.cue --out json | jq '.manifest.workspaces | keys'  # List workspace names
+cue export manifests/workspace-manifest.cue --out json | jq '.manifest.workspaces."nix-workspace"'  # Show specific workspace
+cue export manifests/workspace-manifest.cue --out json | jq '.manifest.workspaces | to_entries | map(.value.repos | length) | add'  # Count total repos
 
-# Count total repos
-yq '.workspaces | to_entries | map(.value.repos | length) | add' manifests/workspace-manifest.yaml
-
-# List workspace names
-yq '.workspaces | keys' manifests/workspace-manifest.yaml
-
-# Show specific workspace
-yq '.workspaces.nix-workspace' manifests/workspace-manifest.yaml
+# Or using generated YAML with yq (if YAML file exists)
+yq '.manifest.workspaces | keys | length' manifests/workspace-manifest.yaml
+yq '.manifest.workspaces | keys' manifests/workspace-manifest.yaml
+yq '.manifest.workspaces."nix-workspace"' manifests/workspace-manifest.yaml
+yq '.manifest.workspaces | to_entries | map(.value.repos | length) | add' manifests/workspace-manifest.yaml
 ```
 
 ### Manual remote operations
@@ -147,8 +159,9 @@ Before syncing on new machine:
 
 Before regenerating manifest:
 - [ ] No uncommitted changes in critical repos
-- [ ] Current manifest committed to git
+- [ ] Current CUE manifest committed to git
 - [ ] Verified all workspaces accessible
+- [ ] Run `cue vet` on generated manifest before committing
 
 ## Exit codes
 
@@ -164,4 +177,5 @@ Before regenerating manifest:
 - Generation script: `scripts/generate-workspace-manifest.sh`
 - Sync script: `scripts/sync-workspace-manifest.sh`
 - Manifest schema: `schemas/workspace-manifest/schema.cue`
-- Current manifest: `manifests/workspace-manifest.yaml`
+- Current manifest (source): `manifests/workspace-manifest.cue`
+- Generated YAML (convenience): `manifests/workspace-manifest.yaml`
