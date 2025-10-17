@@ -20,7 +20,8 @@
     settings = {
       statusLine = {
         type = "command";
-        command = "${pkgs.cc-statusline-rs}/bin/statusline";
+        command = "${pkgs.ccstatusline}/bin/ccstatusline";
+        padding = 0;
       };
 
       theme = "dark";
