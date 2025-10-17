@@ -370,7 +370,7 @@ in
       npmccds = {
         runtimeInputs = with pkgs; [ bun ];
         text = ''
-          exec bunx -p @anthropic-ai/claude-code claude --dangerously-skip-permissions "$@"
+          exec bunx -p @anthropic-ai/claude-code@next claude --dangerously-skip-permissions "$@"
         '';
       };
 
