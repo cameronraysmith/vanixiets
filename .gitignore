@@ -30,5 +30,6 @@ pnpm-debug.log*
 .bisect-nixpkgs-state
 .flake.lock.bisect-backup
 
-# Workspace manifest debug artifacts
+# Workspace manifest generated artifacts (CUE is source of truth)
 manifests/workspace-manifest.json
+manifests/workspace-manifest.yaml
