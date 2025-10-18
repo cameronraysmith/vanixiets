@@ -1,5 +1,28 @@
 # Data modeling
 
+## Scope and purpose
+
+This document covers data modeling for **data pipelines and analytics** using tools like SQLMesh, DuckDB, and data lakehouse patterns.
+
+**What this document covers**:
+- Data warehouse schemas and transformations
+- SQL models and incremental processing
+- Data quality checks and validation
+- Semantic layers and metrics
+- Pipeline orchestration patterns
+
+**What this document does NOT cover**:
+- Application domain modeling (see domain-modeling.md)
+- Business logic workflows
+- State machines for entity lifecycles
+- Smart constructors for domain types
+
+**Key distinction**: This document is about modeling **data at rest** (tables, schemas, metrics) while domain-modeling.md is about modeling **domain logic** (entities, workflows, state transitions).
+
+For application domain modeling using functional programming patterns, see:
+- domain-modeling.md for core patterns (smart constructors, state machines, workflows, aggregates)
+- architectural-patterns.md for application structure (onion architecture, dependency injection)
+
 ## Foundational principles
 
 ### Type safety
@@ -96,6 +119,8 @@ Make data pipeline state explicit and queryable.
 - Implement time travel for debugging and rollback
 - Track data lineage and transformation history
 - Version control pipeline definitions and state schemas
+
+**Connection to application domain modeling**: For modeling pipeline execution states (Pending → Running → Completed → Failed), consider using state machine patterns from domain-modeling.md#state-machines-for-entity-lifecycles. This can be applied to job status tracking, data quality checks, and orchestration workflows.
 
 ## Semantic layer patterns
 
