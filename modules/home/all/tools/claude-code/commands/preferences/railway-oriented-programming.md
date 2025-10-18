@@ -657,6 +657,211 @@ All functions uniform after transformation:
        └────────────┴───────────┴───────────┴─── Failure
 ```
 
+## Error classification and handling strategies
+
+Not all errors should be modeled the same way.
+Understanding error categories helps choose appropriate handling strategies.
+
+### Three categories of errors
+
+Following Wlaschin's classification from "Domain Modeling Made Functional":
+
+**1. Domain errors** - Expected outcomes of domain operations
+- Subject matter experts can describe them
+- Part of normal workflow, not exceptional
+- Have established procedures for handling
+- Should be modeled explicitly as Result types
+
+Examples:
+- Validation failures (invalid email format)
+- Business rule violations (insufficient funds)
+- Not found errors (user doesn't exist)
+- Convergence failures (model didn't converge)
+
+**2. Infrastructure errors** - Technical/architectural failures
+- Technical concerns outside domain logic
+- May be transient (retry can help)
+- Outside subject matter expert vocabulary
+- Can model as Result or use exceptions
+
+Examples:
+- Network timeouts
+- Database connection failures
+- Disk full, out of memory
+- Authentication/authorization failures
+
+**3. Panics** - Unrecoverable system errors
+- System in unknown state
+- Usually programmer errors
+- Cannot meaningfully continue
+- Should use exceptions/panics
+
+Examples:
+- Division by zero (bug in code)
+- Array index out of bounds (logic error)
+- Null/None when value guaranteed (broken invariant)
+- Stack overflow, out of memory
+
+### Decision tree
+
+Ask: "Would a subject matter expert recognize this error as part of the domain?"
+
+```
+Is this a domain concept?
+├─ Yes → Domain error
+│         Model explicitly with Result
+│         Example: OrderQuantityMustBePositive
+│
+└─ No → Ask: "Can we meaningfully continue?"
+         ├─ Yes → Infrastructure error
+         │         Consider modeling as Result
+         │         Example: DatabaseTemporarilyUnavailable
+         │
+         └─ No → Panic
+                  Use exceptions/panics
+                  Example: IndexOutOfBounds (programmer error)
+```
+
+### Handling strategies by category
+
+**Domain errors with Result**:
+
+```python
+from expression import Result, Ok, Error
+
+# Model domain errors explicitly
+@dataclass
+class ValidationError:
+    field: str
+    reason: str
+
+@dataclass
+class InsufficientFunds:
+    account_id: str
+    balance: Decimal
+    requested: Decimal
+
+DomainError = ValidationError | InsufficientFunds
+
+def process_payment(
+    account: Account,
+    amount: Decimal
+) -> Result[Payment, DomainError]:
+    """Domain operation that can fail with known errors."""
+    if amount > account.balance:
+        return Error(InsufficientFunds(
+            account_id=account.id,
+            balance=account.balance,
+            requested=amount
+        ))
+
+    return Ok(Payment(account=account, amount=amount))
+```
+
+**Infrastructure errors - explicit or exception**:
+
+```python
+# Option 1: Model explicitly with Result
+@dataclass
+class DatabaseError:
+    operation: str
+    exception: str
+
+async def save_to_database(
+    data: Data
+) -> Result[SavedData, DatabaseError]:
+    try:
+        result = await db.save(data)
+        return Ok(result)
+    except Exception as e:
+        return Error(DatabaseError("save", str(e)))
+
+# Option 2: Let exception propagate
+async def save_to_database(data: Data) -> SavedData:
+    """May raise DatabaseException."""
+    return await db.save(data)  # Exception if fails
+```
+
+**Panics - always exceptions**:
+
+```python
+def get_first_element(items: list[T]) -> T:
+    """
+    Get first element.
+
+    Precondition: items must be non-empty.
+    Raises AssertionError if violated (programmer error).
+    """
+    assert len(items) > 0, "items must be non-empty"
+    return items[0]
+
+# Better: Use types to make precondition unrepresentable
+from typing import NewType
+
+NonEmptyList = NewType('NonEmptyList', list)
+
+def get_first_element(items: NonEmptyList[T]) -> T:
+    """Get first element. Type guarantees non-empty."""
+    return items[0]  # Safe - type prevents empty list
+```
+
+### Composing different error types
+
+When workflows combine operations with different error types:
+
+```python
+from typing import Union
+
+# Unified error type for workflow
+WorkflowError = (
+    ValidationError |
+    InsufficientFunds |
+    DatabaseError
+)
+
+def process_order_workflow(
+    order: UnvalidatedOrder
+) -> Result[OrderConfirmation, WorkflowError]:
+    """Workflow combining domain and infrastructure errors."""
+    return (
+        validate_order(order)              # Result[ValidOrder, ValidationError]
+        .map_error(lambda e: e)            # Widen to WorkflowError
+        .bind(process_payment)             # Result[Payment, InsufficientFunds]
+        .map_error(lambda e: e)            # Widen to WorkflowError
+        .bind(save_to_database)            # Result[Saved, DatabaseError]
+        .map_error(lambda e: e)            # Widen to WorkflowError
+    )
+```
+
+### Guidelines
+
+1. **Default to Result for domain errors**: If domain experts discuss it, model it explicitly
+2. **Infrastructure errors are judgment calls**: Model explicitly if need fine-grained control, use exceptions if want to fail fast
+3. **Never catch panics in domain logic**: Panics indicate bugs, not business scenarios
+4. **Use types to prevent panics**: Make invalid states unrepresentable instead of asserting
+5. **Document error possibilities**: Function signatures should show what can go wrong
+
+### Cross-language error handling
+
+**Python**:
+- Domain: Result from Expression library
+- Infrastructure: Result or raise exceptions
+- Panics: assert, raise RuntimeError
+
+**TypeScript**:
+- Domain: Either from fp-ts or Effect.Effect
+- Infrastructure: Either or throw Error
+- Panics: throw Error, assert
+
+**Rust**:
+- Domain: Result<T, E> with custom error types
+- Infrastructure: Result or anyhow::Result
+- Panics: panic!, assert
+
+**See also**:
+- domain-modeling.md#pattern-6-domain-errors-vs-infrastructure-errors for detailed examples
+- Language-specific docs (python-development.md, typescript-nodejs-development.md, rust-development.md) for error type hierarchies
+
 ## Integration with data pipelines
 
 ### SQLMesh models as pure functions
