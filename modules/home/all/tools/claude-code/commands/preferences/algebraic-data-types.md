@@ -656,6 +656,309 @@ class Payment(BaseModel):
     amount: Decimal
 ```
 
+## State machines with sum types
+
+Sum types naturally model state machines where entities transition through discrete states.
+
+### Pattern: Shopping cart states
+
+```python
+from typing import Literal, Union
+from pydantic import BaseModel
+from datetime import datetime
+from decimal import Decimal
+
+class EmptyCart(BaseModel):
+    type: Literal["empty"]
+    session_id: str
+
+class ActiveCart(BaseModel):
+    type: Literal["active"]
+    session_id: str
+    items: list[CartItem]
+    subtotal: Decimal
+
+class PaidCart(BaseModel):
+    type: Literal["paid"]
+    session_id: str
+    items: list[CartItem]
+    total: Decimal
+    payment_id: str
+    paid_at: datetime
+
+CartState = EmptyCart | ActiveCart | PaidCart
+
+# State transitions
+def add_item(cart: EmptyCart | ActiveCart, item: CartItem) -> ActiveCart:
+    """Adding item always results in ActiveCart."""
+    items = cart.items if isinstance(cart, ActiveCart) else []
+    new_items = items + [item]
+    subtotal = sum(i.price * i.quantity for i in new_items)
+    return ActiveCart(
+        type="active",
+        session_id=cart.session_id,
+        items=new_items,
+        subtotal=subtotal
+    )
+
+def checkout(cart: ActiveCart, payment_id: str) -> PaidCart:
+    """Can only checkout ActiveCart, produces PaidCart."""
+    return PaidCart(
+        type="paid",
+        session_id=cart.session_id,
+        items=cart.items,
+        total=cart.subtotal,
+        payment_id=payment_id,
+        paid_at=datetime.now()
+    )
+
+# Type system prevents invalid transitions:
+# - Can't checkout EmptyCart (type error)
+# - Can't add items to PaidCart (type error)
+# - PaidCart has payment_id that ActiveCart lacks
+```
+
+### Pattern: Email verification workflow
+
+```python
+class UnverifiedEmail(BaseModel):
+    type: Literal["unverified"]
+    email: str
+    verification_token: str
+    sent_at: datetime
+
+class VerifiedEmail(BaseModel):
+    type: Literal["verified"]
+    email: str
+    verified_at: datetime
+
+EmailState = UnverifiedEmail | VerifiedEmail
+
+# Transitions
+def send_verification(email: str) -> UnverifiedEmail:
+    """Create unverified email with token."""
+    return UnverifiedEmail(
+        type="unverified",
+        email=email,
+        verification_token=generate_token(),
+        sent_at=datetime.now()
+    )
+
+def verify(unverified: UnverifiedEmail, token: str) -> Result[VerifiedEmail, str]:
+    """Verify email if token matches."""
+    if token != unverified.verification_token:
+        return Error("Invalid verification token")
+
+    return Ok(VerifiedEmail(
+        type="verified",
+        email=unverified.email,
+        verified_at=datetime.now()
+    ))
+
+# Can only send password reset to verified emails
+def send_password_reset(email: VerifiedEmail) -> None:
+    """Only accepts VerifiedEmail - type system enforces."""
+    send_email(email.email, "Password reset...")
+
+# Type error if try to pass UnverifiedEmail:
+# send_password_reset(unverified_email)  # ❌ Type error!
+```
+
+### Pattern: Document approval workflow
+
+```typescript
+// Document lifecycle states
+interface Draft {
+  type: "draft";
+  content: string;
+  author: string;
+  lastModified: Date;
+}
+
+interface Submitted {
+  type: "submitted";
+  content: string;
+  author: string;
+  submittedAt: Date;
+  reviewers: string[];
+}
+
+interface Approved {
+  type: "approved";
+  content: string;
+  author: string;
+  approvedBy: string;
+  approvedAt: Date;
+}
+
+interface Rejected {
+  type: "rejected";
+  content: string;
+  author: string;
+  rejectedBy: string;
+  rejectedAt: Date;
+  reason: string;
+}
+
+type DocumentState = Draft | Submitted | Approved | Rejected;
+
+// Transitions
+function submit(draft: Draft, reviewers: string[]): Submitted {
+  return {
+    type: "submitted",
+    content: draft.content,
+    author: draft.author,
+    submittedAt: new Date(),
+    reviewers,
+  };
+}
+
+function approve(submitted: Submitted, approver: string): Approved {
+  if (!submitted.reviewers.includes(approver)) {
+    throw new Error("Approver must be in reviewers list");
+  }
+
+  return {
+    type: "approved",
+    content: submitted.content,
+    author: submitted.author,
+    approvedBy: approver,
+    approvedAt: new Date(),
+  };
+}
+
+// Type system enforces:
+// - Can't approve a Draft (only Submitted)
+// - Can't reject an Approved document
+// - Rejected documents have required reason
+```
+
+**See also**: domain-modeling.md#pattern-3-state-machines-for-entity-lifecycles for workflows and domain-modeling patterns
+
+## Type organization and dependencies
+
+How you organize types affects compilation order and maintainability.
+
+### Principle: Dependencies should form a DAG
+
+Types should depend on each other in a directed acyclic graph (no circular dependencies).
+
+```
+Low-level types (primitives, newtypes)
+       ↓
+Value objects (email, money, quantity)
+       ↓
+Simple domain types (product, customer)
+       ↓
+Aggregates (order with order lines)
+       ↓
+Workflows (place order, fulfill order)
+```
+
+### Pattern: Define types in dependency order
+
+```python
+# 1. Primitive types first (no dependencies)
+class EmailAddress(BaseModel):
+    value: str
+    @field_validator('value')
+    @classmethod
+    def must_be_valid(cls, v: str) -> str:
+        if '@' not in v:
+            raise ValueError('invalid email')
+        return v
+
+class ProductCode(BaseModel):
+    value: str
+
+class Quantity(BaseModel):
+    value: int
+    @field_validator('value')
+    @classmethod
+    def must_be_positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError('quantity must be positive')
+        return v
+
+# 2. Simple domain types (depend on primitives)
+class Product(BaseModel):
+    code: ProductCode
+    name: str
+    price: Decimal
+
+class Customer(BaseModel):
+    email: EmailAddress
+    name: str
+
+# 3. Aggregates (depend on simple types)
+class OrderLine(BaseModel):
+    product_code: ProductCode
+    quantity: Quantity
+    price: Decimal
+
+class Order(BaseModel):
+    customer_email: EmailAddress
+    lines: list[OrderLine]
+    total: Decimal
+
+# 4. Workflows (depend on aggregates)
+def place_order(
+    customer: Customer,
+    lines: list[OrderLine]
+) -> Result[Order, OrderError]:
+    ...
+```
+
+### Anti-pattern: Circular dependencies
+
+```python
+# Bad: A depends on B, B depends on A
+class Order(BaseModel):
+    customer: Customer  # Order depends on Customer
+
+class Customer(BaseModel):
+    orders: list[Order]  # Customer depends on Order ❌
+```
+
+**Fix**: Use IDs for references across aggregates
+
+```python
+# Good: Break cycle with ID reference
+class Order(BaseModel):
+    customer_id: CustomerId  # Reference by ID
+
+class Customer(BaseModel):
+    id: CustomerId
+    # To get orders, query separately:
+    # orders = get_orders_for_customer(customer.id)
+```
+
+### Guideline: Module organization
+
+Organize code to reflect dependency hierarchy:
+
+```
+src/
+  domain/
+    primitives.py      # EmailAddress, ProductCode, Quantity
+    value_objects.py   # Money, Address
+    entities.py        # Product, Customer (depend on primitives)
+    aggregates.py      # Order (depends on entities)
+  workflows/
+    place_order.py     # Depends on domain types
+    fulfill_order.py
+```
+
+This ensures:
+- Low-level types defined before high-level types
+- No circular imports
+- Clear dependency structure
+- Easy to test in isolation
+
+**See also**:
+- domain-modeling.md#pattern-1-types-as-domain-vocabulary for domain type patterns
+- domain-modeling.md#pattern-5-aggregates-as-consistency-boundaries for aggregate design
+
 ## Testing ADTs
 
 ### Property-based testing
