@@ -41,10 +41,12 @@ in
       dates = "weekly";
     };
 
+    # Automatic store optimization via hardlinking
+    optimise.automatic = true;
+
     settings = {
       accept-flake-config = true;
       build-users-group = lib.mkDefault "nixbld";
-      auto-optimise-store = true; # Enable automatic store optimization
       experimental-features = "nix-command flakes auto-allocate-uids";
       extra-platforms = lib.mkIf pkgs.stdenv.isDarwin "aarch64-darwin x86_64-darwin";
       flake-registry = builtins.toFile "empty-flake-registry.json" ''{"flakes":[],"version":2}'';
