@@ -52,11 +52,6 @@ let
           backgroundColor = "bgRed";
         }
         {
-          id = "ba421936-e8b7-4184-9574-32b4cddfcea8";
-          type = "session-cost";
-          backgroundColor = "bgBrightYellow";
-        }
-        {
           id = "639ae281-0919-4c49-9e52-6f24d534f2bd";
           type = "tokens-cached";
           backgroundColor = "bgGreen";
@@ -100,6 +95,11 @@ let
           id = "6030a238-40a2-401d-9267-e14a18defa62";
           type = "block-timer";
           backgroundColor = "bgWhite";
+        }
+        {
+          id = "ba421936-e8b7-4184-9574-32b4cddfcea8";
+          type = "session-cost";
+          backgroundColor = "bgBrightYellow";
         }
       ]
     ];
