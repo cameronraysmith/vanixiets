@@ -31,8 +31,8 @@ in
     // lib.optionalAttrs pkgs.stdenv.isDarwin {
       # Darwin-specific: use launchd interval
       interval = {
-        Weekday = 0; # Sunday
-        Hour = 2;
+        Weekday = 5; # Friday
+        Hour = 21; # 9pm
         Minute = 0;
       };
     }
