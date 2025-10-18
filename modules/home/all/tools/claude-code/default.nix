@@ -6,6 +6,7 @@
 {
   imports = [
     ./mcp-servers.nix
+    ./ccstatusline-settings.nix
   ];
 
   programs.claude-code = {
