@@ -27,7 +27,11 @@ in
       - documentation: ${prefsPath}/documentation.md
       - change management: ${prefsPath}/change-management.md
       - architectural patterns: ${prefsPath}/architectural-patterns.md
-      - data modeling: ${prefsPath}/data-modeling.md
+      - functional domain modeling (DDD, types, aggregates): @${prefsPath}/domain-modeling.md
+      - theoretical foundations (category theory, type theory): @${prefsPath}/theoretical-foundations.md
+      - smart constructors and validation patterns: see domain-modeling.md
+      - error handling with Result types: see railway-oriented-programming.md
+      - data modeling (database schemas, normalization, ER diagrams): ${prefsPath}/data-modeling.md
       - schema versioning: ${prefsPath}/schema-versioning.md
       - web application deployment: ${prefsPath}/web-application-deployment.md
       - cloudflare wrangler configuration: ${prefsPath}/cloudflare-wrangler-reference.md
