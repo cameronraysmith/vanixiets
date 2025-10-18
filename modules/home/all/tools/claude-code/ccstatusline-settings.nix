@@ -1,17 +1,14 @@
 { ... }:
-{
-  # Declarative ccstatusline configuration
-  # Manages ~/.config/ccstatusline/settings.json
-  #
-  # Settings:
-  # - Multi-line statusline layout (3 lines)
-  # - Powerline mode with minimal theme
-  # - Git worktree and branch display
-  # - Session metrics (clock, cost, tokens)
-  # - Session ID via custom jq command
-  # - Context and token tracking
+let
+  # Powerline Unicode character placeholders
+  # These will be replaced with proper JSON Unicode escape sequences after toJSON
+  # to avoid Nix's toJSON mangling Unicode characters
+  powerlineSepPlaceholder = "POWERLINE_SEP_E0B4";
+  powerlineStartCapPlaceholder = "POWERLINE_START_E0B6";
+  powerlineEndCapPlaceholder = "POWERLINE_END_E0B4";
 
-  home.file.".config/ccstatusline/settings.json".text = builtins.toJSON {
+  # Base configuration structure
+  config = {
     version = 3;
 
     # Three-line layout for comprehensive status display
@@ -117,15 +114,47 @@
     inheritSeparatorColors = false;
     globalBold = false;
 
-    # Powerline configuration
+    # Powerline configuration (using placeholders for Unicode characters)
     powerline = {
       enabled = true;
-      separators = [ "" ]; # U+E0B0 powerline arrow
+      separators = [ powerlineSepPlaceholder ]; # U+E0B4 powerline separator
       separatorInvertBackground = [ false ];
-      startCaps = [ "" ]; # U+E0B2 powerline start cap
-      endCaps = [ "" ]; # U+E0B0 powerline end cap
+      startCaps = [ powerlineStartCapPlaceholder ]; # U+E0B6 powerline start cap
+      endCaps = [ powerlineEndCapPlaceholder ]; # U+E0B4 powerline end cap
       theme = "minimal"; # Clean monochrome theme
       autoAlign = false;
     };
   };
+
+  # Generate JSON with toJSON, then replace Unicode placeholders
+  # with proper JSON escape sequences to avoid Nix's Unicode mangling
+  jsonText = builtins.toJSON config;
+
+  finalJson =
+    builtins.replaceStrings
+      [
+        ''"${powerlineSepPlaceholder}"'' # Replace "POWERLINE_SEP_E0B4"
+        ''"${powerlineStartCapPlaceholder}"'' # Replace "POWERLINE_START_E0B6"
+        ''"${powerlineEndCapPlaceholder}"'' # Replace "POWERLINE_END_E0B4"
+      ]
+      [
+        ''"\uE0B4"'' # JSON Unicode escape for U+E0B4 (powerline separator)
+        ''"\uE0B6"'' # JSON Unicode escape for U+E0B6 (powerline start cap)
+        ''"\uE0B4"'' # JSON Unicode escape for U+E0B4 (powerline end cap)
+      ]
+      jsonText;
+in
+{
+  # Declarative ccstatusline configuration
+  # Manages ~/.config/ccstatusline/settings.json
+  #
+  # Settings:
+  # - Multi-line statusline layout (3 lines)
+  # - Powerline mode with minimal theme
+  # - Git worktree and branch display
+  # - Session metrics (clock, cost, tokens)
+  # - Session ID via custom jq command
+  # - Context and token tracking
+
+  home.file.".config/ccstatusline/settings.json".text = finalJson;
 }
