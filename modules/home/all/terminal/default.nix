@@ -48,6 +48,7 @@ in
       sd
       sesh
       # toybox # many (non-)overlapping tools in coreutils + grep/sed/find/xargs/ps
+      trash-cli
       tree
       unison
 
@@ -163,6 +164,7 @@ in
       shellcheck
       starship-jj
       # step-ca
+      tea
       tmate
       tree-sitter
       yq
