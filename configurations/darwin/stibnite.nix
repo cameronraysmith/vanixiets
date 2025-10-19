@@ -21,6 +21,9 @@ in
 
   system.primaryUser = adminUser.username;
 
+  # Enable desktop profile for GUI applications
+  custom.profile.isDesktop = true;
+
   # Bootstrap step 1 complete: linux-builder is used to build nix-rosetta-builder VM
   # Now disabled in favor of nix-rosetta-builder
   # See: docs/notes/containers/multi-arch-container-builds.md
