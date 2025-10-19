@@ -39,6 +39,7 @@
       commands = {
         npmccds = "Claude code with dangerous skip permissions";
         ccvers = "List Claude Code npm package versions with tags and release times";
+        claude-session-cwd = "Get Claude Code session working directory and metadata";
         kindc = "Create kind Kubernetes cluster with ingress support";
         tre = "Tmux resurrect restore with session selection";
         clean-shell-history-secrets = "Clean secrets from shell history using atuin and gitleaks";
