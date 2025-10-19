@@ -671,6 +671,38 @@ in
         '';
       };
 
+      # realpath with tilde home expansion
+      tildepath = {
+        runtimeInputs = with pkgs; [ coreutils ];
+        text = ''
+          case "''${1:-}" in
+            -h|--help)
+              cat <<'HELP'
+          Resolve path to absolute form with tilde expansion for home directory
+
+          Usage: tildepath [PATH]
+
+          Converts relative paths to absolute paths (like realpath) but replaces
+          the home directory prefix with ~ for cleaner output.
+
+          Arguments:
+            PATH    Path to resolve (default: current directory)
+
+          Examples:
+            tildepath .                      # ~/projects/nix-workspace
+            tildepath ../other-dir           # ~/projects/other-dir
+            tildepath /Users/user/projects   # ~/projects
+            tildepath /tmp                   # /tmp (unchanged, not under $HOME)
+          HELP
+              exit 0
+              ;;
+          esac
+
+          path="$(realpath "''${1:-$PWD}")"
+          echo "''${path/#$HOME/~}"
+        '';
+      };
+
       # tmux resurrect session restore
       tre = {
         runtimeInputs = with pkgs; [
@@ -847,6 +879,7 @@ in
           clean-shell-history-secrets  Clean secrets from shell history using atuin and gitleaks
           flakeup                      Update Nix flake and commit lock file
           dev                          Enter Nix development shell
+          tildepath                    Resolve path to absolute form with tilde expansion for home directory
           tre                          Tmux resurrect restore with session selection
           ccvers                       List Claude Code npm package versions with tags and release times
           nsa-ref                      List all nix shell applications with descriptions
