@@ -699,7 +699,13 @@ in
           esac
 
           path="$(realpath "''${1:-$PWD}")"
-          echo "''${path/#$HOME/~}"
+          if [[ $path == "$HOME"/* ]]; then
+            echo "~''${path#"$HOME"}"
+          elif [[ $path == "$HOME" ]]; then
+            echo "~"
+          else
+            echo "$path"
+          fi
         '';
       };
 
