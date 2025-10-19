@@ -698,10 +698,13 @@ in
               ;;
           esac
 
+          # Use runtime HOME, fallback to build-time home directory
+          user_home="''${HOME:-${config.home.homeDirectory}}"
+
           path="$(realpath "''${1:-$PWD}")"
-          if [[ $path == "$HOME"/* ]]; then
-            echo "~''${path#"$HOME"}"
-          elif [[ $path == "$HOME" ]]; then
+          if [[ "$path" == "$user_home"/* ]]; then
+            echo "~''${path#"$user_home"}"
+          elif [[ "$path" == "$user_home" ]]; then
             echo "~"
           else
             echo "$path"
