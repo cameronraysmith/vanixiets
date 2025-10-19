@@ -7,7 +7,7 @@
     ./bottom.nix
     ./claude-code
     ./claude-code-wrappers.nix
-    ./commands.nix
+    ./commands
     ./tealdeer.nix
     ./macchina.nix
     # ./poetry.nix
