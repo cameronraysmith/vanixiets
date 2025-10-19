@@ -15,6 +15,7 @@ in
       home-manager.sharedModules = [
         self.homeModules.default
         self.homeModules.darwin-only
+        inputs.mac-app-util.homeManagerModules.default
       ];
     }
     self.nixosModules.common
