@@ -14,6 +14,9 @@ in
 
   system.primaryUser = adminUser.username;
 
+  # Enable desktop profile for GUI applications
+  custom.profile.isDesktop = true;
+
   custom.homebrew = {
     enable = true;
     additionalCasks = [
