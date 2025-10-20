@@ -79,6 +79,13 @@
     # Upstream Jujutsu for latest SSH signing features (revset-based sign-on-push)
     jj.url = "github:martinvonz/jj";
     jj.inputs.nixpkgs.follows = "nixpkgs";
+
+    # AI coding tools with daily updates
+    nix-ai-tools.url = "github:numtide/nix-ai-tools";
+    nix-ai-tools.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Landlock sandboxing for applications
+    landrun-nix.url = "github:srid/landrun-nix";
   };
 
   outputs =
