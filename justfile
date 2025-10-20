@@ -1240,3 +1240,7 @@ sops-rotate:
   @echo "4. Commit and push changes"
   @echo "5. Verify CI pipeline passes"
 
+# Update keys for all encrypted files in secrets directory
+[group('sops')]
+update-all-keys:
+  fd -e yaml -e json . secrets/ -x sops updatekeys -y {}
