@@ -1,6 +1,7 @@
 {
   config,
   pkgs,
+  lib,
   flake,
   ...
 }:
@@ -107,7 +108,10 @@
   home.shellAliases = {
     ccds = "claude --dangerously-skip-permissions";
 
-    # Optional sandboxed variants (landrun-nix)
+    # Optional sandboxed variants (landrun-nix, Linux only)
+    # Note: landrun uses Landlock LSM which is not available on Darwin/macOS
+  }
+  // lib.optionalAttrs pkgs.stdenv.isLinux {
     claude-safe = "nix run .#claude-sandboxed --";
     ccds-safe = "nix run .#ccds-sandboxed --";
   };
