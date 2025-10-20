@@ -248,14 +248,15 @@ update-primary-inputs:
   nix run .#update
 
 # Update a package using its updateScript
+# Note: claude-code-bin is now from nix-ai-tools and updates automatically
 [group('nix')]
-update-package package="claude-code-bin":
+update-package package="ccstatusline":
   #!/usr/bin/env bash
   set -euo pipefail
   UPDATE_SCRIPT=$(nix build .#{{ package }}.updateScript --no-link --print-out-paths)
   echo "Running updateScript for {{ package }}..."
   $UPDATE_SCRIPT
-  echo "Update complete. Review changes with: git diff overlays/packages/{{ package }}/manifest.json"
+  echo "Update complete. Review changes with: git diff"
 
 ## docs
 
