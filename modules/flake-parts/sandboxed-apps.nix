@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ inputs, lib, ... }:
 let
   inherit (inputs) landrun-nix;
 in
@@ -6,13 +6,20 @@ in
   imports = [ landrun-nix.flakeModule ];
 
   perSystem =
-    { pkgs, config, ... }:
+    {
+      pkgs,
+      config,
+      system,
+      ...
+    }:
     let
       claude-code = inputs.nix-ai-tools.packages.${pkgs.system}.claude-code;
+      # landrun uses Landlock LSM which is Linux-only
+      isLinux = lib.hasSuffix "-linux" system;
     in
     {
-      # Sandboxed claude-code variants
-      landrunApps = {
+      # Sandboxed claude-code variants (Linux only - uses Landlock LSM)
+      landrunApps = lib.optionalAttrs isLinux {
         # Sandboxed claude with full features (normal permissions mode)
         claude-sandboxed = {
           program = "${claude-code}/bin/claude";
