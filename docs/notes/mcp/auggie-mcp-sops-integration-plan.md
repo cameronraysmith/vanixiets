@@ -470,6 +470,7 @@ in
 {
   config,
   pkgs,
+  flake,
   ...
 }:
 {
@@ -480,7 +481,7 @@ in
 
   programs.claude-code = {
     enable = true;
-    package = pkgs.claude-code-bin;
+    package = flake.inputs.nix-ai-tools.packages.${pkgs.system}.claude-code;
 
     # symlink commands and agents directory trees
     commandsDir = ./commands;
@@ -888,7 +889,7 @@ No MCP servers configured
 - `ssh-to-age` - Convert SSH keys to age keys
 - `podman` - Container runtime for containerized MCP servers
 - `nodejs` - For npx-based MCP servers
-- `claude-code-bin` - Claude Code CLI
+- `claude-code` - Claude Code CLI (from nix-ai-tools)
 
 **Optional Packages:**
 - `gitea-mcp` - Custom Gitea MCP server (to be packaged)

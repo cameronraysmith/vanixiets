@@ -44,12 +44,9 @@ overlays/
 │   ├── starship-jj.nix          # Single-file package derivation
 │   ├── cc-statusline-rs.nix     # Single-file package derivation
 │   ├── markdown-tree-parser.nix # Single-file package derivation
-│   ├── atuin-format/            # Multi-file package (directory with package.nix)
-│   │   └── package.nix
-│   │   └── atuin-format.nu
-│   └── claude-code-bin/         # Multi-file package
-│       ├── package.nix
-│       └── manifest.json
+│   └── atuin-format/            # Multi-file package (directory with package.nix)
+│       └── package.nix
+│       └── atuin-format.nu
 ├── debug-packages/     # Experimental packages (NOT in overlay, in legacyPackages)
 │   ├── conda-lock.nix
 │   ├── holos.nix
@@ -258,7 +255,6 @@ pkgs/
     ├── bun-apps.nix
     ├── caddy-docker.nix
     ├── builder/
-    ├── claude-code-bin/
     ├── copilot-cli/
     └── ... (30+ more packages)
 ```
