@@ -437,6 +437,7 @@ Edit `modules/home/all/tools/claude-code/default.nix`:
 {
   config,
   pkgs,
+  flake,
   ...
 }:
 {
@@ -446,7 +447,7 @@ Edit `modules/home/all/tools/claude-code/default.nix`:
 
   programs.claude-code = {
     enable = true;
-    package = pkgs.claude-code-bin;
+    package = flake.inputs.nix-ai-tools.packages.${pkgs.system}.claude-code;
 
     # ... rest of existing config ...
 
