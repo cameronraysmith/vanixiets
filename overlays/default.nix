@@ -62,6 +62,11 @@ let
     # - Uses LazyVim-module's flake inputs (automatically updated)
     # - Centralizes all LazyVim/neovim configuration in LazyVim-module
     # - Avoids duplicate overlay logic with hardcoded hashes
+
+    # Replace local claude-code-bin with nix-ai-tools version
+    # Maintains backward compatibility - all references to pkgs.claude-code-bin continue working
+    # Benefits: daily auto-updates, no local package maintenance
+    claude-code-bin = inputs.nix-ai-tools.packages.${super.system}.claude-code;
   };
 
 in
