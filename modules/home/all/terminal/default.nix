@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, flake, ... }:
 let
   python = pkgs.python312.withPackages (
     ps: with ps; [
@@ -12,6 +12,8 @@ let
     enableAzure = true;
     enableSSH = true;
   };
+  # AI tools from nix-ai-tools (auto-updated daily)
+  opencode = flake.inputs.nix-ai-tools.packages.${pkgs.system}.opencode;
 in
 {
   imports = [
