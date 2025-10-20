@@ -207,7 +207,8 @@ File names become configuration names. No manual registration required.
 
 **Custom packages** (defined in overlays, exposed via packages output):
 
-- From `overlays/packages/`: cc-statusline-rs, starship-jj, markdown-tree-parser, atuin-format, bitwarden-cli, claude-code-bin
+- From `overlays/packages/`: cc-statusline-rs, starship-jj, markdown-tree-parser, atuin-format, bitwarden-cli
+- From `nix-ai-tools` (flake input): claude-code-bin (auto-updated daily)
 
 **Experimental packages** (not in overlay, manual build only):
 
@@ -304,7 +305,7 @@ Instead of manually registering each configuration, module, and overlay in `flak
 │ starship-jj          │ starship plugin for jj                                                               │
 │ bitwarden-cli        │ Secure and free password manager for all of your devices                            │
 │ atuin-format         │ Format atuin history with Catppuccin Mocha colored table output                     │
-│ claude-code-bin      │ Agentic coding tool that lives in your terminal                                     │
+│ claude-code-bin      │ Agentic coding tool (from nix-ai-tools, auto-updated daily)                         │
 │ activate             │ Activate NixOS/nix-darwin/home-manager configurations                               │
 │ cc-statusline-rs     │ Claude Code statusline implementation in Rust                                       │
 │ default              │ Activate NixOS/nix-darwin/home-manager configurations                               │
@@ -876,7 +877,7 @@ Available recipes:
     bootstrap-shell                                # Shell with bootstrap dependencies
     update                                         # Update nix flake
     update-primary-inputs                          # Update primary nix flake inputs (see flake.nix)
-    update-package package="claude-code-bin"       # Update a package using its updateScript
+    update-package package="ccstatusline"          # Update a package using its updateScript
 
     [nix-home-manager]
     home-manager-bootstrap-build profile="aarch64-linux" # Bootstrap build home-manager with flake
