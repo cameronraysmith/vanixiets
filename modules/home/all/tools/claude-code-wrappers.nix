@@ -7,8 +7,10 @@
 }:
 let
   home = config.home.homeDirectory;
+  # Look up user config based on home.username (set by each home configuration)
+  user = flake.config.${config.home.username};
   # User-specific LLM API keys (separate from MCP server keys)
-  llmSecretsFile = flake.inputs.self + "/secrets/users/${config.home.username}/llm-api-keys.yaml";
+  llmSecretsFile = flake.inputs.self + "/secrets/users/${user.sopsIdentifier}/llm-api-keys.yaml";
 in
 {
   # Define sops secret for GLM API key (following mcp-servers.nix pattern)
