@@ -209,6 +209,7 @@ File names become configuration names. No manual registration required.
 
 - From `overlays/packages/`: cc-statusline-rs, starship-jj, markdown-tree-parser, atuin-format, bitwarden-cli
 - From `nix-ai-tools` (flake input): claude-code-bin (auto-updated daily)
+- From `landrun-nix` (flake input): Landlock-based sandboxing for applications (Linux only)
 
 **Experimental packages** (not in overlay, manual build only):
 
