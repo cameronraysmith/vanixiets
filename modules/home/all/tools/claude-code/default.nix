@@ -105,6 +105,10 @@
 
   home.shellAliases = {
     ccds = "claude --dangerously-skip-permissions";
+
+    # Optional sandboxed variants (landrun-nix)
+    claude-safe = "nix run .#claude-sandboxed --";
+    ccds-safe = "nix run .#ccds-sandboxed --";
   };
 
   # symlink .local/bin to satisfy claude doctor
