@@ -27,6 +27,28 @@
         "type": "github"
       }
     },
+    "blueprint": {
+      "inputs": {
+        "nixpkgs": [
+          "nix-ai-tools",
+          "nixpkgs"
+        ],
+        "systems": "systems_4"
+      },
+      "locked": {
+        "lastModified": 1758687491,
+        "narHash": "sha256-sy8Q+MfBe+MZzYj4MJwBDe4lkLnmhy1POO86hWZgqO8=",
+        "owner": "numtide",
+        "repo": "blueprint",
+        "rev": "7ecaeb70f63d14a397c73b38f57177894bb795c8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "blueprint",
+        "type": "github"
+      }
+    },
     "catppuccin": {
       "inputs": {
         "nixpkgs": [
@@ -244,7 +266,7 @@
     },
     "flake-utils_3": {
       "inputs": {
-        "systems": "systems_4"
+        "systems": "systems_5"
       },
       "locked": {
         "lastModified": 1681202837,
@@ -374,6 +396,21 @@
         "type": "github"
       }
     },
+    "landrun-nix": {
+      "locked": {
+        "lastModified": 1760649838,
+        "narHash": "sha256-R1smQ167F9E8tjocHEVYkv01hYmsEYO6/fUtLw69hzM=",
+        "owner": "srid",
+        "repo": "landrun-nix",
+        "rev": "8f5163d86e9b969ef9765cc0c168f0e66266901e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "srid",
+        "repo": "landrun-nix",
+        "type": "github"
+      }
+    },
     "lazyvim": {
       "inputs": {
         "nixpkgs": [
@@ -422,6 +459,28 @@
       "original": {
         "owner": "hraban",
         "repo": "mac-app-util",
+        "type": "github"
+      }
+    },
+    "nix-ai-tools": {
+      "inputs": {
+        "blueprint": "blueprint",
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "treefmt-nix": "treefmt-nix_2"
+      },
+      "locked": {
+        "lastModified": 1760969348,
+        "narHash": "sha256-ySy3zq/2WElONnUjz06dfUgPYuvF4dx1eklyabEWk1U=",
+        "owner": "numtide",
+        "repo": "nix-ai-tools",
+        "rev": "2a9f74974ed70dceb8db03b4cbdf4378d4face30",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "nix-ai-tools",
         "type": "github"
       }
     },
@@ -816,8 +875,10 @@
         "git-hooks": "git-hooks",
         "home-manager": "home-manager",
         "jj": "jj",
+        "landrun-nix": "landrun-nix",
         "lazyvim": "lazyvim",
         "mac-app-util": "mac-app-util",
+        "nix-ai-tools": "nix-ai-tools",
         "nix-darwin": "nix-darwin",
         "nix-index-database": "nix-index-database",
         "nix-rosetta-builder": "nix-rosetta-builder",
@@ -828,7 +889,7 @@
         "nuenv": "nuenv",
         "omnix": "omnix",
         "sops-nix": "sops-nix",
-        "systems": "systems_5"
+        "systems": "systems_6"
       }
     },
     "rust-flake": {
@@ -1014,6 +1075,21 @@
         "type": "github"
       }
     },
+    "systems_6": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    },
     "treefmt-nix": {
       "inputs": {
         "nixpkgs": "nixpkgs"
@@ -1024,6 +1100,27 @@
         "owner": "numtide",
         "repo": "treefmt-nix",
         "rev": "74e1a52d5bd9430312f8d1b8b0354c92c17453e5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "treefmt-nix",
+        "type": "github"
+      }
+    },
+    "treefmt-nix_2": {
+      "inputs": {
+        "nixpkgs": [
+          "nix-ai-tools",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1760945191,
+        "narHash": "sha256-ZRVs8UqikBa4Ki3X4KCnMBtBW0ux1DaT35tgsnB1jM4=",
+        "owner": "numtide",
+        "repo": "treefmt-nix",
+        "rev": "f56b1934f5f8fcab8deb5d38d42fd692632b47c2",
         "type": "github"
       },
       "original": {
