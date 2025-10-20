@@ -5,6 +5,8 @@
   ...
 }:
 let
+  # Look up user config based on home.username (set by each home configuration)
+  user = flake.config.${config.home.username};
 in
 {
   programs.jujutsu = {
@@ -12,8 +14,8 @@ in
 
     settings = {
       user = {
-        name = flake.config.me.fullname;
-        email = flake.config.me.email;
+        name = user.fullname;
+        email = user.email;
       };
 
       signing = {
@@ -27,8 +29,8 @@ in
         # This enables unified signature verification across Git and Jujutsu
         backends.ssh.allowed-signers = config.programs.git.extraConfig.gpg.ssh.allowedSignersFile;
 
-        # Use same SOPS-deployed unified SSH key as Git
-        key = config.sops.secrets."radicle/ssh-private-key".path;
+        # Use same SOPS-deployed per-user signing key as Git
+        key = config.sops.secrets."${user.sopsIdentifier}/signing-key".path;
       };
 
       ui = {
@@ -68,11 +70,11 @@ in
     };
   };
 
-  # Deploy unified SSH key via SOPS (same key as Git and Radicle)
+  # Deploy per-user signing key via SOPS (same key as Git and Radicle)
   # Following defelo-nixos pattern: each module explicitly declares its secret dependencies
-  # Using explicit sopsFile pattern (not defaultSopsFile) for future flexibility
-  sops.secrets."radicle/ssh-private-key" = {
-    sopsFile = flake.inputs.self + "/secrets/radicle.yaml";
+  # Path determined by user's sopsIdentifier (admin-user, raquel-user, etc.)
+  sops.secrets."${user.sopsIdentifier}/signing-key" = {
+    sopsFile = flake.inputs.self + "/secrets/users/${user.sopsIdentifier}/signing-key.yaml";
     mode = "0400";
   };
 }

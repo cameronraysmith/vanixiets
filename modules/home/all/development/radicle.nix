@@ -6,6 +6,8 @@
   ...
 }:
 let
+  # Look up user config based on home.username (set by each home configuration)
+  user = flake.config.${config.home.username};
 in
 {
   # Install Radicle node and CLI tools
@@ -18,8 +20,8 @@ in
     publicExplorer = "https://app.radicle.xyz/nodes/$host/$rid$path";
 
     node = {
-      # Human-readable alias for this node
-      alias = "cameronraysmith";
+      # Human-readable alias for this node (use username as alias)
+      alias = config.home.username;
 
       # Not listening for inbound connections (empty list)
       # This is a simpler configuration for a client node
@@ -38,19 +40,19 @@ in
   # Deploy public key to ~/.radicle/keys/radicle.pub
   # This is the same unified SSH key used for Git and Jujutsu signing
   home.file.".radicle/keys/radicle.pub".text = ''
-    ${flake.config.me.sshKey} ${flake.config.me.email}
+    ${user.sshKey} ${user.email}
   '';
 
-  # Deploy unified SSH private key via SOPS to ~/.radicle/keys/radicle
+  # Deploy per-user signing key via SOPS to ~/.radicle/keys/radicle
   # This key serves three purposes:
   # 1. Radicle node identity (P2P cryptographic identity)
   # 2. Git commit signing (gpg.ssh backend)
   # 3. Jujutsu commit signing (ssh backend)
   #
   # Following defelo-nixos pattern: each module explicitly declares its secret dependencies
-  # Using explicit sopsFile pattern (not defaultSopsFile) for future flexibility
-  sops.secrets."radicle/ssh-private-key" = {
-    sopsFile = flake.inputs.self + "/secrets/radicle.yaml";
+  # Path determined by user's sopsIdentifier (admin-user, raquel-user, etc.)
+  sops.secrets."${user.sopsIdentifier}/signing-key" = {
+    sopsFile = flake.inputs.self + "/secrets/users/${user.sopsIdentifier}/signing-key.yaml";
     path = "${config.home.homeDirectory}/.radicle/keys/radicle";
     mode = "0400";
   };

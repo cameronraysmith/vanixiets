@@ -10,6 +10,7 @@ rec {
   # admin user
   cameron = baseIdentity // {
     username = "cameron";
+    sopsIdentifier = "admin-user";
     isAdmin = true;
   };
 
@@ -19,17 +20,20 @@ rec {
     fullname = "GitHub Actions Runner";
     email = "runner@localhost";
     sshKey = baseIdentity.sshKey;
+    sopsIdentifier = "admin-user";
     isAdmin = false;
   };
 
   # jupyter alias of base identity
   jovyan = baseIdentity // {
     username = "jovyan";
+    sopsIdentifier = "admin-user";
   };
 
   # backward compatibility
   crs58 = baseIdentity // {
     username = "crs58";
+    sopsIdentifier = "admin-user";
     isAdmin = true;
   };
 
@@ -41,6 +45,7 @@ rec {
     fullname = "Someone Local";
     email = "raquel@localhost";
     sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAIBdSMsU0hZy7MPpnFmS+P7RlN/x6GwMPVp3g7BOUuf";
+    sopsIdentifier = "raquel-user";
     isAdmin = false;
   };
 }

@@ -16,35 +16,39 @@ keys:
   - &orb-nixos age140evke8tz6a8k8h04rqfxvxvzkkz5wc9femda0xthwzlk227dpwqsl7zfc   # from sops-orb-nixos-ssh
 
 creation_rules:
-  # User-specific secrets
-  - path_regex: users/crs58/.*\.yaml$
+  # Per-user signing keys (minimal encryption - only that user + dev + admin)
+  - path_regex: secrets/users/admin-user/signing-key\.yaml$
     key_groups:
       - age:
         - *admin
         - *dev
         - *admin-user
 
-  - path_regex: users/raquel/.*\.yaml$
+  - path_regex: secrets/users/raquel-user/signing-key\.yaml$
     key_groups:
       - age:
         - *admin
         - *dev
         - *raquel-user
 
-  # Unified cryptographic identity (radicle/git/jujutsu signing key)
-  # User identity deployed to all hosts
-  - path_regex: secrets/radicle\.yaml$
+  # Other admin-user secrets (llm-api-keys, mcp-api-keys, etc.)
+  - path_regex: secrets/users/admin-user/.*\.yaml$
     key_groups:
       - age:
         - *admin
         - *dev
         - *admin-user
-        - *stibnite
-        - *blackphos
-        - *orb-nixos
+
+  # Other raquel-user secrets
+  - path_regex: secrets/users/raquel-user/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *raquel-user
 
   # Host-specific secrets
-  - path_regex: hosts/stibnite/.*\.yaml$
+  - path_regex: secrets/hosts/stibnite/.*\.yaml$
     key_groups:
       - age:
         - *admin
@@ -52,7 +56,7 @@ creation_rules:
         - *admin-user
         - *stibnite
 
-  - path_regex: hosts/blackphos/.*\.yaml$
+  - path_regex: secrets/hosts/blackphos/.*\.yaml$
     key_groups:
       - age:
         - *admin
@@ -60,7 +64,7 @@ creation_rules:
         - *admin-user
         - *blackphos
 
-  - path_regex: hosts/orb-nixos/.*\.yaml$
+  - path_regex: secrets/hosts/orb-nixos/.*\.yaml$
     key_groups:
       - age:
         - *admin
@@ -68,14 +72,15 @@ creation_rules:
         - *admin-user
         - *orb-nixos
 
-  # Shared secrets (services/, shared.yaml) - all hosts + CI for deployment
-  - path_regex: (services/.*\.yaml$|shared\.yaml$)
+  # Shared secrets (everyone can access)
+  - path_regex: (secrets/services/.*\.yaml$|secrets/shared\.yaml$|secrets/test\.yaml$)
     key_groups:
       - age:
         - *admin
         - *dev
         - *ci
         - *admin-user
+        - *raquel-user
         - *stibnite
         - *blackphos
         - *orb-nixos
