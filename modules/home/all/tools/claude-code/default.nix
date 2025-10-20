@@ -1,6 +1,7 @@
 {
   config,
   pkgs,
+  flake,
   ...
 }:
 {
@@ -11,7 +12,7 @@
 
   programs.claude-code = {
     enable = true;
-    package = pkgs.claude-code-bin;
+    package = flake.inputs.nix-ai-tools.packages.${pkgs.system}.claude-code;
 
     # symlink commands and agents directory trees
     commandsDir = ./commands;
