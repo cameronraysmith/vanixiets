@@ -66,11 +66,5 @@ in
           };
         };
       };
-
-      # Expose as packages for easier access
-      packages = {
-        claude-sandboxed = config.landrunApps.claude-sandboxed.package;
-        ccds-sandboxed = config.landrunApps.ccds-sandboxed.package;
-      };
     };
 }
