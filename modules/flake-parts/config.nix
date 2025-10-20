@@ -18,6 +18,12 @@ let
           SSH public key
         '';
       };
+      sopsIdentifier = lib.mkOption {
+        type = lib.types.str;
+        description = ''
+          SOPS user identifier for secrets path (e.g., "admin-user", "name-user")
+        '';
+      };
       isAdmin = lib.mkOption {
         type = lib.types.bool;
         default = false;

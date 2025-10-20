@@ -7,16 +7,18 @@
 }:
 let
   package = pkgs.gitAndTools.git;
+  # Look up user config based on home.username (set by each home configuration)
+  user = flake.config.${config.home.username};
 in
 {
   programs.git = {
     inherit package;
     enable = true;
-    userName = flake.config.me.fullname;
-    userEmail = flake.config.me.email;
+    userName = user.fullname;
+    userEmail = user.email;
     signing = {
-      # Use SOPS-deployed unified SSH key (same key for Radicle + Git + Jujutsu)
-      key = config.sops.secrets."radicle/ssh-private-key".path;
+      # Use SOPS-deployed per-user signing key
+      key = config.sops.secrets."${user.sopsIdentifier}/signing-key".path;
       format = "ssh";
       signByDefault = true;
     };
@@ -118,14 +120,13 @@ in
   };
 
   home.file."${config.xdg.configHome}/git/allowed_signers".text = ''
-    ${flake.config.me.email} namespaces="git" ${flake.config.me.sshKey}
+    ${user.email} namespaces="git" ${user.sshKey}
   '';
 
-  # Deploy unified SSH key via SOPS
-  # This key is used for Git signing, Jujutsu signing, and Radicle identity
-  # Using explicit sopsFile pattern (not defaultSopsFile) for future flexibility
-  sops.secrets."radicle/ssh-private-key" = {
-    sopsFile = flake.inputs.self + "/secrets/radicle.yaml";
+  # Deploy per-user signing key via SOPS
+  # Path determined by user's sopsIdentifier (admin-user, raquel-user, etc.)
+  sops.secrets."${user.sopsIdentifier}/signing-key" = {
+    sopsFile = flake.inputs.self + "/secrets/users/${user.sopsIdentifier}/signing-key.yaml";
     mode = "0400";
   };
 }
