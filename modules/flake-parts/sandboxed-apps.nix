@@ -7,12 +7,15 @@ in
 
   perSystem =
     { pkgs, config, ... }:
+    let
+      claude-code = inputs.nix-ai-tools.packages.${pkgs.system}.claude-code;
+    in
     {
       # Sandboxed claude-code variants
       landrunApps = {
         # Sandboxed claude with full features (normal permissions mode)
         claude-sandboxed = {
-          program = "${pkgs.claude-code-bin}/bin/claude";
+          program = "${claude-code}/bin/claude";
           imports = [
             landrun-nix.landrunModules.gh
             landrun-nix.landrunModules.git
@@ -26,21 +29,16 @@ in
             rw = [
               "$HOME/.claude"
               "$HOME/.claude.json"
-              "$HOME/.config/gcloud"
             ];
             rwx = [ "." ];
-            env = [
-              "HOME"
-              "CLAUDE_CODE_USE_VERTEX"
-              "ANTHROPIC_MODEL"
-            ];
+            env = [ "HOME" ];
           };
         };
 
         # Sandboxed variant with dangerously-skip-permissions
         ccds-sandboxed = {
           program = "${pkgs.writeShellScript "ccds-wrapped" ''
-            exec ${pkgs.claude-code-bin}/bin/claude --dangerously-skip-permissions "$@"
+            exec ${claude-code}/bin/claude --dangerously-skip-permissions "$@"
           ''}";
           imports = [
             landrun-nix.landrunModules.gh
@@ -55,14 +53,9 @@ in
             rw = [
               "$HOME/.claude"
               "$HOME/.claude.json"
-              "$HOME/.config/gcloud"
             ];
             rwx = [ "." ];
-            env = [
-              "HOME"
-              "CLAUDE_CODE_USE_VERTEX"
-              "ANTHROPIC_MODEL"
-            ];
+            env = [ "HOME" ];
           };
         };
       };
