@@ -7,10 +7,12 @@
 }:
 let
   home = config.home.homeDirectory;
+  # Look up user config based on home.username (set by each home configuration)
+  user = flake.config.${config.home.username};
   # Construct user-specific secrets path
-  # Secrets file structure: secrets/users/{username}/mcp-api-keys.yaml
-  # Requires corresponding .sops.yaml rule: path_regex: users/{username}/.*\.yaml$
-  mcpSecretsFile = flake.inputs.self + "/secrets/users/${config.home.username}/mcp-api-keys.yaml";
+  # Secrets file structure: secrets/users/{sopsIdentifier}/mcp-api-keys.yaml
+  # Requires corresponding .sops.yaml rule: path_regex: secrets/users/{sopsIdentifier}/.*\.yaml$
+  mcpSecretsFile = flake.inputs.self + "/secrets/users/${user.sopsIdentifier}/mcp-api-keys.yaml";
 in
 {
   # Ensure ~/.mcp directory exists before templates are written
