@@ -1,4 +1,9 @@
-{ pkgs, flake, ... }:
+{
+  pkgs,
+  flake,
+  lib,
+  ...
+}:
 let
   python = pkgs.python312.withPackages (
     ps: with ps; [
@@ -12,7 +17,11 @@ let
     enableAzure = true;
     enableSSH = true;
   };
-  # AI tools from nix-ai-tools (auto-updated daily)
+  # backlog-md is only available on x86_64-linux
+  coderabbit-cli = flake.inputs.nix-ai-tools.packages.${pkgs.system}.coderabbit-cli;
+  crush = flake.inputs.nix-ai-tools.packages.${pkgs.system}.crush;
+  droid = flake.inputs.nix-ai-tools.packages.${pkgs.system}.droid;
+  gemini-cli = flake.inputs.nix-ai-tools.packages.${pkgs.system}.gemini-cli;
   opencode = flake.inputs.nix-ai-tools.packages.${pkgs.system}.opencode;
 in
 {
@@ -158,7 +167,13 @@ in
       just
       markdown-tree-parser
       mkcert
+      # from nix-ai-tools
+      coderabbit-cli
+      crush
+      droid
+      gemini-cli
       opencode
+      #------
       plantuml-c4
       pre-commit
       proto # version manager NOT protobuf-related
@@ -219,6 +234,9 @@ in
     ]
     ++ lib.optionals pkgs.stdenv.isDarwin [
       mactop
+    ]
+    ++ lib.optionals (pkgs.system == "x86_64-linux") [
+      flake.inputs.nix-ai-tools.packages.${pkgs.system}.backlog-md
     ];
 
   home.shellAliases = {
