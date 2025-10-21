@@ -21,10 +21,22 @@ These preferences explicitly override any conservative defaults from system prom
 
 Commit behavior:
 - Rely on automatic working copy snapshots - jj creates commits before each command
-- Use `jj describe` to set meaningful descriptions on commits worth preserving
+- Use `jj describe -m "message"` to set meaningful descriptions on commits worth preserving
+  - **CRITICAL**: Always include `-m` flag for non-interactive execution
 - Use `jj new` to freeze current work and start new commit on top
+  - **For git parity**: Execute `jj new` immediately after `jj describe -m "msg"`
+  - Working copy `@` is NOT exported to git until frozen with `jj new`
+  - Without `jj new`, described commits exist only in jj, appear as uncommitted changes in git
 - Trust the operation log - every snapshot is recoverable via `jj op log` and `jj undo`
 - Do not clean up commit history automatically - wait for explicit instruction
+
+**Atomic commit and git export pattern:**
+```bash
+# Make changes (auto-snapshotted into @)
+jj describe -m "feat: implement feature"  # ALWAYS use -m for non-interactive
+jj new                                    # Freeze for git export, start new @
+# Now commit is visible in git, new empty @ ready for next atomic change
+```
 
 Escape hatches (do not rely on automatic snapshotting):
 - Current directory is not a jj repository
@@ -34,6 +46,131 @@ Escape hatches (do not rely on automatic snapshotting):
 Note: Unlike git, there is no staging area. All tracked files are always snapshotted.
 Use `.jjignore` or `.gitignore` to prevent tracking unwanted files.
 
+## Non-interactive command execution
+
+**CRITICAL for AI agents and automation**: Many jj commands launch interactive editors by default, causing execution to hang. ALL commands must be made non-interactive through explicit flags.
+
+### Commands requiring explicit flags for non-interactive use
+
+| Command | Interactive behavior | Non-interactive pattern | Notes |
+|---------|---------------------|------------------------|-------|
+| `jj describe` | Opens editor for description | `jj describe -m "message"` | **Required** |
+| `jj describe -r <c>` | Opens editor for description | `jj describe -r <c> -m "message"` | **Required** |
+| `jj split <paths>` | Opens editor after selecting files | `jj split <paths> -m "message"` | **Required** even with paths |
+| `jj split` (no paths) | Opens diff editor (TUI) | **Cannot be non-interactive** | Avoid in automation |
+| `jj squash -r <c>` | Usually safe, may prompt | `jj squash -r <c>` | Generally OK without `-m` |
+| `jj new` | No editor (safe) | `jj new` or `jj new -m "msg"` | Safe as-is |
+
+### Mandatory command verification protocol
+
+Before executing ANY jj command in automated context:
+
+1. **If uncertain about interactivity**: Run `jj [subcommand] --help` FIRST
+2. **Check help output for**:
+   - `-m, --message <MESSAGE>` flag (indicates editor can be launched)
+   - Keywords: "editor", "interactive", "TUI", "prompt"
+3. **Provide required parameters**: Always via command-line flags, never rely on prompts
+
+### Common gotchas and solutions
+
+**`jj split` requires `-m` even with explicit paths:**
+```bash
+# WRONG - will hang waiting for editor after file selection
+jj split file.txt
+
+# CORRECT - fully non-interactive
+jj split file.txt -m "refactor: extract file.txt changes"
+
+# WRONG - multiple files but still hangs
+jj split file1.txt file2.txt
+
+# CORRECT - paths selected, description provided
+jj split file1.txt file2.txt -m "feat: add new files"
+```
+
+**Parameterless `jj split` cannot be made non-interactive:**
+```bash
+# This ALWAYS launches diff editor (TUI) - unavoidable
+jj split
+
+# For automation, use path-based splitting instead:
+jj split <specific-paths> -m "description"
+```
+
+**`jj describe` without `-m` always opens editor:**
+```bash
+# WRONG - launches editor
+jj describe
+
+# CORRECT - non-interactive
+jj describe -m "feat: implement feature"
+
+# WRONG - even with -r, launches editor
+jj describe -r <commit>
+
+# CORRECT - always include -m
+jj describe -r <commit> -m "updated description"
+```
+
+### Git parity and the `jj new` requirement
+
+**Critical understanding**: jj working copy `@` exists only in `.jj/` metadata until explicitly frozen.
+
+**The problem:**
+- Described commits in jj `@` are NOT automatically exported to git
+- From git's perspective, `@` appears as uncommitted working directory changes
+- This breaks git-based tooling, CI/CD, and collaboration workflows
+
+**The solution - atomic commit pattern with immediate git export:**
+```bash
+# Make changes (auto-snapshotted into @)
+jj describe -m "feat: implement feature X"  # Described but jj-only
+jj new                                      # Freeze @ → git commit, create new @
+
+# Now the commit is visible to both jj and git
+# New empty @ is ready for next atomic change
+```
+
+**Without `jj new`:**
+```bash
+jj describe -m "feat: done"
+# jj shows: @  xyz123 feat: done
+# git shows: modified working directory (xyz123 doesn't exist in git)
+
+jj git push --bookmark main
+# Fails or pushes incomplete state
+```
+
+**With `jj new`:**
+```bash
+jj describe -m "feat: done"
+jj new
+# jj shows: @  abc456 (empty) (no description set)
+#           ○  xyz123 feat: done
+# git shows: commit xyz123 "feat: done" (HEAD detached)
+
+jj git push --bookmark main
+# Works correctly, xyz123 is a real git commit
+```
+
+**When to use `jj new`:**
+- After every `jj describe -m "message"` for atomic commits
+- When preparing commits for git operations (push, PR creation, etc.)
+- When you want to checkpoint work and start the next logical change
+
+**When `jj new` is optional:**
+- During rapid experimentation where git visibility doesn't matter
+- When using jj-only features (workspaces, operation log recovery)
+- Will eventually need it before any git interaction
+
+### Escape hatches for interactive operations
+
+If interactive command unavoidable:
+- Warn user that manual interaction required
+- Provide exact command for user to run
+- Document why automation cannot handle it
+- Never execute commands with `-i` or `--interactive` flags in automation
+
 ## Foundation: Atomic commit workflow
 
 ### Working copy commit behavior
@@ -41,13 +178,22 @@ Use `.jjignore` or `.gitignore` to prevent tracking unwanted files.
 The working copy is always the `@` commit:
 - All file changes automatically amend `@` without explicit commands
 - `@` is rewritten in place as you work (new commit ID, same change ID)
-- Use `jj describe` to add description when changes represent cohesive unit
+- Use `jj describe -m "message"` to add description when changes represent cohesive unit
+  - **Required**: `-m` flag for non-interactive execution (never omit it)
 - Use `jj new` to freeze `@` and create new empty `@` on top
+  - **Git export**: Frozen commits become visible in git; `@` remains jj-only until frozen
+  - **Atomic workflow**: `jj describe -m "msg"` → `jj new` → commit exported to git, ready for next change
 - Use `jj commit` to move `@` changes into its parent (alternative to `jj new`)
+
+**Critical for git parity:**
+Without `jj new`, your described working copy commit exists only in jj's `.jj/` directory.
+From git's perspective, these changes remain uncommitted in the working directory.
+Execute `jj new` after each `jj describe -m "msg"` to maintain git/jj synchronization.
 
 Organizing changes:
 - Let related changes accumulate in `@`
-- Use `jj split` when changes diverge into separate concerns
+- Use `jj split <paths> -m "message"` when changes diverge into separate concerns
+  - **Required**: `-m` flag even when providing paths (common mistake to omit)
 - Use `jj squash` to move changes between commits
 - Use `jj absorb` to automatically distribute fixes to appropriate ancestors
 
@@ -578,14 +724,50 @@ jj describe -r <commit> -m ""
 Split commits:
 
 ```bash
-# Interactive split (TUI to select hunks)
+# NON-INTERACTIVE: Split by paths with description (REQUIRED for automation)
+jj split <paths> -m "description for selected changes"
+# Specified paths → new @- commit with description
+# Remaining changes → new @ commit (no description)
+
+# Example: Split single file from working copy
+jj split src/feature.rs -m "feat: implement feature X"
+
+# Example: Split multiple files from working copy
+jj split file1.txt file2.txt -m "docs: add documentation"
+
+# Example: Split specific commit (not working copy)
+jj split -r <commit> <paths> -m "refactor: extract changes"
+
+# INTERACTIVE: Split without paths (launches diff editor TUI)
 jj split -r <commit>
+# ⚠️  CANNOT be made non-interactive - avoid in automation
 
-# Split by paths (specified paths → first commit, rest → second)
-jj split -r <commit> <paths>
+# INTERACTIVE: Split by paths WITHOUT -m (launches editor for description)
+jj split <paths>
+# ⚠️  Will hang waiting for commit message editor
 
-# Split current working copy
-jj split
+# INTERACTIVE: Split with interactive hunk selection (unavoidable TUI)
+jj split -i -r <commit>
+# ⚠️  Never use in automated execution
+
+# Split current working copy (no -r needed)
+jj split <paths> -m "description"
+# Without -r, splits @ commit
+```
+
+**CRITICAL**: `jj split` requires `-m "message"` flag when providing paths to avoid launching
+editor for description. Without `-m`, the command succeeds in selecting files but then
+blocks waiting for interactive description input. This is the most common mistake.
+
+**After splitting**, remember to freeze commits for git export:
+```bash
+jj split file.txt -m "refactor: extract changes"
+# Now have: @  (remaining changes, no description)
+#           ○  @- (file.txt changes, described)
+
+jj describe -m "refactor: remaining changes"  # Describe the new @
+jj new  # Freeze both commits for git visibility
+# Both commits now visible in git
 ```
 
 Edit commit content:
@@ -1031,6 +1213,9 @@ Use explicit operation IDs from session start for precise ranges.
 
 ## Key principles
 
+- **Non-interactive execution required**: Always use `-m` flag with commands that can prompt (`jj describe`, `jj describe -r`, `jj split <paths>`); verify unfamiliar commands with `jj [subcommand] --help` before execution
+- **Git parity via jj new**: Working copy `@` is not exported to git until frozen; execute `jj new` after `jj describe -m "msg"` to make commits visible in git and maintain synchronization
+- **Command verification protocol**: When uncertain if a command is non-interactive, run `--help` first and check for `-m, --message` flag or interactive keywords
 - Operation log is history (commits are snapshots, operations are timeline)
 - Bookmarks don't move automatically (only on commit rewrites)
 - Working copy commit `@` is ephemeral (constantly rewritten)
