@@ -1,5 +1,7 @@
 # Jujutsu history cleanup
 
+**IMPORTANT for AI agents**: Commands like `jj describe -r` and `jj split <paths>` require `-m "message"` flag for non-interactive execution. See `~/.claude/commands/jj/jj-workflow.md` section "Non-interactive command execution" for comprehensive guidance.
+
 ## Purpose
 
 Transform experimental development history into a clean, reviewable commit sequence where:
@@ -104,11 +106,8 @@ Their descendants are automatically rebased onto the abandoned commit's parent(s
 Change commit messages without touching content:
 
 ```bash
-# Reword single commit
+# Reword single commit (ALWAYS use -m for non-interactive)
 jj describe -r <commit> -m "new description"
-
-# Open editor for description
-jj describe -r <commit>
 
 # Reword multiple commits by pattern
 jj describe -r 'description(glob:"WIP:*")' -m "proper description"
@@ -116,6 +115,8 @@ jj describe -r 'description(glob:"WIP:*")' -m "proper description"
 # Clear description (useful for commits that will be squashed)
 jj describe -r <commit> -m ""
 ```
+
+**CRITICAL**: Always include `-m` flag. Without it, `jj describe -r <commit>` opens an editor and hangs in automation.
 
 Descriptions can be updated at any time without special preparation.
 
@@ -147,19 +148,25 @@ jj new @-  # Return to original location
 Divide a commit into multiple logical commits:
 
 ```bash
-# Interactive split (TUI to select hunks)
+# Non-interactive split by paths (ALWAYS use -m)
+jj split <paths> -m "description for selected changes"
+# Specified paths go to first commit with description, rest to second
+
+# Split specific commit by paths (non-interactive)
+jj split -r <commit> <paths> -m "description"
+
+# Interactive split (TUI to select hunks) - avoid in automation
 jj split -r <commit>
+# Opens diff editor - cannot be non-interactive
 
-# Split by paths
-jj split -r <commit> <paths>
-# Specified paths go to first commit, rest to second
-
-# Split current working copy
-jj split
+# Split current working copy (non-interactive)
+jj split <paths> -m "description"
 # Without -r, splits @ commit
 ```
 
-First commit gets selected changes, second commit gets remainder.
+**CRITICAL**: `jj split` requires `-m "message"` even when providing paths. Without `-m`, it hangs waiting for editor input after file selection.
+
+First commit gets selected changes with description, second commit gets remainder.
 Both commits end up in series with same parent.
 
 ### Combine multiple operations
