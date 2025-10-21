@@ -670,6 +670,17 @@ jj rebase -r <commit> -B <before-commit>
 jj rebase -s <commit> -d <new-base>
 ```
 
+**Note on `-A` and `-B`**: These flags automatically rebase all descendants of the moved commit onto it in a single atomic operation. No second rebase command needed to reconnect the chain.
+
+**Using change ID prefixes**: For faster typing, use unambiguous prefixes of change IDs:
+```bash
+# Full change IDs
+jj rebase -r tknpxpos -A ynrpuxsz
+
+# Prefixes (recommended for interactive use)
+jj rebase -r tk -A y
+```
+
 Squash commits:
 
 ```bash
