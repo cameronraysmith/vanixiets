@@ -681,6 +681,17 @@ jj rebase -r tknpxpos -A ynrpuxsz
 jj rebase -r tk -A y
 ```
 
+**Moving ranges vs single commits**: Choose between `-r` and `-s` based on what you're moving:
+```bash
+# Move single commit (descendants follow automatically)
+jj rebase -r <commit> -A <after>
+
+# Move commit AND all its descendants as a range/subtree
+jj rebase -s <first-commit> -d <destination>
+```
+
+Use `-r` with `-A`/`-B` when moving one commit within a chain. Use `-s` when you want to move multiple commits together as a unit - the specified commit plus everything built on top of it will move to the new destination. This is the primary way to "slide" a range of commits through history.
+
 Squash commits:
 
 ```bash
