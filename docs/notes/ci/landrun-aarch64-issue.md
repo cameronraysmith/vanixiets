@@ -122,11 +122,29 @@ Keep `fail-fast: false` and document the known issue:
 - CI always shows red ✗ for this job
 - Reduces confidence in CI green status
 
-## Recommended Action
+## Implemented Solution
 
-**Short-term:** Proceed with Option 4 (accept failure), document in this file.
+**Platform-Specific Exclusion** (variant of Option 2):
 
-**Mid-term:** Implement Option 1 (skip tests) if ARM overlay caching becomes important.
+Excluded landrun-based sandboxed apps from aarch64-linux builds in `modules/flake-parts/sandboxed-apps.nix`:
+
+```nix
+canBuildLandrun = isLinux && (system != "aarch64-linux");
+landrunApps = lib.optionalAttrs canBuildLandrun { ... };
+```
+
+**Rationale:**
+- Sandboxed variants are optional (not essential for functionality)
+- Tests fail consistently on aarch64-linux (9/10 pass, --ldd test fails)
+- Core sandboxing works, only auto-library-detection broken
+- Simpler than test skipping or upstream patches
+- Aligns with platform-specific availability patterns in Nix
+
+**Impact:**
+- ✅ CI passes on aarch64-linux (no landrun build attempted)
+- ✅ x86_64-linux still builds sandboxed variants
+- ✅ Users on ARM can still use non-sandboxed claude-code
+- ⚠️  No sandboxed claude-code variants available on ARM
 
 **Long-term:** Investigate Option 3 (upstream fix) when time permits.
 
