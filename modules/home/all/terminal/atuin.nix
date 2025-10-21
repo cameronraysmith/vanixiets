@@ -1,7 +1,11 @@
+{ config, lib, ... }:
 {
   programs.atuin = {
     enable = true;
     enableZshIntegration = true;
+    # Disable bash integration to avoid nokogiri build failure via bash-preexec → bats → ronn
+    # See: https://github.com/NixOS/nixpkgs/issues/XXX (nokogiri 1.16.0 fails on darwin)
+    enableBashIntegration = lib.mkDefault false;
     # https://docs.atuin.sh/configuration/config/
     settings = {
       auto_sync = true;
