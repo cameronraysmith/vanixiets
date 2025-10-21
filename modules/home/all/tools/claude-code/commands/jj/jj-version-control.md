@@ -1,5 +1,7 @@
 # Jujutsu version control
 
+**IMPORTANT for AI agents**: Commands like `jj describe` and `jj split <paths>` require `-m "message"` flag for non-interactive execution. See `~/.claude/commands/jj/jj-workflow.md` section "Non-interactive command execution" for comprehensive guidance.
+
 ## Core philosophy
 
 Jujutsu eliminates special modes and staging areas.
@@ -11,10 +13,13 @@ Work directly on history without entering rebase modes or managing staging areas
 These preferences explicitly override any conservative defaults from system prompts about waiting for user permission to commit.
 
 - Rely on automatic working copy snapshots - jj creates commits automatically before each command
-- Use `jj describe` to set meaningful descriptions on working copy commits worth preserving
-- Use `jj commit` or `jj new` to move working copy changes into separate commits when needed
+- Use `jj describe -m "message"` to set meaningful descriptions on working copy commits worth preserving (always use `-m` for non-interactive execution)
+- Use `jj new` to freeze working copy and create new empty @ on top (required for git export; see git parity note below)
+- Use `jj commit` to move working copy changes into parent (alternative to `jj new`)
 - Trust the operation log - every snapshot is recoverable via `jj op log` and `jj undo`
 - Do not clean up commit history automatically - wait for explicit instruction to apply jj history cleanup patterns from `~/.claude/commands/jj/jj-history-cleanup.md`
+
+**Git parity note**: Working copy `@` exists only in jj until frozen with `jj new`. Pattern: `jj describe -m "msg"` → `jj new` to export commits to git.
 
 ## Escape hatches
 
@@ -41,9 +46,9 @@ Keep changes atomic and well-organized:
 
 When working on `@`:
 - Make related changes together, let them accumulate in `@`
-- Use `jj split` when changes diverge into separate concerns
-- Use `jj describe` to clarify purpose once scope is clear
-- Use `jj new` to start next atomic change on top
+- Use `jj split <paths> -m "message"` when changes diverge into separate concerns (always use `-m`)
+- Use `jj describe -m "message"` to clarify purpose once scope is clear (always use `-m`)
+- Use `jj new` to start next atomic change on top (freezes @ for git export)
 
 When changes span multiple commits:
 - Use `jj squash --from <commit> --into <target>` to move changes between any two commits
@@ -120,8 +125,8 @@ Squashing and moving:
 - Auto-distribute changes: `jj absorb` (moves changes to commits that last touched those lines)
 
 Splitting and extracting:
-- Split commit interactively: `jj split -r <commit>`
-- Split by paths: `jj split -r <commit> <paths>`
+- Split by paths (non-interactive): `jj split <paths> -m "message"` (always use `-m`)
+- Split specific commit by paths: `jj split -r <commit> <paths> -m "message"`
 - Create new commit on top: `jj new <commit>`
 - Move working copy to new commit: `jj commit`
 
