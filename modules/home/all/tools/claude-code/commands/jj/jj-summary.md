@@ -33,13 +33,36 @@ For quick questions about commands or concepts, this summary may suffice.
 - Git: "Switch branch to work elsewhere" → jj: "Create new @ anywhere"
 - Git: "Branches are history" → jj: "Operation log is history"
 
+## Non-interactive execution for AI agents
+
+**Commands that launch editors by default (WILL HANG without proper flags):**
+
+| Command | Default behavior | Non-interactive pattern |
+|---------|-----------------|------------------------|
+| `jj describe` | Opens editor | `jj describe -m "message"` |
+| `jj describe -r <c>` | Opens editor | `jj describe -r <c> -m "message"` |
+| `jj split <paths>` | Opens editor | `jj split <paths> -m "message"` |
+| `jj split` (no paths) | Opens diff editor (TUI) | **Cannot be non-interactive** |
+
+**Mandatory verification protocol:**
+1. Not certain a command is non-interactive? → Run `jj [subcommand] --help` FIRST
+2. Check help output for `-m, --message <MESSAGE>` flag
+3. If command accepts `-m`, ALWAYS use it to avoid editor launch
+
+**Git parity requirement:**
+- jj working copy `@` exists only in `.jj/` until frozen
+- From git's perspective, `@` appears as uncommitted working directory changes
+- Pattern: `jj describe -m "msg"` → `jj new` → commit now visible in git
+- Without `jj new`, described commits remain invisible to git operations
+
 ## Critical jj concepts
 
 **Working copy commit (`@`):**
 - Ephemeral commit constantly rewritten as you work
 - Auto-snapshotted before each jj command
-- Use `jj describe` to add description when cohesive
+- Use `jj describe -m "message"` to add description when cohesive (ALWAYS use `-m`)
 - Use `jj new` to freeze @ and create new empty @ on top
+- **Git export**: @ is jj-only until frozen; execute `jj new` after `jj describe` for git visibility
 
 **Bookmarks:**
 - Named pointers that stay put when you create commits
@@ -66,9 +89,10 @@ For quick questions about commands or concepts, this summary may suffice.
 ## Quick command reference
 
 ```bash
-# Start work
+# Start work (atomic commit pattern with git parity)
 jj new <base>                  # New commit on base
-jj describe -m "message"       # Describe current @
+jj describe -m "message"       # Describe current @ (ALWAYS use -m!)
+jj new                         # Freeze @ for git export, create new @ on top
 
 # Bookmarks
 jj bookmark create <name>      # Create at @
@@ -77,13 +101,13 @@ jj bookmark set <name> -r <c>  # Move bookmark
 # Move changes
 jj squash                      # Move @ into parent
 jj squash -r <commit>          # Squash commit into parent
-jj split                       # Split @ interactively
+jj split <paths> -m "message"  # Split @ by paths (REQUIRES -m!)
 jj absorb                      # Auto-distribute @ to ancestors
 
 # Rewrite history
 jj rebase -r <c> -d <dest>     # Move commit to new parent
 jj abandon <commit>            # Remove commit, rebase descendants
-jj describe -r <c> -m "msg"    # Reword commit
+jj describe -r <c> -m "msg"    # Reword commit (ALWAYS use -m!)
 
 # Workspaces
 jj workspace add <path> -r <c> # Create workspace
@@ -158,9 +182,11 @@ jj git push --bookmark <name>  # Push bookmark
 ```bash
 jj bookmark create exp-1 -r main
 jj new exp-1
-# Work, describe commits
-jj bookmark set exp-1 -r @-  # Checkpoint
-jj git push --bookmark exp-1  # Share
+# Work on changes (auto-snapshotted)
+jj describe -m "[exp-1] feat: implement feature"  # ALWAYS use -m
+jj new                         # Freeze for git, start new @ on top
+jj bookmark set exp-1 -r @-    # Checkpoint (point to frozen commit)
+jj git push --bookmark exp-1   # Share
 ```
 
 **Create workspace for serious work:**
@@ -216,6 +242,9 @@ jj log -r 'mine() & ~bookmarks()'
 
 ## Critical reminders
 
+- **Non-interactive execution**: ALWAYS use `-m "message"` with `jj describe`, `jj describe -r`, and `jj split <paths>` to avoid editor hangups; verify unfamiliar commands with `jj [subcommand] --help` first
+- **Command verification protocol**: Before executing any jj command you're uncertain about, run `jj [subcommand] --help` to check for interactive flags (look for `-m, --message`)
+- **Git parity requirement**: Execute `jj new` immediately after `jj describe -m "msg"` to freeze commits for git export; without `jj new`, described commits exist only in jj and appear as uncommitted changes in git
 - **Always colocated mode**: We operate with both .git and .jj (can revert to git anytime)
 - **Operation log is safety net**: Delete bookmarks freely, everything in operation log
 - **Start with bookmarks**: Only create workspaces when need simultaneous file access
