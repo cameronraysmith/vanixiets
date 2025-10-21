@@ -1,4 +1,4 @@
-name: multi-user architecture CI
+name: CI
 on:
   workflow_dispatch:
     inputs:
