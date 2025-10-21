@@ -25,10 +25,31 @@ fi
 echo ""
 
 if [ $FAILED -eq 0 ]; then
-    # Step 2: Build system configuration
-    echo "Step 2/2: Building system configuration (without activation)..."
+    # Step 2: Build configuration (auto-detects home-manager vs system)
+    echo "Step 2/2: Building configuration (without activation)..."
 
-    if command -v darwin-rebuild &> /dev/null; then
+    # Check for home-manager-only configuration first (matches just activate logic)
+    if [ -f ./configurations/home/$USER@$(hostname).nix ]; then
+        echo "Detected home-manager-only configuration: $USER@$(hostname)"
+        # Use nom (nix output manager) for better build output if available
+        if command -v nom &> /dev/null; then
+            if nom build '.#homeConfigurations.'"$USER@$(hostname)"'.activationPackage'; then
+                echo "✓ Home-manager configuration builds successfully"
+            else
+                echo "✗ Home-manager build failed"
+                FAILED=1
+            fi
+        else
+            if nix build '.#homeConfigurations.'"$USER@$(hostname)"'.activationPackage'; then
+                echo "✓ Home-manager configuration builds successfully"
+            else
+                echo "✗ Home-manager build failed"
+                FAILED=1
+            fi
+        fi
+    elif command -v darwin-rebuild &> /dev/null; then
+        # Darwin system configuration
+        echo "Detected darwin system configuration: $(hostname)"
         # Use nom (nix output manager) for better build output if available
         if command -v nom &> /dev/null; then
             if nom build '.#darwinConfigurations.'"$(hostname)"'.system'; then
@@ -46,6 +67,8 @@ if [ $FAILED -eq 0 ]; then
             fi
         fi
     elif command -v nixos-rebuild &> /dev/null; then
+        # NixOS system configuration
+        echo "Detected NixOS system configuration: $(hostname)"
         if nixos-rebuild build --flake .; then
             echo "✓ NixOS system builds successfully"
         else
@@ -53,10 +76,12 @@ if [ $FAILED -eq 0 ]; then
             FAILED=1
         fi
     else
-        echo "⚠ Could not detect darwin-rebuild or nixos-rebuild"
-        echo "  For home-manager only, run:"
-        echo "    nix build '.#homeConfigurations.\$USER@\$(hostname).activationPackage'"
-        echo "  Skipping system build verification"
+        echo "✗ Could not detect configuration type"
+        echo "  Expected one of:"
+        echo "    - ./configurations/home/$USER@$(hostname).nix (home-manager)"
+        echo "    - darwin-rebuild command (nix-darwin)"
+        echo "    - nixos-rebuild command (NixOS)"
+        FAILED=1
     fi
 fi
 
