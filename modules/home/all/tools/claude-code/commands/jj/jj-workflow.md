@@ -1065,6 +1065,45 @@ jj git push --all
 jj git push --tracked
 ```
 
+### Log visibility and remote bookmarks
+
+After pushing commits to a remote, `jj log` hides them by default to focus on work-in-progress.
+
+Symbols indicating commit state:
+- `○` - Mutable commit (local, not pushed)
+- `◆` - Immutable commit (exists on remote)
+- `~` - History truncated (more commits exist but are hidden)
+
+```bash
+# After push, log shows only unpushed commits
+jj git push --bookmark main
+jj log  # Shows @ and maybe a few commits, then ~
+
+# The ◆ symbol marks immutable commits (on remotes)
+# The ~ symbol indicates hidden history below
+
+# See full history including pushed commits
+jj log -r 'all()'
+jj log -r '::@'                    # All ancestors of working copy
+jj log -r 'main@origin::'          # Everything since remote main
+```
+
+Customizing log visibility:
+
+To always show full history, configure default revset in `~/.jjconfig.toml`:
+```toml
+[revsets]
+log = "@ | ancestors(bookmarks() | tags() | remote_bookmarks(), 2)"
+```
+
+Or create an alias for full history:
+```toml
+[aliases]
+la = ["log", "-r", "all()"]
+```
+
+This default behavior keeps your log focused on uncommitted work while clearly marking the boundary between local changes and pushed commits.
+
 ### Reverting to git-only operations
 
 Since colocated mode maintains both `.git/` and `.jj/`, you can revert to git-only operations at any time:
