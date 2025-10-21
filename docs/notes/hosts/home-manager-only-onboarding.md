@@ -10,9 +10,12 @@ Use this procedure when:
 - The host already has nix, SOPS infrastructure, and secrets deployed by the admin
 
 This guide assumes:
-- The admin user has completed host onboarding (see `onboarding.md`)
+- The admin user has completed host onboarding (see [`onboarding.md`](./onboarding.md))
 - The nix daemon is running and `/nix/store` is available
 - Host SSH keys are deployed to `/etc/ssh/ssh_host_ed25519_key`
+
+**For SOPS secrets architecture details**, see the "Architecture overview" section in [`onboarding.md`](./onboarding.md).
+This guide focuses only on user-specific home-manager setup.
 
 ## Architecture overview
 
@@ -171,32 +174,61 @@ If successful, you'll see your decrypted signing key.
 nix build '.#homeConfigurations."<username>@<hostname>".activationPackage'
 ```
 
-### Step 8: Activate (user runs this)
+### Step 8: Activate
 
-**PAUSE - The user must run activation interactively:**
+**The user must run activation interactively:**
 
 ```bash
-# Option 1: Using just (auto-detects user@host)
+# Using just (auto-detects <username>@<hostname>)
 just activate
-
-# Option 2: Using home-manager directly
-nix run github:nix-community/home-manager -- switch --flake ~/projects/nix-config#<username>@<hostname>
-
-# Option 3: Using the flake's activate output
-nix run ~/projects/nix-config#<username>@<hostname>
 ```
+
+The `just activate` recipe automatically detects whether to use:
+- Home-manager-only config (if `./configurations/home/$USER@$(hostname).nix` exists)
+- System-level config (otherwise)
 
 After activation:
 - Home-manager generation is in `/nix/var/nix/profiles/per-user/<username>/home-manager`
 - Dotfiles and configurations are in your home directory
-- SOPS secrets are deployed (git signing key, API keys, etc.)
+- SOPS plist is deployed to `~/Library/LaunchAgents/` (darwin) or systemd unit (linux)
+
+### Step 9: Load SOPS agent (standalone home-manager only)
+
+**CRITICAL STEP for standalone home-manager on darwin:**
+
+```bash
+# Load the SOPS launchd agent (one-time setup)
+just sops-load-agent
+```
+
+**Why this is necessary:**
+- nix-darwin automatically loads SOPS agents during system activation
+- Standalone home-manager creates the plist but **does not load it automatically**
+- Without loading the agent, secrets won't be decrypted and deployed
+- Symptoms: `~/.radicle/keys/radicle` symlink missing, git signing fails
+
+**One-time vs per-login:**
+- The `launchctl load` command is **one-time** (persists across reboots)
+- The plist in `~/Library/LaunchAgents/` ensures the agent starts on login
+- Only run `just sops-load-agent` once after initial activation
+- Re-run only if you unload the agent or the plist changes significantly
+
+**Linux (NixOS) users:** Skip this step - systemd automatically starts the sops-nix user service.
+
+After loading the agent:
+- Secrets directory created: `~/.config/sops-nix/secrets/`
+- Private keys deployed (e.g., `~/.radicle/keys/radicle` symlink to secrets directory)
+- Git signing, jujutsu, radicle keys available
 
 ## Validation
 
-After activation, verify:
+After activation and loading SOPS agent, verify:
 
-- [ ] Git signing works: `git config --get user.signingkey`
-- [ ] Secrets deployed: `ls -la ~/.config/sops/age/keys.txt`
+- [ ] SOPS agent loaded: `launchctl list | grep sops` (darwin only)
+- [ ] Secrets directory exists: `ls -la ~/.config/sops-nix/secrets/`
+- [ ] Git signing key: `git config --get user.signingkey`
+- [ ] Signing key symlink: `ls -la ~/.radicle/keys/radicle`
+- [ ] Age keys synced: `ls -la ~/.config/sops/age/keys.txt`
 - [ ] Shell configured: Check your shell prompt, aliases
 - [ ] Tools available: `which git gh just ripgrep fd bat`
 
@@ -228,6 +260,23 @@ After activation, verify:
 - No conflicts - each user manages their own profile
 
 ## Troubleshooting
+
+### SOPS secrets not deployed (symlinks missing)
+
+If `~/.radicle/keys/radicle` or other secret symlinks are missing:
+
+```bash
+# Check if SOPS agent is loaded (darwin)
+launchctl list | grep sops
+
+# If not loaded, load it
+just sops-load-agent
+
+# Verify secrets directory created
+ls -la ~/.config/sops-nix/secrets/
+```
+
+The SOPS launchd agent (darwin) or systemd service (linux) must be running to deploy secrets.
 
 ### Secrets won't decrypt
 
