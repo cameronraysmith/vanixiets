@@ -1244,3 +1244,53 @@ sops-rotate:
 [group('sops')]
 update-all-keys:
   fd -e yaml -e json . secrets/ -x sops updatekeys -y {}
+
+# Load SOPS launchd agent for standalone home-manager (darwin only, one-time setup)
+[group('sops')]
+sops-load-agent:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  # Check if we're on darwin
+  if [[ "$OSTYPE" != "darwin"* ]]; then
+    echo "⚠️  This command is only needed on macOS (darwin)"
+    echo "   Linux uses systemd instead of launchd"
+    exit 0
+  fi
+
+  PLIST="$HOME/Library/LaunchAgents/org.nix-community.home.sops-nix.plist"
+
+  # Check if plist exists
+  if [ ! -f "$PLIST" ]; then
+    echo "❌ SOPS plist not found: $PLIST"
+    echo "   Run 'just activate' first to create the plist"
+    exit 1
+  fi
+
+  # Check if already loaded
+  if launchctl list | grep -q "org.nix-community.home.sops-nix"; then
+    echo "✓ SOPS agent already loaded"
+    echo "  Secrets directory: ~/.config/sops-nix/secrets/"
+    exit 0
+  fi
+
+  # Load the agent
+  echo "Loading SOPS launchd agent..."
+  launchctl load "$PLIST"
+
+  # Brief wait for agent to start
+  sleep 1
+
+  # Verify it loaded
+  if launchctl list | grep -q "org.nix-community.home.sops-nix"; then
+    echo "✓ SOPS agent loaded successfully"
+    echo "  Secrets directory: ~/.config/sops-nix/secrets/"
+    echo ""
+    echo "  The agent will:"
+    echo "  • Persist across reboots (plist in ~/Library/LaunchAgents)"
+    echo "  • Automatically decrypt and deploy secrets"
+    echo "  • Create symlinks from module paths to secrets directory"
+  else
+    echo "❌ Failed to load SOPS agent"
+    exit 1
+  fi
