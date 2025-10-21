@@ -167,12 +167,16 @@ SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/users/<sopsIdentif
 
 If successful, you'll see your decrypted signing key.
 
-### Step 7: Build configuration
+### Step 7: Verify configuration builds
 
 ```bash
-# From nix-config repository
-nix build '.#homeConfigurations."<username>@<hostname>".activationPackage'
+# Verify flake and build configuration (auto-detects home-manager)
+just verify
 ```
+
+This runs:
+- `nix flake check` to validate the entire flake
+- Auto-detects and builds your home-manager configuration
 
 ### Step 8: Activate
 
