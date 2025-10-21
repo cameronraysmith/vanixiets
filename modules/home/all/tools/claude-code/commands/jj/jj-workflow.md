@@ -1057,6 +1057,17 @@ Workflow:
 - After git operations, check `jj log` to see imported changes
 - Operation log tracks git operations as "import git refs"
 
+Note on detached HEAD:
+jj operates in "detached HEAD" mode (git terminology). This is normal and does not affect jj operations - `jj git push --bookmark <name>` works correctly without an attached HEAD. Only attach HEAD if switching to git-native workflows:
+
+```bash
+# Attach HEAD to branch (only needed when using git commands directly)
+git checkout main
+git switch main      # Modern git (v2.23+)
+```
+
+jj operations may detach HEAD again. This is expected behavior.
+
 ### Remote synchronization
 
 ```bash
