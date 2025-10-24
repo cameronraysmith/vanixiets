@@ -1,6 +1,6 @@
 # Dendritic + Clan integration documentation
 
-This directory contains comprehensive documentation for migrating nix-config from nixos-unified to the dendritic flake-parts pattern with clan-core integration.
+This directory contains comprehensive documentation for migrating nix-config from nixos-unified to the dendritic flake-parts pattern with clan-core integration using a VPS-first infrastructure approach.
 
 ## Document overview
 
@@ -9,70 +9,88 @@ This directory contains comprehensive documentation for migrating nix-config fro
 **Contents**:
 - Repository analysis (current nix-config, dendritic pattern, clan architecture)
 - Integration strategy and architectural decisions
-- Directory structure (dendritic flat categories)
+- Directory structure (dendritic flat categories with terraform/)
 - Module integration patterns (flake.modules.* namespace)
 - Secrets management with clan vars
-- Migration phases (blackphos → rosegold → argentum → stibnite)
+- Migration phases (cinnabar VPS → blackphos → rosegold → argentum → stibnite)
 - Key decisions and tradeoffs
 - References to dendritic and clan examples
 
 **When to read**: Start here for complete context and strategic overview
 
-### 01-phase-1-guide.md
-**Purpose**: Step-by-step implementation guide for Phase 1 (blackphos migration)
+### 01-phase-1-vps-deployment.md
+**Purpose**: Step-by-step implementation guide for Phase 1 (cinnabar VPS deployment)
 **Contents**:
-- Prerequisites and preparation
-- 15 detailed migration steps (inputs, dendritic structure, blackphos deployment)
-- Code examples using dendritic patterns
+- Prerequisites and Hetzner Cloud setup
+- Terraform/terranix configuration for VPS provisioning
+- Dendritic + clan infrastructure setup
+- Disko configuration (LUKS encryption)
+- Core services deployment (zerotier controller, sshd, emergency access)
+- Validation procedures and troubleshooting
+- Cost management and cleanup procedures
+
+**When to read**: When ready to implement Phase 1 (deploying cinnabar VPS as foundation infrastructure)
+
+### 02-phase-2-blackphos-guide.md
+**Purpose**: Step-by-step implementation guide for Phase 2 (first darwin host migration)
+**Contents**:
+- Prerequisites (Phase 1 completion required)
+- Darwin module conversion to dendritic pattern
+- Connecting to cinnabar's zerotier network as peer
+- Home-manager integration
 - Validation procedures
-- Troubleshooting guide
-- Guidance for rosegold, argentum, stibnite migrations
+- Guidance for subsequent darwin hosts
 
-**When to read**: When ready to implement Phase 1 (migrating blackphos to dendritic + clan)
+**When to read**: After Phase 1 completed and cinnabar VPS stable (1-2 weeks)
 
-### 02-migration-assessment.md
+**Status note**: This guide is being updated to reflect VPS-first workflow. Core steps remain valid but assume Phase 1 infrastructure already exists.
+
+### 03-migration-assessment.md
 **Purpose**: Validation criteria and assessment for each migration phase
 **Contents**:
-- Host-specific analysis (blackphos, rosegold, argentum, stibnite)
+- Host-specific analysis (cinnabar VPS, blackphos, rosegold, argentum, stibnite)
 - Per-phase success criteria and validation tests
 - Migration scenarios with concrete validation procedures
 - Decision framework (when to proceed vs. pause)
-- Recommended conservative timeline (8-12 weeks)
+- Recommended conservative timeline (10-14 weeks with VPS)
 - Rollback procedures
 
 **When to read**: Throughout migration to evaluate readiness for each phase and validate success
 
 ## Quick start
 
-### For immediate implementation (Phase 1: blackphos)
+### For immediate implementation (Phase 1: cinnabar VPS)
 
-1. Read `00-integration-plan.md` (45-60 minutes) - understand dendritic pattern and migration strategy
-2. Review prerequisites in `01-phase-1-guide.md`
-3. Follow Phase 1 implementation steps 1-15 sequentially
-4. Deploy to blackphos and validate
-5. Monitor stability for 1-2 weeks before proceeding
+1. Read `00-integration-plan.md` (45-60 minutes) - understand VPS-first approach and dendritic pattern
+2. Review prerequisites in `01-phase-1-vps-deployment.md`
+3. Set up Hetzner Cloud account and generate API token
+4. Follow Phase 1 implementation steps sequentially
+5. Deploy cinnabar VPS and validate infrastructure
+6. Monitor stability for 1-2 weeks before darwin migration
 
 ### For planning and evaluation
 
 1. Skim `00-integration-plan.md` executive summary
-2. Review "Dendritic flake-parts pattern" and "Integration strategy"
-3. Read "Migration phases" section for host order rationale
-4. Review `02-migration-assessment.md` for per-host validation criteria
+2. Review "VPS-first infrastructure approach" rationale
+3. Read "Migration phases" section for complete workflow
+4. Review `03-migration-assessment.md` for per-host validation criteria
 
-### After Phase 1 (blackphos deployed)
+### After Phase 1 (cinnabar VPS deployed)
 
-1. Monitor blackphos stability for 1-2 weeks
-2. Document any issues or pattern refinements needed
-3. Review `02-migration-assessment.md` Scenario 2 for rosegold readiness
-4. Proceed to Phase 2 (rosegold) when blackphos proven stable
+1. Monitor cinnabar stability for 1-2 weeks
+2. Verify zerotier controller operational
+3. Document any issues or pattern refinements needed
+4. Review `03-migration-assessment.md` Phase 2 readiness criteria
+5. Proceed to Phase 2 (blackphos) when cinnabar proven stable
 
 ### Progressive migration workflow
 
-**Phase 1** (Week 0-2): Migrate blackphos, validate dendritic + clan patterns
-**Phase 2** (Week 3-5): Migrate rosegold, validate multi-machine coordination
-**Phase 3** (Week 6-8): Migrate argentum, validate 3-machine network
-**Phase 4** (Week 9-11): Migrate stibnite (primary workstation, highest risk)
-**Phase 5** (Week 12+): Cleanup (remove nixos-unified, old configs)
+**Phase 1** (Week 0-2): Deploy cinnabar VPS, validate dendritic + clan on NixOS, establish zerotier controller
+**Phase 2** (Week 3-5): Migrate blackphos, validate darwin + clan integration, connect to zerotier network
+**Phase 3** (Week 6-8): Migrate rosegold, validate multi-darwin coordination
+**Phase 4** (Week 9-11): Migrate argentum, final validation before primary workstation
+**Phase 5** (Week 12-14): Migrate stibnite (primary workstation, highest risk)
+**Phase 6** (Week 15+): Cleanup (remove nixos-unified, old configs)
 
 ## Key concepts
 
@@ -91,10 +109,18 @@ This directory contains comprehensive documentation for migrating nix-config fro
 ```
 modules/
 ├── base/           # Foundation (nix settings, state versions)
+├── nixos/          # NixOS-specific modules
 ├── darwin/         # Darwin-specific modules
 ├── shell/          # Shell tools (fish, starship)
 ├── dev/            # Development tools (git, languages)
 ├── hosts/          # Machine-specific compositions
+│   ├── cinnabar/   # VPS infrastructure
+│   ├── blackphos/  # Darwin hosts
+│   ├── rosegold/
+│   ├── argentum/
+│   └── stibnite/
+├── flake-parts/    # Flake-level modules (clan inventory, terranix)
+├── terranix/       # Terraform/terranix modules
 └── users/          # User metadata and configurations
 ```
 
@@ -231,37 +257,46 @@ nix eval .#clan.inventory --json
 
 ## Success metrics per migration phase
 
-### Phase 1 (blackphos)
+### Phase 1 (cinnabar VPS)
+- [ ] Hetzner Cloud VPS provisioned via terraform
 - [ ] Dendritic module structure created and operational
-- [ ] blackphos builds with dendritic + clan
-- [ ] All functionality preserved (no regressions)
+- [ ] NixOS installed with LUKS encryption
 - [ ] Clan vars deployed successfully
-- [ ] Zerotier controller operational on blackphos
+- [ ] Zerotier controller operational on cinnabar
+- [ ] SSH access functional
 - [ ] Stable for 1-2 weeks
-- [ ] Other hosts (stibnite, rosegold, argentum) still build with nixos-unified
+- [ ] Darwin hosts (stibnite, blackphos, rosegold, argentum) still build with nixos-unified
 
-### Phase 2 (rosegold)
+### Phase 2 (blackphos)
+- [ ] blackphos builds with dendritic + clan (darwin modules converted)
+- [ ] All functionality preserved (no regressions)
+- [ ] Zerotier peer connects to cinnabar controller
+- [ ] cinnabar ↔ blackphos network functional
+- [ ] SSH via zerotier works (certificate-based)
+- [ ] Stable for 1-2 weeks
+
+### Phase 3 (rosegold)
 - [ ] rosegold builds using blackphos patterns (minimal changes)
-- [ ] Zerotier peer connects to blackphos controller
-- [ ] 2-machine network functional (blackphos ↔ rosegold)
+- [ ] Zerotier peer connects to cinnabar controller
+- [ ] 3-machine network functional (cinnabar ↔ blackphos ↔ rosegold)
 - [ ] Patterns confirmed reusable
 - [ ] Stable for 1-2 weeks
 
-### Phase 3 (argentum)
+### Phase 4 (argentum)
 - [ ] argentum builds using established patterns
-- [ ] 3-machine zerotier network operational
+- [ ] 4-machine zerotier network operational
 - [ ] No new issues discovered
 - [ ] Stable for 1-2 weeks
 - [ ] Ready for stibnite migration
 
-### Phase 4 (stibnite)
+### Phase 5 (stibnite)
 - [ ] stibnite builds using proven patterns
 - [ ] All daily workflows functional
 - [ ] No productivity loss
-- [ ] 4-machine network complete
+- [ ] 5-machine network complete (cinnabar + 4 darwin)
 - [ ] Stable for 1-2 weeks
 
-### Phase 5 (cleanup)
+### Phase 6 (cleanup)
 - [ ] All hosts migrated successfully
 - [ ] nixos-unified removed
 - [ ] Old configurations cleaned up
