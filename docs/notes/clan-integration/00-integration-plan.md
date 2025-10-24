@@ -7,6 +7,77 @@ The migration follows a validation-first approach with VPS infrastructure: valid
 Phase 0 de-risks the migration by proving the architectural combination works in a minimal test environment before infrastructure commitment.
 The approach validates dendritic + clan on NixOS first, provides always-on infrastructure, and de-risks darwin migration while eliminating nixos-unified and adopting clan-core's inventory system, vars management, and multi-machine service coordination using the dendritic pattern's `flake.modules.*` namespace.
 
+## Strategic rationale: why dendritic pattern with clan?
+
+### Type safety through module system maximization
+
+**Foundation: Nix lacks native type system**
+- Nix language provides no compile-time type checking
+- Errors often appear only at evaluation or runtime
+- Large configurations become difficult to maintain safely
+
+**Solution: Nix module system provides type safety**
+- Options with explicit types (bool, int, str, listOf, attrsOf, etc.)
+- Type checking at evaluation time
+- Clear interfaces between modules
+- Validation of configuration values
+
+**flake-parts extends module system to flakes**
+- Brings module system benefits to flake organization
+- Type-safe flake outputs
+- Composable flake configuration
+- Both clan-core and clan-infra use flake-parts
+
+**Dendritic pattern maximizes module system usage**
+- Every file is a flake-parts module
+- Maximum type safety through consistent module usage
+- Clear interfaces via config.flake.* namespace
+- Eliminates untyped specialArgs pass-through
+
+**Result: incremental type safety improvement**
+- Foundation: clan + flake-parts (proven, documented)
+- Optimization: dendritic organization (experimental)
+- Goal: maximum type safety while preserving clan functionality
+
+### Priority hierarchy
+
+When conflicts arise between dendritic purity and clan functionality:
+
+**1. Primary: clan functionality** (non-negotiable)
+- Multi-machine coordination
+- Inventory system
+- Vars/secrets management
+- Service instances and roles
+- All clan features must work correctly
+
+**2. Secondary: dendritic pattern** (best-effort)
+- Apply where feasible without compromising clan
+- Deviate when necessary for clan compatibility
+- Document compromises and rationale
+
+**3. Tertiary: pattern purity** (flexible)
+- Some specialArgs usage acceptable if clan requires it
+- Mixed organization acceptable if necessary
+- Pragmatism over orthodoxy
+
+**Principle**: preserve clan functionality, optimize with dendritic where possible.
+
+### What Phase 0 validates
+
+**Not**: "can we combine two untested patterns?"
+**Yes**: "how much dendritic can we apply to proven clan+flake-parts?"
+
+**Known foundation**:
+- Clan works with flake-parts (clan-core, clan-infra use it)
+- Dendritic pattern works (multiple production examples)
+
+**Unknown optimization**:
+- How much dendritic organization is compatible with clan?
+- Where do dendritic patterns need to be relaxed?
+- What compromises are necessary and acceptable?
+
+**Phase 0 answers**: "what's the optimal dendritic/clan balance?"
+
 ## Repository analysis
 
 ### Current nix-config architecture (pre-migration)
