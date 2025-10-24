@@ -776,6 +776,58 @@ After completing all steps:
 - [ ] Patterns documented for cinnabar: `PATTERNS.md` created
 - [ ] (Optional) Deployment tested: test-vm deployed successfully
 
+### Critical integration point tests
+
+**These tests explicitly validate the untested dendritic + clan combination:**
+
+- [ ] **Integration 1: import-tree + clan flakeModules coexistence**
+  ```bash
+  # Verify both import-tree and clan flakeModules load without conflicts
+  nix eval .#_module.args --json | jq 'has("inputs")'
+  nix eval .#clan --json | jq 'has("inventory")'
+  ```
+  Expected: Both evaluate successfully, no attribute collisions
+
+- [ ] **Integration 2: Dendritic modules access clan inventory**
+  ```bash
+  # Test that dendritic modules can read from clan inventory
+  nix eval .#nixosConfigurations.test-vm.config.clan.inventory.machines.test-vm --json
+  ```
+  Expected: Inventory accessible from nixosConfiguration
+
+- [ ] **Integration 3: Clan services work with dendritic namespace**
+  ```bash
+  # Verify clan services configured correctly in dendritic structure
+  nix eval .#nixosConfigurations.test-vm.config.services.zerotier-one.enable
+  nix eval .#nixosConfigurations.test-vm.config.services.openssh.enable
+  ```
+  Expected: Both return `true`, services configured by clan
+
+- [ ] **Integration 4: specialArgs vs dendritic pattern compatibility**
+  ```bash
+  # Check if clan's specialArgs usage conflicts with dendritic approach
+  nix eval .#clan.specialArgs --json
+  ```
+  Expected: specialArgs only contain essential values (inputs), not extensive pass-through
+
+- [ ] **Integration 5: Clan vars work with import-tree organization**
+  ```bash
+  # Verify vars generation works with dendritic module structure
+  nix run nixpkgs#clan-cli -- vars generate test-vm
+  nix run nixpkgs#clan-cli -- vars list test-vm | grep -E "(luks|zerotier|emergency)"
+  ```
+  Expected: All expected vars generated successfully
+
+- [ ] **Integration 6: nixosConfigurations + clan inventory coexistence**
+  ```bash
+  # Verify both configuration systems coexist
+  nix eval .#nixosConfigurations --apply builtins.attrNames
+  nix eval .#clan.inventory.machines --apply builtins.attrNames
+  ```
+  Expected: test-vm appears in both, no conflicts
+
+**If any integration test fails:** Document the failure, determine if it's a blocker or can be worked around, update findings accordingly.
+
 ## Evaluation framework: assessing dendritic feasibility
 
 Phase 0 determines how much dendritic pattern can be applied while preserving clan functionality.
