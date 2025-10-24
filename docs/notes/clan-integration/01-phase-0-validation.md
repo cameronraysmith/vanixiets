@@ -1035,20 +1035,68 @@ mv modules/constants.nix lib/constants.nix
 6. **specialArgs**: Managed by clan configuration, accessed in dendritic modules
 7. **Module discovery**: import-tree discovers all modules including flake-parts/clan.nix
 
-## Success criteria
+## Success criteria: evaluating Phase 0 outcomes
 
-Phase 0 is successful when:
+Phase 0 is successful when it provides **clear answers** about dendritic feasibility with clan, regardless of whether full dendritic pattern is achievable.
 
-- ✅ test-clan repository builds successfully
-- ✅ import-tree discovers all dendritic modules correctly
-- ✅ Clan inventory evaluates without errors
-- ✅ Essential clan services configured (emergency-access, sshd, zerotier)
-- ✅ Clan vars/secrets system initialized and functional
-- ✅ Integration points tested and documented
-- ✅ Patterns validated and extracted for cinnabar deployment
-- ✅ Reference implementation ready for nix-config migration
-- ✅ Integration findings document completed
-- ✅ No critical blockers or unresolved issues
+### Required outcomes (must achieve all)
+
+**Technical validation**:
+- [ ] test-clan/ repository builds successfully
+- [ ] Clan functionality works (inventory, vars, services)
+- [ ] Multi-machine coordination operational (if tested with multiple VMs)
+- [ ] Secrets/vars system functional
+- [ ] At least one deployment successful (VM or test machine)
+
+**Integration characterization**:
+- [ ] Documented: what dendritic patterns work cleanly with clan
+- [ ] Documented: where compromises are necessary
+- [ ] Documented: specific clan features requiring dendritic violations
+- [ ] Evaluated: type safety benefits gained vs complexity added
+
+**Decision readiness**:
+- [ ] Clear recommendation: full dendritic / hybrid / vanilla clan
+- [ ] Rationale: why recommendation is appropriate
+- [ ] Patterns identified: specific approach for Phase 1 (cinnabar)
+- [ ] Compromises accepted: documented deviations with justification
+
+### Outcome scenarios (all valid)
+
+**Outcome 1: dendritic-optimized clan** (best case)
+- Most code follows dendritic pattern
+- Minimal compromises needed
+- Clear type safety benefits
+- Code clearer than alternatives
+→ Proceed to Phase 1 with dendritic+clan
+
+**Outcome 2: hybrid approach** (pragmatic)
+- Dendritic where compatible
+- Standard clan patterns where necessary
+- Mixed organization documented
+- Net benefit positive but modest
+→ Proceed to Phase 1 with hybrid pattern
+
+**Outcome 3: vanilla clan** (proven alternative)
+- Dendritic compromises too extensive
+- Standard clan+flake-parts simpler
+- Complexity outweighs type safety gains
+- Follow clan-infra pattern
+→ Proceed to Phase 1 with vanilla clan
+
+**All three outcomes are successful Phase 0 completions.**
+
+Success = informed decision, not necessarily full dendritic adoption.
+
+### Failure criteria (restart Phase 0)
+
+Phase 0 fails only if:
+- Cannot get clan working at all (with or without dendritic)
+- Cannot build test-clan/ repository
+- Cannot evaluate integration trade-offs
+- No clear pattern identified for Phase 1
+
+Technical clan functionality is required.
+Full dendritic pattern is aspirational.
 
 ## Next steps: Phase 1 (cinnabar VPS deployment)
 
