@@ -339,7 +339,7 @@ modules/
 - nixos-unified uses specialArgs + directory-based autowire
 - Dendritic eliminates specialArgs in favor of `config.flake.*`
 - These approaches are mutually exclusive (cannot coexist cleanly)
-- clan-infra production infrastructure uses dendritic pattern, not nixos-unified
+- clan-infra production infrastructure uses clan + flake-parts with manual imports, not nixos-unified
 - Decision: **Abandon nixos-unified** in favor of dendritic + clan
 
 **Migration approach**:
@@ -1014,10 +1014,10 @@ Reference repository analysis reveals:
 **Chosen**: Abandon nixos-unified, adopt dendritic pattern
 **Rationale**:
 - Dendritic + clan architectural alignment (both eliminate specialArgs)
-- clan-infra production infrastructure uses dendritic, not nixos-unified
+- clan-infra production infrastructure uses clan + flake-parts (with manual imports), demonstrating clan viability
 - Cleaner `flake.modules.*` namespace vs directory autowire
 - import-tree auto-discovery more flexible than directory scanning
-- Proven scalability (drupol-dendritic-infra, clan-infra)
+- Proven dendritic scalability (drupol-dendritic-infra); proven clan scalability (clan-infra)
 
 **Tradeoff**: Migration effort, but progressive per-host approach mitigates risk
 
@@ -1109,11 +1109,11 @@ Reference repository analysis reveals:
 - Getting started: `~/projects/nix-workspace/clan-core/docs/site/getting-started/`
 
 ### Example repositories
-- clan-infra: `~/projects/nix-workspace/clan-infra` (production, uses dendritic)
+- clan-infra: `~/projects/nix-workspace/clan-infra` (production clan + flake-parts with manual imports)
 - clan-core: `~/projects/nix-workspace/clan-core` (monorepo with modules and CLI)
 - Supporting clan examples:
   - `~/projects/nix-workspace/jfly-clan-snow/` (darwin + clan)
-  - `~/projects/nix-workspace/mic92-clan-dotfiles/` (comprehensive, dendritic + clan)
+  - `~/projects/nix-workspace/mic92-clan-dotfiles/` (comprehensive clan usage)
   - `~/projects/nix-workspace/pinpox-clan-nixos/` (custom clan services)
 
 ### Local references
