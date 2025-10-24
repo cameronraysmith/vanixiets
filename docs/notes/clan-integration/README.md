@@ -384,7 +384,7 @@ nix eval .#clan.inventory --json
 - Architecture decisions: `~/projects/nix-workspace/clan-core/docs/site/decisions/`
 
 ### Example repositories
-- clan-infra: `~/projects/nix-workspace/clan-infra` (production dendritic + clan)
+- clan-infra: `~/projects/nix-workspace/clan-infra` (production clan + flake-parts with manual imports)
 - clan-core: `~/projects/nix-workspace/clan-core` (modules and CLI)
 - jfly-clan-snow: `~/projects/nix-workspace/jfly-clan-snow/` (darwin + clan example)
 
