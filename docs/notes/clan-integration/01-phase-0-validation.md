@@ -244,7 +244,7 @@ modules/
     # Automatic garbage collection
     nix.gc = {
       automatic = true;
-      dates = [ "weekly" ];
+      dates = "weekly";
     };
 
     # Basic packages
