@@ -1,21 +1,21 @@
-# Interactive Clan integration prompt for Claude Code
+# Interactive dendritic + clan migration prompt for Claude Code
 
-Use this prompt to initiate an interactive Clan integration session.
+Use this prompt to initiate an interactive dendritic + clan migration session.
 
 ---
 
-# Clan integration interactive experimentation guide
+# Dendritic + clan migration interactive guide
 
 ## Context and objectives
 
-I want to experimentally integrate Clan (clan.lol) capabilities into my nixos-unified based nix-config repository at `~/projects/nix-workspace/nix-config`.
-This is exploratory work to understand Clan's inventory, vars, and multi-machine coordination systems before committing to full deployment.
+I want to migrate my nixos-unified based nix-config repository at `~/projects/nix-workspace/nix-config` to the dendritic flake-parts pattern with clan-core integration.
+This migration will transition darwin hosts (blackphos, rosegold, argentum, stibnite) from nixos-unified to dendritic's `flake.modules.*` namespace with clan's multi-machine coordination and vars management.
 
 ## Your role
 
-Guide me through a progressive, interactive experimentation process with Clan integration.
-Start with minimal local exploration, validate my understanding at each step, and only proceed to more complex stages when I'm comfortable.
-Prioritize safety (preserve existing configurations), education (explain concepts), and interactivity (pause for my input and questions).
+Guide me through a progressive, interactive migration to dendritic + clan.
+Start with understanding dendritic patterns, validate my understanding at each step, and only proceed to host migration when patterns are clear.
+Prioritize safety (parallel environment, preserve rollback), education (explain dendritic and clan concepts), and interactivity (pause for my input and questions).
 
 ## Required reading for you
 
@@ -49,69 +49,92 @@ Before beginning, read and internalize these documents I've prepared:
 - `~/projects/nix-workspace/clan-core/clanServices/` - Example Clan service implementations
 - `~/projects/nix-workspace/clan-infra/` - Production infrastructure examples
 
-## Experimentation progression
+## Migration progression
 
 Guide me through these stages progressively, with checkpoints between each:
 
-### Stage 1: Local exploration (minimal risk)
+### Stage 1: Dendritic pattern exploration (minimal risk)
 
-**Objective**: Understand Clan abstractions without deployment
-
-**Tasks**:
-
-1. Add clan-core flake input to `flake.nix` with appropriate follows
-2. Create minimal `modules/flake-parts/clan.nix` importing clan-core.flakeModules.default
-3. Define empty inventory structure
-4. Verify flake evaluates: `nix flake check`
-5. Explore Clan outputs: `nix flake show`, `nix eval .#clan.inventory --json`
-6. Examine clan-cli capabilities: `nix run nixpkgs#clan-cli -- --help`
-
-**Checkpoint**: Stop and ask if I understand inventory, machines, and instances concepts before proceeding.
-
-### Stage 2: Vars system experimentation (low risk)
-
-**Objective**: Test declarative secret generation locally
+**Objective**: Understand dendritic flake-parts pattern without migration
 
 **Tasks**:
 
-1. Initialize Clan secrets structure: `secrets/clan/{groups,machines,secrets,users}/`
-2. Generate age key: `nix run nixpkgs#clan-cli -- secrets key generate`
-3. Set up admin group and add self as admin
-4. Create a simple vars generator (e.g., test password hash)
-5. Generate vars for a test machine
-6. Inspect generated files in `secrets/clan/`
-7. Understand `.path` vs `.value` for secret vs public files
+1. Read dendritic pattern documentation: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
+2. Examine production examples: `~/projects/nix-workspace/drupol-dendritic-infra/`
+3. Add clan-core and import-tree flake inputs to `flake.nix`
+4. Update flake outputs to use import-tree: `inputs.import-tree ./modules`
+5. Create dendritic directory structure: `modules/{base,darwin,shell,dev,hosts,users}/`
+6. Verify flake evaluates with import-tree: `nix flake check`
+7. Understand `flake.modules.{darwin,homeManager,nixos}.*` namespace concept
+8. Explore how import-tree discovers modules: `fd -e nix . modules/`
 
-**Checkpoint**: Verify I understand vars generators, prompts, dependencies, and storage before proceeding.
+**Checkpoint**: Stop and ask if I understand dendritic pattern, import-tree auto-discovery, and flake.modules.* namespace before proceeding.
 
-### Stage 3: Local VM testing (medium risk, optional)
+### Stage 2: Module conversion to dendritic (low-medium risk)
 
-**Objective**: Test full Clan workflow without cloud infrastructure
+**Objective**: Convert existing modules to dendritic pattern
 
 **Tasks**:
 
-1. Create `configurations/nixos/remote/test-vm.nix` using Clan patterns
-2. Add to clan inventory in `modules/flake-parts/clan.nix`
-3. Add basic Clan services (emergency-access, sshd)
-4. Generate vars: `nix run .#clan-cli -- vars generate test-vm`
-5. Build VM: `nix build .#nixosConfigurations.test-vm.config.system.build.vm`
-6. Run VM locally: `./result/bin/run-*-vm`
-7. Test deployment workflow to VM
+1. Create base modules in dendritic pattern:
+   - `modules/base/nix.nix`: Define `flake.modules.darwin.base-nix`
+   - `modules/base/system.nix`: Define `flake.modules.darwin.base-system`
+2. Convert shell modules:
+   - `modules/shell/fish.nix`: Define both `darwin.shell-fish` and `homeManager.shell-fish`
+3. Convert development tools:
+   - `modules/dev/git/git.nix`: Define `homeManager.dev-git` with metadata references
+4. Create user metadata module:
+   - `modules/users/crs58/default.nix`: Define `flake.meta.users.crs58` and user modules
+5. Create flake-parts host-machines module:
+   - `modules/flake-parts/host-machines.nix`: Auto-generate darwinConfigurations
+6. Verify module namespace populated: `nix eval .#flake.modules.darwin --apply builtins.attrNames`
 
-**Checkpoint**: Ask if I want to proceed to real remote deployment or continue experimenting locally.
+**Checkpoint**: Verify I understand module conversion patterns, metadata sharing, and host generation before proceeding.
 
-### Stage 4: Remote deployment (Phase 1, production)
+### Stage 3: blackphos migration (medium risk)
 
-**Objective**: Deploy first Clan-managed remote host
+**Objective**: Migrate first darwin host to dendritic + clan
 
-**Tasks**: Follow `01-phase-1-guide.md` steps 1-15 exactly
+**Tasks**: Follow `01-phase-1-guide.md` steps 1-15
 
-- Only proceed if I explicitly confirm readiness
-- Recommend starting with cheapest Hetzner instance (CX11)
-- Validate each step before proceeding to next
-- Create atomic git commits as work progresses
+1. Create clan inventory in `modules/flake-parts/clan.nix`
+2. Define all four hosts with tags and machineClass
+3. Add clan service instances (emergency-access, users, zerotier)
+4. Create blackphos host configuration: `modules/hosts/blackphos/default.nix`
+5. Initialize clan secrets structure
+6. Generate vars for blackphos: `nix run .#clan-cli -- vars generate blackphos`
+7. Build blackphos: `nix build .#darwinConfigurations.blackphos.system`
+8. Deploy to blackphos: `darwin-rebuild switch --flake .#blackphos`
+9. Validate all functionality preserved
+10. Verify zerotier controller operational
+11. Monitor stability for 1-2 weeks
 
-**Checkpoint**: After deployment, evaluate experience and discuss next steps.
+**Checkpoint**: After deployment, evaluate blackphos stability and decide whether to proceed to rosegold.
+
+### Stage 4: Multi-machine coordination (medium-high risk)
+
+**Objective**: Migrate rosegold and argentum, validate multi-machine features
+
+**Tasks**:
+
+1. **rosegold migration**:
+   - Create `modules/hosts/rosegold/default.nix` (reuse blackphos patterns)
+   - Generate vars: `nix run .#clan-cli -- vars generate rosegold`
+   - Deploy: `darwin-rebuild switch --flake .#rosegold`
+   - Test zerotier peer connection to blackphos controller
+   - Validate 2-machine network connectivity
+   - Monitor stability for 1-2 weeks
+2. **argentum migration**:
+   - Create `modules/hosts/argentum/default.nix` (reuse patterns)
+   - Generate vars and deploy
+   - Test 3-machine zerotier mesh network
+   - Validate pattern stability across three hosts
+   - Monitor stability for 1-2 weeks
+3. **Evaluation**:
+   - Assess whether to migrate stibnite (primary workstation)
+   - See `02-migration-assessment.md` for stibnite considerations
+
+**Checkpoint**: After all test hosts stable, discuss stibnite migration readiness and timeline.
 
 ## Your implementation approach
 
@@ -141,29 +164,53 @@ Guide me through these stages progressively, with checkpoints between each:
 
 **Critical constraints**:
 
-- NEVER modify existing host configurations (stibnite, blackphos, etc.)
+- CREATE parallel dendritic environment (modules/ directory alongside configurations/)
+- PRESERVE nixos-unified configurations until migration complete
 - ALWAYS test with `nix flake check` before committing
-- CREATE separate directories for Clan-specific files
-- PRESERVE existing secrets structure (dual systems during experimentation)
-- ENABLE easy rollback (git commits per change, clear separation)
+- CREATE atomic git commits for each logical change
+- ENABLE easy rollback (preserve old configs, git history)
 - VALIDATE each step succeeds before proceeding
+- MIGRATE one host at a time (blackphos → rosegold → argentum → stibnite)
 
 **If anything breaks**:
 
 1. Stop immediately
 2. Show me the error
 3. Explain what happened
-4. Propose troubleshooting steps or rollback
+4. Propose troubleshooting steps or rollback to previous commit
 5. Wait for my decision before acting
 
 ## Interactive teaching points
 
 At appropriate moments, explain these concepts using examples from the repositories:
 
+**Dendritic pattern**:
+
+- Eliminate specialArgs in favor of `config.flake.*` access
+- File path = feature name (clear organization)
+- `flake.modules.*` namespace for all modules
+- Cross-cutting concerns (one module, multiple targets)
+- Examples from `~/projects/nix-workspace/drupol-dendritic-infra/`
+
+**import-tree auto-discovery**:
+
+- Recursively imports all .nix files in modules/
+- Each file is a flake-parts module
+- No manual imports needed
+- Directory structure becomes module hierarchy
+
+**Module composition**:
+
+- Host modules import from `config.flake.modules.*`
+- Combine darwin, homeManager, and nixos modules
+- Metadata sharing via `config.flake.meta.*`
+- Examples from `00-integration-plan.md`
+
 **Inventory system**:
 
 - How machines, tags, instances, and roles relate
 - Configuration hierarchy (instance → role → machine)
+- Service distribution across machines
 - Examples from `~/projects/nix-workspace/clan-infra/machines/flake-module.nix`
 
 **Vars system**:
@@ -173,30 +220,26 @@ At appropriate moments, explain these concepts using examples from the repositor
 - Storage backends and deployment
 - Examples from `~/projects/nix-workspace/clan-core/clanServices/sshd/default.nix`
 
-**Clan services**:
+**Migration strategy**:
 
-- `_class = "clan.service"` module type
-- perInstance vs perMachine
-- Role interfaces and settings
-- Examples from `~/projects/nix-workspace/clan-core/clanServices/`
-
-**Integration with nixos-unified**:
-
-- How flake-parts composition works
-- Module auto-wiring
-- Coexistence of Clan and non-Clan hosts
-- Directory organization patterns
+- Parallel environment (dendritic + nixos-unified coexist)
+- Progressive per-host migration
+- Validation gates between phases
+- Rollback safety (preserve old configs)
 
 ## Success criteria
 
-I'll know experimentation is successful when:
+I'll know migration is successful when:
 
-- ✅ Flake builds cleanly with Clan integrated
-- ✅ I can articulate how inventory maps to NixOS configurations
-- ✅ I can create and generate vars for a machine
-- ✅ I understand when to use Clan services vs plain modules
-- ✅ Existing local hosts build and function identically
-- ✅ I can deploy a configuration to a test machine (VM or remote)
+- ✅ Understand dendritic pattern and `flake.modules.*` namespace
+- ✅ Can convert existing modules to dendritic pattern
+- ✅ import-tree auto-discovery works correctly
+- ✅ blackphos builds and deploys with dendritic + clan
+- ✅ All functionality preserved after migration
+- ✅ Clan inventory and vars system operational
+- ✅ Zerotier multi-machine network functional (blackphos controller, others as peers)
+- ✅ Can articulate how to migrate remaining hosts (rosegold, argentum, stibnite)
+- ✅ Confidence in dendritic + clan approach for all hosts
 
 ## Flexibility and adaptation
 
@@ -209,35 +252,38 @@ I'll know experimentation is successful when:
 
 **Handle different paths**:
 
-- I might want to skip VM testing and go straight to remote
-- I might want to explore specific Clan services in depth
-- I might discover I don't need Clan after Stage 1-2
-- I might want to focus on specific use cases (backups, networking, etc.)
+- I might want to skip pattern exploration and go straight to migration
+- I might want to focus on specific module types (shell, development, etc.)
+- I might discover dendritic pattern doesn't fit after Stage 1-2
+- I might want to migrate multiple hosts quickly vs. conservative timeline
+- I might want to defer stibnite migration indefinitely
 
 **Respond to issues**:
 
-- Clan abstractions feel too complex → simplify explanations, more examples
-- Integration conflicts with existing setup → troubleshoot, propose alternatives
-- I want to try something not in the plan → support exploration while noting risks
-- Documentation unclear → read relevant Clan docs, provide clearer explanation
+- Dendritic pattern feels too complex → simplify explanations, more examples
+- Module conversion unclear → show concrete before/after examples
+- import-tree not discovering modules → troubleshoot file structure
+- Migration conflicts with existing setup → propose fixes or rollback
+- I want to try alternative patterns → support exploration while noting tradeoffs
+- Documentation unclear → read relevant docs, provide clearer explanation
 
 ## Questions to ask me at start
 
 Before beginning Stage 1, ask me:
 
-1. **Time commitment**: How much time do you have for this session? (This helps me pace appropriately)
-2. **Goals**: What do you most want to understand about Clan? (inventory, vars, services, deployment, all of it?)
+1. **Time commitment**: How much time do you have for this migration? (This helps me pace appropriately)
+2. **Goals**: What do you most want to accomplish? (understand dendritic, migrate all hosts, just blackphos, pattern exploration?)
 3. **Risk tolerance**: Should we be extra cautious or can we move at a normal pace?
-4. **End goal**: Are you planning to eventually deploy remote hosts, or just exploring Clan as a concept?
-5. **Preferred learning style**: Learn by doing, or prefer understanding concepts thoroughly before trying?
+4. **End goal**: Are you planning to migrate all four darwin hosts, or just test hosts (blackphos, rosegold, argentum)?
+5. **Preferred learning style**: Learn by doing, or prefer understanding patterns thoroughly before migrating?
 
 Assume the following answers
 
-1. As much as it takes.
-2. All of it.
-3. Normal pace, notify commands and confirm before execution if there is risk involved.
-4. Deploy at least 2 remote hosts to hetzner that can interact with one another and possibly my local machines as well.
-5. Need to do both interleaved with enough of the concepts up front that the doing is well-informed.
+1. As much as it takes (migration can span several weeks with stability monitoring).
+2. Migrate all four darwin hosts to dendritic + clan (blackphos → rosegold → argentum → stibnite).
+3. Normal pace, notify commands and confirm before execution if there is risk involved. Conservative timeline with 1-2 week stability gates.
+4. Migrate all hosts progressively: test hosts first (blackphos, rosegold, argentum), then primary workstation (stibnite) only after others proven stable.
+5. Need to do both interleaved with enough of the concepts up front that the migration is well-informed. Understand dendritic pattern before migrating, validate each phase before proceeding.
 
 ## Starting point
 
@@ -253,21 +299,22 @@ Then proceed with Stage 1, maintaining interactivity and safety throughout.
 
 ## Exit criteria
 
-We can conclude experimentation when:
+We can conclude migration session when:
 
-- I've achieved my stated goals
-- I've decided Clan isn't right for this use case
-- I've successfully deployed a test host and am ready to operate it
-- I want to pause and research more before proceeding
+- I've achieved current phase goals (e.g., blackphos migrated and stable)
+- I've decided dendritic + clan isn't right for this use case
+- I want to pause and monitor stability before next phase
+- I want to research more before proceeding to next host
 - Any unexpected blockers arise that need separate investigation
 
-At conclusion, summarize:
+At conclusion of each session, summarize:
 
 - What we accomplished
-- Key learnings about Clan
-- Recommended next steps
-- Whether to proceed with Phase 1, continue experimenting, or defer
+- Key learnings about dendritic + clan
+- Current migration state (which hosts migrated)
+- Recommended next steps (stability monitoring, next host, or pause)
+- Whether patterns are validated and ready for reuse
 
 ---
 
-**Now: Read all referenced files, understand the context, ask your opening questions, and let's begin the interactive Clan integration experimentation.**
+**Now: Read all referenced files, understand the context, ask your opening questions, and let's begin the interactive dendritic + clan migration.**
