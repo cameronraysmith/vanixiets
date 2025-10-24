@@ -3,9 +3,9 @@
 ## Executive summary
 
 This document provides a comprehensive migration plan for transitioning nix-config from nixos-unified to the dendritic flake-parts pattern with clan-core integration.
-The migration follows a VPS-first infrastructure approach: deploy a Hetzner Cloud VPS (cinnabar) as the foundation with zerotier controller and core services, then migrate darwin hosts progressively (blackphos → rosegold → argentum → stibnite).
-This validates dendritic + clan on NixOS first, provides always-on infrastructure, and de-risks darwin migration.
-The approach eliminates nixos-unified while adopting clan-core's inventory system, vars management, and multi-machine service coordination using the dendritic pattern's `flake.modules.*` namespace.
+The migration follows a validation-first approach with VPS infrastructure: validate dendritic + clan integration in test-clan/ (Phase 0), deploy a Hetzner Cloud VPS (cinnabar) as the foundation with zerotier controller and core services (Phase 1), then migrate darwin hosts progressively (blackphos → rosegold → argentum → stibnite).
+Phase 0 de-risks the migration by proving the architectural combination works in a minimal test environment before infrastructure commitment.
+The approach validates dendritic + clan on NixOS first, provides always-on infrastructure, and de-risks darwin migration while eliminating nixos-unified and adopting clan-core's inventory system, vars management, and multi-machine service coordination using the dendritic pattern's `flake.modules.*` namespace.
 
 ## Repository analysis
 
@@ -762,7 +762,57 @@ clan.core.vars.generators.example = {
 # Use: config.clan.core.vars.generators.example.files.secret.path
 ```
 
+## Phase 0 validation rationale
+
+**Critical discovery**: No production examples exist combining dendritic + clan patterns.
+
+Reference repository analysis reveals:
+- `~/projects/nix-workspace/clan-infra/`: Uses clan WITHOUT dendritic (manual imports)
+- `~/projects/nix-workspace/drupol-dendritic-infra/`: Uses dendritic WITHOUT clan (pure import-tree)
+- `~/projects/nix-workspace/jfly-clan-snow/`: Uses clan WITHOUT dendritic (darwin)
+- `~/projects/nix-workspace/mic92-clan-dotfiles/`: Uses clan WITHOUT dendritic
+
+**Risk without Phase 0**: Deploying untested architectural combination directly to production VPS creates compound debugging complexity across 8 simultaneous layers (dendritic, clan, terraform, hetzner, disko, LUKS, zerotier, NixOS).
+
+**Solution: Phase 0 validation in test-clan/**
+- Validate dendritic + clan integration in minimal environment
+- Test all critical integration points before infrastructure commitment
+- Document findings and extract patterns
+- Prove architectural combination works
+- Reduce risk before VPS deployment
+
+**Expected outcome**: Proven patterns ready for cinnabar deployment with confidence.
+
 ## Migration phases
+
+### Phase 0: Validation (test-clan)
+
+**Objective**: Validate dendritic + clan integration in minimal test environment
+
+**Location**: `~/projects/nix-workspace/test-clan/`
+
+**Tasks**:
+- Convert test-clan from old clan API to dendritic + flake-parts
+- Create minimal dendritic module structure
+- Configure clan inventory with test machine
+- Deploy essential clan services
+- Test all integration points
+- Build nixosConfiguration successfully
+- Document findings and patterns
+
+**Success criteria**:
+- [ ] test-clan flake evaluates successfully
+- [ ] import-tree discovers dendritic modules
+- [ ] Clan inventory evaluates correctly
+- [ ] nixosConfiguration builds
+- [ ] Clan vars generation succeeds
+- [ ] Integration points documented
+- [ ] Patterns extracted for cinnabar
+- [ ] No critical blockers
+
+**Timeline**: 1 week for implementation + validation
+
+**Detailed guide**: `01-phase-0-validation.md`
 
 ### Phase 1: VPS infrastructure (cinnabar)
 
@@ -793,6 +843,8 @@ clan.core.vars.generators.example = {
 
 **Timeline**: 1-2 weeks for deployment + 1-2 weeks monitoring stability
 
+**Detailed guide**: `02-phase-1-vps-deployment.md`
+
 ### Phase 2: First darwin host (blackphos)
 
 **Objective**: Migrate first darwin machine, validate darwin + clan integration
@@ -813,6 +865,8 @@ clan.core.vars.generators.example = {
 - [ ] SSH via zerotier network works (certificate-based)
 - [ ] Secrets deployed via clan vars
 - [ ] Stable for 1-2 weeks
+
+**Detailed guide**: `03-phase-2-blackphos-guide.md`
 
 ### Phase 3: Second darwin host (rosegold)
 
@@ -895,15 +949,16 @@ clan.core.vars.generators.example = {
 
 ### Decision 2: Migration order
 
-**Chosen**: cinnabar (VPS) → blackphos → rosegold → argentum → stibnite
+**Chosen**: test-clan (validation) → cinnabar (VPS) → blackphos → rosegold → argentum → stibnite
 **Rationale**:
+- **Test-clan first**: Validates integration before infrastructure commitment
 - **VPS first**: Validates dendritic + clan on NixOS (clan's native platform) before darwin
 - **Always-on infrastructure**: Provides stable zerotier controller independent of darwin hosts
 - **De-risks darwin migration**: Core services proven working before touching daily-use machines
 - **Progressive validation**: Each host validates patterns before moving to next
 - **Primary workstation last**: stibnite migrated only after all others proven stable
 
-**Tradeoff**: Adds Hetzner Cloud cost (~€24/month), but provides significant risk reduction and operational benefits
+**Tradeoff**: Adds Hetzner Cloud cost (~€24/month) and 1 week validation time, but provides significant risk reduction and operational benefits
 
 ### Decision 3: Clan vars vs. sops-nix/agenix
 
@@ -953,13 +1008,14 @@ clan.core.vars.generators.example = {
 
 ## Next steps
 
-1. **Immediate**: Read `01-phase-1-vps-deployment.md` for detailed VPS deployment steps
-2. **Phase 1**: Deploy cinnabar VPS, validate dendritic + clan on NixOS
-3. **Phase 2**: Migrate blackphos (read `02-phase-2-blackphos-guide.md`), establish darwin patterns
-4. **Phases 3-4**: Migrate rosegold and argentum, validate multi-darwin
-5. **Phase 5**: Migrate stibnite only after all others proven
-6. **Phase 6**: Clean up legacy infrastructure
-7. **Ongoing**: Document learnings, refine patterns
+1. **Immediate**: Read `01-phase-0-validation.md` for dendritic + clan integration validation
+2. **Phase 0**: Validate integration in test-clan/, document findings
+3. **Phase 1**: Deploy cinnabar VPS using proven patterns (read `02-phase-1-vps-deployment.md`)
+4. **Phase 2**: Migrate blackphos (read `03-phase-2-blackphos-guide.md`), establish darwin patterns
+5. **Phases 3-4**: Migrate rosegold and argentum, validate multi-darwin
+6. **Phase 5**: Migrate stibnite only after all others proven
+7. **Phase 6**: Clean up legacy infrastructure
+8. **Ongoing**: Document learnings, refine patterns
 
 ## References
 
