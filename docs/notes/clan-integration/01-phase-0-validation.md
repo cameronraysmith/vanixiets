@@ -776,6 +776,124 @@ After completing all steps:
 - [ ] Patterns documented for cinnabar: `PATTERNS.md` created
 - [ ] (Optional) Deployment tested: test-vm deployed successfully
 
+## Evaluation framework: assessing dendritic feasibility
+
+Phase 0 determines how much dendritic pattern can be applied while preserving clan functionality.
+
+### Evaluation criteria
+
+**Technical validation** (required):
+- [ ] Clan functionality works correctly
+- [ ] All clan services operational
+- [ ] Multi-machine coordination functional
+- [ ] Secrets/vars system working
+
+**Pattern optimization** (best-effort):
+- [ ] How much code uses flake.modules.* namespace?
+- [ ] Where are dendritic compromises necessary?
+- [ ] Are compromises localized or pervasive?
+- [ ] Does dendritic improve clarity or add complexity?
+
+**Trade-off assessment**:
+- Benefits gained: type safety, organization clarity
+- Costs incurred: complexity, maintenance burden, community support
+- Balance: are benefits worth costs?
+
+### Decision scenarios
+
+**Scenario A: clean integration (>80% dendritic)**
+- Minimal compromises required
+- Clan features work with dendritic organization
+- Code is clearer than vanilla clan+flake-parts
+- Type safety benefits realized
+→ **Decision**: proceed with dendritic+clan to Phase 1
+
+**Scenario B: partial integration (40-80% dendritic)**
+- Some dendritic compromises necessary
+- Certain clan features require specialArgs
+- Mixed organization (some dendritic, some standard)
+- Type safety partially improved
+→ **Decision**: use hybrid approach, document deviations
+→ **Evaluation**: assess if partial benefits justify complexity
+
+**Scenario C: minimal integration (<40% dendritic)**
+- Pervasive conflicts with clan patterns
+- Most code requires dendritic violations
+- Marginal type safety improvement
+- Added complexity outweighs benefits
+→ **Decision**: use vanilla clan+flake-parts (clan-infra pattern)
+→ **Rationale**: proven approach, community support, simpler
+
+**Scenario D: fundamental incompatibility**
+- Architectural conflicts prevent clan functionality
+- Essential clan features broken with dendritic
+- No viable compromise path
+→ **Decision**: abandon dendritic, use standard clan
+→ **Pivot**: follow clan-infra organization exactly
+
+### Acceptable compromises
+
+**When dendritic patterns must be relaxed**:
+
+1. **Clan requires specialArgs**:
+   - Document why and where
+   - Minimize usage scope
+   - Acceptable: clan functionality > dendritic purity
+
+2. **Clan modules need standard imports**:
+   - Use standard flake-parts alongside import-tree
+   - Mixed approach acceptable
+   - Acceptable: pragmatic hybrid
+
+3. **Clan services incompatible with flake.modules.***:
+   - Use clan patterns for service definitions
+   - Use dendritic for other modules
+   - Acceptable: best tool for each job
+
+4. **import-tree conflicts with clan discovery**:
+   - Manual imports for clan components
+   - import-tree for other modules
+   - Acceptable: incremental benefit
+
+**Unacceptable compromises**:
+
+1. Breaking clan functionality for dendritic purity
+2. Significant complexity without type safety benefit
+3. Patterns that future contributors cannot understand
+4. Maintenance burden that outweighs benefits
+
+### Alternative: vanilla clan pattern
+
+If Phase 0 shows dendritic adds more complexity than value:
+
+**Reference**: `~/projects/nix-workspace/clan-infra/`
+
+**Organization**:
+- Standard flake-parts (no import-tree)
+- Manual imports in flake.nix
+- Proven clan integration
+- Maintained by clan developers
+- Strong community support
+
+**Benefits**:
+- Well-documented pattern
+- Production-proven
+- Community troubleshooting available
+- Simpler for contributors
+
+**Trade-off**:
+- Less type safety than full dendritic
+- Manual module imports
+- Some specialArgs usage
+
+**When to choose**:
+- Phase 0 shows dendritic conflicts are pervasive
+- Complexity outweighs type safety benefits
+- Team prefers proven patterns
+- Time constraints favor simplicity
+
+This is a **valid, production-proven alternative**, not a failure case.
+
 ## Troubleshooting
 
 ### Issue: Flake evaluation fails with "infinite recursion"
