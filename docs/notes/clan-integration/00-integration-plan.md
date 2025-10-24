@@ -3,8 +3,9 @@
 ## Executive summary
 
 This document provides a comprehensive migration plan for transitioning nix-config from nixos-unified to the dendritic flake-parts pattern with clan-core integration.
-The migration follows a staged host-by-host approach: migrate test machines first (blackphos → rosegold → argentum), validate multi-machine coordination, then migrate the primary workstation (stibnite) last.
-This eliminates nixos-unified while adopting clan-core's inventory system, vars management, and multi-machine service coordination using the dendritic pattern's `flake.modules.*` namespace.
+The migration follows a VPS-first infrastructure approach: deploy a Hetzner Cloud VPS (cinnabar) as the foundation with zerotier controller and core services, then migrate darwin hosts progressively (blackphos → rosegold → argentum → stibnite).
+This validates dendritic + clan on NixOS first, provides always-on infrastructure, and de-risks darwin migration.
+The approach eliminates nixos-unified while adopting clan-core's inventory system, vars management, and multi-machine service coordination using the dendritic pattern's `flake.modules.*` namespace.
 
 ## Repository analysis
 
@@ -21,17 +22,21 @@ This eliminates nixos-unified while adopting clan-core's inventory system, vars 
 
 **Current hosts**:
 - `stibnite` (darwin, aarch64): Primary daily workstation (migrate LAST)
-- `blackphos` (darwin, aarch64): Already activated, test migration first (migrate FIRST)
-- `rosegold` (darwin, aarch64): Not currently in daily use (migrate SECOND)
-- `argentum` (darwin, aarch64): Not currently in daily use (migrate THIRD)
+- `blackphos` (darwin, aarch64): Already activated, test migration (Phase 2)
+- `rosegold` (darwin, aarch64): Not currently in daily use (Phase 3)
+- `argentum` (darwin, aarch64): Not currently in daily use (Phase 4)
 - `stibnite-nixos`, `blackphos-nixos` (nixos): CI validation mirrors
 - `orb-nixos` (nixos): OrbStack/LXD test configurations
 
+**New infrastructure (Phase 1)**:
+- `cinnabar` (nixos, x86_64): Hetzner Cloud CX53 VPS, zerotier controller, always-on core services
+
 **Migration order rationale**:
-1. **blackphos**: Already has nix-config activated, not primary workstation (lowest risk)
-2. **rosegold**: Not in daily use, can test zerotier multi-machine coordination
-3. **argentum**: Not in daily use, validates patterns before primary migration
-4. **stibnite**: Primary workstation, migrate only after all others proven stable
+1. **cinnabar** (VPS): Deploy first as foundation infrastructure, validates dendritic + clan on NixOS, provides always-on zerotier controller
+2. **blackphos**: Connect to cinnabar's zerotier network, validates darwin + clan integration
+3. **rosegold**: Validates darwin patterns are reusable, multi-machine coordination
+4. **argentum**: Final validation before primary workstation
+5. **stibnite**: Primary workstation, migrate only after all others proven stable
 
 **Module organization (will change)**:
 - Current: Directory-based autowire (`modules/{darwin,home,nixos}/`)
@@ -290,6 +295,8 @@ nix-config/
 │   ├── base/                      # Foundation modules
 │   │   ├── nix.nix                # Core nix settings
 │   │   └── system.nix             # State versions
+│   ├── nixos/                     # NixOS-specific modules
+│   │   └── server.nix             # Server configuration
 │   ├── darwin/                    # Darwin-specific modules
 │   │   ├── homebrew.nix
 │   │   └── system-preferences.nix
@@ -302,20 +309,30 @@ nix-config/
 │   │       ├── git.nix
 │   │       └── jj.nix
 │   ├── hosts/                     # Machine-specific configurations
-│   │   ├── blackphos/default.nix  # First to migrate
-│   │   ├── rosegold/default.nix   # Second to migrate
-│   │   ├── argentum/default.nix   # Third to migrate
-│   │   └── stibnite/default.nix   # Last to migrate (primary)
+│   │   ├── cinnabar/              # Phase 1: VPS infrastructure
+│   │   │   ├── default.nix
+│   │   │   ├── disko.nix
+│   │   │   └── terraform-configuration.nix
+│   │   ├── blackphos/default.nix  # Phase 2: First darwin
+│   │   ├── rosegold/default.nix   # Phase 3: Second darwin
+│   │   ├── argentum/default.nix   # Phase 4: Third darwin
+│   │   └── stibnite/default.nix   # Phase 5: Primary workstation
 │   ├── flake-parts/               # Flake-level configuration
 │   │   ├── nixpkgs.nix            # Nixpkgs setup and overlays
-│   │   ├── host-machines.nix      # Generate darwinConfigurations
+│   │   ├── darwin-machines.nix    # Generate darwinConfigurations
+│   │   ├── nixos-machines.nix     # Generate nixosConfigurations
+│   │   ├── terranix.nix           # Terraform/terranix configuration
 │   │   └── clan.nix               # Clan inventory and instances
+│   ├── terranix/                  # Terraform modules
+│   │   ├── base.nix               # Base terraform config
+│   │   └── ssh-keys.nix           # SSH key generation
 │   └── users/                     # User configurations
 │       └── crs58/default.nix      # User metadata and config
 ├── secrets/                        # CHANGED: Clan vars only (migrate from sops)
 │   ├── groups/
 │   │   └── admins/                # Admin group age keys
 │   ├── machines/
+│   │   ├── cinnabar/              # VPS secrets
 │   │   ├── blackphos/
 │   │   ├── rosegold/
 │   │   ├── argentum/
@@ -323,43 +340,48 @@ nix-config/
 │   ├── secrets/                   # Encrypted secrets
 │   └── users/
 │       └── crs58/                 # User age keys
+├── terraform/                      # NEW: Terraform working directory (git-ignored)
+│   └── .gitkeep
 ├── overlays/                      # Existing overlays preserved
 ├── packages/                      # Existing packages preserved
 └── docs/notes/
     └── clan-integration/          # This directory
         ├── 00-integration-plan.md # This document
-        ├── 01-phase-1-guide.md    # Migration implementation
-        └── 02-migration-assessment.md # Host-specific considerations
+        ├── 01-phase-1-vps-deployment.md    # Phase 1: VPS infrastructure
+        ├── 02-phase-2-blackphos-guide.md   # Phase 2: First darwin host
+        └── 03-migration-assessment.md      # Host-specific considerations
 ```
 
 **Migration path**:
 ```
-Phase 0: Preparation
-- Add clan-core and import-tree inputs
+Phase 1: VPS Infrastructure (cinnabar)
+- Add clan-core, import-tree, terranix, disko, srvos inputs
 - Create modules/ structure alongside existing files
+- Setup terraform/terranix for Hetzner Cloud
+- Deploy cinnabar VPS with zerotier controller
+- Validate dendritic + clan on NixOS first
 
-Phase 1: Module conversion
-- Convert modules/{darwin,home,nixos}/* to modules/{base,shell,dev}/*
-- Update to flake.modules.{darwin,homeManager,nixos}.* namespace
-- Keep existing configurations/ active during conversion
-
-Phase 2: Host migration (blackphos)
+Phase 2: First darwin host (blackphos)
+- Convert darwin modules to dendritic pattern
 - Create modules/hosts/blackphos/default.nix
-- Add to clan inventory
-- Test and validate
-- Once stable, can reference for other hosts
+- Connect to cinnabar's zerotier network as peer
+- Validate darwin + clan integration
 
-Phase 3: Test hosts (rosegold, argentum)
-- Create modules/hosts/{rosegold,argentum}/default.nix
-- Test zerotier multi-machine coordination
-- Validate dendritic + clan patterns
+Phase 3: Second darwin host (rosegold)
+- Create modules/hosts/rosegold/default.nix
+- Test multi-darwin coordination
+- Validate patterns are reusable
 
-Phase 4: Primary migration (stibnite)
-- Migrate only after others proven stable
+Phase 4: Third darwin host (argentum)
+- Create modules/hosts/argentum/default.nix
+- Final validation before primary workstation
+
+Phase 5: Primary workstation (stibnite)
+- Migrate only after all others proven stable
 - Create modules/hosts/stibnite/default.nix
-- Final validation
+- Complete 5-machine network
 
-Phase 5: Cleanup
+Phase 6: Cleanup
 - Remove configurations/ directory
 - Remove nixos-unified flake input and module
 - Migrate all secrets to clan vars
@@ -378,7 +400,7 @@ Phase 5: Cleanup
 ```nix
 {
   inputs = {
-    # Remove nixos-unified
+    # Remove nixos-unified (after all hosts migrated)
     # nixos-unified.url = "github:srid/nixos-unified";
 
     # Add clan-core and import-tree
@@ -390,6 +412,19 @@ Phase 5: Cleanup
     clan-core.inputs.nix-darwin.follows = "nix-darwin";
 
     import-tree.url = "github:vic/import-tree";
+
+    # Add terraform/terranix for VPS provisioning
+    terranix.url = "github:terranix/terranix";
+    terranix.inputs.flake-parts.follows = "flake-parts";
+    terranix.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Add disko for declarative partitioning
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Add srvos for server hardening
+    srvos.url = "github:nix-community/srvos";
+    srvos.inputs.nixpkgs.follows = "nixpkgs";
   };
 }
 ```
@@ -398,10 +433,18 @@ Phase 5: Cleanup
 ```nix
 {
   outputs = inputs:
-    inputs.flake-parts.lib.mkFlake { inherit inputs; }
-    (inputs.import-tree ./modules);
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } (
+      { ... }: {
+        imports = [
+          inputs.terranix.flakeModule
+          # Import all .nix files from modules/ recursively
+          (inputs.import-tree ./modules)
+        ];
+      }
+    );
   # import-tree recursively imports all .nix files in modules/
   # Each file is a flake-parts module contributing to flake.modules.*
+  # terranix.flakeModule provides perSystem.terranix configuration
 }
 ```
 
@@ -425,6 +468,10 @@ Phase 5: Cleanup
     specialArgs = { inherit inputs; };
 
     inventory.machines = {
+      cinnabar = {
+        tags = [ "nixos" "vps" "cloud" ];
+        machineClass = "nixos";
+      };
       blackphos = {
         tags = [ "darwin" "workstation" ];
         machineClass = "darwin";
@@ -459,10 +506,28 @@ Phase 5: Cleanup
         };
       };
 
+      users-root = {
+        module = { name = "users"; input = "clan-core"; };
+        roles.default.machines.cinnabar = {};
+        roles.default.settings = {
+          user = "root";
+          prompt = false;
+          groups = [ ];
+        };
+      };
+
       zerotier-local = {
         module = { name = "zerotier"; input = "clan-core"; };
-        roles.controller.machines.blackphos = {};
-        roles.peer.tags."workstation" = {};
+        # cinnabar is controller (always-on VPS)
+        roles.controller.machines.cinnabar = {};
+        # All machines are peers
+        roles.peer.tags."all" = {};
+      };
+
+      sshd-clan = {
+        module = { name = "sshd"; input = "clan-core"; };
+        roles.server.tags."all" = {};
+        roles.client.tags."all" = {};
       };
     };
 
@@ -699,85 +764,107 @@ clan.core.vars.generators.example = {
 
 ## Migration phases
 
-### Phase 0: Preparation (blackphos parallel environment)
+### Phase 1: VPS infrastructure (cinnabar)
 
-**Objective**: Set up dendritic + clan alongside existing nixos-unified
+**Objective**: Deploy always-on infrastructure and validate dendritic + clan on NixOS
+
+**Strategic value**: VPS-first approach validates the integration on clan's native platform (NixOS) before attempting darwin migration, provides stable foundation for darwin hosts
 
 **Tasks**:
-- Add clan-core and import-tree flake inputs
+- Add clan-core, import-tree, terranix, disko, srvos flake inputs
 - Create `modules/` directory with dendritic structure
-- Initialize clan secrets
-- Keep existing `configurations/` active
+- Initialize clan secrets (age keys, API tokens)
+- Setup terraform/terranix for Hetzner Cloud provisioning
+- Create `modules/hosts/cinnabar/` with disko configuration
+- Configure zerotier controller role on cinnabar
+- Deploy VPS via terraform + clan machines install
+- Keep existing `configurations/` active (darwin hosts unaffected)
 
 **Success criteria**:
-- [ ] Flake evaluates with clan-core integrated
-- [ ] import-tree discovers modules/
-- [ ] Secrets initialized
-- [ ] Existing configs still build
+- [ ] Flake evaluates with all new inputs
+- [ ] Terranix configuration generates valid terraform
+- [ ] Hetzner Cloud VPS provisioned successfully
+- [ ] NixOS installed on cinnabar with LUKS encryption
+- [ ] Zerotier controller operational on cinnabar
+- [ ] SSH daemon with CA certificates
+- [ ] Emergency access functional
+- [ ] Clan vars deployed correctly
+- [ ] Existing darwin configs still build
 
-### Phase 1: blackphos migration
+**Timeline**: 1-2 weeks for deployment + 1-2 weeks monitoring stability
 
-**Objective**: Migrate first machine as proof of concept
+### Phase 2: First darwin host (blackphos)
+
+**Objective**: Migrate first darwin machine, validate darwin + clan integration
 
 **Tasks**:
 - Convert darwin modules to dendritic pattern in `modules/{base,darwin,shell,dev}/`
 - Create `modules/hosts/blackphos/default.nix`
+- Configure blackphos as zerotier peer (connects to cinnabar controller)
 - Add to clan inventory
 - Generate vars for blackphos
-- Deploy and validate
+- Deploy with darwin-rebuild switch
 
 **Success criteria**:
 - [ ] blackphos builds with dendritic + clan
-- [ ] All functionality preserved
-- [ ] Zerotier network operational (blackphos as controller)
+- [ ] All functionality preserved (no regressions)
+- [ ] Zerotier peer connects to cinnabar controller
+- [ ] cinnabar ↔ blackphos network communication functional
+- [ ] SSH via zerotier network works (certificate-based)
 - [ ] Secrets deployed via clan vars
+- [ ] Stable for 1-2 weeks
 
-### Phase 2: rosegold migration
+### Phase 3: Second darwin host (rosegold)
 
-**Objective**: Validate patterns on second machine
+**Objective**: Validate darwin patterns are reusable
 
 **Tasks**:
 - Create `modules/hosts/rosegold/default.nix` (reuse blackphos patterns)
 - Add to clan inventory with zerotier peer role
 - Generate vars and deploy
-- Test multi-machine zerotier coordination
+- Test multi-darwin coordination
 
 **Success criteria**:
-- [ ] rosegold operational
-- [ ] blackphos ↔ rosegold zerotier communication
+- [ ] rosegold operational with minimal pattern customization
+- [ ] 3-machine network operational (cinnabar ↔ blackphos ↔ rosegold)
 - [ ] Patterns validated for reuse
+- [ ] Stable for 1-2 weeks
 
-### Phase 3: argentum migration
+### Phase 4: Third darwin host (argentum)
 
-**Objective**: Third machine validation before primary
+**Objective**: Final validation before primary workstation
 
 **Tasks**:
 - Create `modules/hosts/argentum/default.nix`
 - Add to clan inventory
 - Deploy and test
-- Validate 3-machine zerotier network
+- Validate 4-machine zerotier network
 
 **Success criteria**:
 - [ ] argentum operational
-- [ ] 3-machine coordination working
-- [ ] Ready for primary migration
+- [ ] 4-machine coordination working
+- [ ] No new issues discovered
+- [ ] Ready for primary workstation migration
+- [ ] Stable for 1-2 weeks
 
-### Phase 4: stibnite migration
+### Phase 5: Primary workstation (stibnite)
 
 **Objective**: Migrate primary workstation
 
 **Tasks**:
 - Create `modules/hosts/stibnite/default.nix`
 - Extra validation and testing
-- Deploy only after phases 1-3 stable
+- Deploy only after phases 1-4 stable (4-6 weeks minimum)
 - Keep fallback path available
 
 **Success criteria**:
 - [ ] stibnite operational
 - [ ] All daily workflows functional
-- [ ] 4-machine zerotier network complete
+- [ ] 5-machine zerotier network complete
+- [ ] Productivity maintained or improved
+- [ ] Stable for 1-2 weeks
 
-### Phase 5: Cleanup
+### Phase 6: Cleanup
 
 **Objective**: Remove legacy infrastructure
 
@@ -808,14 +895,15 @@ clan.core.vars.generators.example = {
 
 ### Decision 2: Migration order
 
-**Chosen**: blackphos → rosegold → argentum → stibnite
+**Chosen**: cinnabar (VPS) → blackphos → rosegold → argentum → stibnite
 **Rationale**:
-- blackphos already activated, not daily driver (lowest risk)
-- rosegold and argentum not in daily use (safe testing grounds)
-- stibnite migrated last after patterns proven (highest value, highest risk)
-- Multi-machine coordination testable with multiple non-primary hosts
+- **VPS first**: Validates dendritic + clan on NixOS (clan's native platform) before darwin
+- **Always-on infrastructure**: Provides stable zerotier controller independent of darwin hosts
+- **De-risks darwin migration**: Core services proven working before touching daily-use machines
+- **Progressive validation**: Each host validates patterns before moving to next
+- **Primary workstation last**: stibnite migrated only after all others proven stable
 
-**Tradeoff**: Cannot test on primary workstation until late in process
+**Tradeoff**: Adds Hetzner Cloud cost (~€24/month), but provides significant risk reduction and operational benefits
 
 ### Decision 3: Clan vars vs. sops-nix/agenix
 
@@ -855,8 +943,9 @@ clan.core.vars.generators.example = {
    - **Validation**: Test thoroughly with blackphos
 
 4. **Zerotier network topology**: Which machine is controller?
-   - **Chosen**: blackphos (first migrated, always on)
-   - **Rationale**: Stable, not primary workstation
+   - **Chosen**: cinnabar (VPS, always-on infrastructure)
+   - **Rationale**: VPS provides stable controller that doesn't depend on darwin hosts being powered on
+   - **Previous consideration**: blackphos was considered, but darwin machines may not be always-on
 
 5. **Rollback strategy**: How to rollback individual host if migration fails?
    - **Approach**: Keep configurations/ until all hosts migrated
@@ -864,12 +953,12 @@ clan.core.vars.generators.example = {
 
 ## Next steps
 
-1. **Immediate**: Read `01-phase-1-guide.md` for detailed implementation steps
-2. **Phase 0**: Set up dendritic structure parallel to existing configs
-3. **Phase 1**: Migrate blackphos, establish patterns
-4. **Phases 2-3**: Migrate rosegold and argentum, validate multi-machine
-5. **Phase 4**: Migrate stibnite only after others proven
-6. **Phase 5**: Clean up legacy infrastructure
+1. **Immediate**: Read `01-phase-1-vps-deployment.md` for detailed VPS deployment steps
+2. **Phase 1**: Deploy cinnabar VPS, validate dendritic + clan on NixOS
+3. **Phase 2**: Migrate blackphos (read `02-phase-2-blackphos-guide.md`), establish darwin patterns
+4. **Phases 3-4**: Migrate rosegold and argentum, validate multi-darwin
+5. **Phase 5**: Migrate stibnite only after all others proven
+6. **Phase 6**: Clean up legacy infrastructure
 7. **Ongoing**: Document learnings, refine patterns
 
 ## References
