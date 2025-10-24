@@ -12,13 +12,26 @@ This directory contains comprehensive documentation for migrating nix-config fro
 - Directory structure (dendritic flat categories with terraform/)
 - Module integration patterns (flake.modules.* namespace)
 - Secrets management with clan vars
-- Migration phases (cinnabar VPS → blackphos → rosegold → argentum → stibnite)
+- Migration phases (Phase 0 validation → cinnabar VPS → blackphos → rosegold → argentum → stibnite)
 - Key decisions and tradeoffs
 - References to dendritic and clan examples
 
 **When to read**: Start here for complete context and strategic overview
 
-### 01-phase-1-vps-deployment.md
+### 01-phase-0-validation.md
+**Purpose**: Step-by-step implementation guide for Phase 0 (dendritic + clan integration validation in test-clan/)
+**Contents**:
+- Strategic rationale (why Phase 0 is critical before VPS deployment)
+- Analysis of reference repositories (no production examples combining dendritic + clan)
+- Step-by-step validation in test-clan/ (19 detailed steps)
+- Integration points testing
+- Findings documentation template
+- Patterns extraction for cinnabar deployment
+- Troubleshooting integration challenges
+
+**When to read**: Before beginning migration to validate architectural combination in safe environment
+
+### 02-phase-1-vps-deployment.md
 **Purpose**: Step-by-step implementation guide for Phase 1 (cinnabar VPS deployment)
 **Contents**:
 - Prerequisites and Hetzner Cloud setup
@@ -31,7 +44,7 @@ This directory contains comprehensive documentation for migrating nix-config fro
 
 **When to read**: When ready to implement Phase 1 (deploying cinnabar VPS as foundation infrastructure)
 
-### 02-phase-2-blackphos-guide.md
+### 03-phase-2-blackphos-guide.md
 **Purpose**: Step-by-step implementation guide for Phase 2 (first darwin host migration)
 **Contents**:
 - Prerequisites (Phase 1 completion required)
@@ -45,7 +58,7 @@ This directory contains comprehensive documentation for migrating nix-config fro
 
 **Status note**: This guide is being updated to reflect VPS-first workflow. Core steps remain valid but assume Phase 1 infrastructure already exists.
 
-### 03-migration-assessment.md
+### 04-migration-assessment.md
 **Purpose**: Validation criteria and assessment for each migration phase
 **Contents**:
 - Host-specific analysis (cinnabar VPS, blackphos, rosegold, argentum, stibnite)
@@ -59,38 +72,49 @@ This directory contains comprehensive documentation for migrating nix-config fro
 
 ## Quick start
 
-### For immediate implementation (Phase 1: cinnabar VPS)
+### For immediate implementation (Phase 0: validation, then Phase 1: cinnabar VPS)
 
-1. Read `00-integration-plan.md` (45-60 minutes) - understand VPS-first approach and dendritic pattern
-2. Review prerequisites in `01-phase-1-vps-deployment.md`
-3. Set up Hetzner Cloud account and generate API token
-4. Follow Phase 1 implementation steps sequentially
-5. Deploy cinnabar VPS and validate infrastructure
-6. Monitor stability for 1-2 weeks before darwin migration
+1. Read `00-integration-plan.md` (45-60 minutes) - understand VPS-first approach and Phase 0 rationale
+2. Review Phase 0 guide: `01-phase-0-validation.md` - understand integration validation
+3. Complete Phase 0 validation in test-clan/ (4-8 hours) - prove dendritic + clan works
+4. Document findings and extract patterns
+5. Proceed to Phase 1: Review prerequisites in `02-phase-1-vps-deployment.md`
+6. Set up Hetzner Cloud account and generate API token
+7. Follow Phase 1 implementation steps sequentially (using patterns from Phase 0)
+8. Deploy cinnabar VPS and validate infrastructure
+9. Monitor stability for 1-2 weeks before darwin migration
 
 ### For planning and evaluation
 
 1. Skim `00-integration-plan.md` executive summary
-2. Review "VPS-first infrastructure approach" rationale
-3. Read "Migration phases" section for complete workflow
-4. Review `03-migration-assessment.md` for per-host validation criteria
+2. Review "Phase 0 validation" rationale (untested architectural combination)
+3. Review "VPS-first infrastructure approach" rationale
+4. Read "Migration phases" section for complete workflow
+5. Review `04-migration-assessment.md` for per-host validation criteria
+
+### After Phase 0 (integration validated)
+
+1. Review integration findings from test-clan/
+2. Extract patterns for cinnabar deployment
+3. Proceed to Phase 1 (cinnabar VPS) with confidence
 
 ### After Phase 1 (cinnabar VPS deployed)
 
 1. Monitor cinnabar stability for 1-2 weeks
 2. Verify zerotier controller operational
 3. Document any issues or pattern refinements needed
-4. Review `03-migration-assessment.md` Phase 2 readiness criteria
+4. Review `04-migration-assessment.md` Phase 2 readiness criteria
 5. Proceed to Phase 2 (blackphos) when cinnabar proven stable
 
 ### Progressive migration workflow
 
-**Phase 1** (Week 0-2): Deploy cinnabar VPS, validate dendritic + clan on NixOS, establish zerotier controller
-**Phase 2** (Week 3-5): Migrate blackphos, validate darwin + clan integration, connect to zerotier network
-**Phase 3** (Week 6-8): Migrate rosegold, validate multi-darwin coordination
-**Phase 4** (Week 9-11): Migrate argentum, final validation before primary workstation
-**Phase 5** (Week 12-14): Migrate stibnite (primary workstation, highest risk)
-**Phase 6** (Week 15+): Cleanup (remove nixos-unified, old configs)
+**Phase 0** (Week 0-1): Validate dendritic + clan in test-clan/, document integration findings
+**Phase 1** (Week 1-3): Deploy cinnabar VPS, validate dendritic + clan on NixOS, establish zerotier controller
+**Phase 2** (Week 4-6): Migrate blackphos, validate darwin + clan integration, connect to zerotier network
+**Phase 3** (Week 7-9): Migrate rosegold, validate multi-darwin coordination
+**Phase 4** (Week 10-12): Migrate argentum, final validation before primary workstation
+**Phase 5** (Week 13-15): Migrate stibnite (primary workstation, highest risk)
+**Phase 6** (Week 16+): Cleanup (remove nixos-unified, old configs)
 
 ## Key concepts
 
@@ -257,6 +281,17 @@ nix eval .#clan.inventory --json
 
 ## Success metrics per migration phase
 
+### Phase 0 (test-clan validation)
+- [ ] test-clan flake evaluates successfully
+- [ ] import-tree discovers all dendritic modules
+- [ ] Clan inventory evaluates correctly
+- [ ] nixosConfiguration builds for test-vm
+- [ ] Clan vars generation succeeds
+- [ ] Integration points documented
+- [ ] Patterns extracted for cinnabar
+- [ ] No critical blockers identified
+- [ ] Findings document completed
+
 ### Phase 1 (cinnabar VPS)
 - [ ] Hetzner Cloud VPS provisioned via terraform
 - [ ] Dendritic module structure created and operational
@@ -304,6 +339,8 @@ nix eval .#clan.inventory --json
 
 ## Red flags requiring pause or rollback
 
+- Phase 0: Integration blockers preventing test-clan from building
+- Phase 0: Architectural conflicts between dendritic and clan
 - Build evaluation errors
 - Missing functionality compared to nixos-unified
 - Dendritic patterns require excessive customization per host
@@ -317,9 +354,10 @@ nix eval .#clan.inventory --json
 
 ### Local documentation
 - Integration plan: `./00-integration-plan.md` (start here)
-- Implementation guide: `./01-phase-1-guide.md` (blackphos migration steps)
-- Migration assessment: `./02-migration-assessment.md` (validation criteria)
-- Interactive prompt: `./prompt-interactive-integration.md` (guided migration)
+- Phase 0 validation: `./01-phase-0-validation.md` (test-clan integration testing)
+- Phase 1 VPS guide: `./02-phase-1-vps-deployment.md` (cinnabar deployment)
+- Phase 2 darwin guide: `./03-phase-2-blackphos-guide.md` (blackphos migration)
+- Migration assessment: `./04-migration-assessment.md` (validation criteria)
 
 ### Dendritic pattern
 - Pattern documentation: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
