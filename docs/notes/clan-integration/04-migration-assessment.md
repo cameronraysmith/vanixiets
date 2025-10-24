@@ -5,20 +5,83 @@ Use this guide to evaluate readiness for each migration phase and validate succe
 
 ## Migration strategy overview
 
-**Approach**: VPS-first infrastructure, then progressive darwin host migration with validation gates
+**Approach**: Validation-first, then VPS infrastructure, then progressive darwin host migration with validation gates
 
-**Order**: cinnabar (VPS) → blackphos → rosegold → argentum → stibnite
+**Order**: test-clan (validation) → cinnabar (VPS) → blackphos → rosegold → argentum → stibnite
 
 **Rationale**:
-1. **cinnabar (VPS)**: Deploy first as foundation infrastructure, validates dendritic + clan on NixOS, provides always-on zerotier controller
-2. **blackphos**: Connect to cinnabar, validates darwin + clan integration, establishes darwin patterns
-3. **rosegold**: Validates darwin patterns are reusable, multi-darwin coordination
-4. **argentum**: Final validation before primary workstation
-5. **stibnite**: Primary workstation, migrate last (highest value, highest risk, requires proven patterns)
+1. **test-clan (validation)**: Validate dendritic + clan integration in minimal test environment before infrastructure commitment
+2. **cinnabar (VPS)**: Deploy as foundation infrastructure using validated patterns, provides always-on zerotier controller
+3. **blackphos**: Connect to cinnabar, validates darwin + clan integration, establishes darwin patterns
+4. **rosegold**: Validates darwin patterns are reusable, multi-darwin coordination
+5. **argentum**: Final validation before primary workstation
+6. **stibnite**: Primary workstation, migrate last (highest value, highest risk, requires proven patterns)
 
 **Key principle**: Each host must be stable for 1-2 weeks before migrating the next host.
 
 ## Host analysis
+
+### test-clan (Phase 0: validation environment)
+
+**Deployment specs**:
+- Platform: x86_64-linux or aarch64-linux (NixOS)
+- Management: Dendritic + clan integration test
+- Location: `~/projects/nix-workspace/test-clan/`
+- Purpose: Validate architectural combination before production deployment
+- Cost: $0 (local or VM)
+
+**Strategic value**:
+- **Risk reduction**: Proves dendritic + clan integration works before infrastructure investment
+- **Pattern discovery**: Identifies integration challenges in safe environment
+- **Reference implementation**: Provides proven patterns for cinnabar deployment
+- **No production impact**: Isolated testing doesn't affect existing systems
+
+**Validation characteristics**:
+- **Risk level**: None (test environment)
+- **Migration priority**: First (validates all subsequent phases)
+- **Technical validation**: Tests all integration points between dendritic and clan
+- **Rollback ease**: Perfect (git branch, no production impact)
+
+**Success criteria**:
+- [ ] test-clan flake evaluates successfully
+- [ ] import-tree discovers all dendritic modules
+- [ ] Clan inventory evaluates correctly with test machine
+- [ ] nixosConfiguration builds for test-vm
+- [ ] Clan vars generation succeeds
+- [ ] Essential clan services configured (emergency-access, sshd, zerotier)
+- [ ] Integration points documented in INTEGRATION-FINDINGS.md
+- [ ] Patterns extracted in PATTERNS.md for cinnabar use
+- [ ] No critical architectural blockers identified
+
+**Validation tests**:
+```bash
+# Flake evaluation
+cd ~/projects/nix-workspace/test-clan
+nix flake show
+nix flake check
+
+# Module discovery
+nix eval .#flake.modules.nixos --apply builtins.attrNames
+
+# Clan inventory
+nix eval .#clan.inventory --json | jq .
+
+# Build test
+nix build .#nixosConfigurations.test-vm.config.system.build.toplevel
+
+# Vars generation
+nix run nixpkgs#clan-cli -- vars generate test-vm
+```
+
+**Red flags requiring investigation**:
+- Flake evaluation errors
+- import-tree not discovering modules
+- Clan inventory conflicts with dendritic namespace
+- nixosConfiguration build failures
+- Architectural incompatibilities between dendritic and clan
+- Integration patterns requiring excessive workarounds
+
+**Timeline**: 1 week for implementation and validation
 
 ### cinnabar (Phase 1: VPS infrastructure)
 
@@ -575,21 +638,23 @@ Migration is successful when:
 ## Recommended timeline
 
 **Conservative approach** (recommended):
-- **Week 0**: Migrate blackphos
-- **Weeks 1-2**: Monitor blackphos stability
-- **Week 3**: Migrate rosegold (if blackphos stable)
+- **Week 0**: Validate integration in test-clan (Phase 0)
+- **Week 1**: Deploy cinnabar VPS (Phase 1) using validated patterns
+- **Weeks 2-3**: Monitor cinnabar stability
+- **Week 4**: Migrate blackphos (Phase 2) (if cinnabar stable)
 - **Weeks 4-5**: Monitor rosegold and multi-machine features
-- **Week 6**: Migrate argentum (if rosegold stable)
-- **Weeks 7-8**: Monitor argentum and 3-machine network
-- **Week 9+**: Consider stibnite migration (if all stable)
-- **Weeks 10-11**: Monitor stibnite
-- **Week 12+**: Cleanup phase (remove nixos-unified)
+- **Week 7**: Migrate argentum (if rosegold stable)
+- **Weeks 8-9**: Monitor argentum and 4-machine network
+- **Week 10+**: Consider stibnite migration (if all stable)
+- **Weeks 11-12**: Monitor stibnite
+- **Week 13+**: Cleanup phase (remove nixos-unified)
 
 **Aggressive approach** (higher risk):
-- **Week 0**: Migrate blackphos
-- **Week 1**: Migrate rosegold (if blackphos functional)
-- **Week 2**: Migrate argentum (if rosegold functional)
-- **Week 3+**: Consider stibnite (if all functional)
+- **Week 0**: Validate integration in test-clan
+- **Week 1**: Deploy cinnabar and migrate blackphos
+- **Week 2**: Migrate rosegold (if blackphos functional)
+- **Week 3**: Migrate argentum (if rosegold functional)
+- **Week 4+**: Consider stibnite (if all functional)
 
 **Recommended**: Conservative approach with flexibility to slow down or pause if issues arise
 
