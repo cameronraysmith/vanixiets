@@ -1,477 +1,565 @@
-# Phase 2 migration assessment: existing hosts to Clan
+# Migration validation guide: dendritic + clan host-by-host assessment
 
-This document evaluates the potential migration of existing hosts (stibnite, blackphos) from pure nixos-unified management to Clan management.
+This document provides validation criteria and assessment guidelines for the progressive darwin host migration from nixos-unified to dendritic + clan.
+Use this guide to evaluate readiness for each migration phase and validate successful migration.
 
-## Important note
+## Migration strategy overview
 
-**Phase 2 should only be considered after successfully completing Phase 1 and operating Clan-managed remote hosts for 2-3 months.**
-This assessment is provided for planning purposes and will be refined based on Phase 1 learnings.
+**Approach**: Progressive host-by-host migration with validation gates
 
-## Current state analysis
+**Order**: blackphos → rosegold → argentum → stibnite
 
-### Stibnite (primary workstation, darwin)
+**Rationale**:
+1. **blackphos**: Already activated, not primary workstation (lowest risk, establishes patterns)
+2. **rosegold**: Not in daily use, enables multi-machine testing (validates zerotier coordination)
+3. **argentum**: Not in daily use, final validation before primary (confirms pattern stability)
+4. **stibnite**: Primary workstation, migrate last (highest value, highest risk, requires proven patterns)
 
-**Current setup**:
+**Key principle**: Each host must be stable for 1-2 weeks before migrating the next host.
+
+## Host analysis
+
+### blackphos (Phase 1: foundation)
+
+**Current state**:
+- Platform: aarch64-darwin (Apple Silicon Mac)
+- Management: nix-darwin + home-manager via nixos-unified
+- Configuration: `configurations/darwin/blackphos.nix`
+- Status: Already has nix-config activated, not primary workstation
+- Usage: Secondary development environment
+
+**Migration characteristics**:
+- **Risk level**: Low (not primary workstation, can tolerate temporary instability)
+- **Migration priority**: First (establishes all patterns for subsequent hosts)
+- **Strategic value**: Proves dendritic + clan works on darwin, creates reusable patterns
+- **Rollback ease**: High (can rebuild from nixos-unified configurations if needed)
+
+**Success criteria**:
+- [ ] Dendritic module structure created and operational
+- [ ] All existing functionality preserved
+- [ ] Clan inventory and vars system functional
+- [ ] Zerotier controller role operational
+- [ ] No regressions in daily development workflow
+- [ ] Stable for 1-2 weeks before proceeding to rosegold
+
+**Red flags requiring investigation**:
+- Build failures or evaluation errors
+- Missing functionality compared to nixos-unified version
+- Clan vars not deploying correctly
+- Zerotier network issues
+- Unexpected system behavior
+
+### rosegold (Phase 2: multi-machine validation)
+
+**Current state**:
+- Platform: aarch64-darwin (Apple Silicon Mac)
+- Management: nix-darwin + home-manager via nixos-unified
+- Configuration: `configurations/darwin/rosegold.nix`
+- Status: Not currently in daily use
+- Usage: Testing and experimental environment
+
+**Migration characteristics**:
+- **Risk level**: Low (not in daily use, experimental machine)
+- **Migration priority**: Second (validates zerotier multi-machine coordination)
+- **Strategic value**: Proves blackphos patterns are reusable, tests clan multi-machine features
+- **Rollback ease**: High (not critical system)
+
+**Success criteria**:
+- [ ] rosegold configuration builds using blackphos patterns
+- [ ] Zerotier peer role connects to blackphos controller
+- [ ] blackphos ↔ rosegold network communication functional
+- [ ] All home-manager modules work identically to blackphos
+- [ ] Patterns confirmed as reusable (minimal customization needed)
+- [ ] Stable for 1-2 weeks before proceeding to argentum
+
+**Multi-machine validation tests**:
+```bash
+# On blackphos (controller)
+zerotier-cli listnetworks
+zerotier-cli listpeers
+
+# On rosegold (peer)
+zerotier-cli status
+zerotier-cli listnetworks
+
+# Test connectivity
+# From blackphos:
+ping <rosegold-zerotier-ip>
+ssh crs58@<rosegold-zerotier-ip>
+
+# From rosegold:
+ping <blackphos-zerotier-ip>
+ssh crs58@<blackphos-zerotier-ip>
+```
+
+**Red flags requiring investigation**:
+- Pattern modifications needed (indicates blackphos patterns not generic)
+- Zerotier peer connection failures
+- Network connectivity issues between hosts
+- Inconsistent behavior compared to blackphos
+
+### argentum (Phase 3: final validation)
+
+**Current state**:
+- Platform: aarch64-darwin (Apple Silicon Mac)
+- Management: nix-darwin + home-manager via nixos-unified
+- Configuration: `configurations/darwin/argentum.nix`
+- Status: Not currently in daily use
+- Usage: Testing and backup environment
+
+**Migration characteristics**:
+- **Risk level**: Low (not in daily use)
+- **Migration priority**: Third (final validation before primary workstation)
+- **Strategic value**: Confirms patterns scale to three machines, validates 3-machine zerotier network
+- **Rollback ease**: High (not critical system)
+
+**Success criteria**:
+- [ ] argentum configuration builds using established patterns
+- [ ] Zerotier peer role connects to blackphos controller
+- [ ] 3-machine network operational (blackphos ↔ rosegold ↔ argentum)
+- [ ] No new issues discovered (patterns proven stable)
+- [ ] Stable for 1-2 weeks before considering stibnite migration
+
+**3-machine validation tests**:
+```bash
+# Verify all machines see each other
+# On blackphos:
+zerotier-cli listpeers | grep -E '(rosegold|argentum)'
+
+# Test full mesh connectivity
+# From each machine:
+ping <blackphos-zerotier-ip>
+ping <rosegold-zerotier-ip>
+ping <argentum-zerotier-ip>
+```
+
+**Red flags requiring investigation**:
+- New issues not seen with blackphos or rosegold
+- Zerotier network instability with 3+ peers
+- Performance degradation
+- Pattern inconsistencies
+
+### stibnite (Phase 4: primary workstation)
+
+**Current state**:
 - Platform: aarch64-darwin (Apple Silicon Mac)
 - Management: nix-darwin + home-manager via nixos-unified
 - Configuration: `configurations/darwin/stibnite.nix`
-- Modules: Extensive darwin-specific and home-manager modules
-- Secrets: SOPS-based, manual management
-- Services: Homebrew, system preferences, development tools
-
-**Characteristics**:
-- Interactive workstation (not server)
-- Frequent configuration changes
-- Complex darwin-specific settings
-- Heavy home-manager usage
-- Local-only (not distributed)
-
-### Blackphos (secondary system, darwin)
-
-**Current setup**:
-- Platform: aarch64-darwin (Apple Silicon Mac)
-- Management: Similar to stibnite
-- Configuration: `configurations/darwin/blackphos.nix`
-- Usage: Secondary development environment
-
-**Characteristics**:
-- Similar to stibnite
-- Less frequently used
-- Potential testing ground for migration
-
-## Migration benefits analysis
-
-### Potential benefits
-
-**1. Unified secret management via vars**
-
-**Current state**:
-```nix
-# Manual secret management
-sops.secrets.example-secret = {
-  sopsFile = ./secrets/hosts/stibnite.yaml;
-  # ... manual configuration
-};
-```
-
-**Clan approach**:
-```nix
-# Declarative generation
-clan.core.vars.generators.example-secret = {
-  prompts.value.description = "Example secret";
-  script = "...";
-  files.secret = { secret = true; };
-};
-
-# Automatic reference
-services.example.secretFile = config.clan.core.vars.generators.example-secret.files.secret.path;
-```
-
-**Benefit**: Less manual secret file management, declarative generation
-**Value**: Medium (current approach works, but vars more elegant)
-
-**2. Multi-machine service coordination**
-
-**Example use case**: Backup between stibnite and blackphos
-```nix
-# Clan inventory approach
-inventory.instances.local-backup = {
-  module = { name = "borgbackup"; input = "clan-core"; };
-  roles.client.machines.stibnite = {};
-  roles.server.machines.blackphos = {};
-};
-```
-
-**Current approach**: Manually configure both machines with shared secrets
-
-**Benefit**: Cleaner multi-machine coordination
-**Value**: Low-Medium (only 2 machines, limited distributed services)
-
-**3. Inventory abstraction for common settings**
-
-**Example**: Apply settings to all darwin machines via tags
-```nix
-inventory.machines = {
-  stibnite.tags = [ "darwin" "workstation" ];
-  blackphos.tags = [ "darwin" "workstation" ];
-};
-
-inventory.instances.common-darwin = {
-  # ... applies to all darwin machines
-  roles.default.tags."darwin" = {};
-};
-```
-
-**Benefit**: Reduce duplication across similar machines
-**Value**: Low (only 2 similar machines, current approach maintainable)
-
-**4. Consistent tooling across all hosts**
-
-**Benefit**: Same `clan` CLI for local and remote hosts
-**Value**: Medium (consistency valuable, but current tools work well)
-
-### Migration costs
-
-**1. Configuration restructuring**
-
-**Required changes**:
-- Move machine configs to Clan inventory structure
-- Convert services to Clan service instances
-- Migrate darwin-specific modules to work with Clan
-- Update all module imports and references
-
-**Estimated effort**: 2-3 days for initial migration, 1-2 weeks for validation
-**Risk**: High (breaking production workstation setup)
-
-**2. Darwin compatibility validation**
-
-**Unknown factors**:
-- Clan's darwin support maturity
-- Interaction with nix-darwin-specific features
-- Homebrew integration with Clan
-- macOS-specific module compatibility
-
-**Required testing**:
-- Full functionality validation on darwin
-- Homebrew workflow preservation
-- System preference management
-- GUI application integration
-
-**Estimated effort**: 1 week testing and troubleshooting
-**Risk**: Medium-High (darwin support less mature than NixOS)
-
-**3. Home-manager integration patterns**
-
-**Questions**:
-- How to organize home-manager modules with Clan inventory?
-- Can existing home modules be reused as-is?
-- How do per-user settings work with Clan's machine-centric model?
-
-**Required work**:
-- Validate home-manager compatibility
-- Establish patterns for user-specific vs. machine-specific config
-- Test multi-user scenarios
-
-**Estimated effort**: 2-3 days
-**Risk**: Low-Medium (home-manager well-supported by Clan)
-
-**4. Secret migration**
-
-**Required actions**:
-- Convert existing SOPS secrets to Clan vars generators
-- Migrate age keys to Clan structure
-- Validate all secret references updated
-- Ensure rollback path for sensitive data
-
-**Estimated effort**: 1-2 days per machine
-**Risk**: High (secret management critical, errors costly)
-
-**5. Rollback complexity**
-
-**Challenge**: Once migrated, rolling back requires:
-- Removing Clan infrastructure
-- Restoring nixos-unified-only patterns
-- Re-migrating secrets to previous structure
-- Validating all functionality restored
-
-**Estimated effort**: 1-2 days for rollback
-**Risk**: High (complexity of two-way migration)
-
-**6. Learning curve and ongoing maintenance**
-
-**Considerations**:
-- Learning Clan abstractions (inventory, roles, instances)
-- Understanding when to use Clan services vs. plain modules
-- Debugging Clan-specific issues
-- Keeping up with Clan development
-
-**Ongoing cost**: 10-20% increase in complexity
-**Risk**: Medium (additional abstraction layer)
-
-## Migration scenarios
-
-### Scenario 1: Full migration (both hosts)
-
-**Approach**: Migrate both stibnite and blackphos to Clan management
-
-**Pros**:
-- Consistent management across all hosts
-- Full utilization of Clan features
-- Clean final architecture
-
-**Cons**:
-- Highest risk (both production machines)
-- Maximum effort required
-- No comparison baseline if issues arise
-
-**Recommendation**: Not recommended unless Phase 1 demonstrates overwhelming benefits
-
-### Scenario 2: Partial migration (blackphos only)
-
-**Approach**: Migrate blackphos (secondary machine) to Clan, keep stibnite on nixos-unified
-
-**Pros**:
-- Lower risk (secondary machine)
-- Allows comparison of approaches
-- Fallback to stibnite if issues
-- Testing ground for patterns
-
-**Cons**:
-- Inconsistent management across machines
-- Still requires solving darwin+Clan challenges
-- Dual maintenance burden
-
-**Recommendation**: Viable if Phase 1 shows strong benefits and darwin support validated
-
-### Scenario 3: Service-specific migration
-
-**Approach**: Use Clan for specific distributed services, keep core machine management with nixos-unified
-
-**Example**:
-```nix
-# Clan manages only backup service
-inventory.instances.local-backup = {
-  module = { name = "borgbackup"; input = "clan-core"; };
-  roles.client.machines.stibnite = {};
-  roles.server.machines.blackphos = {};
-};
-
-# Core machine management stays with nixos-unified
-darwinConfigurations.stibnite = {
-  # ... existing nixos-unified configuration
-  # Import specific Clan services as plain NixOS modules
-};
-```
-
-**Pros**:
-- Minimal disruption to existing setup
-- Leverage Clan for specific benefits (multi-machine coordination)
-- Gradual adoption path
-- Easy rollback of individual services
-
-**Cons**:
-- Hybrid approach may be confusing
-- Limited benefit compared to full Clan features
-- Some architectural inconsistency
-
-**Recommendation**: Most practical if partial benefits desired without full migration
-
-### Scenario 4: No migration
-
-**Approach**: Keep existing hosts on nixos-unified, use Clan only for remote hosts
-
-**Pros**:
-- Zero migration risk
-- Proven stable configuration unchanged
-- Clear separation: local (nixos-unified) vs. remote (Clan)
-- Minimal learning curve
-
-**Cons**:
-- Dual management approaches
-- Miss out on Clan benefits for local hosts
-- Duplicate some shared configuration
-
-**Recommendation**: Recommended default position pending Phase 1 evaluation
+- Status: Primary daily workstation
+- Usage: Primary development environment, daily workflows
+
+**Migration characteristics**:
+- **Risk level**: High (primary workstation, daily productivity depends on it)
+- **Migration priority**: Last (only after all others proven stable)
+- **Strategic value**: Completes migration, enables full 4-machine coordination
+- **Rollback ease**: Medium (critical to preserve rollback path)
+
+**Pre-migration requirements**:
+- [ ] blackphos stable for 4-6 weeks minimum
+- [ ] rosegold stable for 2-4 weeks minimum
+- [ ] argentum stable for 2-4 weeks minimum
+- [ ] No outstanding issues with dendritic + clan pattern
+- [ ] All workflows validated on other hosts
+- [ ] Full backup of current stibnite configuration
+- [ ] Rollback procedure documented and tested
+- [ ] Low-stakes timing (not before important deadline)
+
+**Success criteria**:
+- [ ] stibnite configuration builds using established patterns
+- [ ] All daily workflows functional (development, communication, etc.)
+- [ ] No regressions compared to nixos-unified version
+- [ ] Zerotier peer role operational
+- [ ] 4-machine network complete and stable
+- [ ] Productivity maintained or improved
+
+**High-risk areas for stibnite**:
+- Complex darwin-specific configurations
+- Daily-use applications and workflows
+- Homebrew casks and GUI applications
+- System preferences and integrations
+- Performance-sensitive workloads
+
+**Rollback procedure**:
+1. Boot into recovery mode if necessary
+2. Rebuild from nixos-unified configuration: `darwin-rebuild switch --flake .#stibnite-nixos-unified`
+3. Verify all functionality restored
+4. Document issues for future migration attempt
+
+## Migration validation scenarios
+
+### Scenario 1: blackphos migration validation
+
+**Context**: First migration, establishes all patterns
+
+**Validation focus**:
+- Dendritic module structure works on darwin
+- import-tree auto-discovery functional
+- Clan inventory correctly defines darwin machines
+- Clan vars generate and deploy successfully
+- Zerotier controller role operational
+- All existing functionality preserved
+
+**Test procedure**:
+1. **Pre-migration baseline**:
+   ```bash
+   # Document current functionality
+   darwin-rebuild --version
+   # Test all critical workflows
+   # Document current packages: darwin-rebuild list
+   ```
+
+2. **Post-migration verification**:
+   ```bash
+   # Verify dendritic configuration
+   nix eval .#flake.modules.darwin --apply builtins.attrNames
+
+   # Verify host configuration
+   nix build .#darwinConfigurations.blackphos.system
+
+   # Verify clan integration
+   nix eval .#clan.inventory.machines.blackphos --json
+
+   # Verify vars deployed
+   ls -la /run/secrets/
+
+   # Verify zerotier
+   zerotier-cli status
+   zerotier-cli listnetworks
+   ```
+
+3. **Functionality comparison**:
+   - Compare package lists: before vs. after
+   - Test all development tools (git, editors, languages)
+   - Verify shell configuration (fish, aliases, functions)
+   - Test system services
+   - Validate performance (build times, responsiveness)
+
+4. **Stability monitoring** (1-2 weeks):
+   - Daily: Check for errors in system logs
+   - Weekly: Run full test suite
+   - Document any issues or regressions
+
+**Success gate**: All validation tests pass, no critical issues for 1-2 weeks → Proceed to rosegold
+
+**Failure response**: Investigate issues, fix patterns, repeat validation
+
+### Scenario 2: rosegold multi-machine validation
+
+**Context**: Second migration, validates pattern reusability and multi-machine coordination
+
+**Validation focus**:
+- blackphos patterns reusable with minimal changes
+- Zerotier multi-machine coordination works
+- Network communication between hosts functional
+- No new dendritic + clan issues discovered
+
+**Test procedure**:
+1. **Pattern reuse validation**:
+   ```bash
+   # Compare module structures
+   diff -u modules/hosts/blackphos/default.nix modules/hosts/rosegold/default.nix
+
+   # Expect only hostName differences
+   ```
+
+2. **Multi-machine coordination**:
+   ```bash
+   # From blackphos (controller):
+   zerotier-cli listpeers | grep rosegold
+   ping <rosegold-zerotier-ip>
+   ssh crs58@<rosegold-zerotier-ip> hostname
+
+   # From rosegold (peer):
+   zerotier-cli listnetworks
+   ping <blackphos-zerotier-ip>
+   ssh crs58@<blackphos-zerotier-ip> hostname
+   ```
+
+3. **Cluster services testing**:
+   - Test clan vars sharing between hosts
+   - Verify clan inventory correctly applies services to both hosts
+   - Test any distributed services (if configured)
+
+4. **Stability monitoring** (1-2 weeks):
+   - Daily: Check both hosts for errors
+   - Weekly: Test multi-machine coordination
+   - Document network stability
+
+**Success gate**: rosegold stable, multi-machine features functional for 1-2 weeks → Proceed to argentum
+
+**Failure response**: Fix multi-machine issues, update patterns if needed, repeat validation
+
+### Scenario 3: argentum final validation
+
+**Context**: Third migration, final validation before primary workstation
+
+**Validation focus**:
+- Patterns scale to three machines
+- No new issues with additional host
+- 3-machine network stable
+- Ready for primary workstation migration
+
+**Test procedure**:
+1. **Third host validation**:
+   ```bash
+   # Verify argentum uses same patterns
+   diff -u modules/hosts/rosegold/default.nix modules/hosts/argentum/default.nix
+
+   # Build and deploy
+   nix build .#darwinConfigurations.argentum.system
+   darwin-rebuild switch --flake .#argentum
+   ```
+
+2. **3-machine network validation**:
+   ```bash
+   # From blackphos (controller):
+   zerotier-cli listpeers | wc -l  # Should show 3+ peers
+
+   # Full mesh connectivity test
+   # From each machine, ping all others:
+   for host in blackphos rosegold argentum; do
+     ping -c 3 <$host-zerotier-ip>
+   done
+   ```
+
+3. **Pattern stability confirmation**:
+   - No modifications needed to existing patterns
+   - argentum configuration nearly identical to rosegold (only hostName differs)
+   - All three hosts stable and functional
+
+4. **Stability monitoring** (1-2 weeks):
+   - Daily: Check all three hosts
+   - Weekly: Test full mesh network
+   - Document any new issues
+
+**Success gate**: All three hosts stable for 1-2 weeks, no new issues → stibnite migration approved
+
+**Failure response**: Address any issues before considering stibnite migration
+
+### Scenario 4: stibnite migration readiness
+
+**Context**: Final migration of primary workstation
+
+**Validation focus**:
+- All previous hosts proven stable long-term
+- Patterns mature and well-understood
+- Risk mitigation in place
+- Rollback plan ready
+
+**Readiness checklist**:
+- [ ] blackphos stable for 4-6+ weeks
+- [ ] rosegold stable for 2-4+ weeks
+- [ ] argentum stable for 2-4+ weeks
+- [ ] No outstanding bugs or issues
+- [ ] All workflows tested on other hosts
+- [ ] Backup of current stibnite config created
+- [ ] Rollback procedure documented
+- [ ] Time available for troubleshooting (not before deadline)
+- [ ] Acceptance of temporary instability if issues arise
+
+**Test procedure**:
+1. **Pre-migration preparation**:
+   ```bash
+   # Full backup
+   darwin-rebuild list > ~/stibnite-packages-backup.txt
+   cp -r ~/projects/nix-workspace/nix-config ~/nix-config-backup-$(date +%Y%m%d)
+
+   # Document current state
+   # List all running services, applications, workflows
+   ```
+
+2. **Staged migration**:
+   - Deploy dendritic config but don't reboot immediately
+   - Test critical workflows before committing
+   - Keep terminal session open with rollback command ready
+
+3. **Post-migration critical path validation**:
+   - Test all daily-use applications immediately
+   - Verify development environment (editors, languages, tools)
+   - Check system preferences and settings
+   - Test network connectivity (including zerotier to other hosts)
+   - Validate performance
+
+4. **Extended validation** (1-2 weeks):
+   - Use stibnite as primary workstation
+   - Document any issues or regressions
+   - Compare productivity to pre-migration baseline
+
+**Success gate**: stibnite stable and functional for 1-2 weeks → Migration complete, proceed to cleanup
+
+**Failure response**: Use rollback procedure, document issues, reassess dendritic + clan approach
 
 ## Decision framework
 
-### Migration makes sense if:
+### When to proceed to next phase
 
-1. **Phase 1 demonstrates clear operational benefits**
-   - Vars system significantly easier than current secret management
-   - Multi-machine coordination valuable in practice
-   - Clan CLI provides better workflow than current tools
+Proceed to next migration phase when:
+1. **Current phase success criteria met**: All checklist items complete
+2. **Stability demonstrated**: No critical issues for 1-2 weeks minimum
+3. **Confidence high**: Understand any issues encountered and have fixes
+4. **Time available**: Can dedicate time to next migration and potential troubleshooting
 
-2. **Darwin support is mature and stable**
-   - Community adoption on darwin
-   - Issues tracked and resolved promptly
-   - Documentation covers darwin-specific patterns
+### When to pause or rollback
 
-3. **Migration effort justified by benefits**
-   - Time saved in ongoing management > migration cost
-   - Features needed (e.g., multi-machine services) unavailable otherwise
-   - Team size or complexity justifies additional tooling
+Pause or rollback if:
+1. **Critical functionality broken**: Essential workflows don't work
+2. **Frequent instability**: System crashes, errors, or unexpected behavior
+3. **Unknown issues**: Problems without clear cause or fix
+4. **Time constraints**: Important deadline approaching, can't afford disruption
+5. **Accumulating technical debt**: Workarounds piling up instead of proper fixes
 
-4. **Risk tolerance acceptable**
-   - Comfortable with potential breakage during migration
-   - Time available for troubleshooting
-   - Can afford temporary productivity loss
+### Red flags requiring investigation
 
-### Migration should be deferred if:
+Stop and investigate if:
+- Build evaluation errors
+- Missing packages or functionality
+- Clan vars not deploying
+- Zerotier network issues
+- Performance degradation
+- Unexpected system behavior
+- Errors in system logs
+- Functionality regressions
+- Pattern inconsistencies between hosts
 
-1. **Phase 1 reveals issues**
-   - Vars system more complex than expected
-   - Clan abstractions confusing or limiting
-   - Bugs or instabilities encountered
+### Success indicators
 
-2. **Current setup working well**
-   - No pain points in existing secret management
-   - Limited need for multi-machine coordination
-   - nixos-unified patterns well-understood and efficient
+Migration is successful when:
+- All hosts build cleanly
+- No functionality regressions
+- Zerotier multi-machine network operational
+- Clan vars system working correctly
+- Stable for extended period (weeks)
+- Productivity maintained or improved
+- Patterns clear and maintainable
+- Confidence high in dendritic + clan approach
 
-3. **Darwin support immature**
-   - Few community examples on darwin
-   - Known issues with darwin-specific features
-   - Homebrew or GUI app integration unclear
+## Host-specific considerations
 
-4. **Limited time or risk tolerance**
-   - Can't afford downtime on primary workstation
-   - Other priorities more important
-   - Prefer stability over new features
+### blackphos-specific
 
-## Recommended decision timeline
+**Key testing areas**:
+- Development environment (primary use case)
+- Git workflows
+- Shell configuration (fish, starship)
+- Editor/IDE setup
+- Zerotier controller functionality
 
-**Month 0 (Now)**: Complete Phase 1, deploy first remote host
-**Month 1-2**: Operate remote host, evaluate Clan workflows
-**Month 3**: Decision point - assess Phase 1 experience
+**Watch for**:
+- Zerotier controller port conflicts
+- Development tool version changes
+- Shell behavior differences
+- Editor plugin issues
 
-**At Month 3 decision point, evaluate**:
-1. How often were Clan features valuable vs. friction points?
-2. Are there specific use cases for local hosts that Clan would solve?
-3. Has Clan darwin support matured?
-4. What's the community adoption trajectory?
-5. Is the team's Clan expertise sufficient for migration?
+### rosegold-specific
 
-**If evaluation positive**: Plan partial migration (Scenario 2 or 3)
-**If evaluation mixed**: Continue current approach, re-evaluate at Month 6
-**If evaluation negative**: Keep Clan for remote only (Scenario 4)
+**Key testing areas**:
+- Zerotier peer role (connecting to blackphos controller)
+- Multi-machine network communication
+- Pattern reusability validation
 
-## Pre-migration checklist (if proceeding)
+**Watch for**:
+- Zerotier peer connection failures
+- Network routing issues
+- Differences from blackphos requiring pattern changes
 
-Before migrating any existing host to Clan:
+### argentum-specific
 
-### Technical validation
-- [ ] Phase 1 completed successfully
-- [ ] At least 2-3 months operating Clan remote hosts
-- [ ] No major issues or blockers encountered
-- [ ] Clan darwin support validated (via community or test machine)
-- [ ] Home-manager integration patterns established
-- [ ] Secret migration path tested and validated
+**Key testing areas**:
+- Third machine in zerotier network
+- Pattern stability with multiple hosts
+- Mesh network connectivity
 
-### Operational readiness
-- [ ] Full backup of current configurations
-- [ ] Rollback procedure documented and tested
-- [ ] Time allocated for migration (minimum 1 week low-priority work)
-- [ ] Acceptance of potential temporary instability
+**Watch for**:
+- Network performance with 3+ hosts
+- Zerotier scaling issues
+- Any new problems not seen with 2 hosts
 
-### Knowledge requirements
-- [ ] Comfortable with Clan inventory system
-- [ ] Understanding of Clan services vs. plain modules
-- [ ] Vars system patterns internalized
-- [ ] Troubleshooting experience from Phase 1
+### stibnite-specific
 
-### Risk mitigation
-- [ ] Secondary machine (blackphos) chosen for initial migration
-- [ ] Primary machine (stibnite) kept stable as fallback
-- [ ] Migration done during low-stakes period (not before major deadline)
-- [ ] Peer review of migration plan (if team environment)
+**Key testing areas**:
+- All daily workflows (highest priority)
+- Complex darwin configurations
+- GUI applications and system preferences
+- Performance-sensitive workloads
+- Homebrew casks
+- Development environment completeness
 
-## Specific migration considerations per host
+**Watch for**:
+- Homebrew integration issues
+- macOS-specific features broken
+- Performance regressions
+- Daily workflow disruptions
+- GUI application problems
 
-### Stibnite migration (if proceeding)
+**Critical workflows to validate immediately**:
+1. Editor/IDE (VSCode, Vim, etc.)
+2. Terminal and shell
+3. Git and version control
+4. Programming language environments
+5. Communication apps (if configured via nix)
+6. Browser (if configured via nix)
+7. System services
 
-**High-risk areas**:
-- Homebrew integration (clan-core may not support)
-- macOS system preferences (darwin-specific)
-- Touch ID authentication (pam configuration)
-- GUI applications (homebrew casks)
+## Recommended timeline
 
-**Recommended approach**:
-1. Keep core system management in darwin configuration
-2. Use Clan only for cross-machine services (if any)
-3. Defer full migration until blackphos validated
+**Conservative approach** (recommended):
+- **Week 0**: Migrate blackphos
+- **Weeks 1-2**: Monitor blackphos stability
+- **Week 3**: Migrate rosegold (if blackphos stable)
+- **Weeks 4-5**: Monitor rosegold and multi-machine features
+- **Week 6**: Migrate argentum (if rosegold stable)
+- **Weeks 7-8**: Monitor argentum and 3-machine network
+- **Week 9+**: Consider stibnite migration (if all stable)
+- **Weeks 10-11**: Monitor stibnite
+- **Week 12+**: Cleanup phase (remove nixos-unified)
 
-**Alternative**: Hybrid approach
-```nix
-# darwin configuration still primary
-darwinConfigurations.stibnite = {
-  # Existing configuration
-  # Selectively import Clan-managed services
-  imports = [
-    # Existing imports
-    inputs.clan-core.darwinModules.vars # Just use vars system
-  ];
-};
+**Aggressive approach** (higher risk):
+- **Week 0**: Migrate blackphos
+- **Week 1**: Migrate rosegold (if blackphos functional)
+- **Week 2**: Migrate argentum (if rosegold functional)
+- **Week 3+**: Consider stibnite (if all functional)
+
+**Recommended**: Conservative approach with flexibility to slow down or pause if issues arise
+
+## Rollback procedures
+
+### Per-host rollback
+
+If a single host migration fails:
+
+```bash
+# Rebuild from nixos-unified configuration
+# Ensure nixos-unified configurations preserved during migration
+darwin-rebuild switch --flake .#<hostname>-nixos-unified
+
+# Or manually:
+git checkout <pre-migration-commit>
+darwin-rebuild switch --flake .#<hostname>
 ```
 
-### Blackphos migration (if proceeding)
+### Full migration rollback
 
-**Advantages**:
-- Secondary machine (lower risk)
-- Similar to stibnite (patterns transfer)
-- Can serve as testing ground
+If dendritic + clan approach proves unsuitable:
 
-**Recommended approach**:
-1. Full migration to Clan inventory
-2. Validate all functionality
-3. Document patterns and issues
-4. Use learnings for potential stibnite migration
-
-**Validation checklist**:
-- [ ] All existing services functioning
-- [ ] Homebrew working (or replacement found)
-- [ ] System preferences applied correctly
-- [ ] Development environment intact
-- [ ] Secret management working
-- [ ] Home-manager modules functioning
-- [ ] No unexpected behaviors
+1. **Preserve nixos-unified configurations** during migration (don't delete)
+2. **Rebuild each host** from nixos-unified configs
+3. **Remove dendritic modules**: `rm -rf modules/` (after backup)
+4. **Remove clan flake inputs**: Edit `flake.nix`
+5. **Document reasons** for rollback decision
 
 ## Conclusion
 
-**Current recommendation**: **Scenario 4 (No migration of existing hosts)**
+**Key principles**:
+1. **Progressive migration**: One host at a time, validate before proceeding
+2. **Stability first**: Wait 1-2 weeks stability before next phase
+3. **Learn from each phase**: Use each migration to refine patterns
+4. **Primary last**: Migrate stibnite only after all others proven stable
+5. **Preserve rollback**: Keep nixos-unified configs until migration complete
 
-**Rationale**:
-1. Current nixos-unified setup is working well
-2. Limited multi-machine coordination needs between local hosts
-3. Migration risk and effort not justified by clear benefits
-4. Clan's primary value for this use case is remote host management
-5. Can re-evaluate after Phase 1 experience
+**Success depends on**:
+- Careful validation at each phase
+- Stability monitoring between phases
+- Willingness to pause or rollback if issues arise
+- Time for troubleshooting and refinement
 
-**Re-evaluation triggers**:
-- Significant pain points emerge in current local host management
-- New requirements for multi-machine coordination across local hosts
-- Clan darwin support demonstrates clear maturity and community adoption
-- Vars system proves dramatically superior to current secret management
-- New Clan features emerge that address specific pain points
-
-## Alternative: Selective feature adoption
-
-Rather than full migration, consider adopting specific Clan features:
-
-**Example 1: Vars system only**
-```nix
-darwinConfigurations.stibnite = {
-  imports = [
-    # Existing imports
-    inputs.clan-core.darwinModules.vars
-  ];
-
-  # Use Clan vars generators for secrets
-  clan.core.vars.generators.my-secret = {
-    # ... generator definition
-  };
-
-  # Rest of configuration unchanged
-};
-```
-
-**Example 2: Specific service modules**
-```nix
-darwinConfigurations.stibnite = {
-  imports = [
-    # Existing imports
-    inputs.clan-core.clanServices.borgbackup.roles.client.perInstance.nixosModule
-  ];
-
-  # Use Clan's borgbackup client module but not full inventory
-};
-```
-
-This hybrid approach may provide benefits without full migration overhead.
-
-## Further reading
-
-- Clan darwin support status: Check clan-core issues and discussions
-- Community examples: Search for darwin configurations using Clan
-- Migration stories: Clan community chat for others' experiences
-- Phase 1 retrospective: `./phase-1-retrospective.md` (to be written after Phase 1)
+**Expected outcome**: After 8-12 weeks, all hosts migrated to dendritic + clan with proven stable patterns, ready for Phase 5 cleanup.
