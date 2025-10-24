@@ -120,7 +120,18 @@ This directory contains comprehensive documentation for migrating nix-config fro
 
 ### Dendritic flake-parts pattern
 
-**Core principle**: Eliminate specialArgs, centralize all values through flake-parts module system
+**Why dendritic? Type safety through module system**
+
+Nix lacks a native type system, but the Nix module system provides type checking through explicit option types.
+flake-parts extends the module system to flakes.
+The dendritic pattern maximizes module system usage, thereby maximizing type safety in flake configurations.
+
+Both clan-core and clan-infra already use flake-parts.
+The dendritic pattern is an incremental optimization that increases type safety by organizing all code as flake-parts modules.
+
+**Priority**: clan functionality is primary; dendritic is a best-effort optimization applied where compatible.
+
+**Core principle**: eliminate specialArgs, centralize all values through flake-parts module system
 
 **Key features**:
 - **Module namespace**: Every module contributes to `flake.modules.{darwin,homeManager,nixos}.*`
