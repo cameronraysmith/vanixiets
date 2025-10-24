@@ -14,7 +14,7 @@
 This guide provides step-by-step instructions for implementing Phase 2 of the dendritic flake-parts + clan-core migration.
 Phase 2 migrates blackphos (the first darwin host) from nixos-unified to the dendritic pattern with clan-core integration, establishing darwin-specific patterns for subsequent host migrations.
 
-**Prerequisites for Phase 2**: Phase 1 (cinnabar VPS) must be operational. Verify with: `ssh root@<cinnabar-ip> zerotier-cli info`
+**Prerequisites for Phase 2**: Phase 0 (test-clan validation) completed and Phase 1 (cinnabar VPS) operational. Verify cinnabar with: `ssh root@<cinnabar-ip> zerotier-cli info`
 
 ## Prerequisites
 
