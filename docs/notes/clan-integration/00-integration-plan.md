@@ -1,34 +1,43 @@
-# Clan integration plan for nixos-unified based configuration
+# Clan integration plan for dendritic flake-parts + clan-core migration
 
 ## Executive summary
 
-This document provides a comprehensive integration plan for adding Clan (clan.lol) capabilities to the existing nixos-unified based nix-config repository.
-The integration follows a phased approach: Phase 1 adds new remote Clan-managed hosts without disrupting existing local configurations, and Phase 2 evaluates migrating existing hosts to Clan management.
+This document provides a comprehensive migration plan for transitioning nix-config from nixos-unified to the dendritic flake-parts pattern with clan-core integration.
+The migration follows a staged host-by-host approach: migrate test machines first (blackphos → rosegold → argentum), validate multi-machine coordination, then migrate the primary workstation (stibnite) last.
+This eliminates nixos-unified while adopting clan-core's inventory system, vars management, and multi-machine service coordination using the dendritic pattern's `flake.modules.*` namespace.
 
 ## Repository analysis
 
-### Current nix-config architecture
+### Current nix-config architecture (pre-migration)
 
 **Foundation**: nixos-unified with flake-parts
 **Structure**:
 - `flake.nix`: Uses `flake-parts.lib.mkFlake` with auto-wired imports from `./modules/flake-parts/`
-- `configurations/{darwin,home,nixos}/`: Host-specific configurations
+- `configurations/{darwin,home,nixos}/`: Host-specific configurations via nixos-unified autowire
 - `modules/{darwin,home,nixos}/`: Modular system and home-manager configurations
 - `secrets/`: SOPS-based secrets management (both agenix and sops-nix available)
 - `overlays/`, `packages/`: Custom package definitions
 - `docs/notes/`: Documentation organized by topic
 
 **Current hosts**:
-- `stibnite` (darwin): Primary workstation
-- `blackphos` (darwin): Secondary system
+- `stibnite` (darwin, aarch64): Primary daily workstation (migrate LAST)
+- `blackphos` (darwin, aarch64): Already activated, test migration first (migrate FIRST)
+- `rosegold` (darwin, aarch64): Not currently in daily use (migrate SECOND)
+- `argentum` (darwin, aarch64): Not currently in daily use (migrate THIRD)
 - `stibnite-nixos`, `blackphos-nixos` (nixos): CI validation mirrors
 - `orb-nixos` (nixos): OrbStack/LXD test configurations
 
-**Module organization**:
-- Clean separation between darwin-only, home-only, and shared modules
-- `modules/flake-parts/nixos-flake.nix` imports nixos-unified's flake modules
-- Type-safe, functional patterns emphasized throughout
-- Strong preference for explicit effects at boundaries
+**Migration order rationale**:
+1. **blackphos**: Already has nix-config activated, not primary workstation (lowest risk)
+2. **rosegold**: Not in daily use, can test zerotier multi-machine coordination
+3. **argentum**: Not in daily use, validates patterns before primary migration
+4. **stibnite**: Primary workstation, migrate only after all others proven stable
+
+**Module organization (will change)**:
+- Current: Directory-based autowire (`modules/{darwin,home,nixos}/`)
+- Target: Dendritic pattern with `flake.modules.{nixos,homeManager,darwin}.*` namespace
+- nixos-unified's specialArgs will be eliminated in favor of `config.flake.*` access
+- import-tree will replace manual directory scanning
 
 ### Clan architecture overview
 
@@ -134,75 +143,234 @@ inventory.instances = {
 - `clan machines update <machine>`: Deploy configuration
 - `clan machines install <machine>`: Initial installation
 
+### Dendritic flake-parts pattern
+
+**Foundation**: Canonical organizational pattern where every Nix file is a flake-parts module
+**Key principle**: Eliminate specialArgs pass-through, centralize all values through flake-parts module system
+
+**Core concepts**:
+
+**Module namespace**:
+```nix
+# Every module contributes to flake.modules namespace
+{
+  flake.modules = {
+    nixos.base = { pkgs, ... }: { /* nixos config */ };
+    homeManager.shell = { pkgs, ... }: { /* home-manager config */ };
+    darwin.system = { pkgs, ... }: { /* darwin config */ };
+  };
+}
+```
+
+**Directory organization**:
+```
+modules/
+├── base/                    # Foundation modules
+│   ├── nix.nix
+│   └── system/
+├── shell/                   # Shell tools
+│   ├── fish.nix
+│   └── starship.nix
+├── dev/                     # Development tools
+│   └── git/
+├── hosts/                   # Machine-specific configurations
+│   ├── blackphos/default.nix
+│   ├── rosegold/default.nix
+│   ├── argentum/default.nix
+│   └── stibnite/default.nix
+├── flake-parts/            # Meta-level flake configuration
+│   ├── nixpkgs.nix
+│   ├── host-machines.nix
+│   └── clan.nix
+└── users/                   # User configurations
+    └── crs58/default.nix
+```
+
+**Auto-discovery with import-tree**:
+```nix
+# flake.nix
+{
+  outputs = inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; }
+    (inputs.import-tree ./modules);
+}
+```
+
+**Host composition pattern**:
+```nix
+# modules/hosts/blackphos/default.nix
+{
+  config, ...
+}:
+{
+  flake.modules.darwin."hosts/blackphos" = { ... }: {
+    imports = with config.flake.modules; [
+      # Reference modules by namespace
+      darwin.base
+      darwin.system
+      homeManager.shell
+      homeManager.dev
+    ];
+
+    # Host-specific configuration
+    networking.hostName = "blackphos";
+    # ...
+  };
+}
+```
+
+**Metadata sharing**:
+```nix
+# modules/users/crs58/default.nix
+{
+  config, ...
+}:
+{
+  flake.meta.users.crs58 = {
+    email = "user@example.com";
+    name = "User Name";
+    # ...
+  };
+
+  # Used across modules via config.flake.meta.users.crs58
+}
+```
+
+**Advantages**:
+- No specialArgs needed (everything via `config.flake.*`)
+- File path = feature name (clear organization)
+- Composable features (mix darwin + nixos + home-manager)
+- Cross-cutting concerns (modules can target multiple systems)
+- Automatic discovery (import-tree)
+- Clear option definition (declare once, use everywhere)
+
+**Reference implementation**: `~/projects/nix-workspace/dendritic-flake-parts/`
+
 ## Integration strategy
 
-### Compatibility analysis
+### Architecture alignment
 
-**Strong compatibility**:
+**Dendritic + Clan synergy**:
 - Both use flake-parts as foundational architecture
-- Both support SOPS for secrets (clan uses sops-nix, nix-config has both agenix and sops-nix)
-- Both emphasize modular, type-safe NixOS configurations
-- Both follow functional programming patterns
-- Clan's flake module integrates cleanly via flake-parts imports
+- Dendritic's `flake.modules.*` namespace pairs naturally with Clan's inventory system
+- Both eliminate specialArgs in favor of explicit module composition
+- Clan's vars system complements dendritic's metadata sharing (`flake.meta.*`)
+- Both support SOPS for secrets (clan uses sops-nix)
+- Both emphasize modular, type-safe configurations
+- import-tree auto-discovery works seamlessly with clan modules
 
-**Key differences**:
-- Clan adds inventory abstraction (not present in nixos-unified)
-- Clan's vars system vs. manual secret management
-- Clan services vs. plain NixOS modules
-- Clan assumes multi-machine coordination, nixos-unified is machine-centric
+**Architectural incompatibility with nixos-unified**:
+- nixos-unified uses specialArgs + directory-based autowire
+- Dendritic eliminates specialArgs in favor of `config.flake.*`
+- These approaches are mutually exclusive (cannot coexist cleanly)
+- clan-infra production infrastructure uses dendritic pattern, not nixos-unified
+- Decision: **Abandon nixos-unified** in favor of dendritic + clan
 
-**Integration approach**:
-- Add clan-core as flake input
-- Import `clan-core.flakeModules.default` in flake-parts imports
-- Define `clan.inventory` for Clan-managed machines
-- Keep existing configurations unchanged (stibnite, blackphos)
-- Use separate module organization for Clan-specific services
+**Migration approach**:
+1. Add clan-core and import-tree as flake inputs
+2. Create `modules/` directory with dendritic structure
+3. Convert modules incrementally to `flake.modules.*` namespace
+4. Migrate hosts one at a time: blackphos → rosegold → argentum → stibnite
+5. Remove nixos-unified after all hosts migrated
+6. Validate at each step before proceeding
 
-### Directory structure proposal
+**Risk mitigation**:
+- Migrate non-primary machines first (blackphos, rosegold, argentum)
+- Keep stibnite on nixos-unified until others proven stable
+- Each host migration can be rolled back independently
+- Dendritic pattern proven in production (drupol-dendritic-infra, clan-infra)
+- Multi-machine testing possible with multiple test hosts
+
+### Directory structure (target state)
 
 ```
 nix-config/
-├── flake.nix                      # Add clan-core input
-├── configurations/
-│   ├── darwin/                    # Unchanged
-│   ├── home/                      # Unchanged
-│   └── nixos/
-│       ├── stibnite-nixos.nix    # Unchanged
-│       ├── blackphos-nixos.nix   # Unchanged
-│       └── remote/                # NEW: Clan-managed remote hosts
-│           ├── hetzner-01.nix
-│           └── hetzner-02.nix
-├── modules/
-│   ├── darwin/                    # Unchanged
-│   ├── home/                      # Unchanged
-│   ├── nixos/                     # Unchanged
-│   ├── flake-parts/
-│   │   ├── nixos-flake.nix       # Unchanged
-│   │   └── clan.nix               # NEW: Clan inventory and instances
-│   └── clan/                      # NEW: Clan-specific shared modules
-│       └── hetzner-base.nix
-├── secrets/
-│   ├── hosts/                     # Existing SOPS structure
-│   ├── services/
-│   ├── users/
-│   └── clan/                      # NEW: Clan vars storage
-│       ├── groups/
-│       ├── machines/
-│       ├── secrets/
-│       └── users/
+├── flake.nix                      # Simplified: import-tree ./modules
+├── modules/                        # CHANGED: Dendritic pattern (flat categories)
+│   ├── base/                      # Foundation modules
+│   │   ├── nix.nix                # Core nix settings
+│   │   └── system.nix             # State versions
+│   ├── darwin/                    # Darwin-specific modules
+│   │   ├── homebrew.nix
+│   │   └── system-preferences.nix
+│   ├── shell/                     # Shell tools
+│   │   ├── fish.nix
+│   │   ├── starship.nix
+│   │   └── direnv.nix
+│   ├── dev/                       # Development tools
+│   │   └── git/
+│   │       ├── git.nix
+│   │       └── jj.nix
+│   ├── hosts/                     # Machine-specific configurations
+│   │   ├── blackphos/default.nix  # First to migrate
+│   │   ├── rosegold/default.nix   # Second to migrate
+│   │   ├── argentum/default.nix   # Third to migrate
+│   │   └── stibnite/default.nix   # Last to migrate (primary)
+│   ├── flake-parts/               # Flake-level configuration
+│   │   ├── nixpkgs.nix            # Nixpkgs setup and overlays
+│   │   ├── host-machines.nix      # Generate darwinConfigurations
+│   │   └── clan.nix               # Clan inventory and instances
+│   └── users/                     # User configurations
+│       └── crs58/default.nix      # User metadata and config
+├── secrets/                        # CHANGED: Clan vars only (migrate from sops)
+│   ├── groups/
+│   │   └── admins/                # Admin group age keys
+│   ├── machines/
+│   │   ├── blackphos/
+│   │   ├── rosegold/
+│   │   ├── argentum/
+│   │   └── stibnite/
+│   ├── secrets/                   # Encrypted secrets
+│   └── users/
+│       └── crs58/                 # User age keys
+├── overlays/                      # Existing overlays preserved
+├── packages/                      # Existing packages preserved
 └── docs/notes/
     └── clan-integration/          # This directory
         ├── 00-integration-plan.md # This document
-        ├── 01-phase-1-guide.md    # Phase 1 implementation
-        └── 02-migration-assessment.md # Phase 2 evaluation
+        ├── 01-phase-1-guide.md    # Migration implementation
+        └── 02-migration-assessment.md # Host-specific considerations
+```
+
+**Migration path**:
+```
+Phase 0: Preparation
+- Add clan-core and import-tree inputs
+- Create modules/ structure alongside existing files
+
+Phase 1: Module conversion
+- Convert modules/{darwin,home,nixos}/* to modules/{base,shell,dev}/*
+- Update to flake.modules.{darwin,homeManager,nixos}.* namespace
+- Keep existing configurations/ active during conversion
+
+Phase 2: Host migration (blackphos)
+- Create modules/hosts/blackphos/default.nix
+- Add to clan inventory
+- Test and validate
+- Once stable, can reference for other hosts
+
+Phase 3: Test hosts (rosegold, argentum)
+- Create modules/hosts/{rosegold,argentum}/default.nix
+- Test zerotier multi-machine coordination
+- Validate dendritic + clan patterns
+
+Phase 4: Primary migration (stibnite)
+- Migrate only after others proven stable
+- Create modules/hosts/stibnite/default.nix
+- Final validation
+
+Phase 5: Cleanup
+- Remove configurations/ directory
+- Remove nixos-unified flake input and module
+- Migrate all secrets to clan vars
 ```
 
 **Rationale**:
-- Minimal changes to existing structure
-- Clear separation between local (nixos-unified) and remote (Clan) hosts
-- Clan-specific concerns isolated to new directories
-- Both secret management approaches can coexist during transition
-- Module organization maintains current patterns
+- Dendritic pattern: flat feature categories, clear module namespace
+- import-tree: automatic discovery eliminates manual imports
+- clan inventory: centralized multi-machine coordination
+- Progressive migration: each host independently testable
+- Rollback safety: old structure remains until all hosts migrated
 
 ### Flake modifications
 
@@ -210,23 +378,38 @@ nix-config/
 ```nix
 {
   inputs = {
-    # Existing inputs...
+    # Remove nixos-unified
+    # nixos-unified.url = "github:srid/nixos-unified";
+
+    # Add clan-core and import-tree
     clan-core.url = "git+https://git.clan.lol/clan/clan-core";
     clan-core.inputs.nixpkgs.follows = "nixpkgs";
     clan-core.inputs.flake-parts.follows = "flake-parts";
     clan-core.inputs.sops-nix.follows = "sops-nix";
     clan-core.inputs.home-manager.follows = "home-manager";
+    clan-core.inputs.nix-darwin.follows = "nix-darwin";
+
+    import-tree.url = "github:vic/import-tree";
   };
 }
 ```
 
-**Import additions** in `flake.nix`:
+**Flake structure** (simplified with import-tree):
 ```nix
 {
-  imports = with builtins;
-    map (fn: ./modules/flake-parts/${fn}) (attrNames (readDir ./modules/flake-parts));
-  # This will automatically pick up ./modules/flake-parts/clan.nix
+  outputs = inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; }
+    (inputs.import-tree ./modules);
+  # import-tree recursively imports all .nix files in modules/
+  # Each file is a flake-parts module contributing to flake.modules.*
 }
+```
+
+**Remove nixos-unified module** from `modules/flake-parts/nixos-flake.nix`:
+```nix
+# DELETE THIS FILE or remove nixos-unified imports:
+# - inputs.nixos-unified.flakeModules.default
+# - inputs.nixos-unified.flakeModules.autoWire
 ```
 
 **New file** `modules/flake-parts/clan.nix`:
@@ -238,213 +421,467 @@ nix-config/
   ];
 
   clan = {
-    meta.name = "nix-config-remote";
+    meta.name = "nix-config";
     specialArgs = { inherit inputs; };
+
     inventory.machines = {
-      # Remote Clan-managed machines defined here
+      blackphos = {
+        tags = [ "darwin" "workstation" ];
+        machineClass = "darwin";
+      };
+      rosegold = {
+        tags = [ "darwin" "workstation" ];
+        machineClass = "darwin";
+      };
+      argentum = {
+        tags = [ "darwin" "workstation" ];
+        machineClass = "darwin";
+      };
+      stibnite = {
+        tags = [ "darwin" "workstation" "primary" ];
+        machineClass = "darwin";
+      };
     };
+
     inventory.instances = {
-      # Clan service instances defined here
+      # Essential services
+      emergency-access = {
+        module = { name = "emergency-access"; input = "clan-core"; };
+        roles.default.tags."workstation" = {};
+      };
+
+      users-crs58 = {
+        module = { name = "users"; input = "clan-core"; };
+        roles.default.tags."workstation" = {};
+        roles.default.settings = {
+          user = "crs58";
+          share = true;
+        };
+      };
+
+      zerotier-local = {
+        module = { name = "zerotier"; input = "clan-core"; };
+        roles.controller.machines.blackphos = {};
+        roles.peer.tags."workstation" = {};
+      };
     };
+
     secrets.sops.defaultGroups = [ "admins" ];
   };
 }
 ```
 
-### Module integration patterns
-
-**Pattern 1: Isolated Clan services**
-Create Clan-specific modules that only apply to Clan-managed hosts:
+**New file** `modules/flake-parts/host-machines.nix`:
 ```nix
-# modules/clan/hetzner-base.nix
-{ lib, ... }:
 {
-  # Common configuration for all Hetzner remote hosts
-  networking.firewall.enable = true;
-  services.openssh.settings.PasswordAuthentication = false;
-  # ... Hetzner-specific settings
+  inputs,
+  lib,
+  config,
+  ...
+}:
+let
+  prefix = "hosts/";
+  collectHostsModules = modules:
+    lib.filterAttrs (name: _: lib.hasPrefix prefix name) modules;
+in
+{
+  flake.darwinConfigurations = lib.pipe
+    (collectHostsModules config.flake.modules.darwin) [
+      (lib.mapAttrs' (
+        name: module:
+        let
+          hostName = lib.removePrefix prefix name;
+        in
+        {
+          name = hostName;
+          value = inputs.nix-darwin.lib.darwinSystem {
+            specialArgs = { inherit inputs; };
+            modules = [
+              inputs.home-manager.darwinModules.home-manager
+              {
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+              }
+              module
+            ];
+          };
+        }
+      ))
+    ];
 }
 ```
 
-**Pattern 2: Shared module adaptation**
-Some existing modules can be reused for both local and Clan-managed hosts:
-```nix
-# modules/nixos/shared/nix.nix (existing)
-# Already works for both local and Clan-managed hosts
-```
+### Module integration patterns (dendritic)
 
-**Pattern 3: Conditional Clan features**
-Use `lib.mkIf` to conditionally enable Clan features:
+**Pattern 1: Base modules (cross-platform)**
 ```nix
-{ config, lib, ... }:
+# modules/base/nix.nix
 {
-  config = lib.mkIf (config.clan.core.settings.machine.name != null) {
-    # Clan-specific configuration
+  flake.modules = {
+    nixos.base = { pkgs, ... }: {
+      nix.settings = {
+        experimental-features = [ "nix-command" "flakes" ];
+        trusted-users = [ "root" "@wheel" ];
+      };
+    };
+
+    darwin.base = { pkgs, ... }: {
+      nix.settings = {
+        experimental-features = [ "nix-command" "flakes" ];
+        trusted-users = [ "root" "@admin" ];
+      };
+    };
   };
 }
 ```
 
-### Secrets management integration
+**Pattern 2: Cross-cutting modules (system + home)**
+```nix
+# modules/shell/fish.nix
+{
+  flake.modules = {
+    darwin.shell = {
+      programs.fish.enable = true;
+    };
 
-**Coexistence strategy**:
-- Existing secrets continue using current sops-nix/agenix setup
-- New Clan-managed machines use Clan vars system
-- Both store encrypted secrets in git (compatible approaches)
-- Gradual migration possible by converting existing secrets to vars generators
-
-**Clan vars directory**:
+    homeManager.shell = { pkgs, ... }: {
+      programs.fish = {
+        enable = true;
+        shellAliases = {
+          ls = "eza";
+          cat = "bat";
+        };
+      };
+    };
+  };
+}
 ```
-secrets/clan/
+
+**Pattern 3: Host-specific composition**
+```nix
+# modules/hosts/blackphos/default.nix
+{
+  config, ...
+}:
+{
+  flake.modules.darwin."hosts/blackphos" = { ... }: {
+    imports = with config.flake.modules; [
+      darwin.base
+      darwin.system
+      darwin.homebrew
+    ];
+
+    # Host-specific config
+    networking.hostName = "blackphos";
+    system.stateVersion = 5;
+
+    # Home-manager for user
+    home-manager.users.crs58 = {
+      imports = with config.flake.modules.homeManager; [
+        shell
+        dev
+      ];
+      home.stateVersion = "25.05";
+    };
+  };
+}
+```
+
+**Pattern 4: Metadata sharing**
+```nix
+# modules/users/crs58/default.nix
+{
+  config, ...
+}:
+{
+  # Define metadata
+  flake.meta.users.crs58 = {
+    email = "user@example.com";
+    name = "User Name";
+    sshKeys = [ "ssh-ed25519 AAAAC3..." ];
+  };
+
+  # Use in darwin module
+  flake.modules.darwin.users = { ... }: {
+    users.users.crs58 = {
+      description = config.flake.meta.users.crs58.name;
+      openssh.authorizedKeys.keys = config.flake.meta.users.crs58.sshKeys;
+    };
+  };
+
+  # Use in home-manager module
+  flake.modules.homeManager.users = { ... }: {
+    programs.git = {
+      userName = config.flake.meta.users.crs58.name;
+      userEmail = config.flake.meta.users.crs58.email;
+    };
+  };
+}
+```
+
+**Pattern 5: Conditional features by tag**
+```nix
+# modules/dev/tools.nix
+{
+  config, lib, ...
+}:
+{
+  flake.modules.homeManager.dev = { pkgs, ... }: {
+    home.packages = with pkgs; [
+      ripgrep
+      fd
+      jq
+    ] ++ lib.optionals (builtins.elem "primary" config.clan.inventory.machines.${config.networking.hostName}.tags) [
+      # Extra tools only on primary workstation
+      kubectl
+      terraform
+    ];
+  };
+}
+```
+
+### Secrets management (clan vars)
+
+**Migration strategy**:
+- Replace sops-nix/agenix with clan vars system
+- Migrate secrets during host conversion (Phase 0-4)
+- Clan vars provides declarative generation and deployment
+- Single encrypted secrets store in git
+
+**Clan vars directory structure**:
+```
+secrets/
 ├── groups/
-│   └── admins/          # Admin age keys
+│   └── admins/              # Admin group age keys
 ├── machines/
-│   ├── hetzner-01/      # Per-machine age keys
-│   └── hetzner-02/
-├── secrets/
-│   └── (encrypted files managed by clan CLI)
+│   ├── blackphos/           # Per-machine age keys and secrets
+│   ├── rosegold/
+│   ├── argentum/
+│   └── stibnite/
+├── secrets/                 # Shared encrypted secrets
 └── users/
-    └── crs58/           # User age keys
+    └── crs58/               # User age keys
 ```
 
 **Initialization**:
 ```bash
 # Generate age key for yourself
-clan secrets key generate
+nix run nixpkgs#clan-cli -- secrets key generate
 
 # Create admin group
-mkdir -p secrets/clan/groups/admins
-clan secrets groups add admins
+nix run nixpkgs#clan-cli -- secrets groups add admins
 
 # Add yourself as admin
-clan secrets users add crs58 <your-age-public-key>
-clan secrets groups add-user admins crs58
+YOUR_AGE_KEY=$(grep 'public key:' ~/.config/sops/age/keys.txt | awk '{print $4}')
+nix run nixpkgs#clan-cli -- secrets users add crs58 "$YOUR_AGE_KEY"
+nix run nixpkgs#clan-cli -- secrets groups add-user admins crs58
 ```
 
-## Phase 1: New remote hosts with Clan
+**Secret migration example**:
+```nix
+# Old: manual sops secret
+sops.secrets.example = {
+  sopsFile = ./secrets/hosts/blackphos.yaml;
+  # Manual management
+};
 
-### Objectives
+# New: clan vars generator
+clan.core.vars.generators.example = {
+  prompts.value.description = "Example secret";
+  script = ''
+    echo -n "$(cat $prompts/value)" > $out/secret
+  '';
+  files.secret = { secret = true; };
+};
 
-- Add Clan capabilities without disrupting existing configurations
-- Deploy 1-2 Hetzner remote hosts using Clan
-- Demonstrate Clan's multi-machine coordination
-- Validate vars system for secrets management
-- Establish patterns for future remote deployments
+# Use: config.clan.core.vars.generators.example.files.secret.path
+```
 
-### Success criteria
+## Migration phases
 
-- [ ] Clan-core integrated into flake
-- [ ] At least one remote host successfully deployed
-- [ ] Vars system managing SSH keys, user passwords
-- [ ] SSHD service with CA-signed certificates working
-- [ ] Existing local hosts (stibnite, blackphos) unaffected
-- [ ] Documentation updated with deployment workflow
-- [ ] CI continues passing
+### Phase 0: Preparation (blackphos parallel environment)
 
-### Implementation steps
+**Objective**: Set up dendritic + clan alongside existing nixos-unified
 
-See `01-phase-1-guide.md` for detailed implementation steps.
+**Tasks**:
+- Add clan-core and import-tree flake inputs
+- Create `modules/` directory with dendritic structure
+- Initialize clan secrets
+- Keep existing `configurations/` active
 
-## Phase 2: Migration assessment
+**Success criteria**:
+- [ ] Flake evaluates with clan-core integrated
+- [ ] import-tree discovers modules/
+- [ ] Secrets initialized
+- [ ] Existing configs still build
 
-### Evaluation criteria
+### Phase 1: blackphos migration
 
-**Benefits of migrating existing hosts to Clan**:
-1. **Unified management**: Single toolset for all hosts
-2. **Multi-machine services**: Leverage Clan services across local and remote
-3. **Declarative secrets**: Replace manual secret management with vars
-4. **Service instances**: Cleaner organization of distributed services
-5. **Inventory abstraction**: Tag-based configuration reduces duplication
+**Objective**: Migrate first machine as proof of concept
 
-**Costs of migration**:
-1. **Breaking changes**: Existing configurations need restructuring
-2. **Learning curve**: New abstractions (inventory, roles, instances)
-3. **Tooling change**: Switch from nixos-unified's patterns to Clan's
-4. **Testing overhead**: Validate all existing functionality preserved
-5. **Complexity**: Additional layer of abstraction
+**Tasks**:
+- Convert darwin modules to dendritic pattern in `modules/{base,darwin,shell,dev}/`
+- Create `modules/hosts/blackphos/default.nix`
+- Add to clan inventory
+- Generate vars for blackphos
+- Deploy and validate
 
-**Recommendation**:
-- Defer Phase 2 until Phase 1 validates Clan's benefits in production
-- Re-evaluate after 2-3 months of operating Clan-managed remote hosts
-- Likely candidates for migration: services that benefit from multi-machine coordination (backups, monitoring, overlay networks)
-- Unlikely candidates: Local-only configurations, homebrew setup, darwin-specific features
+**Success criteria**:
+- [ ] blackphos builds with dendritic + clan
+- [ ] All functionality preserved
+- [ ] Zerotier network operational (blackphos as controller)
+- [ ] Secrets deployed via clan vars
 
-See `02-migration-assessment.md` for detailed analysis.
+### Phase 2: rosegold migration
+
+**Objective**: Validate patterns on second machine
+
+**Tasks**:
+- Create `modules/hosts/rosegold/default.nix` (reuse blackphos patterns)
+- Add to clan inventory with zerotier peer role
+- Generate vars and deploy
+- Test multi-machine zerotier coordination
+
+**Success criteria**:
+- [ ] rosegold operational
+- [ ] blackphos ↔ rosegold zerotier communication
+- [ ] Patterns validated for reuse
+
+### Phase 3: argentum migration
+
+**Objective**: Third machine validation before primary
+
+**Tasks**:
+- Create `modules/hosts/argentum/default.nix`
+- Add to clan inventory
+- Deploy and test
+- Validate 3-machine zerotier network
+
+**Success criteria**:
+- [ ] argentum operational
+- [ ] 3-machine coordination working
+- [ ] Ready for primary migration
+
+### Phase 4: stibnite migration
+
+**Objective**: Migrate primary workstation
+
+**Tasks**:
+- Create `modules/hosts/stibnite/default.nix`
+- Extra validation and testing
+- Deploy only after phases 1-3 stable
+- Keep fallback path available
+
+**Success criteria**:
+- [ ] stibnite operational
+- [ ] All daily workflows functional
+- [ ] 4-machine zerotier network complete
+
+### Phase 5: Cleanup
+
+**Objective**: Remove legacy infrastructure
+
+**Tasks**:
+- Delete `configurations/` directory
+- Remove nixos-unified flake input
+- Remove old secrets structure
+- Update documentation
+
+**Success criteria**:
+- [ ] Clean dendritic + clan architecture
+- [ ] No nixos-unified remnants
+- [ ] Documentation updated
 
 ## Key decisions and tradeoffs
 
-### Decision 1: Separate directory structure vs. unified
+### Decision 1: Dendritic pattern vs. nixos-unified
 
-**Chosen**: Separate directories for Clan-managed hosts
+**Chosen**: Abandon nixos-unified, adopt dendritic pattern
 **Rationale**:
-- Minimizes risk to existing configurations
-- Clear separation of concerns
-- Easier rollback if Clan doesn't meet needs
-- Gradual migration path
+- Dendritic + clan architectural alignment (both eliminate specialArgs)
+- clan-infra production infrastructure uses dendritic, not nixos-unified
+- Cleaner `flake.modules.*` namespace vs directory autowire
+- import-tree auto-discovery more flexible than directory scanning
+- Proven scalability (drupol-dendritic-infra, clan-infra)
 
-**Tradeoff**: Some duplication of shared modules
+**Tradeoff**: Migration effort, but progressive per-host approach mitigates risk
 
-### Decision 2: Dual secrets systems vs. full migration
+### Decision 2: Migration order
 
-**Chosen**: Dual systems (existing + Clan vars)
+**Chosen**: blackphos → rosegold → argentum → stibnite
 **Rationale**:
-- Existing secrets continue working
-- Clan vars proven in new deployments before migration
-- No forced migration timeline
-- Lower risk
+- blackphos already activated, not daily driver (lowest risk)
+- rosegold and argentum not in daily use (safe testing grounds)
+- stibnite migrated last after patterns proven (highest value, highest risk)
+- Multi-machine coordination testable with multiple non-primary hosts
 
-**Tradeoff**: Two systems to maintain temporarily
+**Tradeoff**: Cannot test on primary workstation until late in process
 
-### Decision 3: Instance organization in flake vs. separate files
+### Decision 3: Clan vars vs. sops-nix/agenix
 
-**Chosen**: Single `modules/flake-parts/clan.nix` for inventory
+**Chosen**: Fully migrate to clan vars
 **Rationale**:
-- Follows clan-infra pattern
-- Inventory naturally centralized (service coordination)
-- Easier to see complete multi-machine topology
-- Consistent with flake-parts philosophy
+- Declarative generation cleaner than manual management
+- Integrated with clan deployment workflow
+- Proven in clan-infra production
+- Single secret management approach
 
-**Tradeoff**: Large file as instances grow (can refactor later)
+**Tradeoff**: Must migrate all secrets, but done incrementally per host
 
-### Decision 4: Clan services vs. plain NixOS modules
+### Decision 4: Flat module organization vs. nested
 
-**Chosen**: Use Clan services for multi-machine coordination, plain modules for single-machine
+**Chosen**: Flat feature categories (modules/{base,shell,dev,hosts}/)
 **Rationale**:
-- Leverage Clan's strengths (inventory, roles, multi-machine)
-- Keep simple configurations simple
-- Gradual adoption of Clan abstractions
+- Dendritic pattern: file path = feature name
+- Clear namespace (flake.modules.{nixos,darwin,homeManager}.*)
+- Cross-cutting concerns enabled (one module, multiple targets)
+- Matches reference implementations
 
-**Tradeoff**: Two module styles in same repo
+**Tradeoff**: Different from nixos-unified's modules/{darwin,home,nixos}/ but cleaner separation
 
 ## Open questions
 
-1. **SOPS backend configuration**: Does Clan's default SOPS setup conflict with existing sops-nix configuration?
-   - **Investigation needed**: Test both systems in same flake
-   - **Mitigation**: Use separate secret paths
+1. **Module conversion strategy**: Convert all modules at once or incrementally?
+   - **Chosen**: Incrementally per host to enable rollback
+   - **Approach**: Create modules/ alongside configurations/, migrate per host
 
-2. **Home-manager integration**: Can Clan-managed machines use existing home-manager modules?
-   - **Answer**: Yes, Clan imports home-manager, works normally
-   - **Pattern**: Reference home modules from Clan machine configs
+2. **Home-manager integration with dendritic**: How to structure home-manager modules?
+   - **Pattern**: `flake.modules.homeManager.*` imported in host configs
+   - **Validation**: Test with blackphos first
 
-3. **Darwin support**: Can Clan manage darwin machines?
-   - **Answer**: Clan supports darwin via machineClass = "darwin"
-   - **Validation needed**: Test with local darwin hosts
+3. **Darwin-specific features**: Do all darwin features work with clan?
+   - **Homebrew**: Should work as normal NixOS module
+   - **System preferences**: Standard darwin module
+   - **Validation**: Test thoroughly with blackphos
 
-4. **Build caching**: How does Clan affect cachix/binary cache usage?
-   - **Answer**: Transparent, Clan uses standard nix builds
-   - **Benefit**: Can cache Clan-core derivations
+4. **Zerotier network topology**: Which machine is controller?
+   - **Chosen**: blackphos (first migrated, always on)
+   - **Rationale**: Stable, not primary workstation
 
-5. **Deployment authentication**: How to bootstrap SSH access to fresh Hetzner hosts?
-   - **Pattern from clan-infra**: Terraform deploys SSH keys, then Clan takes over
-   - **Alternative**: Hetzner rescue mode + manual key installation
+5. **Rollback strategy**: How to rollback individual host if migration fails?
+   - **Approach**: Keep configurations/ until all hosts migrated
+   - **Per-host**: Can rebuild from nixos-unified until proven stable
 
 ## Next steps
 
-1. **Immediate**: Read `01-phase-1-guide.md` and begin Phase 1 implementation
-2. **After Phase 1**: Operate remote hosts for 2-3 months, gather experience
-3. **Future**: Re-evaluate Phase 2 migration based on Phase 1 learnings
-4. **Ongoing**: Document patterns, update this plan as understanding evolves
+1. **Immediate**: Read `01-phase-1-guide.md` for detailed implementation steps
+2. **Phase 0**: Set up dendritic structure parallel to existing configs
+3. **Phase 1**: Migrate blackphos, establish patterns
+4. **Phases 2-3**: Migrate rosegold and argentum, validate multi-machine
+5. **Phase 4**: Migrate stibnite only after others proven
+6. **Phase 5**: Clean up legacy infrastructure
+7. **Ongoing**: Document learnings, refine patterns
 
 ## References
+
+### Dendritic pattern
+- Canonical pattern: `~/projects/nix-workspace/dendritic-flake-parts/`
+- README: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
+- Production examples:
+  - `~/projects/nix-workspace/drupol-dendritic-infra/` (comprehensive)
+  - `~/projects/nix-workspace/gaetanlepage-dendritic-nix-config/`
+  - `~/projects/nix-workspace/mightyiam-dendritic-infra/`
+  - `~/projects/nix-workspace/vic-dendritic-vix/`
 
 ### Clan documentation
 - Architecture decisions: `~/projects/nix-workspace/clan-core/docs/site/decisions/`
@@ -453,9 +890,14 @@ See `02-migration-assessment.md` for detailed analysis.
 - Getting started: `~/projects/nix-workspace/clan-core/docs/site/getting-started/`
 
 ### Example repositories
-- clan-infra: `~/projects/nix-workspace/clan-infra` (production infrastructure)
+- clan-infra: `~/projects/nix-workspace/clan-infra` (production, uses dendritic)
 - clan-core: `~/projects/nix-workspace/clan-core` (monorepo with modules and CLI)
+- Supporting clan examples:
+  - `~/projects/nix-workspace/jfly-clan-snow/` (darwin + clan)
+  - `~/projects/nix-workspace/mic92-clan-dotfiles/` (comprehensive, dendritic + clan)
+  - `~/projects/nix-workspace/pinpox-clan-nixos/` (custom clan services)
 
 ### Local references
 - Current config: `~/projects/nix-workspace/nix-config`
 - Preferences: `~/.claude/commands/preferences/`
+- import-tree: `~/projects/nix-workspace/import-tree/`
