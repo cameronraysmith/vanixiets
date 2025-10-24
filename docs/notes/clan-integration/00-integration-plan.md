@@ -856,30 +856,33 @@ Reference repository analysis reveals:
 
 ## Migration phases
 
-### Phase 0: Validation (test-clan)
+### Phase 0: Validation (test-clan/)
 
-**Objective**: Validate dendritic + clan integration in minimal test environment
+**Objective**: determine optimal balance of dendritic pattern with clan functionality
 
-**Location**: `~/projects/nix-workspace/test-clan/`
+**Foundation**: clan + flake-parts (proven in clan-core, clan-infra)
+**Experiment**: how much dendritic optimization is compatible?
 
 **Tasks**:
-- Convert test-clan from old clan API to dendritic + flake-parts
-- Create minimal dendritic module structure
-- Configure clan inventory with test machine
-- Deploy essential clan services
-- Test all integration points
-- Build nixosConfiguration successfully
-- Document findings and patterns
+- Create minimal test-clan/ environment
+- Implement clan with flake-parts (known working)
+- Apply dendritic patterns where feasible
+- Document where compromises are necessary
+- Evaluate type safety benefits vs complexity costs
+
+**Outcomes** (all valid):
+- Dendritic-optimized clan (best case)
+- Hybrid approach (pragmatic)
+- Vanilla clan pattern (proven alternative)
 
 **Success criteria**:
-- [ ] test-clan flake evaluates successfully
-- [ ] import-tree discovers dendritic modules
-- [ ] Clan inventory evaluates correctly
-- [ ] nixosConfiguration builds
-- [ ] Clan vars generation succeeds
-- [ ] Integration points documented
-- [ ] Patterns extracted for cinnabar
-- [ ] No critical blockers
+- [ ] Clan functionality validated
+- [ ] Dendritic feasibility assessed
+- [ ] Pattern decision made for Phase 1
+- [ ] Trade-offs documented
+
+**Not a pass/fail on full dendritic adoption.**
+**Is a characterization of what's feasible and beneficial.**
 
 **Timeline**: 1 week for implementation + validation
 
