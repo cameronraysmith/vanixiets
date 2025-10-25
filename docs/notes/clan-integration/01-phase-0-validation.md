@@ -1150,6 +1150,543 @@ Phase 0 fails only if:
 Technical clan functionality is required.
 Full dendritic pattern is aspirational.
 
+## Phase 0.5: Darwin validation (STRONGLY RECOMMENDED)
+
+### Strategic rationale: why darwin validation before production deployment?
+
+**Problem identified**: Phase 0 validates dendritic + clan on NixOS, but the first darwin + clan test is Phase 2 (blackphos), which is a production host.
+
+**Risk without Phase 0.5**:
+- Unknown darwin-specific integration issues
+- First encounter with nix-darwin + clan + dendritic three-way integration
+- Home-manager nested in darwin with clan services untested
+- No rollback testing before production deployment
+- Potential productivity loss on working development machine
+
+**Solution: Phase 0.5 darwin VM or test environment**
+- Validate darwin + clan + dendritic integration before blackphos
+- Test home-manager + clan combination
+- Verify rollback procedures work
+- Identify darwin-specific issues in safe environment
+- Reduce Phase 2 risk significantly
+
+### Darwin VM options
+
+**Option A: OrbStack darwin container** (if available):
+```bash
+# Create lightweight darwin test environment
+orb create darwin-test -a aarch64
+orb shell darwin-test
+```
+
+**Option B: UTM virtual machine**:
+- Create aarch64 darwin VM using UTM
+- Install nix via https://nixos.org/download.html
+- Clone nix-config in VM
+
+**Option C: Separate test machine** (if available):
+- Use argentum or rosegold as test environment
+- Not currently in daily use, acceptable for testing
+
+**Option D: Git branch on blackphos** (higher risk):
+- Create test branch
+- Deploy and validate
+- Rollback if issues found
+
+### Phase 0.5 implementation steps
+
+**Prerequisites**:
+- Phase 0 (NixOS validation) completed successfully
+- Darwin VM or test environment available
+- Integration findings from Phase 0 documented
+
+**Step 1: Set up darwin test environment**
+
+Choose one of the VM options above and ensure nix is installed.
+
+**Step 2: Create minimal darwin + clan configuration in test-clan**
+
+Extend test-clan to include darwin configuration alongside NixOS:
+
+**File**: `~/projects/nix-workspace/test-clan/modules/hosts/test-darwin/default.nix`
+
+```nix
+{
+  config,
+  pkgs,
+  ...
+}:
+{
+  flake.modules.darwin."hosts/test-darwin" = {
+    imports = [
+      # Base modules from Phase 0
+      config.flake.modules.darwin.base-nix
+    ];
+
+    # Host identification
+    networking = {
+      computerName = "test-darwin";
+      hostName = "test-darwin";
+    };
+
+    # Darwin state version
+    system.stateVersion = 5;
+
+    # Basic packages for testing
+    environment.systemPackages = with pkgs; [
+      vim
+      git
+      curl
+    ];
+
+    # Home-manager integration (critical test)
+    home-manager.users.testuser = {
+      imports = [
+        # Test home-manager module
+      ];
+      home = {
+        username = "testuser";
+        homeDirectory = "/Users/testuser";
+        stateVersion = "25.05";
+      };
+    };
+  };
+}
+```
+
+**Step 3: Create darwin base modules**
+
+**File**: `~/projects/nix-workspace/test-clan/modules/base/darwin.nix`
+
+```nix
+{
+  flake.modules.darwin.base-nix = {
+    pkgs,
+    ...
+  }: {
+    nix.settings = {
+      experimental-features = [
+        "nix-command"
+        "flakes"
+      ];
+      trusted-users = [
+        "root"
+        "@admin"
+      ];
+    };
+
+    nix.gc = {
+      automatic = true;
+      options = "--delete-older-than 30d";
+    };
+  };
+}
+```
+
+**Step 4: Update clan inventory for darwin**
+
+**File**: `~/projects/nix-workspace/test-clan/modules/flake-parts/clan.nix`
+
+Add darwin machine to inventory:
+
+```nix
+inventory.machines = {
+  test-vm = {
+    tags = [ "nixos" "test" ];
+    machineClass = "nixos";
+  };
+  test-darwin = {
+    tags = [ "darwin" "test" "workstation" ];
+    machineClass = "darwin";
+  };
+};
+```
+
+**Step 5: Create darwinConfigurations generator**
+
+**File**: `~/projects/nix-workspace/test-clan/modules/flake-parts/darwin-machines.nix`
+
+```nix
+{
+  inputs,
+  lib,
+  config,
+  ...
+}:
+let
+  prefix = "hosts/";
+  collectHostsModules = modules: lib.filterAttrs (name: _: lib.hasPrefix prefix name) modules;
+in
+{
+  flake.darwinConfigurations = lib.pipe (collectHostsModules config.flake.modules.darwin) [
+    (lib.mapAttrs' (
+      name: module:
+      let
+        hostName = lib.removePrefix prefix name;
+      in
+      {
+        name = hostName;
+        value = inputs.nixpkgs.lib.darwinSystem {
+          specialArgs = {
+            inherit inputs;
+          };
+          modules = [
+            inputs.home-manager.darwinModules.home-manager
+            {
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+            }
+            module
+          ];
+        };
+      }
+    ))
+  ];
+}
+```
+
+**Step 6: Update test-clan flake inputs**
+
+Ensure nix-darwin and home-manager are included:
+
+```nix
+inputs = {
+  # ... existing inputs ...
+
+  nix-darwin.url = "github:LnL7/nix-darwin";
+  nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+
+  home-manager.url = "github:nix-community/home-manager";
+  home-manager.inputs.nixpkgs.follows = "nixpkgs";
+};
+```
+
+**Step 7: Build darwin configuration**
+
+```bash
+cd ~/projects/nix-workspace/test-clan
+
+# Verify darwinConfiguration generated
+nix eval .#darwinConfigurations --apply builtins.attrNames
+# Expected: [ "test-darwin" ]
+
+# Build darwin system
+nix build .#darwinConfigurations.test-darwin.system
+
+# Check for evaluation errors
+nix flake check
+```
+
+**Step 8: Generate clan vars for darwin**
+
+```bash
+# Generate vars for test-darwin
+nix run nixpkgs#clan-cli -- vars generate test-darwin
+
+# Verify vars generated
+nix run nixpkgs#clan-cli -- vars list test-darwin
+ls -la sops/machines/test-darwin/
+```
+
+**Step 9: Deploy to darwin test environment**
+
+```bash
+# In darwin VM or test machine:
+./result/sw/bin/darwin-rebuild switch --flake .#test-darwin
+
+# Or if building from outside and deploying:
+# darwin-rebuild switch --flake .#test-darwin --target-host user@test-darwin-ip
+```
+
+**Step 10: Validate darwin + clan integration**
+
+```bash
+# On test-darwin, verify:
+
+# 1. Clan services configured
+systemctl --user status  # Check services running
+
+# 2. Clan vars deployed
+ls -la /run/secrets/
+# Expected: Emergency access, zerotier files, etc.
+
+# 3. Zerotier peer connection (if configured)
+zerotier-cli status
+zerotier-cli listnetworks
+
+# 4. Home-manager active
+home-manager --version
+
+# 5. Dendritic modules loaded
+darwin-rebuild --version
+```
+
+**Step 11: Test rollback procedure (CRITICAL)**
+
+This validates emergency recovery before production use:
+
+```bash
+# On test-darwin:
+
+# 1. Document current system generation
+darwin-rebuild --list-generations
+
+# 2. Make a trivial configuration change
+# Edit modules/hosts/test-darwin/default.nix
+# Add a comment or test package
+
+# 3. Deploy the change
+darwin-rebuild switch --flake .#test-darwin
+
+# 4. Verify new generation active
+darwin-rebuild --list-generations
+
+# 5. ROLLBACK to previous generation
+sudo /nix/var/nix/profiles/system-<previous-number>-link/activate
+
+# 6. Verify rollback successful
+darwin-rebuild --list-generations
+# Current should be previous generation
+
+# 7. Document rollback experience
+# - Time taken
+# - Issues encountered
+# - Services that needed restart
+# - Functionality restored
+
+# 8. Alternative: Rollback via darwin-rebuild
+darwin-rebuild switch --rollback
+
+# 9. Test git-based rollback
+git log --oneline -n 5
+git checkout HEAD~1
+darwin-rebuild switch --flake .#test-darwin
+# Verify older configuration active
+git checkout -  # Return to latest
+```
+
+**Step 12: Test home-manager + clan integration**
+
+```bash
+# Verify home-manager works with clan services
+
+# 1. Check home-manager configuration
+home-manager packages | head -n 20
+
+# 2. Verify clan services in user context
+systemctl --user list-units | grep -i clan
+
+# 3. Test home-manager standalone rebuild
+home-manager switch --flake .#test-darwin
+
+# 4. Verify no conflicts with clan vars
+ls -la ~/.config/
+ls -la /run/secrets/
+```
+
+**Step 13: Test common darwin workflows**
+
+```bash
+# Test typical darwin operations:
+
+# 1. System updates
+nix flake update
+darwin-rebuild switch --flake .#test-darwin
+
+# 2. Package installation test
+# Add package to environment.systemPackages
+# Rebuild and verify
+
+# 3. Shell environment
+fish  # or your shell
+# Verify aliases, functions work
+
+# 4. Development tools
+git --version
+nix --version
+
+# 5. Performance check
+time darwin-rebuild switch --flake .#test-darwin --dry-run
+# Note evaluation time for comparison
+```
+
+### Phase 0.5 validation checklist
+
+After completing all steps:
+
+- [ ] Darwin test environment set up successfully
+- [ ] test-clan builds darwinConfiguration without errors
+- [ ] Clan inventory includes darwin machine
+- [ ] Clan vars generate for darwin successfully
+- [ ] Darwin deployment succeeds (darwin-rebuild switch works)
+- [ ] Clan services configure correctly on darwin
+- [ ] Home-manager integrates without conflicts
+- [ ] Zerotier peer connection functional (if tested)
+- [ ] Rollback procedure tested and documented (CRITICAL)
+- [ ] Common darwin workflows validated
+- [ ] Evaluation time acceptable (<5 minutes for dry-run)
+- [ ] Integration findings documented
+
+### Darwin-specific integration tests
+
+**Test 1: Dendritic modules on darwin**
+```bash
+nix eval .#flake.modules.darwin --apply builtins.attrNames
+# Expected: base-nix, hosts/test-darwin, etc.
+```
+
+**Test 2: Clan inventory with darwin machine**
+```bash
+nix eval .#clan.inventory.machines.test-darwin --json
+# Expected: machineClass = "darwin", tags include "workstation"
+```
+
+**Test 3: Home-manager + clan vars coexistence**
+```bash
+# Verify both home-manager and clan secrets deploy
+ls -la ~/.config/  # Home-manager files
+ls -la /run/secrets/  # Clan vars
+# Should coexist without conflicts
+```
+
+**Test 4: Darwin services + clan services**
+```bash
+# Verify darwin services don't conflict with clan services
+systemctl --user list-units
+# Both should be present
+```
+
+### Success criteria: evaluating Phase 0.5 outcomes
+
+Phase 0.5 is successful when:
+
+**Technical validation**:
+- [ ] Darwin configuration builds successfully
+- [ ] Dendritic + clan + darwin three-way integration works
+- [ ] Home-manager + clan combination functional
+- [ ] Rollback procedure verified (tested and documented)
+
+**Integration characterization**:
+- [ ] Documented: darwin-specific issues encountered
+- [ ] Documented: how they were resolved
+- [ ] Documented: patterns that differ from NixOS
+- [ ] Evaluated: performance acceptable for daily use
+
+**Decision readiness**:
+- [ ] Confidence in Phase 2 (blackphos) success: >80%
+- [ ] Rollback path proven functional
+- [ ] Emergency procedures tested and documented
+- [ ] Ready to migrate production darwin host
+
+### Red flags requiring investigation
+
+Stop Phase 0.5 and investigate if:
+- Darwin configuration fails to build (evaluation errors)
+- Clan services don't configure on darwin
+- Home-manager conflicts with clan vars
+- Rollback procedure fails
+- Severe performance issues (>10 minute evaluations)
+- Fundamental darwin + clan incompatibilities
+
+### Go/No-Go decision for Phase 2
+
+After Phase 0.5 completion, evaluate whether to proceed to Phase 2 (blackphos):
+
+**GO - Proceed to Phase 2** if:
+- ✅ All validation tests pass
+- ✅ Rollback procedure verified working
+- ✅ Darwin-specific issues understood and resolved
+- ✅ Confidence level >80%
+
+**NO-GO - Pause or revise** if:
+- ❌ Fundamental darwin + clan conflicts
+- ❌ Rollback procedure unreliable
+- ❌ Severe performance issues
+- ❌ Home-manager integration broken
+
+### Timeline
+
+**Phase 0.5 duration**: 2-4 hours (darwin VM setup + testing)
+**Rollback testing**: 30 minutes (critical for safety)
+**Total**: 1 day including documentation
+
+**Recommended schedule**:
+- Week 0: Phase 0 (NixOS validation)
+- Week 0.5: Phase 0.5 (darwin validation) ← NEW
+- Week 1-3: Phase 1 (cinnabar VPS)
+- Week 4-6: Phase 2 (blackphos) ← now significantly de-risked
+
+### Documentation artifacts
+
+Create these documents from Phase 0.5:
+
+**File**: `~/projects/nix-workspace/test-clan/DARWIN-FINDINGS.md`
+
+```markdown
+# Darwin + Clan integration findings
+
+Date: YYYY-MM-DD
+Tester: [your name]
+
+## What works perfectly
+
+- [ ] Darwin configuration builds
+- [ ] Clan services on darwin
+- [ ] Home-manager integration
+- [ ] Rollback procedure
+- [ ] Zerotier peer connection
+- [ ] [other tests]
+
+## Darwin-specific issues encountered
+
+### Issue 1: [describe]
+**Solution**: [describe]
+
+### Issue 2: [describe]
+**Solution**: [describe]
+
+## Rollback testing results
+
+**Rollback method tested**: [darwin-rebuild --rollback / manual activation / git checkout]
+**Time to rollback**: [X minutes]
+**Services requiring restart**: [list]
+**Issues encountered**: [describe]
+**Overall assessment**: [Pass/Fail with notes]
+
+## Recommendations for blackphos deployment
+
+1. [Recommendation based on findings]
+2. [Recommendation based on findings]
+
+## Performance notes
+
+- Evaluation time (dry-run): [X seconds]
+- Rebuild time: [X minutes]
+- Comparison to nixos-unified: [faster/slower/same]
+```
+
+**File**: `~/projects/nix-workspace/test-clan/DARWIN-PATTERNS.md`
+
+```markdown
+# Proven patterns for darwin + clan deployment
+
+## Darwin configuration pattern
+
+[Extract working darwin configuration structure]
+
+## Home-manager integration pattern
+
+[Extract working home-manager + clan pattern]
+
+## Rollback procedure (verified)
+
+[Document exact rollback steps that worked]
+
+## Differences from NixOS
+
+[Document darwin-specific considerations]
+```
+
 ## Next steps: Phase 1 (cinnabar VPS deployment)
 
 After Phase 0 validation succeeds:
