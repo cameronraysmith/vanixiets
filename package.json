@@ -1,17 +1,96 @@
 {
   "name": "nix-config",
-  "version": "0.0.0",
+  "version": "0.0.0-development",
   "private": true,
   "description": "NixOS and home-manager configuration",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cameronraysmith/nix-config.git"
+  },
+  "license": "MIT",
   "workspaces": [
     "packages/*"
   ],
   "packageManager": "bun@1.1.38",
-  "dependencies": {
-    "@astrojs/cloudflare": "^12.6.10",
-    "@astrojs/starlight": "^0.36.1",
-    "@types/node": "^24.9.1",
-    "astro": "^5.15.1",
-    "wrangler": "^4.45.0"
+  "scripts": {
+    "test-release": "semantic-release --dry-run --no-ci"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.0",
+    "conventional-changelog-conventionalcommits": "^9.1.0",
+    "semantic-release": "^25.0.1",
+    "semantic-release-major-tag": "^0.3.2",
+    "semantic-release-monorepo": "^8.0.2"
+  },
+  "release": {
+    "extends": "semantic-release-monorepo",
+    "branches": [
+      {
+        "name": "main"
+      }
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "conventionalcommits",
+          "parserOpts": {
+            "noteKeywords": [
+              "BREAKING CHANGE",
+              "BREAKING-CHANGE"
+            ]
+          }
+        }
+      ],
+      [
+        "@semantic-release/release-notes-generator",
+        {
+          "preset": "conventionalcommits",
+          "parserOpts": {
+            "noteKeywords": [
+              "BREAKING CHANGE",
+              "BREAKING-CHANGE",
+              "NOTABLE CHANGE",
+              "NOTABLE-CHANGE"
+            ]
+          }
+        }
+      ],
+      [
+        "@semantic-release/changelog",
+        {
+          "changelogTitle": "# Changelog"
+        }
+      ],
+      [
+        "@semantic-release/github",
+        {
+          "failComment": false,
+          "successComment": false,
+          "addReleases": "bottom"
+        }
+      ],
+      [
+        "semantic-release-major-tag",
+        {
+          "customTags": [
+            "v${major}",
+            "v${major}.${minor}"
+          ]
+        }
+      ],
+      [
+        "@semantic-release/git",
+        {
+          "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
+          "assets": [
+            "CHANGELOG.md"
+          ]
+        }
+      ]
+    ],
+    "npmPublish": false
   }
 }
