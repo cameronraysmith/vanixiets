@@ -1,10 +1,10 @@
 ---
 title: Getting started
-description: Quick start guide for using typescript-nix-template
+description: Quick start guide for using nix-config
 ---
 
-Welcome to typescript-nix-template!
-This guide will help you get started quickly whether you're using this template for a new project or exploring its features.
+Welcome to nix-config!
+This guide will help you get started with this NixOS and nix-darwin configuration repository.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ cd YOUR_REPO
 
 **Option B: Fork manually**
 ```bash
-git clone https://github.com/sciexp/typescript-nix-template.git my-project
+git clone https://github.com/cameronraysmith/nix-config.git my-project
 cd my-project
 rm -rf .git
 git init
@@ -81,7 +81,7 @@ Visit http://localhost:4321 to see your site.
 This is a Bun workspace monorepo:
 
 ```
-typescript-nix-template/
+nix-config/
 ├── packages/
 │   └── docs/                 # Astro Starlight documentation
 │       ├── src/             # Source code
@@ -171,7 +171,7 @@ If you're using this as a template for your project:
 
 If you're contributing to this template:
 
-1. **Read contributing guidelines** - See [CONTRIBUTING.md](https://github.com/sciexp/typescript-nix-template/blob/main/CONTRIBUTING.md)
+1. **Read contributing guidelines** - See [CONTRIBUTING.md](https://github.com/cameronraysmith/nix-config/blob/main/CONTRIBUTING.md)
 2. **Understand architecture** - Read [Architecture decisions](/reference/architecture)
 3. **Follow conventions** - Use conventional commits for semantic versioning
 4. **Test changes** - Run full test suite before committing
@@ -222,7 +222,7 @@ See [Template usage guide](/guides/template-usage#adding-more-packages) for deta
 just docs dev              # Run dev in docs package
 
 # Using bun directly
-bun run --filter '@typescript-nix-template/docs' dev
+bun run --filter '@nix-config/docs' dev
 ```
 
 ### Deploying to Cloudflare Workers
@@ -340,8 +340,8 @@ just test-e2e
 
 ### Community
 
-- [GitHub Discussions](https://github.com/sciexp/typescript-nix-template/discussions) - Ask questions
-- [GitHub Issues](https://github.com/sciexp/typescript-nix-template/issues) - Report bugs or request features
+- [GitHub Discussions](https://github.com/cameronraysmith/nix-config/discussions) - Ask questions
+- [GitHub Issues](https://github.com/cameronraysmith/nix-config/issues) - Report bugs or request features
 
 ## What's next?
 
