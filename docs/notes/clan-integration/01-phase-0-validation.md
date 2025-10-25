@@ -17,7 +17,7 @@ Analysis of reference repositories reveals:
 **No production example exists combining both patterns.**
 
 **Risk without Phase 0**: Current documentation proposes deploying this untested combination directly to production VPS (cinnabar), creating compound debugging complexity across 8 simultaneous layers:
-1. Dendritic pattern (import-tree, flake.modules.*)
+1. Dendritic flake-parts pattern (import-tree, flake.modules.*)
 2. Clan-core flake-parts integration
 3. Terraform/terranix provisioning
 4. Hetzner Cloud infrastructure
@@ -35,7 +35,7 @@ Analysis of reference repositories reveals:
 ## Prerequisites
 
 - [ ] Read `00-integration-plan.md` for complete migration context
-- [ ] Read dendritic pattern documentation: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
+- [ ] Read dendritic flake-parts pattern documentation: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
 - [ ] Read clan getting started: `~/projects/nix-workspace/clan-core/docs/site/getting-started/`
 - [ ] Understanding of flake-parts module system
 - [ ] Familiarity with nixos module system
@@ -111,7 +111,7 @@ git checkout -b phase-0-dendritic-validation main
 
 ## Step 3: Rewrite flake.nix for dendritic + clan pattern
 
-Replace flake.nix with dendritic pattern:
+Replace flake.nix with dendritic flake-parts pattern:
 
 **File**: `~/projects/nix-workspace/test-clan/flake.nix`
 
@@ -153,7 +153,7 @@ nix flake lock  # Update lockfile
 nix flake show  # Verify flake evaluates (will fail initially, that's expected)
 ```
 
-Expected at this point: Evaluation errors because modules/ doesn't follow dendritic pattern yet.
+Expected at this point: Evaluation errors because modules/ doesn't follow dendritic flake-parts pattern yet.
 
 ## Step 4: Create dendritic module directory structure
 
@@ -852,7 +852,7 @@ Tester: [your name]
 
 ## What requires compromise
 
-- Describe any deviations from pure dendritic pattern
+- Describe any deviations from pure dendritic flake-parts pattern
 - Describe any clan features that needed adjustment
 - Note any conflicts resolved
 
@@ -998,7 +998,7 @@ After completing all steps:
   ```
   Expected: Both return `true`, services configured by clan
 
-- [ ] **Integration 4: specialArgs vs dendritic pattern compatibility**
+- [ ] **Integration 4: specialArgs vs dendritic flake-parts pattern compatibility**
   ```bash
   # Check if clan's specialArgs usage conflicts with dendritic approach
   nix eval .#clan.specialArgs --json
@@ -1025,7 +1025,7 @@ After completing all steps:
 
 ## Evaluation framework: assessing dendritic feasibility
 
-Phase 0 determines how much dendritic pattern can be applied while preserving clan functionality.
+Phase 0 determines how much dendritic flake-parts pattern can be applied while preserving clan functionality.
 
 ### Evaluation criteria
 
@@ -1080,7 +1080,7 @@ Phase 0 determines how much dendritic pattern can be applied while preserving cl
 
 ### Acceptable compromises
 
-**When dendritic patterns must be relaxed**:
+**When dendritic flake-parts patterns must be relaxed**:
 
 1. **Clan requires specialArgs**:
    - Document why and where
@@ -1284,7 +1284,7 @@ mv modules/constants.nix lib/constants.nix
 
 ## Success criteria: evaluating Phase 0 outcomes
 
-Phase 0 is successful when it provides **clear answers** about dendritic feasibility with clan, regardless of whether full dendritic pattern is achievable.
+Phase 0 is successful when it provides **clear answers** about dendritic feasibility with clan, regardless of whether full dendritic flake-parts pattern is achievable.
 
 ### Required outcomes (must achieve all)
 
@@ -1296,7 +1296,7 @@ Phase 0 is successful when it provides **clear answers** about dendritic feasibi
 - [ ] At least one deployment successful (VM or test machine)
 
 **Integration characterization**:
-- [ ] Documented: what dendritic patterns work cleanly with clan
+- [ ] Documented: what dendritic flake-parts patterns work cleanly with clan
 - [ ] Documented: where compromises are necessary
 - [ ] Documented: specific clan features requiring dendritic violations
 - [ ] Evaluated: type safety benefits gained vs complexity added
@@ -1310,7 +1310,7 @@ Phase 0 is successful when it provides **clear answers** about dendritic feasibi
 ### Outcome scenarios (all valid)
 
 **Outcome 1: dendritic-optimized clan** (best case)
-- Most code follows dendritic pattern
+- Most code follows dendritic flake-parts pattern
 - Minimal compromises needed
 - Clear type safety benefits
 - Code clearer than alternatives
@@ -1343,7 +1343,7 @@ Phase 0 fails only if:
 - No clear pattern identified for Phase 1
 
 Technical clan functionality is required.
-Full dendritic pattern is aspirational.
+Full dendritic flake-parts pattern is aspirational.
 
 ## Phase 0.5: Darwin validation (STRONGLY RECOMMENDED)
 
@@ -1898,7 +1898,7 @@ After Phase 0 validation succeeds:
 
 ## Additional resources
 
-### Dendritic pattern
+### Dendritic flake-parts pattern
 - Pattern documentation: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
 - Production examples:
   - `~/projects/nix-workspace/drupol-dendritic-infra/` (dendritic only, no clan)
