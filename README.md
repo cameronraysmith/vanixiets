@@ -165,8 +165,7 @@ nix-config/
 ├── docs/                # Documentation
 │   ├── notes/           # Technical notes and guides
 │   └── development/     # Development workflows
-├── tests/               # Integration tests
-└── disabled/            # Temporarily disabled configurations
+└── tests/               # Integration tests
 ```
 
 ## Directory-to-output mapping
