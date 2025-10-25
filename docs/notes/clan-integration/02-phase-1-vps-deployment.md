@@ -1134,6 +1134,128 @@ nix run .#terraform.terraform -- apply
 # Clan will reinstall NixOS with same configuration
 ```
 
+## CI/CD validation for Phase 1
+
+### Update nix-config justfile for cinnabar
+
+Add cinnabar-specific recipes to the nix-config justfile:
+
+**File**: `~/projects/nix-workspace/nix-config/justfile`
+
+Add to the `nixos` group:
+
+```just
+# Build cinnabar VPS configuration
+[group('nixos')]
+nixos-build-cinnabar:
+  nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel
+
+# Test cinnabar configuration (dry-run)
+[group('nixos')]
+nixos-test-cinnabar:
+  nixos-rebuild test --flake .#cinnabar --dry-run
+
+# Deploy to cinnabar VPS
+[group('nixos')]
+deploy-cinnabar:
+  nix run nixpkgs#clan-cli -- machines install cinnabar
+```
+
+Add to the `clan` group:
+
+```just
+# Generate vars for cinnabar
+[group('clan')]
+vars-generate-cinnabar:
+  nix run nixpkgs#clan-cli -- vars generate cinnabar
+
+# Show cinnabar in clan inventory
+[group('clan')]
+show-cinnabar-inventory:
+  nix eval .#clan.inventory.machines.cinnabar --json | nix run nixpkgs#jq
+```
+
+Add to the `CI/CD` group:
+
+```just
+# Build cinnabar for CI validation
+[group('CI/CD')]
+ci-build-cinnabar:
+  just nixos-build-cinnabar
+```
+
+### Update CI workflow for cinnabar
+
+Update `.github/workflows/ci.yaml` to include cinnabar build:
+
+**File**: `~/projects/nix-workspace/nix-config/.github/workflows/ci.yaml`
+
+Add to the `nix` job matrix:
+
+```yaml
+# In the matrix section, add:
+- system: x86_64-linux
+  runner: ubuntu-latest
+  category: nixos
+  config: cinnabar  # NEW
+```
+
+The existing `ci-build-category` script will handle building cinnabar automatically.
+
+### Local validation before CI
+
+Before pushing to CI, validate locally:
+
+```bash
+cd ~/projects/nix-workspace/nix-config
+
+# Enter devshell
+nix develop
+
+# Validate cinnabar builds
+just ci-build-cinnabar
+
+# Validate flake evaluation
+just check
+
+# Validate clan inventory includes cinnabar
+just show-cinnabar-inventory
+
+# Run full CI validation locally
+just ci-local
+```
+
+### CI validation checklist
+
+After Phase 1 deployment:
+
+- [ ] Cinnabar configuration builds in CI (GitHub Actions)
+- [ ] Justfile recipes for cinnabar work locally
+- [ ] `just check` passes (flake evaluation)
+- [ ] `just ci-build-cinnabar` succeeds
+- [ ] Clan inventory includes cinnabar machine
+- [ ] Terraform configuration validates (if using terraform CI job)
+- [ ] No CI failures after cinnabar integration
+
+### Benefits of CI validation
+
+1. **Early detection**: CI catches configuration errors before deployment
+2. **Reproducibility**: Same commands work locally and in CI (`just` recipes)
+3. **Confidence**: Successful CI run means configuration is valid
+4. **Documentation**: CI workflow serves as executable documentation
+5. **Team collaboration**: Others can validate changes before deployment
+
+### Troubleshooting CI failures
+
+**Issue**: Cinnabar build fails in CI but works locally
+**Solution**: Check system differences (x86_64-linux vs aarch64-darwin), ensure inputs.follows are correct
+
+**Issue**: Terraform validation fails
+**Solution**: Verify secrets are available in CI (SOPS_AGE_KEY secret), check terraform state encryption
+
+**Issue**: Clan vars generation fails in CI
+**Solution**: CI shouldn't run vars generation (requires secrets), only build validation
+
 ## Next steps: Phase 2 (blackphos migration)
 
 After cinnabar is stable (monitor for 1-2 weeks), proceed to Phase 2 (blackphos migration).
