@@ -6,5 +6,12 @@
   "workspaces": [
     "packages/*"
   ],
-  "packageManager": "bun@1.1.38"
+  "packageManager": "bun@1.1.38",
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.6.10",
+    "@astrojs/starlight": "^0.36.1",
+    "@types/node": "^24.9.1",
+    "astro": "^5.15.1",
+    "wrangler": "^4.45.0"
+  }
 }
