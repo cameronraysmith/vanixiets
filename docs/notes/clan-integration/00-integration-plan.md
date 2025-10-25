@@ -873,16 +873,18 @@ Reference repository analysis reveals:
 
 ## Migration phases
 
-### Phase 0: Validation (test-clan/)
+### Phase 0: Pattern validation (test-clan/)
 
-**Objective**: determine optimal balance of dendritic flake-parts pattern with clan functionality
+**Repository**: `~/projects/nix-workspace/test-clan/` (experimental, `main` branch)
+
+**Objective**: Determine optimal balance of dendritic flake-parts pattern with clan functionality
 
 **Foundation**: clan + flake-parts (proven in clan-core, clan-infra)
-**Experiment**: how much dendritic optimization is compatible?
+**Experiment**: How much dendritic optimization is compatible?
 
 **Tasks**:
-- Create minimal test-clan/ environment
-- Implement clan with flake-parts (known working)
+- Create test-clan/ repository with minimal environment
+- Implement clan with flake-parts (known working baseline)
 - Apply dendritic flake-parts patterns where feasible
 - Document where compromises are necessary
 - Evaluate type safety benefits vs complexity costs
@@ -907,48 +909,62 @@ Reference repository analysis reveals:
 
 **Optional but strongly recommended**: Phase 0.5 (darwin validation) - see Phase 0 guide for details. Validates darwin + clan + dendritic integration in a test environment before production darwin deployment (Phase 2).
 
-### Phase 1: VPS infrastructure (cinnabar)
+### Phase 1: Infrastructure deployment (test-clan/ → cinnabar VPS)
 
-**Objective**: Deploy always-on infrastructure and validate dendritic + clan on NixOS
+**Repository**: `~/projects/nix-workspace/test-clan/` (same experimental repo, `main` branch)
 
-**Strategic value**: VPS-first approach validates the integration on clan's native platform (NixOS) before attempting darwin migration, provides stable foundation for darwin hosts
+**Objective**: Deploy cinnabar VPS to Hetzner Cloud as complete end-to-end proof of concept
+
+**Strategic value**: Validates the entire stack (dendritic + clan + terraform + real infrastructure) before touching production nix-config
 
 **Tasks**:
-- Add clan-core, import-tree, terranix, disko, srvos flake inputs
-- Create `modules/` directory with dendritic structure
-- Initialize clan secrets (age keys, API tokens)
-- Setup terraform/terranix for Hetzner Cloud provisioning
-- Create `modules/hosts/cinnabar/` with disko configuration
+- Add clan-core, import-tree, terranix, disko, srvos flake inputs to test-clan
+- Setup terraform/terranix for Hetzner Cloud provisioning (learn from clan-infra patterns)
+- Initialize clan secrets (age keys, Hetzner API tokens)
+- Create cinnabar host configuration with disko for LUKS encryption
 - Configure zerotier controller role on cinnabar
 - Deploy VPS via terraform + clan machines install
-- Keep existing `configurations/` active (darwin hosts unaffected)
+- Validate complete infrastructure stack
 
 **Success criteria**:
 - [ ] Flake evaluates with all new inputs
 - [ ] Terranix configuration generates valid terraform
-- [ ] Hetzner Cloud VPS provisioned successfully
+- [ ] Hetzner Cloud VPS provisioned successfully from test-clan
 - [ ] NixOS installed on cinnabar with LUKS encryption
 - [ ] Zerotier controller operational on cinnabar
-- [ ] SSH daemon with CA certificates
-- [ ] Emergency access functional
+- [ ] SSH daemon with CA certificates functional
+- [ ] Emergency access working
 - [ ] Clan vars deployed correctly
-- [ ] Existing darwin configs still build
+- [ ] Complete stack proven (dendritic + clan + terraform + infrastructure)
 
 **Timeline**: 1-2 weeks for deployment + 1-2 weeks monitoring stability
 
 **Detailed guide**: `02-phase-1-vps-deployment.md`
 
-### Phase 2: First darwin host (blackphos)
+**CRITICAL**: Phase 1 completes the test-clan proof of concept. Phase 2 begins migration to production nix-config.
 
-**Objective**: Migrate first darwin machine, validate darwin + clan integration
+### Phase 2: Production integration (nix-config + blackphos)
+
+**Repository**: `~/projects/nix-workspace/nix-config/` (production config, `clan` branch)
+
+**Objective**: Apply proven patterns from test-clan to production nix-config, migrate first darwin host
+
+**CRITICAL TRANSITION**: This is where we migrate from test-clan to nix-config
 
 **Tasks**:
-- Convert darwin modules to dendritic flake-parts pattern in `modules/{base,darwin,shell,dev}/`
-- Create `modules/hosts/blackphos/default.nix`
-- Configure blackphos as zerotier peer (connects to cinnabar controller)
-- Add to clan inventory
-- Generate vars for blackphos
-- Deploy with darwin-rebuild switch
+- **Apply test-clan learnings to nix-config**:
+  - Add clan-core, import-tree, terranix, disko, srvos flake inputs
+  - Create `modules/` directory with proven patterns from test-clan
+  - Setup terraform/terranix (copy/adapt from test-clan)
+  - Transfer or redeploy cinnabar management to nix-config
+  - Initialize clan secrets for nix-config machines
+- **Migrate blackphos**:
+  - Convert darwin modules to dendritic flake-parts pattern (or hybrid if test-clan showed that's needed)
+  - Create `modules/hosts/blackphos/default.nix`
+  - Configure blackphos as zerotier peer (connects to cinnabar controller)
+  - Add to clan inventory
+  - Generate vars for blackphos
+  - Deploy with darwin-rebuild switch
 
 **Success criteria**:
 - [ ] blackphos builds with dendritic + clan
