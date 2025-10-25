@@ -97,7 +97,8 @@ fi
 echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 
 # Capture output and parse version
-OUTPUT=$(bunx semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" 2>&1 || true)
+# Use bun instead of bunx to access project dependencies
+OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" 2>&1 || true)
 
 # Display relevant output
 echo "$OUTPUT" | grep -v "^$" | grep -E "(semantic-release|Published|next release|Release note|version)" || true
