@@ -8,13 +8,13 @@ import { defineConfig } from "astro/config";
 export default defineConfig({
   integrations: [
     starlight({
-      title: "typescript-nix-template",
+      title: "nix-config",
       prerender: false,
       social: [
         {
           icon: "github",
           label: "GitHub",
-          href: "https://github.com/sciexp/typescript-nix-template",
+          href: "https://github.com/cameronraysmith/nix-config",
         },
       ],
       sidebar: [
