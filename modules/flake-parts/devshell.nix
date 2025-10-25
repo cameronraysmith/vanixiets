@@ -8,8 +8,13 @@
       inputs',
       config,
       pkgs,
+      system,
       ...
     }:
+    let
+      # Playwright driver from versioned flake (synced with package.json)
+      playwrightDriver = inputs.playwright-web-flake.packages.${system}.playwright-driver;
+    in
     {
       devShells.default = pkgs.mkShell {
         name = "dev";
@@ -52,12 +57,13 @@
           # Documentation toolchain
           bun # JavaScript runtime and package manager
           nodePackages.typescript # TypeScript compiler
-          playwright-driver.browsers # E2E testing browsers
+          # E2E testing browsers from playwright-web-flake (pinned to 1.56.1)
         ];
 
         shellHook = ''
-          # Playwright browser configuration
-          export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"
+          # Playwright browser configuration (version-locked via flake input)
+          export PLAYWRIGHT_BROWSERS_PATH="${playwrightDriver.browsers}"
+          export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
           export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
         '';
       };
