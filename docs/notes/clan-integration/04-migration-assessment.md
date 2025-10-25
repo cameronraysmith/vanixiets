@@ -83,6 +83,44 @@ nix run nixpkgs#clan-cli -- vars generate test-vm
 
 **Timeline**: 1 week for implementation and validation
 
+**Go/No-Go Decision Framework (After Phase 0)**:
+
+After completing Phase 0 validation, evaluate whether to proceed to Phase 1 (cinnabar VPS deployment):
+
+**🟢 GO - Proceed to Phase 1** if:
+- ✅ All critical integration tests pass (see 01-phase-0-validation.md integration tests)
+- ✅ test-vm builds successfully
+- ✅ Dendritic + clan patterns coexist without fundamental conflicts
+- ✅ No blockers identified that would prevent production use
+- ✅ Compromises required (if any) are localized and acceptable
+- ✅ Pattern extraction completed with confidence for cinnabar deployment
+
+**🟡 CONDITIONAL GO - Proceed with caution** if:
+- ⚠️ Minor integration issues exist but have known workarounds
+- ⚠️ Some dendritic patterns must be relaxed, but clan functionality preserved
+- ⚠️ Additional testing recommended but not blocking
+- **Decision**: Document compromises, proceed to Phase 1 with increased monitoring
+
+**🔴 NO-GO - Pause or pivot** if:
+- ❌ Fundamental architectural conflicts prevent coexistence
+- ❌ Clan functionality broken or severely compromised
+- ❌ Dendritic pattern requires excessive violations (loses benefits)
+- ❌ Integration complexity outweighs type safety benefits
+- **Decision**: Consider alternative approaches:
+  - **Option A**: Use vanilla clan + flake-parts (clan-infra pattern) - proven, simpler
+  - **Option B**: Investigate specific conflicts and redesign approach
+  - **Option C**: Defer migration until patterns mature
+
+**Review Process**:
+1. Complete all Phase 0 steps and integration tests
+2. Review `INTEGRATION-FINDINGS.md` and `PATTERNS.md` documents
+3. Assess against criteria above
+4. If GO: Extract patterns for Phase 1, begin cinnabar deployment
+5. If CONDITIONAL: Document accepted compromises, set additional validation points
+6. If NO-GO: Document blockers, evaluate alternatives, do not proceed to infrastructure deployment
+
+**Key Principle**: Phase 0 is **not** about achieving "pure dendritic" - it's about determining the **optimal balance** between dendritic optimization and clan functionality. A decision to use vanilla clan + flake-parts is a valid, successful outcome if it better serves the use case.
+
 ### cinnabar (Phase 1: VPS infrastructure)
 
 **Deployment specs**:
