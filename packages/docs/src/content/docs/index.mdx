@@ -1,9 +1,9 @@
 ---
-title: typescript-nix-template
-description: TypeScript monorepo template with Nix, Bun, and semantic-release automation
+title: nix-config
+description: Personal NixOS and nix-darwin configurations with infrastructure documentation
 template: splash
 hero:
-  tagline: Production-ready TypeScript monorepo with Nix development environments, Bun workspaces, and automated semantic versioning
+  tagline: Reproducible system configurations with NixOS, nix-darwin, and home-manager. Infrastructure documentation hosted on Cloudflare Pages.
   image:
     file: ../../assets/houston.webp
   actions:
@@ -12,7 +12,7 @@ hero:
       icon: right-arrow
       variant: primary
     - text: View on GitHub
-      link: https://github.com/sciexp/typescript-nix-template
+      link: https://github.com/cameronraysmith/nix-config
       icon: external
       variant: minimal
 ---
@@ -52,25 +52,25 @@ import { Card, CardGrid } from "@astrojs/starlight/components";
 
 ```bash
 # Clone and setup
-git clone https://github.com/sciexp/typescript-nix-template.git
-cd typescript-nix-template
+git clone https://github.com/cameronraysmith/nix-config.git
+cd nix-config
 nix develop
 bun install
 
 # Start development
-just dev
+just docs-dev
 ```
 
 See [Getting started guide](/guides/getting-started/) for complete setup instructions.
 
-## Using as a template
+## Infrastructure documentation
 
-This repository serves dual purposes:
+This site documents the nix-config repository:
 
-1. **Working deployment** - Live example at ts-nix.scientistexperience.net
-2. **Forkable template** - Starting point for your TypeScript projects
+1. **System configurations** - NixOS and nix-darwin configurations
+2. **Infrastructure patterns** - Reproducible development environments and deployment workflows
 
-See [Template usage guide](/guides/template-usage/) for customization instructions.
+Documentation is deployed to infra.cameronraysmith.net via Cloudflare Pages.
 
 ## Documentation structure
 
