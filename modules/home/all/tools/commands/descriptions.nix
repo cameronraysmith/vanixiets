@@ -45,5 +45,12 @@
         clean-shell-history-secrets = "Clean secrets from shell history using atuin and gitleaks";
       };
     }
+    {
+      name = "System Tools";
+      order = 5;
+      commands = {
+        dnsreset = "Flush DNS cache and restart mDNSResponder on macOS";
+      };
+    }
   ];
 }
