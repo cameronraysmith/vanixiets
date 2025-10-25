@@ -1,20 +1,31 @@
 # Phase 2 implementation guide: darwin migration (blackphos)
 
-**IMPORTANT NOTE**: This guide is being updated to reflect the VPS-first workflow. Phase 1 (cinnabar VPS deployment) must be completed first - see `01-phase-1-vps-deployment.md`. The infrastructure setup (flake inputs, modules directory, clan secrets, terranix) is now done in Phase 1. This guide will be refined to focus on darwin-specific configuration that connects to the existing cinnabar infrastructure.
+This guide provides step-by-step instructions for Phase 2: migrating blackphos (the first darwin host) from nixos-unified to the dendritic pattern with clan-core integration.
+Phase 2 builds on the infrastructure established in Phase 1 (cinnabar VPS) and establishes darwin-specific patterns for subsequent host migrations.
 
-**Current status**: The steps below reference the original Phase 1 workflow. Key changes for VPS-first approach:
-- Flake inputs (clan-core, import-tree, terranix, disko, srvos) added in Phase 1
-- modules/ directory structure created in Phase 1
-- Clan secrets initialized in Phase 1
-- cinnabar VPS provides zerotier controller (not blackphos)
-- blackphos connects as zerotier peer to cinnabar
+## Critical Prerequisites
 
----
+Phase 1 (cinnabar VPS deployment) **MUST be completed first** - see `02-phase-1-vps-deployment.md`.
 
-This guide provides step-by-step instructions for implementing Phase 2 of the dendritic flake-parts + clan-core migration.
-Phase 2 migrates blackphos (the first darwin host) from nixos-unified to the dendritic pattern with clan-core integration, establishing darwin-specific patterns for subsequent host migrations.
+The following infrastructure is already in place from Phase 1:
+- ✅ Flake inputs added (clan-core, import-tree, terranix, disko, srvos)
+- ✅ Dendritic modules/ directory structure created
+- ✅ Clan secrets initialized (age keys, admin group)
+- ✅ cinnabar VPS deployed with zerotier controller operational
+- ✅ Base NixOS modules created (modules/base/nix.nix, modules/nixos/server.nix)
 
-**Prerequisites for Phase 2**: Phase 0 (test-clan validation) completed and Phase 1 (cinnabar VPS) operational. Verify cinnabar with: `ssh root@<cinnabar-ip> zerotier-cli info`
+**Verify Phase 1 complete**:
+```bash
+# Check cinnabar VPS is operational
+ssh root@<cinnabar-ip> zerotier-cli info
+# Expected: 200 info <node-id> <version> ONLINE
+
+# Get zerotier network ID for blackphos configuration
+ssh root@<cinnabar-ip> "zerotier-cli listnetworks | awk 'NR==2 {print \$3}'"
+# Save this network ID - you'll need it in Step 11
+```
+
+**Phase 2 Objective**: Connect blackphos to cinnabar's zerotier network as a peer and establish darwin + clan integration patterns.
 
 ## Prerequisites
 
@@ -26,17 +37,27 @@ Phase 2 migrates blackphos (the first darwin host) from nixos-unified to the den
 
 ## Migration overview
 
-Phase 1 establishes the dendritic + clan foundation by:
-1. Adding clan-core and import-tree inputs
-2. Creating dendritic module structure alongside existing configurations
-3. Converting key modules to flake.modules.* namespace
-4. Migrating blackphos to dendritic pattern
-5. Initializing clan inventory and vars
-6. Validating blackphos deployment
+Phase 2 focuses on darwin-specific configuration:
+1. Create darwin-specific dendritic modules (base, shell, dev tools)
+2. Create blackphos host configuration
+3. Configure blackphos as zerotier peer (connects to cinnabar controller)
+4. Generate clan vars for blackphos
+5. Build and deploy blackphos with darwin-rebuild
+6. Validate blackphos ↔ cinnabar connectivity
 
-This creates a parallel environment where blackphos uses dendritic + clan while other hosts remain on nixos-unified.
+This creates a parallel environment where blackphos uses dendritic + clan while other darwin hosts remain on nixos-unified.
 
-## Step 1: Add clan-core and import-tree flake inputs
+## Steps 1-3: Infrastructure Setup
+
+**⏭️ SKIP THESE STEPS - COMPLETED IN PHASE 1**
+
+Steps 1-3 (flake inputs, import-tree setup, module directory structure) were completed in Phase 1 (cinnabar VPS deployment).
+If you completed Phase 1, proceed directly to Step 4.
+
+<details>
+<summary>Step 1-3 Details (for reference only - already done)</summary>
+
+## Step 1: Add clan-core and import-tree flake inputs (DONE IN PHASE 1)
 
 **File**: `flake.nix`
 
@@ -121,6 +142,10 @@ modules/
 │   └── blackphos/
 └── users/          # User configurations
 ```
+
+</details>
+
+---
 
 ## Step 4: Create base nix configuration module
 
@@ -406,9 +431,12 @@ in
 
 **Function**: Automatically discovers all `flake.modules.darwin."hosts/*"` modules and generates corresponding darwinConfigurations.
 
-## Step 11: Create clan inventory module
+## Step 11: Update clan inventory for blackphos
 
 **File**: `modules/flake-parts/clan.nix`
+
+**Note**: This file was initially created in Phase 1 with cinnabar configuration.
+This step adds blackphos to the existing inventory and ensures zerotier is configured correctly (cinnabar as controller, blackphos as peer).
 
 ```nix
 { inputs, ... }:
@@ -421,7 +449,7 @@ in
       inherit inputs;
     };
 
-    # Machine inventory
+    # Machine inventory (cinnabar added in Phase 1)
     inventory.machines = {
       blackphos = {
         tags = [
@@ -482,9 +510,9 @@ in
           name = "zerotier";
           input = "clan-core";
         };
-        # blackphos is controller
-        roles.controller.machines.blackphos = { };
-        # All machines are peers
+        # cinnabar is controller (configured in Phase 1)
+        roles.controller.machines.cinnabar = { };
+        # All darwin machines connect as peers to cinnabar
         roles.peer.tags."workstation" = { };
       };
     };
@@ -495,9 +523,17 @@ in
 }
 ```
 
-**Note**: Inventory defines all four hosts, but only blackphos will be migrated in Phase 1.
+**Note**: Inventory defines all darwin hosts. cinnabar was added in Phase 1, blackphos is being added now in Phase 2.
 
 ## Step 12: Initialize clan secrets structure
+
+**⏭️ SKIP THIS STEP - COMPLETED IN PHASE 1**
+
+Clan secrets (age keys, admin group) were initialized in Phase 1 Step 4.
+Proceed directly to Step 13 (Generate vars for blackphos).
+
+<details>
+<summary>Step 12 Details (for reference only - already done)</summary>
 
 **Commands**:
 ```bash
@@ -531,6 +567,10 @@ ls -la secrets/users/crs58/
 ```
 
 Expected: Age key files created in both directories.
+
+</details>
+
+---
 
 ## Step 13: Generate vars for blackphos
 
