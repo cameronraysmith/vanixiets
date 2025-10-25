@@ -13,7 +13,8 @@
   ],
   "packageManager": "bun@1.1.38",
   "scripts": {
-    "test-release": "semantic-release --dry-run --no-ci"
+    "test-release": "semantic-release --dry-run --no-ci",
+    "preview-version": "./scripts/preview-version.sh"
   },
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
