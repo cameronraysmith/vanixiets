@@ -50,8 +50,7 @@ overlays/
 ├── debug-packages/     # Experimental packages (NOT in overlay, in legacyPackages)
 │   ├── conda-lock.nix
 │   ├── holos.nix
-│   ├── quarto.nix
-│   └── teller.nix
+│   └── quarto.nix
 ```
 
 ### Main Overlay Composition (default.nix)
