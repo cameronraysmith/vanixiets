@@ -7,7 +7,6 @@
       "https://nix-community.cachix.org"
       "https://numtide.cachix.org"
       "https://cameronraysmith.cachix.org"
-      "https://poetry2nix.cachix.org"
       "https://pyproject-nix.cachix.org"
       "https://om.cachix.org"
       "https://catppuccin.cachix.org"
@@ -17,7 +16,6 @@
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
       "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
       "cameronraysmith.cachix.org-1:aC8ZcRCVcQql77Qn//Q1jrKkiDGir+pIUjhUunN6aio="
-      "poetry2nix.cachix.org-1:eXpeBJl0EQjO+vs9/1cUq19BH1LLKQT9HScbJDeeHaA="
       "pyproject-nix.cachix.org-1:UNzugsOlQIu2iOz0VyZNBQm2JSrL/kwxeCcFGw+jMe0="
       "om.cachix.org-1:ifal/RLZJKN4sbpScyPGqJ2+appCslzu7ZZF/C01f2Q="
       "catppuccin.cachix.org-1:noG/4HkbhJb+lUAdKrph6LaozJvAeEEZj4N732IysmU="
@@ -38,24 +36,18 @@
     mac-app-util.inputs.nixpkgs.follows = "nixpkgs";
     nixos-unified.url = "github:srid/nixos-unified";
     omnix.url = "github:juspay/omnix";
+    omnix.inputs.systems.follows = "systems";
 
     flocken.url = "github:mirkolenz/flocken/v2";
     flocken.inputs.nixpkgs.follows = "nixpkgs";
 
-    # Do not enable
+    # do not enable
     # nix-rosetta-builder.inputs.nixpkgs.follows = "nixpkgs";
-    # It is pinned to the commit of nixpkgs e9f00bd8
+    # it is pinned to the commit of nixpkgs e9f00bd8
     # used to build the cached bootstrap image at
     # /nix/store/c3bav8f2.../nixos.qcow2.
     nix-rosetta-builder.url = "github:cpick/nix-rosetta-builder";
     nix-rosetta-builder.inputs.nixpkgs.url = "github:nixos/nixpkgs/e9f00bd893984bc8ce46c895c3bf7cac95331127";
-
-    # TODO: error: darwin.apple_sdk_11_0 has been removed
-    # <https://nixos.org/manual/nixpkgs/stable/#sec-darwin-legacy-frameworks>
-    # omnix.inputs.nixpkgs.follows = "nixpkgs";
-    # omnix.inputs.flake-parts.follows = "flake-parts";
-    # omnix.inputs.git-hooks.follows = "git-hooks";
-    omnix.inputs.systems.follows = "systems";
 
     agenix.url = "github:ryantm/agenix";
     agenix.inputs.nixpkgs.follows = "nixpkgs";
@@ -78,22 +70,21 @@
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";
     nuenv.inputs.nixpkgs.follows = "nixpkgs";
 
-    # upstream Jujutsu for latest SSH signing features (revset-based sign-on-push)
+    # upstream jujutsu for latest SSH signing features
     jj.url = "github:martinvonz/jj";
     jj.inputs.nixpkgs.follows = "nixpkgs";
 
     # do not override nixpkgs input to preserve numtide.cachix.org cache hits
     nix-ai-tools.url = "github:numtide/nix-ai-tools";
 
-    # Landlock sandboxing for applications
+    # landlock app sandboxing on linux
     landrun-nix.url = "github:srid/landrun-nix";
 
-    # Playwright browsers pinned to match package.json (@playwright/test version)
-    # Tags available at: https://github.com/pietdevries94/playwright-web-flake/tags
-    # Update this when upgrading @playwright/test in packages/docs/package.json
+    # playwright browsers pinned to match package.json (@playwright/test version)
+    # sync this when upgrading @playwright/test in packages/docs/package.json
     playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.56.1";
-    # Override nixpkgs to ensure reproducibility (playwright-web-flake uses indirect input)
-    # Safe on macOS (browsers from Microsoft CDN), but may cause issues on Linux (uses nixpkgs chromium)
+    # playwright-web-flake uses indirect nixpkgs
+    # safe on macOS (browsers from Microsoft CDN), but may cause issues on Linux (uses nixpkgs chromium)
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
 
