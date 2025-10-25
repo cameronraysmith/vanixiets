@@ -1,8 +1,14 @@
 # Phase 0 implementation guide: dendritic + clan validation (test-clan)
 
+**Working repository**: `~/projects/nix-workspace/test-clan/` (experimental repo, `main` branch)
+
+**Scope**: Pattern validation in minimal environment
+
 This guide provides step-by-step instructions for Phase 0 of the dendritic flake-parts + clan-core migration.
 Phase 0 validates the integration of dendritic and clan patterns in a minimal test environment (test-clan/) before deploying production infrastructure.
 This de-risks the migration by proving the architectural combination works before committing to VPS deployment and darwin host migration.
+
+**Note**: Phase 1 (cinnabar VPS deployment) ALSO happens in test-clan as a complete end-to-end proof of concept. Only Phase 2+ transitions to nix-config.
 
 ## Strategic rationale: why Phase 0 is critical
 
