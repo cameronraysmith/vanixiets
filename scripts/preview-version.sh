@@ -97,8 +97,12 @@ fi
 echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 
 # Capture output and parse version
-# Use bun instead of bunx to access project dependencies
-OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" 2>&1 || true)
+# Run semantic-release from package via test-release script
+if [ -n "$PACKAGE_PATH" ]; then
+  OUTPUT=$(bun run test-release --branches "$TARGET_BRANCH" 2>&1 || true)
+else
+  OUTPUT=$(cd "$WORKTREE_DIR" && bun run test-release --branches "$TARGET_BRANCH" 2>&1 || true)
+fi
 
 # Display relevant output
 echo "$OUTPUT" | grep -v "^$" | grep -E "(semantic-release|Published|next release|Release note|version)" || true
