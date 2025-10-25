@@ -44,6 +44,8 @@ Before beginning, read and internalize these documents I've prepared:
 
 **Current repository structure**:
 
+**Working branch**: `clan` (all migration work happens here, built linearly from `beta`)
+
 - `~/projects/nix-workspace/nix-config/flake.nix` - Current flake structure
 - `~/projects/nix-workspace/nix-config/modules/flake-parts/` - Auto-wired flake-parts modules
 - `~/projects/nix-workspace/nix-config/configurations/{darwin,nixos}/` - Host-specific configurations via nixos-unified autowire
@@ -473,16 +475,59 @@ Unless I specify otherwise, assume:
 4. **Learning**: Interleaved - understand concepts enough to make informed migration decisions
 5. **Safety**: Always confirm before risky operations, atomic commits, preserve rollback
 
+## Git workflow and branch management
+
+**Working branch**: `clan`
+
+All clan integration work is performed on the `clan` branch. This branch should be built linearly from the `beta` branch.
+
+**CRITICAL: Verify branch state at session start**
+
+At the beginning of EVERY session, verify the branch state:
+
+```bash
+# 1. Confirm we're on the clan branch
+git branch --show-current
+# Expected: clan
+
+# 2. Verify clan is built linearly from beta (beta is ancestor of clan)
+git merge-base --is-ancestor beta clan && echo "✓ Linear from beta" || echo "✗ WARNING: clan has diverged from beta"
+
+# 3. Show commits on clan not in beta
+git log --oneline beta..clan | head -20
+# This shows what work has been done on the clan branch
+
+# 4. Check for uncommitted changes
+git status --short
+```
+
+**If clan has diverged from beta** (merge-base check fails):
+- STOP immediately
+- Inform me of the divergence
+- Propose: rebase clan onto beta or investigate the divergence
+- Wait for my decision before proceeding
+
+**If there are uncommitted changes**:
+- Show me what's uncommitted
+- Ask if I want to commit them before starting new work
+- Follow atomic commit workflow per git-version-control.md preferences
+
+**Expected workflow**:
+- All migration work happens on `clan` branch
+- `clan` is built linearly from `beta` (no merge commits from other branches)
+- When migration phases are complete and stable, `clan` will be merged to `beta` (or directly to `main`)
+
 ## Starting point
 
 Begin the session by:
 
-1. Reading all referenced documentation files (00-integration-plan.md, phase guides, preferences)
-2. Understanding current nix-config structure by examining flake.nix and modules/
-3. Determining current migration phase (check for test-clan/, modules/ structure, cinnabar deployment, etc.)
-4. Asking me where we are in the migration and what I want to accomplish
-5. Proposing a tailored plan for this session based on current state
-6. Getting my confirmation before making any changes
+1. **FIRST**: Verify git branch state (see "Git workflow and branch management" above)
+2. Reading all referenced documentation files (00-integration-plan.md, phase guides, preferences)
+3. Understanding current nix-config structure by examining flake.nix and modules/
+4. Determining current migration phase (check for test-clan/, modules/ structure, cinnabar deployment, etc.)
+5. Asking me where we are in the migration and what I want to accomplish
+6. Proposing a tailored plan for this session based on current state
+7. Getting my confirmation before making any changes
 
 Then proceed with appropriate phase, maintaining interactivity, safety, and education throughout.
 
