@@ -1,9 +1,9 @@
 ---
 title: Using as a template
-description: How to fork and customize typescript-nix-template for your projects
+description: How to fork and customize nix-config for your projects
 ---
 
-This guide explains how to use typescript-nix-template as a starting point for your TypeScript monorepo projects.
+This guide explains how to use nix-config as a starting point for your TypeScript monorepo projects.
 
 ## Quick start
 
@@ -17,18 +17,18 @@ This guide explains how to use typescript-nix-template as a starting point for y
 ### Option 2: Nix flake (coming soon)
 
 ```bash
-nix flake init --template github:sciexp/typescript-nix-template
+nix flake init --template github:sciexp/nix-config
 ```
 
 ### Option 3: Manual fork
 
 ```bash
-git clone https://github.com/sciexp/typescript-nix-template.git my-project
+git clone https://github.com/cameronraysmith/nix-config.git my-project
 cd my-project
 rm -rf .git
 git init
 git add .
-git commit -m "chore: initial commit from typescript-nix-template"
+git commit -m "chore: initial commit from nix-config"
 ```
 
 ## Understanding the naming pattern
@@ -37,7 +37,7 @@ This template uses framework-agnostic, purpose-based naming that works for both 
 
 ### Package naming strategy
 
-**Template package:** `@typescript-nix-template/docs`
+**Template package:** `@nix-config/docs`
 
 **Why this naming works:**
 
@@ -127,8 +127,8 @@ If your project has multiple public-facing components:
 
 ### Template deployment example
 
-**For typescript-nix-template:**
-- Package: `@typescript-nix-template/docs`
+**For nix-config:**
+- Package: `@nix-config/docs`
 - Worker: `ts-nix-docs`
 - Route: `ts-nix.scientistexperience.net`
 
@@ -234,13 +234,13 @@ Update filter patterns:
 
 ```justfile
 # Before
-bun run --filter '@typescript-nix-template/docs' dev
+bun run --filter '@nix-config/docs' dev
 
 # After
 bun run --filter '@yourorg/my-package-name' dev
 ```
 
-Search and replace `@typescript-nix-template/docs` with your package name.
+Search and replace `@nix-config/docs` with your package name.
 
 ### 7. Documentation
 
@@ -460,7 +460,7 @@ See [Architecture decisions](/reference/architecture#release-configuration) for 
 ### Template issues
 
 If you encounter issues with the template itself:
-- Check [GitHub Issues](https://github.com/sciexp/typescript-nix-template/issues)
+- Check [GitHub Issues](https://github.com/cameronraysmith/nix-config/issues)
 - Open a new issue with reproduction steps
 
 ### Project-specific issues

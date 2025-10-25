@@ -1,6 +1,6 @@
 ---
 title: Architecture decisions
-description: Key architectural decisions and rationale for typescript-nix-template
+description: Key architectural decisions and rationale for nix-config
 ---
 
 This document explains the key architectural decisions made in this template and the rationale behind them.
@@ -145,10 +145,10 @@ This template uses Bun workspaces for monorepo package management.
 **Usage:**
 ```bash
 # Run command in specific package
-bun run --filter '@typescript-nix-template/docs' dev
+bun run --filter '@nix-config/docs' dev
 
 # Run command in all packages
-bun run --filter '@typescript-nix-template/*' test
+bun run --filter '@nix-config/*' test
 ```
 
 ## TypeScript configuration
@@ -327,7 +327,7 @@ The docs package deploys as a Cloudflare Worker using the Astro Cloudflare adapt
 ### Framework independence
 
 The template avoids framework-specific naming:
-- Package name is `@typescript-nix-template/docs` not `@typescript-nix-template/starlight`
+- Package name is `@nix-config/docs` not `@nix-config/starlight`
 - Rationale: Astro/Starlight are implementation details that may change
 
 ### Template duality
