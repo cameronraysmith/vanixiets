@@ -475,47 +475,79 @@ Unless I specify otherwise, assume:
 4. **Learning**: Interleaved - understand concepts enough to make informed migration decisions
 5. **Safety**: Always confirm before risky operations, atomic commits, preserve rollback
 
+## Working directory and repository context
+
+**CRITICAL: Migration happens in TWO repositories**
+
+**Phase 0-1 (Validation & Proof of Concept)**:
+- **Repository**: `~/projects/nix-workspace/test-clan/` (separate experimental repo)
+- **Branch**: `main`
+- **Purpose**: Validate dendritic flake-parts + clan integration, deploy cinnabar to Hetzner
+- **Scope**: Complete end-to-end proof including terraform/terranix and real infrastructure
+- **Outcome**: Proven patterns, documented learnings, deployed cinnabar VPS
+
+**Phase 2+ (Production Integration)**:
+- **Repository**: `~/projects/nix-workspace/nix-config/` (production config)
+- **Purpose**: Apply proven patterns from test-clan to production infrastructure
+- **Scope**: Integrate clan, manage cinnabar, migrate darwin hosts
+- **Git**: `clan` branch, linear from `beta`
+- **Outcome**: Production nix-config with clan integration
+
+**Key transition: Phase 1 → Phase 2**
+
+This is where we migrate from test-clan to nix-config:
+- Proven patterns from test-clan get applied to nix-config
+- Cinnabar management transfers from test-clan to nix-config (or redeploy if cleaner)
+- test-clan becomes reference documentation, may be archived
+
 ## Git workflow and branch management
 
-**Working branch**: `clan`
+**CRITICAL: Verify repository and branch at session start**
 
-All clan integration work is performed on the `clan` branch. This branch should be built linearly from the `beta` branch.
-
-**CRITICAL: Verify branch state at session start**
-
-At the beginning of EVERY session, verify the branch state:
+At the beginning of EVERY session, verify where we are:
 
 ```bash
-# 1. Confirm we're on the clan branch
+# 1. Check current working directory
+pwd
+# Expected Phase 0-1: /Users/crs58/projects/nix-workspace/test-clan
+# Expected Phase 2+:  /Users/crs58/projects/nix-workspace/nix-config
+
+# 2. If in test-clan (Phase 0-1):
+git branch --show-current
+# Expected: main
+
+git status --short
+# Check for uncommitted changes
+
+# 3. If in nix-config (Phase 2+):
 git branch --show-current
 # Expected: clan
 
-# 2. Verify clan is built linearly from beta (beta is ancestor of clan)
-git merge-base --is-ancestor beta clan && echo "✓ Linear from beta" || echo "✗ WARNING: clan has diverged from beta"
+git merge-base --is-ancestor beta clan && echo "✓ Linear from beta" || echo "✗ WARNING: diverged"
 
-# 3. Show commits on clan not in beta
 git log --oneline beta..clan | head -20
-# This shows what work has been done on the clan branch
+# Shows work done on clan branch
 
-# 4. Check for uncommitted changes
 git status --short
+# Check for uncommitted changes
 ```
 
-**If clan has diverged from beta** (merge-base check fails):
+**If in wrong repository for current phase**:
+- STOP immediately
+- Inform me of the mismatch
+- Ask which phase we're actually in
+- Propose switching to correct repository
+
+**If clan branch has diverged from beta** (nix-config only):
 - STOP immediately
 - Inform me of the divergence
-- Propose: rebase clan onto beta or investigate the divergence
+- Propose: rebase clan onto beta or investigate
 - Wait for my decision before proceeding
 
 **If there are uncommitted changes**:
 - Show me what's uncommitted
 - Ask if I want to commit them before starting new work
 - Follow atomic commit workflow per git-version-control.md preferences
-
-**Expected workflow**:
-- All migration work happens on `clan` branch
-- `clan` is built linearly from `beta` (no merge commits from other branches)
-- When migration phases are complete and stable, `clan` will be merged to `beta` (or directly to `main`)
 
 ## Starting point
 
