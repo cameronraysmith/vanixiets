@@ -7,7 +7,7 @@ This directory contains comprehensive documentation for migrating nix-config fro
 ### 00-integration-plan.md
 **Purpose**: Comprehensive analysis and overall migration strategy
 **Contents**:
-- Repository analysis (current nix-config, dendritic pattern, clan architecture)
+- Repository analysis (current nix-config, dendritic flake-parts pattern, clan architecture)
 - Integration strategy and architectural decisions
 - Directory structure (dendritic flat categories with terraform/)
 - Module integration patterns (flake.modules.* namespace)
@@ -48,7 +48,7 @@ This directory contains comprehensive documentation for migrating nix-config fro
 **Purpose**: Step-by-step implementation guide for Phase 2 (first darwin host migration)
 **Contents**:
 - Prerequisites (Phase 1 completion required)
-- Darwin module conversion to dendritic pattern
+- Darwin module conversion to dendritic flake-parts pattern
 - Connecting to cinnabar's zerotier network as peer
 - Home-manager integration
 - Validation procedures
@@ -124,10 +124,10 @@ This directory contains comprehensive documentation for migrating nix-config fro
 
 Nix lacks a native type system, but the Nix module system provides type checking through explicit option types.
 flake-parts extends the module system to flakes.
-The dendritic pattern maximizes module system usage, thereby maximizing type safety in flake configurations.
+The dendritic flake-parts pattern maximizes module system usage, thereby maximizing type safety in flake configurations.
 
 Both clan-core and clan-infra already use flake-parts.
-The dendritic pattern is an incremental optimization that increases type safety by organizing all code as flake-parts modules.
+The dendritic flake-parts pattern is an incremental optimization that increases type safety by organizing all code as flake-parts modules.
 
 **Priority**: clan functionality is primary; dendritic is a best-effort optimization applied where compatible.
 
@@ -234,7 +234,7 @@ nix-config/
 ### Migrating a darwin host
 
 ```bash
-# 1. Create host configuration using dendritic pattern
+# 1. Create host configuration using dendritic flake-parts pattern
 vim modules/hosts/<hostname>/default.nix
 
 # 2. Generate clan vars
@@ -354,7 +354,7 @@ nix eval .#clan.inventory --json
 - Phase 0: Architectural conflicts between dendritic and clan
 - Build evaluation errors
 - Missing functionality compared to nixos-unified
-- Dendritic patterns require excessive customization per host
+- Dendritic flake-parts patterns require excessive customization per host
 - Clan vars not deploying correctly
 - Zerotier network instabilities
 - Frequent system crashes or errors
@@ -370,7 +370,7 @@ nix eval .#clan.inventory --json
 - Phase 2 darwin guide: `./03-phase-2-blackphos-guide.md` (blackphos migration)
 - Migration assessment: `./04-migration-assessment.md` (validation criteria)
 
-### Dendritic pattern
+### Dendritic flake-parts pattern
 - Pattern documentation: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
 - Production examples:
   - `~/projects/nix-workspace/drupol-dendritic-infra/` (comprehensive)
