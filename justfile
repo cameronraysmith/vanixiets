@@ -339,11 +339,6 @@ docs-deploy-production:
     bunx wrangler deploy
   "
 
-# Preview the docs site locally with Cloudflare Workers
-[group('docs')]
-docs-preview:
-  cd packages/docs && bun run preview
-
 # List recent Cloudflare deployments
 [group('docs')]
 docs-deployments:
