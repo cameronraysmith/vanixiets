@@ -905,6 +905,8 @@ Reference repository analysis reveals:
 
 **Detailed guide**: `01-phase-0-validation.md`
 
+**Optional but strongly recommended**: Phase 0.5 (darwin validation) - see Phase 0 guide for details. Validates darwin + clan + dendritic integration in a test environment before production darwin deployment (Phase 2).
+
 ### Phase 1: VPS infrastructure (cinnabar)
 
 **Objective**: Deploy always-on infrastructure and validate dendritic + clan on NixOS
@@ -1516,12 +1518,13 @@ Secrets migration occurs incrementally across phases:
 
 1. **Immediate**: Read `01-phase-0-validation.md` for dendritic + clan integration validation
 2. **Phase 0**: Validate integration in test-clan/, document findings
-3. **Phase 1**: Deploy cinnabar VPS using proven patterns (read `02-phase-1-vps-deployment.md`)
-4. **Phase 2**: Migrate blackphos (read `03-phase-2-blackphos-guide.md`), establish darwin patterns
-5. **Phases 3-4**: Migrate rosegold and argentum, validate multi-darwin
-6. **Phase 5**: Migrate stibnite only after all others proven
-7. **Phase 6**: Clean up legacy infrastructure
-8. **Ongoing**: Document learnings, refine patterns
+3. **Phase 0.5** (optional, strongly recommended): Darwin validation in test environment - see Phase 0 guide section "Phase 0.5: Darwin validation"
+4. **Phase 1**: Deploy cinnabar VPS using proven patterns (read `02-phase-1-vps-deployment.md`)
+5. **Phase 2**: Migrate blackphos (read `03-phase-2-blackphos-guide.md`), establish darwin patterns
+6. **Phases 3-4**: Migrate rosegold and argentum, validate multi-darwin
+7. **Phase 5**: Migrate stibnite only after all others proven
+8. **Phase 6**: Clean up legacy infrastructure
+9. **Ongoing**: Document learnings, refine patterns
 
 ## References
 
