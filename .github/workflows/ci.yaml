@@ -6,6 +6,16 @@ on:
         description: specific job to run (leave empty to run all)
         required: false
         type: string
+      debug_enabled:
+        description: "Run the workflow with tmate.io debugging enabled"
+        required: false
+        type: boolean
+        default: false
+      deploy_enabled:
+        description: "Deploy documentation to Cloudflare Workers"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       target_configs:
@@ -45,7 +55,57 @@ jobs:
           concurrent_skipping: 'never'
           cancel_others: 'false'
 
-  # job 1: bootstrap-verification
+  # job 1: set-variables
+  # determines deployment settings and variables based on event type
+  set-variables:
+    needs: skip-check
+    runs-on: ubuntu-latest
+    if: |
+      needs.skip-check.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'set-variables')
+    outputs:
+      debug: ${{ steps.set-variables.outputs.debug }}
+      deploy_enabled: ${{ steps.set-variables.outputs.deploy_enabled }}
+      deploy_environment: ${{ steps.set-variables.outputs.deploy_environment }}
+      checkout_ref: ${{ steps.set-variables.outputs.checkout_ref }}
+      checkout_rev: ${{ steps.set-variables.outputs.checkout_rev }}
+
+    steps:
+      - name: Set action variables
+        id: set-variables
+        run: |
+          DEBUG="false"
+          DEPLOY_ENABLED="false"
+          DEPLOY_ENVIRONMENT="preview"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            DEBUG="${{ inputs.debug_enabled }}"
+            DEPLOY_ENABLED="${{ inputs.deploy_enabled }}"
+          fi
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            CHECKOUT_REF="${{ github.event.pull_request.head.ref }}"
+            CHECKOUT_REV="${{ github.event.pull_request.head.sha }}"
+          else
+            CHECKOUT_REF="${{ github.ref_name }}"
+            CHECKOUT_REV="${{ github.sha }}"
+          fi
+
+          # Enable deployment on push to main (production)
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            DEPLOY_ENABLED="true"
+            DEPLOY_ENVIRONMENT="production"
+          fi
+
+          echo "debug=$DEBUG" >> $GITHUB_OUTPUT
+          echo "deploy_enabled=$DEPLOY_ENABLED" >> $GITHUB_OUTPUT
+          echo "deploy_environment=$DEPLOY_ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "checkout_ref=$CHECKOUT_REF" >> $GITHUB_OUTPUT
+          echo "checkout_rev=$CHECKOUT_REV" >> $GITHUB_OUTPUT
+
+  # job 2: bootstrap-verification
   # validates Makefile bootstrap workflow on clean ubuntu system
   bootstrap-verification:
     needs: skip-check
@@ -582,35 +642,16 @@ jobs:
 
   # Documentation deployment (conditional)
   docs-deploy:
-    needs: docs-test
+    needs: [set-variables, docs-test]
     if: |
       !cancelled() &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: https://docs.example.com
-    steps:
-      - name: checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
-
-      - name: setup nix
-        uses: ./.github/actions/setup-nix
-        with:
-          system: x86_64-linux
-
-      - name: install dependencies
-        run: nix develop --command bun install
-
-      - name: build documentation
-        run: nix develop --command just docs-build
-
-      - name: deploy to cloudflare workers
-        run: |
-          nix develop --command sops exec-env secrets/shared.yaml '
-            cd packages/docs && bunx wrangler deploy
-          '
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      needs.set-variables.outputs.deploy_enabled == 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'docs-deploy')
+    uses: ./.github/workflows/deploy-docs.yaml
+    with:
+      debug_enabled: ${{ needs.set-variables.outputs.debug }}
+      branch: ${{ needs.set-variables.outputs.checkout_ref }}
+      environment: ${{ needs.set-variables.outputs.deploy_environment }}
+    secrets: inherit
