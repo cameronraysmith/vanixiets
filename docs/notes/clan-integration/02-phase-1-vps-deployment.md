@@ -27,7 +27,7 @@ Deploying cinnabar before migrating darwin hosts provides critical advantages:
 - [ ] Age key generated: `nix run nixpkgs#age -- keygen`
 - [ ] Current nix-config working (darwin hosts can stay on nixos-unified during VPS deployment)
 - [ ] Familiarity with flake-parts module system
-- [ ] Understanding of dendritic pattern and clan architecture from Phase 0
+- [ ] Understanding of dendritic flake-parts pattern and clan architecture from Phase 0
 
 ## Migration overview
 
@@ -599,7 +599,7 @@ Server-specific NixOS configuration:
 
 **File**: `modules/hosts/cinnabar/default.nix`
 
-Main configuration for cinnabar VPS using dendritic pattern:
+Main configuration for cinnabar VPS using dendritic flake-parts pattern:
 
 ```nix
 {
@@ -1261,14 +1261,14 @@ After Phase 1 deployment:
 After cinnabar is stable (monitor for 1-2 weeks), proceed to Phase 2 (blackphos migration).
 
 **Phase 2 overview**:
-1. Create blackphos darwin configuration using dendritic pattern (reference: cinnabar structure)
+1. Create blackphos darwin configuration using dendritic flake-parts pattern (reference: cinnabar structure)
 2. Configure blackphos as zerotier peer (connects to cinnabar controller)
 3. Generate vars for blackphos
 4. Deploy blackphos with `darwin-rebuild switch`
 5. Verify blackphos ↔ cinnabar zerotier connectivity
 6. Test SSH via zerotier network (using sshd-clan CA certificates)
 
-**Key difference**: blackphos uses darwin modules, but follows same dendritic pattern as cinnabar.
+**Key difference**: blackphos uses darwin modules, but follows same dendritic flake-parts pattern as cinnabar.
 
 See `02-phase-2-blackphos-guide.md` for detailed blackphos migration steps.
 
