@@ -3,7 +3,7 @@ title: Testing guide
 description: Comprehensive testing with Vitest and Playwright
 ---
 
-Comprehensive testing documentation for the typescript-nix-template project.
+Comprehensive testing documentation for the nix-config project.
 
 ## Overview
 
