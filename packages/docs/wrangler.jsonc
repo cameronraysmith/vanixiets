@@ -4,7 +4,7 @@
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ts-nix-docs",
+  "name": "nix-config-docs",
   "main": "./dist/_worker.js/index.js",
   "compatibility_date": "2025-10-06",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -22,7 +22,7 @@
   "preview_urls": true,
   "routes": [
     {
-      "pattern": "ts-nix.scientistexperience.net",
+      "pattern": "infra.cameronraysmith.net",
       "custom_domain": true,
     },
   ],
