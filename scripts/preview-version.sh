@@ -84,6 +84,10 @@ if ! git merge --no-edit "$CURRENT_BRANCH" &>/dev/null; then
   exit 1
 fi
 
+# Install dependencies in worktree (bun uses global cache, so this is fast)
+echo -e "${BLUE}installing dependencies in worktree...${NC}"
+bun install --silent &>/dev/null
+
 # Navigate to package if specified
 if [ -n "$PACKAGE_PATH" ]; then
   if [ ! -d "$PACKAGE_PATH" ]; then
@@ -97,17 +101,8 @@ fi
 echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 
 # Capture output and parse version
-# Ensure we have path to original repo's node_modules
-export PATH="$REPO_ROOT/node_modules/.bin:$PATH"
-
-# Run semantic-release via bun with explicit reference to repo node_modules
-if [ -n "$PACKAGE_PATH" ]; then
-  # For package, use bun x from within the worktree package directory
-  OUTPUT=$(NODE_PATH="$REPO_ROOT/node_modules" bun x --bun semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" 2>&1 || true)
-else
-  # For root package
-  OUTPUT=$(cd "$WORKTREE_DIR" && NODE_PATH="$REPO_ROOT/node_modules" bun x --bun semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" 2>&1 || true)
-fi
+# Use test-release script which already has correct semantic-release config
+OUTPUT=$(bun run test-release --branches "$TARGET_BRANCH" 2>&1 || true)
 
 # Display relevant output
 echo "$OUTPUT" | grep -v "^$" | grep -E "(semantic-release|Published|next release|Release note|version)" || true
