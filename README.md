@@ -212,7 +212,7 @@ File names become configuration names. No manual registration required.
 
 **Experimental packages** (not in overlay, manual build only):
 
-- From `overlays/debug-packages/` → `legacyPackages.debug`: conda-lock, holos, quarto, teller
+- From `overlays/debug-packages/` → `legacyPackages.debug`: conda-lock, holos, quarto
 - Access: `nix build .#debug.<package>` or `just debug-build <package>`
 
 **Note**: The `overlays/infra/` subdirectory is intentionally excluded from autowiring to avoid conflicts. It contains:
