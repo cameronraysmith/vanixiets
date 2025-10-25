@@ -97,14 +97,14 @@ After completing Phase 0 validation, evaluate whether to proceed to Phase 1 (cin
 
 **🟡 CONDITIONAL GO - Proceed with caution** if:
 - ⚠️ Minor integration issues exist but have known workarounds
-- ⚠️ Some dendritic patterns must be relaxed, but clan functionality preserved
+- ⚠️ Some dendritic flake-parts patterns must be relaxed, but clan functionality preserved
 - ⚠️ Additional testing recommended but not blocking
 - **Decision**: Document compromises, proceed to Phase 1 with increased monitoring
 
 **🔴 NO-GO - Pause or pivot** if:
 - ❌ Fundamental architectural conflicts prevent coexistence
 - ❌ Clan functionality broken or severely compromised
-- ❌ Dendritic pattern requires excessive violations (loses benefits)
+- ❌ Dendritic flake-parts pattern requires excessive violations (loses benefits)
 - ❌ Integration complexity outweighs type safety benefits
 - **Decision**: Consider alternative approaches:
   - **Option A**: Use vanilla clan + flake-parts (clan-infra pattern) - proven, simpler
