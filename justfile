@@ -1189,6 +1189,17 @@ cache-overlay-packages system:
     echo ""
     echo "CI will now fetch from cachix instead of building."
 
+# Preview semantic-release version after merging current branch to target
+[group('CI/CD')]
+preview-version target="main" package="":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ -n "{{package}}" ]; then
+    ./scripts/preview-version.sh "{{target}}" "{{package}}"
+  else
+    ./scripts/preview-version.sh "{{target}}"
+  fi
+
 ## sops
 
 # Extract key details from Bitwarden (all sops-* keys or specific key)
