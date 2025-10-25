@@ -1124,6 +1124,377 @@ Reference repository analysis reveals:
    - **Approach**: Keep configurations/ until all hosts migrated
    - **Per-host**: Can rebuild from nixos-unified until proven stable
 
+## Appendix: Secrets migration from sops-nix to clan vars
+
+### Context: current sops-nix structure
+
+Current nix-config uses sops-nix for secrets management:
+
+```
+nix-config/
+├── secrets/
+│   ├── .sops.yaml                    # sops configuration
+│   ├── shared.yaml                   # Shared secrets (CACHIX_AUTH_TOKEN, GITHUB_TOKEN, etc.)
+│   ├── test.yaml                     # Test environment secrets
+│   ├── hosts/                        # Per-host secrets
+│   ├── services/                     # Service-specific secrets
+│   └── users/                        # Per-user secrets
+│       └── crs58/
+│           └── <hash>-<name>.yaml    # Content-addressed encrypted secrets
+└── .sops.yaml                        # sops encryption rules (age keys)
+```
+
+**Age keys**: `~/.config/sops/age/keys.txt` (user identity keys)
+
+**Encryption rules**: `.sops.yaml` specifies which age public keys can decrypt
+
+### Clan vars overview
+
+Clan uses a different secrets paradigm:
+
+1. **Generators**: Functions that produce secrets (random passwords, SSH keys, etc.)
+2. **Vars**: Generated values stored per-machine
+3. **Deployment**: Clan deploys vars to `/run/secrets/` on target hosts
+4. **No central secrets file**: Each machine generates its own vars
+
+**Key difference**: sops-nix encrypts existing secrets, clan generates secrets dynamically.
+
+### Migration strategy: hybrid approach
+
+**Recommendation**: Maintain both systems during migration:
+
+1. **Keep sops-nix** for existing secrets (API tokens, manually provisioned credentials)
+2. **Add clan vars** for machine-generated secrets (SSH host keys, passwords)
+3. **Gradually migrate** shared secrets to clan as appropriate
+
+**Rationale**:
+- Clan vars excel at generated secrets (SSH keys, random passwords)
+- sops-nix better for external secrets (API tokens from providers)
+- Hybrid approach minimizes disruption
+
+### Step-by-step migration guide
+
+#### Step 1: Understand what needs migration
+
+**Inventory current secrets**:
+
+```bash
+cd ~/projects/nix-workspace/nix-config
+
+# List all encrypted secrets
+find secrets/ -name "*.yaml" -type f | grep -v ".sops.yaml"
+
+# Categorize by type:
+# 1. Shared secrets (secrets/shared.yaml, secrets/test.yaml)
+# 2. Per-host secrets (secrets/hosts/)
+# 3. Service secrets (secrets/services/)
+# 4. User secrets (secrets/users/)
+```
+
+**Example inventory**:
+
+```
+shared.yaml:
+  - CACHIX_AUTH_TOKEN       # Keep in sops (external credential)
+  - GITHUB_TOKEN            # Keep in sops (external credential)
+  - CLOUDFLARE_API_TOKEN    # Keep in sops (external credential)
+
+hosts/<hostname>/:
+  - ssh_host_ed25519_key    # MIGRATE to clan vars (generated)
+  - ssh_host_rsa_key        # MIGRATE to clan vars (generated)
+
+services/:
+  - database_password       # MIGRATE to clan vars (can be generated)
+  - api_secret_key          # MIGRATE to clan vars (can be generated)
+
+users/<user>/:
+  - ssh_private_key         # Keep in sops (manually created)
+  - gpg_private_key         # Keep in sops (manually created)
+```
+
+#### Step 2: Configure clan vars generators
+
+**File**: `modules/flake-parts/clan.nix` (or dedicated `modules/clan/vars-generators.nix`)
+
+```nix
+{
+  clan.inventory.services = {
+    # SSH host key generator (replaces manual host key management)
+    sshd = {
+      roles.server.machines = {
+        cinnabar = { };
+        test-vm = { };
+        # ... other hosts
+      };
+    };
+
+    # Database password generator
+    postgres = {
+      roles.server.machines = {
+        cinnabar = { };
+      };
+    };
+
+    # API secret generator
+    api-keys = {
+      roles.default.machines = {
+        cinnabar = { };
+      };
+    };
+  };
+}
+```
+
+**Note**: Clan's service instances automatically generate required vars.
+
+#### Step 3: Generate vars for hosts
+
+After clan configuration is in place:
+
+```bash
+cd ~/projects/nix-workspace/nix-config
+
+# Generate vars for each host
+nix run nixpkgs#clan-cli -- vars generate cinnabar
+nix run nixpkgs#clan-cli -- vars generate blackphos
+nix run nixpkgs#clan-cli -- vars generate test-vm
+
+# Verify vars generated
+ls -la sops/machines/cinnabar/
+ls -la sops/machines/blackphos/
+```
+
+**Expected structure**:
+
+```
+sops/
+└── machines/
+    ├── cinnabar/
+    │   ├── facts/
+    │   │   └── sshd.id_ed25519.pub    # Public key (not encrypted)
+    │   └── secrets/
+    │       ├── sshd.id_ed25519        # Private key (encrypted with age)
+    │       ├── postgres.password      # Generated password
+    │       └── api.secret_key         # Generated API key
+    └── blackphos/
+        └── ...
+```
+
+#### Step 4: Update module references
+
+**Before** (sops-nix):
+
+```nix
+{
+  config.sops.secrets."ssh_host_ed25519_key" = {
+    sopsFile = ../secrets/hosts/${config.networking.hostName}/secrets.yaml;
+    mode = "0600";
+    path = "/etc/ssh/ssh_host_ed25519_key";
+  };
+
+  services.openssh.hostKeys = [
+    {
+      path = config.sops.secrets."ssh_host_ed25519_key".path;
+      type = "ed25519";
+    }
+  ];
+}
+```
+
+**After** (clan vars):
+
+```nix
+{
+  # Clan automatically deploys SSH host keys from vars
+  # No explicit configuration needed - handled by clan sshd service
+
+  # Or if manual control needed:
+  services.openssh.hostKeys = [
+    {
+      path = "/run/secrets/sshd.id_ed25519";  # Deployed by clan
+      type = "ed25519";
+    }
+  ];
+}
+```
+
+**Key insight**: Clan services handle vars deployment automatically. Explicit references rarely needed.
+
+#### Step 5: Keep sops-nix for external secrets
+
+Maintain sops-nix configuration for secrets that cannot be generated:
+
+```nix
+{
+  imports = [
+    inputs.sops-nix.nixosModules.sops  # Keep sops-nix module
+  ];
+
+  # Age key for sops decryption
+  sops.age.keyFile = "/home/crs58/.config/sops/age/keys.txt";
+
+  # External secrets (API tokens, manually provisioned)
+  sops.secrets = {
+    "cachix_auth_token" = {
+      sopsFile = ../secrets/shared.yaml;
+    };
+    "github_token" = {
+      sopsFile = ../secrets/shared.yaml;
+    };
+    "cloudflare_api_token" = {
+      sopsFile = ../secrets/shared.yaml;
+    };
+  };
+
+  # Use in configuration
+  systemd.services.example = {
+    environment = {
+      CACHIX_AUTH_TOKEN = config.sops.secrets.cachix_auth_token.path;
+    };
+  };
+}
+```
+
+#### Step 6: Migration validation checklist
+
+After migrating secrets for a host:
+
+- [ ] Clan vars generated: `nix run nixpkgs#clan-cli -- vars list <hostname>`
+- [ ] Vars deployed to /run/secrets/: `ls -la /run/secrets/` on target host
+- [ ] Services using vars start successfully
+- [ ] sops-nix still decrypts external secrets
+- [ ] No permission errors accessing secrets
+- [ ] Secrets survive reboot (clan vars repopulate on activation)
+
+#### Step 7: Document migration decisions
+
+Create migration tracking document:
+
+**File**: `docs/notes/clan-integration/secrets-migration-tracking.md`
+
+```markdown
+# Secrets migration tracking
+
+## Migrated to clan vars
+
+- [ ] cinnabar SSH host keys (sshd service)
+- [ ] cinnabar postgres password (postgres service)
+- [ ] blackphos SSH host keys (sshd service)
+- [ ] test-vm SSH host keys (sshd service)
+
+## Remaining in sops-nix
+
+- [x] CACHIX_AUTH_TOKEN (external credential)
+- [x] GITHUB_TOKEN (external credential)
+- [x] CLOUDFLARE_API_TOKEN (external credential)
+- [x] User SSH private keys (manually created, not generated)
+- [x] GPG private keys (manually created, not generated)
+
+## Migration notes
+
+### cinnabar
+- Migrated: 2025-10-21
+- Generated SSH host keys with clan vars
+- Tested SSH connectivity after migration
+- sops-nix still active for API tokens
+
+### blackphos
+- Status: Pending Phase 2
+- Plan: Migrate SSH host keys during Phase 2 deployment
+```
+
+### Common migration patterns
+
+#### Pattern 1: SSH host keys (generated → clan vars)
+
+**Before (sops-nix)**:
+```bash
+# Generate key manually
+ssh-keygen -t ed25519 -f ssh_host_ed25519_key -N ""
+
+# Encrypt with sops
+echo "ssh_host_ed25519_key: |" > secrets/hosts/cinnabar/secrets.yaml
+cat ssh_host_ed25519_key | sed 's/^/  /' >> secrets/hosts/cinnabar/secrets.yaml
+sops -e -i secrets/hosts/cinnabar/secrets.yaml
+
+# Reference in config
+sops.secrets."ssh_host_ed25519_key" = { ... };
+```
+
+**After (clan vars)**:
+```nix
+# In clan inventory
+clan.inventory.services.sshd.roles.server.machines.cinnabar = { };
+
+# Generate vars
+nix run nixpkgs#clan-cli -- vars generate cinnabar
+
+# Automatic deployment to /run/secrets/sshd.id_ed25519
+```
+
+#### Pattern 2: API tokens (external → keep sops-nix)
+
+**Rationale**: Cannot generate externally provisioned credentials.
+
+**Approach**: Keep in sops-nix, reference as before:
+
+```nix
+sops.secrets."github_token" = {
+  sopsFile = ../secrets/shared.yaml;
+};
+
+# Use in services
+environment.sessionVariables.GITHUB_TOKEN =
+  "$(cat ${config.sops.secrets.github_token.path})";
+```
+
+#### Pattern 3: Database passwords (can generate → migrate to clan vars)
+
+**Before**: Manually generated and encrypted
+**After**: Clan postgres service generates automatically
+
+```nix
+# Clan inventory
+clan.inventory.services.postgres.roles.server.machines.cinnabar = { };
+
+# Generated password at /run/secrets/postgres.password
+# Reference in postgres configuration
+services.postgresql.authentication = ''
+  local all all peer
+'';
+```
+
+### Troubleshooting secrets migration
+
+**Issue**: Vars not deploying to /run/secrets/
+**Solution**: Verify clan service instance configured in inventory, run activation
+
+**Issue**: Permission denied accessing secrets
+**Solution**: Check file ownership/permissions, clan sets correct permissions automatically
+
+**Issue**: sops-nix conflicts with clan vars
+**Solution**: Different paths (/run/secrets/ vs /run/secrets-sops/), should not conflict
+
+**Issue**: Lost access to secrets after migration
+**Solution**: Keep backup of sops-encrypted secrets during migration, rollback if needed
+
+### Migration timeline
+
+Secrets migration occurs incrementally across phases:
+
+- **Phase 0** (test-clan): Test clan vars generation, validate approach
+- **Phase 1** (cinnabar VPS): Migrate SSH host keys, service secrets
+- **Phase 2-5** (darwin hosts): Migrate host-specific secrets progressively
+- **Phase 6** (cleanup): Remove sops-nix entirely if all secrets migrated
+
+**Recommendation**: Do not rush secrets migration. Hybrid sops-nix + clan vars is acceptable long-term.
+
+### References
+
+- Clan vars documentation: `~/projects/nix-workspace/clan-core/docs/vars.md`
+- sops-nix documentation: https://github.com/Mic92/sops-nix
+- Current secrets structure: `~/projects/nix-workspace/nix-config/secrets/`
+
 ## Next steps
 
 1. **Immediate**: Read `01-phase-0-validation.md` for dendritic + clan integration validation
