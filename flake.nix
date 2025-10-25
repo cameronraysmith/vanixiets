@@ -5,7 +5,7 @@
     substituters = [
       "https://cache.nixos.org"
       "https://nix-community.cachix.org"
-      "https://numtide.cachix.org" # nix-ai-tools (claude-code, crush, etc.)
+      "https://numtide.cachix.org"
       "https://cameronraysmith.cachix.org"
       "https://poetry2nix.cachix.org"
       "https://pyproject-nix.cachix.org"
@@ -78,13 +78,12 @@
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";
     nuenv.inputs.nixpkgs.follows = "nixpkgs";
 
-    # Upstream Jujutsu for latest SSH signing features (revset-based sign-on-push)
+    # upstream Jujutsu for latest SSH signing features (revset-based sign-on-push)
     jj.url = "github:martinvonz/jj";
     jj.inputs.nixpkgs.follows = "nixpkgs";
 
-    # AI coding tools with daily updates
+    # do not override nixpkgs input to preserve numtide.cachix.org cache hits
     nix-ai-tools.url = "github:numtide/nix-ai-tools";
-    nix-ai-tools.inputs.nixpkgs.follows = "nixpkgs";
 
     # Landlock sandboxing for applications
     landrun-nix.url = "github:srid/landrun-nix";
