@@ -506,20 +506,205 @@ nix eval .#nixosConfigurations --apply builtins.attrNames
 
 **Integration point 5**: All of these should evaluate successfully if dendritic + clan integration works
 
-## Step 12: Build test-vm configuration
+## Step 11.5: Create justfile for test-clan
 
-Attempt to build the nixosConfiguration:
+Create a justfile to mirror nix-config's development workflow and enable CI/CD validation.
+
+**File**: `~/projects/nix-workspace/test-clan/justfile`
+
+```just
+# justfile for test-clan
+# Mirrors nix-config CI/CD patterns for local-CI parity
+
+## validation
+
+# Check flake evaluation
+[group('validation')]
+check:
+    nix flake check
+
+# Lint nix files
+[group('validation')]
+lint:
+    nix run nixpkgs#statix -- check .
+    nix run nixpkgs#deadnix -- check .
+
+# Verify system configuration builds
+[group('validation')]
+verify:
+    @echo "Building nixosConfigurations..."
+    nix build .#nixosConfigurations.test-vm.config.system.build.toplevel --dry-run
+
+# Verify darwin configuration builds (if Phase 0.5 completed)
+[group('validation')]
+verify-darwin:
+    @echo "Building darwinConfigurations..."
+    nix build .#darwinConfigurations.test-darwin.system --dry-run || echo "No darwin config yet (Phase 0.5 not started)"
+
+## build
+
+# Build nixos configuration
+[group('build')]
+build-nixos:
+    nix build .#nixosConfigurations.test-vm.config.system.build.toplevel
+
+# Build darwin configuration (if exists)
+[group('build')]
+build-darwin:
+    nix build .#darwinConfigurations.test-darwin.system
+
+## clan
+
+# Generate clan vars for a machine
+[group('clan')]
+vars-generate machine="test-vm":
+    nix run nixpkgs#clan-cli -- vars generate {{machine}}
+
+# List clan vars for a machine
+[group('clan')]
+vars-list machine="test-vm":
+    nix run nixpkgs#clan-cli -- vars list {{machine}}
+
+# Show clan inventory
+[group('clan')]
+show-inventory:
+    nix eval .#clan.inventory --json | nix run nixpkgs#jq
+
+# Show clan machines
+[group('clan')]
+show-machines:
+    nix eval .#clan.inventory.machines --apply builtins.attrNames --json
+
+# Show clan services
+[group('clan')]
+show-services:
+    nix eval .#clan.inventory.instances --apply builtins.attrNames --json
+
+## testing
+
+# Run all validation tests
+[group('testing')]
+test-all: check verify vars-generate build-nixos
+    @echo "✅ All tests passed!"
+
+# Test dendritic module discovery
+[group('testing')]
+test-dendritic:
+    @echo "Testing dendritic module discovery..."
+    nix eval .#flake.modules.nixos --apply builtins.attrNames --json | nix run nixpkgs#jq -r '.[]' | sort
+    nix eval .#flake.modules.darwin --apply builtins.attrNames --json | nix run nixpkgs#jq -r '.[]' | sort || echo "No darwin modules yet"
+
+# Test clan integration
+[group('testing')]
+test-clan-integration:
+    @echo "Testing clan integration..."
+    just show-machines
+    just show-services
+    just vars-generate test-vm
+
+## ci (mirrors GitHub Actions workflow)
+
+# CI validation (exactly as run in GitHub Actions)
+[group('ci')]
+ci-local: check lint verify test-dendritic test-clan-integration
+    @echo "✅ CI validation complete (matches GitHub Actions workflow)"
+
+# Build category for CI matrix (mirrors nix-config CI pattern)
+[group('ci')]
+ci-build-category system category config="":
+    @echo "Building {{category}} for {{system}}..."
+    @if [ "{{category}}" = "nixos" ]; then \
+        nix build .#nixosConfigurations.{{config}}.config.system.build.toplevel; \
+    elif [ "{{category}}" = "darwin" ]; then \
+        nix build .#darwinConfigurations.{{config}}.system; \
+    elif [ "{{category}}" = "packages" ]; then \
+        nix build .#packages.{{system}} --all-system; \
+    elif [ "{{category}}" = "checks-devshells" ]; then \
+        nix flake check --all-systems; \
+    fi
+
+# Help command
+help:
+    @just --list
+```
+
+**Usage examples**:
 
 ```bash
 cd ~/projects/nix-workspace/test-clan
 
-# Build test-vm configuration (dry-run, won't deploy)
+# Inside nix develop shell:
+nix develop
+
+# Run validation (matches CI)
+just check
+
+# Build and test
+just test-all
+
+# Test clan integration specifically
+just test-clan-integration
+
+# Test dendritic module discovery
+just test-dendritic
+
+# Generate vars (used in later steps)
+just vars-generate test-vm
+
+# Full CI validation locally
+just ci-local
+```
+
+**CI Integration** (create this after Phase 0 if deploying test-clan to CI):
+
+**File**: `~/projects/nix-workspace/test-clan/.github/workflows/ci.yaml`
+
+```yaml
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Run validation
+        run: nix develop --command just ci-local
+
+      - name: Build nixos configuration
+        run: nix develop --command just build-nixos
+```
+
+**Integration point 6**: Justfile provides local-CI parity and testable validation categories
+
+## Step 12: Build test-vm configuration (now using justfile)
+
+Attempt to build the nixosConfiguration using the justfile:
+
+```bash
+cd ~/projects/nix-workspace/test-clan
+
+# Using justfile (preferred - matches CI)
+just build-nixos
+
+# Or directly with nix (same as justfile internal command)
 nix build .#nixosConfigurations.test-vm.config.system.build.toplevel
 
 # If successful:
 ls -la result/
 readlink result
 ```
+
+**Note**: Use `just build-nixos` going forward to maintain local-CI parity.
 
 **Expected outcome**:
 - Build succeeds: Dendritic + clan integration works!
@@ -531,16 +716,26 @@ readlink result
 - Clan services not finding dendritic modules
 - Missing or duplicate options
 
-## Step 13: Generate clan vars for test-vm
+## Step 13: Generate clan vars for test-vm (now using justfile)
 
-Test clan vars generation:
+Test clan vars generation using the justfile:
 
 ```bash
 cd ~/projects/nix-workspace/test-clan
 
-# Generate all vars for test-vm
+# Using justfile (preferred - matches CI)
+just vars-generate test-vm
+
+# Or directly with clan-cli (same as justfile internal command)
 nix run nixpkgs#clan-cli -- vars generate test-vm
 
+# Verify vars generated
+ls -la sops/machines/test-vm/
+```
+
+**Expected output**:
+
+```
 # You'll be prompted for:
 # - Emergency access password
 # - Any other service-specific prompts

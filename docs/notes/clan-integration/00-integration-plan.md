@@ -335,6 +335,23 @@ modules/
 - Both emphasize modular, type-safe configurations
 - import-tree auto-discovery works seamlessly with clan modules
 
+**CI/CD and development workflow principle**:
+- **Justfile as universal command interface**: All common operations (build, check, test, activate) exposed via justfile recipes
+- **Local-CI parity**: CI workflows execute `nix develop -c just <command>` matching local development
+- **Testability guarantee**: Every major functionality category must have a `just <command>` that validates it locally and in CI
+- **Darwin + NixOS + home-manager coverage**: Each platform has corresponding justfile recipes and CI jobs
+- **Categories to test**:
+  - `just check`: Flake evaluation and syntax validation
+  - `just verify`: System configuration builds without activation
+  - `just lint`: Code quality and formatting
+  - `just activate <config>`: Dry-run activation workflows
+  - Category-specific: `just ci-build-category <system> <category>` for packages/checks/home/nixos
+- **Benefits**:
+  - Developers can reproduce CI failures locally
+  - CI configuration remains simple (delegates to justfile)
+  - Single source of truth for build/test commands
+  - Easy to add new validation steps (update justfile, automatically picked up by CI)
+
 **Architectural incompatibility with nixos-unified**:
 - nixos-unified uses specialArgs + directory-based autowire
 - Dendritic eliminates specialArgs in favor of `config.flake.*`
