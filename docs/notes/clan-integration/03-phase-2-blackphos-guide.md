@@ -1,6 +1,6 @@
 # Phase 2 implementation guide: darwin migration (blackphos)
 
-This guide provides step-by-step instructions for Phase 2: migrating blackphos (the first darwin host) from nixos-unified to the dendritic pattern with clan-core integration.
+This guide provides step-by-step instructions for Phase 2: migrating blackphos (the first darwin host) from nixos-unified to the dendritic flake-parts pattern with clan-core integration.
 Phase 2 builds on the infrastructure established in Phase 1 (cinnabar VPS) and establishes darwin-specific patterns for subsequent host migrations.
 
 ## Critical Prerequisites
@@ -33,7 +33,7 @@ ssh root@<cinnabar-ip> "zerotier-cli listnetworks | awk 'NR==2 {print \$3}'"
 - [ ] Age key generated for yourself: `nix run nixpkgs#age -- keygen`
 - [ ] Current nix-config working and tests passing
 - [ ] Familiarity with flake-parts module system
-- [ ] Understanding of dendritic pattern concepts
+- [ ] Understanding of dendritic flake-parts pattern concepts
 - [ ] **Strongly recommended**: Complete Phase 0.5 (darwin validation) - see `01-phase-0-validation.md` section "Phase 0.5: Darwin validation" to de-risk darwin + clan + dendritic integration before production deployment
 
 ## Migration overview
@@ -212,7 +212,7 @@ Expected: Module evaluates and exports darwin configuration.
 }
 ```
 
-## Step 6: Convert shell modules to dendritic pattern
+## Step 6: Convert shell modules to dendritic flake-parts pattern
 
 **File**: `modules/shell/fish.nix`
 
@@ -325,7 +325,7 @@ Example conversion from existing module:
 
 **File**: `modules/hosts/blackphos/default.nix`
 
-This is the core host composition using dendritic pattern:
+This is the core host composition using dendritic flake-parts pattern:
 
 ```nix
 {
@@ -346,7 +346,7 @@ This is the core host composition using dendritic pattern:
         darwin.base-system
 
         # Darwin-specific modules
-        # (add existing darwin modules converted to dendritic pattern)
+        # (add existing darwin modules converted to dendritic flake-parts pattern)
 
         # Home-manager integration
         inputs.home-manager.darwinModules.home-manager
@@ -727,7 +727,7 @@ mv modules/old-file.nix modules/old-file.nix.bak
 
 ### Overview: darwin vs NixOS differences
 
-The dendritic pattern works identically on darwin and NixOS, but darwin hosts require darwin-specific configuration options. This section documents proven patterns from production darwin configurations.
+The dendritic flake-parts pattern works identically on darwin and NixOS, but darwin hosts require darwin-specific configuration options. This section documents proven patterns from production darwin configurations.
 
 ### Pattern 1: Homebrew integration
 
@@ -901,7 +901,7 @@ Darwin-specific system settings using nix-darwin's `system.*` options.
 }
 ```
 
-**Usage**: Automatically imported via dendritic pattern, affects all darwin hosts.
+**Usage**: Automatically imported via dendritic flake-parts pattern, affects all darwin hosts.
 
 ### Pattern 3: Touch ID for sudo
 
@@ -1616,7 +1616,7 @@ git commit -m "chore: remove nixos-unified after complete migration to dendritic
 
 ## Additional resources
 
-### Dendritic pattern references
+### Dendritic flake-parts pattern references
 - Pattern documentation: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
 - Production examples:
   - `~/projects/nix-workspace/drupol-dendritic-infra/`
