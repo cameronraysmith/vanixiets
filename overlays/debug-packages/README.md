@@ -82,7 +82,6 @@ This places them in `legacyPackages.debug`, which tools like devour-flake (via o
 
 - `conda-lock`: conda environment lock file generator
 - `holos`: kubernetes configuration tool
-- `teller`: secret management tool
 - `quarto`: scientific and technical publishing system
 
 ## See also
