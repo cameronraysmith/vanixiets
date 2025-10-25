@@ -722,6 +722,573 @@ mv modules/old-stuff ../backup-modules/
 mv modules/old-file.nix modules/old-file.nix.bak
 ```
 
+## Darwin-specific configuration patterns
+
+### Overview: darwin vs NixOS differences
+
+The dendritic pattern works identically on darwin and NixOS, but darwin hosts require darwin-specific configuration options. This section documents proven patterns from production darwin configurations.
+
+### Pattern 1: Homebrew integration
+
+Homebrew complements nix on darwin for GUI applications and tools not available in nixpkgs.
+
+**File**: `modules/darwin/homebrew.nix`
+
+```nix
+{
+  flake.modules.darwin.homebrew =
+    { config, lib, ... }:
+    {
+      options.custom.homebrew = {
+        enable = lib.mkEnableOption "Homebrew package management";
+        additionalCasks = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Additional Homebrew casks to install";
+        };
+        additionalBrews = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Additional Homebrew formulae to install";
+        };
+        additionalMasApps = lib.mkOption {
+          type = lib.types.attrsOf lib.types.int;
+          default = { };
+          description = "Additional Mac App Store applications (name = id)";
+        };
+        manageFonts = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Install fonts via Homebrew";
+        };
+      };
+
+      config = lib.mkIf config.custom.homebrew.enable {
+        homebrew = {
+          enable = true;
+
+          # Core behavior
+          onActivation = {
+            autoUpdate = false; # Manual control preferred
+            cleanup = "zap"; # Remove unlisted packages
+            upgrade = false; # Explicit upgrades only
+          };
+
+          # Base GUI applications
+          casks = [
+            "1password"
+            "alfred"
+            "rectangle"
+            "iterm2"
+          ] ++ config.custom.homebrew.additionalCasks;
+
+          # Command-line tools not in nixpkgs
+          brews = [
+            # Example: tools only available via Homebrew
+          ] ++ config.custom.homebrew.additionalBrews;
+
+          # Mac App Store applications
+          masApps =
+            {
+              "1Password for Safari" = 1569813296;
+              Keynote = 409183694;
+              Numbers = 409203825;
+              Pages = 409201541;
+            }
+            // config.custom.homebrew.additionalMasApps;
+
+          # Fonts (optional)
+          caskArgs.fontdir = lib.mkIf config.custom.homebrew.manageFonts "/Library/Fonts";
+        };
+      };
+    };
+}
+```
+
+**Usage in host config** (e.g., `modules/hosts/blackphos/default.nix`):
+
+```nix
+{
+  custom.homebrew = {
+    enable = true;
+    additionalCasks = [
+      "codelayer-nightly"
+      "dbeaver-community"
+      "gpg-suite"
+    ];
+    additionalBrews = [
+      "incus" # Not available in nixpkgs
+    ];
+    additionalMasApps = {
+      save-to-raindrop-io = 1549370672;
+    };
+    manageFonts = false; # Use nix for fonts
+  };
+}
+```
+
+### Pattern 2: macOS system preferences
+
+Darwin-specific system settings using nix-darwin's `system.*` options.
+
+**File**: `modules/darwin/system-preferences.nix`
+
+```nix
+{
+  flake.modules.darwin."system-preferences" =
+    { lib, ... }:
+    {
+      # Dock configuration
+      system.defaults.dock = {
+        autohide = true;
+        orientation = "bottom";
+        tilesize = 48;
+        show-recents = false;
+        mru-spaces = false; # Don't rearrange spaces
+      };
+
+      # Finder configuration
+      system.defaults.finder = {
+        AppleShowAllExtensions = true;
+        AppleShowAllFiles = false;
+        FXEnableExtensionChangeWarning = false;
+        QuitMenuItem = true;
+        ShowPathbar = true;
+        ShowStatusBar = true;
+      };
+
+      # Global macOS settings
+      system.defaults.NSGlobalDomain = {
+        AppleInterfaceStyle = "Dark"; # Dark mode
+        AppleKeyboardUIMode = 3; # Full keyboard navigation
+        ApplePressAndHoldEnabled = false; # Repeat keys instead of accents
+        InitialKeyRepeat = 15; # Faster key repeat
+        KeyRepeat = 2; # Very fast key repeat
+        NSAutomaticCapitalizationEnabled = false;
+        NSAutomaticDashSubstitutionEnabled = false;
+        NSAutomaticPeriodSubstitutionEnabled = false;
+        NSAutomaticQuoteSubstitutionEnabled = false;
+        NSAutomaticSpellingCorrectionEnabled = false;
+      };
+
+      # Trackpad configuration
+      system.defaults.trackpad = {
+        Clicking = true; # Tap to click
+        TrackpadThreeFingerDrag = false;
+      };
+
+      # Screencapture configuration
+      system.defaults.screencapture = {
+        location = "~/Pictures/Screenshots";
+        type = "png";
+      };
+
+      # System UI
+      system.defaults.CustomUserPreferences = {
+        "com.apple.finder" = {
+          ShowExternalHardDrivesOnDesktop = true;
+          ShowHardDrivesOnDesktop = false;
+          ShowMountedServersOnDesktop = true;
+          ShowRemovableMediaOnDesktop = true;
+        };
+        "com.apple.desktopservices" = {
+          DSDontWriteNetworkStores = true; # Don't create .DS_Store on network volumes
+          DSDontWriteUSBStores = true;
+        };
+      };
+    };
+}
+```
+
+**Usage**: Automatically imported via dendritic pattern, affects all darwin hosts.
+
+### Pattern 3: Touch ID for sudo
+
+Darwin-specific PAM configuration for Touch ID authentication.
+
+**File**: `modules/darwin/touchid-sudo.nix`
+
+```nix
+{
+  flake.modules.darwin."touchid-sudo" =
+    { config, lib, ... }:
+    {
+      options.custom.touchid.sudo = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable Touch ID authentication for sudo";
+      };
+
+      config = lib.mkIf config.custom.touchid.sudo {
+        # Enable Touch ID for sudo
+        security.pam.services.sudo_local.touchIdAuth = true;
+
+        # Alternative: system-wide sudo (less secure, use sudo_local instead)
+        # security.pam.enableSudoTouchIdAuth = true;
+      };
+    };
+}
+```
+
+**Usage in host config**:
+
+```nix
+{
+  custom.touchid.sudo = true;
+}
+```
+
+### Pattern 4: Desktop vs server profile
+
+Distinguish between GUI workstations and headless servers.
+
+**File**: `modules/base/profile.nix`
+
+```nix
+{
+  flake.modules = {
+    nixos.profile =
+      { lib, ... }:
+      {
+        options.custom.profile = {
+          isDesktop = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Whether this is a desktop/workstation with GUI";
+          };
+          isServer = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Whether this is a headless server";
+          };
+        };
+
+        config = {
+          # Validation: can't be both
+          assertions = [
+            {
+              assertion = !(config.custom.profile.isDesktop && config.custom.profile.isServer);
+              message = "Profile cannot be both desktop and server";
+            }
+          ];
+        };
+      };
+
+    darwin.profile =
+      { lib, ... }:
+      {
+        # Same options for darwin
+        options.custom.profile = {
+          isDesktop = lib.mkOption {
+            type = lib.types.bool;
+            default = true; # Most darwin hosts are desktops
+            description = "Whether this is a desktop/workstation with GUI";
+          };
+          isServer = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Whether this is a headless server";
+          };
+        };
+
+        config = {
+          assertions = [
+            {
+              assertion = !(config.custom.profile.isDesktop && config.custom.profile.isServer);
+              message = "Profile cannot be both desktop and server";
+            }
+          ];
+        };
+      };
+  };
+}
+```
+
+**Usage**: Conditional configuration based on profile:
+
+```nix
+{
+  # In host config
+  custom.profile.isDesktop = true;
+
+  # In other modules
+  config = lib.mkIf config.custom.profile.isDesktop {
+    # GUI-specific configuration
+    homebrew.casks = [ "iterm2" "alfred" ];
+  };
+}
+```
+
+### Pattern 5: nix-rosetta-builder for multi-arch builds
+
+Enable Linux builds on Apple Silicon darwin hosts.
+
+**File**: `modules/darwin/rosetta-builder.nix`
+
+```nix
+{ inputs, ... }:
+{
+  flake.modules.darwin.rosetta-builder =
+    { config, lib, ... }:
+    {
+      imports = [ inputs.nix-rosetta-builder.darwinModules.default ];
+
+      options.custom.rosetta-builder = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable nix-rosetta-builder for Linux builds";
+        };
+        cores = lib.mkOption {
+          type = lib.types.int;
+          default = 4;
+          description = "Number of CPU cores for VM";
+        };
+        memory = lib.mkOption {
+          type = lib.types.str;
+          default = "8GiB";
+          description = "Memory allocation for VM";
+        };
+        diskSize = lib.mkOption {
+          type = lib.types.str;
+          default = "100GiB";
+          description = "Disk size for VM";
+        };
+      };
+
+      config = lib.mkIf config.custom.rosetta-builder.enable {
+        # Disable standard linux-builder (nix-rosetta-builder replaces it)
+        nix.linux-builder.enable = false;
+
+        # Enable nix-rosetta-builder
+        nix-rosetta-builder = {
+          enable = true;
+          onDemand = true; # VM powers off when idle
+          permitNonRootSshAccess = true; # Safe for localhost-only VM
+          cores = config.custom.rosetta-builder.cores;
+          memory = config.custom.rosetta-builder.memory;
+          diskSize = config.custom.rosetta-builder.diskSize;
+        };
+      };
+    };
+}
+```
+
+**Usage in host config**:
+
+```nix
+{
+  custom.rosetta-builder = {
+    enable = true;
+    cores = 12;
+    memory = "48GiB";
+    diskSize = "500GiB";
+  };
+}
+```
+
+**Notes**:
+- nix-rosetta-builder uses Rosetta 2 for fast x86_64-linux emulation
+- Significantly faster than QEMU-based linux-builder
+- Requires flake input: `inputs.nix-rosetta-builder.darwinModules.default`
+- Bootstrap requires initial build with linux-builder, then migrate
+
+### Pattern 6: GUI application configuration
+
+Configure GUI applications declaratively where possible.
+
+**File**: `modules/darwin/gui-apps.nix`
+
+```nix
+{
+  flake.modules.darwin.gui-apps =
+    { config, pkgs, lib, ... }:
+    {
+      options.custom.gui = {
+        enableVscode = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable VS Code configuration";
+        };
+        enableAlacritty = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable Alacritty terminal";
+        };
+      };
+
+      config = lib.mkMerge [
+        (lib.mkIf config.custom.gui.enableVscode {
+          # VS Code via nix (alternative to Homebrew cask)
+          environment.systemPackages = [ pkgs.vscode ];
+
+          # Note: VS Code settings typically managed via home-manager
+          # See home-manager's programs.vscode module
+        })
+
+        (lib.mkIf config.custom.gui.enableAlacritty {
+          environment.systemPackages = [ pkgs.alacritty ];
+
+          # Alacritty configuration via home-manager
+          # programs.alacritty.enable = true;
+          # programs.alacritty.settings = { ... };
+        })
+      ];
+    };
+}
+```
+
+**Better approach**: Use home-manager for per-user GUI application configuration:
+
+**File**: `modules/home/gui-apps.nix`
+
+```nix
+{
+  flake.modules.homeManager.gui-apps =
+    { config, pkgs, lib, ... }:
+    {
+      # Only enable on darwin desktops
+      config = lib.mkIf (pkgs.stdenv.isDarwin && config.custom.profile.isDesktop or false) {
+        # VS Code
+        programs.vscode = {
+          enable = true;
+          extensions = with pkgs.vscode-extensions; [
+            jnoortheen.nix-ide
+            github.copilot
+            # Add more extensions
+          ];
+          userSettings = {
+            "editor.fontSize" = 14;
+            "editor.fontFamily" = "'JetBrainsMono Nerd Font', monospace";
+            "workbench.colorTheme" = "Catppuccin Mocha";
+          };
+        };
+
+        # Browser configuration (where supported)
+        # programs.firefox.enable = true;
+        # programs.chromium.enable = true;
+      };
+    };
+}
+```
+
+### Pattern 7: Darwin-specific performance considerations
+
+Darwin evaluations may be slower than NixOS due to macOS filesystem characteristics.
+
+**Optimization strategies**:
+
+1. **Use APFS snapshots for rollback** (automatic with nix-darwin)
+2. **Minimize derivation count** (consolidate modules where reasonable)
+3. **Cache darwin builds** (use cachix to avoid repeated builds)
+4. **Profile slow evaluations**:
+
+```bash
+# Time a dry-run activation
+time darwin-rebuild build --flake .#blackphos --dry-run
+
+# If slow (>5 minutes), investigate:
+nix eval .#darwinConfigurations.blackphos.config --show-trace
+```
+
+5. **Use import-tree efficiently** (avoid deeply nested module trees)
+
+### Pattern 8: Home-manager integration on darwin
+
+Home-manager configuration works identically on darwin and NixOS, but activation differs.
+
+**System-level integration** (recommended for darwin):
+
+```nix
+# In darwinConfigurations generator (modules/flake-parts/darwin-machines.nix)
+{
+  modules = [
+    inputs.home-manager.darwinModules.home-manager
+    {
+      home-manager.useGlobalPkgs = true;
+      home-manager.useUserPackages = true;
+      home-manager.users.${username} = {
+        imports = [
+          # User-specific home modules
+        ];
+        home.stateVersion = "25.05";
+      };
+    }
+    # ... other modules
+  ];
+}
+```
+
+**Activation**:
+- NixOS: `nixos-rebuild switch` activates both system and home-manager
+- Darwin: `darwin-rebuild switch` activates both system and home-manager
+- Standalone: `home-manager switch` for home-manager only
+
+### Pattern 9: Zerotier on darwin
+
+Zerotier peer configuration for darwin hosts connecting to VPS controller.
+
+**File**: `modules/darwin/zerotier-peer.nix`
+
+```nix
+{
+  flake.modules.darwin.zerotier-peer =
+    { config, lib, ... }:
+    {
+      # Note: Zerotier configuration typically comes from clan inventory
+      # This module adds darwin-specific zerotier support
+
+      options.custom.zerotier = {
+        enableDarwinPeer = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable Zerotier peer on darwin";
+        };
+      };
+
+      config = lib.mkIf config.custom.zerotier.enableDarwinPeer {
+        # Darwin uses launchd instead of systemd
+        # Zerotier configuration comes from clan service instance
+
+        # Additional darwin-specific configuration if needed
+        # (Most configuration handled by clan zerotier service)
+      };
+    };
+}
+```
+
+**Note**: Clan's zerotier service handles most configuration. Darwin-specific adjustments are minimal.
+
+### Darwin migration checklist
+
+When migrating a darwin host, verify:
+
+- [ ] Homebrew casks install successfully
+- [ ] System preferences apply (check Dock, Finder, etc.)
+- [ ] Touch ID for sudo works (if enabled)
+- [ ] GUI applications launch correctly
+- [ ] Home-manager activates without errors
+- [ ] Performance is acceptable (<5 min for dry-run builds)
+- [ ] Zerotier peer connects to controller (if configured)
+- [ ] nix-rosetta-builder VM starts on-demand (if enabled)
+
+### Common darwin issues
+
+**Issue**: Homebrew casks fail to install
+**Solution**: Run `brew cleanup` and retry, or install manually then let nix manage
+
+**Issue**: System preferences not applying
+**Solution**: Logout/login or reboot required for some preferences
+
+**Issue**: Touch ID stops working after macOS update
+**Solution**: Re-run `darwin-rebuild switch` to refresh PAM configuration
+
+**Issue**: GUI apps in unexpected state
+**Solution**: Home-manager manages dotfiles, system manages app installation - check both
+
+**Issue**: Slow evaluation times
+**Solution**: Profile with `--show-trace`, consider caching, reduce module count
+
 ## Phase 1 validation checklist
 
 After completing all steps:
