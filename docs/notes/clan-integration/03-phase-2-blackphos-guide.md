@@ -34,6 +34,7 @@ ssh root@<cinnabar-ip> "zerotier-cli listnetworks | awk 'NR==2 {print \$3}'"
 - [ ] Current nix-config working and tests passing
 - [ ] Familiarity with flake-parts module system
 - [ ] Understanding of dendritic pattern concepts
+- [ ] **Strongly recommended**: Complete Phase 0.5 (darwin validation) - see `01-phase-0-validation.md` section "Phase 0.5: Darwin validation" to de-risk darwin + clan + dendritic integration before production deployment
 
 ## Migration overview
 
