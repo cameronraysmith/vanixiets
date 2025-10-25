@@ -97,11 +97,16 @@ fi
 echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 
 # Capture output and parse version
-# Run semantic-release from package via test-release script
+# Ensure we have path to original repo's node_modules
+export PATH="$REPO_ROOT/node_modules/.bin:$PATH"
+
+# Run semantic-release via bun with explicit reference to repo node_modules
 if [ -n "$PACKAGE_PATH" ]; then
-  OUTPUT=$(bun run test-release --branches "$TARGET_BRANCH" 2>&1 || true)
+  # For package, use bun x from within the worktree package directory
+  OUTPUT=$(NODE_PATH="$REPO_ROOT/node_modules" bun x --bun semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" 2>&1 || true)
 else
-  OUTPUT=$(cd "$WORKTREE_DIR" && bun run test-release --branches "$TARGET_BRANCH" 2>&1 || true)
+  # For root package
+  OUTPUT=$(cd "$WORKTREE_DIR" && NODE_PATH="$REPO_ROOT/node_modules" bun x --bun semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" 2>&1 || true)
 fi
 
 # Display relevant output
