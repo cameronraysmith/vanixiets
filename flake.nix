@@ -87,6 +87,12 @@
 
     # Landlock sandboxing for applications
     landrun-nix.url = "github:srid/landrun-nix";
+
+    # Playwright browsers pinned to match package.json (@playwright/test version)
+    # Tags available at: https://github.com/pietdevries94/playwright-web-flake/tags
+    # Update this when upgrading @playwright/test in packages/docs/package.json
+    playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.56.1";
+    playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
