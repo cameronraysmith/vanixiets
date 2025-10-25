@@ -1,15 +1,134 @@
-name: Deploy Docs
+name: Deploy docs to Cloudflare
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
+      debug_enabled:
+        description: "Run with tmate.io debugging enabled"
+        required: false
+        type: string
+        default: "false"
       branch:
+        description: "Git branch or ref to checkout"
         required: true
         type: string
+      environment:
+        description: "Deployment environment (preview or production)"
+        required: false
+        type: string
+        default: "preview"
+  workflow_call:
+    inputs:
+      debug_enabled:
+        description: "Run with tmate.io debugging enabled"
+        required: false
+        type: string
+        default: "false"
+      branch:
+        description: "Git branch or ref to checkout"
+        required: true
+        type: string
+      environment:
+        description: "Deployment environment (preview or production)"
+        required: false
+        type: string
+        default: "production"
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  deployments: write
 
 jobs:
-  stub:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Workflow stub
-        run: echo "Stub - full implementation in PR"
+      - name: Check for existing dist artifact
+        id: check-artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: dist-docs
+          path: packages/docs/dist/
+
+      - name: Checkout
+        if: steps.check-artifact.outcome == 'failure'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Setup Nix
+        if: steps.check-artifact.outcome == 'failure'
+        uses: ./.github/actions/setup-nix
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        with:
+          installer: quick
+          system: x86_64-linux
+          setup-cachix: true
+
+      - name: Setup tmate debug session
+        if: steps.check-artifact.outcome == 'failure' && inputs.debug_enabled == 'true'
+        uses: mxschmitt/action-tmate@e5c7151931ca95bad1c6f4190c730ecf8c7dde48 # ratchet:mxschmitt/action-tmate@v3
+
+      - name: Install dependencies
+        if: steps.check-artifact.outcome == 'failure'
+        run: nix develop -c just install
+
+      - name: Build documentation site
+        if: steps.check-artifact.outcome == 'failure'
+        run: nix develop -c just docs-build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-docs-${{ github.run_id }}
+          path: packages/docs/dist/
+          retention-days: 7
+          include-hidden-files: true
+          overwrite: true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://infra.cameronraysmith.net
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-docs-${{ github.run_id }}
+          path: packages/docs/dist/
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        with:
+          installer: quick
+          system: x86_64-linux
+          setup-cachix: true
+
+      - name: Install dependencies
+        run: nix develop -c just install
+
+      - name: Deploy to Cloudflare Workers
+        id: deployment
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          cd packages/docs
+          if [ "${{ inputs.environment }}" = "preview" ]; then
+            nix develop -c sops exec-env ../../secrets/shared.yaml "bunx wrangler versions upload --preview-alias b-${{ inputs.branch }}"
+          else
+            nix develop -c sops exec-env ../../secrets/shared.yaml "bunx wrangler deploy"
+          fi
