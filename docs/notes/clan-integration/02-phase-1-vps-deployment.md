@@ -587,7 +587,7 @@ Server-specific NixOS configuration:
 
     # Automatic garbage collection
     nix.gc.automatic = true;
-    nix.gc.dates = [ "weekly" ];
+    nix.gc.dates = "weekly";
 
     # Basic firewall (zerotier will be added by clan service)
     networking.firewall.enable = true;
