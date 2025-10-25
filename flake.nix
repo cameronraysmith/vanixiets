@@ -92,6 +92,8 @@
     # Tags available at: https://github.com/pietdevries94/playwright-web-flake/tags
     # Update this when upgrading @playwright/test in packages/docs/package.json
     playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.56.1";
+    # Override nixpkgs to ensure reproducibility (playwright-web-flake uses indirect input)
+    # Safe on macOS (browsers from Microsoft CDN), but may cause issues on Linux (uses nixpkgs chromium)
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
 
