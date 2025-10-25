@@ -1056,6 +1056,50 @@ Reference repository analysis reveals:
 
 **Tradeoff**: Different from nixos-unified's modules/{darwin,home,nixos}/ but cleaner separation
 
+### Decision 5: specialArgs usage (minimal vs. extensive)
+
+**Context**: Apparent tension between dendritic anti-pattern and clan usage
+
+**Dendritic principle** (from dendritic-flake-parts/README.md:70-88):
+- specialArgs pass-through is an anti-pattern
+- Values should be shared via `config.flake.*` instead
+- Every file can read/write to flake-parts config
+
+**Clan usage** (from clan-infra/machines/flake-module.nix:10):
+- Uses `specialArgs = { inherit self; }` (minimal passing)
+- Necessary for clan's flakeModules integration
+- Migration docs use `specialArgs = { inherit inputs; }`
+
+**Chosen**: Minimal specialArgs acceptable, extensive pass-through avoided
+
+**Distinction**:
+- **Acceptable (minimal)**: `specialArgs = { inherit inputs; }` or `{ inherit self; }`
+  - Passes only essential flake infrastructure
+  - Minimal surface area (1-2 values)
+  - Required for framework integration (clan, flake-parts)
+  - Matches production patterns (clan-infra)
+
+- **Anti-pattern (extensive)**: `specialArgs = { inherit pkgs lib config user host system; ... }`
+  - Passes many values through specialArgs
+  - Bypasses module system type checking
+  - Creates implicit dependencies
+  - Hard to track value sources
+  - What dendritic warns against
+
+**Rationale**:
+- Clan requires minimal specialArgs for flakeModules integration
+- This is not the anti-pattern dendritic warns against
+- Anti-pattern is extensive pass-through of many values
+- Minimal framework passing is acceptable pragmatism
+- Dendritic's value comes from organizing application/user values via config.flake.*, not from eliminating all specialArgs
+
+**Guideline**:
+- Framework values (inputs, self): acceptable in specialArgs
+- Application values (pkgs, lib, config, user-defined): use config.flake.* instead
+- When in doubt: can this value be accessed via config.flake.*? If yes, use that.
+
+**Tradeoff**: Slight deviation from pure dendritic orthodoxy, but maintains practical clan compatibility while preserving core dendritic benefits
+
 ## Open questions
 
 1. **Module conversion strategy**: Convert all modules at once or incrementally?
