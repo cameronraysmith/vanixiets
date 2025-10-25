@@ -1289,6 +1289,209 @@ When migrating a darwin host, verify:
 **Issue**: Slow evaluation times
 **Solution**: Profile with `--show-trace`, consider caching, reduce module count
 
+## CI/CD validation for Phase 2 (darwin)
+
+### Update nix-config justfile for blackphos
+
+Add blackphos-specific recipes to match existing darwin patterns:
+
+**File**: `~/projects/nix-workspace/nix-config/justfile`
+
+Add to the `nix-darwin` group:
+
+```just
+# Build blackphos darwin configuration
+[group('nix-darwin')]
+darwin-build-blackphos:
+  just build "darwinConfigurations.blackphos.system"
+
+# Test blackphos darwin configuration
+[group('nix-darwin')]
+darwin-test-blackphos:
+  darwin-rebuild check --flake .#blackphos
+
+# Deploy to blackphos
+[group('nix-darwin')]
+deploy-blackphos:
+  darwin-rebuild switch --flake .#blackphos
+```
+
+Add to the `clan` group:
+
+```just
+# Generate vars for blackphos
+[group('clan')]
+vars-generate-blackphos:
+  nix run nixpkgs#clan-cli -- vars generate blackphos
+
+# Show blackphos in clan inventory
+[group('clan')]
+show-blackphos-inventory:
+  nix eval .#clan.inventory.machines.blackphos --json | nix run nixpkgs#jq
+```
+
+### CI workflow for darwin hosts
+
+Update `.github/workflows/ci.yaml` to validate darwin configurations.
+
+**Challenge**: Darwin builds require macOS runners (expensive) or cross-compilation.
+
+**Options**:
+
+**Option A: Use GitHub-hosted macOS runners** (recommended for critical darwin hosts):
+
+```yaml
+# In the matrix section:
+- system: aarch64-darwin
+  runner: macos-14  # Apple Silicon runner
+  category: darwin
+  config: blackphos
+
+- system: aarch64-darwin
+  runner: macos-14
+  category: darwin
+  config: stibnite
+```
+
+**Option B: Use nix-rosetta-builder for cross-compilation** (faster, but requires setup):
+
+Build darwin configurations on Linux using rosetta-builder:
+
+```bash
+# On linux CI runner (with rosetta-builder configured)
+nix build .#darwinConfigurations.blackphos.system --max-jobs 0 --builders @/etc/nix/machines
+```
+
+**Option C: Validate evaluation only** (cheapest, catches most errors):
+
+```yaml
+jobs:
+  validate-darwin-configs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v24
+
+      # Validate darwin configurations evaluate (don't build)
+      - name: Validate darwin configs
+        run: |
+          nix eval .#darwinConfigurations.blackphos.config.system.build.toplevel.drvPath
+          nix eval .#darwinConfigurations.stibnite.config.system.build.toplevel.drvPath
+```
+
+**Recommendation**: Start with Option C (evaluation-only), upgrade to Option A for critical hosts once confident.
+
+### Local validation before deployment
+
+Comprehensive local testing before activating on blackphos:
+
+```bash
+cd ~/projects/nix-workspace/nix-config
+
+# Enter devshell
+nix develop
+
+# 1. Validate flake evaluation
+just check
+
+# 2. Build blackphos configuration locally
+just darwin-build-blackphos
+
+# 3. Validate clan inventory
+just show-blackphos-inventory
+
+# 4. Test home-manager integration (if using)
+nix build .#darwinConfigurations.blackphos.config.home-manager.users.crs58.activationPackage
+
+# 5. Verify no regressions on other darwin hosts
+just darwin-build stibnite  # Primary workstation should still build
+
+# 6. Dry-run activation (shows what would change)
+darwin-rebuild build --flake .#blackphos --dry-run
+```
+
+### CI validation checklist
+
+After integrating blackphos into CI:
+
+- [ ] Blackphos darwin configuration evaluates in CI
+- [ ] Justfile recipes for blackphos work locally
+- [ ] `just check` passes with blackphos included
+- [ ] `just darwin-build-blackphos` succeeds
+- [ ] Clan inventory includes blackphos as darwin machine
+- [ ] Home-manager configuration validates (if used)
+- [ ] Other darwin hosts still build (no regressions)
+- [ ] CI completes without errors after blackphos integration
+
+### Darwin CI optimization strategies
+
+**1. Conditional darwin builds**
+
+Only build darwin configs when darwin files change:
+
+```yaml
+# In .github/workflows/ci.yaml
+jobs:
+  darwin-build:
+    if: |
+      contains(github.event.head_commit.modified, 'modules/darwin/') ||
+      contains(github.event.head_commit.modified, 'configurations/darwin/')
+    runs-on: macos-14
+    # ... build steps
+```
+
+**2. Cache darwin builds**
+
+Push darwin builds to cachix to avoid repeated builds:
+
+```bash
+# Locally (one-time):
+just cache-darwin-system  # From nix-config justfile
+
+# CI will pull from cachix instead of rebuilding
+```
+
+**3. Parallel validation**
+
+Run darwin evaluation and Linux builds in parallel:
+
+```yaml
+strategy:
+  matrix:
+    include:
+      - name: darwin-eval
+        runner: ubuntu-latest
+        job: eval-only
+      - name: linux-build
+        runner: ubuntu-latest
+        job: build-all
+      - name: darwin-build
+        runner: macos-14
+        job: build-darwin
+```
+
+### Benefits of darwin CI validation
+
+1. **Catch errors early**: Darwin config errors detected before deployment to workstation
+2. **Safe migration**: Validate configurations without disrupting daily work
+3. **Reproducibility**: Same validation runs locally and in CI
+4. **Team visibility**: CI status shows configuration health
+5. **Confidence**: Green CI = safe to deploy to primary workstation
+
+### Troubleshooting darwin CI
+
+**Issue**: Darwin builds time out in CI (>1 hour)
+**Solution**: Use cachix pre-caching (`just cache-darwin-system`), enable evaluation-only validation
+
+**Issue**: macOS runner quota exhausted
+**Solution**: Switch to evaluation-only validation, use conditional builds (only on darwin file changes)
+
+**Issue**: Darwin config builds locally but fails in CI
+**Solution**: Check nixpkgs version consistency, verify inputs.follows, ensure no local-only paths
+
+**Issue**: Home-manager fails in CI
+**Solution**: Verify home-manager input follows nixpkgs, check for darwin-specific home-manager options
+
 ## Phase 1 validation checklist
 
 After completing all steps:
