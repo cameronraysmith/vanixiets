@@ -58,7 +58,7 @@ Before beginning, read and internalize these documents I've prepared:
 - `~/projects/nix-workspace/clan-infra/` - Production infrastructure examples (clan + flake-parts)
 - `~/projects/nix-workspace/jfly-clan-snow/` - Darwin + clan example
 
-**Dendritic pattern references**:
+**Dendritic flake-parts pattern references**:
 
 - `~/projects/nix-workspace/dendritic-flake-parts/` - Canonical pattern
 - `~/projects/nix-workspace/drupol-dendritic-infra/` - Comprehensive production example
@@ -81,13 +81,13 @@ Guide me through these phases progressively, with validation gates between each:
 1. Create test-clan/ repository with minimal dendritic + clan setup
 2. Add clan-core, import-tree, flake-parts inputs
 3. Create dendritic module structure: `modules/{base,nixos,hosts}/`
-4. Configure single NixOS test VM using dendritic pattern
+4. Configure single NixOS test VM using dendritic flake-parts pattern
 5. Add clan inventory with test-vm machine
 6. Configure minimal clan service (emergency-access or sshd)
 7. Generate clan vars: `nix run nixpkgs#clan-cli -- vars generate test-vm`
 8. Build and test in VM: `nix run .#clan-cli -- vms run test-vm`
 9. Document findings, patterns, and any compromises needed
-10. Validate: dendritic pattern works with clan, understand integration points
+10. Validate: dendritic flake-parts pattern works with clan, understand integration points
 
 **Success criteria**:
 
@@ -332,7 +332,7 @@ Guide me through these phases progressively, with validation gates between each:
 
 At appropriate moments, explain these concepts using examples from the repositories:
 
-**Dendritic pattern**:
+**Dendritic flake-parts pattern**:
 
 - Minimal specialArgs (only inputs/self for framework), avoid extensive pass-through
 - Values shared via `config.flake.*` instead of specialArgs
@@ -387,7 +387,7 @@ At appropriate moments, explain these concepts using examples from the repositor
 I'll know migration is successful when:
 
 **Phase 0**:
-- ✅ Understand dendritic pattern and `flake.modules.*` namespace
+- ✅ Understand dendritic flake-parts pattern and `flake.modules.*` namespace
 - ✅ Validated dendritic + clan integration in test-clan
 - ✅ import-tree auto-discovery working
 - ✅ Clan inventory and vars system understood
@@ -439,13 +439,13 @@ I'll know migration is successful when:
 
 - I might skip Phase 0.5 (darwin validation) - warn about Phase 2 risks but support decision
 - I might want to stop after Phase 2-4 (test hosts only) and defer stibnite migration
-- I might discover dendritic pattern needs compromises - document and adapt
+- I might discover dendritic flake-parts pattern needs compromises - document and adapt
 - I might want to experiment with alternative patterns in test-clan
 - I might defer Phase 1 and explore test-clan extensively first
 
 **Respond to issues**:
 
-- Dendritic pattern feels too complex → simplify, show concrete examples from drupol-dendritic-infra
+- Dendritic flake-parts pattern feels too complex → simplify, show concrete examples from drupol-dendritic-infra
 - Module conversion unclear → show before/after examples
 - import-tree not discovering → troubleshoot file structure and naming
 - Clan integration confusing → reference clan-infra patterns
