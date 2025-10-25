@@ -59,6 +59,7 @@ let
     // (import ./nix-tools.nix { inherit pkgs lib config; })
     // (import ./file-tools.nix { inherit pkgs lib config; })
     // (import ./dev-tools.nix { inherit pkgs lib config; })
+    // (import ./system-tools.nix { inherit pkgs lib config; })
     // {
       # nsa-ref command with dynamically generated content
       nsa-ref = {
