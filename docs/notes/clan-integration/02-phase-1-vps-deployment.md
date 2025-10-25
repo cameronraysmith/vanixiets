@@ -1,8 +1,14 @@
 # Phase 1 implementation guide: VPS deployment (cinnabar)
 
+**Working repository**: `~/projects/nix-workspace/test-clan/` (same experimental repo, `main` branch)
+
+**Scope**: Complete end-to-end infrastructure deployment proof of concept
+
 This guide provides step-by-step instructions for implementing Phase 1 of the dendritic flake-parts + clan-core migration.
-Phase 1 deploys a Hetzner Cloud VPS named "cinnabar" as the foundation infrastructure, establishing zerotier controller and core services before migrating any darwin hosts.
-This VPS-first approach uses patterns validated in Phase 0 (test-clan) to deploy dendritic + clan on NixOS (clan's native platform) and provides stable always-on infrastructure for darwin hosts to connect to.
+Phase 1 deploys a Hetzner Cloud VPS named "cinnabar" as the foundation infrastructure FROM test-clan, establishing zerotier controller and core services.
+This completes the test-clan proof of concept with real infrastructure before migrating patterns to production nix-config (Phase 2).
+
+**CRITICAL**: Phase 1 happens in test-clan, NOT nix-config. This proves the entire stack (dendritic + clan + terraform + infrastructure) works before touching production configuration.
 
 **Prerequisite**: Phase 0 (test-clan validation) should be completed first to validate dendritic + clan integration patterns.
 
@@ -25,24 +31,25 @@ Deploying cinnabar before migrating darwin hosts provides critical advantages:
 - [ ] Hetzner Cloud account created (https://console.hetzner.cloud/)
 - [ ] Hetzner Cloud API token generated (Read & Write permissions)
 - [ ] Age key generated: `nix run nixpkgs#age -- keygen`
-- [ ] Current nix-config working (darwin hosts can stay on nixos-unified during VPS deployment)
+- [ ] test-clan repository from Phase 0 ready (patterns validated)
 - [ ] Familiarity with flake-parts module system
 - [ ] Understanding of dendritic flake-parts pattern and clan architecture from Phase 0
+- [ ] Production nix-config remains unchanged (darwin hosts stay on nixos-unified, untouched during Phase 1)
 
 ## Migration overview
 
-Phase 1 establishes the infrastructure foundation by:
-1. Adding clan-core, import-tree, and terranix inputs to flake
-2. Creating dendritic module structure with VPS-specific modules
-3. Setting up terraform/terranix for Hetzner Cloud provisioning
+Phase 1 completes the test-clan proof of concept by:
+1. Adding terraform/terranix inputs to test-clan flake (building on Phase 0 setup)
+2. Extending dendritic module structure with VPS-specific modules
+3. Setting up terraform/terranix for Hetzner Cloud provisioning (learning from clan-infra patterns)
 4. Configuring cinnabar VPS with disko (ext4 + LUKS encryption)
-5. Initializing clan inventory with cinnabar as first machine
+5. Adding cinnabar to clan inventory (alongside Phase 0 test VM)
 6. Deploying core services: zerotier controller, sshd-clan, emergency-access, users-root
-7. Validating infrastructure before darwin host migration
+7. Validating complete infrastructure stack works end-to-end
 
 ## Step 1: Add required flake inputs
 
-**File**: `flake.nix`
+**File**: `~/projects/nix-workspace/test-clan/flake.nix`
 
 Add clan-core, import-tree, and terranix inputs with appropriate follows:
 

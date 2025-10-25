@@ -1,31 +1,43 @@
-# Phase 2 implementation guide: darwin migration (blackphos)
+# Phase 2 implementation guide: production integration + blackphos migration
 
-This guide provides step-by-step instructions for Phase 2: migrating blackphos (the first darwin host) from nixos-unified to the dendritic flake-parts pattern with clan-core integration.
-Phase 2 builds on the infrastructure established in Phase 1 (cinnabar VPS) and establishes darwin-specific patterns for subsequent host migrations.
+**Working repository**: `~/projects/nix-workspace/nix-config/` (production config, `clan` branch)
+
+**CRITICAL TRANSITION**: Phase 2 is where we migrate from test-clan to production nix-config
+
+This guide provides step-by-step instructions for Phase 2: applying proven patterns from test-clan to production nix-config and migrating blackphos (the first darwin host) from nixos-unified to clan management.
+
+Phase 2 consists of two major parts:
+1. **Apply test-clan learnings to nix-config**: Transfer proven patterns, setup clan infrastructure
+2. **Migrate blackphos**: First darwin host to clan management, establish darwin-specific patterns
 
 ## Critical Prerequisites
 
-Phase 1 (cinnabar VPS deployment) **MUST be completed first** - see `02-phase-1-vps-deployment.md`.
+Phase 0-1 (test-clan validation + cinnabar deployment) **MUST be completed first** - see `01-phase-0-validation.md` and `02-phase-1-vps-deployment.md`.
 
-The following infrastructure is already in place from Phase 1:
-- ✅ Flake inputs added (clan-core, import-tree, terranix, disko, srvos)
-- ✅ Dendritic modules/ directory structure created
-- ✅ Clan secrets initialized (age keys, admin group)
-- ✅ cinnabar VPS deployed with zerotier controller operational
-- ✅ Base NixOS modules created (modules/base/nix.nix, modules/nixos/server.nix)
+The following has been proven in test-clan (Phase 0-1):
+- ✅ Dendritic flake-parts + clan integration validated (or hybrid approach documented)
+- ✅ Terraform/terranix for Hetzner Cloud working
+- ✅ cinnabar VPS deployed and operational (from test-clan)
+- ✅ Zerotier controller functional on cinnabar
+- ✅ Clan secrets workflow understood
+- ✅ Complete infrastructure stack proven end-to-end
 
 **Verify Phase 1 complete**:
 ```bash
-# Check cinnabar VPS is operational
+# Check cinnabar VPS is operational (deployed from test-clan)
 ssh root@<cinnabar-ip> zerotier-cli info
 # Expected: 200 info <node-id> <version> ONLINE
 
 # Get zerotier network ID for blackphos configuration
 ssh root@<cinnabar-ip> "zerotier-cli listnetworks | awk 'NR==2 {print \$3}'"
-# Save this network ID - you'll need it in Step 11
+# Save this network ID - you'll need it later
 ```
 
-**Phase 2 Objective**: Connect blackphos to cinnabar's zerotier network as a peer and establish darwin + clan integration patterns.
+**Phase 2 Objectives**:
+1. Migrate proven patterns from test-clan to production nix-config
+2. Transfer or redeploy cinnabar management to nix-config
+3. Connect blackphos to cinnabar's zerotier network
+4. Establish darwin + clan integration patterns for subsequent host migrations
 
 ## Prerequisites
 
@@ -38,31 +50,36 @@ ssh root@<cinnabar-ip> "zerotier-cli listnetworks | awk 'NR==2 {print \$3}'"
 
 ## Migration overview
 
-Phase 2 focuses on darwin-specific configuration:
-1. Create darwin-specific dendritic modules (base, shell, dev tools)
+Phase 2 has two major components:
+
+**Part A: Apply test-clan patterns to nix-config** (Steps 1-3)
+1. Add clan-core, import-tree, terraform/terranix inputs to nix-config
+2. Create dendritic modules/ directory structure (copy proven patterns from test-clan)
+3. Setup terraform/terranix (adapt from test-clan)
+4. Initialize clan secrets for production machines
+5. Transfer or redeploy cinnabar management to nix-config
+
+**Part B: Migrate blackphos to clan** (Steps 4+)
+1. Convert darwin modules to clan-compatible pattern (dendritic or hybrid based on test-clan findings)
 2. Create blackphos host configuration
 3. Configure blackphos as zerotier peer (connects to cinnabar controller)
 4. Generate clan vars for blackphos
 5. Build and deploy blackphos with darwin-rebuild
 6. Validate blackphos ↔ cinnabar connectivity
 
-This creates a parallel environment where blackphos uses dendritic + clan while other darwin hosts remain on nixos-unified.
+This creates a parallel environment where blackphos uses clan while other darwin hosts remain on nixos-unified.
 
-## Steps 1-3: Infrastructure Setup
+## Steps 1-3: Infrastructure Setup in nix-config
 
-**⏭️ SKIP THESE STEPS - COMPLETED IN PHASE 1**
+**CRITICAL**: These steps transfer proven patterns from test-clan to production nix-config.
 
-Steps 1-3 (flake inputs, import-tree setup, module directory structure) were completed in Phase 1 (cinnabar VPS deployment).
-If you completed Phase 1, proceed directly to Step 4.
+Unlike test-clan (experimental), these changes happen on the `clan` branch of nix-config and must preserve existing nixos-unified configurations.
 
-<details>
-<summary>Step 1-3 Details (for reference only - already done)</summary>
+## Step 1: Add clan-core and import-tree flake inputs
 
-## Step 1: Add clan-core and import-tree flake inputs (DONE IN PHASE 1)
+**File**: `~/projects/nix-workspace/nix-config/flake.nix`
 
-**File**: `flake.nix`
-
-Add clan-core and import-tree inputs with appropriate follows:
+Add clan-core, import-tree, and infrastructure inputs (copy/adapt from test-clan):
 
 ```nix
 {
