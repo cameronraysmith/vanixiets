@@ -5,9 +5,9 @@
 This document provides a comprehensive migration plan for transitioning nix-config from nixos-unified to the dendritic flake-parts pattern with clan-core integration.
 The migration follows a validation-first approach with VPS infrastructure: validate dendritic + clan integration in test-clan/ (Phase 0), deploy a Hetzner Cloud VPS (cinnabar) as the foundation with zerotier controller and core services (Phase 1), then migrate darwin hosts progressively (blackphos → rosegold → argentum → stibnite).
 Phase 0 de-risks the migration by proving the architectural combination works in a minimal test environment before infrastructure commitment.
-The approach validates dendritic + clan on NixOS first, provides always-on infrastructure, and de-risks darwin migration while eliminating nixos-unified and adopting clan-core's inventory system, vars management, and multi-machine service coordination using the dendritic pattern's `flake.modules.*` namespace.
+The approach validates dendritic + clan on NixOS first, provides always-on infrastructure, and de-risks darwin migration while eliminating nixos-unified and adopting clan-core's inventory system, vars management, and multi-machine service coordination using the dendritic flake-parts pattern's `flake.modules.*` namespace.
 
-## Strategic rationale: why dendritic pattern with clan?
+## Strategic rationale: why dendritic flake-parts pattern with clan?
 
 ### Type safety through module system maximization
 
@@ -28,7 +28,7 @@ The approach validates dendritic + clan on NixOS first, provides always-on infra
 - Composable flake configuration
 - Both clan-core and clan-infra use flake-parts
 
-**Dendritic pattern maximizes module system usage**
+**Dendritic flake-parts pattern maximizes module system usage**
 - Every file is a flake-parts module
 - Maximum type safety through consistent module usage
 - Clear interfaces via config.flake.* namespace
@@ -50,7 +50,7 @@ When conflicts arise between dendritic purity and clan functionality:
 - Service instances and roles
 - All clan features must work correctly
 
-**2. Secondary: dendritic pattern** (best-effort)
+**2. Secondary: dendritic flake-parts pattern** (best-effort)
 - Apply where feasible without compromising clan
 - Deviate when necessary for clan compatibility
 - Document compromises and rationale
@@ -69,11 +69,11 @@ When conflicts arise between dendritic purity and clan functionality:
 
 **Known foundation**:
 - Clan works with flake-parts (clan-core, clan-infra use it)
-- Dendritic pattern works (multiple production examples)
+- Dendritic flake-parts pattern works (multiple production examples)
 
 **Unknown optimization**:
 - How much dendritic organization is compatible with clan?
-- Where do dendritic patterns need to be relaxed?
+- Where do dendritic flake-parts patterns need to be relaxed?
 - What compromises are necessary and acceptable?
 
 **Phase 0 answers**: "what's the optimal dendritic/clan balance?"
@@ -111,7 +111,7 @@ When conflicts arise between dendritic purity and clan functionality:
 
 **Module organization (will change)**:
 - Current: Directory-based autowire (`modules/{darwin,home,nixos}/`)
-- Target: Dendritic pattern with `flake.modules.{nixos,homeManager,darwin}.*` namespace
+- Target: Dendritic flake-parts pattern with `flake.modules.{nixos,homeManager,darwin}.*` namespace
 - nixos-unified's specialArgs will be eliminated in favor of `config.flake.*` access
 - import-tree will replace manual directory scanning
 
@@ -371,7 +371,7 @@ modules/
 - Migrate non-primary machines first (blackphos, rosegold, argentum)
 - Keep stibnite on nixos-unified until others proven stable
 - Each host migration can be rolled back independently
-- Dendritic pattern proven in production (drupol-dendritic-infra, clan-infra)
+- Dendritic flake-parts pattern proven in production (drupol-dendritic-infra, clan-infra)
 - Multi-machine testing possible with multiple test hosts
 
 ### Directory structure (target state)
@@ -379,7 +379,7 @@ modules/
 ```
 nix-config/
 ├── flake.nix                      # Simplified: import-tree ./modules
-├── modules/                        # CHANGED: Dendritic pattern (flat categories)
+├── modules/                        # CHANGED: Dendritic flake-parts pattern (flat categories)
 │   ├── base/                      # Foundation modules
 │   │   ├── nix.nix                # Core nix settings
 │   │   └── system.nix             # State versions
@@ -450,7 +450,7 @@ Phase 1: VPS Infrastructure (cinnabar)
 - Validate dendritic + clan on NixOS first
 
 Phase 2: First darwin host (blackphos)
-- Convert darwin modules to dendritic pattern
+- Convert darwin modules to dendritic flake-parts pattern
 - Create modules/hosts/blackphos/default.nix
 - Connect to cinnabar's zerotier network as peer
 - Validate darwin + clan integration
@@ -476,7 +476,7 @@ Phase 6: Cleanup
 ```
 
 **Rationale**:
-- Dendritic pattern: flat feature categories, clear module namespace
+- Dendritic flake-parts pattern: flat feature categories, clear module namespace
 - import-tree: automatic discovery eliminates manual imports
 - clan inventory: centralized multi-machine coordination
 - Progressive migration: each host independently testable
@@ -875,7 +875,7 @@ Reference repository analysis reveals:
 
 ### Phase 0: Validation (test-clan/)
 
-**Objective**: determine optimal balance of dendritic pattern with clan functionality
+**Objective**: determine optimal balance of dendritic flake-parts pattern with clan functionality
 
 **Foundation**: clan + flake-parts (proven in clan-core, clan-infra)
 **Experiment**: how much dendritic optimization is compatible?
@@ -883,7 +883,7 @@ Reference repository analysis reveals:
 **Tasks**:
 - Create minimal test-clan/ environment
 - Implement clan with flake-parts (known working)
-- Apply dendritic patterns where feasible
+- Apply dendritic flake-parts patterns where feasible
 - Document where compromises are necessary
 - Evaluate type safety benefits vs complexity costs
 
@@ -943,7 +943,7 @@ Reference repository analysis reveals:
 **Objective**: Migrate first darwin machine, validate darwin + clan integration
 
 **Tasks**:
-- Convert darwin modules to dendritic pattern in `modules/{base,darwin,shell,dev}/`
+- Convert darwin modules to dendritic flake-parts pattern in `modules/{base,darwin,shell,dev}/`
 - Create `modules/hosts/blackphos/default.nix`
 - Configure blackphos as zerotier peer (connects to cinnabar controller)
 - Add to clan inventory
@@ -1028,9 +1028,9 @@ Reference repository analysis reveals:
 
 ## Key decisions and tradeoffs
 
-### Decision 1: Dendritic pattern vs. nixos-unified
+### Decision 1: Dendritic flake-parts pattern vs. nixos-unified
 
-**Chosen**: Abandon nixos-unified, adopt dendritic pattern
+**Chosen**: Abandon nixos-unified, adopt dendritic flake-parts pattern
 **Rationale**:
 - Dendritic + clan architectural alignment (both eliminate specialArgs)
 - clan-infra production infrastructure uses clan + flake-parts (with manual imports), demonstrating clan viability
@@ -1068,7 +1068,7 @@ Reference repository analysis reveals:
 
 **Chosen**: Flat feature categories (modules/{base,shell,dev,hosts}/)
 **Rationale**:
-- Dendritic pattern: file path = feature name
+- Dendritic flake-parts pattern: file path = feature name
 - Clear namespace (flake.modules.{nixos,darwin,homeManager}.*)
 - Cross-cutting concerns enabled (one module, multiple targets)
 - Matches reference implementations
@@ -1528,7 +1528,7 @@ Secrets migration occurs incrementally across phases:
 
 ## References
 
-### Dendritic pattern
+### Dendritic flake-parts pattern
 - Canonical pattern: `~/projects/nix-workspace/dendritic-flake-parts/`
 - README: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
 - Production examples:
