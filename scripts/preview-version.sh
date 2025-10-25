@@ -101,8 +101,17 @@ fi
 echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 
 # Capture output and parse version
-# Use test-release script which already has correct semantic-release config
-OUTPUT=$(bun run test-release --branches "$TARGET_BRANCH" 2>&1 || true)
+# Exclude @semantic-release/github to avoid GitHub token requirement for preview
+# This is safe because dry-run skips publish/success/fail steps anyway
+PLUGINS="@semantic-release/commit-analyzer,@semantic-release/release-notes-generator"
+
+if [ -n "$PACKAGE_PATH" ]; then
+  # For monorepo packages, check if package.json has specific plugins configured
+  OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+else
+  # For root package
+  OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+fi
 
 # Display relevant output
 echo "$OUTPUT" | grep -v "^$" | grep -E "(semantic-release|Published|next release|Release note|version)" || true
