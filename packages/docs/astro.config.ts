@@ -10,6 +10,10 @@ export default defineConfig({
     starlight({
       title: "nix-config",
       prerender: false,
+      customCss: [
+        './src/fonts/font-face.css',
+        './src/styles/custom.css',
+      ],
       social: [
         {
           icon: "github",
