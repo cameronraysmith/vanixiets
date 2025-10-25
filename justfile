@@ -339,6 +339,26 @@ docs-deploy-production:
     bunx wrangler deploy
   "
 
+# Preview the docs site locally with Cloudflare Workers
+[group('docs')]
+docs-preview:
+  cd packages/docs && bun run preview
+
+# List recent Cloudflare deployments
+[group('docs')]
+docs-deployments:
+  cd packages/docs && sops exec-env ../../secrets/shared.yaml "bunx wrangler deployments list"
+
+# Tail live logs from Cloudflare Workers
+[group('docs')]
+docs-tail:
+  cd packages/docs && sops exec-env ../../secrets/shared.yaml "bunx wrangler tail"
+
+# List recent Cloudflare versions
+[group('docs')]
+docs-versions limit="10":
+  cd packages/docs && sops exec-env ../../secrets/shared.yaml "bunx wrangler versions list --limit {{limit}}"
+
 ## containers
 
 # Architecture auto-detection: map host arch to target Linux arch
