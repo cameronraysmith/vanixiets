@@ -30,9 +30,9 @@
     "test-release": "semantic-release --dry-run --no-ci"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^12.6.9",
-    "@astrojs/starlight": "^0.36.0",
-    "astro": "^5.6.1",
+    "@astrojs/cloudflare": "^12.6.10",
+    "@astrojs/starlight": "^0.36.1",
+    "astro": "^5.15.1",
     "sharp": "^0.34.2"
   },
   "devDependencies": {
@@ -41,7 +41,7 @@
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^12.0.0",
-    "@types/node": "^24.6.2",
+    "@types/node": "^24.9.1",
     "@vitest/coverage-v8": "^4.0.3",
     "conventional-changelog-conventionalcommits": "^9.1.0",
     "semantic-release": "^25.0.1",
@@ -49,7 +49,7 @@
     "semantic-release-monorepo": "^8.0.2",
     "svgo": "^4.0.0",
     "vitest": "^4.0.3",
-    "wrangler": "^4.42.0"
+    "wrangler": "^4.45.0"
   },
   "release": {
     "extends": "semantic-release-monorepo",
