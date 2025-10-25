@@ -29,6 +29,10 @@
     "branches": [
       {
         "name": "main"
+      },
+      {
+        "name": "beta",
+        "prerelease": true
       }
     ],
     "plugins": [
