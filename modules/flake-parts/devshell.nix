@@ -58,6 +58,7 @@
           # Documentation toolchain
           bun # JavaScript runtime and package manager
           nodePackages.typescript # TypeScript compiler
+          nodePackages.svgo # SVG optimizer
           # E2E testing browsers from playwright-web-flake (pinned to 1.56.1)
         ];
 
