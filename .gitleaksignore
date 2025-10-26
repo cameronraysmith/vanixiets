@@ -1,0 +1,15 @@
+# .gitleaksignore - Fingerprints of false positives safe to ignore
+# Format: <commit>:<file>:<rule>:<line>
+# These are age public keys and sops examples used in documentation and scripts (safe to commit)
+
+# Age public key example in unified crypto infrastructure documentation (commit 9931c496)
+9931c4961ea1cb1cdcc543c74117feb1f197f903:docs/notes/secrets/unified-crypto-infrastructure-implementation.md:private-key:194
+
+# Age public key placeholder in sops update script (commit dd9c4978)
+dd9c497841a75ebbbdbf8edd92cbc56092916601:scripts/sops/update-sops-yaml.sh:generic-api-key:17
+
+# Age public key in CI/CD setup documentation (commit 62d0d157)
+62d0d157e94bae7da9e8e530d87534a4170c9311:packages/docs/src/content/docs/guides/ci-cd-setup.md:generic-api-key:54
+
+# Age public key in new user/host documentation (commit 41a9796f)
+41a9796f41373e73b3d801f227de07c6e17f4faf:docs/new-user-host.md:generic-api-key:111
