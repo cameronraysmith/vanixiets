@@ -125,10 +125,14 @@ jobs:
         id: deployment
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+          GITHUB_ACTIONS: true
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
         run: |
-          cd packages/docs
           if [ "${{ inputs.environment }}" = "preview" ]; then
-            nix develop -c sops exec-env ../../secrets/shared.yaml "bunx wrangler versions upload --preview-alias b-${{ inputs.branch }}"
+            echo "Deploying preview for branch: ${{ inputs.branch }}"
+            nix develop -c just docs-deploy-preview ${{ inputs.branch }}
           else
-            nix develop -c sops exec-env ../../secrets/shared.yaml "bunx wrangler deploy"
+            echo "Deploying to production (promoting existing version if available)"
+            nix develop -c just docs-deploy-production
           fi
