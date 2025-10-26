@@ -360,7 +360,7 @@ docs-deploy-preview branch=`git branch --show-current`:
   echo "  Tag: ${COMMIT_TAG}"
   echo "  Full SHA: ${COMMIT_SHA}"
   echo "  Message: ${MESSAGE}"
-  echo "  Preview URL: https://b-{{branch}}-nix-config-docs.sciexp.workers.dev"
+  echo "  Preview URL: https://b-{{branch}}-infra-docs.sciexp.workers.dev"
 
 # Deploy documentation to Cloudflare Workers (production)
 [group('docs')]
