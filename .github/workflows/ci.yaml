@@ -118,6 +118,7 @@ jobs:
       deploy_environment: ${{ steps.set-variables.outputs.deploy_environment }}
       checkout_ref: ${{ steps.set-variables.outputs.checkout_ref }}
       checkout_rev: ${{ steps.set-variables.outputs.checkout_rev }}
+      packages: ${{ steps.discover-packages.outputs.packages }}
 
     steps:
       - name: Set action variables
@@ -151,6 +152,23 @@ jobs:
           echo "deploy_environment=$DEPLOY_ENVIRONMENT" >> $GITHUB_OUTPUT
           echo "checkout_ref=$CHECKOUT_REF" >> $GITHUB_OUTPUT
           echo "checkout_rev=$CHECKOUT_REV" >> $GITHUB_OUTPUT
+
+      - name: Checkout for package discovery
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          sparse-checkout: |
+            packages
+            justfile
+          sparse-checkout-cone-mode: false
+
+      - name: Discover packages
+        id: discover-packages
+        run: |
+          # Install just for package discovery
+          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+          PACKAGES=$(just list-packages-json)
+          echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
+          echo "Discovered packages: $PACKAGES"
 
   # job 3: bootstrap-verification
   # validates Makefile bootstrap workflow on clean ubuntu system
@@ -638,60 +656,90 @@ jobs:
         if: always()
         run: df -h
 
-  # job 10: docs-test
-  # Documentation testing
-  docs-test:
-    needs: [skip-check, secrets-scan]
+  # job 10: test
+  # Package testing via reusable workflow
+  test:
+    needs: [skip-check, secrets-scan, set-variables]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'docs-test')
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.set-variables.outputs.packages) }}
+    concurrency:
+      group: test-${{ matrix.package.name }}-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref_name }}
+      cancel-in-progress: true
+    uses: ./.github/workflows/package-test.yaml
+    with:
+      package-name: ${{ matrix.package.name }}
+      package-path: ${{ matrix.package.path }}
+      debug-enabled: ${{ needs.set-variables.outputs.debug }}
+      nix-installer: quick
+    secrets:
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-      - name: setup nix
-        uses: ./.github/actions/setup-nix
-        with:
-          system: x86_64-linux
-          enable-cachix: true
-          cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+  # job 11: test-release-packages
+  # Test release process for packages on pull requests
+  test-release-packages:
+    needs: [skip-check, set-variables, test]
+    if: ${{ github.event_name == 'pull_request' && needs.skip-check.outputs.should_skip != 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.set-variables.outputs.packages) }}
+    concurrency:
+      group: test-release-${{ matrix.package.name }}-${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      id-token: write
+    uses: ./.github/workflows/package-release.yaml
+    with:
+      package-path: ${{ matrix.package.path }}
+      package-name: ${{ matrix.package.name }}
+      release-dry-run: true
+      debug-enabled: ${{ needs.set-variables.outputs.debug == 'true' }}
+      checkout-ref: ${{ needs.set-variables.outputs.checkout_ref }}
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: install dependencies
-        run: nix develop --command bun install
+  # job 12: release-packages
+  # Release packages to production on main/beta branches
+  release-packages:
+    needs: [skip-check, set-variables, test, nix]
+    if: |
+      github.repository_owner == 'cameronraysmith' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta') &&
+      needs.skip-check.outputs.should_skip != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.set-variables.outputs.packages) }}
+    concurrency:
+      group: release-${{ matrix.package.name }}-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      id-token: write
+    uses: ./.github/workflows/package-release.yaml
+    with:
+      package-path: ${{ matrix.package.path }}
+      package-name: ${{ matrix.package.name }}
+      release-dry-run: false
+      debug-enabled: ${{ needs.set-variables.outputs.debug == 'true' }}
+      checkout-ref: ${{ needs.set-variables.outputs.checkout_ref }}
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-      - name: run unit tests with coverage
-        run: nix develop --command just docs-test-coverage
-
-      - name: build for e2e tests
-        run: nix develop --command just docs-build
-
-      - name: run e2e tests
-        run: nix develop --command just docs-test-e2e
-
-      - name: upload test results
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
-        with:
-          name: docs-playwright-report
-          path: packages/docs/playwright-report/
-          retention-days: 7
-
-      - name: upload coverage
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
-        with:
-          name: docs-coverage
-          path: packages/docs/coverage/
-          retention-days: 7
-
-  # job 11: docs-deploy
+  # job 13: docs-deploy
   # Documentation deployment (conditional)
   docs-deploy:
-    needs: [set-variables, docs-test]
+    needs: [set-variables, test, release-packages]
     if: |
       !cancelled() &&
       needs.set-variables.outputs.deploy_enabled == 'true' &&
