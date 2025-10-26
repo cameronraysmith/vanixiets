@@ -55,10 +55,46 @@ jobs:
           concurrent_skipping: 'never'
           cancel_others: 'false'
 
-  # job 1: set-variables
+  # job 1: secrets-scan
+  # scans repository for hardcoded secrets using gitleaks
+  secrets-scan:
+    needs: skip-check
+    runs-on: ubuntu-latest
+    if: |
+      needs.skip-check.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'secrets-scan' ||
+       inputs.job == 'set-variables' ||
+       inputs.job == 'bootstrap-verification' ||
+       inputs.job == 'config-validation' ||
+       inputs.job == 'autowiring-validation' ||
+       inputs.job == 'secrets-workflow' ||
+       inputs.job == 'justfile-activation' ||
+       inputs.job == 'cache-overlay-packages' ||
+       inputs.job == 'nix' ||
+       inputs.job == 'docs-test')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history for comprehensive secret scanning
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        with:
+          system: x86_64-linux
+          enable-cachix: true
+          cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Scan for secrets with gitleaks
+        run: nix develop --command just scan-secrets
+
+  # job 2: set-variables
   # determines deployment settings and variables based on event type
   set-variables:
-    needs: skip-check
+    needs: [skip-check, secrets-scan]
     runs-on: ubuntu-latest
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
@@ -105,10 +141,10 @@ jobs:
           echo "checkout_ref=$CHECKOUT_REF" >> $GITHUB_OUTPUT
           echo "checkout_rev=$CHECKOUT_REV" >> $GITHUB_OUTPUT
 
-  # job 2: bootstrap-verification
+  # job 3: bootstrap-verification
   # validates Makefile bootstrap workflow on clean ubuntu system
   bootstrap-verification:
-    needs: skip-check
+    needs: [skip-check, secrets-scan]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
@@ -155,10 +191,10 @@ jobs:
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
           nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt
 
-  # job 2: config-validation
+  # job 4: config-validation
   # tests config.nix user definitions (phase 1)
   config-validation:
-    needs: skip-check
+    needs: [skip-check, secrets-scan]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
@@ -212,10 +248,10 @@ jobs:
 
           echo "✅ user definitions validated successfully"
 
-  # job 3: autowiring-validation
+  # job 5: autowiring-validation
   # verifies nixos-unified automatic config discovery
   autowiring-validation:
-    needs: skip-check
+    needs: [skip-check, secrets-scan]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
@@ -275,10 +311,10 @@ jobs:
 
           echo "✅ all expected homeConfigurations found"
 
-  # job 5: secrets-workflow
+  # job 6: secrets-workflow
   # tests sops-nix mechanics with ephemeral test keys
   secrets-workflow:
-    needs: skip-check
+    needs: [skip-check, secrets-scan]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
@@ -346,10 +382,10 @@ jobs:
           rm -rf test-secrets
           echo "✅ ephemeral test secrets cleaned up"
 
-  # job 6: justfile-activation
+  # job 7: justfile-activation
   # validates user experience: justfile recipes, configuration discovery, and activation workflows
   justfile-activation:
-    needs: skip-check
+    needs: [skip-check, secrets-scan]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
@@ -483,11 +519,11 @@ jobs:
           echo ""
           echo "✅ all configurations properly exposed"
 
-  # job 7: cache-overlay-packages
+  # job 8: cache-overlay-packages
   # pre-cache resource-intensive overlay packages before main build
   # prevents disk space exhaustion during CI builds (especially rust packages)
   cache-overlay-packages:
-    needs: skip-check
+    needs: [skip-check, secrets-scan]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
@@ -522,12 +558,12 @@ jobs:
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-  # job 8: nix
+  # job 9: nix
   # builds flake outputs via category-based matrix for disk space optimization
   # distributes builds across multiple machines to avoid disk space exhaustion
   # each job builds a specific category (packages, home configs, system configs)
   nix:
-    needs: [skip-check, cache-overlay-packages]
+    needs: [skip-check, secrets-scan, cache-overlay-packages]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
@@ -591,9 +627,10 @@ jobs:
         if: always()
         run: df -h
 
+  # job 10: docs-test
   # Documentation testing
   docs-test:
-    needs: skip-check
+    needs: [skip-check, secrets-scan]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
@@ -640,6 +677,7 @@ jobs:
           path: packages/docs/coverage/
           retention-days: 7
 
+  # job 11: docs-deploy
   # Documentation deployment (conditional)
   docs-deploy:
     needs: [set-variables, docs-test]
