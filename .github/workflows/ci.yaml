@@ -669,9 +669,6 @@ jobs:
       fail-fast: false
       matrix:
         package: ${{ fromJson(needs.set-variables.outputs.packages) }}
-    concurrency:
-      group: test-${{ matrix.package.name }}-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref_name }}
-      cancel-in-progress: true
     uses: ./.github/workflows/package-test.yaml
     with:
       package-name: ${{ matrix.package.name }}
@@ -690,9 +687,6 @@ jobs:
       fail-fast: false
       matrix:
         package: ${{ fromJson(needs.set-variables.outputs.packages) }}
-    concurrency:
-      group: test-release-${{ matrix.package.name }}-${{ github.workflow }}-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
     permissions:
       contents: write
       id-token: write
@@ -704,7 +698,7 @@ jobs:
       debug-enabled: ${{ needs.set-variables.outputs.debug == 'true' }}
       checkout-ref: ${{ needs.set-variables.outputs.checkout_ref }}
     secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
   # job 12: release-packages
   # Release packages to production on main/beta branches
@@ -719,9 +713,6 @@ jobs:
       fail-fast: false
       matrix:
         package: ${{ fromJson(needs.set-variables.outputs.packages) }}
-    concurrency:
-      group: release-${{ matrix.package.name }}-${{ github.workflow }}-${{ github.ref_name }}
-      cancel-in-progress: true
     permissions:
       contents: write
       id-token: write
@@ -733,7 +724,6 @@ jobs:
       debug-enabled: ${{ needs.set-variables.outputs.debug == 'true' }}
       checkout-ref: ${{ needs.set-variables.outputs.checkout_ref }}
     secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
   # job 13: docs-deploy
