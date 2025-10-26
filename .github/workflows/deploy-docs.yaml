@@ -1,0 +1,15 @@
+name: Deploy Docs
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        required: true
+        type: string
+
+jobs:
+  stub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Workflow stub
+        run: echo "Stub - full implementation in PR"
