@@ -191,9 +191,7 @@ In the SOPS editor, add:
 ```yaml
 radicle:
   ssh-private-key: |
-    -----BEGIN OPENSSH PRIVATE KEY-----
     [paste contents of ~/.ssh/id_ed25519 here]
-    -----END OPENSSH PRIVATE KEY-----
 ```
 
 2. Create test secret:
