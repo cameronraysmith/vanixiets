@@ -87,13 +87,11 @@ jobs:
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
         with:
+          installer: quick # fast install without space reclamation overhead
           system: x86_64-linux
-          enable-cachix: true
-          cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Scan for secrets with gitleaks
-        run: nix develop --command just scan-secrets
+        run: nix run nixpkgs#gitleaks -- detect --verbose --redact
 
   # job 2: set-variables
   # determines deployment settings and variables based on event type
