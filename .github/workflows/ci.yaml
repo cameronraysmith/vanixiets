@@ -36,6 +36,10 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  contents: read
+  deployments: write
+
 env:
   CACHIX_BINARY_CACHE: cameronraysmith
 
