@@ -111,6 +111,11 @@ git worktree add --detach --quiet "$WORKTREE_DIR" "$TEMP_COMMIT"
 # Navigate to worktree
 cd "$WORKTREE_DIR"
 
+# Make git think we're on the target branch by setting symbolic-ref
+# This allows env-ci to detect the correct branch name via `git rev-parse --abbrev-ref HEAD`
+# Note: This doesn't actually change what commit we're on, just how git reports the branch name
+git symbolic-ref HEAD "refs/heads/$TARGET_BRANCH" 2>/dev/null || true
+
 # Install dependencies in worktree (bun uses global cache, so this is fast)
 echo -e "${BLUE}installing dependencies in worktree...${NC}"
 bun install --silent &>/dev/null
@@ -132,12 +137,20 @@ echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 # This is safe because dry-run skips publish/success/fail steps anyway
 PLUGINS="@semantic-release/commit-analyzer,@semantic-release/release-notes-generator"
 
+# Set environment variables to simulate CI environment with target branch
+# This helps env-ci detect the branch correctly in detached HEAD state
+# Using minimal "generic" CI environment that env-ci will recognize
+export CI=true
+export BRANCH="$TARGET_BRANCH"
+export GIT_BRANCH="$TARGET_BRANCH"
+export BRANCH_NAME="$TARGET_BRANCH"
+
 if [ -n "$PACKAGE_PATH" ]; then
   # For monorepo packages, check if package.json has specific plugins configured
-  OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+  OUTPUT=$(bun run semantic-release --dry-run --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 else
   # For root package
-  OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+  OUTPUT=$(bun run semantic-release --dry-run --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 fi
 
 # Display relevant output
