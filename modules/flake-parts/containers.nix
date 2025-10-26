@@ -32,7 +32,7 @@
             ];
             Labels = {
               "org.opencontainers.image.description" = "Minimal container with ${name}";
-              "org.opencontainers.image.source" = "https://github.com/cameronraysmith/nix-config";
+              "org.opencontainers.image.source" = "https://github.com/cameronraysmith/infra";
             };
           };
         };
