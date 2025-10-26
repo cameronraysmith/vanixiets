@@ -1,4 +1,4 @@
-# nix-config bootstrap makefile
+# infra bootstrap makefile
 #
 # tl;dr:
 #

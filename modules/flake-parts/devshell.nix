@@ -18,7 +18,7 @@
     {
       devShells.default = pkgs.mkShell {
         name = "dev";
-        meta.description = "Dev environment for nix-config";
+        meta.description = "Dev environment for infra";
         inputsFrom = [ config.pre-commit.devShell ];
         packages = with pkgs; [
           # Core development tools

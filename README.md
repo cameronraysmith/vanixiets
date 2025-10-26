@@ -1,4 +1,4 @@
-# nix-config
+# infra
 
 This is my personal [nix](https://nix.dev/reference/nix-manual.html)-config. If
 you'd like to experiment with nix in a containerized environment, consider
@@ -106,7 +106,7 @@ Note: Debug/experimental packages are in `legacyPackages.debug` (not overlay) to
 
 **Critical difference**: mirkolenz/nixos uses flake-parts directly without autowiring. Our integration required adapting patterns to work with nixos-unified's directory-based autowiring:
 
-| Aspect | mirkolenz/nixos | nix-config (adapted) | Reason |
+| Aspect | mirkolenz/nixos | infra (adapted) | Reason |
 |--------|-----------------|---------------------|--------|
 | Directory | `pkgs/` | `overlays/` | nixos-unified autowires `overlays/` |
 | Infrastructure files | `pkgs/hotfixes.nix` | `overlays/infra/hotfixes.nix` | Exclude from autowiring (we don't want separate overlay outputs) |
@@ -119,9 +119,9 @@ The overlay composition logic is identical (same merge order, same layer purpose
 
 **Verification**: Compare these files to see identical patterns:
 
-- mirkolenz: `pkgs/inputs.nix` vs nix-config: `overlays/inputs.nix` (same structure)
-- mirkolenz: `pkgs/hotfixes.nix` vs nix-config: `overlays/infra/hotfixes.nix` (same pattern)
-- mirkolenz: `lib/default.nix` vs nix-config: `lib/default.nix` (systemInput, systemOs, importOverlays are identical)
+- mirkolenz: `pkgs/inputs.nix` vs infra: `overlays/inputs.nix` (same structure)
+- mirkolenz: `pkgs/hotfixes.nix` vs infra: `overlays/infra/hotfixes.nix` (same pattern)
+- mirkolenz: `lib/default.nix` vs infra: `lib/default.nix` (systemInput, systemOs, importOverlays are identical)
 
 ### Why this integration matters
 
@@ -134,7 +134,7 @@ When nixpkgs unstable breaks, you can apply surgical fixes (stable fallback for 
 ## Directory structure
 
 ```
-nix-config/
+infra/
 ├── configurations/      # System and user configurations (autowired)
 │   ├── darwin/          # → darwinConfigurations.*
 │   ├── nixos/           # → nixosConfigurations.*
@@ -317,7 +317,7 @@ Instead of manually registering each configuration, module, and overlay in `flak
 ╭─────────┬────────────────────────────────╮
 │ name    │ description                    │
 ├─────────┼────────────────────────────────┤
-│ default │ Dev environment for nix-config │
+│ default │ Dev environment for infra       │
 ╰─────────┴────────────────────────────────╯
 
 🔍 Checks (nix flake check)
@@ -701,7 +701,7 @@ sops updatekeys secrets/shared.yaml
 **machine 1: stibnite (darwin, admin: crs58)**
 
 ```bash
-cd /path/to/nix-config
+cd /path/to/infra
 make bootstrap && exec $SHELL
 make setup-user  # generate age key
 # send public age key to repo admin
