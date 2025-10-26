@@ -1,18 +1,148 @@
 name: Package Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      package-path:
+        description: "Path to the package directory"
+        required: true
+        type: string
+      package-name:
+        description: "Name of the package"
+        required: true
+        type: string
+      release-dry-run:
+        description: "Whether to run the release in dry-run mode"
+        required: false
+        type: boolean
+        default: false
+      debug-enabled:
+        description: "Enable tmate debug session"
+        required: false
+        type: boolean
+        default: false
+      checkout-ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+        default: ""
+
   workflow_call:
     inputs:
-      package-name:
-        required: true
-        type: string
       package-path:
+        description: "Path to the package directory"
         required: true
         type: string
+      package-name:
+        description: "Name of the package"
+        required: true
+        type: string
+      release-dry-run:
+        description: "Whether to run the release in dry-run mode"
+        required: false
+        type: string
+        default: "false"
+      debug-enabled:
+        description: "Enable tmate debug session"
+        required: false
+        type: boolean
+        default: false
+      checkout-ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+      SOPS_AGE_KEY:
+        required: true
+    outputs:
+      version:
+        description: "Released version"
+        value: ${{ jobs.release.outputs.version }}
+      released:
+        description: "Whether a new release was published"
+        value: ${{ jobs.release.outputs.released }}
+      tag:
+        description: "Git tag created for the release"
+        value: ${{ jobs.release.outputs.tag }}
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
-  stub:
+  release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      version: ${{ steps.semantic-release.outputs.new_release_version }}
+      released: ${{ steps.semantic-release.outputs.new_release_published || 'false' }}
+      tag: ${{ steps.semantic-release.outputs.new_release_git_tag }}
     steps:
-      - name: Workflow stub
-        run: echo "Stub - full implementation in PR"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.checkout-ref != '' && inputs.checkout-ref || github.ref }}
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+
+      - name: Install dependencies
+        if: ${{ inputs.release-dry-run == 'true' }}
+        run: |
+          bun install
+          git log --oneline --branches --tags
+
+      - name: Test semantic-release (dry-run)
+        if: ${{ inputs.release-dry-run == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        working-directory: ${{ inputs.package-path }}
+        run: |
+          unset GITHUB_ACTIONS
+          bun run test-release
+
+      - name: Run semantic-release
+        id: semantic-release
+        uses: cycjimmy/semantic-release-action@b1b432f13acb7768e0c8efdec416d363a57546f2 # ratchet:cycjimmy/semantic-release-action@v4
+        with:
+          working_directory: ${{ inputs.package-path }}
+          dry_run: ${{ inputs.release-dry-run == 'true' }}
+          semantic_version: 24
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            semantic-release-major-tag
+            semantic-release-monorepo
+            conventional-changelog-conventionalcommits
+          ci: ${{ inputs.release-dry-run == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+          GITHUB_ACTIONS: ${{ inputs.release-dry-run == 'false' }}
+
+      - name: Setup tmate debug session
+        uses: mxschmitt/action-tmate@e5c7151931ca95bad1c6f4190c730ecf8c7dde48 # ratchet:mxschmitt/action-tmate@v3
+        if: ${{ inputs.debug-enabled }}
+
+      - name: Log release information
+        run: |
+          if [ "${{ steps.semantic-release.outputs.new_release_published }}" == "true" ]; then
+            echo "Package ${{ inputs.package-name }} released version ${{ steps.semantic-release.outputs.new_release_version }}"
+            echo "Tag: ${{ steps.semantic-release.outputs.new_release_git_tag }}"
+          else
+            echo "No release needed for ${{ inputs.package-name }}"
+          fi
