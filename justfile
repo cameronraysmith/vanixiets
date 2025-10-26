@@ -319,25 +319,104 @@ docs-test-coverage:
 [group('docs')]
 docs-deploy-preview branch=`git branch --show-current`:
   #!/usr/bin/env bash
+  set -euo pipefail
   cd packages/docs
-  sops exec-env ../../secrets/shared.yaml "
-    echo 'Deploying preview for branch: {{branch}}'
-    echo 'Building...'
+
+  # Capture git metadata (use full SHA-1 for tag to enable promotion on main)
+  COMMIT_SHA=$(git rev-parse HEAD)
+  COMMIT_SHORT=$(git rev-parse --short HEAD)
+  COMMIT_MSG=$(git log -1 --pretty=format:'%s')
+  GIT_STATUS=$(git diff-index --quiet HEAD -- && echo "clean" || echo "dirty")
+
+  # Tag is the full SHA-1 (used to find and promote this exact version on main)
+  TAG="${COMMIT_SHA}"
+  # Message includes human-readable context
+  MESSAGE="[{{branch}}] ${COMMIT_MSG} (${COMMIT_SHORT}, ${GIT_STATUS})"
+
+  echo "Deploying preview for branch: {{branch}}"
+  echo "Commit: ${COMMIT_SHORT} (${GIT_STATUS})"
+  echo "Message: ${COMMIT_MSG}"
+  echo "Tag: ${COMMIT_SHA}"
+  echo ""
+
+  # Export variables for use in sops exec-env
+  export VERSION_TAG="${TAG}"
+  export VERSION_MESSAGE="${MESSAGE}"
+
+  sops exec-env ../../secrets/shared.yaml '
+    echo "Building..."
     bun run build
-    echo 'Uploading version with preview alias...'
-    bunx wrangler versions upload --preview-alias b-{{branch}}
-  "
+    echo "Uploading version with preview alias and metadata..."
+    bunx wrangler versions upload \
+      --preview-alias b-{{branch}} \
+      --tag "$VERSION_TAG" \
+      --message "$VERSION_MESSAGE"
+  '
+
+  echo ""
+  echo "✓ Version uploaded successfully"
+  echo "  Tag: ${COMMIT_SHA}"
+  echo "  Message: ${MESSAGE}"
+  echo "  Preview URL: https://b-{{branch}}-nix-config-docs.sciexp.workers.dev"
 
 # Deploy documentation to Cloudflare Workers (production)
 [group('docs')]
 docs-deploy-production:
   #!/usr/bin/env bash
+  set -euo pipefail
   cd packages/docs
-  sops exec-env ../../secrets/shared.yaml "
-    echo 'Building and deploying to production...'
-    bun run build
-    bunx wrangler deploy
-  "
+
+  # Get current commit SHA (should match a previously uploaded version if fast-forward merged)
+  CURRENT_SHA=$(git rev-parse HEAD)
+  CURRENT_SHORT=$(git rev-parse --short HEAD)
+  CURRENT_BRANCH=$(git branch --show-current)
+
+  echo "Deploying to production from branch: ${CURRENT_BRANCH}"
+  echo "Current commit: ${CURRENT_SHORT}"
+  echo "Looking for existing version with tag: ${CURRENT_SHA}"
+  echo ""
+
+  # Query for existing version with matching tag
+  EXISTING_VERSION=$(sops exec-env ../../secrets/shared.yaml \
+    "bunx wrangler versions list --json" | \
+    jq -r --arg sha "$CURRENT_SHA" \
+    '.[] | select(.annotations["workers/tag"] == $sha) | .id' | head -1)
+
+  if [ -n "$EXISTING_VERSION" ]; then
+    echo "✓ Found existing version: ${EXISTING_VERSION}"
+    echo "  This version was already built and tested in preview"
+    echo "  Promoting to 100% production traffic..."
+    echo ""
+
+    sops exec-env ../../secrets/shared.yaml "
+      bunx wrangler versions deploy ${EXISTING_VERSION}@100%
+    "
+
+    echo ""
+    echo "✓ Successfully promoted version ${EXISTING_VERSION} to production"
+    echo "  Tag: ${CURRENT_SHA}"
+    echo "  Production URL: https://infra.cameronraysmith.net"
+  else
+    echo "⚠ No existing version found with tag: ${CURRENT_SHA}"
+    echo "  This should only happen if:"
+    echo "    - This is the first deployment"
+    echo "    - Commit was made directly on main (not recommended)"
+    echo "    - Version was cleaned up (retention policy)"
+    echo ""
+    echo "  Falling back to direct build and deploy..."
+    echo ""
+
+    sops exec-env ../../secrets/shared.yaml "
+      echo 'Building...'
+      bun run build
+      echo 'Deploying...'
+      bunx wrangler deploy
+    "
+
+    echo ""
+    echo "✓ Built and deployed new version directly to production"
+    echo "  Warning: This version was not tested in preview first"
+  fi
 
 # List recent Cloudflare deployments
 [group('docs')]
