@@ -44,7 +44,7 @@ cd YOUR_REPO
 
 **Option B: Fork manually**
 ```bash
-git clone https://github.com/cameronraysmith/nix-config.git my-project
+git clone https://github.com/cameronraysmith/infra.git my-project
 cd my-project
 rm -rf .git
 git init
@@ -171,7 +171,7 @@ If you're using this as a template for your project:
 
 If you're contributing to this template:
 
-1. **Read contributing guidelines** - See [CONTRIBUTING.md](https://github.com/cameronraysmith/nix-config/blob/main/CONTRIBUTING.md)
+1. **Read contributing guidelines** - See [CONTRIBUTING.md](https://github.com/cameronraysmith/infra/blob/main/CONTRIBUTING.md)
 2. **Understand architecture** - Read [Architecture decisions](/reference/architecture)
 3. **Follow conventions** - Use conventional commits for semantic versioning
 4. **Test changes** - Run full test suite before committing
@@ -340,8 +340,8 @@ just test-e2e
 
 ### Community
 
-- [GitHub Discussions](https://github.com/cameronraysmith/nix-config/discussions) - Ask questions
-- [GitHub Issues](https://github.com/cameronraysmith/nix-config/issues) - Report bugs or request features
+- [GitHub Discussions](https://github.com/cameronraysmith/infra/discussions) - Ask questions
+- [GitHub Issues](https://github.com/cameronraysmith/infra/issues) - Report bugs or request features
 
 ## What's next?
 

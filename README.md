@@ -927,7 +927,7 @@ Available recipes:
     ci-show-outputs system=""                      # List categorized flake outputs using nix eval
     ci-status workflow="ci.yaml"                   # View latest CI run status and details
     ci-validate workflow="ci.yaml" run_id=""       # Validate latest CI run comprehensively
-    ghsecrets repo="cameronraysmith/nix-config"    # Update github secrets for repo from environment variables
+    ghsecrets repo="cameronraysmith/infra"         # Update github secrets for repo from environment variables # gitleaks:allow
     list-workflows                                 # List available workflows and associated jobs.
     test-flake-workflow                            # Execute ci.yaml workflow locally via act.
     ratchet-pin                                    # Pin all workflow versions to hash values (requires Docker)

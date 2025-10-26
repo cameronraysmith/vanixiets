@@ -23,12 +23,12 @@ nix flake init --template github:sciexp/nix-config
 ### Option 3: Manual fork
 
 ```bash
-git clone https://github.com/cameronraysmith/nix-config.git my-project
+git clone https://github.com/cameronraysmith/infra.git my-project
 cd my-project
 rm -rf .git
 git init
 git add .
-git commit -m "chore: initial commit from nix-config"
+git commit -m "chore: initial commit from infra template"
 ```
 
 ## Understanding the naming pattern
@@ -460,7 +460,7 @@ See [Architecture decisions](/reference/architecture#release-configuration) for 
 ### Template issues
 
 If you encounter issues with the template itself:
-- Check [GitHub Issues](https://github.com/cameronraysmith/nix-config/issues)
+- Check [GitHub Issues](https://github.com/cameronraysmith/infra/issues)
 - Open a new issue with reproduction steps
 
 ### Project-specific issues

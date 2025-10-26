@@ -18,7 +18,7 @@ export default defineConfig({
         {
           icon: "github",
           label: "GitHub",
-          href: "https://github.com/cameronraysmith/nix-config",
+          href: "https://github.com/cameronraysmith/infra",
         },
       ],
       sidebar: [
