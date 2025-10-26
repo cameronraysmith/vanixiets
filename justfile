@@ -1338,6 +1338,11 @@ validate-package package:
   @test -f "packages/{{ package }}/package.json" || (echo "package.json not found" && exit 1)
   @echo "✓ Package {{ package }} is valid"
 
+# Test a package (install, unit tests, coverage, build, e2e)
+[group('CI/CD')]
+test-package package:
+  cd packages/{{ package }} && bun install && bun run test:unit && bun run test:coverage && bun run build && bun run test:e2e
+
 # Preview semantic-release version after merging current branch to target
 [group('CI/CD')]
 preview-version target="main" package="":
@@ -1347,6 +1352,19 @@ preview-version target="main" package="":
     ./scripts/preview-version.sh "{{target}}" "{{package}}"
   else
     ./scripts/preview-version.sh "{{target}}"
+  fi
+
+# Release a package using semantic-release
+[group('CI/CD')]
+release-package package dry_run="false":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd packages/{{ package }}
+  if [ "{{ dry_run }}" = "true" ]; then
+    bun run test-release
+  else
+    echo "This will create a real release. Use dry_run=true for testing."
+    bun run semantic-release
   fi
 
 ## sops
