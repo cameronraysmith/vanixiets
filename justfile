@@ -322,21 +322,23 @@ docs-deploy-preview branch=`git branch --show-current`:
   set -euo pipefail
   cd packages/docs
 
-  # Capture git metadata (use full SHA-1 for tag to enable promotion on main)
+  # Capture git metadata (use 12-char SHA for tag - fits in 25 char limit, extremely collision-resistant)
   COMMIT_SHA=$(git rev-parse HEAD)
+  COMMIT_TAG=$(git rev-parse --short=12 HEAD)
   COMMIT_SHORT=$(git rev-parse --short HEAD)
   COMMIT_MSG=$(git log -1 --pretty=format:'%s')
   GIT_STATUS=$(git diff-index --quiet HEAD -- && echo "clean" || echo "dirty")
 
-  # Tag is the full SHA-1 (used to find and promote this exact version on main)
-  TAG="${COMMIT_SHA}"
-  # Message includes human-readable context
-  MESSAGE="[{{branch}}] ${COMMIT_MSG} (${COMMIT_SHORT}, ${GIT_STATUS})"
+  # Tag is 12-char SHA (deterministic, <= 25 chars, used to find this version on main)
+  TAG="${COMMIT_TAG}"
+  # Message includes full context for verification
+  MESSAGE="[{{branch}}] ${COMMIT_MSG} (${COMMIT_TAG}, ${GIT_STATUS})"
 
   echo "Deploying preview for branch: {{branch}}"
   echo "Commit: ${COMMIT_SHORT} (${GIT_STATUS})"
+  echo "Full SHA: ${COMMIT_SHA}"
+  echo "Tag: ${COMMIT_TAG}"
   echo "Message: ${COMMIT_MSG}"
-  echo "Tag: ${COMMIT_SHA}"
   echo ""
 
   # Export variables for use in sops exec-env
@@ -355,7 +357,8 @@ docs-deploy-preview branch=`git branch --show-current`:
 
   echo ""
   echo "✓ Version uploaded successfully"
-  echo "  Tag: ${COMMIT_SHA}"
+  echo "  Tag: ${COMMIT_TAG}"
+  echo "  Full SHA: ${COMMIT_SHA}"
   echo "  Message: ${MESSAGE}"
   echo "  Preview URL: https://b-{{branch}}-nix-config-docs.sciexp.workers.dev"
 
@@ -366,21 +369,37 @@ docs-deploy-production:
   set -euo pipefail
   cd packages/docs
 
-  # Get current commit SHA (should match a previously uploaded version if fast-forward merged)
+  # Get current commit tag (should match a previously uploaded version if fast-forward merged)
   CURRENT_SHA=$(git rev-parse HEAD)
+  CURRENT_TAG=$(git rev-parse --short=12 HEAD)
   CURRENT_SHORT=$(git rev-parse --short HEAD)
   CURRENT_BRANCH=$(git branch --show-current)
 
+  # Build deployment message (works in both CI and local)
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    # Running in GitHub Actions
+    DEPLOYER="${GITHUB_ACTOR:-github-actions}"
+    DEPLOY_CONTEXT="${GITHUB_WORKFLOW:-CI}"
+    DEPLOY_MSG="Deployed by ${DEPLOYER} from ${CURRENT_BRANCH} via ${DEPLOY_CONTEXT}"
+  else
+    # Running locally
+    DEPLOYER=$(whoami)
+    DEPLOY_HOST=$(hostname -s)
+    DEPLOY_MSG="Deployed by ${DEPLOYER} from ${CURRENT_BRANCH} on ${DEPLOY_HOST}"
+  fi
+
   echo "Deploying to production from branch: ${CURRENT_BRANCH}"
   echo "Current commit: ${CURRENT_SHORT}"
-  echo "Looking for existing version with tag: ${CURRENT_SHA}"
+  echo "Full SHA: ${CURRENT_SHA}"
+  echo "Looking for existing version with tag: ${CURRENT_TAG}"
+  echo "Deployment message: ${DEPLOY_MSG}"
   echo ""
 
-  # Query for existing version with matching tag
+  # Query for existing version with matching tag (take most recent if multiple)
   EXISTING_VERSION=$(sops exec-env ../../secrets/shared.yaml \
     "bunx wrangler versions list --json" | \
-    jq -r --arg sha "$CURRENT_SHA" \
-    '.[] | select(.annotations["workers/tag"] == $sha) | .id' | head -1)
+    jq -r --arg tag "$CURRENT_TAG" \
+    '.[] | select(.annotations["workers/tag"] == $tag) | .id' | head -1)
 
   if [ -n "$EXISTING_VERSION" ]; then
     echo "✓ Found existing version: ${EXISTING_VERSION}"
@@ -388,16 +407,26 @@ docs-deploy-production:
     echo "  Promoting to 100% production traffic..."
     echo ""
 
-    sops exec-env ../../secrets/shared.yaml "
-      bunx wrangler versions deploy ${EXISTING_VERSION}@100%
-    "
+    # Export for use in sops exec-env
+    export DEPLOYMENT_MESSAGE="${DEPLOY_MSG}"
 
-    echo ""
-    echo "✓ Successfully promoted version ${EXISTING_VERSION} to production"
-    echo "  Tag: ${CURRENT_SHA}"
-    echo "  Production URL: https://infra.cameronraysmith.net"
+    if sops exec-env ../../secrets/shared.yaml "
+      bunx wrangler versions deploy ${EXISTING_VERSION}@100% --yes --message \"\$DEPLOYMENT_MESSAGE\"
+    "; then
+      echo ""
+      echo "✓ Successfully promoted version ${EXISTING_VERSION} to production"
+      echo "  Tag: ${CURRENT_TAG}"
+      echo "  Full SHA: ${CURRENT_SHA}"
+      echo "  Deployed by: ${DEPLOY_MSG}"
+      echo "  Production URL: https://infra.cameronraysmith.net"
+    else
+      echo ""
+      echo "✗ Failed to promote version ${EXISTING_VERSION}"
+      echo "  Deployment was cancelled or failed"
+      exit 1
+    fi
   else
-    echo "⚠ No existing version found with tag: ${CURRENT_SHA}"
+    echo "⚠ No existing version found with tag: ${CURRENT_TAG}"
     echo "  This should only happen if:"
     echo "    - This is the first deployment"
     echo "    - Commit was made directly on main (not recommended)"
@@ -406,16 +435,20 @@ docs-deploy-production:
     echo "  Falling back to direct build and deploy..."
     echo ""
 
-    sops exec-env ../../secrets/shared.yaml "
+    if sops exec-env ../../secrets/shared.yaml "
       echo 'Building...'
       bun run build
       echo 'Deploying...'
       bunx wrangler deploy
-    "
-
-    echo ""
-    echo "✓ Built and deployed new version directly to production"
-    echo "  Warning: This version was not tested in preview first"
+    "; then
+      echo ""
+      echo "✓ Built and deployed new version directly to production"
+      echo "  Warning: This version was not tested in preview first"
+    else
+      echo ""
+      echo "✗ Failed to build and deploy"
+      exit 1
+    fi
   fi
 
 # List recent Cloudflare deployments
