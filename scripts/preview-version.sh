@@ -21,6 +21,9 @@ CURRENT_BRANCH=$(git branch --show-current)
 REPO_ROOT=$(git rev-parse --show-toplevel)
 WORKTREE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/semantic-release-preview.XXXXXX")
 
+# Save original target branch HEAD for restoration
+ORIGINAL_TARGET_HEAD=""
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -31,12 +34,21 @@ NC='\033[0m' # No Color
 # Cleanup function
 cleanup() {
   local exit_code=$?
+
+  # Always restore target branch to original state if we modified it
+  if [ -n "$ORIGINAL_TARGET_HEAD" ]; then
+    echo -e "\n${BLUE}restoring ${TARGET_BRANCH} to original state...${NC}"
+    git update-ref "refs/heads/$TARGET_BRANCH" "$ORIGINAL_TARGET_HEAD" 2>/dev/null || true
+  fi
+
+  # Clean up worktree
   if [ -d "$WORKTREE_DIR" ]; then
-    echo -e "\n${BLUE}cleaning up worktree...${NC}"
+    echo -e "${BLUE}cleaning up worktree...${NC}"
     git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
     # Prune any stale worktree references
     git worktree prune 2>/dev/null || true
   fi
+
   exit $exit_code
 }
 
@@ -71,7 +83,10 @@ if ! git show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
   exit 1
 fi
 
-# Create merge tree (without touching branches)
+# Save original target branch HEAD before any modifications
+ORIGINAL_TARGET_HEAD=$(git rev-parse "$TARGET_BRANCH")
+
+# Create merge tree to test if merge is possible
 echo -e "${BLUE}simulating merge of ${CURRENT_BRANCH} → ${TARGET_BRANCH}...${NC}"
 
 # Perform merge-tree operation to test if merge is possible
@@ -94,7 +109,7 @@ if [ -z "$MERGE_TREE" ]; then
   exit 1
 fi
 
-# Create temporary merge commit (not on any branch)
+# Create temporary merge commit
 echo -e "${BLUE}creating temporary merge commit...${NC}"
 TEMP_COMMIT=$(git commit-tree -p "$TARGET_BRANCH" -p "$CURRENT_BRANCH" \
   -m "Temporary merge for semantic-release preview" "$MERGE_TREE")
@@ -104,17 +119,18 @@ if [ -z "$TEMP_COMMIT" ]; then
   exit 1
 fi
 
-# Create detached worktree at the temporary merge commit
-echo -e "${BLUE}creating temporary worktree (detached HEAD at merge commit)...${NC}"
-git worktree add --detach --quiet "$WORKTREE_DIR" "$TEMP_COMMIT"
+# Temporarily update target branch to point to merge commit
+# This allows semantic-release to analyze the correct commit history
+# The cleanup function will ALWAYS restore the original branch HEAD
+echo -e "${BLUE}temporarily updating ${TARGET_BRANCH} ref for analysis...${NC}"
+git update-ref "refs/heads/$TARGET_BRANCH" "$TEMP_COMMIT"
+
+# Create worktree at target branch (now pointing to merge commit)
+echo -e "${BLUE}creating temporary worktree at ${TARGET_BRANCH}...${NC}"
+git worktree add --quiet "$WORKTREE_DIR" "$TARGET_BRANCH"
 
 # Navigate to worktree
 cd "$WORKTREE_DIR"
-
-# Make git think we're on the target branch by setting symbolic-ref
-# This allows env-ci to detect the correct branch name via `git rev-parse --abbrev-ref HEAD`
-# Note: This doesn't actually change what commit we're on, just how git reports the branch name
-git symbolic-ref HEAD "refs/heads/$TARGET_BRANCH" 2>/dev/null || true
 
 # Install dependencies in worktree (bun uses global cache, so this is fast)
 echo -e "${BLUE}installing dependencies in worktree...${NC}"
@@ -137,20 +153,12 @@ echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 # This is safe because dry-run skips publish/success/fail steps anyway
 PLUGINS="@semantic-release/commit-analyzer,@semantic-release/release-notes-generator"
 
-# Set environment variables to simulate CI environment with target branch
-# This helps env-ci detect the branch correctly in detached HEAD state
-# Using minimal "generic" CI environment that env-ci will recognize
-export CI=true
-export BRANCH="$TARGET_BRANCH"
-export GIT_BRANCH="$TARGET_BRANCH"
-export BRANCH_NAME="$TARGET_BRANCH"
-
 if [ -n "$PACKAGE_PATH" ]; then
   # For monorepo packages, check if package.json has specific plugins configured
-  OUTPUT=$(bun run semantic-release --dry-run --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+  OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 else
   # For root package
-  OUTPUT=$(bun run semantic-release --dry-run --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+  OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 fi
 
 # Display relevant output
