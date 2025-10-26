@@ -520,6 +520,16 @@ container-all-multiarch container binary:
 # Define the project variable
 gcp_project_id := env_var_or_default('GCP_PROJECT_ID', 'development')
 
+# Scan repository for hardcoded secrets (full history)
+[group('secrets')]
+scan-secrets:
+  gitleaks detect --verbose --redact
+
+# Scan staged changes for secrets (pre-commit)
+[group('secrets')]
+scan-staged:
+  gitleaks protect --staged --verbose --redact
+
 # Show existing secrets using sops
 [group('secrets')]
 show:
