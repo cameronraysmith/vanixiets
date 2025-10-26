@@ -2,6 +2,14 @@ name: setup-nix
 description: setup nix using nothing-but-nix pattern with space reclamation and github actions cache
 
 inputs:
+  installer:
+    description: |
+      nix installation strategy:
+      - 'full' (default): space reclamation + cache + cachix for builds
+      - 'quick': minimal install for simple tasks (no space reclamation, no caching overhead)
+    type: string
+    required: false
+    default: full
   system:
     description: nix system to configure (e.g., x86_64-linux, aarch64-darwin)
     type: string
@@ -52,14 +60,14 @@ runs:
   using: composite
   steps:
     - name: reclaim space (linux)
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && inputs.installer == 'full'
       uses: wimpysworld/nothing-but-nix@10c936d9e46521bf923f75458e0cbd4fa309300d # ratchet:wimpysworld/nothing-but-nix@main
       with:
         hatchet-protocol: carve
         nix-permission-edict: true
 
     - name: reclaim space (darwin)
-      if: runner.os == 'macOS'
+      if: runner.os == 'macOS' && inputs.installer == 'full'
       shell: bash
       run: |
         echo "::group::disk space (before)"
@@ -94,7 +102,7 @@ runs:
           keep-outputs = true
 
     - name: setup cache
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && inputs.installer == 'full'
       id: cache
       uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a # ratchet:nix-community/cache-nix-action@v6
       with:
@@ -118,7 +126,7 @@ runs:
         skipPush: ${{ inputs.cachix-skip-push }}
 
     - name: post setup-nix
-      if: runner.os == 'macOS'
+      if: runner.os == 'macOS' && inputs.installer == 'full'
       uses: srz-zumix/post-run-action@2bf288bc024acd0341914f792a811080ebd0f252 # ratchet:srz-zumix/post-run-action@v2
       with:
         shell: bash -e {0}
