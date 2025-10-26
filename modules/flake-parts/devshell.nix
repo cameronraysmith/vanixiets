@@ -49,6 +49,7 @@
           ssh-to-age # SSH to age key conversion
           inputs'.agenix.packages.default # Agenix CLI
           bitwarden-cli # Bitwarden CLI (bw) for key extraction
+          gitleaks # Secret scanning
 
           # Utilities
           jq # JSON processing
@@ -70,6 +71,13 @@
 
       pre-commit.settings = {
         hooks.nixfmt-rfc-style.enable = true;
+        hooks.gitleaks = {
+          enable = true;
+          name = "gitleaks";
+          entry = "${pkgs.gitleaks}/bin/gitleaks protect --staged --verbose --redact";
+          language = "system";
+          pass_filenames = false;
+        };
       };
     };
 }
