@@ -34,7 +34,6 @@ This guide walks through setting up the GitHub Actions CI/CD pipeline for automa
 
 Optional but recommended for full CI functionality:
 
-- **GITGUARDIAN_API_KEY**: Get from https://dashboard.gitguardian.com/api/personal-access-tokens
 - **CACHIX_AUTH_TOKEN**: Get from https://app.cachix.org/cache/YOUR_CACHE/settings
 - **CACHIX_CACHE_NAME**: Your Cachix cache name
 
@@ -45,7 +44,6 @@ Create `vars/shared.yaml` with your secrets:
 ```yaml
 CLOUDFLARE_ACCOUNT_ID: your-actual-account-id
 CLOUDFLARE_API_TOKEN: your-actual-api-token
-GITGUARDIAN_API_KEY: your-actual-gitguardian-key
 CACHIX_AUTH_TOKEN: your-actual-cachix-token
 CACHIX_CACHE_NAME: your-cache-name
 CI_AGE_KEY: age-secret-key-1... # CI age private key from .sops.yaml
@@ -140,11 +138,17 @@ gh run view --web
 ### 3.3 Verify Each Job
 
 The workflow should complete these jobs in order:
-1. ✅ **scan**: GitGuardian secret scanning
+1. ✅ **secrets-scan**: Gitleaks secret scanning
 2. ✅ **set-variables**: Configure workflow variables
-3. ✅ **nixci**: Nix flake checks
-4. ✅ **build**: Build Astro documentation site
-5. ✅ **deploy**: Deploy to Cloudflare Workers (only if enabled)
+3. ✅ **bootstrap-verification**: Validate bootstrap workflow
+4. ✅ **config-validation**: Test config.nix user definitions
+5. ✅ **autowiring-validation**: Verify nixos-unified autowiring
+6. ✅ **secrets-workflow**: Test sops-nix mechanics
+7. ✅ **justfile-activation**: Validate justfile recipes
+8. ✅ **cache-overlay-packages**: Pre-cache overlay packages
+9. ✅ **nix**: Build all flake outputs
+10. ✅ **docs-test**: Test documentation site
+11. ✅ **docs-deploy**: Deploy to Cloudflare Workers (only if enabled)
 
 ### 3.4 Check Deployment
 
