@@ -1311,6 +1311,33 @@ cache-overlay-packages system:
     echo ""
     echo "CI will now fetch from cachix instead of building."
 
+# List all packages in packages/ directory
+[group('CI/CD')]
+list-packages:
+  @ls -1 packages/
+
+# List packages in JSON format for CI matrix
+[group('CI/CD')]
+list-packages-json:
+  #!/usr/bin/env bash
+  cd packages
+  packages=()
+  for dir in */; do
+    pkg_name="${dir%/}"
+    if [ -f "$dir/package.json" ]; then
+      packages+=("{\"name\":\"$pkg_name\",\"path\":\"packages/$pkg_name\"}")
+    fi
+  done
+  echo "[$(IFS=,; echo "${packages[*]}")]"
+
+# Validate package structure
+[group('CI/CD')]
+validate-package package:
+  @echo "Validating package: {{ package }}"
+  @test -d "packages/{{ package }}" || (echo "Package directory not found" && exit 1)
+  @test -f "packages/{{ package }}/package.json" || (echo "package.json not found" && exit 1)
+  @echo "✓ Package {{ package }} is valid"
+
 # Preview semantic-release version after merging current branch to target
 [group('CI/CD')]
 preview-version target="main" package="":
