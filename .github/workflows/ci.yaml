@@ -31,6 +31,15 @@ on:
         description: comma-separated list of jobs to run
         required: false
         type: string
+  pull_request:
+    types: [opened, labeled, reopened, synchronize]
+    paths-ignore:
+      - "*.md"
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - "*.md"
 
 defaults:
   run:
