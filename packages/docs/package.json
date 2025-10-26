@@ -1,5 +1,5 @@
 {
-  "name": "@nix-config/docs",
+  "name": "@infra/docs",
   "version": "0.0.0-development",
   "private": true,
   "description": "Documentation site built with Astro Starlight",

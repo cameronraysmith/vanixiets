@@ -37,7 +37,7 @@ This template uses framework-agnostic, purpose-based naming that works for both 
 
 ### Package naming strategy
 
-**Template package:** `@nix-config/docs`
+**Template package:** `@infra/docs`
 
 **Why this naming works:**
 
@@ -127,10 +127,10 @@ If your project has multiple public-facing components:
 
 ### Template deployment example
 
-**For nix-config:**
-- Package: `@nix-config/docs`
-- Worker: `ts-nix-docs`
-- Route: `ts-nix.scientistexperience.net`
+**For infra:**
+- Package: `@infra/docs`
+- Worker: `nix-config-docs`
+- Route: `infra.cameronraysmith.net`
 
 **Rationale:**
 - Preserves `docs.*` for actual org documentation
@@ -234,13 +234,13 @@ Update filter patterns:
 
 ```justfile
 # Before
-bun run --filter '@nix-config/docs' dev
+bun run --filter '@infra/docs' dev
 
 # After
 bun run --filter '@yourorg/my-package-name' dev
 ```
 
-Search and replace `@nix-config/docs` with your package name.
+Search and replace `@infra/docs` with your package name.
 
 ### 7. Documentation
 

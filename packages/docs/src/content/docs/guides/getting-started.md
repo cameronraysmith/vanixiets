@@ -222,7 +222,7 @@ See [Template usage guide](/guides/template-usage#adding-more-packages) for deta
 just docs dev              # Run dev in docs package
 
 # Using bun directly
-bun run --filter '@nix-config/docs' dev
+bun run --filter '@infra/docs' dev
 ```
 
 ### Deploying to Cloudflare Workers
