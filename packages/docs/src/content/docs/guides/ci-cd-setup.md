@@ -50,7 +50,7 @@ CI_AGE_KEY: age-secret-key-1... # CI age private key from .sops.yaml
 ```
 
 The `CI_AGE_KEY` should be the private key corresponding to the public key:
-`age1m9m8h5vqr7dqlmvnzcwshmm4uk8umcllazum6eaulkdp3qc88ugs22j3p8`
+`age1m9m8h5vqr7dqlmvnzcwshmm4uk8umcllazum6eaulkdp3qc88ugs22j3p8` <!-- gitleaks:allow - age public key -->
 
 ### 1.5 Encrypt the Secrets File
 

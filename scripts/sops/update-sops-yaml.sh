@@ -14,7 +14,7 @@ SOPS_YAML=".sops.yaml"
 BACKUP_SUFFIX=".backup-$(date +%Y%m%d-%H%M%S)"
 
 # Admin recovery key (not in Bitwarden - preserved from existing)
-ADMIN_RECOVERY_KEY="age1vy7wsnf8eg5229evq3ywup285jzk9cntsx5hhddjtwsjh0kf4c6s9fmalv"
+ADMIN_RECOVERY_KEY="age1vy7wsnf8eg5229evq3ywup285jzk9cntsx5hhddjtwsjh0kf4c6s9fmalv" # gitleaks:allow - age public key
 
 echo -e "${YELLOW}=== Updating .sops.yaml from Bitwarden ===${NC}"
 echo ""
