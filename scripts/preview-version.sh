@@ -34,6 +34,8 @@ cleanup() {
   if [ -d "$WORKTREE_DIR" ]; then
     echo -e "\n${BLUE}cleaning up worktree...${NC}"
     git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
+    # Prune any stale worktree references
+    git worktree prune 2>/dev/null || true
   fi
   exit $exit_code
 }
@@ -69,20 +71,45 @@ if ! git show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
   exit 1
 fi
 
-# Create worktree at target branch
-echo -e "${BLUE}creating temporary worktree at ${TARGET_BRANCH}...${NC}"
-git worktree add --quiet "$WORKTREE_DIR" "$TARGET_BRANCH"
+# Create merge tree (without touching branches)
+echo -e "${BLUE}simulating merge of ${CURRENT_BRANCH} → ${TARGET_BRANCH}...${NC}"
+
+# Perform merge-tree operation to test if merge is possible
+MERGE_OUTPUT=$(git merge-tree --write-tree "$TARGET_BRANCH" "$CURRENT_BRANCH" 2>&1)
+MERGE_EXIT=$?
+
+if [ $MERGE_EXIT -ne 0 ]; then
+  echo -e "${RED}error: merge conflicts detected${NC}" >&2
+  echo -e "${YELLOW}please resolve conflicts in your branch before previewing${NC}" >&2
+  echo -e "\n${YELLOW}conflict details:${NC}" >&2
+  echo "$MERGE_OUTPUT" >&2
+  exit 1
+fi
+
+# Extract tree hash from merge-tree output (first line)
+MERGE_TREE=$(echo "$MERGE_OUTPUT" | head -1)
+
+if [ -z "$MERGE_TREE" ]; then
+  echo -e "${RED}error: failed to create merge tree${NC}" >&2
+  exit 1
+fi
+
+# Create temporary merge commit (not on any branch)
+echo -e "${BLUE}creating temporary merge commit...${NC}"
+TEMP_COMMIT=$(git commit-tree -p "$TARGET_BRANCH" -p "$CURRENT_BRANCH" \
+  -m "Temporary merge for semantic-release preview" "$MERGE_TREE")
+
+if [ -z "$TEMP_COMMIT" ]; then
+  echo -e "${RED}error: failed to create temporary merge commit${NC}" >&2
+  exit 1
+fi
+
+# Create detached worktree at the temporary merge commit
+echo -e "${BLUE}creating temporary worktree (detached HEAD at merge commit)...${NC}"
+git worktree add --detach --quiet "$WORKTREE_DIR" "$TEMP_COMMIT"
 
 # Navigate to worktree
 cd "$WORKTREE_DIR"
-
-# Merge current branch (test merge, will be discarded)
-echo -e "${BLUE}simulating merge of ${CURRENT_BRANCH} → ${TARGET_BRANCH}...${NC}"
-if ! git merge --no-edit "$CURRENT_BRANCH" &>/dev/null; then
-  echo -e "${RED}error: merge conflicts detected${NC}" >&2
-  echo -e "${YELLOW}please resolve conflicts in your branch before previewing${NC}" >&2
-  exit 1
-fi
 
 # Install dependencies in worktree (bun uses global cache, so this is fast)
 echo -e "${BLUE}installing dependencies in worktree...${NC}"
