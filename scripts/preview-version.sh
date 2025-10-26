@@ -161,8 +161,9 @@ else
   OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 fi
 
-# Display relevant output
-echo "$OUTPUT" | grep -v "^$" | grep -E "(semantic-release|Published|next release|Release note|version)" || true
+# Display semantic-release summary (filter out verbose plugin repetition)
+echo "$OUTPUT" | grep -v "^$" | grep -vE "(No more plugins|does not provide step)" | \
+  grep -E "(semantic-release|Running|analyzing|Found.*commits|release version|Release note|Features|Bug Fixes|Breaking Changes|Published|\*\s)" || true
 
 echo -e "\n${BLUE}═══════════════════════════════════════════════════════════════${NC}"
 
