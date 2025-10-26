@@ -4,7 +4,7 @@
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "nix-config-docs",
+  "name": "infra-docs",
   "main": "./dist/_worker.js/index.js",
   "compatibility_date": "2025-10-06",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],

@@ -8,7 +8,7 @@ import { defineConfig } from "astro/config";
 export default defineConfig({
   integrations: [
     starlight({
-      title: "nix-config",
+      title: "infra",
       prerender: false,
       customCss: [
         './src/fonts/font-face.css',

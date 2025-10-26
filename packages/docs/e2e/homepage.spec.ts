@@ -5,7 +5,7 @@ test.describe("Homepage", () => {
     await page.goto("/");
 
     // Verify page title
-    await expect(page).toHaveTitle(/nix-config/);
+    await expect(page).toHaveTitle(/infra/);
 
     // Verify main heading
     const heading = page.locator("h1").first();
