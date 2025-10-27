@@ -1361,10 +1361,10 @@ release-package package dry_run="false":
   set -euo pipefail
   cd packages/{{ package }}
   if [ "{{ dry_run }}" = "true" ]; then
-    bun run test-release
+    bunx semantic-release --dry-run --no-ci
   else
     echo "This will create a real release. Use dry_run=true for testing."
-    bun run semantic-release
+    bunx semantic-release
   fi
 
 ## sops
