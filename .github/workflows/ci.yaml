@@ -193,7 +193,9 @@ jobs:
           fetch-tags: true  # Explicitly fetch all tags for version detection
 
       - name: Fetch target branch for preview
-        run: git fetch origin main:main
+        run: |
+          git fetch origin main
+          git branch -f main FETCH_HEAD
 
       - name: Configure git identity for temporary commits
         run: |
@@ -212,7 +214,7 @@ jobs:
       - name: Preview version for ${{ matrix.package.name }}
         run: |
           echo "::group::Preview semantic-release version"
-          nix develop -c just preview-version main ${{ matrix.package.name }}
+          nix develop -c just preview-version main ${{ matrix.package.path }}
           echo "::endgroup::"
 
   # job 4: preview-docs-deploy
