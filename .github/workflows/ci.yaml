@@ -212,7 +212,8 @@ jobs:
         run: nix develop -c bun install
 
       - name: Setup tmate debug session
-        if: needs.set-variables.outputs.debug == 'true'
+        # TEMPORARY: condition commented out for automatic debugging on next push
+        # if: needs.set-variables.outputs.debug == 'true'
         uses: mxschmitt/action-tmate@e5c7151931ca95bad1c6f4190c730ecf8c7dde48 # ratchet:mxschmitt/action-tmate@v3
 
       - name: Preview version for ${{ matrix.package.name }}
