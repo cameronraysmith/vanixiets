@@ -134,7 +134,7 @@ cd "$WORKTREE_DIR"
 
 # Install dependencies in worktree (bun uses global cache, so this is fast)
 echo -e "${BLUE}installing dependencies in worktree...${NC}"
-nix develop -c bun install --silent &>/dev/null
+nix develop -c bun install --silent
 
 # Navigate to package if specified
 if [ -n "$PACKAGE_PATH" ]; then
