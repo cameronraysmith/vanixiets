@@ -61,7 +61,7 @@ if [ "$CURRENT_BRANCH" == "$TARGET_BRANCH" ]; then
   if [ -n "$PACKAGE_PATH" ]; then
     cd "$REPO_ROOT/$PACKAGE_PATH"
   fi
-  exec bun run test-release
+  exec nix develop -c bun run test-release
 fi
 
 # Display what we're doing
@@ -134,7 +134,7 @@ cd "$WORKTREE_DIR"
 
 # Install dependencies in worktree (bun uses global cache, so this is fast)
 echo -e "${BLUE}installing dependencies in worktree...${NC}"
-bun install --silent &>/dev/null
+nix develop -c bun install --silent &>/dev/null
 
 # Navigate to package if specified
 if [ -n "$PACKAGE_PATH" ]; then
@@ -155,10 +155,10 @@ PLUGINS="@semantic-release/commit-analyzer,@semantic-release/release-notes-gener
 
 if [ -n "$PACKAGE_PATH" ]; then
   # For monorepo packages, check if package.json has specific plugins configured
-  OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+  OUTPUT=$(nix develop -c bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 else
   # For root package
-  OUTPUT=$(bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+  OUTPUT=$(nix develop -c bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 fi
 
 # Display semantic-release summary (filter out verbose plugin repetition)
