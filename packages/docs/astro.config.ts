@@ -9,7 +9,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "infra",
-      prerender: false,
+      prerender: true,
       customCss: [
         './src/fonts/font-face.css',
         './src/styles/custom.css',
