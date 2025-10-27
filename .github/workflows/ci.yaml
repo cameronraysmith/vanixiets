@@ -70,11 +70,12 @@ jobs:
 
   # job 1: secrets-scan
   # scans repository for hardcoded secrets using gitleaks
+  # ALWAYS runs (ignores skip-check) - security critical
   secrets-scan:
     needs: skip-check
     runs-on: ubuntu-latest
     if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
+      !cancelled() &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'secrets-scan' ||
