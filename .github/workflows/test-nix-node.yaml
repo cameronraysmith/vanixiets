@@ -1,0 +1,74 @@
+name: Test Nix Node Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      installer-mode:
+        description: "Nix installer mode (quick or full)"
+        required: true
+        type: choice
+        options:
+          - quick
+          - full
+        default: quick
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test-node-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+
+      - name: Check Node version (before nix)
+        run: |
+          echo "=== Node version BEFORE nix setup ==="
+          which node || echo "node not found"
+          node --version || echo "node not available"
+          echo "PATH: $PATH"
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        with:
+          installer: ${{ inputs.installer-mode }}
+          system: x86_64-linux
+
+      - name: Check Node version (after nix, outside nix develop)
+        run: |
+          echo "=== Node version AFTER nix setup (outside nix develop) ==="
+          which node || echo "node not found"
+          node --version || echo "node not available"
+          echo "PATH: $PATH"
+
+      - name: Check Node version (inside nix develop)
+        run: |
+          echo "=== Node version INSIDE nix develop ==="
+          nix develop -c bash -c 'which node'
+          nix develop -c bash -c 'node --version'
+          nix develop -c bash -c 'echo "PATH: $PATH"'
+
+      - name: Check Bun and bunx inside nix develop
+        run: |
+          echo "=== Bun version INSIDE nix develop ==="
+          nix develop -c bash -c 'which bun'
+          nix develop -c bash -c 'bun --version'
+          echo "=== bunx --version INSIDE nix develop ==="
+          nix develop -c bash -c 'bunx --version'
+
+      - name: Install dependencies
+        run: nix develop -c bun install
+
+      - name: Test semantic-release version check
+        run: |
+          echo "=== Testing semantic-release node version check ==="
+          cd packages/docs
+          nix develop -c bunx semantic-release --version || echo "semantic-release failed"
+
+      - name: Test just recipe (dry-run)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=== Testing just recipe ==="
+          nix develop -c just release-package docs true
