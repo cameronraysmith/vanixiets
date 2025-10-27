@@ -194,6 +194,11 @@ jobs:
       - name: Fetch target branch for preview
         run: git fetch origin main:main
 
+      - name: Configure git identity for temporary commits
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
         with:
