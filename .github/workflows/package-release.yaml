@@ -81,9 +81,9 @@ jobs:
       contents: write
       id-token: write
     outputs:
-      version: ${{ steps.semantic-release.outputs.new_release_version }}
-      released: ${{ steps.semantic-release.outputs.new_release_published || 'false' }}
-      tag: ${{ steps.semantic-release.outputs.new_release_git_tag }}
+      version: ${{ steps.release-info.outputs.version }}
+      released: ${{ steps.release-info.outputs.released }}
+      tag: ${{ steps.release-info.outputs.tag }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
         with:
@@ -91,56 +91,58 @@ jobs:
           ref: ${{ inputs.checkout-ref != '' && inputs.checkout-ref || github.ref }}
           persist-credentials: false
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
         with:
-          bun-version: "1.1.38"
+          installer: quick
+          system: x86_64-linux
 
       - name: Install dependencies
-        if: ${{ inputs.release-dry-run == 'true' }}
-        run: |
-          bun install
-          git log --oneline --branches --tags
-
-      - name: Test semantic-release (dry-run)
-        if: ${{ inputs.release-dry-run == 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-        working-directory: ${{ inputs.package-path }}
-        run: |
-          unset GITHUB_ACTIONS
-          bun run test-release
+        run: nix develop -c bun install
 
       - name: Run semantic-release
         id: semantic-release
-        uses: cycjimmy/semantic-release-action@b1b432f13acb7768e0c8efdec416d363a57546f2 # ratchet:cycjimmy/semantic-release-action@v4
-        with:
-          working_directory: ${{ inputs.package-path }}
-          dry_run: ${{ inputs.release-dry-run == 'true' }}
-          semantic_version: 24
-          extra_plugins: |
-            @semantic-release/changelog
-            @semantic-release/git
-            semantic-release-major-tag
-            semantic-release-monorepo
-            conventional-changelog-conventionalcommits
-          ci: ${{ inputs.release-dry-run == 'false' }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-          GITHUB_ACTIONS: ${{ inputs.release-dry-run == 'false' }}
+        run: |
+          nix develop -c just release-package ${{ inputs.package-name }} ${{ inputs.release-dry-run }}
+
+      - name: Extract release info
+        if: always()
+        id: release-info
+        run: |
+          # Extract version and tag from git if release was created
+          # For dry-run mode, these will remain as defaults
+          if [ "${{ inputs.release-dry-run }}" = "false" ]; then
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -n "$LATEST_TAG" ]; then
+              # Extract version from tag (e.g., docs-v1.2.3 -> 1.2.3)
+              VERSION=$(echo "$LATEST_TAG" | grep -oP '\d+\.\d+\.\d+' || echo "unknown")
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+              echo "released=true" >> $GITHUB_OUTPUT
+              echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+            else
+              echo "version=unknown" >> $GITHUB_OUTPUT
+              echo "released=false" >> $GITHUB_OUTPUT
+              echo "tag=" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "version=unknown" >> $GITHUB_OUTPUT
+            echo "released=false" >> $GITHUB_OUTPUT
+            echo "tag=" >> $GITHUB_OUTPUT
+          fi
 
       - name: Setup tmate debug session
+        if: inputs.debug-enabled == true
         uses: mxschmitt/action-tmate@e5c7151931ca95bad1c6f4190c730ecf8c7dde48 # ratchet:mxschmitt/action-tmate@v3
-        if: ${{ inputs.debug-enabled }}
 
       - name: Log release information
+        if: always()
         run: |
-          if [ "${{ steps.semantic-release.outputs.new_release_published }}" == "true" ]; then
-            echo "Package ${{ inputs.package-name }} released version ${{ steps.semantic-release.outputs.new_release_version }}"
-            echo "Tag: ${{ steps.semantic-release.outputs.new_release_git_tag }}"
+          if [ "${{ steps.release-info.outputs.released }}" == "true" ]; then
+            echo "Package ${{ inputs.package-name }} released version ${{ steps.release-info.outputs.version }}"
+            echo "Tag: ${{ steps.release-info.outputs.tag }}"
           else
-            echo "No release needed for ${{ inputs.package-name }}"
+            echo "No release created for ${{ inputs.package-name }}"
           fi
