@@ -87,7 +87,7 @@ jobs:
        inputs.job == 'justfile-activation' ||
        inputs.job == 'cache-overlay-packages' ||
        inputs.job == 'nix' ||
-       inputs.job == 'docs-test')
+       inputs.job == 'typescript')
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
@@ -732,15 +732,15 @@ jobs:
         if: always()
         run: df -h
 
-  # job 10: test
-  # Package testing via reusable workflow
-  test:
+  # job 10: typescript
+  # TypeScript package testing via reusable workflow
+  typescript:
     needs: [skip-check, secrets-scan, set-variables]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
-       inputs.job == 'docs-test')
+       inputs.job == 'typescript')
     strategy:
       fail-fast: false
       matrix:
@@ -756,12 +756,12 @@ jobs:
 
   # job 11: production-release-packages
   # Release packages to production on main/beta branches
-  # IGNORES skip-check but REQUIRES test+nix success/skipped (safe for fast-forward merge)
+  # IGNORES skip-check but REQUIRES typescript+nix success/skipped (safe for fast-forward merge)
   production-release-packages:
-    needs: [set-variables, test, nix]
+    needs: [set-variables, typescript, nix]
     if: |
       !cancelled() &&
-      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (needs.typescript.result == 'success' || needs.typescript.result == 'skipped') &&
       (needs.nix.result == 'success' || needs.nix.result == 'skipped') &&
       github.repository_owner == 'cameronraysmith' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
@@ -787,10 +787,10 @@ jobs:
   # Documentation deployment to production (conditional)
   # Depends on production-release-packages to ensure packages are released first
   production-docs-deploy:
-    needs: [set-variables, test, production-release-packages]
+    needs: [set-variables, typescript, production-release-packages]
     if: |
       !cancelled() &&
-      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (needs.typescript.result == 'success' || needs.typescript.result == 'skipped') &&
       needs.production-release-packages.result == 'success' &&
       needs.set-variables.outputs.deploy_enabled == 'true' &&
       (github.event_name != 'workflow_dispatch' ||
