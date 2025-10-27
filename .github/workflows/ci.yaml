@@ -751,37 +751,18 @@ jobs:
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-  # job 11: test-release-packages
-  # Test release process for packages on pull requests
-  test-release-packages:
-    needs: [skip-check, set-variables, test]
-    if: ${{ github.event_name == 'pull_request' && needs.skip-check.outputs.should_skip != 'true' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJson(needs.set-variables.outputs.packages) }}
-    permissions:
-      contents: write
-      id-token: write
-    uses: ./.github/workflows/package-release.yaml
-    with:
-      package-path: ${{ matrix.package.path }}
-      package-name: ${{ matrix.package.name }}
-      release-dry-run: true
-      debug-enabled: ${{ needs.set-variables.outputs.debug == 'true' }}
-      checkout-ref: ${{ needs.set-variables.outputs.checkout_ref }}
-    secrets:
-      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-
-  # job 12: release-packages
+  # job 11: production-release-packages
   # Release packages to production on main/beta branches
-  release-packages:
-    needs: [skip-check, set-variables, test, nix]
+  # IGNORES skip-check but REQUIRES test+nix success/skipped (safe for fast-forward merge)
+  production-release-packages:
+    needs: [set-variables, test, nix]
     if: |
+      !cancelled() &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (needs.nix.result == 'success' || needs.nix.result == 'skipped') &&
       github.repository_owner == 'cameronraysmith' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta') &&
-      needs.skip-check.outputs.should_skip != 'true'
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
     strategy:
       fail-fast: false
       matrix:
@@ -799,12 +780,15 @@ jobs:
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-  # job 13: docs-deploy
-  # Documentation deployment (conditional)
-  docs-deploy:
-    needs: [set-variables, test, release-packages]
+  # job 12: production-docs-deploy
+  # Documentation deployment to production (conditional)
+  # Depends on production-release-packages to ensure packages are released first
+  production-docs-deploy:
+    needs: [set-variables, test, production-release-packages]
     if: |
       !cancelled() &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      needs.production-release-packages.result == 'success' &&
       needs.set-variables.outputs.deploy_enabled == 'true' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
