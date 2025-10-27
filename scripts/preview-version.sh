@@ -23,6 +23,7 @@ WORKTREE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/semantic-release-preview.XXXXXX")
 
 # Save original target branch HEAD for restoration
 ORIGINAL_TARGET_HEAD=""
+ORIGINAL_REMOTE_HEAD=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -39,6 +40,11 @@ cleanup() {
   if [ -n "$ORIGINAL_TARGET_HEAD" ]; then
     echo -e "\n${BLUE}restoring ${TARGET_BRANCH} to original state...${NC}"
     git update-ref "refs/heads/$TARGET_BRANCH" "$ORIGINAL_TARGET_HEAD" 2>/dev/null || true
+  fi
+
+  # Always restore remote-tracking branch to original state if we modified it
+  if [ -n "$ORIGINAL_REMOTE_HEAD" ]; then
+    git update-ref "refs/remotes/origin/$TARGET_BRANCH" "$ORIGINAL_REMOTE_HEAD" 2>/dev/null || true
   fi
 
   # Clean up worktree
@@ -86,6 +92,9 @@ fi
 # Save original target branch HEAD before any modifications
 ORIGINAL_TARGET_HEAD=$(git rev-parse "$TARGET_BRANCH")
 
+# Save original remote-tracking branch HEAD before any modifications
+ORIGINAL_REMOTE_HEAD=$(git rev-parse "origin/$TARGET_BRANCH" 2>/dev/null || echo "")
+
 # Create merge tree to test if merge is possible
 echo -e "${BLUE}simulating merge of ${CURRENT_BRANCH} → ${TARGET_BRANCH}...${NC}"
 
@@ -124,6 +133,9 @@ fi
 # The cleanup function will ALWAYS restore the original branch HEAD
 echo -e "${BLUE}temporarily updating ${TARGET_BRANCH} ref for analysis...${NC}"
 git update-ref "refs/heads/$TARGET_BRANCH" "$TEMP_COMMIT"
+
+# Also update remote-tracking branch to match (so semantic-release sees them as synchronized)
+git update-ref "refs/remotes/origin/$TARGET_BRANCH" "$TEMP_COMMIT"
 
 # Create worktree at target branch (now pointing to merge commit)
 echo -e "${BLUE}creating temporary worktree at ${TARGET_BRANCH}...${NC}"
