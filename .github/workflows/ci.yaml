@@ -184,6 +184,10 @@ jobs:
       matrix:
         package: ${{ fromJson(needs.set-variables.outputs.packages) }}
     runs-on: ubuntu-latest
+    # semantic-release verifyAuth requires push permission even in dry-run mode
+    # https://github.com/semantic-release/semantic-release/blob/v25.0.1/index.js#L87-L98
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
@@ -212,8 +216,7 @@ jobs:
         run: nix develop -c bun install
 
       - name: Setup tmate debug session
-        # TEMPORARY: condition commented out for automatic debugging on next push
-        # if: needs.set-variables.outputs.debug == 'true'
+        if: needs.set-variables.outputs.debug == 'true'
         uses: mxschmitt/action-tmate@e5c7151931ca95bad1c6f4190c730ecf8c7dde48 # ratchet:mxschmitt/action-tmate@v3
 
       - name: Preview version for ${{ matrix.package.name }}
