@@ -194,8 +194,8 @@ jobs:
 
       - name: Fetch target branch for preview
         run: |
-          git fetch origin main
-          git branch -f main FETCH_HEAD
+          git fetch origin
+          git branch -f main origin/main
 
       - name: Configure git identity for temporary commits
         run: |
