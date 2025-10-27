@@ -188,6 +188,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
         with:
+          ref: ${{ github.head_ref }}  # Checkout actual PR branch, not merge commit
           fetch-depth: 0  # Full history needed for semantic-release analysis
 
       - name: Fetch target branch for preview
