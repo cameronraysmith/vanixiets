@@ -223,8 +223,7 @@ jobs:
       branch: ${{ github.head_ref }}
       environment: preview
       debug_enabled: ${{ needs.set-variables.outputs.debug }}
-    secrets:
-      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+    secrets: inherit
 
   # job 5: bootstrap-verification
   # validates Makefile bootstrap workflow on clean ubuntu system
