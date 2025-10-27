@@ -190,6 +190,7 @@ jobs:
         with:
           ref: ${{ github.head_ref }}  # Checkout actual PR branch, not merge commit
           fetch-depth: 0  # Full history needed for semantic-release analysis
+          fetch-tags: true  # Explicitly fetch all tags for version detection
 
       - name: Fetch target branch for preview
         run: git fetch origin main:main
