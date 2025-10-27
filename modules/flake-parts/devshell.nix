@@ -57,6 +57,7 @@
 
           # Documentation toolchain
           bun # JavaScript runtime and package manager
+          nodejs_22 # Node.js v22 (required by semantic-release v25)
           nodePackages.typescript # TypeScript compiler
           nodePackages.svgo # SVG optimizer
           # E2E testing browsers from playwright-web-flake (pinned to 1.56.1)
