@@ -105,11 +105,12 @@ jobs:
 
   # job 2: set-variables
   # determines deployment settings and variables based on event type
+  # ALWAYS runs (ignores skip-check) - needed for production job routing
   set-variables:
     needs: [skip-check, secrets-scan]
     runs-on: ubuntu-latest
     if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
+      !cancelled() &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'set-variables')
