@@ -96,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
-      url: https://infra.cameronraysmith.net
+      url: ${{ inputs.environment == 'preview' && format('https://b-{0}-infra-docs.sciexp.workers.dev', inputs.branch) || 'https://infra.cameronraysmith.net' }}
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
