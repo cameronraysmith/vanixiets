@@ -172,7 +172,78 @@ jobs:
           echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
           echo "Discovered packages: $PACKAGES"
 
-  # job 3: bootstrap-verification
+  # job 3: preview-release-version
+  # Preview semantic-release version for each package (PR only, fast feedback)
+  preview-release-version:
+    needs: [set-variables]
+    if: |
+      !cancelled() &&
+      github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.set-variables.outputs.packages) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0  # Full history needed for semantic-release analysis
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        with:
+          installer: quick
+          system: x86_64-linux
+
+      - name: Install dependencies
+        run: nix develop -c bun install
+
+      - name: Preview version for ${{ matrix.package.name }}
+        run: |
+          echo "::group::Preview semantic-release version"
+          nix develop -c just preview-version main ${{ matrix.package.name }}
+          echo "::endgroup::"
+
+  # job 4: preview-docs-deploy
+  # Deploy docs to preview environment (PR only, fast feedback)
+  preview-docs-deploy:
+    needs: [set-variables]
+    if: |
+      !cancelled() &&
+      github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: preview
+      url: https://b-${{ github.head_ref }}-infra-docs.sciexp.workers.dev
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        with:
+          installer: quick
+          system: x86_64-linux
+
+      - name: Install dependencies
+        run: nix develop -c bun install
+
+      - name: Deploy docs preview for branch ${{ github.head_ref }}
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          echo "::group::Deploy to preview"
+          nix develop -c just docs-deploy-preview ${{ github.head_ref }}
+          echo "::endgroup::"
+          echo "Preview URL: https://b-${{ github.head_ref }}-infra-docs.sciexp.workers.dev"
+
+  # job 5: bootstrap-verification
   # validates Makefile bootstrap workflow on clean ubuntu system
   bootstrap-verification:
     needs: [skip-check, secrets-scan]
