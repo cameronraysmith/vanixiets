@@ -190,6 +190,9 @@ jobs:
         with:
           fetch-depth: 0  # Full history needed for semantic-release analysis
 
+      - name: Fetch target branch for preview
+        run: git fetch origin main:main
+
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
         with:
