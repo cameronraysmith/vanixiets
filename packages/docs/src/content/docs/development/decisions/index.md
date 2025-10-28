@@ -2,8 +2,6 @@
 title: Architecture Decisions
 ---
 
-# Architecture decisions
-
 Architecture Decision Records (ADRs) documenting key technical and design decisions.
 
 - [ADR-0001: Claude Code multi-profile system](0001-claude-code-multi-profile-system/)
