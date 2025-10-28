@@ -35,6 +35,8 @@ Before editing any file, run `git status --short [file]` and `git diff [file]` t
 
 ## Atomic commit workflow
 
+Atomic commits in this workflow mean one commit per file with exactly one logical change. Each commit is the smallest meaningful unit that can be independently reverted, cherry-picked, or bisected. This is not atomic in the database sense of bundling multiple operations together, but atomic as the finest practical granularity for version control.
+
 Make one logical edit per file (even when using MultiEdit to edit multiple files in parallel), then commit each file separately: edit file → `git add [file]` → verify with `git diff --cached [file]` → commit with focused message. This eliminates mixed hunks by construction.
 
 ## Handling pre-existing mixed changes
