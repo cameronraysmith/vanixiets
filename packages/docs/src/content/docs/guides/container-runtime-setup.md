@@ -1,3 +1,7 @@
+---
+title: Container Management with Colima
+---
+
 # Container management with colima
 
 This configuration uses a hybrid approach for optimal container and VM management on macOS:
