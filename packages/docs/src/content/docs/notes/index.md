@@ -1,3 +1,7 @@
+---
+title: Notes
+---
+
 # Notes
 
 Meta-documents and working notes about the project.
