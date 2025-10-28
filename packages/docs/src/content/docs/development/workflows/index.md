@@ -1,7 +1,5 @@
 ---
 title: Contents
-sidebar:
-  label: Workflows
 ---
 
 Development processes and procedures.

@@ -34,10 +34,35 @@ export default defineConfig({
         },
         {
           label: "Development",
-          autogenerate: {
-            directory: "development",
-            collapsed: true,
-          },
+          collapsed: true,
+          items: [
+            { label: "Contents", link: "/development/" },
+            {
+              label: "Decisions",
+              collapsed: true,
+              autogenerate: { directory: "development/decisions" },
+            },
+            {
+              label: "Operations",
+              collapsed: true,
+              autogenerate: { directory: "development/operations" },
+            },
+            {
+              label: "Traceability",
+              collapsed: true,
+              autogenerate: { directory: "development/traceability" },
+            },
+            {
+              label: "Work Items",
+              collapsed: true,
+              autogenerate: { directory: "development/work-items" },
+            },
+            {
+              label: "Workflows",
+              collapsed: true,
+              autogenerate: { directory: "development/workflows" },
+            },
+          ],
         },
         {
           label: "Reference",
