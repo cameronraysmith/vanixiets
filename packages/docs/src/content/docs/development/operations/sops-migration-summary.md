@@ -1,3 +1,7 @@
+---
+title: SOPS Unified Secrets Management Implementation Summary
+---
+
 # SOPS unified secrets management implementation summary
 
 Date: 2025-10-09
