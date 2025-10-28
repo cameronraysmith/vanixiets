@@ -33,6 +33,14 @@ export default defineConfig({
           autogenerate: { directory: "guides" },
         },
         {
+          label: "Concepts",
+          autogenerate: { directory: "concepts" },
+        },
+        {
+          label: "Reference",
+          autogenerate: { directory: "reference" },
+        },
+        {
           label: "Development",
           collapsed: true,
           items: [
@@ -63,10 +71,6 @@ export default defineConfig({
               autogenerate: { directory: "development/work-items" },
             },
           ],
-        },
-        {
-          label: "Reference",
-          autogenerate: { directory: "reference" },
         },
         {
           label: "About",
