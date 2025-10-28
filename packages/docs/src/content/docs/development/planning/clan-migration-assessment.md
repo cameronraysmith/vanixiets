@@ -2,8 +2,6 @@
 title: "Migration Validation Guide: Dendritic + Clan Host-by-Host Assessment"
 ---
 
-# Migration validation guide: dendritic + clan host-by-host assessment
-
 This document provides validation criteria and assessment guidelines for the VPS-first migration from nixos-unified to dendritic + clan.
 Use this guide to evaluate readiness for each migration phase and validate successful migration.
 
