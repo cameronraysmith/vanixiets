@@ -1,6 +1,8 @@
 ---
 title: Testing guide
 description: Comprehensive testing with Vitest and Playwright
+sidebar:
+  order: 10
 ---
 
 Comprehensive testing documentation for the nix-config project.

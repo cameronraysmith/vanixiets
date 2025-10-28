@@ -1,5 +1,7 @@
 ---
 title: Semantic Release Version Preview
+sidebar:
+  order: 12
 ---
 
 Preview what version semantic-release would publish when merging the current branch to a target branch.

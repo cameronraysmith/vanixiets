@@ -1,5 +1,7 @@
 ---
 title: Container Management with Colima
+sidebar:
+  order: 7
 ---
 
 This configuration uses a hybrid approach for optimal container and VM management on macOS:

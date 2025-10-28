@@ -1,6 +1,8 @@
 ---
 title: CI/CD setup
 description: Setting up GitHub Actions CI/CD pipeline with Cloudflare Workers deployment
+sidebar:
+  order: 6
 ---
 
 This guide walks through setting up the GitHub Actions CI/CD pipeline for automated Cloudflare Workers deployment.
