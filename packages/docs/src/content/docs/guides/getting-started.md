@@ -96,7 +96,7 @@ nix-config/
 └── CONTRIBUTING.md          # Contribution guidelines
 ```
 
-See [Architecture decisions](/reference/architecture) for design rationale.
+See [Architecture decisions](/about/contributing/docs) for design rationale.
 
 ## Essential commands
 
@@ -174,7 +174,7 @@ If you're using this as a template for your project:
 If you're contributing to this template:
 
 1. **Read contributing guidelines** - See [CONTRIBUTING.md](https://github.com/cameronraysmith/infra/blob/main/CONTRIBUTING.md)
-2. **Understand architecture** - Read [Architecture decisions](/reference/architecture)
+2. **Understand architecture** - Read [Architecture decisions](/about/contributing/docs)
 3. **Follow conventions** - Use conventional commits for semantic versioning
 4. **Test changes** - Run full test suite before committing
 5. **Create atomic commits** - Commit changes immediately after editing
@@ -329,7 +329,7 @@ just test-e2e
 - [CI/CD setup guide](/guides/ci-cd-setup) - Automated deployment
 - [Testing guide](/guides/testing) - Comprehensive testing
 - [Secrets management guide](/guides/secrets-management) - SOPS workflow
-- [Architecture decisions](/reference/architecture) - Design rationale
+- [Architecture decisions](/about/contributing/docs) - Design rationale
 
 ### External resources
 
