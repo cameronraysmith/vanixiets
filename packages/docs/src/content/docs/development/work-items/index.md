@@ -1,7 +1,5 @@
 ---
 title: Contents
-sidebar:
-  label: Work Items
 ---
 
 Implementation tracking and task management.

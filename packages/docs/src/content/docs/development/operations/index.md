@@ -1,7 +1,5 @@
 ---
 title: Contents
-sidebar:
-  label: Operations
 ---
 
 Operational procedures and incident response.
