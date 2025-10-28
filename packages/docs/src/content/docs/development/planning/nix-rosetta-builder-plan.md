@@ -1,3 +1,7 @@
+---
+title: "Implementation Plan: Eliminate Nix-Rosetta-Builder Bootstrap Complexity"
+---
+
 # Implementation plan: eliminate nix-rosetta-builder bootstrap complexity
 
 Concrete steps to implement cachix-based bootstrap elimination for GitHub issue #7.
