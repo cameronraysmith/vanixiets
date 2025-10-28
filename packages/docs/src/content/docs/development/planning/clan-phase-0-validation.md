@@ -1,3 +1,7 @@
+---
+title: "Phase 0 Implementation Guide: Dendritic + Clan Validation"
+---
+
 # Phase 0 implementation guide: dendritic + clan validation (test-clan)
 
 **Working repository**: `~/projects/nix-workspace/test-clan/` (experimental repo, `main` branch)
