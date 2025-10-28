@@ -1,3 +1,7 @@
+---
+title: Host Onboarding Guide
+---
+
 # Host onboarding guide
 
 This guide covers the procedure for onboarding a new host (nix-darwin or NixOS) to this nix-config repository.
