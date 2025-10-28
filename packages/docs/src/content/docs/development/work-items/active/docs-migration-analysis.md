@@ -1,3 +1,7 @@
+---
+title: Documentation Migration Analysis
+---
+
 # Documentation migration analysis
 
 Comprehensive review of ~/projects/nix-workspace/infra/docs/notes/ markdown files for factoring into the Diataxis+AMDiRE documentation structure at ~/projects/nix-workspace/infra/packages/docs/src/content/docs.
