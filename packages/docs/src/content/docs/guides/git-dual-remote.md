@@ -1,5 +1,7 @@
 ---
 title: "Dual-Remote Workflow: GitHub + Radicle"
+sidebar:
+  order: 8
 ---
 
 This document describes the current secrets management setup using GitHub as the primary remote with Radicle as a secondary remote for future migration.
