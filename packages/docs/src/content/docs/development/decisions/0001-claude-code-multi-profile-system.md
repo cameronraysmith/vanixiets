@@ -2,8 +2,6 @@
 title: "ADR-0001: Claude Code Multi-Profile System"
 ---
 
-# ADR-0001: Claude Code multi-profile system
-
 **Status**: Implemented
 **Date**: 2025-10-15
 **Scope**: Development tooling
