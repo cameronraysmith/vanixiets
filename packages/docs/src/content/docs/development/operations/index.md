@@ -1,3 +1,7 @@
+---
+title: Operations
+---
+
 # Operations
 
 Operational procedures and incident response.
