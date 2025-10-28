@@ -2,7 +2,7 @@
   "name": "@infra/docs",
   "version": "0.0.0-development",
   "private": true,
-  "description": "Documentation site built with Astro Starlight",
+  "description": "Documentation site for nix homelab",
   "type": "module",
   "repository": {
     "type": "git",
