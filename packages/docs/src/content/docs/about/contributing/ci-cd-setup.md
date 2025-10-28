@@ -153,7 +153,44 @@ To enable the `/fast-forward` command functionality:
    - When ready to merge, comment `/fast-forward` on the PR
    - The workflow will automatically perform the fast-forward merge
 
-### 2.4 Configure Production Environment
+### 2.4 Configure Mergify (Optional but Recommended)
+
+Mergify provides automated merge queue functionality with fast-forward-only enforcement.
+The repository includes a `.github/mergify.yml` configuration that:
+- Enforces fast-forward merges exclusively
+- Automatically queues approved PRs
+- Handles skipped CI checks from duplicate detection
+- Validates fast-forward compatibility before merging
+
+To enable Mergify:
+
+1. Install the Mergify GitHub App:
+   - Visit https://github.com/apps/mergify
+   - Click "Install"
+   - Select your repository
+   - Grant required permissions
+
+2. Verify configuration:
+   ```bash
+   # The .github/mergify.yml file is already configured
+   # Check the configuration at:
+   cat .github/mergify.yml
+   ```
+
+3. Configure the update bot account:
+   - The configuration uses `update_bot_account: cameronraysmith`
+   - This allows Mergify to push rebased commits on your behalf
+   - Ensure Mergify has write access to the repository
+
+4. Usage:
+   - When a PR is approved and all checks pass, Mergify automatically adds it to the merge queue
+   - The queue uses `merge_method: fast-forward` and `update_method: rebase`
+   - PRs are merged only if they can be fast-forwarded
+   - Conflicting PRs are automatically rebased by the bot account
+
+For more details, see the [Mergify documentation](https://docs.mergify.com/).
+
+### 2.5 Configure Production Environment
 
 1. Go to https://github.com/YOUR_USERNAME/YOUR_REPO/settings/environments
 2. Click "New environment"
