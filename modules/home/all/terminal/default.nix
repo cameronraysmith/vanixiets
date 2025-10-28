@@ -145,6 +145,7 @@ in
       pgcli
       postgresql_16
       sqlite
+      supabase-cli
       turso-cli
 
       # dev
