@@ -1,3 +1,7 @@
+---
+title: Clan Integration Plan for Dendritic Flake-Parts + Clan-Core Migration
+---
+
 # Clan integration plan for dendritic flake-parts + clan-core migration
 
 ## Executive summary
