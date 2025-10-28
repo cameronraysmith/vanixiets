@@ -1,3 +1,7 @@
+---
+title: Semantic Release Version Preview Tool
+---
+
 # Semantic Release Version Preview Tool
 
 ## Prompt for implementation
