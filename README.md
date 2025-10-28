@@ -24,12 +24,12 @@ When nixpkgs unstable breaks, apply surgical fixes (stable fallback, upstream pa
 ## Quick Start
 
 ```bash
-# Bootstrap nix and essential tools
-make bootstrap && exec $SHELL
-
 # Clone repository
 git clone https://github.com/cameronraysmith/infra.git
 cd infra
+
+# Bootstrap nix and essential tools
+make bootstrap && exec $SHELL
 
 # Activate direnv
 direnv allow
