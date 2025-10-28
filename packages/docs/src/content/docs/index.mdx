@@ -1,9 +1,9 @@
 ---
 title: infra
-description: Personal infrastructure configurations with NixOS, nix-darwin, and Kubernetes
+description: Personal nix-config with multi-channel resilience and directory-based autowiring
 template: splash
 hero:
-  tagline: Reproducible system configurations with NixOS, nix-darwin, and home-manager. Infrastructure documentation hosted on Cloudflare Pages.
+  tagline: Reproducible system configurations for macOS and NixOS. Multi-channel nixpkgs resilience with directory-based autowiring eliminates boilerplate and handles breakage gracefully.
   image:
     file: ../../assets/nix-snowflake-colours.svg
   actions:
@@ -22,79 +22,87 @@ import { Card, CardGrid } from "@astrojs/starlight/components";
 ## Features
 
 <CardGrid stagger>
-  <Card title="Nix development environments" icon="puzzle">
-    Reproducible development environments with all tools managed by Nix flakes.
-    No manual installation needed.
+  <Card title="Directory-based autowiring" icon="puzzle">
+    Add a file, get a flake output. nixos-unified eliminates manual wiring in flake.nix.
+    File paths become configurations automatically.
   </Card>
-  <Card title="Bun workspaces" icon="rocket">
-    Fast monorepo package management with Bun workspaces.
-    Shared dependencies and efficient builds.
+  <Card title="Multi-channel resilience" icon="shield">
+    Surgical fixes for nixpkgs breakage without full rollbacks.
+    Stable fallbacks, upstream patches, and build overrides.
   </Card>
-  <Card title="Automated versioning" icon="approve-check">
-    Semantic-release automation with conventional commits.
-    Automated changelog generation and GitHub releases.
+  <Card title="Platform support" icon="laptop">
+    macOS via nix-darwin, Linux via NixOS, standalone home-manager.
+    Consistent configuration across all platforms.
   </Card>
-  <Card title="Comprehensive testing" icon="magnifier">
-    Vitest for unit tests, Playwright for E2E.
-    Type-safe testing patterns throughout.
-  </Card>
-  <Card title="CI/CD ready" icon="github">
-    GitHub Actions workflows for testing and deployment.
-    Cloudflare Workers deployment included.
+  <Card title="Multi-user patterns" icon="user">
+    Admin users with integrated home-manager. Non-admin users with standalone configs.
+    Multiple users per host supported.
   </Card>
   <Card title="Secrets management" icon="lock">
     SOPS with age encryption for secure secrets.
     Git-committed encrypted secrets with key rotation support.
+  </Card>
+  <Card title="Proven patterns" icon="approve-check">
+    Built on flake-parts, nixos-unified, and mirkolenz resilience patterns.
+    Standing on the shoulders of giants.
   </Card>
 </CardGrid>
 
 ## Quick start
 
 ```bash
-# Clone and setup
+# Bootstrap nix and essential tools
+make bootstrap && exec $SHELL
+
+# Clone repository
 git clone https://github.com/cameronraysmith/infra.git
 cd infra
-nix develop
-bun install
 
-# Start development
-just docs-dev
+# Activate direnv
+direnv allow
+
+# Activate configuration
+just activate
 ```
 
 See [Getting started guide](/guides/getting-started/) for complete setup instructions.
 
-## Infrastructure documentation
+## Architecture
 
-This site documents the infra repository:
+This nix-config combines three complementary architectural patterns:
 
-1. **System configurations** - NixOS and nix-darwin configurations
-2. **Infrastructure patterns** - Reproducible development environments and deployment workflows
-3. **Kubernetes deployments** - GitOps with nixidy and holos
+1. **flake-parts** - Modular flake composition framework
+2. **nixos-unified** - Directory-based autowiring eliminates boilerplate
+3. **mirkolenz patterns** - Multi-channel nixpkgs resilience for handling breakage
 
-Documentation is deployed to infra.cameronraysmith.net via Cloudflare Pages.
+When nixpkgs unstable breaks, apply surgical fixes (stable fallback for one package) without rolling back your entire flake.lock.
+
+Learn more in [Nix-Config Architecture](/concepts/nix-config-architecture/).
 
 ## Documentation structure
 
-- **Guides** - Step-by-step instructions for common tasks
-- **Reference** - Technical details and architecture decisions
+- **Guides** - Task-oriented how-tos for common operations
+- **Concepts** - Understanding-oriented explanations of architecture and patterns
+- **Reference** - Information-oriented lookup material
+- **Development** - AMDiRE-based development documentation
 
 ## Next steps
 
 <CardGrid>
-  <Card title="Set up CI/CD" icon="github">
-    Configure GitHub Actions for automated testing and deployment.
-    [CI/CD setup guide →](/guides/ci-cd-setup/)
+  <Card title="Understand the architecture" icon="open-book">
+    Learn about the three-layer design combining flake-parts, nixos-unified, and multi-channel resilience.
+    [Nix-Config Architecture →](/concepts/nix-config-architecture/)
+  </Card>
+  <Card title="Add a new host" icon="laptop">
+    Onboard a new macOS or NixOS system with this configuration.
+    [Host onboarding guide →](/guides/host-onboarding/)
   </Card>
   <Card title="Configure secrets" icon="lock">
-    Set up SOPS for encrypted secrets management.
+    Set up SOPS for encrypted secrets management with age encryption.
     [Secrets management guide →](/guides/secrets-management/)
   </Card>
-  <Card title="Add tests" icon="magnifier">
-    Learn the testing stack and patterns.
-    [Testing guide →](/guides/testing/)
-  </Card>
-  <Card title="Understand architecture" icon="open-book">
-    Read about key design decisions and rationale.
-    [Architecture decisions →](/about/contributing/docs/)
+  <Card title="Handle breakage" icon="warning">
+    Learn the systematic workflow for addressing nixpkgs unstable breakage.
+    [Incident response →](/guides/nixpkgs-incident-response/)
   </Card>
 </CardGrid>
