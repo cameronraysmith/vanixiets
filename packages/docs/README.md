@@ -1,4 +1,4 @@
-# @typescript-nix-template/docs
+# infra/docs
 
 [![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
 
@@ -12,6 +12,7 @@ Documentation site built with Astro Starlight and deployed to Cloudflare Workers
 - E2E testing with [Playwright](https://playwright.dev)
 - Code quality with [Biome](https://biomejs.dev)
 - Deployed to [Cloudflare Workers](https://workers.cloudflare.com)
+- Documentation structure following [Diataxis](https://diataxis.fr/) framework
 
 ## Project structure
 
@@ -21,12 +22,28 @@ packages/docs/
 │   ├── assets/              # Images and static assets
 │   ├── content/
 │   │   └── docs/            # Markdown documentation files
+│   │       ├── guides/      # Task-oriented how-tos (12 files, ordered)
+│   │       ├── reference/   # Information-oriented docs
+│   │       ├── development/ # Development documentation (AMDiRE)
+│   │       │   ├── decisions/      # Architecture Decision Records
+│   │       │   ├── operations/     # Operational procedures
+│   │       │   ├── traceability/   # CI philosophy and testing
+│   │       │   ├── work-items/     # Implementation tracking
+│   │       │   └── workflows/      # Development workflows
+│   │       └── notes/       # Working notes (excluded from sidebar)
+│   │           ├── clan/           # Clan integration planning
+│   │           ├── mcp/            # MCP integration notes
+│   │           ├── nix-rosetta/    # Cross-arch build planning
+│   │           ├── nixpkgs/        # Nixpkgs troubleshooting
+│   │           ├── prompts/        # LLM session templates
+│   │           └── work-items/     # Meta-documentation
 │   ├── components/          # Astro components
+│   ├── grammars/            # Syntax highlighting (Justfile)
 │   └── utils/               # Utility functions
 ├── public/                  # Static assets (favicon, etc.)
 ├── e2e/                     # End-to-end tests
 ├── tests/                   # Unit tests and fixtures
-├── astro.config.ts          # Astro configuration
+├── astro.config.ts          # Astro configuration with sidebar config
 ├── wrangler.jsonc           # Cloudflare Workers configuration
 ├── tsconfig.json            # TypeScript configuration
 ├── vitest.config.ts         # Vitest configuration
@@ -115,12 +132,42 @@ bun run deploy
 just cf-deploy-production
 ```
 
+## Documentation structure
+
+This site follows the [Diataxis](https://diataxis.fr/) framework for user-facing documentation and AMDiRE methodology for development documentation.
+
+### User-facing documentation
+
+- **guides/** - Task-oriented how-tos for accomplishing specific goals
+  - Files use `sidebar.order` frontmatter for explicit ordering (1-12)
+  - Each guide should be action-oriented and practical
+
+- **reference/** - Information-oriented API docs and reference material
+
+### Development documentation
+
+Located in `development/` with capitalized subsections via hybrid sidebar config:
+
+- **Decisions** - Architecture Decision Records (ADRs)
+- **Operations** - Operational procedures and incident response
+- **Traceability** - Requirements traceability and testing philosophy
+- **Work Items** - Implementation tracking (active/completed/backlog)
+- **Workflows** - Development workflows and processes
+
+### Working notes (excluded from main site)
+
+The `notes/` directory contains LLM-centric planning documents and working notes, organized by topic:
+- **clan/** - Clan integration migration planning
+- **mcp/** - Model Context Protocol integration
+- **nix-rosetta/** - Cross-architecture build infrastructure
+- **nixpkgs/** - Nixpkgs troubleshooting procedures
+- **prompts/** - LLM session templates
+
+These are intentionally excluded from the sidebar but remain in the repository for context.
+
 ## Adding content
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory.
-Each file is exposed as a route based on its file name.
-
-### Example
+### Adding a guide
 
 Create `src/content/docs/guides/my-guide.md`:
 
@@ -128,14 +175,40 @@ Create `src/content/docs/guides/my-guide.md`:
 ---
 title: My Guide
 description: A guide for using this feature
+sidebar:
+  order: 13  # Explicit ordering
 ---
 
-# My Guide
-
-Content goes here...
+Content goes here (no duplicate H1 needed, title becomes H1)...
 ```
 
-This will be available at `/guides/my-guide`.
+### Adding a development document
+
+Create `src/content/docs/development/operations/my-procedure.md`:
+
+```markdown
+---
+title: My Procedure
+---
+
+Operational procedure content...
+```
+
+The file will be auto-discovered and added to the Operations section.
+
+### Adding to notes (working documents)
+
+Create `src/content/docs/notes/topic/my-note.md`:
+
+```markdown
+---
+title: My Planning Document
+---
+
+LLM-centric planning content...
+```
+
+Update the relevant `notes/topic/index.md` to link to your new document.
 
 ## Adding components
 
@@ -167,8 +240,54 @@ import MyComponent from '../../components/MyComponent.astro';
 </MyComponent>
 ```
 
+## Sidebar configuration
+
+The sidebar uses a hybrid manual/autogenerate approach in `astro.config.ts`:
+
+- **Guides** - Fully autogenerated from `guides/` directory, ordered by `sidebar.order` frontmatter
+- **Development** - Manual structure with capitalized labels, autogenerate within each subdirectory
+- **Reference** - Fully autogenerated from `reference/` directory
+
+This approach provides:
+- Capitalized section labels (Decisions, Operations, etc.) without renaming directories
+- Autogenerate benefits within each section (automatic file discovery)
+- Fine-grained control over section ordering and structure
+
+### Index files
+
+Each directory with an `index.md` uses `title: Contents` since Starlight automatically uses the directory name for the sidebar label.
+
+## Frontmatter conventions
+
+### Required fields
+```yaml
+---
+title: Page Title  # Always required
+---
+```
+
+### Optional fields
+```yaml
+---
+title: Page Title
+description: SEO description  # Recommended for guides
+sidebar:
+  order: 1         # Explicit ordering (guides only)
+  label: Custom    # Override sidebar display (rarely needed)
+---
+```
+
+### Markdown conventions
+
+- One sentence per line in markdown files
+- Use `title` frontmatter; Starlight renders it as H1
+- No duplicate `# H1` headings in content
+- Start content with prose or `## H2` headings
+- Avoid emojis in documentation
+
 ## Learn more
 
 - [Starlight documentation](https://starlight.astro.build/)
 - [Astro documentation](https://docs.astro.build)
 - [Cloudflare Workers docs](https://developers.cloudflare.com/workers/)
+- [Diataxis framework](https://diataxis.fr/)
