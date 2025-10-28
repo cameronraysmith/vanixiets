@@ -24,13 +24,14 @@ export default defineConfig({
       sidebar: [
         {
           label: "Guides",
-          items: [
-            { label: "Getting started", slug: "guides/getting-started" },
-            { label: "Template usage", slug: "guides/template-usage" },
-            { label: "CI/CD setup", slug: "guides/ci-cd-setup" },
-            { label: "Testing", slug: "guides/testing" },
-            { label: "Secrets management", slug: "guides/secrets-management" },
-          ],
+          autogenerate: { directory: "guides" },
+        },
+        {
+          label: "Development",
+          autogenerate: {
+            directory: "development",
+            collapsed: true,
+          },
         },
         {
           label: "Reference",
