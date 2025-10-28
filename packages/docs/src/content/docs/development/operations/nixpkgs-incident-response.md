@@ -1,3 +1,7 @@
+---
+title: Nixpkgs Incident Response Workflow
+---
+
 # Nixpkgs incident response workflow
 
 Systematic approach to handling nixpkgs unstable breakage using the hotfixes infrastructure.
