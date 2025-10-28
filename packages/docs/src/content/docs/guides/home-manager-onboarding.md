@@ -1,7 +1,7 @@
 ---
 title: Home-Manager-Only User Onboarding Guide
 sidebar:
-  order: 4
+  order: 3
 ---
 
 This guide covers onboarding non-admin users (like runner, raquel) on hosts where an admin user already has nix-darwin/NixOS configured.
