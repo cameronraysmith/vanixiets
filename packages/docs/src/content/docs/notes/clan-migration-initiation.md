@@ -1,3 +1,7 @@
+---
+title: Interactive Dendritic + Clan Migration Prompt for Claude Code
+---
+
 # Interactive dendritic + clan migration prompt for Claude Code
 
 Use this prompt to initiate an interactive dendritic + clan migration session.
