@@ -2,8 +2,6 @@
 title: Nixpkgs Hotfixes Infrastructure
 ---
 
-# Nixpkgs hotfixes infrastructure
-
 Multi-channel nixpkgs resilience system for handling unstable breakage without full rollbacks.
 
 Implemented: 2025-10-13 (Phases 1-3)
