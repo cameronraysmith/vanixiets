@@ -2,8 +2,6 @@
 title: Semantic Release Version Preview Tool
 ---
 
-# Semantic Release Version Preview Tool
-
 ## Prompt for implementation
 
 You are a development tooling engineer specializing in semantic versioning automation for monorepo and polyrepo workflows.
