@@ -2,8 +2,6 @@
 title: MCP + SOPS-nix Integration Plan
 ---
 
-# MCP + SOPS-nix Integration Plan (auggie-gpt)
-
 ## Objective
 Integrate Model Context Protocol (MCP) server configurations into nix-config using SOPS-nix for secrets, aligned with nixos-unified patterns. Preserve portability across NixOS and nix-darwin and compatibility with Claude Desktop/Code.
 
