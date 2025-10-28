@@ -13,17 +13,19 @@ Working notes and LLM-centric planning documents excluded from the main document
 Migration from nixos-unified to dendritic + clan-core.
 
 - [Integration index](clan/index/)
-- [Integration plan](clan/integration-plan/)
-- [Migration assessment](clan/migration-assessment/)
-- [Phase 0 validation](clan/phase-0-validation/)
-- [Phase 1 VPS](clan/phase-1-vps/)
-- [Phase 2 blackphos](clan/phase-2-blackphos/)
+- [NetBird SSH implementation](clan/netbird-ssh-implementation/)
 
 ## MCP integration
 
 Model Context Protocol server configuration.
 
 - [SOPS integration](mcp/sops-integration/)
+
+## Nixpkgs
+
+Nixpkgs-specific troubleshooting procedures.
+
+- [Bisect guide](nixpkgs/bisect-guide/)
 
 ## Nix rosetta
 
