@@ -1,3 +1,7 @@
+---
+title: MCP + SOPS-nix Integration Plan
+---
+
 # MCP + SOPS-nix Integration Plan (auggie-gpt)
 
 ## Objective
