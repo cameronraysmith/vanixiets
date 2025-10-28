@@ -6,21 +6,31 @@ Working notes and LLM-centric planning documents excluded from the main document
 
 ## LLM prompts
 
-- [Clan migration initiation](clan-migration-initiation/)
+- [Clan migration](prompts/clan-migration/)
 
-## Planning
+## Clan integration
 
-Strategic planning and implementation guides.
+Migration from nixos-unified to dendritic + clan-core.
 
-- [Clan integration index](planning/clan-integration-index/)
-- [Clan integration plan](planning/clan-integration-plan/)
-- [Clan migration assessment](planning/clan-migration-assessment/)
-- [Clan phase 0 validation](planning/clan-phase-0-validation/)
-- [Clan phase 1 VPS](planning/clan-phase-1-vps/)
-- [Clan phase 2 blackphos](planning/clan-phase-2-blackphos/)
-- [MCP SOPS integration](planning/mcp-sops-integration/)
-- [Nix rosetta builder plan](planning/nix-rosetta-builder-plan/)
-- [Nix rosetta caching](planning/nix-rosetta-caching/)
+- [Integration index](clan/index/)
+- [Integration plan](clan/integration-plan/)
+- [Migration assessment](clan/migration-assessment/)
+- [Phase 0 validation](clan/phase-0-validation/)
+- [Phase 1 VPS](clan/phase-1-vps/)
+- [Phase 2 blackphos](clan/phase-2-blackphos/)
+
+## MCP integration
+
+Model Context Protocol server configuration.
+
+- [SOPS integration](mcp/sops-integration/)
+
+## Nix rosetta
+
+Cross-architecture build infrastructure.
+
+- [Builder plan](nix-rosetta/builder-plan/)
+- [Caching](nix-rosetta/caching/)
 
 ## Work items
 
