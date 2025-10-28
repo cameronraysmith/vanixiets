@@ -707,6 +707,39 @@ validate-secrets:
     sops -d "$file" > /dev/null && echo "  ✅ Valid" || echo "  ❌ Failed"; \
   done
 
+# Rotate GitHub Personal Access Token for fast-forward merges
+[group('secrets')]
+rotate-fast-forward-pat repo="cameronraysmith/infra":
+  @echo "=== Fast-forward PAT Rotation Workflow ==="
+  @echo ""
+  @echo "Step 1: Create new fine-grained PAT"
+  @echo "  Visit: https://github.com/settings/personal-access-tokens/new"
+  @echo "  Token name: Fast-forward merge token"
+  @echo "  Expiration: 90 days recommended"
+  @echo "  Repository: {{ repo }}"
+  @echo "  Permissions:"
+  @echo "    - Contents: Read and write"
+  @echo "    - Issues: Read and write"
+  @echo "    - Pull requests: Read and write"
+  @echo ""
+  @echo "Press Enter after creating the token..."
+  @read
+  @echo ""
+  @echo "Step 2: Upload new PAT to GitHub"
+  @echo "  Running: gh secret set FAST_FORWARD_PAT --repo={{ repo }}"
+  @gh secret set FAST_FORWARD_PAT --repo={{ repo }}
+  @echo ""
+  @echo "Step 3: Test the workflow"
+  @echo "  1. Create a test PR"
+  @echo "  2. Comment '/fast-forward' on the PR"
+  @echo "  3. Verify the workflow succeeds"
+  @echo ""
+  @echo "Step 4: Revoke old PAT"
+  @echo "  Visit: https://github.com/settings/tokens"
+  @echo "  Find the old token and click 'Revoke'"
+  @echo ""
+  @echo "✅ Rotation workflow complete"
+
 ## CI/CD
 
 # Trigger CI workflow and wait for result (blocking)
