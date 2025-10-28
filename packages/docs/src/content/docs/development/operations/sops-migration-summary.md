@@ -2,8 +2,6 @@
 title: SOPS Unified Secrets Management Implementation Summary
 ---
 
-# SOPS unified secrets management implementation summary
-
 Date: 2025-10-09
 Branch: 06-sops-update
 Status: Complete (stibnite validated, blackphos/orb-nixos deferred)
