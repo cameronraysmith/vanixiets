@@ -2,8 +2,6 @@
 title: NetBird SSH-over-WireGuard Implementation Plan for Nix-Darwin
 ---
 
-# NetBird SSH-over-WireGuard Implementation Plan for nix-darwin
-
 ## Executive Summary
 
 This plan implements robust SSH connectivity over NetBird's WireGuard mesh network for all nix-darwin hosts (stibnite, blackphos, and future systems).
