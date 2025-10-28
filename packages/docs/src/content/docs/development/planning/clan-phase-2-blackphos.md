@@ -2,8 +2,6 @@
 title: "Phase 2 Implementation Guide: Production Integration + Blackphos Migration"
 ---
 
-# Phase 2 implementation guide: production integration + blackphos migration
-
 **Working repository**: `~/projects/nix-workspace/nix-config/` (production config, `clan` branch)
 
 **CRITICAL TRANSITION**: Phase 2 is where we migrate from test-clan to production nix-config
