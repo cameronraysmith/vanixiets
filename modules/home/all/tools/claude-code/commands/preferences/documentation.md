@@ -34,25 +34,27 @@ docs/
 ├── concepts/            # Diataxis: Understanding-oriented explanations
 ├── reference/           # Diataxis: Information-oriented API docs (optional)
 ├── about/               # Contributing, conduct, links into development
-└── development/         # Development documentation (adapted AMDiRE-based)
-    ├── index.md         # Development overview and navigation
-    ├── context/         # Context Specification (problem domain)
-    │   ├── index.md     # Context overview and table of contents
-    │   └── context.md   # Problem domain, stakeholders, objectives
-    ├── requirements/    # Requirements Specification (problem ↔ solution bridge)
-    │   ├── index.md     # Requirements overview and traceability matrix
-    │   └── requirements.md  # Functional/non-functional requirements
-    ├── architecture/    # System Specification (solution space)
-    │   ├── index.md     # Architecture overview and table of contents
-    │   └── architecture.md  # System design and component structure
-    ├── traceability/    # Requirements traceability
-    │   ├── index.md     # Traceability overview
-    │   └── testing.md   # Test framework and validation approach
-    └── work-items/      # Work packages and implementation tracking
-        ├── index.md     # Work items overview and status dashboard
-        ├── active/      # In-progress work items
-        ├── completed/   # Finished items with PR/ADR/RFC/RFD references
-        └── backlog/     # Planned but not yet started items
+├── development/         # Development documentation (adapted AMDiRE-based)
+│   ├── index.md         # Development overview and navigation
+│   ├── context/         # Context Specification (problem domain)
+│   │   ├── index.md     # Context overview and table of contents
+│   │   └── context.md   # Problem domain, stakeholders, objectives
+│   ├── requirements/    # Requirements Specification (problem ↔ solution bridge)
+│   │   ├── index.md     # Requirements overview and traceability matrix
+│   │   └── requirements.md  # Functional/non-functional requirements
+│   ├── architecture/    # System Specification (solution space)
+│   │   ├── index.md     # Architecture overview and table of contents
+│   │   └── architecture.md  # System design and component structure
+│   ├── traceability/    # Requirements traceability
+│   │   ├── index.md     # Traceability overview
+│   │   └── testing.md   # Test framework and validation approach
+│   └── work-items/      # Work packages and implementation tracking
+│       ├── index.md     # Work items overview and status dashboard
+│       ├── active/      # In-progress work items
+│       ├── completed/   # Finished items with PR/ADR/RFC/RFD references
+│       └── backlog/     # Planned but not yet started items
+└── notes/               # EPHEMERAL: Working notes excluded from rendering
+    └── [category]/      # Temporary staging (see "Working notes" section)
 ```
 
 ### Document evolution
@@ -67,6 +69,67 @@ index.md to serve as table of contents and navigation after sharding. This
 pattern maintains manageability while preserving traceability as documentation
 scales. If the documentation becomes sufficiently complex, we can continue to
 refactor into a directory tree with additional levels.
+
+### Working notes
+
+The `docs/notes/` directory serves as ephemeral staging for development notes
+that have not been formalized into the permanent documentation structure. These
+notes are explicitly temporary and must be either migrated to formal
+documentation or discarded.
+
+**Organization**: Use category-based subdirectories with kebab-case filenames:
+```
+docs/notes/
+├── security/           # Security investigations
+├── architecture/       # Architectural exploration
+├── performance/        # Performance analysis
+└── [category]/         # Other categorized notes
+```
+
+**Exclusion from rendering**: Working notes must never appear in rendered
+documentation sites. Configure your documentation system accordingly:
+
+- **Astro** (content collections): Only include specific directories in
+  `src/content/config.ts`, implicitly excluding `notes/`
+- **Quarto** (`_quarto.yml`):
+  ```yaml
+  project:
+    render:
+      - "!docs/notes/**"
+  ```
+- **Docusaurus** (`docusaurus.config.js`):
+  ```javascript
+  docs: {
+    exclude: ['**/notes/**']
+  }
+  ```
+- **MkDocs** (`mkdocs.yml`):
+  ```yaml
+  exclude_docs: |
+    notes/
+  ```
+
+**Lifecycle**: Every working note must eventually follow one of two paths:
+
+1. **Migrate to formal documentation**: Extract valuable insights, revoice from
+   informal working notes to formal documentation style, and move content to the
+   appropriate location in the user-facing docs (`tutorials/`, `guides/`,
+   `concepts/`, `reference/`) or development docs
+   (`development/context/`, `development/requirements/`,
+   `development/architecture/`, etc.). Delete the working note after migration.
+
+2. **Discard when no longer relevant**: Delete notes that served temporary
+   investigation purposes, documented abandoned approaches, or have been
+   superseded by other documentation.
+
+Working notes should not persist indefinitely. Regularly audit `docs/notes/` for
+stale content and progress notes through their lifecycle. The goal is to keep
+this directory empty or minimal in stable projects.
+
+**Relationship to work items**: Unlike `docs/development/work-items/` which
+maintains a permanent record of development efforts with traceability to issues
+and PRs, working notes in `docs/notes/` are ephemeral drafts that get cleaned
+up after their content is either formalized or determined to be no longer needed.
 
 ### Key principles
 
