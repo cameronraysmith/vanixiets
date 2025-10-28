@@ -1,4 +1,8 @@
-  Recommended Testing Workflow for Implementation
+---
+title: Testing Nix-Darwin Configuration
+---
+
+# Recommended Testing Workflow for Implementation
 
   For the agent to test each file before committing:
 
