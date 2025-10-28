@@ -1,356 +1,236 @@
 ---
 title: Getting started
-description: Quick start guide for using nix-config
+description: Quick start guide for bootstrapping and using this nix-config
 sidebar:
   order: 1
 ---
 
-Welcome to nix-config!
-This guide will help you get started with this NixOS and nix-darwin configuration repository.
+Welcome to the infra nix-config!
+This guide will help you bootstrap a new machine with this configuration.
 
 ## Prerequisites
 
 Before you begin, ensure you have:
-
-- [Nix](https://nixos.org/download.html) with flakes enabled
-- [direnv](https://direnv.net/) (recommended for automatic shell activation)
-- [Git](https://git-scm.com/) for version control
-- A [GitHub](https://github.com) account (for CI/CD features)
-
-### Enabling Nix flakes
-
-If you haven't enabled flakes yet, add this to `~/.config/nix/nix.conf`:
-
-```
-experimental-features = nix-command flakes
-```
-
-Or for NixOS, add to `/etc/nixos/configuration.nix`:
-
-```nix
-nix.settings.experimental-features = [ "nix-command" "flakes" ];
-```
+- Physical access or SSH access to the target machine
+- macOS (for nix-darwin) or NixOS system
+- Internet connection for downloading Nix and packages
 
 ## Quick setup
 
-### 1. Get the template
+### Step 1: Bootstrap Nix and essential tools
 
-Choose one of these methods:
-
-**Option A: Use as GitHub template**
 ```bash
-# Click "Use this template" on GitHub, then:
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
-cd YOUR_REPO
+make bootstrap && exec $SHELL
 ```
 
-**Option B: Fork manually**
+**What this does:**
+- Installs Nix using the [Determinate Systems installer](https://github.com/DeterminateSystems/nix-installer)
+- Installs direnv for automatic environment activation
+- Configures Nix flakes support
+- Sets up experimental features
+
+### Step 2: Clone the repository
+
 ```bash
-git clone https://github.com/cameronraysmith/infra.git my-project
-cd my-project
-rm -rf .git
-git init
+git clone https://github.com/cameronraysmith/infra.git
+cd infra
 ```
 
-### 2. Enter the development environment
+### Step 3: Allow direnv
 
 ```bash
-# Allow direnv (recommended)
 direnv allow
-
-# Or enter manually
-nix develop
+# or if already in the shell:
+direnv reload
 ```
 
-The first time may take a few minutes as Nix downloads dependencies.
+**What this does:**
+- Automatically loads the Nix development shell
+- Makes `just` and other dev tools available
+- Activates the project environment
 
-### 3. Install JavaScript dependencies
+### Step 4: Verify installation
 
 ```bash
-bun install
+make verify
 ```
 
-### 4. Start development server
+**This checks:**
+- Nix installation
+- Flakes support
+- Flake validity
+
+### Step 5: Set up secrets (optional, for existing users)
 
 ```bash
-just dev
+make setup-user
 ```
 
-Visit http://localhost:4321 to see your site.
+**What this does:**
+- Generates age key at `~/.config/sops/age/keys.txt` for secrets encryption
+- Skip this if you're just exploring the configuration
 
-## Understanding the structure
+### Step 6: Activate configuration
 
-This is a Bun workspace monorepo:
-
-```
-nix-config/
-├── packages/
-│   └── docs/                 # Astro Starlight documentation
-│       ├── src/             # Source code
-│       ├── e2e/             # End-to-end tests
-│       ├── tests/           # Unit test fixtures
-│       └── package.json     # Package configuration
-├── package.json             # Workspace root
-├── flake.nix                # Nix development environment
-├── justfile                 # Task automation
-└── CONTRIBUTING.md          # Contribution guidelines
+**For admin users** (Darwin/NixOS with integrated home-manager):
+```bash
+nix run . hostname
+# Example: nix run . stibnite
 ```
 
-See [Architecture decisions](/about/contributing/docs) for design rationale.
+**For non-admin users** (standalone home-manager, no sudo required):
+```bash
+nix run . user@hostname
+# Example: nix run . runner@stibnite
+```
+
+Or use the justfile shortcut:
+```bash
+just activate
+```
 
 ## Essential commands
 
-### Development
+Once you've activated direnv, you have access to the `just` task runner:
 
 ```bash
-# Start dev server
-just dev
+# Show all available commands
+just help
 
-# Build for production
-just build
-
-# Preview production build
-just preview
+# Or just run 'just' to see the command list
+just
 ```
 
-### Testing
+### Common tasks
 
+**System management:**
 ```bash
-# Run all tests
-just test
-
-# Run unit tests only
-just test-unit
-
-# Run E2E tests only
-just test-e2e
-
-# Watch mode
-just test-watch
+just activate          # Activate configuration for current user/host
+just update            # Update nix flake inputs
+just verify            # Verify system builds without activating
 ```
 
-See [Testing guide](/guides/testing) for comprehensive documentation.
-
-### Code quality
-
+**Development:**
 ```bash
-# Format code
-just format
-
-# Lint code
-just lint
-
-# Check and fix
-just check
+just dev               # Enter development shell manually
+just lint              # Lint nix files
+just clean             # Remove build output links
 ```
 
-### Nix environment
-
+**Secrets:**
 ```bash
-# Rebuild flake
-nix flake check --impure
-
-# Show flake info
-nix flake show
-
-# Update dependencies
-nix flake update
+just check-secrets     # Verify secrets access
+just edit-secret FILE  # Edit encrypted secret
+just validate-secrets  # Validate all secrets decrypt correctly
 ```
+
+**Troubleshooting:**
+```bash
+just bisect-nixpkgs    # Find breaking nixpkgs commits
+just verify            # Test if configuration builds
+```
+
+See the full command reference by running `just help` after activating the dev shell.
+
+## Understanding the structure
+
+This nix-config uses directory-based autowiring:
+
+```
+infra/
+├── configurations/   # System and home configurations
+│   ├── darwin/       # macOS (nix-darwin)
+│   ├── nixos/        # Linux (NixOS)
+│   └── home/         # Standalone home-manager
+├── modules/          # Reusable modules
+├── overlays/         # Package overlays
+└── lib/              # Shared library functions
+```
+
+See [Repository Structure](/reference/repository-structure) for complete directory mapping.
 
 ## Next steps
 
-### For template users
+### Learn the architecture
 
-If you're using this as a template for your project:
+- [Nix-Config Architecture](/concepts/nix-config-architecture) - Understand the three-layer design
+- [Understanding Autowiring](/concepts/understanding-autowiring) - How directory-based autowiring works
+- [Multi-User Patterns](/concepts/multi-user-patterns) - Admin vs non-admin users
 
-1. **Customize the template** - Follow [Template usage guide](/guides/template-usage) to rename packages and update configuration
-2. **Set up CI/CD** - Follow [CI/CD setup guide](/guides/ci-cd-setup) for GitHub Actions automation
-3. **Configure secrets** - Follow [Secrets management guide](/guides/secrets-management) for SOPS setup
-4. **Write tests** - Follow [Testing guide](/guides/testing) to add your own tests
-5. **Deploy** - Deploy to Cloudflare Workers or your preferred platform
+### Set up a new machine
 
-### For contributors
+- [Host Onboarding](/guides/host-onboarding) - Add a new Darwin/NixOS host
+- [Home Manager Onboarding](/guides/home-manager-onboarding) - Add a new standalone user
 
-If you're contributing to this template:
+### Operational tasks
 
-1. **Read contributing guidelines** - See [CONTRIBUTING.md](https://github.com/cameronraysmith/infra/blob/main/CONTRIBUTING.md)
-2. **Understand architecture** - Read [Architecture decisions](/about/contributing/docs)
-3. **Follow conventions** - Use conventional commits for semantic versioning
-4. **Test changes** - Run full test suite before committing
-5. **Create atomic commits** - Commit changes immediately after editing
-
-## Common tasks
-
-### Adding a new page
-
-Create a new markdown file in `packages/docs/src/content/docs/`:
-
-```bash
-# Create a guide
-touch packages/docs/src/content/docs/guides/my-guide.md
-
-# Add frontmatter
-cat > packages/docs/src/content/docs/guides/my-guide.md << 'EOF'
----
-title: My guide
-description: Description of my guide
----
-
-Content here...
-EOF
-```
-
-The page will be automatically available at `/guides/my-guide/`.
-
-### Adding a new package
-
-To add another package to the monorepo:
-
-```bash
-# Create package directory
-mkdir -p packages/my-package/src
-
-# Create package.json
-cd packages/my-package
-# ... add package configuration
-```
-
-See [Template usage guide](/guides/template-usage#adding-more-packages) for details.
-
-### Running commands in specific packages
-
-```bash
-# Using just (recommended)
-just docs dev              # Run dev in docs package
-
-# Using bun directly
-bun run --filter '@infra/docs' dev
-```
-
-### Deploying to Cloudflare Workers
-
-```bash
-# Build and deploy
-cd packages/docs
-bun run deploy
-
-# Or use justfile
-just cf-deploy-production
-```
-
-See [CI/CD setup guide](/guides/ci-cd-setup) for automated deployment.
+- [Secrets Management](/guides/secrets-management) - Managing encrypted secrets with SOPS
+- [Nixpkgs Incident Response](/guides/nixpkgs-incident-response) - Handling nixpkgs breakage
 
 ## Troubleshooting
 
-### Nix issues
+### Nix not found after bootstrap
 
-**Problem:** "experimental features not enabled"
-
-**Solution:** Enable flakes in nix configuration (see Prerequisites above)
-
----
-
-**Problem:** Direnv not activating automatically
-
-**Solution:**
+**Solution:** Restart your shell or source the nix profile:
 ```bash
-# Add to ~/.bashrc or ~/.zshrc
+exec $SHELL
+# or
+source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+```
+
+### Direnv not activating
+
+**Solution:** Ensure direnv is installed and hooked into your shell.
+Check `~/.bashrc` or `~/.zshrc` for:
+```bash
 eval "$(direnv hook bash)"  # or zsh
 ```
 
----
+### Build failures
 
-**Problem:** "error: getting status of '/nix/store/...': No such file or directory"
-
-**Solution:** Rebuild the flake:
+**Solution:** Check if nixpkgs unstable has breaking changes:
 ```bash
-nix develop --rebuild
+just verify  # Test build without activating
 ```
 
-### Bun issues
+If build fails, see [Nixpkgs Incident Response](/guides/nixpkgs-incident-response) for troubleshooting workflow.
 
-**Problem:** "command not found: bun"
+### Secrets not decrypting
 
-**Solution:** Ensure you're in the Nix development shell:
+**Solution:** Ensure your age key is properly set up:
 ```bash
-nix develop
+make setup-user                    # Generate age key
+just check-secrets                 # Verify access
 ```
 
----
-
-**Problem:** Workspace dependencies not resolving
-
-**Solution:** Reinstall dependencies:
-```bash
-rm -rf node_modules packages/*/node_modules
-bun install
-```
-
-### Build issues
-
-**Problem:** "Module not found" during build
-
-**Solution:** Check TypeScript paths and ensure all imports are correct:
-```bash
-just check  # Run biome check
-```
-
----
-
-**Problem:** Playwright browsers not found
-
-**Solution:** The browsers are managed by Nix. Rebuild the development shell:
-```bash
-exit  # Exit current shell
-nix develop --rebuild
-```
-
-### Test issues
-
-**Problem:** Tests timing out
-
-**Solution:** Increase timeout in test configuration or check for hanging async operations
-
----
-
-**Problem:** E2E tests failing with "page not found"
-
-**Solution:** Ensure dev server is running or build is complete:
-```bash
-just build  # Build before E2E tests
-just test-e2e
-```
+See [Secrets Management](/guides/secrets-management) for detailed troubleshooting.
 
 ## Getting help
 
 ### Documentation
 
-- [Template usage guide](/guides/template-usage) - Forking and customization
-- [CI/CD setup guide](/guides/ci-cd-setup) - Automated deployment
-- [Testing guide](/guides/testing) - Comprehensive testing
-- [Secrets management guide](/guides/secrets-management) - SOPS workflow
-- [Architecture decisions](/about/contributing/docs) - Design rationale
+- [Guides](/guides/) - Task-oriented how-tos
+- [Concepts](/concepts/) - Understanding-oriented explanations
+- [Reference](/reference/) - Information-oriented lookup
 
 ### External resources
 
-- [Nix manual](https://nixos.org/manual/nix/stable/) - Nix package manager
-- [Bun documentation](https://bun.sh/docs) - Bun runtime and package manager
-- [Astro documentation](https://docs.astro.build/) - Astro framework
-- [Starlight documentation](https://starlight.astro.build/) - Starlight docs framework
-- [Vitest documentation](https://vitest.dev/) - Unit testing
-- [Playwright documentation](https://playwright.dev/) - E2E testing
+- [Nix manual](https://nixos.org/manual/nix/stable/) - Official Nix documentation
+- [NixOS wiki](https://nixos.wiki/) - Community documentation
+- [nix-darwin](https://github.com/LnL7/nix-darwin) - macOS system configuration
+- [home-manager](https://github.com/nix-community/home-manager) - User environment management
 
 ### Community
 
 - [GitHub Discussions](https://github.com/cameronraysmith/infra/discussions) - Ask questions
-- [GitHub Issues](https://github.com/cameronraysmith/infra/issues) - Report bugs or request features
+- [GitHub Issues](https://github.com/cameronraysmith/infra/issues) - Report bugs
 
 ## What's next?
 
 Now that you're set up, you can:
+- Explore the configuration files to understand the setup
+- Customize the configuration for your needs
+- Add new hosts or users following the onboarding guides
+- Set up secrets management for sensitive data
 
-- **Explore the codebase** - Look at example components and tests
-- **Customize for your needs** - Follow the template usage guide
-- **Build something awesome** - Start creating your project
-
-Happy coding!
+Happy hacking!
