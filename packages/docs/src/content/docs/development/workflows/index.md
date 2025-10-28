@@ -2,8 +2,6 @@
 title: Development Workflows
 ---
 
-# Development workflows
-
 Development processes and procedures.
 
 - [Secrets management](secrets-management/)
