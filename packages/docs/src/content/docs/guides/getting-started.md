@@ -5,8 +5,7 @@ sidebar:
   order: 1
 ---
 
-Welcome to the infra nix-config!
-This guide will help you bootstrap a new machine with this configuration.
+This guide walks through bootstrapping a new machine with this configuration.
 
 ## Prerequisites
 
@@ -17,7 +16,14 @@ Before you begin, ensure you have:
 
 ## Quick setup
 
-### Step 1: Bootstrap Nix and essential tools
+### Step 1: Clone the repository
+
+```bash
+git clone https://github.com/cameronraysmith/infra.git
+cd infra
+```
+
+### Step 2: Bootstrap Nix and essential tools
 
 ```bash
 make bootstrap && exec $SHELL
@@ -28,13 +34,6 @@ make bootstrap && exec $SHELL
 - Installs direnv for automatic environment activation
 - Configures Nix flakes support
 - Sets up experimental features
-
-### Step 2: Clone the repository
-
-```bash
-git clone https://github.com/cameronraysmith/infra.git
-cd infra
-```
 
 ### Step 3: Allow direnv
 
@@ -232,5 +231,3 @@ Now that you're set up, you can:
 - Customize the configuration for your needs
 - Add new hosts or users following the onboarding guides
 - Set up secrets management for sensitive data
-
-Happy hacking!
