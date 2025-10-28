@@ -105,7 +105,55 @@ If using Cachix, set these as repository variables (not secrets):
 
 Alternatively, the workflow will read from the encrypted `vars/shared.yaml`.
 
-### 2.3 Configure Production Environment
+### 2.3 Configure Fast-forward Merge Workflow
+
+The repository enforces fast-forward-only merges to maintain linear history.
+Two workflows handle this:
+- `pr-check.yaml`: Validates that PRs can be fast-forward merged (runs automatically)
+- `pr-merge.yaml`: Performs the fast-forward merge when `/fast-forward` is commented on a PR
+
+To enable the `/fast-forward` command functionality:
+
+1. Create a Personal Access Token (PAT):
+   - Go to https://github.com/settings/tokens
+   - Click "Generate new token (classic)"
+   - Name: `Fast-forward merge token`
+   - Expiration: Set according to your security policy
+   - Scopes: Select `repo` (full control of private repositories)
+   - Click "Generate token" and copy the value
+
+2. Add the PAT as a repository secret:
+   ```bash
+   gh secret set FAST_FORWARD_PAT
+   # Paste the token when prompted
+   ```
+
+   Or manually:
+   - Go to https://github.com/YOUR_USERNAME/YOUR_REPO/settings/secrets/actions
+   - Click "New repository secret"
+   - Name: `FAST_FORWARD_PAT`
+   - Value: Paste the PAT
+   - Click "Add secret"
+
+3. Set the GitHub actor as a repository variable:
+   ```bash
+   gh variable set FAST_FORWARD_ACTOR -b"YOUR_GITHUB_USERNAME"
+   ```
+
+   Or manually:
+   - Go to https://github.com/YOUR_USERNAME/YOUR_REPO/settings/variables/actions
+   - Click "New repository variable"
+   - Name: `FAST_FORWARD_ACTOR`
+   - Value: Your GitHub username
+   - Click "Add variable"
+
+4. Usage:
+   - PRs will automatically be checked for fast-forward compatibility
+   - If checks fail, rebase your branch: `git rebase main`
+   - When ready to merge, comment `/fast-forward` on the PR
+   - The workflow will automatically perform the fast-forward merge
+
+### 2.4 Configure Production Environment
 
 1. Go to https://github.com/YOUR_USERNAME/YOUR_REPO/settings/environments
 2. Click "New environment"
