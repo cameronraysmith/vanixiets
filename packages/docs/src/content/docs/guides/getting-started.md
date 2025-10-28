@@ -1,6 +1,8 @@
 ---
 title: Getting started
 description: Quick start guide for using nix-config
+sidebar:
+  order: 1
 ---
 
 Welcome to nix-config!

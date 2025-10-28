@@ -1,6 +1,8 @@
 ---
 title: Using as a template
 description: How to fork and customize nix-config for your projects
+sidebar:
+  order: 2
 ---
 
 This guide explains how to use nix-config as a starting point for your TypeScript monorepo projects.
