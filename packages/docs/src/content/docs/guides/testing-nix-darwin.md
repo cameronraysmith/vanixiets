@@ -1,7 +1,7 @@
 ---
 title: Testing Nix-Darwin Configuration
 sidebar:
-  order: 11
+  order: 8
 ---
 
   For the agent to test each file before committing:
