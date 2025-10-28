@@ -2,8 +2,6 @@
 title: End-to-End Secrets Workflow
 ---
 
-# End-to-End Secrets Workflow
-
 Comprehensive guide to how secrets management works in this nix-config, covering both the existing system and the new unified cryptographic infrastructure.
 
 ## Overview: Two Complementary Systems
