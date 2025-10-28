@@ -1,3 +1,7 @@
+---
+title: "ADR-0002: Justfile Generic Over Specific"
+---
+
 # Justfile Design Principles
 
 ## Prefer Generic Over Specific
