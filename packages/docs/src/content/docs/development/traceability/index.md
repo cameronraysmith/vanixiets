@@ -6,4 +6,4 @@ title: Traceability
 
 Requirements traceability and testing.
 
-- [CI philosophy](ci-philosophy.md)
+- [CI philosophy](ci-philosophy/)
