@@ -2,8 +2,6 @@
 title: "Phase 1 Implementation Guide: VPS Deployment (Cinnabar)"
 ---
 
-# Phase 1 implementation guide: VPS deployment (cinnabar)
-
 **Working repository**: `~/projects/nix-workspace/test-clan/` (same experimental repo, `main` branch)
 
 **Scope**: Complete end-to-end infrastructure deployment proof of concept
