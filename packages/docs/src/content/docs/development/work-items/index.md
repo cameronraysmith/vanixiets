@@ -6,7 +6,7 @@ Implementation tracking and task management.
 
 ## Active
 
-- [Documentation migration analysis](active/docs-migration-analysis/)
+(No active items yet)
 
 ## Completed
 
