@@ -1,3 +1,7 @@
+---
+title: "ADR-0003: Overlay Composition Patterns"
+---
+
 # Overlay Patterns Analysis
 
 ## Summary
