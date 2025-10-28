@@ -18,8 +18,7 @@ in
       the corresponding document, without pausing to ask if you should, to ensure
       you are aware of our ideal guidelines and conventions:
 
-      - preferences: @${prefsPath}/preferences.md
-      - general development practices: @${prefsPath}/general-practices.md
+      - style and conventions: @${prefsPath}/style-and-conventions.md
       - git version control: @${prefsPath}/git-version-control.md
       - git history cleanup: ${prefsPath}/git-history-cleanup.md
       - jj version control: ${commandsPath}/jj/jj-summary.md
