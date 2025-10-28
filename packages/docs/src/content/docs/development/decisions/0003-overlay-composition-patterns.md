@@ -2,8 +2,6 @@
 title: "ADR-0003: Overlay Composition Patterns"
 ---
 
-# Overlay Patterns Analysis
-
 ## Summary
 
 Based on exploration of `nix-config` and `mirkolenz-nixos`, overlay organization follows consistent patterns that must be retained when integrating with nixos-unified.
