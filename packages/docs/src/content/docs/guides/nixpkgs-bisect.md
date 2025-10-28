@@ -1,3 +1,7 @@
+---
+title: Nixpkgs Bisect Guide
+---
+
 # Nixpkgs bisect guide
 
 Finding which nixpkgs commit broke your build after flake updates.
