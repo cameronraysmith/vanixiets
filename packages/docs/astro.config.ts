@@ -1,6 +1,7 @@
 import cloudflare from "@astrojs/cloudflare";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
+import justGrammar from "./src/grammars/just.tmLanguage.json";
 // ROLLDOWN INTEGRATION (DISABLED) - Uncomment when re-enabling (see ROLLDOWN.md)
 // import * as vite from "vite";
 
@@ -21,6 +22,11 @@ export default defineConfig({
           href: "https://github.com/cameronraysmith/infra",
         },
       ],
+      expressiveCode: {
+        shiki: {
+          langs: [justGrammar],
+        },
+      },
       sidebar: [
         {
           label: "Guides",
