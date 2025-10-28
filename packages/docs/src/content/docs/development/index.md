@@ -2,8 +2,6 @@
 title: Development Documentation
 ---
 
-# Development documentation
-
 ## Sections
 
 - [Architecture decisions](decisions/)
