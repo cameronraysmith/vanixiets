@@ -2,8 +2,6 @@
 title: Nix-Rosetta-Builder Bootstrap Caching Analysis
 ---
 
-# nix-rosetta-builder bootstrap caching analysis
-
 Investigation of GitHub issue #7 bootstrap complexity and caching solution design.
 
 ## Problem statement
