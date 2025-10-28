@@ -2,8 +2,6 @@
 title: MCP Servers Usage Guide
 ---
 
-# MCP servers usage guide
-
 ## Philosophy
 
 MCP servers are manually selected per Claude session to optimize context window usage.
