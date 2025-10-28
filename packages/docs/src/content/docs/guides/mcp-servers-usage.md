@@ -1,3 +1,7 @@
+---
+title: MCP Servers Usage Guide
+---
+
 # MCP servers usage guide
 
 ## Philosophy
