@@ -153,7 +153,7 @@ just edit-secrets
 
 ### GitHub PAT rotation (fast-forward merge)
 
-The fast-forward merge workflow (`pr-merge.yaml`) uses a GitHub Personal Access Token that requires periodic rotation due to expiration or security policy.
+The fast-forward merge workflow (`pr-merge.yaml`) uses a GitHub Personal Access Token stored in `secrets/shared.yaml` as `FAST_FORWARD_PAT`.
 
 ```bash
 # 1. Create new fine-grained PAT
@@ -166,20 +166,21 @@ The fast-forward merge workflow (`pr-merge.yaml`) uses a GitHub Personal Access 
 # Set expiration according to security policy (90 days recommended)
 # Copy the generated token
 
-# 2. Upload new PAT to GitHub
-gh secret set FAST_FORWARD_PAT --repo=cameronraysmith/infra
-# Paste the new token when prompted
+# 2. Update encrypted secrets
+just edit-secrets
+# Update FAST_FORWARD_PAT field with new token value
 
-# 3. Test fast-forward workflow
+# 3. Upload to GitHub
+just ghsecrets
+# Uploads FAST_FORWARD_PAT along with other secrets
+
+# 4. Test fast-forward workflow
 # Create a test PR, comment '/fast-forward' to trigger merge
 # Verify workflow succeeds with new token
 
-# 4. Revoke old PAT
+# 5. Revoke old PAT
 # Visit: https://github.com/settings/tokens
 # Find the old token and click "Revoke"
-
-# Guided workflow available:
-just rotate-fast-forward-pat
 ```
 
 **Why fine-grained PAT over classic?**
@@ -190,7 +191,7 @@ just rotate-fast-forward-pat
 **Token lifecycle:**
 - Set expiration date (90 days recommended)
 - Rotate before expiration using this workflow
-- Store backup reference in password manager if needed
+- Backed up in `secrets/shared.yaml` (encrypted with SOPS)
 
 ### Adding new secrets
 

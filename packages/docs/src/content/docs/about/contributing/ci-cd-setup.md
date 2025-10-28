@@ -158,7 +158,9 @@ To enable the `/fast-forward` command functionality:
 
 **Token rotation:**
 Fine-grained PATs expire and must be rotated periodically.
-See the [GitHub PAT rotation guide](/guides/secrets-management/#github-pat-rotation-fast-forward-merge) for the complete rotation workflow, or run `just rotate-fast-forward-pat` for guided steps.
+The token is stored in `secrets/shared.yaml` as `FAST_FORWARD_PAT`.
+To rotate: update with `just edit-secrets`, upload with `just ghsecrets`, then revoke the old token.
+See the [GitHub PAT rotation guide](/guides/secrets-management/#github-pat-rotation-fast-forward-merge) for detailed steps.
 
 ### 2.4 Configure Mergify (Optional but Recommended)
 
