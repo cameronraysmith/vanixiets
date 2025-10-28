@@ -2,8 +2,6 @@
 title: CI Testing Strategy
 ---
 
-# CI Testing Strategy
-
 This document describes what our CI tests validate and why, organized by job.
 
 ## Testing Philosophy
