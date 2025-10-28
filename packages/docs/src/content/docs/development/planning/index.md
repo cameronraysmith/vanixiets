@@ -2,8 +2,6 @@
 title: Planning
 ---
 
-# Planning
-
 Strategic planning and migration documents.
 
 - [Clan integration index](clan-integration-index/)
