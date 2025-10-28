@@ -8,7 +8,7 @@ Implementation tracking and task management.
 
 ## Active
 
-- [Documentation migration analysis](active/docs-migration-analysis.md)
+- [Documentation migration analysis](active/docs-migration-analysis/)
 
 ## Completed
 
