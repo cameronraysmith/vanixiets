@@ -77,7 +77,7 @@ infra/
 | `overlays/overrides/default.nix` | `overlays.overrides` | Auto-imported per-package build modifications |
 
 **Custom packages** (defined in overlays, exposed via packages output):
-- From `overlays/packages/`: cc-statusline-rs, starship-jj, markdown-tree-parser, atuin-format, bitwarden-cli
+- From `overlays/packages/`: cc-statusline-rs, starship-jj, markdown-tree-parser, atuin-format
 - From `nix-ai-tools` (flake input): claude-code-bin (auto-updated daily)
 - From `landrun-nix` (flake input): Landlock-based sandboxing for applications (Linux only)
 
@@ -108,7 +108,6 @@ Complete output listing from `om show .`:
 **Packages** (nix build .#<name>):
 - nvim-treesitter-main
 - starship-jj - starship plugin for jj
-- bitwarden-cli - Secure password manager
 - atuin-format - Format atuin history with Catppuccin Mocha
 - claude-code-bin - Agentic coding tool (auto-updated daily)
 - activate - Activate NixOS/nix-darwin/home-manager configurations
