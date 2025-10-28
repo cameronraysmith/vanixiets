@@ -790,8 +790,8 @@ ghsecrets repo="cameronraysmith/infra": # gitleaks:allow
   @echo
   PAGER=cat gh secret list --repo={{ repo }}
   @echo
-  sops exec-env secrets/shared.yaml 'gh secret set CACHIX_AUTH_TOKEN --repo={{ repo }} --body="$CACHIX_AUTH_TOKEN"'
-  sops exec-env secrets/shared.yaml 'gh secret set FAST_FORWARD_PAT --repo={{ repo }} --body="$FAST_FORWARD_PAT"'
+  sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set CACHIX_AUTH_TOKEN --repo={{ repo }} --body="$CACHIX_AUTH_TOKEN"'
+  sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set FAST_FORWARD_PAT --repo={{ repo }} --body="$FAST_FORWARD_PAT"'
   @echo
   @echo secrets after updates:
   @echo
