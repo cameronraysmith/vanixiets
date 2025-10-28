@@ -2,8 +2,6 @@
 title: Dendritic + Clan Integration Documentation
 ---
 
-# Dendritic + Clan integration documentation
-
 This directory contains comprehensive documentation for migrating nix-config from nixos-unified to the dendritic flake-parts pattern with clan-core integration using a VPS-first infrastructure approach.
 
 ## Document overview
