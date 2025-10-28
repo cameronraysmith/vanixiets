@@ -2,7 +2,7 @@
 title: Secrets management
 description: Managing encrypted secrets with SOPS and age encryption
 sidebar:
-  order: 5
+  order: 4
 ---
 
 This guide documents the complete workflow for managing SOPS keys and secrets for the nix-config, supporting both initial bootstrap and key rotation.
