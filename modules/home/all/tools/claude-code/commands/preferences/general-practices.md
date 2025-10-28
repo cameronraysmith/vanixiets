@@ -1,6 +1,9 @@
 # General Practices
 
 - Write one sentence per line in markdown, text, and documentation files.
+- Prefer prose over bullet lists when explaining concepts or providing narrative flow. Reserve bulleted lists for genuinely discrete items or enumerations, not for breaking up what should be continuous explanation.
+- Keep section header nesting shallow. Avoid deeply nested subsections (###, ####) when flatter structure with clear prose transitions would be more readable. Most documents should rarely need headers beyond three levels.
+- For documentation-specific markdown conventions (frontmatter titles, header levels), see "Markdown formatting conventions" in `~/.claude/commands/preferences/documentation.md`.
 - Always at least consider testing changes with the relevant framework like bash shell commands where you can validate output, `cargo test`, `pytest`, `vitest`, `nix eval` or `nix build`, a task runner like `just test` or `make test`, or `gh workflow run` before considering any work to be complete and correct.
 - Be judicious about test execution. If a test might take a very long time, be resource-intensive, or require elevated security privileges but is important, pause to provide the proposed command and reason why it's an important test.
 - Use performant CLI tools matched to task intent:
