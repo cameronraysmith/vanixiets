@@ -1,3 +1,7 @@
+---
+title: Planning
+---
+
 # Planning
 
 Strategic planning and migration documents.
