@@ -2,8 +2,6 @@
 title: Semantic Release Version Preview
 ---
 
-# Semantic Release Version Preview
-
 Preview what version semantic-release would publish when merging the current branch to a target branch.
 
 ## Overview
