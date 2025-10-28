@@ -2,8 +2,6 @@
 title: Clan Integration Plan for Dendritic Flake-Parts + Clan-Core Migration
 ---
 
-# Clan integration plan for dendritic flake-parts + clan-core migration
-
 ## Executive summary
 
 This document provides a comprehensive migration plan for transitioning nix-config from nixos-unified to the dendritic flake-parts pattern with clan-core integration.
