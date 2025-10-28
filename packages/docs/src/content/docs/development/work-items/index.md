@@ -1,3 +1,7 @@
+---
+title: Work Items
+---
+
 # Work items
 
 Implementation tracking and task management.
