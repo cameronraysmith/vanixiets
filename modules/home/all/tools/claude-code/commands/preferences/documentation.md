@@ -131,6 +131,16 @@ maintains a permanent record of development efforts with traceability to issues
 and PRs, working notes in `docs/notes/` are ephemeral drafts that get cleaned
 up after their content is either formalized or determined to be no longer needed.
 
+### Markdown formatting conventions
+
+Documentation systems differ in how they handle markdown structure:
+
+Frontmatter-driven systems (Astro Starlight, Quarto, Pandoc): The document title comes from YAML frontmatter, not a markdown header. Begin content with second-level headers (`##`), not top-level (`#`), to avoid duplicate titles in rendered output.
+
+Plain markdown systems (GitHub, static markdown): Use top-level headers (`#`) as the document title when no frontmatter title exists.
+
+When working in a documentation directory, check for frontmatter in existing files to determine which convention applies. If files contain `title:` in YAML frontmatter, use `##` to start content sections.
+
 ### Key principles
 
 - Separate user documentation (diataxis framework) from development
