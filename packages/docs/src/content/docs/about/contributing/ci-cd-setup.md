@@ -114,13 +114,16 @@ Two workflows handle this:
 
 To enable the `/fast-forward` command functionality:
 
-1. Create a Personal Access Token (PAT):
-   - Go to https://github.com/settings/tokens
-   - Click "Generate new token (classic)"
-   - Name: `Fast-forward merge token`
-   - Expiration: Set according to your security policy
-   - Scopes: Select `repo` (full control of private repositories)
-   - Click "Generate token" and copy the value
+1. Create a fine-grained Personal Access Token (PAT):
+   - Go to https://github.com/settings/personal-access-tokens/new
+   - Token name: `Fast-forward merge token`
+   - Expiration: Set according to your security policy (90 days recommended)
+   - Repository access: Select only this repository
+   - Repository permissions:
+     - **Contents**: Read and write (required for merging)
+     - **Issues**: Read and write (required for commenting)
+     - **Pull requests**: Read and write (required for PR updates)
+   - Click "Generate token" and copy the value immediately
 
 2. Add the PAT as a repository secret:
    ```bash
@@ -152,6 +155,10 @@ To enable the `/fast-forward` command functionality:
    - If checks fail, rebase your branch: `git rebase main`
    - When ready to merge, comment `/fast-forward` on the PR
    - The workflow will automatically perform the fast-forward merge
+
+**Token rotation:**
+Fine-grained PATs expire and must be rotated periodically.
+See the [GitHub PAT rotation guide](/guides/secrets-management/#github-pat-rotation-fast-forward-merge) for the complete rotation workflow, or run `just rotate-fast-forward-pat` for guided steps.
 
 ### 2.4 Configure Mergify (Optional but Recommended)
 
