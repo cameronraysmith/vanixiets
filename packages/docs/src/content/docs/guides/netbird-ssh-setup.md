@@ -1,3 +1,7 @@
+---
+title: NetBird SSH-over-WireGuard Implementation Plan for Nix-Darwin
+---
+
 # NetBird SSH-over-WireGuard Implementation Plan for nix-darwin
 
 ## Executive Summary
