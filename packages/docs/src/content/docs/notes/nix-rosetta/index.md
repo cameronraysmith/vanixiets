@@ -1,5 +1,5 @@
 ---
-title: Nix Rosetta
+title: Contents
 ---
 
 Cross-architecture build infrastructure planning for rosetta-based aarch64 builds on x86_64.

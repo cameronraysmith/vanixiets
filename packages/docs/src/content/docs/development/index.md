@@ -1,5 +1,5 @@
 ---
-title: Development Documentation
+title: Contents
 ---
 
 ## Sections

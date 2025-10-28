@@ -1,5 +1,5 @@
 ---
-title: Nixpkgs
+title: Contents
 ---
 
 Nixpkgs-specific troubleshooting and working procedures.

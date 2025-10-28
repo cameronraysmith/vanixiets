@@ -1,5 +1,5 @@
 ---
-title: Notes
+title: Contents
 ---
 
 Working notes and LLM-centric planning documents excluded from the main documentation site.
