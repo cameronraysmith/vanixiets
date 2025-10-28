@@ -1,3 +1,7 @@
+---
+title: Development Documentation
+---
+
 # Development documentation
 
 ## Sections
