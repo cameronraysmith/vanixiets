@@ -1,5 +1,7 @@
 ---
 title: Nixpkgs Incident Response Workflow
+sidebar:
+  order: 7
 ---
 
 Systematic approach to handling nixpkgs unstable breakage using the hotfixes infrastructure.
