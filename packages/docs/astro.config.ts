@@ -38,14 +38,19 @@ export default defineConfig({
           items: [
             { label: "Contents", link: "/development/" },
             {
-              label: "Decisions",
+              label: "Context",
               collapsed: true,
-              autogenerate: { directory: "development/decisions" },
+              autogenerate: { directory: "development/context" },
             },
             {
-              label: "Operations",
+              label: "Requirements",
               collapsed: true,
-              autogenerate: { directory: "development/operations" },
+              autogenerate: { directory: "development/requirements" },
+            },
+            {
+              label: "Architecture",
+              collapsed: true,
+              autogenerate: { directory: "development/architecture" },
             },
             {
               label: "Traceability",
@@ -57,16 +62,16 @@ export default defineConfig({
               collapsed: true,
               autogenerate: { directory: "development/work-items" },
             },
-            {
-              label: "Workflows",
-              collapsed: true,
-              autogenerate: { directory: "development/workflows" },
-            },
           ],
         },
         {
           label: "Reference",
           autogenerate: { directory: "reference" },
+        },
+        {
+          label: "About",
+          collapsed: true,
+          autogenerate: { directory: "about" },
         },
       ],
     }),
