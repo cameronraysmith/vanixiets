@@ -1,5 +1,5 @@
 ---
-title: Clan Integration
+title: Contents
 ---
 
 Migration from nixos-unified to dendritic flake-parts pattern with clan-core integration.

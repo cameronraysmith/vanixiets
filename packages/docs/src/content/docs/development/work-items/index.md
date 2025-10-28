@@ -1,5 +1,5 @@
 ---
-title: Work Items
+title: Contents
 ---
 
 Implementation tracking and task management.

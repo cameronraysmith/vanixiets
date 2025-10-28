@@ -1,5 +1,5 @@
 ---
-title: Development Workflows
+title: Contents
 ---
 
 Development processes and procedures.

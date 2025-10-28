@@ -1,5 +1,5 @@
 ---
-title: Operations
+title: Contents
 ---
 
 Operational procedures and incident response.

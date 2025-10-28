@@ -1,5 +1,5 @@
 ---
-title: Traceability
+title: Contents
 ---
 
 Requirements traceability and testing.
