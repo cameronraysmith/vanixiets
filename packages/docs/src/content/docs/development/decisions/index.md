@@ -1,5 +1,7 @@
 ---
 title: Contents
+sidebar:
+  label: Decisions
 ---
 
 Architecture Decision Records (ADRs) documenting key technical and design decisions.
