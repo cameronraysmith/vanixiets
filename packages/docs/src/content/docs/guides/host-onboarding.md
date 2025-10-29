@@ -1,7 +1,7 @@
 ---
 title: Host Onboarding Guide
 sidebar:
-  order: 2
+  order: 3
 ---
 
 This guide covers the procedure for onboarding a new host (nix-darwin or NixOS) to this nix-config repository.

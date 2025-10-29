@@ -1,5 +1,7 @@
 ---
 title: Contents
+sidebar:
+  order: 1
 ---
 
 ## Sections

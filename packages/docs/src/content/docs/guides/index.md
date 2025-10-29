@@ -1,5 +1,7 @@
 ---
 title: Contents
+sidebar:
+  order: 1
 ---
 
 Task-oriented guides for common operations and workflows with this nix-config.

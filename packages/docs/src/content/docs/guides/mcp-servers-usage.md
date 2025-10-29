@@ -1,7 +1,7 @@
 ---
 title: MCP Servers Usage Guide
 sidebar:
-  order: 7
+  order: 8
 ---
 
 ## Philosophy
