@@ -11,7 +11,7 @@ This guide covers the procedure for onboarding a new host (nix-darwin or NixOS) 
 Use this procedure when:
 - Setting up a new machine with this nix-config for the first time
 - Re-onboarding a machine after a clean OS installation
-- Adding a machine that has a host configuration defined in `hosts/<hostname>/`
+- Adding a machine that has a host configuration defined in `configurations/darwin/` or `configurations/nixos/`
 
 This guide assumes the host configuration already exists in the repository.
 If you need to create a new host configuration first, do that before following these steps.
@@ -38,7 +38,7 @@ Before starting, ensure you have:
 - [ ] Nix installed on the host (with flakes enabled)
 - [ ] Bitwarden CLI access with master password
 - [ ] Git access to this repository
-- [ ] Host configuration exists in `hosts/<hostname>/`
+- [ ] Host configuration exists in `configurations/darwin/<hostname>.nix` or `configurations/nixos/<hostname>/`
 - [ ] Host key generated in Bitwarden as `sops-<hostname>-ssh`
 - [ ] Secrets already encrypted for the host (check `.sops.yaml`)
 
@@ -50,11 +50,11 @@ On the target host:
 
 ```bash
 cd ~/projects
-git clone https://github.com/cameronraysmith/nix-config
+git clone https://github.com/cameronraysmith/infra
 # OR if already cloned:
-cd ~/projects/nix-config && git pull
+cd ~/projects/infra && git pull
 
-cd nix-config
+cd infra
 git checkout <branch>  # Use main or current development branch
 ```
 
