@@ -121,7 +121,7 @@ docs: update installation guide
 - Clear documentation in CONTRIBUTING.md
 - Semantic-release requires proper format for version bumps
 
-See [CONTRIBUTING.md](/CONTRIBUTING.md) for detailed conventional commit guidelines.
+See [contributing guidelines](/about/contributing/) for detailed conventional commit guidelines.
 
 ## Workspace configuration
 
@@ -230,7 +230,7 @@ This template uses Nix flakes for reproducible development environments.
 - Playwright provides reliable cross-browser testing
 - Nix ensures consistent Playwright browser versions
 
-See [Testing guide](/guides/testing) for comprehensive documentation.
+See [Testing guide](/about/contributing/testing/) for comprehensive documentation.
 
 ## Secrets management
 
@@ -298,7 +298,7 @@ This template includes three main workflows:
 - Matrix strategy scales to multiple packages
 - Reusing artifacts reduces CI time and cost
 
-See [CI/CD setup guide](/guides/ci-cd-setup) for detailed configuration.
+See [CI/CD setup guide](/about/contributing/ci-cd-setup/) for detailed configuration.
 
 ## Deployment architecture
 
