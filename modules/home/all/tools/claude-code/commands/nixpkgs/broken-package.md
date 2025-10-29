@@ -1,12 +1,12 @@
-Nixpkgs breakage incident after flake update.
+Nixpkgs broken package after flake update.
 
 Error from: [nix flake check / darwin-rebuild switch / nix build ...]
 ```
 [paste error output here]
 ```
 
-Follow @docs/notes/nixpkgs-incident-response.md workflow:
-1. Read the incident response guide and hotfixes architecture docs
+Follow @docs/guides/handling-broken-packages.md workflow:
+1. Read the handling broken packages guide and hotfixes architecture docs
 2. Identify broken package(s) from error
 3. Check upstream status:
    - GitHub nixpkgs issues/PRs for this package
