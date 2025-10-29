@@ -19,7 +19,7 @@ To use custom packages effectively, you need to understand how they integrate wi
 
 **Overlays extend nixpkgs.**
 Nixpkgs is the base package set containing tens of thousands of packages.
-[Overlays](https://ryantm.github.io/nixpkgs/using/overlays/) are the standard mechanism for extending or modifying this package set without forking the entire repository.
+[Overlays](https://nixos.org/manual/nixpkgs/stable/#chap-overlays) are the standard mechanism for extending or modifying this package set without forking the entire repository.
 An overlay is a function that takes two arguments (`final` and `prev`) and returns an attribute set of packages to add or override.
 
 **This repository automates the overlay boilerplate.**
