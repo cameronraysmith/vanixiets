@@ -210,7 +210,7 @@ See [Secrets Management](/guides/secrets-management) for detailed troubleshootin
 
 - [Guides](/guides/) - Task-oriented how-tos
 - [Concepts](/concepts/) - Understanding-oriented explanations
-- [Reference](/reference/) - Information-oriented lookup
+- [Reference](/reference/repository-structure/) - Information-oriented lookup
 
 ### External resources
 
