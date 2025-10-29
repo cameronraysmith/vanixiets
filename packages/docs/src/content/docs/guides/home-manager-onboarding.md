@@ -1,7 +1,7 @@
 ---
-title: Home-Manager-Only User Onboarding Guide
+title: User Onboarding Guide
 sidebar:
-  order: 3
+  order: 4
 ---
 
 This guide covers onboarding non-admin users (like runner, raquel) on hosts where an admin user already has nix-darwin/NixOS configured.
@@ -9,11 +9,13 @@ This guide covers onboarding non-admin users (like runner, raquel) on hosts wher
 ## When to use this guide
 
 Use this procedure when:
+
 - An admin user (crs58/cameron) has already configured nix-darwin on the host
 - You need to set up a non-admin user's environment with home-manager only
 - The host already has nix, SOPS infrastructure, and secrets deployed by the admin
 
 This guide assumes:
+
 - The admin user has completed host onboarding (see [`onboarding.md`](./onboarding.md))
 - The nix daemon is running and `/nix/store` is available
 - Host SSH keys are deployed to `/etc/ssh/ssh_host_ed25519_key`
@@ -24,11 +26,13 @@ This guide focuses only on user-specific home-manager setup.
 ## Architecture overview
 
 **Admin user** (crs58/cameron):
+
 - Managed via nix-darwin (macOS) or NixOS (Linux)
 - Controls system-level configuration
 - Manages the nix daemon and shared `/nix/store`
 
 **Non-admin users** (runner, raquel):
+
 - Managed via home-manager only (standalone mode)
 - Personal environment in their home directory
 - Use shared `/nix/store` and nix daemon
@@ -37,6 +41,7 @@ This guide focuses only on user-specific home-manager setup.
 ## Prerequisites
 
 Before starting, ensure:
+
 - [ ] You can SSH or have physical access to the host
 - [ ] The admin user has completed host onboarding
 - [ ] Your user account exists on the host: `id <username>`
@@ -116,6 +121,7 @@ secrets/
 ```
 
 **For new users**: Copy from the template:
+
 ```bash
 cp -r secrets/users/template-user secrets/users/<sopsIdentifier>
 ```
@@ -159,6 +165,7 @@ bw lock
 ```
 
 This creates `~/.config/sops/age/keys.txt` containing:
+
 - Repository dev key (all users)
 - Your user identity key
 - Host key (for this machine)
@@ -179,6 +186,7 @@ just verify
 ```
 
 This runs:
+
 - `nix flake check` to validate the entire flake
 - Auto-detects and builds your home-manager configuration
 
@@ -192,10 +200,12 @@ just activate
 ```
 
 The `just activate` recipe automatically detects whether to use:
+
 - Home-manager-only config (if `./configurations/home/$USER@$(hostname).nix` exists)
 - System-level config (otherwise)
 
 After activation:
+
 - Home-manager generation is in `/nix/var/nix/profiles/per-user/<username>/home-manager`
 - Dotfiles and configurations are in your home directory
 - SOPS plist is deployed to `~/Library/LaunchAgents/` (darwin) or systemd unit (linux)
@@ -210,12 +220,14 @@ just sops-load-agent
 ```
 
 **Why this is necessary:**
+
 - nix-darwin automatically loads SOPS agents during system activation
 - Standalone home-manager creates the plist but **does not load it automatically**
 - Without loading the agent, secrets won't be decrypted and deployed
 - Symptoms: `~/.radicle/keys/radicle` symlink missing, git signing fails
 
 **One-time vs per-login:**
+
 - The `launchctl load` command is **one-time** (persists across reboots)
 - The plist in `~/Library/LaunchAgents/` ensures the agent starts on login
 - Only run `just sops-load-agent` once after initial activation
@@ -224,6 +236,7 @@ just sops-load-agent
 **Linux (NixOS) users:** Skip this step - systemd automatically starts the sops-nix user service.
 
 After loading the agent:
+
 - Secrets directory created: `~/.config/sops-nix/secrets/`
 - Private keys deployed (e.g., `~/.radicle/keys/radicle` symlink to secrets directory)
 - Git signing, jujutsu, radicle keys available
@@ -261,6 +274,7 @@ After activation and loading SOPS agent, verify:
 ```
 
 **Key points:**
+
 - Admin's nix-darwin controls system-level configuration
 - Each user's home-manager controls their personal environment
 - All users share the same `/nix/store` (deduplication)
@@ -312,6 +326,7 @@ If missing, copy from template and re-encrypt.
 ### Activation permission errors
 
 Home-manager-only activation should not require `sudo`. If you see permission errors:
+
 - Check you're not trying to modify system files
 - Verify you own your home directory: `ls -ld ~`
 - Ensure nix daemon is running: `pgrep nix-daemon`
@@ -321,4 +336,3 @@ Home-manager-only activation should not require `sudo`. If you see permission er
 - Host onboarding (admin): `docs/notes/hosts/onboarding.md`
 - SOPS architecture: `docs/notes/secrets/sops-migration-summary.md`
 - Creating new users: See "Template user directory" section below
-

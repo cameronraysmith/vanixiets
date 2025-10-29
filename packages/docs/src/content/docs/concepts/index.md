@@ -1,5 +1,7 @@
 ---
 title: Contents
+sidebar:
+  order: 1
 ---
 
 Conceptual documentation to help you understand the architecture and design patterns used in this nix-config.

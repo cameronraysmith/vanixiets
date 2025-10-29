@@ -2,7 +2,7 @@
 title: Adding custom packages
 description: How to add your own package derivations to the nix-config
 sidebar:
-  order: 4
+  order: 5
 ---
 
 This guide shows you how to add custom package derivations to your nix-config.

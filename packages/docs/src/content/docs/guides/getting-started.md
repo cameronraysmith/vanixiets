@@ -2,7 +2,7 @@
 title: Getting started
 description: Quick start guide for bootstrapping and using this nix-config
 sidebar:
-  order: 1
+  order: 2
 ---
 
 This guide walks through bootstrapping a new machine with this configuration.
