@@ -1,7 +1,7 @@
 ---
 title: Multi-Arch Container Builds with Flocken and Nix-Rosetta-Builder
 sidebar:
-  order: 8
+  order: 10
 ---
 
 This configuration enables building multi-architecture (aarch64-linux and x86_64-linux) container images on Darwin using flocken and nix-rosetta-builder.
