@@ -477,9 +477,9 @@ For your forked project:
 
 After customization:
 
-1. **Set up CI/CD** - Follow [CI/CD setup guide](/guides/ci-cd-setup)
+1. **Set up CI/CD** - Follow [CI/CD setup guide](/about/contributing/ci-cd-setup/)
 2. **Configure secrets** - Follow [Secrets management guide](/guides/secrets-management)
-3. **Add tests** - Follow [Testing guide](/guides/testing)
+3. **Add tests** - Follow [Testing guide](/about/contributing/testing/)
 4. **Deploy** - Configure Cloudflare Workers or your deployment target
 5. **Start building** - Create your application code
 
