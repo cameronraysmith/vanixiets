@@ -47,7 +47,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 - ⊛ **Platform support** - macOS (nix-darwin), Linux (NixOS), standalone home-manager
 - ⊢ **Secrets management** - sops-nix with age encryption
 - ⊎ **Multi-user patterns** - admin (integrated) and non-admin (standalone) configurations
-- ⊠ **Custom packages** - easily add [custom package builds](https://infra.cameronraysmith.net/guides/adding-custom-packages) via overlays
+- ⊠ **Custom packages** - easily add [custom package builds](https://infra.cameronraysmith.net/guides/adding-custom-packages) via [overlays](https://ryantm.github.io/nixpkgs/using/overlays/)
 - ↯ **Development shell** - complete with direnv integration and `just` task runner
 
 ## Documentation
