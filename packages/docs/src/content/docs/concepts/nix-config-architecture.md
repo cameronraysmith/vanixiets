@@ -90,7 +90,7 @@ nixpkgs-linux-stable.url = "github:nixos/nixpkgs/nixos-25.05";
 **Organized overrides** (overlays/overrides/):
 - Per-package build modifications
 - Auto-imported via `lib.importOverlays`
-- Example: `ghc_filesystem.nix` with `enableParallelBuilding = false;`
+- Example pattern: individual .nix files defining per-package overrideAttrs changes
 
 **5-layer overlay composition** (overlays/default.nix):
 ```nix
