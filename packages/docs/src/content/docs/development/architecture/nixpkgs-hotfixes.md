@@ -390,7 +390,7 @@ Prevents infinite recursion from nixos-unified's autowiring attempting to import
 ### Phase 3 (Validation)
 
 - Comprehensive testing across all layers
-- Documentation (this file + incident-response.md)
+- Documentation (this file + handling-broken-packages.md)
 - Example scenario validation
 - README update
 
@@ -458,7 +458,7 @@ inherit (final.stable)
 
 ## See also
 
-- ./nixpkgs-incident-response.md
-- https://nixos.org/manual/nixpkgs/stable/#chap-overlays
+- [Handling broken packages](/guides/handling-broken-packages)
+- [Nixpkgs overlays manual](https://nixos.org/manual/nixpkgs/stable/#chap-overlays)
 - https://github.com/srid/nixos-unified
 - https://github.com/mirkolenz/nixos

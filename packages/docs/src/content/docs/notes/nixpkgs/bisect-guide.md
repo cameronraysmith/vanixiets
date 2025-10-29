@@ -306,9 +306,9 @@ If bisecting 1000+ commits:
 - Or let automatic mode run overnight
 - Each iteration takes 2-5 minutes typically
 
-## Integration with incident response
+## Integration with handling broken packages
 
-After finding the breaking commit, use the incident response workflow:
+After finding the breaking commit, use the workflow for handling broken packages:
 
 ```bash
 # 1. Bisect found the breaking commit
@@ -318,7 +318,7 @@ just bisect-nixpkgs
 # Check for related PRs, issues, fixes
 
 # 3. Apply appropriate fix using hotfixes infrastructure
-# See: docs/notes/nixpkgs-incident-response.md
+# See: docs/guides/handling-broken-packages.md
 
 # Options:
 # - Wait for fix in unstable
@@ -398,6 +398,6 @@ This ensures:
 
 ## See also
 
-- [nixpkgs-incident-response.md](../nixpkgs-incident-response.md) - What to do after finding the break
-- [nixpkgs-hotfixes.md](../nixpkgs-hotfixes.md) - Hotfixes infrastructure
+- [handling-broken-packages.md](/guides/handling-broken-packages) - What to do after finding the break
+- [nixpkgs-hotfixes.md](/development/architecture/nixpkgs-hotfixes) - Hotfixes infrastructure
 - [verify-system.sh](../../../scripts/verify-system.sh) - Verification script used by bisect
