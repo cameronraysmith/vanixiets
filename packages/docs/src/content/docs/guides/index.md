@@ -19,6 +19,6 @@ Task-oriented guides for common operations and workflows with this nix-config.
 ## Operations & Maintenance
 
 - [Secrets management](secrets-management) - Manage encrypted secrets with SOPS and age
-- [Nixpkgs incident response](nixpkgs-incident-response) - Handle nixpkgs unstable breakage with surgical fixes
+- [Handling broken packages](handling-broken-packages) - Fix broken packages from nixpkgs unstable with surgical hotfixes
 - [MCP servers usage](mcp-servers-usage) - Configure and use Model Context Protocol servers
 - [Dual-remote workflow](git-dual-remote) - Work with GitHub and Radicle remotes

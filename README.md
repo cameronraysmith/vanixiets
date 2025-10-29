@@ -59,7 +59,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 [Nix-Config Architecture](https://infra.cameronraysmith.net/concepts/nix-config-architecture) • [Understanding Autowiring](https://infra.cameronraysmith.net/concepts/understanding-autowiring) • [Multi-User Patterns](https://infra.cameronraysmith.net/concepts/multi-user-patterns) • [Repository Structure](https://infra.cameronraysmith.net/reference/repository-structure)
 
 **Operations:**
-[Secrets Management](https://infra.cameronraysmith.net/guides/secrets-management) • [Nixpkgs Hotfixes](https://infra.cameronraysmith.net/development/architecture/nixpkgs-hotfixes) • [Incident Response](https://infra.cameronraysmith.net/guides/nixpkgs-incident-response)
+[Secrets Management](https://infra.cameronraysmith.net/guides/secrets-management) • [Nixpkgs Hotfixes](https://infra.cameronraysmith.net/development/architecture/nixpkgs-hotfixes) • [Handling Broken Packages](https://infra.cameronraysmith.net/guides/handling-broken-packages)
 
 📘 **Full documentation:** <https://infra.cameronraysmith.net/>
 

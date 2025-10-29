@@ -164,7 +164,7 @@ See [Repository Structure](/reference/repository-structure) for complete directo
 ### Operational tasks
 
 - [Secrets Management](/guides/secrets-management) - Managing encrypted secrets with SOPS
-- [Nixpkgs Incident Response](/guides/nixpkgs-incident-response) - Handling nixpkgs breakage
+- [Handling broken packages](/guides/handling-broken-packages) - Fixing broken packages from nixpkgs unstable
 
 ## Troubleshooting
 
@@ -192,7 +192,7 @@ eval "$(direnv hook bash)"  # or zsh
 just verify  # Test build without activating
 ```
 
-If build fails, see [Nixpkgs Incident Response](/guides/nixpkgs-incident-response) for troubleshooting workflow.
+If build fails, see [Handling broken packages](/guides/handling-broken-packages) for troubleshooting workflow.
 
 ### Secrets not decrypting
 
