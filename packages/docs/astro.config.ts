@@ -58,7 +58,18 @@ export default defineConfig({
             {
               label: "Architecture",
               collapsed: true,
-              autogenerate: { directory: "development/architecture" },
+              items: [
+                { label: "Contents", link: "/development/architecture/" },
+                {
+                  label: "ADRs",
+                  collapsed: true,
+                  autogenerate: { directory: "development/architecture/adrs" },
+                },
+                {
+                  label: "Nixpkgs Hotfixes",
+                  link: "/development/architecture/nixpkgs-hotfixes",
+                },
+              ],
             },
             {
               label: "Traceability",
@@ -75,7 +86,14 @@ export default defineConfig({
         {
           label: "About",
           collapsed: true,
-          autogenerate: { directory: "about" },
+          items: [
+            {
+              label: "Contributing",
+              collapsed: true,
+              autogenerate: { directory: "about/contributing" },
+            },
+            { label: "Credits", link: "/about/credits" },
+          ],
         },
       ],
     }),
