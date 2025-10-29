@@ -234,7 +234,7 @@ matrix:
 
 Update filter patterns:
 
-```justfile
+```just
 # Before
 bun run --filter '@infra/docs' dev
 
