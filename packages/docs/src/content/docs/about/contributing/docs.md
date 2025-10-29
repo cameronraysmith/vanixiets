@@ -1,6 +1,8 @@
 ---
 title: Architecture decisions
 description: Key architectural decisions and rationale for nix-config
+sidebar:
+  order: 3
 ---
 
 This document explains the key architectural decisions made in this template and the rationale behind them.
