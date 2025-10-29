@@ -41,7 +41,7 @@ Optional but recommended for full CI functionality:
 
 ### 1.4 Create Unencrypted Secrets File
 
-Create `vars/shared.yaml` with your secrets:
+Create `secrets/shared.yaml` with your secrets:
 
 ```yaml
 CLOUDFLARE_ACCOUNT_ID: your-actual-account-id
@@ -61,17 +61,17 @@ The `CI_AGE_KEY` should be the private key corresponding to the public key:
 cat .sops.yaml
 
 # Encrypt the file in place
-sops --encrypt --in-place vars/shared.yaml
+sops --encrypt --in-place secrets/shared.yaml
 
 # Verify encryption succeeded
-head vars/shared.yaml
+head secrets/shared.yaml
 # Should show encrypted content starting with ENC[...]
 ```
 
 ### 1.6 Commit Encrypted Secrets
 
 ```bash
-git add vars/shared.yaml
+git add secrets/shared.yaml
 git commit -m "build: add encrypted secrets for CI/CD"
 git push
 ```
@@ -80,15 +80,15 @@ git push
 
 ### 2.1 Upload SOPS Age Key to GitHub Secrets
 
-The CI needs the private age key to decrypt `vars/shared.yaml`:
+The CI needs the private age key to decrypt `secrets/shared.yaml`:
 
 ```bash
 # Extract the CI_AGE_KEY from the encrypted file
-sops --decrypt --extract '["CI_AGE_KEY"]' vars/shared.yaml | gh secret set SOPS_AGE_KEY
+sops --decrypt --extract '["CI_AGE_KEY"]' secrets/shared.yaml | gh secret set SOPS_AGE_KEY
 ```
 
 Or manually:
-1. Decrypt the file: `sops vars/shared.yaml`
+1. Decrypt the file: `sops secrets/shared.yaml`
 2. Copy the `CI_AGE_KEY` value
 3. Go to https://github.com/YOUR_USERNAME/YOUR_REPO/settings/secrets/actions
 4. Click "New repository secret"
@@ -103,7 +103,7 @@ If using Cachix, set these as repository variables (not secrets):
 1. Go to https://github.com/YOUR_USERNAME/YOUR_REPO/settings/variables/actions
 2. Add variable `CACHIX_CACHE_NAME` with your cache name
 
-Alternatively, the workflow will read from the encrypted `vars/shared.yaml`.
+Alternatively, the workflow will read from the encrypted `secrets/shared.yaml`.
 
 ### 2.3 Configure Fast-forward Merge Workflow
 
@@ -294,13 +294,13 @@ The CI/CD workflow runs on:
 
 Check:
 - `SOPS_AGE_KEY` is set correctly in GitHub secrets
-- `vars/shared.yaml` exists and is encrypted
+- `secrets/shared.yaml` exists and is encrypted
 - Age key has permissions to decrypt the file
 
 ```bash
 # Test decryption locally
 export SOPS_AGE_KEY_FILE=/path/to/your/age/key
-sops --decrypt vars/shared.yaml
+sops --decrypt secrets/shared.yaml
 ```
 
 ### Deployment fails with "Invalid API token"
@@ -326,7 +326,7 @@ bun run build
 
 ### SOPS decryption shows wrong age key
 
-Ensure the `CI_AGE_KEY` in `vars/shared.yaml` matches the public key in `.sops.yaml`:
+Ensure the `CI_AGE_KEY` in `secrets/shared.yaml` matches the public key in `.sops.yaml`:
 ```yaml
 keys:
   - &ci age1m9m8h5vqr7dqlmvnzcwshmm4uk8umcllazum6eaulkdp3qc88ugs22j3p8
