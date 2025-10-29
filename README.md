@@ -47,7 +47,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 - ⊛ **Platform support** - macOS (nix-darwin), Linux (NixOS), standalone home-manager
 - ⊢ **Secrets management** - sops-nix with age encryption
 - ⊎ **Multi-user patterns** - admin (integrated) and non-admin (standalone) configurations
-- ⊠ **Custom packages** - easily add custom package builds via overlays
+- ⊠ **Custom packages** - [easily add custom package builds via overlays](https://infra.cameronraysmith.net/development/architecture/adrs/0003-overlay-composition-patterns#pattern-3-packages-single-and-multi-file)
 - ↯ **Development shell** - complete with direnv integration and `just` task runner
 
 ## Documentation
