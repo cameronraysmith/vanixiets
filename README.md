@@ -42,14 +42,13 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ## Features
 
-- 🏗️ **Directory-based autowiring** - Add a file, get a flake output (nixos-unified)
-- 🛡️ **Multi-channel resilience** - Surgical fixes without full rollbacks
-- 🔧 **Platform support** - macOS (nix-darwin), Linux (NixOS), standalone home-manager
-- 🔑 **Secrets management** - sops-nix with age encryption
-- 👥 **Multi-user patterns** - Admin (integrated) and non-admin (standalone) configurations
-- 📦 **Custom packages** - starship-jj, claude-code-bin, cc-statusline-rs, and more
-- 🔄 **Automated workflows** - nixpkgs bisecting, incident response, systematic troubleshooting
-- ⚡ **Development shell** - Complete with direnv integration and justfile automation
+- ⊕ **Directory-based autowiring** - add a file, get a flake output (nixos-unified)
+- ⋈ **Multi-channel resilience** - surgical fixes without holding or rolling back
+- ⊛ **Platform support** - macOS (nix-darwin), Linux (NixOS), standalone home-manager
+- ⊢ **Secrets management** - sops-nix with age encryption
+- ⊎ **Multi-user patterns** - admin (integrated) and non-admin (standalone) configurations
+- ⊠ **Custom packages** - easily add custom package builds via overlays
+- ↯ **Development shell** - complete with direnv integration and `just` task runner
 
 ## Documentation
 
@@ -62,7 +61,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 **Operations:**
 [Secrets Management](https://infra.cameronraysmith.net/guides/secrets-management) • [Nixpkgs Hotfixes](https://infra.cameronraysmith.net/development/architecture/nixpkgs-hotfixes) • [Incident Response](https://infra.cameronraysmith.net/guides/nixpkgs-incident-response)
 
-📘 **Full documentation:** https://infra.cameronraysmith.net/
+📘 **Full documentation:** <https://infra.cameronraysmith.net/>
 
 ## License
 
