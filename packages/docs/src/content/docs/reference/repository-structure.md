@@ -48,11 +48,12 @@ infra/
 |------|--------------|-------------------|
 | `configurations/darwin/stibnite.nix` | `darwinConfigurations.stibnite` | `darwin-rebuild switch --flake .#stibnite` |
 | `configurations/darwin/blackphos.nix` | `darwinConfigurations.blackphos` | `darwin-rebuild switch --flake .#blackphos` |
-| `configurations/nixos/orb-nixos.nix` | `nixosConfigurations.orb-nixos` | `nixos-rebuild switch --flake .#orb-nixos` |
+| `configurations/nixos/orb-nixos/` | `nixosConfigurations.orb-nixos` | `nixos-rebuild switch --flake .#orb-nixos` |
 | `configurations/nixos/stibnite-nixos.nix` | `nixosConfigurations.stibnite-nixos` | `nixos-rebuild switch --flake .#stibnite-nixos` |
 | `configurations/nixos/blackphos-nixos.nix` | `nixosConfigurations.blackphos-nixos` | `nixos-rebuild switch --flake .#blackphos-nixos` |
 | `configurations/home/runner@stibnite.nix` | `legacyPackages.${system}.homeConfigurations.runner@stibnite` | `nix run .#activate-home -- runner@stibnite` |
 | `configurations/home/runner@blackphos.nix` | `legacyPackages.${system}.homeConfigurations.runner@blackphos` | `nix run .#activate-home -- runner@blackphos` |
+| `configurations/home/raquel@stibnite.nix` | `legacyPackages.${system}.homeConfigurations.raquel@stibnite` | `nix run .#activate-home -- raquel@stibnite` |
 | `configurations/home/raquel@blackphos.nix` | `legacyPackages.${system}.homeConfigurations.raquel@blackphos` | `nix run .#activate-home -- raquel@blackphos` |
 
 **Pattern**: File names become configuration names. No manual registration required.
