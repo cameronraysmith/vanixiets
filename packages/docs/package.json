@@ -16,6 +16,7 @@
     "build": "astro build",
     "preview": "astro build && wrangler dev",
     "deploy": "astro build && wrangler deploy",
+    "linkcheck": "CHECK_LINKS=true astro build",
     "cf-typegen": "wrangler types",
     "format": "biome format --write",
     "lint": "biome lint",
