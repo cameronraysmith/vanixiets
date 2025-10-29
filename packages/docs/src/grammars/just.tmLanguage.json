@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "Just",
+  "name": "just",
   "scopeName": "source.just",
   "fileTypes": ["just", "justfile", "Justfile"],
   "firstLineMatch": "#![\\s\\t]*\\/.*\\just\\b",
