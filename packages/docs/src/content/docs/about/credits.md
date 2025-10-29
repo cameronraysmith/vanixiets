@@ -3,7 +3,7 @@ title: Credits
 description: Acknowledgments and project credits
 ---
 
-This nix-config builds on excellent work from the Nix community.
+This nix infrastructure config builds on a variety of other work from the Nix community.
 
 ## Primary frameworks
 
@@ -33,7 +33,3 @@ This nix-config builds on excellent work from the Nix community.
 - [nix-darwin](https://github.com/LnL7/nix-darwin) - Nix-based macOS system configuration
 - [home-manager](https://github.com/nix-community/home-manager) - User environment management with Nix
 - [sops-nix](https://github.com/Mic92/sops-nix) - Secrets management for Nix
-
-## Community
-
-Thank you to the entire Nix community for creating and maintaining this incredible ecosystem.
