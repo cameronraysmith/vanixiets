@@ -1,10 +1,10 @@
 ---
-title: Nixpkgs Incident Response Workflow
+title: Handling broken packages
 sidebar:
   order: 7
 ---
 
-Systematic approach to handling nixpkgs unstable breakage using the hotfixes infrastructure.
+Systematic approach to fixing broken packages from nixpkgs unstable using the hotfixes infrastructure.
 
 ## Quick reference
 
