@@ -95,7 +95,7 @@ else
     echo ""
     echo "Next steps:"
     echo "  1. Review error output above"
-    echo "  2. Check incident response guide: docs/notes/nixpkgs-incident-response.md"
-    echo "  3. Or use incident response prompt: @modules/home/all/tools/claude-code/commands/nixpkgs/incident-response.md"
+    echo "  2. Check handling broken packages guide: docs/guides/handling-broken-packages.md"
+    echo "  3. Or use broken package prompt: @modules/home/all/tools/claude-code/commands/nixpkgs/broken-package.md"
     exit 1
 fi
