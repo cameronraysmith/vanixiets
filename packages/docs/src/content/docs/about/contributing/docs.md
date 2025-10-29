@@ -241,19 +241,19 @@ This template uses SOPS (Secrets OPerationS) with age encryption for managing se
 **Key architecture:**
 - Developer keys for local decryption
 - CI key stored in GitHub Secrets
-- Encrypted `vars/shared.yaml` committed to repository
+- Encrypted `secrets/shared.yaml` committed to repository
 - `.sops.yaml` contains public keys only
 
 **Design decisions:**
 
-#### Why store CI_AGE_KEY in vars/shared.yaml?
+#### Why store CI_AGE_KEY in secrets/shared.yaml?
 - Allows rotating SOPS_AGE_KEY GitHub secret from dev workstation
 - Still requires dev key to decrypt
 - Bitwarden serves as offline backup
 
 #### Why separate sops-upload-github-key from ghsecrets?
 - Avoids chicken-and-egg: can't use SOPS to get key needed to use SOPS
-- During rotation, new key may not be in vars/shared.yaml yet
+- During rotation, new key may not be in secrets/shared.yaml yet
 - Supports pasting from Bitwarden during initial bootstrap
 
 See [Secrets management guide](/guides/secrets-management) for workflows and setup.
