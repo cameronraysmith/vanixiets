@@ -1,5 +1,5 @@
 ---
-title: "ADR-0002: Justfile Generic Over Specific"
+title: "ADR-0002: Use generic just recipes"
 ---
 
 ## Prefer Generic Over Specific
