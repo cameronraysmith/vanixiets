@@ -102,7 +102,7 @@ Steps:
 2. Test the fix:
 
 ```bash
-cd ~/projects/nix-workspace/nix-config
+cd ~/projects/nix-workspace/infra
 
 # Test flake check
 nix flake check 2>&1 | grep -E "(checking|error)" | head -20
@@ -160,7 +160,7 @@ final: prev: {
 2. Test (auto-imported, no rebuild needed):
 
 ```bash
-cd ~/projects/nix-workspace/nix-config
+cd ~/projects/nix-workspace/infra
 
 # Verify override applied
 nix eval .#packages.aarch64-darwin.packageName.dontCheck
@@ -217,7 +217,7 @@ Steps:
 3. Get the hash:
 
 ```bash
-cd ~/projects/nix-workspace/nix-config
+cd ~/projects/nix-workspace/infra
 
 # Try to build - it will fail with hash mismatch
 nix build .#packages.aarch64-darwin.patched.hello 2>&1 | grep "got:"
@@ -271,7 +271,7 @@ Steps:
 1. Find last working commit:
 
 ```bash
-cd ~/projects/nix-workspace/nix-config
+cd ~/projects/nix-workspace/infra
 
 # Check flake.lock history
 git log --oneline -10 flake.lock
@@ -328,7 +328,7 @@ Time: 2 minutes for rollback, additional time for selective updates
 #### 3.1 Verify system builds
 
 ```bash
-cd ~/projects/nix-workspace/nix-config
+cd ~/projects/nix-workspace/infra
 
 # Full flake check
 nix flake check 2>&1 | tee verify-check.log
@@ -381,7 +381,7 @@ inherit (final.stable)
 #### 4.2 Weekly review
 
 ```bash
-cd ~/projects/nix-workspace/nix-config
+cd ~/projects/nix-workspace/infra
 
 # List active hotfixes
 echo "=== Active Hotfixes ==="
@@ -405,7 +405,7 @@ For each hotfix/override/patch:
 #### 4.3 Cleanup when fixed
 
 ```bash
-cd ~/projects/nix-workspace/nix-config
+cd ~/projects/nix-workspace/infra
 
 # Remove from hotfixes.nix or delete override file
 # For overrides:
