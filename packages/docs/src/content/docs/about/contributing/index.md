@@ -1,5 +1,7 @@
 ---
 title: Contents
+sidebar:
+  order: 1
 ---
 
 Contributing to the infra documentation site.
