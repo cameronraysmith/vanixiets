@@ -14,12 +14,12 @@ This guide documents the complete workflow for managing SOPS keys and secrets fo
 1. **Dev key** (`age1dn8...ghptu3`): Developer workstation key
    - Stored in `~/.config/sops/age/keys.txt`
    - Can be shared among small team (or individual per developer)
-   - Can decrypt all secrets in vars/
+   - Can decrypt all secrets in secrets/
 
 2. **CI key** (`age1m9m...22j3p8`): GitHub Actions key
    - Stored in GitHub Secrets as `SOPS_AGE_KEY`
    - Backup stored in Bitwarden
-   - Can decrypt all secrets in vars/
+   - Can decrypt all secrets in secrets/
 
 ### Secret categories
 
@@ -27,7 +27,7 @@ This guide documents the complete workflow for managing SOPS keys and secrets fo
    - `SOPS_AGE_KEY` - GitHub secret containing CI private age key
    - Uploaded directly via `gh secret set`
 
-2. **SOPS-managed secrets** (in `vars/shared.yaml`):
+2. **SOPS-managed secrets** (in `secrets/shared.yaml`):
    - `CACHIX_AUTH_TOKEN` - Nix binary cache auth
    - `GITGUARDIAN_API_KEY` - Secret scanning
    - `CLOUDFLARE_API_TOKEN` - Cloudflare Workers deployment
@@ -39,14 +39,14 @@ This guide documents the complete workflow for managing SOPS keys and secrets fo
 
 ### Design decisions
 
-**Why store `CI_AGE_KEY` in vars/shared.yaml?**
+**Why store `CI_AGE_KEY` in secrets/shared.yaml?**
 - Allows rotating SOPS_AGE_KEY GitHub secret from dev workstation
 - Still requires dev key to decrypt
 - Bitwarden serves as offline backup
 
 **Why separate `sops-upload-github-key` from `ghsecrets`?**
 - Avoids chicken-and-egg: can't use SOPS to get key needed to use SOPS
-- During rotation, new key may not be in vars/shared.yaml yet
+- During rotation, new key may not be in secrets/shared.yaml yet
 - Supports pasting from Bitwarden during initial bootstrap
 
 **Why support both SSH and age key generation?**
@@ -71,7 +71,7 @@ just sops-add-key
 just sops-bootstrap ci
 
 # Output shows private key - save to Bitwarden
-# The recipe automatically adds it to vars/shared.yaml
+# The recipe automatically adds it to secrets/shared.yaml
 
 # 3. Edit secrets with actual values
 just edit-secrets
