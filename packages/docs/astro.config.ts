@@ -1,5 +1,6 @@
 import cloudflare from "@astrojs/cloudflare";
 import starlight from "@astrojs/starlight";
+import starlightLinksValidator from "starlight-links-validator";
 import { defineConfig } from "astro/config";
 import justGrammar from "./src/grammars/just.tmLanguage.json";
 // ROLLDOWN INTEGRATION (DISABLED) - Uncomment when re-enabling (see ROLLDOWN.md)
@@ -11,6 +12,13 @@ export default defineConfig({
     starlight({
       title: "infra",
       prerender: true,
+      plugins: process.env.CHECK_LINKS
+        ? [
+            starlightLinksValidator({
+              errorOnRelativeLinks: false,
+            }),
+          ]
+        : [],
       customCss: [
         './src/fonts/font-face.css',
         './src/styles/custom.css',
