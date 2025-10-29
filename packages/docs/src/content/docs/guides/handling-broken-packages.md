@@ -10,11 +10,11 @@ Systematic approach to fixing broken packages from nixpkgs unstable using the ho
 
 | Scenario | Strategy | File | Recovery time |
 |----------|----------|------|---------------|
-| Single package broken | Stable fallback | infra/hotfixes.nix | 5 minutes |
-| Tests fail only | Build modification | overrides/*.nix | 5 minutes |
-| Fix exists in PR | Upstream patch | infra/patches.nix | 10 minutes |
+| Single package broken | Stable fallback | overlays/infra/hotfixes.nix | 5 minutes |
+| Tests fail only | Build modification | overlays/overrides/*.nix | 5 minutes |
+| Fix exists in PR | Upstream patch | overlays/infra/patches.nix | 10 minutes |
 | Multiple packages broken | Flake.lock rollback | flake.lock | 2 minutes |
-| Darwin-specific issue | Platform hotfix | infra/hotfixes.nix (darwin section) | 5 minutes |
+| Darwin-specific issue | Platform hotfix | overlays/infra/hotfixes.nix (darwin section) | 5 minutes |
 
 ## Incident workflow
 
