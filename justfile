@@ -295,6 +295,11 @@ docs-lint:
 docs-check:
   cd packages/docs && bun run check:fix
 
+# Validate internal and external links in documentation
+[group('docs')]
+docs-linkcheck:
+  cd packages/docs && bun run linkcheck
+
 # Run all documentation tests
 [group('docs')]
 docs-test:
