@@ -636,7 +636,7 @@ EOF
 
 ## See also
 
-- ./nixpkgs-hotfixes.md (architecture documentation)
+- [Nixpkgs Hotfixes](/development/architecture/nixpkgs-hotfixes) (architecture documentation)
 - https://hydra.nixos.org/jobset/nixpkgs/trunk (build status)
 - https://github.com/NixOS/nixpkgs/issues (upstream issues)
 - https://nixos.org/manual/nixpkgs/stable/#chap-overlays (overlay documentation)
