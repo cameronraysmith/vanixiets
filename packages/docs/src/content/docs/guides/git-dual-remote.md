@@ -59,7 +59,7 @@ git push rad main       # Secondary: Radicle
 ### Using Secrets in nix-config
 
 ```bash
-cd ~/projects/nix-workspace/nix-config
+cd ~/projects/nix-workspace/infra
 
 # Nix automatically fetches from GitHub
 nix flake update secrets  # Update to latest from GitHub

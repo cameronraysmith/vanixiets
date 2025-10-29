@@ -153,7 +153,7 @@ mv ~/.mcp-nix-managed ~/.mcp
 
 **Disable nix management**:
 ```bash
-cd ~/projects/nix-workspace/nix-config
+cd ~/projects/nix-workspace/infra
 
 # Comment out import in claude-code/default.nix
 # Remove line: ./mcp-servers.nix
