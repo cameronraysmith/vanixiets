@@ -1,3 +1,7 @@
+---
+title: BMM Workflow Status
+---
+
 # BMM Workflow Status
 
 ## Project Configuration
