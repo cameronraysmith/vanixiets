@@ -13,6 +13,29 @@ The filename (without `.nix`) becomes the package name, and the file is automati
 
 For example, creating `overlays/packages/hello-world.nix` makes the package available as `pkgs.hello-world`.
 
+## Understanding how this works
+
+To use custom packages effectively, you need to understand how they integrate with nixpkgs.
+
+**Overlays extend nixpkgs.**
+Nixpkgs is the base package set containing tens of thousands of packages.
+[Overlays](https://ryantm.github.io/nixpkgs/using/overlays/) are the standard mechanism for extending or modifying this package set without forking the entire repository.
+An overlay is a function that takes two arguments (`final` and `prev`) and returns an attribute set of packages to add or override.
+
+**This repository automates the overlay boilerplate.**
+Instead of writing overlay functions directly, you write standard package derivations.
+The file `overlays/default.nix` uses `lib.packagesFromDirectoryRecursive` to automatically discover your package files, call them with the necessary dependencies, and merge them into an overlay layer.
+
+**What packagesFromDirectoryRecursive does.**
+This nixpkgs library function scans the `overlays/packages/` directory and transforms it into an attribute set of packages.
+For each `.nix` file, it uses `callPackage` to inject dependencies automatically based on the function arguments you declare.
+For each directory containing `package.nix`, it calls that file and uses the directory name as the package name.
+
+**You write package derivations, not overlays.**
+When you create a file in `overlays/packages/`, you're writing a standard nix derivation using functions like `rustPlatform.buildRustPackage` or `buildNpmPackage`.
+The overlay mechanism happens automatically in `overlays/default.nix` where your derivations are merged into the package set.
+This is why your packages become available as `pkgs.your-package-name` throughout your system configuration.
+
 ## Single-file packages
 
 Single-file packages work well for most use cases.
@@ -176,15 +199,27 @@ Copy the `got` hash into your package definition.
 
 For npm packages, you also need `npmDepsHash` which works the same way.
 
-## What happens automatically
+## How packages are discovered
 
-The nix-config uses `lib.packagesFromDirectoryRecursive` to discover packages in `overlays/packages/`.
-This happens in `overlays/default.nix` and runs automatically when you build.
+The discovery process happens in `overlays/default.nix`:
 
-Every `.nix` file becomes a package with the filename as its name.
-Every directory with `package.nix` becomes a package with the directory name as its name.
+```nix
+fromDirectory = directory:
+  lib.packagesFromDirectoryRecursive {
+    callPackage = lib.callPackageWith self;
+    inherit directory;
+  };
 
-Your packages are merged into the overlay and available as `pkgs.your-package-name` throughout your configuration.
+packages = fromDirectory ./packages;
+```
+
+This means:
+- Files like `foo.nix` become `pkgs.foo`
+- Directories like `bar/package.nix` become `pkgs.bar`
+- Non-nix files and empty directories are ignored
+- The `callPackage` mechanism handles dependency injection automatically
+
+The resulting package set is merged into the overlay's fifth layer (after inputs, hotfixes, and before overrides), making your packages available throughout your system configuration.
 
 ## Common build functions
 
