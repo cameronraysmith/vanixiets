@@ -83,7 +83,7 @@ just sops-check-requirements
 
 # 5. Upload SOPS_AGE_KEY to GitHub
 just sops-upload-github-key
-# Choose option 2 to extract from vars/shared.yaml
+# Choose option 2 to extract from secrets/shared.yaml
 
 # 6. Upload other secrets to GitHub
 just sops-setup-github
@@ -129,7 +129,7 @@ just sops-finalize-rotation dev
 just sops-bootstrap ci
 # Adds as ci-next, saves private key to Bitwarden
 
-# 2. Add new key to vars/shared.yaml
+# 2. Add new key to secrets/shared.yaml
 just edit-secrets
 # Update CI_AGE_KEY field with new private key
 
@@ -146,7 +146,7 @@ just gh-workflow-status
 # 6. Finalize rotation (remove old key)
 just sops-finalize-rotation ci
 
-# 7. Update vars/shared.yaml to remove old CI_AGE_KEY
+# 7. Update secrets/shared.yaml to remove old CI_AGE_KEY
 just edit-secrets
 # (The old value is fine to keep or remove)
 ```
@@ -203,7 +203,7 @@ just edit-secrets
 # NEW_SECRET_NAME: new_secret_value
 
 # 3. If needed in CI, upload to GitHub
-sops exec-env vars/shared.yaml \
+sops exec-env secrets/shared.yaml \
   'gh secret set NEW_SECRET_NAME --body="$NEW_SECRET_NAME"'
 
 # Or add to ghsecrets recipe
@@ -266,7 +266,7 @@ just sops-bootstrap dev
 - `just sops-finalize-rotation <role>` - Remove old key after verifying new one
 
 ### Secret management
-- `just edit-secrets` - Edit vars/shared.yaml (decrypts, opens editor, re-encrypts)
+- `just edit-secrets` - Edit secrets/shared.yaml (decrypts, opens editor, re-encrypts)
 - `just show-secrets` - Display decrypted secrets
 - `just set-secret <name> <value>` - Set specific secret value
 - `just rotate-secret <name>` - Rotate specific secret value
@@ -276,7 +276,7 @@ just sops-bootstrap dev
 - `just sops-check-requirements` - Analyze workflows and show required secrets
 - `just sops-upload-github-key [repo]` - Upload SOPS_AGE_KEY to GitHub
 - `just sops-setup-github [repo]` - Upload all secrets and variables (except SOPS_AGE_KEY)
-- `just ghsecrets [repo]` - Upload specific secrets from vars/shared.yaml
+- `just ghsecrets [repo]` - Upload specific secrets from secrets/shared.yaml
 - `just ghvars [repo]` - Upload variables from environment
 
 ### Key management
@@ -294,7 +294,7 @@ just sops-bootstrap dev
 ```
 .
 ├── .sops.yaml                    # SOPS config with public keys (committed)
-├── vars/
+├── secrets/
 │   ├── shared.yaml              # Encrypted secrets (committed)
 │   └── README.md                # Documentation
 ├── .github/workflows/
@@ -309,14 +309,14 @@ just sops-bootstrap dev
 - [ ] `SOPS_AGE_KEY` GitHub secret set
 - [ ] No unencrypted secrets committed to git
 - [ ] `.sops.yaml` only contains public keys
-- [ ] All secrets in `vars/shared.yaml` have non-REPLACE_ME values
+- [ ] All secrets in `secrets/shared.yaml` have non-REPLACE_ME values
 - [ ] GitHub Actions logs don't expose `SOPS_AGE_KEY` or decrypted secrets
 - [ ] Key rotation procedure documented and tested
 - [ ] Recovery procedure documented (CI key in Bitwarden)
 
 ## Troubleshooting
 
-### Cannot decrypt vars/shared.yaml
+### Cannot decrypt secrets/shared.yaml
 
 ```bash
 # Check if you have a valid key
@@ -326,10 +326,10 @@ grep "public key:" ~/.config/sops/age/keys.txt
 cat .sops.yaml
 
 # Verify file is encrypted
-head vars/shared.yaml  # Should show SOPS metadata
+head secrets/shared.yaml  # Should show SOPS metadata
 
 # Try decrypting with explicit key
-SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d vars/shared.yaml
+SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml
 ```
 
 ### CI fails with "could not decrypt data key"
@@ -401,19 +401,19 @@ keys:
   - &prod-admin age1xyz...
 
 creation_rules:
-  - path_regex: vars/dev\.yaml$
+  - path_regex: secrets/dev\.yaml$
     key_groups:
       - age: [*dev, *ci]
 
-  - path_regex: vars/prod\.yaml$
+  - path_regex: secrets/prod\.yaml$
     key_groups:
       - age: [*prod-admin, *ci]
 ```
 
 ```bash
 # Edit environment-specific secrets
-just edit-secrets vars/dev.yaml
-just edit-secrets vars/prod.yaml
+just edit-secrets secrets/dev.yaml
+just edit-secrets secrets/prod.yaml
 ```
 
 ### Multi-repository shared secrets
@@ -455,7 +455,7 @@ just edit-secrets
 # Replace all REPLACE_ME values
 
 # 4. Upload to GitHub
-just sops-upload-github-key  # Option 2: from vars/shared.yaml
+just sops-upload-github-key  # Option 2: from secrets/shared.yaml
 just sops-setup-github       # Other secrets and variables
 
 # 5. Verify
@@ -509,7 +509,7 @@ just sops-upload-github-key
 just sops-setup-github
 
 # Or upload individually
-just ghsecrets  # Secrets from vars/shared.yaml
+just ghsecrets  # Secrets from secrets/shared.yaml
 just ghvars     # Variables from environment
 ```
 
@@ -537,7 +537,7 @@ just gh-logs  # Check error message
 | `sops-finalize-rotation <role>` | Remove old key after rotation |
 | `sops-add-key` | Install key locally |
 | `sops-init` | Generate new age key |
-| `edit-secrets` | Edit vars/shared.yaml |
+| `edit-secrets` | Edit secrets/shared.yaml |
 | `show-secrets` | View decrypted secrets |
 | `set-secret <name> <value>` | Set specific secret |
 | `rotate-secret <name>` | Rotate specific secret value |
@@ -554,7 +554,7 @@ just gh-logs  # Check error message
 | File | Purpose |
 |------|---------|
 | `.sops.yaml` | SOPS config (public keys only) |
-| `vars/shared.yaml` | Encrypted secrets (committed) |
+| `secrets/shared.yaml` | Encrypted secrets (committed) |
 | `~/.config/sops/age/keys.txt` | Your private keys (NOT committed) |
 | GitHub Secrets: `SOPS_AGE_KEY` | CI private key |
 
@@ -568,18 +568,18 @@ just gh-logs  # Check error message
 | Secret | Location | Purpose |
 |--------|----------|---------|
 | `SOPS_AGE_KEY` | GitHub Secret | CI age private key |
-| `CACHIX_AUTH_TOKEN` | vars/shared.yaml → GitHub Secret | Nix cache auth |
-| `CACHIX_CACHE_NAME` | vars/shared.yaml → GitHub Variable | Nix cache name |
-| `GITGUARDIAN_API_KEY` | vars/shared.yaml → GitHub Secret | Secret scanning |
-| `CLOUDFLARE_API_TOKEN` | vars/shared.yaml | Cloudflare deploy |
-| `CLOUDFLARE_ACCOUNT_ID` | vars/shared.yaml | Cloudflare account |
-| `CI_AGE_KEY` | vars/shared.yaml | Backup of SOPS_AGE_KEY |
+| `CACHIX_AUTH_TOKEN` | secrets/shared.yaml → GitHub Secret | Nix cache auth |
+| `CACHIX_CACHE_NAME` | secrets/shared.yaml → GitHub Variable | Nix cache name |
+| `GITGUARDIAN_API_KEY` | secrets/shared.yaml → GitHub Secret | Secret scanning |
+| `CLOUDFLARE_API_TOKEN` | secrets/shared.yaml | Cloudflare deploy |
+| `CLOUDFLARE_ACCOUNT_ID` | secrets/shared.yaml | Cloudflare account |
+| `CI_AGE_KEY` | secrets/shared.yaml | Backup of SOPS_AGE_KEY |
 
 ### Emergency contacts
 
 - Bitwarden: CI key backup
 - `.sops.yaml.backup`: Rollback point
-- `vars/shared.yaml.backup`: Rollback point
+- `secrets/shared.yaml.backup`: Rollback point
 - SOPS-WORKFLOW-GUIDE.md: Full documentation
 
 ## References
