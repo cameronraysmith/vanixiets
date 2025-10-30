@@ -9,7 +9,6 @@ Contributing to the infra documentation site.
 ## Documentation Site
 
 - [Docs Site Architecture](docs) - Architecture decisions for the Astro/Starlight documentation site
-- [Template Usage](template-usage) - Using this as a TypeScript monorepo template
 - [Testing](testing) - Vitest and Playwright testing for the docs site
 
 ## CI/CD and Deployment
