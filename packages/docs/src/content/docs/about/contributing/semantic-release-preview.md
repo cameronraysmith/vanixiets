@@ -1,5 +1,5 @@
 ---
-title: Semantic Release Version Preview
+title: Semantic Release Preview
 sidebar:
   order: 8
 ---
