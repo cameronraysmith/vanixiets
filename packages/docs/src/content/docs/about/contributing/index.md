@@ -14,7 +14,6 @@ Contributing to the infra documentation site.
 ## CI/CD and Deployment
 
 - [CI/CD Setup](ci-cd-setup) - GitHub Actions CI/CD pipeline for Cloudflare Workers
-- [Semantic Release](semantic-release) - Automated versioning with semantic-release
 - [Semantic Release Preview](semantic-release-preview) - Preview semantic-release behavior
 
 ## Infrastructure

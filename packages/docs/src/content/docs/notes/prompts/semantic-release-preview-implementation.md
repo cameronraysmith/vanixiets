@@ -1,7 +1,5 @@
 ---
-title: Semantic Release Version Preview Tool
-sidebar:
-  order: 7
+title: Semantic Release Version Preview Tool (Implementation Prompt)
 ---
 
 ## Prompt for implementation
