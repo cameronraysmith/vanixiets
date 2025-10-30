@@ -1,5 +1,5 @@
 ---
-title: CI/CD setup
+title: CI/CD Setup
 description: Setting up GitHub Actions CI/CD pipeline with Cloudflare Workers deployment
 sidebar:
   order: 6
