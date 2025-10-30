@@ -47,7 +47,7 @@ Implement **smart path-based job filtering** and **concurrency control** as prim
 
 ### Layer 1: Path-based job filtering (highest priority, highest impact)
 
-Add `paths` and `paths-ignore` per job using `dorny/paths-filter` action.
+Implement per-job path filtering using native git diff in bash (zero external dependencies).
 
 **Pattern from Dioxus:**
 ```yaml
@@ -65,55 +65,70 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      nix: ${{ steps.filter.outputs.nix }}
-      typescript: ${{ steps.filter.outputs.typescript }}
-      docs: ${{ steps.filter.outputs.docs }}
-      workflows: ${{ steps.filter.outputs.workflows }}
+      nix: ${{ steps.changes.outputs.nix }}
+      typescript: ${{ steps.changes.outputs.typescript }}
+      docs: ${{ steps.changes.outputs.docs }}
     steps:
       - uses: actions/checkout@v5
-      - uses: dorny/paths-filter@v3
-        id: filter
         with:
-          filters: |
-            nix:
-              - 'flake.nix'
-              - 'flake.lock'
-              - 'configurations/**'
-              - 'modules/**'
-              - 'overlays/**'
-              - 'packages/*/flake.nix'
-            typescript:
-              - 'packages/docs/**/*.ts'
-              - 'packages/docs/**/*.tsx'
-              - 'packages/docs/**/*.astro'
-              - 'packages/docs/package.json'
-              - 'packages/docs/tsconfig.json'
-              - 'package.json'
-              - 'bun.lockb'
-            docs:
-              - 'packages/docs/**/*.md'
-              - 'packages/docs/astro.config.ts'
-            workflows:
-              - '.github/**'
+          fetch-depth: 0  # Need history for git diff
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          # Determine base ref for comparison
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_REF="HEAD^"
+          fi
+
+          # Workflow changes trigger everything
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '\.github/'; then
+            echo "nix=true" >> $GITHUB_OUTPUT
+            echo "typescript=true" >> $GITHUB_OUTPUT
+            echo "docs=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check for nix changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(\.nix$|flake\.lock|configurations/|modules/|overlays/)'; then
+            echo "nix=true" >> $GITHUB_OUTPUT
+          else
+            echo "nix=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for typescript changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(packages/docs/.*\.(ts|tsx|astro)|package\.json|bun\.lockb)'; then
+            echo "typescript=true" >> $GITHUB_OUTPUT
+          else
+            echo "typescript=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for docs content changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE 'packages/docs/.*\.(md|mdx)'; then
+            echo "docs=true" >> $GITHUB_OUTPUT
+          else
+            echo "docs=false" >> $GITHUB_OUTPUT
+          fi
 ```
 
 **Job conditions:**
 ```yaml
 nix:
   needs: [detect-changes]
-  if: |
-    needs.detect-changes.outputs.nix == 'true' ||
-    needs.detect-changes.outputs.workflows == 'true'
+  if: needs.detect-changes.outputs.nix == 'true'
   # ... rest of job
 
 typescript:
   needs: [detect-changes]
   if: |
     needs.detect-changes.outputs.typescript == 'true' ||
-    needs.detect-changes.outputs.docs == 'true' ||
-    needs.detect-changes.outputs.workflows == 'true'
+    needs.detect-changes.outputs.docs == 'true'
   # ... rest of job
 ```
+
+**Note:** Workflow changes (.github/**) trigger all jobs via exit early logic in detect-changes step.
 
 ### Layer 2: Concurrency control (prevent redundant runs)
 
@@ -262,23 +277,26 @@ Playwright browsers managed by Nix, but GitHub Actions cache can help.
 
 ## Trade-offs
 
-### Path-based filtering
+### Path-based filtering (native git diff approach)
 
 **Positive:**
 - Massive time savings (skip entire job categories)
-- Explicit about job dependencies
-- Better developer experience (faster feedback)
-- Zero external dependencies
+- Zero external dependencies (uses git + bash)
+- No maintenance burden (no third-party actions)
+- Easy to test locally (just run git diff)
+- Full control over filtering logic
+- No security concerns
 
 **Negative:**
-- Requires maintenance (keep filters updated)
-- Risk of under-filtering (job should run but doesn't)
-- More complex workflow logic
+- More verbose than action-based approach
+- Need to handle edge cases manually
+- Regex patterns need careful testing
 
 **Mitigation:**
-- Include `.github/**` in all filters (workflow changes trigger all)
-- Conservative filters (when in doubt, run the job)
-- Regular audits of filter accuracy
+- Workflow changes (.github/**) trigger all jobs automatically
+- Conservative patterns (when in doubt, run the job)
+- Test with multiple PR types before merging
+- Fallback available: tj-actions/changed-files if complexity grows
 
 ### Concurrency control
 
