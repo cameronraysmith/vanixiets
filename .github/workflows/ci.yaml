@@ -1,3 +1,4 @@
+# Test change for CI path filtering validation - workflow changes should trigger ALL jobs
 name: CI
 on:
   workflow_dispatch:
