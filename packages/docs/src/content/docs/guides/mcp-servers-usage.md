@@ -1,5 +1,5 @@
 ---
-title: MCP Servers Usage Guide
+title: MCP Servers Usage
 sidebar:
   order: 8
 ---
