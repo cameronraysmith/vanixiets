@@ -72,11 +72,73 @@ jobs:
           concurrent_skipping: 'never'
           cancel_others: 'false'
 
-  # job 1: secrets-scan
+  # job 1: detect-changes
+  # detects which files changed to enable path-based job filtering
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      nix-code: ${{ steps.changes.outputs.nix-code }}
+      typescript: ${{ steps.changes.outputs.typescript }}
+      docs-content: ${{ steps.changes.outputs.docs-content }}
+      bootstrap: ${{ steps.changes.outputs.bootstrap }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0  # Need history for git diff
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          # Determine base ref for comparison
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_REF="HEAD^"
+          fi
+
+          # Workflow changes trigger everything
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '\.github/'; then
+            echo "nix-code=true" >> $GITHUB_OUTPUT
+            echo "typescript=true" >> $GITHUB_OUTPUT
+            echo "docs-content=true" >> $GITHUB_OUTPUT
+            echo "bootstrap=true" >> $GITHUB_OUTPUT
+            echo "Workflow changes detected - triggering all jobs"
+            exit 0
+          fi
+
+          # Check for nix changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile)'; then
+            echo "nix-code=true" >> $GITHUB_OUTPUT
+          else
+            echo "nix-code=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for typescript changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(packages/docs/.*\.(ts|tsx|astro|test\.ts)|.*\.config\.(ts|js)|package\.json|bun\.lockb)'; then
+            echo "typescript=true" >> $GITHUB_OUTPUT
+          else
+            echo "typescript=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for docs content changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE 'packages/docs/.*\.(md|mdx)'; then
+            echo "docs-content=true" >> $GITHUB_OUTPUT
+          else
+            echo "docs-content=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for bootstrap changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(Makefile|\.envrc)'; then
+            echo "bootstrap=true" >> $GITHUB_OUTPUT
+          else
+            echo "bootstrap=false" >> $GITHUB_OUTPUT
+          fi
+
+  # job 2: secrets-scan
   # scans repository for hardcoded secrets using gitleaks
   # ALWAYS runs (ignores skip-check) - security critical
   secrets-scan:
-    needs: skip-check
+    needs: [skip-check, detect-changes]
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
@@ -249,12 +311,11 @@ jobs:
   # job 5: bootstrap-verification
   # validates Makefile bootstrap workflow on clean ubuntu system
   bootstrap-verification:
-    needs: [skip-check, secrets-scan]
+    needs: [skip-check, secrets-scan, detect-changes]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'bootstrap-verification')
+      (needs.detect-changes.outputs.bootstrap == 'true' ||
+       github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -299,12 +360,11 @@ jobs:
   # job 4: config-validation
   # tests config.nix user definitions (phase 1)
   config-validation:
-    needs: [skip-check, secrets-scan]
+    needs: [skip-check, secrets-scan, detect-changes]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'config-validation')
+      (needs.detect-changes.outputs.nix-code == 'true' ||
+       github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -356,12 +416,11 @@ jobs:
   # job 5: autowiring-validation
   # verifies nixos-unified automatic config discovery
   autowiring-validation:
-    needs: [skip-check, secrets-scan]
+    needs: [skip-check, secrets-scan, detect-changes]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'autowiring-validation')
+      (needs.detect-changes.outputs.nix-code == 'true' ||
+       github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -419,12 +478,11 @@ jobs:
   # job 6: secrets-workflow
   # tests sops-nix mechanics with ephemeral test keys
   secrets-workflow:
-    needs: [skip-check, secrets-scan]
+    needs: [skip-check, secrets-scan, detect-changes]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'secrets-workflow')
+      (needs.detect-changes.outputs.nix-code == 'true' ||
+       github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -490,12 +548,11 @@ jobs:
   # job 7: justfile-activation
   # validates user experience: justfile recipes, configuration discovery, and activation workflows
   justfile-activation:
-    needs: [skip-check, secrets-scan]
+    needs: [skip-check, secrets-scan, detect-changes]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'justfile-activation')
+      (needs.detect-changes.outputs.nix-code == 'true' ||
+       github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
@@ -628,13 +685,11 @@ jobs:
   # pre-cache resource-intensive overlay packages before main build
   # prevents disk space exhaustion during CI builds (especially rust packages)
   cache-overlay-packages:
-    needs: [skip-check, secrets-scan]
+    needs: [skip-check, secrets-scan, detect-changes]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'cache-overlay-packages' ||
-       inputs.job == 'nix')
+      (needs.detect-changes.outputs.nix-code == 'true' ||
+       github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false # allow each system to cache independently
       matrix:
@@ -668,12 +723,11 @@ jobs:
   # distributes builds across multiple machines to avoid disk space exhaustion
   # each job builds a specific category (packages, home configs, system configs)
   nix:
-    needs: [skip-check, secrets-scan, cache-overlay-packages]
+    needs: [skip-check, secrets-scan, cache-overlay-packages, detect-changes]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'nix')
+      (needs.detect-changes.outputs.nix-code == 'true' ||
+       github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -735,12 +789,12 @@ jobs:
   # job 10: typescript
   # TypeScript package testing via reusable workflow
   typescript:
-    needs: [skip-check, secrets-scan, set-variables]
+    needs: [skip-check, secrets-scan, set-variables, detect-changes]
     if: |
       needs.skip-check.outputs.should_skip != 'true' &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'typescript')
+      (needs.detect-changes.outputs.typescript == 'true' ||
+       needs.detect-changes.outputs.docs-content == 'true' ||
+       github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
