@@ -1,5 +1,5 @@
 ---
-title: Testing guide
+title: Testing
 description: Comprehensive testing with Vitest and Playwright
 sidebar:
   order: 5
