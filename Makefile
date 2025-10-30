@@ -76,7 +76,9 @@ install-nix: ## Install Nix using the NixOS community installer
 			--no-confirm \
 			--extra-conf "experimental-features = nix-command flakes" \
 			--extra-conf "auto-optimise-store = true" \
-			--extra-conf "max-jobs = auto"; \
+			--extra-conf "max-jobs = auto" \
+			--extra-conf "always-allow-substitutes = true" \
+			--extra-conf "extra-nix-path = nixpkgs=flake:nixpkgs"; \
 	fi
 
 .PHONY: install-direnv
@@ -132,6 +134,20 @@ verify: ## Verify nix installation and environment setup
 		printf "✅ age-keygen, ssh-to-age, sops, just available\n"; \
 	else \
 		printf "❌ some tools missing from devShell\n"; \
+		exit 1; \
+	fi
+	@printf "\nChecking nix.conf settings: "
+	@MISSING=0; \
+	for setting in "experimental-features.*nix-command" "experimental-features.*flakes" "auto-optimise-store.*true" "max-jobs.*auto" "always-allow-substitutes.*true" "extra-nix-path.*nixpkgs=flake:nixpkgs"; do \
+		if ! grep -qE "$$setting" /etc/nix/nix.conf 2>/dev/null; then \
+			if [ $$MISSING -eq 0 ]; then printf "❌\n"; fi; \
+			printf "  Missing or incorrect: $$setting\n"; \
+			MISSING=1; \
+		fi; \
+	done; \
+	if [ $$MISSING -eq 0 ]; then \
+		printf "✅ all required settings present\n"; \
+	else \
 		exit 1; \
 	fi
 	@printf "\n✅ All verification checks passed!\n\n"
