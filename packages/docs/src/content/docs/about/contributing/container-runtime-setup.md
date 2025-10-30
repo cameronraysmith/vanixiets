@@ -1,5 +1,5 @@
 ---
-title: Container Management with Colima
+title: Container Management
 sidebar:
   order: 9
 ---
