@@ -39,62 +39,72 @@ defaults:
 **Add new job at the beginning:**
 ```yaml
 jobs:
-  # NEW JOB: Detect which subsystems changed
+  # NEW JOB: Detect which subsystems changed (native git diff approach)
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      nix-code: ${{ steps.filter.outputs.nix-code }}
-      typescript: ${{ steps.filter.outputs.typescript }}
-      docs-content: ${{ steps.filter.outputs.docs-content }}
-      workflows: ${{ steps.filter.outputs.workflows }}
-      bootstrap: ${{ steps.filter.outputs.bootstrap }}
+      nix-code: ${{ steps.changes.outputs.nix-code }}
+      typescript: ${{ steps.changes.outputs.typescript }}
+      docs-content: ${{ steps.changes.outputs.docs-content }}
+      bootstrap: ${{ steps.changes.outputs.bootstrap }}
     steps:
       - uses: actions/checkout@v5
-
-      - uses: dorny/paths-filter@v3
-        id: filter
         with:
-          filters: |
-            # Nix configuration changes
-            nix-code:
-              - 'flake.nix'
-              - 'flake.lock'
-              - 'configurations/**'
-              - 'modules/**'
-              - 'overlays/**'
-              - 'packages/*/flake.nix'
-              - 'justfile'
+          fetch-depth: 0  # Need history for git diff
 
-            # TypeScript source changes
-            typescript:
-              - 'packages/docs/src/**/*.ts'
-              - 'packages/docs/src/**/*.tsx'
-              - 'packages/docs/src/**/*.astro'
-              - 'packages/docs/**/*.test.ts'
-              - 'packages/docs/playwright.config.ts'
-              - 'packages/docs/vitest.config.ts'
-              - 'packages/docs/package.json'
-              - 'packages/docs/tsconfig.json'
-              - 'package.json'
-              - 'bun.lockb'
+      - name: Detect changed files
+        id: changes
+        run: |
+          # Determine base ref for comparison
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_REF="HEAD^"
+          fi
 
-            # Documentation content changes (markdown only)
-            docs-content:
-              - 'packages/docs/src/content/**/*.md'
-              - 'packages/docs/src/content/**/*.mdx'
-              - 'packages/docs/astro.config.ts'
+          # Workflow changes trigger everything
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '\.github/'; then
+            echo "nix-code=true" >> $GITHUB_OUTPUT
+            echo "typescript=true" >> $GITHUB_OUTPUT
+            echo "docs-content=true" >> $GITHUB_OUTPUT
+            echo "bootstrap=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-            # Workflow changes (trigger everything)
-            workflows:
-              - '.github/**'
+          # Check for nix changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile)'; then
+            echo "nix-code=true" >> $GITHUB_OUTPUT
+          else
+            echo "nix-code=false" >> $GITHUB_OUTPUT
+          fi
 
-            # Bootstrap/setup changes
-            bootstrap:
-              - 'Makefile'
-              - '.envrc'
+          # Check for typescript changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(packages/docs/.*\.(ts|tsx|astro|test\.ts)|.*\.config\.(ts|js)|package\.json|bun\.lockb)'; then
+            echo "typescript=true" >> $GITHUB_OUTPUT
+          else
+            echo "typescript=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for docs content changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE 'packages/docs/.*\.(md|mdx)'; then
+            echo "docs-content=true" >> $GITHUB_OUTPUT
+          else
+            echo "docs-content=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for bootstrap changes
+          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(Makefile|\.envrc)'; then
+            echo "bootstrap=true" >> $GITHUB_OUTPUT
+          else
+            echo "bootstrap=false" >> $GITHUB_OUTPUT
+          fi
 
   # Existing jobs remain, but add conditions...
 ```
+
+**Alternative: tj-actions/changed-files (if native becomes too complex):**
+
+See [Path Filtering Research](/notes/development/path-filtering-research/) for details on actively-maintained alternative.
 
 **Update each job with appropriate conditions:**
 
