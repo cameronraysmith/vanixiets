@@ -65,7 +65,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ## License
 
-[AGPL-3.0](LICENSE)
+[MIT](LICENSE)
 
 ## Credits
 
@@ -77,5 +77,5 @@ See [complete credits](https://infra.cameronraysmith.net/about/credits) for full
 [ci-link]: https://github.com/cameronraysmith/infra/actions/workflows/ci.yaml
 [docs-badge]: https://img.shields.io/badge/docs-infra.cameronraysmith.net-blue
 [docs-link]: https://infra.cameronraysmith.net
-[license-badge]: https://img.shields.io/badge/license-AGPL--3.0-blue
-[license-link]: https://spdx.org/licenses/AGPL-3.0-only.html
+[license-badge]: https://img.shields.io/badge/license-MIT-blue
+[license-link]: https://spdx.org/licenses/MIT.html
