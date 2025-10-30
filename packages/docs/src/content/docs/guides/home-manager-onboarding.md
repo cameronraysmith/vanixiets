@@ -1,5 +1,5 @@
 ---
-title: User Onboarding Guide
+title: User Onboarding
 sidebar:
   order: 4
 ---
