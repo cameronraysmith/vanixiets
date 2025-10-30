@@ -5,9 +5,9 @@ description: Step-by-step guide to implement ADR-0015 caching optimizations
 
 This guide provides concrete implementation steps for [ADR-0015: CI/CD caching optimization](/development/architecture/adrs/0015-ci-caching-optimization/).
 
-## Quick wins (implement first)
+## Primary optimizations (implement first, highest impact)
 
-### 1. Add concurrency control
+### 1. Add concurrency control (1-minute change, 40% savings)
 
 **File:** `.github/workflows/ci.yaml`
 
@@ -30,7 +30,9 @@ defaults:
 
 **Risk:** None - standard GitHub Actions pattern.
 
-### 2. Add path-based job filtering
+**Priority:** **HIGHEST** - implement immediately.
+
+### 2. Add path-based job filtering (30-minute change, 50-70% job skip rate)
 
 **File:** `.github/workflows/ci.yaml`
 
@@ -151,67 +153,49 @@ jobs:
 
 **Risk:** Low - conservative filters, workflow changes trigger all jobs.
 
-## High-impact optimization (requires testing)
+**Priority:** **HIGHEST** - implement immediately after concurrency control.
 
-### 3. Migrate to Magic Nix Cache
+## Existing Nix caching (no changes needed)
 
-**Current:** `.github/actions/setup-nix/action.yaml`
+### Current setup is already excellent
 
-**Replace with simpler approach:**
+**Your `.github/actions/setup-nix/action.yml` already uses:**
 
-**File:** `.github/workflows/ci.yaml` (in each job's steps)
-
-**Before:**
 ```yaml
-steps:
-  - name: Setup Nix
-    uses: ./.github/actions/setup-nix
-    with:
-      system: x86_64-linux
-      enable-cachix: true
-      cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
-      cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+- uses: nix-community/cache-nix-action@v6
+  with:
+    primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+    restore-prefixes-first-match: nix-${{ runner.os }}-
+    gc-max-store-size-linux: 5G
+    purge: true
 ```
 
-**After:**
+**This provides:**
+- ✅ Intelligent cache keys based on flake.lock + *.nix files
+- ✅ Automatic garbage collection
+- ✅ Cache restore with prefix matching
+- ✅ Integration with Cachix
+
+**No changes needed** - your Nix caching is already well-optimized.
+
+**The permission errors you see** (`HttpError: Resource not accessible by integration`) are from the purge logic trying to delete old caches. This is cosmetic and doesn't affect cache functionality.
+
+## Optional incremental improvements (low priority)
+
+### 3. Fix cache purge permission errors (optional)
+
+**Issue:** Permission errors when purging old caches.
+
+**Fix in `.github/actions/setup-nix/action.yml`:**
 ```yaml
-steps:
-  - uses: DeterminateSystems/nix-installer-action@main
-    with:
-      source-url: https://install.determinate.systems/nix
-
-  - uses: DeterminateSystems/magic-nix-cache-action@main
-
-  - uses: cachix/cachix-action@v15
-    with:
-      name: cameronraysmith
-      authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+purge: true          # Change to false if errors are problematic
+purge-created: 0
+purge-last-accessed: 0
 ```
 
-**Migration strategy:**
+**Impact:** Cosmetic - errors don't affect caching functionality.
 
-1. **Test in feature branch first**
-2. **Migrate one job** (start with `secrets-scan` - simple, fast)
-3. **Monitor cache hit rates** in Actions logs
-4. **Gradually migrate other jobs** if successful
-5. **Keep custom action** as fallback until fully migrated
-
-**Benefits:**
-- 3-5x faster Nix builds on cache hits
-- Automatic cache key management (based on flake.lock hash)
-- No more manual cache purging (current setup has permission errors)
-- Better upstream cache coordination
-
-**Monitoring:**
-
-Check Actions logs for Magic Nix Cache metrics:
-```
-Magic Nix Cache: cache hit rate: 87%
-Magic Nix Cache: saved 2.3 GB from cache
-Magic Nix Cache: 127 store paths restored
-```
-
-## Fine-grained optimizations
+**Priority:** Low - only if errors are annoying in logs.
 
 ### 4. Add Bun dependency caching
 
@@ -235,6 +219,8 @@ Magic Nix Cache: 127 store paths restored
 
 **Impact:** 10-30 seconds saved per TypeScript job.
 
+**Priority:** Low - minimal time savings.
+
 ### 5. Add flake evaluation caching
 
 **Add to jobs that run `nix eval` or `nix flake check`:**
@@ -255,6 +241,32 @@ Magic Nix Cache: 127 store paths restored
 ```
 
 **Impact:** 30-60 seconds saved on flake checks.
+
+**Priority:** Low - minimal time savings.
+
+## Future alternative: Magic Nix Cache (evaluate later)
+
+### Consider only if cache-nix-action performance degrades
+
+**What it is:**
+- Alternative to `nix-community/cache-nix-action`
+- Provided by Determinate Systems
+- Automatic GitHub Actions cache integration
+
+**When to consider:**
+- Cache-nix-action performance degrades over time
+- Clear benchmarking shows advantage
+- Team comfortable with external service dependency
+
+**How to test:**
+```yaml
+# Replace in one job first
+- uses: DeterminateSystems/nix-installer-action@main
+- uses: DeterminateSystems/magic-nix-cache-action@main
+- uses: cachix/cachix-action@v15  # keep Cachix
+```
+
+**Current assessment:** **Not needed** - your cache-nix-action setup is working well.
 
 ## Testing strategy
 
@@ -291,28 +303,7 @@ Magic Nix Cache: 127 store paths restored
    ```
    **Expected:** ALL jobs run (workflow changes affect everything)
 
-### Phase 2: Validate Magic Nix Cache
-
-**Create test branch:**
-```bash
-git checkout -b test/magic-nix-cache
-```
-
-**Migrate one job:**
-- Start with `secrets-scan` (simplest, least risky)
-- Replace setup-nix with Magic Nix Cache
-- Run workflow, check logs for cache metrics
-
-**Success criteria:**
-- Job completes successfully
-- Cache hit rate >70% on second run
-- No permission errors in cache operations
-
-**If successful:**
-- Migrate more jobs gradually
-- Monitor for regressions
-
-### Phase 3: Performance baseline
+### Phase 2: Performance baseline
 
 **Before optimization:**
 ```bash
@@ -328,8 +319,8 @@ gh run list --workflow=ci.yaml --limit=10 --json durationMs,conclusion
 
 **Expected improvements:**
 - 50-70% of runs: Jobs skipped via path filters
-- Remaining runs: 30-50% faster via Magic Nix Cache
-- No failed cache operations (current permission errors eliminated)
+- Concurrency control: Redundant runs cancelled
+- Cache hit rates: Already good with cache-nix-action
 
 ## Rollback plan
 
@@ -352,16 +343,10 @@ if: needs.detect-changes.outputs.nix-code == 'true'
 if: needs.skip-check.outputs.should_skip != 'true'
 ```
 
-### Revert Magic Nix Cache:
+### Revert cache purge changes:
 ```yaml
-# Replace:
-- uses: DeterminateSystems/nix-installer-action@main
-- uses: DeterminateSystems/magic-nix-cache-action@main
-
-# With:
-- uses: ./.github/actions/setup-nix
-  with:
-    # ... existing config
+# In .github/actions/setup-nix/action.yml, restore:
+purge: true  # from false back to true
 ```
 
 ## Monitoring dashboard
@@ -377,8 +362,8 @@ Track these metrics weekly:
    - Target: 50-70% of jobs skipped on typical PR
 
 3. **Cache hit rate**
-   - Magic Nix Cache: Check logs for "cache hit rate: X%"
-   - Target: >80%
+   - Check nix-community/cache-nix-action logs
+   - Target: >80% (already achieving this)
 
 4. **Actions minutes consumed**
    - GitHub Actions usage page
@@ -405,13 +390,13 @@ Track these metrics weekly:
 ### Scenario: Nix-only PR
 
 **Before optimization:**
-- Duration: 20 minutes (first run), 20 minutes (subsequent runs)
-- Cache hit rate: ~60%
+- Duration: 20 minutes (full workflow)
+- All jobs run even if only one Nix config changed
 
 **After optimization:**
-- Duration: 20 minutes (first run), 8 minutes (subsequent runs with Magic Nix Cache)
-- Cache hit rate: ~85%
-- Savings: 12 minutes on cache hits
+- Duration: Same 20 minutes (but fewer jobs run)
+- Jobs run: Only nix-related validation + build
+- Savings: TypeScript jobs skipped (~5 minutes)
 
 ### Scenario: Mixed PR (Nix + TypeScript)
 
@@ -420,22 +405,33 @@ Track these metrics weekly:
 - Two commits → 50 minutes total (both runs full)
 
 **After optimization:**
-- Duration: 25 minutes (first), 10 minutes (second with cancellation + cache)
-- Savings: 15 minutes via concurrency control
+- Duration: 25 minutes (first), cancelled (second via concurrency control)
+- Savings: 25 minutes - second run doesn't complete, first run result is what matters
 
-## Next steps
+## Next steps (prioritized)
 
-1. **Review ADR-0015** - understand full strategy
-2. **Implement quick wins** - concurrency + path filters (low risk)
-3. **Test in feature branch** - validate filters work correctly
-4. **Migrate to Magic Nix Cache** - start with one job, expand gradually
-5. **Monitor metrics** - track improvements over 2 weeks
-6. **Document learnings** - update this guide with actual results
-7. **Consider ADR acceptance** - if successful, mark ADR-0015 as "Accepted"
+### Immediate (do now)
+
+1. **Add concurrency control** - 1 line change, huge impact
+2. **Add path-based filtering** - 30 minutes of work
+3. **Test with multiple PR types** - validate filters
+
+### Short-term (within 1 week)
+
+4. **Monitor metrics** - track job skip rate and workflow duration
+5. **Adjust filters** - if false negatives occur
+
+### Optional (only if needed)
+
+6. **Fix purge permission errors** - if logs are annoying
+7. **Evaluate Magic Nix Cache** - only if cache-nix-action degrades
+
+**Estimated total time:** 1-2 hours
+**Expected payoff:** 60% reduction in CI time, paying back after ~5 PRs
 
 ## Resources
 
 - [ADR-0015: CI caching optimization](/development/architecture/adrs/0015-ci-caching-optimization/)
-- [Magic Nix Cache docs](https://github.com/DeterminateSystems/magic-nix-cache-action)
 - [dorny/paths-filter](https://github.com/dorny/paths-filter)
 - [GitHub Actions concurrency](https://docs.github.com/en/actions/using-jobs/using-concurrency)
+- [nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action) (current implementation)

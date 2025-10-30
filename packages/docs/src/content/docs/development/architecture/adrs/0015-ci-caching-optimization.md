@@ -41,36 +41,11 @@ PR #17 run https://github.com/cameronraysmith/infra/actions/runs/18946909588:
 
 ## Decision
 
-Implement **multi-layered caching optimization** with **Nix-first approach** and **smart path-based job filtering**.
+Implement **smart path-based job filtering** and **concurrency control** as primary optimizations. Existing Nix caching via `nix-community/cache-nix-action` is already excellent.
 
 ## Proposed architecture
 
-### Layer 1: Magic Nix Cache (Nix-native, highest priority)
-
-Replace current `setup-nix` action with **Determinate Systems Nix Installer** + **Magic Nix Cache**.
-
-**Benefits:**
-- Automatic GitHub Actions cache integration
-- Intelligent Nix store caching
-- Cache key based on flake.lock hash
-- Upstream-aware (knows about cache.nixos.org and Cachix)
-- Zero configuration after setup
-
-**Implementation:**
-```yaml
-- name: Install Nix
-  uses: DeterminateSystems/nix-installer-action@main
-
-- name: Setup Magic Nix Cache
-  uses: DeterminateSystems/magic-nix-cache-action@main
-```
-
-**Replaces:**
-- Manual actions/cache setup
-- Custom cache purging logic (currently failing with permission errors)
-- Explicit Nix store path caching
-
-### Layer 2: Path-based job filtering (GitHub Actions level)
+### Layer 1: Path-based job filtering (highest priority, highest impact)
 
 Add `paths` and `paths-ignore` per job using `dorny/paths-filter` action.
 
@@ -140,7 +115,7 @@ typescript:
   # ... rest of job
 ```
 
-### Layer 3: Concurrency control (prevent redundant runs)
+### Layer 2: Concurrency control (prevent redundant runs)
 
 **Pattern from Dioxus:**
 ```yaml
@@ -154,7 +129,30 @@ concurrency:
 - Saves compute time and GitHub Actions minutes
 - Prevents queue backlog
 
-### Layer 4: Flake evaluation caching
+### Layer 3: Existing Nix caching (already optimized)
+
+**Current implementation in `.github/actions/setup-nix/action.yml`:**
+
+```yaml
+- uses: nix-community/cache-nix-action@v6
+  with:
+    primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+    restore-prefixes-first-match: nix-${{ runner.os }}-
+    gc-max-store-size-linux: 5G
+    purge: true
+```
+
+**This is already excellent:**
+- ✅ Intelligent cache keys (flake.lock + *.nix hash)
+- ✅ Garbage collection to manage size
+- ✅ Restore prefix matching for cache reuse
+- ✅ Integrated with Cachix
+
+**No changes needed** - keep current setup.
+
+**Optional consideration:** Minor permission errors in purge logic are cosmetic, not affecting cache functionality.
+
+### Layer 4: Flake evaluation caching (optional incremental improvement)
 
 Cache Nix flake evaluation results separately from store paths.
 
@@ -176,7 +174,7 @@ Cache Nix flake evaluation results separately from store paths.
 - Reuses evaluation across jobs in same workflow run
 - Respects flake.lock changes automatically
 
-### Layer 5: TypeScript dependency caching
+### Layer 5: TypeScript dependency caching (optional incremental improvement)
 
 Current setup already uses Bun, but can optimize further.
 
@@ -204,7 +202,7 @@ Current setup already uses Bun, but can optimize further.
 - Faster `bun install` (already fast, but can skip network fetch)
 - Respects bun.lockb changes automatically
 
-### Layer 6: Playwright browser caching
+### Layer 6: Playwright browser caching (optional incremental improvement)
 
 Playwright browsers managed by Nix, but GitHub Actions cache can help.
 
@@ -219,39 +217,87 @@ Playwright browsers managed by Nix, but GitHub Actions cache can help.
       playwright-${{ runner.os }}-
 ```
 
-## Caching hierarchy (most effective to least)
+## Optimization impact (most effective to least)
 
-1. **Magic Nix Cache** - Nix store paths (85% of build time)
-2. **Cachix** - Custom overlay packages (10% of build time)
-3. **Path filters** - Skip entire jobs (100% time saved when applicable)
-4. **Flake evaluation cache** - Fast nix eval (3% of build time)
-5. **Bun cache** - Fast npm installs (1% of build time)
-6. **Playwright cache** - Browser downloads (1% of build time)
+1. **Path filters** - Skip entire jobs (100% time saved when applicable) - **PRIMARY OPTIMIZATION**
+2. **Concurrency control** - Cancel redundant runs (100% time saved on superseded runs) - **PRIMARY OPTIMIZATION**
+3. **Existing Nix caching** (cache-nix-action + Cachix) - Already optimized (85% of build time)
+4. **Flake evaluation cache** - Fast nix eval (3% of build time) - optional
+5. **Bun cache** - Fast npm installs (1% of build time) - optional
+6. **Playwright cache** - Browser downloads (1% of build time) - optional
 
 ## Implementation strategy
 
-### Phase 1: Quick wins (low risk, high impact)
+### Phase 1: Primary optimizations (low risk, highest impact)
 
-1. **Add concurrency control** - 1 line change, immediate savings
-2. **Add path-based job filtering** - prevents unnecessary runs
-3. **Fix current permission errors** - actions/cache permissions
+1. **Add concurrency control** - 1 line change, immediate 40% savings
+2. **Add path-based job filtering** - prevents 50-70% of unnecessary job runs
+3. **Validate with test PRs** - ensure filters work correctly
 
-### Phase 2: Magic Nix Cache migration (moderate risk, highest impact)
+### Phase 2: Optional incremental improvements (low priority)
 
-1. **Test in separate branch** - verify Magic Nix Cache works
-2. **Migrate setup-nix → nix-installer-action** - one action at a time
-3. **Remove custom cache logic** - simplify workflows
-4. **Monitor cache hit rates** - ensure improvement
+1. **Fix permission errors** - purge logic cosmetic issue
+2. **Add flake evaluation cache** - small improvement on cache misses
 
-### Phase 3: Fine-grained optimizations (low risk, incremental gains)
+3. **Add Bun cache** - small time savings
+4. **Add Playwright cache** - small time savings
 
-1. **Add Bun cache** - small time savings
-2. **Add Playwright cache** - small time savings
-3. **Optimize matrix strategies** - reduce duplicate work
+### Phase 3: Alternative Nix caching (evaluate later, if needed)
+
+**Consider Magic Nix Cache as alternative to cache-nix-action:**
+
+**Potential migration:**
+```yaml
+- uses: DeterminateSystems/nix-installer-action@main
+- uses: DeterminateSystems/magic-nix-cache-action@main
+- uses: cachix/cachix-action@v15  # keep Cachix
+```
+
+**Only migrate if:**
+- Cache-nix-action performance degrades
+- Magic Nix Cache shows clear benchmarking advantage
+- Team comfortable with dependency on Determinate Systems service
+
+**Current assessment:** Not needed - cache-nix-action is working well.
 
 ## Trade-offs
 
-### Magic Nix Cache
+### Path-based filtering
+
+**Positive:**
+- Massive time savings (skip entire job categories)
+- Explicit about job dependencies
+- Better developer experience (faster feedback)
+- Zero external dependencies
+
+**Negative:**
+- Requires maintenance (keep filters updated)
+- Risk of under-filtering (job should run but doesn't)
+- More complex workflow logic
+
+**Mitigation:**
+- Include `.github/**` in all filters (workflow changes trigger all)
+- Conservative filters (when in doubt, run the job)
+- Regular audits of filter accuracy
+
+### Concurrency control
+
+**Positive:**
+- Saves compute time
+- Prevents queue backlog
+- Standard GitHub Actions pattern
+- Zero external dependencies
+
+**Negative:**
+- Cancels previous runs (might want to keep them for debugging)
+- Can't A/B compare runs
+
+**Mitigation:**
+- Only cancel in-progress runs, not completed runs
+- Can disable per-PR if debugging needed
+- Logs preserved even after cancellation
+
+### Magic Nix Cache (future alternative)
 
 **Positive:**
 - Best-in-class Nix caching for GitHub Actions
