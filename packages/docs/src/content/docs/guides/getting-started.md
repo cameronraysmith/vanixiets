@@ -33,7 +33,8 @@ make bootstrap && exec $SHELL
 - Installs Nix using the [NixOS community installer](https://github.com/NixOS/experimental-nix-installer)
 - Configures Nix with comprehensive settings for optimal performance:
   - Enables flakes and nix-command experimental features
-  - Enables store optimization (auto-optimise-store) and parallel builds (max-jobs)
+  - Disables store optimization (auto-optimise-store=false) to prevent corruption on Darwin
+  - Enables parallel builds (max-jobs=auto)
   - Allows binary cache substitution for all derivations (always-allow-substitutes)
   - Configures legacy NIX_PATH compatibility (extra-nix-path)
 - Installs direnv for automatic environment activation
