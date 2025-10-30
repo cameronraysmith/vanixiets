@@ -1,5 +1,5 @@
 ---
-title: Host Onboarding Guide
+title: Host Onboarding
 sidebar:
   order: 3
 ---
