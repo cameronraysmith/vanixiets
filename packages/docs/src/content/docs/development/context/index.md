@@ -47,7 +47,7 @@ Restrictions influencing the system, distinguishing non-negotiable constraints f
 - Nix ecosystem requirement
 - Platform support (macOS aarch64, NixOS x86_64)
 - Security requirements (encrypted secrets, age encryption)
-- Licensing (AGPL-3.0)
+- Licensing (MIT)
 
 **Rules** (conditional procedures):
 - Git workflow (atomic commits, conventional messages)

@@ -82,7 +82,7 @@ Constraints are non-negotiable restrictions arising from business context, laws,
 ### Licensing constraints
 
 **Open source requirement**:
-- Repository licensed under AGPL-3.0
+- Repository licensed under MIT
 - All dependencies must have compatible open source licenses
 - Cannot use proprietary tools in core configuration
 - Reason: License compliance and open source principles

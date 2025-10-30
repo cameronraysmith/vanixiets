@@ -57,7 +57,7 @@ title: Stakeholders
 **Responsibilities**:
 - Adapt configuration to their own needs
 - Understand architectural patterns used
-- Follow licensing terms (AGPL-3.0)
+- Follow licensing terms (MIT)
 
 **Interests**:
 - Working, production-ready configuration
@@ -185,7 +185,7 @@ Communication occurs through:
 - Documentation explains architectural patterns
 - ADRs document decisions and rationale
 - Repository structure is self-documenting
-- License (AGPL-3.0) clarifies usage terms
+- License (MIT) clarifies usage terms
 
 ## Stakeholder needs summary
 
