@@ -453,7 +453,7 @@ git push
 gh run watch
 ```
 
-See [System Architecture](/development/architecture/system-architecture#release-configuration) for release strategy details.
+See [ADR-0005: Semantic versioning](/development/architecture/adrs/0005-semantic-versioning/) for release strategy details.
 
 ## Getting help
 
