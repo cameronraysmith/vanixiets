@@ -3,7 +3,7 @@
 # infra
 
 <a href="https://nix.dev/concepts/flakes" target="_blank">
-  <img alt="Nix Flakes Ready" src="https://img.shields.io/static/v1?logo=nixos&logoColor=d8dee9&label=Nix%20Flakes&labelColor=5e81ac&message=Personal%20Config&color=d8dee9&style=for-the-badge">
+  <img alt="Nix Flakes Ready" src="https://img.shields.io/static/v1?logo=nixos&logoColor=d8dee9&label=Nix%20Flakes&labelColor=5e81ac&message=infrastructure&color=d8dee9&style=for-the-badge">
 </a>
 
 [![CI][ci-badge]][ci-link] [![Docs][docs-badge]][docs-link] [![License][license-badge]][license-link]
