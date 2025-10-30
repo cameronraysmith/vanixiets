@@ -34,6 +34,7 @@ Architecture Decision Records (ADRs) documenting key technical and design decisi
 
 - [ADR-0012: GitHub Actions CI/CD pipeline](0012-github-actions-pipeline/)
 - [ADR-0013: Cloudflare Workers deployment](0013-cloudflare-workers-deployment/)
+- [ADR-0015: CI/CD caching optimization strategy](0015-ci-caching-optimization/)
 
 ## Design Philosophy
 
