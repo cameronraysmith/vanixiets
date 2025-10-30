@@ -30,7 +30,7 @@ make bootstrap && exec $SHELL
 ```
 
 **What this does:**
-- Installs Nix using the [Determinate Systems installer](https://github.com/DeterminateSystems/nix-installer)
+- Installs Nix using the [NixOS community installer](https://github.com/NixOS/experimental-nix-installer)
 - Installs direnv for automatic environment activation
 - Configures Nix flakes support
 - Sets up experimental features
