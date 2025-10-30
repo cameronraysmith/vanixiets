@@ -1,3 +1,4 @@
+# Test change for CI path filtering validation
 {
   flake,
   pkgs,
