@@ -6,9 +6,12 @@ sidebar:
 
 Contributing to the infra documentation site.
 
+## Guidelines
+
+- [Commit Conventions](commit-conventions) - Conventional commit format and rationale
+
 ## Documentation Site
 
-- [Docs Site Architecture](docs) - Architecture decisions for the Astro/Starlight documentation site
 - [Testing](testing) - Vitest and Playwright testing for the docs site
 
 ## CI/CD and Deployment
