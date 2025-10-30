@@ -407,7 +407,7 @@ When ready for public releases:
 
 ### 1. Verify conventional commits
 
-Ensure your team understands and uses [conventional commit format](/about/contributing/docs#commit-message-conventions).
+Ensure your team understands and uses [conventional commit format](/about/contributing/commit-conventions).
 
 ### 2. Test releases
 
@@ -453,7 +453,7 @@ git push
 gh run watch
 ```
 
-See [Architecture decisions](/about/contributing/docs#release-configuration) for release strategy details.
+See [System Architecture](/development/architecture/system-architecture#release-configuration) for release strategy details.
 
 ## Getting help
 
