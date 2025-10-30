@@ -67,12 +67,12 @@ bootstrap: install-nix install-direnv
 	@printf "For detailed documentation, see docs/new-user-host.md\n"
 
 .PHONY: install-nix
-install-nix: ## Install Nix using the Determinate Systems installer
+install-nix: ## Install Nix using the NixOS community installer
 	@echo "Installing Nix..."
 	@if command -v nix >/dev/null 2>&1; then \
 		echo "Nix is already installed."; \
 	else \
-		curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --no-confirm; \
+		curl --proto '=https' --tlsv1.2 -sSf -L https://artifacts.nixos.org/experimental-installer | sh -s -- install --no-confirm; \
 	fi
 
 .PHONY: install-direnv
