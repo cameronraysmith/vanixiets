@@ -1,5 +1,5 @@
 ---
-title: Multi-Arch Container Builds with Flocken and Nix-Rosetta-Builder
+title: Multi-Arch Container Builds
 sidebar:
   order: 10
 ---
