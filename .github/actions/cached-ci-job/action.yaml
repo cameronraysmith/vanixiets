@@ -31,6 +31,9 @@ outputs:
   any-changed:
     description: Whether any files matching path filters changed (when path-filters specified)
     value: ${{ steps.changed-files.outputs.any_changed || 'false' }}
+  content-hash:
+    description: Job-specific content hash for debugging and analysis
+    value: ${{ steps.content-hash.outputs.content-hash || '' }}
 
 runs:
   using: composite
@@ -83,6 +86,7 @@ runs:
             core.setOutput('previously-succeeded', 'false');
           }
 
+    
     - name: Get changed files
       id: changed-files
       if: |
@@ -93,6 +97,66 @@ runs:
         files: ${{ inputs.path-filters }}
         json: true
         separator: ','
+
+    - name: Compute job-specific content hash
+      id: content-hash
+      if: steps.check-history.outputs.previously-succeeded != 'true'
+      shell: bash
+      env:
+        CHECK_NAME: ${{ inputs.check-name }}
+        PATH_FILTERS: ${{ inputs.path-filters }}
+      run: |
+        echo "=== Computing Content Hash ==="
+
+        # Base content hash from commit SHA
+        CONTENT_HASH="${{ github.sha }}"
+        echo "Base hash (commit SHA): $CONTENT_HASH"
+
+        # Add workflow file hash to detect job definition changes
+        WF_HASH=$(git hash-object .github/workflows/ci.yaml 2>/dev/null || echo "unknown")
+        CONTENT_HASH="${CONTENT_HASH}-${WF_HASH}"
+        echo "Workflow hash: $WF_HASH"
+
+        # Add composite action hash to detect logic changes
+        ACTION_HASH=$(git hash-object .github/actions/cached-ci-job/action.yaml 2>/dev/null || echo "unknown")
+        CONTENT_HASH="${CONTENT_HASH}-${ACTION_HASH}"
+        echo "Action hash: $ACTION_HASH"
+
+        # Add relevant file content hashing when path filters are specified
+        if [ -n "$PATH_FILTERS" ]; then
+          echo "Path filters active: $PATH_FILTERS"
+
+          # Use changed files from previous step if available
+          if [ -n "${{ steps.changed-files.outputs.all_changed_files || '' }}" ]; then
+            CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_files }}"
+            echo "Using changed files: $CHANGED_FILES"
+
+            # Hash each changed file
+            FILE_HASHES=""
+            for file in $(echo "$CHANGED_FILES" | tr ',' '\n'); do
+              if [ -f "$file" ]; then
+                FILE_HASH=$(git hash-object "$file" 2>/dev/null)
+                if [ -n "$FILE_HASH" ]; then
+                  FILE_HASHES="${FILE_HASHES}${FILE_HASH}"
+                fi
+              fi
+            done
+
+            # Create final file hash
+            if [ -n "$FILE_HASHES" ]; then
+              RELEVANT_HASH=$(echo "$FILE_HASHES" | sha256sum | cut -d' ' -f1)
+              CONTENT_HASH="${CONTENT_HASH}-${RELEVANT_HASH}"
+              echo "Relevant files hash: $RELEVANT_HASH"
+            fi
+          else
+            echo "No changed files available for hashing"
+          fi
+        else
+          echo "No path filters - skipping file content hashing"
+        fi
+
+        echo "Final content hash: $CONTENT_HASH"
+        echo "content-hash=$CONTENT_HASH" >> $GITHUB_OUTPUT
 
     - name: Check for relevant file changes
       id: check-paths
