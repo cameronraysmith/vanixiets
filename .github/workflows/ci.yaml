@@ -844,8 +844,8 @@ jobs:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
   # job 12: production-release-packages
-  # Release packages to production on main/beta branches (push events only)
-  # Requires typescript+nix success/skipped (safe for fast-forward merge)
+  # Release packages via semantic-release on main/beta branches
+  # Semantic-release determines if actual release is needed
   production-release-packages:
     needs: [set-variables, typescript, nix]
     if: |
@@ -853,7 +853,7 @@ jobs:
       (needs.typescript.result == 'success' || needs.typescript.result == 'skipped') &&
       (needs.nix.result == 'success' || needs.nix.result == 'skipped') &&
       github.repository_owner == 'cameronraysmith' &&
-      github.event_name == 'push' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
     strategy:
       fail-fast: false
