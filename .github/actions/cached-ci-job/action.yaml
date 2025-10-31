@@ -47,6 +47,9 @@ outputs:
   resolved-check-name:
     description: 'Resolved check name after hash substitution'
     value: ${{ steps.check-history.outputs.resolved-check-name }}
+  cache-source:
+    description: 'Where cache hit occurred (actions-cache, checks-api, or none)'
+    value: ${{ steps.decide.outputs.cache-source }}
 
 runs:
   using: composite
@@ -83,6 +86,37 @@ runs:
         CONFIG_HASH=$(echo -e "$CONFIG_IDENTITY" | sha256sum | cut -c1-8)
         echo "Configuration hash: $CONFIG_HASH"
         echo "config-hash=$CONFIG_HASH" >> $GITHUB_OUTPUT
+
+    - name: Prepare cache key for actions/cache
+      id: cache-result
+      shell: bash
+      env:
+        CHECK_NAME: ${{ inputs.check-name }}
+        CONFIG_HASH: ${{ steps.config-hash.outputs.config-hash }}
+      run: |
+        echo "=== Actions Cache Lookup ==="
+
+        # Extract base check name (remove hash suffix if present)
+        # Input: "nix-{hash} (packages, x86_64-linux)" or "nix-a1b2c3d4 (packages, x86_64-linux)"
+        # Output: "nix-packages-x86_64-linux"
+        BASE_NAME=$(echo "$CHECK_NAME" | sed 's/-{hash}//g' | sed 's/-[a-f0-9]\{8\}//g' | tr -d '()' | tr ', ' '-' | tr -s '-')
+
+        CACHE_KEY="job-result-${BASE_NAME}-${CONFIG_HASH}"
+        echo "Cache key: $CACHE_KEY"
+
+        # Use actions/cache/restore for lookup
+        CACHE_PATH=".cache/job-results/${CHECK_NAME}"
+
+        echo "cache-key=$CACHE_KEY" >> $GITHUB_OUTPUT
+        echo "cache-path=$CACHE_PATH" >> $GITHUB_OUTPUT
+
+    - name: Lookup job result in actions/cache
+      id: cache-lookup
+      uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/restore@v4
+      with:
+        path: ${{ steps.cache-result.outputs.cache-path }}
+        key: ${{ steps.cache-result.outputs.cache-key }}
+        lookup-only: true
 
     - name: Query GitHub Checks API for execution history
       id: check-history
@@ -351,13 +385,15 @@ runs:
       env:
         FORCE: ${{ inputs.force-run }}
         PREV_SUCCESS: ${{ steps.check-history.outputs.previously-succeeded }}
+        CACHE_HIT: ${{ steps.cache-lookup.outputs.cache-hit || 'false' }}
         HAS_CHANGES: ${{ steps.check-paths.outputs.relevant-changes }}
         HAS_FILTERS: ${{ inputs.path-filters != '' }}
         VALIDATION_FAILED: ${{ steps.validate.outputs.validation-failed || 'false' }}
       run: |
         echo "=== Execution Decision ==="
         echo "Force run: $FORCE"
-        echo "Previously succeeded: $PREV_SUCCESS"
+        echo "Actions cache hit: $CACHE_HIT"
+        echo "Previously succeeded (Checks API): $PREV_SUCCESS"
         echo "Validation failed: $VALIDATION_FAILED"
         echo "Has path filters: $HAS_FILTERS"
         echo "Relevant changes: $HAS_CHANGES"
@@ -366,6 +402,7 @@ runs:
         # Force run overrides everything
         if [ "$FORCE" = "true" ]; then
           echo "should-run=true" >> $GITHUB_OUTPUT
+          echo "cache-source=none" >> $GITHUB_OUTPUT
           echo "Decision: RUN (forced by input)"
           exit 0
         fi
@@ -373,13 +410,23 @@ runs:
         # Validation failure overrides cache decision
         if [ "$VALIDATION_FAILED" = "true" ]; then
           echo "should-run=true" >> $GITHUB_OUTPUT
+          echo "cache-source=none" >> $GITHUB_OUTPUT
           echo "Decision: RUN (check name validation failed)"
           exit 0
         fi
 
-        # If already succeeded for this commit, skip
+        # Check actions/cache first (cross-commit caching)
+        if [ "$CACHE_HIT" = "true" ]; then
+          echo "should-run=false" >> $GITHUB_OUTPUT
+          echo "cache-source=actions-cache" >> $GITHUB_OUTPUT
+          echo "Decision: SKIP (cached result from actions/cache)"
+          exit 0
+        fi
+
+        # Check GitHub Checks API (same-commit caching)
         if [ "$PREV_SUCCESS" = "true" ]; then
           echo "should-run=false" >> $GITHUB_OUTPUT
+          echo "cache-source=checks-api" >> $GITHUB_OUTPUT
           echo "Decision: SKIP (already succeeded for this commit)"
           exit 0
         fi
@@ -387,6 +434,7 @@ runs:
         # If we have path filters, honor them
         if [ "$HAS_FILTERS" = "true" ]; then
           echo "should-run=${HAS_CHANGES}" >> $GITHUB_OUTPUT
+          echo "cache-source=none" >> $GITHUB_OUTPUT
           if [ "$HAS_CHANGES" = "true" ]; then
             echo "Decision: RUN (relevant file changes detected)"
           else
@@ -395,5 +443,6 @@ runs:
         else
           # No filters means always run if not already succeeded
           echo "should-run=true" >> $GITHUB_OUTPUT
+          echo "cache-source=none" >> $GITHUB_OUTPUT
           echo "Decision: RUN (no path filters specified)"
         fi
