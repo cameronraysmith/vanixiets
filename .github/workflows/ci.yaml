@@ -557,7 +557,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          path-filters: '\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile'
+          path-filters: 'justfile$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
       - name: setup nix
