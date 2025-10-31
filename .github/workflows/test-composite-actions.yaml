@@ -41,17 +41,16 @@ jobs:
         id: cache-test
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: test-cache-hit-{hash}
+          check-name: test-cache-hit
           path-filters: '\.md$'
 
       - name: Validate outputs
         run: |
           echo "=== Composite Action Outputs ==="
           echo "should-run: ${{ steps.cache-test.outputs.should-run }}"
-          echo "previously-succeeded: ${{ steps.cache-test.outputs.previously-succeeded }}"
           echo "relevant-changes: ${{ steps.cache-test.outputs.relevant-changes }}"
-          echo "config-hash: ${{ steps.cache-test.outputs.config-hash }}"
-          echo "resolved-check-name: ${{ steps.cache-test.outputs.resolved-check-name }}"
+          echo "cache-key: ${{ steps.cache-test.outputs.cache-key }}"
+          echo "cache-path: ${{ steps.cache-test.outputs.cache-path }}"
 
           # Validate required outputs present
           if [ -z "${{ steps.cache-test.outputs.should-run }}" ]; then
@@ -59,36 +58,27 @@ jobs:
             exit 1
           fi
 
-          if [ -z "${{ steps.cache-test.outputs.config-hash }}" ]; then
-            echo "❌ Missing required output: config-hash"
+          if [ -z "${{ steps.cache-test.outputs.cache-key }}" ]; then
+            echo "❌ Missing required output: cache-key"
             exit 1
           fi
 
-          if [ -z "${{ steps.cache-test.outputs.resolved-check-name }}" ]; then
-            echo "❌ Missing required output: resolved-check-name"
+          if [ -z "${{ steps.cache-test.outputs.cache-path }}" ]; then
+            echo "❌ Missing required output: cache-path"
             exit 1
           fi
 
           echo "✅ All required outputs present"
 
-      - name: Validate config hash format
+      - name: Validate cache key format
         run: |
-          HASH="${{ steps.cache-test.outputs.config-hash }}"
-          if ! echo "$HASH" | grep -qE '^[a-f0-9]{8}$'; then
-            echo "❌ Invalid config hash format: $HASH"
-            echo "Expected: 8 hex characters"
+          KEY="${{ steps.cache-test.outputs.cache-key }}"
+          if ! echo "$KEY" | grep -qE '^job-result-.*-[a-f0-9]{8}$'; then
+            echo "❌ Invalid cache key format: $KEY"
+            echo "Expected: job-result-{name}-{8-char-sha}"
             exit 1
           fi
-          echo "✅ Config hash format valid: $HASH"
-
-      - name: Validate resolved check name
-        run: |
-          RESOLVED="${{ steps.cache-test.outputs.resolved-check-name }}"
-          if echo "$RESOLVED" | grep -q '{hash}'; then
-            echo "❌ Hash template not replaced: $RESOLVED"
-            exit 1
-          fi
-          echo "✅ Check name resolved: $RESOLVED"
+          echo "✅ Cache key format valid: $KEY"
 
   test-path-filters:
     name: Test path filter logic
@@ -107,7 +97,7 @@ jobs:
         id: filter-test
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: test-path-filters-{hash}
+          check-name: test-path-filters
           path-filters: '\.nix$|flake\.lock'
 
       - name: Validate path filter outputs
@@ -122,29 +112,3 @@ jobs:
           fi
 
           echo "✅ Path filter outputs valid"
-
-  test-validation:
-    name: Test check name validation
-    runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      (inputs.test-scenario == 'all' || inputs.test-scenario == 'validation')
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Test with valid check name
-        id: valid-test
-        uses: ./.github/actions/cached-ci-job
-        with:
-          check-name: test-validation-{hash}
-
-      - name: Validate success
-        run: |
-          if [ "${{ steps.valid-test.outputs.should-run }}" = "" ]; then
-            echo "❌ Validation test failed"
-            exit 1
-          fi
-          echo "✅ Valid check name accepted"
