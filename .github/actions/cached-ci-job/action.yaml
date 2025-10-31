@@ -129,6 +129,22 @@ runs:
             } catch (error) {
               const isLastAttempt = attempt === maxRetries;
 
+              // Check for rate limiting
+              if (error.status === 403) {
+                const remaining = error.response?.headers?.['x-ratelimit-remaining'];
+                const resetTime = error.response?.headers?.['x-ratelimit-reset'];
+
+                if (remaining === '0' || remaining === 0) {
+                  const resetDate = resetTime ? new Date(resetTime * 1000) : 'unknown';
+                  core.error(`GitHub API rate limit exceeded. Resets at: ${resetDate}`);
+                  core.error('Too many workflow runs. Consider reducing check frequency.');
+
+                  // Don't retry on rate limit - it won't help
+                  core.setOutput('previously-succeeded', 'false');
+                  return;
+                }
+              }
+
               if (isLastAttempt) {
                 core.warning(`API query failed after ${maxRetries} attempts: ${error.message}`);
                 core.setOutput('previously-succeeded', 'false');
