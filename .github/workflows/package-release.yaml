@@ -91,17 +91,28 @@ jobs:
           ref: ${{ inputs.checkout-ref != '' && inputs.checkout-ref || github.ref }}
           persist-credentials: false
 
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: ${{ inputs.package-name }}-release
+          path-filters: 'packages/${{ inputs.package-name }}/**/*|bun\.lock$|\.github/workflows/package-release\.yaml$|justfile$'
+          force-run: ${{ inputs.debug-enabled == 'true' && 'true' || 'false' }}
+
       - name: Setup Nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           installer: quick
           system: x86_64-linux
 
       - name: Install dependencies
+        if: steps.cache.outputs.should-run == 'true'
         run: nix develop -c bun install
 
       - name: Run semantic-release
         id: semantic-release
+        if: steps.cache.outputs.should-run == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}

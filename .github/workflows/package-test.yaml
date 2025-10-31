@@ -58,23 +58,38 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: ${{ inputs.package-name }}-test
+          path-filters: 'packages/${{ inputs.package-name }}/**/*|bun\.lock$|\.github/workflows/package-test\.yaml$'
+          force-run: ${{ inputs.debug-enabled == 'true' && 'true' || 'false' }}
 
       - name: setup nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           installer: ${{ inputs.nix-installer }}
           system: x86_64-linux
 
       - name: install dependencies
+        if: steps.cache.outputs.should-run == 'true'
         run: nix develop --command bun install
 
       - name: run unit tests with coverage
+        if: steps.cache.outputs.should-run == 'true'
         run: nix develop --command just ${{ inputs.package-name }}-test-coverage
 
       - name: build for e2e tests
+        if: steps.cache.outputs.should-run == 'true'
         run: nix develop --command just ${{ inputs.package-name }}-build
 
       - name: run e2e tests
+        if: steps.cache.outputs.should-run == 'true'
         run: nix develop --command just ${{ inputs.package-name }}-test-e2e
 
       - name: upload test results
