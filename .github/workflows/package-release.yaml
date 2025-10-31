@@ -95,7 +95,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ inputs.package-name }}-release
+          check-name: ${{ inputs.package-name }}-release-{hash}
           path-filters: 'packages/${{ inputs.package-name }}/**/*|bun\.lock$|\.github/workflows/package-release\.yaml$|justfile$'
           force-run: ${{ inputs.debug-enabled == 'true' && 'true' || 'false' }}
 
