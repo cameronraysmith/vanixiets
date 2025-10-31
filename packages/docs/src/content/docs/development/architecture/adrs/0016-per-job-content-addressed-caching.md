@@ -774,6 +774,73 @@ gh api repos/$REPO/actions/runs/$RUN_ID/jobs --jq '.jobs[].name'
 - Cache expiration: 7-day TTL + 24-hour staleness filter
 - Incident response: documented emergency procedures
 
+### Phase 1.9: Two-Layer Simplification (2025-10-31)
+
+**Problem**: Phase 1.8 implementation encountered fundamental architectural conflicts with GitHub Actions design.
+
+**Issues identified**:
+1. **Cache key collisions**: Stable config-based keys couldn't be overwritten on workflow reruns
+2. **Check name validation failures**: Embedded config hashes didn't match GitHub's actual check run names
+3. **Architectural complexity**: Three-layer design fought against GitHub's natural caching mechanisms
+
+**Root cause**: GitHub Checks API integration added complexity without proportional benefit.
+The check name templating with embedded config hashes created a mismatch between internal cache logic and GitHub's actual check run naming.
+
+**Solution**: Simplify to two-layer architecture by removing GitHub Checks API integration.
+
+**Architecture changes**:
+
+**Removed**:
+- GitHub Checks API query for execution history
+- Check name validation logic
+- Config hash computation and embedding
+
+**Simplified cache key**:
+```bash
+# Before: job-result-{job}-{config-hash}
+# After:  job-result-{job}-{sha-prefix}
+
+CACHE_KEY="job-result-${SANITIZED_JOB}-${GITHUB_SHA:0:8}"
+```
+
+**Cross-commit caching via restore-keys**:
+```yaml
+key: job-result-secrets-scan-079f605a
+restore-keys: |
+  job-result-secrets-scan-
+```
+
+GitHub Actions cache will match the most recent cache with the restore-keys prefix, enabling cross-commit reuse while preventing save collisions.
+
+**Two-layer decision flow**:
+1. **actions/cache lookup** (with restore-keys for cross-commit)
+   - Hit: skip job
+   - Miss: continue to layer 2
+2. **Path filters** (change-based optimization)
+   - No filters: run job
+   - With filters: run only if relevant files changed
+
+**Benefits**:
+- Eliminates cache save collisions (SHA makes keys unique)
+- Fixes validation failures (no check name templating)
+- Maintains cross-commit caching (via restore-keys)
+- Simpler implementation (fewer steps, clearer logic)
+- More robust (fewer failure modes)
+
+**Trade-offs accepted**:
+- Lost same-commit deduplication from Checks API (minor - actions/cache handles this)
+- Config changes don't immediately invalidate cache (acceptable - commits create new SHAs)
+
+**Migration impact**:
+- Existing caches remain usable via restore-keys prefix matching
+- Breaking changes to composite action outputs (removed obsolete outputs)
+- All workflows updated to simplified marker format
+
+**Performance characteristics**:
+- Cache hit rate: Expected to remain 85-95% on typical PRs
+- Lookup performance: Slightly faster (fewer API calls)
+- Reliability: Significantly improved (eliminates two major failure modes)
+
 ## References
 
 - **Implementation commits:**
