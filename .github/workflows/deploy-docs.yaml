@@ -62,7 +62,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: preview-docs-deploy-{hash}
+          check-name: preview-docs-deploy
           path-filters: 'packages/docs/|\.github/workflows/deploy-docs\.yaml$'
           force-run: ${{ inputs.debug_enabled == 'true' && 'true' || 'false' }}
 
@@ -108,14 +108,13 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
-          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
-            "config_hash": "${{ steps.cache.outputs.config-hash }}",
-            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
             "workflow_run_id": "${{ github.run_id }}",
             "environment": "${{ inputs.environment }}",
             "branch": "${{ inputs.branch }}"
@@ -126,5 +125,5 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
-          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
