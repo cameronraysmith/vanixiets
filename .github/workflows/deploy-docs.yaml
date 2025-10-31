@@ -127,4 +127,4 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+          key: ${{ steps.cache.outputs.cache-key }}
