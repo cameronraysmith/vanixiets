@@ -106,6 +106,29 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         run: nix run nixpkgs#gitleaks -- detect --verbose --redact
 
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+
   # job 1: set-variables
   # determines deployment settings and variables based on event type
   # Always runs - needed for production job routing and provides outputs
@@ -311,6 +334,29 @@ jobs:
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
           nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt
 
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+
   # job 5: config-validation
   # tests config.nix user definitions (phase 1)
   config-validation:
@@ -379,6 +425,29 @@ jobs:
           fi
 
           echo "✅ user definitions validated successfully"
+
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
 
   # job 6: autowiring-validation
   # verifies nixos-unified automatic config discovery
@@ -454,6 +523,29 @@ jobs:
           done
 
           echo "✅ all expected homeConfigurations found"
+
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
 
   # job 7: secrets-workflow
   # tests sops-nix mechanics with ephemeral test keys
@@ -541,6 +633,29 @@ jobs:
         run: |
           rm -rf test-secrets
           echo "✅ ephemeral test secrets cleaned up"
+
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
 
   # job 8: justfile-activation
   # validates user experience: justfile recipes, configuration discovery, and activation workflows
@@ -693,6 +808,29 @@ jobs:
 
           echo ""
           echo "✅ all configurations properly exposed"
+
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
 
   # job 9: cache-overlay-packages
   # pre-cache resource-intensive overlay packages before main build
