@@ -104,6 +104,11 @@ runs:
           core.info(`Resolved check name: "${resolvedCheckName}" @ ${commit}`);
           core.info(`Event: ${context.eventName}, Using commit: ${commit}`);
 
+          // Cache expiration: 7 days
+          const maxAgeMs = 7 * 24 * 60 * 60 * 1000;
+          const cutoffTime = new Date(Date.now() - maxAgeMs);
+          core.info(`Cache cutoff time: ${cutoffTime.toISOString()} (7 days ago)`);
+
           try {
             const { data: checks } = await github.rest.checks.listForRef({
               owner: context.repo.owner,
@@ -130,12 +135,22 @@ runs:
             }
 
             // Find any completed successful run from authentic GitHub Actions
-            const successfulRun = checks.check_runs.find(run =>
-              run.conclusion === 'success' &&
-              run.status === 'completed' &&
-              run.app.slug === 'github-actions' &&
-              run.details_url && run.details_url.includes('/actions/runs/')
-            );
+            const successfulRun = checks.check_runs.find(run => {
+              const runAge = run.completed_at ? new Date(run.completed_at) : null;
+              const isRecent = runAge && runAge > cutoffTime;
+
+              if (run.conclusion === 'success' && run.status === 'completed' && !isRecent) {
+                core.info(`Ignoring stale check run from ${runAge?.toISOString()} (older than 7 days)`);
+              }
+
+              return (
+                run.conclusion === 'success' &&
+                run.status === 'completed' &&
+                run.app.slug === 'github-actions' &&
+                run.details_url && run.details_url.includes('/actions/runs/') &&
+                isRecent
+              );
+            });
 
             if (successfulRun) {
               core.info(`✓ Job already succeeded: ${successfulRun.html_url}`);
