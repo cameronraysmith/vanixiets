@@ -797,7 +797,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
-          path-filters: '\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile'
+          path-filters: 'flake\.(nix|lock)$|^\.github/workflows/ci\.yaml|overlays/.*\.nix$|modules/.*\.nix$|configurations/.*\.nix$|justfile$|pkgs/.*\.nix$'
           force-run: ${{ inputs.force_run || 'false' }}
 
       - name: setup nix
