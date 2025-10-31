@@ -91,7 +91,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }}-{hash}
+          check-name: ${{ github.job }}
           force-run: ${{ inputs.force_run || 'false' }}
           # No path-filters - security scanning always relevant
 
@@ -110,14 +110,13 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
-          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
-            "config_hash": "${{ steps.cache.outputs.config-hash }}",
-            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
             "workflow_run_id": "${{ github.run_id }}"
           }
           EOF
@@ -126,7 +125,7 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
-          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
   # job 1: set-variables
@@ -288,7 +287,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }}-{hash}
+          check-name: ${{ github.job }}
           path-filters: 'Makefile$|\.envrc$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -338,14 +337,13 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
-          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
-            "config_hash": "${{ steps.cache.outputs.config-hash }}",
-            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
             "workflow_run_id": "${{ github.run_id }}"
           }
           EOF
@@ -354,7 +352,7 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
-          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
   # job 5: config-validation
@@ -377,7 +375,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }}-{hash}
+          check-name: ${{ github.job }}
           path-filters: 'configurations/(darwin|nixos)/.*\.nix$|modules/(users|base)/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -430,14 +428,13 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
-          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
-            "config_hash": "${{ steps.cache.outputs.config-hash }}",
-            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
             "workflow_run_id": "${{ github.run_id }}"
           }
           EOF
@@ -446,7 +443,7 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
-          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
   # job 6: autowiring-validation
@@ -469,7 +466,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }}-{hash}
+          check-name: ${{ github.job }}
           path-filters: 'flake\.(nix|lock)$|configurations/.*\.nix$|modules/.*\.nix$|justfile$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -528,14 +525,13 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
-          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
-            "config_hash": "${{ steps.cache.outputs.config-hash }}",
-            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
             "workflow_run_id": "${{ github.run_id }}"
           }
           EOF
@@ -544,7 +540,7 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
-          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
   # job 7: secrets-workflow
@@ -567,7 +563,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }}-{hash}
+          check-name: ${{ github.job }}
           path-filters: '\.sops\.ya?ml$|modules/secrets/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -638,14 +634,13 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
-          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
-            "config_hash": "${{ steps.cache.outputs.config-hash }}",
-            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
             "workflow_run_id": "${{ github.run_id }}"
           }
           EOF
@@ -654,7 +649,7 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
-          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
   # job 8: justfile-activation
@@ -677,7 +672,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }}-{hash}
+          check-name: ${{ github.job }}
           path-filters: 'justfile$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -813,14 +808,13 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
-          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
-            "config_hash": "${{ steps.cache.outputs.config-hash }}",
-            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
             "workflow_run_id": "${{ github.run_id }}"
           }
           EOF
@@ -829,7 +823,7 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
-          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
   # job 9: cache-overlay-packages
@@ -862,7 +856,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }}-{hash} (${{ matrix.system }})
+          check-name: ${{ github.job }} (${{ matrix.system }})
           path-filters: 'overlays/.*\.nix$|flake\.(nix|lock)$|pkgs/.*\.nix$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -886,14 +880,13 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
-          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
-            "config_hash": "${{ steps.cache.outputs.config-hash }}",
-            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
             "workflow_run_id": "${{ github.run_id }}",
             "matrix": {
               "system": "${{ matrix.system }}"
@@ -905,7 +898,7 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
-          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
   # job 10: nix
@@ -966,7 +959,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }}-{hash} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
+          check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
           path-filters: 'flake\.(nix|lock)$|^\.github/workflows/ci\.yaml|overlays/.*\.nix$|modules/.*\.nix$|configurations/.*\.nix$|justfile$|pkgs/.*\.nix$'
           force-run: ${{ github.ref == 'refs/heads/main' && 'true' || inputs.force_run || 'false' }}
 
@@ -993,14 +986,13 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
-          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
-            "config_hash": "${{ steps.cache.outputs.config-hash }}",
-            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
             "workflow_run_id": "${{ github.run_id }}",
             "matrix": {
               "system": "${{ matrix.system }}",
@@ -1014,7 +1006,7 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
-          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
   # job 11: typescript
