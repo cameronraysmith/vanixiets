@@ -110,8 +110,8 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
+          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -338,8 +338,8 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
+          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -430,8 +430,8 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
+          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -528,8 +528,8 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
+          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -638,8 +638,8 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
+          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -813,8 +813,8 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
+          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -886,8 +886,8 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
+          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -993,8 +993,8 @@ jobs:
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
         run: |
-          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          mkdir -p ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}"
+          cat > ".cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker" <<EOF
           {
             "success": true,
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
