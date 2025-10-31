@@ -264,7 +264,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          path-filters: 'Makefile|\.envrc'
+          path-filters: 'Makefile$|\.envrc$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
       - name: run make bootstrap
