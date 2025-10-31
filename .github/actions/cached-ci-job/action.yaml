@@ -10,6 +10,10 @@ inputs:
     description: Regex pattern for relevant file paths (empty means always relevant)
     required: false
     default: ''
+  workflow-file:
+    description: 'Workflow file path (auto-detected if not provided)'
+    required: false
+    default: ''
   force-run:
     description: Force execution even if already successful
     required: false
@@ -37,24 +41,67 @@ outputs:
   content-hash:
     description: Job-specific content hash for debugging and analysis
     value: ${{ steps.content-hash.outputs.content-hash || '' }}
+  config-hash:
+    description: 'Configuration identity hash (workflow+action+filters)'
+    value: ${{ steps.config-hash.outputs.config-hash }}
 
 runs:
   using: composite
   steps:
+    - name: Compute configuration-identity hash
+      id: config-hash
+      shell: bash
+      env:
+        PATH_FILTERS: ${{ inputs.path-filters }}
+      run: |
+        echo "=== Computing Configuration-Identity Hash ==="
+
+        # Detect workflow file
+        WORKFLOW_PATH=$(echo "$GITHUB_WORKFLOW_REF" | sed 's|.*@refs/[^:]*:||')
+        if [ -n "${{ inputs.workflow-file }}" ]; then
+          WORKFLOW_PATH="${{ inputs.workflow-file }}"
+        fi
+        if [ -z "$WORKFLOW_PATH" ] || [ ! -f "$WORKFLOW_PATH" ]; then
+          WORKFLOW_PATH=".github/workflows/ci.yaml"
+        fi
+
+        echo "Workflow file: $WORKFLOW_PATH"
+
+        # Compute component hashes
+        WF_HASH=$(git hash-object "$WORKFLOW_PATH" 2>/dev/null || echo "unknown")
+        ACTION_HASH=$(git hash-object .github/actions/cached-ci-job/action.yaml 2>/dev/null || echo "unknown")
+
+        echo "Workflow hash: $WF_HASH"
+        echo "Action hash: $ACTION_HASH"
+        echo "Path filters: $PATH_FILTERS"
+
+        # Combine into configuration-identity hash
+        CONFIG_IDENTITY="workflow:${WF_HASH}\naction:${ACTION_HASH}\nfilters:${PATH_FILTERS}"
+        CONFIG_HASH=$(echo -e "$CONFIG_IDENTITY" | sha256sum | cut -c1-8)
+        echo "Configuration hash: $CONFIG_HASH"
+        echo "config-hash=$CONFIG_HASH" >> $GITHUB_OUTPUT
+
     - name: Query GitHub Checks API for execution history
       id: check-history
       uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # ratchet:actions/github-script@v7
       env:
         CHECK_NAME: ${{ inputs.check-name }}
+        CONFIG_HASH: ${{ steps.config-hash.outputs.config-hash }}
       with:
         script: |
           const checkName = process.env.CHECK_NAME;
+          const configHash = process.env.CONFIG_HASH;
+
+          // Replace {hash} placeholder with actual hash
+          const resolvedCheckName = checkName.replace('{hash}', configHash);
+
           // Use PR head commit for pull_request events, otherwise use context.sha
           const commit = context.eventName === 'pull_request'
             ? context.payload.pull_request.head.sha
             : context.sha;
 
-          core.info(`Querying execution history for: "${checkName}" @ ${commit}`);
+          core.info(`Check name template: "${checkName}"`);
+          core.info(`Resolved check name: "${resolvedCheckName}" @ ${commit}`);
           core.info(`Event: ${context.eventName}, Using commit: ${commit}`);
 
           try {
@@ -62,7 +109,7 @@ runs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               ref: commit,
-              check_name: checkName,
+              check_name: resolvedCheckName,
             });
 
             core.info(`Found ${checks.check_runs.length} check run(s) for this commit`);
@@ -113,65 +160,13 @@ runs:
         json: true
         separator: ','
 
-    - name: Compute job-specific content hash
+    - name: Compute job-specific content hash (legacy)
       id: content-hash
       if: steps.check-history.outputs.previously-succeeded != 'true'
       shell: bash
-      env:
-        CHECK_NAME: ${{ inputs.check-name }}
-        PATH_FILTERS: ${{ inputs.path-filters }}
       run: |
-        echo "=== Computing Content Hash ==="
-
-        # Base content hash from commit SHA
-        CONTENT_HASH="${{ github.sha }}"
-        echo "Base hash (commit SHA): $CONTENT_HASH"
-
-        # Add workflow file hash to detect job definition changes
-        WF_HASH=$(git hash-object .github/workflows/ci.yaml 2>/dev/null || echo "unknown")
-        CONTENT_HASH="${CONTENT_HASH}-${WF_HASH}"
-        echo "Workflow hash: $WF_HASH"
-
-        # Add composite action hash to detect logic changes
-        ACTION_HASH=$(git hash-object .github/actions/cached-ci-job/action.yaml 2>/dev/null || echo "unknown")
-        CONTENT_HASH="${CONTENT_HASH}-${ACTION_HASH}"
-        echo "Action hash: $ACTION_HASH"
-
-        # Add relevant file content hashing when path filters are specified
-        if [ -n "$PATH_FILTERS" ]; then
-          echo "Path filters active: $PATH_FILTERS"
-
-          # Use filtered changed files from previous step if available
-          if [ -n "${{ steps.changed-files.outputs.all_changed_files || '' }}" ]; then
-            CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_files }}"
-            echo "Using filtered changed files: $CHANGED_FILES"
-
-            # Hash each changed file
-            FILE_HASHES=""
-            for file in $(echo "$CHANGED_FILES" | tr ',' '\n'); do
-              if [ -f "$file" ]; then
-                FILE_HASH=$(git hash-object "$file" 2>/dev/null)
-                if [ -n "$FILE_HASH" ]; then
-                  FILE_HASHES="${FILE_HASHES}${FILE_HASH}"
-                fi
-              fi
-            done
-
-            # Create final file hash
-            if [ -n "$FILE_HASHES" ]; then
-              RELEVANT_HASH=$(echo "$FILE_HASHES" | sha256sum | cut -d' ' -f1)
-              CONTENT_HASH="${CONTENT_HASH}-${RELEVANT_HASH}"
-              echo "Relevant files hash: $RELEVANT_HASH"
-            fi
-          else
-            echo "No changed files available for hashing"
-          fi
-        else
-          echo "No path filters - skipping file content hashing"
-        fi
-
-        echo "Final content hash: $CONTENT_HASH"
-        echo "content-hash=$CONTENT_HASH" >> $GITHUB_OUTPUT
+        # Legacy output for backward compatibility - now superseded by config-hash
+        echo "content-hash=${{ github.sha }}" >> $GITHUB_OUTPUT
 
     - name: Check for relevant file changes
       id: check-paths
