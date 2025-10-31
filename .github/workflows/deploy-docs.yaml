@@ -56,8 +56,18 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
         with:
           ref: ${{ inputs.branch }}
+          fetch-depth: 0  # for git diff in composite action
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: preview-docs-deploy-{hash}
+          path-filters: 'packages/docs/|\.github/workflows/deploy-docs\.yaml$'
+          force-run: ${{ inputs.debug_enabled == 'true' && 'true' || 'false' }}
 
       - name: Setup Nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
@@ -66,16 +76,19 @@ jobs:
           system: x86_64-linux
 
       - name: Setup tmate debug session
-        if: inputs.debug_enabled == 'true'
+        if: inputs.debug_enabled == 'true' && steps.cache.outputs.should-run == 'true'
         uses: mxschmitt/action-tmate@e5c7151931ca95bad1c6f4190c730ecf8c7dde48 # ratchet:mxschmitt/action-tmate@v3
 
       - name: Install dependencies
+        if: steps.cache.outputs.should-run == 'true'
         run: nix develop -c just install
 
       - name: Validate documentation links
+        if: steps.cache.outputs.should-run == 'true'
         run: nix develop -c just docs-linkcheck
 
       - name: Deploy to Cloudflare Workers
+        if: steps.cache.outputs.should-run == 'true'
         id: deployment
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
@@ -90,3 +103,28 @@ jobs:
             echo "Deploying to production (promoting existing version if available)"
             nix develop -c just docs-deploy-production
           fi
+
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "environment": "${{ inputs.environment }}",
+            "branch": "${{ inputs.branch }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
