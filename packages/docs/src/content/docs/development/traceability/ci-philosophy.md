@@ -203,8 +203,18 @@ Track locally:
 - `just check` should stay under 30s
 - If it grows beyond 1min, investigate what's being evaluated
 
+## Job Execution Caching
+
+As of ADR-0016, all jobs use per-job content-addressed caching via GitHub Checks API.
+Each job independently decides whether to run based on:
+1. Previous successful execution for the current commit SHA
+2. Relevant file changes (via path filters)
+3. Manual force-run override
+
+This means jobs automatically skip if they've already succeeded for a given commit, providing optimal retry behavior and faster feedback loops.
+
 ## References
 
-- **Implementation**: `.github/workflows/ci.yaml:289-424`
-- **Design doc**: `./justfile-activation-redesign.md`
-- **User workflows**: `../../README.md` (usage section)
+- **Implementation**: `.github/workflows/ci.yaml` (see job definitions for caching logic)
+- **Caching architecture**: [ADR-0016: Per-job content-addressed caching](/development/architecture/adrs/0016-per-job-content-addressed-caching/)
+- **User workflows**: Repository README (usage section)

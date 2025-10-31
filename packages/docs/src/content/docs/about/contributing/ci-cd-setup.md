@@ -219,6 +219,9 @@ gh workflow run ci.yaml
 
 # Or with deployment enabled
 gh workflow run ci.yaml -f deploy_enabled=true
+
+# Force all jobs to run (ignore caching)
+gh workflow run ci.yaml -f force_run=true
 ```
 
 ### 3.2 Monitor Workflow Execution
@@ -233,18 +236,34 @@ gh run view --web
 
 ### 3.3 Verify Each Job
 
-The workflow should complete these jobs in order:
-1. ✅ **secrets-scan**: Gitleaks secret scanning
-2. ✅ **set-variables**: Configure workflow variables
-3. ✅ **bootstrap-verification**: Validate bootstrap workflow
-4. ✅ **config-validation**: Test config.nix user definitions
-5. ✅ **autowiring-validation**: Verify nixos-unified autowiring
-6. ✅ **secrets-workflow**: Test sops-nix mechanics
-7. ✅ **justfile-activation**: Validate justfile recipes
-8. ✅ **cache-overlay-packages**: Pre-cache overlay packages
-9. ✅ **nix**: Build all flake outputs
-10. ✅ **docs-test**: Test documentation site
-11. ✅ **docs-deploy**: Deploy to Cloudflare Workers (only if enabled)
+The workflow executes these jobs with intelligent per-job caching (jobs skip if already succeeded for this commit):
+
+**Core jobs (always run on PR/push):**
+1. ✅ **secrets-scan**: Gitleaks secret scanning (security critical, no caching)
+2. ✅ **set-variables**: Configure workflow variables (produces outputs, always runs)
+
+**Preview jobs (PR only, fast feedback):**
+3. ✅ **preview-release-version**: Show what version would be released
+4. ✅ **preview-docs-deploy**: Deploy docs to branch-specific preview URL
+
+**Validation jobs (run based on file changes):**
+5. ✅ **bootstrap-verification**: Validate Makefile bootstrap workflow
+6. ✅ **config-validation**: Test config.nix user definitions
+7. ✅ **autowiring-validation**: Verify nixos-unified autowiring
+8. ✅ **secrets-workflow**: Test sops-nix mechanics
+9. ✅ **justfile-activation**: Validate justfile recipes
+
+**Build jobs (run based on file changes, with matrix):**
+10. ✅ **cache-overlay-packages**: Pre-cache overlay packages (per system)
+11. ✅ **nix**: Build all flake outputs (per category/system)
+12. ✅ **typescript**: Test TypeScript packages (per package)
+
+**Production jobs (main/beta only):**
+13. ✅ **production-release-packages**: Release packages to production
+14. ✅ **production-docs-deploy**: Deploy documentation to production
+
+Jobs use path-based filtering to skip when irrelevant files change (e.g., nix jobs skip on markdown-only changes).
+Each job queries GitHub Checks API to skip if it already succeeded for the current commit SHA.
 
 ### 3.4 Check Deployment
 
@@ -278,14 +297,14 @@ The CI/CD workflow runs on:
 1. **Manual dispatch** (`workflow_dispatch`)
    - `debug_enabled`: Enable tmate debugging session
    - `deploy_enabled`: Force deployment even on non-main branch
+   - `force_run`: Force all jobs to run, ignoring per-job caching
 
 2. **Pull requests** (`pull_request`)
    - Runs CI checks only (no deployment)
-   - Skip with label: `skip-ci`
-   - Enable debug with label: `actions-debug`
+   - Jobs use intelligent caching (skip if already succeeded for this commit)
 
 3. **Push to main** (`push` to `main` branch)
-   - Runs full CI
+   - Runs full CI with intelligent caching
    - Automatically deploys to production
 
 ## Troubleshooting

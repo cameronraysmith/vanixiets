@@ -4,7 +4,11 @@ title: "ADR-0015: CI/CD caching optimization strategy"
 
 ## Status
 
-Proposed
+Superseded by [ADR-0016: Per-job content-addressed caching](/development/architecture/adrs/0016-per-job-content-addressed-caching/)
+
+This document describes the originally proposed approach using centralized helper jobs (`skip-check` and `detect-changes`).
+While this approach was implemented and worked well, it was later superseded by a per-job caching mechanism that provides finer granularity and better convergence toward content-addressed execution semantics.
+See ADR-0016 for the current implementation.
 
 ## Context
 
