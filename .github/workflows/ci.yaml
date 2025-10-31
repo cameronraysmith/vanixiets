@@ -857,8 +857,8 @@ jobs:
     needs: [set-variables, typescript, nix]
     if: |
       !cancelled() &&
-      (needs.typescript.result == 'success' || needs.typescript.result == 'skipped') &&
-      (needs.nix.result == 'success' || needs.nix.result == 'skipped') &&
+      needs.typescript.result == 'success' &&
+      needs.nix.result == 'success' &&
       github.repository_owner == 'cameronraysmith' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
