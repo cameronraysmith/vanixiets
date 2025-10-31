@@ -23,9 +23,6 @@ outputs:
   should-run:
     description: Whether job should execute (true/false)
     value: ${{ steps.decide.outputs.should-run }}
-  previously-succeeded:
-    description: Whether this job previously succeeded for this commit
-    value: ${{ steps.check-history.outputs.previously-succeeded }}
   relevant-changes:
     description: Whether relevant file changes were detected
     value: ${{ steps.check-paths.outputs.relevant-changes }}
@@ -41,77 +38,51 @@ outputs:
   content-hash:
     description: Job-specific content hash for debugging and analysis
     value: ${{ steps.content-hash.outputs.content-hash || '' }}
-  config-hash:
-    description: 'Configuration identity hash (workflow+action+filters)'
-    value: ${{ steps.config-hash.outputs.config-hash }}
-  resolved-check-name:
-    description: 'Resolved check name after hash substitution'
-    value: ${{ steps.check-history.outputs.resolved-check-name }}
   cache-source:
-    description: 'Where cache hit occurred (actions-cache, checks-api, or none)'
+    description: 'Where cache hit occurred (actions-cache or none)'
     value: ${{ steps.decide.outputs.cache-source }}
   cache-key:
     description: 'Sanitized cache key for actions/cache (no special characters)'
     value: ${{ steps.cache-result.outputs.cache-key }}
+  cache-path:
+    description: 'Cache directory path for job result marker'
+    value: ${{ steps.cache-result.outputs.cache-path }}
+  cache-restore-keys:
+    description: 'Restore keys pattern for actions/cache fallback matching'
+    value: ${{ steps.cache-result.outputs.cache-restore-keys }}
 
 runs:
   using: composite
   steps:
-    - name: Compute configuration-identity hash
-      id: config-hash
-      shell: bash
-      env:
-        PATH_FILTERS: ${{ inputs.path-filters }}
-      run: |
-        echo "=== Computing Configuration-Identity Hash ==="
-
-        # Detect workflow file
-        WORKFLOW_PATH=$(echo "$GITHUB_WORKFLOW_REF" | sed 's|.*@refs/[^:]*:||')
-        if [ -n "${{ inputs.workflow-file }}" ]; then
-          WORKFLOW_PATH="${{ inputs.workflow-file }}"
-        fi
-        if [ -z "$WORKFLOW_PATH" ] || [ ! -f "$WORKFLOW_PATH" ]; then
-          WORKFLOW_PATH=".github/workflows/ci.yaml"
-        fi
-
-        echo "Workflow file: $WORKFLOW_PATH"
-
-        # Compute component hashes
-        WF_HASH=$(git hash-object "$WORKFLOW_PATH" 2>/dev/null || echo "unknown")
-        ACTION_HASH=$(git hash-object .github/actions/cached-ci-job/action.yaml 2>/dev/null || echo "unknown")
-
-        echo "Workflow hash: $WF_HASH"
-        echo "Action hash: $ACTION_HASH"
-        echo "Path filters: $PATH_FILTERS"
-
-        # Combine into configuration-identity hash
-        CONFIG_IDENTITY="workflow:${WF_HASH}\naction:${ACTION_HASH}\nfilters:${PATH_FILTERS}"
-        CONFIG_HASH=$(echo -e "$CONFIG_IDENTITY" | sha256sum | cut -c1-8)
-        echo "Configuration hash: $CONFIG_HASH"
-        echo "config-hash=$CONFIG_HASH" >> $GITHUB_OUTPUT
-
     - name: Prepare cache key for actions/cache
       id: cache-result
       shell: bash
       env:
         CHECK_NAME: ${{ inputs.check-name }}
-        CONFIG_HASH: ${{ steps.config-hash.outputs.config-hash }}
       run: |
-        echo "=== Actions Cache Lookup ==="
+        echo "=== Cache Key Preparation ==="
 
-        # Extract base check name (remove hash suffix if present)
-        # Input: "nix-{hash} (packages, x86_64-linux)" or "nix-a1b2c3d4 (packages, x86_64-linux)"
-        # Output: "nix-packages-x86_64-linux"
-        BASE_NAME=$(echo "$CHECK_NAME" | sed 's/-{hash}//g' | sed 's/-[a-f0-9]\{8\}//g' | tr -d '()' | tr ', ' '-' | tr -s '-')
+        # Sanitize check name: remove parens, convert ", " to "-", collapse multiple dashes
+        SANITIZED=$(echo "$CHECK_NAME" | tr -d '()' | tr ', ' '-' | tr -s '-')
 
-        CACHE_KEY="job-result-${BASE_NAME}-${CONFIG_HASH}"
+        # Use short SHA for uniqueness (prevents save collisions)
+        SHA_SHORT="${GITHUB_SHA:0:8}"
+
+        # Construct cache key and path
+        CACHE_KEY="job-result-${SANITIZED}-${SHA_SHORT}"
+        CACHE_PATH=".cache/job-results/${SANITIZED}"
+        RESTORE_KEYS="job-result-${SANITIZED}-"
+
+        echo "Check name: $CHECK_NAME"
+        echo "Sanitized: $SANITIZED"
+        echo "SHA prefix: $SHA_SHORT"
         echo "Cache key: $CACHE_KEY"
-
-        # Use actions/cache/restore for lookup
-        CACHE_PATH=".cache/job-results/${CHECK_NAME}"
+        echo "Cache path: $CACHE_PATH"
+        echo "Restore pattern: ${RESTORE_KEYS}*"
 
         echo "cache-key=$CACHE_KEY" >> $GITHUB_OUTPUT
         echo "cache-path=$CACHE_PATH" >> $GITHUB_OUTPUT
+        echo "cache-restore-keys=$RESTORE_KEYS" >> $GITHUB_OUTPUT
 
     - name: Lookup job result in actions/cache
       id: cache-lookup
@@ -119,209 +90,12 @@ runs:
       with:
         path: ${{ steps.cache-result.outputs.cache-path }}
         key: ${{ steps.cache-result.outputs.cache-key }}
+        restore-keys: ${{ steps.cache-result.outputs.cache-restore-keys }}
         lookup-only: true
-
-    - name: Query GitHub Checks API for execution history
-      id: check-history
-      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # ratchet:actions/github-script@v7
-      env:
-        CHECK_NAME: ${{ inputs.check-name }}
-        CONFIG_HASH: ${{ steps.config-hash.outputs.config-hash }}
-      with:
-        script: |
-          const checkName = process.env.CHECK_NAME;
-          const configHash = process.env.CONFIG_HASH;
-
-          // Replace {hash} placeholder with actual hash
-          const resolvedCheckName = checkName.replace('{hash}', configHash);
-
-          // Export resolved check name for validation
-          core.setOutput('resolved-check-name', resolvedCheckName);
-
-          // Use PR head commit for pull_request events, otherwise use context.sha
-          const commit = context.eventName === 'pull_request'
-            ? context.payload.pull_request.head.sha
-            : context.sha;
-
-          core.info(`Check name template: "${checkName}"`);
-          core.info(`Resolved check name: "${resolvedCheckName}" @ ${commit}`);
-          core.info(`Event: ${context.eventName}, Using commit: ${commit}`);
-
-          // Cache expiration: 7 days
-          const maxAgeMs = 7 * 24 * 60 * 60 * 1000;
-          const cutoffTime = new Date(Date.now() - maxAgeMs);
-          core.info(`Cache cutoff time: ${cutoffTime.toISOString()} (7 days ago)`);
-
-          // Retry logic with exponential backoff
-          const maxRetries = 3;
-          let checks = null;
-
-          for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-              const response = await github.rest.checks.listForRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: commit,
-                check_name: resolvedCheckName,
-              });
-
-              checks = response.data;
-              core.info(`Successfully queried check runs (attempt ${attempt}/${maxRetries})`);
-              break; // Success - exit retry loop
-
-            } catch (error) {
-              const isLastAttempt = attempt === maxRetries;
-
-              // Check for rate limiting
-              if (error.status === 403) {
-                const remaining = error.response?.headers?.['x-ratelimit-remaining'];
-                const resetTime = error.response?.headers?.['x-ratelimit-reset'];
-
-                if (remaining === '0' || remaining === 0) {
-                  const resetDate = resetTime ? new Date(resetTime * 1000) : 'unknown';
-                  core.error(`GitHub API rate limit exceeded. Resets at: ${resetDate}`);
-                  core.error('Too many workflow runs. Consider reducing check frequency.');
-
-                  // Don't retry on rate limit - it won't help
-                  core.setOutput('previously-succeeded', 'false');
-                  return;
-                }
-              }
-
-              if (isLastAttempt) {
-                core.warning(`API query failed after ${maxRetries} attempts: ${error.message}`);
-                core.setOutput('previously-succeeded', 'false');
-                return;
-              }
-
-              const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
-              core.warning(`Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
-              core.info(`Retrying in ${delay}ms...`);
-
-              await new Promise(resolve => setTimeout(resolve, delay));
-            }
-          }
-
-          if (!checks) {
-            core.warning('Failed to retrieve check runs after retries');
-            core.setOutput('previously-succeeded', 'false');
-            return;
-          }
-
-          core.info(`Found ${checks.check_runs.length} check run(s) for this commit`);
-
-          // Filter to recent check runs only (last 24 hours)
-          const staleCutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          const recentChecks = checks.check_runs.filter(run => {
-            if (!run.started_at) return false;
-            const startTime = new Date(run.started_at);
-            return startTime > staleCutoffTime;
-          });
-
-          const staleCount = checks.check_runs.length - recentChecks.length;
-          if (staleCount > 0) {
-            core.info(`Filtered out ${staleCount} stale check run(s) older than 24 hours`);
-          }
-
-          core.info(`Checking ${recentChecks.length} recent check run(s) for success`);
-
-          // Check for invalid check runs (security: reject non-GitHub Actions runs)
-          if (recentChecks.length > 0) {
-            const invalidRuns = recentChecks.filter(run =>
-              run.conclusion === 'success' &&
-              run.status === 'completed' &&
-              (run.app.slug !== 'github-actions' || !run.details_url?.includes('/actions/runs/'))
-            );
-
-            if (invalidRuns.length > 0) {
-              core.warning(`Found ${invalidRuns.length} check run(s) with invalid origin (ignored for security)`);
-            }
-          }
-
-          // Find any completed successful run from authentic GitHub Actions (from recent checks only)
-          const successfulRun = recentChecks.find(run => {
-            const runAge = run.completed_at ? new Date(run.completed_at) : null;
-            const isRecent = runAge && runAge > cutoffTime;
-
-            if (run.conclusion === 'success' && run.status === 'completed' && !isRecent) {
-              core.info(`Ignoring stale check run from ${runAge?.toISOString()} (older than 7 days)`);
-            }
-
-            return (
-              run.conclusion === 'success' &&
-              run.status === 'completed' &&
-              run.app.slug === 'github-actions' &&
-              run.details_url && run.details_url.includes('/actions/runs/') &&
-              isRecent
-            );
-          });
-
-          if (successfulRun) {
-            core.info(`✓ Job already succeeded: ${successfulRun.html_url}`);
-            core.setOutput('previously-succeeded', 'true');
-          } else {
-            const failedRuns = recentChecks.filter(run =>
-              run.conclusion === 'failure' &&
-              run.status === 'completed'
-            );
-            if (failedRuns.length > 0) {
-              core.info(`✗ Found ${failedRuns.length} recent failed run(s)`);
-            } else {
-              core.info(`✗ No recent successful runs found`);
-            }
-            core.setOutput('previously-succeeded', 'false');
-          }
-
-    - name: Validate check name format
-      id: validate
-      if: steps.check-history.outputs.previously-succeeded == 'true'
-      shell: bash
-      env:
-        CHECK_NAME_TEMPLATE: ${{ inputs.check-name }}
-        RESOLVED_CHECK_NAME: ${{ steps.check-history.outputs.resolved-check-name }}
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        echo "=== Check Name Validation ==="
-        echo "Template: $CHECK_NAME_TEMPLATE"
-        echo "Resolved: $RESOLVED_CHECK_NAME"
-
-        # Query current workflow run for all check names
-        CURRENT_RUN_CHECKS=$(gh api \
-          repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs \
-          --jq '.jobs[].name' 2>/dev/null || echo "")
-
-        if [ -z "$CURRENT_RUN_CHECKS" ]; then
-          echo "⚠️  Could not query current run checks (API unavailable)"
-          echo "Proceeding with cache decision (no validation)"
-          exit 0
-        fi
-
-        echo "Current run checks:"
-        echo "$CURRENT_RUN_CHECKS"
-        echo ""
-
-        # Check if resolved name appears in current run
-        if echo "$CURRENT_RUN_CHECKS" | grep -qF "$RESOLVED_CHECK_NAME"; then
-          echo "✓ Check name validated: $RESOLVED_CHECK_NAME"
-        else
-          echo "⚠️  Check name mismatch!"
-          echo "Expected: $RESOLVED_CHECK_NAME"
-          echo "Available checks:"
-          echo "$CURRENT_RUN_CHECKS" | sed 's/^/  - /'
-          echo ""
-          echo "Possible causes:"
-          echo "- Matrix parameters changed format"
-          echo "- GitHub changed check name formatting"
-          echo "- Template has errors"
-          echo ""
-          echo "OVERRIDE: Running job to be safe (cache decision unreliable)"
-          echo "validation-failed=true" >> $GITHUB_OUTPUT
-        fi
-
 
     - name: Get changed files (all + filtered)
       id: changed-files
-      if: steps.check-history.outputs.previously-succeeded != 'true'
+      if: steps.cache-lookup.outputs.cache-hit != 'true'
       uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62
       with:
         # Use files_yaml for multiple pattern groups
@@ -335,16 +109,15 @@ runs:
 
     - name: Compute job-specific content hash (legacy)
       id: content-hash
-      if: steps.check-history.outputs.previously-succeeded != 'true'
+      if: steps.cache-lookup.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        # Legacy output for backward compatibility - now superseded by config-hash
+        # Legacy output for backward compatibility
         echo "content-hash=${{ github.sha }}" >> $GITHUB_OUTPUT
 
     - name: Check for relevant file changes
       id: check-paths
-      if: |
-        steps.check-history.outputs.previously-succeeded != 'true'
+      if: steps.cache-lookup.outputs.cache-hit != 'true'
       shell: bash
       env:
         HAS_FILTERS: ${{ inputs.path-filters != '' }}
@@ -359,9 +132,10 @@ runs:
         echo "Filtered files: $FILTERED_FILES"
         echo ""
 
-        # Check for workflow changes FIRST (using all changed files)
-        if echo "$ALL_CHANGED_FILES" | grep -q '\.github/workflows/'; then
-          echo "✓ Workflow changes detected - job is always relevant"
+        # Check for workflow changes FIRST (current workflow only)
+        WORKFLOW_PATH=$(echo "$GITHUB_WORKFLOW_REF" | sed 's|.*@refs/[^:]*:||')
+        if echo "$ALL_CHANGED_FILES" | grep -qF "$WORKFLOW_PATH"; then
+          echo "✓ Current workflow changed - job is always relevant"
           echo "relevant-changes=true" >> $GITHUB_OUTPUT
           exit 0
         fi
@@ -387,17 +161,13 @@ runs:
       shell: bash
       env:
         FORCE: ${{ inputs.force-run }}
-        PREV_SUCCESS: ${{ steps.check-history.outputs.previously-succeeded }}
         CACHE_HIT: ${{ steps.cache-lookup.outputs.cache-hit || 'false' }}
         HAS_CHANGES: ${{ steps.check-paths.outputs.relevant-changes }}
         HAS_FILTERS: ${{ inputs.path-filters != '' }}
-        VALIDATION_FAILED: ${{ steps.validate.outputs.validation-failed || 'false' }}
       run: |
         echo "=== Execution Decision ==="
         echo "Force run: $FORCE"
         echo "Actions cache hit: $CACHE_HIT"
-        echo "Previously succeeded (Checks API): $PREV_SUCCESS"
-        echo "Validation failed: $VALIDATION_FAILED"
         echo "Has path filters: $HAS_FILTERS"
         echo "Relevant changes: $HAS_CHANGES"
         echo ""
@@ -410,27 +180,11 @@ runs:
           exit 0
         fi
 
-        # Validation failure overrides cache decision
-        if [ "$VALIDATION_FAILED" = "true" ]; then
-          echo "should-run=true" >> $GITHUB_OUTPUT
-          echo "cache-source=none" >> $GITHUB_OUTPUT
-          echo "Decision: RUN (check name validation failed)"
-          exit 0
-        fi
-
-        # Check actions/cache first (cross-commit caching)
+        # Check actions/cache (cross-commit caching)
         if [ "$CACHE_HIT" = "true" ]; then
           echo "should-run=false" >> $GITHUB_OUTPUT
           echo "cache-source=actions-cache" >> $GITHUB_OUTPUT
-          echo "Decision: SKIP (cached result from actions/cache)"
-          exit 0
-        fi
-
-        # Check GitHub Checks API (same-commit caching)
-        if [ "$PREV_SUCCESS" = "true" ]; then
-          echo "should-run=false" >> $GITHUB_OUTPUT
-          echo "cache-source=checks-api" >> $GITHUB_OUTPUT
-          echo "Decision: SKIP (already succeeded for this commit)"
+          echo "Decision: SKIP (cached result found)"
           exit 0
         fi
 
@@ -444,7 +198,7 @@ runs:
             echo "Decision: SKIP (no relevant file changes)"
           fi
         else
-          # No filters means always run if not already succeeded
+          # No filters means always run if not already cached
           echo "should-run=true" >> $GITHUB_OUTPUT
           echo "cache-source=none" >> $GITHUB_OUTPUT
           echo "Decision: RUN (no path filters specified)"
