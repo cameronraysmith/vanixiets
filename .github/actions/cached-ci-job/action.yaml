@@ -1,0 +1,157 @@
+name: Cached CI Job
+description: Execute job only if not already successful for this commit SHA
+
+inputs:
+  check-name:
+    description: Full check run name (defaults to github.job, include matrix values for matrix jobs)
+    required: false
+    default: ${{ github.job }}
+  path-filters:
+    description: Regex pattern for relevant file paths (empty means always relevant)
+    required: false
+    default: ''
+  force-run:
+    description: Force execution even if already successful
+    required: false
+    default: 'false'
+
+outputs:
+  should-run:
+    description: Whether job should execute (true/false)
+    value: ${{ steps.decide.outputs.should-run }}
+  previously-succeeded:
+    description: Whether this job previously succeeded for this commit
+    value: ${{ steps.check-history.outputs.previously-succeeded }}
+  relevant-changes:
+    description: Whether relevant file changes were detected
+    value: ${{ steps.check-paths.outputs.relevant-changes }}
+
+runs:
+  using: composite
+  steps:
+    - name: Query GitHub Checks API for execution history
+      id: check-history
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # ratchet:actions/github-script@v7
+      env:
+        CHECK_NAME: ${{ inputs.check-name }}
+      with:
+        script: |
+          const checkName = process.env.CHECK_NAME;
+          const commit = context.sha;
+
+          core.info(`Querying execution history for: "${checkName}" @ ${commit}`);
+
+          try {
+            const { data: checks } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: commit,
+              check_name: checkName,
+            });
+
+            core.info(`Found ${checks.check_runs.length} check run(s) for this commit`);
+
+            // Find any completed successful run
+            const successfulRun = checks.check_runs.find(run =>
+              run.conclusion === 'success' &&
+              run.status === 'completed'
+            );
+
+            if (successfulRun) {
+              core.info(`✓ Job already succeeded: ${successfulRun.html_url}`);
+              core.setOutput('previously-succeeded', 'true');
+            } else {
+              const failedRuns = checks.check_runs.filter(run =>
+                run.conclusion === 'failure' &&
+                run.status === 'completed'
+              );
+              if (failedRuns.length > 0) {
+                core.info(`✗ Found ${failedRuns.length} previous failed run(s)`);
+              } else {
+                core.info(`✗ No previous runs found`);
+              }
+              core.setOutput('previously-succeeded', 'false');
+            }
+          } catch (error) {
+            core.warning(`API query failed: ${error.message}`);
+            core.setOutput('previously-succeeded', 'false');
+          }
+
+    - name: Check for relevant file changes
+      id: check-paths
+      if: |
+        steps.check-history.outputs.previously-succeeded != 'true' &&
+        inputs.path-filters != ''
+      shell: bash
+      env:
+        PATH_FILTERS: ${{ inputs.path-filters }}
+      run: |
+        # Determine base ref for comparison
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          BASE_REF="${{ github.event.pull_request.base.sha }}"
+        else
+          BASE_REF="HEAD^"
+        fi
+
+        echo "Checking for changes matching: $PATH_FILTERS"
+        echo "Comparing $BASE_REF...HEAD"
+
+        # Workflow changes always trigger all jobs
+        if git diff --name-only "$BASE_REF" HEAD | grep -qE '\.github/workflows/'; then
+          echo "relevant-changes=true" >> $GITHUB_OUTPUT
+          echo "✓ Workflow changes detected - job is relevant"
+          exit 0
+        fi
+
+        # Check if any relevant files changed
+        if git diff --name-only "$BASE_REF" HEAD | grep -qE "$PATH_FILTERS"; then
+          echo "relevant-changes=true" >> $GITHUB_OUTPUT
+          echo "✓ Relevant file changes detected"
+        else
+          echo "relevant-changes=false" >> $GITHUB_OUTPUT
+          echo "✗ No relevant file changes"
+        fi
+
+    - name: Make execution decision
+      id: decide
+      shell: bash
+      env:
+        FORCE: ${{ inputs.force-run }}
+        PREV_SUCCESS: ${{ steps.check-history.outputs.previously-succeeded }}
+        HAS_CHANGES: ${{ steps.check-paths.outputs.relevant-changes }}
+        HAS_FILTERS: ${{ inputs.path-filters != '' }}
+      run: |
+        echo "=== Execution Decision ==="
+        echo "Force run: $FORCE"
+        echo "Previously succeeded: $PREV_SUCCESS"
+        echo "Has path filters: $HAS_FILTERS"
+        echo "Relevant changes: $HAS_CHANGES"
+        echo ""
+
+        # Force run overrides everything
+        if [ "$FORCE" = "true" ]; then
+          echo "should-run=true" >> $GITHUB_OUTPUT
+          echo "Decision: RUN (forced by input)"
+          exit 0
+        fi
+
+        # If already succeeded for this commit, skip
+        if [ "$PREV_SUCCESS" = "true" ]; then
+          echo "should-run=false" >> $GITHUB_OUTPUT
+          echo "Decision: SKIP (already succeeded for this commit)"
+          exit 0
+        fi
+
+        # If we have path filters, honor them
+        if [ "$HAS_FILTERS" = "true" ]; then
+          echo "should-run=${HAS_CHANGES}" >> $GITHUB_OUTPUT
+          if [ "$HAS_CHANGES" = "true" ]; then
+            echo "Decision: RUN (relevant file changes detected)"
+          else
+            echo "Decision: SKIP (no relevant file changes)"
+          fi
+        else
+          # No filters means always run if not already succeeded
+          echo "should-run=true" >> $GITHUB_OUTPUT
+          echo "Decision: RUN (no path filters specified)"
+        fi
