@@ -44,6 +44,9 @@ outputs:
   config-hash:
     description: 'Configuration identity hash (workflow+action+filters)'
     value: ${{ steps.config-hash.outputs.config-hash }}
+  resolved-check-name:
+    description: 'Resolved check name after hash substitution'
+    value: ${{ steps.check-history.outputs.resolved-check-name }}
 
 runs:
   using: composite
@@ -94,6 +97,9 @@ runs:
 
           // Replace {hash} placeholder with actual hash
           const resolvedCheckName = checkName.replace('{hash}', configHash);
+
+          // Export resolved check name for validation
+          core.setOutput('resolved-check-name', resolvedCheckName);
 
           // Use PR head commit for pull_request events, otherwise use context.sha
           const commit = context.eventName === 'pull_request'
@@ -229,7 +235,53 @@ runs:
             core.setOutput('previously-succeeded', 'false');
           }
 
-    
+    - name: Validate check name format
+      id: validate
+      if: steps.check-history.outputs.previously-succeeded == 'true'
+      shell: bash
+      env:
+        CHECK_NAME_TEMPLATE: ${{ inputs.check-name }}
+        RESOLVED_CHECK_NAME: ${{ steps.check-history.outputs.resolved-check-name }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "=== Check Name Validation ==="
+        echo "Template: $CHECK_NAME_TEMPLATE"
+        echo "Resolved: $RESOLVED_CHECK_NAME"
+
+        # Query current workflow run for all check names
+        CURRENT_RUN_CHECKS=$(gh api \
+          repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs \
+          --jq '.jobs[].name' 2>/dev/null || echo "")
+
+        if [ -z "$CURRENT_RUN_CHECKS" ]; then
+          echo "⚠️  Could not query current run checks (API unavailable)"
+          echo "Proceeding with cache decision (no validation)"
+          exit 0
+        fi
+
+        echo "Current run checks:"
+        echo "$CURRENT_RUN_CHECKS"
+        echo ""
+
+        # Check if resolved name appears in current run
+        if echo "$CURRENT_RUN_CHECKS" | grep -qF "$RESOLVED_CHECK_NAME"; then
+          echo "✓ Check name validated: $RESOLVED_CHECK_NAME"
+        else
+          echo "⚠️  Check name mismatch!"
+          echo "Expected: $RESOLVED_CHECK_NAME"
+          echo "Available checks:"
+          echo "$CURRENT_RUN_CHECKS" | sed 's/^/  - /'
+          echo ""
+          echo "Possible causes:"
+          echo "- Matrix parameters changed format"
+          echo "- GitHub changed check name formatting"
+          echo "- Template has errors"
+          echo ""
+          echo "OVERRIDE: Running job to be safe (cache decision unreliable)"
+          echo "validation-failed=true" >> $GITHUB_OUTPUT
+        fi
+
+
     - name: Get changed files (all + filtered)
       id: changed-files
       if: steps.check-history.outputs.previously-succeeded != 'true'
@@ -301,10 +353,12 @@ runs:
         PREV_SUCCESS: ${{ steps.check-history.outputs.previously-succeeded }}
         HAS_CHANGES: ${{ steps.check-paths.outputs.relevant-changes }}
         HAS_FILTERS: ${{ inputs.path-filters != '' }}
+        VALIDATION_FAILED: ${{ steps.validate.outputs.validation-failed || 'false' }}
       run: |
         echo "=== Execution Decision ==="
         echo "Force run: $FORCE"
         echo "Previously succeeded: $PREV_SUCCESS"
+        echo "Validation failed: $VALIDATION_FAILED"
         echo "Has path filters: $HAS_FILTERS"
         echo "Relevant changes: $HAS_CHANGES"
         echo ""
@@ -313,6 +367,13 @@ runs:
         if [ "$FORCE" = "true" ]; then
           echo "should-run=true" >> $GITHUB_OUTPUT
           echo "Decision: RUN (forced by input)"
+          exit 0
+        fi
+
+        # Validation failure overrides cache decision
+        if [ "$VALIDATION_FAILED" = "true" ]; then
+          echo "should-run=true" >> $GITHUB_OUTPUT
+          echo "Decision: RUN (check name validation failed)"
           exit 0
         fi
 
