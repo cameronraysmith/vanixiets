@@ -31,6 +31,9 @@ outputs:
   any-changed:
     description: Whether any files matching path filters changed (when path-filters specified)
     value: ${{ steps.changed-files.outputs.any_changed || 'false' }}
+  all-changed-files:
+    description: List of all changed files (for debugging workflow change detection)
+    value: ${{ steps.all-changed-files.outputs.all_changed_files || '' }}
   content-hash:
     description: Job-specific content hash for debugging and analysis
     value: ${{ steps.content-hash.outputs.content-hash || '' }}
@@ -87,7 +90,15 @@ runs:
           }
 
     
-    - name: Get changed files
+    - name: Get ALL changed files (for workflow detection)
+      id: all-changed-files
+      if: steps.check-history.outputs.previously-succeeded != 'true'
+      uses: tj-actions/changed-files@v44
+      with:
+        json: true
+        separator: ','
+
+    - name: Get filtered changed files (for path filtering)
       id: changed-files
       if: |
         steps.check-history.outputs.previously-succeeded != 'true' &&
@@ -126,10 +137,10 @@ runs:
         if [ -n "$PATH_FILTERS" ]; then
           echo "Path filters active: $PATH_FILTERS"
 
-          # Use changed files from previous step if available
+          # Use filtered changed files from previous step if available
           if [ -n "${{ steps.changed-files.outputs.all_changed_files || '' }}" ]; then
             CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_files }}"
-            echo "Using changed files: $CHANGED_FILES"
+            echo "Using filtered changed files: $CHANGED_FILES"
 
             # Hash each changed file
             FILE_HASHES=""
@@ -165,29 +176,36 @@ runs:
       shell: bash
       env:
         HAS_FILTERS: ${{ inputs.path-filters != '' }}
-        ANY_CHANGED: ${{ steps.changed-files.outputs.any_changed || 'false' }}
-        CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files || '' }}
+        ALL_CHANGED_FILES: ${{ steps.all-changed-files.outputs.all_changed_files || '' }}
+        FILTERED_CHANGED: ${{ steps.changed-files.outputs.any_changed || 'false' }}
+        FILTERED_FILES: ${{ steps.changed-files.outputs.all_changed_files || '' }}
       run: |
+        echo "=== File Change Analysis ==="
+        echo "Has path filters: $HAS_FILTERS"
+        echo "All changed files: $ALL_CHANGED_FILES"
+        echo "Filtered changed: $FILTERED_CHANGED"
+        echo "Filtered files: $FILTERED_FILES"
+        echo ""
+
+        # Check for workflow changes FIRST (using all changed files)
+        if echo "$ALL_CHANGED_FILES" | grep -q '\.github/workflows/'; then
+          echo "✓ Workflow changes detected - job is always relevant"
+          echo "relevant-changes=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
         if [ "$HAS_FILTERS" = "true" ]; then
-          # Path filtering is enabled
-          if [ "$ANY_CHANGED" = "true" ]; then
-            echo "Found relevant file changes"
-            echo "Changed files: $CHANGED_FILES"
-
-            # Check for workflow changes specifically
-            if echo "$CHANGED_FILES" | grep -q '\.github/workflows/'; then
-              echo "✓ Workflow changes detected - job is relevant"
-            else
-              echo "✓ Relevant file changes detected"
-            fi
-
+          # Path filtering is enabled and no workflow changes
+          if [ "$FILTERED_CHANGED" = "true" ]; then
+            echo "✓ Relevant file changes detected"
+            echo "Changed files: $FILTERED_FILES"
             echo "relevant-changes=true" >> $GITHUB_OUTPUT
           else
             echo "✗ No relevant file changes detected"
             echo "relevant-changes=false" >> $GITHUB_OUTPUT
           fi
         else
-          # No path filters - always relevant
+          # No path filters - always relevant if no workflow changes
           echo "✓ No path filters specified - job is always relevant"
           echo "relevant-changes=true" >> $GITHUB_OUTPUT
         fi
