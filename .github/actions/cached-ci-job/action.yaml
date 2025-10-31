@@ -93,7 +93,7 @@ runs:
     - name: Get ALL changed files (for workflow detection)
       id: all-changed-files
       if: steps.check-history.outputs.previously-succeeded != 'true'
-      uses: tj-actions/changed-files@v44
+      uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62
       with:
         json: true
         separator: ','
@@ -103,7 +103,7 @@ runs:
       if: |
         steps.check-history.outputs.previously-succeeded != 'true' &&
         inputs.path-filters != ''
-      uses: tj-actions/changed-files@v44
+      uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62
       with:
         files: ${{ inputs.path-filters }}
         json: true
