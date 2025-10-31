@@ -16,6 +16,11 @@ on:
         required: false
         type: boolean
         default: false
+      force_run:
+        description: "Force execution even if already successful for this commit"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       target_configs:
@@ -57,88 +62,10 @@ env:
   CACHIX_BINARY_CACHE: cameronraysmith
 
 jobs:
-  # job 0: skip-check
-  # prevents duplicate workflow runs on same commit hash
-  skip-check:
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # ratchet:fkirc/skip-duplicate-actions@v5
-        with:
-          skip_after_successful_duplicate: 'true'
-          do_not_skip: '["schedule"]'
-          concurrent_skipping: 'never'
-          cancel_others: 'false'
-
-  # job 1: detect-changes
-  # detects which files changed to enable path-based job filtering
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      nix-code: ${{ steps.changes.outputs.nix-code }}
-      typescript: ${{ steps.changes.outputs.typescript }}
-      docs-content: ${{ steps.changes.outputs.docs-content }}
-      bootstrap: ${{ steps.changes.outputs.bootstrap }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
-        with:
-          fetch-depth: 0  # Need history for git diff
-
-      - name: Detect changed files
-        id: changes
-        run: |
-          # Determine base ref for comparison
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_REF="${{ github.event.pull_request.base.sha }}"
-          else
-            BASE_REF="HEAD^"
-          fi
-
-          # Workflow changes trigger everything
-          if git diff --name-only "$BASE_REF" HEAD | grep -qE '\.github/'; then
-            echo "nix-code=true" >> $GITHUB_OUTPUT
-            echo "typescript=true" >> $GITHUB_OUTPUT
-            echo "docs-content=true" >> $GITHUB_OUTPUT
-            echo "bootstrap=true" >> $GITHUB_OUTPUT
-            echo "Workflow changes detected - triggering all jobs"
-            exit 0
-          fi
-
-          # Check for nix changes
-          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile)'; then
-            echo "nix-code=true" >> $GITHUB_OUTPUT
-          else
-            echo "nix-code=false" >> $GITHUB_OUTPUT
-          fi
-
-          # Check for typescript changes
-          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(packages/docs/.*\.(ts|tsx|astro|test\.ts)|.*\.config\.(ts|js)|package\.json|bun\.lockb)'; then
-            echo "typescript=true" >> $GITHUB_OUTPUT
-          else
-            echo "typescript=false" >> $GITHUB_OUTPUT
-          fi
-
-          # Check for docs content changes
-          if git diff --name-only "$BASE_REF" HEAD | grep -qE 'packages/docs/.*\.(md|mdx)'; then
-            echo "docs-content=true" >> $GITHUB_OUTPUT
-          else
-            echo "docs-content=false" >> $GITHUB_OUTPUT
-          fi
-
-          # Check for bootstrap changes
-          if git diff --name-only "$BASE_REF" HEAD | grep -qE '(Makefile|\.envrc)'; then
-            echo "bootstrap=true" >> $GITHUB_OUTPUT
-          else
-            echo "bootstrap=false" >> $GITHUB_OUTPUT
-          fi
-
-  # job 2: secrets-scan
+  # job 0: secrets-scan
   # scans repository for hardcoded secrets using gitleaks
-  # ALWAYS runs (ignores skip-check) - security critical
+  # Security critical - runs for all commits
   secrets-scan:
-    needs: [skip-check, detect-changes]
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
@@ -158,22 +85,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
         with:
-          fetch-depth: 0 # full history for comprehensive secret scanning
+          fetch-depth: 0 # full history for comprehensive secret scanning and git diff
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          force-run: ${{ inputs.force_run || 'false' }}
+          # No path-filters - security scanning always relevant
 
       - name: Setup Nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           installer: quick # fast install without space reclamation overhead
           system: x86_64-linux
 
       - name: Scan for secrets with gitleaks
+        if: steps.cache.outputs.should-run == 'true'
         run: nix run nixpkgs#gitleaks -- detect --verbose --redact
 
-  # job 2: set-variables
+  # job 1: set-variables
   # determines deployment settings and variables based on event type
-  # ALWAYS runs (ignores skip-check) - needed for production job routing
+  # Always runs - needed for production job routing and provides outputs
   set-variables:
-    needs: [skip-check, secrets-scan]
+    needs: [secrets-scan]
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
@@ -238,7 +174,7 @@ jobs:
           echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
           echo "Discovered packages: $PACKAGES"
 
-  # job 3: preview-release-version
+  # job 2: preview-release-version
   # Preview semantic-release version for each package (PR only, fast feedback)
   preview-release-version:
     needs: [set-variables]
@@ -291,7 +227,7 @@ jobs:
           nix develop -c just preview-version main ${{ matrix.package.path }}
           echo "::endgroup::"
 
-  # job 4: preview-docs-deploy
+  # job 3: preview-docs-deploy
   # Deploy docs to preview environment (PR only, fast feedback)
   preview-docs-deploy:
     needs: [set-variables]
@@ -308,23 +244,35 @@ jobs:
       debug_enabled: ${{ needs.set-variables.outputs.debug }}
     secrets: inherit
 
-  # job 5: bootstrap-verification
+  # job 4: bootstrap-verification
   # validates Makefile bootstrap workflow on clean ubuntu system
   bootstrap-verification:
-    needs: [skip-check, secrets-scan, detect-changes]
-    if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
-      (needs.detect-changes.outputs.bootstrap == 'true' ||
-       github.event_name == 'workflow_dispatch')
+    needs: [secrets-scan]
     runs-on: ubuntu-latest
+    if: |
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'bootstrap-verification')
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0  # for git diff in composite action
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          path-filters: 'Makefile|\.envrc'
+          force-run: ${{ inputs.force_run || 'false' }}
 
       - name: run make bootstrap
+        if: steps.cache.outputs.should-run == 'true'
         run: make bootstrap
 
       - name: verify nix installed
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           if ! command -v nix &> /dev/null; then
             echo "nix not found in PATH"
@@ -334,6 +282,7 @@ jobs:
           nix --version
 
       - name: verify direnv configured
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           if ! command -v direnv &> /dev/null; then
             echo "direnv not found in PATH"
@@ -342,12 +291,15 @@ jobs:
           echo "direnv found at: $(command -v direnv)"
 
       - name: run make verify
+        if: steps.cache.outputs.should-run == 'true'
         run: make verify
 
       - name: run make setup-user
+        if: steps.cache.outputs.should-run == 'true'
         run: make setup-user
 
       - name: verify age key generated
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           if [ ! -f ~/.config/sops/age/keys.txt ]; then
             echo "age key not generated"
@@ -357,20 +309,31 @@ jobs:
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
           nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt
 
-  # job 4: config-validation
+  # job 5: config-validation
   # tests config.nix user definitions (phase 1)
   config-validation:
-    needs: [skip-check, secrets-scan, detect-changes]
-    if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
-      (needs.detect-changes.outputs.nix-code == 'true' ||
-       github.event_name == 'workflow_dispatch')
+    needs: [secrets-scan]
     runs-on: ubuntu-latest
+    if: |
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'config-validation')
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          path-filters: '\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile'
+          force-run: ${{ inputs.force_run || 'false' }}
 
       - name: setup nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           system: x86_64-linux
@@ -379,6 +342,7 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: validate user definitions
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           echo "validating config.nix user definitions through darwin configurations..."
 
@@ -413,20 +377,31 @@ jobs:
 
           echo "✅ user definitions validated successfully"
 
-  # job 5: autowiring-validation
+  # job 6: autowiring-validation
   # verifies nixos-unified automatic config discovery
   autowiring-validation:
-    needs: [skip-check, secrets-scan, detect-changes]
-    if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
-      (needs.detect-changes.outputs.nix-code == 'true' ||
-       github.event_name == 'workflow_dispatch')
+    needs: [secrets-scan]
     runs-on: ubuntu-latest
+    if: |
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'autowiring-validation')
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          path-filters: '\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile'
+          force-run: ${{ inputs.force_run || 'false' }}
 
       - name: setup nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           system: x86_64-linux
@@ -435,6 +410,7 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: verify autowired outputs
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           echo "verifying nixos-unified autowiring..."
 
@@ -475,20 +451,31 @@ jobs:
 
           echo "✅ all expected homeConfigurations found"
 
-  # job 6: secrets-workflow
+  # job 7: secrets-workflow
   # tests sops-nix mechanics with ephemeral test keys
   secrets-workflow:
-    needs: [skip-check, secrets-scan, detect-changes]
-    if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
-      (needs.detect-changes.outputs.nix-code == 'true' ||
-       github.event_name == 'workflow_dispatch')
+    needs: [secrets-scan]
     runs-on: ubuntu-latest
+    if: |
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'secrets-workflow')
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          path-filters: '\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile'
+          force-run: ${{ inputs.force_run || 'false' }}
 
       - name: setup nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           system: x86_64-linux
@@ -497,6 +484,7 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: generate ephemeral test age key
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           mkdir -p test-secrets
           nix develop --command age-keygen -o test-secrets/test-key.txt
@@ -506,6 +494,7 @@ jobs:
           echo "TEST_AGE_PUBLIC=$TEST_AGE_PUBLIC" >> $GITHUB_ENV
 
       - name: create test .sops.yaml
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           cat > test-secrets/.sops.yaml <<EOF
           creation_rules:
@@ -517,6 +506,7 @@ jobs:
           echo "created test .sops.yaml"
 
       - name: create and encrypt test secret
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           cd test-secrets
           echo "test_secret: test-value-12345" > test.yaml
@@ -524,6 +514,7 @@ jobs:
           echo "encrypted test secret"
 
       - name: verify decryption
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           cd test-secrets
           SOPS_AGE_KEY_FILE=test-key.txt \
@@ -531,6 +522,7 @@ jobs:
           echo "✅ test secret decryption successful"
 
       - name: validate sops structure
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           if [ -f .sops.yaml ]; then
             echo "✅ .sops.yaml exists in repository"
@@ -545,20 +537,31 @@ jobs:
           rm -rf test-secrets
           echo "✅ ephemeral test secrets cleaned up"
 
-  # job 7: justfile-activation
+  # job 8: justfile-activation
   # validates user experience: justfile recipes, configuration discovery, and activation workflows
   justfile-activation:
-    needs: [skip-check, secrets-scan, detect-changes]
-    if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
-      (needs.detect-changes.outputs.nix-code == 'true' ||
-       github.event_name == 'workflow_dispatch')
+    needs: [secrets-scan]
     runs-on: ubuntu-latest
+    if: |
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'justfile-activation')
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          path-filters: '\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile'
+          force-run: ${{ inputs.force_run || 'false' }}
 
       - name: setup nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           system: x86_64-linux
@@ -567,6 +570,7 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: test justfile recipes
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           # Use --summary instead of --list to avoid broken pipe with large output
           JUST_RECIPES=$(nix develop --command just --summary)
@@ -587,11 +591,13 @@ jobs:
           done
 
       - name: validate flake structure
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           echo "validating flake structure with nix flake check..."
           nix develop --command just check
 
       - name: test home configurations (dry-run)
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           echo "discovering home configurations..."
 
@@ -628,6 +634,7 @@ jobs:
           echo "✅ all home configurations validated"
 
       - name: verify configuration outputs
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           echo "verifying all configurations are exposed in flake outputs..."
 
@@ -681,30 +688,42 @@ jobs:
           echo ""
           echo "✅ all configurations properly exposed"
 
-  # job 8: cache-overlay-packages
+  # job 9: cache-overlay-packages
   # pre-cache resource-intensive overlay packages before main build
   # prevents disk space exhaustion during CI builds (especially rust packages)
   cache-overlay-packages:
-    needs: [skip-check, secrets-scan, detect-changes]
+    needs: [secrets-scan]
+    runs-on: ${{ matrix.runner }}
     if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
-      (needs.detect-changes.outputs.nix-code == 'true' ||
-       github.event_name == 'workflow_dispatch')
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'cache-overlay-packages' ||
+       inputs.job == 'nix')
     strategy:
       fail-fast: false # allow each system to cache independently
       matrix:
-        system:
-          - x86_64-linux # standard linux (ubuntu-latest)
-          - aarch64-linux # arm linux (ubuntu-24.04-arm)
-    # dynamic runner selection based on system architecture
-    runs-on: >-
-      ${{ (matrix.system == 'x86_64-linux' && 'ubuntu-latest')
-      || (matrix.system == 'aarch64-linux' && 'ubuntu-24.04-arm') }}
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: ${{ github.job }} (${{ matrix.system }})
+          path-filters: '\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile'
+          force-run: ${{ inputs.force_run || 'false' }}
 
       - name: setup nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           system: ${{ matrix.system }}
@@ -713,21 +732,24 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: cache overlay packages
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           nix develop --command just cache-overlay-packages ${{ matrix.system }}
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-  # job 9: nix
+  # job 10: nix
   # builds flake outputs via category-based matrix for disk space optimization
   # distributes builds across multiple machines to avoid disk space exhaustion
   # each job builds a specific category (packages, home configs, system configs)
   nix:
-    needs: [skip-check, secrets-scan, cache-overlay-packages, detect-changes]
+    needs: [secrets-scan, cache-overlay-packages]
+    runs-on: ${{ matrix.runner }}
     if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
-      (needs.detect-changes.outputs.nix-code == 'true' ||
-       github.event_name == 'workflow_dispatch')
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'nix')
     strategy:
       fail-fast: false
       matrix:
@@ -764,12 +786,22 @@ jobs:
             runner: ubuntu-24.04-arm
             category: nixos
             config: orb-nixos
-    runs-on: ${{ matrix.runner }}
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
+          path-filters: '\.nix$|flake\.lock|configurations/|modules/|overlays/|justfile'
+          force-run: ${{ inputs.force_run || 'false' }}
 
       - name: setup nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           system: ${{ matrix.system }}
@@ -778,6 +810,7 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: build ${{ matrix.category }}${{ matrix.config && format(' - {0}', matrix.config) || '' }}
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           echo "building ${{ matrix.category }}${{ matrix.config && format(' {0}', matrix.config) || '' }} for ${{ matrix.system }}"
           nix develop --command just ci-build-category "${{ matrix.system }}" "${{ matrix.category }}" "${{ matrix.config }}"
@@ -786,15 +819,17 @@ jobs:
         if: always()
         run: df -h
 
-  # job 10: typescript
+  # job 11: typescript
   # TypeScript package testing via reusable workflow
+  # Note: Cannot add composite action steps to reusable workflow calls
+  # Job-level caching happens via GitHub Checks API query in the called workflow
   typescript:
-    needs: [skip-check, secrets-scan, set-variables, detect-changes]
+    needs: [secrets-scan, set-variables]
     if: |
-      needs.skip-check.outputs.should_skip != 'true' &&
-      (needs.detect-changes.outputs.typescript == 'true' ||
-       needs.detect-changes.outputs.docs-content == 'true' ||
-       github.event_name == 'workflow_dispatch')
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'typescript')
     strategy:
       fail-fast: false
       matrix:
@@ -808,9 +843,9 @@ jobs:
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-  # job 11: production-release-packages
+  # job 12: production-release-packages
   # Release packages to production on main/beta branches
-  # IGNORES skip-check but REQUIRES typescript+nix success/skipped (safe for fast-forward merge)
+  # Requires typescript+nix success/skipped (safe for fast-forward merge)
   production-release-packages:
     needs: [set-variables, typescript, nix]
     if: |
@@ -837,7 +872,7 @@ jobs:
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-  # job 12: production-docs-deploy
+  # job 13: production-docs-deploy
   # Documentation deployment to production (conditional)
   # Depends on production-release-packages to ensure packages are released first
   production-docs-deploy:
