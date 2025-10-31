@@ -91,6 +91,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
+          check-name: ${{ github.job }}-{hash}
           force-run: ${{ inputs.force_run || 'false' }}
           # No path-filters - security scanning always relevant
 
@@ -264,6 +265,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
+          check-name: ${{ github.job }}-{hash}
           path-filters: 'Makefile$|\.envrc$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -329,6 +331,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
+          check-name: ${{ github.job }}-{hash}
           path-filters: 'configurations/(darwin|nixos)/.*\.nix$|modules/(users|base)/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -397,6 +400,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
+          check-name: ${{ github.job }}-{hash}
           path-filters: 'flake\.(nix|lock)$|configurations/.*\.nix$|modules/.*\.nix$|justfile$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -471,6 +475,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
+          check-name: ${{ github.job }}-{hash}
           path-filters: '\.sops\.ya?ml$|modules/secrets/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -557,6 +562,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
+          check-name: ${{ github.job }}-{hash}
           path-filters: 'justfile$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -718,7 +724,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }} (${{ matrix.system }})
+          check-name: ${{ github.job }}-{hash} (${{ matrix.system }})
           path-filters: 'overlays/.*\.nix$|flake\.(nix|lock)$|pkgs/.*\.nix$|^\.github/workflows/ci\.yaml'
           force-run: ${{ inputs.force_run || 'false' }}
 
@@ -796,7 +802,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
+          check-name: ${{ github.job }}-{hash} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
           path-filters: 'flake\.(nix|lock)$|^\.github/workflows/ci\.yaml|overlays/.*\.nix$|modules/.*\.nix$|configurations/.*\.nix$|justfile$|pkgs/.*\.nix$'
           force-run: ${{ inputs.force_run || 'false' }}
 

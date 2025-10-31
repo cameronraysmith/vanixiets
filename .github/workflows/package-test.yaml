@@ -65,7 +65,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ inputs.package-name }}-test
+          check-name: ${{ inputs.package-name }}-test-{hash}
           path-filters: 'packages/${{ inputs.package-name }}/**/*|bun\.lock$|\.github/workflows/package-test\.yaml$'
           force-run: ${{ inputs.debug-enabled == 'true' && 'true' || 'false' }}
 
