@@ -608,6 +608,36 @@ Moving closer to true content-addressed caching while maintaining practical GitH
 - Implementation changes (action hash)
 - Input content variations (file content hashes)
 
+### Phase 1.4: Configuration-Identity Hash (2025-10-31)
+
+**Problem:** Content hash computed but never used for cache decisions. Workflow and action changes didn't invalidate cache unless commit SHA changed.
+
+**Solution:** Include configuration-identity hash in check names via template system.
+
+**Implementation:**
+```yaml
+# Hash computation
+config_hash = sha256(workflow_content + action_content + path_filters)[0:8]
+
+# Check name template
+check-name: "nix-{hash} (packages, x86_64-linux)"
+# Becomes: "nix-a1b2c3d4 (packages, x86_64-linux)"
+```
+
+**Configuration-identity semantics:**
+- Hash includes: workflow definition, action logic, path filters
+- Hash excludes: commit SHA, runtime values, changed files
+- Effect: Configuration changes auto-invalidate cache
+- Benefit: Cross-commit caching when configuration identical
+
+**Benefits:**
+- Workflow definition changes correctly invalidate cache
+- Composite action updates correctly invalidate cache
+- Path filter changes correctly invalidate cache
+- Enables cross-branch/cross-commit cache reuse (same config)
+
+**Auto-detection:** Workflow file auto-detected from `GITHUB_WORKFLOW_REF`, fixing hardcoded `ci.yaml` reference that broke reusable workflows.
+
 ### Future Evolution Path
 
 **Phase 2 (Planned):**
