@@ -15,6 +15,7 @@ Supersedes [ADR-0015](/development/architecture/adrs/0015-ci-caching-optimizatio
 - **Phase 1.5 (2025-10-31)**: Security hardening (authenticity verification, production safety)
 - **Phase 1.6 (2025-10-31)**: Reliability improvements (retry logic, rate limits, stale filtering)
 - **Phase 1.7 (2025-10-31)**: Validation and testing infrastructure
+- **Phase 1.8 (2025-10-31)**: Cross-commit caching with actions/cache
 
 **Current implementation**: Fully deployed and operational
 
@@ -674,6 +675,57 @@ gh api repos/$REPO/actions/runs/$RUN_ID/jobs --jq '.jobs[].name'
 - Self-healing: runs job when validation fails
 - Automated regression testing for composite action
 - Improved debugging and observability
+
+### Phase 1.8: Cross-Commit Caching with actions/cache (2025-10-31)
+
+**Problem:** Cache invalidated on force-push, rebase, or commit rewrites despite identical configurations.
+
+**Root cause:** GitHub Checks API is commit-addressed:
+- Query: `GET /commits/{SHA}/check-runs`
+- Different commit SHA = no cache found
+- Even if config hash identical
+
+**Solution:** Add actions/cache as primary caching layer, keyed by content hash.
+
+**Implementation:**
+```yaml
+# Composite action: Restore
+- uses: actions/cache/restore@v4
+  with:
+    key: job-result-{check-name}-{config-hash}
+    lookup-only: true
+
+# Workflow jobs: Save
+- uses: actions/cache/save@v4
+  with:
+    key: job-result-{check-name}-{config-hash}
+    path: .cache/job-results/{check-name}/marker
+```
+
+**Cache hierarchy:**
+1. actions/cache (content-addressed) → cross-commit
+2. GitHub Checks API (commit-addressed) → same-commit fallback
+3. Path filters (change-based) → ultimate fallback
+
+**Benefits:**
+- Force-push preserves cache (same config = same key)
+- Rebase preserves cache (same config = same key)
+- Cross-branch caching (default branch available to PRs)
+- Minimal storage (~1KB per job per unique config)
+
+**Scope:**
+- 13-14 jobs (all validation, matrix, preview deploy)
+- Excluded: set-variables (outputs), production (safety)
+
+**Storage model:**
+- Marker files: JSON metadata (~1KB)
+- Repository limit: 10GB total
+- Auto-eviction: 7 days without access
+
+**Integration:**
+- No conflicts with nix-community/cache-nix-action
+- No conflicts with cachix/cachix-action
+- Complementary three-layer strategy
 
 ### Future Evolution Path
 
