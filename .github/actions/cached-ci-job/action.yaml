@@ -50,6 +50,9 @@ outputs:
   cache-source:
     description: 'Where cache hit occurred (actions-cache, checks-api, or none)'
     value: ${{ steps.decide.outputs.cache-source }}
+  cache-key:
+    description: 'Sanitized cache key for actions/cache (no special characters)'
+    value: ${{ steps.cache-result.outputs.cache-key }}
 
 runs:
   using: composite

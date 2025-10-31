@@ -127,7 +127,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 1: set-variables
   # determines deployment settings and variables based on event type
@@ -355,7 +355,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 5: config-validation
   # tests config.nix user definitions (phase 1)
@@ -447,7 +447,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 6: autowiring-validation
   # verifies nixos-unified automatic config discovery
@@ -545,7 +545,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 7: secrets-workflow
   # tests sops-nix mechanics with ephemeral test keys
@@ -655,7 +655,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 8: justfile-activation
   # validates user experience: justfile recipes, configuration discovery, and activation workflows
@@ -830,7 +830,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 9: cache-overlay-packages
   # pre-cache resource-intensive overlay packages before main build
@@ -906,7 +906,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 10: nix
   # builds flake outputs via category-based matrix for disk space optimization
@@ -1015,7 +1015,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
-          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 11: typescript
   # TypeScript package testing via reusable workflow
