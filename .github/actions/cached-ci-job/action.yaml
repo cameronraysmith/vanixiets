@@ -167,11 +167,24 @@ runs:
 
           core.info(`Found ${checks.check_runs.length} check run(s) for this commit`);
 
-          // Check for invalid check runs (security: reject non-GitHub Actions runs)
-          if (checks.check_runs.length > 0) {
-            core.info(`Checking ${checks.check_runs.length} check run(s) for authenticity`);
+          // Filter to recent check runs only (last 24 hours)
+          const staleCutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const recentChecks = checks.check_runs.filter(run => {
+            if (!run.started_at) return false;
+            const startTime = new Date(run.started_at);
+            return startTime > staleCutoffTime;
+          });
 
-            const invalidRuns = checks.check_runs.filter(run =>
+          const staleCount = checks.check_runs.length - recentChecks.length;
+          if (staleCount > 0) {
+            core.info(`Filtered out ${staleCount} stale check run(s) older than 24 hours`);
+          }
+
+          core.info(`Checking ${recentChecks.length} recent check run(s) for success`);
+
+          // Check for invalid check runs (security: reject non-GitHub Actions runs)
+          if (recentChecks.length > 0) {
+            const invalidRuns = recentChecks.filter(run =>
               run.conclusion === 'success' &&
               run.status === 'completed' &&
               (run.app.slug !== 'github-actions' || !run.details_url?.includes('/actions/runs/'))
@@ -182,8 +195,8 @@ runs:
             }
           }
 
-          // Find any completed successful run from authentic GitHub Actions
-          const successfulRun = checks.check_runs.find(run => {
+          // Find any completed successful run from authentic GitHub Actions (from recent checks only)
+          const successfulRun = recentChecks.find(run => {
             const runAge = run.completed_at ? new Date(run.completed_at) : null;
             const isRecent = runAge && runAge > cutoffTime;
 
@@ -204,14 +217,14 @@ runs:
             core.info(`✓ Job already succeeded: ${successfulRun.html_url}`);
             core.setOutput('previously-succeeded', 'true');
           } else {
-            const failedRuns = checks.check_runs.filter(run =>
+            const failedRuns = recentChecks.filter(run =>
               run.conclusion === 'failure' &&
               run.status === 'completed'
             );
             if (failedRuns.length > 0) {
-              core.info(`✗ Found ${failedRuns.length} previous failed run(s)`);
+              core.info(`✗ Found ${failedRuns.length} recent failed run(s)`);
             } else {
-              core.info(`✗ No previous runs found`);
+              core.info(`✗ No recent successful runs found`);
             }
             core.setOutput('previously-succeeded', 'false');
           }
