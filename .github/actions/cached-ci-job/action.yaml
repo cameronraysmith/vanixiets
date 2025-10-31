@@ -49,9 +49,13 @@ runs:
       with:
         script: |
           const checkName = process.env.CHECK_NAME;
-          const commit = context.sha;
+          // Use PR head commit for pull_request events, otherwise use context.sha
+          const commit = context.eventName === 'pull_request'
+            ? context.payload.pull_request.head.sha
+            : context.sha;
 
           core.info(`Querying execution history for: "${checkName}" @ ${commit}`);
+          core.info(`Event: ${context.eventName}, Using commit: ${commit}`);
 
           try {
             const { data: checks } = await github.rest.checks.listForRef({
