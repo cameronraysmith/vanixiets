@@ -101,11 +101,15 @@ jobs:
           ref: ${{ inputs.checkout-ref != '' && inputs.checkout-ref || github.ref }}
           persist-credentials: false
 
+      # NOTE: Production releases intentionally DO NOT save cache results.
+      # This ensures fresh builds for all production deployments per ADR-0016.
+      # Cache lookup may skip if prior release already succeeded, but new
+      # releases always execute with current code state.
       - name: Check execution cache
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
-          check-name: ${{ inputs.package-name }}-release-{hash}
+          check-name: ${{ inputs.package-name }}-release
           path-filters: 'packages/${{ inputs.package-name }}/**/*|bun\.lock$|\.github/workflows/package-release\.yaml$|justfile$'
           force-run: ${{ inputs.force-run == 'true' || inputs.debug-enabled == 'true' && 'true' || 'false' }}
 
