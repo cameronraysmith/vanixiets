@@ -114,10 +114,27 @@ runs:
 
             core.info(`Found ${checks.check_runs.length} check run(s) for this commit`);
 
-            // Find any completed successful run
+            // Check for invalid check runs (security: reject non-GitHub Actions runs)
+            if (checks.check_runs.length > 0) {
+              core.info(`Checking ${checks.check_runs.length} check run(s) for authenticity`);
+
+              const invalidRuns = checks.check_runs.filter(run =>
+                run.conclusion === 'success' &&
+                run.status === 'completed' &&
+                (run.app.slug !== 'github-actions' || !run.details_url?.includes('/actions/runs/'))
+              );
+
+              if (invalidRuns.length > 0) {
+                core.warning(`Found ${invalidRuns.length} check run(s) with invalid origin (ignored for security)`);
+              }
+            }
+
+            // Find any completed successful run from authentic GitHub Actions
             const successfulRun = checks.check_runs.find(run =>
               run.conclusion === 'success' &&
-              run.status === 'completed'
+              run.status === 'completed' &&
+              run.app.slug === 'github-actions' &&
+              run.details_url && run.details_url.includes('/actions/runs/')
             );
 
             if (successfulRun) {
