@@ -804,7 +804,7 @@ jobs:
         with:
           check-name: ${{ github.job }}-{hash} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
           path-filters: 'flake\.(nix|lock)$|^\.github/workflows/ci\.yaml|overlays/.*\.nix$|modules/.*\.nix$|configurations/.*\.nix$|justfile$|pkgs/.*\.nix$'
-          force-run: ${{ inputs.force_run || 'false' }}
+          force-run: ${{ github.ref == 'refs/heads/main' && 'true' || inputs.force_run || 'false' }}
 
       - name: setup nix
         if: steps.cache.outputs.should-run == 'true'
@@ -846,6 +846,7 @@ jobs:
       package-path: ${{ matrix.package.path }}
       debug-enabled: ${{ needs.set-variables.outputs.debug }}
       nix-installer: quick
+      force-run: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
@@ -875,6 +876,7 @@ jobs:
       release-dry-run: false
       debug-enabled: ${{ needs.set-variables.outputs.debug == 'true' }}
       checkout-ref: ${{ needs.set-variables.outputs.checkout_ref }}
+      force-run: 'true'
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 

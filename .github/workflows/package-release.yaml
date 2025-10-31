@@ -26,6 +26,11 @@ on:
         required: false
         type: string
         default: ""
+      force-run:
+        description: "Force execution even if already successful"
+        required: false
+        type: boolean
+        default: false
 
   workflow_call:
     inputs:
@@ -52,6 +57,11 @@ on:
         required: false
         type: string
         default: ""
+      force-run:
+        description: "Force execution even if already successful"
+        required: false
+        type: string
+        default: "false"
     secrets:
       SOPS_AGE_KEY:
         required: true
@@ -97,7 +107,7 @@ jobs:
         with:
           check-name: ${{ inputs.package-name }}-release-{hash}
           path-filters: 'packages/${{ inputs.package-name }}/**/*|bun\.lock$|\.github/workflows/package-release\.yaml$|justfile$'
-          force-run: ${{ inputs.debug-enabled == 'true' && 'true' || 'false' }}
+          force-run: ${{ inputs.force-run == 'true' || inputs.debug-enabled == 'true' && 'true' || 'false' }}
 
       - name: Setup Nix
         if: steps.cache.outputs.should-run == 'true'
