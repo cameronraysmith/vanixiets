@@ -102,6 +102,30 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         run: nix develop --command just ${{ inputs.package-name }}-test-e2e
 
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "package": "${{ inputs.package-name }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+
       - name: upload test results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4

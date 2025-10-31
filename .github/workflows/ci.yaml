@@ -882,6 +882,32 @@ jobs:
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "matrix": {
+              "system": "${{ matrix.system }}"
+            }
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
+
   # job 10: nix
   # builds flake outputs via category-based matrix for disk space optimization
   # distributes builds across multiple machines to avoid disk space exhaustion
@@ -962,6 +988,34 @@ jobs:
       - name: report disk usage
         if: always()
         run: df -h
+
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          cat > .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}/marker <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "config_hash": "${{ steps.cache.outputs.config-hash }}",
+            "check_name": "${{ steps.cache.outputs.resolved-check-name }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "matrix": {
+              "system": "${{ matrix.system }}",
+              "category": "${{ matrix.category }}",
+              "config": "${{ matrix.config || 'none' }}"
+            }
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@6849a6489940f00c2f30c0fb92c6274307ccb58a # ratchet:actions/cache/save@v4
+        with:
+          path: .cache/job-results/${{ steps.cache.outputs.resolved-check-name }}
+          key: job-result-${{ steps.cache.outputs.resolved-check-name }}-${{ steps.cache.outputs.config-hash }}
 
   # job 11: typescript
   # TypeScript package testing via reusable workflow
