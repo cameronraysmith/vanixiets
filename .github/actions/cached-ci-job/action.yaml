@@ -109,66 +109,94 @@ runs:
           const cutoffTime = new Date(Date.now() - maxAgeMs);
           core.info(`Cache cutoff time: ${cutoffTime.toISOString()} (7 days ago)`);
 
-          try {
-            const { data: checks } = await github.rest.checks.listForRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: commit,
-              check_name: resolvedCheckName,
-            });
+          // Retry logic with exponential backoff
+          const maxRetries = 3;
+          let checks = null;
 
-            core.info(`Found ${checks.check_runs.length} check run(s) for this commit`);
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              const response = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: commit,
+                check_name: resolvedCheckName,
+              });
 
-            // Check for invalid check runs (security: reject non-GitHub Actions runs)
-            if (checks.check_runs.length > 0) {
-              core.info(`Checking ${checks.check_runs.length} check run(s) for authenticity`);
+              checks = response.data;
+              core.info(`Successfully queried check runs (attempt ${attempt}/${maxRetries})`);
+              break; // Success - exit retry loop
 
-              const invalidRuns = checks.check_runs.filter(run =>
-                run.conclusion === 'success' &&
-                run.status === 'completed' &&
-                (run.app.slug !== 'github-actions' || !run.details_url?.includes('/actions/runs/'))
-              );
+            } catch (error) {
+              const isLastAttempt = attempt === maxRetries;
 
-              if (invalidRuns.length > 0) {
-                core.warning(`Found ${invalidRuns.length} check run(s) with invalid origin (ignored for security)`);
+              if (isLastAttempt) {
+                core.warning(`API query failed after ${maxRetries} attempts: ${error.message}`);
+                core.setOutput('previously-succeeded', 'false');
+                return;
               }
+
+              const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+              core.warning(`Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+              core.info(`Retrying in ${delay}ms...`);
+
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+
+          if (!checks) {
+            core.warning('Failed to retrieve check runs after retries');
+            core.setOutput('previously-succeeded', 'false');
+            return;
+          }
+
+          core.info(`Found ${checks.check_runs.length} check run(s) for this commit`);
+
+          // Check for invalid check runs (security: reject non-GitHub Actions runs)
+          if (checks.check_runs.length > 0) {
+            core.info(`Checking ${checks.check_runs.length} check run(s) for authenticity`);
+
+            const invalidRuns = checks.check_runs.filter(run =>
+              run.conclusion === 'success' &&
+              run.status === 'completed' &&
+              (run.app.slug !== 'github-actions' || !run.details_url?.includes('/actions/runs/'))
+            );
+
+            if (invalidRuns.length > 0) {
+              core.warning(`Found ${invalidRuns.length} check run(s) with invalid origin (ignored for security)`);
+            }
+          }
+
+          // Find any completed successful run from authentic GitHub Actions
+          const successfulRun = checks.check_runs.find(run => {
+            const runAge = run.completed_at ? new Date(run.completed_at) : null;
+            const isRecent = runAge && runAge > cutoffTime;
+
+            if (run.conclusion === 'success' && run.status === 'completed' && !isRecent) {
+              core.info(`Ignoring stale check run from ${runAge?.toISOString()} (older than 7 days)`);
             }
 
-            // Find any completed successful run from authentic GitHub Actions
-            const successfulRun = checks.check_runs.find(run => {
-              const runAge = run.completed_at ? new Date(run.completed_at) : null;
-              const isRecent = runAge && runAge > cutoffTime;
+            return (
+              run.conclusion === 'success' &&
+              run.status === 'completed' &&
+              run.app.slug === 'github-actions' &&
+              run.details_url && run.details_url.includes('/actions/runs/') &&
+              isRecent
+            );
+          });
 
-              if (run.conclusion === 'success' && run.status === 'completed' && !isRecent) {
-                core.info(`Ignoring stale check run from ${runAge?.toISOString()} (older than 7 days)`);
-              }
-
-              return (
-                run.conclusion === 'success' &&
-                run.status === 'completed' &&
-                run.app.slug === 'github-actions' &&
-                run.details_url && run.details_url.includes('/actions/runs/') &&
-                isRecent
-              );
-            });
-
-            if (successfulRun) {
-              core.info(`✓ Job already succeeded: ${successfulRun.html_url}`);
-              core.setOutput('previously-succeeded', 'true');
+          if (successfulRun) {
+            core.info(`✓ Job already succeeded: ${successfulRun.html_url}`);
+            core.setOutput('previously-succeeded', 'true');
+          } else {
+            const failedRuns = checks.check_runs.filter(run =>
+              run.conclusion === 'failure' &&
+              run.status === 'completed'
+            );
+            if (failedRuns.length > 0) {
+              core.info(`✗ Found ${failedRuns.length} previous failed run(s)`);
             } else {
-              const failedRuns = checks.check_runs.filter(run =>
-                run.conclusion === 'failure' &&
-                run.status === 'completed'
-              );
-              if (failedRuns.length > 0) {
-                core.info(`✗ Found ${failedRuns.length} previous failed run(s)`);
-              } else {
-                core.info(`✗ No previous runs found`);
-              }
-              core.setOutput('previously-succeeded', 'false');
+              core.info(`✗ No previous runs found`);
             }
-          } catch (error) {
-            core.warning(`API query failed: ${error.message}`);
             core.setOutput('previously-succeeded', 'false');
           }
 
