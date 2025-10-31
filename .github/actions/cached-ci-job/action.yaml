@@ -37,7 +37,7 @@ outputs:
     value: ${{ steps.changed-files.outputs.any_changed || 'false' }}
   all-changed-files:
     description: List of all changed files (for debugging workflow change detection)
-    value: ${{ steps.all-changed-files.outputs.all_changed_files || '' }}
+    value: ${{ steps.changed-files.outputs.all_modified_files || '' }}
   content-hash:
     description: Job-specific content hash for debugging and analysis
     value: ${{ steps.content-hash.outputs.content-hash || '' }}
@@ -173,22 +173,17 @@ runs:
           }
 
     
-    - name: Get ALL changed files (for workflow detection)
-      id: all-changed-files
+    - name: Get changed files (all + filtered)
+      id: changed-files
       if: steps.check-history.outputs.previously-succeeded != 'true'
       uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62
       with:
-        json: true
-        separator: ','
-
-    - name: Get filtered changed files (for path filtering)
-      id: changed-files
-      if: |
-        steps.check-history.outputs.previously-succeeded != 'true' &&
-        inputs.path-filters != ''
-      uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62
-      with:
-        files: ${{ inputs.path-filters }}
+        # Use files_yaml for multiple pattern groups
+        files_yaml: |
+          all:
+            - '**/*'
+          filtered:
+            - ${{ inputs.path-filters }}
         json: true
         separator: ','
 
@@ -207,9 +202,9 @@ runs:
       shell: bash
       env:
         HAS_FILTERS: ${{ inputs.path-filters != '' }}
-        ALL_CHANGED_FILES: ${{ steps.all-changed-files.outputs.all_changed_files || '' }}
-        FILTERED_CHANGED: ${{ steps.changed-files.outputs.any_changed || 'false' }}
-        FILTERED_FILES: ${{ steps.changed-files.outputs.all_changed_files || '' }}
+        ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_modified_files || '' }}
+        FILTERED_CHANGED: ${{ steps.changed-files.outputs.filtered_any_changed || 'false' }}
+        FILTERED_FILES: ${{ steps.changed-files.outputs.filtered_all_changed_files || '' }}
       run: |
         echo "=== File Change Analysis ==="
         echo "Has path filters: $HAS_FILTERS"
