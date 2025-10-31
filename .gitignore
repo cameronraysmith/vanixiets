@@ -4,6 +4,7 @@
 .secrets.env
 result*
 external-references
+.obsidian
 .pre-commit-config.yaml
 .*rules*
 node_modules/
