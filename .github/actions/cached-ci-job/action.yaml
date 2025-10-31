@@ -25,6 +25,12 @@ outputs:
   relevant-changes:
     description: Whether relevant file changes were detected
     value: ${{ steps.check-paths.outputs.relevant-changes }}
+  changed-files:
+    description: List of changed files matching path filters (when path-filters specified)
+    value: ${{ steps.changed-files.outputs.all_changed_files || '' }}
+  any-changed:
+    description: Whether any files matching path filters changed (when path-filters specified)
+    value: ${{ steps.changed-files.outputs.any_changed || 'false' }}
 
 runs:
   using: composite
@@ -77,39 +83,49 @@ runs:
             core.setOutput('previously-succeeded', 'false');
           }
 
-    - name: Check for relevant file changes
-      id: check-paths
+    - name: Get changed files
+      id: changed-files
       if: |
         steps.check-history.outputs.previously-succeeded != 'true' &&
         inputs.path-filters != ''
+      uses: tj-actions/changed-files@v44
+      with:
+        files: ${{ inputs.path-filters }}
+        json: true
+        separator: ','
+
+    - name: Check for relevant file changes
+      id: check-paths
+      if: |
+        steps.check-history.outputs.previously-succeeded != 'true'
       shell: bash
       env:
-        PATH_FILTERS: ${{ inputs.path-filters }}
+        HAS_FILTERS: ${{ inputs.path-filters != '' }}
+        ANY_CHANGED: ${{ steps.changed-files.outputs.any_changed || 'false' }}
+        CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files || '' }}
       run: |
-        # Determine base ref for comparison
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          BASE_REF="${{ github.event.pull_request.base.sha }}"
+        if [ "$HAS_FILTERS" = "true" ]; then
+          # Path filtering is enabled
+          if [ "$ANY_CHANGED" = "true" ]; then
+            echo "Found relevant file changes"
+            echo "Changed files: $CHANGED_FILES"
+
+            # Check for workflow changes specifically
+            if echo "$CHANGED_FILES" | grep -q '\.github/workflows/'; then
+              echo "✓ Workflow changes detected - job is relevant"
+            else
+              echo "✓ Relevant file changes detected"
+            fi
+
+            echo "relevant-changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "✗ No relevant file changes detected"
+            echo "relevant-changes=false" >> $GITHUB_OUTPUT
+          fi
         else
-          BASE_REF="HEAD^"
-        fi
-
-        echo "Checking for changes matching: $PATH_FILTERS"
-        echo "Comparing $BASE_REF...HEAD"
-
-        # Workflow changes always trigger all jobs
-        if git diff --name-only "$BASE_REF" HEAD | grep -qE '\.github/workflows/'; then
+          # No path filters - always relevant
+          echo "✓ No path filters specified - job is always relevant"
           echo "relevant-changes=true" >> $GITHUB_OUTPUT
-          echo "✓ Workflow changes detected - job is relevant"
-          exit 0
-        fi
-
-        # Check if any relevant files changed
-        if git diff --name-only "$BASE_REF" HEAD | grep -qE "$PATH_FILTERS"; then
-          echo "relevant-changes=true" >> $GITHUB_OUTPUT
-          echo "✓ Relevant file changes detected"
-        else
-          echo "relevant-changes=false" >> $GITHUB_OUTPUT
-          echo "✗ No relevant file changes"
         fi
 
     - name: Make execution decision
