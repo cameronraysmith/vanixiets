@@ -1,0 +1,150 @@
+name: Test Composite Actions
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-scenario:
+        description: 'Test scenario to run'
+        required: false
+        type: choice
+        options:
+          - all
+          - cache-hit
+          - cache-miss
+          - path-filters
+          - validation
+        default: all
+  pull_request:
+    paths:
+      - '.github/actions/**'
+      - '.github/workflows/test-composite-actions.yaml'
+
+concurrency:
+  group: test-composite-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-cache-hit:
+    name: Test cache hit scenario
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.test-scenario == 'all' || inputs.test-scenario == 'cache-hit') ||
+      github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test cached-ci-job action
+        id: cache-test
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: test-cache-hit-{hash}
+          path-filters: '\.md$'
+
+      - name: Validate outputs
+        run: |
+          echo "=== Composite Action Outputs ==="
+          echo "should-run: ${{ steps.cache-test.outputs.should-run }}"
+          echo "previously-succeeded: ${{ steps.cache-test.outputs.previously-succeeded }}"
+          echo "relevant-changes: ${{ steps.cache-test.outputs.relevant-changes }}"
+          echo "config-hash: ${{ steps.cache-test.outputs.config-hash }}"
+          echo "resolved-check-name: ${{ steps.cache-test.outputs.resolved-check-name }}"
+
+          # Validate required outputs present
+          if [ -z "${{ steps.cache-test.outputs.should-run }}" ]; then
+            echo "❌ Missing required output: should-run"
+            exit 1
+          fi
+
+          if [ -z "${{ steps.cache-test.outputs.config-hash }}" ]; then
+            echo "❌ Missing required output: config-hash"
+            exit 1
+          fi
+
+          if [ -z "${{ steps.cache-test.outputs.resolved-check-name }}" ]; then
+            echo "❌ Missing required output: resolved-check-name"
+            exit 1
+          fi
+
+          echo "✅ All required outputs present"
+
+      - name: Validate config hash format
+        run: |
+          HASH="${{ steps.cache-test.outputs.config-hash }}"
+          if ! echo "$HASH" | grep -qE '^[a-f0-9]{8}$'; then
+            echo "❌ Invalid config hash format: $HASH"
+            echo "Expected: 8 hex characters"
+            exit 1
+          fi
+          echo "✅ Config hash format valid: $HASH"
+
+      - name: Validate resolved check name
+        run: |
+          RESOLVED="${{ steps.cache-test.outputs.resolved-check-name }}"
+          if echo "$RESOLVED" | grep -q '{hash}'; then
+            echo "❌ Hash template not replaced: $RESOLVED"
+            exit 1
+          fi
+          echo "✅ Check name resolved: $RESOLVED"
+
+  test-path-filters:
+    name: Test path filter logic
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.test-scenario == 'all' || inputs.test-scenario == 'path-filters') ||
+      github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test with specific path filters
+        id: filter-test
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: test-path-filters-{hash}
+          path-filters: '\.nix$|flake\.lock'
+
+      - name: Validate path filter outputs
+        run: |
+          echo "=== Path Filter Outputs ==="
+          echo "relevant-changes: ${{ steps.filter-test.outputs.relevant-changes }}"
+          echo "any-changed: ${{ steps.filter-test.outputs.any-changed }}"
+
+          if [ -z "${{ steps.filter-test.outputs.relevant-changes }}" ]; then
+            echo "❌ Missing relevant-changes output"
+            exit 1
+          fi
+
+          echo "✅ Path filter outputs valid"
+
+  test-validation:
+    name: Test check name validation
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.test-scenario == 'all' || inputs.test-scenario == 'validation')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test with valid check name
+        id: valid-test
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: test-validation-{hash}
+
+      - name: Validate success
+        run: |
+          if [ "${{ steps.valid-test.outputs.should-run }}" = "" ]; then
+            echo "❌ Validation test failed"
+            exit 1
+          fi
+          echo "✅ Valid check name accepted"
