@@ -92,7 +92,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          force-run: ${{ inputs.force_run || 'false' }}
+          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
           # No path-filters - security scanning always relevant
 
       - name: Setup Nix
@@ -289,7 +289,7 @@ jobs:
         with:
           check-name: ${{ github.job }}
           path-filters: 'Makefile$|\.envrc$|^\.github/workflows/ci\.yaml'
-          force-run: ${{ inputs.force_run || 'false' }}
+          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: run make bootstrap
         if: steps.cache.outputs.should-run == 'true'
@@ -377,7 +377,7 @@ jobs:
         with:
           check-name: ${{ github.job }}
           path-filters: 'configurations/(darwin|nixos)/.*\.nix$|modules/(users|base)/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
-          force-run: ${{ inputs.force_run || 'false' }}
+          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
         if: steps.cache.outputs.should-run == 'true'
@@ -468,7 +468,7 @@ jobs:
         with:
           check-name: ${{ github.job }}
           path-filters: 'flake\.(nix|lock)$|configurations/.*\.nix$|modules/.*\.nix$|justfile$|^\.github/workflows/ci\.yaml'
-          force-run: ${{ inputs.force_run || 'false' }}
+          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
         if: steps.cache.outputs.should-run == 'true'
@@ -565,7 +565,7 @@ jobs:
         with:
           check-name: ${{ github.job }}
           path-filters: '\.sops\.ya?ml$|modules/secrets/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
-          force-run: ${{ inputs.force_run || 'false' }}
+          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
         if: steps.cache.outputs.should-run == 'true'
@@ -674,7 +674,7 @@ jobs:
         with:
           check-name: ${{ github.job }}
           path-filters: 'justfile$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
-          force-run: ${{ inputs.force_run || 'false' }}
+          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
         if: steps.cache.outputs.should-run == 'true'
@@ -858,7 +858,7 @@ jobs:
         with:
           check-name: ${{ github.job }} (${{ matrix.system }})
           path-filters: 'overlays/.*\.nix$|flake\.(nix|lock)$|pkgs/.*\.nix$|^\.github/workflows/ci\.yaml'
-          force-run: ${{ inputs.force_run || 'false' }}
+          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
         if: steps.cache.outputs.should-run == 'true'
@@ -961,7 +961,7 @@ jobs:
         with:
           check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
           path-filters: 'flake\.(nix|lock)$|^\.github/workflows/ci\.yaml|overlays/.*\.nix$|modules/.*\.nix$|configurations/.*\.nix$|justfile$|pkgs/.*\.nix$'
-          force-run: ${{ github.ref == 'refs/heads/main' && 'true' || inputs.force_run || 'false' }}
+          force-run: ${{ github.ref == 'refs/heads/main' && 'true' || inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
         if: steps.cache.outputs.should-run == 'true'
@@ -1030,7 +1030,7 @@ jobs:
       package-path: ${{ matrix.package.path }}
       debug-enabled: ${{ needs.set-variables.outputs.debug }}
       nix-installer: quick
-      force-run: ${{ github.ref == 'refs/heads/main' && 'true' || inputs.force_run || 'false' }}
+      force-run: ${{ github.ref == 'refs/heads/main' && 'true' || inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
@@ -1060,7 +1060,7 @@ jobs:
       release-dry-run: false
       debug-enabled: ${{ needs.set-variables.outputs.debug == 'true' }}
       checkout-ref: ${{ needs.set-variables.outputs.checkout_ref }}
-      force-run: ${{ inputs.force_run || 'false' }}
+      force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
