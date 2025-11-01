@@ -95,7 +95,7 @@ in
       svg2pdf
 
       # compute
-      argo
+      argo-workflows
       argocd
       argocd-autopilot
       crane
