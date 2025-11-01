@@ -74,7 +74,7 @@ jobs:
         with:
           check-name: preview-docs-deploy
           path-filters: 'packages/docs/|\.github/workflows/(deploy-docs|ci)\.yaml$'
-          force-run: ${{ inputs.debug_enabled == 'true' || inputs.force_run == 'true' || 'false' }}
+          force-run: ${{ inputs.force_run }}
 
       - name: Setup Nix
         if: steps.cache.outputs.should-run == 'true'
