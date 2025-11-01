@@ -265,6 +265,7 @@ jobs:
       branch: ${{ github.head_ref }}
       environment: preview
       debug_enabled: ${{ needs.set-variables.outputs.debug }}
+      force_run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
     secrets: inherit
 
   # job 4: bootstrap-verification
@@ -1082,4 +1083,5 @@ jobs:
       debug_enabled: ${{ needs.set-variables.outputs.debug }}
       branch: ${{ needs.set-variables.outputs.checkout_ref }}
       environment: ${{ needs.set-variables.outputs.deploy_environment }}
+      force_run: ${{ inputs.force_run || 'false' }}
     secrets: inherit
