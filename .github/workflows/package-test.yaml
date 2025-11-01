@@ -76,7 +76,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ inputs.package-name }}-test
-          path-filters: 'packages/${{ inputs.package-name }}/**/*|bun\.lock$|\.github/workflows/(package-test|ci)\.yaml$'
+          hash-sources: 'packages/${{ inputs.package-name }}/**/* bun.lock'
           force-run: ${{ inputs.force-run }}
 
       - name: setup nix

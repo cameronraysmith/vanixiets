@@ -110,7 +110,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ inputs.package-name }}-release
-          path-filters: 'packages/${{ inputs.package-name }}/**/*|bun\.lock$|\.github/workflows/package-release\.yaml$|justfile$'
+          hash-sources: 'packages/${{ inputs.package-name }}/**/* bun.lock justfile'
           force-run: ${{ inputs.force-run }}
 
       - name: Setup Nix
