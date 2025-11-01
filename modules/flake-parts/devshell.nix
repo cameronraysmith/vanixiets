@@ -8,12 +8,12 @@
       inputs',
       config,
       pkgs,
-      system,
       ...
     }:
     let
       # Playwright driver from versioned flake (synced with package.json)
-      playwrightDriver = inputs.playwright-web-flake.packages.${system}.playwright-driver;
+      playwrightDriver =
+        inputs.playwright-web-flake.packages.${pkgs.stdenv.hostPlatform.system}.playwright-driver;
     in
     {
       devShells.default = pkgs.mkShell {
