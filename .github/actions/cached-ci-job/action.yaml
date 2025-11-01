@@ -64,21 +64,46 @@ runs:
 
         # Compute content hash of all source files
         # Note: Using git hash-object for consistency with Git's object hashing
+        # Using find instead of shell glob expansion to support ** recursive patterns
         CONTENT_HASH=""
         for pattern in $ALL_SOURCES; do
-          # Find matching files and compute their hashes
           if [ -f "$pattern" ]; then
-            # Single file
+            # Direct file path - hash it directly
             FILE_HASH=$(git hash-object "$pattern" 2>/dev/null || echo "missing")
             CONTENT_HASH="${CONTENT_HASH}${FILE_HASH}"
-          else
-            # Glob pattern - expand and hash each file
-            for file in $pattern; do
-              if [ -f "$file" ]; then
+          elif [[ "$pattern" == *"*"* ]]; then
+            # Glob pattern - use find to expand recursively
+            # Convert glob pattern to find-compatible format
+            # Examples: **/*.nix -> find all .nix files recursively
+            #           modules/**/*.nix -> find .nix files under modules/
+
+            # Extract base directory and file pattern
+            if [[ "$pattern" == *"/"* ]]; then
+              BASE_DIR="${pattern%%/**}"
+              FILE_PATTERN="${pattern##*/}"
+            else
+              BASE_DIR="."
+              FILE_PATTERN="$pattern"
+            fi
+
+            # Handle ** prefix (recursive from current dir)
+            if [[ "$pattern" == "**/"* ]]; then
+              BASE_DIR="."
+              FILE_PATTERN="${pattern#**/}"
+            fi
+
+            # Find matching files, sort for deterministic ordering
+            if [ -d "$BASE_DIR" ]; then
+              while IFS= read -r file; do
                 FILE_HASH=$(git hash-object "$file" 2>/dev/null || echo "missing")
                 CONTENT_HASH="${CONTENT_HASH}${FILE_HASH}"
-              fi
-            done
+              done < <(find "$BASE_DIR" -type f -name "$FILE_PATTERN" 2>/dev/null | sort)
+            else
+              echo "::warning::Pattern base directory not found: $BASE_DIR (pattern: $pattern)"
+            fi
+          else
+            # Pattern doesn't match a file and has no glob chars - might be missing
+            echo "::warning::Source file not found: $pattern"
           fi
         done
 
