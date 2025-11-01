@@ -9,17 +9,16 @@ in
     {
       pkgs,
       config,
-      system,
       ...
     }:
     let
       claude-code = inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
       # landrun uses Landlock LSM which is Linux-only
-      isLinux = lib.hasSuffix "-linux" system;
+      isLinux = lib.hasSuffix "-linux" pkgs.stdenv.hostPlatform.system;
       # landrun tests fail on aarch64-linux due to Landlock LSM compatibility issues
       # See: docs/notes/ci/landrun-aarch64-issue.md
       # TODO: Remove when upstream fixes Landlock compatibility on ARM
-      canBuildLandrun = isLinux && (system != "aarch64-linux");
+      canBuildLandrun = isLinux && (pkgs.stdenv.hostPlatform.system != "aarch64-linux");
     in
     {
       # Sandboxed claude-code variants (x86_64-linux only - landrun broken on aarch64-linux)
