@@ -236,7 +236,7 @@ in
     ++ lib.optionals pkgs.stdenv.isDarwin [
       mactop
     ]
-    ++ lib.optionals (pkgs.system == "x86_64-linux") [
+    ++ lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
       flake.inputs.nix-ai-tools.packages.${pkgs.system}.backlog-md
     ];
 
