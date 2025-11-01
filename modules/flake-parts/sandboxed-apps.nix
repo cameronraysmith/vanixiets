@@ -13,7 +13,7 @@ in
       ...
     }:
     let
-      claude-code = inputs.nix-ai-tools.packages.${pkgs.system}.claude-code;
+      claude-code = inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
       # landrun uses Landlock LSM which is Linux-only
       isLinux = lib.hasSuffix "-linux" system;
       # landrun tests fail on aarch64-linux due to Landlock LSM compatibility issues
