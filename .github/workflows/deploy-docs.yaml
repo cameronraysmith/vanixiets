@@ -73,7 +73,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: preview-docs-deploy
-          path-filters: 'packages/docs/|\.github/workflows/deploy-docs\.yaml$'
+          path-filters: 'packages/docs/|\.github/workflows/(deploy-docs|ci)\.yaml$'
           force-run: ${{ inputs.debug_enabled == 'true' || inputs.force_run == 'true' || 'false' }}
 
       - name: Setup Nix
