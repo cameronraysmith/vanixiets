@@ -413,7 +413,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: 'configurations/(darwin|nixos)/.*\.nix$|modules/(users|base)/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
+          path-filters: 'configurations/(darwin|nixos)/.*\.nix$|modules/(users|base)/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml$'
           force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
@@ -504,7 +504,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: 'flake\.(nix|lock)$|configurations/.*\.nix$|modules/.*\.nix$|justfile$|^\.github/workflows/ci\.yaml'
+          path-filters: 'flake\.(nix|lock)$|configurations/.*\.nix$|modules/.*\.nix$|justfile$|^\.github/workflows/ci\.yaml$'
           force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
@@ -601,7 +601,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: '\.sops\.ya?ml$|modules/secrets/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
+          path-filters: '\.sops\.ya?ml$|modules/secrets/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml$'
           force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
@@ -710,7 +710,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: 'justfile$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml'
+          path-filters: 'justfile$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml$'
           force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
@@ -894,7 +894,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }} (${{ matrix.system }})
-          path-filters: 'overlays/.*\.nix$|flake\.(nix|lock)$|pkgs/.*\.nix$|^\.github/workflows/ci\.yaml'
+          path-filters: 'overlays/.*\.nix$|flake\.(nix|lock)$|pkgs/.*\.nix$|^\.github/workflows/ci\.yaml$'
           force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
