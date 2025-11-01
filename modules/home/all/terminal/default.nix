@@ -88,7 +88,7 @@ in
       exiftool
       ghostscript
       imagemagick
-      poppler_utils
+      poppler-utils
       qpdf
       quarto
       repomix
