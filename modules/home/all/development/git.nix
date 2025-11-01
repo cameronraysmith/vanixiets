@@ -6,7 +6,7 @@
   ...
 }:
 let
-  package = pkgs.gitAndTools.git;
+  package = pkgs.gitFull;
   # Look up user config based on home.username (set by each home configuration)
   user = flake.config.${config.home.username};
 in
