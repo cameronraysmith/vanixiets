@@ -226,7 +226,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ matrix.package.name }}-preview-release
-          path-filters: 'packages/${{ matrix.package.name }}/**/*|\.github/workflows/ci\.yaml'
+          path-filters: 'packages/${{ matrix.package.name }}/**/*|\.github/workflows/ci\.yaml$'
           force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: Fetch target branch for preview
@@ -325,7 +325,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: 'Makefile$|\.envrc$|^\.github/workflows/ci\.yaml'
+          path-filters: 'Makefile$|\.envrc$|^\.github/workflows/ci\.yaml$'
           force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: run make bootstrap
@@ -997,7 +997,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
-          path-filters: 'flake\.(nix|lock)$|^\.github/workflows/ci\.yaml|overlays/.*\.nix$|modules/.*\.nix$|configurations/.*\.nix$|justfile$|pkgs/.*\.nix$'
+          path-filters: 'flake\.(nix|lock)$|^\.github/workflows/ci\.yaml$|overlays/.*\.nix$|modules/.*\.nix$|configurations/.*\.nix$|justfile$|pkgs/.*\.nix$'
           force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
