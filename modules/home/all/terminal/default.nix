@@ -192,7 +192,7 @@ in
       # snzip
 
       # fonts
-      noto-fonts-emoji
+      noto-fonts-color-emoji
       fira-code
       cascadia-code
       monaspace
