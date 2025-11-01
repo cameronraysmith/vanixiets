@@ -613,7 +613,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          hash-sources: '.sops.yaml .sops.yml modules/secrets/**/*.nix flake.nix flake.lock .github/actions/setup-nix/action.yml'
+          hash-sources: '.sops.yaml modules/secrets/**/*.nix flake.nix flake.lock .github/actions/setup-nix/action.yml'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix
@@ -906,7 +906,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }} (${{ matrix.system }})
-          hash-sources: 'overlays/**/*.nix flake.nix flake.lock pkgs/**/*.nix .github/actions/setup-nix/action.yml'
+          hash-sources: 'overlays/**/*.nix flake.nix flake.lock .github/actions/setup-nix/action.yml'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix
@@ -1009,7 +1009,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
-          hash-sources: 'flake.nix flake.lock overlays/**/*.nix modules/**/*.nix configurations/**/*.nix justfile pkgs/**/*.nix .github/actions/setup-nix/action.yml'
+          hash-sources: 'flake.nix flake.lock overlays/**/*.nix modules/**/*.nix configurations/**/*.nix justfile .github/actions/setup-nix/action.yml'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix

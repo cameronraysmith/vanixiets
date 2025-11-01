@@ -1,3 +1,7 @@
+---
+title: Cache Key Dependency Audit
+---
+
 # Cache Key Dependency Audit
 
 **Date**: 2025-11-01
