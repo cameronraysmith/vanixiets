@@ -146,6 +146,7 @@ jobs:
       checkout_ref: ${{ steps.set-variables.outputs.checkout_ref }}
       checkout_rev: ${{ steps.set-variables.outputs.checkout_rev }}
       packages: ${{ steps.discover-packages.outputs.packages }}
+      force-ci: ${{ steps.compute-force-ci.outputs.force-ci }}
 
     steps:
       - name: Set action variables
@@ -179,6 +180,17 @@ jobs:
           echo "deploy_environment=$DEPLOY_ENVIRONMENT" >> $GITHUB_OUTPUT
           echo "checkout_ref=$CHECKOUT_REF" >> $GITHUB_OUTPUT
           echo "checkout_rev=$CHECKOUT_REV" >> $GITHUB_OUTPUT
+
+      - name: Compute force-ci flag
+        id: compute-force-ci
+        run: |
+          # Compute once for all jobs: workflow_dispatch force_run input OR force-ci PR label
+          if [[ "${{ inputs.force_run }}" == "true" ]] || \
+             [[ "${{ github.event_name }}" == "pull_request" && "${{ contains(github.event.pull_request.labels.*.name, 'force-ci') }}" == "true" ]]; then
+            echo "force-ci=true" >> $GITHUB_OUTPUT
+          else
+            echo "force-ci=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Checkout for package discovery
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
