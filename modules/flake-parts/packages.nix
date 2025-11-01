@@ -1,7 +1,7 @@
 { lib, self, ... }:
 {
   perSystem =
-    { pkgs, system, ... }:
+    { pkgs, ... }:
     let
       # read .nix files from packages directory
       packagesDir = self + /overlays/packages;
@@ -24,7 +24,9 @@
       # get packages from pkgs that exist and are derivations
       customPackagesPerSystem = lib.filterAttrs (
         name: value:
-        value != null && lib.isDerivation value && lib.meta.availableOn { inherit system; } value
+        value != null
+        && lib.isDerivation value
+        && lib.meta.availableOn { system = pkgs.stdenv.hostPlatform.system; } value
       ) (lib.genAttrs allPackageNames (name: pkgs.${name} or null));
     in
     {
