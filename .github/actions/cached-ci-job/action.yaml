@@ -56,14 +56,15 @@ runs:
       shell: bash
       env:
         CHECK_NAME: ${{ inputs.check-name }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
         echo "=== Cache Key Preparation ==="
 
         # Sanitize check name: remove parens, convert ", " to "-", collapse multiple dashes
         SANITIZED=$(echo "$CHECK_NAME" | tr -d '()' | tr ', ' '-' | tr -s '-')
 
-        # Use short SHA for uniqueness (prevents save collisions)
-        SHA_SHORT="${GITHUB_SHA:0:12}"
+        # Use head commit SHA for stable cache keys across PR events (prevents merge commit regeneration issues)
+        SHA_SHORT="${HEAD_SHA:0:12}"
 
         # Construct cache key and path
         CACHE_KEY="job-result-${SANITIZED}-${SHA_SHORT}"
@@ -72,7 +73,7 @@ runs:
 
         echo "Check name: $CHECK_NAME"
         echo "Sanitized: $SANITIZED"
-        echo "SHA prefix: $SHA_SHORT"
+        echo "SHA prefix: $SHA_SHORT (from head commit)"
         echo "Cache key: $CACHE_KEY"
         echo "Cache path: $CACHE_PATH"
         echo "Restore pattern: ${RESTORE_KEYS}*"
