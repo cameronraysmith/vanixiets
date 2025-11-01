@@ -3,34 +3,28 @@ name: Test Composite Actions
 on:
   workflow_dispatch:
     inputs:
-      test-scenario:
-        description: 'Test scenario to run'
+      test-job:
+        description: 'Specific test job to run (leave at "all" to run all tests)'
         required: false
         type: choice
         options:
           - all
-          - cache-hit
-          - cache-miss
-          - path-filters
-          - validation
+          - test-cache-hit
+          - test-path-filters
+          - test-workflow-change-detection
+          - test-force-run
+          - test-check-name-sanitization
         default: all
-  pull_request:
-    paths:
-      - '.github/actions/**'
-      - '.github/workflows/test-composite-actions.yaml'
 
 concurrency:
-  group: test-composite-${{ github.event.pull_request.number || github.ref }}
+  group: test-composite-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test-cache-hit:
     name: Test cache hit scenario
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      (inputs.test-scenario == 'all' || inputs.test-scenario == 'cache-hit') ||
-      github.event_name == 'pull_request'
+    if: inputs.test-job == 'all' || inputs.test-job == 'test-cache-hit'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,10 +77,7 @@ jobs:
   test-path-filters:
     name: Test path filter logic
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      (inputs.test-scenario == 'all' || inputs.test-scenario == 'path-filters') ||
-      github.event_name == 'pull_request'
+    if: inputs.test-job == 'all' || inputs.test-job == 'test-path-filters'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,10 +107,7 @@ jobs:
   test-workflow-change-detection:
     name: Test workflow change detection
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      (inputs.test-scenario == 'all' || inputs.test-scenario == 'validation') ||
-      github.event_name == 'pull_request'
+    if: inputs.test-job == 'all' || inputs.test-job == 'test-workflow-change-detection'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -158,10 +146,7 @@ jobs:
   test-force-run:
     name: Test force-run parameter
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      (inputs.test-scenario == 'all' || inputs.test-scenario == 'validation') ||
-      github.event_name == 'pull_request'
+    if: inputs.test-job == 'all' || inputs.test-job == 'test-force-run'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -199,10 +184,7 @@ jobs:
   test-check-name-sanitization:
     name: Test check name sanitization
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      (inputs.test-scenario == 'all' || inputs.test-scenario == 'validation') ||
-      github.event_name == 'pull_request'
+    if: inputs.test-job == 'all' || inputs.test-job == 'test-check-name-sanitization'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
