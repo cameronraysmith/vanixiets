@@ -50,12 +50,15 @@ runs:
         WORKFLOW_FILE=$(echo "$GITHUB_WORKFLOW_REF" | sed 's|^[^/]*/[^/]*/||' | sed 's|@.*||')
         echo "Workflow file: $WORKFLOW_FILE"
 
-        # Combine user sources + workflow file
+        # Auto-include the composite action itself (critical - computes the cache key)
+        CACHE_ACTION=".github/actions/cached-ci-job/action.yaml"
+
+        # Combine user sources + workflow file + cache action
         if [ -n "$HASH_SOURCES" ]; then
-          ALL_SOURCES="$HASH_SOURCES $WORKFLOW_FILE"
+          ALL_SOURCES="$HASH_SOURCES $WORKFLOW_FILE $CACHE_ACTION"
         else
-          # If no sources specified, use workflow file only
-          ALL_SOURCES="$WORKFLOW_FILE"
+          # If no sources specified, use workflow file + cache action
+          ALL_SOURCES="$WORKFLOW_FILE $CACHE_ACTION"
         fi
 
         echo "Hash sources: $ALL_SOURCES"
