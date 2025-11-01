@@ -6,12 +6,12 @@ inputs:
     description: Full check run name (defaults to github.job, include matrix values for matrix jobs)
     required: false
     default: ${{ github.job }}
-  path-filters:
-    description: Regex pattern for relevant file paths (empty means always relevant)
-    required: false
-    default: ''
-  workflow-file:
-    description: 'Workflow file path (auto-detected if not provided)'
+  hash-sources:
+    description: |
+      Glob patterns for files to hash (one per line or space-separated).
+      Used to compute content-addressed cache key.
+      Example: '**/*.nix flake.lock Makefile'
+      The workflow file is automatically included.
     required: false
     default: ''
   force-run:
@@ -23,129 +23,104 @@ outputs:
   should-run:
     description: Whether job should execute (true/false)
     value: ${{ steps.decide.outputs.should-run }}
-  relevant-changes:
-    description: Whether relevant file changes were detected
-    value: ${{ steps.check-paths.outputs.relevant-changes }}
-  changed-files:
-    description: List of changed files matching path filters (when path-filters specified)
-    value: ${{ steps.changed-files.outputs.all_changed_files || '' }}
-  any-changed:
-    description: Whether any files matching path filters changed (when path-filters specified)
-    value: ${{ steps.changed-files.outputs.any_changed || 'false' }}
-  all-changed-files:
-    description: List of all changed files (for debugging workflow change detection)
-    value: ${{ steps.changed-files.outputs.all_modified_files || '' }}
   cache-source:
     description: 'Where cache hit occurred (actions-cache or none)'
     value: ${{ steps.decide.outputs.cache-source }}
   cache-key:
-    description: 'Sanitized cache key for actions/cache (no special characters)'
-    value: ${{ steps.cache-result.outputs.cache-key }}
+    description: 'Content-addressed cache key'
+    value: ${{ steps.compute-hash.outputs.cache-key }}
   cache-path:
     description: 'Cache directory path for job result marker'
-    value: ${{ steps.cache-result.outputs.cache-path }}
-  cache-restore-keys:
-    description: 'Restore keys pattern for actions/cache fallback matching'
-    value: ${{ steps.cache-result.outputs.cache-restore-keys }}
+    value: ${{ steps.compute-hash.outputs.cache-path }}
 
 runs:
   using: composite
   steps:
-    - name: Prepare cache key for actions/cache
+    - name: Compute content-addressed cache key
+      id: compute-hash
+      shell: bash
+      env:
+        CHECK_NAME: ${{ inputs.check-name }}
+        HASH_SOURCES: ${{ inputs.hash-sources }}
+      run: |
+        echo "::notice title=Cache Key Computation::Computing content-addressed cache key for $CHECK_NAME"
+
+        # Sanitize check name
+        SANITIZED=$(echo "$CHECK_NAME" | tr -d '()' | tr ', ' '-' | tr -s '-')
+
+        # Get workflow file path (automatically included in hash)
+        WORKFLOW_FILE=$(echo "$GITHUB_WORKFLOW_REF" | sed 's|^[^/]*/[^/]*/||' | sed 's|@.*||')
+        echo "Workflow file: $WORKFLOW_FILE"
+
+        # Combine user sources + workflow file
+        if [ -n "$HASH_SOURCES" ]; then
+          ALL_SOURCES="$HASH_SOURCES $WORKFLOW_FILE"
+        else
+          # If no sources specified, use workflow file only
+          ALL_SOURCES="$WORKFLOW_FILE"
+        fi
+
+        echo "Hash sources: $ALL_SOURCES"
+
+        # Compute content hash of all source files
+        # Note: Using git hash-object for consistency with Git's object hashing
+        CONTENT_HASH=""
+        for pattern in $ALL_SOURCES; do
+          # Find matching files and compute their hashes
+          if [ -f "$pattern" ]; then
+            # Single file
+            FILE_HASH=$(git hash-object "$pattern" 2>/dev/null || echo "missing")
+            CONTENT_HASH="${CONTENT_HASH}${FILE_HASH}"
+          else
+            # Glob pattern - expand and hash each file
+            for file in $pattern; do
+              if [ -f "$file" ]; then
+                FILE_HASH=$(git hash-object "$file" 2>/dev/null || echo "missing")
+                CONTENT_HASH="${CONTENT_HASH}${FILE_HASH}"
+              fi
+            done
+          fi
+        done
+
+        # Hash the concatenated hashes to get final content hash
+        FINAL_HASH=$(echo -n "$CONTENT_HASH" | sha256sum | cut -c1-12)
+
+        # Construct cache key
+        CACHE_KEY="job-result-${SANITIZED}-${FINAL_HASH}"
+        CACHE_PATH=".cache/job-results/${SANITIZED}"
+
+        echo "Content hash: $FINAL_HASH"
+        echo "Cache key: $CACHE_KEY"
+        echo "Cache path: $CACHE_PATH"
+
+        # Use GitHub Actions notice annotation for visibility
+        echo "::notice title=Cache Key (${CHECK_NAME})::${CACHE_KEY}"
+
+        echo "cache-key=$CACHE_KEY" >> $GITHUB_OUTPUT
+        echo "cache-path=$CACHE_PATH" >> $GITHUB_OUTPUT
+        echo "content-hash=$FINAL_HASH" >> $GITHUB_OUTPUT
+
+    - name: Prepare cache restore keys
       id: cache-result
       shell: bash
       env:
         CHECK_NAME: ${{ inputs.check-name }}
-        HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
-        echo "=== Cache Key Preparation ==="
-
-        # Sanitize check name: remove parens, convert ", " to "-", collapse multiple dashes
+        # Sanitize check name for restore-keys
         SANITIZED=$(echo "$CHECK_NAME" | tr -d '()' | tr ', ' '-' | tr -s '-')
-
-        # Use head commit SHA for stable cache keys across PR events (prevents merge commit regeneration issues)
-        SHA_SHORT="${HEAD_SHA:0:12}"
-
-        # Construct cache key and path
-        CACHE_KEY="job-result-${SANITIZED}-${SHA_SHORT}"
-        CACHE_PATH=".cache/job-results/${SANITIZED}"
         RESTORE_KEYS="job-result-${SANITIZED}-"
 
-        echo "Check name: $CHECK_NAME"
-        echo "Sanitized: $SANITIZED"
-        echo "SHA prefix: $SHA_SHORT (from head commit)"
-        echo "Cache key: $CACHE_KEY"
-        echo "Cache path: $CACHE_PATH"
-        echo "Restore pattern: ${RESTORE_KEYS}*"
-
-        echo "cache-key=$CACHE_KEY" >> $GITHUB_OUTPUT
-        echo "cache-path=$CACHE_PATH" >> $GITHUB_OUTPUT
-        echo "cache-restore-keys=$RESTORE_KEYS" >> $GITHUB_OUTPUT
+        echo "Restore keys pattern: ${RESTORE_KEYS}*"
+        echo "restore-keys=$RESTORE_KEYS" >> $GITHUB_OUTPUT
 
     - name: Lookup job result in actions/cache
       id: cache-lookup
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/restore@v4
       with:
-        path: ${{ steps.cache-result.outputs.cache-path }}
-        key: ${{ steps.cache-result.outputs.cache-key }}
-        restore-keys: ${{ steps.cache-result.outputs.cache-restore-keys }}
+        path: ${{ steps.compute-hash.outputs.cache-path }}
+        key: ${{ steps.compute-hash.outputs.cache-key }}
+        restore-keys: ${{ steps.cache-result.outputs.restore-keys }}
         lookup-only: true
-
-    - name: Get changed files (all + filtered)
-      id: changed-files
-      if: steps.cache-lookup.outputs.cache-hit != 'true'
-      uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62
-      with:
-        # Use files_yaml for multiple pattern groups
-        files_yaml: |
-          all:
-            - '**/*'
-          filtered:
-            - ${{ inputs.path-filters }}
-        json: true
-        separator: ','
-
-    - name: Check for relevant file changes
-      id: check-paths
-      if: steps.cache-lookup.outputs.cache-hit != 'true'
-      shell: bash
-      env:
-        HAS_FILTERS: ${{ inputs.path-filters != '' }}
-        ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_modified_files || '' }}
-        FILTERED_CHANGED: ${{ steps.changed-files.outputs.filtered_any_changed || 'false' }}
-        FILTERED_FILES: ${{ steps.changed-files.outputs.filtered_all_changed_files || '' }}
-      run: |
-        echo "=== File Change Analysis ==="
-        echo "Has path filters: $HAS_FILTERS"
-        echo "All changed files: $ALL_CHANGED_FILES"
-        echo "Filtered changed: $FILTERED_CHANGED"
-        echo "Filtered files: $FILTERED_FILES"
-        echo ""
-
-        # Check for workflow changes FIRST (current workflow only)
-        # Extract .github/workflows/file.yaml from owner/repo/.github/workflows/file.yaml@refs/...
-        WORKFLOW_PATH=$(echo "$GITHUB_WORKFLOW_REF" | sed 's|^[^/]*/[^/]*/||' | sed 's|@.*||')
-        if echo "$ALL_CHANGED_FILES" | grep -qF "$WORKFLOW_PATH"; then
-          echo "✓ Current workflow changed - job is always relevant"
-          echo "relevant-changes=true" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-
-        if [ "$HAS_FILTERS" = "true" ]; then
-          # Path filtering is enabled and no workflow changes
-          if [ "$FILTERED_CHANGED" = "true" ]; then
-            echo "✓ Relevant file changes detected"
-            echo "Changed files: $FILTERED_FILES"
-            echo "relevant-changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "✗ No relevant file changes detected"
-            echo "relevant-changes=false" >> $GITHUB_OUTPUT
-          fi
-        else
-          # No path filters - always relevant if no workflow changes
-          echo "✓ No path filters specified - job is always relevant"
-          echo "relevant-changes=true" >> $GITHUB_OUTPUT
-        fi
 
     - name: Make execution decision
       id: decide
@@ -153,44 +128,35 @@ runs:
       env:
         FORCE: ${{ inputs.force-run }}
         CACHE_HIT: ${{ steps.cache-lookup.outputs.cache-hit || 'false' }}
-        HAS_CHANGES: ${{ steps.check-paths.outputs.relevant-changes }}
-        HAS_FILTERS: ${{ inputs.path-filters != '' }}
+        CACHE_KEY: ${{ steps.compute-hash.outputs.cache-key }}
+        CHECK_NAME: ${{ inputs.check-name }}
       run: |
         echo "=== Execution Decision ==="
         echo "Force run: $FORCE"
+        echo "Cache key: $CACHE_KEY"
         echo "Actions cache hit: $CACHE_HIT"
-        echo "Has path filters: $HAS_FILTERS"
-        echo "Relevant changes: $HAS_CHANGES"
         echo ""
 
         # Force run overrides everything
         if [ "$FORCE" = "true" ]; then
           echo "should-run=true" >> $GITHUB_OUTPUT
           echo "cache-source=none" >> $GITHUB_OUTPUT
+          echo "::notice title=Decision (${CHECK_NAME})::RUN (forced by input)"
           echo "Decision: RUN (forced by input)"
           exit 0
         fi
 
-        # Check actions/cache (cross-commit caching)
+        # Check actions/cache (content-addressed)
         if [ "$CACHE_HIT" = "true" ]; then
           echo "should-run=false" >> $GITHUB_OUTPUT
           echo "cache-source=actions-cache" >> $GITHUB_OUTPUT
+          echo "::notice title=Decision (${CHECK_NAME})::SKIP (cached result found for content hash)"
           echo "Decision: SKIP (cached result found)"
           exit 0
         fi
 
-        # If we have path filters, honor them
-        if [ "$HAS_FILTERS" = "true" ]; then
-          echo "should-run=${HAS_CHANGES}" >> $GITHUB_OUTPUT
-          echo "cache-source=none" >> $GITHUB_OUTPUT
-          if [ "$HAS_CHANGES" = "true" ]; then
-            echo "Decision: RUN (relevant file changes detected)"
-          else
-            echo "Decision: SKIP (no relevant file changes)"
-          fi
-        else
-          # No filters means always run if not already cached
-          echo "should-run=true" >> $GITHUB_OUTPUT
-          echo "cache-source=none" >> $GITHUB_OUTPUT
-          echo "Decision: RUN (no path filters specified)"
-        fi
+        # No cache hit - must run
+        echo "should-run=true" >> $GITHUB_OUTPUT
+        echo "cache-source=none" >> $GITHUB_OUTPUT
+        echo "::notice title=Decision (${CHECK_NAME})::RUN (no cached result found)"
+        echo "Decision: RUN (no cached result found)"
