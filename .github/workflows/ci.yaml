@@ -93,7 +93,7 @@ jobs:
         with:
           check-name: ${{ github.job }}
           force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
-          # No path-filters - security scanning always relevant
+          # No hash-sources - workflow file only (security scanning always relevant)
 
       - name: Setup Nix
         if: steps.cache.outputs.should-run == 'true'
@@ -238,7 +238,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ matrix.package.name }}-preview-release
-          path-filters: 'packages/${{ matrix.package.name }}/**/*|\.github/workflows/ci\.yaml$'
+          hash-sources: 'packages/${{ matrix.package.name }}/**/*'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: Fetch target branch for preview
@@ -337,7 +337,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: 'Makefile$|\.envrc$|^\.github/workflows/ci\.yaml$'
+          hash-sources: 'Makefile .envrc'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: run make bootstrap
@@ -425,7 +425,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: 'configurations/(darwin|nixos)/.*\.nix$|modules/(users|base)/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml$'
+          hash-sources: 'configurations/darwin/**/*.nix configurations/nixos/**/*.nix modules/users/**/*.nix modules/base/**/*.nix flake.nix flake.lock'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix
@@ -516,7 +516,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: 'flake\.(nix|lock)$|configurations/.*\.nix$|modules/.*\.nix$|justfile$|^\.github/workflows/ci\.yaml$'
+          hash-sources: 'flake.nix flake.lock configurations/**/*.nix modules/**/*.nix justfile'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix
@@ -613,7 +613,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: '\.sops\.ya?ml$|modules/secrets/.*\.nix$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml$'
+          hash-sources: '.sops.yaml .sops.yml modules/secrets/**/*.nix flake.nix flake.lock'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix
@@ -722,7 +722,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          path-filters: 'justfile$|flake\.(nix|lock)$|^\.github/workflows/ci\.yaml$'
+          hash-sources: 'justfile flake.nix flake.lock'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix
@@ -906,7 +906,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }} (${{ matrix.system }})
-          path-filters: 'overlays/.*\.nix$|flake\.(nix|lock)$|pkgs/.*\.nix$|^\.github/workflows/ci\.yaml$'
+          hash-sources: 'overlays/**/*.nix flake.nix flake.lock pkgs/**/*.nix'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix
@@ -1009,7 +1009,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
-          path-filters: 'flake\.(nix|lock)$|^\.github/workflows/ci\.yaml$|overlays/.*\.nix$|modules/.*\.nix$|configurations/.*\.nix$|justfile$|pkgs/.*\.nix$'
+          hash-sources: 'flake.nix flake.lock overlays/**/*.nix modules/**/*.nix configurations/**/*.nix justfile pkgs/**/*.nix'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix
