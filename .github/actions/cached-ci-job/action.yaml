@@ -35,9 +35,6 @@ outputs:
   all-changed-files:
     description: List of all changed files (for debugging workflow change detection)
     value: ${{ steps.changed-files.outputs.all_modified_files || '' }}
-  content-hash:
-    description: Job-specific content hash for debugging and analysis
-    value: ${{ steps.content-hash.outputs.content-hash || '' }}
   cache-source:
     description: 'Where cache hit occurred (actions-cache or none)'
     value: ${{ steps.decide.outputs.cache-source }}
@@ -106,14 +103,6 @@ runs:
             - ${{ inputs.path-filters }}
         json: true
         separator: ','
-
-    - name: Compute job-specific content hash (legacy)
-      id: content-hash
-      if: steps.cache-lookup.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        # Legacy output for backward compatibility
-        echo "content-hash=${{ github.sha }}" >> $GITHUB_OUTPUT
 
     - name: Check for relevant file changes
       id: check-paths
