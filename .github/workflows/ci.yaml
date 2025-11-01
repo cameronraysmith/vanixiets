@@ -962,7 +962,7 @@ jobs:
         with:
           check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
           path-filters: 'flake\.(nix|lock)$|^\.github/workflows/ci\.yaml|overlays/.*\.nix$|modules/.*\.nix$|configurations/.*\.nix$|justfile$|pkgs/.*\.nix$'
-          force-run: ${{ github.ref == 'refs/heads/main' && 'true' || inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
+          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
 
       - name: setup nix
         if: steps.cache.outputs.should-run == 'true'
