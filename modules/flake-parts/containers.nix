@@ -4,7 +4,6 @@
     {
       pkgs,
       lib,
-      system,
       ...
     }:
     let
@@ -60,7 +59,7 @@
         # Multi-arch manifests for registry distribution
         # Note: These require registry configuration to run
         # For local multi-arch testing, use: just build-multiarch <container>
-        fdManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
+        fdManifest = inputs.flocken.legacyPackages.${pkgs.stdenv.hostPlatform.system}.mkDockerManifest {
           version = "latest";
           imageFiles = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
           registries = {
@@ -73,7 +72,7 @@
           tags = [ "latest" ];
         };
 
-        rgManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
+        rgManifest = inputs.flocken.legacyPackages.${pkgs.stdenv.hostPlatform.system}.mkDockerManifest {
           version = "latest";
           imageFiles = map (sys: inputs.self.packages.${sys}.rgContainer) imageSystems;
           registries = {
