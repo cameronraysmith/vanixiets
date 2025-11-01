@@ -13,7 +13,7 @@
 
   programs.claude-code = {
     enable = true;
-    package = flake.inputs.nix-ai-tools.packages.${pkgs.system}.claude-code;
+    package = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
 
     # symlink commands and agents directory trees
     commandsDir = ./commands;
