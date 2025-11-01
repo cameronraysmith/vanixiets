@@ -43,8 +43,6 @@ runs:
         CHECK_NAME: ${{ inputs.check-name }}
         HASH_SOURCES: ${{ inputs.hash-sources }}
       run: |
-        echo "::notice title=Cache Key Computation::Computing content-addressed cache key for $CHECK_NAME"
-
         # Sanitize check name
         SANITIZED=$(echo "$CHECK_NAME" | tr -d '()' | tr ', ' '-' | tr -s '-')
 
@@ -68,7 +66,13 @@ runs:
         CONTENT_HASH=""
         for pattern in $ALL_SOURCES; do
           if [ -f "$pattern" ]; then
-            # Direct file path - hash it directly
+            # Direct file path - exclude ephemeral notes directory
+            case "$pattern" in
+              packages/docs/src/content/docs/notes/*)
+                continue
+                ;;
+            esac
+            # Hash it directly
             FILE_HASH=$(git hash-object "$pattern" 2>/dev/null || echo "missing")
             CONTENT_HASH="${CONTENT_HASH}${FILE_HASH}"
           elif [[ "$pattern" == *"*"* ]]; then
@@ -95,6 +99,12 @@ runs:
             # Find matching files, sort for deterministic ordering
             if [ -d "$BASE_DIR" ]; then
               while IFS= read -r file; do
+                # Exclude ephemeral notes directory from cache key computation
+                case "$file" in
+                  packages/docs/src/content/docs/notes/*)
+                    continue
+                    ;;
+                esac
                 FILE_HASH=$(git hash-object "$file" 2>/dev/null || echo "missing")
                 CONTENT_HASH="${CONTENT_HASH}${FILE_HASH}"
               done < <(find "$BASE_DIR" -type f -name "$FILE_PATTERN" 2>/dev/null | sort)
@@ -117,9 +127,6 @@ runs:
         echo "Content hash: $FINAL_HASH"
         echo "Cache key: $CACHE_KEY"
         echo "Cache path: $CACHE_PATH"
-
-        # Use GitHub Actions notice annotation for visibility
-        echo "::notice title=Cache Key (${CHECK_NAME})::${CACHE_KEY}"
 
         echo "cache-key=$CACHE_KEY" >> $GITHUB_OUTPUT
         echo "cache-path=$CACHE_PATH" >> $GITHUB_OUTPUT
@@ -166,7 +173,8 @@ runs:
         if [ "$FORCE" = "true" ]; then
           echo "should-run=true" >> $GITHUB_OUTPUT
           echo "cache-source=none" >> $GITHUB_OUTPUT
-          echo "::notice title=Decision (${CHECK_NAME})::RUN (forced by input)"
+          SANITIZED_NAME=$(echo "$CHECK_NAME" | tr -d '()' | tr ', ' '-' | tr -s '-')
+          echo "::notice title=CI Cache | ${SANITIZED_NAME}::RUN | ${CACHE_KEY} | Forced"
           echo "Decision: RUN (forced by input)"
           exit 0
         fi
@@ -175,7 +183,8 @@ runs:
         if [ "$CACHE_HIT" = "true" ]; then
           echo "should-run=false" >> $GITHUB_OUTPUT
           echo "cache-source=actions-cache" >> $GITHUB_OUTPUT
-          echo "::notice title=Decision (${CHECK_NAME})::SKIP (cached result found for content hash)"
+          SANITIZED_NAME=$(echo "$CHECK_NAME" | tr -d '()' | tr ', ' '-' | tr -s '-')
+          echo "::notice title=CI Cache | ${SANITIZED_NAME}::SKIP | ${CACHE_KEY} | Cached"
           echo "Decision: SKIP (cached result found)"
           exit 0
         fi
@@ -183,5 +192,6 @@ runs:
         # No cache hit - must run
         echo "should-run=true" >> $GITHUB_OUTPUT
         echo "cache-source=none" >> $GITHUB_OUTPUT
-        echo "::notice title=Decision (${CHECK_NAME})::RUN (no cached result found)"
+        SANITIZED_NAME=$(echo "$CHECK_NAME" | tr -d '()' | tr ', ' '-' | tr -s '-')
+        echo "::notice title=CI Cache | ${SANITIZED_NAME}::RUN | ${CACHE_KEY} | Cache miss"
         echo "Decision: RUN (no cached result found)"
