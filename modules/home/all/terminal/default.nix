@@ -18,11 +18,12 @@ let
     enableSSH = true;
   };
   # backlog-md is only available on x86_64-linux
-  coderabbit-cli = flake.inputs.nix-ai-tools.packages.${pkgs.system}.coderabbit-cli;
-  crush = flake.inputs.nix-ai-tools.packages.${pkgs.system}.crush;
-  droid = flake.inputs.nix-ai-tools.packages.${pkgs.system}.droid;
-  gemini-cli = flake.inputs.nix-ai-tools.packages.${pkgs.system}.gemini-cli;
-  opencode = flake.inputs.nix-ai-tools.packages.${pkgs.system}.opencode;
+  coderabbit-cli =
+    flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
+  crush = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.crush;
+  droid = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.droid;
+  gemini-cli = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
+  opencode = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.opencode;
 in
 {
   imports = [
@@ -237,7 +238,7 @@ in
       mactop
     ]
     ++ lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
-      flake.inputs.nix-ai-tools.packages.${pkgs.system}.backlog-md
+      flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.backlog-md
     ];
 
   home.shellAliases = {
