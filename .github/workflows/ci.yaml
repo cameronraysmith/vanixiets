@@ -1060,7 +1060,7 @@ jobs:
       release-dry-run: false
       debug-enabled: ${{ needs.set-variables.outputs.debug == 'true' }}
       checkout-ref: ${{ needs.set-variables.outputs.checkout_ref }}
-      force-run: 'true'
+      force-run: ${{ inputs.force_run || 'false' }}
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
