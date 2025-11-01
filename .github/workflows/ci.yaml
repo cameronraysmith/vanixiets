@@ -221,34 +221,70 @@ jobs:
           fetch-depth: 0  # Full history needed for semantic-release analysis
           fetch-tags: true  # Explicitly fetch all tags for version detection
 
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: ${{ matrix.package.name }}-preview-release
+          path-filters: 'packages/${{ matrix.package.name }}/**/*|\.github/workflows/ci\.yaml'
+          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
+
       - name: Fetch target branch for preview
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           git fetch origin
           git branch -f main origin/main
 
       - name: Configure git identity for temporary commits
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Setup Nix
+        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           installer: quick
           system: x86_64-linux
 
       - name: Install dependencies
+        if: steps.cache.outputs.should-run == 'true'
         run: nix develop -c bun install
 
       - name: Setup tmate debug session
-        if: needs.set-variables.outputs.debug == 'true'
+        if: steps.cache.outputs.should-run == 'true' && needs.set-variables.outputs.debug == 'true'
         uses: mxschmitt/action-tmate@e5c7151931ca95bad1c6f4190c730ecf8c7dde48 # ratchet:mxschmitt/action-tmate@v3
 
       - name: Preview version for ${{ matrix.package.name }}
+        if: steps.cache.outputs.should-run == 'true'
         run: |
           echo "::group::Preview semantic-release version"
           nix develop -c just preview-version main ${{ matrix.package.path }}
           echo "::endgroup::"
+
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "package": "${{ matrix.package.name }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
+        with:
+          path: ${{ steps.cache.outputs.cache-path }}
+          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 3: preview-docs-deploy
   # Deploy docs to preview environment (PR only, fast feedback)
