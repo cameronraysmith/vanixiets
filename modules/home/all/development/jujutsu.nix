@@ -27,7 +27,7 @@ in
 
         # Reuse Git's allowedSignersFile for signature verification
         # This enables unified signature verification across Git and Jujutsu
-        backends.ssh.allowed-signers = config.programs.git.extraConfig.gpg.ssh.allowedSignersFile;
+        backends.ssh.allowed-signers = config.programs.git.settings.gpg.ssh.allowedSignersFile;
 
         # Use same SOPS-deployed per-user signing key as Git
         key = config.sops.secrets."${user.sopsIdentifier}/signing-key".path;
