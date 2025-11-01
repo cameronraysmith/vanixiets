@@ -63,6 +63,8 @@ runs:
         # Compute content hash of all source files
         # Note: Using git hash-object for consistency with Git's object hashing
         # Using find instead of shell glob expansion to support ** recursive patterns
+        # Disable glob expansion to preserve patterns for manual processing
+        set -f
         CONTENT_HASH=""
         for pattern in $ALL_SOURCES; do
           if [ -f "$pattern" ]; then
@@ -116,6 +118,7 @@ runs:
             echo "::warning::Source file not found: $pattern"
           fi
         done
+        set +f  # Re-enable glob expansion
 
         # Hash the concatenated hashes to get final content hash
         FINAL_HASH=$(echo -n "$CONTENT_HASH" | sha256sum | cut -c1-12)
