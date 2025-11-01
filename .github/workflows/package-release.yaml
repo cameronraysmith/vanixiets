@@ -111,7 +111,7 @@ jobs:
         with:
           check-name: ${{ inputs.package-name }}-release
           path-filters: 'packages/${{ inputs.package-name }}/**/*|bun\.lock$|\.github/workflows/package-release\.yaml$|justfile$'
-          force-run: ${{ inputs.force-run == 'true' || inputs.debug-enabled == 'true' && 'true' || 'false' }}
+          force-run: ${{ inputs.force-run }}
 
       - name: Setup Nix
         if: steps.cache.outputs.should-run == 'true'
