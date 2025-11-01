@@ -1030,7 +1030,7 @@ jobs:
       package-path: ${{ matrix.package.path }}
       debug-enabled: ${{ needs.set-variables.outputs.debug }}
       nix-installer: quick
-      force-run: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+      force-run: ${{ github.ref == 'refs/heads/main' && 'true' || inputs.force_run || 'false' }}
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
