@@ -14,8 +14,6 @@ in
   programs.git = {
     inherit package;
     enable = true;
-    userName = user.fullname;
-    userEmail = user.email;
     signing = {
       # Use SOPS-deployed per-user signing key
       key = config.sops.secrets."${user.sopsIdentifier}/signing-key".path;
@@ -28,7 +26,9 @@ in
       skipSmudge = false;
     };
 
-    extraConfig = {
+    settings = {
+      user.name = user.fullname;
+      user.email = user.email;
       core.editor = "nvim";
       credential.helper = "store --file ~/.git-credentials";
       github.user = "cameronraysmith";
@@ -51,55 +51,56 @@ in
       };
       gpg.ssh.allowedSignersFile = "${config.home.homeDirectory}/.config/git/allowed_signers";
       log.showSignature = false; # --[no-]show-signature
-    };
-
-    aliases = {
-      a = "add";
-      br = "branch";
-      bra = "branch -a";
-      c = "commit";
-      ca = "commit --amend";
-      can = "commit --amend --no-edit";
-      cavm = "commit -a -v -m";
-      cfg = "config --list";
-      cl = "clone";
-      cm = "commit -m";
-      co = "checkout";
-      cp = "cherry-pick";
-      cpx = "cherry-pick -x";
-      d = "diff";
-      div = "log --oneline --left-right @{u}...HEAD";
-      f = "fetch";
-      fo = "fetch origin";
-      fu = "fetch upstream";
-      lease = "push --force-with-lease";
-      lol = "log --graph --decorate --pretty=oneline --abbrev-commit";
-      lola = "log --graph --decorate --pretty=oneline --abbrev-commit --all";
-      pl = "pull";
-      pr = "pull -r";
-      ps = "push";
-      psf = "push -f";
-      rb = "rebase";
-      rbi = "rebase -i";
-      r = "remote";
-      ra = "remote add";
-      rr = "remote rm";
-      rv = "remote -v";
-      rs = "remote show";
-      st = "status";
-      stn = "status -uno";
-    };
-
-    delta = {
-      enable = true;
-      options = {
-        side-by-side = true;
+      alias = {
+        a = "add";
+        br = "branch";
+        bra = "branch -a";
+        c = "commit";
+        ca = "commit --amend";
+        can = "commit --amend --no-edit";
+        cavm = "commit -a -v -m";
+        cfg = "config --list";
+        cl = "clone";
+        cm = "commit -m";
+        co = "checkout";
+        cp = "cherry-pick";
+        cpx = "cherry-pick -x";
+        d = "diff";
+        div = "log --oneline --left-right @{u}...HEAD";
+        f = "fetch";
+        fo = "fetch origin";
+        fu = "fetch upstream";
+        lease = "push --force-with-lease";
+        lol = "log --graph --decorate --pretty=oneline --abbrev-commit";
+        lola = "log --graph --decorate --pretty=oneline --abbrev-commit --all";
+        pl = "pull";
+        pr = "pull -r";
+        ps = "push";
+        psf = "push -f";
+        rb = "rebase";
+        rbi = "rebase -i";
+        r = "remote";
+        ra = "remote add";
+        rr = "remote rm";
+        rv = "remote -v";
+        rs = "remote show";
+        st = "status";
+        stn = "status -uno";
       };
     };
+
     ignores = [
       "*~"
       "*.swp"
     ];
+  };
+
+  programs.delta = {
+    enable = true;
+    enableGitIntegration = true;
+    options = {
+      side-by-side = true;
+    };
   };
 
   programs.lazygit = {
