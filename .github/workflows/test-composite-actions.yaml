@@ -73,9 +73,9 @@ jobs:
       - name: Validate cache key format
         run: |
           KEY="${{ steps.cache-test.outputs.cache-key }}"
-          if ! echo "$KEY" | grep -qE '^job-result-.*-[a-f0-9]{8}$'; then
+          if ! echo "$KEY" | grep -qE '^job-result-.*-[a-f0-9]{12}$'; then
             echo "❌ Invalid cache key format: $KEY"
-            echo "Expected: job-result-{name}-{8-char-sha}"
+            echo "Expected: job-result-{name}-{12-char-sha}"
             exit 1
           fi
           echo "✅ Cache key format valid: $KEY"
