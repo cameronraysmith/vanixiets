@@ -234,9 +234,9 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$CACHE_KEY" | grep -qE '^job-result-test-job-ubuntu-latest-3-11-[a-f0-9]{12}$'; then
+          if ! echo "$CACHE_KEY" | grep -qE '^job-result-test-job-ubuntu-latest-3\.11-[a-f0-9]{12}$'; then
             echo "❌ Cache key not properly sanitized: $CACHE_KEY"
-            echo "Expected: job-result-test-job-ubuntu-latest-3-11-{12-char-sha}"
+            echo "Expected: job-result-test-job-ubuntu-latest-3.11-{12-char-sha}"
             exit 1
           fi
 
