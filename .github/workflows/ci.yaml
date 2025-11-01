@@ -319,7 +319,7 @@ jobs:
   # job 4: bootstrap-verification
   # validates Makefile bootstrap workflow on clean ubuntu system
   bootstrap-verification:
-    needs: [secrets-scan]
+    needs: [secrets-scan, set-variables]
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
@@ -407,7 +407,7 @@ jobs:
   # job 5: config-validation
   # tests config.nix user definitions (phase 1)
   config-validation:
-    needs: [secrets-scan]
+    needs: [secrets-scan, set-variables]
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
@@ -498,7 +498,7 @@ jobs:
   # job 6: autowiring-validation
   # verifies nixos-unified automatic config discovery
   autowiring-validation:
-    needs: [secrets-scan]
+    needs: [secrets-scan, set-variables]
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
@@ -595,7 +595,7 @@ jobs:
   # job 7: secrets-workflow
   # tests sops-nix mechanics with ephemeral test keys
   secrets-workflow:
-    needs: [secrets-scan]
+    needs: [secrets-scan, set-variables]
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
@@ -704,7 +704,7 @@ jobs:
   # job 8: justfile-activation
   # validates user experience: justfile recipes, configuration discovery, and activation workflows
   justfile-activation:
-    needs: [secrets-scan]
+    needs: [secrets-scan, set-variables]
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
@@ -879,7 +879,7 @@ jobs:
   # pre-cache resource-intensive overlay packages before main build
   # prevents disk space exhaustion during CI builds (especially rust packages)
   cache-overlay-packages:
-    needs: [secrets-scan]
+    needs: [secrets-scan, set-variables]
     runs-on: ${{ matrix.runner }}
     if: |
       !cancelled() &&
@@ -955,7 +955,7 @@ jobs:
   # distributes builds across multiple machines to avoid disk space exhaustion
   # each job builds a specific category (packages, home configs, system configs)
   nix:
-    needs: [secrets-scan, cache-overlay-packages]
+    needs: [secrets-scan, cache-overlay-packages, set-variables]
     runs-on: ${{ matrix.runner }}
     if: |
       !cancelled() &&
