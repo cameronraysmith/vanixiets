@@ -122,7 +122,8 @@ runs:
         echo ""
 
         # Check for workflow changes FIRST (current workflow only)
-        WORKFLOW_PATH=$(echo "$GITHUB_WORKFLOW_REF" | sed 's|.*@refs/[^:]*:||')
+        # Extract .github/workflows/file.yaml from owner/repo/.github/workflows/file.yaml@refs/...
+        WORKFLOW_PATH=$(echo "$GITHUB_WORKFLOW_REF" | sed 's|^[^/]*/[^/]*/||' | sed 's|@.*||')
         if echo "$ALL_CHANGED_FILES" | grep -qF "$WORKFLOW_PATH"; then
           echo "✓ Current workflow changed - job is always relevant"
           echo "relevant-changes=true" >> $GITHUB_OUTPUT
