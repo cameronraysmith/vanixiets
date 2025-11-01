@@ -1,5 +1,5 @@
 ---
-title: Content-Addressed Build Caching in GitHub Actions: Comprehensive Research Report
+title: "Content-Addressed Build Caching in GitHub Actions"
 ---
 
 **Date:** November 1, 2025
@@ -2729,4 +2729,3 @@ Every build that hits cache instead of rebuilding saves 2-10 minutes of CI timeâ
 **Next action:** Create the feature branch and start with Action 1.1 from section 6.
 
 Good luck with the implementation! The Nix ecosystem's content-addressed foundation makes this transition particularly cleanâ€”you're leveraging existing strengths, not fighting against your infrastructure.
-
