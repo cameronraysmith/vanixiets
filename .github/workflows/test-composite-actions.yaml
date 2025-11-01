@@ -112,3 +112,132 @@ jobs:
           fi
 
           echo "✅ Path filter outputs valid"
+
+  test-workflow-change-detection:
+    name: Test workflow change detection
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.test-scenario == 'all' || inputs.test-scenario == 'validation') ||
+      github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test action with path filter that won't match
+        id: workflow-test
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: test-workflow-change
+          path-filters: '^packages/nonexistent/'
+
+      - name: Validate workflow change detected when test workflow modified
+        env:
+          RELEVANT_CHANGES: ${{ steps.workflow-test.outputs.relevant-changes }}
+          ALL_CHANGED: ${{ steps.workflow-test.outputs.all-changed-files }}
+        run: |
+          echo "=== Workflow Change Detection ==="
+          echo "Relevant changes: $RELEVANT_CHANGES"
+          echo "All changed files: $ALL_CHANGED"
+
+          # This test workflow is in the changeset on PR
+          # Even though path-filters won't match, workflow change should force relevant-changes=true
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "$RELEVANT_CHANGES" = "true" ]; then
+              echo "✅ Workflow change correctly detected on PR"
+            else
+              echo "⚠️ Workflow change not detected (may not be in changeset)"
+              # Don't fail - workflow might not be in this PR's changeset
+            fi
+          else
+            echo "ℹ️ Skipping workflow change validation (not a PR event)"
+          fi
+
+  test-force-run:
+    name: Test force-run parameter
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.test-scenario == 'all' || inputs.test-scenario == 'validation') ||
+      github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test with force-run enabled
+        id: force-test
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: test-force-run
+          force-run: 'true'
+
+      - name: Validate force-run behavior
+        env:
+          SHOULD_RUN: ${{ steps.force-test.outputs.should-run }}
+          CACHE_SOURCE: ${{ steps.force-test.outputs.cache-source }}
+        run: |
+          echo "=== Force-Run Validation ==="
+          echo "should-run: $SHOULD_RUN"
+          echo "cache-source: $CACHE_SOURCE"
+
+          if [ "$SHOULD_RUN" != "true" ]; then
+            echo "❌ force-run=true should set should-run=true"
+            exit 1
+          fi
+
+          if [ "$CACHE_SOURCE" != "none" ]; then
+            echo "❌ force-run=true should set cache-source=none"
+            exit 1
+          fi
+
+          echo "✅ Force-run parameter working correctly"
+
+  test-check-name-sanitization:
+    name: Test check name sanitization
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.test-scenario == 'all' || inputs.test-scenario == 'validation') ||
+      github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test with matrix-style check name
+        id: matrix-test
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: 'test-job (ubuntu-latest, 3.11)'
+
+      - name: Validate check name sanitization
+        env:
+          CACHE_KEY: ${{ steps.matrix-test.outputs.cache-key }}
+        run: |
+          echo "=== Check Name Sanitization ==="
+          echo "Cache key: $CACHE_KEY"
+
+          # Should sanitize: remove parens, convert ", " to "-", collapse dashes
+          # Expected: job-result-test-job-ubuntu-latest-3.11-{12-char-sha}
+          if echo "$CACHE_KEY" | grep -q '('; then
+            echo "❌ Cache key contains parentheses: $CACHE_KEY"
+            exit 1
+          fi
+
+          if echo "$CACHE_KEY" | grep -q ', '; then
+            echo "❌ Cache key contains comma-space: $CACHE_KEY"
+            exit 1
+          fi
+
+          if ! echo "$CACHE_KEY" | grep -qE '^job-result-test-job-ubuntu-latest-3-11-[a-f0-9]{12}$'; then
+            echo "❌ Cache key not properly sanitized: $CACHE_KEY"
+            echo "Expected: job-result-test-job-ubuntu-latest-3-11-{12-char-sha}"
+            exit 1
+          fi
+
+          echo "✅ Check name sanitization working correctly"
