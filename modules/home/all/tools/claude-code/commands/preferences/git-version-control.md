@@ -18,7 +18,8 @@ Do not commit if:
 
 ## Branch workflow
 
-Branch naming: N-descriptor where N is the issue/PR number (6-docs, 42-refactor, 142-bugfix, 1337-feature, etc)
+Branch naming: N-descriptor where N is the issue/PR number in lowercase kebab-case (6-docs, 42-refactor, 142-bugfix, 1337-feature).
+Never use forward slashes in branch names as they break compatibility with URLs, docker image tags, and other tooling that embeds branch names.
 
 Create a new branch when your next commits won't match the current branch's N-descriptor:
 - Example: current branch is "42-feature-auth" but you're fixing bug #58 in logging → create "58-bugfix-logging"
