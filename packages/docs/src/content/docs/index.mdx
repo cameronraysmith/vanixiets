@@ -95,19 +95,19 @@ Learn more in [Nix-Config Architecture](/concepts/nix-config-architecture/).
 
 <CardGrid>
   <Card title="Understand the architecture" icon="open-book">
-    Learn about the three-layer design combining flake-parts, nixos-unified, and multi-channel resilience.
+    Three-layer design combining flake-parts, nixos-unified, and multi-channel overlay composition.
     [Nix-Config Architecture →](/concepts/nix-config-architecture/)
   </Card>
   <Card title="Add a new host" icon="laptop">
-    Onboard a new macOS or NixOS system with this configuration.
+    Onboard a new NixOS or nix-darwin system with this configuration.
     [Host onboarding guide →](/guides/host-onboarding/)
   </Card>
   <Card title="Configure secrets" icon="lock">
-    Set up SOPS for encrypted secrets management with age encryption.
+    sops-nix integration with age encryption for declarative secrets management.
     [Secrets management guide →](/guides/secrets-management/)
   </Card>
   <Card title="Handle broken packages" icon="warning">
-    Learn the systematic workflow for addressing nixpkgs unstable breakage.
+    Systematic workflow for per-package channel selection when nixpkgs unstable packages fail.
     [Handling broken packages →](/guides/handling-broken-packages/)
   </Card>
 </CardGrid>
