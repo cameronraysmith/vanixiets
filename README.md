@@ -8,7 +8,9 @@
 
 [![CI][ci-badge]][ci-link] [![Docs][docs-badge]][docs-link] [![License][license-badge]][license-link]
 
-**Personal nix-config with multi-channel resilience and directory-based autowiring**
+**declarative, reproducible, type-safe infrastructure with nix flake modules**
+
+> And all this to realize compositional algebras of graded effects, structured as indexed monad transformer stacks over effectful computations, from heterogeneous components to support experimentation, discovery, and understanding of the past in the present for the future.
 
 [Documentation][docs-link] • [Getting Started](https://infra.cameronraysmith.net/guides/getting-started) • [Architecture](https://infra.cameronraysmith.net/concepts/nix-config-architecture) • [Discussions](https://github.com/cameronraysmith/infra/discussions)
 
@@ -18,10 +20,12 @@
 
 ## What This Provides
 
-Personal nix-config for macOS (nix-darwin) and NixOS systems using a three-layer architecture that combines flake-parts modular composition, nixos-unified directory-based autowiring, and proven multi-channel nixpkgs resilience patterns.
-When nixpkgs unstable breaks, apply surgical fixes (stable fallback, upstream patch, or build override) without rolling back your entire system.
+Nix flake-based system configurations for NixOS, nix-darwin, and home-manager using three-layer architecture: flake-parts modular composition, nixos-unified directory-based autowiring, and multi-channel overlay composition.
 
 ## Quick Start
+
+> [!WARNING]
+> These commands install the Nix package manager system-wide (multi-user daemon), modify shell initialization files, and apply system configurations. You almost surely don't want to execute them without reading the relevant source.
 
 ```bash
 # Clone repository
@@ -42,13 +46,19 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ## Features
 
-- ⊕ **Directory-based autowiring** - add a file, get a flake output (nixos-unified)
-- ⋈ **Multi-channel resilience** - surgical fixes without holding or rolling back
-- ⊛ **Platform support** - macOS (nix-darwin), Linux (NixOS), standalone home-manager
-- ⊢ **Secrets management** - sops-nix with age encryption
-- ⊎ **Multi-user patterns** - admin (integrated) and non-admin (standalone) configurations
-- ⊠ **Custom packages** - easily add [custom package builds](https://infra.cameronraysmith.net/guides/adding-custom-packages) via [overlays](https://nixos.org/manual/nixpkgs/stable/#chap-overlays)
-- ↯ **Development shell** - complete with direnv integration and `just` task runner
+⊕ **Directory-based autowiring** - nixos-unified scans filesystem structure to automatically generate flake outputs (configurations → darwinConfigurations/nixosConfigurations/homeConfigurations, modules → flakeModules/darwinModules/nixosModules, overlays → overlays.*)
+
+⋈ **Per-package nixpkgs channel selection** - Multi-channel overlay architecture enables unstable default with selective stable fallbacks via overlays/infra/hotfixes.nix without requiring full flake.lock rollback
+
+⊛ **Cross-platform deployment targets** - NixOS, nix-darwin, or home-manager configurations
+
+⊎ **Multi-user configuration patterns** - Admin users with integrated system/home-manager configurations and non-admin users with standalone home-manager deployments
+
+⊢ **Declarative secrets management** - sops-nix integration with age encryption for managing encrypted secrets
+
+⊠ **Composable package overlays** - layered overlay composition (multi-channel access → hotfixes → custom packages → build overrides → flake input overlays) for package customization and dependency management
+
+↯ **Reproducible development environments** - Nix development shell with direnv activation and just task runner
 
 ## Documentation
 
@@ -69,7 +79,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ## Credits
 
-Built with [flake-parts](https://github.com/hercules-ci/flake-parts), [nixos-unified](https://github.com/srid/nixos-unified), and resilience patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos).
+Built with [flake-parts](https://github.com/hercules-ci/flake-parts), [nixos-unified](https://github.com/srid/nixos-unified), and overlay pattern from [mirkolenz/nixos](https://github.com/mirkolenz/nixos).
 
 See [complete credits](https://infra.cameronraysmith.net/about/credits) for full acknowledgments.
 
