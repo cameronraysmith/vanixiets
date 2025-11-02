@@ -74,13 +74,13 @@ See [Getting started guide](/guides/getting-started/) for complete setup instruc
 
 ## Architecture
 
-This nix-config combines three complementary architectural patterns:
+Three-layer architecture combining complementary patterns:
 
 1. **flake-parts** - Modular flake composition framework
-2. **nixos-unified** - Directory-based autowiring eliminates boilerplate
-3. **mirkolenz patterns** - Multi-channel nixpkgs resilience for handling breakage
+2. **nixos-unified** - Directory-based autowiring (filesystem structure → flake outputs)
+3. **Multi-channel overlay composition** - Per-package nixpkgs channel selection via overlays/infra/hotfixes.nix
 
-When nixpkgs unstable breaks, apply surgical fixes (stable fallback for one package) without rolling back your entire flake.lock.
+Per-package channel selection enables selective stable fallbacks for broken packages without full flake.lock rollback affecting O(10^5) packages.
 
 Learn more in [Nix-Config Architecture](/concepts/nix-config-architecture/).
 
