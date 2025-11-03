@@ -14,15 +14,16 @@ The nix-config infrastructure migration to dendritic flake-parts pattern with cl
 The migration delivers improved type safety through consistent module system usage, clearer organizational patterns via the dendritic `flake.modules.*` namespace, and robust multi-machine coordination capabilities via clan-core's inventory system, vars management, and service instances with roles.
 
 The critical architectural challenge is that no proven examples exist combining dendritic flake-parts with clan patterns.
-This necessitates a validation-first approach: Phase 0 validates the architectural combination in a minimal test-clan repository before any infrastructure commitment, de-risking the entire migration by proving feasibility in isolation.
-Following validation, Phase 1 deploys the cinnabar VPS as always-on foundation infrastructure with zerotier controller, validating the complete stack (dendritic + clan + terraform + infrastructure) on clan's native platform (NixOS) before touching darwin hosts.
+This necessitates a validation-first approach: Phase 0 validates the architectural combination in a minimal test-clan repository, then immediately deploys real infrastructure (Hetzner VPS + GCP VM) using clan-infra's proven terranix pattern to validate multi-machine coordination before darwin migration.
+This combined validation + infrastructure deployment approach de-risks both the architectural integration and the infrastructure deployment pattern before touching any darwin hosts.
+Following infrastructure validation, Phase 1 integrates production services and hardening on the deployed VMs, proving the complete production-ready stack before darwin migration.
 Phases 2-4 progressively migrate darwin workstations (blackphos → rosegold → argentum) with 1-2 week stability gates between each host.
 Phase 5 migrates the primary workstation (stibnite) only after 4-6 weeks of proven stability across all other hosts.
 Phase 6 removes legacy nixos-unified infrastructure.
 
 ### What Makes This Special
 
-**Validation-first de-risking**: Phase 0 validates an untested architectural combination (dendritic + clan) in a disposable test environment before deploying production infrastructure, eliminating the risk of discovering fundamental incompatibilities after VPS commitment.
+**Validation-first de-risking**: Phase 0 validates an untested architectural combination (dendritic + clan) in a disposable test environment, then immediately deploys real infrastructure (Hetzner VPS + GCP VM) to validate multi-machine coordination and infrastructure deployment patterns before darwin migration, eliminating the risk of discovering fundamental incompatibilities or infrastructure issues after committing to darwin host changes.
 
 **Type safety through progressive optimization**: Leverages flake-parts module system to bring compile-time type checking to infrastructure configuration, addressing Nix's lack of native type system while maintaining pragmatism—clan functionality is non-negotiable, dendritic optimization applied where feasible without compromise.
 
@@ -87,23 +88,25 @@ The project combines three proven technologies in an unproven configuration:
 
 **Migration success is measured by technical correctness, operational stability, and productivity preservation across the 6-phase progressive rollout:**
 
-### Phase 0 success (test-clan validation) - GO/NO-GO decision gate
+### Phase 0 success (test-clan validation + infrastructure deployment) - GO/NO-GO decision gate
 
 - test-clan flake evaluates and builds successfully with dendritic + clan integration
 - Dendritic flake-parts pattern proven feasible with clan functionality (no fundamental conflicts discovered)
 - Integration patterns documented with confidence in `INTEGRATION-FINDINGS.md` and `PATTERNS.md`
 - Go/no-go framework evaluation shows "GO" or "CONDITIONAL GO" with acceptable compromises
-- If NO-GO: fallback to vanilla clan + flake-parts pattern (proven in clan-infra) without proceeding to infrastructure deployment
+- If architectural validation succeeds: proceed to infrastructure deployment using clan-infra's proven terranix pattern (Hetzner VPS + GCP VM)
+- Infrastructure validated with minimal services (SSH access, basic connectivity) before Phase 1 production integration
+- If NO-GO: fallback to vanilla clan + flake-parts pattern (proven in clan-infra) without dendritic optimization
 
-### Phase 1 success (cinnabar VPS) - Proceed to darwin migration if
+### Phase 1 success (production integration) - Proceed to darwin migration if
 
-- Hetzner Cloud VPS deployed and operational with validated patterns from Phase 0
-- Complete infrastructure stack proven (dendritic + clan + terraform + infrastructure) on NixOS
-- Zerotier controller functional and reachable from local development machine
-- SSH access working with certificate-based authentication via zerotier network
-- Clan vars deployed correctly to `/run/secrets/` with proper permissions
-- Disko declarative partitioning with LUKS encryption operational
-- Stable for 1-2 weeks minimum with no critical issues
+- Production services integrated on deployed infrastructure (cinnabar VPS + GCP VM from Phase 0)
+- Zerotier controller operational with mesh network coordination across both VMs
+- Production-grade hardening applied (srvos modules, firewall rules, security baseline)
+- Service deployment patterns validated (zerotier coordination, SSH via mesh network)
+- Clan vars deployed correctly to `/run/secrets/` with proper permissions on all infrastructure
+- Multi-VM coordination proven (clan inventory managing 2+ machines with different roles)
+- Stable for 1-2 weeks minimum with no critical issues before darwin migration
 
 ### Phase 2-4 success (darwin hosts: blackphos → rosegold → argentum) - Proceed to next host if
 
@@ -142,9 +145,9 @@ The project combines three proven technologies in an unproven configuration:
 
 **Maintainability score**: Subjective assessment of ease of understanding and modifying configurations (baseline: current cognitive load, target: "significantly easier to understand module dependencies")
 
-**Migration timeline**: Conservative estimate 13-15 weeks for complete migration with stability gates, aggressive 4-6 weeks if all phases proceed smoothly without issues
+**Migration timeline**: Conservative estimate 15-18 weeks for complete migration with infrastructure deployment and stability gates, aggressive 6-8 weeks if all phases proceed smoothly without issues (extended 2-3 weeks from original estimate due to Phase 0 infrastructure deployment)
 
-**Operational cost**: Hetzner Cloud VPS adds ~€24/month (~$25 USD) ongoing operational expense, accepted as cost of always-on infrastructure benefits and migration de-risking
+**Operational cost**: Infrastructure adds ~€24/month (~$25 USD) Hetzner VPS + ~$5/month GCP e2-micro VM = ~$30 USD/month ongoing operational expense, accepted as cost of always-on infrastructure benefits and migration validation before darwin hosts
 
 **Rollback frequency**: Number of times rollback required during migration (target: 0, acceptable: 1-2 for non-primary hosts, unacceptable: rollback of stibnite primary workstation)
 
@@ -156,27 +159,39 @@ The project combines three proven technologies in an unproven configuration:
 
 The MVP encompasses the complete 6-phase migration delivering a fully operational dendritic + clan infrastructure across all 5 machines with type safety improvements, multi-machine coordination, and validated architectural patterns.
 
-**Phase 0 - Validation Environment** (test-clan repository, Week 0):
+**Phase 0 - Validation Environment + Infrastructure Deployment** (test-clan repository + real infrastructure, Weeks 0-2):
 
+**Architectural validation (Week 0)**:
 - Minimal flake structure with clan-core + import-tree + flake-parts integration in disposable test repository
 - Test NixOS VM configuration using dendritic flake-parts pattern (or validated hybrid if pure dendritic conflicts with clan)
 - Clan inventory with single test machine demonstrating inventory evaluation
 - Essential clan services (emergency-access, sshd, zerotier) configured via service instances
 - Vars generation and deployment validation (test generators, verify deployment to `/run/secrets/`)
 - Documentation of integration findings in `INTEGRATION-FINDINGS.md` (what works, what requires compromise)
-- Pattern extraction in `PATTERNS.md` (reusable patterns for Phase 1 cinnabar deployment)
+- Pattern extraction in `PATTERNS.md` (reusable patterns for infrastructure deployment)
 - Go/no-go decision framework evaluation (GO/CONDITIONAL GO/NO-GO with explicit criteria)
 
-**Phase 1 - VPS Infrastructure** (cinnabar, Weeks 1-3):
+**Infrastructure deployment (Weeks 1-2, if architectural validation succeeds)**:
+- Adopt clan-infra's proven terranix pattern for multi-cloud infrastructure deployment
+- Deploy Hetzner Cloud CX53 VPS (cinnabar) using validated patterns from test-clan
+- Deploy GCP e2-micro VM (orb-nixos) for multi-cloud validation
+- Minimal service configuration: SSH access, zerotier mesh network coordination between VMs
+- Disko declarative partitioning with LUKS encryption on both VMs
+- Validate multi-machine clan inventory coordination across heterogeneous cloud providers
+- Terraform state management via encrypted backend (S3 or GCS)
+- Infrastructure validated and stable before Phase 1 production integration
 
-- Terraform/terranix provisioning for Hetzner Cloud CX53 VPS (8 vCPU, 32GB RAM, 240GB NVMe SSD, ~€24/month)
-- NixOS configuration using validated patterns from Phase 0 (dendritic + clan or hybrid as determined)
-- Disko declarative partitioning with LUKS encryption (automatic disk setup during installation)
-- Zerotier controller role (provides stable always-on controller independent of darwin host power state)
-- SSH daemon with certificate-based authentication via clan sshd service
+**Phase 1 - Production Integration** (cinnabar + orb-nixos, Weeks 3-5):
+
+- Production services integrated on deployed infrastructure from Phase 0
+- Zerotier controller operational on cinnabar with mesh network coordination to orb-nixos
+- Production-grade hardening via srvos modules (security baseline for both VMs)
+- SSH daemon with certificate-based authentication via clan sshd service on both machines
 - Emergency access configuration via clan emergency-access service (root access recovery)
-- Clan vars deployment for VPS secrets (SSH host keys, service credentials)
-- Complete infrastructure stack validation (dendritic + clan + terraform + hetzner + disko + LUKS + zerotier + NixOS)
+- Clan vars deployment for production secrets (SSH host keys, service credentials, API tokens)
+- Firewall rules configured via NixOS (zerotier mesh access, deny external except SSH)
+- Service deployment patterns validated (zerotier coordination, SSH via mesh, multi-VM clan inventory)
+- Infrastructure stable and production-ready before darwin migration
 
 **Phase 2 - First Darwin Host** (blackphos, Weeks 4-5):
 
@@ -527,9 +542,25 @@ activate-darwin host:
 
 **FR-1.4**: Go/no-go decision framework shall evaluate:
 
-- GO: No fundamental conflicts, proceed to Phase 1 with confidence
+- GO: No fundamental conflicts, proceed to infrastructure deployment with confidence
 - CONDITIONAL GO: Minor compromises required, proceed with caution and additional monitoring
 - NO-GO: Fundamental incompatibilities, pivot to vanilla clan + flake-parts pattern
+
+**FR-1.5**: Infrastructure deployment shall provision multi-cloud VMs with:
+
+- Hetzner Cloud CX53 VPS (cinnabar) via terranix using clan-infra's proven pattern
+- GCP e2-micro VM (orb-nixos) for multi-cloud validation
+- Disko declarative partitioning with LUKS encryption on both VMs
+- Minimal service configuration (SSH access, basic connectivity)
+- Terraform state management via encrypted backend
+
+**FR-1.6**: Multi-machine coordination shall be validated with:
+
+- Clan inventory managing 2 machines (cinnabar + orb-nixos) with heterogeneous cloud providers
+- Zerotier mesh network between VMs proving service coordination
+- SSH access functional on both machines via zerotier network
+- Clan vars deployed to `/run/secrets/` on both machines
+- Infrastructure stable before Phase 1 production integration
 
 **Acceptance criteria**:
 
@@ -537,54 +568,60 @@ activate-darwin host:
 - [ ] test-vm builds successfully (`nix build .#nixosConfigurations.test-vm.config.system.build.toplevel`)
 - [ ] Documentation complete with architectural decision rationale
 - [ ] Go/no-go decision made with explicit justification
+- [ ] Infrastructure deployed successfully (cinnabar + orb-nixos operational)
+- [ ] Multi-machine coordination validated (zerotier mesh, SSH access, clan vars)
+- [ ] Infrastructure stable for 1 week minimum before Phase 1
 
 ---
 
-### FR-2: VPS Infrastructure Deployment (Phase 1)
+### FR-2: Production Integration (Phase 1)
 
-**FR-2.1**: Terraform/terranix shall provision Hetzner Cloud CX53 VPS with:
+**FR-2.1**: Production services shall be integrated on deployed infrastructure with:
 
-- Declarative terraform configuration via terranix (Nix-based terraform config generation)
-- Hetzner Cloud API integration via API token from clan vars
-- SSH key provisioning for initial access
-- Server specification: 8 vCPU, 32GB RAM, 240GB NVMe SSD, CX53 instance type
+- Zerotier controller operational on cinnabar coordinating mesh network to orb-nixos
+- Production-grade configuration applied to both VMs (srvos hardening, security baseline)
+- Service deployment patterns validated (multi-VM coordination via clan inventory)
+- Infrastructure proven stable under production-like load
 
-**FR-2.2**: NixOS shall be installed on cinnabar via:
+**FR-2.2**: Security hardening shall be applied with:
 
-- `clan machines install cinnabar` command (automated NixOS installation)
-- Disko declarative partitioning with LUKS encryption (automatic disk setup)
-- Validated dendritic + clan patterns from Phase 0 (or hybrid as determined)
-- Initial system configuration activating all clan services
+- srvos modules providing security baseline (both cinnabar and orb-nixos)
+- Firewall rules configured via NixOS (zerotier mesh access, external SSH only)
+- LUKS encryption validated operational on both VMs
+- Certificate-based SSH authentication enforced (no password-based auth)
+- Principle of least privilege applied to all services
 
-**FR-2.3**: Zerotier controller shall be operational with:
+**FR-2.3**: Multi-VM coordination shall be operational with:
 
-- Zerotier service configured via clan zerotier service instance (controller role on cinnabar)
-- Network ID generated and accessible to all machines
-- Controller reachable from local development machine for network management
-- Zerotier CLI functional for network administration
+- Clan inventory managing 2 machines with different roles
+- Zerotier mesh network connecting cinnabar + orb-nixos
+- SSH via zerotier functional between VMs
+- Clan vars deployed correctly to `/run/secrets/` on both machines with proper permissions
+- Service instances with roles proven across heterogeneous infrastructure
 
-**FR-2.4**: SSH access shall be configured with:
+**FR-2.4**: Production secrets management shall be validated with:
 
-- SSH daemon via clan sshd service instance (server role on cinnabar)
-- Certificate-based authentication (SSH CA certificates distributed via clan)
-- Accessible via zerotier network IP (zerotier VPN mesh)
-- Emergency access via clan emergency-access service (root password recovery)
+- Clan vars generators producing all required secrets (SSH host keys, service credentials, API tokens)
+- Secrets encrypted at rest via age encryption in `sops/machines/<hostname>/secrets/`
+- Automatic deployment to `/run/secrets/` with correct ownership (root or specific user)
+- Shared secrets (where `share = true`) accessible across machines as configured
+- Rollback procedure for secrets tested (redeploy previous generation)
 
-**FR-2.5**: Clan vars shall deploy secrets with:
+**FR-2.5**: Infrastructure monitoring and validation:
 
-- SSH host keys generated via clan sshd vars generator
-- Service credentials generated as needed
-- Secrets deployed to `/run/secrets/` with correct ownership and permissions
-- Public keys accessible in nix store, private keys only in `/run/secrets/`
+- System resource utilization within expected parameters (CPU, memory, disk, network)
+- Log aggregation functional (journald, clan logging if configured)
+- Backup procedures validated (if implemented in Phase 1)
+- Disaster recovery procedure documented (rebuild from configuration)
 
 **Acceptance criteria**:
 
-- [ ] Terraform provisions VPS successfully (`nix run .#terraform.terraform -- apply`)
-- [ ] NixOS installation completes without errors
-- [ ] SSH access functional from local machine (`ssh root@<cinnabar-zerotier-ip>`)
-- [ ] Zerotier controller operational (`zerotier-cli info` shows controller status)
-- [ ] Clan vars deployed (`ls /run/secrets/` shows expected files)
-- [ ] Stable for 1-2 weeks minimum before Phase 2
+- [ ] Zerotier controller operational with mesh network to orb-nixos
+- [ ] Production-grade hardening applied (srvos modules, firewall, LUKS)
+- [ ] Multi-VM coordination validated (clan inventory, service instances, SSH via mesh)
+- [ ] Clan vars deployed correctly on both machines (`ls /run/secrets/`)
+- [ ] Infrastructure stable for 1-2 weeks minimum before darwin migration
+- [ ] Production-readiness validated (security, monitoring, disaster recovery)
 
 ---
 
@@ -842,13 +879,13 @@ Requirements must be decomposed into epics and bite-sized stories (200k context 
 
 **Epic alignment to 6 migration phases**:
 
-**Epic 1: Architectural Validation** (Phase 0)
+**Epic 1: Architectural Validation + Infrastructure Deployment** (Phase 0)
 
-- Stories: test-clan setup, dendritic + clan integration, pattern extraction, go/no-go decision
+- Stories: test-clan setup, dendritic + clan integration, pattern extraction, go/no-go decision, infrastructure deployment (Hetzner VPS + GCP VM), multi-machine coordination validation
 
-**Epic 2: VPS Infrastructure Deployment** (Phase 1)
+**Epic 2: Production Integration** (Phase 1)
 
-- Stories: terraform setup, cinnabar provisioning, NixOS installation, zerotier controller, SSH configuration, vars deployment, stability validation
+- Stories: production services integration, security hardening (srvos), zerotier controller, multi-VM coordination, SSH configuration, vars deployment, production-readiness validation, stability monitoring
 
 **Epic 3: First Darwin Migration** (Phase 2 - blackphos)
 

@@ -33,143 +33,325 @@ Each epic includes:
 
 ---
 
-## Epic 1: Architectural Validation (Phase 0 - test-clan)
+## Epic 1: Architectural Validation + Infrastructure Deployment (Phase 0)
 
-**Goal:** Validate dendritic flake-parts + clan-core integration in minimal test environment before production infrastructure commitment
+**Goal:** Deploy Hetzner + GCP VMs using clan-infra's proven terranix pattern, with dendritic as optional optimization
 
-**Strategic Value:** De-risks entire migration by proving architectural combination works, documenting integration patterns, and making informed go/no-go decision in disposable test environment
+**Strategic Value:** Validates complete stack (terraform + clan + infrastructure) on real VMs before darwin migration, following proven patterns from clan-infra, de-risking deployment with real infrastructure experience
 
-**Timeline:** 1 week implementation + validation
+**Timeline:** 3-4 weeks (2-3 weeks deployment + 1 week stability validation)
 
 **Success Criteria:**
-- test-clan flake evaluates successfully
-- Dendritic + clan patterns coexist without fundamental conflicts
-- Integration findings documented with confidence
+- Hetzner VM deployed and operational (minimum requirement)
+- GCP VM deployed and operational (optimal, can defer if complex)
+- Multi-machine coordination working via clan inventory and zerotier
+- 1 week stability validation minimum
+- Infrastructure patterns documented for Phase 1
 - GO/CONDITIONAL GO/NO-GO decision made with explicit rationale
 
+**Risk Level:** Medium (infrastructure deployment costs money, operational risk)
+
 ---
 
-### Story 1.1: Prepare existing test-clan repository for validation
+### Story 1.1: Setup test-clan repository with terraform/terranix infrastructure
 
 As a system administrator,
-I want to review and prepare the existing test-clan repository for dendritic + clan validation,
-So that I can validate the architectural combination in isolation before infrastructure deployment.
-
-**Context:** Existing fledgling repository at ~/projects/nix-workspace/test-clan/ can be used/adapted for Phase 0 validation.
+I want to prepare test-clan repository with both clan-core and terranix/terraform infrastructure,
+So that I can deploy real VMs (Hetzner + GCP) using proven patterns from clan-infra.
 
 **Acceptance Criteria:**
-1. Existing test-clan repository at ~/projects/nix-workspace/test-clan/ reviewed and working branch created/confirmed
-2. flake.nix updated to use flake-parts.lib.mkFlake with required inputs: nixpkgs, flake-parts, clan-core, import-tree
-3. Clan-core flakeModules.default imported
-4. modules/ directory structure verified/created: modules/base/, modules/hosts/, modules/flake-parts/
-5. Flake evaluates without errors: `nix flake check`
-6. README.md updated to document Phase 0 validation purpose and scope
-7. Git working state clean and ready for iterative development
+1. test-clan repository at ~/projects/nix-workspace/test-clan/ has working branch created
+2. flake.nix updated with inputs: nixpkgs (unstable), flake-parts, clan-core (main branch), terranix (for terraform generation), disko (for declarative disk partitioning), srvos (for server hardening)
+3. Terranix flake module imported: `inputs.terranix.flakeModule`
+4. modules/ directory structure created: modules/base/, modules/hosts/, modules/flake-parts/, modules/terranix/
+5. modules/terranix/base.nix created with provider configuration: Hetzner Cloud provider (hcloud), GCP provider (google), Secrets retrieval via clan secrets (API tokens)
+6. modules/flake-parts/clan.nix created with clan.meta.name = "test-clan"
+7. Flake evaluates: `nix flake check`
+8. Terraform inputs available: `nix eval .#terranix --apply builtins.attrNames`
+9. README.md documents Phase 0 infrastructure deployment purpose
 
-**Prerequisites:** None (first story in migration, uses existing repo)
+**Prerequisites:** None (first story)
+
+**Estimated Effort:** 2-4 hours
+
+**Risk Level:** Low (setup only, no deployment yet)
 
 ---
 
-### Story 1.2: Implement dendritic flake-parts pattern in test-clan
+### Story 1.2: Implement dendritic flake-parts pattern in test-clan (OPTIONAL)
 
 As a system administrator,
 I want to apply dendritic flake-parts organizational patterns to test-clan,
-So that I can validate dendritic module namespace compatibility with clan.
+So that I can evaluate whether dendritic optimization adds value alongside clan functionality.
+
+**⚠️ OPTIONAL STORY - Can skip if conflicts with infrastructure deployment**
 
 **Acceptance Criteria:**
-1. import-tree configured in flake.nix for automatic module discovery: `(inputs.import-tree ./modules)`
-2. Base module created contributing to flake.modules.nixos.base namespace with nix settings
-3. Test host module created in modules/hosts/test-vm/default.nix using config.flake.modules namespace imports
-4. Module namespace evaluates successfully: `nix eval .#flake.modules.nixos --apply builtins.attrNames`
-5. No specialArgs pass-through beyond minimal framework values (inputs, self if needed)
-6. Dendritic pattern applied: every .nix file is a flake-parts module
+1. import-tree configured in flake.nix for automatic module discovery (if using dendritic)
+2. Base module created contributing to flake.modules.nixos.base namespace
+3. Test host module using config.flake.modules namespace imports
+4. Module namespace evaluates: `nix eval .#flake.modules.nixos --apply builtins.attrNames`
+5. No additional specialArgs beyond minimal framework values
+6. Dendritic pattern documented in DENDRITIC-NOTES.md (what worked, what didn't)
 
-**Prerequisites:** Story 1.1 (test-clan repository exists)
+**Prerequisites:** Story 1.1 (test-clan infrastructure setup)
+
+**Estimated Effort:** 2-4 hours (only if pursuing dendritic)
+
+**Risk Level:** Low (can abandon if conflicts discovered)
+
+**Decision Point:** If dendritic conflicts with terranix or clan integration: SKIP and proceed to Story 1.3. Infrastructure deployment is non-negotiable, dendritic optimization is nice-to-have.
 
 ---
 
-### Story 1.3: Configure clan inventory and service instances for test-vm
+### Story 1.3: Configure clan inventory with Hetzner and GCP VM definitions
 
 As a system administrator,
-I want to define clan inventory with a test-vm machine and essential service instances,
-So that I can validate clan functionality with dendritic organization.
+I want to define clan inventory with real VM machine definitions (Hetzner + GCP),
+So that I have infrastructure targets for terraform deployment and clan coordination.
 
 **Acceptance Criteria:**
-1. modules/flake-parts/clan.nix created with clan.meta.name = "test-clan"
-2. Clan inventory defines test-vm machine: tags = ["nixos" "test"], machineClass = "nixos"
-3. Service instances configured: emergency-access (default role), sshd-clan (server + client roles), zerotier-test (controller role on test-vm)
-4. Inventory evaluates successfully: `nix eval .#clan.inventory --json | jq .`
-5. nixosConfiguration created for test-vm imports host module via config.flake.modules
-6. Configuration builds successfully: `nix build .#nixosConfigurations.test-vm.config.system.build.toplevel`
+1. modules/flake-parts/clan.nix expanded with inventory.machines: `hetzner-vm`: tags = ["nixos" "cloud" "hetzner"], machineClass = "nixos"; `gcp-vm`: tags = ["nixos" "cloud" "gcp"], machineClass = "nixos"
+2. Service instances configured: `emergency-access`: roles.default.tags."all" (both VMs), `sshd-clan`: roles.server.tags."all" + roles.client.tags."all", `zerotier-local`: roles.controller.machines.hetzner-vm + roles.peer.machines.gcp-vm, `users-root`: roles.default.tags."all" (root access both VMs)
+3. Inventory evaluates: `nix eval .#clan.inventory --json | jq .machines`
+4. Machine definitions include proper tags for service targeting
+5. nixosConfigurations created for both machines (minimal, will expand later)
+6. Configurations build: `nix build .#nixosConfigurations.{hetzner-vm,gcp-vm}.config.system.build.toplevel`
 
-**Prerequisites:** Story 1.2 (dendritic pattern implemented)
+**Prerequisites:** Story 1.1 (infrastructure setup), Story 1.2 OPTIONAL (dendritic pattern, only if completed)
+
+**Estimated Effort:** 2-4 hours
+
+**Risk Level:** Low (configuration only, no deployment)
 
 ---
 
-### Story 1.4: Test clan vars generation and validate integration points
+### Story 1.4: Create Hetzner VM terraform configuration and host modules
 
 As a system administrator,
-I want to generate clan vars for test-vm and validate all integration points,
-So that I can verify dendritic + clan architectural combination works end-to-end.
+I want to create terraform configuration for Hetzner Cloud VM provisioning,
+So that I can deploy hetzner-vm using proven patterns from clan-infra.
 
 **Acceptance Criteria:**
-1. Clan secrets initialized: age keys generated for admins group
-2. Clan vars generated for test-vm: `nix run nixpkgs#clan-cli -- vars generate test-vm`
-3. Vars generation succeeds without errors
-4. Generated secrets present in sops/machines/test-vm/secrets/ (encrypted)
-5. Public facts present in sops/machines/test-vm/facts/ (unencrypted)
-6. Integration tests pass: flake check, build, vars generation, inventory evaluation
-7. No architectural conflicts between dendritic namespace and clan functionality discovered
+1. modules/terranix/hetzner.nix created with: hcloud provider configuration, SSH key resource for terraform deployment key, Hetzner Cloud server resource (CX22 or CX32, 2-4 vCPU for testing), null_resource for `clan machines install` provisioning
+2. modules/hosts/hetzner-vm/default.nix created with: Base NixOS configuration (hostname, state version, nix settings), srvos hardening modules imported, Networking configuration
+3. modules/hosts/hetzner-vm/disko.nix created with: LUKS encryption for root partition, Standard partition layout (EFI + LUKS root)
+4. Hetzner API token stored as clan secret: `clan secrets set hetzner-api-token`
+5. Terraform configuration generates: `nix build .#terranix.terraform`
+6. Generated terraform valid: manual review of terraform.tf.json
+7. Host configuration builds: `nix build .#nixosConfigurations.hetzner-vm.config.system.build.toplevel`
+8. Disko configuration generates partition commands: `nix eval .#nixosConfigurations.hetzner-vm.config.disko.disks --apply toString`
 
-**Prerequisites:** Story 1.3 (clan inventory configured)
+**Prerequisites:** Story 1.3 (inventory configured)
+
+**Estimated Effort:** 4-6 hours
+
+**Risk Level:** Medium (first terraform configuration, pattern learning)
 
 ---
 
-### Story 1.5: Document integration findings and extract patterns
+### Story 1.5: Deploy Hetzner VM and validate infrastructure stack
 
 As a system administrator,
-I want to document all integration findings and extract reusable patterns,
-So that I have a reference for Phase 1 cinnabar deployment.
+I want to provision and deploy hetzner-vm to Hetzner Cloud,
+So that I can validate the complete infrastructure stack (terraform + clan + disko + NixOS) works end-to-end.
 
 **Acceptance Criteria:**
-1. INTEGRATION-FINDINGS.md created documenting:
-   - Integration points between dendritic and clan
-   - Compromises required (if any) from pure dendritic pattern
-   - Acceptable deviations and rationale
-   - Architectural decisions made
-2. PATTERNS.md created with reusable patterns:
-   - Module structure templates for NixOS configurations
-   - Clan inventory patterns for machine definitions
-   - Service instance patterns for essential services
-   - Vars generator patterns for secrets management
-3. Examples extracted from test-clan showing working integration
-4. Documentation includes both successes and challenges encountered
-5. Confidence level assessed for each pattern (proven, needs-testing, uncertain)
+1. Terraform initialized: `nix run .#terranix.terraform -- init`
+2. Terraform plan reviewed: `nix run .#terranix.terraform -- plan` (check resource creation)
+3. Hetzner VM provisioned: `nix run .#terranix.terraform -- apply`
+4. VM accessible via SSH with terraform deploy key
+5. Clan vars generated for hetzner-vm: `clan vars generate hetzner-vm`
+6. NixOS installed via clan: `clan machines install hetzner-vm --target-host root@<ip> --update-hardware-config nixos-facter --yes`
+7. System boots successfully with LUKS encryption
+8. Post-installation SSH access works: `ssh root@<hetzner-ip>` (using clan-managed keys)
+9. Zerotier controller operational: `ssh root@<hetzner-ip> "zerotier-cli info"` shows controller
+10. Clan vars deployed: `ssh root@<hetzner-ip> "ls -la /run/secrets/"` shows sshd keys
+11. No critical errors in journalctl logs
 
-**Prerequisites:** Story 1.4 (integration validated)
+**Prerequisites:** Story 1.4 (Hetzner terraform + host config)
+
+**Estimated Effort:** 4-8 hours (deployment + validation + troubleshooting)
+
+**Risk Level:** High (real infrastructure deployment, costs money, operational risk)
+
+**Cost:** ~€5-8/month for Hetzner CX22/CX32 (acceptable testing cost)
 
 ---
 
-### Story 1.6: Execute go/no-go decision framework and document outcome
+### Story 1.6: Initialize clan secrets and test vars deployment on Hetzner
+
+As a system administrator,
+I want to validate clan secrets management and vars deployment on hetzner-vm,
+So that I can confirm the secrets infrastructure works correctly before GCP deployment.
+
+**Acceptance Criteria:**
+1. Clan secrets initialized in test-clan: age keys generated for admins group
+2. User age key added: `clan secrets groups add-user admins <username>`
+3. Hetzner API token verified in clan secrets (from Story 1.4)
+4. Clan vars for hetzner-vm validated: SSH host keys generated (encrypted in sops/machines/hetzner-vm/secrets/), Zerotier identity generated (if needed), Public facts accessible (unencrypted in sops/machines/hetzner-vm/facts/)
+5. Vars deployed correctly: `/run/secrets/` has proper permissions (0600 root-owned)
+6. SSH host keys functional: able to SSH without host key warnings after redeployment
+7. Zerotier controller uses managed identity (not ephemeral)
+8. Vars generation repeatable: can regenerate and redeploy without errors
+9. Documentation created: SECRETS-MANAGEMENT.md covering clan vars workflow
+
+**Prerequisites:** Story 1.5 (Hetzner deployed)
+
+**Estimated Effort:** 2-4 hours
+
+**Risk Level:** Low (validation and documentation)
+
+---
+
+### Story 1.7: Create GCP VM terraform configuration and host modules
+
+As a system administrator,
+I want to create terraform configuration for GCP VM provisioning,
+So that I can deploy gcp-vm using patterns learned from Hetzner deployment.
+
+**Acceptance Criteria:**
+1. modules/terranix/gcp.nix created with: Google Cloud provider configuration, SSH key resource for terraform deployment key, GCP compute instance resource (e2-micro or e2-small for testing, free tier eligible), null_resource for `clan machines install` provisioning, Network configuration (VPC, firewall rules for SSH + zerotier)
+2. modules/hosts/gcp-vm/default.nix created with: Base NixOS configuration (hostname, state version, nix settings), srvos hardening modules imported, GCP-specific networking configuration
+3. modules/hosts/gcp-vm/disko.nix created with: LUKS encryption for root partition, GCP-compatible partition layout (considers boot requirements)
+4. GCP service account JSON stored as clan secret: `clan secrets set gcp-service-account-json`
+5. GCP project ID configured in terraform
+6. Terraform configuration generates: `nix build .#terranix.terraform`
+7. Host configuration builds: `nix build .#nixosConfigurations.gcp-vm.config.system.build.toplevel`
+
+**Prerequisites:** Story 1.6 (Hetzner stable, secrets validated)
+
+**Estimated Effort:** 4-6 hours
+
+**Risk Level:** Medium-High (GCP is new territory, different from Hetzner/Vultr)
+
+---
+
+### Story 1.8: Deploy GCP VM and validate multi-cloud infrastructure
+
+As a system administrator,
+I want to provision and deploy gcp-vm to Google Cloud Platform,
+So that I can validate multi-cloud infrastructure coordination via clan and zerotier.
+
+**Acceptance Criteria:**
+1. Terraform plan reviewed for GCP resources: `nix run .#terranix.terraform -- plan`
+2. GCP VM provisioned: `nix run .#terranix.terraform -- apply`
+3. VM accessible via SSH with terraform deploy key
+4. Clan vars generated for gcp-vm: `clan vars generate gcp-vm`
+5. NixOS installed via clan: `clan machines install gcp-vm --target-host root@<gcp-ip> --update-hardware-config nixos-facter --yes`
+6. System boots successfully with LUKS encryption
+7. Post-installation SSH access works: `ssh root@<gcp-ip>`
+8. Zerotier peer connects to Hetzner controller: `ssh root@<gcp-ip> "zerotier-cli status"` shows network membership
+9. Zerotier mesh operational: From Hetzner, can ping GCP zerotier IP and vice versa
+10. SSH via zerotier works: `ssh root@<gcp-zerotier-ip>` from Hetzner
+11. Clan vars deployed correctly on GCP VM
+
+**Prerequisites:** Story 1.7 (GCP terraform + host config)
+
+**Estimated Effort:** 6-8 hours (new cloud provider, troubleshooting expected)
+
+**Risk Level:** High (new cloud provider, networking complexity, cost)
+
+**Cost:** ~$7-10/month for GCP e2-micro (acceptable testing cost)
+
+**Decision Point:** If GCP deployment too complex: consider dropping GCP from MVP, stick with Hetzner only. If GCP works but unreliable: document issues, may defer to post-Phase 0.
+
+---
+
+### Story 1.9: Test multi-machine coordination across Hetzner + GCP
+
+As a system administrator,
+I want to validate multi-machine coordination features across Hetzner and GCP VMs,
+So that I can confirm clan inventory and service instances work correctly in multi-cloud environment.
+
+**Acceptance Criteria:**
+1. 2-machine zerotier network operational: Hetzner VM (controller role) + GCP VM (peer role), Full mesh connectivity: bidirectional ping successful, Network latency acceptable (< 200ms, depends on regions)
+2. SSH via zerotier works in both directions: From Hetzner to GCP via zerotier IP, From GCP to Hetzner via zerotier IP, Certificate-based authentication functional
+3. Clan service instances deployed correctly: emergency-access on both machines (root access recovery), sshd-clan server + client roles on both machines, users-root on both machines
+4. Vars shared appropriately (if any configured with share = true)
+5. Multi-machine rebuild test: update configuration, rebuild both machines, validate changes
+6. Service coordination test: modify service instance setting, verify applied to both machines
+7. Network stability: 24-hour monitoring shows no disconnections or errors
+
+**Prerequisites:** Story 1.8 (GCP deployed)
+
+**Estimated Effort:** 2-4 hours
+
+**Risk Level:** Medium (depends on successful deployment from previous stories)
+
+---
+
+### Story 1.10: Monitor infrastructure stability and extract deployment patterns
+
+As a system administrator,
+I want to monitor both VMs for stability over 1 week minimum,
+So that I can validate the infrastructure is production-ready before darwin migration.
+
+**Acceptance Criteria:**
+1. 1-week stability monitoring (minimum): Daily checks: SSH access, zerotier connectivity, system logs; No critical errors or service failures; No unexpected reboots or crashes; Uptime > 99% (allowing brief maintenance)
+2. DEPLOYMENT-PATTERNS.md created documenting: Terraform/terranix configuration patterns (Hetzner + GCP), Clan inventory patterns for cloud VMs, Disko patterns for LUKS encryption, Vars generation patterns for secrets, Multi-cloud zerotier mesh setup, Troubleshooting notes from deployment experience
+3. Cost tracking: actual monthly costs for Hetzner + GCP (~$15-20/month total)
+4. Performance baseline: build times, deployment times, network latency
+5. Patterns validated as reusable for Phase 1 (cinnabar) deployment
+6. Issues log: any problems discovered, workarounds applied
+7. Rollback procedure tested: can destroy and recreate infrastructure from configuration
+
+**Prerequisites:** Story 1.9 (multi-machine coordination validated)
+
+**Estimated Effort:** 1 week calendar time (15-30 min daily monitoring)
+
+**Risk Level:** Low (monitoring only, stability gate)
+
+**Stability Gate:** Infrastructure must be stable for 1 week minimum before go/no-go decision
+
+---
+
+### Story 1.11: Document integration findings and architectural decisions
+
+As a system administrator,
+I want to document all integration findings and architectural decisions from Phase 0,
+So that I have comprehensive reference for Phase 1 and beyond.
+
+**Acceptance Criteria:**
+1. INTEGRATION-FINDINGS.md created documenting: Terraform/terranix + clan integration (how it works, gotchas), Dendritic pattern evaluation (if attempted in Story 1.2), Acceptable deviations from pure patterns (specialArgs, module organization), Hetzner deployment experience (easy, hard, surprises), GCP deployment experience (comparison to Hetzner, challenges), Multi-cloud coordination findings (what works, what doesn't), Zerotier mesh networking across clouds (latency, reliability)
+2. ARCHITECTURAL-DECISIONS.md created with: Why terraform/terranix for infrastructure provisioning, Why LUKS encryption (security requirement), Why zerotier mesh (always-on coordination, VPN), Clan inventory patterns chosen, Service instance patterns (roles, targeting), Secrets management strategy (clan vars vs sops-nix)
+3. Confidence level assessed for each pattern: proven, needs-testing, uncertain
+4. Recommendations for Phase 1 cinnabar deployment
+5. Known limitations documented (GCP complexity, cost, alternatives)
+
+**Prerequisites:** Story 1.10 (stability validated, patterns extracted)
+
+**Estimated Effort:** 2-4 hours
+
+**Risk Level:** Low (documentation only)
+
+---
+
+### Story 1.12: Execute go/no-go decision framework for Phase 1
 
 As a system administrator,
 I want to evaluate Phase 0 results against go/no-go criteria,
-So that I can make an informed decision about proceeding to Phase 1 infrastructure deployment.
+So that I can make an informed decision about proceeding to Phase 1 (cinnabar production deployment).
 
 **Acceptance Criteria:**
-1. GO-NO-GO-DECISION.md created with decision framework evaluation:
-   - All critical integration tests status (pass/fail)
-   - test-vm build success confirmation
-   - Dendritic + clan coexistence assessment (compatible/compromises-needed/incompatible)
-   - Blockers identified (if any) with severity
-   - Compromises documented and acceptability assessment
-2. Decision rendered: GO (proceed with confidence) / CONDITIONAL GO (proceed with caution and additional monitoring) / NO-GO (pivot to vanilla clan pattern)
-3. If GO or CONDITIONAL GO: Pattern extraction confirmed ready for Phase 1
-4. If NO-GO: Alternative approaches documented (vanilla clan + flake-parts, delayed migration)
-5. Rationale documented for decision with supporting evidence from integration findings
+1. GO-NO-GO-DECISION.md created with decision framework evaluation: Infrastructure deployment success (Hetzner + GCP operational: PASS/FAIL), Stability validation (1 week stable: PASS/FAIL), Multi-machine coordination (clan inventory + zerotier working: PASS/FAIL), Terraform/terranix integration (proven pattern: PASS/FAIL), Secrets management (clan vars working: PASS/FAIL), Cost acceptability (~$15-20/month for 2 VMs: ACCEPTABLE/EXCESSIVE), Pattern confidence (reusable for Phase 1: HIGH/MEDIUM/LOW)
+2. Blockers identified (if any): Critical: must resolve before Phase 1, Major: can work around but risky, Minor: document and monitor
+3. Decision rendered: **GO**: All criteria passed, high confidence, proceed to Phase 1 cinnabar; **CONDITIONAL GO**: Some issues but manageable, proceed with caution; **NO-GO**: Critical blockers, resolve or pivot strategy
+4. If GO/CONDITIONAL GO: Phase 1 cinnabar deployment plan confirmed, Patterns ready to apply to production infrastructure, Test VMs can be destroyed (or kept for experimentation)
+5. If NO-GO: Alternative approaches documented, Issues requiring resolution identified, Timeline for retry or pivot strategy
 6. Next steps clearly defined based on decision outcome
 
-**Prerequisites:** Story 1.5 (findings documented)
+**Prerequisites:** Story 1.11 (findings documented)
+
+**Estimated Effort:** 1-2 hours
+
+**Risk Level:** Low (decision only)
+
+**Decision Criteria - GO if:** Both VMs deployed successfully, 1 week stability achieved, Multi-machine coordination working, Patterns documented with confidence, Cost acceptable for production use
+
+**Decision Criteria - CONDITIONAL GO if:** Minor issues discovered but workarounds available, GCP more complex than expected but Hetzner solid, Dendritic pattern skipped (acceptable, not required), Stability good but < 1 week (6+ days acceptable)
+
+**Decision Criteria - NO-GO if:** Critical deployment failures, Stability issues (crashes, service failures), Excessive cost or complexity, Patterns not reusable for production
 
 ---
 
@@ -785,10 +967,10 @@ So that [benefit/value].
 
 **Total Epics:** 7 (aligned to 6 migration phases + cleanup)
 
-**Total Stories:** 30 stories across all epics
+**Total Stories:** 36 stories across all epics
 
 **Story Distribution:**
-- Epic 1 (Phase 0 - test-clan): 6 stories
+- Epic 1 (Phase 0 - Infrastructure Deployment): 12 stories
 - Epic 2 (Phase 1 - cinnabar): 6 stories
 - Epic 3 (Phase 2 - blackphos): 5 stories
 - Epic 4 (Phase 3 - rosegold): 3 stories
@@ -797,17 +979,18 @@ So that [benefit/value].
 - Epic 7 (Phase 6 - cleanup): 3 stories
 
 **Parallelization Opportunities:**
-- Within Phase 0: Stories 1.1-1.4 must be sequential, 1.5-1.6 can be concurrent after 1.4
+- Within Phase 0: Stories 1.1-1.3 must be sequential (foundation), Stories 1.4-1.6 must be sequential (Hetzner), Stories 1.7-1.9 must be sequential (GCP, depends on Hetzner), Story 1.10 blocks on calendar time (1 week) but can do documentation (1.11) in parallel, Stories 1.11-1.12 must be sequential
 - Within Phase 1: Stories 2.1-2.5 must be sequential, documentation in 2.6 can be concurrent with stability monitoring
 - Across phases: Each phase must complete before next begins (stability gates enforce sequencing)
 
 **Estimated Timeline:**
-- Conservative: 13-15 weeks (1 week per phase + 1-2 week stability gates)
-- Aggressive: 4-6 weeks (if all phases proceed smoothly without issues)
-- Realistic: 10-12 weeks (accounting for some issues but not major blockers)
+- Conservative: 17-19 weeks (3-4 weeks Phase 0 + 1-2 weeks per remaining phase + stability gates)
+- Aggressive: 7-9 weeks (if all phases proceed smoothly without issues)
+- Realistic: 13-15 weeks (accounting for some issues but not major blockers)
 
 **Critical Success Factors:**
-- Phase 0 GO/CONDITIONAL GO decision (Epic 1, Story 1.6)
+- Phase 0 infrastructure deployment success (Epic 1, Stories 1.5 + 1.8)
+- Phase 0 GO/CONDITIONAL GO decision (Epic 1, Story 1.12)
 - Cinnabar VPS stability validation (Epic 2, Story 2.6)
 - Darwin patterns proven reusable (Epic 3, Story 3.5)
 - Pre-migration readiness for stibnite (Epic 6, Story 6.1)
