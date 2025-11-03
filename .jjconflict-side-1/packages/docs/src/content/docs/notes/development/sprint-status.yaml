@@ -60,7 +60,7 @@ story_location: "{project-root}/docs/notes/development/work-items"
 development_status:
   # Epic 1: Architectural Validation (Phase 0 - test-clan)
   epic-1: backlog
-  1-1-prepare-existing-test-clan-repository-for-validation: backlog
+  1-1-prepare-existing-test-clan-repository-for-validation: drafted
   1-2-implement-dendritic-flake-parts-pattern-in-test-clan: backlog
   1-3-configure-clan-inventory-and-service-instances-for-test-vm: backlog
   1-4-test-clan-vars-generation-and-validate-integration-points: backlog
