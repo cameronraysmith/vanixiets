@@ -8,16 +8,19 @@ Status: ready-for-dev
 ## Story
 
 As a system administrator,
-I want to review and prepare the existing test-clan repository for nix dendritic flake-parts + clan validation, so that I can validate the architectural combination in isolation before infrastructure deployment.
+I want to review and prepare the existing test-clan repository for nix dendritic flake-parts + clan + terraform/terranix infrastructure validation, so that I can validate both the architectural patterns and infrastructure provisioning before production deployment.
 
 ## Context
 
 The test-clan repository already exists at `~/projects/nix-workspace/test-clan/` as a fledgling repository.
-Story 1.1 reviews and prepares it for dendritic flake-parts + clan-core integration validation.
+Story 1.1 reviews and prepares it for dendritic flake-parts + clan-core + terraform/terranix infrastructure integration validation.
 This is the entry point to the entire migration - if this foundation isn't solid, everything built on it will be unstable.
 
-**Phase 0 Strategic Purpose**: Validate an untested architectural combination (dendritic flake-parts + clan) in a disposable test environment before committing production infrastructure (cinnabar VPS).
-De-risks the entire migration by proving feasibility in isolation.
+**Phase 0 Strategic Purpose**: Validate an untested architectural combination (dendritic flake-parts + clan) AND deploy real infrastructure (Hetzner + GCP VMs) using clan-infra's proven terranix pattern in a disposable test environment before committing to production nix-config.
+De-risks the entire migration by proving both patterns AND infrastructure provisioning work in isolation.
+
+**Infrastructure-First Strategy**: Following clan-infra's proven terranix + flake-parts pattern (non-dendritic) is the primary objective.
+Dendritic optimization is secondary and can be added later via refactoring AFTER infrastructure works.
 
 **Non-Standard Sequencing**: This project deliberately defers architecture workflow until after Phase 0.
 Phase 0 (Epic 1) IS the architectural validation - it produces the patterns and decisions that normally come from architecture workflow.
@@ -25,12 +28,12 @@ Phase 0 (Epic 1) IS the architectural validation - it produces the patterns and 
 ## Acceptance Criteria
 
 1. Existing test-clan repository at ~/projects/nix-workspace/test-clan/ reviewed and working branch created/confirmed
-2. flake.nix updated to use flake-parts.lib.mkFlake with required inputs: nixpkgs, flake-parts, clan-core, import-tree
-3. Clan-core flakeModules.default imported
-4. modules/ directory structure verified/created: modules/base/, modules/hosts/, modules/flake-parts/
+2. flake.nix updated to use flake-parts.lib.mkFlake with required inputs: nixpkgs, flake-parts, clan-core, import-tree, terranix, disko, srvos
+3. Clan-core flakeModules.default and terranix.flakeModule imported
+4. modules/ directory structure verified/created: modules/base/, modules/hosts/, modules/flake-parts/, modules/terranix/
 5. Flake evaluates without errors: `nix flake check`
-6. README.md updated to document Phase 0 validation purpose and scope
-7. Git working state clean and ready for iterative development
+6. README.md updated to document Phase 0 validation + infrastructure deployment purpose and scope
+7. Git working state clean and ready for iterative development (Story 1.2 or Story 1.4 depending on dendritic decision)
 
 ## Tasks / Subtasks
 
@@ -45,10 +48,14 @@ Phase 0 (Epic 1) IS the architectural validation - it produces the patterns and 
   - [ ] Create branch: `git checkout -b phase-0-validation` or confirm on main
   - [ ] Ensure clean working state before modifications
 
-- [ ] Update flake inputs for dendritic + clan integration (AC: #2)
+- [ ] Update flake inputs for dendritic + clan + infrastructure integration (AC: #2)
   - [ ] Add clan-core input: `git+https://git.clan.lol/clan/clan-core` following nixpkgs/flake-parts
   - [ ] Add import-tree input: `github:vic/import-tree`
-  - [ ] Configure input follows for clan-core: nixpkgs, flake-parts, sops-nix, home-manager
+  - [ ] Add terranix input: `github:terranix/terranix` following flake-parts/nixpkgs
+  - [ ] Add disko input: `github:nix-community/disko` following nixpkgs
+  - [ ] Add srvos input: `github:nix-community/srvos` following nixpkgs
+  - [ ] Configure input follows for clan-core: nixpkgs, flake-parts, sops-nix, home-manager, nix-darwin
+  - [ ] Configure input follows for terranix: flake-parts, nixpkgs
   - [ ] Verify flake.lock updates after input changes
 
 - [ ] Configure flake-parts.lib.mkFlake structure (AC: #2)
@@ -56,15 +63,19 @@ Phase 0 (Epic 1) IS the architectural validation - it produces the patterns and 
   - [ ] Add import-tree auto-discovery: `(inputs.import-tree ./modules)`
   - [ ] Verify flake structure follows dendritic pattern
 
-- [ ] Import clan-core flakeModules.default (AC: #3)
+- [ ] Import clan-core and terranix flakeModules (AC: #3)
   - [ ] Add `inputs.clan-core.flakeModules.default` to imports list
-  - [ ] Verify clan flakeModule loads without conflicts
+  - [ ] Add `inputs.terranix.flakeModule` to imports list (following clan-infra pattern)
+  - [ ] Verify both flakeModules load without conflicts
+  - [ ] Reference clan-infra pattern: ~/projects/nix-workspace/infra/packages/docs/src/content/docs/notes/implementation/clan-infra-terranix-pattern.md
 
-- [ ] Create/verify dendritic modules/ directory structure (AC: #4)
+- [ ] Create/verify modules/ directory structure for infrastructure (AC: #4)
   - [ ] Create modules/base/ for foundation modules (nix settings)
   - [ ] Create modules/hosts/ for machine-specific configurations
   - [ ] Create modules/flake-parts/ for flake-level configuration
-  - [ ] Verify directory structure matches dendritic pattern from integration-plan.md
+  - [ ] Create modules/terranix/ for terraform/terranix modules (following clan-infra pattern)
+  - [ ] Verify directory structure supports infrastructure deployment
+  - [ ] Note: Dendritic pattern optional at this stage (Story 1.2 can be skipped)
 
 - [ ] Test flake evaluation (AC: #5)
   - [ ] Run: `nix flake check`
@@ -72,18 +83,19 @@ Phase 0 (Epic 1) IS the architectural validation - it produces the patterns and 
   - [ ] Run: `nix flake show` to verify outputs structure
   - [ ] Verify no warnings or critical issues
 
-- [ ] Update README.md with Phase 0 validation documentation (AC: #6)
-  - [ ] Document purpose: Phase 0 architectural validation environment
-  - [ ] Document scope: Testing dendritic flake-parts + clan integration before infrastructure commitment
-  - [ ] Document structure: Module organization, flake inputs, intended outcomes
-  - [ ] Note disposable nature: Experimental repository, failure is acceptable and informative
-  - [ ] Reference integration-plan.md for migration context
+- [ ] Update README.md with Phase 0 validation + infrastructure documentation (AC: #6)
+  - [ ] Document purpose: Phase 0 architectural validation + infrastructure deployment environment
+  - [ ] Document scope: Testing clan + infrastructure using clan-infra's proven terranix pattern, dendritic optimization secondary
+  - [ ] Document strategy: Infrastructure-first (follow clan-infra patterns), dendritic optional/later
+  - [ ] Document structure: Module organization, flake inputs, terraform/terranix setup, intended outcomes
+  - [ ] Note disposable nature: Experimental repository for validation, can destroy infrastructure via terraform destroy
+  - [ ] Reference integration-plan.md and clan-infra-terranix-pattern.md for patterns
 
 - [ ] Verify clean git state (AC: #7)
   - [ ] Stage changes: `git add .`
-  - [ ] Commit with atomic message: "chore(phase-0): prepare test-clan for dendritic + clan validation"
+  - [ ] Commit with atomic message: "chore(phase-0): prepare test-clan for clan + infrastructure validation"
   - [ ] Verify working tree clean: `git status`
-  - [ ] Ready for Story 1.2 (dendritic pattern implementation)
+  - [ ] Ready for next story (Story 1.2 dendritic pattern OPTIONAL, or skip to Story 1.4 terraform setup)
 
 ## Dev Notes
 
