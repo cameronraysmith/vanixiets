@@ -3,7 +3,7 @@
 title: "Story 1.1: Prepare existing test-clan repository for validation"
 ---
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -168,7 +168,7 @@ The zero-regression mandate applies to production hosts (Phases 1-6), not Phase 
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/notes/development/work-items/1-1-prepare-existing-test-clan-repository-for-validation.context.xml
 
 ### Agent Model Used
 
