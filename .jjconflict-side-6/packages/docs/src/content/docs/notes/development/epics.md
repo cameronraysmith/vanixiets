@@ -967,7 +967,7 @@ So that [benefit/value].
 
 **Total Epics:** 7 (aligned to 6 migration phases + cleanup)
 
-**Total Stories:** 36 stories across all epics
+**Total Stories:** 34 stories across all epics
 
 **Story Distribution:**
 - Epic 1 (Phase 0 - Infrastructure Deployment): 12 stories
