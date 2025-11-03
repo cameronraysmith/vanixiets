@@ -136,13 +136,15 @@ So that I can deploy hetzner-vm using proven patterns from clan-infra.
 1. modules/terranix/hetzner.nix created with: hcloud provider configuration, SSH key resource for terraform deployment key, Hetzner Cloud server resource (CX22 or CX32, 2-4 vCPU for testing), null_resource for `clan machines install` provisioning
 2. modules/hosts/hetzner-vm/default.nix created with: Base NixOS configuration (hostname, state version, nix settings), srvos hardening modules imported, Networking configuration
 3. modules/hosts/hetzner-vm/disko.nix created with: LUKS encryption for root partition, Standard partition layout (EFI + LUKS root)
-4. Hetzner API token stored as clan secret: `clan secrets set hetzner-api-token`
+4. Hetzner API token stored as clan secret: `clan secrets set hetzner-api-token` **(REQUIRES USER: obtain real API token from Hetzner Cloud console, agent must pause and coordinate)**
 5. Terraform configuration generates: `nix build .#terranix.terraform`
 6. Generated terraform valid: manual review of terraform.tf.json
 7. Host configuration builds: `nix build .#nixosConfigurations.hetzner-vm.config.system.build.toplevel`
 8. Disko configuration generates partition commands: `nix eval .#nixosConfigurations.hetzner-vm.config.disko.disks --apply toString`
 
 **Prerequisites:** Story 1.3 (inventory configured)
+
+**Note:** Story 1.4 requires manual user intervention to configure cloud provider credentials. Agent must pause before terraform validation commands.
 
 **Estimated Effort:** 4-6 hours
 
@@ -214,12 +216,14 @@ So that I can deploy gcp-vm using patterns learned from Hetzner deployment.
 1. modules/terranix/gcp.nix created with: Google Cloud provider configuration, SSH key resource for terraform deployment key, GCP compute instance resource (e2-micro or e2-small for testing, free tier eligible), null_resource for `clan machines install` provisioning, Network configuration (VPC, firewall rules for SSH + zerotier)
 2. modules/hosts/gcp-vm/default.nix created with: Base NixOS configuration (hostname, state version, nix settings), srvos hardening modules imported, GCP-specific networking configuration
 3. modules/hosts/gcp-vm/disko.nix created with: LUKS encryption for root partition, GCP-compatible partition layout (considers boot requirements)
-4. GCP service account JSON stored as clan secret: `clan secrets set gcp-service-account-json`
+4. GCP service account JSON stored as clan secret: `clan secrets set gcp-service-account-json` **(REQUIRES USER: create service account with Compute Admin role, download JSON key, agent must pause and coordinate)**
 5. GCP project ID configured in terraform
 6. Terraform configuration generates: `nix build .#terranix.terraform`
 7. Host configuration builds: `nix build .#nixosConfigurations.gcp-vm.config.system.build.toplevel`
 
 **Prerequisites:** Story 1.6 (Hetzner stable, secrets validated)
+
+**Note:** Story 1.7 requires manual user intervention to configure GCP credentials (service account creation, IAM permissions, JSON key download). Agent must pause before terraform validation commands.
 
 **Estimated Effort:** 4-6 hours
 
