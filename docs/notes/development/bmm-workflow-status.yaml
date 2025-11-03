@@ -35,11 +35,11 @@
    # Phase 1: Analysis
    brainstorm-project: skipped  # Analysis done manually in docs/notes/clan/integration-plan.md
    research: docs/notes/clan/integration-plan.md  # Comprehensive research documented
--  product-brief: required  # RESET: Generate BMAD product-brief from integration-plan.md
-+  product-brief: docs/notes/development/bmm-product-brief-infra-2025-11-02.md
+   product-brief: docs/notes/development/bmm-product-brief-infra-2025-11-02.md
  
    # Phase 2: Planning
-   prd: required  # RESET: Generate BMAD PRD from product-brief + integration docs
+-  prd: required  # RESET: Generate BMAD PRD from product-brief + integration docs
++  prd: docs/notes/development/PRD.md
    validate-prd: skipped
    create-design: skipped  # No UI work (infrastructure project)
  
