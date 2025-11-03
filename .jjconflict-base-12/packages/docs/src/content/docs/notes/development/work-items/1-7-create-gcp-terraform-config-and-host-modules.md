@@ -113,6 +113,42 @@ If GCP proves too complex, can defer to post-Phase 0 and proceed with Hetzner-on
 
 ## Dev Notes
 
+### Secrets Management Coordination Required
+
+**CRITICAL PAUSE POINT:** This story requires manual coordination for GCP credentials.
+
+**Pattern Reference:** Same as Story 1.4, adapted for GCP provider
+
+**Secrets to Configure:**
+1. **tf-passphrase** - Already configured in Story 1.4 (reused)
+
+2. **gcp-service-account-json** - GCP service account credentials
+   - Create service account in GCP Console (IAM & Admin → Service Accounts)
+   - Grant Compute Admin role (or Compute Instance Admin v1)
+   - Create JSON key and download
+   - Store: `clan secrets set gcp-service-account-json < /path/to/service-account-key.json`
+   - **Delete local JSON file after storing in clan secrets**
+   - Fetched at terraform runtime via data.external in modules/terranix/base.nix
+
+**Developer Workflow:**
+1. Implement secret-fetching STRUCTURE in modules/terranix/gcp.nix and modules/terranix/base.nix (data.external pattern for GCP credentials)
+2. **PAUSE** - Request user to:
+   - Create GCP project (if needed)
+   - Create service account with Compute Admin permissions
+   - Download JSON key
+   - Run: `clan secrets set gcp-service-account-json < service-account-key.json`
+   - Delete local JSON file
+3. Wait for confirmation that secrets are stored
+4. Only after confirmation: proceed to AC #12-13 (terraform generation and validation)
+
+**DO NOT:**
+- Generate fake/placeholder service account JSON
+- Proceed with terraform commands before secrets are configured
+- Assume GCP project or service account exists
+
+**Why This Matters:**
+Story 1.8 (GCP deployment) will fail without real GCP credentials. GCP authentication is more complex than Hetzner - requires service account with proper IAM permissions.
+
 ### GCP-Specific Considerations
 
 **Networking Complexity:**

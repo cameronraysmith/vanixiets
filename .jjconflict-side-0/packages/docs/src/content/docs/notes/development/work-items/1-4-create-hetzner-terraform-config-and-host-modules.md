@@ -85,6 +85,36 @@ Disko configuration handles declarative disk partitioning with encryption.
 
 ## Dev Notes
 
+### Secrets Management Coordination Required
+
+**CRITICAL PAUSE POINT:** This story requires manual coordination for cloud provider credentials.
+
+**Pattern Reference:** ~/projects/nix-workspace/clan-infra (Step 6: Setup clan secrets in docs/notes/implementation/clan-infra-terranix-pattern.md)
+
+**Secrets to Configure:**
+1. **tf-passphrase** - OpenTofu state encryption
+   - Generate: `openssl rand -base64 32 | clan secrets set tf-passphrase`
+   - Used in terraformWrapper.prefixText for state encryption
+
+2. **hetzner-api-token** - Hetzner Cloud API authentication
+   - Obtain from Hetzner Cloud console (Project → Security → API Tokens)
+   - Store: `clan secrets set hetzner-api-token` (paste token when prompted)
+   - Fetched at terraform runtime via data.external in modules/terranix/base.nix
+
+**Developer Workflow:**
+1. Implement secret-fetching STRUCTURE in modules/terranix/base.nix (data.external pattern)
+2. **PAUSE** - Request user to configure secrets with real cloud provider credentials
+3. Wait for confirmation that secrets are stored via `clan secrets set`
+4. Only after confirmation: proceed to AC #9-12 (terraform generation and validation)
+
+**DO NOT:**
+- Generate fake/placeholder secrets
+- Proceed with terraform commands before secrets are configured
+- Assume cloud provider accounts exist
+
+**Why This Matters:**
+Story 1.5 (terraform deployment) will fail without real credentials. The data.external pattern fetches secrets at runtime - terraform init/plan/apply require valid authentication.
+
 ### Terraform Pattern Reference
 
 **clan-infra vultr.nix pattern** (adapt for Hetzner):

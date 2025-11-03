@@ -112,6 +112,22 @@ This follows proven patterns from clan-infra and validates the foundation for al
 
 ## Dev Notes
 
+### Prerequisites Validation
+
+**MANDATORY:** Before executing this story, verify Story 1.4 secrets are configured:
+
+```bash
+# Verify secrets exist (should not error)
+clan secrets get tf-passphrase
+clan secrets get hetzner-api-token
+
+# If either command fails, return to Story 1.4 and complete secret setup
+```
+
+This story executes actual terraform commands that authenticate with Hetzner Cloud API. Without valid credentials, terraform init/plan/apply will fail with authentication errors.
+
+**Story 1.4 must be fully complete** including the manual secrets setup step before proceeding.
+
 ### Deployment Workflow Summary
 
 **Phase 1: Terraform Provisioning**
