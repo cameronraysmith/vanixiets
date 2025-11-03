@@ -64,7 +64,8 @@ env:
 jobs:
   # job 0: secrets-scan
   # scans repository for hardcoded secrets using gitleaks
-  # Security critical - runs for all commits
+  # Security critical - always runs on all commits (no caching)
+  # Setup optimized for speed since this job runs frequently
   secrets-scan:
     runs-on: ubuntu-latest
     if: |
@@ -87,46 +88,14 @@ jobs:
         with:
           fetch-depth: 0 # full history for comprehensive secret scanning and git diff
 
-      - name: Check execution cache
-        id: cache
-        uses: ./.github/actions/cached-ci-job
-        with:
-          check-name: ${{ github.job }}
-          force-run: ${{ inputs.force_run || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'force-ci')) || 'false' }}
-          hash-sources: '.github/actions/setup-nix/action.yml'
-
       - name: Setup Nix
-        if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           installer: quick # fast install without space reclamation overhead
           system: x86_64-linux
 
       - name: Scan for secrets with gitleaks
-        if: steps.cache.outputs.should-run == 'true'
         run: nix run nixpkgs#gitleaks -- detect --verbose --redact
-
-      - name: Create job result marker
-        if: success() && steps.cache.outputs.should-run == 'true'
-        shell: bash
-        run: |
-          mkdir -p "${{ steps.cache.outputs.cache-path }}"
-          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
-          {
-            "success": true,
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "commit": "${{ github.sha }}",
-            "cache_key": "${{ steps.cache.outputs.cache-key }}",
-            "workflow_run_id": "${{ github.run_id }}"
-          }
-          EOF
-
-      - name: Save job result to cache
-        if: success() && steps.cache.outputs.should-run == 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
-        with:
-          path: ${{ steps.cache.outputs.cache-path }}
-          key: ${{ steps.cache.outputs.cache-key }}
 
   # job 1: set-variables
   # determines deployment settings and variables based on event type
