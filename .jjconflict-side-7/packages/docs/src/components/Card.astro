@@ -1,0 +1,60 @@
+---
+interface Props {
+  title: string;
+  href?: string;
+  variant?: "default" | "featured";
+}
+
+const { title, href, variant = "default" } = Astro.props;
+const Tag = href ? "a" : "div";
+---
+
+<Tag
+  class:list={[
+    "card",
+    {
+      "card--featured": variant === "featured",
+      "card--link": Boolean(href),
+    },
+  ]}
+  href={href}
+>
+  <h3 class="card__title">{title}</h3>
+  <div class="card__content">
+    <slot />
+  </div>
+</Tag>
+
+<style>
+  .card {
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: white;
+  }
+
+  .card--featured {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+
+  .card--link {
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .card--link:hover {
+    border-color: #3b82f6;
+  }
+
+  .card__title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .card__content {
+    color: #6b7280;
+  }
+</style>

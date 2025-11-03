@@ -1,0 +1,90 @@
+pull_request_rules:
+  - name: self-assign PRs
+    conditions:
+      - -merged
+      - -closed
+      - "#assignee=0"
+    actions:
+      assign:
+        add_users:
+          - "{{ author }}"
+  - name: automatic merge to queue
+    conditions:
+      - "#approved-reviews-by>=1"
+      - label!=work-in-progress
+      - -draft
+      - -conflict
+      - check-success=skip-check
+      - check-success=secrets-scan
+      - check-success=set-variables
+      - or:
+        - check-success=bootstrap-verification
+        - check-skipped=bootstrap-verification
+      - or:
+        - check-success=config-validation
+        - check-skipped=config-validation
+      - or:
+        - check-success=autowiring-validation
+        - check-skipped=autowiring-validation
+      - or:
+        - check-success=secrets-workflow
+        - check-skipped=secrets-workflow
+      - or:
+        - check-success=justfile-activation
+        - check-skipped=justfile-activation
+      - or:
+        - check-success=cache-overlay-packages (x86_64-linux)
+        - check-skipped=cache-overlay-packages (x86_64-linux)
+      - or:
+        - check-success=cache-overlay-packages (aarch64-linux)
+        - check-skipped=cache-overlay-packages (aarch64-linux)
+      - or:
+        - check-success=nix (x86_64-linux, packages)
+        - check-skipped=nix (x86_64-linux, packages)
+      - or:
+        - check-success=nix (x86_64-linux, checks-devshells)
+        - check-skipped=nix (x86_64-linux, checks-devshells)
+      - or:
+        - check-success=nix (x86_64-linux, home)
+        - check-skipped=nix (x86_64-linux, home)
+      - or:
+        - check-success=nix (x86_64-linux, nixos, blackphos-nixos)
+        - check-skipped=nix (x86_64-linux, nixos, blackphos-nixos)
+      - or:
+        - check-success=nix (x86_64-linux, nixos, stibnite-nixos)
+        - check-skipped=nix (x86_64-linux, nixos, stibnite-nixos)
+      - or:
+        - check-success=nix (aarch64-linux, packages)
+        - check-skipped=nix (aarch64-linux, packages)
+      - or:
+        - check-success=nix (aarch64-linux, checks-devshells)
+        - check-skipped=nix (aarch64-linux, checks-devshells)
+      - or:
+        - check-success=nix (aarch64-linux, home)
+        - check-skipped=nix (aarch64-linux, home)
+      - or:
+        - check-success=nix (aarch64-linux, nixos, orb-nixos)
+        - check-skipped=nix (aarch64-linux, nixos, orb-nixos)
+      - or:
+        - check-success=typescript (docs)
+        - check-skipped=typescript (docs)
+      - check-success=PR Check Fast-forward
+    actions:
+      queue:
+        name: default
+
+queue_rules:
+  - name: default
+    merge_method: fast-forward
+    update_method: rebase
+    update_bot_account: cameronraysmith
+    batch_size: 1
+    checks_timeout: 3600
+    queue_conditions:
+      - check-success=skip-check
+    merge_conditions:
+      - check-success=skip-check
+    commit_message_template: |
+      {{ title }} (#{{ number }})
+
+      {{ body }}

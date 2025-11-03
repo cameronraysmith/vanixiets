@@ -1,0 +1,42 @@
+---
+title: Contents
+---
+
+Architecture Decision Records (ADRs) documenting key technical and design decisions.
+
+## Development Environment and Tooling
+
+- [ADR-0001: Claude Code multi-profile system](0001-claude-code-multi-profile-system/)
+- [ADR-0002: Use generic just recipes](0002-use-generic-just-recipes/)
+- [ADR-0009: Nix flake-based development environment](0009-nix-development-environment/)
+
+## Nix Configuration
+
+- [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/)
+
+## Monorepo Architecture
+
+- [ADR-0004: Monorepo structure](0004-monorepo-structure/)
+- [ADR-0005: Semantic versioning with semantic-release](0005-semantic-versioning/)
+- [ADR-0006: Monorepo tag strategy](0006-monorepo-tag-strategy/)
+- [ADR-0007: Bun workspaces configuration](0007-bun-workspaces/)
+- [ADR-0008: TypeScript configuration strategy](0008-typescript-configuration/)
+
+## Testing and Quality
+
+- [ADR-0010: Testing architecture](0010-testing-architecture/)
+
+## Security and Secrets
+
+- [ADR-0011: SOPS secrets management](0011-sops-secrets-management/)
+
+## CI/CD and Deployment
+
+- [ADR-0012: GitHub Actions CI/CD pipeline](0012-github-actions-pipeline/)
+- [ADR-0013: Cloudflare Workers deployment](0013-cloudflare-workers-deployment/)
+- [ADR-0015: CI/CD caching optimization strategy](0015-ci-caching-optimization/) (Superseded by ADR-0016)
+- [ADR-0016: Per-job content-addressed caching](0016-per-job-content-addressed-caching/)
+
+## Design Philosophy
+
+- [ADR-0014: Design principles](0014-design-principles/)

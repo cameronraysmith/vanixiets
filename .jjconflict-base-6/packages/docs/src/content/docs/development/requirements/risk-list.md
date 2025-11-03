@@ -1,0 +1,792 @@
+---
+title: Risk list
+---
+
+This document catalogs migration risks with likelihood, impact, risk factors, and mitigation strategies.
+
+## Overview
+
+The risk list identifies potential problems during the migration from nixos-unified to dendritic + clan architecture.
+Each risk includes assessment, affected phases, and concrete mitigation approaches.
+
+Risks are organized by category and severity, enabling proactive management throughout the migration process.
+
+## R-001: Dendritic + clan integration complexity
+
+### Description
+
+No production examples exist of dendritic flake-parts combined with clan-core, creating uncertainty about integration challenges and edge cases.
+
+### Risk factors
+
+- Novel architecture combination (pioneering integration)
+- No reference implementations to follow
+- Potential undiscovered incompatibilities
+- Learning curve for both patterns simultaneously
+- Documentation gaps for combined usage
+
+### Likelihood
+
+**Medium** - While both technologies are mature independently, their integration is untested.
+
+### Impact
+
+**High** - Integration failures could block migration entirely or require significant rework.
+
+### Affected phases
+
+- Phase 0: Validation (primary impact - this phase exists to catch this risk)
+- All subsequent phases depend on successful validation
+
+### Mitigation strategies
+
+**Phase 0 validation environment**:
+- Create test-clan/ workspace isolated from production
+- Validate integration patterns before infrastructure investment
+- Test all expected features (secrets, services, cross-platform modules)
+- Document integration approach comprehensively
+- Identify and resolve issues before VPS deployment
+
+**Incremental validation**:
+- Test one feature at a time
+- Build confidence through small successes
+- Document discovered patterns immediately
+- Create reference examples for future use
+
+**De-risk before commitment**:
+- Phase 0 has no infrastructure costs
+- Can abandon or redesign without losing production capability
+- Preserves ability to stay on nixos-unified if integration fails
+
+**Fallback position**:
+- nixos-unified remains operational throughout validation
+- Can abort migration if fundamental incompatibilities found
+- Alternative: use clan without dendritic, or dendritic without clan
+
+### Status
+
+**Not started** - Phase 0 validation pending
+
+### References
+
+- Phase 0 validation plan: docs/notes/clan/phase-0-validation.md
+- [Project scope](../context/project-scope/) - De-risk rationale
+
+## R-002: VPS infrastructure costs and management overhead
+
+### Description
+
+Deploying cinnabar VPS introduces ongoing costs and operational responsibilities not present in current darwin-only setup.
+
+### Risk factors
+
+- Monthly Hetzner costs (small but permanent)
+- Server maintenance responsibilities
+- Security update cadence
+- Monitoring requirements
+- Backup strategy needs
+- Additional attack surface
+
+### Likelihood
+
+**High** - VPS deployment is certain if migration proceeds.
+
+### Impact
+
+**Medium** - Manageable costs and effort, but permanent ongoing commitment.
+
+### Affected phases
+
+- Phase 1: VPS deployment (introduces risk)
+- All subsequent phases depend on VPS stability
+- Long-term operational phase after migration
+
+### Mitigation strategies
+
+**Cost management**:
+- Choose smallest viable VPS instance
+- Document baseline costs in project notes
+- Evaluate cost vs. benefit periodically
+- Plan for cost increase if usage grows
+
+**Operational efficiency**:
+- Automate security updates via NixOS configuration
+- Use unattended-upgrades for critical security patches
+- Monitoring via simple systemd-based health checks
+- Backup strategy: automated via NixOS modules
+
+**Security hardening**:
+- Minimal service exposure (SSH, zerotier only)
+- SSH key authentication only (no passwords)
+- Firewall configured via NixOS (declarative)
+- Regular security audit via nix flake check + statix
+
+**Effort bounds**:
+- Target: <2 hours/month maintenance
+- Automate everything possible
+- Document procedures for rare operations
+- Keep configuration simple
+
+**Exit strategy**:
+- Document VPS teardown procedure
+- Zerotier can migrate to different controller if needed
+- No vendor lock-in (Hetzner-agnostic configuration)
+
+### Status
+
+**Not started** - Phase 1 pending
+
+### References
+
+- Phase 1 VPS deployment: docs/notes/clan/phase-1-vps.md
+- [Goals](../context/goals-and-objectives/) - G-B02: Reasonable time and cost investment
+
+## R-003: Darwin host migration breaking daily workflows
+
+### Description
+
+Configuration changes during migration could break critical development workflows, impacting productivity.
+
+### Risk factors
+
+- Complex host configurations (accumulated over time)
+- Undocumented dependencies between components
+- Subtle behavior changes between architectures
+- Testing limitations (can't fully test until activation)
+- User muscle memory and expectations
+
+### Likelihood
+
+**High** - Some workflow disruption almost certain during migration.
+
+### Impact
+
+**Variable by host**:
+- blackphos, rosegold, argentum: **Medium** (secondary workstations, can tolerate issues)
+- stibnite: **High** (primary workstation, productivity-critical)
+
+### Affected phases
+
+- Phase 2: blackphos (first darwin, highest migration risk)
+- Phase 3: rosegold (validation of pattern reusability)
+- Phase 4: argentum (final validation before primary)
+- Phase 5: stibnite (highest impact if issues occur)
+
+### Mitigation strategies
+
+**Pre-migration validation**:
+- Comprehensive dry-run review
+- Compare current vs new configuration outputs
+- Test in guest user account first (if feasible)
+- Document rollback procedure per host
+
+**Migration order optimization**:
+- blackphos first (secondary workstation, lowest impact)
+- Validate pattern works before next host
+- stibnite last (maximize learning before highest-risk host)
+- 1-2 week stability validation between hosts
+
+**Workflow preservation checklist**:
+- Development tools (editors, shells, languages)
+- SSH access and configurations
+- Git and version control workflows
+- Network connectivity (wifi, VPN)
+- Homebrew applications
+- Keyboard shortcuts and system preferences
+
+**Rapid rollback capability**:
+- Test rollback before migration (dry-run)
+- Keep previous generation accessible
+- Document exact rollback commands per host
+- Time allocation for troubleshooting
+
+**Incremental migration within host**:
+- Convert core modules first (shell, dev tools)
+- Keep optional features in nixos-unified initially
+- Migrate additional features after stability confirmed
+- Progressive conversion reduces risk
+
+### Status
+
+**Not started** - Phase 2 pending
+
+### References
+
+- Migration assessment: docs/notes/clan/migration-assessment.md
+- [Usage model](usage-model/) - UC-007: Migration use case
+
+## R-004: Primary workstation (stibnite) migration risk
+
+### Description
+
+Migration of stibnite (primary workstation) has highest impact if problems occur, potentially blocking all work.
+
+### Risk factors
+
+- Most complex configuration of all hosts
+- Daily productivity dependency
+- Highest cognitive load (most familiarity required)
+- Most accumulated customizations
+- Less tolerance for experimentation
+
+### Likelihood
+
+**Medium** - Previous migrations provide validation, but stibnite is most complex.
+
+### Impact
+
+**Critical** - Work disruption could be severe if migration fails or causes instability.
+
+### Affected phases
+
+- Phase 5: stibnite migration (primary risk event)
+- Post-migration stability monitoring
+
+### Mitigation strategies
+
+**Maximum preparation**:
+- Wait until all other hosts migrated successfully (Phases 2-4)
+- Learn from issues encountered on earlier hosts
+- Comprehensive testing on secondary hosts first
+- Full backup before migration
+
+**Timing strategy**:
+- Choose low-pressure time window (not before deadline)
+- Allocate full day for migration + troubleshooting
+- Have backup device available (rosegold or blackphos)
+- Don't migrate on Friday (weekend debugging less appealing)
+
+**Incremental approach**:
+- Migrate minimal configuration first
+- Validate core workflows before adding features
+- Keep optional features in nixos-unified initially
+- Progressive addition of customizations
+
+**Rollback readiness**:
+- Test rollback procedure on secondary host first
+- Document exact rollback commands
+- Verify previous generation accessible and working
+- Have git rollback procedure ready (checkout previous commit)
+
+**Safety nets**:
+- Keep secondary workstation (blackphos) fully operational
+- SSH access to other hosts for remote work if needed
+- Cloud-based development as emergency fallback
+- Pair with time for recovery (not before critical deliverables)
+
+**Success criteria before attempting**:
+- Phases 2-4 completed successfully
+- All hosts stable 1-2 weeks post-migration
+- No unresolved issues from earlier migrations
+- Clear understanding of dendritic + clan patterns
+- Rollback tested and verified
+
+### Status
+
+**Not started** - Phase 5 pending (last migration phase)
+
+### References
+
+- [Project scope](../context/project-scope/) - Migration order rationale
+- [Stakeholders](../context/stakeholders/) - Risk tolerance considerations
+
+## R-005: Secrets migration from sops-nix to clan vars
+
+### Description
+
+Transitioning from manual sops-nix secrets to declarative clan vars generation could expose secrets or break services.
+
+### Risk factors
+
+- Two secrets management systems during migration
+- Risk of secrets committed unencrypted
+- Service downtime if secrets missing
+- Generator script bugs
+- Key rotation complexity
+- Unclear migration path for certain secret types
+
+### Likelihood
+
+**Medium** - Careful execution can manage risk, but complexity is significant.
+
+### Impact
+
+**High** - Secret exposure is critical security issue; service failures impact functionality.
+
+### Affected phases
+
+- Phase 1: VPS deployment (first clan vars usage)
+- Phase 2-5: Progressive secrets migration during host migrations
+- Post-migration: Hybrid sops-nix + clan vars operation
+
+### Mitigation strategies
+
+**Hybrid approach** (recommended):
+- Generated secrets → clan vars (SSH keys, service credentials, etc.)
+- External secrets → remain in sops-nix (API tokens, passwords)
+- Both systems coexist long-term
+- No forced migration of external secrets
+
+**Incremental migration**:
+- Migrate one generator at a time
+- Validate generation works before removing sops-nix secret
+- Test service with generated secret before committing
+- Keep sops-nix version as backup initially
+
+**Pre-commit validation**:
+- Use git pre-commit hooks to detect unencrypted secrets
+- gitleaks prevents secret leakage
+- Review diffs carefully before commit
+- Test generation in separate branch first
+
+**Generator testing**:
+- Test generator script in isolation
+- Verify output format before integration
+- Check encryption occurs correctly
+- Validate service can read generated secret
+
+**Key management**:
+- Age keys generated and backed up before vars generation
+- Test decryption works on target host
+- Document key recovery procedure
+- Backup encrypted secrets separately
+
+**Rollback strategy**:
+- Keep sops-nix secrets until clan vars validated
+- Dual configuration (can switch back to sops-nix)
+- Document transition per secret type
+- No deletion of sops-nix secrets until fully replaced
+
+### Status
+
+**Not started** - Phase 1 begins secrets migration
+
+### References
+
+- Migration plan: Appendix on secrets migration strategy
+- [Usage model](usage-model/) - UC-003: Declarative secrets management
+- [Security](quality-requirements/) - QR-005: Secrets encryption requirements
+
+## R-006: Breaking changes in upstream dependencies
+
+### Description
+
+Updates to nixpkgs, dendritic-flake-parts, or clan-core could introduce breaking changes during migration.
+
+### Risk factors
+
+- Dendritic and clan-core both actively developed
+- nixpkgs-unstable inherently unstable
+- API changes between versions
+- Documentation lag behind implementation
+- Multiple dependency updates during multi-month migration
+
+### Likelihood
+
+**High** - Breaking changes are common in unstable channel and evolving projects.
+
+### Impact
+
+**Medium** - Can delay migration or require rework, but not catastrophic.
+
+### Affected phases
+
+- All phases (ongoing risk)
+- Particularly Phase 0 (validation against current versions)
+- Risk increases with migration duration
+
+### Mitigation strategies
+
+**Input locking discipline**:
+- Lock all inputs at Phase 0 start
+- Only update inputs intentionally
+- Document reason for each update
+- Test thoroughly after updates
+
+**Conservative update policy**:
+- Don't update inputs during active migration phase
+- Update between phases only
+- Read changelogs before updating
+- Test in validation environment before production
+
+**Multi-channel resilience** (already implemented):
+- Stable fallback for broken packages
+- Surgical fixes without system rollback
+- Overlay infrastructure operational
+- Package-specific workarounds
+
+**Version pinning strategy**:
+- Pin critical inputs to specific commits
+- Use follows for input consistency
+- Document known-good versions
+- Maintain working flake.lock in git
+
+**Monitoring and awareness**:
+- Subscribe to clan-core and dendritic releases
+- Review nixpkgs weekly summary
+- Track upstream issues affecting our use case
+- Participate in community discussions
+
+**Contingency planning**:
+- Document workaround procedures
+- Maintain patches directory for upstream fixes
+- Plan time buffer for unexpected breakage
+- Can delay migration if dependencies unstable
+
+### Status
+
+**Ongoing** - Risk exists throughout migration and beyond
+
+### References
+
+- [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Multi-channel resilience
+- [System constraints](system-constraints/) - SC-003: Input locking
+
+## R-007: Phase 0 validation revealing architectural incompatibility
+
+### Description
+
+Test-clan validation could uncover fundamental incompatibilities requiring architecture redesign.
+
+### Risk factors
+
+- Novel integration (dendritic + clan)
+- No reference implementations
+- Possible fundamental conflicts
+- Late discovery of limitations
+- Investment in approach that doesn't work
+
+### Likelihood
+
+**Low-Medium** - Both technologies mature, but integration untested.
+
+### Impact
+
+**Very High** - Could force complete architecture redesign or migration abandonment.
+
+### Affected phases
+
+- Phase 0: Validation (discovery phase)
+- If discovered: all subsequent phases blocked pending redesign
+
+### Mitigation strategies
+
+**Purpose of Phase 0**:
+- Exists specifically to catch this risk
+- Isolated validation before infrastructure investment
+- No production impact if issues found
+- Time investment only (no financial cost)
+
+**Early validation approach**:
+- Test integration basics first (can dendritic + clan coexist?)
+- Validate core use cases before complex scenarios
+- Document blockers immediately
+- Engage community if issues found
+
+**Fallback options if incompatibility found**:
+1. **Clan without dendritic**: Use clan-core with standard flake-parts
+2. **Dendritic without clan**: Use dendritic with enhanced sops-nix
+3. **Hybrid approach**: Dendritic for modules, traditional flake for clan
+4. **Stay on nixos-unified**: Abort migration, enhance current architecture
+5. **Custom integration layer**: Build compatibility wrapper
+
+**Decision criteria**:
+- Severity of incompatibility
+- Workaround feasibility
+- Benefit vs. complexity trade-off
+- Time investment required
+- Alternative architecture viability
+
+**Community engagement**:
+- Open issues on relevant repositories
+- Discuss in Matrix/Discord channels
+- Share findings publicly
+- Contribute fixes upstream if possible
+
+### Status
+
+**Not started** - Phase 0 will discover if risk materializes
+
+### References
+
+- Phase 0 validation: docs/notes/clan/phase-0-validation.md
+- [Project scope](../context/project-scope/) - Validation rationale
+
+## R-008: Zerotier network reliability and connectivity issues
+
+### Description
+
+Overlay network dependency introduces new failure modes: controller outages, peer connectivity problems, or network instability.
+
+### Risk factors
+
+- Single controller (VPS) as point of failure
+- Network configuration complexity
+- Firewall / NAT traversal issues
+- Zerotier service bugs or breaking changes
+- Dependency on external zerotier.com infrastructure
+
+### Likelihood
+
+**Medium** - Zerotier is mature, but any network dependency adds complexity.
+
+### Impact
+
+**Low-Medium** - Degrades multi-host coordination but doesn't break individual hosts.
+
+### Affected phases
+
+- Phase 1: VPS deployment (controller setup)
+- Phase 2-5: Peer additions during host migrations
+- Post-migration: Ongoing operational risk
+
+### Mitigation strategies
+
+**Controller reliability**:
+- VPS on reliable infrastructure (Hetzner)
+- Monitoring via simple health checks
+- Automatic restart via systemd
+- Backup/restore procedure documented
+
+**Graceful degradation**:
+- Hosts functional without zerotier
+- Network coordination optional, not required
+- Critical workflows not zerotier-dependent
+- Can operate disconnected temporarily
+
+**Peer resilience**:
+- Peers cache credentials and reconnect automatically
+- Network survives peer restarts
+- No peer dependencies (all peer-controller, not peer-peer-critical)
+- Temporary disconnection acceptable
+
+**Connectivity validation**:
+- Test zerotier before depending on it
+- Validate NAT traversal works
+- Firewall configuration documented
+- Troubleshooting procedures prepared
+
+**Alternative approaches**:
+- Tailscale as alternative overlay network
+- Direct WireGuard if needed
+- SSH port forwarding as fallback
+- Can operate without overlay network initially
+
+**Monitoring**:
+- Periodic connectivity checks
+- Log zerotier status
+- Alert on prolonged disconnection
+- Dashboard for network state (future enhancement)
+
+### Status
+
+**Not started** - Phase 1 introduces zerotier
+
+### References
+
+- [Usage model](usage-model/) - UC-006: Overlay network use case
+- [System constraints](system-constraints/) - SC-009: Network constraints
+
+## R-009: Multi-host synchronization failures
+
+### Description
+
+Service instances spanning multiple hosts could have inconsistent configuration or deployment timing issues.
+
+### Risk factors
+
+- No atomic multi-host deployment
+- Configuration drift if hosts updated separately
+- Role assignment errors
+- Partial deployment failures
+- Timing dependencies between roles
+
+### Likelihood
+
+**Low-Medium** - Clan-core handles coordination, but complexity remains.
+
+### Impact
+
+**Medium** - Service malfunction but individual hosts remain operational.
+
+### Affected phases
+
+- Phase 1: VPS deployment (first multi-host service - zerotier)
+- Phases 2-5: Additional hosts joining services
+- Post-migration: Ongoing coordination
+
+### Mitigation strategies
+
+**Deployment order discipline**:
+- Deploy controller role first (establishes service)
+- Deploy dependent roles after controller operational
+- Validate each deployment before next
+- Document deployment order per service
+
+**Configuration validation**:
+- Use nix flake check to validate configuration
+- Test service definitions before deployment
+- Verify role assignments correct
+- Check tag-based assignments match expectations
+
+**Idempotent deployment**:
+- Re-running deployment safe (clan-core property)
+- Can re-deploy host without affecting others
+- Incremental convergence to desired state
+- No harm from repeated deployment
+
+**Health checks**:
+- Validate service operational after each deployment
+- Test inter-host communication
+- Verify role-appropriate behavior
+- Document expected state per role
+
+**Rollback strategy**:
+- Each host independently rollback-able
+- Service instance configuration in git (revertable)
+- Can remove host from service instance if problematic
+- No cascading failures from single host rollback
+
+**Graceful failure**:
+- Service degradation acceptable vs. all-or-nothing
+- Hosts functional even if coordination fails
+- Can re-deploy to fix synchronization
+- Manual coordination as fallback
+
+### Status
+
+**Not started** - Phase 1 begins multi-host coordination
+
+### References
+
+- [Usage model](usage-model/) - UC-004: Multi-host services
+- [Domain model](../context/domain-model/) - Clan service instances
+
+## R-010: Learning curve for dendritic + clan patterns
+
+### Description
+
+Mastering new patterns requires time investment and could lead to suboptimal early implementations.
+
+### Risk factors
+
+- Two new patterns simultaneously
+- Limited documentation for combination
+- No mentors or existing team knowledge
+- Trial-and-error learning
+- Refactoring needs as understanding deepens
+
+### Likelihood
+
+**High** - Learning curve is certain for new patterns.
+
+### Impact
+
+**Low-Medium** - Time investment and potential rework, but not blocking.
+
+### Affected phases
+
+- Phase 0: Validation (steepest learning)
+- All phases: Ongoing learning and refinement
+- Post-migration: Consolidation and optimization
+
+### Mitigation strategies
+
+**Structured learning**:
+- Phase 0 dedicated to experimentation
+- Document learnings immediately
+- Create reference examples
+- Build pattern library
+
+**Iterative refinement**:
+- Accept early implementations may be suboptimal
+- Plan for refactoring as understanding grows
+- Incremental improvement over perfection
+- Learning investment pays off long-term
+
+**Documentation discipline**:
+- Document patterns as discovered
+- Capture rationale for decisions
+- Create examples for future reference
+- AMDiRE documentation captures architecture
+
+**Community engagement**:
+- Ask questions in dendritic/clan channels
+- Share findings publicly
+- Contribute documentation improvements
+- Learn from others' experience
+
+**Time allocation**:
+- Budget learning time in migration schedule
+- Don't rush early phases
+- Allow experimentation time
+- Patience with learning process
+
+**Quality over speed**:
+- Thorough understanding > rapid migration
+- Deep learning prevents future issues
+- Investment in learning reduces future rework
+- Build confidence through mastery
+
+### Status
+
+**Not started** - Phase 0 begins learning process
+
+### References
+
+- [Goals](../context/goals-and-objectives/) - G-S03: Reasonable time investment
+- [Context: Project scope](../context/project-scope/) - Migration rationale
+
+## Risk summary matrix
+
+| Risk | Likelihood | Impact | Phase | Priority |
+|------|-----------|--------|-------|----------|
+| R-001: Integration complexity | Medium | High | P0 | Critical |
+| R-002: VPS costs | High | Medium | P1 | Medium |
+| R-003: Workflow breakage | High | Variable | P2-5 | High |
+| R-004: Stibnite migration | Medium | Critical | P5 | Critical |
+| R-005: Secrets migration | Medium | High | P1-5 | High |
+| R-006: Dependency breakage | High | Medium | All | Medium |
+| R-007: Architecture incompatibility | Low-Medium | Very High | P0 | Critical |
+| R-008: Network issues | Medium | Low-Medium | P1+ | Low |
+| R-009: Multi-host sync | Low-Medium | Medium | P1+ | Low |
+| R-010: Learning curve | High | Low-Medium | All | Low |
+
+## Risk response strategy
+
+### Critical risks (must address proactively)
+
+- **R-001, R-007**: Phase 0 validation exists specifically to address
+- **R-004**: Migration order designed to minimize (stibnite last)
+
+### High priority risks (active mitigation)
+
+- **R-003**: Careful validation, rollback procedures, migration order
+- **R-005**: Hybrid approach, incremental migration
+
+### Medium priority risks (monitoring)
+
+- **R-002**: Cost-benefit analysis, automation
+- **R-006**: Input locking, conservative updates
+
+### Low priority risks (accept with awareness)
+
+- **R-008, R-009**: Graceful degradation, can operate without
+- **R-010**: Time allocation, documentation
+
+## References
+
+**Context layer**:
+- [Project scope](../context/project-scope/) - Migration strategy and risk management
+- [Goals and objectives](../context/goals-and-objectives/) - Risk tolerance considerations
+- [Stakeholders](../context/stakeholders/) - Risk decision authority
+
+**Requirements**:
+- [Usage model](usage-model/) - Use cases affected by risks
+- [Quality requirements](quality-requirements/) - Quality attributes at risk
+- [Deployment requirements](deployment-requirements/) - Deployment failure risks
+
+**Migration planning** (internal):
+- docs/notes/clan/integration-plan.md - Complete migration strategy
+- docs/notes/clan/phase-0-validation.md - R-001, R-007 mitigation
+- docs/notes/clan/migration-assessment.md - Per-host risk assessment
