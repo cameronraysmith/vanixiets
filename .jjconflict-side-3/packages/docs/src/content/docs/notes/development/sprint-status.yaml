@@ -31,8 +31,9 @@
 #
 # MIGRATION-SPECIFIC NOTES:
 # =========================
-# - This is a progressive rollout infrastructure migration with 6 phases
-# - Each phase includes: implementation (3-7 days) + stability validation (7-14 days)
+# - This is a progressive rollout infrastructure migration with 6 phases (Phase 0-5)
+# - Phase 0 includes INFRASTRUCTURE DEPLOYMENT (Hetzner + GCP VMs) in test-clan
+# - Each phase includes: implementation + stability validation (1-2 weeks)
 # - Stories within phases are largely sequential, not parallelizable
 # - Each phase must reach stability gate before next phase begins
 # - Phase 0 has a GO/NO-GO decision gate that determines entire migration approach
@@ -40,7 +41,8 @@
 #
 # STABILITY GATES:
 # ================
-# - Epic 1 (Story 1.6): GO/CONDITIONAL GO/NO-GO decision determines entire approach
+# - Epic 1 (Story 1.12): GO/CONDITIONAL GO/NO-GO decision determines entire approach
+# - Epic 1 (Story 1.10): Infrastructure stable 1 week minimum before Phase 1
 # - Epic 2 (Story 2.6): cinnabar stable 1-2 weeks → proceed to blackphos
 # - Epic 3 (Story 3.5): blackphos stable 1-2 weeks → proceed to rosegold
 # - Epic 4 (Story 4.3): rosegold stable 1-2 weeks → proceed to argentum
@@ -58,14 +60,20 @@ tracking_system: file-system
 story_location: "{project-root}/docs/notes/development/work-items"
 
 development_status:
-  # Epic 1: Architectural Validation (Phase 0 - test-clan)
+  # Epic 1: Architectural Validation + Infrastructure Deployment (Phase 0 - test-clan)
   epic-1: backlog
   1-1-prepare-existing-test-clan-repository-for-validation: ready-for-dev
   1-2-implement-dendritic-flake-parts-pattern-in-test-clan: backlog
   1-3-configure-clan-inventory-and-service-instances-for-test-vm: backlog
-  1-4-test-clan-vars-generation-and-validate-integration-points: backlog
-  1-5-document-integration-findings-and-extract-patterns: backlog
-  1-6-execute-go-no-go-decision-framework-and-document-outcome: backlog
+  1-4-create-hetzner-terraform-config-and-host-modules: drafted
+  1-5-deploy-hetzner-vm-and-validate-stack: drafted
+  1-6-validate-clan-secrets-vars-on-hetzner: drafted
+  1-7-create-gcp-terraform-config-and-host-modules: drafted
+  1-8-deploy-gcp-vm-and-validate-multi-cloud: drafted
+  1-9-test-multi-machine-coordination: drafted
+  1-10-monitor-stability-for-one-week: drafted
+  1-11-document-integration-findings-and-patterns: drafted
+  1-12-execute-go-no-go-decision-framework: drafted
   epic-1-retrospective: optional
 
   # Epic 2: VPS Infrastructure Foundation (Phase 1 - cinnabar)
