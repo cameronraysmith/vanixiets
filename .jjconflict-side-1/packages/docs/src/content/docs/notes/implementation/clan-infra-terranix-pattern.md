@@ -1,4 +1,6 @@
-# Clan-infra terranix pattern extraction
+---
+title: Clan-infra terranix pattern extraction
+---
 
 Complete guide for implementing terranix with flake-parts in test-clan, based on clan-infra's proven patterns.
 
