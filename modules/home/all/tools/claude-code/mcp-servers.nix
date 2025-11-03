@@ -243,14 +243,32 @@ in
         };
       };
     };
+
+    # Google Cloud: GCP operations via gcloud CLI
+    mcp-gcloud = {
+      mode = "0400";
+      path = "${home}/.mcp/gcloud.json";
+      content = builtins.toJSON {
+        mcpServers = {
+          gcloud = {
+            command = "npx";
+            args = [
+              "-y"
+              "@google-cloud/gcloud-mcp"
+            ];
+          };
+        };
+      };
+    };
   };
 
   # Runtime dependencies for MCP servers
   home.packages = with pkgs; [
     nodejs_22
-    # For npx: firecrawl, huggingface, chrome, cloudflare, historian, playwright
+    # For npx: firecrawl, huggingface, chrome, cloudflare, historian, playwright, gcloud
     # Also provides node binary for mcp-prompt-server
     uv # For uvx: duckdb, nixos
     docker # For terraform container (requires OrbStack, Docker Desktop, or Colima on macOS)
+    # google-cloud-sdk installed in modules/home/all/terminal/default.nix (required for gcloud MCP)
   ];
 }
