@@ -1,0 +1,27 @@
+# .gitleaksignore - Fingerprints of false positives safe to ignore
+# Format: <commit>:<file>:<rule>:<line>
+# These are age public keys and sops examples used in documentation and scripts (safe to commit)
+
+# Age public key example in unified crypto infrastructure documentation
+# Old commit from pre-rebase history (still reachable via reflog/other branches)
+9931c4961ea1cb1cdcc543c74117feb1f197f903:docs/notes/secrets/unified-crypto-infrastructure-implementation.md:private-key:194
+# New commit after rebase
+78181874cf1c30286bb650f56918d9674eebb2a4:docs/notes/secrets/unified-crypto-infrastructure-implementation.md:private-key:194
+
+# Age public key placeholder in sops update script
+# Old commit from pre-rebase history
+dd9c497841a75ebbbdbf8edd92cbc56092916601:scripts/sops/update-sops-yaml.sh:generic-api-key:17
+# New commit after rebase
+c02cc25215de378e9624802b0841cbaef8fba425:scripts/sops/update-sops-yaml.sh:generic-api-key:17
+
+# Age public key in CI/CD setup documentation
+# Old commit from pre-rebase history
+62d0d157e94bae7da9e8e530d87534a4170c9311:packages/docs/src/content/docs/guides/ci-cd-setup.md:generic-api-key:54
+# New commit after rebase
+c2c450b11490e7dbc370d6b0ccfec1ee40a9fbf3:packages/docs/src/content/docs/guides/ci-cd-setup.md:generic-api-key:54
+
+# Age public key in new user/host documentation
+# Old commit from pre-rebase history
+41a9796f41373e73b3d801f227de07c6e17f4faf:docs/new-user-host.md:generic-api-key:111
+# New commit after rebase
+9a2beebd1ca0519ba7f3ae0c06628f8717387089:docs/new-user-host.md:generic-api-key:111
