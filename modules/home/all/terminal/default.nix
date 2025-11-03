@@ -107,6 +107,7 @@ in
       (google-cloud-sdk.withExtraComponents [
         google-cloud-sdk.components.gke-gcloud-auth-plugin
       ])
+      hcloud
       holos # from nixpkgs (custom version available at .#debug.holos)
       # kcl
       kind
