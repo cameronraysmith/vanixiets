@@ -133,13 +133,20 @@ up after their content is either formalized or determined to be no longer needed
 
 ### Markdown formatting conventions
 
-Documentation systems differ in how they handle markdown structure:
+Some documentation generators like Astro Starlight require markdown files to use YAML frontmatter with a title like
+```yaml
+---
+title: "Title: subtitle"
+---
+```
+instead of the `# Title: subtitle` format.
+As such it's best to primarily use this convention when authoring markdown.
+Note that quotes are required in YAML when the title contains special characters like colons; simple titles without special characters don't require quotes.
+Not all markdown documents require subtitles—the subtitle format is shown here for completeness to demonstrate proper quoting.
 
-Frontmatter-driven systems (Astro Starlight, Quarto, Pandoc): The document title comes from YAML frontmatter, not a markdown header. Begin content with second-level headers (`##`), not top-level (`#`), to avoid duplicate titles in rendered output.
-
-Plain markdown systems (GitHub, static markdown): Use top-level headers (`#`) as the document title when no frontmatter title exists.
-
-When working in a documentation directory, check for frontmatter in existing files to determine which convention applies. If files contain `title:` in YAML frontmatter, use `##` to start content sections.
+Plain markdown systems (GitHub, static markdown) also support frontmatter titles, making this convention broadly compatible.
+When working in a documentation directory, check for frontmatter in existing files to confirm the convention in use.
+If files contain `title:` in YAML frontmatter, use `##` to start content sections to avoid duplicate titles in rendered output.
 
 ### Key principles
 
