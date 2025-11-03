@@ -1,53 +1,55 @@
-# Workflow Status Template
-# This tracks progress through phases 1-3 of the BMM methodology
-# Phase 4 (Implementation) is tracked separately in sprint-status.yaml
-
-# generated: 2025-10-30
-# project: infra
-# project_type: software
-# project_level: 3
-# field_type: brownfield
-# workflow_path: brownfield-level-3.yaml
-
-# STATUS DEFINITIONS:
-# ==================
-# Initial Status (before completion):
-#   - required: Must be completed to progress
-#   - optional: Can be completed but not required
-#   - recommended: Strongly suggested but not required
-#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
-#
-# Completion Status:
-#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
-#   - skipped: Optional/conditional workflow that was skipped
-
-generated: "2025-10-30"
-project: "infra"
-project_type: "software"
-project_level: "3"
-field_type: "brownfield"
-workflow_path: "brownfield-level-3.yaml"
-
-workflow_status:
-  # Prerequisite: Documentation (conditional - if_undocumented)
-  document-project: skipped  # Existing docs comprehensive, will validate/polish separately
-
-  # Phase 1: Analysis
-  brainstorm-project: skipped  # Analysis done manually in docs/notes/clan/integration-plan.md
-  research: docs/notes/clan/integration-plan.md  # Comprehensive research documented
-  product-brief: skipped  # Context captured in integration-plan.md
-
-  # Phase 2: Planning
-  prd: docs/notes/clan/integration-plan.md  # Planning documented comprehensively
-  validate-prd: skipped
-  create-design: skipped  # No UI work (infrastructure project)
-
-  # Phase 3: Solutioning
-  architecture-review: docs/notes/clan/integration-plan.md  # Current architecture documented
-  integration-planning: docs/notes/clan/integration-plan.md  # Integration strategy documented
-  create-architecture: required  # In progress - Phase 0 validation pending
-  validate-architecture: optional
-  solutioning-gate-check: required  # Pending after architecture finalized
-
-  # Phase 4: Implementation
-  sprint-planning: required  # Pending after solutioning gate check passes
+ # Workflow Status Template
+ # This tracks progress through phases 1-3 of the BMM methodology
+ # Phase 4 (Implementation) is tracked separately in sprint-status.yaml
+ 
+ # generated: 2025-10-30
+ # project: infra
+ # project_type: software
+ # project_level: 3
+ # field_type: brownfield
+ # workflow_path: brownfield-level-3.yaml
+ 
+ # STATUS DEFINITIONS:
+ # ==================
+ # Initial Status (before completion):
+ #   - required: Must be completed to progress
+ #   - optional: Can be completed but not required
+ #   - recommended: Strongly suggested but not required
+ #   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+ #
+ # Completion Status:
+ #   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+ #   - skipped: Optional/conditional workflow that was skipped
+ 
+ generated: "2025-10-30"
+ project: "infra"
+ project_type: "software"
+ project_level: "3"
+ field_type: "brownfield"
+ workflow_path: "brownfield-level-3.yaml"
+ 
+ workflow_status:
+   # Prerequisite: Documentation (conditional - if_undocumented)
+   document-project: skipped  # Existing docs comprehensive, will validate/polish separately
+ 
+   # Phase 1: Analysis
+   brainstorm-project: skipped  # Analysis done manually in docs/notes/clan/integration-plan.md
+   research: docs/notes/clan/integration-plan.md  # Comprehensive research documented
+-  product-brief: skipped  # Context captured in integration-plan.md
++  product-brief: required  # RESET: Generate BMAD product-brief from integration-plan.md
+ 
+   # Phase 2: Planning
+-  prd: docs/notes/clan/integration-plan.md  # Planning documented comprehensively
++  prd: required  # RESET: Generate BMAD PRD from product-brief + integration docs
+   validate-prd: skipped
+   create-design: skipped  # No UI work (infrastructure project)
+ 
+   # Phase 3: Solutioning
+   architecture-review: docs/notes/clan/integration-plan.md  # Current architecture documented
+   integration-planning: docs/notes/clan/integration-plan.md  # Integration strategy documented
+   create-architecture: required  # In progress - Phase 0 validation pending
+   validate-architecture: optional
+   solutioning-gate-check: required  # Pending after architecture finalized
+ 
+   # Phase 4: Implementation
+   sprint-planning: required  # Pending after solutioning gate check passes
