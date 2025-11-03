@@ -1,4 +1,6 @@
-# Implementation Readiness Assessment Report
+---
+title: Implementation Readiness Assessment Report
+---
 
 **Date:** 2025-11-03
 **Project:** infra
