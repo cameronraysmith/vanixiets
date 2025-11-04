@@ -2,7 +2,7 @@
 title: "Story 1.5: Deploy Hetzner VM and validate infrastructure stack"
 ---
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -426,7 +426,7 @@ After this story completes:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/notes/development/work-items/1-5-deploy-hetzner-vm-and-validate-stack.context.xml
 
 ### Agent Model Used
 
