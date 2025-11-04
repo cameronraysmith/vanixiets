@@ -47,7 +47,32 @@
   </acceptanceCriteria>
 
   <artifacts>
-    <docs>{{docs_artifacts}}</docs>
+    <docs>
+      <doc>
+        <path>docs/notes/development/work-items/1-4-create-hetzner-terraform-config-and-host-modules.md</path>
+        <title>Story 1.4: Create Hetzner VM terraform configuration and host modules (DONE - APPROVED)</title>
+        <section>Dev Notes - Learnings from Previous Story</section>
+        <snippet>Story 1.4 successfully created all terraform/terranix configuration and host modules. Critical findings: cx43 VM (8 vCPU, 16GB RAM) at $9.99/month for performant testing; vars errors BEFORE clan vars generate are EXPECTED and CORRECT; specialArgs pattern fixes infinite recursion; /dev/sda device path per srvos convention; secrets (tf-passphrase, hetzner-api-token) configured via clan secrets.</snippet>
+      </doc>
+      <doc>
+        <path>docs/notes/development/work-items/1-4-create-hetzner-terraform-config-and-host-modules.md</path>
+        <title>Story 1.4: Test Results and Validation</title>
+        <section>Dev Agent Record - Completion Notes</section>
+        <snippet>All 13 acceptance criteria met with comprehensive evidence. Terraform config generates successfully (nix build .#terraform). Generated terraform.tf.json reviewed: hcloud provider with API token from data.external, hcloud_server.hetzner-vm (cx43, debian-12, fsn1), null_resource.install-hetzner-vm calling clan machines install. Disko evaluates correctly: device=/dev/sda, partitions=[ESP,luks], btrfs subvolumes: /root, /nix, /home.</snippet>
+      </doc>
+      <doc>
+        <path>docs/notes/development/epic-1-infrastructure-restructure-proposal.md</path>
+        <title>Epic 1: Infrastructure Deployment Restructure Proposal</title>
+        <section>Story 1.5: Deploy Hetzner VM and validate infrastructure stack</section>
+        <snippet>Progressive validation strategy: Hetzner deployment must succeed before GCP (Story 1.8). This story performs first real infrastructure deployment, validating terraform/terranix + clan + disko + NixOS stack end-to-end. HIGH RISK because it creates real infrastructure with costs. Expected workflow: terraform apply (2-5 min) → clan vars generate (1-2 min) → clan machines install (10-30 min) → validation (15-30 min).</snippet>
+      </doc>
+      <doc>
+        <path>docs/notes/implementation/clan-infra-terranix-pattern.md</path>
+        <title>Clan-infra terranix pattern extraction</title>
+        <section>State encryption with OpenTofu, Clan secrets in terraform, Machine deployment automation</section>
+        <snippet>Proven patterns from clan-infra: OpenTofu state encryption via TF_ENCRYPTION with PBKDF2+AES-GCM using passphrase from clan secrets; data.external pattern fetches secrets at terraform runtime via clan secrets get (no plaintext in git/state); null_resource provisioner with local-exec runs clan machines install for automated NixOS deployment.</snippet>
+      </doc>
+    </docs>
     <code>{{code_artifacts}}</code>
     <dependencies>{{dependencies_artifacts}}</dependencies>
   </artifacts>
