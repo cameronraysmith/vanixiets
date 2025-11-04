@@ -72,8 +72,8 @@ development_status:
   1-3-configure-clan-inventory-and-service-instances-for-test-vm: done
   # Story 1.4: APPROVED - Review corrected, cx43 at $9.99/month per user direction, all ACs satisfied
   1-4-create-hetzner-terraform-config-and-host-modules: done
-  # Story 1.5: READY - Context generated with Story 1.4 learnings, terraform/host config references, deployment validation tests
-  1-5-deploy-hetzner-vm-and-validate-stack: ready-for-dev
+  # Story 1.5: IN PROGRESS - Deploying Hetzner VM and validating infrastructure stack
+  1-5-deploy-hetzner-vm-and-validate-stack: in-progress
   1-6-validate-clan-secrets-vars-on-hetzner: drafted
   # Story 1.7: REQUIRES MANUAL SECRET SETUP - agent must pause for user to configure GCP service account JSON
   1-7-create-gcp-terraform-config-and-host-modules: drafted
