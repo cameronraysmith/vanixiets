@@ -219,8 +219,8 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) via BMAD dev-story workflow
 - `nix develop -c clan --help`: Clan CLI working in dev shell
 - Git working tree: CLEAN (5 atomic commits on phase-0-validation branch)
 
-**Next steps recommendation**: SKIP Story 1.2 (dendritic pattern) and proceed directly to Story 1.4 (Hetzner terraform config).
-Reasoning: Infrastructure deployment is primary objective, dendritic pattern can be refactored later if desired after infrastructure works.
+**Next steps recommendation**: SKIP Story 1.2 (dendritic pattern) and proceed to Story 1.3 (clan inventory), then Story 1.4 (Hetzner terraform config).
+Reasoning: Infrastructure deployment is primary objective, dendritic pattern can be refactored later if desired after infrastructure works. Story 1.3 is a required prerequisite for Story 1.4 (terraform needs inventory).
 
 ### File List
 
