@@ -73,7 +73,48 @@
         <snippet>Proven patterns from clan-infra: OpenTofu state encryption via TF_ENCRYPTION with PBKDF2+AES-GCM using passphrase from clan secrets; data.external pattern fetches secrets at terraform runtime via clan secrets get (no plaintext in git/state); null_resource provisioner with local-exec runs clan machines install for automated NixOS deployment.</snippet>
       </doc>
     </docs>
-    <code>{{code_artifacts}}</code>
+    <code>
+      <!-- Terraform/Terranix Configuration (from test-clan repository) -->
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/terranix/base.nix</path>
+        <kind>terranix-module</kind>
+        <symbol>provider configuration and secrets integration</symbol>
+        <lines>1-31</lines>
+        <reason>Base terraform provider configuration with Hetzner Cloud API token fetched via clan secrets data.external pattern. Required for terraform authentication. Implements OpenTofu state encryption variable passphrase.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/terranix/hetzner.nix</path>
+        <kind>terranix-module</kind>
+        <symbol>hcloud_server.hetzner-vm, null_resource.install-hetzner-vm</symbol>
+        <lines>1-42</lines>
+        <reason>Hetzner Cloud server resource definition (cx43, fsn1, debian-12). Generates ED25519 SSH deployment key, registers with Hetzner, provisions VM. null_resource provisioner calls clan machines install for NixOS deployment. This is the core terraform configuration that Story 1.5 will execute via terraform apply.</reason>
+      </artifact>
+
+      <!-- Host Configuration (from test-clan repository) -->
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/hosts/hetzner-vm/default.nix</path>
+        <kind>nixos-module</kind>
+        <symbol>hetzner-vm NixOS host configuration</symbol>
+        <lines>1-38</lines>
+        <reason>NixOS host configuration for hetzner-vm with srvos hardening (server + hardware-hetzner-cloud), systemd-networkd DHCP configuration, firewall. Base nix-settings and disko imports. This configuration will be deployed during clan machines install in AC #6.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/hosts/hetzner-vm/disko.nix</path>
+        <kind>nixos-module</kind>
+        <symbol>disko LUKS partition configuration with clan vars generator</symbol>
+        <lines>1-79</lines>
+        <reason>Declarative disk partitioning with LUKS encryption. Clan vars generator creates 64-char LUKS passphrase via pwgen. GPT partitions: EFI boot (512MB) + LUKS root. Btrfs subvolumes: /root, /nix, /home with zstd compression. Device path /dev/sda validated in Story 1.4. Critical for AC #7-8 validation.</reason>
+      </artifact>
+
+      <!-- Clan Integration (from test-clan repository) -->
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/flake-parts/clan.nix</path>
+        <kind>flake-module</kind>
+        <symbol>clan inventory, terranix integration, specialArgs</symbol>
+        <lines>19-20, 127-149</lines>
+        <reason>Clan inventory machines configuration (hetzner-vm, gcp-vm), service instances (emergency-access, zerotier controller). Terranix integration with terraformWrapper.prefixText for state encryption (TF_ENCRYPTION env var). specialArgs pattern fixes infinite recursion per Story 1.4. Critical context for understanding terraform and clan integration.</reason>
+      </artifact>
+    </code>
     <dependencies>{{dependencies_artifacts}}</dependencies>
   </artifacts>
 
