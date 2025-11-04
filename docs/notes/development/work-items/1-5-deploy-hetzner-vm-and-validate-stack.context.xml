@@ -115,11 +115,76 @@
         <reason>Clan inventory machines configuration (hetzner-vm, gcp-vm), service instances (emergency-access, zerotier controller). Terranix integration with terraformWrapper.prefixText for state encryption (TF_ENCRYPTION env var). specialArgs pattern fixes infinite recursion per Story 1.4. Critical context for understanding terraform and clan integration.</reason>
       </artifact>
     </code>
-    <dependencies>{{dependencies_artifacts}}</dependencies>
+    <dependencies>
+      <nix>
+        <input name="nixpkgs" source="github:NixOS/nixpkgs/nixos-unstable" />
+        <input name="flake-parts" source="github:hercules-ci/flake-parts" />
+        <input name="clan-core" source="git+https://git.clan.lol/clan/clan-core" />
+        <input name="terranix" source="github:terranix/terranix" />
+        <input name="disko" source="github:nix-community/disko" />
+        <input name="srvos" source="github:nix-community/srvos" />
+      </nix>
+      <terraform>
+        <provider name="hcloud" source="hetznercloud/hcloud" description="Hetzner Cloud provider for VM provisioning" />
+        <provider name="external" source="hashicorp/external" description="Executes clan secrets get for API token retrieval" />
+        <provider name="tls" source="hashicorp/tls" description="Generates ED25519 SSH deployment key" />
+        <provider name="null" source="hashicorp/null" description="Provisions NixOS via clan machines install" />
+        <provider name="local" source="hashicorp/local" description="Stores SSH private key with 0600 permissions" />
+      </terraform>
+      <runtime>
+        <tool name="opentofu" description="Terraform-compatible tool with native state encryption" />
+        <tool name="clan" description="Clan CLI for secrets management and machine installation" />
+        <tool name="jq" description="JSON processor for data.external script output" />
+        <tool name="pwgen" description="Password generator for 64-char LUKS passphrase" />
+      </runtime>
+    </dependencies>
   </artifacts>
 
-  <constraints>{{constraints}}</constraints>
-  <interfaces>{{interfaces}}</interfaces>
+  <constraints>
+    <constraint>All terraform commands MUST run inside nix develop shell (not nix run wrapper) per Story 1.4 implementation</constraint>
+    <constraint>Vars errors BEFORE clan vars generate are EXPECTED and CORRECT - do not attempt to fix</constraint>
+    <constraint>Secrets (tf-passphrase, hetzner-api-token) MUST be configured via clan secrets before terraform apply</constraint>
+    <constraint>terraform apply will start billing at $9.99/month for cx43 VM - budget approved for ephemeral testing</constraint>
+    <constraint>Device path /dev/sda validated in Story 1.4 per srvos hardware-hetzner-cloud convention</constraint>
+    <constraint>Expected timing: terraform apply (2-5 min), clan vars generate (1-2 min), clan install (10-30 min), validation (15-30 min)</constraint>
+    <constraint>This is HIGH RISK story - actual infrastructure deployment with irreversible costs</constraint>
+    <constraint>Progressive validation: Hetzner must succeed before GCP (Story 1.8)</constraint>
+    <constraint>Deployment workflow: cd ~/projects/nix-workspace/test-clan, nix develop, terraform commands</constraint>
+    <constraint>specialArgs pattern (clan.specialArgs = inherit inputs) fixes infinite recursion - required for module evaluation</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Hetzner Cloud API</name>
+      <kind>REST API</kind>
+      <signature>Authentication via API token from clan secrets (data.external pattern)</signature>
+      <path>modules/terranix/base.nix:16-27, modules/terranix/hetzner.nix</path>
+    </interface>
+    <interface>
+      <name>Clan secrets CLI</name>
+      <kind>command-line</kind>
+      <signature>clan secrets get &lt;secret-name&gt; - fetches encrypted secret at runtime</signature>
+      <path>modules/terranix/base.nix:22 (jq wrapper calling clan secrets get)</path>
+    </interface>
+    <interface>
+      <name>Clan machines install</name>
+      <kind>command-line</kind>
+      <signature>clan machines install &lt;machine-name&gt; --target-host root@&lt;ip&gt; --update-hardware-config nixos-facter --yes</signature>
+      <path>modules/terranix/hetzner.nix:39 (null_resource provisioner)</path>
+    </interface>
+    <interface>
+      <name>Clan vars generators</name>
+      <kind>nix-module</kind>
+      <signature>clan.core.vars.generators.&lt;name&gt;.files.&lt;file&gt;.neededFor = "partitioning"</signature>
+      <path>modules/hosts/hetzner-vm/disko.nix:4-13 (luks-password generator)</path>
+    </interface>
+    <interface>
+      <name>Terraform state encryption</name>
+      <kind>environment-variable</kind>
+      <signature>TF_ENCRYPTION with PBKDF2 key provider and AES-GCM encryption method</signature>
+      <path>modules/flake-parts/clan.nix:127-149 (terraformWrapper.prefixText)</path>
+    </interface>
+  </interfaces>
   <tests>
     <standards>{{test_standards}}</standards>
     <locations>{{test_locations}}</locations>
