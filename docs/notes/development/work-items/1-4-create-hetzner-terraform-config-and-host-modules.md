@@ -2,7 +2,7 @@
 title: "Story 1.4: Create Hetzner VM terraform configuration and host modules"
 ---
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -295,7 +295,7 @@ Budget ~€12-15 for 2-3 weeks of testing (acceptable for validation).
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/notes/development/work-items/1-4-create-hetzner-terraform-config-and-host-modules.context.xml
 
 ### Agent Model Used
 

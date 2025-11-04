@@ -71,7 +71,7 @@ development_status:
   # Story 1.3: COMPLETE - Inventory configured, ready for Story 1.4
   1-3-configure-clan-inventory-and-service-instances-for-test-vm: done
   # Story 1.4: REQUIRES MANUAL SECRET SETUP - agent must pause for user to configure Hetzner API token
-  1-4-create-hetzner-terraform-config-and-host-modules: drafted
+  1-4-create-hetzner-terraform-config-and-host-modules: ready-for-dev
   1-5-deploy-hetzner-vm-and-validate-stack: drafted
   1-6-validate-clan-secrets-vars-on-hetzner: drafted
   # Story 1.7: REQUIRES MANUAL SECRET SETUP - agent must pause for user to configure GCP service account JSON
