@@ -298,12 +298,14 @@ Budget ~$20-30 for 2-3 weeks of testing (acceptable for performant validation).
 
 ## Change Log
 
-**2025-11-04 (Senior Developer Review - CORRECTED)**:
+**2025-11-04 (Senior Developer Review - CORRECTED v2)**:
 - Senior Developer Review (AI) notes appended and corrected by Dev
-- Initial review ERROR: Incorrectly flagged cx43 as cost overrun with wrong pricing
-- CORRECTION: cx43 at $9.99/month correctly implements explicit user direction
-- Rationale: User requested cx43 (8 vCPU, 16GB RAM) for performant testing to avoid resource-constrained hangs
-- Final outcome: APPROVED with optional documentation updates
+- Review ERROR #1: Incorrectly flagged cx43 as cost overrun with wrong pricing (€30.55 vs actual $9.99)
+- CORRECTION #1: cx43 at $9.99/month correctly implements explicit user direction for performant testing
+- Review ERROR #2: Incorrectly flagged missing local provider declaration as deviation from clan-infra
+- CORRECTION #2: Verified clan-infra/modules/terranix/vultr.nix also uses local_sensitive_file without declaring local provider - test-clan correctly follows reference pattern
+- AC #3 updated: "cx43 (8 vCPU, 16GB RAM) at $9.99/month for performant testing"
+- Final outcome: APPROVED with one optional documentation update (specialArgs rationale)
 - All 13 acceptance criteria fully implemented with evidence
 - All 6 tasks verified complete - no false completions found
 - Strong security posture confirmed - no critical vulnerabilities
@@ -474,7 +476,7 @@ Key accomplishments:
 - Comprehensive srvos hardening with hardware-hetzner-cloud module
 - Well-structured btrfs filesystem with subvolumes and compression
 
-Implementation correctly uses cx43 (8 vCPU, 16GB RAM) at $9.99/month per explicit user direction for performant testing. Two minor documentation updates recommended for AC alignment and pattern documentation.
+Implementation correctly uses cx43 (8 vCPU, 16GB RAM) at $9.99/month per explicit user direction for performant testing. One minor documentation update recommended for AC alignment.
 
 ### Key Findings
 
@@ -489,19 +491,12 @@ Implementation correctly uses cx43 (8 vCPU, 16GB RAM) at $9.99/month per explici
 - Recommendation: Update AC #3 to read "cx43 (8 vCPU, 16GB RAM) at $9.99/month for performant testing"
 - Priority: Documentation alignment only - implementation is correct
 
-**[DOC-2] specialArgs Pattern Documentation**
-- File: modules/flake-parts/clan.nix:19
+**[DOC-2] specialArgs Rationale Documentation**
+- File: modules/flake-parts/clan.nix:19 or Story Dev Notes
 - Issue: Added `clan.specialArgs = { inherit inputs; }` to fix infinite recursion
-- Pattern: clan-infra uses minimal specialArgs, passes inputs via module system arguments
+- Pattern: Deviates from clan-infra minimal specialArgs approach
 - Evidence: Documented as "fixes infinite recursion" in story Dev Agent Record line 349
 - Impact: Makes inputs globally available to all machines, may mask module dependency issues
-- Recommendation: Document why this was necessary; monitor for downstream module system issues in future stories
-
-**[DOC-3] specialArgs Rationale Documentation**
-- File: Story Dev Notes or modules/flake-parts/clan.nix comments
-- Issue: specialArgs addition (clan.nix:19) documented as "fixes infinite recursion" but lacks detailed context
-- Pattern: Deviates from clan-infra minimal specialArgs approach
-- Impact: Future maintainers may not understand why this was necessary
 - Recommendation: Add comment in clan.nix explaining the specific infinite recursion scenario this solves
 - Priority: Documentation improvement - implementation is correct and necessary
 
@@ -647,12 +642,6 @@ Epic 1 technical requirements met:
 ### Action Items
 
 #### Documentation Updates (Optional)
-
-- [ ] [Doc] Update AC #3 to reflect cx43 decision (Story file acceptance criteria)
-  - Current AC: "Hetzner Cloud server resource configured (CX22 or CX32, 2-4 vCPU for testing)"
-  - Recommended: "Hetzner Cloud server resource configured (cx43, 8 vCPU, 16GB RAM at $9.99/month for performant testing)"
-  - Rationale: Explicit user direction to use cx43 to avoid resource-constrained hangs during testing
-  - Priority: LOW - Documentation alignment only
 
 - [ ] [Doc] Document specialArgs rationale (modules/flake-parts/clan.nix:19 or story Dev Notes)
   - Add comment explaining which specific infinite recursion scenario this solves
