@@ -272,7 +272,7 @@ in
       set-environment -g COLORTERM "truecolor"
 
       # Modern tmux features
-      set -g focus-events on
+      set -g focus-events off
       setw -g aggressive-resize on
 
       # User experience settings
