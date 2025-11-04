@@ -1,0 +1,62 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>5</storyId>
+    <title>Deploy Hetzner VM and validate infrastructure stack</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-04</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/notes/development/work-items/1-5-deploy-hetzner-vm-and-validate-stack.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a system administrator</asA>
+    <iWant>to provision and deploy hetzner-vm to Hetzner Cloud</iWant>
+    <soThat>I can validate the complete infrastructure stack (terraform + clan + disko + NixOS) works end-to-end</soThat>
+    <tasks>
+- Navigate to test-clan repository and enter nix develop shell
+- Initialize terraform (AC: #1)
+- Review terraform plan (AC: #2)
+- Provision Hetzner VM (AC: #3-4)
+- Generate clan vars for hetzner-vm (AC: #5)
+- Install NixOS via clan (AC: #6-7-8)
+- Validate post-installation SSH access (AC: #9)
+- Validate zerotier controller (AC: #10)
+- Validate clan vars deployment (AC: #11)
+- Validate btrfs filesystem structure (AC: #7)
+- Check system logs for errors (AC: #12)
+- Test system reboot (AC: #13)
+- Document deployment experience
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. Terraform initialized from test-clan repository: enter nix develop shell, then `terraform init`
+2. Terraform plan reviewed and validated: `terraform plan` shows cx43 server creation, SSH key, hcloud provider
+3. Hetzner VM (cx43, 8 vCPU, 16GB RAM at $9.99/month) provisioned via terraform: `terraform apply`
+4. VM accessible via SSH with terraform-generated deployment key
+5. Clan vars generated for hetzner-vm: `clan vars generate hetzner-vm`
+6. NixOS installed via clan: `clan machines install hetzner-vm --target-host root@<ip> --update-hardware-config nixos-facter --yes`
+7. System boots successfully with LUKS encryption (btrfs subvolumes: /root, /nix, /home)
+8. Device path validated: /dev/sda confirmed as boot device
+9. Post-installation SSH access works with clan-managed keys: `ssh root@<hetzner-ip>`
+10. Zerotier controller operational: `ssh root@<hetzner-ip> "zerotier-cli info"`
+11. Clan vars deployed correctly: `ssh root@<hetzner-ip> "ls -la /run/secrets/"`
+12. No critical errors in system logs: `ssh root@<hetzner-ip> "journalctl -p err --no-pager"`
+13. System survives reboot
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>{{docs_artifacts}}</docs>
+    <code>{{code_artifacts}}</code>
+    <dependencies>{{dependencies_artifacts}}</dependencies>
+  </artifacts>
+
+  <constraints>{{constraints}}</constraints>
+  <interfaces>{{interfaces}}</interfaces>
+  <tests>
+    <standards>{{test_standards}}</standards>
+    <locations>{{test_locations}}</locations>
+    <ideas>{{test_ideas}}</ideas>
+  </tests>
+</story-context>
