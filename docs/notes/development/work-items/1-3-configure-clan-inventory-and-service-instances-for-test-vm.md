@@ -1,6 +1,6 @@
 # Story 1.3: Configure clan inventory and service instances for test VMs
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -226,7 +226,7 @@ Story 1.3 MUST complete successfully before Story 1.4 can proceed.
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/notes/development/work-items/1-3-configure-clan-inventory-and-service-instances-for-test-vm.context.xml
 
 ### Agent Model Used
 
