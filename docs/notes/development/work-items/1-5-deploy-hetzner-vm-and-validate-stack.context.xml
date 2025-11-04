@@ -186,8 +186,28 @@
     </interface>
   </interfaces>
   <tests>
-    <standards>{{test_standards}}</standards>
-    <locations>{{test_locations}}</locations>
-    <ideas>{{test_ideas}}</ideas>
+    <standards>
+Story 1.5 is an infrastructure deployment story, not a code development story. Testing focuses on operational validation through manual verification commands documented in acceptance criteria and tasks. Standards: (1) Run terraform init/plan/apply in sequence, verify each succeeds before proceeding. (2) Run clan vars generate, verify secrets/facts created in sops/ directory. (3) Run clan machines install, monitor installation logs for errors. (4) Execute SSH validation commands on deployed VM. (5) Check systemd service status and journal logs. (6) Test system reboot and verify services restore. All validation is imperative shell commands, not automated test suites. Success criteria: all 13 acceptance criteria pass with documented evidence.
+    </standards>
+    <locations>
+      <location>~/projects/nix-workspace/test-clan (working directory for all deployment commands)</location>
+      <location>Story 1.5 task checklist (manual validation tracking)</location>
+      <location>Dev Notes documentation (record actual deployment experience)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC #1">Terraform initialization test: nix develop shell, terraform init, verify .terraform/ directory created with hcloud provider</idea>
+      <idea ac="AC #2">Terraform plan validation: terraform plan output shows cx43 server, SSH key resources, hcloud provider with API token fetch</idea>
+      <idea ac="AC #3-4">VM provisioning test: terraform apply creates Hetzner VM, capture IP, test SSH with deployment key</idea>
+      <idea ac="AC #5">Clan vars generation test: clan vars generate hetzner-vm, verify sops/machines/hetzner-vm/ contains secrets and facts</idea>
+      <idea ac="AC #6-7-8">NixOS installation test: clan machines install, monitor disko partitioning logs, verify /dev/sda device path, check btrfs subvolumes after installation</idea>
+      <idea ac="AC #9">Post-install SSH test: ssh root@hetzner-ip (without -i flag), verify clan-managed keys work</idea>
+      <idea ac="AC #10">Zerotier validation: ssh root@hetzner-ip "zerotier-cli info", verify controller role, capture network ID</idea>
+      <idea ac="AC #11">Secrets deployment test: ssh root@hetzner-ip "ls -la /run/secrets/", verify sshd keys, zerotier identity, proper permissions</idea>
+      <idea ac="AC #12">System logs check: ssh root@hetzner-ip "journalctl -p err --no-pager", investigate any critical errors</idea>
+      <idea ac="AC #13">Reboot stability test: ssh root@hetzner-ip "reboot", wait 2-3 min, verify SSH+zerotier+services restored</idea>
+      <idea ac="validation">Device path verification: compare disko.nix device="/dev/sda" with actual boot device via lsblk on deployed system</idea>
+      <idea ac="validation">Vars error confirmation: verify no vars errors AFTER clan vars generate (expected before, resolved after)</idea>
+      <idea ac="cost-tracking">Billing validation: check Hetzner Cloud console for cx43 VM billing start ($9.99/month), record actual costs</idea>
+    </ideas>
   </tests>
 </story-context>
