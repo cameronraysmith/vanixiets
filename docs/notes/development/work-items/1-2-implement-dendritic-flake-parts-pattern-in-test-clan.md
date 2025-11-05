@@ -641,7 +641,7 @@ This was correct - Story 1.4 established foundation, Story 1.5 validated complet
 
 ### Context Reference
 
-<!-- Path to story context XML will be added here by story-context workflow -->
+- docs/notes/development/work-items/1-2-implement-dendritic-flake-parts-pattern-in-test-clan.context.xml
 
 ### Agent Model Used
 
