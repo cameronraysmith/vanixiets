@@ -152,16 +152,301 @@ Document evaluation findings and architectural decisions in DENDRITIC-NOTES.md w
 </acceptanceCriteria>
 
   <artifacts>
-    <docs>{{docs_artifacts}}</docs>
-    <code>{{code_artifacts}}</code>
-    <dependencies>{{dependencies_artifacts}}</dependencies>
+    <docs>
+      <!-- Critical Previous Story Learnings -->
+      <doc>
+        <path>docs/notes/development/work-items/1-4-create-hetzner-terraform-config-and-host-modules.md</path>
+        <title>Story 1.4: Hetzner Terraform Configuration</title>
+        <section>specialArgs Pattern Rationale</section>
+        <snippet>Added clan.specialArgs = { inherit inputs; } to fix infinite recursion in module evaluation. Required for srvos imports: inputs.srvos.nixosModules.server. Deviation from clan-infra noted: clan-infra uses minimal pattern { inherit self; }. Question for Story 1.2: How does clan-infra import srvos without inputs in specialArgs?</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/notes/development/work-items/1-5-deploy-hetzner-vm-and-validate-stack.md</path>
+        <title>Story 1.5: Hetzner VM Deployment and Validation</title>
+        <section>Terraform Toggle Refactoring</section>
+        <snippet>Refactored terraform toggle mechanism from O(N) manual chaining to O(1) declarative pattern using lib.mapAttrs and lib.filterAttrs. Demonstrates value of scalable patterns even at small scale (2 machines). Pattern: Declarative definitions + functional generation scales to N machines with +5 lines per machine.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/notes/development/work-items/1-5-deploy-hetzner-vm-and-validate-stack.md</path>
+        <title>Story 1.5: Senior Developer Review</title>
+        <section>Architecture Assessment</section>
+        <snippet>APPROVED ✅ - Implementation follows clan-infra proven patterns closely. Excellent code quality, comprehensive documentation. Recommendation: Continue following clan-infra patterns with documented deviations. All 13 acceptance criteria validated with extensive evidence.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/notes/development/epic-1-infrastructure-restructure-proposal.md</path>
+        <title>Epic 1: Infrastructure Deployment Restructure</title>
+        <section>Strategic Context</section>
+        <snippet>Restructured Epic 1 to prioritize infrastructure deployment over architectural validation. clan-infra provides proven pattern for terraform/terranix + clan integration. Story 1.2 (dendritic pattern) marked OPTIONAL - can skip if conflicts with infrastructure. Key decision: Infrastructure deployment non-negotiable, dendritic optimization nice-to-have.</snippet>
+      </doc>
+
+      <!-- Comparison Repository Patterns -->
+      <doc>
+        <path>~/projects/nix-workspace/clan-infra/machines/flake-module.nix</path>
+        <title>clan-infra: specialArgs Pattern</title>
+        <section>Minimal specialArgs Configuration</section>
+        <snippet>clan-infra uses minimal specialArgs pattern: specialArgs = { inherit self; }. Production-ready clan infrastructure (10+ machines) with this minimal pattern. Critical question: How does clan-infra import srvos modules without inputs in specialArgs?</snippet>
+      </doc>
+
+      <doc>
+        <path>~/projects/nix-workspace/drupol-dendritic-infra/flake.nix</path>
+        <title>drupol-dendritic-infra: Dendritic Pattern</title>
+        <section>import-tree Usage</section>
+        <snippet>Uses import-tree for automatic module discovery: outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules). Real-world dendritic infrastructure example with pragmatic infrastructure integration. Demonstrates automatic module discovery vs manual imports.</snippet>
+      </doc>
+
+      <doc>
+        <path>~/projects/nix-workspace/dendrix-dendritic-nix/README.md</path>
+        <title>Dendrix: Dendritic Nix Documentation</title>
+        <section>Community Distribution Overview</section>
+        <snippet>Dendrix provides community-driven, opinionated configurations using flake-parts dendritic modules. Documentation site at https://vic.github.io/dendrix with comprehensive guides on dendritic principles, import-trees, layers, and ecosystem patterns.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <!-- test-clan Current Architecture -->
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/flake-parts/clan.nix</path>
+        <kind>flake-parts module</kind>
+        <symbol>clan configuration</symbol>
+        <lines>1-177</lines>
+        <reason>Central clan configuration with inventory, specialArgs ({ inherit inputs; }), manual machine imports (lines 109-120), terranix module exports (lines 8-9). Core of architectural evaluation.</reason>
+      </artifact>
+
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/base/nix-settings.nix</path>
+        <kind>base module</kind>
+        <symbol>nix settings</symbol>
+        <lines>1-19</lines>
+        <reason>Shared base module for nix configuration. Not exported to namespace. Assessment question: Should this be exported to flake.modules.nixos.base.nix-settings?</reason>
+      </artifact>
+
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/base/admins.nix</path>
+        <kind>base module</kind>
+        <symbol>admin users</symbol>
+        <lines>1-20</lines>
+        <reason>Shared base module for admin user configuration. Assessment: Is this truly shared or machine-specific?</reason>
+      </artifact>
+
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/base/initrd-networking.nix</path>
+        <kind>base module</kind>
+        <symbol>initrd networking</symbol>
+        <lines>1-30</lines>
+        <reason>Shared base module for initrd network configuration. Applicable to all nixos hosts with LUKS/ZFS encryption.</reason>
+      </artifact>
+
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/hosts/hetzner-ccx23/default.nix</path>
+        <kind>host module</kind>
+        <symbol>hetzner-ccx23 configuration</symbol>
+        <lines>1-46</lines>
+        <reason>Host configuration demonstrating srvos imports requiring inputs via specialArgs (line 7-8). Pattern: default.nix + disko.nix per host. Imports base modules via relative paths (lines 4-6).</reason>
+      </artifact>
+
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/terranix/hetzner.nix</path>
+        <kind>terranix module</kind>
+        <symbol>hetzner terraform</symbol>
+        <lines>1-72</lines>
+        <reason>Story 1.5 refactored pattern: lib.mapAttrs + lib.filterAttrs for O(1) scalability. Demonstrates declarative infrastructure generation. Exported via clan.nix:9.</reason>
+      </artifact>
+
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/flake.nix</path>
+        <kind>flake configuration</kind>
+        <symbol>flake outputs</symbol>
+        <lines>1-40</lines>
+        <reason>Root flake configuration showing imports pattern (lines 37-40). Uses manual imports, not import-tree. Includes import-tree in inputs (line 14) but not actively used.</reason>
+      </artifact>
+
+      <!-- Comparison Repository Code -->
+      <artifact>
+        <path>~/projects/nix-workspace/clan-infra/machines/flake-module.nix</path>
+        <kind>flake-parts module</kind>
+        <symbol>clan configuration</symbol>
+        <lines>1-80</lines>
+        <reason>clan-infra reference implementation with specialArgs = { inherit self; } (line 12). Production-proven pattern at 10+ machine scale. Critical for understanding srvos import mechanism.</reason>
+      </artifact>
+
+      <artifact>
+        <path>~/projects/nix-workspace/drupol-dendritic-infra/flake.nix</path>
+        <kind>flake configuration</kind>
+        <symbol>import-tree usage</symbol>
+        <lines>64</lines>
+        <reason>Dendritic pattern with automatic module discovery via import-tree. Real-world infrastructure example combining dendritic purity with pragmatic infrastructure needs.</reason>
+      </artifact>
+
+      <artifact>
+        <path>~/projects/nix-workspace/drupol-dendritic-infra/modules/flake-parts/host-machines.nix</path>
+        <kind>flake-parts module</kind>
+        <symbol>host machine organization</symbol>
+        <lines>1-50</lines>
+        <reason>Example of how dendritic infrastructure organizes host machines. Useful comparison for test-clan's manual import pattern scalability assessment.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <nix>
+        <package name="flake-parts" version="follows nixpkgs-lib">Modular flake framework</package>
+        <package name="clan-core" version="main">Clan infrastructure framework</package>
+        <package name="import-tree" version="latest">Automatic module discovery (available but not used)</package>
+        <package name="terranix" version="latest">Nix DSL for terraform</package>
+        <package name="disko" version="latest">Declarative disk partitioning</package>
+        <package name="srvos" version="latest">Server hardening modules (requires inputs in specialArgs per Story 1.4)</package>
+      </nix>
+    </dependencies>
   </artifacts>
 
-  <constraints>{{constraints}}</constraints>
-  <interfaces>{{interfaces}}</interfaces>
+  <constraints>
+    <constraint>
+      <type>Zero-Regression</type>
+      <description>Does NOT apply to test-clan (Phase 0 test infrastructure), BUT should not break operational VMs (hetzner-ccx23: 162.55.175.87, hetzner-cx43: 49.13.140.183) without good reason. Rollback plan: Git commit before changes, revert if issues.</description>
+    </constraint>
+
+    <constraint>
+      <type>Time Budget</type>
+      <description>Maximum 4-8 hours total. Evaluation/validation: 2-4 hours. Easy refactoring (Outcome B): additional 2-4 hours. If exceeds 8 hours: Stop, document as Outcome C, defer to post-Epic 1.</description>
+    </constraint>
+
+    <constraint>
+      <type>Decision Framework</type>
+      <description>Must choose one outcome: A (Already Compliant - document and complete), B (Easy Refactoring &lt;4 hours - implement now), C (Complex Refactoring &gt;4 hours - defer). Infrastructure deployment is non-negotiable, dendritic optimization is nice-to-have.</description>
+    </constraint>
+
+    <constraint>
+      <type>Validation Requirements</type>
+      <description>If Outcome B (refactoring): nix flake check passes, all host configurations build, terraform/terranix unchanged, VMs remain operational. Use nix store path comparison for functional equivalence verification.</description>
+    </constraint>
+
+    <constraint>
+      <type>Story 1.6 Dependency</type>
+      <description>Story 1.6 (secrets validation) should proceed regardless of Story 1.2 outcome. If refactoring in progress, Story 1.6 can wait or work in parallel branch. Document integration approach if refactoring changes affect Story 1.6.</description>
+    </constraint>
+
+    <constraint>
+      <type>Phase 1 Impact</type>
+      <description>Architectural decisions now affect Phase 1 (cinnabar production deployment) and beyond (Epic 2+ darwin migration with 5+ machines). Recommendations must consider scalability to 10+ machines.</description>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>clan.specialArgs</name>
+      <kind>module system configuration</kind>
+      <signature>specialArgs = { inherit inputs; } | specialArgs = { inherit self; }</signature>
+      <path>~/projects/nix-workspace/test-clan/modules/flake-parts/clan.nix:19</path>
+      <description>Critical evaluation point: test-clan uses { inherit inputs; } required for srvos imports. clan-infra uses minimal { inherit self; }. Compatibility with dendritic patterns unclear.</description>
+    </interface>
+
+    <interface>
+      <name>clan.machines.{name}.imports</name>
+      <kind>manual machine imports</kind>
+      <signature>clan.machines.hetzner-ccx23.imports = [ ../hosts/hetzner-ccx23 ]</signature>
+      <path>~/projects/nix-workspace/test-clan/modules/flake-parts/clan.nix:109-120</path>
+      <description>Manual per-machine imports pattern. Scalability question: acceptable at 2-4 machines, unmaintainable at 10+ machines? Compare with dendritic automatic discovery via import-tree.</description>
+    </interface>
+
+    <interface>
+      <name>flake.modules.terranix.*</name>
+      <kind>namespace exports</kind>
+      <signature>flake.modules.terranix.base = ../terranix/base.nix; flake.modules.terranix.hetzner = ../terranix/hetzner.nix</signature>
+      <path>~/projects/nix-workspace/test-clan/modules/flake-parts/clan.nix:8-9</path>
+      <description>Terranix modules exported to namespace for reuse. Base modules NOT exported. Assessment question: Would base module namespace exports improve reusability?</description>
+    </interface>
+
+    <interface>
+      <name>import-tree module discovery</name>
+      <kind>automatic module discovery</kind>
+      <signature>outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules)</signature>
+      <path>~/projects/nix-workspace/drupol-dendritic-infra/flake.nix:64</path>
+      <description>Dendritic pattern for automatic module discovery. import-tree available in test-clan inputs (flake.nix:14) but not used. Compare complexity/value vs manual imports.</description>
+    </interface>
+
+    <interface>
+      <name>srvos module imports</name>
+      <kind>external module imports</kind>
+      <signature>inputs.srvos.nixosModules.server</signature>
+      <path>~/projects/nix-workspace/test-clan/modules/hosts/hetzner-ccx23/default.nix:7</path>
+      <description>srvos imports requiring inputs via specialArgs (Story 1.4 finding). clan-infra question: How do they import srvos with only self in specialArgs?</description>
+    </interface>
+  </interfaces>
   <tests>
-    <standards>{{test_standards}}</standards>
-    <locations>{{test_locations}}</locations>
-    <ideas>{{test_ideas}}</ideas>
+    <standards>
+      This is an architectural evaluation story with validation focus, not implementation requiring unit tests.
+      Testing strategy focuses on validating existing infrastructure stability if refactoring is performed (Outcome B):
+      - nix flake check: Validates flake evaluation and module system correctness
+      - nix build .#nixosConfigurations.{machine}.config.system.build.toplevel: Validates host configuration builds
+      - nix build .#terraform: Validates terranix configuration generation
+      - terraform plan: Validates terraform configuration (dry-run, no apply)
+      - nix store path comparison: Validates functional equivalence after refactoring
+      - SSH access validation: Ensures operational VMs remain accessible
+      If Outcome A or C (no refactoring), validation is documentation-only - no build/deploy tests required.
+    </standards>
+
+    <locations>
+      <location>~/projects/nix-workspace/test-clan/</location>
+      <location>~/projects/nix-workspace/test-clan/modules/</location>
+      <location>docs/notes/development/DENDRITIC-NOTES.md</location>
+    </locations>
+
+    <ideas>
+      <!-- AC1: Comprehensive Architectural Assessment -->
+      <test id="AC1" description="Validate architectural assessment completeness">
+        - Verify test-clan structure analysis covers clan.nix, base modules, host modules, terranix modules
+        - Verify clan-infra comparison identifies specialArgs pattern, machine organization, srvos imports
+        - Verify dendritic exemplar analysis covers import-tree, namespace exports, composition patterns
+        - Verify all three evaluation dimensions documented: module discovery, namespacing, specialArgs
+      </test>
+
+      <!-- AC2: Decision Framework Execution -->
+      <test id="AC2" description="Validate decision outcome with clear rationale">
+        - Verify chosen outcome (A/B/C) explicitly stated with detailed justification
+        - Verify file:line evidence provided for key architectural findings
+        - Verify trade-offs documented: dendritic purity vs clan/terraform pragmatism
+        - If Outcome B: Verify refactoring tasks defined with time estimates
+        - If Outcome C: Verify blockers documented with revisit conditions
+      </test>
+
+      <!-- AC3: Module Organization Evaluation -->
+      <test id="AC3" description="Validate module structure scalability assessment">
+        - Verify base module reusability assessment (nix-settings, admins, initrd-networking)
+        - Verify host configuration consistency (hetzner-ccx23 vs hetzner-cx43 patterns)
+        - Verify infrastructure module scalability (terranix/hetzner.nix lib.mapAttrs pattern)
+        - Verify 10+ machine projection (maintenance burden analysis)
+      </test>
+
+      <!-- AC4: specialArgs Compatibility Assessment -->
+      <test id="AC4" description="Validate specialArgs compatibility analysis">
+        - Verify clan-infra specialArgs pattern documented ({ inherit self; })
+        - Verify srvos import mechanism understood (how clan-infra avoids inputs in specialArgs)
+        - Verify dendritic specialArgs requirements clarified
+        - Verify compatibility assessment: Can dendritic work with { inherit inputs; }?
+      </test>
+
+      <!-- AC5: Infrastructure Validation (if Outcome B) -->
+      <test id="AC5" description="Validate operational stability after refactoring">
+        - Run: nix flake check (in test-clan repository)
+        - Build: nix build .#nixosConfigurations.hetzner-ccx23.config.system.build.toplevel
+        - Build: nix build .#nixosConfigurations.hetzner-cx43.config.system.build.toplevel
+        - Build: nix build .#terraform
+        - Compare: nix store paths pre/post refactoring (functional equivalence)
+        - Test: terraform plan (dry-run validation)
+        - Verify: SSH access to both VMs (162.55.175.87, 49.13.140.183)
+      </test>
+
+      <!-- AC6: Documentation Completeness -->
+      <test id="AC6" description="Validate DENDRITIC-NOTES.md completeness">
+        - Verify assessment results section with chosen outcome
+        - Verify pattern comparison (test-clan vs clan-infra vs dendritic exemplars)
+        - Verify trade-offs analysis (what gained/lost with dendritic)
+        - Verify scalability analysis (projecting to 10+ machines)
+        - Verify Phase 1 recommendations (should cinnabar follow same patterns?)
+        - Verify file:line citations throughout documentation
+      </test>
+    </ideas>
   </tests>
 </story-context>
