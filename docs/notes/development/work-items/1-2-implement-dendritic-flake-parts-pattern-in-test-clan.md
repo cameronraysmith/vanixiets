@@ -712,12 +712,12 @@ Architectural foundation validated for Phase 1 (cinnabar) through Phase 2+ (darw
 Current patterns balance dendritic principles (modular composition, namespace exports for terranix) with clan pragmatism (explicit registration, inventory-driven services) and infrastructure needs (terraform integration, explicit lifecycle).
 
 No refactoring recommended at this time.
-Comprehensive assessment documented in docs/notes/development/DENDRITIC-ASSESSMENT.md for future reference.
+Comprehensive assessment documented in docs/notes/development/dendritic-flake-parts-assessment.md for future reference.
 
 ### File List
 
 **Created:**
-- docs/notes/development/DENDRITIC-ASSESSMENT.md (comprehensive 538-line architectural evaluation)
+- docs/notes/development/dendritic-flake-parts-assessment.md (comprehensive 538-line architectural evaluation)
 
 **Modified:**
 - docs/notes/development/sprint-status.yaml (status: ready-for-dev → in-progress → review)
