@@ -187,6 +187,20 @@
         <lines>not yet read</lines>
         <reason>Already exported to namespace (flake.modules.terranix.hetzner). Contains Hetzner VM resource definitions that generate terraform JSON validated by RT-1 test.</reason>
       </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/nix-unit/tests/assets/basic.nix</path>
+        <kind>test reference</kind>
+        <symbol>nix-unit test examples</symbol>
+        <lines>1-50</lines>
+        <reason>Local nix-unit source provides canonical test pattern examples using expr/expected assertions. Shows proper nix-unit interface: { expr = value; expected = value; } and error testing with expectedError.type. Test strategy document uses pkgs.runCommand wrapper pattern - this shows the underlying nix-unit assertion format that integrates with nix-unit CLI and flake checks.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/nix-unit/README.md</path>
+        <kind>documentation</kind>
+        <symbol>nix-unit documentation</symbol>
+        <lines>1-44</lines>
+        <reason>Explains nix-unit advantages: compatible with lib.debug.runTests, allows individual test failures, uses Nix evaluator C++ API for speed. Points to full documentation at https://nix-community.github.io/nix-unit/. Critical context: nix-unit can test eval failures (important for feature tests expected to fail).</reason>
+      </artifact>
     </code>
     <dependencies>
       <nix>
@@ -239,8 +253,34 @@
 
   <interfaces>
 ### Nix-unit Test Interface
+
+**Canonical nix-unit pattern** (see ~/projects/nix-workspace/nix-unit/tests/assets/basic.nix):
 ```nix
-# Test structure for nix-unit integration
+# Simple assertion tests
+{
+  testName = {
+    expr = actualValue;
+    expected = expectedValue;
+  };
+
+  # Error testing
+  testCatchThrow = {
+    expr = throw "error message";
+    expectedError.type = "ThrownError";
+    expectedError.msg = "regex pattern";  # optional
+  };
+
+  # Nested test groups
+  category.testName = {
+    expr = value;
+    expected = value;
+  };
+}
+```
+
+**Test strategy wrapper pattern** (for complex validations):
+```nix
+# Test structure wrapping nix-unit with pkgs.runCommand for complex checks
 {
   # Test function returns attrset with test metadata
   test = pkgs.runCommand "test-name" {} ''
@@ -259,6 +299,8 @@
   mustPassAfterRefactor = true | false;  # For feature
 }
 ```
+
+**Note**: Test strategy document uses pkgs.runCommand wrapper for complex validations (JSON comparison, file diffs). For simple property assertions, prefer canonical nix-unit expr/expected pattern. Both integrate with flake checks.
 
 ### NixosTest Interface
 ```nix
