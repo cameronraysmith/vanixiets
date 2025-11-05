@@ -461,22 +461,32 @@ This was correct - Story 1.4 established foundation, Story 1.5 validated complet
 
 **Dendritic Repositories to Review:**
 
-1. **dendritic-flake-parts** (~/projects/nix-workspace/dendritic-flake-parts/)
-   - Core dendritic patterns demonstration repository
-   - Focus: import-tree usage, module namespace exports
+1. **dendrix-dendritic-nix** (~/projects/nix-workspace/dendrix-dendritic-nix/) ⭐ PRIMARY
+   - Complete documentation site for dendritic flake-parts pattern
+   - Comprehensive reference for understanding dendritic principles
+   - Focus: import-tree usage, module namespace exports, pattern explanations
 
-2. **mightyiam-dendritic-infra** (~/projects/nix-workspace/mightyiam-dendritic-infra/)
-   - Real-world dendritic infrastructure example
+2. **drupol-dendritic-infra** (~/projects/nix-workspace/drupol-dendritic-infra/) ⭐ HIGH QUALITY
+   - Excellent real-world dendritic infrastructure example
+   - Strikes ideal balance: dendritic patterns + practical infrastructure needs
+   - Focus: Infrastructure-focused dendritic adoption, pragmatic patterns
+   - Recommended: Study this for balanced approach to dendritic + clan/terraform
+
+3. **mightyiam-dendritic-infra** (~/projects/nix-workspace/mightyiam-dendritic-infra/)
+   - Another real-world dendritic infrastructure example
    - Focus: Multi-machine organization, practical patterns
+   - Useful for comparing different dendritic infrastructure approaches
 
-3. **gaetanlepage-dendritic-nix-config** (~/projects/nix-workspace/gaetanlepage-dendritic-nix-config/)
-   - Another dendritic configuration example
+4. **gaetanlepage-dendritic-nix-config** (~/projects/nix-workspace/gaetanlepage-dendritic-nix-config/)
+   - Personal dendritic configuration example
    - Focus: Personal configuration patterns (may differ from infrastructure)
+   - Note: Personal configs may have different priorities than infrastructure repos
 
-4. **clan-infra** (~/projects/nix-workspace/clan-infra/)
+5. **clan-infra** (~/projects/nix-workspace/clan-infra/)
    - Production-ready clan infrastructure (10+ machines)
    - Focus: Proven clan patterns, specialArgs usage, machine organization
    - Question: Does clan-infra use dendritic patterns? Or different approach?
+   - Critical: Understand how clan-infra achieves scale without dendritic patterns
 
 **Key Comparison Points:**
 
