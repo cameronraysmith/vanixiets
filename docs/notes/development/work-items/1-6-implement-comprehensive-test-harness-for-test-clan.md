@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Infrastructure Deployment (Phase 0 - test-clan)
 
-**Status:** Drafted
+**Status:** Ready for Dev
 
 **Dependencies:**
 - Story 1.5 (complete): Operational VMs provide test targets
@@ -10,6 +10,9 @@
 **Related Documents:**
 - Test strategy: docs/notes/development/dendritic-refactor-test-strategy.md
 - Assessment: docs/notes/development/dendritic-flake-parts-assessment.md
+
+**Dev Agent Record:**
+- Context Reference: docs/notes/development/work-items/1-6-implement-comprehensive-test-harness-for-test-clan.context.xml
 
 ---
 
