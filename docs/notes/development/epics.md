@@ -181,7 +181,59 @@ So that I can validate the complete infrastructure stack (terraform + clan + dis
 
 ---
 
-### Story 1.6: Initialize clan secrets and test vars deployment on Hetzner
+### Story 1.6: Implement comprehensive test harness for test-clan infrastructure validation
+
+As a system administrator,
+I want to implement a comprehensive test suite for test-clan that validates infrastructure functionality,
+So that I can confidently refactor the codebase with zero-regression guarantees.
+
+**Acceptance Criteria:**
+1. Test infrastructure setup: nix-unit added, test directories created (regression, invariant, feature, integration, snapshots), test runner script operational
+2. Regression tests implemented and passing: RT-1 (Terraform output equivalence), RT-2 (NixOS closure equivalence), RT-3 (Machine builds)
+3. Invariant tests implemented and passing: IT-1 (Clan inventory structure), IT-2 (Service targeting), IT-3 (specialArgs propagation)
+4. Feature tests implemented (expected to fail): FT-1 (import-tree discovery), FT-2 (Namespace exports), FT-3 (Self-composition)
+5. Integration tests implemented and passing: VT-1 (VM boot tests for all 3 machines)
+6. Baseline snapshots captured: terraform.json, nixos-configs.json, clan-inventory.json
+7. Full test suite runs successfully via ./tests/run-all.sh
+8. Test categories behave as expected: regression PASS, invariant PASS, feature FAIL (expected), integration PASS
+
+**Prerequisites:** Story 1.5 (Hetzner deployed - operational VMs provide test targets)
+
+**Estimated Effort:** 6-8 hours (test infrastructure + implementation + validation)
+
+**Risk Level:** Low (testing infrastructure, no deployment changes)
+
+**Related Documents:** docs/notes/development/dendritic-refactor-test-strategy.md
+
+---
+
+### Story 1.7: Execute dendritic flake-parts refactoring in test-clan using test harness
+
+As a system administrator,
+I want to refactor test-clan to full dendritic compliance using the test harness for validation,
+So that the architectural pattern is proven and validated for future phases.
+
+**Acceptance Criteria:**
+1. All refactoring steps completed with test validation: Step 2.1 (import-tree added), Step 2.2 (base modules exported), Step 2.3 (one host refactored), Step 2.4 (remaining hosts refactored), Step 2.5 (automatic host collection assessed)
+2. All regression tests passing: Terraform output equivalent, NixOS closures equivalent, all machines build
+3. All invariant tests passing: Inventory preserved, service targeting preserved, specialArgs propagation maintained
+4. All feature tests passing: import-tree discovery works, namespace exports functional, self-composition enabled
+5. All integration tests passing: All 3 machines boot successfully in VMs
+6. Git workflow complete: Feature branch with per-step commits, merged to main after validation
+7. Operational VMs protected: No accidental deployment to 162.55.175.87 or 49.13.140.183
+8. Zero regressions confirmed via comprehensive test suite
+
+**Prerequisites:** Story 1.6 (test harness operational with all baseline tests passing)
+
+**Estimated Effort:** 8-10 hours (incremental refactoring + validation per step)
+
+**Risk Level:** Medium (refactoring code, but test harness provides safety net)
+
+**Related Documents:** docs/notes/development/dendritic-flake-parts-assessment.md (defines gaps), docs/notes/development/dendritic-refactor-test-strategy.md (defines approach)
+
+---
+
+### Story 1.8: Initialize clan secrets and test vars deployment on Hetzner
 
 As a system administrator,
 I want to validate clan secrets management and vars deployment on hetzner-vm,
@@ -198,7 +250,7 @@ So that I can confirm the secrets infrastructure works correctly before GCP depl
 8. Vars generation repeatable: can regenerate and redeploy without errors
 9. Documentation created: SECRETS-MANAGEMENT.md covering clan vars workflow
 
-**Prerequisites:** Story 1.5 (Hetzner deployed)
+**Prerequisites:** Story 1.7 (dendritic refactoring complete)
 
 **Estimated Effort:** 2-4 hours
 
@@ -206,7 +258,7 @@ So that I can confirm the secrets infrastructure works correctly before GCP depl
 
 ---
 
-### Story 1.7: Create GCP VM terraform configuration and host modules
+### Story 1.9: Create GCP VM terraform configuration and host modules
 
 As a system administrator,
 I want to create terraform configuration for GCP VM provisioning,
@@ -221,9 +273,9 @@ So that I can deploy gcp-vm using patterns learned from Hetzner deployment.
 6. Terraform configuration generates: `nix build .#terranix.terraform`
 7. Host configuration builds: `nix build .#nixosConfigurations.gcp-vm.config.system.build.toplevel`
 
-**Prerequisites:** Story 1.6 (Hetzner stable, secrets validated)
+**Prerequisites:** Story 1.8 (Hetzner stable, secrets validated)
 
-**Note:** Story 1.7 requires manual user intervention to configure GCP credentials (service account creation, IAM permissions, JSON key download). Agent must pause before terraform validation commands.
+**Note:** Story 1.9 requires manual user intervention to configure GCP credentials (service account creation, IAM permissions, JSON key download). Agent must pause before terraform validation commands.
 
 **Estimated Effort:** 4-6 hours
 
@@ -231,7 +283,7 @@ So that I can deploy gcp-vm using patterns learned from Hetzner deployment.
 
 ---
 
-### Story 1.8: Deploy GCP VM and validate multi-cloud infrastructure
+### Story 1.10: Deploy GCP VM and validate multi-cloud infrastructure
 
 As a system administrator,
 I want to provision and deploy gcp-vm to Google Cloud Platform,
@@ -250,7 +302,7 @@ So that I can validate multi-cloud infrastructure coordination via clan and zero
 10. SSH via zerotier works: `ssh root@<gcp-zerotier-ip>` from Hetzner
 11. Clan vars deployed correctly on GCP VM
 
-**Prerequisites:** Story 1.7 (GCP terraform + host config)
+**Prerequisites:** Story 1.9 (GCP terraform + host config)
 
 **Estimated Effort:** 6-8 hours (new cloud provider, troubleshooting expected)
 
@@ -262,7 +314,7 @@ So that I can validate multi-cloud infrastructure coordination via clan and zero
 
 ---
 
-### Story 1.9: Test multi-machine coordination across Hetzner + GCP
+### Story 1.11: Test multi-machine coordination across Hetzner + GCP
 
 As a system administrator,
 I want to validate multi-machine coordination features across Hetzner and GCP VMs,
@@ -277,7 +329,7 @@ So that I can confirm clan inventory and service instances work correctly in mul
 6. Service coordination test: modify service instance setting, verify applied to both machines
 7. Network stability: 24-hour monitoring shows no disconnections or errors
 
-**Prerequisites:** Story 1.8 (GCP deployed)
+**Prerequisites:** Story 1.10 (GCP deployed)
 
 **Estimated Effort:** 2-4 hours
 
@@ -285,7 +337,7 @@ So that I can confirm clan inventory and service instances work correctly in mul
 
 ---
 
-### Story 1.10: Monitor infrastructure stability and extract deployment patterns
+### Story 1.12: Monitor infrastructure stability and extract deployment patterns
 
 As a system administrator,
 I want to monitor both VMs for stability over 1 week minimum,
@@ -300,7 +352,7 @@ So that I can validate the infrastructure is production-ready before darwin migr
 6. Issues log: any problems discovered, workarounds applied
 7. Rollback procedure tested: can destroy and recreate infrastructure from configuration
 
-**Prerequisites:** Story 1.9 (multi-machine coordination validated)
+**Prerequisites:** Story 1.11 (multi-machine coordination validated)
 
 **Estimated Effort:** 1 week calendar time (15-30 min daily monitoring)
 
@@ -310,7 +362,7 @@ So that I can validate the infrastructure is production-ready before darwin migr
 
 ---
 
-### Story 1.11: Document integration findings and architectural decisions
+### Story 1.13: Document integration findings and architectural decisions
 
 As a system administrator,
 I want to document all integration findings and architectural decisions from Phase 0,
@@ -323,7 +375,7 @@ So that I have comprehensive reference for Phase 1 and beyond.
 4. Recommendations for Phase 1 cinnabar deployment
 5. Known limitations documented (GCP complexity, cost, alternatives)
 
-**Prerequisites:** Story 1.10 (stability validated, patterns extracted)
+**Prerequisites:** Story 1.12 (stability validated, patterns extracted)
 
 **Estimated Effort:** 2-4 hours
 
@@ -331,7 +383,7 @@ So that I have comprehensive reference for Phase 1 and beyond.
 
 ---
 
-### Story 1.12: Execute go/no-go decision framework for Phase 1
+### Story 1.14: Execute go/no-go decision framework for Phase 1
 
 As a system administrator,
 I want to evaluate Phase 0 results against go/no-go criteria,
@@ -345,7 +397,7 @@ So that I can make an informed decision about proceeding to Phase 1 (cinnabar pr
 5. If NO-GO: Alternative approaches documented, Issues requiring resolution identified, Timeline for retry or pivot strategy
 6. Next steps clearly defined based on decision outcome
 
-**Prerequisites:** Story 1.11 (findings documented)
+**Prerequisites:** Story 1.13 (findings documented)
 
 **Estimated Effort:** 1-2 hours
 
@@ -971,10 +1023,10 @@ So that [benefit/value].
 
 **Total Epics:** 7 (aligned to 6 migration phases + cleanup)
 
-**Total Stories:** 34 stories across all epics
+**Total Stories:** 36 stories across all epics
 
 **Story Distribution:**
-- Epic 1 (Phase 0 - Infrastructure Deployment): 12 stories
+- Epic 1 (Phase 0 - Infrastructure Deployment): 14 stories
 - Epic 2 (Phase 1 - cinnabar): 6 stories
 - Epic 3 (Phase 2 - blackphos): 5 stories
 - Epic 4 (Phase 3 - rosegold): 3 stories
