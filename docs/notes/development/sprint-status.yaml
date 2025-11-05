@@ -41,8 +41,8 @@
 #
 # STABILITY GATES:
 # ================
-# - Epic 1 (Story 1.12): GO/CONDITIONAL GO/NO-GO decision determines entire approach
-# - Epic 1 (Story 1.10): Infrastructure stable 1 week minimum before Phase 1
+# - Epic 1 (Story 1.14): GO/CONDITIONAL GO/NO-GO decision determines entire approach
+# - Epic 1 (Story 1.12): Infrastructure stable 1 week minimum before Phase 1
 # - Epic 2 (Story 2.6): cinnabar stable 1-2 weeks → proceed to blackphos
 # - Epic 3 (Story 3.5): blackphos stable 1-2 weeks → proceed to rosegold
 # - Epic 4 (Story 4.3): rosegold stable 1-2 weeks → proceed to argentum
@@ -61,27 +61,29 @@ story_location: "{project-root}/docs/notes/development/work-items"
 
 development_status:
   # Epic 1: Architectural Validation + Infrastructure Deployment (Phase 0 - test-clan)
-  # Strategic decision (2025-11-03): Infrastructure-first approach - defer Story 1.2 (dendritic)
-  # Rationale: Infrastructure deployment is primary objective, dendritic pattern can be refactored later
-  # Flow: 1.1 (complete) → 1.3 (inventory) → 1.4-1.8 (infrastructure) → 1.2 (dendritic if time)
+  # Strategic decision (2025-11-05): Story 1.2 complete (Outcome A) - implement test harness + dendritic refactoring NOW
+  # Rationale: Test strategy enables risk-free refactoring, validates architecture during Phase 0, benefits Epic 2+
+  # Flow: 1.1-1.5 (complete) → 1.6 (test harness) → 1.7 (dendritic refactor) → 1.8-1.14 (GCP + validation)
   epic-1: backlog
   1-1-prepare-existing-test-clan-repository-for-validation: done
-  # Story 1.2: REVIEW - Outcome A (Already Compliant) - No refactoring needed, architecture validated
-  1-2-implement-dendritic-flake-parts-pattern-in-test-clan: review
+  # Story 1.2: DONE - Outcome A (Already Compliant) - No refactoring needed, architecture validated
+  1-2-implement-dendritic-flake-parts-pattern-in-test-clan: done
   # Story 1.3: COMPLETE - Inventory configured, ready for Story 1.4
   1-3-configure-clan-inventory-and-service-instances-for-test-vm: done
   # Story 1.4: APPROVED - Review corrected, cx43 at $9.99/month per user direction, all ACs satisfied
   1-4-create-hetzner-terraform-config-and-host-modules: done
   # Story 1.5: DONE - APPROVED ✅ - All 13 ACs validated, ZFS encryption bug discovered and documented
   1-5-deploy-hetzner-vm-and-validate-stack: done
-  1-6-validate-clan-secrets-vars-on-hetzner: drafted
-  # Story 1.7: REQUIRES MANUAL SECRET SETUP - agent must pause for user to configure GCP service account JSON
-  1-7-create-gcp-terraform-config-and-host-modules: drafted
-  1-8-deploy-gcp-vm-and-validate-multi-cloud: drafted
-  1-9-test-multi-machine-coordination: drafted
-  1-10-monitor-stability-for-one-week: drafted
-  1-11-document-integration-findings-and-patterns: drafted
-  1-12-execute-go-no-go-decision-framework: drafted
+  1-6-implement-comprehensive-test-harness-for-test-clan: drafted
+  1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness: drafted
+  1-8-validate-clan-secrets-vars-on-hetzner: drafted
+  # Story 1.9: REQUIRES MANUAL SECRET SETUP - agent must pause for user to configure GCP service account JSON
+  1-9-create-gcp-terraform-config-and-host-modules: drafted
+  1-10-deploy-gcp-vm-and-validate-multi-cloud: drafted
+  1-11-test-multi-machine-coordination: drafted
+  1-12-monitor-stability-for-one-week: drafted
+  1-13-document-integration-findings-and-patterns: drafted
+  1-14-execute-go-no-go-decision-framework: drafted
   epic-1-retrospective: optional
 
   # Epic 2: VPS Infrastructure Foundation (Phase 1 - cinnabar)
