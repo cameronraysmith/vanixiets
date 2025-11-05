@@ -1,0 +1,404 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>6</storyId>
+    <title>Implement Comprehensive Test Harness for test-clan Infrastructure Validation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-05</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/notes/development/work-items/1-6-implement-comprehensive-test-harness-for-test-clan.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Infrastructure developer working on test-clan refactoring</asA>
+    <iWant>A comprehensive test suite that validates existing functionality and defines expected dendritic capabilities</iWant>
+    <soThat>I can confidently refactor test-clan to dendritic flake-parts compliance with zero regression in critical infrastructure functionality</soThat>
+    <tasks>
+### Task 1: Setup Test Infrastructure (1-2 hours)
+1. Add nix-unit to flake.nix inputs
+2. Create test directory structure
+3. Create test runner script template
+4. Add checks section to flake.nix perSystem
+
+### Task 2: Implement Regression Tests (2-3 hours)
+1. Implement RT-1: Terraform output equivalence
+   - Normalize and compare terraform JSON outputs
+   - Capture baseline snapshot
+2. Implement RT-2: NixOS closure equivalence
+   - Extract configuration properties (hostname, services, bootloader, users)
+   - Compare before/after snapshots
+3. Implement RT-3: Machine builds
+   - Verify all 3 machines build successfully
+   - Test toplevel derivation accessibility
+
+### Task 3: Implement Invariant Tests (1-2 hours)
+1. Implement IT-1: Clan inventory structure
+   - Validate 3 machines present with correct tags
+   - Validate service instances (emergency-access, users-root, zerotier, tor)
+   - Verify zerotier controller/peer targeting
+2. Implement IT-2: Service targeting preservation
+   - Validate role assignments unchanged
+   - Confirm hetzner-ccx23 is zerotier controller
+3. Implement IT-3: specialArgs propagation
+   - Verify inputs accessible in host modules
+   - Confirm srvos importable
+
+### Task 4: Implement Feature Tests (1 hour)
+1. Implement FT-1: import-tree discovery
+   - Check for automatic module discovery
+   - Expected to fail before dendritic refactoring
+2. Implement FT-2: Namespace exports
+   - Verify modules exported to config.flake.modules
+   - Expected to fail (only terranix currently exported)
+3. Implement FT-3: Self-composition
+   - Check host modules for namespace imports vs relative paths
+   - Expected to fail (currently using relative imports)
+
+### Task 5: Implement Integration Tests (1-2 hours)
+1. Implement VT-1: VM boot tests
+   - Create nixosTest for each machine
+   - Validate boot to multi-user.target
+   - Test base module features (nix, users, sudo, SSH)
+   - Verify hostname and service enablement
+
+### Task 6: Validation and Documentation (1 hour)
+1. Run complete test suite baseline
+2. Capture all snapshots
+3. Verify test categories behave as expected:
+   - Regression: PASS
+   - Invariant: PASS
+   - Feature: FAIL (expected)
+   - Integration: PASS
+4. Document test execution in story completion notes
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+### AC1: Test Infrastructure Setup
+- [ ] nix-unit added to flake inputs
+- [ ] Test directory structure created: `tests/{regression,invariant,feature,integration,snapshots}/`
+- [ ] Test outputs exposed via `flake.nix` checks
+- [ ] Test runner script operational: `./tests/run-all.sh`
+
+### AC2: Regression Tests Implemented and Passing
+- [ ] RT-1: Terraform output equivalence test implemented
+- [ ] RT-2: NixOS configuration closure equivalence test implemented
+- [ ] RT-3: Machine configurations build test implemented
+- [ ] All regression tests pass with baseline snapshots captured
+
+### AC3: Invariant Tests Implemented and Passing
+- [ ] IT-1: Clan inventory structure test implemented
+- [ ] IT-2: Clan service targeting test implemented
+- [ ] IT-3: specialArgs propagation test implemented
+- [ ] All invariant tests pass (validates clan-core integration)
+
+### AC4: Feature Tests Implemented (Expected to Fail)
+- [ ] FT-1: import-tree discovery test implemented
+- [ ] FT-2: Namespace exports test implemented
+- [ ] FT-3: Self-composition test implemented
+- [ ] Feature tests fail as expected (confirms test correctness - dendritic features don't exist yet)
+
+### AC5: Integration Tests Implemented and Passing
+- [ ] VT-1: VM boot tests implemented for all 3 machines
+- [ ] All VMs boot successfully with base module features validated
+- [ ] SSH access confirmed on all test VMs
+
+### AC6: Baseline Snapshots Captured
+- [ ] Terraform baseline: `tests/snapshots/terraform.json`
+- [ ] NixOS configs baseline: `tests/snapshots/nixos-configs.json`
+- [ ] Clan inventory baseline: `tests/snapshots/clan-inventory.json`
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact>
+        <path>docs/notes/development/dendritic-refactor-test-strategy.md</path>
+        <title>Test Strategy: Dendritic Flake-Parts Refactoring for test-clan</title>
+        <section>Complete Document (Lines 1-1913)</section>
+        <snippet>Comprehensive testing strategy document providing complete test implementations for all four test categories: regression tests (terraform equivalence, NixOS closure equivalence, machine builds), invariant tests (clan inventory, service targeting, specialArgs propagation), feature tests (import-tree discovery, namespace exports, self-composition), and integration tests (VM boot validation). Includes detailed rationale for each test, expected pass/fail states, and incremental refactoring execution strategy with rollback procedures.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/notes/development/dendritic-flake-parts-assessment.md</path>
+        <title>Dendritic Architecture Assessment: test-clan</title>
+        <section>Complete Document (Assessment and Trade-offs Analysis)</section>
+        <snippet>Assessment concludes test-clan architecture is pragmatically sound for current scale (2-4 machines). Key findings: manual imports acceptable, specialArgs pattern dendritic-compatible (validated by drupol-dendritic-infra), current architecture suitable through Epic 1. Documents three critical architectural dimensions: module discovery scalability, module namespacing/reusability, and specialArgs compatibility with dendritic patterns.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/notes/development/work-items/1-5-deploy-and-validate-test-clan-phase-0-infrastructure.md</path>
+        <title>Story 1.5: Deploy and Validate test-clan Phase 0 Infrastructure</title>
+        <section>Context for Operational VMs</section>
+        <snippet>Story 1.5 delivered 2 operational Hetzner VMs (162.55.175.87, 49.13.140.183) that serve as test targets for integration tests. These VMs validate clan-core integration, zerotier networking, and base module functionality. Test harness will use these as baseline for ensuring refactoring preserves operational behavior.</snippet>
+      </artifact>
+    </docs>
+    <code>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/flake.nix</path>
+        <kind>flake configuration</kind>
+        <symbol>flake inputs and outputs</symbol>
+        <lines>1-52</lines>
+        <reason>Current flake structure uses manual imports (lines 37-41) that will be validated by feature tests. Contains inputs including import-tree (line 14) already available. Test infrastructure will add checks to perSystem.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/flake-parts/clan.nix</path>
+        <kind>clan configuration module</kind>
+        <symbol>clan configuration</symbol>
+        <lines>1-178</lines>
+        <reason>Critical for invariant tests. Contains clan.inventory.machines (21-39), clan.inventory.instances (42-103) with service targeting, specialArgs pattern (line 19), manual machine imports (108-120), and terranix namespace exports (7-9). All invariant tests validate this structure remains unchanged.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/hosts/hetzner-ccx23/default.nix</path>
+        <kind>host configuration</kind>
+        <symbol>hetzner-ccx23 configuration</symbol>
+        <lines>1-47</lines>
+        <reason>Representative host module showing current patterns tested by regression/feature tests: relative imports to base modules (lines 4-6), srvos imports via inputs (lines 7-8), host-specific configuration. Feature tests will check for transition to namespace imports.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/base/nix-settings.nix</path>
+        <kind>base module</kind>
+        <symbol>nix configuration</symbol>
+        <lines>1-19</lines>
+        <reason>Base module that should be reused across all hosts. Currently imported via relative paths. Integration tests will validate nix experimental features (flakes) are enabled. Feature tests check for namespace export.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/base/admins.nix</path>
+        <kind>base module</kind>
+        <symbol>user administration</symbol>
+        <lines>1-28</lines>
+        <reason>Base module defining user crs58 with wheel group and sudo. Integration tests will validate user exists, wheel group membership, sudo works, zsh available. Regression tests ensure user configuration unchanged after refactoring.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/base/initrd-networking.nix</path>
+        <kind>base module</kind>
+        <symbol>initrd SSH configuration</symbol>
+        <lines>not yet read</lines>
+        <reason>Base module for initrd networking (LUKS/ZFS remote unlock). Imported by all hosts. Should be included in namespace export feature tests.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/terranix/base.nix</path>
+        <kind>terranix module</kind>
+        <symbol>base terraform configuration</symbol>
+        <lines>not yet read</lines>
+        <reason>Already exported to namespace (flake.modules.terranix.base). Regression tests must validate terraform output equivalence. Provides pattern for namespace exports.</reason>
+      </artifact>
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/terranix/hetzner.nix</path>
+        <kind>terranix module</kind>
+        <symbol>hetzner provider configuration</symbol>
+        <lines>not yet read</lines>
+        <reason>Already exported to namespace (flake.modules.terranix.hetzner). Contains Hetzner VM resource definitions that generate terraform JSON validated by RT-1 test.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <nix>
+        <package name="nixpkgs" version="follows:nixos-unstable" />
+        <package name="flake-parts" version="github:hercules-ci/flake-parts" />
+        <package name="clan-core" version="git+https://git.clan.lol/clan/clan-core" />
+        <package name="import-tree" version="github:vic/import-tree" note="Already in inputs, will be used for feature tests" />
+        <package name="terranix" version="github:terranix/terranix" />
+        <package name="disko" version="github:nix-community/disko" />
+        <package name="srvos" version="github:nix-community/srvos" />
+        <package name="nix-unit" version="github:nix-community/nix-unit" note="TO BE ADDED for test framework" />
+      </nix>
+      <system>
+        <tool name="jq" purpose="JSON normalization and comparison in tests" />
+        <tool name="diffutils" purpose="Snapshot comparison in regression tests" />
+        <tool name="opentofu" purpose="Terraform execution for infrastructure provisioning" />
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+1. **Test Infrastructure Location**: All test files must be created in ~/projects/nix-workspace/test-clan/ repository, NOT in infra repository. Story context lives in infra for documentation, but implementation happens in test-clan.
+
+2. **Baseline Preservation**: Regression tests MUST capture baselines BEFORE any refactoring. Snapshots serve as source of truth for "what worked before." Test failure after refactoring = regression detected.
+
+3. **Test Category Semantics**:
+   - Regression: Must pass before AND after refactoring (validates preservation)
+   - Invariant: Must always pass (validates clan-core contract)
+   - Feature: Expected to FAIL before refactoring, MUST pass after (validates new capabilities)
+   - Integration: Must pass before AND after (validates runtime behavior)
+
+4. **Operational VM Safety**: Tests must NOT modify deployed VMs (162.55.175.87, 49.13.140.183). Integration tests use nixosTest VM instantiation, not real infrastructure. Terraform baseline capture must use terraform show, not terraform apply.
+
+5. **Clan-core Integration Requirements**: Invariant tests protect clan-core compatibility requirements that must never break:
+   - clan.inventory.machines structure with tags and machineClass
+   - clan.inventory.instances with service targeting (roles.controller.machines, roles.peer.tags)
+   - specialArgs propagation enabling inputs access in modules
+   - Service targeting preservation (hetzner-ccx23 MUST remain zerotier controller)
+
+6. **Test Framework Choice**: Use nix-unit for Nix expression tests (regression, invariant, feature categories). Use nixosTest for integration tests (VM boot validation). Both frameworks integrate with flake checks.
+
+7. **Snapshot Storage**: All baseline snapshots stored in tests/snapshots/ directory. Snapshots must be committed to git BEFORE refactoring begins to establish source of truth.
+
+8. **Test Execution Order**: Phase 1 (baseline capture) must complete before Phase 2 (refactoring). Never refactor without baselines. Feature test failures are expected and desirable in Phase 1 (prove tests work).
+
+9. **Flake Checks Integration**: All tests must be exposed via flake checks for nix flake check integration. This enables CI/CD validation and developer workflow integration.
+
+10. **Test Naming Convention**: Tests follow pattern {category}-{description}.nix (e.g., terraform-output-equivalence.nix). Test names must clearly indicate what is being validated for maintainability.
+  </constraints>
+
+  <interfaces>
+### Nix-unit Test Interface
+```nix
+# Test structure for nix-unit integration
+{
+  # Test function returns attrset with test metadata
+  test = pkgs.runCommand "test-name" {} ''
+    # Validation logic
+    echo "✅ PASS: description" > $out
+    # OR
+    echo "❌ FAIL: description"
+    exit 1
+  '';
+
+  # Metadata for test tracking
+  category = "regression" | "invariant" | "feature" | "integration";
+  critical = true | false;
+  mustRemainPassing = true | false;  # For regression/invariant
+  expectedToFailBeforeRefactor = true | false;  # For feature
+  mustPassAfterRefactor = true | false;  # For feature
+}
+```
+
+### NixosTest Interface
+```nix
+# VM test structure using nixosTest
+pkgs.nixosTest {
+  name = "boot-machine-name";
+  nodes.machine = config.config;  # NixOS configuration
+  testScript = ''
+    machine.start()
+    machine.wait_for_unit("multi-user.target")
+    machine.succeed("test command")
+  '';
+}
+```
+
+### Flake Checks Integration
+```nix
+# In test-clan/flake.nix perSystem
+perSystem = { system, pkgs, lib, ... }: {
+  checks = {
+    # Regression tests
+    terraform-baseline = import ./tests/regression/terraform-output-equivalence.nix { inherit self pkgs lib; }.baseline;
+
+    # Invariant tests
+    clan-inventory = import ./tests/invariant/clan-inventory-structure.nix { inherit self pkgs lib; }.test;
+
+    # Feature tests (expected to fail initially)
+    import-tree-discovery = import ./tests/feature/import-tree-discovery.nix { inherit self pkgs lib; }.test;
+
+    # Integration tests
+    vm-boots = import ./tests/integration/vm-boot-tests.nix { inherit self pkgs lib; }.all;
+  };
+};
+```
+
+### Test Runner Script Interface
+```bash
+# tests/run-all.sh
+# Usage: ./tests/run-all.sh [baseline|all]
+#
+# baseline: Run only baseline capture (Phase 1)
+# all: Run complete test suite (Phase 3 validation)
+```
+
+### Clan Inventory Structure Interface
+```nix
+# Expected clan.inventory structure preserved by invariant tests
+clan.inventory.machines = {
+  machine-name = {
+    tags = [ "nixos" "cloud" "provider" ];
+    machineClass = "nixos";
+  };
+};
+
+clan.inventory.instances = {
+  service-name = {
+    module = { name = "service"; input = "clan-core"; };
+    roles.role-name.machines."machine-name" = { };  # Specific machine targeting
+    roles.role-name.tags."tag-name" = { };  # Tag-based targeting
+  };
+};
+```
+
+### SpecialArgs Interface
+```nix
+# Pattern validated by IT-3
+clan.specialArgs = { inherit inputs; };
+
+# Enables in host modules:
+{ inputs, lib, ... }: {
+  imports = [
+    inputs.srvos.nixosModules.server  # External input access
+  ];
+}
+```
+  </interfaces>
+
+  <tests>
+    <standards>
+Tests use nix-unit framework for Nix expression validation and nixosTest for VM integration testing. All tests integrate with flake checks (nix flake check) for developer workflow and CI/CD compatibility. Test categories follow test-driven refactoring methodology: establish baseline with regression/invariant tests (what must not break), define target with feature tests (what must be achieved), validate runtime with integration tests (what must work in practice). Tests generate structured output with clear pass/fail indication and rationale. Baseline snapshots commit to git before refactoring to establish source of truth.
+    </standards>
+    <locations>
+Test directory structure in test-clan repository:
+- tests/regression/ - Tests that must remain passing (terraform equivalence, nixos closure, builds)
+- tests/invariant/ - Tests that must always pass (clan inventory, service targeting, specialArgs)
+- tests/feature/ - Tests that define dendritic compliance (import-tree, namespace exports, self-composition)
+- tests/integration/ - VM boot tests for runtime validation
+- tests/snapshots/ - Baseline snapshots (terraform.json, nixos-configs.json, clan-inventory.json)
+- tests/run-all.sh - Test orchestration script
+    </locations>
+    <ideas>
+### Regression Test Ideas
+
+**RT-1 Enhancement**: Add terraform resource count validation - ensure number of VMs, networks, firewalls unchanged. Catch accidental resource additions/removals.
+
+**RT-2 Enhancement**: Add closure size tracking - detect if refactoring accidentally increases system closure size (indicates dependency bloat).
+
+**RT-3 Enhancement**: Test build reproducibility - build same config twice, compare store paths to detect non-determinism.
+
+**RT-4 New**: Configuration evaluation time - track how long nixosConfiguration evaluation takes, detect if refactoring slows evaluation significantly.
+
+### Invariant Test Ideas
+
+**IT-1 Enhancement**: Validate clan vars generation works - ensure clan secrets can still be generated for all service instances after refactoring.
+
+**IT-2 Enhancement**: Test service targeting resolution - verify clan-core correctly resolves which machines receive which service configurations.
+
+**IT-3 Enhancement**: Validate module evaluation doesn't have circular dependencies - detect infinite recursion scenarios early.
+
+**IT-4 New**: Disko configuration preservation - ensure disk layouts unchanged (critical for deployed VMs, modifications could cause data loss).
+
+### Feature Test Ideas
+
+**FT-1 Enhancement**: Count discovered modules - verify import-tree finds expected number of modules (prevents silent module exclusion).
+
+**FT-2 Enhancement**: Test external flake consumption - verify another flake can import test-clan's namespace exports.
+
+**FT-3 Enhancement**: Check import path types - detect any remaining relative imports after refactoring claims self-composition complete.
+
+**FT-4 New**: Automatic host collection - if implementing auto nixosConfigurations generation, test all expected machines appear.
+
+### Integration Test Ideas
+
+**VT-1 Enhancement**: Test zerotier network connectivity - verify VMs can actually communicate over zerotier after deployment.
+
+**VT-2 New**: Clan service functionality - test emergency-access SSH keys work, users-root creates expected users, tor service functional.
+
+**VT-3 New**: Deployment idempotency - deploy configuration twice, verify second deployment is no-op (no unexpected changes).
+
+**VT-4 New**: Rollback capability - test that previous system generations remain bootable after refactoring.
+
+### Cross-cutting Test Ideas
+
+**Snapshot diffing tool**: Create script to generate human-readable diffs between baseline and current snapshots for investigation.
+
+**Test result dashboard**: Generate markdown summary of test results by category with pass/fail counts and failed test details.
+
+**Continuous baseline updates**: After validated refactoring, capture new baselines for next iteration (baselines evolve with intentional changes).
+
+**Property-based testing**: Use hypothesis-style testing for configuration properties (e.g., all machines have SSH, all services have targeting).
+    </ideas>
+  </tests>
+</story-context>
