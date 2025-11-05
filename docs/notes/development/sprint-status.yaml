@@ -66,8 +66,8 @@ development_status:
   # Flow: 1.1 (complete) → 1.3 (inventory) → 1.4-1.8 (infrastructure) → 1.2 (dendritic if time)
   epic-1: backlog
   1-1-prepare-existing-test-clan-repository-for-validation: done
-  # Story 1.2: READY-FOR-DEV - Evaluate dendritic patterns now that infrastructure is mature (2 VMs operational)
-  1-2-implement-dendritic-flake-parts-pattern-in-test-clan: ready-for-dev
+  # Story 1.2: IN-PROGRESS - Evaluating dendritic patterns now that infrastructure is mature (2 VMs operational)
+  1-2-implement-dendritic-flake-parts-pattern-in-test-clan: in-progress
   # Story 1.3: COMPLETE - Inventory configured, ready for Story 1.4
   1-3-configure-clan-inventory-and-service-instances-for-test-vm: done
   # Story 1.4: APPROVED - Review corrected, cx43 at $9.99/month per user direction, all ACs satisfied
