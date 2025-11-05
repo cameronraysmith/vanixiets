@@ -74,7 +74,8 @@ development_status:
   1-4-create-hetzner-terraform-config-and-host-modules: done
   # Story 1.5: DONE - APPROVED ✅ - All 13 ACs validated, ZFS encryption bug discovered and documented
   1-5-deploy-hetzner-vm-and-validate-stack: done
-  1-6-implement-comprehensive-test-harness-for-test-clan: drafted
+  # Story 1.6: Context generated - ready for implementation
+  1-6-implement-comprehensive-test-harness-for-test-clan: ready-for-dev
   1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness: drafted
   1-8-validate-clan-secrets-vars-on-hetzner: drafted
   # Story 1.9: REQUIRES MANUAL SECRET SETUP - agent must pause for user to configure GCP service account JSON
