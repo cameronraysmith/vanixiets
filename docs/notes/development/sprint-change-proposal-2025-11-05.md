@@ -274,7 +274,7 @@ NEW:
 
 ### Change 7: Create Story 1.6 File
 
-**File:** `docs/notes/development/work-items/story-1.6.md` (NEW)
+**File:** `docs/notes/development/work-items/1-6-implement-comprehensive-test-harness-for-test-clan.md` (NEW)
 
 **Content:** Comprehensive story markdown for test harness implementation with:
 - Full acceptance criteria (6 ACs covering test infrastructure, regression tests, invariant tests, feature tests, integration tests, baseline snapshots)
@@ -288,7 +288,7 @@ NEW:
 
 ### Change 8: Create Story 1.7 File
 
-**File:** `docs/notes/development/work-items/story-1.7.md` (NEW)
+**File:** `docs/notes/development/work-items/1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness.md` (NEW)
 
 **Content:** Comprehensive story markdown for dendritic refactoring with:
 - Full acceptance criteria (6 ACs covering regression tests, invariant tests, feature tests, integration tests, refactoring steps, git workflow)
@@ -345,7 +345,7 @@ NEW:
 
 **Product Owner/Scrum Master:**
 1. Update sprint tracking documents (sprint-status.yaml, epics.md)
-2. Create story files (story-1.6.md, story-1.7.md)
+2. Create story files (1-6-implement-comprehensive-test-harness-for-test-clan.md, 1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness.md)
 3. Monitor Epic 1 timeline adjustment (+2-3 days)
 4. Ensure stakeholder awareness of scope expansion
 
@@ -398,8 +398,8 @@ NEW:
 4. ✅ Renumber stories 1.6-1.12 → 1.8-1.14
 5. ✅ Update stability gate references
 6. ✅ Update strategic decision comment
-7. ✅ Create story-1.6.md file
-8. ✅ Create story-1.7.md file
+7. ✅ Create 1-6-implement-comprehensive-test-harness-for-test-clan.md file
+8. ✅ Create 1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness.md file
 9. ✅ Update epics.md with new stories
 
 ### Implementation Authorization
@@ -429,11 +429,11 @@ NEW:
 
 ### Files Created
 
-1. `docs/notes/development/work-items/story-1.6.md`
+1. `docs/notes/development/work-items/1-6-implement-comprehensive-test-harness-for-test-clan.md`
    - Test harness implementation story
    - 6 acceptance criteria, 6 tasks, technical notes
 
-2. `docs/notes/development/work-items/story-1.7.md`
+2. `docs/notes/development/work-items/1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness.md`
    - Dendritic refactoring story
    - 6 acceptance criteria, 6 tasks, risk mitigation, technical notes
 
