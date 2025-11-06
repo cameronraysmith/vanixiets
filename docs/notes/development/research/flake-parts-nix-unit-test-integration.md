@@ -444,45 +444,285 @@ Either:
 
 ## 4. Working Reference Implementations
 
-### 4.1 Flake-Parts Projects with Test Suites
+### 4.1 Flake-Parts Own Test Suite
 
-[TO BE RESEARCHED - Search for working examples]
+**Location:** `~/projects/nix-workspace/flake-parts/dev/tests/eval-tests.nix`
 
-### 4.2 Terranix FlakeModule Analysis
+flake-parts tests itself using pure Nix assertions, NOT derivation-based tests:
 
-[TO BE RESEARCHED - How does terranix expose perSystem.terranix outputs?]
+```nix
+{ flake-parts }:
+rec {
+  example1 = mkFlake { inputs.self = { }; } {
+    systems = [ "a" "b" ];
+    perSystem = { config, system, ... }: {
+      packages.hello = pkg system "hello";
+      apps.hello.program = config.packages.hello;
+    };
+  };
 
-test-clan uses terranix, so understanding its flakeModule is critical.
+  runTests = ok:
+    assert example1 == { apps = { /* ... */ }; /* ... */ };
+    assert example1.packages.a.hello == pkg "a" "hello";
+    ok;
 
-### 4.3 Proven Patterns for Test Check Integration
+  result = runTests "ok";
+}
+```
 
-[TO BE RESEARCHED]
+**Key Insight:** flake-parts tests evaluate flake outputs directly, not via `nix flake check`.
+The tests import flake-parts library, call `mkFlake`, and assert on the resulting attribute set.
+
+**Pattern:** Build complete test flakes, evaluate them, compare results.
+No circular dependency because tests are EXTERNAL to the flakes being tested.
+
+### 4.2 Nix-Unit Own Test Suite
+
+**Location:** `~/projects/nix-workspace/nix-unit/flake.nix` and `lib/modules/flake/dogfood.nix`
+
+nix-unit tests itself using its own flake module:
+
+```nix
+# From dogfood.nix
+{ inputs, ... }:
+{
+  perSystem = {
+    nix-unit.allowNetwork = true;
+    nix-unit.tests = {
+      "test integer equality is reflexive" = {
+        expr = "123";
+        expected = "123";
+      };
+      "frobnicator" = {
+        "testFoo" = {
+          expr = "foo";
+          expected = "foo";
+        };
+      };
+    };
+  };
+  flake.tests.testBar = {
+    expr = "bar";
+    expected = "bar";
+  };
+}
+```
+
+**Key Insight:** Tests are DATA (expr/expected) defined in perSystem, but evaluated by nix-unit binary which receives the complete flake.
+
+**Pattern:** Separate test DATA definition from test EXECUTION.
+
+### 4.3 Pattern: Accessing Flake Outputs in Tests
+
+**The Working Pattern (from nix-unit):**
+
+1. Define test EXPRESSIONS in perSystem as data:
+```nix
+perSystem = {
+  nix-unit.tests.my-test = {
+    expr = "flakeOutputs.terranix.x86_64-linux.google_compute_instance.test";
+    expected = "{ /* expected structure */ }";
+  };
+};
+```
+
+2. The expression is evaluated by nix-unit binary which has access to `self` (the complete flake):
+```nix
+checks.nix-unit = pkgs.runCommand "test" { } ''
+  nix-unit --flake ${self}#tests.systems.${system}
+'';
+```
+
+**Why This Works:**
+- Test DATA is just strings and attribute sets (no evaluation yet)
+- Test EXECUTION happens in the check derivation
+- Check derivation has `${self}` interpolated (complete flake)
+- nix-unit binary evaluates expressions in context where `self` is available
+
+### 4.4 Terranix FlakeModule Pattern
+
+test-clan uses terranix's flakeModule.
+Let me examine terranix to understand how it exposes outputs:
+
+**Expected Pattern (needs verification):**
+terranix likely uses `mkTransposedPerSystemModule` to create:
+- `perSystem.terranix` option (per-system terranix configurations)
+- `flake.terranix.${system}` output (transposed to flake level)
+
+This means `flake.terranix` is created AFTER perSystem evaluation completes.
 
 ---
 
 ## 5. Failed Attempt Forensics: phase-0-tests Branch
 
-### 5.1 Commit Analysis (f0aa5e9 through f405a6a)
+**Branch:** `test-clan/phase-0-tests`
+**Commit Range:** f0aa5e9..f405a6a (10 commits)
+**Location:** `~/projects/nix-workspace/test-clan`
 
-[TO BE RESEARCHED - Review test-clan phase-0-tests branch]
+### 5.1 Commit Sequence Analysis
 
-### 5.2 What Was Attempted and Why Each Failed
+```
+f0aa5e9 feat(tests): add nix-unit to flake inputs for test framework
+edf25a7 feat(tests): implement comprehensive test suite for test-clan validation
+32f368b feat(tests): integrate test suite with flake checks and add runner script
+5895147 fix(tests): use testers.nixosTest instead of deprecated nixosTest
+414d427 chore(deps): update flake.lock with nix-unit input
+8f5048b fix(gcp-vm): add minimal filesystem configuration for test compatibility
+0d0f40b fix(tests): add file check in machine-configurations-build test
+53a8e83 fix(tests): remove buildInputs from aggregate machine build test
+0d22a96 docs(tests): add comprehensive test suite documentation
+f405a6a fix(tests): use config.flake for test imports in perSystem
+```
 
-#### Attempt 1: Using config.flake in perSystem
-[TO BE ANALYZED]
-- What was tried?
-- Why did it fail?
-- What constraint was discovered?
+### 5.2 What Was Attempted and Why It Failed
 
-#### Attempt 2: Using inputs.self
-[TO BE ANALYZED]
+#### Initial Implementation (edf25a7)
 
-#### Attempt 3: Post-hoc flake merging
-[TO BE ANALYZED]
+**What was tried:**
+Created comprehensive test files importing flake outputs directly:
+
+```nix
+# tests/invariant/clan-inventory-structure.nix
+{ self, lib, pkgs, ... }:
+let
+  clanConfig = self.clan or (throw "No clan configuration found!");
+  # Test validates clan inventory structure
+in {
+  test = pkgs.runCommand "validate-clan-inventory" { } ''
+    # Validation logic
+  '';
+}
+```
+
+**The Problem:**
+Tests expected `self` to contain complete flake outputs (`self.clan`, `self.terranix`, `self.nixosConfigurations`).
+
+#### Integration with Checks (32f368b)
+
+**What was tried:**
+Import tests in perSystem.checks with `inputs.self`:
+
+```nix
+perSystem = { pkgs, inputs', self', system, lib, ... }: {
+  checks =
+    let
+      importTest = path: import path {
+        self = inputs.self;  # ❌ ATTEMPT 1: Use inputs.self
+        inherit pkgs lib inputs;
+      };
+
+      invariantTests = {
+        clan-inventory = (importTest ./tests/invariant/clan-inventory-structure.nix).test;
+      };
+    in invariantTests;
+};
+```
+
+**Why it failed:**
+`inputs.self` refers to the flake currently being evaluated.
+At the point perSystem is being evaluated, `inputs.self.clan`, `inputs.self.terranix`, etc. DO NOT EXIST YET.
+These outputs are created BY the perSystem evaluation, so they can't be accessed FROM within perSystem evaluation.
+
+**Error encountered:**
+```
+error: attribute 'terranix' missing
+```
+
+#### Final Fix Attempt (f405a6a)
+
+**What was tried:**
+Use `config.flake` instead of `inputs.self`:
+
+```nix
+perSystem = { config, pkgs, inputs', self', system, lib, inputs, ... }: {
+  checks =
+    let
+      importTest = path: import path {
+        self = config.flake;  # ❌ ATTEMPT 2: Use config.flake
+        inherit pkgs lib inputs;
+      };
+    in /* ... */;
+};
+```
+
+**Why it STILL fails:**
+`config.flake` is the RESULT of the entire flake-parts evaluation.
+Accessing it from within perSystem creates a circular dependency:
+1. perSystem must evaluate to produce config.flake
+2. perSystem evaluation needs config.flake
+3. Infinite recursion
+
+**Commit message reveals understanding:**
+> "In flake-parts perSystem context, config.flake provides access to the complete flake outputs"
+
+This is INCORRECT.
+`config.flake` is not available in perSystem context for the same reason `inputs.self.outputs` isn't: the outputs don't exist until perSystem finishes evaluating.
 
 ### 5.3 Architectural Constraints Discovered
 
-[TO BE SYNTHESIZED from failure analysis]
+**The Core Constraint:**
+perSystem evaluation happens BEFORE flake outputs exist.
+Therefore, any code in perSystem CANNOT access:
+- `config.flake` (the complete flake outputs)
+- `inputs.self.<output>` (outputs of the flake being built)
+- Top-level flake attributes like `terranix`, `clan`, `nixosConfigurations`
+
+**Why the Attempted Approaches Failed:**
+
+1. **Attempt: Import test modules in perSystem**
+   - FAILS: Tests need flake outputs that don't exist yet
+
+2. **Attempt: Pass `inputs.self` to tests**
+   - FAILS: `inputs.self` doesn't have outputs yet (circular)
+
+3. **Attempt: Pass `config.flake` to tests**
+   - FAILS: `config.flake` IS the output being constructed (circular)
+
+**The Fundamental Problem:**
+test-clan tests validate properties of complete flake outputs:
+- Terraform configurations (`flake.terranix`)
+- NixOS machine configurations (`flake.nixosConfigurations`)
+- Clan inventory structure (`flake.clan`)
+
+These outputs are assembled from perSystem evaluations.
+You cannot validate the assembled result from within the assembly process.
+
+**Correct Approaches (not attempted in phase-0-tests):**
+
+1. **Use `top@` pattern:**
+```nix
+top@{ config, lib, ... }: {
+  perSystem = { ... }: { /* normal perSystem */ };
+  flake.checks.x86_64-linux = import ./tests {
+    self = top.config.flake;  # ✅ Available at flake level
+  };
+}
+```
+
+2. **Use `withSystem` at flake level:**
+```nix
+{ withSystem, config, ... }: {
+  systems = [ "x86_64-linux" ];
+  perSystem = { ... }: { /* normal perSystem */ };
+  flake.checks.x86_64-linux = withSystem "x86_64-linux" ({ pkgs, ... }): {
+    my-test = pkgs.runCommand "test" {} ''
+      # Test has access to config.flake via outer scope
+    '';
+  };
+}
+```
+
+3. **Use nix-unit expr/expected pattern:**
+```nix
+perSystem = {
+  nix-unit.tests.terranix-validation = {
+    expr = "flake.terranix.x86_64-linux";  # String expression
+    expected = "{ /* expected structure */ }";
+  };
+};
+```
+
+The nix-unit pattern works because the expression is just a STRING in perSystem, but gets evaluated by nix-unit binary which receives the complete flake.
 
 ---
 
