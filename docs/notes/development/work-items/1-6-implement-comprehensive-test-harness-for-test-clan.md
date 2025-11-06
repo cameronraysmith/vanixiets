@@ -28,38 +28,45 @@ It provides ongoing value for validating any changes to the infrastructure codeb
 ## Acceptance Criteria
 
 ### AC1: Test Infrastructure Setup
-- [ ] nix-unit added to flake inputs
-- [ ] Test directory structure created: `tests/{regression,invariant,feature,integration,snapshots}/`
-- [ ] Test outputs exposed via `flake.nix` checks
-- [ ] Test runner script operational: `./tests/run-all.sh`
+- [ ] nix-unit added to flake inputs with flake module imported
+- [ ] Test directory structure created: `tests/nix-unit/` and `tests/integration/`
+- [ ] flake.nix uses `top@` pattern for accessing complete flake outputs
+- [ ] Simple tests defined in `perSystem.nix-unit.tests` (nix-unit pattern)
+- [ ] Complex tests defined in `flake.checks` using `withSystem` (withSystem pattern)
+- [ ] `nix flake show` displays checks without infinite recursion errors
 
 ### AC2: Regression Tests Implemented and Passing
-- [ ] RT-1: Terraform output equivalence test implemented
-- [ ] RT-2: NixOS configuration closure equivalence test implemented
-- [ ] RT-3: Machine configurations build test implemented
+- [ ] RT-1: Terraform output equivalence test implemented using nix-unit expr/expected
+- [ ] RT-2: NixOS configuration closure test implemented using withSystem
+- [ ] RT-3: Machine configurations build test implemented using withSystem
+- [ ] All regression tests avoid circular dependencies (no access to config.flake or inputs.self from perSystem)
 - [ ] All regression tests pass with baseline snapshots captured
 
 ### AC3: Invariant Tests Implemented and Passing
-- [ ] IT-1: Clan inventory structure test implemented
-- [ ] IT-2: Clan service targeting test implemented
-- [ ] IT-3: specialArgs propagation test implemented
+- [ ] IT-1: Clan inventory structure test implemented using nix-unit expr/expected
+- [ ] IT-2: Clan service targeting test implemented using nix-unit expr/expected
+- [ ] IT-3: specialArgs propagation test implemented using nix-unit expr/expected
+- [ ] All invariant tests defined in `tests/nix-unit/invariant.nix`
 - [ ] All invariant tests pass (validates clan-core integration)
 
 ### AC4: Feature Tests Implemented (Expected to Fail)
-- [ ] FT-1: import-tree discovery test implemented
-- [ ] FT-2: Namespace exports test implemented
-- [ ] FT-3: Self-composition test implemented
+- [ ] FT-1: import-tree discovery test implemented using nix-unit expr/expected
+- [ ] FT-2: Namespace exports test implemented using nix-unit expr/expected
+- [ ] All feature tests defined in `tests/nix-unit/feature.nix`
 - [ ] Feature tests fail as expected (confirms test correctness - dendritic features don't exist yet)
 
 ### AC5: Integration Tests Implemented and Passing
-- [ ] VT-1: VM boot tests implemented for all 3 machines
+- [ ] VT-1: VM boot tests implemented for all 3 machines using withSystem + runNixOSTest
+- [ ] VM tests defined in `tests/integration/vm-boot.nix` at flake level
 - [ ] All VMs boot successfully with base module features validated
 - [ ] SSH access confirmed on all test VMs
 
-### AC6: Baseline Snapshots Captured
-- [ ] Terraform baseline: `tests/snapshots/terraform.json`
-- [ ] NixOS configs baseline: `tests/snapshots/nixos-configs.json`
-- [ ] Clan inventory baseline: `tests/snapshots/clan-inventory.json`
+### AC6: Validation and Integration
+- [ ] `nix flake check` executes without errors
+- [ ] All individual checks can be built: `nix build .#checks.x86_64-linux.<check-name>`
+- [ ] nix-unit check passes: `nix build .#checks.x86_64-linux.nix-unit`
+- [ ] Tests fail appropriately when conditions are not met (verified by temporarily breaking a test)
+- [ ] No circular dependency errors during evaluation
 
 ---
 
