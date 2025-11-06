@@ -239,20 +239,206 @@ Tests that need access to complete flake outputs MUST be defined at the flake le
 
 ### 3.1 Nix-Unit Design and Architecture
 
-[TO BE RESEARCHED - Study ~/projects/nix-workspace/nix-unit]
+**Location:** `~/projects/nix-workspace/nix-unit`
+
+nix-unit is a C++ binary test runner for Nix that evaluates test expressions and compares them to expected values.
+It integrates with flake-parts via a flake module that creates check derivations.
+
+**Core Components:**
+- C++ test runner binary: `/nix-unit/src/` (invoked as `nix-unit`)
+- Flake modules for integration: `/nix-unit/lib/modules/flake/`
+- Test type definitions: `/nix-unit/lib/types.nix`
+
+**Integration Architecture:**
+nix-unit provides a flake module that:
+1. Defines `perSystem.nix-unit.tests` option for test suites
+2. Creates `checks.nix-unit` derivation that runs the test binary
+3. Exposes `flake.tests.systems.${system}` for test discovery
+4. Supports both system-specific and system-agnostic tests
+
+**Source References:**
+- Flake module: `~/projects/nix-workspace/nix-unit/lib/modules.nix`
+- System integration: `~/projects/nix-workspace/nix-unit/lib/modules/flake/system.nix`
+- System-agnostic tests: `~/projects/nix-workspace/nix-unit/lib/modules/flake/system-agnostic.nix`
 
 ### 3.2 Nix-Unit Test Structure
 
-[TO BE RESEARCHED]
+**Basic Test Format:**
+```nix
+{
+  testName = {
+    expr = <nix expression to evaluate>;
+    expected = <expected value>;
+  };
+}
+```
 
-Key questions:
-- expr/expected pattern vs pkgs.runCommand wrapper?
-- Test module structure and interfaces?
-- How do nix-unit tests integrate with flake checks?
+**Example from nix-unit/tests/assets/basic.nix:**
+```nix
+{
+  testPass = {
+    expr = 1;
+    expected = 1;
+  };
 
-### 3.3 Best Practices from nix-unit/tests/
+  nested = {
+    testFoo = {
+      expr = "bar";
+      expected = "bar";
+    };
+  };
 
-[TO BE RESEARCHED - Analyze nix-unit's own test examples]
+  testCatchThrow = {
+    expr = throw "I give up";
+    expectedError.type = "ThrownError";
+  };
+}
+```
+
+**Test Suite Structure:**
+Tests can be nested arbitrarily deep:
+```nix
+{
+  "category" = {
+    "subcategory" = {
+      "testName" = {
+        expr = ...;
+        expected = ...;
+      };
+    };
+  };
+}
+```
+
+**Error Testing:**
+Tests can validate that expressions throw expected errors:
+```nix
+testCatchMessage = {
+  expr = throw "Still about 100 errors to go";
+  expectedError.type = "ThrownError";
+  expectedError.msg = "\\d+ errors";  # Regex match
+};
+```
+
+### 3.3 Flake-Parts Integration Pattern
+
+**From nix-unit/lib/modules/flake/system.nix (lines 105-138):**
+
+nix-unit creates a check derivation that runs the test binary:
+
+```nix
+perSystem = { config, pkgs, system, ... }: {
+  options.nix-unit = {
+    package = mkOption { type = types.package; };
+    inputs = mkOption { type = types.attrsOf types.path; default = {}; };
+    allowNetwork = mkOption { type = types.bool; default = false; };
+    tests = mkOption { type = suite; default = {}; };
+  };
+
+  config = {
+    checks.nix-unit = pkgs.runCommandNoCC "nix-unit-check" {
+      nativeBuildInputs = [ config.nix-unit.package ];
+    } ''
+      nix-unit \
+        --show-trace \
+        --extra-experimental-features flakes \
+        ${lib.concatStringsSep " " (lib.mapAttrsToList overrideArg config.nix-unit.inputs)} \
+        --flake ${self}#tests.systems.${system}
+      echo "pass" > $out
+    '';
+  };
+};
+```
+
+**Key Insight: Test Discovery via Flake Outputs**
+
+From system.nix lines 133-137:
+```nix
+config = {
+  flake = {
+    tests.systems = lib.mapAttrs (_system: config: config.nix-unit.tests) config.allSystems;
+  };
+};
+```
+
+This creates `flake.tests.systems.${system}` containing the test suite, which nix-unit reads via `--flake ${self}#tests.systems.${system}`.
+
+**Important:** The check invokes `nix-unit` with `${self}` - the complete flake.
+This means the check CAN access all flake outputs because it runs AFTER the flake is fully evaluated.
+
+### 3.4 System-Agnostic Tests
+
+**From system-agnostic.nix:**
+```nix
+perSystem = { config, ... }: {
+  options.nix-unit = {
+    enableSystemAgnostic = mkOption {
+      default = true;
+      type = types.bool;
+    };
+  };
+  config = mkIf config.nix-unit.enableSystemAgnostic {
+    nix-unit.tests.system-agnostic = lib.removeAttrs top.config.flake.tests [ "systems" ];
+  };
+};
+```
+
+Tests defined in `flake.tests` (not `flake.tests.systems`) are automatically copied into each system's test suite under a `system-agnostic` namespace.
+
+### 3.5 Usage Pattern
+
+**In user flake:**
+```nix
+{
+  inputs.nix-unit.url = "github:nix-community/nix-unit";
+
+  outputs = inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [
+        inputs.nix-unit.modules.flake.default
+      ];
+
+      perSystem = { config, ... }: {
+        nix-unit.tests = {
+          "test integer equality" = {
+            expr = "123";
+            expected = "123";
+          };
+        };
+      };
+
+      # Optional: system-agnostic tests
+      flake.tests.testBar = {
+        expr = "bar";
+        expected = "bar";
+      };
+    };
+}
+```
+
+**Running tests:**
+- `nix flake check`: Runs all checks including nix-unit
+- `nix build .#checks.x86_64-linux.nix-unit`: Run nix-unit check specifically
+- `nix-unit --flake .#tests.systems.x86_64-linux`: Run nix-unit directly
+
+### 3.6 Critical Constraint for test-clan
+
+**The Problem with Direct Test Imports:**
+
+nix-unit's pattern works because tests are defined as DATA (attribute sets with expr/expected), not as derivations requiring immediate access to flake outputs.
+
+For test-clan's needs (testing terranix outputs, nixosConfigurations, clan inventory), tests need to:
+1. Import actual flake outputs during test evaluation
+2. Access outputs that don't exist yet in perSystem context
+
+**nix-unit's Solution:**
+The test SUITE is defined in perSystem (as data), but the test RUNNER (the check derivation) has access to the complete flake via `${self}` passed to nix-unit binary.
+
+**Implication for test-clan:**
+Either:
+- Use nix-unit's expr/expected pattern (tests are expressions evaluated by nix-unit)
+- Create check derivations at flake level using `withSystem` or `top@` pattern
+- Combine both: define test data in perSystem, create test derivations at flake level
 
 ---
 
