@@ -126,6 +126,76 @@ It provides ongoing value for validating any changes to the infrastructure codeb
 
 ## Technical Notes
 
+### Critical Architecture Constraint: Flake-Parts Evaluation Model
+
+**IMPORTANT:** This story's implementation was revised based on comprehensive technical research that identified why the phase-0-tests branch failed.
+
+**Root Cause of Failure:** The phase-0-tests branch (commits f0aa5e9..f405a6a) attempted to import test modules in perSystem with access to complete flake outputs (`inputs.self`, `config.flake`).
+This created circular dependencies because perSystem evaluation happens BEFORE flake outputs exist.
+
+**Technical Research Reference:**
+`docs/notes/development/research/flake-parts-nix-unit-test-integration.md`
+
+This research document provides:
+- Deep analysis of flake-parts perSystem evaluation model
+- Root cause analysis of circular dependency failures
+- THREE correct implementation patterns with working code examples
+- Recommended hybrid approach for test-clan
+- Specific implementation guidance
+
+### Correct Implementation Patterns
+
+**Pattern 1: nix-unit expr/expected (for simple property tests)**
+```nix
+perSystem = {
+  nix-unit.tests."test-name" = {
+    expr = "flake.terranix.x86_64-linux.google_compute_instance";  # String expression
+    expected = "{ /* ... */ }";
+  };
+};
+```
+- Test DATA defined in perSystem as strings
+- Test EXECUTION happens in check derivation with complete flake access
+- No circular dependency because expressions are not evaluated until nix-unit binary runs
+
+**Pattern 2: withSystem at flake level (for complex derivation tests)**
+```nix
+top@{ withSystem, config, lib, ... }:
+{
+  perSystem = { /* normal perSystem */ };
+
+  flake.checks = lib.genAttrs config.systems (system:
+    withSystem system ({ pkgs, ... }: {
+      vm-boot = pkgs.testers.runNixOSTest {
+        nodes.machine = { imports = [ top.config.flake.nixosModules.default ]; };
+        testScript = ''machine.wait_for_unit("multi-user.target")'';
+      };
+    })
+  );
+}
+```
+- Tests defined at flake level, NOT in perSystem
+- Access both perSystem context (pkgs) AND complete flake outputs (via top.config.flake)
+- No circular dependency because tests run after flake outputs assembled
+
+**Hybrid Approach (RECOMMENDED for test-clan):**
+- Simple property tests (RT-1, IT-1, IT-2, IT-3, FT-1, FT-2) → nix-unit
+- Build validation tests (RT-2, RT-3) → withSystem + runCommand
+- VM integration tests (VT-1) → withSystem + runNixOSTest
+
+### Test File Organization
+
+```
+tests/
+├── nix-unit/                # Simple property tests (nix-unit expr/expected)
+│   ├── regression.nix       # RT-1: Terraform output equivalence
+│   ├── invariant.nix        # IT-1, IT-2, IT-3: Clan structure tests
+│   └── feature.nix          # FT-1, FT-2: Dendritic features
+└── integration/             # Complex derivation-based tests (withSystem)
+    ├── machine-builds.nix   # RT-2, RT-3: Build validation
+    └── vm-boot.nix          # VT-1: VM boot tests
+```
+
 ### Test Categories
 
 **Category 1: Regression Tests (MUST REMAIN PASSING)**
@@ -155,6 +225,10 @@ It provides ongoing value for:
 - Preventing regressions in future stories
 - Documenting expected behavior
 - Enabling confident experimentation
+
+### References
+
+[Research: Flake-Parts Nix-Unit Test Integration](../research/flake-parts-nix-unit-test-integration.md) - Comprehensive technical analysis of correct test implementation patterns for flake-parts repositories
 
 ---
 
