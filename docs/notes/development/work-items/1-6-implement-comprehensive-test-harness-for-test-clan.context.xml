@@ -3,10 +3,11 @@
     <epicId>1</epicId>
     <storyId>6</storyId>
     <title>Implement Comprehensive Test Harness for test-clan Infrastructure Validation</title>
-    <status>drafted</status>
+    <status>ready-for-dev</status>
     <generatedAt>2025-11-05</generatedAt>
     <generator>BMAD Story Context Workflow</generator>
     <sourceStoryPath>docs/notes/development/work-items/1-6-implement-comprehensive-test-harness-for-test-clan.md</sourceStoryPath>
+    <revisionContext>Revised after phase-0-tests failure analysis and comprehensive technical research</revisionContext>
   </metadata>
 
   <story>
@@ -14,103 +15,127 @@
     <iWant>A comprehensive test suite that validates existing functionality and defines expected dendritic capabilities</iWant>
     <soThat>I can confidently refactor test-clan to dendritic flake-parts compliance with zero regression in critical infrastructure functionality</soThat>
     <tasks>
-### Task 1: Setup Test Infrastructure (1-2 hours)
-1. Add nix-unit to flake.nix inputs
-2. Create test directory structure
-3. Create test runner script template
-4. Add checks section to flake.nix perSystem
+### Task 1: Setup Test Infrastructure with Correct Patterns (2-3 hours)
+1. Add nix-unit to flake.nix inputs and import flake module
+   - inputs.nix-unit.url = "github:nix-community/nix-unit";
+   - Add to imports: inputs.nix-unit.modules.flake.default
+2. Modify flake.nix to use top@ pattern for accessing complete flake outputs
+   - Change signature: top@{ withSystem, config, lib, ... }:
+   - This enables access to top.config.flake from flake level
+3. Create test directory structure
+   - tests/nix-unit/ for simple property tests (nix-unit expr/expected)
+   - tests/integration/ for complex derivation tests (withSystem)
+4. Verify no circular dependencies
+   - Run nix flake show to confirm no infinite recursion
+   - This validates the flake structure before writing tests
 
-### Task 2: Implement Regression Tests (2-3 hours)
-1. Implement RT-1: Terraform output equivalence
-   - Normalize and compare terraform JSON outputs
-   - Capture baseline snapshot
-2. Implement RT-2: NixOS closure equivalence
-   - Extract configuration properties (hostname, services, bootloader, users)
-   - Compare before/after snapshots
-3. Implement RT-3: Machine builds
-   - Verify all 3 machines build successfully
-   - Test toplevel derivation accessibility
+### Task 2: Implement Simple Property Tests via nix-unit (2-3 hours)
+Pattern: Define test DATA as strings in perSystem, executed by nix-unit binary
 
-### Task 3: Implement Invariant Tests (1-2 hours)
-1. Implement IT-1: Clan inventory structure
-   - Validate 3 machines present with correct tags
-   - Validate service instances (emergency-access, users-root, zerotier, tor)
-   - Verify zerotier controller/peer targeting
-2. Implement IT-2: Service targeting preservation
-   - Validate role assignments unchanged
-   - Confirm hetzner-ccx23 is zerotier controller
-3. Implement IT-3: specialArgs propagation
-   - Verify inputs accessible in host modules
-   - Confirm srvos importable
+1. Create tests/nix-unit/regression.nix
+   - RT-1: Terraform output structure validation using expr/expected
+2. Create tests/nix-unit/invariant.nix
+   - IT-1: Clan inventory structure
+   - IT-2: Clan service targeting
+   - IT-3: specialArgs propagation
+3. Create tests/nix-unit/feature.nix
+   - FT-1: import-tree discovery (expected to fail)
+   - FT-2: Namespace exports (expected to fail)
+4. Import test suites in perSystem using nix-unit.tests option
 
-### Task 4: Implement Feature Tests (1 hour)
-1. Implement FT-1: import-tree discovery
-   - Check for automatic module discovery
-   - Expected to fail before dendritic refactoring
-2. Implement FT-2: Namespace exports
-   - Verify modules exported to config.flake.modules
-   - Expected to fail (only terranix currently exported)
-3. Implement FT-3: Self-composition
-   - Check host modules for namespace imports vs relative paths
-   - Expected to fail (currently using relative imports)
+### Task 3: Implement Complex Tests via withSystem (2-3 hours)
+Pattern: Define tests at flake level using withSystem for perSystem context + flake outputs
 
-### Task 5: Implement Integration Tests (1-2 hours)
-1. Implement VT-1: VM boot tests
-   - Create nixosTest for each machine
-   - Validate boot to multi-user.target
-   - Test base module features (nix, users, sudo, SSH)
-   - Verify hostname and service enablement
+1. Create tests/integration/machine-builds.nix
+   - RT-2: NixOS closure validation
+   - RT-3: Machine configurations build
+   - Access flake.nixosConfigurations via top.config.flake parameter
+2. Create tests/integration/vm-boot.nix
+   - VT-1: VM boot tests for all machines using pkgs.testers.runNixOSTest
+3. Integrate complex tests at flake level
+   - Use lib.genAttrs config.systems with withSystem
+   - Pass top.config.flake to test modules for flake output access
+   - Access pkgs from perSystem context via withSystem
 
-### Task 6: Validation and Documentation (1 hour)
-1. Run complete test suite baseline
-2. Capture all snapshots
-3. Verify test categories behave as expected:
-   - Regression: PASS
-   - Invariant: PASS
-   - Feature: FAIL (expected)
-   - Integration: PASS
-4. Document test execution in story completion notes
+### Task 4: Validation and Verification (1 hour)
+1. Verify no circular dependencies
+   - Run nix flake show (should complete without errors)
+   - Confirm all checks are listed in output
+2. Test individual checks
+   - nix build .#checks.x86_64-linux.nix-unit (simple property tests)
+   - nix build .#checks.x86_64-linux.machine-builds
+   - nix build .#checks.x86_64-linux.vm-boot
+3. Run complete test suite
+   - nix flake check (may take several minutes for VM tests)
+4. Verify test behavior
+   - Regression tests: PASS
+   - Invariant tests: PASS
+   - Feature tests: FAIL (expected - dendritic features not implemented)
+   - Integration tests: PASS
+5. Test failure detection
+   - Temporarily break a test condition
+   - Verify check fails appropriately
+   - Restore condition and verify check passes again
+
+### Task 5: Documentation (30 minutes)
+1. Document test execution in story completion notes
+2. Note any deviations from planned approach
+3. Record test execution times
+4. List any tests that were skipped or deferred
     </tasks>
   </story>
 
   <acceptanceCriteria>
 ### AC1: Test Infrastructure Setup
-- [ ] nix-unit added to flake inputs
-- [ ] Test directory structure created: `tests/{regression,invariant,feature,integration,snapshots}/`
-- [ ] Test outputs exposed via `flake.nix` checks
-- [ ] Test runner script operational: `./tests/run-all.sh`
+- [ ] nix-unit added to flake inputs with flake module imported
+- [ ] Test directory structure created: tests/nix-unit/ and tests/integration/
+- [ ] flake.nix uses top@ pattern for accessing complete flake outputs
+- [ ] Simple tests defined in perSystem.nix-unit.tests (nix-unit pattern)
+- [ ] Complex tests defined in flake.checks using withSystem (withSystem pattern)
+- [ ] nix flake show displays checks without infinite recursion errors
 
 ### AC2: Regression Tests Implemented and Passing
-- [ ] RT-1: Terraform output equivalence test implemented
-- [ ] RT-2: NixOS configuration closure equivalence test implemented
-- [ ] RT-3: Machine configurations build test implemented
+- [ ] RT-1: Terraform output equivalence test implemented using nix-unit expr/expected
+- [ ] RT-2: NixOS configuration closure test implemented using withSystem
+- [ ] RT-3: Machine configurations build test implemented using withSystem
+- [ ] All regression tests avoid circular dependencies (no access to config.flake or inputs.self from perSystem)
 - [ ] All regression tests pass with baseline snapshots captured
 
 ### AC3: Invariant Tests Implemented and Passing
-- [ ] IT-1: Clan inventory structure test implemented
-- [ ] IT-2: Clan service targeting test implemented
-- [ ] IT-3: specialArgs propagation test implemented
+- [ ] IT-1: Clan inventory structure test implemented using nix-unit expr/expected
+- [ ] IT-2: Clan service targeting test implemented using nix-unit expr/expected
+- [ ] IT-3: specialArgs propagation test implemented using nix-unit expr/expected
+- [ ] All invariant tests defined in tests/nix-unit/invariant.nix
 - [ ] All invariant tests pass (validates clan-core integration)
 
 ### AC4: Feature Tests Implemented (Expected to Fail)
-- [ ] FT-1: import-tree discovery test implemented
-- [ ] FT-2: Namespace exports test implemented
-- [ ] FT-3: Self-composition test implemented
+- [ ] FT-1: import-tree discovery test implemented using nix-unit expr/expected
+- [ ] FT-2: Namespace exports test implemented using nix-unit expr/expected
+- [ ] All feature tests defined in tests/nix-unit/feature.nix
 - [ ] Feature tests fail as expected (confirms test correctness - dendritic features don't exist yet)
 
 ### AC5: Integration Tests Implemented and Passing
-- [ ] VT-1: VM boot tests implemented for all 3 machines
+- [ ] VT-1: VM boot tests implemented for all 3 machines using withSystem + runNixOSTest
+- [ ] VM tests defined in tests/integration/vm-boot.nix at flake level
 - [ ] All VMs boot successfully with base module features validated
 - [ ] SSH access confirmed on all test VMs
 
-### AC6: Baseline Snapshots Captured
-- [ ] Terraform baseline: `tests/snapshots/terraform.json`
-- [ ] NixOS configs baseline: `tests/snapshots/nixos-configs.json`
-- [ ] Clan inventory baseline: `tests/snapshots/clan-inventory.json`
+### AC6: Validation and Integration
+- [ ] nix flake check executes without errors
+- [ ] All individual checks can be built: nix build .#checks.x86_64-linux.<check-name>
+- [ ] nix-unit check passes: nix build .#checks.x86_64-linux.nix-unit
+- [ ] Tests fail appropriately when conditions are not met (verified by temporarily breaking a test)
+- [ ] No circular dependency errors during evaluation
   </acceptanceCriteria>
 
   <artifacts>
     <docs>
+      <artifact>
+        <path>docs/notes/development/research/flake-parts-nix-unit-test-integration.md</path>
+        <title>Testing Nix Flake-Parts Based Repositories: Deep Technical Research</title>
+        <section>Complete Document - CRITICAL TECHNICAL REFERENCE</section>
+        <snippet>AUTHORITATIVE technical research document analyzing why phase-0-tests branch failed and documenting THREE correct implementation patterns for testing flake-parts repositories. Root cause: perSystem evaluation happens BEFORE flake outputs exist, creating circular dependencies when tests try to access config.flake or inputs.self from within perSystem. Solution: Hybrid approach using (1) nix-unit expr/expected for simple tests in perSystem, (2) withSystem at flake level for complex tests needing both perSystem context and flake outputs. Includes working code examples, pitfalls to avoid, and complete validation criteria. This document is the technical specification for Story 1.6 implementation.</snippet>
+      </artifact>
       <artifact>
         <path>docs/notes/development/dendritic-refactor-test-strategy.md</path>
         <title>Test Strategy: Dendritic Flake-Parts Refactoring for test-clan</title>
@@ -222,127 +247,190 @@
   </artifacts>
 
   <constraints>
-1. **Test Infrastructure Location**: All test files must be created in ~/projects/nix-workspace/test-clan/ repository, NOT in infra repository. Story context lives in infra for documentation, but implementation happens in test-clan.
+1. **CRITICAL - Circular Dependency Avoidance**: perSystem evaluation happens BEFORE flake outputs exist. NEVER access config.flake or inputs.self from within perSystem modules. This creates infinite recursion. Simple tests use nix-unit expr/expected in perSystem (test DATA only). Complex tests use withSystem at flake level (test EXECUTION with flake access). See research document for complete technical analysis.
 
-2. **Baseline Preservation**: Regression tests MUST capture baselines BEFORE any refactoring. Snapshots serve as source of truth for "what worked before." Test failure after refactoring = regression detected.
+2. **Test Infrastructure Location**: All test files must be created in ~/projects/nix-workspace/test-clan/ repository, NOT in infra repository. Story context lives in infra for documentation, but implementation happens in test-clan.
 
-3. **Test Category Semantics**:
+3. **Correct Implementation Patterns**:
+   - Simple property tests: Define in perSystem.nix-unit.tests using expr/expected (nix-unit pattern)
+   - Complex derivation tests: Define at flake level using withSystem (withSystem pattern)
+   - Access flake outputs: Use top.config.flake passed to tests at flake level
+   - Access perSystem context: Use withSystem to get pkgs from perSystem while at flake level
+   - Test organization: tests/nix-unit/ for simple tests, tests/integration/ for complex tests
+
+4. **Test Category Semantics**:
    - Regression: Must pass before AND after refactoring (validates preservation)
    - Invariant: Must always pass (validates clan-core contract)
    - Feature: Expected to FAIL before refactoring, MUST pass after (validates new capabilities)
    - Integration: Must pass before AND after (validates runtime behavior)
 
-4. **Operational VM Safety**: Tests must NOT modify deployed VMs (162.55.175.87, 49.13.140.183). Integration tests use nixosTest VM instantiation, not real infrastructure. Terraform baseline capture must use terraform show, not terraform apply.
+5. **Validation Requirements**: Run nix flake show to verify no circular dependencies BEFORE writing tests. Test implementation must not introduce infinite recursion errors. All tests must integrate with nix flake check. Individual tests must be buildable via nix build .#checks.<system>.<test-name>.
 
-5. **Clan-core Integration Requirements**: Invariant tests protect clan-core compatibility requirements that must never break:
+6. **Clan-core Integration Requirements**: Invariant tests protect clan-core compatibility requirements that must never break:
    - clan.inventory.machines structure with tags and machineClass
    - clan.inventory.instances with service targeting (roles.controller.machines, roles.peer.tags)
    - specialArgs propagation enabling inputs access in modules
    - Service targeting preservation (hetzner-ccx23 MUST remain zerotier controller)
 
-6. **Test Framework Choice**: Use nix-unit for Nix expression tests (regression, invariant, feature categories). Use nixosTest for integration tests (VM boot validation). Both frameworks integrate with flake checks.
+7. **Test Framework Choice**: Use nix-unit expr/expected for simple property tests (RT-1, IT-1, IT-2, IT-3, FT-1, FT-2). Use withSystem + runCommand/runNixOSTest for complex tests (RT-2, RT-3, VT-1). Both patterns integrate with flake checks but use different evaluation strategies to avoid circular dependencies.
 
-7. **Snapshot Storage**: All baseline snapshots stored in tests/snapshots/ directory. Snapshots must be committed to git BEFORE refactoring begins to establish source of truth.
+8. **Flake Structure Requirements**: flake.nix must use top@ pattern: top@{ withSystem, config, lib, ... }: to enable access to top.config.flake from flake level. Import nix-unit flake module: inputs.nix-unit.modules.flake.default. Define simple tests in perSystem.nix-unit.tests. Define complex tests in flake.checks using withSystem.
 
-8. **Test Execution Order**: Phase 1 (baseline capture) must complete before Phase 2 (refactoring). Never refactor without baselines. Feature test failures are expected and desirable in Phase 1 (prove tests work).
+9. **Research Document Authority**: docs/notes/development/research/flake-parts-nix-unit-test-integration.md is the authoritative technical specification for this story. It documents why phase-0-tests failed, explains flake-parts evaluation model, and provides working code examples. When in doubt, refer to this research document.
 
-9. **Flake Checks Integration**: All tests must be exposed via flake checks for nix flake check integration. This enables CI/CD validation and developer workflow integration.
-
-10. **Test Naming Convention**: Tests follow pattern {category}-{description}.nix (e.g., terraform-output-equivalence.nix). Test names must clearly indicate what is being validated for maintainability.
+10. **Prohibited Patterns** (These patterns create circular dependencies and MUST NOT be used):
+    - Accessing config.flake from within perSystem
+    - Accessing inputs.self outputs from within perSystem
+    - Importing test modules in perSystem that expect flake outputs
+    - Passing inputs.self to tests in perSystem.checks
+    - Any pattern that requires flake outputs to exist during perSystem evaluation
   </constraints>
 
   <interfaces>
-### Nix-unit Test Interface
+### CORRECT Pattern: Nix-unit expr/expected (Simple Property Tests)
 
-**Canonical nix-unit pattern** (see ~/projects/nix-workspace/nix-unit/tests/assets/basic.nix):
+**Use for: RT-1, IT-1, IT-2, IT-3, FT-1, FT-2**
+
 ```nix
-# Simple assertion tests
+# tests/nix-unit/regression.nix
 {
-  testName = {
-    expr = actualValue;
-    expected = expectedValue;
-  };
-
-  # Error testing
-  testCatchThrow = {
-    expr = throw "error message";
-    expectedError.type = "ThrownError";
-    expectedError.msg = "regex pattern";  # optional
-  };
-
-  # Nested test groups
-  category.testName = {
-    expr = value;
-    expected = value;
+  "terraform-has-compute-instances" = {
+    expr = ''builtins.hasAttr "google_compute_instance" flake.terranix.x86_64-linux'';
+    expected = "true";
   };
 }
-```
 
-**Test strategy wrapper pattern** (for complex validations):
-```nix
-# Test structure wrapping nix-unit with pkgs.runCommand for complex checks
-{
-  # Test function returns attrset with test metadata
-  test = pkgs.runCommand "test-name" {} ''
-    # Validation logic
-    echo "✅ PASS: description" > $out
-    # OR
-    echo "❌ FAIL: description"
-    exit 1
-  '';
-
-  # Metadata for test tracking
-  category = "regression" | "invariant" | "feature" | "integration";
-  critical = true | false;
-  mustRemainPassing = true | false;  # For regression/invariant
-  expectedToFailBeforeRefactor = true | false;  # For feature
-  mustPassAfterRefactor = true | false;  # For feature
-}
-```
-
-**Note**: Test strategy document uses pkgs.runCommand wrapper for complex validations (JSON comparison, file diffs). For simple property assertions, prefer canonical nix-unit expr/expected pattern. Both integrate with flake checks.
-
-### NixosTest Interface
-```nix
-# VM test structure using nixosTest
-pkgs.nixosTest {
-  name = "boot-machine-name";
-  nodes.machine = config.config;  # NixOS configuration
-  testScript = ''
-    machine.start()
-    machine.wait_for_unit("multi-user.target")
-    machine.succeed("test command")
-  '';
-}
-```
-
-### Flake Checks Integration
-```nix
-# In test-clan/flake.nix perSystem
-perSystem = { system, pkgs, lib, ... }: {
-  checks = {
-    # Regression tests
-    terraform-baseline = import ./tests/regression/terraform-output-equivalence.nix { inherit self pkgs lib; }.baseline;
-
-    # Invariant tests
-    clan-inventory = import ./tests/invariant/clan-inventory-structure.nix { inherit self pkgs lib; }.test;
-
-    # Feature tests (expected to fail initially)
-    import-tree-discovery = import ./tests/feature/import-tree-discovery.nix { inherit self pkgs lib; }.test;
-
-    # Integration tests
-    vm-boots = import ./tests/integration/vm-boot-tests.nix { inherit self pkgs lib; }.all;
+# Integration in perSystem
+perSystem = { config, ... }: {
+  nix-unit.tests = {
+    regression = import ./tests/nix-unit/regression.nix;
+    invariant = import ./tests/nix-unit/invariant.nix;
+    feature = import ./tests/nix-unit/feature.nix;
   };
 };
 ```
 
-### Test Runner Script Interface
+**Why this works**: Test expressions are STRINGS (data) in perSystem, but nix-unit binary evaluates them with complete flake access. No circular dependency because expressions are not evaluated during perSystem evaluation.
+
+### CORRECT Pattern: withSystem at Flake Level (Complex Tests)
+
+**Use for: RT-2, RT-3, VT-1**
+
+```nix
+# Flake structure with top@ pattern
+top@{ withSystem, config, lib, ... }:
+{
+  # Normal perSystem (simple tests only)
+  perSystem = { config, ... }: {
+    nix-unit.tests = { /* simple tests */ };
+  };
+
+  # Complex tests at flake level using withSystem
+  flake.checks = lib.genAttrs config.systems (system:
+    withSystem system ({ pkgs, ... }: {
+      machine-builds = import ./tests/integration/machine-builds.nix {
+        flake = top.config.flake;  # ✅ CORRECT: Access flake outputs from flake level
+        inherit pkgs lib system;    # ✅ CORRECT: Get pkgs from perSystem via withSystem
+      };
+
+      vm-boot = pkgs.testers.runNixOSTest {
+        name = "test-clan-vm-boot";
+        nodes.machine = {
+          imports = [ top.config.flake.nixosModules.default ];
+        };
+        testScript = ''machine.wait_for_unit("multi-user.target")'';
+      };
+    })
+  );
+}
+```
+
+**Why this works**: Tests defined at flake level, AFTER perSystem evaluation completes. withSystem provides perSystem context (pkgs) while allowing access to complete flake outputs via top.config.flake.
+
+### INCORRECT Patterns (NEVER USE - Creates Circular Dependencies)
+
+```nix
+# ❌ WRONG: Accessing config.flake from perSystem
+perSystem = { config, ... }: {
+  checks.my-test = import ./test.nix {
+    flake = config.flake;  # ❌ CIRCULAR: config.flake doesn't exist yet
+  };
+};
+
+# ❌ WRONG: Accessing inputs.self outputs from perSystem
+perSystem = { ... }: {
+  checks.my-test = import ./test.nix {
+    self = inputs.self;  # ❌ CIRCULAR: inputs.self outputs don't exist yet
+  };
+};
+
+# ❌ WRONG: Importing test modules expecting flake outputs in perSystem
+perSystem = { pkgs, ... }: {
+  checks = {
+    test = (import ./test.nix { inherit self; }).test;  # ❌ CIRCULAR
+  };
+};
+```
+
+### Test File Examples
+
+**Simple Test (tests/nix-unit/invariant.nix):**
+```nix
+{
+  "clan-inventory-valid" = {
+    expr = ''
+      let inv = flake.clan.inventory;
+      in builtins.hasAttr "machines" inv && builtins.hasAttr "instances" inv
+    '';
+    expected = "true";
+  };
+
+  "zerotier-controller-targeting" = {
+    expr = ''
+      let zerotier = flake.clan.inventory.instances.zerotier;
+      in builtins.hasAttr "controller" zerotier.roles
+    '';
+    expected = "true";
+  };
+}
+```
+
+**Complex Test (tests/integration/machine-builds.nix):**
+```nix
+{ flake, pkgs, lib, system }:
+
+pkgs.runCommand "machine-builds-test" {
+  machines = builtins.attrNames flake.nixosConfigurations;
+} ''
+  echo "Validating ${builtins.toString (builtins.length machines)} machine configs..."
+
+  ${lib.concatMapStringsSep "\n" (m: ''
+    config="${flake.nixosConfigurations.${m}.config.system.build.toplevel}"
+    if [ -d "$config" ]; then
+      echo "✅ ${m} builds successfully"
+    else
+      echo "❌ ${m} failed to build"
+      exit 1
+    fi
+  '') machines}
+
+  echo "pass" > $out
+''
+```
+
+### Validation Commands
+
 ```bash
-# tests/run-all.sh
-# Usage: ./tests/run-all.sh [baseline|all]
-#
-# baseline: Run only baseline capture (Phase 1)
-# all: Run complete test suite (Phase 3 validation)
+# Verify no circular dependencies
+nix flake show
+
+# Test individual checks
+nix build .#checks.x86_64-linux.nix-unit
+nix build .#checks.x86_64-linux.machine-builds
+nix build .#checks.x86_64-linux.vm-boot
+
+# Run complete test suite
+nix flake check
 ```
 
 ### Clan Inventory Structure Interface
@@ -380,16 +468,21 @@ clan.specialArgs = { inherit inputs; };
 
   <tests>
     <standards>
-Tests use nix-unit framework for Nix expression validation and nixosTest for VM integration testing. All tests integrate with flake checks (nix flake check) for developer workflow and CI/CD compatibility. Test categories follow test-driven refactoring methodology: establish baseline with regression/invariant tests (what must not break), define target with feature tests (what must be achieved), validate runtime with integration tests (what must work in practice). Tests generate structured output with clear pass/fail indication and rationale. Baseline snapshots commit to git before refactoring to establish source of truth.
+Tests use HYBRID approach combining nix-unit expr/expected for simple property tests and withSystem at flake level for complex derivation tests. CRITICAL: All test patterns avoid circular dependencies by following flake-parts evaluation model (perSystem runs BEFORE flake outputs exist). Simple tests define test DATA as strings in perSystem.nix-unit.tests (nix-unit pattern). Complex tests define test EXECUTION at flake level using withSystem for perSystem context + top.config.flake for flake outputs (withSystem pattern). All tests integrate with nix flake check. Validation requirement: nix flake show must complete without infinite recursion errors. Test categories follow test-driven refactoring methodology: regression/invariant tests establish baseline (what must not break), feature tests define target (what must be achieved), integration tests validate runtime (what must work in practice). Reference docs/notes/development/research/flake-parts-nix-unit-test-integration.md for complete technical specification.
     </standards>
     <locations>
-Test directory structure in test-clan repository:
-- tests/regression/ - Tests that must remain passing (terraform equivalence, nixos closure, builds)
-- tests/invariant/ - Tests that must always pass (clan inventory, service targeting, specialArgs)
-- tests/feature/ - Tests that define dendritic compliance (import-tree, namespace exports, self-composition)
-- tests/integration/ - VM boot tests for runtime validation
-- tests/snapshots/ - Baseline snapshots (terraform.json, nixos-configs.json, clan-inventory.json)
-- tests/run-all.sh - Test orchestration script
+Test directory structure in test-clan repository (REVISED from phase-0-tests failure analysis):
+- tests/nix-unit/ - Simple property tests using expr/expected pattern (RT-1, IT-1, IT-2, IT-3, FT-1, FT-2)
+  - tests/nix-unit/regression.nix - Terraform output structure validation
+  - tests/nix-unit/invariant.nix - Clan inventory, service targeting, specialArgs tests
+  - tests/nix-unit/feature.nix - Dendritic feature tests (expected to fail)
+- tests/integration/ - Complex derivation tests using withSystem pattern (RT-2, RT-3, VT-1)
+  - tests/integration/machine-builds.nix - NixOS closure and build validation
+  - tests/integration/vm-boot.nix - VM boot tests with runNixOSTest
+- Integration points:
+  - perSystem.nix-unit.tests imports tests/nix-unit/*.nix files
+  - flake.checks uses withSystem to import tests/integration/*.nix files
+  - All tests accessible via nix flake check and individual nix build commands
     </locations>
     <ideas>
 ### Regression Test Ideas
