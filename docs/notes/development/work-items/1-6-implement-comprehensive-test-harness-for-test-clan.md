@@ -10,6 +10,10 @@
 **Related Documents:**
 - Test strategy: docs/notes/development/dendritic-refactor-test-strategy.md
 - Assessment: docs/notes/development/dendritic-flake-parts-assessment.md
+- **Technical Research (CRITICAL):** docs/notes/development/research/flake-parts-nix-unit-test-integration.md
+  - Analysis of phase-0-tests failure
+  - Correct implementation patterns
+  - Working code examples
 
 **Dev Agent Record:**
 - Context Reference: docs/notes/development/work-items/1-6-implement-comprehensive-test-harness-for-test-clan.context.xml
@@ -22,6 +26,13 @@ Implement a comprehensive test suite for test-clan that enables confident refact
 
 This test harness is a **general-purpose test infrastructure** for test-clan, not specific to dendritic refactoring.
 It provides ongoing value for validating any changes to the infrastructure codebase.
+
+**Story Revision Context:**
+This story was revised based on comprehensive technical research conducted after the phase-0-tests branch (commits f0aa5e9..f405a6a) failed due to circular dependency errors.
+The research identified the root cause (accessing flake outputs from within perSystem evaluation) and documented three correct implementation patterns.
+This revision adopts a hybrid nix-unit + withSystem approach that avoids circular dependencies while providing complete test coverage.
+
+See: `docs/notes/development/research/flake-parts-nix-unit-test-integration.md` for complete technical analysis.
 
 ---
 
