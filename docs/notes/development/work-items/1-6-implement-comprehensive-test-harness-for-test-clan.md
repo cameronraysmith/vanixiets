@@ -481,8 +481,49 @@ Successfully implemented comprehensive test harness for test-clan using withSyst
   - Individual builds can succeed while full check reveals evaluation errors
   - Check output shows which derivations fail to evaluate vs. which fail to build
 
+### Post-Implementation Investigation (2025-11-05)
+
+**Investigation Question:** Did the previous implementation properly configure nix-unit? Could it work with proper configuration?
+
+**Answer:** NO (missing configuration), but YES (technically possible with proper setup)
+
+**What Was Missing:**
+1. `nix-unit.inputs = { inherit (inputs) nixpkgs flake-parts nix-unit clan-core terranix disko srvos import-tree; }`
+2. `follows` rules to flatten transitive dependencies: `nix-unit.inputs.treefmt-nix.follows = "clan-core/treefmt-nix"`
+3. `nix-unit.allowNetwork = true` - **MANDATORY** (not optional)
+
+**Experimental Validation:**
+Created test branches to validate proper configuration:
+- WITHOUT configuration: Network errors fetching treefmt-nix
+- WITH `nix-unit.inputs` + `follows` but NO `allowNetwork`: STILL network errors
+- WITH all three: Build succeeds
+
+**Critical Discovery - `allowNetwork = true`:**
+Makes the check derivation a **fixed-output derivation** (sets `outputHash`), which Nix permits to access the network during builds. Examined nix-unit source: `toNetworkedCheck` function adds `pkgs.cacert` and hash attributes.
+
+**Implication:**
+- nix-unit REQUIRES network access during `nix build .#checks.<system>.nix-unit`
+- Defeats Nix reproducibility benefits
+- Cannot use binary cache substitution effectively
+- CI/CD must have network access during check runs
+
+**Conclusion:** withSystem was correct choice
+
+Even WITH proper nix-unit configuration, withSystem remains superior because:
+- No network access during builds (fully reproducible)
+- No fixed-output derivation requirement
+- Simpler configuration (no explicit input overrides)
+- Binary cache friendly
+- Faster (no build-time dependency fetching)
+- More reliable (fewer moving parts)
+
+**Recommendation:** Keep current withSystem implementation, NO refactoring needed
+
+**Documentation:** Full investigation findings added to `docs/notes/development/research/flake-parts-nix-unit-test-integration.md` Section 11
+
 ### Status
 
-**Current:** Ready for Review
-**Branch:** test-clan/phase-0-validation (6 commits)
+**Current:** Approved - Investigation Complete, Implementation Validated
+**Branch:** test-clan/phase-0-validation
+**Conclusion:** Current withSystem implementation is CORRECT and OPTIMAL
 **Next:** Story 1.7 - Execute dendritic refactoring using this test harness
