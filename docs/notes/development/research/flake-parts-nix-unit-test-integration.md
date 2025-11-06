@@ -728,21 +728,534 @@ The nix-unit pattern works because the expression is just a STRING in perSystem,
 
 ## 6. Correct Implementation Pattern
 
-### 6.1 The RIGHT Way to Define Checks Needing Flake Output Access
+### 6.1 The THREE Correct Approaches
 
-[TO BE DOCUMENTED - working code patterns with explanations]
+Based on flake-parts architecture analysis and failed attempt forensics, there are THREE viable approaches for testing flake-parts repositories:
 
-### 6.2 Module Structure and File Organization
+1. **Flake-Level Checks with `top@` Pattern** (Best for complex test derivations)
+2. **Flake-Level Checks with `withSystem`** (Best for accessing perSystem context)
+3. **nix-unit expr/expected Pattern** (Best for simple property validations)
 
-[TO BE DOCUMENTED]
+### 6.2 Approach 1: Flake-Level Checks with `top@` Pattern
 
-### 6.3 Integration Points
+**When to use:** Tests that need access to complete flake outputs and don't need perSystem context.
 
-[TO BE DOCUMENTED]
+**Pattern:**
+```nix
+top@{ config, lib, flake-parts-lib, ... }:
+{
+  systems = [ "x86_64-linux" "aarch64-linux" ];
 
-### 6.4 Pitfalls to Avoid (Learned from phase-0-tests)
+  perSystem = { config, pkgs, system, ... }: {
+    # Normal perSystem configuration
+    packages.default = pkgs.hello;
+  };
 
-[TO BE DOCUMENTED]
+  # Define checks at FLAKE level, not perSystem level
+  flake.checks = {
+    x86_64-linux = {
+      terranix-validation = import ./tests/terranix-validation.nix {
+        # ✅ CORRECT: top.config.flake is available at flake level
+        flake = top.config.flake;
+        inherit lib;
+        system = "x86_64-linux";
+      };
+
+      clan-inventory = import ./tests/clan-inventory.nix {
+        flake = top.config.flake;
+        inherit lib;
+        system = "x86_64-linux";
+      };
+    };
+
+    aarch64-linux = {
+      # Repeat for other systems
+    };
+  };
+}
+```
+
+**Test File Example (tests/terranix-validation.nix):**
+```nix
+{ flake, lib, system }:
+
+let
+  pkgs = flake.legacyPackages.${system};
+  terranixConfigs = flake.terranix.${system} or (throw "No terranix output for ${system}");
+
+  # Validate terraform resources exist
+  hasComputeInstances = terranixConfigs ? google_compute_instance;
+  hasNetworkConfig = terranixConfigs ? google_compute_network;
+
+  validationPassed = hasComputeInstances && hasNetworkConfig;
+in
+pkgs.runCommand "terranix-validation" {
+  result = builtins.toJSON {
+    inherit hasComputeInstances hasNetworkConfig validationPassed;
+  };
+} ''
+  echo "Validating terranix configuration..."
+  echo "$result" | ${pkgs.jq}/bin/jq .
+
+  ${if validationPassed then ''
+    echo "✅ PASS: Terranix configuration valid"
+    echo "pass" > $out
+  '' else ''
+    echo "❌ FAIL: Terranix configuration invalid"
+    exit 1
+  ''}
+''
+```
+
+**Pros:**
+- Full access to complete flake outputs
+- Can create complex test derivations
+- Clear separation: tests defined outside perSystem
+
+**Cons:**
+- Manual duplication across systems
+- Can't use perSystem context directly (pkgs, inputs', self')
+
+### 6.3 Approach 2: Flake-Level Checks with `withSystem`
+
+**When to use:** Tests that need BOTH complete flake outputs AND perSystem context (pkgs, inputs', etc.).
+
+**Pattern:**
+```nix
+{ withSystem, config, lib, ... }:
+{
+  systems = [ "x86_64-linux" "aarch64-linux" ];
+
+  perSystem = { config, pkgs, system, ... }: {
+    # Normal perSystem configuration
+  };
+
+  flake.checks =
+    let
+      # Generate checks for each system using withSystem
+      mkSystemChecks = system: withSystem system ({ config, pkgs, lib, ... }:
+        {
+          terranix-validation = import ./tests/terranix-validation.nix {
+            # ✅ Has access to BOTH config (perSystem) and outer config (flake)
+            flake = config.flake; # Would access flake outputs if needed via outer scope
+            inherit pkgs lib system;
+          };
+
+          clan-inventory = import ./tests/clan-inventory.nix {
+            flake = config.flake; # Access via outer scope
+            inherit pkgs lib system;
+          };
+
+          machine-builds = pkgs.runCommand "machine-builds-test" {} ''
+            # Uses pkgs from perSystem context
+            ${pkgs.jq}/bin/jq --version > $out
+          '';
+        }
+      );
+    in
+      {
+        x86_64-linux = mkSystemChecks "x86_64-linux";
+        aarch64-linux = mkSystemChecks "aarch64-linux";
+      };
+}
+```
+
+**Better: Iterate over systems:**
+```nix
+{ withSystem, config, lib, ... }:
+{
+  systems = [ "x86_64-linux" "aarch64-linux" ];
+
+  perSystem = { ... }: { /* normal perSystem */ };
+
+  flake.checks = lib.genAttrs config.systems (system:
+    withSystem system ({ config, pkgs, lib, ... }: {
+      terranix-validation = import ./tests/terranix-validation.nix {
+        flake = config.flake; # Access flake outputs via outer scope
+        inherit pkgs lib system;
+      };
+    })
+  );
+}
+```
+
+**Pros:**
+- Access to perSystem context (pkgs, inputs', self')
+- Access to flake outputs (via outer scope)
+- Automatic iteration over systems
+- No manual duplication
+
+**Cons:**
+- Slightly more complex syntax with nested closures
+- Need to understand `withSystem` semantics
+
+### 6.4 Approach 3: nix-unit expr/expected Pattern
+
+**When to use:** Simple property validation tests that can be expressed as Nix expressions.
+
+**Setup:**
+```nix
+{
+  inputs.nix-unit.url = "github:nix-community/nix-unit";
+
+  outputs = inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [
+        inputs.nix-unit.modules.flake.default
+      ];
+
+      perSystem = { config, ... }: {
+        nix-unit.tests = {
+          # Tests are DATA (expressions as strings)
+          "terranix has compute instances" = {
+            expr = "builtins.hasAttr \"google_compute_instance\" flake.terranix.x86_64-linux";
+            expected = "true";
+          };
+
+          "clan inventory has machines" = {
+            expr = "builtins.length (builtins.attrNames flake.clan.inventory.machines) > 0";
+            expected = "true";
+          };
+
+          "all nixos configs build" = {
+            expr = "builtins.all (m: m ? config) (builtins.attrValues flake.nixosConfigurations)";
+            expected = "true";
+          };
+        };
+      };
+    };
+}
+```
+
+**Advanced: Access flake outputs in test expressions:**
+
+The nix-unit binary receives the complete flake, so test expressions can reference `flake`:
+
+```nix
+perSystem = {
+  nix-unit.tests = {
+    "regression" = {
+      "terraform-output-equivalence" = {
+        expr = ''
+          let
+            terraform = flake.terranix.x86_64-linux;
+            hasResources = terraform ? google_compute_instance;
+          in hasResources
+        '';
+        expected = "true";
+      };
+    };
+
+    "invariant" = {
+      "clan-inventory-structure" = {
+        expr = ''
+          let
+            inventory = flake.clan.inventory;
+            hasMachines = builtins.hasAttr "machines" inventory;
+            hasInstances = builtins.hasAttr "instances" inventory;
+          in hasMachines && hasInstances
+        '';
+        expected = "true";
+      };
+    };
+  };
+};
+```
+
+**Pros:**
+- Define tests in perSystem (natural location)
+- Automatic check generation (nix-unit creates checks.nix-unit)
+- Tests are pure Nix expressions (easy to understand)
+- Automatic system iteration
+- Framework handles test execution
+
+**Cons:**
+- Limited to expression-based tests (can't easily create complex derivations)
+- Need to learn nix-unit test format
+- Test logic is string expressions (less type-safe during development)
+
+### 6.5 Hybrid Approach: Combine Multiple Patterns
+
+**Recommended for test-clan:**
+
+```nix
+top@{ withSystem, config, lib, ... }:
+{
+  inputs.nix-unit.url = "github:nix-community/nix-unit";
+
+  imports = [
+    inputs.nix-unit.modules.flake.default
+  ];
+
+  systems = [ "x86_64-linux" "aarch64-linux" ];
+
+  # Simple property tests via nix-unit
+  perSystem = { config, pkgs, ... }: {
+    nix-unit.tests = {
+      "regression" = {
+        "terranix-resources-exist" = {
+          expr = "builtins.hasAttr \"google_compute_instance\" flake.terranix.x86_64-linux";
+          expected = "true";
+        };
+      };
+      "invariant" = {
+        "clan-inventory-valid" = {
+          expr = "builtins.hasAttr \"inventory\" flake.clan";
+          expected = "true";
+        };
+      };
+    };
+  };
+
+  # Complex tests via withSystem at flake level
+  flake.checks = lib.genAttrs config.systems (system:
+    withSystem system ({ config, pkgs, lib, ... }:
+      {
+        # Complex VM boot test (needs pkgs from perSystem)
+        vm-boot-test = import ./tests/integration/vm-boot.nix {
+          flake = top.config.flake;
+          inherit pkgs lib system;
+        };
+
+        # Complex terraform validation (needs pkgs from perSystem)
+        terraform-deep-validation = pkgs.runCommand "terraform-validation" {
+          terraform = top.config.flake.terranix.${system};
+          nativeBuildInputs = [ pkgs.jq pkgs.terraform ];
+        } ''
+          # Complex validation logic
+          echo "pass" > $out
+        '';
+      }
+      // {
+        # nix-unit check is automatically added to checks
+        # No need to redefine it here
+      }
+    )
+  );
+}
+```
+
+**Benefits of Hybrid:**
+- Simple tests: use nix-unit (less boilerplate)
+- Complex tests: use withSystem (full power)
+- All tests integrated into `nix flake check`
+- Clear separation of concerns
+
+### 6.6 Module Structure and File Organization
+
+**Recommended test structure for test-clan:**
+
+```
+test-clan/
+├── flake.nix                    # Main flake with check integration
+├── tests/
+│   ├── nix-unit/                # nix-unit test suites
+│   │   ├── regression.nix       # RT-1, RT-2, RT-3
+│   │   ├── invariant.nix        # IT-1, IT-2, IT-3
+│   │   └── feature.nix          # FT-1, FT-2, FT-3
+│   ├── integration/             # Complex derivation-based tests
+│   │   ├── vm-boot-tests.nix    # VT-1
+│   │   └── terraform-apply.nix  # If needed
+│   └── lib/                     # Shared test utilities
+│       ├── assertions.nix       # Common assertion functions
+│       └── fixtures.nix         # Test data
+```
+
+**flake.nix structure:**
+```nix
+top@{ withSystem, config, lib, ... }:
+{
+  imports = [
+    inputs.nix-unit.modules.flake.default
+    inputs.clan-core.flakeModules.default
+  ];
+
+  systems = [ "x86_64-linux" ];
+
+  perSystem = { config, pkgs, ... }: {
+    # Import nix-unit test suites
+    nix-unit.tests = {
+      regression = import ./tests/nix-unit/regression.nix;
+      invariant = import ./tests/nix-unit/invariant.nix;
+      feature = import ./tests/nix-unit/feature.nix;
+    };
+  };
+
+  # Complex tests at flake level
+  flake.checks = lib.genAttrs config.systems (system:
+    withSystem system ({ pkgs, ... }: {
+      vm-boot = import ./tests/integration/vm-boot-tests.nix {
+        flake = top.config.flake;
+        inherit pkgs lib system;
+      };
+    })
+  );
+}
+```
+
+### 6.7 Pitfalls to Avoid (Learned from phase-0-tests)
+
+**❌ DON'T: Access config.flake in perSystem**
+```nix
+perSystem = { config, ... }: {
+  checks.my-test = import ./test.nix {
+    self = config.flake; # ❌ CIRCULAR DEPENDENCY
+  };
+};
+```
+
+**❌ DON'T: Access inputs.self outputs in perSystem**
+```nix
+perSystem = { ... }: {
+  checks.my-test = import ./test.nix {
+    self = inputs.self; # ❌ CIRCULAR DEPENDENCY
+  };
+};
+```
+
+**❌ DON'T: Import test modules that expect flake outputs in perSystem**
+```nix
+perSystem = { pkgs, ... }: {
+  checks = {
+    my-test = (import ./test.nix {
+      self = /* any attempt to pass flake outputs */;
+    }).test;
+  };
+};
+```
+
+**✅ DO: Use top@ pattern for flake outputs**
+```nix
+top@{ config, ... }: {
+  perSystem = { ... }: { /* normal perSystem */ };
+  flake.checks.x86_64-linux.my-test = import ./test.nix {
+    self = top.config.flake; # ✅ Available at flake level
+  };
+}
+```
+
+**✅ DO: Use withSystem for perSystem context + flake outputs**
+```nix
+{ withSystem, config, ... }: {
+  perSystem = { ... }: { /* normal perSystem */ };
+  flake.checks.x86_64-linux = withSystem "x86_64-linux" ({ pkgs, ... }: {
+    my-test = import ./test.nix {
+      self = config.flake; # ✅ Access via outer scope
+      inherit pkgs; # ✅ From perSystem context
+    };
+  });
+}
+```
+
+**✅ DO: Use nix-unit for expression-based tests**
+```nix
+perSystem = {
+  nix-unit.tests.my-test = {
+    expr = "flake.terranix.x86_64-linux.google_compute_instance"; # ✅ String expression
+    expected = "{ /* ... */ }";
+  };
+};
+```
+
+### 6.8 Working Code Example for test-clan
+
+**Complete working flake.nix excerpt:**
+
+```nix
+top@{ inputs, withSystem, config, lib, ... }:
+{
+  inputs = {
+    nix-unit.url = "github:nix-community/nix-unit";
+    clan-core.url = "git+https://git.clan.lol/clan/clan-core";
+    terranix.url = "github:terranix/terranix";
+  };
+
+  imports = [
+    inputs.nix-unit.modules.flake.default
+    inputs.clan-core.flakeModules.default
+    inputs.terranix.flakeModules.default
+  ];
+
+  systems = [ "x86_64-linux" "aarch64-linux" ];
+
+  perSystem = { config, pkgs, system, ... }: {
+    # Simple property tests via nix-unit
+    nix-unit.tests = {
+      "RT-1: Terraform output equivalence" = {
+        expr = ''
+          let
+            terraform = flake.terranix.${system};
+          in builtins.hasAttr "google_compute_instance" terraform
+        '';
+        expected = "true";
+      };
+
+      "IT-1: Clan inventory structure" = {
+        expr = ''
+          let
+            inv = flake.clan.inventory;
+          in builtins.hasAttr "machines" inv && builtins.hasAttr "instances" inv
+        '';
+        expected = "true";
+      };
+
+      "IT-2: Clan service targeting" = {
+        expr = ''
+          let
+            zerotier = flake.clan.inventory.instances.zerotier;
+          in builtins.hasAttr "controller" zerotier.roles
+        '';
+        expected = "true";
+      };
+    };
+  };
+
+  # Complex tests requiring derivations
+  flake.checks = lib.genAttrs config.systems (system:
+    withSystem system ({ config, pkgs, lib, ... }:
+      {
+        # RT-3: Machine configurations build
+        machine-builds = pkgs.runCommand "machine-builds-test" {
+          machines = builtins.attrNames top.config.flake.nixosConfigurations;
+        } ''
+          echo "Checking ${builtins.toString (builtins.length machines)} machine configs exist..."
+          ${lib.concatMapStringsSep "\n" (m: ''
+            if [ -d "${top.config.flake.nixosConfigurations.${m}.config.system.build.toplevel}" ]; then
+              echo "✅ ${m} config valid"
+            else
+              echo "❌ ${m} config invalid"
+              exit 1
+            fi
+          '') machines}
+          echo "pass" > $out
+        '';
+
+        # VT-1: VM boot tests
+        vm-boot-test = pkgs.testers.runNixOSTest {
+          name = "test-clan-vm-boot";
+          nodes.machine = {
+            imports = [
+              top.config.flake.nixosModules.default
+            ];
+          };
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+            machine.succeed("echo VM booted successfully")
+          '';
+        };
+      }
+    )
+  );
+}
+```
+
+**This pattern:**
+- ✅ Avoids circular dependencies
+- ✅ Uses nix-unit for simple tests
+- ✅ Uses withSystem for complex tests
+- ✅ Integrates with `nix flake check`
+- ✅ Accesses complete flake outputs correctly
+- ✅ Maintains per-system context where needed
 
 ---
 
