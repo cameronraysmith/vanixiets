@@ -72,62 +72,135 @@ It provides ongoing value for validating any changes to the infrastructure codeb
 
 ## Implementation Tasks
 
-### Task 1: Setup Test Infrastructure (1-2 hours)
-1. Add nix-unit to flake.nix inputs
-2. Create test directory structure
-3. Create test runner script template
-4. Add checks section to flake.nix perSystem
+### Task 1: Setup Test Infrastructure with Correct Patterns (2-3 hours)
+1. Add nix-unit to flake.nix inputs and import flake module
+   - `inputs.nix-unit.url = "github:nix-community/nix-unit";`
+   - Add to imports: `inputs.nix-unit.modules.flake.default`
+2. Modify flake.nix to use `top@` pattern
+   - Change signature: `top@{ withSystem, config, lib, ... }:`
+   - This enables access to `top.config.flake` from flake level
+3. Create test directory structure
+   - `tests/nix-unit/` for simple property tests (nix-unit expr/expected)
+   - `tests/integration/` for complex derivation tests (withSystem)
+4. Verify no circular dependencies
+   - Run `nix flake show` to confirm no infinite recursion
+   - This validates the flake structure before writing tests
 
-### Task 2: Implement Regression Tests (2-3 hours)
-1. Implement RT-1: Terraform output equivalence
-   - Normalize and compare terraform JSON outputs
-   - Capture baseline snapshot
-2. Implement RT-2: NixOS closure equivalence
-   - Extract configuration properties (hostname, services, bootloader, users)
-   - Compare before/after snapshots
-3. Implement RT-3: Machine builds
-   - Verify all 3 machines build successfully
-   - Test toplevel derivation accessibility
+### Task 2: Implement Simple Property Tests via nix-unit (2-3 hours)
+**Pattern: Define test DATA as strings in perSystem, executed by nix-unit binary**
 
-### Task 3: Implement Invariant Tests (1-2 hours)
-1. Implement IT-1: Clan inventory structure
-   - Validate 3 machines present with correct tags
-   - Validate service instances (emergency-access, users-root, zerotier, tor)
-   - Verify zerotier controller/peer targeting
-2. Implement IT-2: Service targeting preservation
-   - Validate role assignments unchanged
-   - Confirm hetzner-ccx23 is zerotier controller
-3. Implement IT-3: specialArgs propagation
-   - Verify inputs accessible in host modules
-   - Confirm srvos importable
+1. Create `tests/nix-unit/regression.nix`
+   - RT-1: Terraform output structure validation
+   ```nix
+   {
+     "terraform-has-compute-instances" = {
+       expr = ''builtins.hasAttr "google_compute_instance" flake.terranix.x86_64-linux'';
+       expected = "true";
+     };
+   }
+   ```
 
-### Task 4: Implement Feature Tests (1 hour)
-1. Implement FT-1: import-tree discovery
-   - Check for automatic module discovery
-   - Expected to fail before dendritic refactoring
-2. Implement FT-2: Namespace exports
-   - Verify modules exported to config.flake.modules
-   - Expected to fail (only terranix currently exported)
-3. Implement FT-3: Self-composition
-   - Check host modules for namespace imports vs relative paths
-   - Expected to fail (currently using relative imports)
+2. Create `tests/nix-unit/invariant.nix`
+   - IT-1: Clan inventory structure
+   ```nix
+   {
+     "clan-inventory-valid" = {
+       expr = ''
+         let inv = flake.clan.inventory;
+         in builtins.hasAttr "machines" inv && builtins.hasAttr "instances" inv
+       '';
+       expected = "true";
+     };
+   }
+   ```
+   - IT-2: Clan service targeting
+   - IT-3: specialArgs propagation
 
-### Task 5: Implement Integration Tests (1-2 hours)
-1. Implement VT-1: VM boot tests
-   - Create nixosTest for each machine
-   - Validate boot to multi-user.target
-   - Test base module features (nix, users, sudo, SSH)
-   - Verify hostname and service enablement
+3. Create `tests/nix-unit/feature.nix`
+   - FT-1: import-tree discovery (expected to fail)
+   - FT-2: Namespace exports (expected to fail)
 
-### Task 6: Validation and Documentation (1 hour)
-1. Run complete test suite baseline
-2. Capture all snapshots
-3. Verify test categories behave as expected:
-   - Regression: PASS
-   - Invariant: PASS
-   - Feature: FAIL (expected)
-   - Integration: PASS
-4. Document test execution in story completion notes
+4. Import test suites in perSystem
+   ```nix
+   perSystem = { config, ... }: {
+     nix-unit.tests = {
+       regression = import ./tests/nix-unit/regression.nix;
+       invariant = import ./tests/nix-unit/invariant.nix;
+       feature = import ./tests/nix-unit/feature.nix;
+     };
+   };
+   ```
+
+### Task 3: Implement Complex Tests via withSystem (2-3 hours)
+**Pattern: Define tests at flake level using withSystem for perSystem context + flake outputs**
+
+1. Create `tests/integration/machine-builds.nix`
+   - RT-2: NixOS closure validation
+   - RT-3: Machine configurations build
+   ```nix
+   { flake, pkgs, lib, system }:
+   pkgs.runCommand "machine-builds-test" {
+     machines = builtins.attrNames flake.nixosConfigurations;
+   } ''
+     # Validation logic accessing flake.nixosConfigurations
+     echo "pass" > $out
+   ''
+   ```
+
+2. Create `tests/integration/vm-boot.nix`
+   - VT-1: VM boot tests for all machines
+   ```nix
+   { flake, pkgs, lib, system }:
+   pkgs.testers.runNixOSTest {
+     name = "test-clan-vm-boot";
+     nodes.machine = {
+       imports = [ flake.nixosModules.default ];
+     };
+     testScript = ''machine.wait_for_unit("multi-user.target")'';
+   }
+   ```
+
+3. Integrate complex tests at flake level
+   ```nix
+   flake.checks = lib.genAttrs config.systems (system:
+     withSystem system ({ pkgs, ... }: {
+       machine-builds = import ./tests/integration/machine-builds.nix {
+         flake = top.config.flake;
+         inherit pkgs lib system;
+       };
+       vm-boot = import ./tests/integration/vm-boot.nix {
+         flake = top.config.flake;
+         inherit pkgs lib system;
+       };
+     })
+   );
+   ```
+
+### Task 4: Validation and Verification (1 hour)
+1. Verify no circular dependencies
+   - Run `nix flake show` (should complete without errors)
+   - Confirm all checks are listed in output
+2. Test individual checks
+   - `nix build .#checks.x86_64-linux.nix-unit` (simple property tests)
+   - `nix build .#checks.x86_64-linux.machine-builds`
+   - `nix build .#checks.x86_64-linux.vm-boot`
+3. Run complete test suite
+   - `nix flake check` (may take several minutes for VM tests)
+4. Verify test behavior
+   - Regression tests: PASS
+   - Invariant tests: PASS
+   - Feature tests: FAIL (expected - dendritic features not implemented)
+   - Integration tests: PASS
+5. Test failure detection
+   - Temporarily break a test condition
+   - Verify check fails appropriately
+   - Restore condition and verify check passes again
+
+### Task 5: Documentation (30 minutes)
+1. Document test execution in story completion notes
+2. Note any deviations from planned approach
+3. Record test execution times
+4. List any tests that were skipped or deferred
 
 ---
 
