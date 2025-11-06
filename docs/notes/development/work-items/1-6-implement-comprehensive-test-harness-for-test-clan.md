@@ -426,16 +426,18 @@ Successfully implemented comprehensive test harness for test-clan using withSyst
 - tests/integration/feature.nix (created: FT-1, FT-2)
 - tests/integration/vm-boot.nix (created: VT-1)
 - tests/nix-unit/ (created but unused - nix-unit pattern abandoned)
+- README.md (updated: added test suite documentation)
 
 ### Commits
 
-**test-clan (6 commits on phase-0-validation):**
+**test-clan (7 commits on phase-0-validation):**
 1. `0fc29be` - feat(tests): add nix-unit input and implement top@ pattern
 2. `ce88a16` - feat(tests): implement simple property tests with nix-unit
 3. `d4039e2` - feat(tests): implement comprehensive test suite using withSystem pattern
 4. `9429c6e` - fix(tests): simplify terraform test to check module exports
 5. `f745355` - fix(tests): avoid deprecated inventory.services attribute
 6. `96d9660` - fix(tests): simplify nixos-configs test to avoid building toplevel
+7. (pending) - docs(tests): add comprehensive test suite documentation to README
 
 ### Completion Notes
 
