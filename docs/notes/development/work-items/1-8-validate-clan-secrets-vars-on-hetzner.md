@@ -111,7 +111,7 @@ Understanding the complete lifecycle NOW ensures smooth GCP integration later.
    - Current TC-007 smoke test replaced with comprehensive vars lifecycle test
    - New test validates: vars directory structure, secret encryption (age recipients), public facts accessibility, vars generation repeatability
    - Test runs in test harness without requiring deployed infrastructure
-   - Test passes in `nix flake check` and `./tests/run-all.sh all`
+   - Test passes in `nix flake check` (or `just test` for full test suite)
 
 3. **Secrets Management Documentation and Justfile Recipes Created:**
    - test-clan/docs/notes/development/secrets-management.md created (lowercase kebab-case)
@@ -171,9 +171,9 @@ Understanding the complete lifecycle NOW ensures smooth GCP integration later.
     - Test 5: Public facts are readable (zerotier-ip/value, state-version/version/value)
     - Test 6: Vars generation is idempotent (re-running doesn't fail)
   - [ ] Implement enhanced TC-007 test in `modules/checks/validation.nix`
-  - [ ] Run test: `nix build .#checks.x86_64-linux.secrets-generation`
+  - [ ] Run test: `nix flake check` (or `just test` from test-clan root)
   - [ ] Verify test passes with current vars structure
-  - [ ] Run full test suite: `cd ~/projects/nix-workspace/test-clan && ./tests/run-all.sh all`
+  - [ ] Verify enhanced TC-007 specifically: `nix build .#checks.aarch64-darwin.secrets-generation` (or use `just test-quick`)
   - [ ] Commit enhanced test: `git add modules/checks/validation.nix && git commit -m "test(vars): enhance TC-007 with comprehensive vars lifecycle validation"`
 
 - [ ] **Task 3: Research Clan CLI Commands and Create Documentation** (AC: #3)
@@ -294,7 +294,7 @@ Understanding the complete lifecycle NOW ensures smooth GCP integration later.
 **Revised Story 1.8 Focus:**
 - **Validation**: Confirm existing infrastructure understood
 - **Testing**: Enhance TC-007 from smoke test to lifecycle test
-- **Documentation**: Comprehensive SECRETS-MANAGEMENT.md guide
+- **Documentation**: Comprehensive secrets-management.md guide (lowercase kebab-case)
 - **Operational Understanding**: Prove vars workflow mastery
 
 ### Why Story 1.8 Still Necessary
@@ -400,14 +400,15 @@ Based on service instances configured:
 - 18 tests implemented (12 nix-unit + 4 runCommand + 2 runNixOSTest)
 - Test architecture: modules/checks/ with import-tree auto-discovery
 - TC-007 (secrets-generation) is smoke test only - validates clan CLI availability
-- Test execution: `./tests/run-all.sh all` (~11s full suite)
+- Test execution: `nix flake check` (full suite) or justfile recipes (`just test`, `just test-quick`, `just test-integration`)
 - Hybrid pattern: nix-unit for property tests, withSystem for derivation tests
 
 **Key Files Created in Story 1.6:**
 - `modules/checks/nix-unit.nix` (expression evaluation tests)
 - `modules/checks/validation.nix` (TC-007 secrets smoke test)
 - `modules/checks/integration.nix` (VM boot tests)
-- `tests/run-all.sh` (test execution script)
+- `modules/checks/performance.nix` (CI performance tests)
+- `justfile` test recipes (test, test-quick, test-integration)
 
 **TC-007 Current Implementation:**
 ```nix
@@ -459,7 +460,7 @@ This story is LOW RISK validation and documentation:
 **Expected execution time:** 2-3 hours
 - Task 1 (SSH host keys): 30 minutes
 - Task 2 (enhance TC-007): 45 minutes
-- Task 3 (SECRETS-MANAGEMENT.md): 60 minutes
+- Task 3 (secrets-management.md): 60 minutes
 - Tasks 4-6 (validation): 30 minutes
 - Task 7 (completion notes): 15 minutes
 
@@ -671,7 +672,7 @@ This story was completely rewritten based on actual completion state of Stories 
 - ✅ Test harness operational with 18 tests (Story 1.6)
 - ✅ Pure dendritic pattern proven (Story 1.7)
 - ✅ TC-007 exists but is smoke test only (validates clan CLI availability)
-- ❌ No SECRETS-MANAGEMENT.md documentation
+- ❌ No secrets-management.md documentation
 - ❌ SSH host key persistence not explicitly validated
 - ❌ Vars lifecycle not comprehensively tested
 
@@ -719,7 +720,7 @@ This story was completely rewritten based on actual completion state of Stories 
 - Added "Learnings from Previous Stories" with comprehensive findings from 1.5-1.7
 - Added "SSH Host Keys Investigation" with outcome scenarios
 - Added "Test Coverage Strategy" for TC-007 enhancement
-- Added "Documentation Structure" for SECRETS-MANAGEMENT.md
+- Added "Documentation Structure" for secrets-management.md
 
 **All story number references corrected:**
 - Original draft referenced "Story 1.6" (meant 1.8 in new numbering)
