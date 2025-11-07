@@ -75,10 +75,11 @@ While the infrastructure is operational, the following gaps exist that Story 1.8
    - Does NOT test actual vars generation, encryption, or deployment
    - Need comprehensive test for vars lifecycle
 
-3. **Documentation Gap:** No SECRETS-MANAGEMENT.md documenting operational patterns
-   - Vars vs secrets distinction unclear
-   - Generation/deployment workflow not documented
-   - Troubleshooting guidance missing
+3. **Documentation Gap:** No local documentation referencing clan-core patterns
+   - Need to identify essential clan CLI commands for daily operations
+   - Need justfile recipes for recalling clan commands easily
+   - Need local guide showing test-clan-specific application of clan patterns
+   - Should defer to clan-core docs (do not reinvent workflows)
 
 4. **Workflow Validation:** Vars workflow works but not explicitly validated end-to-end
    - Need to prove understanding by executing complete lifecycle
@@ -88,10 +89,10 @@ While the infrastructure is operational, the following gaps exist that Story 1.8
 **Revised Story Focus:**
 
 This story now focuses on:
-- Validating SSH host key persistence (AC #1-2)
-- Enhancing TC-007 test to cover vars lifecycle (AC #3)
-- Creating comprehensive secrets management documentation (AC #4)
-- Validating end-to-end vars workflow understanding (AC #5-6)
+- Validating SSH host key persistence (AC #1)
+- Enhancing TC-007 test to cover vars lifecycle (AC #2)
+- Researching clan CLI commands, creating local documentation referencing clan-core docs, and adding justfile recipes (AC #3)
+- Validating end-to-end vars workflow understanding (AC #4-6)
 
 **Strategic Importance:**
 
@@ -112,12 +113,22 @@ Understanding the complete lifecycle NOW ensures smooth GCP integration later.
    - Test runs in test harness without requiring deployed infrastructure
    - Test passes in `nix flake check` and `./tests/run-all.sh all`
 
-3. **Secrets Management Documentation Created:**
-   - docs/notes/clan/SECRETS-MANAGEMENT.md created with comprehensive coverage
-   - Sections: Overview (vars vs secrets), Age encryption (admins group, machine keys), Vars structure (per-machine layout, secret/fact distinction), Generation workflow (clan CLI commands, service instance integration), Deployment mechanism (/run/secrets/ tmpfs, sops-nix integration), Operational patterns (adding new secrets, rotating keys, troubleshooting)
-   - Examples from test-clan (zerotier, LUKS, SSH keys, emergency-access)
-   - Troubleshooting section with common failure modes
-   - Reference implementation: test-clan vars structure
+3. **Secrets Management Documentation and Justfile Recipes Created:**
+   - test-clan/docs/notes/development/secrets-management.md created (lowercase kebab-case)
+   - **Primary Source:** Document references clan-core official documentation as authoritative source
+     - clan-core/docs/site/guides/vars/ for vars workflow
+     - clan-core/docs/site/guides/secrets.md for secrets management
+     - Document DEFERS to upstream docs, does NOT reinvent workflows
+   - **Local Context:** Document explains test-clan-specific application of clan patterns
+   - Essential clan CLI commands identified via `clan --help` and clan-core docs:
+     - Secrets management commands (clan secrets)
+     - Vars generation commands (clan vars)
+     - Why they're different and when to use each
+   - Justfile recipes added to test-clan/justfile for essential clan commands:
+     - Secrets operations (under new ## secrets section)
+     - Vars operations (under new ## vars section)
+     - Recipes make essential clan commands easily recallable
+   - Examples from test-clan showing clan-core patterns in practice
 
 4. **Vars Workflow Validation:**
    - Execute complete vars lifecycle on hetzner-ccx23: inspect current vars, regenerate specific var (e.g., emergency-access password), verify encryption (age recipients correct), deploy to VM, validate on VM (/run/secrets/ updated)
@@ -165,39 +176,40 @@ Understanding the complete lifecycle NOW ensures smooth GCP integration later.
   - [ ] Run full test suite: `cd ~/projects/nix-workspace/test-clan && ./tests/run-all.sh all`
   - [ ] Commit enhanced test: `git add modules/checks/validation.nix && git commit -m "test(vars): enhance TC-007 with comprehensive vars lifecycle validation"`
 
-- [ ] **Task 3: Create SECRETS-MANAGEMENT.md Documentation** (AC: #3)
-  - [ ] Create docs/notes/clan/SECRETS-MANAGEMENT.md
-  - [ ] Write Overview section:
-    - Define vars vs secrets distinction
-    - Explain age encryption model
-    - Describe sops-nix integration
-  - [ ] Write Age Encryption section:
-    - Document admins group (sops/users/)
-    - Document machine keys (sops/machines/)
-    - Explain encryption recipients (users + machines)
-  - [ ] Write Vars Structure section:
-    - Document per-machine layout (vars/per-machine/<machine>/)
-    - Explain secret vs fact files
-    - Show examples from test-clan (zerotier, LUKS, emergency-access)
-  - [ ] Write Generation Workflow section:
-    - Document `clan vars generate <machine>` command
-    - Explain service instance integration (vars generated from service definitions)
-    - Show examples: zerotier identity, LUKS passphrase, emergency-access password
-  - [ ] Write Deployment Mechanism section:
-    - Explain /run/secrets/ tmpfs
-    - Document sops-nix activation
-    - Show permissions model (root:keys, 0600)
-  - [ ] Write Operational Patterns section:
-    - Adding new secrets to service instances
-    - Rotating secrets (regenerate specific var)
-    - Multi-machine coordination (controller vs peer roles)
-  - [ ] Write Troubleshooting section:
-    - Vars generation failures (age keys missing)
-    - Deployment failures (sops-nix not activated)
-    - Permission issues (keys group membership)
-    - Common errors and solutions
-  - [ ] Add examples from test-clan with actual file paths
-  - [ ] Commit documentation: `git add docs/notes/clan/SECRETS-MANAGEMENT.md && git commit -m "docs(clan): add comprehensive secrets management guide"`
+- [ ] **Task 3: Research Clan CLI Commands and Create Documentation** (AC: #3)
+  - [ ] Research clan-core official documentation:
+    - Read ~/projects/nix-workspace/clan-core/docs/site/guides/vars/*.md
+    - Read ~/projects/nix-workspace/clan-core/docs/site/guides/secrets.md
+    - Run `clan --help` to see available commands
+    - Run `clan secrets --help` to understand secrets operations
+    - Run `clan vars --help` to understand vars operations (if available)
+  - [ ] Identify essential clan CLI commands:
+    - Secrets management: `clan secrets list`, `clan secrets get`, `clan secrets set`, etc.
+    - Vars operations: `clan vars generate`, vars inspection commands, etc.
+    - Document WHY secrets vs vars are different (from clan-core docs)
+    - Identify optimal subset for daily operations
+  - [ ] Create test-clan/docs/notes/development/secrets-management.md (lowercase kebab-case):
+    - **Header:** Clear statement that clan-core docs are authoritative source
+    - **References Section:** Links to clan-core/docs/site/guides/vars/ and secrets.md
+    - **Purpose:** Document test-clan-specific application of clan patterns
+    - **Defer to Upstream:** Do NOT reinvent clan workflows, reference clan-core docs
+    - **Local Context:** Show how test-clan uses clan secrets/vars (examples only)
+    - Vars vs secrets distinction (per clan-core documentation)
+    - Test-clan examples: zerotier, LUKS, emergency-access (actual usage)
+    - Multi-machine coordination patterns (as applied in test-clan)
+  - [ ] Add justfile recipes to test-clan/justfile:
+    - Add new ## secrets section with recipes:
+      - `secrets-list`: List all secrets
+      - `secrets-get SECRET`: Get specific secret value
+      - Other essential secrets operations
+    - Add new ## vars section with recipes:
+      - `vars-generate MACHINE`: Generate vars for machine
+      - `vars-inspect MACHINE`: Inspect vars structure for machine
+      - Other essential vars operations
+    - Follow existing justfile patterns (## sections, # recipe docs)
+  - [ ] Commit changes:
+    - `git add docs/notes/development/secrets-management.md justfile`
+    - `git commit -m "docs(clan): add secrets-management guide referencing clan-core docs and justfile recipes for clan commands"`
 
 - [ ] **Task 4: Validate Vars Workflow End-to-End** (AC: #4)
   - [ ] Navigate to test-clan: `cd ~/projects/nix-workspace/test-clan`
@@ -223,17 +235,18 @@ Understanding the complete lifecycle NOW ensures smooth GCP integration later.
   - [ ] Compare vars between machines:
     - `diff -qr vars/per-machine/hetzner-ccx23/ vars/per-machine/hetzner-cx43/`
     - Note differences: zerotier-network-id (controller only), luks-password (ccx23 only), zfs/key (ccx23 only)
-  - [ ] Document machine role differences in SECRETS-MANAGEMENT.md:
+  - [ ] Document machine role differences in secrets-management.md:
+    - **Defer to clan-core:** Reference clan service instance documentation
     - Controller machine (ccx23): zerotier-network-id fact, zerotier-identity-secret
     - Peer machines (cx43, gcp-vm): zerotier-identity-secret only
     - LUKS machines (ccx23): luks-password/key secret
     - ZFS machines (ccx23): zfs/key secret (disabled in current config but var exists)
-  - [ ] Document shared secrets model:
+  - [ ] Document shared secrets model (per clan-core encryption patterns):
     - All secrets encrypted for admins group (crs58)
     - Machine-specific encryption (each machine can decrypt its own secrets)
     - No cross-machine secret sharing in current test-clan setup
-  - [ ] Add multi-machine coordination examples to documentation
-  - [ ] Update SECRETS-MANAGEMENT.md with multi-machine patterns
+  - [ ] Add multi-machine coordination examples showing clan patterns in practice
+  - [ ] Update secrets-management.md with test-clan-specific examples
 
 - [ ] **Task 6: Validate Vars Generation Repeatable** (AC: #6)
   - [ ] Document vars generation for new machine (use gcp-vm as example since vars exist):
@@ -245,8 +258,8 @@ Understanding the complete lifecycle NOW ensures smooth GCP integration later.
     - `ls -R vars/per-machine/gcp-vm/`
     - Verify expected vars present: zerotier, emergency-access, initrd-ssh, user-password-root, state-version
     - Verify age encryption: check users/ and machines/ symlinks
-  - [ ] Document vars generation workflow in SECRETS-MANAGEMENT.md
-  - [ ] Add example commands for adding new machine to documentation
+  - [ ] Document vars generation workflow in secrets-management.md (referencing clan-core docs)
+  - [ ] Add example commands for adding new machine (from clan-core patterns)
 
 - [ ] **Task 7: Update Story 1.8 Completion Notes** (AC: all)
   - [ ] Document what was ALREADY COMPLETE from Stories 1.5-1.7
@@ -255,10 +268,12 @@ Understanding the complete lifecycle NOW ensures smooth GCP integration later.
     - Enhanced TC-007 test implementation
     - Vars lifecycle understanding
     - Multi-machine coordination patterns
-  - [ ] Reference SECRETS-MANAGEMENT.md as primary documentation
+    - Essential clan CLI commands identified
+  - [ ] Reference test-clan/docs/notes/development/secrets-management.md
   - [ ] List files created/modified:
-    - CREATED: docs/notes/clan/SECRETS-MANAGEMENT.md
-    - MODIFIED: modules/checks/validation.nix (enhanced TC-007)
+    - CREATED: test-clan/docs/notes/development/secrets-management.md (references clan-core docs)
+    - MODIFIED: test-clan/modules/checks/validation.nix (enhanced TC-007)
+    - MODIFIED: test-clan/justfile (added secrets/vars recipes)
   - [ ] Mark story as done in sprint-status.yaml
 
 ## Dev Notes
@@ -296,10 +311,11 @@ Despite most work being complete, Story 1.8 is NOT redundant because:
    - Need comprehensive vars lifecycle test
    - Test harness needs this coverage
 
-3. **Documentation:** No guide for secrets management
-   - Troubleshooting scenarios undocumented
-   - Multi-machine patterns unclear
-   - Future operators need operational guide
+3. **Documentation:** No local guide referencing clan-core documentation
+   - Essential clan CLI commands not identified for test-clan
+   - No justfile recipes for recalling clan commands
+   - Need local context showing clan patterns in test-clan
+   - Must defer to clan-core official docs (not reinvent)
 
 4. **SSH Host Keys:** Potential gap identified
    - Need to validate SSH host key persistence
@@ -533,73 +549,73 @@ secrets-generation = pkgs.runCommand "secrets-generation" {
 
 ### Documentation Structure
 
-**SECRETS-MANAGEMENT.md Outline:**
+**test-clan/docs/notes/development/secrets-management.md Outline:**
 
-1. **Overview**
-   - Purpose: Declarative secrets management for multi-machine coordination
-   - Key concepts: vars vs secrets, age encryption, sops-nix
-   - Reference implementation: test-clan repository
+**CRITICAL: Document defers to clan-core official documentation as authoritative source**
 
-2. **Architecture**
-   - Vars = Secrets (encrypted) + Facts (public)
-   - Age encryption model (admins group + machine keys)
-   - Sops-nix integration for deployment
-   - Lifecycle: generate → store → deploy
+1. **Header and References**
+   - **Authoritative Source:** clan-core documentation
+   - **Upstream References:**
+     - `~/projects/nix-workspace/clan-core/docs/site/guides/vars/` (vars workflow)
+     - `~/projects/nix-workspace/clan-core/docs/site/guides/secrets.md` (secrets management)
+   - **Purpose:** Document test-clan-specific application of clan patterns
+   - **Scope:** Local examples only, defer to upstream for canonical workflows
 
-3. **Vars Structure**
-   - Directory layout: vars/per-machine/<machine>/
-   - Service instance → vars mapping
-   - Secret vs fact file structure
-   - Age recipients (users/ and machines/ symlinks)
+2. **Essential Clan CLI Commands** (from clan --help and clan-core docs)
+   - **Secrets commands:** clan secrets list, get, set (see clan secrets --help)
+   - **Vars commands:** clan vars generate, inspection (see clan vars --help if available)
+   - **Why different:** Secrets vs vars distinction per clan-core documentation
+   - **When to use each:** Reference clan-core guides for decision tree
+   - **Justfile recipes:** Reference test-clan/justfile for convenient command shortcuts
 
-4. **Generation Workflow**
-   - Service instances define required vars
-   - `clan vars generate <machine>` command
-   - Vars generators create secrets and facts
-   - Encryption applied via age
+3. **Test-clan Examples** (showing clan patterns in practice)
+   - Zerotier vars (controller vs peer) - service instance example
+   - LUKS passphrase - disko integration example
+   - Emergency access - users service example
+   - **Reference clan-core docs** for understanding underlying patterns
 
-5. **Deployment Mechanism**
-   - Vars deployed to /run/secrets/vars/ (tmpfs)
-   - Sops-nix activation at system boot
-   - Permissions: root:keys, 0600 for secrets
-   - Systemd services read from /run/secrets/
+4. **Multi-machine Coordination** (as applied in test-clan)
+   - Controller vs peer roles (zerotier service instances)
+   - Machine-specific vars (LUKS, ZFS) per machine configuration
+   - Age encryption recipients (admins group + machine keys)
+   - **See clan-core docs** for service instance patterns
 
-6. **Operational Patterns**
-   - Adding new machine: inventory → generate → deploy
-   - Rotating secrets: regenerate specific var → deploy
-   - Multi-machine coordination: controller vs peer roles
-   - Shared secrets: admins group encryption
-
-7. **Examples from test-clan**
-   - Zerotier identity (controller vs peer)
-   - LUKS passphrase (persistent encryption)
-   - Emergency access (root password recovery)
-   - SSH keys (initrd and runtime)
-
-8. **Troubleshooting**
-   - Vars generation failures (age keys missing)
-   - Deployment failures (sops-nix not activated)
-   - Permission issues (keys group membership)
-   - Common errors and solutions
+5. **Common Workflows** (clan commands used in test-clan)
+   - Generating vars for new machine: `just vars-generate <machine>`
+   - Inspecting vars structure: `just vars-inspect <machine>`
+   - Managing secrets: `just secrets-list`, `just secrets-get <secret>`
+   - **All commands delegate to clan CLI** (justfile provides convenience)
 
 ### References
 
+**Story Context:**
 - [Source: docs/notes/development/epics.md#Story-1.8]
 - [Prerequisite: docs/notes/development/work-items/1-5-deploy-hetzner-vm-and-validate-stack.md]
 - [Prerequisite: docs/notes/development/work-items/1-6-implement-comprehensive-test-harness-for-test-clan.md]
 - [Prerequisite: docs/notes/development/work-items/1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness.md]
-- [Upstream: clan-core vars documentation]
-- [Upstream: sops-nix documentation]
-- [Upstream: age encryption]
+
+**Authoritative Upstream Documentation (clan-core):**
+- [Upstream: ~/projects/nix-workspace/clan-core/docs/site/guides/vars/vars-overview.md] - Vars system overview
+- [Upstream: ~/projects/nix-workspace/clan-core/docs/site/guides/vars/vars-concepts.md] - Vars concepts and architecture
+- [Upstream: ~/projects/nix-workspace/clan-core/docs/site/guides/vars/vars-backend.md] - Vars backend (sops integration)
+- [Upstream: ~/projects/nix-workspace/clan-core/docs/site/guides/vars/vars-troubleshooting.md] - Vars troubleshooting guide
+- [Upstream: ~/projects/nix-workspace/clan-core/docs/site/guides/secrets.md] - Secrets management
+- [Upstream: ~/projects/nix-workspace/clan-core/docs/site/guides/migrations/migration-facts-vars.md] - Facts to vars migration
+
+**Supporting Documentation:**
+- [Upstream: sops-nix documentation] - Secrets deployment mechanism
+- [Upstream: age encryption] - Encryption backend
 
 ### Expected Validation Points
 
 After this story completes:
-- ✅ Vars workflow completely understood and documented
+- ✅ Vars workflow completely understood (via clan-core documentation)
 - ✅ TC-007 test covers vars lifecycle comprehensively
-- ✅ SECRETS-MANAGEMENT.md provides operational guide
+- ✅ Essential clan CLI commands identified and documented
+- ✅ Justfile recipes created for convenient clan command recall
+- ✅ Local documentation references clan-core docs (does not reinvent)
 - ✅ SSH host key persistence validated (outcome documented)
-- ✅ Multi-machine coordination patterns clear
+- ✅ Multi-machine coordination patterns clear (per clan service instances)
 - ✅ Ready for Story 1.9 (GCP terraform with secrets workflow replication)
 
 **What Story 1.8 does NOT cover:**
@@ -664,18 +680,23 @@ This story was completely rewritten based on actual completion state of Stories 
 - **REMOVED:** All "first-time vars generation" tasks (already done in Story 1.5)
 - **REMOVED:** Basic vars deployment validation (completed in Story 1.5)
 - **RETAINED:** SSH host key persistence validation (gap identified)
-- **RETAINED:** Documentation creation (SECRETS-MANAGEMENT.md)
+- **RETAINED:** Documentation creation (test-clan/docs/notes/development/secrets-management.md, lowercase kebab-case)
+- **ADDED:** Research clan CLI commands via clan-core docs and `clan --help`
+- **ADDED:** Create justfile recipes for essential clan commands (secrets/vars sections)
 - **ADDED:** Enhance TC-007 from smoke test to lifecycle test
-- **ADDED:** Validate vars workflow understanding end-to-end
-- **ADDED:** Document multi-machine coordination patterns
+- **ADDED:** Validate vars workflow understanding end-to-end (using clan commands)
+- **ADDED:** Document multi-machine coordination patterns (referencing clan service instances)
 
 **Acceptance Criteria Changes:**
 - Original 9 ACs → Revised 6 ACs (more focused)
 - AC #1: NEW - SSH host key persistence validation
 - AC #2: NEW - Enhance TC-007 test (was smoke test)
-- AC #3: RETAINED - SECRETS-MANAGEMENT.md documentation
-- AC #4: NEW - Vars workflow end-to-end validation
-- AC #5: NEW - Multi-machine patterns documentation
+- AC #3: REVISED - Research clan CLI commands, create documentation (test-clan/docs/notes/development/secrets-management.md, lowercase kebab-case), add justfile recipes
+  - **CRITICAL:** Document defers to clan-core official documentation
+  - **CRITICAL:** Justfile recipes delegate to clan CLI commands
+  - **CRITICAL:** No uppercase/shouting filenames (use lowercase kebab-case)
+- AC #4: NEW - Vars workflow end-to-end validation (using clan commands from research)
+- AC #5: NEW - Multi-machine patterns documentation (per clan service instances)
 - AC #6: REVISED - Vars generation repeatability (use existing gcp-vm vars as example)
 - REMOVED: ACs #1-2 (secrets initialization - already done)
 - REMOVED: AC #3 (Hetzner API token - validated in Story 1.5)
@@ -710,3 +731,45 @@ This story was completely rewritten based on actual completion state of Stories 
 - Revised: 2-3 hours (validation + documentation focus)
 
 **Risk level unchanged:** Low (validation and documentation)
+
+---
+
+**2025-11-07 (Story Update - User Corrections for Clan-core Deference and Justfile Integration):**
+
+Applied three critical corrections based on user feedback:
+
+**1. Defer to clan-core Official Documentation:**
+- **BEFORE:** Story planned to create comprehensive standalone documentation
+- **AFTER:** Documentation explicitly defers to clan-core as authoritative source
+- References added: clan-core/docs/site/guides/vars/ and secrets.md
+- Local documentation scope: test-clan-specific examples only
+- **Rationale:** Clan manages sops secrets AND vars together; do not reinvent workflows
+
+**2. Research Clan CLI Commands and Create Justfile Recipes:**
+- **ADDED:** Task to research essential clan commands via `clan --help` and clan-core docs
+- **ADDED:** Identify optimal subset of clan commands for daily operations
+- **ADDED:** Create justfile recipes for secrets operations (new ## secrets section)
+- **ADDED:** Create justfile recipes for vars operations (new ## vars section)
+- **PURPOSE:** Make essential clan commands easily recallable via just recipes
+- **INTEGRATION:** test-clan/justfile already exists with testing/building sections
+
+**3. Fix Documentation Filename (No Uppercase/Shouting):**
+- **BEFORE:** docs/notes/clan/SECRETS-MANAGEMENT.md (uppercase, wrong path)
+- **AFTER:** test-clan/docs/notes/development/secrets-management.md (lowercase kebab-case)
+- **RATIONALE:** Per user preferences and style guide, never use shouting case filenames
+- **VERIFIED:** test-clan/docs/notes/development/ directory exists
+
+**All References Updated:**
+- Changed all mentions of "SECRETS-MANAGEMENT.md" to "secrets-management.md"
+- Updated all paths to "test-clan/docs/notes/development/secrets-management.md"
+- Added clan-core documentation references throughout
+- Updated task descriptions to emphasize clan-core as primary source
+- Added justfile modification to AC #3 and Task 3
+- Updated Dev Notes "Documentation Structure" to emphasize upstream deference
+
+**Key Principles Reinforced:**
+- **Authoritative Source:** clan-core documentation is canonical
+- **Local Context:** test-clan docs show application of clan patterns
+- **No Reinvention:** Do not create auxiliary workflows
+- **Justfile Integration:** Convenient recipes delegate to clan CLI
+- **Naming Convention:** Always lowercase kebab-case for filenames
