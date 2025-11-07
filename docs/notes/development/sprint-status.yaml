@@ -1,4 +1,4 @@
-# generated: 2025-11-03
+# generated: 2025-11-07
 # project: infra
 # project_key: infra
 # tracking_system: file-system
@@ -53,7 +53,7 @@
 # ============================
 # All functionality must be preserved during migration. Validate at every phase.
 
-generated: 2025-11-03
+generated: 2025-11-07
 project: infra
 project_key: infra
 tracking_system: file-system
@@ -74,10 +74,12 @@ development_status:
   1-4-create-hetzner-terraform-config-and-host-modules: done
   # Story 1.5: DONE - APPROVED ✅ - All 13 ACs validated, ZFS encryption bug discovered and documented
   1-5-deploy-hetzner-vm-and-validate-stack: done
-  # Story 1.6: COMPLETE - Test harness implemented, all tests functional, ready for Story 1.7
-  1-6-implement-comprehensive-test-harness-for-test-clan: review
-  # Story 1.7: IN PROGRESS - Executing dendritic refactoring with test-driven validation
-  1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness: in-progress
+  # Story 1.6: DONE - Test harness implemented with 18 tests (12 nix-unit + 4 validation + 2 integration)
+  # Implementation evolved to hybrid approach in modules/checks/ with auto-discovery (superior to original plan)
+  1-6-implement-comprehensive-test-harness-for-test-clan: done
+  # Story 1.7: DONE - Pure dendritic flake-parts pattern achieved with zero regressions
+  # All feature tests passing (TC-008, TC-009), Step 2.5 deferred (manual machine registration retained)
+  1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness: done
   1-8-validate-clan-secrets-vars-on-hetzner: drafted
   # Story 1.9: REQUIRES MANUAL SECRET SETUP - agent must pause for user to configure GCP service account JSON
   1-9-create-gcp-terraform-config-and-host-modules: drafted
