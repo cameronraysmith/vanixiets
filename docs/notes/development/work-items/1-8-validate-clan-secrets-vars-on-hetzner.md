@@ -2,7 +2,7 @@
 title: "Story 1.8: Validate and document clan secrets/vars workflow on Hetzner VMs"
 ---
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -640,7 +640,7 @@ After this story completes:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/notes/development/work-items/1-8-validate-clan-secrets-vars-on-hetzner.context.xml (generated 2025-11-07)
 
 ### Agent Model Used
 
