@@ -82,7 +82,7 @@ development_status:
   1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness: done
   # Story 1.8: Migration rehearsal - convert blackphos from infra nixos-unified to test-clan dendritic + clan
   # Strategic: Documents transformation pattern for production refactoring in Epic 2+
-  1-8-migrate-blackphos-from-infra-to-test-clan: backlog
+  1-8-migrate-blackphos-from-infra-to-test-clan: drafted
   # Story 1.9: Rename test VMs to production names (cinnabar/electrum) and establish zerotier network
   1-9-rename-vms-cinnabar-electrum-establish-zerotier: backlog
   # Story 1.10: Integrate blackphos (nix-darwin) into zerotier network with cinnabar/electrum (nixos)
