@@ -80,16 +80,18 @@ development_status:
   # Story 1.7: DONE - Pure dendritic flake-parts pattern achieved with zero regressions
   # All feature tests passing (TC-008, TC-009), Step 2.5 deferred (manual machine registration retained)
   1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness: done
-  # Story 1.8: READY-FOR-DEV - Story context generated (2025-11-07) with comprehensive test-clan analysis
-  # Focus: validation/documentation, enhance TC-007, create secrets-management.md, add justfile recipes
-  1-8-validate-clan-secrets-vars-on-hetzner: ready-for-dev
-  # Story 1.9: REQUIRES MANUAL SECRET SETUP - agent must pause for user to configure GCP service account JSON
-  1-9-create-gcp-terraform-config-and-host-modules: drafted
-  1-10-deploy-gcp-vm-and-validate-multi-cloud: drafted
-  1-11-test-multi-machine-coordination: drafted
-  1-12-monitor-stability-for-one-week: drafted
-  1-13-document-integration-findings-and-patterns: drafted
-  1-14-execute-go-no-go-decision-framework: drafted
+  # Story 1.8: Migration rehearsal - convert blackphos from infra nixos-unified to test-clan dendritic + clan
+  # Strategic: Documents transformation pattern for production refactoring in Epic 2+
+  1-8-migrate-blackphos-from-infra-to-test-clan: backlog
+  # Story 1.9: Rename test VMs to production names (cinnabar/electrum) and establish zerotier network
+  1-9-rename-vms-cinnabar-electrum-establish-zerotier: backlog
+  # Story 1.10: Integrate blackphos (nix-darwin) into zerotier network with cinnabar/electrum (nixos)
+  # Validates heterogeneous networking across platforms
+  1-10-integrate-blackphos-into-zerotier-network: backlog
+  # Story 1.11: Document complete findings including darwin validation and transformation patterns
+  1-11-document-integration-findings-and-patterns: backlog
+  # Story 1.12: GO/NO-GO decision based on expanded validation (nixos + darwin + transformation)
+  1-12-execute-go-no-go-decision-framework: backlog
   epic-1-retrospective: optional
 
   # Epic 2: VPS Infrastructure Foundation (Phase 1 - cinnabar)

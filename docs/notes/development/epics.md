@@ -33,20 +33,21 @@ Each epic includes:
 
 ---
 
-## Epic 1: Architectural Validation + Infrastructure Deployment (Phase 0)
+## Epic 1: Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Goal:** Deploy Hetzner + GCP VMs using clan-infra's proven terranix pattern, with dendritic as optional optimization
+**Goal:** Validate dendritic flake-parts + clan architecture for both nixos VMs and nix-darwin hosts, and document nixos-unified → dendritic + clan transformation pattern through blackphos migration rehearsal
 
-**Strategic Value:** Validates complete stack (terraform + clan + infrastructure) on real VMs before darwin migration, following proven patterns from clan-infra, de-risking deployment with real infrastructure experience
+**Strategic Value:** Validates complete stack (dendritic + clan + terraform + infrastructure) on real VMs and darwin machines before production refactoring, proves both target architecture AND transformation process, provides reusable migration blueprint for Epic 2+ by rehearsing complete nixos-unified → dendritic + clan conversion
 
-**Timeline:** 3-4 weeks (2-3 weeks deployment + 1 week stability validation)
+**Timeline:** 3-4 weeks (2 weeks nixos validation complete + 1-2 weeks darwin migration rehearsal)
 
 **Success Criteria:**
-- Hetzner VM deployed and operational (minimum requirement)
-- GCP VM deployed and operational (optimal, can defer if complex)
-- Multi-machine coordination working via clan inventory and zerotier
-- 1 week stability validation minimum
-- Infrastructure patterns documented for Phase 1
+- Hetzner VMs deployed and operational (minimum requirement achieved)
+- Dendritic flake-parts pattern proven with zero regressions (achieved via Stories 1.6-1.7)
+- Nix-darwin machine (blackphos) migrated from infra to test-clan management
+- Heterogeneous zerotier network operational (nixos VMs + nix-darwin host)
+- Nixos-unified → dendritic + clan transformation pattern documented
+- Migration patterns documented for production refactoring in Epic 2+
 - GO/CONDITIONAL GO/NO-GO decision made with explicit rationale
 
 **Risk Level:** Medium (infrastructure deployment costs money, operational risk)
@@ -233,181 +234,131 @@ So that the architectural pattern is proven and validated for future phases.
 
 ---
 
-### Story 1.8: Initialize clan secrets and test vars deployment on Hetzner
+### Story 1.8: Migrate blackphos from infra to test-clan management
 
 As a system administrator,
-I want to validate clan secrets management and vars deployment on hetzner-vm,
-So that I can confirm the secrets infrastructure works correctly before GCP deployment.
+I want to migrate blackphos nix-darwin configuration from infra's nixos-unified pattern to test-clan's dendritic + clan pattern,
+So that I can validate the complete transformation process and document the migration pattern for refactoring infra in Epic 2+.
 
 **Acceptance Criteria:**
-1. Clan secrets initialized in test-clan: age keys generated for admins group
-2. User age key added: `clan secrets groups add-user admins <username>`
-3. Hetzner API token verified in clan secrets (from Story 1.4)
-4. Clan vars for hetzner-vm validated: SSH host keys generated (encrypted in sops/machines/hetzner-vm/secrets/), Zerotier identity generated (if needed), Public facts accessible (unencrypted in sops/machines/hetzner-vm/facts/)
-5. Vars deployed correctly: `/run/secrets/` has proper permissions (0600 root-owned)
-6. SSH host keys functional: able to SSH without host key warnings after redeployment
-7. Zerotier controller uses managed identity (not ephemeral)
-8. Vars generation repeatable: can regenerate and redeploy without errors
-9. Documentation created: SECRETS-MANAGEMENT.md covering clan vars workflow
+1. Blackphos configuration migrated from infra to test-clan: Nix-darwin host configuration created in modules/hosts/blackphos/, Home-manager user configuration (crs58) migrated and functional, All existing functionality preserved (packages, services, shell config)
+2. Configuration uses dendritic flake-parts pattern: Module imports via config.flake.modules namespace, Proper module organization (darwin base, homeManager, host-specific), Reference clan-core home-manager integration patterns, Reference dendritic flake-parts home-manager usage from examples in CLAUDE.md (clan-infra, qubasa-clan-infra, mic92-clan-dotfiles, dendrix-dendritic-nix, gaetanlepage-dendritic-nix-config)
+3. Blackphos added to clan inventory: tags = ["darwin" "workstation" "backup"], machineClass = "darwin"
+4. Clan secrets/vars configured for blackphos: Age key for user crs58 added to admins group, SSH host keys generated via clan vars, User secrets configured if needed
+5. Configuration builds successfully: `nix build .#darwinConfigurations.blackphos.system`
+6. Transformation documented if needed: nixos-unified-to-clan-migration.md created (if valuable) documenting step-by-step conversion process, Module organization patterns (what goes where), Secrets migration approach (sops-nix → clan vars), Common issues and solutions discovered
+7. Package list comparison: Pre-migration vs post-migration packages identical (zero-regression validation)
 
 **Prerequisites:** Story 1.7 (dendritic refactoring complete)
 
-**Estimated Effort:** 2-4 hours
+**Estimated Effort:** 6-8 hours (investigation + transformation + documentation)
 
-**Risk Level:** Low (validation and documentation)
+**Risk Level:** Medium (converting real production machine, but not deploying yet)
+
+**Strategic Value:** Provides concrete migration pattern for refactoring all 4 other machines in infra during Epic 2+
 
 ---
 
-### Story 1.9: Create GCP VM terraform configuration and host modules
+### Story 1.9: Rename Hetzner VMs to cinnabar/electrum and establish zerotier network
 
 As a system administrator,
-I want to create terraform configuration for GCP VM provisioning,
-So that I can deploy gcp-vm using patterns learned from Hetzner deployment.
+I want to rename the test Hetzner VMs to their intended production names (cinnabar and electrum) and establish a zerotier network between them,
+So that the test-clan infrastructure mirrors the production topology that will be deployed in Epic 2+.
 
 **Acceptance Criteria:**
-1. modules/terranix/gcp.nix created with: Google Cloud provider configuration, SSH key resource for terraform deployment key, GCP compute instance resource (e2-micro or e2-small for testing, free tier eligible), null_resource for `clan machines install` provisioning, Network configuration (VPC, firewall rules for SSH + zerotier)
-2. modules/hosts/gcp-vm/default.nix created with: Base NixOS configuration (hostname, state version, nix settings), srvos hardening modules imported, GCP-specific networking configuration
-3. modules/hosts/gcp-vm/disko.nix created with: LUKS encryption for root partition, GCP-compatible partition layout (considers boot requirements)
-4. GCP service account JSON stored as clan secret: `clan secrets set gcp-service-account-json` **(REQUIRES USER: create service account with Compute Admin role, download JSON key, agent must pause and coordinate)**
-5. GCP project ID configured in terraform
-6. Terraform configuration generates: `nix build .#terranix.terraform`
-7. Host configuration builds: `nix build .#nixosConfigurations.gcp-vm.config.system.build.toplevel`
+1. VMs renamed in test-clan configuration: hetzner-vm → cinnabar (primary VPS), test-vm → electrum (secondary test VM)
+2. Clan inventory updated: Machine definitions reflect new names (cinnabar, electrum), Tags and roles preserved from original configuration
+3. Zerotier network established: Cinnabar configured as zerotier controller, Electrum configured as zerotier peer, Network ID documented for future machine additions
+4. Network connectivity validated: Bidirectional ping between cinnabar and electrum via zerotier IPs, SSH via zerotier works in both directions, Network latency acceptable for coordination
+5. Configuration rebuilds successful: Both VMs rebuild with new names without errors, Clan vars regenerated for renamed machines if needed
+6. Test harness updated: Tests reference new machine names (cinnabar, electrum), All regression tests passing after rename
+7. Documentation updated: README or relevant docs reflect cinnabar/electrum as test infrastructure names
 
-**Prerequisites:** Story 1.8 (Hetzner stable, secrets validated)
+**Prerequisites:** Story 1.8 (blackphos configuration migrated)
 
-**Note:** Story 1.9 requires manual user intervention to configure GCP credentials (service account creation, IAM permissions, JSON key download). Agent must pause before terraform validation commands.
+**Estimated Effort:** 2-3 hours
 
-**Estimated Effort:** 4-6 hours
+**Risk Level:** Low (rename operation, zerotier already working from Story 1.5)
 
-**Risk Level:** Medium-High (GCP is new territory, different from Hetzner/Vultr)
+**Note:** This prepares test-clan to mirror production topology where cinnabar and electrum will be migrated from test-clan to infra during the production refactoring.
 
 ---
 
-### Story 1.10: Deploy GCP VM and validate multi-cloud infrastructure
+### Story 1.10: Integrate blackphos into test-clan zerotier network
 
 As a system administrator,
-I want to provision and deploy gcp-vm to Google Cloud Platform,
-So that I can validate multi-cloud infrastructure coordination via clan and zerotier.
+I want to integrate the blackphos nix-darwin machine into the test-clan zerotier network with cinnabar and electrum,
+So that I can validate heterogeneous networking (nixos ↔ nix-darwin) and prove multi-platform coordination before production refactoring.
 
 **Acceptance Criteria:**
-1. Terraform plan reviewed for GCP resources: `nix run .#terranix.terraform -- plan`
-2. GCP VM provisioned: `nix run .#terranix.terraform -- apply`
-3. VM accessible via SSH with terraform deploy key
-4. Clan vars generated for gcp-vm: `clan vars generate gcp-vm`
-5. NixOS installed via clan: `clan machines install gcp-vm --target-host root@<gcp-ip> --update-hardware-config nixos-facter --yes`
-6. System boots successfully with LUKS encryption
-7. Post-installation SSH access works: `ssh root@<gcp-ip>`
-8. Zerotier peer connects to Hetzner controller: `ssh root@<gcp-ip> "zerotier-cli status"` shows network membership
-9. Zerotier mesh operational: From Hetzner, can ping GCP zerotier IP and vice versa
-10. SSH via zerotier works: `ssh root@<gcp-zerotier-ip>` from Hetzner
-11. Clan vars deployed correctly on GCP VM
+1. Blackphos zerotier peer configuration: Zerotier service configured on blackphos (investigate nix-darwin zerotier module or homebrew workaround), Blackphos joins zerotier network as peer (cinnabar remains controller), Zerotier configuration uses nix-native approach where possible
+2. Blackphos deployed to physical hardware: Configuration deployed to actual blackphos laptop: `darwin-rebuild switch --flake .#blackphos`, Deployment succeeds without errors, All existing functionality validated post-deployment
+3. Heterogeneous network validated: 3-machine zerotier network operational (cinnabar + electrum + blackphos), Blackphos can ping both cinnabar and electrum via zerotier IPs, Both nixos VMs can ping blackphos via zerotier IP
+4. Cross-platform SSH validated: SSH from blackphos to cinnabar/electrum works, SSH from cinnabar/electrum to blackphos works, Certificate-based authentication functional across platforms
+5. Clan vars deployed correctly on blackphos: /run/secrets/ populated with proper permissions (darwin-compatible), SSH host keys functional, User secrets accessible
+6. Zero-regression validation: All blackphos daily workflows functional, Development environment intact, No performance degradation
+7. Zerotier workarounds documented: If nix-darwin zerotier module unavailable, document approach used (homebrew, custom module, etc.), Note any platform-specific issues encountered
 
-**Prerequisites:** Story 1.9 (GCP terraform + host config)
+**Prerequisites:** Story 1.9 (VMs renamed, zerotier network established)
 
-**Estimated Effort:** 6-8 hours (new cloud provider, troubleshooting expected)
+**Estimated Effort:** 4-6 hours (includes zerotier darwin integration investigation)
 
-**Risk Level:** High (new cloud provider, networking complexity, cost)
+**Risk Level:** Medium-High (deploying to real physical machine, zerotier darwin support uncertain)
 
-**Cost:** ~$7-10/month for GCP e2-micro (acceptable testing cost)
+**Strategic Value:** Proves heterogeneous networking (nixos ↔ nix-darwin) works, validates complete multi-platform coordination pattern for production fleet
 
-**Decision Point:** If GCP deployment too complex: consider dropping GCP from MVP, stick with Hetzner only. If GCP works but unreliable: document issues, may defer to post-Phase 0.
+**Note:** This story may require investigating zerotier-one installation on nix-darwin. Options include: native nix-darwin module (if available), custom clan service for darwin based on nixos zerotier service, homebrew-based installation managed via nix-darwin.
 
 ---
 
-### Story 1.11: Test multi-machine coordination across Hetzner + GCP
-
-As a system administrator,
-I want to validate multi-machine coordination features across Hetzner and GCP VMs,
-So that I can confirm clan inventory and service instances work correctly in multi-cloud environment.
-
-**Acceptance Criteria:**
-1. 2-machine zerotier network operational: Hetzner VM (controller role) + GCP VM (peer role), Full mesh connectivity: bidirectional ping successful, Network latency acceptable (< 200ms, depends on regions)
-2. SSH via zerotier works in both directions: From Hetzner to GCP via zerotier IP, From GCP to Hetzner via zerotier IP, Certificate-based authentication functional
-3. Clan service instances deployed correctly: emergency-access on both machines (root access recovery), sshd-clan server + client roles on both machines, users-root on both machines
-4. Vars shared appropriately (if any configured with share = true)
-5. Multi-machine rebuild test: update configuration, rebuild both machines, validate changes
-6. Service coordination test: modify service instance setting, verify applied to both machines
-7. Network stability: 24-hour monitoring shows no disconnections or errors
-
-**Prerequisites:** Story 1.10 (GCP deployed)
-
-**Estimated Effort:** 2-4 hours
-
-**Risk Level:** Medium (depends on successful deployment from previous stories)
-
----
-
-### Story 1.12: Monitor infrastructure stability and extract deployment patterns
-
-As a system administrator,
-I want to monitor both VMs for stability over 1 week minimum,
-So that I can validate the infrastructure is production-ready before darwin migration.
-
-**Acceptance Criteria:**
-1. 1-week stability monitoring (minimum): Daily checks: SSH access, zerotier connectivity, system logs; No critical errors or service failures; No unexpected reboots or crashes; Uptime > 99% (allowing brief maintenance)
-2. DEPLOYMENT-PATTERNS.md created documenting: Terraform/terranix configuration patterns (Hetzner + GCP), Clan inventory patterns for cloud VMs, Disko patterns for LUKS encryption, Vars generation patterns for secrets, Multi-cloud zerotier mesh setup, Troubleshooting notes from deployment experience
-3. Cost tracking: actual monthly costs for Hetzner + GCP (~$15-20/month total)
-4. Performance baseline: build times, deployment times, network latency
-5. Patterns validated as reusable for Phase 1 (cinnabar) deployment
-6. Issues log: any problems discovered, workarounds applied
-7. Rollback procedure tested: can destroy and recreate infrastructure from configuration
-
-**Prerequisites:** Story 1.11 (multi-machine coordination validated)
-
-**Estimated Effort:** 1 week calendar time (15-30 min daily monitoring)
-
-**Risk Level:** Low (monitoring only, stability gate)
-
-**Stability Gate:** Infrastructure must be stable for 1 week minimum before go/no-go decision
-
----
-
-### Story 1.13: Document integration findings and architectural decisions
+### Story 1.11: Document integration findings and architectural decisions
 
 As a system administrator,
 I want to document all integration findings and architectural decisions from Phase 0,
-So that I have comprehensive reference for Phase 1 and beyond.
+So that I have comprehensive reference for production refactoring in Epic 2+.
 
 **Acceptance Criteria:**
-1. INTEGRATION-FINDINGS.md created documenting: Terraform/terranix + clan integration (how it works, gotchas), Dendritic pattern evaluation (if attempted in Story 1.2), Acceptable deviations from pure patterns (specialArgs, module organization), Hetzner deployment experience (easy, hard, surprises), GCP deployment experience (comparison to Hetzner, challenges), Multi-cloud coordination findings (what works, what doesn't), Zerotier mesh networking across clouds (latency, reliability)
-2. ARCHITECTURAL-DECISIONS.md created with: Why terraform/terranix for infrastructure provisioning, Why LUKS encryption (security requirement), Why zerotier mesh (always-on coordination, VPN), Clan inventory patterns chosen, Service instance patterns (roles, targeting), Secrets management strategy (clan vars vs sops-nix)
+1. Integration findings documented (in existing docs or new docs as appropriate): Terraform/terranix + clan integration (how it works, gotchas), Dendritic flake-parts pattern evaluation (proven via Stories 1.6-1.7), Nix-darwin + clan integration patterns (learned from Story 1.8), Home-manager integration approach with dendritic + clan, Heterogeneous zerotier networking (nixos ↔ nix-darwin from Story 1.10), Nixos-unified → dendritic + clan transformation process (from Story 1.8)
+2. Architectural decisions documented (in existing docs or new docs as appropriate): Why dendritic flake-parts + clan combination, Why terraform/terranix for infrastructure provisioning, Why zerotier mesh (always-on coordination, VPN), Clan inventory patterns chosen, Service instance patterns (roles, targeting), Secrets management strategy (clan vars vs sops-nix), Home-manager integration approach
 3. Confidence level assessed for each pattern: proven, needs-testing, uncertain
-4. Recommendations for Phase 1 cinnabar deployment
-5. Known limitations documented (GCP complexity, cost, alternatives)
+4. Recommendations for production refactoring: Specific steps to refactor infra from nixos-unified to dendritic + clan, Machine migration sequence and approach, Risk mitigation strategies based on test-clan learnings
+5. Known limitations documented: Darwin-specific challenges, Platform-specific workarounds (if any), Areas requiring additional investigation
 
-**Prerequisites:** Story 1.12 (stability validated, patterns extracted)
+**Prerequisites:** Story 1.10 (blackphos integrated, heterogeneous networking validated)
 
-**Estimated Effort:** 2-4 hours
+**Estimated Effort:** 3-4 hours
 
 **Risk Level:** Low (documentation only)
 
+**Strategic Value:** Provides comprehensive blueprint for Epic 2+ production refactoring based on complete validation (nixos + nix-darwin + transformation pattern)
+
 ---
 
-### Story 1.14: Execute go/no-go decision framework for Phase 1
+### Story 1.12: Execute go/no-go decision framework for production refactoring
 
 As a system administrator,
 I want to evaluate Phase 0 results against go/no-go criteria,
-So that I can make an informed decision about proceeding to Phase 1 (cinnabar production deployment).
+So that I can make an informed decision about proceeding to production refactoring in Epic 2+.
 
 **Acceptance Criteria:**
-1. GO-NO-GO-DECISION.md created with decision framework evaluation: Infrastructure deployment success (Hetzner + GCP operational: PASS/FAIL), Stability validation (1 week stable: PASS/FAIL), Multi-machine coordination (clan inventory + zerotier working: PASS/FAIL), Terraform/terranix integration (proven pattern: PASS/FAIL), Secrets management (clan vars working: PASS/FAIL), Cost acceptability (~$15-20/month for 2 VMs: ACCEPTABLE/EXCESSIVE), Pattern confidence (reusable for Phase 1: HIGH/MEDIUM/LOW)
-2. Blockers identified (if any): Critical: must resolve before Phase 1, Major: can work around but risky, Minor: document and monitor
-3. Decision rendered: **GO**: All criteria passed, high confidence, proceed to Phase 1 cinnabar; **CONDITIONAL GO**: Some issues but manageable, proceed with caution; **NO-GO**: Critical blockers, resolve or pivot strategy
-4. If GO/CONDITIONAL GO: Phase 1 cinnabar deployment plan confirmed, Patterns ready to apply to production infrastructure, Test VMs can be destroyed (or kept for experimentation)
-5. If NO-GO: Alternative approaches documented, Issues requiring resolution identified, Timeline for retry or pivot strategy
+1. Decision framework evaluation documented (go-no-go-decision.md or integrated into existing docs): Infrastructure deployment success (Hetzner VMs operational: PASS/FAIL), Dendritic flake-parts pattern validated (Stories 1.6-1.7: PASS/FAIL), Nix-darwin + clan integration proven (Story 1.8: PASS/FAIL), Heterogeneous networking validated (nixos ↔ darwin zerotier: PASS/FAIL), Transformation pattern documented (nixos-unified → dendritic + clan: PASS/FAIL), Home-manager integration proven (PASS/FAIL), Pattern confidence (reusable for production refactoring: HIGH/MEDIUM/LOW)
+2. Blockers identified (if any): Critical: must resolve before production refactoring, Major: can work around but risky, Minor: document and monitor
+3. Decision rendered: **GO**: All criteria passed, high confidence, proceed to Epic 2+ production refactoring; **CONDITIONAL GO**: Some issues but manageable, proceed with specific cautions documented; **NO-GO**: Critical blockers, resolve or pivot strategy
+4. If GO/CONDITIONAL GO: Production refactoring plan confirmed for Epic 2+, Migration pattern ready to apply to infra repository, Test-clan cinnabar/electrum configurations ready to migrate into infra, Blackphos can be reverted to infra management or kept in test-clan as ongoing validation
+5. If NO-GO: Alternative approaches documented, Issues requiring resolution identified, Timeline for retry or pivot strategy, Specific validation gaps that need addressing
 6. Next steps clearly defined based on decision outcome
 
-**Prerequisites:** Story 1.13 (findings documented)
+**Prerequisites:** Story 1.11 (findings documented)
 
 **Estimated Effort:** 1-2 hours
 
 **Risk Level:** Low (decision only)
 
-**Decision Criteria - GO if:** Both VMs deployed successfully, 1 week stability achieved, Multi-machine coordination working, Patterns documented with confidence, Cost acceptable for production use
+**Decision Criteria - GO if:** Hetzner VMs deployed and operational, Dendritic flake-parts pattern proven with zero regressions, Blackphos successfully migrated from nixos-unified to dendritic + clan, Heterogeneous zerotier network operational (nixos + darwin), Transformation pattern documented and reusable, High confidence in applying patterns to production
 
-**Decision Criteria - CONDITIONAL GO if:** Minor issues discovered but workarounds available, GCP more complex than expected but Hetzner solid, Dendritic pattern skipped (acceptable, not required), Stability good but < 1 week (6+ days acceptable)
+**Decision Criteria - CONDITIONAL GO if:** Minor platform-specific issues discovered but workarounds documented, Some manual steps required but acceptable, Partial automation acceptable with documented procedures, Medium-high confidence in production refactoring
 
-**Decision Criteria - NO-GO if:** Critical deployment failures, Stability issues (crashes, service failures), Excessive cost or complexity, Patterns not reusable for production
+**Decision Criteria - NO-GO if:** Critical failures in darwin integration, Transformation pattern unclear or too complex, Heterogeneous networking unreliable, Patterns not reusable for production, Major gaps in validation coverage
 
 ---
 
@@ -1023,10 +974,10 @@ So that [benefit/value].
 
 **Total Epics:** 7 (aligned to 6 migration phases + cleanup)
 
-**Total Stories:** 36 stories across all epics
+**Total Stories:** 34 stories across all epics
 
 **Story Distribution:**
-- Epic 1 (Phase 0 - Infrastructure Deployment): 14 stories
+- Epic 1 (Phase 0 - Architectural Validation + Migration Pattern Rehearsal): 12 stories
 - Epic 2 (Phase 1 - cinnabar): 6 stories
 - Epic 3 (Phase 2 - blackphos): 5 stories
 - Epic 4 (Phase 3 - rosegold): 3 stories
