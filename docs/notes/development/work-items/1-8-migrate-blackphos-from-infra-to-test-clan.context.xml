@@ -72,51 +72,123 @@
 
   <acceptanceCriteria>
 ### AC1: Blackphos Darwin Configuration Migrated to test-clan
-- Darwin host module created at test-clan/modules/machines/darwin/blackphos/default.nix following dendritic pattern
-- Configuration uses namespace imports (with config.flake.modules pattern)
-- All existing functionality preserved (homebrew, desktop profile, touchID, stateVersion)
-- Module exports to flake.modules.darwin."machines/darwin/blackphos" namespace
-- Configuration builds: nix build .#darwinConfigurations.blackphos.system
+
+- [ ] Darwin host module created at test-clan/modules/machines/darwin/blackphos/default.nix following dendritic pattern
+- [ ] Configuration uses namespace imports (with config.flake.modules pattern from Story 1.7)
+- [ ] All existing functionality preserved:
+  - Homebrew packages and casks (codelayer-nightly, dbeaver-community, docker-desktop, gpg-suite, inkscape, keycastr, meld, postgres-unofficial)
+  - Desktop profile enabled (isDesktop = true equivalent)
+  - TouchID authentication for sudo
+  - System state version preserved (stateVersion = 4)
+- [ ] Module exports to flake.modules.darwin."machines/darwin/blackphos" namespace
+- [ ] Configuration builds: `nix build .#darwinConfigurations.blackphos.system`
+
+**Implementation Notes:**
+- Reference infra/configurations/darwin/blackphos.nix for current config
+- Reference mic92-clan-dotfiles/machines/evo/ for darwin + clan pattern
+- Use dendritic self-composition (namespace imports, not relative paths)
+- System primaryUser = "crs58" (admin user for blackphos)
 
 ### AC2: Home-Manager Integration for Users
-- Home-manager integrated for both users (crs58, raquel)
-- crs58: Minimal admin configuration
-- raquel: Full home configuration migrated with packages and git config
-- LazyVim disabled for raquel (mkForce false)
-- Home-manager integration pattern documented
+
+- [ ] Home-manager integrated for both users (crs58, raquel)
+- [ ] crs58 (admin user): Minimal admin configuration
+- [ ] raquel (primary user): Full home configuration migrated from infra/configurations/home/raquel@blackphos.nix
+- [ ] raquel's preferred tools preserved (git, gh, just, ripgrep, fd, bat, eza)
+- [ ] raquel's git config preserved (userName, userEmail)
+- [ ] LazyVim disabled for raquel (mkForce false as in original)
+- [ ] Home-manager integration pattern documented
+
+**Implementation Notes:**
+- Investigate clan-core home-manager integration (clan-core supports it but examples limited)
+- Reference mic92-clan-dotfiles for home-manager patterns (uses nixosModules.home-manager)
+- Option A: Integrated home-manager (via darwin configuration)
+- Option B: Standalone home-manager (separate activation)
+- Document chosen approach and rationale
 
 ### AC3: Blackphos Added to Clan Inventory
-- blackphos added to clan inventory (tags = ["darwin" "workstation" "laptop"], machineClass = "darwin")
-- Clan machine registration in modules/clan/machines.nix
-- Inventory evaluates: nix eval .#clan.inventory --json | jq '.machines.blackphos'
+
+- [ ] blackphos added to test-clan clan inventory (modules/clan/inventory/machines.nix)
+- [ ] Machine metadata:
+  - tags = ["darwin", "workstation", "laptop"]
+  - machineClass = "darwin"
+  - description = "raquel's laptop (primary user), crs58 admin"
+- [ ] Clan machine registration in modules/clan/machines.nix
+- [ ] Inventory evaluates: `nix eval .#clan.inventory --json | jq '.machines.blackphos'`
+
+**Implementation Notes:**
+- Follow test-clan inventory pattern from Story 1.3-1.5
+- blackphos is darwin, not nixos (different machineClass)
 
 ### AC4: Secrets Migrated to Clan Vars
-- Existing secrets identified and documented
-- Secrets migrated using clan vars generators pattern
-- Clan admin keypair generated and users added
-- Vars generated for blackphos
-- Migration documented with rationale
+
+- [ ] Existing infra secrets identified and documented (if any exist for blackphos)
+- [ ] Secrets migrated to clan vars system:
+  - **If existing sops secrets:** Use `clan secrets import-sops` to migrate
+  - **If no existing secrets:** Define new generators using `clan.core.vars.generators` pattern
+  - **For system-generated values:** Use clan vars generators (SSH host keys, certificates)
+- [ ] Clan admin keypair generated: `clan secrets key generate`
+- [ ] Admin user added to clan secrets: `clan secrets users add <user> --age-key <public_key>`
+- [ ] Vars generated for blackphos: `clan vars generate blackphos`
+- [ ] Secrets accessible via `config.clan.core.vars.generators.<name>.files.<file>.path`
+- [ ] Migration documented with rationale
+
+**Implementation Notes:**
+- **clan vars uses sops-nix** as its default encryption backend (clan-core docs: secrets.md)
+- **macOS supports vars** explicitly (clan-core docs: macos.md line 10)
+- clan-core docs (secrets.md lines 1-2): "should use Vars directly instead" of raw sops-nix
+- Generators pattern: prompts (user input) → script (generation logic) → files (output)
+- Age keys stored at `~/.config/sops/age/keys.txt` (or `SOPS_AGE_KEY` env var)
+- Reference: clan-core docs vars-backend.md for complete generator examples
 
 ### AC5: Configuration Builds and Deploys Successfully
-- Configuration builds without errors
-- Deployment to blackphos hardware successful
-- System activates successfully
-- All services start correctly
-- Users can log in and home-manager activations succeed
+
+- [ ] Configuration builds without errors: `nix build .#darwinConfigurations.blackphos.system`
+- [ ] Deployment to blackphos hardware: `darwin-rebuild switch --flake ~/projects/nix-workspace/test-clan#blackphos`
+- [ ] System activates successfully (no activation failures)
+- [ ] All services start correctly (homebrew, touchID, etc.)
+- [ ] Users can log in (crs58, raquel)
+- [ ] Home-manager activations successful for both users
+
+**Implementation Notes:**
+- Deploy from blackphos machine itself (local deployment)
+- Backup current system before deployment (Time Machine or snapshot)
+- Test in VM first if possible (darwin VMs complex, may skip)
 
 ### AC6: Zero-Regression Validation
-- Pre/post migration package lists captured and compared
-- All critical packages present
-- raquel's daily workflows validated (terminal, git, dev tools, GUI apps)
-- Any differences documented and justified
+
+- [ ] Pre-migration package list captured: `darwin-rebuild --flake ~/projects/nix-workspace/infra#blackphos build && nix-store -q --references result | sort > pre-migration-packages.txt`
+- [ ] Post-migration package list captured: `darwin-rebuild --flake ~/projects/nix-workspace/test-clan#blackphos build && nix-store -q --references result | sort > post-migration-packages.txt`
+- [ ] Package diff analyzed: `diff pre-migration-packages.txt post-migration-packages.txt`
+- [ ] All critical packages present in post-migration
+- [ ] Any differences documented and justified
+- [ ] raquel's daily workflows validated:
+  - Terminal (zsh + starship)
+  - Git operations
+  - Development tools (just, ripgrep, fd, bat, eza)
+  - GUI applications (homebrew casks working)
+
+**Implementation Notes:**
+- Focus on functional equivalence, not byte-for-byte package identity
+- Some package path changes expected (different nix store paths)
+- Validate critical functionality, not every package
 
 ### AC7: Transformation Pattern Documented
-- Migration process documented (nixos-unified → dendritic + clan)
-- Module organization patterns captured
-- Secrets migration approach documented
-- Home-manager integration pattern documented
-- Common issues and solutions documented
-- Darwin-specific considerations noted</acceptanceCriteria>
+
+- [ ] Migration process documented (decide location: new doc vs inline notes)
+- [ ] Documentation captures:
+  - Step-by-step conversion process (nixos-unified → dendritic + clan)
+  - Module organization patterns (where to place darwin modules, home configs)
+  - Secrets migration approach (sops-nix handling)
+  - Home-manager integration pattern chosen
+  - Common issues encountered and solutions
+  - Differences between nixos and darwin in clan context
+- [ ] Documentation valuable for Epic 2+ (refactoring remaining infra machines)
+
+**Implementation Notes:**
+- May be inline completion notes rather than separate doc
+- Focus on TRANSFORMATION PATTERN, not blackphos-specific details
+- Answer: "How do I convert a machine from infra to dendritic + clan?"</acceptanceCriteria>
 
   <artifacts>
     <docs>
@@ -137,6 +209,30 @@
         <title>infra Repository Overview</title>
         <section>Machine Fleet</section>
         <snippet>blackphos: nix-darwin laptop, primary user raquel, admin user crs58. Currently managed by infra using nixos-unified pattern.</snippet>
+      </doc>
+      <doc>
+        <path>docs/notes/development/PRD.md</path>
+        <title>infra Product Requirements Document</title>
+        <section>Executive Summary and Project Classification</section>
+        <snippet>Level 3 brownfield infrastructure migration targeting 5-machine heterogeneous environment (1 x86_64 NixOS VPS + 4 aarch64 darwin workstations). Validation-first de-risking via Phase 0 test-clan validation before production deployment. Progressive validation gates with explicit go/no-go frameworks. Zero-regression requirement for all migrations.</snippet>
+      </doc>
+      <doc>
+        <path>~/projects/nix-workspace/test-clan/README.md</path>
+        <title>test-clan Repository Architecture</title>
+        <section>Architecture and Structure</section>
+        <snippet>Dendritic flake-parts architecture with pure import-tree auto-discovery. All modules automatically discovered without manual imports. Structure: modules/{clan,terranix,system,machines,checks}. Validates dendritic + clan-core integration. Machine definitions in modules/machines/darwin/ and modules/machines/nixos/. Clan inventory in modules/clan/inventory/machines.nix. Manual clan.machines registration required.</snippet>
+      </doc>
+      <doc>
+        <path>~/projects/nix-workspace/clan-core/docs/site/guides/vars/vars-backend.md</path>
+        <title>Clan Vars Generator Pattern Documentation</title>
+        <section>Declare the generator</section>
+        <snippet>clan.core.vars.generators pattern for managing machine-specific variables declaratively. Generator structure: prompts (user input), files (outputs with secret=true/false), script (generation logic), runtimeInputs (required tools). Example: root-password generator using mkpasswd to hash prompted password. File path exposed via config.clan.core.vars.generators.{name}.files.{file}.path for use in configuration.</snippet>
+      </doc>
+      <doc>
+        <path>~/projects/nix-workspace/clan-core/docs/site/guides/macos.md</path>
+        <title>Clan macOS Support Documentation</title>
+        <section>Supported Features</section>
+        <snippet>Clan supports macOS machines with 'clan machines update' for nix-darwin installations and full support for vars system. Darwin machines use machineClass = "darwin" in clan inventory. Configuration follows same clan patterns as NixOS with nix-darwin-specific adaptations.</snippet>
       </doc>
     </docs>
     <code>
