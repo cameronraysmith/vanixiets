@@ -80,9 +80,12 @@ development_status:
   # Story 1.7: DONE - Pure dendritic flake-parts pattern achieved with zero regressions
   # All feature tests passing (TC-008, TC-009), Step 2.5 deferred (manual machine registration retained)
   1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness: done
-  # Story 1.8: Migration rehearsal - convert blackphos from infra nixos-unified to test-clan dendritic + clan
-  # Strategic: Documents transformation pattern for production refactoring in Epic 2+
-  1-8-migrate-blackphos-from-infra-to-test-clan: ready-for-dev
+  # Story 1.8: DONE - Configuration build complete, deployment pending physical access
+  # Successfully migrated blackphos to test-clan dendritic + clan pattern
+  # AC1-AC4 complete: module structure, home-manager, clan inventory validated
+  # AC5-AC7 deferred: physical deployment awaits access to blackphos hardware
+  # Transformation pattern documented for Epic 2+ production refactoring
+  1-8-migrate-blackphos-from-infra-to-test-clan: review
   # Story 1.9: Rename test VMs to production names (cinnabar/electrum) and establish zerotier network
   1-9-rename-vms-cinnabar-electrum-establish-zerotier: backlog
   # Story 1.10: Integrate blackphos (nix-darwin) into zerotier network with cinnabar/electrum (nixos)
