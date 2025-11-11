@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** drafted
+**Status:** ready-for-dev
 
 **Dependencies:**
 - Story 1.7 (complete): Dendritic flake-parts refactoring complete in test-clan
@@ -756,7 +756,7 @@ modules/
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- `docs/notes/development/work-items/1-8-migrate-blackphos-from-infra-to-test-clan.context.xml`
 
 ### Agent Model Used
 
