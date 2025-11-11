@@ -79,22 +79,26 @@ blackphos is raquel's nix-darwin laptop currently managed by infra repository us
 - Follow test-clan inventory pattern from Story 1.3-1.5
 - blackphos is darwin, not nixos (different machineClass)
 
-### AC4: Secrets Management Approach Determined
+### AC4: Secrets Migrated to Clan Vars
 
-- [ ] Secrets strategy chosen and implemented:
-  - **Option A:** Keep using sops-nix (like mic92-clan-dotfiles/machines/evo)
-  - **Option B:** Migrate to clan secrets
-  - **Option C:** Hybrid (clan vars for generated keys, sops-nix for user secrets)
-- [ ] If using sops-nix: Age keyfile configured (darwin path: /Library/Application Support/sops-nix/age-key.txt)
-- [ ] If using clan secrets: Secrets configured via clan.core.secrets
-- [ ] Generated values use clan vars if applicable (SSH host keys via clan.core.vars.generators)
-- [ ] Approach documented with rationale
+- [ ] Existing infra secrets identified and documented (if any exist for blackphos)
+- [ ] Secrets migrated to clan vars system:
+  - **If existing sops secrets:** Use `clan secrets import-sops` to migrate
+  - **If no existing secrets:** Define new generators using `clan.core.vars.generators` pattern
+  - **For system-generated values:** Use clan vars generators (SSH host keys, certificates)
+- [ ] Clan admin keypair generated: `clan secrets key generate`
+- [ ] Admin user added to clan secrets: `clan secrets users add <user> --age-key <public_key>`
+- [ ] Vars generated for blackphos: `clan vars generate blackphos`
+- [ ] Secrets accessible via `config.clan.core.vars.generators.<name>.files.<file>.path`
+- [ ] Migration documented with rationale
 
 **Implementation Notes:**
-- infra likely uses sops-nix or agenix (check current secrets usage)
-- mic92-clan-dotfiles uses sops-nix on darwin (proven pattern)
-- Clan vars are for system-generated values (SSH keys), not user secrets
-- Simplest: Keep sops-nix (proven), defer clan secrets investigation
+- **clan vars uses sops-nix** as its default encryption backend (clan-core docs: secrets.md)
+- **macOS supports vars** explicitly (clan-core docs: macos.md line 10)
+- clan-core docs (secrets.md lines 1-2): "should use Vars directly instead" of raw sops-nix
+- Generators pattern: prompts (user input) → script (generation logic) → files (output)
+- Age keys stored at `~/.config/sops/age/keys.txt` (or `SOPS_AGE_KEY` env var)
+- Reference: clan-core docs vars-backend.md for complete generator examples
 
 ### AC5: Configuration Builds and Deploys Successfully
 
@@ -268,31 +272,64 @@ blackphos is raquel's nix-darwin laptop currently managed by infra repository us
 - darwinConfigurations.blackphos available
 - Clan integration working
 
-### Task 6: Configure Secrets Management (1-2 hours)
+### Task 6: Migrate Secrets to Clan Vars (1-2 hours)
 
-**Objective:** Set up secrets for blackphos
+**Objective:** Migrate blackphos secrets to clan vars system (uses sops-nix underneath)
 
 **Actions:**
-1. Choose secrets approach:
-   - **Recommended:** Keep sops-nix (proven with darwin in mic92 example)
-   - Alternative: Clan secrets (less proven on darwin)
-2. If sops-nix:
-   - Configure age.keyFile = "/Library/Application Support/sops-nix/age-key.txt"
-   - Import sops-nix darwin module
-   - Migrate any existing secrets from infra
-3. If clan secrets:
-   - Configure clan.core.secrets
-   - Generate age keys
-   - Set up secrets
-4. For generated values (SSH host keys):
-   - Consider clan.core.vars.generators pattern
-   - Or keep existing approach from infra
-5. Test secrets access
+1. **Generate clan admin keypair** (if not already done for test-clan):
+   ```bash
+   clan secrets key generate
+   # Output: Public key displayed, private key stored at ~/.config/sops/age/keys.txt
+   ```
+2. **Add admin user to clan secrets:**
+   ```bash
+   clan secrets users add <your_username> --age-key <public_key_from_step_1>
+   ```
+3. **Identify existing infra secrets for blackphos:**
+   - Check infra repository for any sops-encrypted secrets
+   - Check if blackphos uses any secrets currently
+   - Document what needs to be migrated
+4. **Choose migration approach:**
+   - **If existing sops secrets:** Use `clan secrets import-sops` to migrate from infra
+   - **If no existing secrets:** Define new generators using `clan.core.vars.generators` pattern
+5. **Define generators for system values** (example SSH host keys):
+   ```nix
+   clan.core.vars.generators.ssh-host-key = {
+     files."ed25519".secret = false;  # Public key can be in git
+     files."ed25519_priv".secret = true;  # Private key encrypted
+     script = ''
+       ssh-keygen -t ed25519 -N "" -f $out/ed25519
+       mv $out/ed25519 $out/ed25519_priv
+     '';
+     runtimeInputs = [ pkgs.openssh ];
+   };
+   ```
+6. **Generate vars for blackphos:**
+   ```bash
+   clan vars generate blackphos
+   # Will prompt for any required inputs, generate files, commit to git
+   ```
+7. **Reference vars in configuration:**
+   ```nix
+   services.openssh.hostKeys = [{
+     path = config.clan.core.vars.generators.ssh-host-key.files.ed25519_priv.path;
+     type = "ed25519";
+   }];
+   ```
+8. **Test vars access:** Build configuration and verify var paths are correct
 
 **Success Criteria:**
-- Secrets approach chosen and documented
-- Configuration builds with secrets integration
-- Secrets accessible to system and users
+- Clan admin keypair generated and backed up
+- All necessary secrets/vars defined as generators
+- Vars generated for blackphos
+- Configuration builds with vars integration
+- Secrets accessible via generated file paths
+
+**References:**
+- clan-core docs: docs/site/guides/vars/vars-backend.md (generator examples)
+- clan-core docs: docs/site/guides/macos.md (macOS vars support)
+- clan-core docs: docs/site/guides/secrets.md (underlying sops integration)
 
 ### Task 7: Deploy to blackphos Hardware (2-3 hours)
 
@@ -413,28 +450,66 @@ homeConfigurations."raquel@blackphos" = ...
 
 **Recommendation:** Option A (integrated) - simpler activation, proven in mic92 example
 
-### Secrets: sops-nix vs Clan Secrets
+### Clan Vars: The Unified Secrets and Generated Values System
 
-**sops-nix (Proven on Darwin):**
-- mic92 uses sops-nix on evo darwin machine
-- Age keyfile: /Library/Application Support/sops-nix/age-key.txt
-- Secrets defined with owner, path, sopsFile
-- Templates supported
+**Critical Understanding:**
+- **Clan vars IS the standard way to manage both secrets AND generated values** (clan-core docs: secrets.md lines 1-2)
+- **Clan vars uses sops-nix as its default encryption backend** (clan-core docs: vars-overview.md lines 100-103, secrets.md lines 12-13)
+- **macOS explicitly supports clan vars** (clan-core docs: macos.md line 10)
+- **NOT a choice between sops-nix OR clan vars** - clan vars uses sops underneath!
 
-**Clan Secrets (Less Proven on Darwin):**
-- Primarily validated on nixos
-- Darwin support uncertain
-- Potentially simpler for clan integration
+**How Clan Vars Works:**
+1. **Declare generators** using `clan.core.vars.generators.<name>` pattern
+2. **Define generation logic:**
+   - `prompts`: Collect user input (passwords, tokens)
+   - `script`: Generation logic (mkpasswd, ssh-keygen, certificate generation)
+   - `files`: Output files (marked secret=true/false)
+3. **Generate values:** `clan vars generate <machine>` runs generators and encrypts secrets
+4. **Deploy automatically:** Secrets decrypted at runtime to /run/secrets/ via sops-nix integration
+5. **Access in config:** `config.clan.core.vars.generators.<name>.files.<file>.path`
 
-**Clan Vars (Generated Values):**
-- For system-generated values (SSH host keys)
-- Not for user secrets
-- Uses clan.core.vars.generators pattern
+**Storage Architecture:**
+- **Secret files** (secret=true): Encrypted with sops, stored in git, decrypted at activation
+- **Public files** (secret=false): Stored in nix store, no encryption needed
+- **Encryption backend**: sops (default), or password-store (alternative)
+- **Age keys**: `~/.config/sops/age/keys.txt` or `SOPS_AGE_KEY` env var
 
-**Recommendation for Story 1.8:**
-- **Primary:** sops-nix (proven pattern, less risk)
-- **Generated values:** Consider clan vars for SSH keys
-- **Future:** Clan secrets in Epic 2+ if darwin support improves
+**Migration from Raw sops-nix:**
+- **If existing sops secrets:** Use `clan secrets import-sops` to migrate (secrets.md lines 234-248)
+- **If no secrets yet:** Define generators from scratch
+- **Result:** Same sops encryption, better declarative interface
+
+**Example Generator (Password Hash):**
+```nix
+clan.core.vars.generators.root-password = {
+  prompts.password.description = "Root password";
+  prompts.password.type = "hidden";
+  prompts.password.persist = false;
+  files.hash.secret = false;  # Hash can be in nix store
+  script = ''
+    mkpasswd -m sha-512 < $prompts/password > $out/hash
+  '';
+  runtimeInputs = [ pkgs.mkpasswd ];
+};
+
+users.users.root.hashedPasswordFile =
+  config.clan.core.vars.generators.root-password.files.hash.path;
+```
+
+**Why Use Clan Vars Instead of Raw sops-nix:**
+- **Declarative generation:** Define once, regenerate with `clan vars generate --regenerate`
+- **User prompts:** Interactive input collection, no manual file creation
+- **Cross-machine sharing:** `share = true` for shared secrets across machines
+- **Dependency management:** Generators can depend on other generators (e.g., CA → intermediate certs)
+- **Type safety:** Separate secret vs public file handling
+- **Integrated workflow:** Works seamlessly with `clan machines update`
+
+**References:**
+- clan-core docs: guides/vars/vars-overview.md (architecture and benefits)
+- clan-core docs: guides/vars/vars-concepts.md (design principles)
+- clan-core docs: guides/vars/vars-backend.md (complete generator examples)
+- clan-core docs: guides/secrets.md (underlying sops integration)
+- clan-core docs: guides/macos.md (macOS vars support confirmation)
 
 ### Darwin vs NixOS in Clan Context
 
@@ -600,32 +675,48 @@ homeConfigurations."raquel@blackphos" = ...
 
 ### Architecture Patterns
 
-**Clan Vars vs sops-nix Secrets:**
-- **Clan Vars:** System-generated values (SSH host keys, certificates). Uses `clan.core.vars.generators.<name>` with `script` to generate.
-- **sops-nix:** User-managed encrypted secrets (passwords, API tokens). Age-encrypted files, accessed via config.sops.secrets.<name>.path.
-- **Not Exclusive:** Can use both (clan vars for generated, sops-nix for user secrets)
+**Clan Vars: Unified System for Secrets AND Generated Values**
 
-**Example from test-clan (initrd-networking.nix:10-20):**
+**Corrected Understanding (from clan-core docs):**
+- **Clan vars is THE standard way** to manage both secrets AND generated values
+- **Clan vars uses sops-nix** as its default encryption backend (not separate from sops)
+- **macOS explicitly supports clan vars** (confirmed in clan-core docs: macos.md)
+- **Generators** define how to create files from user prompts and/or generation scripts
+- **Both user secrets AND generated values** use the same `clan.core.vars.generators` pattern
+
+**Unified Pattern for All Managed Files:**
 ```nix
-clan.core.vars.generators.initrd-ssh = {
-  files."id_ed25519".neededFor = "activation";
-  files."id_ed25519.pub".secret = false;
-  runtimeInputs = [ pkgs.coreutils pkgs.openssh ];
+# User secret (password hash)
+clan.core.vars.generators.root-password = {
+  prompts.password.description = "Root password";
+  prompts.password.type = "hidden";
+  files.hash.secret = false;  # Hash not sensitive
   script = ''
-    ssh-keygen -t ed25519 -N "" -f $out/id_ed25519
+    mkpasswd -m sha-512 < $prompts/password > $out/hash
   '';
+  runtimeInputs = [ pkgs.mkpasswd ];
+};
+
+# Generated value (SSH host key)
+clan.core.vars.generators.ssh-host-key = {
+  files."ed25519_priv".secret = true;  # Private key encrypted
+  files."ed25519".secret = false;       # Public key in git
+  script = ''
+    ssh-keygen -t ed25519 -N "" -f $out/ed25519
+    mv $out/ed25519 $out/ed25519_priv
+  '';
+  runtimeInputs = [ pkgs.openssh ];
 };
 ```
 
-**Example from mic92 evo (configuration.nix:49-61):**
-```nix
-sops.age.keyFile = "/Library/Application Support/sops-nix/age-key.txt";
-sops.secrets.test-secret = {
-  owner = "joerg";
-  path = "${config.users.users.joerg.home}/.foo";
-  sopsFile = ./test-secrets.yml;
-};
-```
+**Why mic92 Uses Raw sops-nix:**
+The mic92 darwin example uses raw `sops.secrets` because it predates the clan vars system or is using legacy patterns. The clan-core docs explicitly recommend using vars instead (secrets.md lines 1-2: "should use Vars directly instead").
+
+**Migration Approach:**
+- **Don't replicate mic92's raw sops-nix usage** - it's the old way
+- **Use clan vars generators** - it's the modern, declarative clan-core pattern
+- **Still uses sops encryption** - just with better interface
+- **Migration tool available:** `clan secrets import-sops` for existing sops secrets
 
 ### Project Structure Alignment
 
