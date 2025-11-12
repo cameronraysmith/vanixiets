@@ -80,14 +80,14 @@ development_status:
   # Story 1.7: DONE - Pure dendritic flake-parts pattern achieved with zero regressions
   # All feature tests passing (TC-008, TC-009), Step 2.5 deferred (manual machine registration retained)
   1-7-execute-dendritic-refactoring-in-test-clan-using-test-harness: done
-  # Story 1.8: REVIEW - Configuration build complete, CRITICAL GAP IDENTIFIED
+  # Story 1.8: DONE - Configuration build complete, APPROVED ✅
   # Successfully migrated blackphos to test-clan dendritic + clan pattern
   # AC1-AC4 complete: module structure, home-manager, clan inventory validated
   # AC5-AC7 deferred: physical deployment awaits access to blackphos hardware
-  # ⚠️ CRITICAL GAP: crs58/raquel configs inline (not reusable across platforms)
-  # BLOCKS Story 1.9: cinnabar needs crs58 config, would require duplication
-  # COURSE CORRECTION EXECUTED (2025-11-12): Story 1.8A inserted to restore modular pattern
-  1-8-migrate-blackphos-from-infra-to-test-clan: review
+  # Architectural gap identified: crs58/raquel configs inline (not reusable across platforms)
+  # Course correction executed (2025-11-12): Story 1.8A inserted to restore modular pattern
+  # Review outcome: APPROVE - All configuration objectives achieved, proper course correction
+  1-8-migrate-blackphos-from-infra-to-test-clan: done
   # Story 1.8A: READY-FOR-DEV - Extract Portable Home-Manager Modules (CRITICAL PATH)
   # Extract crs58/raquel into shared modules (modules/home/users/{crs58,raquel}/)
   # Export to dendritic namespace: flake.modules.homeManager."users/crs58"
