@@ -26,16 +26,16 @@
 
 # NON-STANDARD WORKFLOW SEQUENCING:
 # =================================
-# Standard BMAD path: PRD ’ architecture ’ epics ’ sprint-planning ’ implementation
-# This project path:  PRD ’ epics ’ sprint-planning ’ Epic 1 (Phase 0) ’ architecture
+# Standard BMAD path: PRD ï¿½ architecture ï¿½ epics ï¿½ sprint-planning ï¿½ implementation
+# This project path:  PRD ï¿½ epics ï¿½ sprint-planning ï¿½ Epic 1 (Phase 0) ï¿½ architecture
 #
 # RATIONALE: Phase 0 (Epic 1) is architectural validation of unproven dendritic + clan
 # integration patterns. The architecture workflow should document VALIDATED patterns
 # after Epic 1 completes, not speculative patterns before validation.
 #
 # RETURN POINT: After Epic 1 completion (or sufficient validation), return to this file
-# to resume standard workflow: create-architecture ’ validate-architecture ’
-# solutioning-gate-check ’ continue implementation with validated patterns.
+# to resume standard workflow: create-architecture ï¿½ validate-architecture ï¿½
+# solutioning-gate-check ï¿½ continue implementation with validated patterns.
 
 generated: "2025-11-05"
 project: "infra"
@@ -58,7 +58,7 @@ workflow_status:
   # ============================================================================
   # Phase 2: Planning - COMPLETED
   # ============================================================================
-  prd: docs/notes/development/PRD.md  # Completed 2025-11-02
+  prd: docs/notes/development/PRD/index.md  # Completed 2025-11-02, sharded 2025-11-12
   validate-prd: skipped  # PRD validated through epic creation process
   create-design: skipped  # No UI work (infrastructure project)
   create-epics-and-stories: docs/notes/development/epics.md  # Completed 2025-11-03
@@ -76,17 +76,17 @@ workflow_status:
   # DEFERRED: Run create-architecture workflow AFTER Epic 1 completion
   # Purpose: Document VALIDATED patterns from Epic 1 (dendritic evaluation, clan integration)
   # Expected artifacts:
-  #   - docs/notes/development/architecture.md (or sharded: architecture/index.md)
+  #   - docs/notes/development/architecture/index.md (sharded 2025-11-12)
   #   - Architecture decisions from Story 1.2 dendritic evaluation
   #   - Validated patterns from Stories 1.4-1.5 (terraform, clan, infrastructure)
   #   - Integration findings from Story 1.11
-  create-architecture: deferred  # RETURN HERE after Epic 1
+  create-architecture: docs/notes/development/architecture/index.md  # Created early, sharded 2025-11-12
 
   validate-architecture: deferred  # After create-architecture completes
 
   # DEFERRED: Run solutioning-gate-check AFTER architecture + validation
   # Purpose: Validate all planning/solutioning complete before Epic 2+ implementation
-  # Checks: PRD ” epics ” architecture alignment, no gaps or contradictions
+  # Checks: PRD ï¿½ epics ï¿½ architecture alignment, no gaps or contradictions
   solutioning-gate-check: deferred  # After validate-architecture completes
 
   # ============================================================================
@@ -120,7 +120,7 @@ workflow_status:
 #    - Consider sharding: PRD/index.md, epics/index.md if documents too large
 #
 # 4. Run validate-architecture workflow:
-#    - Verify architecture ” PRD ” epics alignment
+#    - Verify architecture ï¿½ PRD ï¿½ epics alignment
 #    - Check for gaps, contradictions, missing decisions
 #
 # 5. Run solutioning-gate-check workflow:
@@ -141,9 +141,9 @@ workflow_status:
 # ============================================================================
 # If any documents become too large (>500 lines), consider sharding:
 #
-# PRD.md ’ PRD/index.md + PRD/epic-{n}.md (one file per epic)
-# epics.md ’ epics/index.md + epics/epic-{n}.md (one file per epic)
-# architecture.md ’ architecture/index.md + architecture/{section}.md
+# PRD.md ï¿½ PRD/index.md + PRD/epic-{n}.md (one file per epic)
+# epics.md ï¿½ epics/index.md + epics/epic-{n}.md (one file per epic)
+# architecture.md ï¿½ architecture/index.md + architecture/{section}.md
 #
 # Sharding should be done BEFORE create-architecture if documents are already large,
 # or DURING create-architecture if architecture doc will be comprehensive.
