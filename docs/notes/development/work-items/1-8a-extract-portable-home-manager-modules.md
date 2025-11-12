@@ -184,6 +184,39 @@ Story 1.8 successfully migrated blackphos to test-clan's dendritic + clan patter
 - Use `assert` or `lib.assertMsg` for verification
 - Keep tests fast (structural checks, not builds)
 
+### AC8: Architectural Decisions Documented (Clan Pattern Analysis)
+
+- [ ] Document clan-core user management investigation findings:
+  - Clan users clanService exists (`clanServices/users/`) for multi-machine user account coordination
+  - Decision to use traditional `users.users.*` instead of clanService (darwin compatibility + UID control)
+  - Trade-offs documented: clan service abstraction vs explicit per-machine control
+- [ ] Document home-manager pattern divergence analysis:
+  - Clan examples use profile-based exports (`homeConfigurations.desktop` - pinpox pattern)
+  - Our approach uses user-based modules (`flake.modules.homeManager."users/crs58"`)
+  - Justification: Multi-user machines (blackphos: crs58 + raquel) benefit from user-granular modules
+  - Dendritic namespace integration (`flake.modules.*`) vs direct flake outputs
+- [ ] Document architectural alignment assessment:
+  - User account management: DIVERGENT but JUSTIFIED (real-world clan usage validates pattern)
+  - Portable home modules: NOVEL (fills gap in clan ecosystem)
+  - Vars naming convention: ALIGNED (`ssh-key-{username}` matches clan pattern)
+  - Multi-machine coordination: Manual per-machine definitions, shared configs via dendritic namespace
+- [ ] Document preservation of infra features:
+  - Cross-platform user config sharing validated (darwin + NixOS)
+  - DRY principle maintained (single definition, multiple machines)
+  - Three integration modes supported (darwin, NixOS, standalone)
+  - Zero regression validated
+- [ ] Add reference to clan pattern investigation:
+  - Location: `docs/notes/development/clan-pattern-investigation-2025-11-12.md` (or inline in architecture.md)
+  - Clan-core source analysis findings (users clanService, vars/secrets patterns)
+  - Clan-infra and developer repo patterns (qubasa, mic92, pinpox)
+  - Alignment matrix with recommendations
+
+**Implementation Notes:**
+- This captures the comprehensive architectural investigation completed before Story 1.8A execution
+- Documents why our pattern diverges from some clan examples but is justified
+- Provides context for future architectural decisions
+- References clan-core source code locations for validation
+
 ---
 
 ## Implementation Tasks
