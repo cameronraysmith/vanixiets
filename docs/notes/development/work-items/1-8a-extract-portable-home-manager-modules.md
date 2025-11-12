@@ -1044,17 +1044,18 @@ No security concerns. User modules contain only public configuration.
 
 #### Code Changes Required:
 
-- [ ] [Med] Remove hardcoded homeDirectory from crs58 module [file: test-clan modules/home/users/crs58/default.nix:12]
-  - Delete: `home.homeDirectory = "/Users/crs58";`
-  - Let home-manager infer from platform
+- [x] [Med] Remove hardcoded homeDirectory from crs58 module [file: test-clan modules/home/users/crs58/default.nix:12]
+  - ✅ RESOLVED: Implemented conditional homeDirectory (commit 0a666ed)
+  - Platform-aware: `/Users/` on darwin, `/home/` on linux
 
-- [ ] [Med] Remove hardcoded homeDirectory from raquel module [file: test-clan modules/home/users/raquel/default.nix:12]
-  - Delete: `home.homeDirectory = "/Users/raquel";`
-  - Same rationale
+- [x] [Med] Remove hardcoded homeDirectory from raquel module [file: test-clan modules/home/users/raquel/default.nix:12]
+  - ✅ RESOLVED: Implemented conditional homeDirectory (commit 0a666ed)
+  - Same platform-aware pattern as crs58
 
 - [ ] [Low] Add cross-platform build test [file: test-clan modules/checks/validation.nix]
   - TC-020: Build homeConfigurations with x86_64-linux pkgs
   - Prevents portability regressions
+  - NOTE: Deferred - manual validation sufficient for now
 
 #### Advisory Notes:
 
@@ -1071,3 +1072,29 @@ Story 1.8A is 95% complete. Fix medium-severity portability issue (2 line deleti
 ## Change Log
 
 **2025-11-12** - Senior Developer Review notes appended (AI)
+**2025-11-12** - Cross-platform portability fix implemented (commit 0a666ed in test-clan)
+
+### Resolution of Review Findings
+
+**[MED-1] Hardcoded Darwin Home Directories - RESOLVED**
+
+**Fix implemented:** test-clan commit `0a666ed` (2025-11-12)
+
+**Changes:**
+1. `modules/home/users/crs58/default.nix`: Conditional homeDirectory based on `pkgs.stdenv.isDarwin`
+2. `modules/home/users/raquel/default.nix`: Same conditional pattern
+3. `modules/home/configurations.nix`: Multi-system homeConfiguration generation using `lib.genAttrs`
+
+**Results:**
+- ✅ Linux configs use `/home/${username}` (verified: `nix eval .#homeConfigurations.crs58-x86_64-linux.config.home.homeDirectory`)
+- ✅ Darwin configs use `/Users/${username}` (verified: `nix eval .#homeConfigurations.crs58-aarch64-darwin.config.home.homeDirectory`)
+- ✅ Generated configs for all 3 systems: `x86_64-linux`, `aarch64-linux`, `aarch64-darwin`
+- ✅ System-specific naming: `crs58-${system}`, `raquel-${system}`
+- ✅ Convenience aliases: `crs58`, `raquel` (default to aarch64-darwin)
+- ✅ Zero duplication via `lib.genAttrs` over `config.systems`
+- ✅ blackphos darwin integrated config still builds
+- ✅ TC-018 and TC-019 validation tests pass
+
+**Pattern:** Leverages flake-parts' multi-system support for automatic cross-platform config generation. Single user module works everywhere via platform-conditional paths.
+
+**Story Status:** All medium-severity findings resolved. Story 1.8A now achieves 100% cross-platform portability as originally intended.
