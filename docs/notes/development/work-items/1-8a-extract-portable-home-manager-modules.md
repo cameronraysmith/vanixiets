@@ -1078,23 +1078,26 @@ Story 1.8A is 95% complete. Fix medium-severity portability issue (2 line deleti
 
 **[MED-1] Hardcoded Darwin Home Directories - RESOLVED**
 
-**Fix implemented:** test-clan commit `0a666ed` (2025-11-12)
+**Fix implemented:** test-clan commit `7a6d6ca` (2025-11-12)
 
 **Changes:**
-1. `modules/home/users/crs58/default.nix`: Conditional homeDirectory based on `pkgs.stdenv.isDarwin`
-2. `modules/home/users/raquel/default.nix`: Same conditional pattern
-3. `modules/home/configurations.nix`: Multi-system homeConfiguration generation using `lib.genAttrs`
+1. `modules/home/users/crs58/default.nix`: Removed hardcoded username and homeDirectory
+2. `modules/home/users/raquel/default.nix`: Removed hardcoded username and homeDirectory
+3. `modules/home/configurations.nix`: Configuration wrapper sets username and platform-aware homeDirectory
+
+**Architecture:**
+- **User modules:** Completely platform-agnostic (no username, no homeDirectory)
+- **Standalone configs:** Configuration wrapper provides both via `lib.hasInfix "darwin"`
+- **Integrated configs:** username/homeDirectory inferred from system user definition
 
 **Results:**
-- ✅ Linux configs use `/home/${username}` (verified: `nix eval .#homeConfigurations.crs58-x86_64-linux.config.home.homeDirectory`)
-- ✅ Darwin configs use `/Users/${username}` (verified: `nix eval .#homeConfigurations.crs58-aarch64-darwin.config.home.homeDirectory`)
-- ✅ Generated configs for all 3 systems: `x86_64-linux`, `aarch64-linux`, `aarch64-darwin`
-- ✅ System-specific naming: `crs58-${system}`, `raquel-${system}`
-- ✅ Convenience aliases: `crs58`, `raquel` (default to aarch64-darwin)
-- ✅ Zero duplication via `lib.genAttrs` over `config.systems`
+- ✅ Linux configs use `/home/${username}` (verified: `nix eval .#homeConfigurations."crs58@linux".config.home.homeDirectory`)
+- ✅ Darwin configs use `/Users/${username}` (verified: `nix eval .#homeConfigurations."crs58@darwin".config.home.homeDirectory`)
+- ✅ Cross-platform naming: `crs58@linux`, `crs58@darwin`, `raquel@linux`, `raquel@darwin`
+- ✅ Convenience aliases: `crs58`, `raquel` (default to darwin)
 - ✅ blackphos darwin integrated config still builds
 - ✅ TC-018 and TC-019 validation tests pass
 
-**Pattern:** Leverages flake-parts' multi-system support for automatic cross-platform config generation. Single user module works everywhere via platform-conditional paths.
+**Pattern:** Follows home-manager best practices - user modules are pure and reusable, configuration layer handles platform-specific details.
 
 **Story Status:** All medium-severity findings resolved. Story 1.8A now achieves 100% cross-platform portability as originally intended.
