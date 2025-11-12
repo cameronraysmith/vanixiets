@@ -774,6 +774,7 @@ nh home switch . -c crs58
 
 ### Context Reference
 
+- **Story Context File:** `docs/notes/development/work-items/1-8a-extract-portable-home-manager-modules.context.xml` (Generated 2025-11-12)
 - Story 1.8 completion notes: `1-8-migrate-blackphos-from-infra-to-test-clan.md` lines 771-884
 - test-clan dendritic pattern: Validated in Stories 1.1-1.7
 - infra home modules: `~/projects/nix-workspace/infra/modules/home/`
