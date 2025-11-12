@@ -61,7 +61,7 @@ workflow_status:
   prd: docs/notes/development/PRD/index.md  # Completed 2025-11-02, sharded 2025-11-12
   validate-prd: skipped  # PRD validated through epic creation process
   create-design: skipped  # No UI work (infrastructure project)
-  create-epics-and-stories: docs/notes/development/epics.md  # Completed 2025-11-03
+  create-epics-and-stories: docs/notes/development/epics/index.md  # Completed 2025-11-03, sharded 2025-11-12
 
   # ============================================================================
   # Phase 3: Solutioning - DEFERRED (pending Epic 1 architectural validation)
@@ -139,13 +139,12 @@ workflow_status:
 # ============================================================================
 # NOTES ON DOCUMENT SHARDING
 # ============================================================================
-# If any documents become too large (>500 lines), consider sharding:
+# Documents sharded on 2025-11-12 (all exceeded >500 line threshold):
 #
-# PRD.md � PRD/index.md + PRD/epic-{n}.md (one file per epic)
-# epics.md � epics/index.md + epics/epic-{n}.md (one file per epic)
-# architecture.md � architecture/index.md + architecture/{section}.md
+# PRD.md → PRD/index.md + 13 section files (via bunx @kayvan/markdown-tree-parser)
+# epics.md → epics/index.md + 7 epic files + 3 support files (via bunx @kayvan/markdown-tree-parser)
+# architecture.md → architecture/index.md + 17 section files (via bunx @kayvan/markdown-tree-parser)
 #
-# Sharding should be done BEFORE create-architecture if documents are already large,
-# or DURING create-architecture if architecture doc will be comprehensive.
+# Phase 4 workflows can now selectively load only needed sections for token efficiency.
 #
-# Use /bmad:core:tools:shard-doc to split documents while maintaining structure.
+# Use /bmad:core:tools:shard-doc (or bunx @kayvan/markdown-tree-parser) for future sharding.
