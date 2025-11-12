@@ -37,6 +37,7 @@
           findutils # find, xargs (rarely used but available)
 
           # Nix tooling
+          nh # nix helper cli
           nixd # Nix language server
           nix-output-monitor # Pretty nix build output (nom)
           omnix # Nix CI orchestration (om)
