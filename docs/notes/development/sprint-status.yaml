@@ -88,18 +88,21 @@ development_status:
   # Course correction executed (2025-11-12): Story 1.8A inserted to restore modular pattern
   # Review outcome: APPROVE - All configuration objectives achieved, proper course correction
   1-8-migrate-blackphos-from-infra-to-test-clan: done
-  # Story 1.8A: READY-FOR-DEV - Extract Portable Home-Manager Modules (CRITICAL PATH)
-  # Extract crs58/raquel into shared modules (modules/home/users/{crs58,raquel}/)
-  # Export to dendritic namespace: flake.modules.homeManager."users/crs58"
-  # Expose homeConfigurations for standalone use (nh home switch workflow)
-  # Refactor blackphos to import shared modules (validate zero regression)
-  # Validate cross-platform user config sharing (Epic 1 architectural requirement)
-  # Unblocks Story 1.9: cinnabar can reuse crs58 config without duplication
-  # Estimated: 2-3 hours, well-scoped, pattern proven in infra
-  1-8a-extract-portable-home-manager-modules: ready-for-dev
-  # Story 1.9: BLOCKED BY 1.8A - Rename test VMs to production names (cinnabar/electrum)
-  # Requires crs58 home module from Story 1.8A for cinnabar NixOS config
-  1-9-rename-vms-cinnabar-electrum-establish-zerotier: backlog
+  # Story 1.8A: DONE ✅ - Extract Portable Home-Manager Modules (CRITICAL PATH)
+  # Extracted crs58/raquel into portable modules (modules/home/users/{crs58,raquel}/)
+  # Exported to dendritic namespace: flake.modules.homeManager."users/{username}"
+  # Exposed standalone homeConfigurations.{crs58,raquel} for nh home switch workflow
+  # Refactored blackphos to import from namespace (46 lines removed, zero regression validated)
+  # Package diff: 270 packages preserved exactly, all functionality intact
+  # Added test coverage: TC-018 (home-module-exports), TC-019 (home-configurations-exposed)
+  # Pattern documented in architecture.md with validation evidence
+  # Successfully unblocked Story 1.9: crs58 module ready for cinnabar NixOS reuse
+  # Implementation time: ~2 hours, all 8 acceptance criteria satisfied
+  1-8a-extract-portable-home-manager-modules: done
+  # Story 1.9: READY - Rename test VMs to production names (cinnabar/electrum)
+  # Can now import crs58 home module from Story 1.8A for cinnabar NixOS config
+  # Pattern proven: flake.modules.homeManager."users/crs58" works cross-platform
+  1-9-rename-vms-cinnabar-electrum-establish-zerotier: ready-for-dev
   # Story 1.10: Integrate blackphos (nix-darwin) into zerotier network with cinnabar/electrum (nixos)
   # Validates heterogeneous networking across platforms
   1-10-integrate-blackphos-into-zerotier-network: backlog
