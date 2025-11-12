@@ -833,10 +833,34 @@ AC5-AC7 (physical deployment, validation, comparison) **PAUSED** pending user de
 - Ready for deployment to blackphos hardware when user provides physical access
 - Zero-regression validation workflow documented in story (AC6 commands preserved)
 
-**Story 1.8 Status: Configuration Build Complete - Deployment Pending Physical Access**
+**Story 1.8 Status: Configuration Build Complete - Cross-Platform Validation REQUIRED**
 
 All acceptance criteria for *configuration creation and validation* (AC1-AC4) are met.
 Physical deployment (AC5-AC7) deferred pending access to blackphos hardware.
+
+**⚠️ CRITICAL ARCHITECTURAL GAP IDENTIFIED:**
+
+Current implementation has crs58/raquel home configs **inline in blackphos module**.
+This blocks Epic 1 progression because:
+
+1. **Story 1.9 (cinnabar)** will need crs58 home config (same user, different platform)
+2. **Without shared modules**: Must duplicate crs58 config in cinnabar = two sources of truth
+3. **Epic 2+ (stibnite, rosegold, argentum)**: All machines duplicate crs58 config = maintenance nightmare
+4. **Violates DRY principle**: User config should be defined once, reused across machines
+
+**Course Correction Required:**
+
+**Story 1.8A: Extract Portable Home-Manager Modules** (NEW - insert before Story 1.9)
+- Extract crs58/raquel into `modules/home/users/{crs58,raquel}/default.nix`
+- Export to dendritic namespace: `flake.modules.homeManager."users/crs58"`
+- Expose `homeConfigurations.{crs58,raquel}` for standalone use
+- Refactor blackphos to import shared modules (zero regression)
+- Validate both `nh darwin` (integrated) and `nh home` (standalone) workflows
+- Document pattern for cinnabar reuse in Story 1.9
+
+**Why This Blocks Story 1.9:**
+cinnabar (NixOS) requires crs58 home config. Without Story 1.8A, we'd duplicate the config.
+Epic 1 goal is architectural validation - must prove cross-platform user config sharing works.
 
 ### File List
 
