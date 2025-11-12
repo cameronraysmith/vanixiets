@@ -229,6 +229,22 @@ flake.modules.homeManager."users/crs58" = { config, pkgs, lib, ... }: { ... };
 - Developer repositories (qubasa, mic92, pinpox)
 - Alignment assessment matrix with trade-off analysis
 
+**Validation (Story 1.8A - Complete 2025-11-12):**
+- ✅ Extracted crs58 and raquel home modules from blackphos inline configs
+- ✅ Exported to dendritic namespace (`flake.modules.homeManager."users/{username}"`)
+- ✅ Exposed standalone `homeConfigurations.{crs58,raquel}` for nh CLI
+- ✅ Refactored blackphos to import from namespace (46 lines removed, zero regression)
+- ✅ Package diff validation: 270 packages preserved exactly (zero functional change)
+- ✅ Standalone activation tested (`nh home switch . -c {username}`)
+- ✅ Test coverage added (TC-018: home-module-exports, TC-019: home-configurations-exposed)
+- ✅ Pattern ready for Story 1.9 (cinnabar NixOS will reuse crs58 module)
+
+**Preservation of infra Features:**
+- ✅ Cross-platform user config sharing (darwin + NixOS)
+- ✅ DRY principle maintained (single definition, multiple machines)
+- ✅ Three integration modes supported (darwin, NixOS, standalone)
+- ✅ Modular architecture restored (Story 1.8 inline configs removed)
+
 ---
 
 ## Project Structure
