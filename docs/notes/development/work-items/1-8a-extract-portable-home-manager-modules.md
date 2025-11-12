@@ -1078,26 +1078,25 @@ Story 1.8A is 95% complete. Fix medium-severity portability issue (2 line deleti
 
 **[MED-1] Hardcoded Darwin Home Directories - RESOLVED**
 
-**Fix implemented:** test-clan commit `7a6d6ca` (2025-11-12)
+**Fix implemented:** test-clan commit `b7b622e` (2025-11-12)
 
 **Changes:**
-1. `modules/home/users/crs58/default.nix`: Removed hardcoded username and homeDirectory
-2. `modules/home/users/raquel/default.nix`: Removed hardcoded username and homeDirectory
-3. `modules/home/configurations.nix`: Configuration wrapper sets username and platform-aware homeDirectory
+1. `modules/home/users/crs58/default.nix`: Platform-aware homeDirectory via `pkgs.stdenv.isDarwin`
+2. `modules/home/users/raquel/default.nix`: Platform-aware homeDirectory via `pkgs.stdenv.isDarwin`
+3. `modules/home/configurations.nix`: Single homeConfiguration per user (no platform variants)
 
 **Architecture:**
-- **User modules:** Completely platform-agnostic (no username, no homeDirectory)
-- **Standalone configs:** Configuration wrapper provides both via `lib.hasInfix "darwin"`
-- **Integrated configs:** username/homeDirectory inferred from system user definition
+- **User modules:** Self-contained with conditional homeDirectory based on `pkgs.stdenv.isDarwin`
+- **Standalone configs:** One config per user, pkgs determines platform
+- **Integrated configs:** username/homeDirectory inferred from system user (unchanged)
 
 **Results:**
-- ✅ Linux configs use `/home/${username}` (verified: `nix eval .#homeConfigurations."crs58@linux".config.home.homeDirectory`)
-- ✅ Darwin configs use `/Users/${username}` (verified: `nix eval .#homeConfigurations."crs58@darwin".config.home.homeDirectory`)
-- ✅ Cross-platform naming: `crs58@linux`, `crs58@darwin`, `raquel@linux`, `raquel@darwin`
-- ✅ Convenience aliases: `crs58`, `raquel` (default to darwin)
+- ✅ Single homeConfiguration per user: `crs58`, `raquel`
+- ✅ homeDirectory adapts to build platform via `pkgs.stdenv.isDarwin`
+- ✅ Darwin build: `/Users/crs58` (verified: `nix eval .#homeConfigurations.crs58.config.home.homeDirectory`)
 - ✅ blackphos darwin integrated config still builds
 - ✅ TC-018 and TC-019 validation tests pass
 
-**Pattern:** Follows home-manager best practices - user modules are pure and reusable, configuration layer handles platform-specific details.
+**Pattern:** Single conditional in user module (`pkgs.stdenv.isDarwin`) handles all cross-platform scenarios. Simple, maintainable, follows Pattern 3 from home-manager-configurations-system-platform-home-directory.md.
 
 **Story Status:** All medium-severity findings resolved. Story 1.8A now achieves 100% cross-platform portability as originally intended.
