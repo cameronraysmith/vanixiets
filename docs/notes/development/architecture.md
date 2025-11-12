@@ -381,7 +381,91 @@ flake.modules.nixos.base = {
 - Add new system-wide config: create file in `system/` → auto-merged
 - Test-clan validated (Stories 1.1-1.7, 17 test cases passing)
 
-**Pattern 2: Darwin Multi-User with Per-User Vars Naming**
+**Pattern 2: Portable Home-Manager Modules with Dendritic Integration**
+
+**Problem**: User home-manager configurations need to work across platforms (darwin + NixOS) and support three integration modes (darwin integrated, NixOS integrated, standalone) without duplication.
+
+**Gap Identified (Story 1.8)**: blackphos implemented inline home configs, blocking cross-platform reuse. This is a feature regression from infra's proven modular pattern.
+
+**Solution (Story 1.8A)**: Extract home configs into portable modules that export to dendritic namespace and support all three integration modes.
+
+**Module Structure:**
+```nix
+# modules/home/users/{username}/default.nix
+{
+  flake.modules.homeManager."users/{username}" = { config, pkgs, lib, ... }: {
+    home.stateVersion = "23.11";
+    programs.zsh.enable = true;
+    programs.starship.enable = true;
+    programs.git.enable = true;
+    home.packages = with pkgs; [ git gh ... ];
+  };
+}
+```
+
+**Three Integration Modes:**
+
+**Mode 1: Darwin Integrated** (blackphos example)
+```nix
+# In darwin machine module
+{
+  imports = [
+    inputs.home-manager.darwinModules.home-manager
+  ];
+
+  home-manager.useGlobalPkgs = true;
+  home-manager.useUserPackages = true;
+
+  home-manager.users.crs58.imports = [
+    config.flake.modules.homeManager."users/crs58"
+  ];
+}
+```
+
+**Mode 2: NixOS Integrated** (cinnabar Story 1.9)
+```nix
+# In NixOS machine module
+{
+  imports = [
+    inputs.home-manager.nixosModules.home-manager
+  ];
+
+  home-manager.useGlobalPkgs = true;
+  home-manager.useUserPackages = true;
+
+  home-manager.users.crs58.imports = [
+    config.flake.modules.homeManager."users/crs58"
+  ];
+}
+```
+
+**Mode 3: Standalone** (nh home CLI workflow)
+```nix
+# In modules/home/configurations.nix
+{
+  flake.homeConfigurations.crs58 = inputs.home-manager.lib.homeManagerConfiguration {
+    pkgs = import inputs.nixpkgs { system = "aarch64-darwin"; };
+    modules = [
+      config.flake.modules.homeManager."users/crs58"
+    ];
+  };
+}
+
+# Usage: nh home switch . -c crs58
+```
+
+**Benefits:**
+- Single source of truth (DRY principle): User defined once, used on 6 machines
+- Cross-platform portability: Same module works on darwin and NixOS
+- Three deployment contexts: Integrated (system + home), standalone (home only)
+- Dendritic auto-discovery: No manual imports in flake.nix
+- Username-only naming: No @hostname for maximum portability
+- Clan compatible: Users defined per machine, configs imported modularly
+
+**Lesson from Story 1.8:**
+Inline home configs are anti-pattern for multi-machine infrastructure. Always modularize user configs to enable cross-platform reuse.
+
+**Pattern 3: Darwin Multi-User with Per-User Vars Naming**
 
 **Problem**: Clan vars generators are machine-scoped, not user-scoped. Multi-user darwin machines (blackphos: raquel + crs58) need separate secrets per user.
 

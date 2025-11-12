@@ -35,22 +35,26 @@ Each epic includes:
 
 ## Epic 1: Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Goal:** Validate dendritic flake-parts + clan architecture for both nixos VMs and nix-darwin hosts, and document nixos-unified → dendritic + clan transformation pattern through blackphos migration rehearsal
+**Goal:** Validate dendritic flake-parts + clan architecture for both nixos VMs and nix-darwin hosts, validate cross-platform user config sharing, and document nixos-unified → dendritic + clan transformation pattern through blackphos migration rehearsal
 
-**Strategic Value:** Validates complete stack (dendritic + clan + terraform + infrastructure) on real VMs and darwin machines before production refactoring, proves both target architecture AND transformation process, provides reusable migration blueprint for Epic 2+ by rehearsing complete nixos-unified → dendritic + clan conversion
+**Strategic Value:** Validates complete stack (dendritic + clan + terraform + infrastructure) on real VMs and darwin machines before production refactoring, proves both target architecture AND transformation process, validates cross-platform home-manager modularity (Epic 1 architectural requirement), provides reusable migration blueprint for Epic 2+ by rehearsing complete nixos-unified → dendritic + clan conversion
 
-**Timeline:** 3-4 weeks (2 weeks nixos validation complete + 1-2 weeks darwin migration rehearsal)
+**Timeline:** 3-4 weeks (2 weeks nixos validation complete + 1-2 weeks darwin migration rehearsal + home-manager modularity)
 
 **Success Criteria:**
 - Hetzner VMs deployed and operational (minimum requirement achieved)
 - Dendritic flake-parts pattern proven with zero regressions (achieved via Stories 1.6-1.7)
 - Nix-darwin machine (blackphos) migrated from infra to test-clan management
+- **Cross-platform user config sharing validated (Story 1.8A - portable home modules)**
 - Heterogeneous zerotier network operational (nixos VMs + nix-darwin host)
 - Nixos-unified → dendritic + clan transformation pattern documented
 - Migration patterns documented for production refactoring in Epic 2+
 - GO/CONDITIONAL GO/NO-GO decision made with explicit rationale
 
 **Risk Level:** Medium (infrastructure deployment costs money, operational risk)
+
+**Architectural Gap Identified (2025-11-12):**
+Story 1.8 revealed inline home-manager configs (feature regression from infra). Story 1.8A inserted to restore modular pattern before Story 1.9. This validates cross-platform user config sharing as part of Epic 1 architectural requirements.
 
 ---
 
@@ -240,12 +244,14 @@ As a system administrator,
 I want to migrate blackphos nix-darwin configuration from infra's nixos-unified pattern to test-clan's dendritic + clan pattern,
 So that I can validate the complete transformation process and document the migration pattern for refactoring infra in Epic 2+.
 
+**Status Update (2025-11-12):** Configuration build complete, CRITICAL GAP IDENTIFIED - home-manager configs are inline (not reusable across platforms). This blocks Epic 1 progression. Course correction: Insert Story 1.8A to extract portable home modules before Story 1.9.
+
 **Acceptance Criteria:**
 1. Blackphos configuration migrated from infra to test-clan: Nix-darwin host configuration created in modules/hosts/blackphos/, Home-manager user configuration (crs58) migrated and functional, All existing functionality preserved (packages, services, shell config)
 2. Configuration uses dendritic flake-parts pattern: Module imports via config.flake.modules namespace, Proper module organization (darwin base, homeManager, host-specific), Reference clan-core home-manager integration patterns, Reference dendritic flake-parts home-manager usage from examples in CLAUDE.md (clan-infra, qubasa-clan-infra, mic92-clan-dotfiles, dendrix-dendritic-nix, gaetanlepage-dendritic-nix-config)
 3. Blackphos added to clan inventory: tags = ["darwin" "workstation" "backup"], machineClass = "darwin"
 4. Clan secrets/vars configured for blackphos: Age key for user crs58 added to admins group, SSH host keys generated via clan vars, User secrets configured if needed
-5. Configuration builds successfully: `nix build .#darwinConfigurations.blackphos.system`
+5. Configuration builds successfully: `nix build .#darwinConfigurations.blackphos.system` ✅ COMPLETE
 6. Transformation documented if needed: nixos-unified-to-clan-migration.md created (if valuable) documenting step-by-step conversion process, Module organization patterns (what goes where), Secrets migration approach (sops-nix → clan vars), Common issues and solutions discovered
 7. Package list comparison: Pre-migration vs post-migration packages identical (zero-regression validation)
 
@@ -256,6 +262,44 @@ So that I can validate the complete transformation process and document the migr
 **Risk Level:** Medium (converting real production machine, but not deploying yet)
 
 **Strategic Value:** Provides concrete migration pattern for refactoring all 4 other machines in infra during Epic 2+
+
+**Outcome:** Configuration builds successfully, multi-user pattern validated, BUT home configs are inline (feature regression from infra). Story 1.8A required to restore modular pattern.
+
+---
+
+### Story 1.8A: Extract Portable Home-Manager Modules for Cross-Platform User Config Sharing
+
+**⚠️ CRITICAL PATH - Blocks Story 1.9 and Epic 1 Progression**
+
+As a system administrator,
+I want to extract crs58 and raquel home-manager configurations from blackphos into portable, reusable modules,
+So that user configs can be shared across platforms (darwin + NixOS) without duplication and support three integration modes (darwin integrated, NixOS integrated, standalone).
+
+**Context:** Story 1.8 successfully validated dendritic + clan pattern but implemented home configs inline in machine module. This is a **feature regression** from infra's proven modular pattern. Blocks:
+- Story 1.9: cinnabar needs crs58 config → would require duplication
+- Story 1.10: Network validation needs crs58 on both platforms
+- Epic 2+: 4 more machines need crs58 → 6 duplicate configs total
+
+**Epic 1 Goal:** Architectural validation must prove cross-platform user config sharing works.
+
+**Acceptance Criteria:**
+1. crs58 home module created: `modules/home/users/crs58/default.nix` exported to `flake.modules.homeManager."users/crs58"` namespace
+2. raquel home module created: `modules/home/users/raquel/default.nix` exported to namespace
+3. Standalone homeConfigurations exposed: `flake.homeConfigurations.{crs58,raquel}` for `nh home switch` workflow
+4. blackphos refactored to import shared modules: Zero regression validated via package diff
+5. Standalone activation validated: `nh home switch . -c crs58` works
+6. Pattern documented in architecture.md for Story 1.9 reuse (cinnabar NixOS)
+7. Test harness updated with validation coverage
+
+**Prerequisites:** Story 1.8 (configuration builds, inline configs identified as gap)
+
+**Blocks:** Story 1.9 (cinnabar needs crs58 module), Story 1.10 (network validation needs shared config)
+
+**Estimated Effort:** 2-3 hours (well-scoped, pattern proven in infra)
+
+**Risk Level:** Low (refactoring only, builds already validated)
+
+**Strategic Value:** Restores proven capability from infra, unblocks Epic 1-6 progression, enables DRY principle for 6 machines
 
 ---
 
