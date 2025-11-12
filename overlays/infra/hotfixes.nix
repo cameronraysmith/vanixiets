@@ -33,7 +33,18 @@ final: prev:
 }
 // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
   # Darwin-wide hotfixes (both aarch64 and x86_64)
-  # (Add Darwin-specific hotfixes here as needed)
+  inherit (final.stable)
+    # https://hydra.nixos.org/job/nixpkgs/trunk/sbcl.aarch64-darwin
+    # https://hydra.nixos.org/job/nixpkgs/trunk/sbcl.x86_64-darwin
+    # Error: iterate Common Lisp library fetch failure (404 from gitlab.common-lisp.net)
+    # - Root cause: upstream source URL moved/unavailable
+    # - Cascades through: iterate → sbcl → mac-app-util → activation-script
+    # - Breaks entire darwin system build
+    # - Stable version has working source URLs
+    # TODO: Remove when iterate source URL fixed upstream or sbcl updated to avoid broken iterate
+    # Added: 2025-01-12
+    sbcl
+    ;
 })
 // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "x86_64-darwin") {
   # x86_64-darwin specific hotfixes
