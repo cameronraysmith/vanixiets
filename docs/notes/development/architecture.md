@@ -535,7 +535,7 @@ flake.modules.nixos.base = {
 
 **Gap Identified (Story 1.8)**: blackphos implemented inline home configs, blocking cross-platform reuse. This is a feature regression from infra's proven modular pattern.
 
-**Solution (Story 1.8A)**: Extract home configs into portable modules that export to dendritic namespace and support all three integration modes.
+**Solution (Story 1.8A - COMPLETE)**: Extracted home configs into portable modules that export to dendritic namespace and support all three integration modes. Validated in test-clan with zero regression (270 packages preserved, 46 lines of duplication removed from blackphos).
 
 **Module Structure:**
 ```nix
@@ -612,6 +612,14 @@ flake.modules.nixos.base = {
 
 **Lesson from Story 1.8:**
 Inline home configs are anti-pattern for multi-machine infrastructure. Always modularize user configs to enable cross-platform reuse.
+
+**Implementation Status (Story 1.8A):**
+- ✅ crs58 and raquel modules created in test-clan (`modules/home/users/{username}/default.nix`)
+- ✅ Exported to dendritic namespace (`flake.modules.homeManager."users/{username}"`)
+- ✅ Standalone homeConfigurations exposed (`flake.homeConfigurations.{crs58,raquel}`)
+- ✅ blackphos refactored to import from namespace (zero regression validated)
+- ✅ Standalone activation tested (`nh home switch . -c {username}`)
+- ✅ Pattern ready for Story 1.9 (cinnabar NixOS needs crs58 module)
 
 **Pattern 3: Darwin Multi-User with Per-User Vars Naming**
 
