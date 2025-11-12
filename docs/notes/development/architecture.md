@@ -61,8 +61,8 @@ Migrate blackphos darwin host from infra's nixos-unified pattern to test-clan's 
 | **Networking** | Zerotier mesh VPN | zerotier-one 1.14.2 | Epic 1-7 | Always-on coordination independent of darwin host power state, controller on cinnabar VPS | Clan zerotier service |
 | **Networking (darwin)** | Multiple options | Varies | Epic 2-6 (darwin hosts) | Zerotier clan service is NixOS-only; darwin requires alternative (see Darwin Networking Options section) | Source code analysis |
 | **Secrets Management** | Clan vars generators | clan-core vars system | Epic 1-7 | Declarative secret generation, automatic deployment to /run/secrets/, replaces manual sops-nix | Clan vars architecture |
-| **Multi-User Pattern** | Standard NixOS users.users | NixOS module system | Epic 2-6 (darwin multi-user) | No clan-specific user management; use standard NixOS patterns with per-user vars naming convention | Production examples (clan-infra, mic92) |
-| **Home-Manager** | Darwin module integration | home-manager 25.05 | Epic 2-6 (darwin hosts) | Import as darwinModules.home-manager, useGlobalPkgs=true, separate from clan inventory | Production pattern (enzime, clan-infra) |
+| **Multi-User Pattern** | Standard NixOS users.users (not clan users service) | NixOS module system | Epic 2-6 (darwin multi-user) | Clan users clanService exists but NOT used; traditional users.users chosen for darwin compatibility + explicit UID control. Per-user vars use naming convention. See "User Management Decision" below. | clan-core analysis + real-world usage (clan-infra, qubasa, pinpox) |
+| **Home-Manager** | Portable user-based modules | home-manager 25.05 | All epics | User-based modules (`flake.modules.homeManager."users/{username}"`) support three integration modes (darwin, NixOS, standalone). See Pattern 2 and "Home-Manager Pattern Decision" below. | Test-clan validation + pinpox pattern divergence |
 | **Base Module Auto-Merge** | Automatic via import-tree | import-tree feature | All | System-wide modules (nix-settings, admins, initrd-networking) auto-merge to flake.modules.nixos.base | Test-clan proven pattern |
 | **Test Framework** | nix-unit + runNixOSTest | nix-unit 2.28.1 | Epic 1 (validation) | Fast expression tests + VM integration tests, 17 test cases in test-clan | Test-clan validation infrastructure |
 | **Migration Strategy** | Progressive with stability gates | N/A | Epic 1-7 | 1-2 week validation between hosts, explicit rollback procedures, primary workstation last | Risk mitigation for brownfield |
@@ -82,6 +82,154 @@ Migrate blackphos darwin host from infra's nixos-unified pattern to test-clan's 
 - **Minimal specialArgs acceptable**: Clan requires `specialArgs = { inherit inputs; inherit self; }` for flakeModules integration (framework values only, not extensive pass-through)
 - **Auto-merge replaces pure exports**: Base modules auto-merge via import-tree instead of explicit exports (pragmatic dendritic adaptation)
 - **Clan coordination over pure dendritic**: When clan functionality conflicts with dendritic purity, clan takes precedence (documented deviations)
+
+## Architectural Decisions
+
+### User Management Decision: Traditional vs Clan Users Service
+
+**Investigation Date:** 2025-11-12
+
+**Question:** Should we use clan-core's native users clanService or traditional NixOS `users.users.*` definitions?
+
+**Clan Users ClanService Analysis:**
+
+Clan-core provides `clanServices/users/` for multi-machine user account coordination via inventory service instances:
+
+```nix
+# Clan pattern (NOT used in our architecture)
+inventory.instances.user-crs58 = {
+  module = { name = "users"; input = "clan-core"; };
+  roles.default.tags.all = { };  # Deploy on all machines
+  roles.default.settings = {
+    user = "crs58";
+    groups = [ "wheel" ];
+    share = true;  # Same password across machines
+  };
+};
+```
+
+**Features:**
+- Automatic password generation and distribution
+- Cross-machine password coordination (`share = true`)
+- Tag-based deployment to machine subsets
+- Built-in vars integration (`user-password-{username}`)
+
+**Real-World Usage Analysis:**
+
+Examined clan-infra and developer repos (qubasa, mic92, pinpox):
+- **clan-infra:** Uses users service ONLY for root account, regular users via traditional definitions
+- **qubasa-clan-infra:** NO users service usage, all traditional definitions
+- **pinpox-clan-nixos:** NO users service usage, all traditional definitions
+
+**Finding:** Real-world clan usage favors traditional `users.users.*` approach for regular users.
+
+**Decision: Use Traditional `users.users.*` Definitions**
+
+**Rationale:**
+
+1. **Darwin Compatibility** (CRITICAL):
+   - Users clanService sets `users.mutableUsers = false` (line 150 of `clanServices/users/default.nix`)
+   - Darwin requires mutable users for system integration
+   - 4 of 5 machines in our fleet are darwin
+
+2. **Explicit UID Control** (IMPORTANT):
+   - Users service auto-assigns UIDs
+   - Multi-machine consistency requires explicit UID coordination (crs58 = 550, raquel = 551)
+   - Traditional definitions provide explicit UID control per machine
+
+3. **Per-Machine Flexibility** (IMPORTANT):
+   - SSH keys differ per machine for security
+   - Home directories may vary (darwin `/Users/` vs NixOS `/home/`)
+   - Traditional definitions allow per-machine customization
+
+4. **Real-World Validation**:
+   - Clan-infra (production) uses hybrid: users service for root, traditional for regular users
+   - All examined repos favor traditional approach for regular users
+   - Pattern proven across heterogeneous fleets
+
+**Trade-offs:**
+
+| Aspect | Traditional Definitions | Users ClanService |
+|--------|------------------------|-------------------|
+| Darwin Support | ✅ Native | ❌ Incompatible (`users.mutableUsers = false`) |
+| UID Control | ✅ Explicit | ❌ Auto-assigned |
+| Per-Machine SSH Keys | ✅ Easy | ⚠️ Requires overrides |
+| Cross-Machine Password | ⚠️ Manual vars | ✅ Automatic (`share = true`) |
+| Service Abstraction | ❌ Manual | ✅ Declarative |
+| Complexity | ✅ Simple | ⚠️ Additional layer |
+
+**Conclusion:** Traditional approach is DIVERGENT from clan's native capability but JUSTIFIED by darwin compatibility and UID control requirements. Real-world usage validates this pattern.
+
+**Implementation:** See Pattern 3 (Darwin Multi-User) for per-user vars naming convention (`ssh-key-{username}`) that provides similar organization without clanService dependency.
+
+---
+
+### Home-Manager Pattern Decision: User-Based vs Profile-Based Modules
+
+**Investigation Date:** 2025-11-12
+
+**Question:** How should home-manager configurations be organized for cross-platform reuse?
+
+**Clan Examples Analysis:**
+
+Only 1 of 3 examined clan repositories uses home-manager:
+
+- **pinpox-clan-nixos:** Uses profile-based exports (`flake.homeConfigurations.desktop`)
+  ```nix
+  homeConfigurations.desktop = { ... }: {
+    imports = [ ./home-manager/profiles/desktop ];
+  };
+  # Machine usage:
+  home-manager.users.pinpox = flake-self.homeConfigurations.desktop;
+  ```
+
+- **Other repos:** No home-manager integration found (qubasa, mic92, clan-infra)
+
+**Decision: User-Based Modules via Dendritic Namespace**
+
+**Pattern:**
+```nix
+flake.modules.homeManager."users/crs58" = { config, pkgs, lib, ... }: { ... };
+```
+
+**Rationale:**
+
+1. **Multi-User Granularity:**
+   - blackphos has 2 users (crs58 admin + raquel non-admin) with different configs
+   - User-based modules allow per-user customization naturally
+   - Profile-based would require mapping profiles to users
+
+2. **Dendritic Integration:**
+   - Uses `flake.modules.*` namespace (dendritic pattern)
+   - Auto-discovered via import-tree
+   - Self-composable via `config.flake.modules`
+
+3. **Three Integration Modes:**
+   - Darwin integrated: `darwinModules.home-manager` + imports
+   - NixOS integrated: `nixosModules.home-manager` + imports
+   - Standalone: `homeConfigurations.{username}` for `nh home switch`
+
+**Comparison:**
+
+| Aspect | User-Based (Our Approach) | Profile-Based (Pinpox) |
+|--------|---------------------------|------------------------|
+| Multi-User Support | ✅ Natural | ⚠️ Requires mapping |
+| Granularity | Per-user modules | Per-profile configs |
+| Dendritic Integration | ✅ Namespace exports | ❌ Direct flake outputs |
+| Reusability | Users share modules | Profiles reused |
+| Cross-Platform | ✅ Works anywhere | ✅ Works anywhere |
+
+**Conclusion:** User-based approach is DIVERGENT from pinpox pattern but SUPERIOR for multi-user machines. Fills gap in clan ecosystem (no standard home-manager patterns exist).
+
+**Implementation:** See Pattern 2 (Portable Home-Manager Modules) for complete pattern documentation.
+
+**Evidence:** Comprehensive clan-core investigation (2025-11-12) covering:
+- Clan-core source analysis (`clanServices/users/`, vars/secrets patterns)
+- Clan-infra production usage patterns
+- Developer repositories (qubasa, mic92, pinpox)
+- Alignment assessment matrix with trade-off analysis
+
+---
 
 ## Project Structure
 
