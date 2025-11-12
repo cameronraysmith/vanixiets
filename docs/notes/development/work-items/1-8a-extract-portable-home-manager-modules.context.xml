@@ -61,6 +61,9 @@ Architecture.md documents "Portable Home-Manager Modules with Dendritic Integrat
 
 ### AC7: Test Harness Updated (Validation Coverage)
 Validation tests added to `test-clan/modules/checks/validation.nix` verifying module exports and homeConfigurations exist.
+
+### AC8: Architectural Decisions Documented (Clan Pattern Analysis)
+Comprehensive documentation of clan-core investigation findings: users clanService analysis (exists but not used due to darwin compatibility), home-manager pattern divergence (user-based vs profile-based), alignment assessment (DIVERGENT but JUSTIFIED), and preservation of infra features. References architectural investigation completed 2025-11-12.
 </acceptanceCriteria>
 
   <artifacts>
@@ -88,6 +91,12 @@ Validation tests added to `test-clan/modules/checks/validation.nix` verifying mo
         <title>Story 1.8 Completion</title>
         <section>Architectural Gap Identified</section>
         <snippet>Lines 841-861: Inline configs identified as anti-pattern for multi-machine reuse. Story 1.8A course correction restores modular pattern for cross-platform sharing.</snippet>
+      </doc>
+      <doc>
+        <path>~/.claude/chat_history/2025-11-12-clan-pattern-investigation.md</path>
+        <title>Clan-Core User/Vars/Secrets Management Analysis</title>
+        <section>Comprehensive Architectural Review</section>
+        <snippet>Investigation of clan-core patterns (2025-11-12): users clanService exists (clanServices/users/) but real-world usage favors traditional users.users definitions. Analysis covers clan-infra, qubasa, mic92, pinpox repos. Finding: DIVERGENT but JUSTIFIED - darwin compatibility and UID control require traditional approach. Home-manager: user-based modules (our approach) vs profile-based (pinpox). Alignment assessment confirms Story 1.8A approach is valid with enhancements.</snippet>
       </doc>
     </docs>
     <code>

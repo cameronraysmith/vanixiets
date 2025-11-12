@@ -290,6 +290,7 @@ So that user configs can be shared across platforms (darwin + NixOS) without dup
 5. Standalone activation validated: `nh home switch . -c crs58` works
 6. Pattern documented in architecture.md for Story 1.9 reuse (cinnabar NixOS)
 7. Test harness updated with validation coverage
+8. Architectural decisions documented: Clan-core investigation findings (users clanService analysis, home-manager pattern divergence, alignment assessment), justification for traditional `users.users.*` approach (darwin compatibility + UID control), user-based vs profile-based modules rationale, preservation of infra features validated
 
 **Prerequisites:** Story 1.8 (configuration builds, inline configs identified as gap)
 
