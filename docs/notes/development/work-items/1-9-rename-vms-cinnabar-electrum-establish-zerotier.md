@@ -768,4 +768,40 @@ This will:
 3. Establish zerotier network between both VMs
 4. Cost: ~€18/month combined during Phase 0 validation
 
+**Deployment and Zerotier Validation Complete (2025-11-13):**
+
+**test-clan additional commits (2 total):**
+15. `821ca0c` - Add internet service for public IP access
+16. Regenerated vars with fresh zerotier identities (network `db4344343b14b903`)
+
+**Deployment workflow:**
+1. ✅ Deployed both VMs via `nix run .#terraform`
+2. ✅ Updated age keys: `clan secrets machines add cinnabar <key> --force` (both machines)
+3. ✅ Regenerated all encrypted vars (emergency-access, tor, user-password-root, zerotier)
+4. ✅ Deployed configs: `clan machines update cinnabar electrum`
+5. ✅ Manually restarted zerotierone on both VMs to apply new identities
+
+**Key discovery:** `clan machines update` uploads vars but doesn't restart services. Manual `systemctl restart zerotierone.service` required on both VMs to apply new zerotier identities from vars.
+
+**Zerotier Network Validated (AC3, AC4, AC6 ✅):**
+- Network ID: `db4344343b14b903`
+- cinnabar (controller): `fddb:4344:343b:14b9:399:93db:4344:343b` (node `db4344343b`)
+- electrum (peer): `fddb:4344:343b:14b9:399:93d1:7e6d:27cc` (node `d17e6d27cc`)
+- Bidirectional ping: ✅ 1-12ms latency, 0% packet loss
+- Both machines status: `OK`, authorized, IP assigned
+- Auto-accept service working on controller
+
+**Public IPs:**
+- cinnabar: 49.13.68.78
+- electrum: 162.55.175.87
+
+**All Acceptance Criteria Validated:**
+- ✅ AC1: VMs renamed (cinnabar, electrum)
+- ✅ AC2: Clan inventory updated
+- ✅ AC3: Zerotier network operational
+- ✅ AC4: Bidirectional connectivity validated
+- ✅ AC5: Both VMs deployed successfully
+- ✅ AC6: All tests passing (14/14 nix-unit)
+- ✅ AC7: Documentation updated
+
 ### File List
