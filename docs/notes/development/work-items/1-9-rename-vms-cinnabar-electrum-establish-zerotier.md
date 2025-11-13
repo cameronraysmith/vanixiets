@@ -713,10 +713,17 @@ Generated/cache files (auto-updated, low priority):
 - `justfile` - may have machine-specific commands
 
 **Implementation plan adjustment:**
-1. First fix zerotier controller config (cx43, not ccx23) BEFORE rename
-2. Then proceed with rename operations
-3. Enable electrum in terranix during rename
-4. Deploy electrum and validate network
+1. ✅ First fix zerotier controller config (cx43, not ccx23) BEFORE rename
+2. ✅ Disable hetzner-cx43 in terranix (commit d08d118)
+3. ⏸️ **PAUSED**: Awaiting user execution of `nix run .#terranix` to destroy cx43
+4. Then proceed with rename operations
+5. Enable both cinnabar + electrum in terranix
+6. Deploy both machines and validate zerotier network
+
+**Workflow Decision (2025-11-13):**
+- Destroy → Rename → Deploy approach to avoid terraform state confusion
+- Accept new zerotier network creation (test-clan is disposable infrastructure)
+- Clean slate deployment with correct names from the start
 
 ### Completion Notes List
 
