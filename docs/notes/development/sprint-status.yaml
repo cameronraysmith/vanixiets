@@ -102,12 +102,17 @@ development_status:
   # Story 1.9: READY - Rename test VMs to production names (cinnabar/electrum)
   # Can now import crs58 home module from Story 1.8A for cinnabar NixOS config
   # Pattern proven: flake.modules.homeManager."users/crs58" works cross-platform
-  1-9-rename-vms-cinnabar-electrum-establish-zerotier: ready-for-dev
+  1-9-rename-vms-cinnabar-electrum-establish-zerotier: backlog
   # Story 1.10: Integrate blackphos (nix-darwin) into zerotier network with cinnabar/electrum (nixos)
   # Validates heterogeneous networking across platforms
   1-10-integrate-blackphos-into-zerotier-network: backlog
-  # Story 1.11: Document complete findings including darwin validation and transformation patterns
-  1-11-document-integration-findings-and-patterns: backlog
+  # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
+  # Now includes type-safe home-manager architecture implementation (phases 1-5)
+  # Implements homeHosts options with type validation, smart resolution app, CI checks
+  # Reference: docs/notes/development/home-manager-type-safe-architecture.md
+  # Updated effort: 12-18 hours (9-14h architecture + 3-4h documentation)
+  # Establishes production-ready pattern for Epic 2+ (all 6 machines)
+  1-11-refine-home-manager-architecture-and-document-patterns: backlog
   # Story 1.12: GO/NO-GO decision based on expanded validation (nixos + darwin + transformation)
   1-12-execute-go-no-go-decision-framework: backlog
   epic-1-retrospective: optional
