@@ -669,9 +669,54 @@ This story contributes to Epic 1 success criteria:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-sonnet-4-5-20250929
 
 ### Debug Log References
+
+**Task 1 Catalog (2025-11-13):**
+
+**Critical Finding:** Zerotier service configuration error discovered in `modules/clan/inventory/services/zerotier.nix`:
+- Current config shows `hetzner-ccx23` as controller
+- Story 1.5 and terranix show `hetzner-cx43` (enabled=true) is deployed controller
+- Correcting: cx43 (deployed) → cinnabar (controller), ccx23 (will deploy) → electrum (peer)
+
+**Files requiring updates (comprehensive catalog):**
+
+Machine modules (rename directories + update hostnames):
+- `modules/machines/nixos/hetzner-cx43/default.nix` → cinnabar (line 90: networking.hostName, line 8: flake.modules path)
+- `modules/machines/nixos/hetzner-ccx23/default.nix` → electrum (line 87: networking.hostName, line 8: flake.modules path)
+
+Clan configuration:
+- `modules/clan/inventory/machines.nix` - machine keys for both (lines 3-19)
+- `modules/clan/machines.nix` - registration with import paths
+- `modules/clan/inventory/services/zerotier.nix` - **FIX controller to cx43** then rename (line 10)
+
+Terranix configuration:
+- `modules/terranix/hetzner.nix` - machine keys (lines 10-23), enable electrum (line 11: enabled=false→true)
+
+Test files:
+- `modules/checks/nix-unit.nix` - machine name assertions
+- `modules/checks/integration.nix` - VM boot tests
+- `modules/checks/validation.nix` - may reference machine names (need to verify)
+
+Documentation:
+- `README.md` - deployment instructions, topology description
+- `docs/notes/development/architecture.md` - machine references
+- `docs/notes/development/project-overview.md` - machine references
+- `docs/notes/development/index.md` - machine references
+- `docs/notes/development/source-tree-analysis.md` - machine references
+- `docs/notes/development/development-guide.md` - ccx23 references only
+- `docs/notes/development/technology-stack.md` - ccx23 references only
+
+Generated/cache files (auto-updated, low priority):
+- `inventory.json` - generated from clan inventory
+- `justfile` - may have machine-specific commands
+
+**Implementation plan adjustment:**
+1. First fix zerotier controller config (cx43, not ccx23) BEFORE rename
+2. Then proceed with rename operations
+3. Enable electrum in terranix during rename
+4. Deploy electrum and validate network
 
 ### Completion Notes List
 
