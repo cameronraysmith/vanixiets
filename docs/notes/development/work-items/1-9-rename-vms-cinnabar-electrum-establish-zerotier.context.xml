@@ -251,7 +251,7 @@
         <kind>config</kind>
         <symbol>clan.inventory.machines</symbol>
         <lines>1-48</lines>
-        <reason>Central machine inventory definition. Currently has hetzner-ccx23, hetzner-cx43, gcp-vm, test-darwin, blackphos. Story 1.9 needs to identify which names are hetzner-vm and test-vm equivalents for rename to cinnabar/electrum.</reason>
+        <reason>Central machine inventory definition. Currently has hetzner-ccx23, hetzner-cx43, gcp-vm, test-darwin, blackphos. Story 1.9 renames: hetzner-cx43 → cinnabar, hetzner-ccx23 → electrum. Must update machine keys and tags appropriately.</reason>
       </artifact>
 
       <!-- Clan Machine Registration (will need updates) -->
@@ -274,19 +274,19 @@
 
       <!-- Machine Modules (will be renamed) -->
       <artifact>
-        <path>~/projects/nix-workspace/test-clan/modules/machines/nixos/hetzner-ccx23/</path>
-        <kind>directory</kind>
-        <symbol>hetzner-ccx23 machine config</symbol>
-        <lines>N/A</lines>
-        <reason>Likely candidate for rename to cinnabar (primary VPS). Contains default.nix with machine configuration, networking.hostName, disko config.</reason>
-      </artifact>
-
-      <artifact>
         <path>~/projects/nix-workspace/test-clan/modules/machines/nixos/hetzner-cx43/</path>
         <kind>directory</kind>
         <symbol>hetzner-cx43 machine config</symbol>
         <lines>N/A</lines>
-        <reason>Likely candidate for rename to electrum (secondary test VM). Contains default.nix with machine configuration.</reason>
+        <reason>WILL RENAME TO cinnabar. Currently deployed (enabled=true in terranix), has zerotier controller from Story 1.5. Primary VPS. Contains default.nix with machine configuration, networking.hostName, disko config.</reason>
+      </artifact>
+
+      <artifact>
+        <path>~/projects/nix-workspace/test-clan/modules/machines/nixos/hetzner-ccx23/</path>
+        <kind>directory</kind>
+        <symbol>hetzner-ccx23 machine config</symbol>
+        <lines>N/A</lines>
+        <reason>WILL RENAME TO electrum. Currently NOT deployed (enabled=false in terranix), will be enabled and deployed in this story. Secondary test VM, zerotier peer. Contains default.nix with machine configuration.</reason>
       </artifact>
 
       <!-- Terranix Configuration (will need updates) -->
@@ -295,7 +295,7 @@
         <kind>infrastructure</kind>
         <symbol>flake.modules.terranix.hetzner</symbol>
         <lines>N/A</lines>
-        <reason>Terraform resource generation for Hetzner VMs. Uses machines = { hetzner-ccx23 = {...}, hetzner-cx43 = {...} } pattern with toggle mechanism. Must update machine keys to cinnabar/electrum.</reason>
+        <reason>Terraform resource generation for Hetzner VMs. Uses machines = { hetzner-ccx23 = {enabled=false, ...}, hetzner-cx43 = {enabled=true, ...} } pattern. Must: 1) rename machine keys (cx43→cinnabar, ccx23→electrum), 2) enable electrum (enabled=true), 3) update resource references to new names.</reason>
       </artifact>
 
       <!-- Zerotier Service Configuration -->
@@ -354,7 +354,7 @@
   <constraints>
     <constraint type="architecture">Dendritic flake-parts pattern: All module imports via config.flake.modules.* namespace. No direct file path imports in machine configs. Module paths must match directory structure.</constraint>
     <constraint type="architecture">Clan inventory pattern: Machine definitions must have matching entries in both clan.machines (registration) and clan.inventory.machines (metadata). Service instances target machines by name or tags.</constraint>
-    <constraint type="configuration">Configuration-only changes: Story 1.9 does NOT deploy new infrastructure or users. No crs58 user deployment to cinnabar (deferred to future work). Focus: rename VMs + zerotier network validation.</constraint>
+    <constraint type="deployment">Infrastructure deployment scope: Story 1.9 DOES deploy electrum VM (currently disabled, will be enabled in terranix and deployed via terraform). Story 1.9 does NOT deploy user configurations (no crs58 user on cinnabar - deferred to future work). Focus: rename VMs + deploy electrum + validate zerotier network between two nixos machines.</constraint>
     <constraint type="testing">Zero-regression requirement: All 18 tests must pass after rename. Test harness validates structural equivalence. Machine closures may have different paths (name embedded) but same functionality.</constraint>
     <constraint type="naming">Production topology alignment: cinnabar = primary VPS, permanent, zerotier controller. electrum = secondary test VM, may be ephemeral, zerotier peer. Names chosen for production infra (Epic 2+).</constraint>
     <constraint type="operational">Protect operational VMs: Story 1.7 notes mention operational IPs (162.55.175.87, 49.13.140.183). Avoid accidental deployment during testing. Use enabled=false in terranix toggle.</constraint>
