@@ -99,12 +99,13 @@ development_status:
   # Successfully unblocked Story 1.9: crs58 module ready for cinnabar NixOS reuse
   # Implementation time: ~2 hours, all 8 acceptance criteria satisfied
   1-8a-extract-portable-home-manager-modules: done
-  # Story 1.9: IN-PROGRESS - Rename test VMs to production names (cinnabar/electrum)
-  # Establishes zerotier network between renamed VMs
-  # Configuration refactoring: update inventory, tests, docs for production topology
-  # Does NOT deploy crs58 user yet (focus: rename + zerotier network validation)
+  # Story 1.9: DONE ✅ - Rename test VMs to production names (cinnabar/electrum)
+  # All 7 ACs validated: VMs renamed, clan inventory updated, zerotier network operational
+  # Bidirectional connectivity confirmed (1-12ms latency), 14/14 tests passing
+  # Zerotier network: db4344343b14b903 (cinnabar controller + electrum peer)
+  # Key learning: clan machines update uploads vars but doesn't restart services
   # Context generated 2025-11-13 with 17 doc refs (7 internal + 10 external examples)
-  1-9-rename-vms-cinnabar-electrum-establish-zerotier: in-progress
+  1-9-rename-vms-cinnabar-electrum-establish-zerotier: done
   # Story 1.10: Integrate blackphos (nix-darwin) into zerotier network with cinnabar/electrum (nixos)
   # Validates heterogeneous networking across platforms
   1-10-integrate-blackphos-into-zerotier-network: backlog
