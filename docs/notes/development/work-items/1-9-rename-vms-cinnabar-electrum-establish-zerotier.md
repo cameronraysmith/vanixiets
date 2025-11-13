@@ -354,6 +354,48 @@ This AC validates network still works after rename and electrum peer joins prope
 
 ## Dev Notes
 
+### Implementation Approach - Critical Guidance
+
+**⚠️ This story involves a triple-stack of esoteric/cutting-edge technologies:**
+
+1. **Nix language** - Esoteric functional language with lazy evaluation, complex module system
+2. **Dendritic flake-parts pattern** - Novel architectural pattern with limited real-world adoption
+3. **Clan-core integration** - Very new system (2024) with small user base, evolving patterns
+
+**Due to this complexity stack, the following approach is ESSENTIAL:**
+
+**A. Anchor ALL code changes to working examples:**
+- **Never guess** Nix syntax, module patterns, or clan integration points
+- **Always inspect source code** from reference projects before implementing
+- **Priority order for reference inspection:**
+  1. **test-clan working code** (modules/clan/*, modules/checks/*, proven in Stories 1.1-1.8A)
+  2. **External clan examples** (clan-infra, mic92-clan-dotfiles, qubasa-clan-infra for clan patterns)
+  3. **External dendritic examples** (gaetanlepage-dendritic-nix-config, dendrix-dendritic-nix for module organization)
+  4. **Upstream source** (clan-core, flake-parts, import-tree for authoritative patterns)
+- **Verify example quality** before copying: Does it work? Is it maintained? Does it match our architecture?
+
+**B. Design test cases with extreme care:**
+- **Test harness is your safety net** - 18 tests validate zero-regression
+- **Before changing code**: Understand which tests will validate the change
+- **After changing code**: Run full test suite immediately (`just test`)
+- **Test failures are design feedback** - don't bypass tests, understand why they fail
+- **Add new tests** if rename operation exposes gaps in coverage
+- **Nix-unit test design**: Use working tests as templates (TC-001 through TC-021 in modules/checks/nix-unit.nix)
+
+**C. When uncertain:**
+1. Read the working example code in reference projects
+2. Search upstream source code for similar patterns
+3. Run `nix repl` to test expressions before committing
+4. Ask for clarification rather than guessing
+
+**D. Red flags that indicate you're guessing:**
+- "This should work..." without checking an example
+- Copying from ChatGPT/LLM output without verifying against real code
+- Skipping test execution because "it's just a rename"
+- Using Nix syntax you haven't seen in a working example
+
+**This story is primarily search-and-replace refactoring, but the STACK COMPLEXITY means every change must be validated against working examples and tests.**
+
 ### Learnings from Previous Story (Story 1.8A)
 
 **From Story 1.8A completion notes (Status: done):**
