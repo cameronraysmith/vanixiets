@@ -18,14 +18,26 @@ I want to rename the test Hetzner VMs to their intended production names (cinnab
 So that the test-clan infrastructure mirrors the production topology that will be deployed in Epic 2+ and heterogeneous networking is validated.
 
 **Context:**
-Story 1.5 deployed hetzner-vm with basic zerotier controller configuration.
+Story 1.5 deployed hetzner-cx43 with zerotier controller configuration.
 Story 1.8A extracted portable home-manager modules ready for cross-platform reuse.
 This story renames test VMs to production names (cinnabar = primary VPS, electrum = secondary test VM) and establishes proper zerotier networking between them.
 Story does NOT deploy crs58 user to cinnabar yet (that's future work - this story focuses on VM renaming and zerotier network establishment).
 
+**Current Machine State (from test-clan/modules/terranix/hetzner.nix):**
+- `hetzner-cx43`: **enabled = true** (actively deployed, has zerotier controller from Story 1.5) → will become **cinnabar**
+- `hetzner-ccx23`: **enabled = false** (configuration exists but NOT deployed) → will become **electrum**
+
+**Story 1.9 Scope:**
+1. **Rename configurations**: hetzner-cx43 → cinnabar, hetzner-ccx23 → electrum
+2. **Enable electrum in terranix**: Change `enabled = false` to `enabled = true` for electrum machine
+3. **Deploy electrum VM**: Run terraform apply to provision electrum on Hetzner Cloud
+4. **Configure zerotier on electrum**: Join cinnabar's zerotier network as peer
+5. **Validate network**: Test nixos ↔ nixos zerotier connectivity (prepares for Story 1.10 darwin integration)
+6. **Update all references**: Inventory, tests, docs to use production names
+
 **Key Distinction:**
-This is primarily a configuration refactoring story (renaming machines, updating inventory, fixing tests) with zerotier network validation.
-The zerotier foundation was laid in Story 1.5 - this story formalizes the network between renamed machines.
+This story DOES deploy infrastructure (electrum VM) but does NOT deploy user configurations (no crs58 on cinnabar).
+The zerotier foundation (controller on cinnabar) was laid in Story 1.5 - this story deploys the peer (electrum) and validates the network.
 
 ---
 
@@ -33,17 +45,18 @@ The zerotier foundation was laid in Story 1.5 - this story formalizes the networ
 
 ### AC1: VMs renamed in test-clan configuration
 
-- [ ] hetzner-vm → cinnabar (primary VPS, zerotier controller)
-- [ ] test-vm → electrum (secondary test VM, zerotier peer) OR hetzner-ccx23 → electrum if different naming
+- [ ] hetzner-cx43 → cinnabar (currently deployed, primary VPS, zerotier controller)
+- [ ] hetzner-ccx23 → electrum (currently disabled, will be deployed, zerotier peer)
 - [ ] All module paths updated to reflect new names
 - [ ] Machine definitions use production names consistently
-- [ ] No references to old names (hetzner-vm, test-vm) remain in configuration
+- [ ] No references to old names (hetzner-cx43, hetzner-ccx23) remain in configuration
 
 **Files to update:**
-- `modules/machines/nixos/hetzner-vm/` → `modules/machines/nixos/cinnabar/`
-- `modules/machines/nixos/test-vm/` or similar → `modules/machines/nixos/electrum/`
-- `modules/flake-parts/clan.nix` inventory machine keys
-- Any terranix configuration files referencing old names
+- `modules/machines/nixos/hetzner-cx43/` → `modules/machines/nixos/cinnabar/`
+- `modules/machines/nixos/hetzner-ccx23/` → `modules/machines/nixos/electrum/`
+- `modules/clan/inventory/machines.nix` inventory machine keys
+- `modules/clan/machines.nix` machine registration
+- `modules/terranix/hetzner.nix` machine definitions
 
 ### AC2: Clan inventory updated with new machine names
 
@@ -181,21 +194,25 @@ This AC validates network still works after rename and electrum peer joins prope
 
 ### Task 4: Update terranix configuration for new machine names (30 minutes)
 
-**Objective:** Update terraform generation to reference production names
+**Objective:** Update terraform generation to reference production names and enable electrum
 
 **Actions:**
-1. Identify terranix files from Task 1 search
-2. Update terraform resource names:
-   - Hetzner server resource names: `hetzner-vm` → `cinnabar`
-   - Any null_resource provisioners reference new names
-3. Update terraform-generated identifiers if needed
-4. Regenerate terraform: `nix build .#terranix.terraform`
-5. Review generated `terraform.tf.json` for consistency
+1. Edit `modules/terranix/hetzner.nix`:
+   - Rename machine keys: `hetzner-cx43` → `cinnabar`, `hetzner-ccx23` → `electrum`
+   - **Enable electrum**: Change `electrum = { enabled = false; ...}` to `enabled = true;`
+   - Update any resource references to use new names
+2. Update terraform-generated identifiers if needed
+3. Regenerate terraform: `nix build .#terranix.terraform`
+4. Review generated `terraform.tf.json`:
+   - Both cinnabar and electrum resources present
+   - Resource names use production names
+   - Provisioners reference new machine names
 
 **Success Criteria:**
 - Terranix configuration uses production names
+- Electrum enabled for deployment
 - Terraform regenerates without errors
-- Resource names aligned with inventory
+- Both machines in generated config
 
 ### Task 5: Regenerate clan vars for renamed machines (20 minutes)
 
@@ -243,27 +260,42 @@ This AC validates network still works after rename and electrum peer joins prope
 - Invariant tests passing
 - Integration tests passing (or status unchanged)
 
-### Task 7: Validate zerotier network between cinnabar and electrum (45 minutes)
+### Task 7: Deploy electrum and validate zerotier network (60 minutes)
 
-**Objective:** Confirm zerotier mesh network operational with renamed machines
+**Objective:** Deploy electrum VM and confirm zerotier mesh network operational
 
 **Actions:**
-1. Verify cinnabar zerotier controller status:
+1. **Deploy electrum VM** (first time deployment):
+   ```bash
+   cd ~/projects/nix-workspace/test-clan
+
+   # Generate vars for electrum (if not already done in Task 5)
+   clan vars generate electrum
+
+   # Deploy electrum via terraform (enabled=true from Task 4)
+   nix run .#terraform
+   # This will provision electrum on Hetzner Cloud and run clan machines install
+   ```
+
+2. Verify cinnabar zerotier controller status (should already be running from Story 1.5):
    ```bash
    ssh root@<cinnabar-ip> "zerotier-cli info"
    ssh root@<cinnabar-ip> "zerotier-cli listnetworks"
    ```
-2. Verify electrum zerotier peer status:
+
+3. Verify electrum zerotier peer status (should auto-join network via clan service):
    ```bash
    ssh root@<electrum-ip> "zerotier-cli info"
    ssh root@<electrum-ip> "zerotier-cli listpeers"
    ```
-3. Get zerotier IPs from both machines:
+
+4. Get zerotier IPs from both machines:
    ```bash
    ssh root@<cinnabar-ip> "ip addr show zt+"
    ssh root@<electrum-ip> "ip addr show zt+"
    ```
-4. Test bidirectional connectivity:
+
+5. Test bidirectional connectivity:
    ```bash
    # From cinnabar to electrum
    ssh root@<cinnabar-ip> "ping -c 3 <electrum-zerotier-ip>"
@@ -271,20 +303,24 @@ This AC validates network still works after rename and electrum peer joins prope
    # From electrum to cinnabar
    ssh root@<electrum-ip> "ping -c 3 <cinnabar-zerotier-ip>"
    ```
-5. Test SSH via zerotier:
+
+6. Test SSH via zerotier:
    ```bash
    # From local machine via zerotier IPs (if joined to network)
    ssh root@<cinnabar-zerotier-ip>
    ssh root@<electrum-zerotier-ip>
    ```
-6. Document zerotier network ID and IPs
+
+7. Document zerotier network ID and IPs in README or architecture docs
 
 **Success Criteria:**
+- Electrum VM deployed successfully to Hetzner Cloud
 - Both machines show zerotier online
 - Bidirectional ping successful
 - SSH via zerotier working
-- Network latency acceptable
+- Network latency acceptable (< 100ms for Hetzner-to-Hetzner)
 - Network ID documented
+- NixOS ↔ NixOS zerotier networking validated (prepares for Story 1.10 darwin integration)
 
 ### Task 8: Update documentation with production topology (30 minutes)
 
