@@ -294,46 +294,44 @@ So that the test-clan infrastructure mirrors the production topology that will b
 
 ---
 
-## Story 1.10: Integrate blackphos into test-clan zerotier network
+## Story 1.10: Complete blackphos Migration and Establish Dendritic Pattern Foundation
 
 As a system administrator,
-I want to integrate the blackphos nix-darwin machine into the test-clan zerotier network with cinnabar and electrum,
-So that I can validate heterogeneous networking (nixos ↔ nix-darwin) and prove multi-platform coordination before production refactoring.
+I want to complete the blackphos migration from infra, refactor test-clan to exemplar dendritic patterns, and implement type-safe home-manager architecture,
+So that I establish a clean, well-architected foundation before deploying to hardware and validate patterns for Epic 2+ production refactoring.
 
-**Acceptance Criteria:**
-1. Blackphos zerotier peer configuration: Zerotier service configured on blackphos (investigate nix-darwin zerotier module or homebrew workaround), Blackphos joins zerotier network as peer (cinnabar remains controller), Zerotier configuration uses nix-native approach where possible
-2. Blackphos deployed to physical hardware: Configuration deployed to actual blackphos laptop: `darwin-rebuild switch --flake .#blackphos`, Deployment succeeds without errors, All existing functionality validated post-deployment
-3. Heterogeneous network validated: 3-machine zerotier network operational (cinnabar + electrum + blackphos), Blackphos can ping both cinnabar and electrum via zerotier IPs, Both nixos VMs can ping blackphos via zerotier IP
-4. Cross-platform SSH validated: SSH from blackphos to cinnabar/electrum works, SSH from cinnabar/electrum to blackphos works, Certificate-based authentication functional across platforms
-5. Clan vars deployed correctly on blackphos: /run/secrets/ populated with proper permissions (darwin-compatible), SSH host keys functional, User secrets accessible
-6. Zero-regression validation: All blackphos daily workflows functional, Development environment intact, No performance degradation
-7. Zerotier workarounds documented: If nix-darwin zerotier module unavailable, document approach used (homebrew, custom module, etc.), Note any platform-specific issues encountered
+**Context:**
+- Story 1.8/1.8A migrated blackphos configuration but did NOT migrate all configuration from infra repository
+- Some configuration files growing too long without proper modularization
+- Dendritic pattern not consistently applied (some violations using `_` prefix as shortcut)
+- Must establish clean architectural foundation BEFORE deploying blackphos to physical hardware (Story 1.11)
+- This sets pattern quality baseline for Epic 2-6 (4 additional machines)
 
-**Prerequisites:** Story 1.9 (VMs renamed, zerotier network established)
+**Critical Gap:** Deploying incomplete blackphos configuration in Story 1.11 would require multiple deploy-refactor-redeploy cycles (pure waste). Completing migration and refactoring NOW enables Story 1.11 to deploy complete, well-architected config once.
 
-**Estimated Effort:** 4-6 hours (includes zerotier darwin integration investigation)
-
-**Risk Level:** Medium-High (deploying to real physical machine, zerotier darwin support uncertain)
-
-**Strategic Value:** Proves heterogeneous networking (nixos ↔ nix-darwin) works, validates complete multi-platform coordination pattern for production fleet
-
-**Note:** This story may require investigating zerotier-one installation on nix-darwin. Options include: native nix-darwin module (if available), custom clan service for darwin based on nixos zerotier service, homebrew-based installation managed via nix-darwin.
-
----
-
-## Story 1.11: Refine home-manager architecture and document patterns
-
-As a system administrator,
-I want to implement type-safe home-manager architecture and document all integration findings from Phase 0,
-So that I have a production-ready home-manager pattern and comprehensive reference for production refactoring in Epic 2+.
-
-**Context:** Story 1.8A established portable home modules, but the architecture lacks type safety, smart resolution, and clan inventory integration. This story implements the type-safe enhancement (phases 1-5) before finalizing Epic 1 documentation.
-
-**Implementation Reference:** See `docs/notes/development/home-manager-type-safe-architecture.md` for complete architectural design, migration phases, and implementation details.
+**Architectural Reference:**
+- `docs/notes/development/home-manager-type-safe-architecture.md` - type-safe home-manager design
+- `~/projects/nix-workspace/gaetanlepage-dendritic-nix-config` - exemplar dendritic pattern
+- Maintain clan-core compatibility throughout (inventory, services, vars/secrets access)
 
 **Acceptance Criteria:**
 
-**A. Type-Safe Home-Manager Architecture Implementation (Phases 1-5):**
+**A. Complete blackphos Migration from infra:**
+1. Audit infra blackphos configuration vs test-clan blackphos configuration
+2. Identify ALL remaining configuration not yet migrated (packages, services, system settings, etc.)
+3. Migrate all remaining configuration to test-clan following dendritic patterns
+4. Validate zero regression: Package list comparison (pre vs post migration)
+5. Document migration checklist for reproducibility
+
+**B. Apply Dendritic Pattern Refinements (nixos + nix-darwin + home-manager):**
+1. **File length compliance:** No files >200 lines without justified modularization
+2. **Pattern compliance:** ALL files in modules/ directories are proper flake-parts modules (not data files with `_` prefix escape hatch)
+3. **Use `_` prefix ONLY for:** Non-module data files (JSON, YAML, shell scripts), never as shortcut for long flake-parts modules
+4. **Module organization:** Clear separation (base modules, host-specific modules, user modules)
+5. **Namespace hygiene:** Consistent use of `flake.modules.*` namespace for imports
+6. **Reference validation:** Match gaetanlepage patterns for module structure and composition
+
+**C. Type-Safe Home-Manager Architecture Implementation (Phases 1-5):**
 
 1. **Phase 1 - Type-safe layer (non-breaking):**
    - `modules/flake/home-hosts.nix` created with options definition (homeHosts option + submodule types)
@@ -365,34 +363,183 @@ So that I have a production-ready home-manager pattern and comprehensive referen
    - Optional: Shared profile modules (homeManager.profile-desktop, profile-server) if valuable
    - Optional: Tag-based conditional module application
 
-**B. Test Coverage:**
+**D. Clan-Core Integration Validation:**
+1. Verify clan-core compatibility maintained throughout refactoring:
+   - `clan-core.inventory` structure for machine definitions (unchanged)
+   - Service instance registration via `clan-core.services.*` (unchanged)
+   - `clan-core.vars.*` and `clan-core.secrets.*` access patterns (unchanged)
+   - Zerotier network configuration interface (unchanged)
+2. Configuration builds successfully: `nix build .#darwinConfigurations.blackphos.system`
+3. All nixosConfigurations build: `nix build .#nixosConfigurations.{cinnabar,electrum}.config.system.build.toplevel`
+
+**E. Test Coverage:**
    - TC-020: homeHosts type validation (typo in username → compile error, invalid machine reference → assertion failure)
    - TC-021: Smart resolution logic (machine-specific preferred, system-generic fallback, clear error messages)
    - TC-022: All homeConfigurations build successfully
    - TC-023: Activation scripts pass CI checks
+   - All existing regression tests passing (14/14 tests from Story 1.9)
 
-**C. Integration Findings Documentation:**
-1. Integration findings documented (in existing docs or new docs as appropriate): Terraform/terranix + clan integration (how it works, gotchas), Dendritic flake-parts pattern evaluation (proven via Stories 1.6-1.7), Nix-darwin + clan integration patterns (learned from Story 1.8), Type-safe home-manager architecture (implemented this story), Heterogeneous zerotier networking (nixos ↔ nix-darwin from Story 1.10), Nixos-unified → dendritic + clan transformation process (from Story 1.8)
-2. Architectural decisions documented (in existing docs or new docs as appropriate): Why dendritic flake-parts + clan combination, Why terraform/terranix for infrastructure provisioning, Why zerotier mesh (always-on coordination, VPN), Why type-safe homeHosts pattern (validated in this story), Clan inventory patterns chosen, Service instance patterns (roles, targeting), Secrets management strategy (clan vars vs sops-nix), Home-manager integration approach evolution (1.8A → 1.11)
-3. Confidence level assessed for each pattern: proven, needs-testing, uncertain
-4. Recommendations for production refactoring: Specific steps to refactor infra from nixos-unified to dendritic + clan, Machine migration sequence and approach, Risk mitigation strategies based on test-clan learnings, Type-safe home-manager adoption strategy for production
-5. Known limitations documented: Darwin-specific challenges, Platform-specific workarounds (if any), Areas requiring additional investigation
+**F. Documentation:**
+1. Pattern refinements documented (what changed, why, how to apply to other machines)
+2. Dendritic pattern compliance guidelines (for Epic 2+ machine migrations)
+3. Architectural decisions captured (type-safe home-manager rationale, module organization principles)
 
-**Prerequisites:** Story 1.10 (blackphos integrated, heterogeneous networking validated)
+**Prerequisites:** Story 1.9 (VMs renamed, zerotier network established)
 
-**Estimated Effort:** 12-18 hours (9-14 hours for type-safe architecture phases 1-5, 3-4 hours for documentation)
+**Estimated Effort:** 16-24 hours
+- 3-5 hours: Complete blackphos migration audit and execution
+- 4-6 hours: Apply dendritic pattern refinements across all modules
+- 9-14 hours: Type-safe home-manager architecture implementation (phases 1-5)
+- 2-3 hours: Validation, testing, documentation
 
-**Risk Level:** Low-Medium (refactoring home-manager architecture, but test harness provides safety net)
+**Risk Level:** Low-Medium (refactoring only, no physical deployment yet, test harness provides safety net)
 
 **Strategic Value:**
-- Establishes production-ready type-safe home-manager pattern for Epic 2+ (all 6 machines)
-- Provides comprehensive blueprint for production refactoring based on complete validation
-- Validates gaetanlepage-level type safety with mic92-style clan integration
-- Smart resolution improves deployment UX across entire fleet
+- Eliminates deploy-then-rework waste (Story 1.11 can deploy complete config once)
+- Establishes clean dendritic patterns early (before Epic 2-6 add 4 more machines)
+- Validates gaetanlepage-level architecture with clan-core compatibility
+- Provides production-ready pattern and complete migration baseline for Epic 2+
+- Proves dendritic pattern refinement approach works before applying to production infra
+
+**Note:** This story establishes the architectural foundation. Story 1.11 becomes a streamlined deployment and integration test of mature, well-architected configuration.
 
 ---
 
-## Story 1.12: Execute go/no-go decision framework for production refactoring
+## Story 1.11: Deploy blackphos and Integrate into Zerotier Network
+
+As a system administrator,
+I want to deploy the fully-migrated, well-architected blackphos configuration to physical hardware and integrate into the test-clan zerotier network,
+So that I validate heterogeneous networking (nixos ↔ nix-darwin), prove multi-platform coordination, and complete Epic 1 architectural validation.
+
+**Context:**
+- Story 1.10 completed blackphos migration, dendritic pattern refinements, and type-safe home-manager architecture
+- Configuration is now complete, well-architected, and ready for deployment
+- This story is streamlined deployment + integration test (no refactoring, minimal rework)
+
+**Acceptance Criteria:**
+
+**A. Blackphos Deployment to Physical Hardware:**
+1. Configuration deployed to actual blackphos laptop: `darwin-rebuild switch --flake .#blackphos`
+2. Deployment succeeds without errors
+3. All existing functionality validated post-deployment
+4. Zero-regression validation: All blackphos daily workflows functional, development environment intact, no performance degradation
+
+**B. Zerotier Peer Configuration:**
+1. Zerotier service configured on blackphos (investigate nix-darwin zerotier module or homebrew workaround)
+2. Blackphos joins zerotier network as peer (cinnabar remains controller)
+3. Zerotier configuration uses nix-native approach where possible
+4. If nix-darwin zerotier module unavailable, document approach used (homebrew, custom module, etc.)
+5. Note any platform-specific issues encountered
+
+**C. Heterogeneous Network Validation:**
+1. 3-machine zerotier network operational (cinnabar + electrum + blackphos)
+2. Blackphos can ping both cinnabar and electrum via zerotier IPs
+3. Both nixos VMs can ping blackphos via zerotier IP
+4. Network latency acceptable for coordination (<50ms typical)
+
+**D. Cross-Platform SSH Validation:**
+1. SSH from blackphos to cinnabar/electrum works
+2. SSH from cinnabar/electrum to blackphos works
+3. Certificate-based authentication functional across platforms
+4. Clan-managed SSH keys operational
+
+**E. Clan Vars/Secrets Validation on Darwin:**
+1. `/run/secrets/` populated with proper permissions (darwin-compatible)
+2. SSH host keys functional
+3. User secrets accessible
+4. No permission issues on darwin platform
+
+**F. Integration Findings Documentation:**
+1. Deployment process documented (commands, sequence, any manual steps)
+2. Zerotier darwin integration approach documented (what worked, what didn't)
+3. Platform-specific challenges captured (if any)
+4. Heterogeneous networking validation results (latency, reliability, any issues)
+
+**Prerequisites:** Story 1.10 (blackphos migration complete, dendritic patterns established, type-safe home-manager architecture implemented)
+
+**Estimated Effort:** 4-6 hours
+- 1-2 hours: Physical deployment and validation
+- 2-3 hours: Zerotier darwin integration investigation and configuration
+- 1 hour: Network validation and documentation
+
+**Risk Level:** Medium (deploying to real physical machine, zerotier darwin support uncertain)
+
+**Strategic Value:**
+- Proves heterogeneous networking (nixos ↔ nix-darwin) works with complete configurations
+- Validates multi-platform coordination pattern for production fleet
+- Demonstrates dendritic pattern + clan-core works seamlessly across platforms
+- Completes Epic 1 architectural validation with real darwin hardware
+
+**Note:** With Story 1.10 establishing complete, well-architected configuration, this story focuses purely on deployment and integration testing. Minimal rework expected.
+
+---
+
+## Story 1.12: Document Integration Findings and Architectural Patterns
+
+As a system administrator,
+I want to document all integration findings, architectural patterns, and lessons learned from Epic 1 Phase 0 validation,
+So that I have a comprehensive reference and decision framework for production refactoring in Epic 2+.
+
+**Context:**
+- Epic 1 validation complete: nixos VMs deployed, dendritic patterns proven, darwin integration validated
+- Type-safe home-manager architecture implemented and tested
+- Heterogeneous zerotier networking operational across platforms
+- Now consolidate findings into actionable documentation for production refactoring
+
+**Acceptance Criteria:**
+
+**A. Integration Findings Documentation:**
+1. Terraform/terranix + clan integration patterns documented (how it works, gotchas, best practices)
+2. Dendritic flake-parts pattern evaluation documented (proven via Stories 1.6-1.7, refinements from Story 1.10)
+3. Nix-darwin + clan integration patterns documented (learned from Stories 1.8, 1.10, 1.11)
+4. Type-safe home-manager architecture documented (implemented Story 1.10, validated Story 1.11)
+5. Heterogeneous zerotier networking documented (nixos ↔ nix-darwin from Story 1.11)
+6. Nixos-unified → dendritic + clan transformation process documented (from Stories 1.8, 1.10)
+
+**B. Architectural Decisions Documentation:**
+1. Why dendritic flake-parts + clan combination (rationale, benefits, trade-offs)
+2. Why terraform/terranix for infrastructure provisioning (compared to alternatives)
+3. Why zerotier mesh (always-on coordination, VPN, compared to tailscale/wireguard)
+4. Why type-safe homeHosts pattern (gaetanlepage influence, benefits for fleet management)
+5. Clan inventory patterns chosen (machines, services, roles, targeting)
+6. Service instance patterns (how roles work, targeting strategies)
+7. Secrets management strategy (clan vars vs sops-nix, when to use each)
+8. Home-manager integration approach evolution (1.8 → 1.8A → 1.10 journey)
+
+**C. Pattern Confidence Assessment:**
+For each pattern, assess confidence level and evidence:
+1. **Proven:** Validated in test-clan with zero regressions, ready for production
+2. **Needs-testing:** Conceptually sound but requires additional validation
+3. **Uncertain:** Potential issues identified, needs investigation or alternative
+
+**D. Production Refactoring Recommendations:**
+1. Specific steps to refactor infra from nixos-unified to dendritic + clan
+2. Machine migration sequence and approach (which machines first, why)
+3. Risk mitigation strategies based on test-clan learnings
+4. Type-safe home-manager adoption strategy for production (phased rollout)
+5. Testing strategy for production migration (leverage test harness patterns)
+
+**E. Known Limitations and Gaps:**
+1. Darwin-specific challenges documented
+2. Platform-specific workarounds captured (if any)
+3. Areas requiring additional investigation identified
+4. Technical debt or pattern violations noted (to address in Epic 2+)
+
+**Prerequisites:** Story 1.11 (blackphos deployed, heterogeneous networking validated)
+
+**Estimated Effort:** 3-4 hours (documentation consolidation and review)
+
+**Risk Level:** Low (documentation only)
+
+**Strategic Value:**
+- Provides comprehensive blueprint for production refactoring based on complete validation
+- Captures institutional knowledge from Phase 0 experimentation
+- De-risks Epic 2-6 by documenting proven patterns and known limitations
+- Enables informed go/no-go decision in Story 1.13
+
+---
+
+## Story 1.13: Execute go/no-go decision framework for production refactoring
 
 As a system administrator,
 I want to evaluate Phase 0 results against go/no-go criteria,
@@ -406,13 +553,18 @@ So that I can make an informed decision about proceeding to production refactori
 5. If NO-GO: Alternative approaches documented, Issues requiring resolution identified, Timeline for retry or pivot strategy, Specific validation gaps that need addressing
 6. Next steps clearly defined based on decision outcome
 
-**Prerequisites:** Story 1.11 (findings documented)
+**Context:**
+- Epic 1 Phase 0 validation complete (Stories 1.1-1.12)
+- Documentation consolidated in Story 1.12
+- Ready to assess results against decision criteria
+
+**Prerequisites:** Story 1.12 (integration findings and patterns documented)
 
 **Estimated Effort:** 1-2 hours
 
 **Risk Level:** Low (decision only)
 
-**Decision Criteria - GO if:** Hetzner VMs deployed and operational, Dendritic flake-parts pattern proven with zero regressions, Blackphos successfully migrated from nixos-unified to dendritic + clan, Heterogeneous zerotier network operational (nixos + darwin), Transformation pattern documented and reusable, High confidence in applying patterns to production
+**Decision Criteria - GO if:** Hetzner VMs deployed and operational, Dendritic flake-parts pattern proven with zero regressions (Stories 1.6-1.7, 1.10), Blackphos successfully migrated with complete configuration (Stories 1.8, 1.10, 1.11), Heterogeneous zerotier network operational (nixos + darwin, Story 1.11), Transformation pattern documented and reusable (Story 1.12), Type-safe home-manager architecture validated (Story 1.10, 1.11), High confidence in applying patterns to production
 
 **Decision Criteria - CONDITIONAL GO if:** Minor platform-specific issues discovered but workarounds documented, Some manual steps required but acceptable, Partial automation acceptable with documented procedures, Medium-high confidence in production refactoring
 
