@@ -321,26 +321,74 @@ So that I can validate heterogeneous networking (nixos ↔ nix-darwin) and prove
 
 ---
 
-## Story 1.11: Document integration findings and architectural decisions
+## Story 1.11: Refine home-manager architecture and document patterns
 
 As a system administrator,
-I want to document all integration findings and architectural decisions from Phase 0,
-So that I have comprehensive reference for production refactoring in Epic 2+.
+I want to implement type-safe home-manager architecture and document all integration findings from Phase 0,
+So that I have a production-ready home-manager pattern and comprehensive reference for production refactoring in Epic 2+.
+
+**Context:** Story 1.8A established portable home modules, but the architecture lacks type safety, smart resolution, and clan inventory integration. This story implements the type-safe enhancement (phases 1-5) before finalizing Epic 1 documentation.
+
+**Implementation Reference:** See `docs/notes/development/home-manager-type-safe-architecture.md` for complete architectural design, migration phases, and implementation details.
 
 **Acceptance Criteria:**
-1. Integration findings documented (in existing docs or new docs as appropriate): Terraform/terranix + clan integration (how it works, gotchas), Dendritic flake-parts pattern evaluation (proven via Stories 1.6-1.7), Nix-darwin + clan integration patterns (learned from Story 1.8), Home-manager integration approach with dendritic + clan, Heterogeneous zerotier networking (nixos ↔ nix-darwin from Story 1.10), Nixos-unified → dendritic + clan transformation process (from Story 1.8)
-2. Architectural decisions documented (in existing docs or new docs as appropriate): Why dendritic flake-parts + clan combination, Why terraform/terranix for infrastructure provisioning, Why zerotier mesh (always-on coordination, VPN), Clan inventory patterns chosen, Service instance patterns (roles, targeting), Secrets management strategy (clan vars vs sops-nix), Home-manager integration approach
+
+**A. Type-Safe Home-Manager Architecture Implementation (Phases 1-5):**
+
+1. **Phase 1 - Type-safe layer (non-breaking):**
+   - `modules/flake/home-hosts.nix` created with options definition (homeHosts option + submodule types)
+   - `modules/home/core/default.nix` created providing base home-manager config
+   - `modules/home/generic-configs.nix` created with system-generic homeHosts declarations
+   - Existing `modules/home/configurations.nix` kept for parallel operation
+   - Test: One homeHost declared, verifies correct homeConfiguration generation
+
+2. **Phase 2 - Smart resolution app:**
+   - `modules/home/app.nix` enhanced with smart resolution logic (tries machine-specific → system-generic fallback)
+   - Help text updated to reflect new resolution strategy
+   - Test: App works with generic configs (backward compatibility)
+   - Test: Machine-specific config preferred when available
+
+3. **Phase 3 - Migrate to typed declarations:**
+   - `modules/home/users/*/default.nix` restructured to use `flake.modules.homeManager.user-*` namespace
+   - Machine-specific home configs created in `modules/machines/*/home/*.nix`
+   - homeHosts declared for all user@machine combinations (crs58-cinnabar, crs58-blackphos, raquel-blackphos)
+   - Validation: `nix flake check` passes all type checks
+   - Test: App resolution chain works correctly (auto-detects hostname, falls back gracefully)
+
+4. **Phase 4 - Remove legacy generator:**
+   - `modules/home/configurations.nix` deleted
+   - Documentation and README.md updated with smart resolution examples
+   - All usage examples verified working
+
+5. **Phase 5 - Advanced features:**
+   - CI checks added for homeConfiguration activation scripts (following mic92 pattern)
+   - Optional: Shared profile modules (homeManager.profile-desktop, profile-server) if valuable
+   - Optional: Tag-based conditional module application
+
+**B. Test Coverage:**
+   - TC-020: homeHosts type validation (typo in username → compile error, invalid machine reference → assertion failure)
+   - TC-021: Smart resolution logic (machine-specific preferred, system-generic fallback, clear error messages)
+   - TC-022: All homeConfigurations build successfully
+   - TC-023: Activation scripts pass CI checks
+
+**C. Integration Findings Documentation:**
+1. Integration findings documented (in existing docs or new docs as appropriate): Terraform/terranix + clan integration (how it works, gotchas), Dendritic flake-parts pattern evaluation (proven via Stories 1.6-1.7), Nix-darwin + clan integration patterns (learned from Story 1.8), Type-safe home-manager architecture (implemented this story), Heterogeneous zerotier networking (nixos ↔ nix-darwin from Story 1.10), Nixos-unified → dendritic + clan transformation process (from Story 1.8)
+2. Architectural decisions documented (in existing docs or new docs as appropriate): Why dendritic flake-parts + clan combination, Why terraform/terranix for infrastructure provisioning, Why zerotier mesh (always-on coordination, VPN), Why type-safe homeHosts pattern (validated in this story), Clan inventory patterns chosen, Service instance patterns (roles, targeting), Secrets management strategy (clan vars vs sops-nix), Home-manager integration approach evolution (1.8A → 1.11)
 3. Confidence level assessed for each pattern: proven, needs-testing, uncertain
-4. Recommendations for production refactoring: Specific steps to refactor infra from nixos-unified to dendritic + clan, Machine migration sequence and approach, Risk mitigation strategies based on test-clan learnings
+4. Recommendations for production refactoring: Specific steps to refactor infra from nixos-unified to dendritic + clan, Machine migration sequence and approach, Risk mitigation strategies based on test-clan learnings, Type-safe home-manager adoption strategy for production
 5. Known limitations documented: Darwin-specific challenges, Platform-specific workarounds (if any), Areas requiring additional investigation
 
 **Prerequisites:** Story 1.10 (blackphos integrated, heterogeneous networking validated)
 
-**Estimated Effort:** 3-4 hours
+**Estimated Effort:** 12-18 hours (9-14 hours for type-safe architecture phases 1-5, 3-4 hours for documentation)
 
-**Risk Level:** Low (documentation only)
+**Risk Level:** Low-Medium (refactoring home-manager architecture, but test harness provides safety net)
 
-**Strategic Value:** Provides comprehensive blueprint for Epic 2+ production refactoring based on complete validation (nixos + nix-darwin + transformation pattern)
+**Strategic Value:**
+- Establishes production-ready type-safe home-manager pattern for Epic 2+ (all 6 machines)
+- Provides comprehensive blueprint for production refactoring based on complete validation
+- Validates gaetanlepage-level type safety with mic92-style clan integration
+- Smart resolution improves deployment UX across entire fleet
 
 ---
 
