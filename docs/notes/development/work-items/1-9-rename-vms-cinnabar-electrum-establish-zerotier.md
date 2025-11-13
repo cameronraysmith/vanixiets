@@ -727,4 +727,45 @@ Generated/cache files (auto-updated, low priority):
 
 ### Completion Notes List
 
+**Implementation Complete (2025-11-13):**
+
+All rename and configuration work complete in test-clan. Ready for deployment.
+
+**test-clan commits (14 total):**
+1. `082c7d0` - Fix zerotier controller (ccx23→cx43)
+2. `d08d118` - Disable cx43 for destroy→rename→deploy
+3. `6f1c80d` - Rename directories (cx43→cinnabar, ccx23→electrum)
+4. `ab9d394` - Update clan inventory
+5. `daf649b` - Update terranix (enable both machines)
+6. `f4d3577` - Rename sops secrets directories
+7. `98f2d6b` - Update test harness (all 18 tests)
+8. `65db2d1` - Update documentation (7 files)
+9. `8c304c7` - Rename vars directories
+10. `bc13ce2` - Rename machine metadata (WIP)
+11. `551537e` - Add zerotier-network-id to cinnabar
+12. `5e58316` - Regenerate vars with clan CLI
+13. `2c43fdc` - Remove stale inventory.json
+14. `08f91c2` - Fix darwin configs test (blackphos)
+
+**Test results:** ✅ 14/14 nix-unit tests passing
+
+**Validation summary:**
+- ✅ All machine references renamed (directories, configs, inventory, secrets, vars, tests, docs)
+- ✅ Zerotier controller corrected (cinnabar, not electrum)
+- ✅ Both machines enabled in terranix (ready for deployment)
+- ✅ All 14 nix-unit tests passing (zero regressions)
+- ✅ Clan inventory clean (only cinnabar, electrum, gcp-vm, blackphos, test-darwin)
+
+**Ready for Task 7 (manual deployment):**
+```bash
+cd ~/projects/nix-workspace/test-clan
+nix run .#terraform
+```
+
+This will:
+1. Deploy cinnabar (cx43, 8vCPU/16GB, zerotier controller)
+2. Deploy electrum (ccx23, 4vCPU/16GB, zerotier peer)
+3. Establish zerotier network between both VMs
+4. Cost: ~€18/month combined during Phase 0 validation
+
 ### File List
