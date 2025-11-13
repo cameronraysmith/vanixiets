@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** ready-for-dev
+**Status:** done
 
 **Dependencies:**
 - Story 1.8A (done): Portable home-manager modules extracted and validated
