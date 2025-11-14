@@ -4,13 +4,22 @@
 
 **Strategic Value:** Validates complete stack (dendritic + clan + terraform + infrastructure) on real VMs and darwin machines before production refactoring, proves both target architecture AND transformation process, validates cross-platform home-manager modularity (Epic 1 architectural requirement), provides reusable migration blueprint for Epic 2+ by rehearsing complete nixos-unified → dendritic + clan conversion
 
-**Timeline:** 3-4 weeks (2 weeks nixos validation complete + 1-2 weeks darwin migration rehearsal + home-manager modularity)
+**Timeline:** 4-5 weeks
+- Phase 0 (Stories 1.1-1.10A): ✅ COMPLETE (3 weeks actual)
+- Phase 1 (Stories 1.10B-1.10C): 16-22 hours (home-manager + secrets migration)
+- Phase 2 (Party Mode Checkpoint): 1-2 hours (evidence-based Story 1.11 decision)
+- Phase 3 (Story 1.11 conditional): 0-16 hours (depends on checkpoint)
+- Phase 4 (Stories 1.12-1.14): 8-12 hours (deployment + validation + GO/NO-GO)
+- **Total remaining:** 25-52 hours (1-2 weeks depending on Story 1.11 decision)
 
 **Success Criteria:**
 - Hetzner VMs deployed and operational (minimum requirement achieved)
 - Dendritic flake-parts pattern proven with zero regressions (achieved via Stories 1.6-1.7)
 - Nix-darwin machine (blackphos) migrated from infra to test-clan management
+- **Complete home-manager ecosystem migrated (Story 1.10B - 51 modules, all priorities)**
+- **Secrets migrated to clan vars (Story 1.10C - Pattern B validated)**
 - **Cross-platform user config sharing validated (Story 1.8A - portable home modules)**
+- **Evidence-based architectural decisions (Party Mode checkpoint validates patterns)**
 - Heterogeneous zerotier network operational (nixos VMs + nix-darwin host)
 - Nixos-unified → dendritic + clan transformation pattern documented
 - Migration patterns documented for production refactoring in Epic 2+
@@ -560,7 +569,323 @@ So that I validate the clan-core recommended pattern before Epic 2-6 scaling and
 
 ---
 
-## Story 1.11: Implement Type-Safe Home-Manager Architecture
+## Story 1.10B: Migrate Home-Manager Module Ecosystem from infra to test-clan
+
+**⚠️ DISCOVERED STORY - Configuration Completeness Gap**
+
+As a system administrator,
+I want to migrate the remaining 51 home-manager modules from infra to test-clan,
+So that blackphos configuration is complete and ready for physical deployment validation.
+
+**Context:**
+Comprehensive investigation (2025-11-14) revealed Story 1.10 audit was incomplete:
+- Claimed "no additional packages/services needed" but only compared top-level darwin configs
+- Missed 51 home-manager modules (2,500+ lines) auto-wired via nixos-unified
+- Current coverage: ~15% (basic git/gh/zsh only)
+- Missing: Development environment (neovim, wezterm, editors), AI tooling (claude-code, 11 MCP servers), shell environment (atuin, yazi, zellij), utilities (bat, gpg, awscli, k9s, rbw)
+- Physical deployment risk: Severe productivity regression
+
+**Investigation Findings:**
+infra uses nixos-unified auto-wiring (`self.homeModules.default` aggregates all 51 modules), test-clan uses dendritic explicit imports.
+Story 1.10 audit compared surface configs, missed deep module composition.
+
+**Module Categories (Priority-Based Migration):**
+
+**Priority 1: Critical Development Environment (MUST HAVE)**
+- git.nix - Git with SSH signing, delta diff, lazygit, allowed_signers
+- jujutsu.nix - Modern VCS with SSH signing, git colocate mode
+- neovim/ - LazyVim editor framework
+- wezterm/ - Terminal emulator with GPU acceleration
+- zed/ - Zed editor configuration
+- starship.nix - Enhanced prompt (basic already migrated, enhance)
+- zsh.nix - Enhanced shell (basic already migrated, enhance)
+
+**Priority 2: AI-Assisted Development (HIGH VALUE)**
+- claude-code/default.nix - Claude Code CLI configuration
+- claude-code/mcp-servers.nix - 11 MCP server configs (firecrawl, huggingface, chrome, cloudflare, duckdb, historian, mcp-prompt-server, nixos, playwright, terraform, gcloud, gcs)
+- claude-code-wrappers.nix - GLM alternative LLM backend
+- claude-code/ccstatusline-settings.nix - Status line configuration
+
+**Priority 3: Shell & Terminal Environment (HIGH VALUE)**
+- atuin.nix - Shell history with sync
+- yazi.nix - Terminal file manager
+- zellij.nix - Terminal multiplexer
+- tmux.nix - Alternative multiplexer
+- bash.nix - Bash shell setup
+- nushell/ - Modern structured shell
+
+**Priority 4: Development Tools (MEDIUM VALUE)**
+- radicle.nix - Decentralized code collaboration
+- commands/ - 6 command helper modules (dev-tools, nix-tools, git-tools, system-tools, file-tools, descriptions)
+- bat.nix - Syntax highlighting cat replacement
+- bottom.nix - System monitor
+- gpg.nix - GPG/PGP encryption
+- pandoc.nix - Document conversion
+
+**Priority 5: Platform Tools (MEDIUM VALUE)**
+- awscli.nix - AWS CLI tools
+- k9s.nix - Kubernetes TUI
+- rbw.nix - Bitwarden CLI password manager
+- texlive.nix - LaTeX environment
+
+**Priority 6: Core System & Utilities (LOW VALUE)**
+- profile.nix, xdg.nix, bitwarden.nix, tealdeer.nix, macchina.nix, nixpkgs.nix, agents-md.nix
+
+**Acceptance Criteria:**
+
+**A. Priority 1-3 Module Migration (Critical Path):**
+1. All Priority 1 modules migrated following dendritic pattern (explicit namespace exports)
+2. All Priority 2 modules migrated (AI tooling ecosystem)
+3. All Priority 3 modules migrated (shell/terminal environment)
+4. Each module exported to `flake.modules.homeManager.*` namespace
+5. User modules (crs58, raquel) import migrated modules explicitly
+6. Build validation: `nix build .#homeConfigurations.crs58.activationPackage` succeeds
+
+**B. Module Access Pattern Updates:**
+1. Update git.nix to reference clan vars for signing keys (coordinate with Story 1.10C)
+2. Update jujutsu.nix to reference clan vars for signing keys
+3. Update mcp-servers.nix to reference clan vars for API keys (coordinate with Story 1.10C)
+4. Update claude-code-wrappers.nix to reference clan vars for GLM API key
+5. All sops-nix references replaced with clan vars equivalents
+
+**C. Dendritic Pattern Compliance:**
+1. All modules use explicit imports (`config.flake.modules.homeManager.*`)
+2. No auto-aggregation patterns (infra's `self.homeModules.default` not replicated)
+3. Module organization: `modules/home/users/crs58/` contains user-specific imports
+4. Tool modules: `modules/home/tools/` contains reusable tool configs
+5. Development modules: `modules/home/development/` contains dev environment configs
+
+**D. Build Validation:**
+1. All homeConfigurations build: `nix build .#homeConfigurations.{crs58,raquel}.activationPackage`
+2. All darwinConfigurations build: `nix build .#darwinConfigurations.blackphos.system`
+3. Zero evaluation errors
+4. Configuration coverage: ~15% → ~100% (all critical functionality migrated)
+
+**E. Zero-Regression Validation:**
+1. Package diff comparison: infra blackphos vs test-clan blackphos
+2. Target: <10% package delta (mostly clan vars additions)
+3. Document any regressions and justification for differences
+4. Validate all Priority 1-3 functionality present
+
+**F. Documentation:**
+1. Migration checklist documented (Priority 1-3 completion)
+2. Dendritic pattern notes (explicit imports, no auto-aggregation)
+3. Module organization documented (users/, tools/, development/ structure)
+4. Learnings captured for Party Mode checkpoint discussion
+
+**Prerequisites:** Story 1.10A (clan inventory pattern migration complete)
+
+**Blocks:** Story 1.10C (secrets migration needs home modules migrated first for access pattern updates), Story 1.12 (physical deployment needs complete config)
+
+**Estimated Effort:** 12-16 hours
+- Priority 1 migration: 6-8 hours
+- Priority 2 migration: 3-4 hours
+- Priority 3 migration: 2-3 hours
+- Build validation + documentation: 1-2 hours
+
+**Risk Level:** Medium (extensive refactoring, but proven patterns from infra, clear migration path)
+
+**Strategic Value:**
+- Completes blackphos configuration migration (15% → 100% coverage)
+- Validates dendritic pattern at scale (51 modules, not just 2-3)
+- Unblocks Story 1.12 physical deployment (complete config required)
+- Provides empirical data for Party Mode checkpoint (Story 1.11 assessment)
+- Establishes home-manager migration pattern for Epic 2-6 (4 more machines)
+
+**Investigation Reference:** Comprehensive blackphos audit (2025-11-14) identified 51 modules across 6 categories, current coverage ~15%, deployment risk HIGH without migration.
+
+---
+
+## Story 1.10C: Migrate Secrets from sops-nix to Clan Vars
+
+**⚠️ DISCOVERED STORY - Secrets Management Gap**
+
+As a system administrator,
+I want to migrate sops-nix secrets to clan vars system following Pattern B (vars in user modules),
+So that blackphos uses clan-core's recommended secrets pattern and enables scalable multi-machine secret management.
+
+**Context:**
+Investigation (2025-11-14) revealed:
+- Story 1.8 AC4 deferred secrets migration ("Future work: Migrate to clan vars")
+- Story 1.10 never addressed secrets (0% secrets coverage)
+- infra has 6 sops-nix encrypted files (signing keys, API keys)
+- No clan vars generators defined in test-clan
+- Physical deployment would fail (no SSH signing keys, no MCP API keys)
+
+**Clan Vars Architecture Understanding:**
+- Clan vars IS sops-nix (with declarative interface)
+- `clan.core.vars.generators` wraps sops-nix encryption
+- macOS explicitly supported (darwin-compatible)
+- Pattern B (vars in user modules) aligns with dendritic philosophy
+
+**Reference Implementations:**
+- mic92-clan-dotfiles: Uses raw sops-nix (128 secrets, 9 machines) - legacy pattern
+- clan-core docs: Recommends vars over raw sops-nix
+- Pattern B: Vars generators defined in user modules, reusable across machines
+
+**Secrets Inventory (from infra):**
+
+| Secret File | Usage | Type | Migration Strategy |
+|------------|-------|------|-------------------|
+| `admin-user/signing-key.yaml` | Git/jujutsu SSH signing | SSH private key | **Generate new** (ssh-keygen generator) |
+| `admin-user/llm-api-keys.yaml` (glm) | GLM alternative LLM backend | API token | **Import existing** (prompt for value) |
+| `admin-user/mcp-api-keys.yaml` (firecrawl, context7, huggingface) | 3 MCP server API keys | API tokens | **Import existing** (prompts) |
+| `shared.yaml` (BITWARDEN_EMAIL) | Bitwarden password manager | Email address | **Prompt** (user input) |
+| `raquel-user/*` | raquel's signing keys, API keys | Same as admin-user | **Same strategies** |
+
+**Acceptance Criteria:**
+
+**A. Clan Vars Setup:**
+1. Clan admin keypair generated: `clan secrets key generate`
+2. Cameron user added to clan secrets: `clan secrets users add cameron --age-key <public-key>`
+3. Age keys configured for encryption/decryption
+4. Vars directory structure created: `vars/shared/`, `vars/machines/`
+
+**B. Vars Generators Defined (Pattern B - in user modules):**
+1. Create `modules/home/users/crs58/vars.nix` with generators:
+   - `ssh-signing-key`: SSH key generator (regenerable via ssh-keygen)
+   - `llm-api-keys`: Prompt-based generator (GLM API key)
+   - `mcp-api-keys`: Multi-prompt generator (firecrawl, context7, huggingface)
+   - `bitwarden-config`: Prompt for email
+2. Create `modules/home/users/raquel/vars.nix` with equivalent generators
+3. Generators export to `flake.modules.homeManager."users/*/vars"` namespace
+4. User modules import vars modules via `config.flake.modules.homeManager.*`
+
+**C. Module Access Pattern Updates:**
+1. `modules/home/users/crs58/git.nix`: Update signing key access
+   - Before: `config.sops.secrets."admin-user/signing-key".path`
+   - After: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path`
+2. `modules/home/users/crs58/jujutsu.nix`: Update signing key access (same as git)
+3. `modules/home/users/crs58/mcp-servers.nix`: Update API key access
+   - Before: `config.sops.secrets."mcp-firecrawl-api-key".path`
+   - After: `config.clan.core.vars.generators.mcp-api-keys.files.firecrawl.path`
+4. `modules/home/users/crs58/claude-code-wrappers.nix`: Update GLM API key access
+5. `modules/home/users/crs58/rbw.nix`: Update Bitwarden email access
+6. Same updates for raquel's modules
+
+**D. Vars Generation and Validation:**
+1. Generate vars: `clan vars generate blackphos` (prompts for imported secrets)
+2. Verify encryption: `file vars/shared/ssh-signing-key/ed25519_priv/secret` shows JSON (sops-encrypted)
+3. Build validation: `nix build .#darwinConfigurations.blackphos.system` succeeds
+4. Secrets accessible in build: Verify `/run/secrets/vars/*` paths resolve
+5. SSH signing validated: `git log --show-signature` shows verified commits in build
+
+**E. GitHub Signing Key Update (Post-Deployment):**
+1. Document new SSH signing public key location
+2. Instructions for adding to GitHub settings (Settings → SSH and GPG keys → Signing keys)
+3. Verify commits signed with new key after deployment
+
+**F. Dendritic + Clan Vars Integration Validation:**
+1. Vars generators work with dendritic namespace pattern
+2. No conflicts between dendritic imports and clan vars access
+3. Pattern B (vars in user modules) enables reuse: crs58 vars work on blackphos (darwin) and cinnabar (nixos)
+4. Import-tree discovers vars modules correctly
+
+**G. Documentation:**
+1. Secrets migration guide: sops-nix → clan vars conversion
+2. Pattern B documentation: Vars in user modules, dendritic integration
+3. Operational guide: How to add new secrets, regenerate vars, update GitHub keys
+4. Access pattern examples: Before/after comparisons
+
+**Prerequisites:** Story 1.10B (home-manager modules migrated, access patterns ready for update)
+
+**Blocks:** Story 1.12 (physical deployment needs functional secrets for SSH signing, API access)
+
+**Estimated Effort:** 4-6 hours
+- Clan vars setup + generators: 2 hours
+- Module access pattern updates: 1-2 hours
+- Vars generation + validation: 1 hour
+- Documentation: 1 hour
+
+**Risk Level:** Medium-High (encryption concerns, new pattern, must preserve API keys)
+
+**Risk Mitigation:**
+- Backup `~/.config/sops/age/keys.txt` before migration
+- Test vars generation in separate branch first
+- Validate encryption before committing to git
+- Keep infra sops-nix secrets accessible for rollback
+
+**Strategic Value:**
+- Adopts clan-core recommended pattern (vars over raw sops-nix)
+- Validates Pattern B at scale (multiple secret types, multiple users)
+- Enables Epic 2-6 scalability (vars shared across 6 machines)
+- Proves dendritic + clan vars compatibility
+- Provides empirical data for Party Mode checkpoint (secrets at scale)
+
+**Investigation Reference:** Comprehensive secrets audit (2025-11-14) identified 6 sops-nix files, 0% clan vars coverage, Pattern B recommended for dendritic compatibility.
+
+---
+
+## Party Mode Checkpoint: Story 1.11 Evidence-Based Assessment
+
+**⚠️ ADAPTIVE DECISION POINT**
+
+After completing Stories 1.10B (51 home-manager modules) and 1.10C (secrets migration), reconvene Party Mode team to make evidence-based decision about Story 1.11 (Type-Safe Home-Manager Architecture) execution.
+
+**Rationale:**
+Story 1.11 proposes specific architectural pattern (homeHosts with type safety, smart resolution, machine-specific configs).
+This pattern was designed before implementing dendritic + clan synthesis at scale (51 modules + clan vars).
+After real implementation, we'll have empirical evidence to assess whether Story 1.11:
+- Improves established patterns (GO)
+- Needs adjustment to fit actual patterns (MODIFY)
+- Adds unnecessary complexity (SKIP)
+
+**Assessment Framework:**
+
+**Evidence to Collect from Stories 1.10B + 1.10C:**
+1. **Type safety value:** Count typos/errors encountered during migration that homeHosts types would catch
+2. **Machine-specific configs:** Assess whether crs58@blackphos needs different home config than crs58@cinnabar
+3. **Pattern quality:** Evaluate whether dendritic + clan synthesis feels elegant or clunky
+4. **CI check value:** Determine if activation script validation would have caught issues
+5. **Smart resolution:** Assess whether auto-detection adds value or explicit names sufficient
+
+**Story 1.11 Decision Criteria:**
+
+**GO (Execute Story 1.11 as planned):**
+- ✅ Encountered typos/errors that homeHosts type validation would catch
+- ✅ Need machine-specific home configs (blackphos ≠ cinnabar user configs)
+- ✅ homeHosts pattern clearly improves on current dendritic approach
+- ✅ CI activation checks would have caught real issues from 1.10B/1.10C
+- ✅ Story 1.11 aligns with dendritic + clan philosophy (no conflicts)
+
+**MODIFY (Adjust Story 1.11 scope):**
+- 🔶 Some elements valuable (e.g., CI checks) but not full homeHosts pattern
+- 🔶 Need lighter-weight type safety (not full submodule types)
+- 🔶 Smart resolution valuable but machine-specific configs unnecessary
+- 🔶 Story 1.11 has valuable goals but approach needs adaptation
+
+**SKIP (Proceed directly to Story 1.12):**
+- ❌ No significant typos/errors (nix eval catches everything needed)
+- ❌ Generic user configs work everywhere (no machine-specific overrides needed)
+- ❌ Current dendritic + clan pattern elegant and maintainable
+- ❌ Story 1.11 adds complexity without clear benefit
+- ❌ homeHosts conflicts with established dendritic patterns
+
+**Party Mode Agenda:**
+1. Review Stories 1.10B + 1.10C implementation learnings (what worked, what didn't)
+2. Assess dendritic + clan synthesis patterns that emerged
+3. Evaluate Story 1.11 value proposition against actual implementation evidence
+4. Discuss alternative approaches if MODIFY decision (lighter-weight solutions)
+5. Make decision: GO / MODIFY / SKIP with explicit rationale
+6. If GO or MODIFY: Update Story 1.11 scope and acceptance criteria accordingly
+7. Update Story 1.12 dependencies based on decision
+
+**Documentation Requirement:**
+Party Mode session outcome documented in Story 1.13 (integration findings) with:
+- Evidence collected from Stories 1.10B + 1.10C
+- Decision rationale (GO/MODIFY/SKIP)
+- If MODIFY: Adjusted Story 1.11 scope
+- If SKIP: Explanation of why dendritic + clan synthesis is sufficient
+
+**Strategic Value:**
+- Evidence-based decision-making (not theoretical speculation)
+- Prevents premature optimization (implements only what's proven valuable)
+- Validates architectural patterns empirically (real code, real issues)
+- Aligns with Epic 1 goal: Validate patterns, don't over-engineer
+
+---
+
+## Story 1.11: Implement Type-Safe Home-Manager Architecture **[CONDITIONAL - Pending Party Mode Checkpoint]**
 
 As a system administrator,
 I want to implement type-safe home-manager architecture with smart resolution and machine-specific configurations,
@@ -568,9 +893,13 @@ So that I have a production-ready, maintainable home-manager pattern for the ent
 
 **Context:**
 - Story 1.10 completed migrations and established clean foundation (user modules finalized, clean codebase)
+- Story 1.10B migrated 51 home-manager modules using dendritic pattern
+- Story 1.10C migrated secrets to clan vars using Pattern B
+- **Party Mode Checkpoint after 1.10B/1.10C:** Evidence-based decision on Story 1.11 execution
 - Current home-manager uses static generator (`configurations.nix`) - no type safety, no machine-specific configs
 - Need gaetanlepage-level type safety with mic92-style clan integration for production fleet (6 machines)
 - Must support three integration modes: darwin-integrated, nixos-integrated, standalone homeConfigurations
+- **NOTE:** This story is CONDITIONAL on Party Mode checkpoint GO decision
 
 **Architectural Reference:**
 - `docs/notes/development/home-manager-type-safe-architecture.md` - complete design and migration phases
@@ -723,9 +1052,21 @@ So that I have a production-ready, maintainable home-manager pattern for the ent
    - Different user: `nix run . -- raquel`
    - Development workflow: `nix run . -- crs58 . --dry`
 
-**Prerequisites:** Story 1.10 (migrations complete, clean foundation established, user modules finalized)
+**Prerequisites:**
+- Story 1.10B (home-manager modules migrated - provides empirical evidence)
+- Story 1.10C (secrets migrated - completes configuration)
+- Party Mode Checkpoint (GO decision required to execute this story)
 
 **Blocks:** None (Story 1.12 blackphos deployment can proceed without this, but benefits from it)
+
+**Conditional Execution:**
+This story executes ONLY if Party Mode checkpoint (after Stories 1.10B + 1.10C) determines:
+- Story 1.11 provides clear value over established dendritic + clan patterns
+- homeHosts architecture aligns with (not conflicts with) proven patterns
+- Type safety, smart resolution, or CI checks address real issues encountered
+
+If checkpoint determines SKIP, proceed directly to Story 1.12 with current home-manager pattern.
+If checkpoint determines MODIFY, adjust scope/approach based on empirical evidence.
 
 **Estimated Effort:** 10-16 hours
 - Phase 1: Type-safe layer (3 hours)
@@ -757,9 +1098,10 @@ I want to deploy the fully-migrated, well-architected blackphos configuration to
 So that I validate heterogeneous networking (nixos ↔ nix-darwin), prove multi-platform coordination, and complete Epic 1 architectural validation.
 
 **Context:**
-- Story 1.10 completed blackphos migration, cinnabar user configuration, and dendritic pattern refinements
-- Story 1.11 implemented type-safe home-manager architecture (optional but recommended)
-- Configuration is now complete, well-architected, and ready for deployment
+- Story 1.10B completed home-manager migration (51 modules, complete dev environment)
+- Story 1.10C completed secrets migration (clan vars functional)
+- Story 1.11 MAY have implemented type-safe architecture (if Party Mode checkpoint GO)
+- Configuration is now complete, secrets functional, ready for physical deployment
 - This story is streamlined deployment + integration test (no refactoring, minimal rework)
 
 **Acceptance Criteria:**
@@ -801,9 +1143,13 @@ So that I validate heterogeneous networking (nixos ↔ nix-darwin), prove multi-
 3. Platform-specific challenges captured (if any)
 4. Heterogeneous networking validation results (latency, reliability, any issues)
 
-**Prerequisites:** Story 1.10 (blackphos migration complete, cinnabar user configured, dendritic patterns established)
+**Prerequisites:**
+- Story 1.10B (home-manager modules migrated - REQUIRED for complete configuration)
+- Story 1.10C (secrets migrated - REQUIRED for SSH signing, API keys functional)
+- Story 1.11 (type-safe architecture - OPTIONAL, depends on Party Mode checkpoint decision)
 
-**Optional Prerequisites:** Story 1.11 (type-safe home-manager architecture - enhances but not required for deployment)
+**Hard Dependencies:** Stories 1.10B + 1.10C must be complete (full config + secrets)
+**Soft Dependency:** Story 1.11 improves deployment quality but not required for validation
 
 **Estimated Effort:** 4-6 hours
 - 1-2 hours: Physical deployment and validation
