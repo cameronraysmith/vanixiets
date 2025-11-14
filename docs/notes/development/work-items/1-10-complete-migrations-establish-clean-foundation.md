@@ -663,9 +663,82 @@ This story contributes to Epic 1 success criteria:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-sonnet-4-5-20250929
 
 ### Debug Log References
+
+**Task 1: blackphos Migration Audit (2025-11-13)**
+
+Performed explicit comparison between:
+- Source: `~/projects/nix-workspace/infra/configurations/darwin/blackphos.nix` + imported modules
+- Target: `~/projects/nix-workspace/test-clan/modules/machines/darwin/blackphos/default.nix`
+
+**Already Migrated (Story 1.8):**
+- ✅ Hostname, computer name, platform (aarch64-darwin)
+- ✅ State version = 4 (correctly overriding base)
+- ✅ Primary user = crs58
+- ✅ Homebrew casks: codelayer-nightly, dbeaver-community, docker-desktop, gpg-suite, inkscape, keycastr, meld, postgres-unofficial
+- ✅ Mac App Store: save-to-raindrop-io (1549370672)
+- ✅ TouchID sudo authentication
+- ✅ Multi-user config: crs58 (UID 550) + raquel (UID 551) with SSH keys, shells (zsh), home directories
+- ✅ Home-manager integration with portable modules (flakeModulesHome."users/{crs58,raquel}")
+- ✅ System packages: vim, git
+- ✅ Zsh enabled system-wide
+
+**Missing Shared Configuration (From infra's nixosModules.common):**
+
+1. **Nix Caches/Substituters** (`modules/nixos/shared/caches.nix`):
+   - 7 cachix caches: cache.nixos.org, nix-community, cameronraysmith, poetry2nix, pyproject-nix, om, catppuccin
+   - Corresponding trusted-public-keys
+   - **Classification: SHARED** (benefits both darwin + nixos)
+
+2. **Advanced Nix Settings** (`modules/nixos/shared/nix.nix`):
+   - nixpkgs.config: allowBroken, allowUnsupportedSystem, allowUnfree
+   - nixpkgs.overlays (from self.overlays + lazyvim.overlays.nvim-treesitter-main)
+   - nix.nixPath = [ "nixpkgs=${flake.inputs.nixpkgs}" ]
+   - nix.registry.nixpkgs.flake (pinned nixpkgs)
+   - Automatic garbage collection: gc.automatic = true, gc.options = "--delete-older-than 14d", gc.interval (darwin launchd)
+   - Automatic store optimization: optimise.automatic = true
+   - nix.settings.extra-platforms (darwin: aarch64-darwin x86_64-darwin)
+   - nix.settings.min-free = 5GB, max-free = 10GB (emergency GC)
+   - **Classification: SHARED** (nix daemon behavior consistent across platforms)
+
+3. **macOS System Defaults** (`modules/darwin/all/settings.nix` - 258 lines):
+   - Dock, Finder, LoginWindow, Trackpad, Screenshot, NSGlobalDomain preferences
+   - **Classification: PLATFORM-SPECIFIC** (darwin only, NOT needed on cinnabar)
+   - **Decision: Do NOT migrate to test-clan base** (already exists in infra, user can customize per-machine)
+   - Note: These are user preferences, not infrastructure config
+
+4. **Additional Homebrew Packages** (`modules/darwin/all/homebrew.nix`):
+   - baseCaskApps (40+ GUI apps): aldente, alt-tab, betterdisplay, calibre, claude, cyberduck, etc.
+   - baseMasApps: bitwarden, whatsapp
+   - caskFonts: 14 font families
+   - **Classification: PLATFORM-SPECIFIC** (darwin only)
+   - **Decision: NOT migrated** - blackphos uses additionalCasks, not base cask list
+
+**Shared vs Platform-Specific Summary:**
+
+**SHARED Configuration (apply to both blackphos darwin + cinnabar nixos):**
+- Nix caches/substituters (build performance + availability)
+- Nix settings (experimental-features already shared, add gc/optimization/overlays)
+- User identity (crs58/cameron SSH keys, shell, admin privileges) ← **CRITICAL for Story Task 3**
+
+**PLATFORM-SPECIFIC (darwin):**
+- Homebrew (casks, GUI apps, fonts)
+- macOS system defaults (dock, finder, trackpad)
+- TouchID authentication
+- system.stateVersion (darwin versioning)
+
+**PLATFORM-SPECIFIC (nixos):**
+- Boot loader, disk config (disko)
+- systemd services
+- Firewall/networking (beyond hostname)
+- system.stateVersion (nixos versioning)
+
+**Migration Checklist for Task 2:**
+1. Add nix caches/substituters to test-clan darwin base or blackphos
+2. Add advanced nix settings to test-clan darwin base
+3. Validate zero regression via package diff (pre vs post migration)
 
 ### Completion Notes List
 
