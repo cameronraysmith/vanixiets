@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** drafted
+**Status:** ready-for-dev
 
 **Dependencies:**
 - Story 1.10 (done): cameron user exists on cinnabar via direct NixOS configuration, working baseline established
@@ -475,7 +475,7 @@ test-clan/
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- [Story Context XML](story-contexts/1-10A-migrate-user-management-inventory.context.xml) - Generated 2025-11-14
 
 ### Agent Model Used
 
