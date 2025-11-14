@@ -118,7 +118,7 @@ development_status:
   # 16/16 ACs satisfied, 7/7 tasks complete, production-ready documentation, zero regressions
   # User approved story-done (2025-11-14) - VPS deployment deferred to separate infrastructure task
   1-10-complete-migrations-establish-clean-foundation: done
-  # Story 1.10A: READY-FOR-DEV (2025-11-14) - Migrate User Management to Clan Inventory Pattern
+  # Story 1.10A: IN-PROGRESS (2025-11-14) - Migrate User Management to Clan Inventory Pattern
   # DISCOVERED STORY - Architectural validation enhancement from party-mode review
   # Refactors cameron user from direct NixOS to clan inventory users service + vars
   # Validates clan-core pattern before Epic 2-6 scaling (6 machines × 4+ users)
@@ -128,7 +128,7 @@ development_status:
   # Enables: Story 1.11 type-safe architecture + Epic 2-6 fleet deployment
   # Estimated effort: 3-4 hours (1h instances + 1h removal + 1h vars + 0.5h tests + 0.5h docs)
   # Story context generated 2025-11-14 with comprehensive doc refs, code artifacts, proven patterns
-  1-10a-migrate-user-management-inventory: ready-for-dev
+  1-10a-migrate-user-management-inventory: in-progress
   # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
   # Now includes type-safe home-manager architecture implementation (phases 1-5)
   # Implements homeHosts options with type validation, smart resolution app, CI checks
