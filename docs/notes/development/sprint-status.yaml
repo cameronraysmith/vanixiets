@@ -112,7 +112,7 @@ development_status:
   # Completes blackphos migration, deploys cameron user to cinnabar, refines dendritic patterns
   # Critical: cinnabar user config BLOCKS Story 1.12 (heterogeneous networking validation)
   # Foundation for Story 1.11 (type-safe home-manager architecture)
-  1-10-complete-migrations-establish-clean-foundation: drafted
+  1-10-complete-migrations-establish-clean-foundation: ready-for-dev
   # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
   # Now includes type-safe home-manager architecture implementation (phases 1-5)
   # Implements homeHosts options with type validation, smart resolution app, CI checks
