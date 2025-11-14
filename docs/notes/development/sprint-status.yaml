@@ -107,7 +107,7 @@ development_status:
   # Context generated 2025-11-13 with 17 doc refs (7 internal + 10 external examples)
   # Review (2025-11-13): APPROVED - 3 advisory notes (documentation improvements), zero blockers
   1-9-rename-vms-cinnabar-electrum-establish-zerotier: done
-  # Story 1.10: READY-FOR-REVIEW (2025-11-13) - Complete Migrations and Establish Clean Foundation
+  # Story 1.10: DONE ✅ (2025-11-14) - Complete Migrations and Establish Clean Foundation
   # Split from original 1.10 to optimize sizing (10-15h vs 18-27h original)
   # Completes blackphos migration, deploys cameron user to cinnabar, refines dendritic patterns
   # Critical: cinnabar user config BLOCKS Story 1.12 (heterogeneous networking validation)
@@ -116,8 +116,8 @@ development_status:
   # IMPLEMENTATION: Created migration-patterns.md (424 lines), dendritic-patterns.md (651 lines), completed story notes
   # REVIEW #2 (2025-11-13): APPROVED ✅ - All CRITICAL gaps resolved, documentation exceeds requirements
   # 16/16 ACs satisfied, 7/7 tasks complete, production-ready documentation, zero regressions
-  # Pending: User approval for story-done (VPS deployment deferred to separate infrastructure task)
-  1-10-complete-migrations-establish-clean-foundation: ready-for-review
+  # User approved story-done (2025-11-14) - VPS deployment deferred to separate infrastructure task
+  1-10-complete-migrations-establish-clean-foundation: done
   # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
   # Now includes type-safe home-manager architecture implementation (phases 1-5)
   # Implements homeHosts options with type validation, smart resolution app, CI checks
