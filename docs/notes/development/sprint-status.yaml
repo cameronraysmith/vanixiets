@@ -144,7 +144,7 @@ development_status:
   # Estimated effort: 12-16 hours (6-8h P1 + 3-4h P2 + 2-3h P3 + 1-2h validation/docs)
   # Dependencies: Story 1.10A (done), Blocks: Story 1.10C (secrets need home modules first)
   # Context generated 2025-11-14: Comprehensive technical context with 17 Priority 1-3 modules
-  1-10b-migrate-home-manager-modules: ready-for-dev
+  1-10b-migrate-home-manager-modules: in-progress
   # Story 1.10C: DISCOVERED STORY (2025-11-14) - Migrate Secrets from sops-nix to Clan Vars
   # Secrets management gap identified - Story 1.8 deferred, Story 1.10 never addressed (0% secrets coverage)
   # infra has 6 sops-nix encrypted files (signing keys, API keys), test-clan has zero clan vars generators
