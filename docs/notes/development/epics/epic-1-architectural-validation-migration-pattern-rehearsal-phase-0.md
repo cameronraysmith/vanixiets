@@ -6,11 +6,13 @@
 
 **Timeline:** 4-5 weeks
 - Phase 0 (Stories 1.1-1.10A): ✅ COMPLETE (3 weeks actual)
-- Phase 1 (Stories 1.10B-1.10C): 16-22 hours (home-manager + secrets migration)
-- Phase 2 (Party Mode Checkpoint): 1-2 hours (evidence-based Story 1.11 decision)
+- Phase 1A (Story 1.10B): ✅ COMPLETE (16 hours, Pattern B limitations discovered)
+- Phase 1B (Story 1.10BA): 8-10 hours (refactor to Pattern A, restore functionality)
+- Phase 1C (Story 1.10C): 4-6 hours (secrets migration with working modules)
+- Phase 2 (Party Mode Checkpoint): 1-2 hours (evidence-based Story 1.11 decision based on Pattern A)
 - Phase 3 (Story 1.11 conditional): 0-16 hours (depends on checkpoint)
 - Phase 4 (Stories 1.12-1.14): 8-12 hours (deployment + validation + GO/NO-GO)
-- **Total remaining:** 25-52 hours (1-2 weeks depending on Story 1.11 decision)
+- **Total remaining:** 21-46 hours (1-2 weeks depending on Story 1.11 decision)
 
 **Success Criteria:**
 - Hetzner VMs deployed and operational (minimum requirement achieved)
@@ -696,6 +698,212 @@ Story 1.10 audit compared surface configs, missed deep module composition.
 
 ---
 
+## Story 1.10BA: Refactor Home-Manager Modules from Pattern B to Pattern A (Drupol Multi-Aggregate)
+
+**⚠️ CRITICAL ARCHITECTURAL CORRECTION - Unblocks Story 1.10C**
+
+As a system administrator,
+I want to refactor the 17 migrated home-manager modules from Pattern B (underscore directories, plain modules) to Pattern A (drupol multi-aggregate dendritic),
+So that full functionality is restored (flake inputs, sops-nix compatibility, custom packages) and Story 1.10C can proceed with working modules.
+
+**Context:**
+
+Story 1.10B migration (Session 2, 2025-11-14) discovered **CRITICAL ARCHITECTURAL LIMITATIONS** of Pattern B that block 11 features and break darwinConfigurations builds:
+
+**Pattern B Failures (Documented in Story 1.10B Dev Notes lines 767-1031):**
+- No flake context access (plain modules signature: `{ config, pkgs, lib }` only - missing `flake` parameter)
+- sops-nix DISABLED (requires `flake.config` lookups, incompatible with plain modules)
+- Flake inputs DISABLED (nix-ai-tools, lazyvim, catppuccin-nix unreachable)
+- darwinConfigurations.blackphos.system **FAILS TO BUILD** (lazyvim integration broken)
+- 11 features disabled with Story 1.10C TODOs (SSH signing, MCP API keys, GLM wrapper, ccstatusline, tmux theme)
+
+**Party Mode Investigation (2025-11-14):**
+- Both reference implementations use Pattern A (gaetanlepage: single `core` aggregate, drupol: multi-aggregate `base`/`shell`/`desktop`)
+- Zero references use Pattern B (underscore workaround is test-clan invention)
+- Team unanimous (9/9 agents): Refactor to Pattern A immediately
+- Validation experiment recommended (1 hour) to prove Pattern A works in test-clan before full refactoring
+
+**Strategic Rationale:**
+- Refactoring cost ~8 hours (same as finishing Pattern B migrations would have been)
+- Restores full functionality (11 disabled features re-enabled)
+- Aligns with industry-standard pattern (both gaetanlepage and drupol references)
+- Unblocks Story 1.10C (secrets need modules with flake context for clan vars)
+- Fixes darwinConfigurations build failure (lazyvim accessible via flake.inputs)
+
+**Acceptance Criteria:**
+
+**A. Validation Experiment (Murat's 1-Hour Test):**
+1. Convert ONE module (git.nix) to Pattern A (drupol multi-aggregate dendritic)
+2. Create `development` aggregate namespace: `flake.modules.homeManager.development`
+3. Wrap git.nix in dendritic export: `flake.modules.homeManager.development = { config, pkgs, lib, flake, ... }: { programs.git = { ... }; }`
+4. Move `modules/home/_development/git.nix` → `modules/home/development/git.nix` (remove underscore)
+5. Import in crs58 user module: `config.flake.modules.homeManager.development`
+6. Build validation: `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage` succeeds
+7. If successful: Proceed with full refactoring (AC B-F)
+8. If fails: Analyze root cause (infinite recursion, evaluation errors), adjust approach
+
+**B. Aggregate Namespace Organization:**
+1. Define aggregate structure for 17 modules (following drupol pattern):
+   - `homeManager.development` (7 modules: git, jujutsu, neovim, wezterm, zed, starship, zsh)
+   - `homeManager.ai` (4 modules: claude-code, mcp-servers, wrappers, ccstatusline-settings)
+   - `homeManager.shell` (6 modules: atuin, yazi, zellij, tmux, bash, nushell)
+2. Remove underscore prefixes: `_development/` → `development/`, `_tools/` → `ai/` and `shell/`
+3. All modules auto-discovered by import-tree (no underscore prevention needed)
+4. Each module merges into aggregate namespace (multiple files → one namespace)
+
+**C. Refactor Existing Modules to Pattern A:**
+
+**Priority 1 modules (7 modules → development aggregate):**
+1. Wrap each module in dendritic export wrapper:
+   - Before: `{ config, pkgs, lib, ... }: { programs.git = { ... }; }`
+   - After: `{ flake.modules.homeManager.development = { config, pkgs, lib, flake, ... }: { programs.git = { ... }; }; }`
+2. Move modules: `_development/git.nix` → `development/git.nix` (all 7 modules)
+3. Preserve module content (move inside wrapper, no functional changes yet)
+4. Verify individual builds after each module refactoring
+
+**Priority 2 modules (4 modules → ai aggregate):**
+1. Wrap in `flake.modules.homeManager.ai = { ... }`
+2. Move: `_tools/claude-code/*.nix` → `ai/claude-code/*.nix`
+3. Restore disabled features (AC E) during refactoring
+
+**Priority 3 modules (6 modules → shell aggregate):**
+1. Wrap in `flake.modules.homeManager.shell = { ... }`
+2. Move: `_tools/atuin.nix`, `_tools/yazi.nix`, etc. → `shell/`
+3. Restore catppuccin-nix tmux integration (flake input now accessible)
+
+**D. Update User Modules to Import Aggregates:**
+
+**crs58 user module** (`modules/home/users/crs58/default.nix`):
+1. Change from relative imports to aggregate imports
+2. Before (Pattern B):
+   ```nix
+   imports = [
+     ../../_development/git.nix
+     ../../_development/jujutsu.nix
+     # ... 17 relative paths
+   ];
+   ```
+3. After (Pattern A):
+   ```nix
+   imports = with config.flake.modules.homeManager; [
+     development  # All 7 Priority 1 modules
+     ai           # All 4 Priority 2 modules
+     shell        # All 6 Priority 3 modules
+   ];
+   ```
+
+**raquel user module** (`modules/home/users/raquel/default.nix`):
+1. Selective aggregate imports (raquel doesn't need ai tools):
+   ```nix
+   imports = with config.flake.modules.homeManager; [
+     development  # git, starship, zsh, neovim
+     shell        # atuin, yazi, tmux, bash
+   ];
+   ```
+2. Verify raquel gets appropriate subset (no claude-code)
+
+**E. Restore Disabled Features (from Story 1.10B TODOs):**
+
+**SSH signing (git.nix, jujutsu.nix):**
+1. Re-enable sops-nix blocks (flake context now available via `flake` parameter)
+2. Use `flake.config` for user lookup pattern
+3. Prepare for Story 1.10C clan vars migration (working sops-nix → working clan vars)
+
+**MCP API keys (mcp-servers.nix):**
+1. Re-enable 3 disabled `sops.secrets` blocks (firecrawl, huggingface, context7)
+2. Re-enable 3 disabled `sops.templates` blocks
+3. Access flake.config for user lookup
+
+**GLM wrapper (wrappers.nix):**
+1. Re-enable entire GLM wrapper (sops.secrets + home.packages with writeShellApplication)
+2. Access flake.config for API key path
+
+**nix-ai-tools claude-code package (default.nix):**
+1. Uncomment: `package = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;`
+2. Access flake.inputs via `flake` parameter
+
+**ccstatusline (default.nix):**
+1. Investigate package availability (pkgs.ccstatusline or flake input)
+2. Re-enable if package source identified
+3. If unavailable: Document limitation, keep disabled
+
+**catppuccin-nix tmux theme (tmux.nix):**
+1. Re-integrate 36-line `catppuccin.tmux = { ... }` block removed in commit 6b7f33f
+2. Access catppuccin-nix flake input for home-manager module
+3. Restore: window styling, status bar separators, kubernetes module customizations
+
+**F. Build Validation:**
+
+**homeConfigurations validation:**
+1. `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage` SUCCEEDS
+2. `nix build .#homeConfigurations.aarch64-darwin.raquel.activationPackage` SUCCEEDS
+3. Verify all 17 modules integrated for crs58
+4. Verify 7 module subset for raquel (development + shell, no ai)
+
+**darwinConfigurations validation (CRITICAL FIX):**
+1. `nix build .#darwinConfigurations.blackphos.system` SUCCEEDS
+2. Lazyvim integration functional (flake.inputs.lazyvim accessible)
+3. Previous Pattern B failure: "option 'programs.lazyvim' does not exist" RESOLVED
+
+**Feature validation:**
+1. SSH signing configs present and accessible (sops-nix or clan vars ready)
+2. MCP servers with API keys functional (3 servers re-enabled)
+3. GLM wrapper operational (API key accessible)
+4. catppuccin tmux theme integrated (if flake input available)
+5. nix-ai-tools package integrated (if flake input configured)
+
+**G. Zero-Regression Validation:**
+1. Compare Pattern B vs Pattern A package lists:
+   - homeConfigurations.crs58: all Pattern B packages present + restored features
+   - No functionality lost from Pattern B
+   - All 11 disabled features restored (or documented if blocked by external factors)
+2. darwinConfigurations.blackphos: build succeeds (was failing in Pattern B)
+3. Test harness: All existing tests continue passing
+
+**H. Documentation:**
+
+**Refactoring documentation:**
+1. Pattern B → Pattern A transformation documented in work item
+2. Why Pattern B failed (11 limitations from Story 1.10B dev notes)
+3. How Pattern A solves issues (flake context access, aggregate namespaces)
+4. Aggregate organization rationale (development, ai, shell following drupol pattern)
+
+**Architecture updates:**
+1. Update `docs/notes/architecture/home-manager-architecture.md` with Pattern A as standard
+2. Document aggregate namespace pattern (multi-aggregate like drupol, not monolithic like gaetanlepage)
+3. Remove Pattern B references (underscore workaround was dead end)
+
+**Story 1.10B lessons learned:**
+1. Underscore workaround prevented import-tree discovery but blocked flake context
+2. Both reference implementations (gaetanlepage, drupol) use Pattern A for good reason
+3. Party Mode architectural review validated empirically (11 failures documented)
+4. Evidence-based decision-making prevented wasted effort on Pattern B migrations
+
+**Prerequisites:** Story 1.10B (done-with-limitations - provided empirical evidence of Pattern B architectural failures)
+
+**Blocks:** Story 1.10C (secrets migration needs working modules with flake context for clan vars integration)
+
+**Estimated Effort:** 8-10 hours
+- Validation experiment (AC A): 1 hour
+- Refactor Priority 1-3 modules to Pattern A (AC C): 5-6 hours
+- Update user modules + restore disabled features (AC D-E): 2-3 hours
+- Build validation + documentation (AC F-H): 1 hour
+
+**Risk Level:** Medium (refactoring 17 modules, but validation experiment de-risks, proven pattern from references)
+
+**Strategic Value:**
+- Restores 11 disabled features (SSH signing, MCP API keys, GLM wrapper, themes, custom packages)
+- Fixes darwinConfigurations.blackphos.system build failure (unblocks Story 1.12 physical deployment)
+- Aligns with industry-standard pattern (gaetanlepage + drupol both use Pattern A)
+- Unblocks Story 1.10C (secrets need modules with flake context for clan vars)
+- Validates Party Mode architectural review (unanimous 9/9 recommendation proven correct by empirical evidence)
+- Provides correct migration pattern for Epic 2-6 (4 more machines will use Pattern A)
+- Demonstrates evidence-based decision-making (Pattern B tried, failed, corrected based on data)
+
+**Note:** This story refactors work completed in Story 1.10B based on empirical evidence of architectural limitations. The Party Mode team's unanimous recommendation (9/9 agents, 2025-11-14) to refactor to Pattern A was validated by Story 1.10B's discovery of 11 disabled features and darwinConfigurations build failures.
+
+---
+
 ## Story 1.10C: Migrate Secrets from sops-nix to Clan Vars
 
 **⚠️ DISCOVERED STORY - Secrets Management Gap**
@@ -814,18 +1022,58 @@ Investigation (2025-11-14) revealed:
 
 **Investigation Reference:** Comprehensive secrets audit (2025-11-14) identified 6 sops-nix files, 0% clan vars coverage, Pattern B recommended for dendritic compatibility.
 
+**UPDATE (Post-Story 1.10BA):** Pattern B recommendation superseded - Story 1.10BA refactored to Pattern A (drupol multi-aggregate). This story will migrate secrets using modules with flake context (Pattern A provides `flake` parameter for clan vars access).
+
+**Prerequisites:** Story 1.10BA (home-manager modules refactored to Pattern A, flake context access restored, modules functional with sops-nix)
+
+**Blocks:** Story 1.12 (physical deployment needs functional secrets for SSH signing, API access)
+
+**Estimated Effort:** 4-6 hours
+- Clan vars setup + generators: 2 hours
+- Module access pattern updates (sops-nix → clan vars): 1-2 hours
+- Vars generation + validation: 1 hour
+- Documentation: 1 hour
+
+**Risk Level:** Medium-High (encryption concerns, new pattern, must preserve API keys)
+
+**Risk Mitigation:**
+- Backup `~/.config/sops/age/keys.txt` before migration
+- Test vars generation in separate branch first
+- Validate encryption before committing to git
+- Keep infra sops-nix secrets accessible for rollback
+
+**Strategic Value:**
+- Adopts clan-core recommended pattern (vars over raw sops-nix)
+- Validates Pattern B at scale (multiple secret types, multiple users)
+- Enables Epic 2-6 scalability (vars shared across 6 machines)
+- Proves dendritic + clan vars compatibility (Pattern A provides flake context for vars access)
+- Provides empirical data for Party Mode checkpoint (secrets at scale with Pattern A)
+
 ---
 
 ## Party Mode Checkpoint: Story 1.11 Evidence-Based Assessment
 
 **⚠️ ADAPTIVE DECISION POINT**
 
-After completing Stories 1.10B (51 home-manager modules) and 1.10C (secrets migration), reconvene Party Mode team to make evidence-based decision about Story 1.11 (Type-Safe Home-Manager Architecture) execution.
+After completing Stories 1.10BA (Pattern A refactoring) and 1.10C (secrets migration), reconvene Party Mode team to make evidence-based decision about Story 1.11 (Type-Safe Home-Manager Architecture) execution.
+
+**UPDATE (2025-11-14): Story 1.10B Empirical Evidence Validates Pattern A Decision**
+
+Story 1.10B implementation discovered **CRITICAL ARCHITECTURAL LIMITATIONS** of Pattern B (documented in dev notes lines 767-1031):
+- 11 features disabled (SSH signing, MCP API keys, themes, custom packages)
+- darwinConfigurations.blackphos.system **FAILS TO BUILD**
+- No flake context access (plain modules cannot access flake.inputs, overlays, or home-manager modules from flake inputs)
+- sops-nix completely incompatible (requires flake.config lookups)
+
+**Evidence-Based Decision:** Story 1.10BA inserted to refactor Pattern B → Pattern A before Story 1.10C.
+
+**Party Mode Checkpoint Updated:**
+After Stories 1.10BA + 1.10C complete, reconvene Party Mode to assess Story 1.11 (type-safe architecture) based on Pattern A implementation evidence (not Pattern B failures).
 
 **Rationale:**
 Story 1.11 proposes specific architectural pattern (homeHosts with type safety, smart resolution, machine-specific configs).
-This pattern was designed before implementing dendritic + clan synthesis at scale (51 modules + clan vars).
-After real implementation, we'll have empirical evidence to assess whether Story 1.11:
+This pattern was designed before implementing dendritic + clan synthesis at scale (Pattern A multi-aggregate + clan vars).
+After real Pattern A implementation, we'll have empirical evidence to assess whether Story 1.11:
 - Improves established patterns (GO)
 - Needs adjustment to fit actual patterns (MODIFY)
 - Adds unnecessary complexity (SKIP)
@@ -1053,14 +1301,14 @@ So that I have a production-ready, maintainable home-manager pattern for the ent
    - Development workflow: `nix run . -- crs58 . --dry`
 
 **Prerequisites:**
-- Story 1.10B (home-manager modules migrated - provides empirical evidence)
+- Story 1.10BA (home-manager modules refactored to Pattern A - provides working baseline with aggregate namespaces)
 - Story 1.10C (secrets migrated - completes configuration)
-- Party Mode Checkpoint (GO decision required to execute this story)
+- Party Mode Checkpoint (GO decision required to execute this story - assesses Pattern A implementation)
 
 **Blocks:** None (Story 1.12 blackphos deployment can proceed without this, but benefits from it)
 
 **Conditional Execution:**
-This story executes ONLY if Party Mode checkpoint (after Stories 1.10B + 1.10C) determines:
+This story executes ONLY if Party Mode checkpoint (after Stories 1.10BA + 1.10C) determines:
 - Story 1.11 provides clear value over established dendritic + clan patterns
 - homeHosts architecture aligns with (not conflicts with) proven patterns
 - Type safety, smart resolution, or CI checks address real issues encountered
@@ -1098,7 +1346,7 @@ I want to deploy the fully-migrated, well-architected blackphos configuration to
 So that I validate heterogeneous networking (nixos ↔ nix-darwin), prove multi-platform coordination, and complete Epic 1 architectural validation.
 
 **Context:**
-- Story 1.10B completed home-manager migration (51 modules, complete dev environment)
+- Story 1.10BA completed Pattern A refactoring (17 modules in multi-aggregate dendritic, full functionality restored)
 - Story 1.10C completed secrets migration (clan vars functional)
 - Story 1.11 MAY have implemented type-safe architecture (if Party Mode checkpoint GO)
 - Configuration is now complete, secrets functional, ready for physical deployment
@@ -1144,11 +1392,11 @@ So that I validate heterogeneous networking (nixos ↔ nix-darwin), prove multi-
 4. Heterogeneous networking validation results (latency, reliability, any issues)
 
 **Prerequisites:**
-- Story 1.10B (home-manager modules migrated - REQUIRED for complete configuration)
+- Story 1.10BA (home-manager modules refactored to Pattern A - REQUIRED for complete functional configuration)
 - Story 1.10C (secrets migrated - REQUIRED for SSH signing, API keys functional)
 - Story 1.11 (type-safe architecture - OPTIONAL, depends on Party Mode checkpoint decision)
 
-**Hard Dependencies:** Stories 1.10B + 1.10C must be complete (full config + secrets)
+**Hard Dependencies:** Stories 1.10BA + 1.10C must be complete (full config + secrets + working features)
 **Soft Dependency:** Story 1.11 improves deployment quality but not required for validation
 
 **Estimated Effort:** 4-6 hours
@@ -1161,10 +1409,10 @@ So that I validate heterogeneous networking (nixos ↔ nix-darwin), prove multi-
 **Strategic Value:**
 - Proves heterogeneous networking (nixos ↔ nix-darwin) works with complete configurations
 - Validates multi-platform coordination pattern for production fleet
-- Demonstrates dendritic pattern + clan-core works seamlessly across platforms
+- Demonstrates dendritic Pattern A + clan-core works seamlessly across platforms
 - Completes Epic 1 architectural validation with real darwin hardware
 
-**Note:** Story 1.10 established complete, well-architected configuration. This story focuses purely on deployment and integration testing. Minimal rework expected.
+**Note:** Story 1.10BA established complete, well-architected configuration with Pattern A. This story focuses purely on deployment and integration testing. Minimal rework expected.
 
 ---
 
