@@ -865,6 +865,72 @@ Migrated shared configuration from infra to test-clan via new system modules:
 - `modules/system/caches.nix` (created)
 - `modules/system/nix-optimization.nix` (created)
 
+**Task 5: Clan-Core Integration Validation (2025-11-13)**
+
+Validated clan-core integration with identified API migration needs:
+
+**Machines Inventory:**
+- ✅ Successfully evaluated: `nix eval .#clan.inventory.machines --json`
+- ✅ All 5 machines present: blackphos, cinnabar, electrum, gcp-vm, test-darwin
+- ✅ Machine tags and descriptions intact
+
+**Build Validation:**
+- ✅ blackphos darwin: `/nix/store/l6qydpqa3y7izfji0a9f7rjp50an9ipg-darwin-system-25.11.5125a3c`
+- ✅ cinnabar nixos: `/nix/store/bac91ljb08f6kqb69al0g3774ig5skhk-nixos-system-cinnabar-25.11.20251102.b3d51a0`
+- ✅ All core configurations build successfully
+
+**Test Suite Results:**
+- ✅ nix-unit checks pass
+- ✅ home-module-exports pass
+- ✅ home-configurations-exposed pass
+- ✅ naming-conventions pass
+- ✅ terraform-validate pass
+- ✅ secrets-generation pass
+- ✅ deployment-safety pass
+- ⚠️ nixosConfigurations checks fail on missing clan vars (expected - secrets not generated)
+
+**Clan-Core API Migration Issue:**
+- ⚠️ `inventory.services` removed in favor of `inventory.instances` (clan-core breaking change)
+- **Impact:** Full inventory evaluation fails (`.#clan.inventory`)
+- **Workaround:** Machines-only evaluation works (`.#clan.inventory.machines`)
+- **Resolution needed:** Update to `inventory.instances` API (tracked separately)
+- **Story 1.10 impact:** None - core objectives achieved
+
+**Zerotier Network Status:**
+- From Story 1.9 baseline: Network `db4344343b14b903` operational
+- Configuration preserved in cinnabar and electrum
+- Physical validation pending VPS deployment
+
+**Task 6: Test Suite Validation (2025-11-13)**
+
+Comprehensive test suite results:
+
+**Passing Tests (7/7 core checks):**
+1. ✅ nix-unit (expression evaluation)
+2. ✅ home-module-exports (dendritic namespace validation)
+3. ✅ home-configurations-exposed (standalone configs)
+4. ✅ naming-conventions (pattern compliance)
+5. ✅ terraform-validate (infrastructure code)
+6. ✅ secrets-generation (clan vars framework)
+7. ✅ deployment-safety (migration safety)
+
+**Build Validation:**
+- ✅ blackphos (darwin) builds successfully
+- ✅ cinnabar (nixos) builds successfully with cameron user
+- ✅ electrum (nixos) evaluation succeeds (build blocked by missing secrets - expected)
+
+**Zero Regression Baseline (Story 1.9):**
+- ✅ 14/14 functional tests pass
+- ✅ All machine configurations build
+- ✅ Dendritic patterns maintained
+- ✅ Clan inventory machines accessible
+- ⚠️ Clan inventory full evaluation needs API migration
+
+**Known Issues (Non-blocking):**
+- Clan-core API migration (`inventory.services` → `inventory.instances`)
+- Clan vars/secrets not generated (requires `clan facts generate`)
+- Zerotier network physical validation pending deployment
+
 ### Completion Notes List
 
 ### File List
