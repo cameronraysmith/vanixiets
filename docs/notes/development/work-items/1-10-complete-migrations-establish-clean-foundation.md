@@ -36,103 +36,103 @@ Three parallel investigations revealed critical insights:
 ### A. Complete blackphos Migration and Apply Shared Config to cinnabar
 
 **AC1: blackphos Migration Audit Complete**
-- [ ] Audit infra blackphos configuration vs test-clan blackphos configuration
-- [ ] Identify ALL remaining configuration not yet migrated (packages, services, system settings)
-- [ ] Document audit findings in story completion notes
-- [ ] Migration checklist created for remaining config
+- [x] Audit infra blackphos configuration vs test-clan blackphos configuration
+- [x] Identify ALL remaining configuration not yet migrated (packages, services, system settings)
+- [x] Document audit findings in story completion notes
+- [x] Migration checklist created for remaining config
 
 **AC2: All Remaining Configuration Migrated to test-clan**
-- [ ] All identified configuration migrated from infra to test-clan following dendritic patterns
-- [ ] Package list comparison validates zero regression (pre-migration vs post-migration)
-- [ ] All blackphos functionality preserved
+- [x] All identified configuration migrated from infra to test-clan following dendritic patterns
+- [x] Package list comparison validates zero regression (pre-migration vs post-migration)
+- [x] All blackphos functionality preserved
 
 **AC3: Shared vs Platform-Specific Configuration Identified and Documented**
-- [ ] Shared configuration identified: User identity (cameron/crs58), SSH keys, nix settings, caches, development tooling
-- [ ] Platform-specific darwin identified: Homebrew, GUI apps, macOS system defaults, touchID
-- [ ] Platform-specific nixos identified: Boot/disk config, systemd services, server-specific tools
-- [ ] Documentation created: Shared vs platform-specific configuration guidelines
+- [x] Shared configuration identified: User identity (cameron/crs58), SSH keys, nix settings, caches, development tooling
+- [x] Platform-specific darwin identified: Homebrew, GUI apps, macOS system defaults, touchID
+- [x] Platform-specific nixos identified: Boot/disk config, systemd services, server-specific tools
+- [x] Documentation created: Shared vs platform-specific configuration guidelines
 
 **AC4: cinnabar User Configuration Deployed**
-- [ ] cameron user added to cinnabar (username: cameron, preferred for new machines per CLAUDE.md)
-- [ ] SSH authorized keys for cameron configured
-- [ ] User shell (zsh), home directory (/home/cameron), admin privileges set
-- [ ] Portable home-manager module integrated: `flake.modules.homeManager."users/crs58"` (references crs58 identity)
-- [ ] SSH login as cameron validated: `ssh cameron@<cinnabar-ip>` works
-- [ ] Home-manager builds successfully for nixos: `nix build .#homeConfigurations.crs58.activationPackage`
+- [x] cameron user added to cinnabar (username: cameron, preferred for new machines per CLAUDE.md)
+- [x] SSH authorized keys for cameron configured
+- [x] User shell (zsh), home directory (/home/cameron), admin privileges set
+- [x] Portable home-manager module integrated: `flake.modules.homeManager."users/crs58"` (references crs58 identity)
+- [ ] SSH login as cameron validated: `ssh cameron@<cinnabar-ip>` works (PENDING VPS DEPLOYMENT)
+- [x] Home-manager builds successfully for nixos: `nix build .#homeConfigurations.crs58.activationPackage`
 
 **AC5: Migration Pattern Documented**
-- [ ] Shared vs platform-specific configuration guidelines documented
-- [ ] Migration checklist for reproducibility created
-- [ ] Pattern for applying user config across darwin/nixos documented
+- [x] Shared vs platform-specific configuration guidelines documented
+- [x] Migration checklist for reproducibility created
+- [x] Pattern for applying user config across darwin/nixos documented
 
 ### B. Apply Dendritic Pattern Refinements
 
 **AC6: File Length Compliance Validated**
-- [ ] Audit all modules for files >200 lines
-- [ ] Modularize if justified (extract reusable components)
-- [ ] Document any exceptions with rationale
+- [x] Audit all modules for files >200 lines
+- [x] Modularize if justified (extract reusable components)
+- [x] Document any exceptions with rationale
 
 **AC7: Pattern Compliance Enforced**
-- [ ] ALL files in modules/ directories are proper flake-parts modules
-- [ ] `_` prefix ONLY used for non-module data files (JSON, YAML, shell scripts)
-- [ ] Never use `_` prefix as shortcut for long flake-parts modules
-- [ ] Verification: `fd '^_' modules/` shows only non-module files
+- [x] ALL files in modules/ directories are proper flake-parts modules
+- [x] `_` prefix ONLY used for non-module data files (JSON, YAML, shell scripts)
+- [x] Never use `_` prefix as shortcut for long flake-parts modules
+- [x] Verification: `fd '^_' modules/` shows only non-module files
 
 **AC8: Module Organization Refined**
-- [ ] Clear separation: base modules, host-specific modules, user modules
-- [ ] Consistent namespace usage: `flake.modules.{darwin|nixos|homeManager}.*`
-- [ ] Reference gaetanlepage patterns for structure and composition
-- [ ] Architecture documentation updated with organization guidelines
+- [x] Clear separation: base modules, host-specific modules, user modules
+- [x] Consistent namespace usage: `flake.modules.{darwin|nixos|homeManager}.*`
+- [x] Reference gaetanlepage patterns for structure and composition
+- [x] Architecture documentation updated with organization guidelines
 
 **AC9: All Configurations Build Successfully**
-- [ ] darwinConfigurations build: `nix build .#darwinConfigurations.blackphos.system`
-- [ ] All nixosConfigurations build: `nix build .#nixosConfigurations.{cinnabar,electrum}.config.system.build.toplevel`
-- [ ] All homeConfigurations build: `nix build .#homeConfigurations.{crs58,raquel}.activationPackage`
+- [x] darwinConfigurations build: `nix build .#darwinConfigurations.blackphos.system`
+- [x] All nixosConfigurations build: `nix build .#nixosConfigurations.{cinnabar,electrum}.config.system.build.toplevel`
+- [x] All homeConfigurations build: `nix build .#homeConfigurations.{crs58,raquel}.activationPackage`
 
 ### C. Clan-Core Integration Validation
 
 **AC10: Clan-Core Compatibility Maintained**
-- [ ] `clan-core.inventory` structure unchanged (machine definitions, service instances)
-- [ ] Service instance registration via `clan-core.services.*` unchanged
-- [ ] `clan-core.vars.*` and `clan-core.secrets.*` access patterns unchanged
-- [ ] Zerotier network configuration interface unchanged
-- [ ] All clan machines build: `nix build .#clan.machines.{cinnabar,electrum,blackphos}.config.system.build.toplevel`
+- [x] `clan-core.inventory` structure unchanged (machine definitions, service instances)
+- [x] Service instance registration via `clan-core.services.*` unchanged
+- [x] `clan-core.vars.*` and `clan-core.secrets.*` access patterns unchanged
+- [x] Zerotier network configuration interface unchanged
+- [x] All clan machines build: `nix build .#clan.machines.{cinnabar,electrum,blackphos}.config.system.build.toplevel`
 
 **AC11: Zerotier Network Operational**
-- [ ] Cinnabar controller operational (network `db4344343b14b903` from Story 1.9)
-- [ ] Electrum peer operational
-- [ ] Clan inventory evaluates without errors: `nix eval .#clan.inventory --json | jq .machines`
+- [ ] Cinnabar controller operational (network `db4344343b14b903` from Story 1.9) (PENDING VPS DEPLOYMENT)
+- [ ] Electrum peer operational (PENDING VPS DEPLOYMENT)
+- [x] Clan inventory evaluates without errors: `nix eval .#clan.inventory --json | jq .machines`
 
 ### D. Test Coverage
 
 **AC12: Migration Validation Tests Pass**
-- [ ] blackphos package diff: zero regression validated (pre vs post migration)
-- [ ] cinnabar user login test: SSH as cameron works, home-manager activated (shell=zsh, ~/.config/ exists, git config present)
-- [ ] Home-manager builds for both platforms (darwin + nixos)
+- [x] blackphos package diff: zero regression validated (pre vs post migration)
+- [ ] cinnabar user login test: SSH as cameron works, home-manager activated (shell=zsh, ~/.config/ exists, git config present) (PENDING VPS DEPLOYMENT)
+- [x] Home-manager builds for both platforms (darwin + nixos)
 
 **AC13: Pattern Compliance Tests Pass**
-- [ ] All 14 regression tests from Story 1.9 continue passing
-- [ ] File length compliance verified
-- [ ] Module namespace consistency validated
+- [x] All 14 regression tests from Story 1.9 continue passing
+- [x] File length compliance verified
+- [x] Module namespace consistency validated
 
 **AC14: Integration Tests Pass**
-- [ ] Configurations build across all outputs
-- [ ] Clan inventory evaluates without errors
-- [ ] Full test suite passes: `nix flake check`
+- [x] Configurations build across all outputs
+- [x] Clan inventory evaluates without errors
+- [x] Full test suite passes: `nix flake check`
 
 ### E. Documentation
 
 **AC15: Migration Documentation Complete**
-- [ ] Shared vs platform-specific configuration pattern documented
-- [ ] blackphos migration checklist documented
-- [ ] cinnabar user configuration guide documented
-- [ ] Migration findings added to story completion notes
+- [x] Shared vs platform-specific configuration pattern documented
+- [x] blackphos migration checklist documented
+- [x] cinnabar user configuration guide documented
+- [x] Migration findings added to story completion notes
 
 **AC16: Dendritic Pattern Guidelines Documented**
-- [ ] File organization standards documented
-- [ ] Module composition patterns documented
-- [ ] Namespace hygiene rules documented
-- [ ] Reference to gaetanlepage exemplar patterns included
+- [x] File organization standards documented
+- [x] Module composition patterns documented
+- [x] Namespace hygiene rules documented
+- [x] Reference to gaetanlepage exemplar patterns included
 
 ---
 
@@ -654,26 +654,26 @@ This story contributes to Epic 1 success criteria:
 
 ## Definition of Done
 
-- [ ] blackphos migration audit complete (AC1)
-- [ ] All remaining configuration migrated to test-clan (AC2)
-- [ ] Shared vs platform-specific configuration identified and documented (AC3)
-- [ ] cinnabar user configuration deployed and validated (AC4)
-- [ ] Migration pattern documented (AC5)
-- [ ] File length compliance validated (AC6)
-- [ ] Pattern compliance enforced (AC7)
-- [ ] Module organization refined (AC8)
-- [ ] All configurations build successfully (AC9)
-- [ ] Clan-core compatibility maintained (AC10)
-- [ ] Zerotier network operational (AC11)
-- [ ] Migration validation tests pass (AC12)
-- [ ] Pattern compliance tests pass (AC13)
-- [ ] Integration tests pass (AC14)
-- [ ] Migration documentation complete (AC15)
-- [ ] Dendritic pattern guidelines documented (AC16)
-- [ ] All 7 implementation tasks completed
-- [ ] Story completion notes document all findings
-- [ ] Story 1.11 unblocked (clean foundation established for type-safe architecture)
-- [ ] Story 1.12 unblocked (cameron user on cinnabar enables heterogeneous networking validation)
+- [x] blackphos migration audit complete (AC1)
+- [x] All remaining configuration migrated to test-clan (AC2)
+- [x] Shared vs platform-specific configuration identified and documented (AC3)
+- [ ] cinnabar user configuration deployed and validated (AC4) - BUILD COMPLETE, SSH VALIDATION PENDING VPS DEPLOYMENT
+- [x] Migration pattern documented (AC5)
+- [x] File length compliance validated (AC6)
+- [x] Pattern compliance enforced (AC7)
+- [x] Module organization refined (AC8)
+- [x] All configurations build successfully (AC9)
+- [x] Clan-core compatibility maintained (AC10)
+- [ ] Zerotier network operational (AC11) - CONFIGURATION PRESERVED, PHYSICAL VALIDATION PENDING VPS DEPLOYMENT
+- [ ] Migration validation tests pass (AC12) - BUILDS PASS, SSH LOGIN TEST PENDING VPS DEPLOYMENT
+- [x] Pattern compliance tests pass (AC13)
+- [x] Integration tests pass (AC14)
+- [x] Migration documentation complete (AC15)
+- [x] Dendritic pattern guidelines documented (AC16)
+- [x] All 7 implementation tasks completed
+- [x] Story completion notes document all findings
+- [x] Story 1.11 unblocked (clean foundation established for type-safe architecture)
+- [ ] Story 1.12 unblocked (cameron user on cinnabar enables heterogeneous networking validation) - REQUIRES VPS DEPLOYMENT
 
 ---
 
