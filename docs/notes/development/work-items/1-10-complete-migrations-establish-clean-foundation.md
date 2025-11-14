@@ -27,7 +27,7 @@ Three parallel investigations revealed critical insights:
 
 **Critical Gap:** cinnabar (nixos server) currently has NO user configuration (only srvos defaults + zerotier). This blocks Story 1.12 (blackphos deployment) - can't validate heterogeneous networking without user logins. Also blocks type-safe architecture (Story 1.11) - needs finalized user modules.
 
-**Story Split Rationale:** Story 1.10 was split from original single story to optimize sizing (8-11h vs 18-27h original). This story focuses on completing migrations and establishing clean foundation. Story 1.11 implements type-safe home-manager architecture on this foundation.
+**Story Split Rationale:** Story 1.10 was split from original single story to optimize sizing (10-15h vs 18-27h original). This story focuses on completing migrations and establishing clean foundation. Story 1.11 implements type-safe home-manager architecture on this foundation.
 
 ---
 
@@ -53,10 +53,10 @@ Three parallel investigations revealed critical insights:
 - [ ] Documentation created: Shared vs platform-specific configuration guidelines
 
 **AC4: cinnabar User Configuration Deployed**
-- [ ] cameron user added to cinnabar (username: crs58 or cameron per platform convention)
+- [ ] cameron user added to cinnabar (username: cameron, preferred for new machines per CLAUDE.md)
 - [ ] SSH authorized keys for cameron configured
-- [ ] User shell (zsh), home directory, admin privileges set
-- [ ] Portable home-manager module integrated: `flake.modules.homeManager."users/crs58"`
+- [ ] User shell (zsh), home directory (/home/cameron), admin privileges set
+- [ ] Portable home-manager module integrated: `flake.modules.homeManager."users/crs58"` (references crs58 identity)
 - [ ] SSH login as cameron validated: `ssh cameron@<cinnabar-ip>` works
 - [ ] Home-manager builds successfully for nixos: `nix build .#homeConfigurations.crs58.activationPackage`
 
@@ -107,7 +107,7 @@ Three parallel investigations revealed critical insights:
 
 **AC12: Migration Validation Tests Pass**
 - [ ] blackphos package diff: zero regression validated (pre vs post migration)
-- [ ] cinnabar user login test: SSH as cameron works
+- [ ] cinnabar user login test: SSH as cameron works, home-manager activated (shell=zsh, ~/.config/ exists, git config present)
 - [ ] Home-manager builds for both platforms (darwin + nixos)
 
 **AC13: Pattern Compliance Tests Pass**
@@ -186,9 +186,16 @@ Three parallel investigations revealed critical insights:
   - Add missing environment variables
   - Add missing system-level configuration
 
+- [ ] **Subtask 2.3a:** Capture pre-migration baseline for zero-regression validation
+  - Generate blackphos package list (current test-clan): `nix-store -qR $(nix build .#darwinConfigurations.blackphos.system --no-link --print-out-paths) | sort > /tmp/blackphos-pre-migration-packages.txt`
+  - Save baseline for comparison in Subtask 2.4
+  - Document baseline capture in story completion notes
+
 - [ ] **Subtask 2.4:** Validate zero regression
   - Build test-clan blackphos: `nix build .#darwinConfigurations.blackphos.system`
-  - Generate package list comparison (pre vs post migration)
+  - Generate post-migration package list: `nix-store -qR $(nix build .#darwinConfigurations.blackphos.system --no-link --print-out-paths) | sort > /tmp/blackphos-post-migration-packages.txt`
+  - Compare with baseline from Subtask 2.3a: `diff /tmp/blackphos-pre-migration-packages.txt /tmp/blackphos-post-migration-packages.txt`
+  - Expected result: Identical (zero delta) or only expected additions from migration
   - Document package diff in story completion notes
   - Validate: zero regressions (all functionality preserved)
 
@@ -200,15 +207,20 @@ Three parallel investigations revealed critical insights:
 
 - [ ] **Subtask 3.1:** Add cameron user to cinnabar nixos configuration
   - Edit `~/projects/nix-workspace/test-clan/modules/machines/nixos/cinnabar/default.nix`
-  - Add user configuration: username (crs58 or cameron), UID, shell (zsh), admin privileges
+  - Add user configuration: username cameron (preferred for new machines), UID, shell (zsh), admin privileges
   - Configure SSH authorized keys for cameron
-  - Set home directory: `/home/crs58` or `/home/cameron`
+  - Set home directory: `/home/cameron`
+  - Note: home-manager module references crs58 identity (user-level config) but system username is cameron
   - Reference infra blackphos-nixos for shared user pattern
 
-- [ ] **Subtask 3.2:** Integrate portable home-manager module
-  - Import `config.flake.modules.homeManager."users/crs58"` in cinnabar config
-  - Configure home-manager settings for nixos integration
-  - Validate home-manager builds: `nix build .#homeConfigurations.crs58.activationPackage`
+- [ ] **Subtask 3.2:** Integrate portable home-manager module (nixos integrated mode)
+  - Add home-manager nixos module to cinnabar configuration imports
+  - Configure home-manager.users.cameron module to import `config.flake.modules.homeManager."users/crs58"`
+  - This integrates home-manager into nixosConfiguration (one of three supported modes from Story 1.8A)
+  - Set home-manager.users.cameron.home.username = "cameron"
+  - Set home-manager.users.cameron.home.homeDirectory = "/home/cameron"
+  - Validate home-manager builds: `nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel`
+  - Note: This is nixos-integrated mode (home-manager activated with system switch), not standalone mode
 
 - [ ] **Subtask 3.3:** Build and deploy cinnabar configuration
   - Build cinnabar: `nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel`
@@ -216,10 +228,12 @@ Three parallel investigations revealed critical insights:
   - Verify deployment successful
 
 - [ ] **Subtask 3.4:** Validate SSH login as cameron
-  - Test SSH login: `ssh cameron@<cinnabar-ip>` or `ssh crs58@<cinnabar-ip>`
+  - Test SSH login: `ssh cameron@<cinnabar-ip>`
   - Verify user shell (zsh), home directory exists
   - Verify home-manager activation successful
   - Verify admin privileges (sudo access)
+  - Verify home-manager activation: shell is zsh, ~/.config/ directory populated, git config accessible
+  - Verify packages from crs58 module available (git, gh, starship)
   - Document zerotier IP for future reference
 
 **Success Criteria:** cameron user operational on cinnabar, SSH login works, home-manager integrated, cross-platform user module reuse validated.
@@ -312,14 +326,14 @@ Three parallel investigations revealed critical insights:
   - Document blackphos migration checklist
   - Document cinnabar user configuration guide
   - Document cross-platform user module reuse pattern
-  - Save to appropriate docs location (architecture/ or development/)
+  - Save to `docs/notes/architecture/` (alongside dendritic-organization-patterns.md from investigations)
 
 - [ ] **Subtask 7.2:** Document dendritic pattern guidelines
   - Document file organization standards
   - Document module composition patterns
   - Document namespace hygiene rules
   - Reference gaetanlepage as exemplar pattern
-  - Save to architecture documentation
+  - Save to `docs/notes/architecture/` (dendritic pattern reference for Epic 2-6)
 
 - [ ] **Subtask 7.3:** Update story completion notes
   - Document audit findings (Task 1)

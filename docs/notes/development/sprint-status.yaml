@@ -108,7 +108,7 @@ development_status:
   # Review (2025-11-13): APPROVED - 3 advisory notes (documentation improvements), zero blockers
   1-9-rename-vms-cinnabar-electrum-establish-zerotier: done
   # Story 1.10: DRAFTED (2025-11-13) - Complete Migrations and Establish Clean Foundation
-  # Split from original 1.10 to optimize sizing (8-11h vs 18-27h original)
+  # Split from original 1.10 to optimize sizing (10-15h vs 18-27h original)
   # Completes blackphos migration, deploys cameron user to cinnabar, refines dendritic patterns
   # Critical: cinnabar user config BLOCKS Story 1.12 (heterogeneous networking validation)
   # Foundation for Story 1.11 (type-safe home-manager architecture)
