@@ -294,125 +294,340 @@ So that the test-clan infrastructure mirrors the production topology that will b
 
 ---
 
-## Story 1.10: Complete blackphos Migration and Establish Dendritic Pattern Foundation
+## Story 1.10: Complete Migrations and Establish Clean Foundation
 
 As a system administrator,
-I want to complete the blackphos migration from infra, refactor test-clan to exemplar dendritic patterns, and implement type-safe home-manager architecture,
-So that I establish a clean, well-architected foundation before deploying to hardware and validate patterns for Epic 2+ production refactoring.
+I want to complete the blackphos migration from infra, apply shared configuration to cinnabar, and refactor test-clan to exemplar dendritic patterns,
+So that I have complete, clean configurations ready for deployment and a solid foundation for type-safe home-manager architecture.
 
 **Context:**
 - Story 1.8/1.8A migrated blackphos configuration but did NOT migrate all configuration from infra repository
+- cinnabar (nixos server) currently has NO user configuration (only srvos defaults + zerotier)
 - Some configuration files growing too long without proper modularization
-- Dendritic pattern not consistently applied (some violations using `_` prefix as shortcut)
-- Must establish clean architectural foundation BEFORE deploying blackphos to physical hardware (Story 1.11)
-- This sets pattern quality baseline for Epic 2-6 (4 additional machines)
+- Dendritic pattern not consistently applied in all areas
+- Must complete migrations and establish clean foundation BEFORE implementing type-safe architecture (Story 1.11)
 
-**Critical Gap:** Deploying incomplete blackphos configuration in Story 1.11 would require multiple deploy-refactor-redeploy cycles (pure waste). Completing migration and refactoring NOW enables Story 1.11 to deploy complete, well-architected config once.
+**Critical Insight from Architecture Investigation:**
+infra's blackphos ↔ blackphos-nixos relationship shows "replica" means SHARED configuration (caches, nix settings, user identity, SSH keys) NOT identical configuration. cinnabar should share user configuration with blackphos (cameron/crs58 identity) but exclude platform-specific settings (homebrew, GUI, macOS defaults).
 
 **Architectural Reference:**
-- `docs/notes/development/home-manager-type-safe-architecture.md` - type-safe home-manager design
 - `~/projects/nix-workspace/gaetanlepage-dendritic-nix-config` - exemplar dendritic pattern
+- `docs/notes/architecture/dendritic-organization-patterns.md` - investigation findings
 - Maintain clan-core compatibility throughout (inventory, services, vars/secrets access)
 
 **Acceptance Criteria:**
 
-**A. Complete blackphos Migration from infra:**
-1. Audit infra blackphos configuration vs test-clan blackphos configuration
-2. Identify ALL remaining configuration not yet migrated (packages, services, system settings, etc.)
-3. Migrate all remaining configuration to test-clan following dendritic patterns
-4. Validate zero regression: Package list comparison (pre vs post migration)
-5. Document migration checklist for reproducibility
+**A. Complete blackphos Migration and Apply Shared Config to cinnabar:**
 
-**B. Apply Dendritic Pattern Refinements (nixos + nix-darwin + home-manager):**
-1. **File length compliance:** No files >200 lines without justified modularization
-2. **Pattern compliance:** ALL files in modules/ directories are proper flake-parts modules (not data files with `_` prefix escape hatch)
-3. **Use `_` prefix ONLY for:** Non-module data files (JSON, YAML, shell scripts), never as shortcut for long flake-parts modules
-4. **Module organization:** Clear separation (base modules, host-specific modules, user modules)
-5. **Namespace hygiene:** Consistent use of `flake.modules.*` namespace for imports
-6. **Reference validation:** Match gaetanlepage patterns for module structure and composition
+1. **blackphos Migration Audit:**
+   - Audit infra blackphos configuration vs test-clan blackphos configuration
+   - Identify ALL remaining configuration not yet migrated (packages, services, system settings, etc.)
+   - Migrate all remaining configuration to test-clan following dendritic patterns
+   - Validate zero regression: Package list comparison (pre vs post migration)
 
-**C. Type-Safe Home-Manager Architecture Implementation (Phases 1-5):**
+2. **Identify Shared vs Platform-Specific Configuration:**
+   - Shared: User identity (cameron/crs58), SSH keys, nix settings, caches, development tooling
+   - Platform-specific darwin: Homebrew, GUI apps, macOS system defaults, touchID
+   - Platform-specific nixos: Boot/disk config, systemd services, server-specific tools
 
-1. **Phase 1 - Type-safe layer (non-breaking):**
-   - `modules/flake/home-hosts.nix` created with options definition (homeHosts option + submodule types)
-   - `modules/home/core/default.nix` created providing base home-manager config
-   - `modules/home/generic-configs.nix` created with system-generic homeHosts declarations
-   - Existing `modules/home/configurations.nix` kept for parallel operation
-   - Test: One homeHost declared, verifies correct homeConfiguration generation
+3. **Configure cinnabar with Shared User Configuration:**
+   - Add cameron user to cinnabar (username: crs58 or cameron per platform convention)
+   - Configure SSH authorized keys for cameron
+   - Set user shell (zsh), home directory, admin privileges
+   - Integrate portable home-manager module: `flake.modules.homeManager."users/crs58"`
+   - Validate: SSH login as cameron works, home-manager builds for nixos
 
-2. **Phase 2 - Smart resolution app:**
-   - `modules/home/app.nix` enhanced with smart resolution logic (tries machine-specific → system-generic fallback)
-   - Help text updated to reflect new resolution strategy
-   - Test: App works with generic configs (backward compatibility)
-   - Test: Machine-specific config preferred when available
+4. **Document Migration Pattern:**
+   - Shared vs platform-specific configuration guidelines
+   - Migration checklist for reproducibility
+   - Pattern for applying user config across darwin/nixos
 
-3. **Phase 3 - Migrate to typed declarations:**
-   - `modules/home/users/*/default.nix` restructured to use `flake.modules.homeManager.user-*` namespace
-   - Machine-specific home configs created in `modules/machines/*/home/*.nix`
-   - homeHosts declared for all user@machine combinations (crs58-cinnabar, crs58-blackphos, raquel-blackphos)
-   - Validation: `nix flake check` passes all type checks
-   - Test: App resolution chain works correctly (auto-detects hostname, falls back gracefully)
+**B. Apply Dendritic Pattern Refinements:**
 
-4. **Phase 4 - Remove legacy generator:**
-   - `modules/home/configurations.nix` deleted
-   - Documentation and README.md updated with smart resolution examples
-   - All usage examples verified working
+1. **File Length Compliance:**
+   - Audit all modules for files >200 lines
+   - Modularize if justified (extract reusable components)
+   - Document any exceptions (with rationale)
 
-5. **Phase 5 - Advanced features:**
-   - CI checks added for homeConfiguration activation scripts (following mic92 pattern)
-   - Optional: Shared profile modules (homeManager.profile-desktop, profile-server) if valuable
-   - Optional: Tag-based conditional module application
+2. **Pattern Compliance:**
+   - ALL files in modules/ directories are proper flake-parts modules
+   - Use `_` prefix ONLY for non-module data files (JSON, YAML, shell scripts)
+   - Never use `_` prefix as shortcut for long flake-parts modules
 
-**D. Clan-Core Integration Validation:**
-1. Verify clan-core compatibility maintained throughout refactoring:
-   - `clan-core.inventory` structure for machine definitions (unchanged)
-   - Service instance registration via `clan-core.services.*` (unchanged)
-   - `clan-core.vars.*` and `clan-core.secrets.*` access patterns (unchanged)
-   - Zerotier network configuration interface (unchanged)
-2. Configuration builds successfully: `nix build .#darwinConfigurations.blackphos.system`
-3. All nixosConfigurations build: `nix build .#nixosConfigurations.{cinnabar,electrum}.config.system.build.toplevel`
+3. **Module Organization:**
+   - Clear separation: base modules, host-specific modules, user modules
+   - Consistent namespace usage: `flake.modules.{darwin|nixos|homeManager}.*`
+   - Reference gaetanlepage patterns for structure and composition
 
-**E. Test Coverage:**
-   - TC-020: homeHosts type validation (typo in username → compile error, invalid machine reference → assertion failure)
-   - TC-021: Smart resolution logic (machine-specific preferred, system-generic fallback, clear error messages)
-   - TC-022: All homeConfigurations build successfully
-   - TC-023: Activation scripts pass CI checks
-   - All existing regression tests passing (14/14 tests from Story 1.9)
+4. **Validation:**
+   - All configurations build: `nix build .#darwinConfigurations.blackphos.system`
+   - All nixosConfigurations build: `nix build .#nixosConfigurations.{cinnabar,electrum}.config.system.build.toplevel`
+   - All homeConfigurations build successfully
 
-**F. Documentation:**
-1. Pattern refinements documented (what changed, why, how to apply to other machines)
-2. Dendritic pattern compliance guidelines (for Epic 2+ machine migrations)
-3. Architectural decisions captured (type-safe home-manager rationale, module organization principles)
+**C. Clan-Core Integration Validation:**
 
-**Prerequisites:** Story 1.9 (VMs renamed, zerotier network established)
+1. **Verify Compatibility Maintained:**
+   - `clan-core.inventory` structure unchanged (machine definitions, service instances)
+   - Service instance registration via `clan-core.services.*` unchanged
+   - `clan-core.vars.*` and `clan-core.secrets.*` access patterns unchanged
+   - Zerotier network configuration interface unchanged
 
-**Estimated Effort:** 16-24 hours
-- 3-5 hours: Complete blackphos migration audit and execution
-- 4-6 hours: Apply dendritic pattern refinements across all modules
-- 9-14 hours: Type-safe home-manager architecture implementation (phases 1-5)
-- 2-3 hours: Validation, testing, documentation
+2. **Validate Configurations:**
+   - All clan machines build successfully
+   - Zerotier network operational (cinnabar controller, electrum peer)
+   - Clan inventory evaluates correctly
 
-**Risk Level:** Low-Medium (refactoring only, no physical deployment yet, test harness provides safety net)
+**D. Test Coverage:**
+
+1. **Migration Validation:**
+   - blackphos package diff: zero regression validated
+   - cinnabar user login test: SSH as cameron works
+   - Home-manager builds for both platforms (darwin + nixos)
+
+2. **Pattern Compliance:**
+   - All 14 regression tests from Story 1.9 continue passing
+   - File length compliance verified
+   - Module namespace consistency validated
+
+3. **Integration Tests:**
+   - Configurations build across all outputs
+   - Clan inventory evaluates without errors
+
+**E. Documentation:**
+
+1. **Migration Documentation:**
+   - Shared vs platform-specific configuration pattern
+   - blackphos migration checklist
+   - cinnabar user configuration guide
+
+2. **Dendritic Pattern Guidelines:**
+   - File organization standards
+   - Module composition patterns
+   - Namespace hygiene rules
+   - Reference to gaetanlepage exemplar patterns
+
+**Prerequisites:** Story 1.9 (VMs renamed cinnabar/electrum, zerotier network established)
+
+**Blocks:** Story 1.11 (type-safe home-manager architecture), Story 1.12 (blackphos deployment)
+
+**Estimated Effort:** 8-11 hours
+- 5-8 hours: Complete blackphos migration + cinnabar user configuration
+- 4-6 hours: Apply dendritic pattern refinements
+- Test coverage and validation included in above
+- 1 hour: Documentation
+
+**Risk Level:** Low (migration and refinement only, no physical deployment, test harness provides safety net)
 
 **Strategic Value:**
-- Eliminates deploy-then-rework waste (Story 1.11 can deploy complete config once)
-- Establishes clean dendritic patterns early (before Epic 2-6 add 4 more machines)
-- Validates gaetanlepage-level architecture with clan-core compatibility
-- Provides production-ready pattern and complete migration baseline for Epic 2+
-- Proves dendritic pattern refinement approach works before applying to production infra
+- Unblocks Story 1.12 (blackphos deployment) with complete, clean configuration
+- Establishes shared configuration pattern for Epic 2-6 (4 more machines)
+- Provides clean foundation for Story 1.11 (type-safe home-manager architecture)
+- Validates cross-platform user configuration sharing (darwin ↔ nixos)
+- Proves dendritic pattern refinement approach before production infra migration
 
-**Note:** This story establishes the architectural foundation. Story 1.11 becomes a streamlined deployment and integration test of mature, well-architected configuration.
+**Note:** This story completes migrations and establishes clean foundation. Story 1.11 implements type-safe home-manager architecture on this foundation.
 
 ---
 
-## Story 1.11: Deploy blackphos and Integrate into Zerotier Network
+## Story 1.11: Implement Type-Safe Home-Manager Architecture
+
+As a system administrator,
+I want to implement type-safe home-manager architecture with smart resolution and machine-specific configurations,
+So that I have a production-ready, maintainable home-manager pattern for the entire fleet (Epic 2-6) with compile-time validation and intelligent deployment.
+
+**Context:**
+- Story 1.10 completed migrations and established clean foundation (user modules finalized, clean codebase)
+- Current home-manager uses static generator (`configurations.nix`) - no type safety, no machine-specific configs
+- Need gaetanlepage-level type safety with mic92-style clan integration for production fleet (6 machines)
+- Must support three integration modes: darwin-integrated, nixos-integrated, standalone homeConfigurations
+
+**Architectural Reference:**
+- `docs/notes/development/home-manager-type-safe-architecture.md` - complete design and migration phases
+- `~/projects/nix-workspace/gaetanlepage-dendritic-nix-config/modules/flake/hosts.nix` - exemplar homeHosts pattern
+- `~/projects/nix-workspace/mic92-clan-dotfiles/home-manager/` - clan integration + CI checks pattern
+
+**Acceptance Criteria:**
+
+**A. Phase 1 - Type-Safe Layer (Non-Breaking):**
+
+1. **Create Type-Safe Options:**
+   - `modules/flake/home-hosts.nix` created with homeHosts option definition
+   - Submodule types: user, system, machine (optional), unstable, modules, pkgs (computed)
+   - Machine reference validation: asserts machine exists in clan.inventory if specified
+   - System auto-inheritance from machine if machine reference provided
+
+2. **Create Core Base Module:**
+   - `modules/home/core/default.nix` provides base home-manager config
+   - Exports to `flake.modules.homeManager.core` namespace
+   - Sets home.stateVersion, home.homeDirectory (platform-aware), programs.home-manager.enable
+
+3. **Create Generic Configurations:**
+   - `modules/home/generic-configs.nix` with system-generic homeHosts declarations
+   - Declares: crs58-x86_64-linux, crs58-aarch64-darwin, raquel-aarch64-darwin
+   - No machine references (portable for standalone usage)
+
+4. **Parallel Operation:**
+   - Keep existing `modules/home/configurations.nix` (non-breaking)
+   - Both old and new systems generate homeConfigurations simultaneously
+
+5. **Validation:**
+   - Declare one homeHost, verify homeConfiguration generated correctly
+   - Type checks pass: `nix flake check`
+   - Test homeConfiguration builds successfully
+
+**B. Phase 2 - Smart Resolution App:**
+
+1. **Enhance app.nix:**
+   - Implement smart resolution logic: tries machine-specific (user-hostname) → generic (user-system) fallback
+   - Use `nix flake show --json` for fast metadata query (checks available configs without building)
+   - Clear error messages showing what was tried, what's available
+
+2. **Update Help Text:**
+   - Document smart resolution strategy
+   - Examples: auto-detection, explicit config name, different user
+   - Show current context (user, host, system)
+
+3. **Validation:**
+   - App works with generic configs (backward compatibility tested)
+   - Machine-specific config preferred when both exist
+   - Fallback to generic works gracefully
+   - Error messages clear and actionable
+
+**C. Phase 3 - Migrate to Typed Declarations:**
+
+1. **Restructure User Modules:**
+   - `modules/home/users/crs58/default.nix` exports to `flake.modules.homeManager.user-crs58`
+   - `modules/home/users/raquel/default.nix` exports to `flake.modules.homeManager.user-raquel`
+   - User modules contain only cross-platform user identity config
+
+2. **Create Machine-Specific Home Configs:**
+   - `modules/machines/darwin/blackphos/home/crs58.nix` - declares homeHosts.crs58-blackphos
+   - `modules/machines/darwin/blackphos/home/raquel.nix` - declares homeHosts.raquel-blackphos
+   - `modules/machines/nixos/cinnabar/home/crs58.nix` - declares homeHosts.crs58-cinnabar
+   - Optional: electrum, other machines as needed
+
+3. **homeHosts Declarations:**
+   - crs58-cinnabar: user = "crs58", machine = "cinnabar", modules = [machine-specific overrides]
+   - crs58-blackphos: user = "crs58", machine = "blackphos", modules = [admin config]
+   - raquel-blackphos: user = "raquel", machine = "blackphos", modules = [primary user config]
+
+4. **Validation:**
+   - `nix flake check` passes all type checks
+   - App resolution chain works: auto-detects hostname, falls back gracefully
+   - All homeConfigurations build successfully
+
+**D. Phase 4 - Remove Legacy Generator:**
+
+1. **Delete Legacy:**
+   - Remove `modules/home/configurations.nix` (replaced by homeHosts)
+   - Verify no references remain in codebase
+
+2. **Update Documentation:**
+   - README.md updated with smart resolution examples
+   - Migration guide for adding new users/machines
+   - All usage examples verified working
+
+3. **Validation:**
+   - All homeConfigurations still available (via homeHosts)
+   - App continues working (uses new typed system)
+   - Zero regressions in functionality
+
+**E. Phase 5 - Advanced Features:**
+
+1. **CI Checks (following mic92 pattern):**
+   - Add checks for homeConfiguration activation scripts
+   - Validates configs build and activate without runtime testing
+   - Integrated into `modules/checks/validation.nix`
+
+2. **Optional Profile Modules:**
+   - Create `flake.modules.homeManager.profile-desktop` if valuable
+   - Create `flake.modules.homeManager.profile-server` if valuable
+   - Enable composition: user module + profile module + machine overrides
+
+3. **Optional Tag-Based Conditional Application:**
+   - If useful, enable conditional module application based on clan machine tags
+   - Example: desktop tag → auto-apply desktop profile
+
+**F. Test Coverage:**
+
+1. **Type Validation (TC-020):**
+   - Typo in username → compile error (undefined user-* module)
+   - Invalid machine reference → assertion failure with clear message
+   - Missing required options → evaluation error
+
+2. **Smart Resolution Logic (TC-021):**
+   - Machine-specific preferred when available
+   - System-generic fallback works correctly
+   - Error messages clear when no match found
+   - Shows tried candidates and available options
+
+3. **Build Validation (TC-022):**
+   - All homeConfigurations build successfully
+   - Generic configs work (crs58-x86_64-linux, etc.)
+   - Machine-specific configs work (crs58-cinnabar, crs58-blackphos, raquel-blackphos)
+
+4. **Activation Scripts (TC-023):**
+   - CI checks pass for all homeConfigurations
+   - Activation scripts valid (mic92 pattern)
+
+5. **Regression:**
+   - All 14 existing tests from Story 1.9/1.10 continue passing
+   - Zero regressions in functionality
+
+**G. Documentation:**
+
+1. **Architecture Documentation:**
+   - Type-safe home-manager rationale (why homeHosts pattern)
+   - gaetanlepage influence (type safety) + mic92 influence (clan integration)
+   - Benefits for fleet management (6 machines)
+
+2. **Migration Guide:**
+   - How to add new user (create user module, declare homeHosts)
+   - How to add new machine (create machine-specific home config)
+   - How to add profile modules (shared configurations)
+
+3. **Usage Examples:**
+   - Auto-detection workflow: `nix run .`
+   - Explicit config: `nix run . -- crs58-cinnabar`
+   - Different user: `nix run . -- raquel`
+   - Development workflow: `nix run . -- crs58 . --dry`
+
+**Prerequisites:** Story 1.10 (migrations complete, clean foundation established, user modules finalized)
+
+**Blocks:** None (Story 1.12 blackphos deployment can proceed without this, but benefits from it)
+
+**Estimated Effort:** 10-16 hours
+- Phase 1: Type-safe layer (3 hours)
+- Phase 2: Smart resolution app (2 hours)
+- Phase 3: Migrate to typed declarations (5 hours)
+- Phase 4: Remove legacy generator (1 hour)
+- Phase 5: Advanced features (2-3 hours)
+- Test coverage: 2-3 hours (distributed across phases)
+- Documentation: 2-3 hours
+
+**Risk Level:** Low-Medium (refactoring home-manager architecture, but test harness + phase 1 parallel operation provides safety net)
+
+**Strategic Value:**
+- Establishes production-ready type-safe home-manager pattern for Epic 2-6 (all 6 machines)
+- Compile-time validation prevents typos and configuration errors
+- Smart resolution improves deployment UX across entire fleet
+- Machine-specific configs enable per-machine customization without duplication
+- gaetanlepage-level type safety with mic92-style clan integration
+- Sets pattern quality baseline for production infra refactoring
+
+**Note:** Phases 1-2 are non-breaking (parallel operation). Phase 3 migrates to typed system. Phase 4 removes legacy. Phase 5 adds advanced features.
+
+---
+
+## Story 1.12: Deploy blackphos and Integrate into Zerotier Network
 
 As a system administrator,
 I want to deploy the fully-migrated, well-architected blackphos configuration to physical hardware and integrate into the test-clan zerotier network,
 So that I validate heterogeneous networking (nixos ↔ nix-darwin), prove multi-platform coordination, and complete Epic 1 architectural validation.
 
 **Context:**
-- Story 1.10 completed blackphos migration, dendritic pattern refinements, and type-safe home-manager architecture
+- Story 1.10 completed blackphos migration, cinnabar user configuration, and dendritic pattern refinements
+- Story 1.11 implemented type-safe home-manager architecture (optional but recommended)
 - Configuration is now complete, well-architected, and ready for deployment
 - This story is streamlined deployment + integration test (no refactoring, minimal rework)
 
@@ -455,7 +670,9 @@ So that I validate heterogeneous networking (nixos ↔ nix-darwin), prove multi-
 3. Platform-specific challenges captured (if any)
 4. Heterogeneous networking validation results (latency, reliability, any issues)
 
-**Prerequisites:** Story 1.10 (blackphos migration complete, dendritic patterns established, type-safe home-manager architecture implemented)
+**Prerequisites:** Story 1.10 (blackphos migration complete, cinnabar user configured, dendritic patterns established)
+
+**Optional Prerequisites:** Story 1.11 (type-safe home-manager architecture - enhances but not required for deployment)
 
 **Estimated Effort:** 4-6 hours
 - 1-2 hours: Physical deployment and validation
@@ -470,11 +687,11 @@ So that I validate heterogeneous networking (nixos ↔ nix-darwin), prove multi-
 - Demonstrates dendritic pattern + clan-core works seamlessly across platforms
 - Completes Epic 1 architectural validation with real darwin hardware
 
-**Note:** With Story 1.10 establishing complete, well-architected configuration, this story focuses purely on deployment and integration testing. Minimal rework expected.
+**Note:** Story 1.10 established complete, well-architected configuration. This story focuses purely on deployment and integration testing. Minimal rework expected.
 
 ---
 
-## Story 1.12: Document Integration Findings and Architectural Patterns
+## Story 1.13: Document Integration Findings and Architectural Patterns
 
 As a system administrator,
 I want to document all integration findings, architectural patterns, and lessons learned from Epic 1 Phase 0 validation,
@@ -482,18 +699,19 @@ So that I have a comprehensive reference and decision framework for production r
 
 **Context:**
 - Epic 1 validation complete: nixos VMs deployed, dendritic patterns proven, darwin integration validated
-- Type-safe home-manager architecture implemented and tested
-- Heterogeneous zerotier networking operational across platforms
+- Story 1.10: Migrations complete, dendritic patterns refined, cinnabar user configured
+- Story 1.11: Type-safe home-manager architecture implemented (if completed)
+- Story 1.12: blackphos deployed, heterogeneous zerotier networking operational
 - Now consolidate findings into actionable documentation for production refactoring
 
 **Acceptance Criteria:**
 
 **A. Integration Findings Documentation:**
 1. Terraform/terranix + clan integration patterns documented (how it works, gotchas, best practices)
-2. Dendritic flake-parts pattern evaluation documented (proven via Stories 1.6-1.7, refinements from Story 1.10)
-3. Nix-darwin + clan integration patterns documented (learned from Stories 1.8, 1.10, 1.11)
-4. Type-safe home-manager architecture documented (implemented Story 1.10, validated Story 1.11)
-5. Heterogeneous zerotier networking documented (nixos ↔ nix-darwin from Story 1.11)
+2. Dendritic flake-parts pattern evaluation documented (proven via Stories 1.6-1.7, refined in Story 1.10)
+3. Nix-darwin + clan integration patterns documented (learned from Stories 1.8, 1.10, 1.12)
+4. Type-safe home-manager architecture documented (implemented Story 1.11 if completed, or future work)
+5. Heterogeneous zerotier networking documented (nixos ↔ nix-darwin from Story 1.12)
 6. Nixos-unified → dendritic + clan transformation process documented (from Stories 1.8, 1.10)
 
 **B. Architectural Decisions Documentation:**
@@ -525,7 +743,9 @@ For each pattern, assess confidence level and evidence:
 3. Areas requiring additional investigation identified
 4. Technical debt or pattern violations noted (to address in Epic 2+)
 
-**Prerequisites:** Story 1.11 (blackphos deployed, heterogeneous networking validated)
+**Prerequisites:** Story 1.12 (blackphos deployed, heterogeneous networking validated)
+
+**Optional Prerequisites:** Story 1.11 (type-safe home-manager architecture - if completed, document it)
 
 **Estimated Effort:** 3-4 hours (documentation consolidation and review)
 
@@ -535,11 +755,11 @@ For each pattern, assess confidence level and evidence:
 - Provides comprehensive blueprint for production refactoring based on complete validation
 - Captures institutional knowledge from Phase 0 experimentation
 - De-risks Epic 2-6 by documenting proven patterns and known limitations
-- Enables informed go/no-go decision in Story 1.13
+- Enables informed go/no-go decision in Story 1.14
 
 ---
 
-## Story 1.13: Execute go/no-go decision framework for production refactoring
+## Story 1.14: Execute go/no-go decision framework for production refactoring
 
 As a system administrator,
 I want to evaluate Phase 0 results against go/no-go criteria,
@@ -554,17 +774,17 @@ So that I can make an informed decision about proceeding to production refactori
 6. Next steps clearly defined based on decision outcome
 
 **Context:**
-- Epic 1 Phase 0 validation complete (Stories 1.1-1.12)
-- Documentation consolidated in Story 1.12
+- Epic 1 Phase 0 validation complete (Stories 1.1-1.13)
+- Documentation consolidated in Story 1.13
 - Ready to assess results against decision criteria
 
-**Prerequisites:** Story 1.12 (integration findings and patterns documented)
+**Prerequisites:** Story 1.13 (integration findings and patterns documented)
 
 **Estimated Effort:** 1-2 hours
 
 **Risk Level:** Low (decision only)
 
-**Decision Criteria - GO if:** Hetzner VMs deployed and operational, Dendritic flake-parts pattern proven with zero regressions (Stories 1.6-1.7, 1.10), Blackphos successfully migrated with complete configuration (Stories 1.8, 1.10, 1.11), Heterogeneous zerotier network operational (nixos + darwin, Story 1.11), Transformation pattern documented and reusable (Story 1.12), Type-safe home-manager architecture validated (Story 1.10, 1.11), High confidence in applying patterns to production
+**Decision Criteria - GO if:** Hetzner VMs deployed and operational, Dendritic flake-parts pattern proven with zero regressions (Stories 1.6-1.7, 1.10), Blackphos successfully migrated with complete configuration (Stories 1.8, 1.10, 1.12), cinnabar configured with shared user configuration (Story 1.10), Heterogeneous zerotier network operational (nixos + darwin, Story 1.12), Transformation pattern documented and reusable (Story 1.13), Type-safe home-manager architecture validated (Story 1.11 if completed, or acceptable to defer), High confidence in applying patterns to production
 
 **Decision Criteria - CONDITIONAL GO if:** Minor platform-specific issues discovered but workarounds documented, Some manual steps required but acceptable, Partial automation acceptable with documented procedures, Medium-high confidence in production refactoring
 
