@@ -425,7 +425,138 @@ infra's blackphos ↔ blackphos-nixos relationship shows "replica" means SHARED 
 - Validates cross-platform user configuration sharing (darwin ↔ nixos)
 - Proves dendritic pattern refinement approach before production infra migration
 
-**Note:** This story completes migrations and establishes clean foundation. Story 1.11 implements type-safe home-manager architecture on this foundation.
+**Note:** This story completes migrations and establishes clean foundation. Story 1.10A validates clan inventory pattern. Story 1.11 implements type-safe home-manager architecture on this foundation.
+
+---
+
+## Story 1.10A: Migrate User Management to Clan Inventory Pattern
+
+**⚠️ DISCOVERED STORY - Architectural Validation Enhancement**
+
+As a system administrator,
+I want to refactor cinnabar user configuration from direct NixOS to clan inventory users service with vars-based password management,
+So that I validate the clan-core recommended pattern before Epic 2-6 scaling and establish the fleet-wide user management architecture.
+
+**Context:**
+- Story 1.10 COMPLETE: cameron user exists on cinnabar via direct NixOS configuration (users.users.cameron)
+- Party-mode architectural review (2025-11-14) revealed clan-core provides official inventory users service pattern
+- Investigation findings show clan inventory + vars provides 5-10x productivity improvement for multi-machine/multi-user deployments
+- Current direct NixOS pattern works but doesn't scale optimally for Epic 2-6 (6 machines × 4+ users)
+- Test-clan's purpose is to validate clan-core patterns before infra migration
+
+**Architectural Investigation Findings:**
+
+1. **Clan-Core Provides Official Users Service:**
+   - `clanServices/users/` implements declarative user management
+   - Automatic password generation via vars system (xkcdpass)
+   - `share = true` enables identical passwords across machines
+   - `extraModules` pattern integrates home-manager
+
+2. **Proven Developer Patterns:**
+   - pinpox-clan-nixos: 8 machines × 3 users via 2 inventory declarations
+   - mic92-clan-dotfiles: 9 machines, 128 secrets managed declaratively
+   - qubasa-clan-infra: Complex multi-file generators (nextcloud, vaultwarden)
+
+3. **Dendritic + Inventory Compatibility:**
+   - Fully compatible (validated in test-clan, nixpkgs.molybdenum.software-dendritic-clan)
+   - Clan-core provides native flake-parts integration
+   - Import-tree auto-discovers inventory modules
+
+4. **Vars vs Direct sops-nix:**
+   - Vars: Declarative generation, automatic encryption, dependency composition
+   - Epic 2-6 scaling: 30 min vs 2-4 hours for adding 4 machines
+   - Incremental migration: Use vars for user passwords, keep sops.secrets for services
+
+**Strategic Rationale:**
+- Refactor cost is constant (same effort now or later)
+- Easier with 1 machine (cinnabar) than 5 machines later
+- Epic 2-6 will save 6-12 hours with inventory pattern
+- Test-clan validates clan-core patterns (mission alignment)
+
+**Acceptance Criteria:**
+
+**A. Inventory User Instances Definition:**
+1. Create `modules/clan/inventory/services/users.nix`:
+   - Define `user-cameron` inventory instance
+   - Module: `{ name = "users"; input = "clan-core"; }`
+   - Role targeting: `roles.default.tags.all = { };` (all machines)
+   - Settings: `user = "cameron"`, `groups = ["wheel" "networkmanager"]`, `share = true`, `prompt = false`
+   - extraModules: Reference user overlay file
+
+2. User overlay created in `modules/clan/inventory/services/users/cameron.nix`:
+   - Shell preference (users.users.cameron.shell = pkgs.zsh)
+   - Home-manager integration via extraModules pattern
+   - Platform-specific configuration not handled by users service
+
+**B. Direct NixOS Configuration Removal:**
+1. Remove `users.users.cameron` from `modules/machines/nixos/cinnabar/default.nix`
+2. Remove home-manager.users.cameron from machine config (now in overlay)
+3. Verify no duplicate user definitions remain
+
+**C. Vars System Validation:**
+1. Vars generated: `clan vars generate cinnabar` (or automatic during deployment)
+2. User password vars created in `vars/shared/user-password-cameron/`:
+   - `user-password/secret` (encrypted password)
+   - `user-password-hash/secret` (encrypted hash for NixOS)
+3. SOPS encryption validated: `file vars/shared/user-password-cameron/user-password/secret` shows JSON data
+4. Deployment test: `/run/secrets/vars/user-password-cameron/user-password-hash` exists on cinnabar
+
+**D. Functional Validation:**
+1. SSH login works: `ssh cameron@cinnabar` (via zerotier or public IP)
+2. Home-manager activated: `ssh cameron@cinnabar "echo \$SHELL"` shows zsh
+3. Sudo access works: cameron in wheel group, passwordless sudo configured
+4. User identity preserved: git config, SSH keys, development environment intact
+
+**E. Test Coverage:**
+1. All 14 existing regression tests from Story 1.9/1.10 continue passing
+2. New vars validation tests (TC-024):
+   - Vars list test: `clan vars list cinnabar | grep user-password-cameron`
+   - SOPS encryption test: Verify secret files are encrypted JSON
+   - Deployment test: Verify /run/secrets populated correctly
+   - Home-manager integration test: Verify shell, configs activated
+
+**F. Documentation:**
+1. Architecture decision documented in `docs/notes/architecture/user-management.md`:
+   - Inventory users service pattern (how it works)
+   - Vars system for password management (automatic generation, encryption)
+   - Party-mode investigation findings summary
+   - Rationale for inventory adoption (scalability for Epic 2-6)
+
+2. Operational guide in `docs/guides/adding-users.md`:
+   - How to add new user to inventory (define instance, create overlay)
+   - How to generate vars for new machines
+   - How to deploy user configuration
+   - Examples for Epic 2-6 (argentum, rosegold, stibnite)
+
+**Prerequisites:** Story 1.10 (cameron user exists via direct NixOS, working baseline established)
+
+**Blocks:** None (Story 1.11 can proceed, but benefits from this foundation)
+
+**Estimated Effort:** 3-4 hours
+- 1 hour: Create inventory instances and user overlay files
+- 1 hour: Remove direct NixOS config, validate builds
+- 1 hour: Generate vars, test deployment, validate SSH/home-manager
+- 0.5 hour: Update test harness with vars validation tests
+- 0.5 hour: Documentation (architecture decision, operational guide)
+
+**Risk Level:** Low (refactoring only, Story 1.10 baseline working, test harness provides safety net)
+
+**Strategic Value:**
+- Validates clan-core inventory pattern before Epic 2-6 (4 more machines)
+- Establishes fleet-wide user management architecture (6 machines × 4+ users)
+- Proves vars system scalability for password management
+- Demonstrates dendritic + inventory compatibility (test-clan mission)
+- Saves 6-12 hours in Epic 2-6 deployment time
+- Provides concrete example for infra migration (Epic 2+ reference)
+
+**Party-Mode Investigation Evidence:**
+- Clan-core docs investigation: Official users service architecture
+- clan-infra pattern analysis: Direct NixOS (pragmatic) vs inventory (recommended)
+- Developer repos analysis: Proven inventory patterns at scale
+- Vars vs sops-nix comparison: 5-10x productivity improvement
+- Dendritic compatibility validation: Full compatibility confirmed
+
+**Note:** This story discovered during Story 1.10 party-mode review (2025-11-14). Separates architectural pattern validation from user creation baseline. Story 1.10 establishes "user works", Story 1.10A validates "clan inventory pattern works".
 
 ---
 
