@@ -494,9 +494,10 @@ No debug issues encountered. Implementation proceeded smoothly following story c
 All 6 tasks completed successfully:
 
 1. **Task 1 (AC1-AC2):** Created inventory user instance
-   - `modules/clan/inventory/services/users.nix` with user-cameron instance
-   - Inline extraModules overlay for shell (zsh) and home-manager integration
-   - Fleet-wide deployment via `roles.default.tags.all`
+   - `modules/clan/inventory/services/users.nix` with user-cameron and user-crs58 instances
+   - Two-instance pattern: cameron (nixos machines), crs58 (darwin machines)
+   - Machine-specific targeting (not tags.all to avoid incorrect darwin deployments)
+   - Inline extraModules overlay for shell (zsh), SSH keys, and home-manager integration
    - Build verified: `/nix/store/kmcznclxddvl7pmagy7n0i18a95c2dr3-nixos-system-cinnabar`
 
 2. **Task 2 (AC3):** Removed direct NixOS configuration
@@ -511,11 +512,14 @@ All 6 tasks completed successfully:
    - SOPS encryption validated: JSON format with AES256_GCM
    - Added home-manager.nixosModules.home-manager to extraModules for compatibility
 
-4. **Task 4 (AC6-AC7):** Functional validation DEFERRED
-   - VPS deployment pending (per Story 1.10 notes)
-   - AC6-AC7 require actual cinnabar VPS deployment for SSH login/home-manager validation
-   - Local validation complete (build outputs, vars generation, test suite)
-   - Pattern established correctly for Epic 2-6 scaling
+4. **Task 4 (AC6-AC7):** Functional validation COMPLETE
+   - Deployed to cinnabar VPS via `clan machines update cinnabar`
+   - SSH login verified: `ssh cameron@49.13.68.78` (successful login)
+   - Shell verified: `echo $SHELL` returns `/run/current-system/sw/bin/zsh`
+   - Sudo verified: `sudo -n true` (passwordless sudo works)
+   - Git config verified: `git config --get user.name` returns "Cameron Smith"
+   - Home-manager packages verified: `which gh` and `which starship` both present
+   - Pattern validated end-to-end on actual VPS infrastructure
 
 5. **Task 5 (AC8-AC9):** Updated test harness
    - All existing tests passing (nix flake check - 10 checks total)
@@ -533,8 +537,13 @@ All 6 tasks completed successfully:
 **Key Decisions:**
 
 - **Inline extraModules:** Used inline overlay pattern instead of separate file to avoid nix store path issues during flake evaluation
-- **Home-manager import:** Added `inputs.home-manager.nixosModules.home-manager` to extraModules to ensure compatibility across all machine evaluations
+- **Home-manager import:** Added `inputs.home-manager.nixosModules.home-manager` to extraModules; works cross-platform via common.nix
 - **TC-024 test approach:** Checked vars files directly (file existence, SOPS structure) instead of running clan CLI in sandbox (which requires writable /homeless-shelter/.cache)
+- **SSH keys critical:** SSH authorized keys must be in extraModules (clan users service doesn't provide SSH key settings)
+- **Two-instance pattern:** Separate user-cameron (nixos) and user-crs58 (darwin) instances to handle username differences across platforms
+- **Machine-specific targeting:** Use `roles.default.machines.*` instead of `tags.all` to avoid deploying wrong usernames to darwin machines
+- **Home directory auto-detection:** Trust crs58 module's conditional logic (pkgs.stdenv.isDarwin) instead of hardcoding paths
+- **Darwin compatibility:** Clan users service is currently NixOS-only, but extraModules provide cross-platform user config (forward-compatible pattern)
 
 **Zero Regression Validated:**
 
@@ -546,7 +555,11 @@ All 6 tasks completed successfully:
 
 **test-clan repository (implementation):**
 
-- `modules/clan/inventory/services/users.nix` (NEW): User inventory instance
+- `modules/clan/inventory/services/users.nix` (NEW): User inventory instances (user-cameron, user-crs58)
+  - Two-instance pattern for cross-platform deployment
+  - Machine-specific targeting (cinnabar, electrum, blackphos active)
+  - Future machines commented (argentum, rosegold, stibnite)
+  - Darwin compatibility documented
 - `modules/machines/nixos/cinnabar/default.nix` (MODIFIED): Removed direct user config
 - `modules/checks/validation.nix` (MODIFIED): Added TC-024 vars validation test
 - `vars/shared/user-password-cameron/user-password/secret` (NEW): SOPS-encrypted password
@@ -563,19 +576,31 @@ All 6 tasks completed successfully:
 
 ## Change Log
 
+### 2025-11-14 - Post-Review Improvements and Validation
+- Functional validation COMPLETE: Deployed to cinnabar VPS, all AC6-AC7 verified
+- SSH login, shell (zsh), sudo, git config, home-manager packages all working
+- Additional improvements after initial review:
+  - `6364610`: CRITICAL FIX - Added SSH authorized keys to user overlay (was missing!)
+  - `08fa6dd`: Two-instance pattern (user-cameron for nixos, user-crs58 for darwin)
+  - `04301ef`: Commented future machines (argentum, rosegold, stibnite)
+  - `f28ccb1`: Removed unused function arguments (config, lib) - cleaner code
+  - `e629e8e`: Removed hardcoded home directories - trust crs58 module's conditional
+  - `fa90429`: Documented darwin limitations and cross-platform compatibility
+- Pattern now correctly handles both nixos and darwin machines
+- Forward-compatible with future clan darwin support
+- Implementation time: ~3.5 hours total (including post-review refinements)
+
 ### 2025-11-14 - Story Implementation Complete
 - All 6 tasks completed (inventory instance, direct config removal, vars generation, test harness, documentation)
-- Implementation time: ~2.5 hours (within 3-4 hour estimate)
-- Commits in test-clan repository:
+- Initial implementation time: ~2.5 hours (within 3-4 hour estimate)
+- Initial commits in test-clan repository:
   - `846b61e`: Create user inventory instance for cameron
   - `848019f`: Remove direct NixOS user configuration
   - `79dac23`: Generate and validate vars for cameron user (with home-manager.nixosModules fix)
   - `81831c5`: Add TC-024 vars validation tests
   - `5d789db`: Create user management documentation
 - Zero regressions: All 14 existing tests passing + new TC-024 test
-- Functional validation (AC6-AC7) deferred to VPS deployment
 - Story status: ready-for-dev → in-progress → review
-- Pattern validated for Epic 2-6 scaling (6 machines × 4+ users)
 
 ### 2025-11-14 - Story Created
 - Story 1.10A drafted based on party-mode architectural review findings
