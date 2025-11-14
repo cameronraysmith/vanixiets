@@ -154,7 +154,7 @@
 
       <!-- Architecture Documentation -->
       <doc path="docs/notes/development/test-clan-validated-architecture.md" title="test-clan Validated Architecture Map" section="Complete architecture overview" snippet="Comprehensive test-clan architecture documentation including dendritic flake-parts pattern, clan integration (metadata, machines, inventory, services), terranix infrastructure configuration, machine configuration patterns, test harness structure. Stories 1.1-1.7 complete with 17 test cases passing." />
-      <doc path="docs/notes/development/architecture/architecture-decision-records-adrs.md" title="Architecture Decision Records" section="ADR-001 through ADR-006" snippet="Key decisions: Adopt dendritic + clan-core (ADR-001), ZFS unencrypted (ADR-002), progressive migration with stability gates (ADR-003), multi-user via standard NixOS patterns - no clan magic (ADR-005 - critical for this story)." />
+      <doc path="docs/notes/development/architecture/architecture-decision-records-adrs.md" title="Architecture Decision Records" section="ADR-001 through ADR-006" snippet="Key decisions: Adopt dendritic + clan-core (ADR-001), ZFS unencrypted (ADR-002), progressive migration with stability gates (ADR-003), multi-user via standard NixOS patterns - no custom frameworks (ADR-005). Note: Story 1.10A adopts clan-core's official inventory users service based on party-mode investigation findings - this is the recommended clan pattern, not custom magic." />
     </docs>
 
     <code>
