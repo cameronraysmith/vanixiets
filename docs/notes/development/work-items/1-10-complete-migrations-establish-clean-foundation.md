@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** drafted
+**Status:** ready-for-dev
 
 **Dependencies:**
 - Story 1.9 (done): VMs renamed to cinnabar/electrum, zerotier network operational
@@ -659,7 +659,7 @@ This story contributes to Epic 1 success criteria:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- `docs/notes/development/work-items/1-10-complete-migrations-establish-clean-foundation.context.xml` (generated 2025-11-13)
 
 ### Agent Model Used
 
