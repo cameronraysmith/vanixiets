@@ -106,6 +106,7 @@ Three parallel investigations conducted during party-mode review:
 - [ ] Deploy to cinnabar: `clan machines update cinnabar` succeeds
 - [ ] Verify `/run/secrets/vars/user-password-cameron/user-password-hash` exists on cinnabar
 - [ ] Verify vars properly populated in runtime secrets
+- **Note:** Story 1.10 noted "VPS deployment pending" - clarify during implementation whether actual Hetzner VPS deployment is required for vars validation or if local VM testing is sufficient for pattern validation.
 
 ### D. Functional Validation
 
@@ -204,6 +205,7 @@ Three parallel investigations conducted during party-mode review:
   - [ ] TC-024-2: SOPS encryption test (file format validation)
   - [ ] TC-024-3: Deployment test (runtime secrets)
   - [ ] TC-024-4: Home-manager integration test
+  - **Note:** Confirm test numbering convention during implementation - should these be TC-024 (single test with 4 assertions) OR TC-024-1 through TC-024-4 (four separate test cases)? Follow existing test harness patterns in `modules/checks/validation.nix`.
 - [ ] Run updated test suite: `nix flake check`
 
 ### Task 6: Documentation (AC10, AC11)
@@ -257,7 +259,7 @@ services.user-cameron = {
   roles.default = {
     tags.all = { }; # Deploy to all machines
   };
-  config = {
+  settings = {
     user = "cameron";
     groups = ["wheel" "networkmanager"];
     share = true;  # Same password across machines
@@ -306,6 +308,50 @@ nix flake check
 # Functional validation (post-deployment)
 ssh cameron@cinnabar "echo $SHELL"
 ssh cameron@cinnabar "sudo -n true"
+```
+
+### Quick Reference Commands
+
+**Build Validation:**
+```bash
+# Build cinnabar configuration
+nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel
+
+# Run full test suite
+nix flake check
+```
+
+**Vars Operations:**
+```bash
+# Generate vars for cinnabar
+clan vars generate cinnabar
+
+# List generated vars
+clan vars list cinnabar
+
+# Check specific user password vars
+clan vars list cinnabar | grep user-password-cameron
+```
+
+**Deployment:**
+```bash
+# Deploy to cinnabar
+clan machines update cinnabar
+```
+
+**Functional Validation (post-deployment):**
+```bash
+# Test SSH login
+ssh cameron@cinnabar
+
+# Verify shell
+ssh cameron@cinnabar "echo \$SHELL"
+
+# Verify sudo access
+ssh cameron@cinnabar "sudo -n true"
+
+# Check home-manager service
+ssh cameron@cinnabar "systemctl --user status home-manager-cameron.service"
 ```
 
 ### Learnings from Previous Story (Story 1.10)
@@ -408,7 +454,7 @@ test-clan/
 
 **Architecture Documentation:**
 - [Source: docs/notes/development/architecture/index.md] - Architecture index (note: some docs may be outdated)
-- [Relevant: docs/notes/development/architecture/architectural-decisions.md#user-management-decision] - User management decision section
+- [Relevant: docs/notes/development/architecture/architectural-decisions.md#user-management-decision] - User management decision section (to be created in AC10)
 
 **Previous Story Context:**
 - [Source: docs/notes/development/work-items/1-10-complete-migrations-establish-clean-foundation.md] - Story 1.10 completion
