@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** backlog
+**Status:** ready-for-dev
 
 **Dependencies:**
 - Story 1.10A (done): Clan inventory pattern migration complete, user management established
@@ -746,7 +746,7 @@ Rejected because: 51 modules in one directory = hard to navigate, unclear organi
 
 ### Context Reference
 
-<!-- Path to story context XML will be added here by context workflow -->
+- [Story 1.10B Context XML](./1-10B-migrate-home-manager-modules.context.xml) - Generated 2025-11-14
 
 ### Agent Model Used
 
