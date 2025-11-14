@@ -210,15 +210,16 @@ Three parallel investigations revealed critical insights:
 
 **Objective:** Add cameron user to cinnabar with home-manager integration, enabling SSH login and validating cross-platform user module reuse.
 
-- [ ] **Subtask 3.1:** Add cameron user to cinnabar nixos configuration
+- [x] **Subtask 3.1:** Add cameron user to cinnabar nixos configuration
   - Edit `~/projects/nix-workspace/test-clan/modules/machines/nixos/cinnabar/default.nix`
   - Add user configuration: username cameron (preferred for new machines), UID, shell (zsh), admin privileges
   - Configure SSH authorized keys for cameron
   - Set home directory: `/home/cameron`
   - Note: home-manager module references crs58 identity (user-level config) but system username is cameron
   - Reference infra blackphos-nixos for shared user pattern
+  - **COMPLETED:** User configuration added with wheel group, zsh shell, SSH key
 
-- [ ] **Subtask 3.2:** Integrate portable home-manager module (nixos integrated mode)
+- [x] **Subtask 3.2:** Integrate portable home-manager module (nixos integrated mode)
   - Add home-manager nixos module to cinnabar configuration imports
   - Configure home-manager.users.cameron module to import `config.flake.modules.homeManager."users/crs58"`
   - This integrates home-manager into nixosConfiguration (one of three supported modes from Story 1.8A)
@@ -226,11 +227,15 @@ Three parallel investigations revealed critical insights:
   - Set home-manager.users.cameron.home.homeDirectory = "/home/cameron"
   - Validate home-manager builds: `nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel`
   - Note: This is nixos-integrated mode (home-manager activated with system switch), not standalone mode
+  - **COMPLETED:** Build successful `/nix/store/bac91ljb08f6kqb69al0g3774ig5skhk-nixos-system-cinnabar-25.11.20251102.b3d51a0`
+  - **COMPLETED:** home-manager service created: `unit-home-manager-cameron.service`
+  - **COMPLETED:** Made crs58 module username-configurable via mkDefault to avoid recursion
 
 - [ ] **Subtask 3.3:** Build and deploy cinnabar configuration
   - Build cinnabar: `nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel`
   - Deploy to cinnabar: `clan machines update cinnabar`
   - Verify deployment successful
+  - **PENDING DEPLOYMENT:** Build validated locally, requires VPS deployment
 
 - [ ] **Subtask 3.4:** Validate SSH login as cameron
   - Test SSH login: `ssh cameron@<cinnabar-ip>`
@@ -240,6 +245,7 @@ Three parallel investigations revealed critical insights:
   - Verify home-manager activation: shell is zsh, ~/.config/ directory populated, git config accessible
   - Verify packages from crs58 module available (git, gh, starship)
   - Document zerotier IP for future reference
+  - **PENDING DEPLOYMENT:** Requires VPS deployment to validate
 
 **Success Criteria:** cameron user operational on cinnabar, SSH login works, home-manager integrated, cross-platform user module reuse validated.
 
