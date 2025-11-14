@@ -132,19 +132,34 @@ development_status:
   # Strategic value validated: Pattern ready for Epic 2-6 scaling (6 machines × 4+ users)
   # Estimated time savings: 6-12 hours in Epic 2-6 (inventory pattern vs direct config)
   1-10a-migrate-user-management-inventory: done
-  # Story 1.10B: DISCOVERED STORY (2025-11-14) - Migrate Home-Manager Module Ecosystem from infra to test-clan
-  # Configuration completeness gap identified via comprehensive blackphos audit
-  # Story 1.10 audit was superficial - missed 51 home-manager modules (2,500+ lines) auto-wired via nixos-unified
-  # Current coverage: ~15% (basic git/gh/zsh only), Missing: dev environment, AI tooling, shell environment
-  # Priority 1-3 modules (17 total): Critical dev env (7) + AI tooling (4) + shell/terminal (6)
-  # Architectural pattern: nixos-unified auto-wiring (infra) → dendritic explicit imports (test-clan)
-  # Validates dendritic pattern at scale (51 modules vs 2-3 in Story 1.8A)
-  # Unblocks Story 1.12 physical deployment (complete config required)
-  # starship-jj intentionally excluded (custom Rust package, long compile time, non-essential)
-  # Estimated effort: 12-16 hours (6-8h P1 + 3-4h P2 + 2-3h P3 + 1-2h validation/docs)
-  # Dependencies: Story 1.10A (done), Blocks: Story 1.10C (secrets need home modules first)
-  # Context generated 2025-11-14: Comprehensive technical context with 17 Priority 1-3 modules
-  1-10b-migrate-home-manager-modules: in-progress
+  # Story 1.10B: DONE ✅ (2025-11-14) - Migrate Home-Manager Module Ecosystem from infra to test-clan
+  # DISCOVERED STORY - Configuration completeness gap via comprehensive blackphos audit
+  # Implementation: 18 commits across 2 sessions (71dde62-d4ef3a2)
+  # Priority 1-3 modules migrated (17 total): dev env (7) + AI tooling (4) + shell/terminal (6)
+  # Pattern B implemented (underscore directories + plain HM modules)
+  # CRITICAL ARCHITECTURAL LIMITATIONS DISCOVERED (dev notes lines 767-1031):
+  #   - 11 features DISABLED (SSH signing, MCP API keys, GLM wrapper, tmux theme, custom packages)
+  #   - darwinConfigurations.blackphos.system FAILS TO BUILD (lazyvim integration broken)
+  #   - No flake context access (plain modules cannot access flake.inputs, flake.config)
+  #   - sops-nix completely incompatible (requires flake.config lookups)
+  # Functional status: 85% (core functionality present, secrets/themes/packages disabled)
+  # homeConfigurations.crs58/raquel build successfully, darwinConfigurations FAILS
+  # Party Mode investigation (9 agents): UNANIMOUS refactor to Pattern A (both references use Pattern A)
+  # Story 1.10BA inserted to refactor Pattern B → Pattern A before Story 1.10C
+  # Strategic value: Provided empirical evidence that Pattern B is architectural dead end
+  1-10b-migrate-home-manager-modules: done
+  # Story 1.10BA: DISCOVERED STORY (2025-11-14) - Refactor Home-Manager Modules from Pattern B to Pattern A
+  # CRITICAL ARCHITECTURAL CORRECTION based on Story 1.10B empirical evidence
+  # Refactors 17 modules from Pattern B (underscore dirs, plain modules) to Pattern A (drupol multi-aggregate)
+  # Aggregate organization: development (7), ai (4), shell (6) following drupol reference pattern
+  # Restores 11 disabled features: SSH signing, MCP API keys, GLM wrapper, themes, custom packages
+  # Fixes darwinConfigurations.blackphos.system build failure (lazyvim flake input accessible)
+  # Pattern A benefits: flake context access, aggregate namespaces, industry-standard (gaetanlepage + drupol)
+  # Validation experiment (AC A): 1h to prove Pattern A works before full refactoring (de-risks)
+  # Estimated effort: 8-10 hours (1h validation + 5-6h refactoring + 2-3h user updates + 1h docs)
+  # Dependencies: Story 1.10B (done - provided evidence), Blocks: Story 1.10C (needs flake context)
+  # Strategic value: Aligns with references, unblocks Story 1.10C, validates Party Mode review, Epic 2-6 pattern
+  1-10ba-refactor-pattern-a: backlog
   # Story 1.10C: DISCOVERED STORY (2025-11-14) - Migrate Secrets from sops-nix to Clan Vars
   # Secrets management gap identified - Story 1.8 deferred, Story 1.10 never addressed (0% secrets coverage)
   # infra has 6 sops-nix encrypted files (signing keys, API keys), test-clan has zero clan vars generators
@@ -153,8 +168,9 @@ development_status:
   # Secrets inventory: signing keys (regenerable), API keys (prompt-based), bitwarden email
   # Module access pattern updates: git.nix, jujutsu.nix, mcp-servers.nix, claude-code-wrappers.nix, rbw.nix
   # Clan vars IS sops-nix (declarative interface wrapper), darwin-compatible, recommended by clan-core
-  # Estimated effort: 8-12 hours (2h setup + 3-4h generators + 2-3h access patterns + 1-2h validation/docs)
-  # Dependencies: Story 1.10B (home modules must exist before updating access patterns)
+  # UPDATE (Post-Story 1.10BA): Pattern A provides flake context for clan vars access (sops-nix re-enabled)
+  # Estimated effort: 4-6 hours (2h setup + 1-2h access patterns + 1h validation + 1h docs)
+  # Dependencies: Story 1.10BA (modules must have flake context before clan vars migration)
   1-10c-migrate-secrets-clan-vars: backlog
   # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
   # Now includes type-safe home-manager architecture implementation (phases 1-5)
