@@ -159,7 +159,8 @@ development_status:
   # Estimated effort: 8-10 hours (1h validation + 5-6h refactoring + 2-3h user updates + 1h docs)
   # Dependencies: Story 1.10B (done - provided evidence), Blocks: Story 1.10C (needs flake context)
   # Strategic value: Aligns with references, unblocks Story 1.10C, validates Party Mode review, Epic 2-6 pattern
-  1-10ba-refactor-pattern-a: drafted
+  # Context generated 2025-11-14: Comprehensive context XML following Story 1.10A baseline quality (5/5)
+  1-10ba-refactor-pattern-a: ready-for-dev
   # Story 1.10C: DISCOVERED STORY (2025-11-14) - Migrate Secrets from sops-nix to Clan Vars
   # Secrets management gap identified - Story 1.8 deferred, Story 1.10 never addressed (0% secrets coverage)
   # infra has 6 sops-nix encrypted files (signing keys, API keys), test-clan has zero clan vars generators
