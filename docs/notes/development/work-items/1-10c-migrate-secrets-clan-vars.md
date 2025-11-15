@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** drafted
+**Status:** ready-for-dev
 
 **Dependencies:**
 - Story 1.10BA (done): Pattern A refactoring provides flake context access for clan vars integration
@@ -841,7 +841,7 @@ clan vars generate blackphos --user crs58
 
 ### Context Reference
 
-<!-- Path to story context XML will be added here by context workflow -->
+- Story Context XML: `docs/notes/development/work-items/1-10c-migrate-secrets-clan-vars.context.xml` (Generated: 2025-11-15)
 
 ### Agent Model Used
 
