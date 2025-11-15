@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** drafted
+**Status:** ready-for-dev
 
 **Dependencies:**
 - Story 1.10B (done-with-limitations): Provided empirical evidence of Pattern B architectural failures (11 disabled features, darwinConfigurations build failure)
@@ -1040,7 +1040,7 @@ Murat's 1-hour test to de-risk full refactoring:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by story-context workflow -->
+- `docs/notes/development/work-items/1-10BA-refactor-pattern-a.context.xml` (Generated 2025-11-14)
 
 ### Agent Model Used
 
