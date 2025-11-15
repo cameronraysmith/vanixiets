@@ -32,122 +32,200 @@ Story 1.8 deferred secrets migration, Story 1.10 never addressed secrets (0% cla
 - Pattern B for vars (generators in user modules) aligns with dendritic philosophy
 - Pattern A home-manager modules (Story 1.10BA) provide flake context for clan vars access
 
-**Secrets Inventory (from infra sops-nix):**
+**Secrets Inventory (from infra sops-nix - VERIFIED 2025-11-15):**
 
-| Secret File | Usage | Type | Migration Strategy |
-|------------|-------|------|-------------------|
-| `admin-user/signing-key.yaml` | Git/jujutsu SSH signing | SSH private key | **Generate new** (ssh-keygen) |
-| `admin-user/llm-api-keys.yaml` (glm) | GLM alternative LLM backend | API token | **Import existing** (manual transfer) |
-| `admin-user/mcp-api-keys.yaml` (3 keys) | firecrawl, context7, huggingface | API tokens | **Import existing** (manual transfer) |
-| `shared.yaml` (BITWARDEN_EMAIL) | Bitwarden password manager | Email address | **Prompt** (user input) |
-| `raquel-user/*` | raquel's signing keys, API keys | Same as crs58 | **Same strategies** |
+| Secret | Source File | Usage | Type | Migration Strategy |
+|--------|------------|-------|------|-------------------|
+| `github-token` | `secrets/shared.yaml` | Git operations, gh CLI | API token | **Import existing** (sops decrypt) |
+| `ssh-signing-key` | `secrets/users/admin-user/signing-key.yaml` | Git/jujutsu SSH signing | SSH private key | **Generate new** (ssh-keygen) |
+| `glm-api-key` | `secrets/users/admin-user/llm-api-keys.yaml` | GLM wrapper backend | API token | **Import existing** (sops decrypt) |
+| `firecrawl-api-key` | `secrets/users/admin-user/mcp-api-keys.yaml` | Firecrawl MCP server | API token | **Import existing** (sops decrypt) |
+| `huggingface-token` | `secrets/users/admin-user/mcp-api-keys.yaml` | HuggingFace MCP server | API token | **Import existing** (sops decrypt) |
+| `bitwarden-email` | `secrets/shared.yaml` | Bitwarden config | Email address | **Import existing** (sops decrypt) |
+| `atuin-key` | Runtime extraction | Shell history sync | Encryption key | **Extract existing** (`atuin key --base64`) |
+
+**User Distribution:**
+- crs58/cameron (7 secrets): All secrets above
+- raquel (4 secrets): github-token, ssh-signing-key, bitwarden-email, atuin-key
+- Rationale: raquel uses development + shell aggregates only (no ai tools)
 
 **⚠️ SECURITY PROTOCOL:** Whenever decryption and transfer of secret data is required, the dev agent MUST provide optimal sops/clan CLI commands for the orchestrator to execute interactively, avoiding population of secret values in the chat session.
 
 ---
 
+## Implementation Notes (2025-11-15)
+
+**Discovered During Implementation:**
+
+Investigation revealed multiple discrepancies between story assumptions and test-clan reality.
+Story updated to reflect actual state based on evidence-based findings.
+
+**Infrastructure Already Exists (AC1-AC3 SKIP):**
+- ✅ Admin age keypair exists: 4 keys in `~/.config/sops/age/keys.txt`
+- ✅ Sops setup complete: `sops/users/crs58/`, `sops/machines/*`, `sops/secrets/*`
+- ✅ Vars directory exists: `vars/shared/`, `vars/per-machine/*` (note: per-machine NOT machines)
+- Stories 1.1-1.10A already established sops/vars infrastructure
+- **No setup work needed** - proceed directly to generator creation
+
+**User Identity Pattern (Confirmed):**
+- Cameron shares crs58 sops identity (same home module, same encryption key)
+- Raquel shares crs58 sops identity (development + shell aggregates only)
+- Single vars.nix in `modules/home/users/crs58/vars.nix` serves all three usernames
+- Conditional secret access based on username (crs58/cameron get all 7, raquel gets subset of 4)
+
+**Module Location Reality (Code Investigation):**
+- Aggregates own logic: `modules/home/development/`, `modules/home/ai/`, `modules/home/shell/`
+- User modules minimal: `modules/home/users/crs58/default.nix` imports aggregates
+- Update paths in aggregates, NOT user directories
+- Raquel configuration: development + shell only (no ai aggregate)
+
+**Actual Secrets Inventory (Verified from infra):**
+
+crs58/cameron (7 secrets):
+1. `github-token` (shared.yaml) - Git operations, gh CLI
+2. `ssh-signing-key` (admin-user/signing-key.yaml) - Git/jujutsu commit signing
+3. `glm-api-key` (admin-user/llm-api-keys.yaml) - GLM wrapper
+4. `firecrawl-api-key` (admin-user/mcp-api-keys.yaml) - Firecrawl MCP server
+5. `huggingface-token` (admin-user/mcp-api-keys.yaml) - HuggingFace MCP server
+6. `bitwarden-email` (shared.yaml) - Bitwarden password manager
+7. `atuin-key` (extract with `atuin key --base64`) - Atuin shell history sync
+
+raquel (4 secrets for development + shell aggregates):
+1. `github-token` - Git operations
+2. `ssh-signing-key` - Git commit signing
+3. `bitwarden-email` - Bitwarden config
+4. `atuin-key` - Shell history sync
+
+**Note:** Only 2 MCP API keys exist (firecrawl, huggingface), not 3.
+Original story mentioned "context7" which does not exist in infra secrets.
+
+**Correct Module Paths for Updates:**
+- `modules/home/development/git.nix` - ssh-signing-key, github-token
+- `modules/home/development/jujutsu.nix` - ssh-signing-key (if configured)
+- `modules/home/ai/claude-code/mcp-servers.nix` - firecrawl-api-key, huggingface-token
+- `modules/home/ai/claude-code/wrappers.nix` - glm-api-key
+- `modules/home/shell/atuin.nix` - atuin-key
+- Bitwarden module location TBD (need to find or create)
+
+---
+
 ## Acceptance Criteria
 
-### A. Clan Vars Setup and Admin Configuration
+### A. Clan Vars Setup and Admin Configuration - ✅ SKIP (Already Complete)
 
-**AC1: Clan Admin Keypair Generated**
-- [ ] Run `clan secrets key generate` to create admin age keypair
-- [ ] Verify keypair stored in `~/.config/sops/age/keys.txt`
-- [ ] Record public key for adding users
+**AC1: Clan Admin Keypair Generated** - ✅ COMPLETE (Stories 1.1-1.10A)
+- [x] ~~Run `clan secrets key generate`~~ - Already exists (4 keys in ~/.config/sops/age/keys.txt)
+- [x] ~~Verify keypair stored~~ - Verified during investigation (2025-11-15)
+- [x] ~~Record public key~~ - Existing infrastructure functional
 
-**AC2: Cameron User Added to Clan Secrets**
-- [ ] Run `clan secrets users add cameron --age-key <public-key>`
-- [ ] Verify cameron added to `sops/users/cameron/key.json`
-- [ ] Age keys configured for encryption/decryption
+**AC2: User Added to Clan Secrets** - ✅ COMPLETE (Modified Approach)
+- [x] ~~Add cameron to sops users~~ - Cameron shares crs58 sops identity (confirmed pattern)
+- [x] ~~Verify sops/users/cameron/~~ - Using sops/users/crs58/ (single identity for cameron/crs58/raquel)
+- [x] ~~Age keys configured~~ - Encryption working (verified via existing vars)
 
-**AC3: Vars Directory Structure Created**
-- [ ] Directory structure: `sops/vars/shared/`, `sops/vars/machines/`
-- [ ] Verify clan vars directory structure follows clan-core conventions
-- [ ] No conflicts with existing test-clan structure
+**AC3: Vars Directory Structure Created** - ✅ COMPLETE (Stories 1.1-1.10A)
+- [x] ~~Directory structure~~ - vars/shared/, vars/per-machine/* exist (note: per-machine NOT machines)
+- [x] ~~Verify clan vars structure~~ - Follows clan-core conventions
+- [x] ~~No conflicts~~ - Existing vars (user-password-cameron, machine-specific) functional
 
 ### B. Vars Generators Defined (Pattern B - in user modules)
 
-**AC4: crs58 Vars Module Created**
-- [ ] Create `modules/home/users/crs58/vars.nix` with generators:
-  - `ssh-signing-key`: SSH key generator (regenerable via ssh-keygen)
-  - `llm-api-keys`: Prompt-based generator for GLM API key
-  - `mcp-api-keys`: Multi-prompt generator (firecrawl, context7, huggingface)
-  - `bitwarden-config`: Prompt for email
-- [ ] Generators export secret file paths via clan.core.vars.generators.X.files.Y
-- [ ] Generator types properly configured (password, secret, prompt)
+**AC4: Unified Vars Module with Conditional Access**
+- [ ] Create `modules/home/users/crs58/vars.nix` with 7 generators serving all users
+- [ ] Generator structure with conditional username-based access:
+  - `github-token`: Prompt generator (all users: crs58, cameron, raquel)
+  - `ssh-signing-key`: SSH keygen generator (all users)
+  - `glm-api-key`: Prompt generator (crs58/cameron only)
+  - `firecrawl-api-key`: Prompt generator (crs58/cameron only)
+  - `huggingface-token`: Prompt generator (crs58/cameron only)
+  - `bitwarden-email`: Prompt generator (all users)
+  - `atuin-key`: Manual extraction generator (all users)
+- [ ] Generators export via `clan.core.vars.generators.X.files.Y.path`
+- [ ] Conditional logic: crs58/cameron get all 7, raquel gets subset of 4
 
-**AC5: raquel Vars Module Created**
-- [ ] Create `modules/home/users/raquel/vars.nix` with equivalent generators
-- [ ] Same generator types as crs58 (ssh-signing-key, api-keys, bitwarden)
-- [ ] Independent vars namespace (raquel vars separate from crs58)
+**AC5: Generator Types Properly Configured**
+- [ ] `ssh-signing-key`: Uses ssh-keygen, outputs ed25519_priv + ed25519_pub
+- [ ] API token generators: Use password/prompt type with hidden input
+- [ ] `bitwarden-email`: Uses prompt type with line input
+- [ ] `atuin-key`: Custom generator with manual extraction note
+- [ ] All secret files marked with `secret = true`, pub keys `secret = false`
 
-**AC6: Vars Modules Integrated with Dendritic**
-- [ ] Vars modules use dendritic export pattern: `flake.modules.homeManager."users/*/vars"`
-- [ ] Import-tree auto-discovers vars.nix files
-- [ ] User modules import vars via dendritic namespace (not relative paths)
-- [ ] Verify flake.modules.homeManager."users/crs58/vars" and "users/raquel/vars" exist
+**AC6: Dendritic Integration**
+- [ ] Vars module exports to `flake.modules.homeManager."users/crs58/vars"`
+- [ ] Import-tree auto-discovers vars.nix file
+- [ ] No relative paths (uses dendritic namespace)
+- [ ] Verify export: `nix eval .#flake.modules.homeManager."users/crs58/vars" --apply builtins.attrNames`
 
 ### C. Module Access Pattern Updates (sops-nix → clan vars)
 
-**AC7: Git Module SSH Signing Updated (crs58, raquel)**
-- [ ] `modules/home/development/git.nix`: Update signing key access
-  - Before: `config.sops.secrets."${user.sopsIdentifier}/signing-key".path`
-  - After: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path`
-- [ ] Pattern works for both crs58 and raquel (user-specific vars)
-- [ ] Build validation: git signing config references correct path
+**AC7: Git Module Updated (all users)**
+- [ ] `modules/home/development/git.nix`: Update for SSH signing + GitHub token
+  - SSH signing: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path`
+  - GitHub token: Add if needed for gh CLI or git operations
+  - Allowed signers: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_pub.value`
+- [ ] Pattern works for crs58, cameron, raquel (shared vars.nix)
+- [ ] Build validation: git config references correct clan vars paths
 
-**AC8: Jujutsu Module SSH Signing Updated (crs58, raquel)**
-- [ ] `modules/home/development/jujutsu.nix`: Update signing key access (same as git)
-- [ ] Verify both users get independent signing keys
-- [ ] Build validation: jujutsu signing config references correct path
+**AC8: Jujutsu Module Updated (if SSH signing configured)**
+- [ ] `modules/home/development/jujutsu.nix`: Update signing key if already configured
+- [ ] Reference: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path`
+- [ ] Works for all users (crs58, cameron, raquel)
 
-**AC9: MCP Servers API Keys Updated (crs58 only)**
-- [ ] `modules/home/ai/claude-code/mcp-servers.nix`: Update 3 API key accesses
-  - Before: `config.sops.secrets."mcp-firecrawl-api-key".path`
-  - After: `config.clan.core.vars.generators.mcp-api-keys.files.firecrawl.path`
-- [ ] Same for context7, huggingface keys
-- [ ] raquel doesn't import ai aggregate (no MCP servers)
+**AC9: MCP Servers API Keys Updated (crs58/cameron only)**
+- [ ] `modules/home/ai/claude-code/mcp-servers.nix`: Update 2 API key accesses
+  - Firecrawl: `config.clan.core.vars.generators.firecrawl-api-key.files.key.path`
+  - HuggingFace: `config.clan.core.vars.generators.huggingface-token.files.token.path`
+- [ ] Note: Only 2 MCP keys (no context7)
+- [ ] raquel doesn't access (no ai aggregate)
 
-**AC10: Claude Code GLM Wrapper Updated (crs58 only)**
-- [ ] `modules/home/ai/claude-code/wrappers.nix`: Update GLM API key access
-- [ ] Reference: `config.clan.core.vars.generators.llm-api-keys.files.glm.path`
-- [ ] raquel doesn't use GLM wrapper
+**AC10: GLM Wrapper Updated (crs58/cameron only)**
+- [ ] `modules/home/ai/claude-code/wrappers.nix`: Update GLM API key
+- [ ] Reference: `config.clan.core.vars.generators.glm-api-key.files.key.path`
+- [ ] raquel doesn't access (no ai aggregate)
 
-**AC11: Bitwarden Email Updated (crs58, raquel)**
-- [ ] `modules/home/ai/claude-code/rbw.nix` (crs58) or equivalent: Update Bitwarden email
-- [ ] Reference: `config.clan.core.vars.generators.bitwarden-config.files.email.path`
-- [ ] Both users get independent Bitwarden configs
+**AC11: Atuin Shell History Updated (all users)**
+- [ ] `modules/home/shell/atuin.nix`: Update encryption key
+- [ ] Reference: `config.clan.core.vars.generators.atuin-key.files.key.path`
+- [ ] Works for crs58, cameron, raquel (development + shell aggregates)
+
+**AC12: Bitwarden Config Updated (all users)**
+- [ ] Find or create Bitwarden/rbw module
+- [ ] Reference: `config.clan.core.vars.generators.bitwarden-email.files.email.path`
+- [ ] Works for crs58, cameron, raquel
 
 ### D. Vars Generation and Validation
 
-**AC12: Generate Vars for crs58**
-- [ ] Run: `clan vars generate blackphos --user crs58` (or equivalent command)
-- [ ] Prompts for imported secrets (GLM API key, MCP keys, Bitwarden email)
-- [ ] SSH signing key auto-generated (ssh-keygen)
-- [ ] Verify encryption: `file sops/vars/*/secret` shows JSON (sops-encrypted)
+**AC13: Manual Secret Extraction (Atuin)**
+- [ ] Extract atuin key: `atuin key --base64` (run on machine with existing atuin setup)
+- [ ] Record base64 key for manual entry during clan vars generation
+- [ ] Note: Atuin key extracted from existing setup, not prompted from infra secrets
 
-**AC13: Generate Vars for raquel**
-- [ ] Run: `clan vars generate blackphos --user raquel`
-- [ ] Prompts for raquel's secrets
-- [ ] Independent vars from crs58 (separate encryption)
-- [ ] Verify raquel vars encrypted
+**AC14: Generate Vars for All Users**
+- [ ] Run: `clan vars generate blackphos` (generates for all configured users)
+- [ ] Or per-user: `clan vars generate blackphos --user crs58` then raquel
+- [ ] Prompts for secrets (orchestrator enters from infra sops decrypt):
+  - github-token (from shared.yaml via sops -d)
+  - glm-api-key (from admin-user/llm-api-keys.yaml via sops -d)
+  - firecrawl-api-key (from admin-user/mcp-api-keys.yaml via sops -d)
+  - huggingface-token (from admin-user/mcp-api-keys.yaml via sops -d)
+  - bitwarden-email (from shared.yaml via sops -d)
+  - atuin-key (from manual extraction AC13)
+- [ ] SSH signing key auto-generated (ssh-keygen, regenerable)
+- [ ] Verify encryption: `file vars/per-machine/blackphos/*/secret` shows JSON (sops-encrypted)
 
-**AC14: Build Validation**
+**AC15: Build Validation (Corrected Paths)**
+- [ ] `nix flake check` passes
 - [ ] `nix build .#darwinConfigurations.blackphos.system` succeeds
-- [ ] `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage` succeeds
+- [ ] `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage` succeeds (note: .activationPackage suffix)
 - [ ] `nix build .#homeConfigurations.aarch64-darwin.raquel.activationPackage` succeeds
 - [ ] No evaluation errors related to vars access
 
-**AC15: Secrets Accessible in Build**
+**AC16: Secrets Accessible in Build**
 - [ ] Verify `/run/secrets/vars/*` paths resolve in activation scripts
-- [ ] SSH signing key paths point to generated keys
-- [ ] API key paths point to imported secrets
-- [ ] Bitwarden email path valid
-
-**AC16: SSH Signing Validated**
-- [ ] Git log shows signing key path configured
-- [ ] Jujutsu log shows signing key path configured
-- [ ] Post-deployment: GitHub signing keys update documented (see AC G)
+- [ ] SSH signing key paths: vars/per-machine/blackphos/ssh-signing-key/ed25519_priv
+- [ ] API key paths: vars/per-machine/blackphos/{glm,firecrawl,huggingface}/*
+- [ ] Atuin key path: vars/per-machine/blackphos/atuin-key/key
+- [ ] GitHub token, bitwarden email paths valid
 
 ### E. Dendritic + Clan Vars Integration Validation
 
@@ -157,16 +235,17 @@ Story 1.8 deferred secrets migration, Story 1.10 never addressed secrets (0% cla
 - [ ] `config.clan.core.vars.generators.*` paths resolve correctly in home-manager modules
 - [ ] Flake context (from Pattern A) enables vars access
 
-**AC18: Multi-User Vars Isolation**
-- [ ] crs58 vars accessible only in crs58 home-manager config
-- [ ] raquel vars accessible only in raquel home-manager config
-- [ ] No vars namespace conflicts between users
-- [ ] Independent encryption (different age keys if applicable)
+**AC18: Multi-User Conditional Access**
+- [ ] crs58/cameron access all 7 generators (shared identity, full access)
+- [ ] raquel accesses subset of 4 generators (conditional logic in vars.nix)
+- [ ] No vars namespace conflicts (single vars.nix with conditional access)
+- [ ] Shared encryption (all use sops/users/crs58/ age key)
 
-**AC19: Import-Tree Discovers Vars Modules**
-- [ ] vars.nix files auto-discovered in user directories
-- [ ] Dendritic namespace exports work: `flake.modules.homeManager."users/*/vars"`
+**AC19: Import-Tree Discovers Vars Module**
+- [ ] Single vars.nix file auto-discovered in users/crs58/
+- [ ] Dendritic namespace export works: `flake.modules.homeManager."users/crs58/vars"`
 - [ ] No manual wiring required for vars discovery
+- [ ] Imported by user modules (users/crs58/default.nix) via dendritic namespace
 
 ### F. GitHub Signing Key Update Documentation
 
@@ -184,11 +263,12 @@ Story 1.8 deferred secrets migration, Story 1.10 never addressed secrets (0% cla
 - [ ] Security protocol: Manual transfer steps for sensitive secrets
 - [ ] Clan vars generator patterns (ssh-keygen, password, prompt)
 
-**AC22: Pattern B Vars Documentation**
-- [ ] Pattern B for vars (generators in user modules) explained
-- [ ] NOT the Pattern B that failed for home-manager modules
-- [ ] Dendritic integration: How Pattern A modules access Pattern B vars
-- [ ] Rationale: Generator locality (vars near user config)
+**AC22: Unified Vars Pattern Documentation**
+- [ ] Single vars.nix with conditional access explained
+- [ ] Shared sops identity (cameron/crs58/raquel use same encryption key)
+- [ ] Conditional secret access: username-based logic (all get 7 vs subset of 4)
+- [ ] Pattern A modules access clan vars via `config.clan.core.vars.generators.*`
+- [ ] Rationale: Simplifies management, single source of truth for all user secrets
 
 **AC23: Operational Guide**
 - [ ] How to add new secrets to existing users
@@ -205,239 +285,219 @@ Story 1.8 deferred secrets migration, Story 1.10 never addressed secrets (0% cla
 
 ## Tasks / Subtasks
 
-### Task 1: Clan Vars Setup and Admin Configuration (AC: 1-3)
+### Task 1: Clan Vars Setup and Admin Configuration (AC: 1-3) - ✅ SKIP
 
-**Estimated Time:** 30 minutes
+**Status:** Complete from Stories 1.1-1.10A
 
-- [ ] **1.1: Generate Clan Admin Keypair**
-  - [ ] Run: `clan secrets key generate`
-  - [ ] Verify: `cat ~/.config/sops/age/keys.txt | grep "AGE-SECRET-KEY"`
-  - [ ] Record public key from output
+- [x] ~~1.1: Generate Clan Admin Keypair~~ - Already exists (4 keys verified)
+- [x] ~~1.2: Add User to Clan Secrets~~ - crs58 sops user exists, cameron/raquel share identity
+- [x] ~~1.3: Verify Vars Directory Structure~~ - vars/shared/, vars/per-machine/* exist and functional
 
-- [ ] **1.2: Add Cameron User to Clan Secrets**
-  - [ ] Get cameron's age public key (from existing setup or generate)
-  - [ ] Run: `clan secrets users add cameron --age-key <public-key>`
-  - [ ] Verify: `ls -la sops/users/cameron/`
-  - [ ] Check: `cat sops/users/cameron/key.json`
+### Task 2: Create Unified Vars Module with Conditional Access (AC: 4-6)
 
-- [ ] **1.3: Verify Vars Directory Structure**
-  - [ ] Check structure: `tree sops/vars/` (if exists)
-  - [ ] Create if needed: `mkdir -p sops/vars/{shared,machines}`
-  - [ ] Verify no conflicts with existing test-clan structure
-
-### Task 2: Define crs58 Vars Generators (AC: 4, 6)
-
-**Estimated Time:** 1-1.5 hours
+**Estimated Time:** 1.5-2 hours
 
 - [ ] **2.1: Create crs58 vars.nix File**
   - [ ] Create: `modules/home/users/crs58/vars.nix`
   - [ ] Use dendritic export pattern: `flake.modules.homeManager."users/crs58/vars" = { ... }`
   - [ ] Add flake-parts module signature
 
-- [ ] **2.2: Define SSH Signing Key Generator**
-  - [ ] Generator type: `clan.core.vars.generator` with ssh-keygen
-  - [ ] Output files: `ed25519_priv`, `ed25519_pub`
-  - [ ] Regenerable: Uses ssh-keygen to create new key
-  - [ ] Reference clan-core generator examples
+- [ ] **2.2: Define 7 Generators with Conditional Access**
+  - [ ] `github-token`: Prompt generator (all users)
+  - [ ] `ssh-signing-key`: SSH keygen (all users), outputs ed25519_priv + ed25519_pub
+  - [ ] `glm-api-key`: Prompt generator (crs58/cameron only)
+  - [ ] `firecrawl-api-key`: Prompt generator (crs58/cameron only)
+  - [ ] `huggingface-token`: Prompt generator (crs58/cameron only)
+  - [ ] `bitwarden-email`: Prompt generator (all users)
+  - [ ] `atuin-key`: Manual extraction generator (all users)
 
-- [ ] **2.3: Define LLM API Keys Generator**
-  - [ ] Generator type: prompt-based for GLM API key
-  - [ ] Output file: `glm`
-  - [ ] Prompt message: "Enter GLM API key for crs58"
-  - [ ] Secret stored encrypted in sops/vars/
+- [ ] **2.3: Implement Conditional Logic**
+  - [ ] Username detection: Use config.home.username or similar
+  - [ ] crs58/cameron: Access all 7 generators
+  - [ ] raquel: Access 4 generators (github-token, ssh-signing-key, bitwarden-email, atuin-key)
+  - [ ] Conditional file exports based on username
 
-- [ ] **2.4: Define MCP API Keys Generator**
-  - [ ] Generator type: multi-prompt for 3 keys (firecrawl, context7, huggingface)
-  - [ ] Output files: `firecrawl`, `context7`, `huggingface`
-  - [ ] Each with dedicated prompt message
-  - [ ] All secrets encrypted separately
+- [ ] **2.4: Add Security Notes for Manual Extraction**
+  - [ ] atuin-key: Note in generator to run `atuin key --base64` manually
+  - [ ] SSH signing key: Auto-generated (ssh-keygen), regenerable
+  - [ ] API tokens: Prompt-based, orchestrator enters from infra sops decrypt
 
-- [ ] **2.5: Define Bitwarden Config Generator**
-  - [ ] Generator type: prompt for email address
-  - [ ] Output file: `email`
-  - [ ] Prompt message: "Enter Bitwarden email for crs58"
-
-- [ ] **2.6: Verify Generator Export**
+- [ ] **2.5: Verify Generator Export**
   - [ ] Check namespace: `nix eval .#flake.modules.homeManager."users/crs58/vars" --apply builtins.attrNames`
   - [ ] Verify import-tree discovers vars.nix
   - [ ] Build test: `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage --dry-run`
 
-### Task 3: Define raquel Vars Generators (AC: 5, 6)
+### ~~Task 3: Define raquel Vars Generators~~ - REMOVED
 
-**Estimated Time:** 30 minutes (copy and adapt from crs58)
+**Status:** Merged into Task 2 (single vars.nix with conditional access)
 
-- [ ] **3.1: Create raquel vars.nix File**
-  - [ ] Create: `modules/home/users/raquel/vars.nix`
-  - [ ] Use dendritic export: `flake.modules.homeManager."users/raquel/vars" = { ... }`
-  - [ ] Copy crs58 generators structure
+### Task 3: Update Module Access Patterns (AC: 7-12)
 
-- [ ] **3.2: Adapt Generators for raquel**
-  - [ ] ssh-signing-key: Same generator type, independent key
-  - [ ] llm-api-keys: Prompt for raquel's GLM key (if needed, or omit)
-  - [ ] mcp-api-keys: Likely omit (raquel doesn't use ai aggregate)
-  - [ ] bitwarden-config: Prompt for raquel's email
-
-- [ ] **3.3: Verify raquel Namespace**
-  - [ ] Check: `nix eval .#flake.modules.homeManager."users/raquel/vars" --apply builtins.attrNames`
-  - [ ] Verify independent from crs58 vars
-  - [ ] Build test for raquel
-
-### Task 4: Update Module Access Patterns (AC: 7-11)
+**Note:** Renumbered from Task 4 after removing separate raquel vars task
 
 **Estimated Time:** 1.5-2 hours
 
-- [ ] **4.1: Update git.nix SSH Signing**
-  - [ ] File: `modules/home/development/git.nix`
-  - [ ] Replace sops-nix path with clan vars path
-  - [ ] Before: `config.sops.secrets."${user.sopsIdentifier}/signing-key".path`
-  - [ ] After: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path`
-  - [ ] Handle user-specific vars (crs58 vs raquel)
-  - [ ] Build test after change
+- [ ] **3.1: Update git.nix (all users)**
+  - [ ] File: `modules/home/development/git.nix` (aggregate module)
+  - [ ] SSH signing: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path`
+  - [ ] GitHub token: Add if needed for gh CLI
+  - [ ] Allowed signers: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_pub.value`
+  - [ ] Works for crs58, cameron, raquel (shared vars.nix)
+  - [ ] Build test all users
 
-- [ ] **4.2: Update jujutsu.nix SSH Signing**
-  - [ ] File: `modules/home/development/jujutsu.nix`
-  - [ ] Same clan vars path as git.nix
-  - [ ] Verify user-specific vars work
+- [ ] **3.2: Update jujutsu.nix (if configured)**
+  - [ ] File: `modules/home/development/jujutsu.nix` (aggregate module)
+  - [ ] SSH signing: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path`
   - [ ] Build test
 
-- [ ] **4.3: Update mcp-servers.nix API Keys (crs58 only)**
-  - [ ] File: `modules/home/ai/claude-code/mcp-servers.nix`
-  - [ ] Replace 3 sops-nix secrets with clan vars paths:
-    - firecrawl: `config.clan.core.vars.generators.mcp-api-keys.files.firecrawl.path`
-    - context7: `config.clan.core.vars.generators.mcp-api-keys.files.context7.path`
-    - huggingface: `config.clan.core.vars.generators.mcp-api-keys.files.huggingface.path`
-  - [ ] Update sops.templates to reference new paths
-  - [ ] Build test (crs58 only - raquel doesn't import ai aggregate)
+- [ ] **3.3: Update mcp-servers.nix (crs58/cameron only)**
+  - [ ] File: `modules/home/ai/claude-code/mcp-servers.nix` (aggregate module)
+  - [ ] Replace 2 sops-nix secrets with clan vars paths (Note: only 2, not 3):
+    - firecrawl: `config.clan.core.vars.generators.firecrawl-api-key.files.key.path`
+    - huggingface: `config.clan.core.vars.generators.huggingface-token.files.token.path`
+  - [ ] Conditional access: crs58/cameron only (raquel has no ai aggregate)
+  - [ ] Build test crs58
 
-- [ ] **4.4: Update wrappers.nix GLM API Key (crs58 only)**
-  - [ ] File: `modules/home/ai/claude-code/wrappers.nix`
-  - [ ] Replace sops-nix secret with clan vars path
-  - [ ] After: `config.clan.core.vars.generators.llm-api-keys.files.glm.path`
-  - [ ] Verify GLM wrapper package references correct path
-  - [ ] Build test
+- [ ] **3.4: Update wrappers.nix (crs58/cameron only)**
+  - [ ] File: `modules/home/ai/claude-code/wrappers.nix` (aggregate module)
+  - [ ] GLM API key: `config.clan.core.vars.generators.glm-api-key.files.key.path`
+  - [ ] Build test crs58
 
-- [ ] **4.5: Update Bitwarden Email (crs58, raquel)**
-  - [ ] File: Locate rbw.nix or Bitwarden config module
-  - [ ] Replace sops-nix path with clan vars path
-  - [ ] After: `config.clan.core.vars.generators.bitwarden-config.files.email.path`
-  - [ ] Both users get independent configs
-  - [ ] Build test for both users
+- [ ] **3.5: Update atuin.nix (all users)**
+  - [ ] File: `modules/home/shell/atuin.nix` (aggregate module)
+  - [ ] Encryption key: `config.clan.core.vars.generators.atuin-key.files.key.path`
+  - [ ] Works for all users (development + shell aggregates)
+  - [ ] Build test all users
 
-- [ ] **4.6: Commit Access Pattern Updates**
+- [ ] **3.6: Update/Create Bitwarden Module (all users)**
+  - [ ] Find or create Bitwarden/rbw module
+  - [ ] Email config: `config.clan.core.vars.generators.bitwarden-email.files.email.path`
+  - [ ] Build test all users
+
+- [ ] **3.7: Commit Access Pattern Updates**
   - [ ] Commit: "refactor(story-1.10C): update module access patterns from sops-nix to clan vars"
-  - [ ] Verify all modules updated (git, jujutsu, mcp-servers, wrappers, rbw)
+  - [ ] Verify all 6 modules updated
 
-### Task 5: Generate and Validate Vars (AC: 12-16)
+### Task 4: Generate and Validate Vars (AC: 13-16)
+
+**Note:** Renumbered from Task 5 after removing Task 3
 
 **Estimated Time:** 1-1.5 hours (includes secret transfer protocol)
 
-- [ ] **5.1: Generate crs58 Vars**
-  - [ ] Run: `clan vars generate blackphos --user crs58` (or equivalent)
-  - [ ] For regenerable secrets (ssh-signing-key): Auto-generated, verify output
-  - [ ] For imported secrets (GLM, MCP keys): SECURITY PROTOCOL
-    1. Dev agent provides optimal sops command to decrypt from infra
-    2. Orchestrator executes: `cd ~/projects/nix-workspace/infra && sops <file>`
-    3. Orchestrator copies values
-    4. Dev agent provides optimal clan vars set command
-    5. Orchestrator enters values interactively
-  - [ ] For prompted secrets (Bitwarden email): Enter value when prompted
-  - [ ] Verify encryption: `file sops/vars/*/secret` shows JSON encrypted
+- [ ] **4.1: Extract Atuin Key Manually (AC13)**
+  - [ ] Run on machine with existing atuin: `atuin key --base64`
+  - [ ] Record base64 key for entering during vars generation
+  - [ ] Note: Manual extraction, not from infra secrets
 
-- [ ] **5.2: Generate raquel Vars**
-  - [ ] Run: `clan vars generate blackphos --user raquel`
-  - [ ] Same SECURITY PROTOCOL for secret transfer
-  - [ ] Verify independent encryption from crs58
-  - [ ] Check vars directory structure for raquel
+- [ ] **4.2: Generate Vars for All Users (AC14)**
+  - [ ] Run: `clan vars generate blackphos` (generates for all users)
+  - [ ] Or per-user if needed: `clan vars generate blackphos --user crs58`
+  - [ ] SSH signing key: Auto-generated (ssh-keygen), regenerable
+  - [ ] For imported secrets: SECURITY PROTOCOL
+    1. Dev agent provides sops decrypt command for infra secrets
+    2. Orchestrator: `cd ~/projects/nix-workspace/infra && sops -d secrets/users/admin-user/<file>.yaml`
+    3. Orchestrator copies specific key values
+    4. Enter when clan vars prompts
+  - [ ] Secrets to enter (orchestrator decrypts from infra):
+    - github-token (from shared.yaml)
+    - glm-api-key (from admin-user/llm-api-keys.yaml)
+    - firecrawl-api-key (from admin-user/mcp-api-keys.yaml)
+    - huggingface-token (from admin-user/mcp-api-keys.yaml)
+    - bitwarden-email (from shared.yaml)
+    - atuin-key (from manual extraction AC13)
+  - [ ] Verify encryption: `file vars/per-machine/blackphos/*/secret` shows JSON
 
-- [ ] **5.3: Build Validation (All Configs)**
-  - [ ] Build darwinConfigurations: `nix build .#darwinConfigurations.blackphos.system`
-  - [ ] Build crs58 home: `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage`
-  - [ ] Build raquel home: `nix build .#homeConfigurations.aarch64-darwin.raquel.activationPackage`
+- [ ] **4.3: Build Validation (AC15)**
+  - [ ] `nix flake check` passes
+  - [ ] `nix build .#darwinConfigurations.blackphos.system` succeeds
+  - [ ] `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage` succeeds
+  - [ ] `nix build .#homeConfigurations.aarch64-darwin.raquel.activationPackage` succeeds
   - [ ] No evaluation errors related to vars
-  - [ ] Record build success
 
-- [ ] **5.4: Verify Secrets Accessible**
-  - [ ] Check activation scripts reference `/run/secrets/vars/*` paths
-  - [ ] SSH signing key paths resolve
-  - [ ] API key paths resolve
-  - [ ] Bitwarden email path valid
-  - [ ] Verify in nix repl if needed: `nix repl` → `:lf .` → inspect config
+- [ ] **4.4: Verify Secrets Accessible (AC16)**
+  - [ ] Check activation scripts reference correct paths
+  - [ ] SSH signing key: vars/per-machine/blackphos/ssh-signing-key/ed25519_priv
+  - [ ] API keys: vars/per-machine/blackphos/{glm,firecrawl,huggingface}/*
+  - [ ] Atuin key: vars/per-machine/blackphos/atuin-key/key
+  - [ ] GitHub token, bitwarden email paths valid
 
-- [ ] **5.5: SSH Signing Path Validation**
-  - [ ] Git config shows signing key path: Check `programs.git.signing.key` in build
-  - [ ] Jujutsu config shows signing key path: Check `programs.jujutsu.signing.key`
-  - [ ] Paths point to clan vars generated keys
+- [ ] **4.5: SSH Signing Path Validation**
+  - [ ] Git config references clan vars signing key path
+  - [ ] Jujutsu config references clan vars signing key path (if configured)
   - [ ] Document public key location for GitHub update (AC20)
 
-### Task 6: Integration and Multi-User Validation (AC: 17-19)
+### Task 5: Integration and Multi-User Validation (AC: 17-19)
+
+**Note:** Renumbered from Task 6 after removing Task 3
 
 **Estimated Time:** 30 minutes
 
-- [ ] **6.1: Pattern A + Pattern B Integration**
-  - [ ] Verify Pattern A home-manager modules access Pattern B vars
-  - [ ] git.nix (Pattern A) → crs58 vars (Pattern B): Works
-  - [ ] mcp-servers.nix (Pattern A) → crs58 vars (Pattern B): Works
+- [ ] **5.1: Pattern A Modules + Clan Vars Integration (AC17)**
+  - [ ] Verify Pattern A home-manager modules access clan vars
+  - [ ] git.nix (Pattern A) → clan vars generators: Works
+  - [ ] mcp-servers.nix (Pattern A) → clan vars generators: Works
   - [ ] No conflicts between dendritic imports and clan vars access
-  - [ ] Flake context enables vars access (from extraSpecialArgs)
+  - [ ] Flake context enables vars access via `config.clan.core.vars.generators.*`
 
-- [ ] **6.2: Multi-User Vars Isolation**
-  - [ ] crs58 config only sees crs58 vars
-  - [ ] raquel config only sees raquel vars
-  - [ ] Check namespace separation in builds
-  - [ ] Verify no cross-contamination
+- [ ] **5.2: Multi-User Conditional Access (AC18)**
+  - [ ] crs58/cameron access all 7 generators (verified in builds)
+  - [ ] raquel accesses subset of 4 generators (conditional logic works)
+  - [ ] Shared encryption (all use sops/users/crs58/ age key)
+  - [ ] No namespace conflicts (single vars.nix serves all users)
 
-- [ ] **6.3: Import-Tree Discovery**
-  - [ ] Verify vars.nix auto-discovered: `fd vars.nix modules/home/users/`
-  - [ ] Check dendritic exports: `nix eval .#flake.modules.homeManager --apply builtins.attrNames | grep vars`
+- [ ] **5.3: Import-Tree Discovery (AC19)**
+  - [ ] Verify vars.nix auto-discovered: `fd vars.nix modules/home/users/crs58/`
+  - [ ] Check dendritic export: `nix eval .#flake.modules.homeManager."users/crs58/vars"`
   - [ ] No manual wiring needed for discovery
+  - [ ] User modules import via dendritic namespace
 
-- [ ] **6.4: Commit Integration Validation**
-  - [ ] Commit: "test(story-1.10C): validate Pattern A+B integration and multi-user vars"
+- [ ] **5.4: Commit Integration Validation**
+  - [ ] Commit: "test(story-1.10C): validate Pattern A + clan vars integration and conditional access"
 
-### Task 7: Documentation (AC: 20-24)
+### Task 6: Documentation (AC: 20-24)
+
+**Note:** Renumbered from Task 7 after removing Task 3
 
 **Estimated Time:** 1-1.5 hours
 
-- [ ] **7.1: Document SSH Signing Public Key**
-  - [ ] Extract crs58 public key: `ssh-keygen -y -f sops/vars/crs58/ssh-signing-key/ed25519_priv`
-  - [ ] Extract raquel public key (same command for raquel path)
+- [ ] **6.1: Document SSH Signing Public Key (AC20)**
+  - [ ] Extract public key: `ssh-keygen -y -f vars/per-machine/blackphos/ssh-signing-key/ed25519_priv`
   - [ ] Document location in story completion notes
   - [ ] GitHub instructions: Settings → SSH and GPG keys → New SSH key → Signing key
-  - [ ] Post-deployment validation steps
+  - [ ] Post-deployment validation steps (verify commits signed)
 
-- [ ] **7.2: Create Secrets Migration Guide**
+- [ ] **6.2: Create Secrets Migration Guide (AC21)**
   - [ ] Document sops-nix → clan vars conversion process
-  - [ ] Migration strategies table (generate new, import existing, prompt)
-  - [ ] Security protocol for manual secret transfer (steps from Task 5.1)
-  - [ ] Clan vars generator patterns (ssh-keygen, password, prompt examples)
-  - [ ] File: `docs/notes/development/secrets-migration-guide.md` (in test-clan or infra)
+  - [ ] Migration strategies: generate new (SSH), import existing (API keys), manual extraction (atuin)
+  - [ ] Security protocol for manual secret transfer (from Task 4.2)
+  - [ ] Clan vars generator patterns (ssh-keygen, password prompts, manual extraction)
+  - [ ] File: `docs/notes/development/secrets-migration-guide.md` (test-clan or infra)
 
-- [ ] **7.3: Document Pattern B for Vars**
-  - [ ] Explain Pattern B vars (generators in user modules) vs Pattern B home-manager (deprecated)
-  - [ ] Why different patterns: Vars locality (near user config) vs modules composability
-  - [ ] Dendritic integration: Pattern A modules + Pattern B vars works
-  - [ ] Rationale section in architecture doc
-  - [ ] File: Update `test-clan-validated-architecture.md` Section 11 or new section
+- [ ] **6.3: Document Unified Vars Pattern (AC22)**
+  - [ ] Single vars.nix with conditional access explained
+  - [ ] Shared sops identity (cameron/crs58/raquel use same age key)
+  - [ ] Conditional secret access: username-based (7 vs 4 generators)
+  - [ ] Pattern A modules access clan vars via `config.clan.core.vars.generators.*`
+  - [ ] Rationale: Simplifies management, single source of truth
+  - [ ] File: Update `test-clan-validated-architecture.md` with new section
 
-- [ ] **7.4: Create Operational Guide**
-  - [ ] How to add new secrets: Edit vars.nix, run `clan vars generate`
+- [ ] **6.4: Create Operational Guide (AC23)**
+  - [ ] How to add new secrets: Edit vars.nix conditional logic, run `clan vars generate`
   - [ ] How to regenerate vars for new machines: `clan vars generate <machine>`
-  - [ ] How to update GitHub signing keys: Extract public key, add to GitHub settings
-  - [ ] Clan vars CLI reference: generate, regenerate, list, show commands
+  - [ ] How to update GitHub signing keys: Extract public key, update GitHub settings
+  - [ ] Clan vars CLI reference: generate, list commands
+  - [ ] Manual extraction workflows (atuin key example)
   - [ ] File: `docs/notes/development/clan-vars-ops-guide.md`
 
-- [ ] **7.5: Access Pattern Examples**
-  - [ ] Before/after comparison table: sops-nix paths → clan vars paths
-  - [ ] Code examples from actual modules:
-    - git.nix signing key
-    - mcp-servers.nix API keys (3 examples)
-    - wrappers.nix GLM key
-  - [ ] Multi-user examples: Show crs58 vs raquel vars access patterns
-  - [ ] Include in secrets migration guide or separate examples doc
+- [ ] **6.5: Create Access Pattern Examples (AC24)**
+  - [ ] Before/after code snippets: sops-nix → clan vars
+  - [ ] Module examples: git.nix, mcp-servers.nix, wrappers.nix, atuin.nix
+  - [ ] Conditional access examples: crs58/cameron (all 7) vs raquel (subset 4)
+  - [ ] Include in migration guide or architecture doc
 
-- [ ] **7.6: Final Documentation Commit**
+- [ ] **6.6: Final Documentation Commit**
   - [ ] Commit: "docs(story-1.10C): comprehensive clan vars migration and operational guides"
-  - [ ] Verify all 4 documentation files created/updated
+  - [ ] Verify documentation files created/updated
   - [ ] Link docs in story completion notes
 
 ---
