@@ -725,6 +725,365 @@ Once Epic 1 completes with GO decision (Story 1.12), migrate patterns to infra:
 - Emergency access across fleet
 - User management (crs58, raquel, christophersmith, janettesmith)
 
+## 11. Module System Architecture - Flake-Parts + Home-Manager Nesting
+
+**Updated**: 2025-11-14 (Stories 1.10B, 1.10BA complete)
+
+**Critical for all development:** This section explains the nested module system architecture that causes the most agent confusion. Read this FIRST before working with home-manager modules.
+
+### The Fundamental Misunderstanding: Two Separate Module Systems
+
+Most agent failures stem from confusing two SEPARATE, NESTED module systems. They are not the same, they are not merged, they are LAYERED.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. FLAKE OUTPUTS (what `nix flake show` displays)           │
+│    - Final build artifacts                                  │
+│    - No `config`, no `flake.config`                         │
+│                                                              │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │ 2. FLAKE-PARTS MODULE SYSTEM (evaluation-time)     │     │
+│  │    - Your dendritic modules ARE flake-parts modules│     │
+│  │    - Access: config.flake.*, inputs.*              │     │
+│  │    - Lives: modules/home/development/git.nix       │     │
+│  │                                                     │     │
+│  │  ┌──────────────────────────────────────────┐      │     │
+│  │  │ 3. HOME-MANAGER MODULE SYSTEM (nested)   │      │     │
+│  │  │    - The FUNCTION your dendritic defines │      │     │
+│  │  │    - Access: config.*, pkgs.*, flake.*   │      │     │
+│  │  │    - Lives: Return value of dendritic    │      │     │
+│  │  └──────────────────────────────────────────┘      │     │
+│  └────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### The Dendritic Pattern: A Nested Function
+
+**What a dendritic module ACTUALLY is:**
+
+```nix
+# File: modules/home/development/git.nix
+# ┌─ OUTER: This is a FLAKE-PARTS module
+# │
+{ config, inputs, ... }:  # ← Flake-parts module signature
+{
+  # Setting a flake-parts option
+  flake.modules = {
+    # ┌─ INNER: This VALUE is a HOME-MANAGER module
+    # │
+    homeManager.development =
+      { config, pkgs, flake, ... }:  # ← DIFFERENT config!
+      {
+        programs.git = { ... };
+      };
+    # └─ END INNER
+  };
+}
+# └─ END OUTER
+```
+
+**Two different `config` variables:**
+- **Outer config:** Flake-parts module system state (`config.flake.*`, `inputs.*`)
+- **Inner config:** Home-manager module system state (`config.programs.*`, `config.home.*`, `config.sops.*`)
+
+**They are NOT the same object!**
+
+### What `config.flake` Actually Contains (Flake-Parts Layer)
+
+During flake-parts evaluation, `config.flake` contains the **options being set** by all flake-parts modules:
+
+```nix
+# In a flake-parts module
+{ config, ... }:
+{
+  # What you CAN access:
+  config.flake.packages.${system}.* = ...;        # ✓ Flake outputs being set
+  config.flake.homeConfigurations.* = ...;        # ✓ Flake outputs being set
+  config.flake.modules.homeManager.* = ...;       # ✓ Our dendritic modules
+
+  # IF clan-core imported as flake-parts module:
+  config.flake.config.clan.inventory.* = ...;     # ✓ Clan options
+  config.flake.config.clan.core.vars.* = ...;     # ✓ Clan vars
+
+  # What does NOT exist:
+  config.flake.config.sops.* = ...;               # ✗ sops-nix is home-manager module
+  config.flake.config.programs.* = ...;           # ✗ programs is home-manager option
+  config.flake.pkgs.* = ...;                      # ✗ pkgs doesn't exist in flake
+}
+```
+
+**Why this matters:** `config.flake` is the flake-parts options namespace, NOT the final flake outputs, and definitely NOT home-manager config.
+
+### What `config` Contains (Home-Manager Layer)
+
+In the **inner** home-manager module:
+
+```nix
+# The inner module (what dendritic modules DEFINE)
+{ config, pkgs, flake, ... }:  # ← flake from extraSpecialArgs
+{
+  # What you CAN access:
+  config.programs.* = ...;                        # ✓ Home-manager programs
+  config.home.* = ...;                            # ✓ Home-manager home
+  config.sops.* = ...;                            # ✓ IF sops-nix imported
+  config.clan.core.vars.* = ...;                  # ✓ IF clan-core imported
+
+  pkgs.git                                        # ✓ Nixpkgs packages
+  flake.inputs.nix-ai-tools.* = ...;              # ✓ From extraSpecialArgs
+  flake.config.clan.inventory.* = ...;            # ✓ From extraSpecialArgs
+
+  # What does NOT exist:
+  flake.config.sops.* = ...;                      # ✗ Wrong layer!
+  flake.pkgs.* = ...;                             # ✗ Use pkgs, not flake.pkgs
+  config.inputs.* = ...;                          # ✗ Use flake.inputs, not config.inputs
+}
+```
+
+### The Bridge: extraSpecialArgs
+
+**How the layers connect:**
+
+```nix
+# File: modules/home/configurations.nix (flake-parts module)
+{ config, inputs, ... }:  # ← Flake-parts signature
+{
+  flake.homeConfigurations.crs58 =
+    inputs.home-manager.lib.homeManagerConfiguration {
+      # The bridge: Pass flake-parts config.flake to home-manager
+      extraSpecialArgs = {
+        flake = config.flake;  # ← Bridge from outer to inner!
+      };
+
+      modules = [
+        config.flake.modules.homeManager.development
+        # ...
+      ];
+    };
+}
+```
+
+**What this does:** Makes `config.flake` from flake-parts available as `flake` parameter in home-manager modules.
+
+**Result in home-manager modules:**
+```nix
+{ config, pkgs, flake, ... }:
+{
+  # flake.* = config.flake from flake-parts (the bridge)
+  # config.* = home-manager config (separate system)
+}
+```
+
+### Access Patterns Reference Table
+
+**READ THIS BEFORE EVERY HOME-MANAGER MODULE IMPLEMENTATION:**
+
+| What You Want | In Home-Manager Module | In Flake-Parts Module | Why |
+|---------------|------------------------|----------------------|-----|
+| Flake input package | `flake.inputs.X.packages.${pkgs.system}.Y` | `inputs.X.packages.${system}.Y` | Flake inputs passed via extraSpecialArgs |
+| Nixpkgs package | `pkgs.git` | `inputs.nixpkgs.legacyPackages.${system}.git` | Home-manager provides `pkgs` automatically |
+| Clan inventory user | `flake.config.clan.inventory.services.users.users.cameron` | `config.flake.config.clan.inventory.services.users.users.cameron` | Clan-core is flake-parts module |
+| Clan vars secret | `config.clan.core.vars.generators.X.files.Y.path` | N/A (wrong layer) | Clan vars in home-manager if imported |
+| Sops-nix secret | `config.sops.secrets."user/key".path` | N/A (wrong layer) | sops-nix is home-manager module |
+| Another dendritic module | N/A (imported by configurations.nix) | `config.flake.modules.homeManager.shell` | Dendritic modules accessed in flake-parts layer |
+| Home-manager option | `config.programs.git.userName` | N/A (wrong layer) | Home-manager config only in home-manager modules |
+
+### Anti-Patterns - DO NOT USE THESE
+
+**These patterns WILL fail. Do not try them:**
+
+```nix
+# In home-manager module:
+
+# ✗ WRONG - sops-nix is home-manager module, not flake-parts
+flake.config.sops.secrets.*
+
+# ✗ WRONG - programs is home-manager option, not flake-parts
+flake.config.programs.*
+
+# ✗ WRONG - pkgs doesn't exist in flake
+flake.pkgs.*
+
+# ✗ WRONG - inputs doesn't exist in home-manager config
+config.inputs.*
+
+# ✗ WRONG - trying to import dendritic modules in home-manager
+imports = [ flake.modules.homeManager.shell ];  # Causes recursion
+```
+
+### test-clan Specific Reality: Clan Vars, NOT sops-nix
+
+**CRITICAL FACT:** test-clan does NOT have sops-nix configured. It uses clan vars.
+
+**Proof:**
+```bash
+cd ~/projects/nix-workspace/test-clan
+ls sops/
+# Shows: vars/ (clan vars), NOT secrets/ (sops-nix)
+```
+
+**Implications:**
+
+```nix
+# ✗ DOES NOT WORK in test-clan (no sops-nix)
+config.sops.secrets."user/signing-key".path
+
+# ✓ CORRECT for test-clan (clan vars, if configured)
+config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path
+
+# ✓ CORRECT for accessing clan inventory
+flake.config.clan.inventory.services.users.users.cameron.name
+```
+
+**Why clan inventory works but sops doesn't:**
+- Clan inventory (`flake.config.clan.inventory.*`): Clan-core IS a flake-parts module, so `config.flake.config.clan.*` exists
+- Sops secrets (`config.sops.*`): sops-nix is a HOME-MANAGER module (if imported), exists in home-manager `config`, NOT in `flake.config`
+
+### Pattern A Home-Manager Modules (Story 1.10BA Validated)
+
+**Correct structure for dendritic home-manager modules:**
+
+```nix
+# File: modules/home/development/git.nix
+{ ... }:  # Flake-parts module (outer)
+{
+  # CORRECT: Explicit braces pattern
+  flake.modules = {
+    homeManager.development =
+      { pkgs, lib, flake, ... }:  # Home-manager module (inner)
+      {
+        programs.git = {
+          package = pkgs.gitFull;  # ✓ Use pkgs for nixpkgs packages
+
+          # ✓ Access flake inputs via extraSpecialArgs
+          # signing.key = flake.inputs.sops-nix...;  # (if sops-nix used)
+
+          # ✓ Access home-manager config
+          userName = lib.mkDefault "Cameron Smith";
+        };
+      };
+  };
+}
+```
+
+**WRONG structure (causes errors):**
+
+```nix
+# ✗ WRONG - dot notation instead of explicit braces
+flake.modules.homeManager.development =
+  { pkgs, ... }:
+  {
+    programs.git = { ... };
+  };
+```
+
+**Why explicit braces matter:** Dendritic import-tree requires the explicit `flake.modules = { ... }` structure for proper module merging during flake-parts evaluation.
+
+### Diagnostic Questions for Access Patterns
+
+**When you want to access something, ask these questions in order:**
+
+**Q1: Is it a flake input?**
+- ✅ YES → Use `flake.inputs.*` (via extraSpecialArgs in home-manager)
+
+**Q2: Is it from a FLAKE-PARTS module (clan-core, custom flake-parts modules)?**
+- ✅ YES → Use `flake.config.*` (via extraSpecialArgs in home-manager)
+- Example: `flake.config.clan.inventory.*`
+
+**Q3: Is it from a HOME-MANAGER module (sops-nix, catppuccin-nix.homeManagerModules)?**
+- ✅ YES → Use `config.*` (home-manager config)
+- Example: `config.sops.secrets.*`, `config.programs.*`
+
+**Q4: Is it a nixpkgs package?**
+- ✅ YES → Use `pkgs.*` (always available in home-manager)
+
+**Q5: Is it another dendritic module?**
+- ✅ In flake-parts layer: Use `config.flake.modules.homeManager.*`
+- ❌ In home-manager layer: DO NOT import (already imported by configurations.nix)
+
+### Verification Commands
+
+**When in doubt, check what actually exists:**
+
+```bash
+# What's in flake outputs?
+cd ~/projects/nix-workspace/test-clan
+nix flake show
+# Shows: packages, homeConfigurations, etc.
+# Does NOT show: config, flake.config (evaluation-time only)
+
+# What's available via extraSpecialArgs.flake?
+# It's: config.flake from flake-parts
+# Contains: inputs, modules, config.clan (if imported)
+# Does NOT contain: sops, programs, home (those are home-manager)
+
+# What modules are imported?
+rg "imports.*clan-core" modules/
+rg "imports.*sops-nix" modules/
+# If sops-nix not found → config.sops.* doesn't exist
+```
+
+### Common Error Messages and Fixes
+
+**Error: "attribute 'config' missing"**
+```nix
+# ✗ WRONG
+programs.git.signing.key = flake.config.sops.secrets."user/key".path;
+
+# ✓ CORRECT
+programs.git.signing.key = config.sops.secrets."user/key".path;
+# (But only if sops-nix is imported!)
+```
+
+**Error: "attribute 'sops' missing"**
+```nix
+# Check: Is sops-nix imported?
+rg "sops-nix" modules/
+
+# If NOT imported, don't try to use config.sops.*
+# Use clan vars instead:
+programs.git.signing.key = config.clan.core.vars.generators.ssh-key.files.*.path;
+```
+
+**Error: "infinite recursion"**
+```nix
+# ✗ WRONG - trying to import dendritic module in home-manager module
+{ flake, ... }: {
+  imports = [ flake.modules.homeManager.shell ];  # Recursion!
+}
+
+# ✓ CORRECT - import in configurations.nix (flake-parts layer)
+{ config, ... }: {
+  flake.homeConfigurations.user = homeManagerConfiguration {
+    modules = [
+      config.flake.modules.homeManager.development
+      config.flake.modules.homeManager.shell  # Import here
+    ];
+  };
+}
+```
+
+### Summary: The Two-Layer Mental Model
+
+**Always remember:**
+
+1. **Flake-parts layer (outer):** Where dendritic modules live
+   - Access: `config.flake.*`, `inputs.*`
+   - Purpose: Define what home-manager modules exist
+
+2. **Home-manager layer (inner):** What dendritic modules return
+   - Access: `config.*`, `pkgs.*`, `flake.*` (via extraSpecialArgs)
+   - Purpose: Configure user environment
+
+3. **The bridge:** `extraSpecialArgs.flake = config.flake`
+   - Makes flake-parts data available in home-manager
+   - Does NOT merge the two `config` objects
+
+4. **Key insight:** `flake.config.*` only contains data from FLAKE-PARTS modules (like clan-core), NOT from home-manager modules (like sops-nix)
+
+**When you write code, always know which layer you're in:**
+- In a dendritic .nix file outer scope? → Flake-parts layer
+- In the function returned by dendritic module? → Home-manager layer
+
 ## References
 
 - **test-clan README**: `~/projects/nix-workspace/test-clan/README.md`
@@ -732,3 +1091,4 @@ Once Epic 1 completes with GO decision (Story 1.12), migrate patterns to infra:
 - **Epic breakdown**: `~/projects/nix-workspace/infra/docs/notes/development/epics.md`
 - **Sprint status**: `~/projects/nix-workspace/infra/docs/notes/development/sprint-status.yaml`
 - **Terranix pattern**: `~/projects/nix-workspace/infra/docs/notes/implementation/clan-infra-terranix-pattern.md`
+- **Story 1.10BA work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10BA-refactor-pattern-a.md` (Pattern A validation)
