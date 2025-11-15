@@ -172,7 +172,8 @@ development_status:
   # Estimated effort: 4-6 hours (2h setup + 1-2h access patterns + 1h validation + 1h docs)
   # Dependencies: Story 1.10BA (done), Blocks: Story 1.10D (features need secrets), Story 1.12 (deployment needs secrets)
   # DRAFTED (2025-11-15): Comprehensive story file created with 24 ACs, 7 tasks, security protocol documented
-  1-10c-migrate-secrets-clan-vars: drafted
+  # READY-FOR-DEV (2025-11-15): Story context XML generated with comprehensive docs/code artifacts/constraints
+  1-10c-migrate-secrets-clan-vars: ready-for-dev
   # Story 1.10D: NEW STORY (2025-11-14) - Enable Features Using Clan Vars and Flake Inputs
   # Feature enablement deferred from Story 1.10BA (original AC17-AC20) - requires clan vars infrastructure first
   # Enable 11 disabled features from Story 1.10B using Pattern A + clan vars architecture
