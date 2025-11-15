@@ -728,6 +728,7 @@ Once Epic 1 completes with GO decision (Story 1.12), migrate patterns to infra:
 ## 11. Module System Architecture - Flake-Parts + Home-Manager Nesting
 
 **Updated**: 2025-11-14 (Stories 1.10B, 1.10BA complete)
+**Note**: Story 1.10BA validated structural Pattern A only; feature restoration deferred to Story 1.10D (depends on Story 1.10C clan vars infrastructure).
 
 **Critical for all development:** This section explains the nested module system architecture that causes the most agent confusion. Read this FIRST before working with home-manager modules.
 
@@ -912,13 +913,22 @@ imports = [ flake.modules.homeManager.shell ];  # Causes recursion
 
 ### test-clan Specific Reality: Clan Vars, NOT sops-nix
 
-**CRITICAL FACT:** test-clan does NOT have sops-nix configured. It uses clan vars.
+**CRITICAL FACT:** test-clan uses clan vars for secrets management (NOT sops-nix for home-manager modules). After Story 1.10BA (structural Pattern A), Story 1.10C will migrate to clan vars, and Story 1.10D will enable features.
+
+**Current State (Post-Story 1.10BA, 2025-11-14):**
+- sops-nix: Machine/terraform secrets active (`sops/secrets/*-age.key`, `hetzner-api-token`), user/home-manager secrets DISABLED (commented pending migration)
+- Clan vars: Infrastructure exists (`vars/shared/`, `vars/per-machine/`), home-manager integration PENDING Story 1.10C
+- All secrets references in home-manager modules: COMMENTED OUT with Story 1.10C TODOs
+- Story 1.10C will establish clan vars infrastructure for home-manager modules
+- Story 1.10D will enable features (SSH signing, MCP API keys, GLM wrapper) using clan vars
 
 **Proof:**
 ```bash
 cd ~/projects/nix-workspace/test-clan
-ls sops/
-# Shows: vars/ (clan vars), NOT secrets/ (sops-nix)
+ls sops/         # Shows: secrets/ (machine keys), machines/, users/
+ls vars/         # Shows: shared/ (user-password-cameron), per-machine/ (cinnabar, electrum, gcp-vm)
+rg "sops.secrets" modules/home/     # All occurrences COMMENTED OUT
+rg "clan.core.vars" modules/home/   # All occurrences COMMENTED OUT (Story 1.10C targets)
 ```
 
 **Implications:**
