@@ -148,19 +148,18 @@ development_status:
   # Story 1.10BA inserted to refactor Pattern B → Pattern A before Story 1.10C
   # Strategic value: Provided empirical evidence that Pattern B is architectural dead end
   1-10b-migrate-home-manager-modules: done
-  # Story 1.10BA: DISCOVERED STORY (2025-11-14) - Refactor Home-Manager Modules from Pattern B to Pattern A
-  # CRITICAL ARCHITECTURAL CORRECTION based on Story 1.10B empirical evidence
-  # Refactors 17 modules from Pattern B (underscore dirs, plain modules) to Pattern A (drupol multi-aggregate)
-  # Aggregate organization: development (7), ai (4), shell (6) following drupol reference pattern
-  # Restores 11 disabled features: SSH signing, MCP API keys, GLM wrapper, themes, custom packages
-  # Fixes darwinConfigurations.blackphos.system build failure (lazyvim flake input accessible)
-  # Pattern A benefits: flake context access, aggregate namespaces, industry-standard (gaetanlepage + drupol)
-  # Validation experiment (AC A): 1h to prove Pattern A works before full refactoring (de-risks)
-  # Estimated effort: 8-10 hours (1h validation + 5-6h refactoring + 2-3h user updates + 1h docs)
-  # Dependencies: Story 1.10B (done - provided evidence), Blocks: Story 1.10C (needs flake context)
-  # Strategic value: Aligns with references, unblocks Story 1.10C, validates Party Mode review, Epic 2-6 pattern
-  # Context generated 2025-11-14: Comprehensive context XML following Story 1.10A baseline quality (5/5)
-  1-10ba-refactor-pattern-a: in-progress
+  # Story 1.10BA: DONE (2025-11-14) - Refactor Home-Manager Modules from Pattern B to Pattern A
+  # ✅ SCOPE ADJUSTED: Feature restoration (original AC17-AC20) moved to Story 1.10D
+  # Structural Pattern A migration COMPLETE: All 16 modules use explicit flake.modules = { ... } pattern
+  # Aggregate organization validated: development (7), ai (4), shell (6) following drupol reference
+  # All 3 critical builds passing: crs58, raquel, blackphos (darwinConfigurations build FIXED)
+  # Pattern A benefits validated: flake context access, aggregate namespaces, industry-standard
+  # Actual effort: ~4 hours (vs 8-10h estimated - structural work only, features deferred to 1.10D)
+  # Party Mode architectural review validated empirically
+  # Feature restoration deferred rationale: test-clan uses clan vars (not sops-nix), requires Story 1.10C infrastructure first
+  # Dependencies: Story 1.10B (done), Blocks: Story 1.10C (modules have flake context), Story 1.10D (deferred features)
+  # Strategic value achieved: Validates Pattern A at scale, unblocks Story 1.10C, provides Epic 2-6 pattern
+  1-10ba-refactor-pattern-a: done
   # Story 1.10C: DISCOVERED STORY (2025-11-14) - Migrate Secrets from sops-nix to Clan Vars
   # Secrets management gap identified - Story 1.8 deferred, Story 1.10 never addressed (0% secrets coverage)
   # infra has 6 sops-nix encrypted files (signing keys, API keys), test-clan has zero clan vars generators
@@ -171,8 +170,20 @@ development_status:
   # Clan vars IS sops-nix (declarative interface wrapper), darwin-compatible, recommended by clan-core
   # UPDATE (Post-Story 1.10BA): Pattern A provides flake context for clan vars access (sops-nix re-enabled)
   # Estimated effort: 4-6 hours (2h setup + 1-2h access patterns + 1h validation + 1h docs)
-  # Dependencies: Story 1.10BA (modules must have flake context before clan vars migration)
+  # Dependencies: Story 1.10BA (done), Blocks: Story 1.10D (features need secrets), Story 1.12 (deployment needs secrets)
   1-10c-migrate-secrets-clan-vars: backlog
+  # Story 1.10D: NEW STORY (2025-11-14) - Enable Features Using Clan Vars and Flake Inputs
+  # Feature enablement deferred from Story 1.10BA (original AC17-AC20) - requires clan vars infrastructure first
+  # Enable 11 disabled features from Story 1.10B using Pattern A + clan vars architecture
+  # Category A (5 features): SSH signing (git, jujutsu), MCP API keys (3 servers) via clan vars
+  # Category B (3 features): GLM wrapper, claude-code package, ccstatusline via flake.inputs
+  # Category C (3 features): catppuccin tmux theme (36-line config) via flake.inputs
+  # Access patterns: config.clan.core.vars.generators.X.files.Y.path (secrets), flake.inputs.X.packages (packages)
+  # Validates Pattern A + clan vars work for production features (not just minimal structure)
+  # Estimated effort: 2-3 hours (30min SSH + 30min MCP + 1h packages/themes + 1h validation/docs)
+  # Dependencies: Story 1.10C (clan vars infrastructure), Blocks: Story 1.12 (deployment needs features)
+  # Strategic value: Completes Pattern A + clan vars validation (structure + secrets + features), Epic 2-6 reference
+  1-10d-enable-features-clan-vars: backlog
   # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
   # Now includes type-safe home-manager architecture implementation (phases 1-5)
   # Implements homeHosts options with type validation, smart resolution app, CI checks
