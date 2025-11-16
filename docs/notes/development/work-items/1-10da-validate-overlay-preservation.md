@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** backlog
+**Status:** review
 
 **Created:** 2025-11-16
 
