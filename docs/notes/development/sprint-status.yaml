@@ -215,6 +215,25 @@ development_status:
   # Dependencies: Story 1.10D (Layer 3 foundation) ✅ COMPLETE
   # Blocks: Epic 1 GO/NO-GO decision (Story 1.12) - architectural coverage validation in progress
   1-10da-validate-overlay-preservation: in-progress
+  # Story 1.10DB: READY-FOR-DEV (2025-11-16) - Execute Overlay Architecture Migration from infra to test-clan
+  # DISCOVERED STORY - Party Mode ultrathink (9 agents unanimous) identified Story 1.10DA empirical validation gap
+  # Story 1.10DA (theoretical documentation) vs Story 1.10DB (actual migration) per Epic 1 core principle
+  # Epic 1 principle: "Architectural Validation via Pattern Rehearsal" requires DOING IT FOR REAL
+  # Mission: Execute ACTUAL overlay migration (Layers 1,2,4,5), validate all 5 layers work, prove hybrid pattern
+  # Context file generated: 1130 lines comprehensive dev context (all source code, migration steps, validation commands)
+  # Five-layer migration targets:
+  #   Layer 1: infra/overlays/inputs.nix → test-clan/modules/flake-parts/overlays/inputs.nix
+  #   Layer 2: infra/overlays/infra/hotfixes.nix → test-clan/modules/flake-parts/overlays/hotfixes.nix
+  #   Layer 4: infra/overlays/overrides/default.nix → test-clan/modules/flake-parts/overlays/overrides.nix
+  #   Layer 5: infra flake.nix inputs.nuenv → test-clan nixpkgs.nix overlays array
+  #   Layer 3: Already validated (Story 1.10D ccstatusline, zero regression requirement)
+  # Hybrid pattern proof: drupol-dendritic-infra (overlays array + pkgsDirectory coexist in same perSystem)
+  # Estimated effort: 2-3 hours (matches Story 1.10D complexity, similar validation rigor)
+  # Target quality: Match Story 1.10D Section 13.1 (9.5/10 clarity, empirical evidence, production-ready)
+  # Strategic value: Achieves 95% Epic 1 coverage with EMPIRICAL validation, removes Epic 2-6 blocker
+  # Dependencies: Story 1.10D (done, Layer 3 foundation), Story 1.10DA (in-progress, theoretical foundation)
+  # Blocks: Story 1.12 (GO/NO-GO decision requires 95% Epic 1 coverage with empirical validation)
+  1-10db-execute-overlay-architecture-migration: ready-for-dev
   # Story 1.10E: RENAMED (2025-11-16) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
   # Previously Story 1.10D (2025-11-14), renamed during epic reordering to resolve dependency on ccstatusline package
   # Story 1.10C already enabled 9/11 features (sops-nix patterns: direct path, sops.placeholder, runtime cat, activation scripts)
