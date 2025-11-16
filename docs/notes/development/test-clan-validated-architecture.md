@@ -1094,6 +1094,380 @@ programs.git.signing.key = config.clan.core.vars.generators.ssh-key.files.*.path
 - In a dendritic .nix file outer scope? → Flake-parts layer
 - In the function returned by dendritic module? → Home-manager layer
 
+## 12. Two-Tier Secrets Architecture - System vs User Secrets
+
+**Added**: 2025-11-16 (Story 1.10C complete)
+**Critical Discovery**: clan vars module incompatible with home-manager context
+
+### The Problem: Clan Vars + Home-Manager Incompatibility
+
+During Story 1.10C implementation (2025-11-15), we discovered a **critical architectural limitation**:
+
+**clan vars module** (`clan-core.nixosModules.clanCore.vars`) is **NixOS-specific** and **cannot be imported** into home-manager modules.
+
+**Evidence**:
+- Zero reference repos use clan vars in home-manager modules (mic92, qubasa, pinpox, jfly, enzime, clan-infra, onix examined)
+- Clan vars module expects `_class` parameter (NixOS/nix-darwin module system concept)
+- Home-manager module system does NOT provide `_class` parameter
+- Attempting to import clan vars in home-manager causes evaluation error: "attribute '_class' missing"
+
+**Implication**: Clan vars designed for **SYSTEM-level** secrets (machine configuration), NOT **USER-level** secrets (home-manager).
+
+### The Solution: Two-Tier Secrets Architecture
+
+We validated a **two-tier architecture** that cleanly separates system secrets from user secrets:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ TIER 1: System-Level Secrets (NixOS/nix-darwin)                │
+│                                                                 │
+│ Technology: clan vars                                           │
+│ Scope:      Machine/system configuration                       │
+│ Module:     clan-core.nixosModules.clanCore.vars               │
+│ Storage:    vars/shared/, vars/per-machine/                    │
+│ Access:     config.clan.core.vars.generators.*                 │
+│                                                                 │
+│ Use Cases:                                                      │
+│   - Machine identity (user passwords, system SSH keys)         │
+│   - System services (VPN credentials, API tokens for daemons)  │
+│   - Infrastructure (Terraform tokens, DNS keys)                │
+│   - Deployment automation (clan machines update)               │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ TIER 2: User-Level Secrets (home-manager)                      │
+│                                                                 │
+│ Technology: sops-nix                                            │
+│ Scope:      Per-user home-manager configuration                │
+│ Module:     sops-nix.homeManagerModules.sops                   │
+│ Storage:    secrets/home-manager/users/{user}/secrets.yaml     │
+│ Access:     config.sops.secrets.*                              │
+│                                                                 │
+│ Use Cases:                                                      │
+│   - Personal credentials (GitHub tokens, SSH signing keys)     │
+│   - Development tools (API keys for AI services, MCP servers)  │
+│   - Shell environment (atuin sync keys, bitwarden email)       │
+│   - User-specific configs (git signing, ssh config)            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Principle**: **Both tiers can use the SAME age keypair** (one per user), simplifying key management while maintaining architectural separation.
+
+### Age Key Reuse Pattern
+
+**ONE SSH keypair** (stored in Bitwarden) derives **ONE age keypair** used in **THREE contexts**:
+
+1. **infra repository**: sops-nix home-manager (user's workstation `~/.config/sops/age/keys.txt`)
+2. **clan user management**: Tier 1 system secrets (clan-core `sops/users/{user}/key.json`)
+3. **test-clan repository**: sops-nix home-manager (Epic 1 validation, same pattern as infra)
+
+**Workflow**:
+```bash
+# Source of truth: Bitwarden SSH key
+bw get item "sops-admin-user-ssh"
+
+# Derive age PUBLIC key (deterministic, one-way)
+age_pub=$(bw get item "sops-admin-user-ssh" | jq -r '.sshKey.publicKey' | ssh-to-age)
+# Output: age1vn8fpkmkzkjttcuc3prq3jrp7t5fsrdqey74ydu5p88keqmcupvs8jtmv8
+
+# Use in THREE contexts:
+
+# Context 1: clan user (for system-level clan vars)
+clan secrets users add crs58 --age-key "$age_pub"
+# Stores in: sops/users/crs58/key.json
+
+# Context 2: sops-nix .sops.yaml (for user-level secrets)
+# Add to .sops.yaml keys section:
+#   - &crs58-user age1vn8fpkmkzkjttcuc3prq3jrp7t5fsrdqey74ydu5p88keqmcupvs8jtmv8
+
+# Context 3: User's workstation age private key
+age_priv=$(bw get item "sops-admin-user-ssh" | jq -r '.sshKey.privateKey' | ssh-to-age -private-key)
+echo "$age_priv" >> ~/.config/sops/age/keys.txt
+```
+
+**Validation** (ensure correspondence across all three contexts):
+```bash
+# Extract from each context
+clan_age=$(jq -r '.[0].publickey' sops/users/crs58/key.json)
+yaml_age=$(grep "crs58-user" .sops.yaml | awk '{print $NF}')
+work_age=$(age-keygen -y < <(grep "AGE-SECRET-KEY" ~/.config/sops/age/keys.txt | tail -1))
+
+# Verify all match
+if [ "$clan_age" = "$yaml_age" ] && [ "$yaml_age" = "$work_age" ]; then
+  echo "✅ Age keys correspond across all contexts"
+else
+  echo "❌ CRITICAL: Age key mismatch!"
+fi
+```
+
+**Benefit**: Single key management burden, multiple usage contexts. User generates ONE SSH key in Bitwarden → derives ONE age key → uses everywhere.
+
+### sops-nix Home-Manager Integration Patterns
+
+Story 1.10C validated **three production-ready patterns** for sops-nix in home-manager:
+
+#### Pattern 1: Direct Secret Path Access
+
+**Use case**: Simple path reference to decrypted secret
+
+**Example** (git.nix):
+```nix
+{ config, ... }: {
+  programs.git.signing.key = config.sops.secrets.ssh-signing-key.path;
+  # Path resolves to: /run/user/501/secrets.d/ssh-signing-key (macOS)
+  # Path resolves to: /run/user/1000/secrets.d/ssh-signing-key (Linux)
+}
+```
+
+**Deployment**: sops-nix creates symlink at `config.sops.secrets.{name}.path` pointing to runtime secrets directory.
+
+#### Pattern 2: sops.templates for Config File Generation
+
+**Use case**: Generate entire config file with secret placeholders
+
+**Example** (mcp-servers.nix):
+```nix
+{ config, pkgs, ... }: {
+  sops.templates."mcp-firecrawl" = {
+    mode = "0400";
+    path = "${config.xdg.configHome}/claude-code/mcp-servers/firecrawl.json";
+    content = ''
+      {
+        "mcpServers": {
+          "firecrawl": {
+            "command": "${pkgs.npx}/bin/npx",
+            "args": ["-y", "@mendable/firecrawl-mcp-server"],
+            "env": {
+              "FIRECRAWL_API_KEY": "${config.sops.placeholder."firecrawl-api-key"}"
+            }
+          }
+        }
+      }
+    '';
+  };
+}
+```
+
+**Advantages**:
+- **Security**: Secret never exposed in process arguments (unlike environment variables)
+- **Atomic**: Config file generated with secrets already populated
+- **Clean**: No activation scripts needed, declarative
+
+**How it works**:
+1. sops-nix creates template file at specified path
+2. `sops.placeholder."secret-name"` replaced with actual secret value from decrypted secrets file
+3. File permissions set per `mode` specification
+4. File atomically written during home-manager activation
+
+#### Pattern 3: Activation Script with Symlinks
+
+**Use case**: Deploy secret to location expected by external tool
+
+**Example** (atuin.nix):
+```nix
+{ config, ... }: {
+  home.activation.deployAtuinKey = ''
+    $DRY_RUN_CMD mkdir -p ${config.xdg.configHome}/atuin
+    $DRY_RUN_CMD ln -sf \
+      ${config.sops.secrets.atuin-key.path} \
+      ${config.xdg.configHome}/atuin/key
+  '';
+}
+```
+
+**Use when**: External tool expects secret at specific hardcoded path not configurable via config file.
+
+**Caution**: Activation scripts run at every `home-manager switch`, idempotency required.
+
+### Multi-User Encryption and Isolation
+
+sops-nix supports **per-user secret files** with **multi-user encryption** via `.sops.yaml` creation rules:
+
+**Example** (.sops.yaml):
+```yaml
+keys:
+  - &admin age1vy7wsnf8eg5229evq3ywup285jzk9cntsx5hhddjtwsjh0kf4c6s9fmalv
+  - &crs58-user age1vn8fpkmkzkjttcuc3prq3jrp7t5fsrdqey74ydu5p88keqmcupvs8jtmv8
+  - &raquel-user age12w0rmmskrds6m334w7qrcmpms5lpe3llah6wf8ry5jtatvuxku2sarl8ut
+
+creation_rules:
+  # crs58/cameron: 8 secrets (development + ai + shell aggregates)
+  - path_regex: secrets/home-manager/users/crs58/.*\.yaml$
+    key_groups:
+      - age: [*admin, *crs58-user]
+
+  # raquel: 5 secrets (development + shell, no ai aggregate)
+  - path_regex: secrets/home-manager/users/raquel/.*\.yaml$
+    key_groups:
+      - age: [*admin, *raquel-user]
+```
+
+**Security properties**:
+- crs58 can decrypt ONLY crs58's secrets (requires crs58-user private key)
+- raquel can decrypt ONLY raquel's secrets (requires raquel-user private key)
+- admin can decrypt ALL secrets (recovery/ops key)
+- Secrets file paths enforce isolation: `secrets/home-manager/users/{user}/secrets.yaml`
+
+**Module pattern** (per-user sops configuration):
+```nix
+# modules/home/users/crs58/default.nix
+{ flake, ... }: {
+  flake.modules.homeManager."users/crs58" = { config, flake, ... }: {
+    sops = {
+      defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
+      secrets = {
+        github-token = { };
+        ssh-signing-key = { mode = "0400"; };
+        ssh-public-key = { };  # For allowed_signers template
+        glm-api-key = { };
+        firecrawl-api-key = { };
+        huggingface-token = { };
+        bitwarden-email = { };
+        atuin-key = { };
+      };
+    };
+  };
+}
+```
+
+**Aggregate pattern** (user imports aggregates, secrets flow through):
+```nix
+# User modules import aggregates
+modules/home/users/crs58/  → imports development, ai, shell aggregates
+modules/home/users/raquel/ → imports development, shell aggregates (NO ai)
+
+# Aggregates access secrets conditionally
+modules/home/ai/claude-code/mcp-servers.nix:
+  # Only works for users who import ai aggregate + have secrets defined
+  sops.templates."mcp-firecrawl" = {
+    content = ''... ${config.sops.placeholder."firecrawl-api-key"} ...''
+  };
+```
+
+**Result**: Secret declarations in user module + aggregate imports = scoped access.
+
+### Implementation Evidence (Story 1.10C)
+
+**Code locations** (test-clan repository):
+- `.sops.yaml`: Multi-user encryption rules (lines 1-23)
+- `modules/home/base/sops.nix`: Base sops-nix module (imports sops-nix, sets age.keyFile)
+- `modules/home/users/crs58/default.nix`: crs58 sops secrets (8 secrets declared, sops.templates for allowed_signers)
+- `modules/home/users/raquel/default.nix`: raquel sops secrets (5 secrets declared)
+- `modules/home/development/git.nix`: Pattern 1 (direct path access for signing.key)
+- `modules/home/ai/claude-code/mcp-servers.nix`: Pattern 2 (sops.templates for Firecrawl, HuggingFace)
+- `modules/home/shell/atuin.nix`: Pattern 3 (activation script symlink)
+- `modules/home/shell/rbw.nix`: Pattern 2 (sops.templates for rbw config.json)
+
+**Build validation** (AC16, 2025-11-16):
+```bash
+# All builds PASSED
+nix build .#darwinConfigurations.blackphos.system --no-link  # ✅ SUCCESS
+nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage --no-link  # ✅ SUCCESS
+nix build .#homeConfigurations.aarch64-darwin.raquel.activationPackage --no-link  # ✅ SUCCESS
+```
+
+**Security validation**:
+- Zero private keys committed to repository (AGE-SECRET-KEY, BEGIN PRIVATE KEY) ✅
+- All secrets files encrypted (ASCII text format, sops-encrypted) ✅
+- `.gitignore` excludes `~/.config/sops/age/keys.txt` ✅
+
+### Architectural Lessons for Epic 2-6
+
+**What worked**:
+1. **Two-tier separation**: Clean boundary between system (clan vars) and user (sops-nix) secrets
+2. **Age key reuse**: Single keypair works for both tiers (simpler management)
+3. **sops.templates pattern**: Exceeds expectations, production-ready for Epic 2-6
+4. **Multi-user isolation**: Separate secrets files prevent cross-user access
+5. **Pattern A compatibility**: sops-nix works seamlessly with dendritic flake-parts modules
+
+**What didn't work**:
+1. **Clan vars in home-manager**: Technical impossibility due to `_class` parameter requirement
+2. **Shared secrets file**: Attempted initially, abandoned for per-user files (better isolation)
+
+**Epic 2-6 migration readiness**:
+- **Pattern validated**: test-clan proves sops-nix + Pattern A works at scale (2 users, 8+5 secrets)
+- **Documentation complete**: Age key management guide (`test-clan/docs/guides/age-key-management.md`)
+- **Onboarding workflow**: Step-by-step process for adding new users (Bitwarden → age keys → clan → sops-nix)
+- **Multi-machine ready**: Same pattern replicates across 6 machines (4 darwin + 2 NixOS)
+
+**Critical dependencies**:
+- Bitwarden as source of truth (SSH keys stored in vault)
+- `bw` CLI for age key derivation (`ssh-to-age` tool)
+- `~/.config/sops/age/keys.txt` on every user's workstation
+- `.sops.yaml` creation rules per repository
+- Encrypted secrets files per user in repository
+
+### Diagnostic Questions
+
+When implementing secrets in home-manager modules, ask:
+
+**Q1: Is this a system-level secret or user-level secret?**
+- System (machine identity, system services) → Use clan vars (NixOS/darwin module)
+- User (personal credentials, dev tools) → Use sops-nix (home-manager module)
+
+**Q2: Am I in a home-manager module context?**
+- YES → Use sops-nix (`config.sops.secrets.*`)
+- NO (NixOS/darwin system module) → Use clan vars (`config.clan.core.vars.*`)
+
+**Q3: Do I need to generate a config file with secrets?**
+- YES → Use sops.templates pattern (Pattern 2)
+- NO (just need secret path) → Use direct path access (Pattern 1)
+
+**Q4: Does the tool expect secret at specific hardcoded path?**
+- YES → Use activation script symlink (Pattern 3)
+- NO → Use sops.templates or direct path
+
+**Q5: Is the secret shared across multiple users?**
+- YES → Create shared secrets file with multi-user encryption rule
+- NO → Use per-user secrets file (recommended for isolation)
+
+### Quick Reference
+
+**Tier 1 (System Secrets - clan vars)**:
+```nix
+# In NixOS/darwin module
+{ config, ... }: {
+  # Declare generator
+  clan.core.vars.generators.user-password-cameron = {
+    files."password.txt".secret = true;
+    script = ''mkpasswd -m bcrypt > "$facts/password.txt"'';
+  };
+
+  # Access secret
+  users.users.cameron.hashedPasswordFile =
+    config.clan.core.vars.generators.user-password-cameron.files."password.txt".path;
+}
+```
+
+**Tier 2 (User Secrets - sops-nix)**:
+```nix
+# In home-manager module
+{ config, flake, ... }: {
+  sops = {
+    defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
+    secrets.github-token = { };
+  };
+
+  # Pattern 1: Direct path access
+  programs.git.extraConfig.credential.helper =
+    "!f() { echo \"password=$(cat ${config.sops.secrets.github-token.path})\"; }; f";
+
+  # Pattern 2: sops.templates
+  sops.templates."config.json" = {
+    content = ''{"token": "${config.sops.placeholder."github-token"}"}''
+    path = "${config.xdg.configHome}/app/config.json";
+  };
+}
+```
+
+**Age key correspondence validation**:
+```bash
+# Ensure same age public key in all three contexts
+jq -r '.[0].publickey' sops/users/crs58/key.json  # Clan
+grep "crs58-user" .sops.yaml | awk '{print $NF}'  # sops-nix
+age-keygen -y < <(grep "AGE-SECRET-KEY" ~/.config/sops/age/keys.txt | tail -1)  # Workstation
+```
+
 ## References
 
 - **test-clan README**: `~/projects/nix-workspace/test-clan/README.md`
