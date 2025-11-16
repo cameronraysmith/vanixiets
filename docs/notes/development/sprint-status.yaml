@@ -214,8 +214,8 @@ development_status:
   # Next: Address review findings, then story-done
   # Dependencies: Story 1.10D (Layer 3 foundation) ✅ COMPLETE
   # Blocks: Epic 1 GO/NO-GO decision (Story 1.12) - architectural coverage validation in progress
-  1-10da-validate-overlay-preservation: in-progress
-  # Story 1.10DB: READY-FOR-DEV (2025-11-16) - Execute Overlay Architecture Migration from infra to test-clan
+  1-10da-validate-overlay-preservation: done
+  # Story 1.10DB: IN PROGRESS (2025-11-16) - Execute Overlay Architecture Migration from infra to test-clan
   # DISCOVERED STORY - Party Mode ultrathink (9 agents unanimous) identified Story 1.10DA empirical validation gap
   # Story 1.10DA (theoretical documentation) vs Story 1.10DB (actual migration) per Epic 1 core principle
   # Epic 1 principle: "Architectural Validation via Pattern Rehearsal" requires DOING IT FOR REAL
@@ -233,7 +233,7 @@ development_status:
   # Strategic value: Achieves 95% Epic 1 coverage with EMPIRICAL validation, removes Epic 2-6 blocker
   # Dependencies: Story 1.10D (done, Layer 3 foundation), Story 1.10DA (in-progress, theoretical foundation)
   # Blocks: Story 1.12 (GO/NO-GO decision requires 95% Epic 1 coverage with empirical validation)
-  1-10db-execute-overlay-architecture-migration: ready-for-dev
+  1-10db-execute-overlay-architecture-migration: in-progress
   # Story 1.10E: RENAMED (2025-11-16) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
   # Previously Story 1.10D (2025-11-14), renamed during epic reordering to resolve dependency on ccstatusline package
   # Story 1.10C already enabled 9/11 features (sops-nix patterns: direct path, sops.placeholder, runtime cat, activation scripts)
