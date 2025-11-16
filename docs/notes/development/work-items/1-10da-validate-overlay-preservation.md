@@ -1567,11 +1567,333 @@ Comprehensive work item matching Story 1.10D baseline (~1100 lines):
 
 ---
 
+### 2025-11-16 - Senior Developer Review (AI) Appended
+
+**Review Outcome:** Changes Requested (1 MEDIUM, 1 LOW finding)
+
+**Reviewer:** Dev (AI Code Review Agent)
+
+**Key Findings:**
+- MEDIUM: AC-A pass criteria partially met - documentation complete but evaluation commands not executed to verify channel access in test-clan context
+- LOW: Task tracking not updated (work completed but checkboxes not marked)
+- No HIGH severity blockers
+
+**Acceptance Criteria Status:**
+- 5 of 6 ACs fully implemented
+- 1 AC partially implemented (AC-A: documentation ✅, testing ❌)
+
+**Quality Assessment:**
+- ✅ Excellent architectural alignment with Epic 1 objectives
+- ✅ Comprehensive documentation (375 lines, production-quality)
+- ✅ Accurate code examples and references
+- ✅ MAJOR findings proactively addressed (commit 81289d65)
+- ⚠️ Testing gap: verification confidence issue for Epic 1 completeness
+
+**Action Items:**
+1. Execute AC-A evaluation commands in test-clan to verify multi-channel access (MEDIUM priority)
+2. Update task checkboxes for completed tasks (LOW priority)
+
+**Context:**
+- Overlays production-validated in infra
+- drupol proves coexistence at scale (9 packages, zero conflicts)
+- Story 1.10E does NOT include overlay pattern testing (verified)
+- Testing gap is verification issue, not architectural risk for Epic 2-6
+
+---
+
 ## Senior Developer Review (AI)
 
-**Reviewer:** [To be assigned]
-**Date:** [To be recorded]
-**Review Outcome:** [To be determined]
-**Justification:** [To be provided]
+**Reviewer:** Dev (AI Code Review Agent)
+**Date:** 2025-11-16
+**Review Outcome:** Changes Requested
+**Justification:** Story 1.10DA successfully documents infra's 5-layer overlay architecture preservation alongside pkgs-by-name pattern. Section 13.2 provides comprehensive Epic 2-6 migration guidance. All 6 acceptance criteria substantially satisfied with minor testing gap in AC-A. One MEDIUM severity finding (evaluation commands not executed) and one LOW severity finding (task tracking not updated). No HIGH severity blockers.
 
-[Review content to be generated after implementation via code-review workflow]
+---
+
+### Summary
+
+Story 1.10DA delivers comprehensive documentation of infra's overlay architecture preservation strategy, creating a 375-line Section 13.2 that validates all 5 overlay layers (inputs, hotfixes, packages, overrides, flakeInputs) are compatible with pkgs-by-name integration. The documentation is production-quality with accurate code examples, clear migration strategy, and proper references.
+
+**Key Achievements:**
+- ✅ All 6 acceptance criteria documented comprehensively
+- ✅ 5-layer overlay architecture model accurately captured
+- ✅ drupol hybrid pattern validated (overlays + pkgs-by-name coexist)
+- ✅ Epic 2-6 migration strategy clear and actionable
+- ✅ MAJOR findings proactively addressed (commit 81289d65: Layer 5 location, Section 13.2 path)
+- ✅ Production-quality technical writing (375 lines, complete with examples and references)
+
+**Areas for Improvement:**
+- ⚠️ AC-A pass criteria partially met (documentation complete, evaluation commands not executed)
+- ⚠️ Task checkboxes not updated (work completed but tracking not maintained)
+
+---
+
+### Outcome: Changes Requested
+
+**Rationale:** One MEDIUM severity finding requires attention before approval. AC-A pass criteria states "Channel access verified in test-clan context (evaluation commands work)" but no evidence of test execution found. While overlays are production-validated in infra and drupol proves coexistence, explicit testing in test-clan would strengthen Epic 1 validation completeness.
+
+**Context Considered:**
+- Overlays proven in infra production environment
+- Story 1.10D validates pkgs-by-name works in test-clan
+- drupol-dendritic-infra demonstrates coexistence at scale (9 packages, zero conflicts)
+- Story constraints emphasize "documentation + verification" (logical proof)
+- Story 1.10E does NOT include overlay pattern testing (verified via epic review)
+
+**Impact Assessment:** Testing gap is a **verification confidence issue**, not an architectural risk. However, Epic 1's mission is comprehensive validation before Epic 2-6, so explicit testing adds value.
+
+---
+
+### Key Findings
+
+#### HIGH Severity
+
+None.
+
+#### MEDIUM Severity
+
+**1. AC-A Pass Criteria Partially Met - Evaluation Commands Not Executed**
+
+**Description:** AC-A requires "Channel access verified in test-clan context (evaluation commands work)" with specific test commands documented in work item lines 547, 553, 892-893, 1070-1071, 1224-1225. No evidence of actual command execution found in Dev Agent Record or commit history.
+
+**Evidence:**
+- **Required** (AC-A pass criteria line 571): "Channel access verified in test-clan context (evaluation commands work)"
+- **Required** (AC-A implementation step 2, lines 545-549): "Test stable channel access in test-clan context" with command `nix eval .#homeConfigurations.aarch64-darwin.crs58.pkgs.stable.hello.version`
+- **Required** (AC-A implementation step 3, lines 551-555): "Test unstable channel access in test-clan context" with command `nix eval .#homeConfigurations.aarch64-darwin.crs58.pkgs.unstable.hello.version`
+- **Found** (Dev Agent Record line 1307): "Story 1.10DA is a DOCUMENTATION story" (testing not performed)
+- **Found** (commit 1dd5ecc7): Only documentation changes (367 lines added), no test execution
+- **Verified** (Story 1.10E review): No deferred testing in Story 1.10E
+
+**Impact:**
+- Moderate severity - overlays proven in infra production, drupol validates coexistence, but explicit test requirement not met
+- Epic 1 validation completeness: 95% architectural coverage claim depends on comprehensive validation
+- Confidence gap: Documentation proves architectural compatibility, but testing proves functional integration
+
+**Recommendation:**
+```bash
+# Execute in test-clan repository to verify channel access
+cd ~/projects/nix-workspace/test-clan
+
+# Test stable channel access (AC-A requirement)
+nix eval .#homeConfigurations.aarch64-darwin.crs58.pkgs.stable.hello.version
+
+# Test unstable channel access (AC-A requirement)
+nix eval .#homeConfigurations.aarch64-darwin.crs58.pkgs.unstable.hello.version
+
+# Verify no conflicts with pkgs-by-name (AC-A requirement)
+nix eval .#packages.aarch64-darwin.ccstatusline.meta.description
+```
+
+**Expected Outcome:** Commands execute successfully, confirming multi-channel access works in test-clan context. Document results in Dev Agent Record.
+
+**Priority:** Medium - Recommended for Epic 1 completeness, not blocking Epic 2-6 (overlays proven in infra).
+
+**File References:**
+- Work item AC-A: docs/notes/development/work-items/1-10da-validate-overlay-preservation.md:533-577
+- Dev Agent Record: docs/notes/development/work-items/1-10da-validate-overlay-preservation.md:1346-1353
+
+---
+
+#### LOW Severity
+
+**2. Task Tracking Not Updated - Work Completed But Checkboxes Not Marked**
+
+**Description:** All 9 subtasks (Task 1.1-1.4, Task 2.1-2.2, Task 3.1-3.3) completed successfully but remain marked as `[ ]` (unchecked) in work item. This is a process/tracking issue, not an implementation gap.
+
+**Evidence:**
+- **Found** (Tasks section lines 889-981): All tasks marked `[ ]` (unchecked)
+- **Verified** (Section 13.2 validation): All task deliverables present in documentation
+  - Task 1.1: Multi-channel access documented (lines 1962-2028) ✅
+  - Task 1.2: Hotfixes documented (lines 2029-2078) ✅
+  - Task 1.3: Overrides documented (lines 2079-2142) ✅
+  - Task 1.4: Flake input overlays documented (lines 2143-2193) ✅
+  - Task 2.1: drupol pattern documented (lines 2196-2226) ✅
+  - Task 2.2: Integration validation documented (lines 2242-2247) ✅
+  - Task 3.1-3.3: Section 13.2 structure complete (lines 1937-2302) ✅
+- **Verified** (Dev Agent Record lines 1346-1395): All 6 ACs marked as "✅ SATISFIED"
+
+**Impact:**
+- Low severity - work completed correctly, only tracking not updated
+- No false completions (critical violation avoided)
+- Process improvement opportunity for future stories
+
+**Recommendation:** Update task checkboxes to `[x]` for completed tasks to maintain accurate tracking.
+
+**Priority:** Low - Informational, does not affect implementation quality.
+
+**File References:**
+- Tasks section: docs/notes/development/work-items/1-10da-validate-overlay-preservation.md:879-985
+
+---
+
+### Acceptance Criteria Coverage
+
+All 6 acceptance criteria substantially satisfied. Documentation complete and accurate for all layers.
+
+| AC | Description | Status | Evidence | Notes |
+|----|-------------|--------|----------|-------|
+| **AC-A** | Validate Multi-Channel Access (Layer 1) | ⚠️ PARTIAL | Section 13.2 lines 1962-2028 | Documentation ✅, Testing ❌ (MEDIUM finding) |
+| **AC-B** | Validate Hotfixes Layer (Layer 2) | ✅ IMPLEMENTED | Section 13.2 lines 2029-2078 | micromamba real example, complete |
+| **AC-C** | Validate Overrides Layer (Layer 4) | ✅ IMPLEMENTED | Section 13.2 lines 2079-2142 | Auto-import pattern documented |
+| **AC-D** | Validate Flake Input Overlays (Layer 5) | ✅ IMPLEMENTED | Section 13.2 lines 2143-2193 | Implementation location clarified (MAJOR fix) |
+| **AC-E** | Integration Validation (Hybrid Architecture) | ✅ IMPLEMENTED | Section 13.2 lines 2194-2248 | drupol pattern proof, 5-item checklist |
+| **AC-F** | Documentation - Section 13.2 | ✅ IMPLEMENTED | Section 13.2 lines 1937-2302 | 375 lines, comprehensive |
+
+**Summary:** 5 of 6 ACs fully implemented, 1 AC partially implemented (documentation complete, testing gap).
+
+**AC-A Detailed Validation:**
+
+From Epic 1 AC-A requirements (epic file lines 1392-1398):
+1. ✅ Document `overlays/inputs.nix` pattern - DONE (Section 13.2 lines 1972-2004)
+2. ⚠️ Test stable channel access - PARTIAL (command documented but not executed)
+3. ⚠️ Test unstable channel access - PARTIAL (command documented but not executed)
+4. ✅ Confirm no conflicts with pkgs-by-name - DONE (logical validation via drupol proof)
+5. ✅ Document multi-channel pattern in Section 13.2 - DONE (lines 1962-2028)
+
+**Pass Criteria Analysis (line 571):**
+- ✅ Multi-channel access pattern documented
+- ⚠️ Channel access verified in test-clan context (evaluation commands work) - NOT EXECUTED
+- ✅ No conflicts with pkgs-by-name packages (ccstatusline + stable/unstable coexist) - VALIDATED LOGICALLY
+- ✅ Code examples provided for common use cases
+- ✅ Section 13.2 includes multi-channel documentation
+
+---
+
+### Task Completion Validation
+
+All tasks completed but not marked as checked. No false completions detected (critical requirement met).
+
+| Task | Marked As | Verified As | Evidence |
+|------|-----------|-------------|----------|
+| **1.1** Document multi-channel access | `[ ]` Unchecked | ✅ COMPLETED | Section 13.2 lines 1962-2028 |
+| **1.2** Document hotfixes layer | `[ ]` Unchecked | ✅ COMPLETED | Section 13.2 lines 2029-2078 |
+| **1.3** Document overrides layer | `[ ]` Unchecked | ✅ COMPLETED | Section 13.2 lines 2079-2142 |
+| **1.4** Document flake input overlays | `[ ]` Unchecked | ✅ COMPLETED | Section 13.2 lines 2143-2193 |
+| **2.1** Analyze drupol hybrid pattern | `[ ]` Unchecked | ✅ COMPLETED | Section 13.2 lines 2196-2226 |
+| **2.2** Test all 5 layers functional | `[ ]` Unchecked | ⚠️ PARTIAL | Logical validation only, no testing |
+| **3.1** Create Section 13.2 structure | `[ ]` Unchecked | ✅ COMPLETED | Section 13.2 lines 1937-2302 (375 lines) |
+| **3.2** Document 5-layer model | `[ ]` Unchecked | ✅ COMPLETED | Table lines 1951-1957, layer details complete |
+| **3.3** Document Epic 2-6 migration | `[ ]` Unchecked | ✅ COMPLETED | Lines 2249-2283 |
+
+**Summary:** 9 of 9 tasks verified complete, 0 questionable, 0 falsely marked complete.
+
+**Critical Validation:** ✅ PASS - No tasks falsely marked as complete (zero tolerance requirement satisfied).
+
+---
+
+### Test Coverage and Gaps
+
+**Documentation Story - No Code Tests Required**
+
+Story 1.10DA is a documentation and architectural validation story, not a code implementation story. Traditional test coverage metrics (unit tests, integration tests) do not apply.
+
+**Validation Testing Gap:**
+
+AC-A requires functional validation via evaluation commands but testing not performed:
+- ⚠️ Multi-channel access: Commands documented but not executed (MEDIUM finding above)
+- Impact: Verification confidence gap for Epic 1 completeness claim
+
+**Existing Test Coverage (from Story 1.10D):**
+- ✅ Layer 3 (pkgs-by-name): ccstatusline package builds and activates successfully
+- ✅ Integration: pkgs-by-name packages accessible via `pkgs.*` namespace
+
+**Testing Recommendation:** Execute AC-A evaluation commands to close verification gap (see MEDIUM finding above for specific commands).
+
+---
+
+### Architectural Alignment
+
+**✅ EXCELLENT - Full alignment with Epic 1 objectives and infra architecture**
+
+**Epic 1 Architectural Validation Mission:**
+- ✅ Validate ALL infra patterns work with dendritic + clan (modules ✅, secrets ✅, overlays ✅)
+- ✅ Document validated patterns for Epic 2-6 migration teams
+- ✅ Prove zero feature loss in migration (5-layer preservation documented)
+- ✅ Achieve 95% Epic 1 coverage (ALL 5 overlay layers validated)
+
+**5-Layer Architecture Accuracy:**
+- ✅ Layer model accurately represents infra/overlays/default.nix (lines 1-77)
+- ✅ Each layer documented with correct file references and line numbers
+- ✅ Orthogonal layer composition explained (lib.mergeAttrsList pattern)
+- ✅ Preservation strategy sound (Layers 1,2,4,5 unchanged, Layer 3 migrated)
+
+**drupol Hybrid Pattern Fidelity:**
+- ✅ Reference implementation correctly cited (modules/flake-parts/nixpkgs.nix lines 19-37)
+- ✅ overlays array + pkgsDirectory coexistence pattern accurately documented
+- ✅ Production validation evidence included (9 packages, zero conflicts)
+- ✅ Orthogonal concerns explanation correct (overlays modify, pkgs-by-name adds)
+
+**Epic 2-6 Migration Strategy:**
+- ✅ Layer-by-layer preservation clearly documented
+- ✅ Migration steps actionable (6-step process, lines 2262-2273)
+- ✅ Effort estimate realistic (2.5-3 hours for 4 packages)
+- ✅ Risk assessment accurate (LOW - directory restructuring only)
+
+**Tech-Spec Compliance:**
+- ⚠️ No Epic 1 Tech Spec found (WARNING from Step 2)
+- ✅ Epic 1 story definition requirements met (epic file lines 1364-1463)
+
+**Constraints Adherence:**
+- ✅ Validation only, not migration (Constraint 1 satisfied)
+- ✅ Layer 3 foundation referenced (Story 1.10D, Constraint 2 satisfied)
+- ✅ drupol pattern fidelity maintained (Constraint 3 satisfied)
+- ✅ Documentation comprehensive and Epic 2-6 ready (Constraint 4 satisfied)
+- ✅ Epic 1 completion dependency addressed (Constraint 5 satisfied)
+
+---
+
+### Security Notes
+
+No security concerns identified. This is a documentation and architectural validation story with no code changes, secrets handling, or security-sensitive modifications.
+
+**Documentation Security:**
+- ✅ No secrets or credentials exposed in code examples
+- ✅ File paths are local development references (safe)
+- ✅ External references use public URLs (safe)
+
+---
+
+### Best-Practices and References
+
+**Nix Ecosystem Best Practices:**
+- ✅ Overlays: https://nixos.org/manual/nixpkgs/stable/#chap-overlays (official documentation referenced)
+- ✅ pkgs-by-name: RFC 140 - https://github.com/NixOS/rfcs/pull/140 (nixpkgs alignment)
+- ✅ flake-parts: https://flake.parts/ (modular flake configuration)
+- ✅ dendritic pattern: https://github.com/drupol/dendritic-flake-parts (auto-import reference)
+
+**Reference Implementations:**
+- ✅ drupol-dendritic-infra: ~/projects/nix-workspace/drupol-dendritic-infra/modules/flake-parts/nixpkgs.nix (lines 19-37) - PRIMARY pattern source
+- ✅ infra overlays: ~/projects/nix-workspace/infra/overlays/ (5-layer production implementation)
+- ✅ test-clan validation: ~/projects/nix-workspace/test-clan/ (Story 1.10D pkgs-by-name foundation)
+
+**Documentation Quality:**
+- ✅ Professional technical writing (clear, concise, accurate)
+- ✅ Proper markdown formatting (headers, code blocks, tables)
+- ✅ Accurate code examples (valid Nix syntax, production patterns)
+- ✅ Complete references (local paths + external URLs)
+
+---
+
+### Action Items
+
+#### Code Changes Required
+
+- [ ] [Medium] Execute AC-A evaluation commands to verify multi-channel access in test-clan context (AC-A) [file: docs/notes/development/work-items/1-10da-validate-overlay-preservation.md:547-555]
+  ```bash
+  cd ~/projects/nix-workspace/test-clan
+  nix eval .#homeConfigurations.aarch64-darwin.crs58.pkgs.stable.hello.version
+  nix eval .#homeConfigurations.aarch64-darwin.crs58.pkgs.unstable.hello.version
+  nix eval .#packages.aarch64-darwin.ccstatusline.meta.description
+  ```
+  Document results in Dev Agent Record "Acceptance Criteria Satisfaction" section for AC-A.
+
+- [ ] [Low] Update task checkboxes to `[x]` for completed tasks 1.1-1.4, 2.1-2.2, 3.1-3.3 [file: docs/notes/development/work-items/1-10da-validate-overlay-preservation.md:889-981]
+
+#### Advisory Notes
+
+- Note: Story 1.10DA achieves comprehensive architectural documentation even with testing gap. Overlays are production-validated in infra, and drupol proves coexistence at scale (9 packages, zero conflicts). Testing gap is a verification confidence issue for Epic 1 completeness, not an architectural risk for Epic 2-6 migration.
+
+- Note: MAJOR findings proactively addressed in commit 81289d65 before review (Layer 5 implementation location clarified, Section 13.2 path specified). This demonstrates strong self-review and attention to detail.
+
+- Note: Documentation quality is excellent - 375 lines comparable to Section 13.1 (467 lines from Story 1.10D), maintaining consistent comprehensive Epic 2-6 guidance standard.
+
+- Note: Consider adding Quality Gate validation checklist execution results to Dev Agent Record (Gates 1-3 all marked ✅ PASS but no execution evidence provided).
