@@ -1,4 +1,4 @@
-# Story 1.10D: Enable sops-nix Features - Dev Agent Hand-Off
+# Story 1.10C continuation: Enable sops-nix Features - Dev Agent Hand-Off
 
 **Status**: Ready for implementation (Story 1.10C infrastructure complete)
 **Repository**: `~/projects/nix-workspace/test-clan/`
@@ -303,11 +303,11 @@ ls -la result/home-path/  # Look for sops-nix activation scripts
 ## Commit Strategy
 
 **Atomic commits per module** (follow infra git workflow):
-1. `refactor(story-1.10D): enable glm-api-key in wrappers.nix`
-2. `refactor(story-1.10D): convert mcp-servers to sops.templates`
-3. `refactor(story-1.10D): enable atuin-key deployment`
-4. `refactor(story-1.10D): convert rbw to sops.templates`
-5. `refactor(story-1.10D): enable SSH allowed_signers generation`
+1. `refactor(story-1.10C): enable glm-api-key in wrappers.nix`
+2. `refactor(story-1.10C): convert mcp-servers to sops.templates`
+3. `refactor(story-1.10C): enable atuin-key deployment`
+4. `refactor(story-1.10C): convert rbw to sops.templates`
+5. `refactor(story-1.10C): enable SSH allowed_signers generation`
 6. Final validation commit
 
 ## Success Criteria
