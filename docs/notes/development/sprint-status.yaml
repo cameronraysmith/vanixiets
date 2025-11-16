@@ -193,6 +193,24 @@ development_status:
   # Strategic value: Completes Epic 1 architectural coverage (95%), removes Epic 2-6 migration blocker (overlay uncertainty)
   # Story context created: 2025-11-16 (docs/notes/development/work-items/1-10d-validate-custom-package-overlays.context.xml)
   1-10d-validate-custom-package-overlays: ready-for-dev
+  # Story 1.10DA: TODO (2025-11-16) - Validate Overlay Architecture Preservation with pkgs-by-name Integration
+  # DISCOVERED STORY - Party Mode team identified architectural gap (Option C staged validation)
+  # Story 1.10D validates Layer 3 only (custom packages via pkgs-by-name), missing Layers 1,2,4,5 (overlays)
+  # Validates 4 missing overlay layers to complete Epic 1 to 95% architectural coverage
+  # Five-layer overlay architecture (per architecture.md Section 8):
+  #   Layer 1: Foundational tooling (ripgrep, fd, jq, tree, etc)
+  #   Layer 2: CLI enhancement (atuin, zoxide, eza, bat, fzf, etc)
+  #   Layer 3: Custom packages (ccstatusline, atuin-format, markdown-tree-parser, starship-jj) ← Story 1.10D
+  #   Layer 4: Development tools (git, gh, neovim, tmux, etc)
+  #   Layer 5: Shell configuration (zsh, starship, wezterm, etc)
+  # Test case: Migrate infra's overlay pattern (overlays/default.nix → modules/overlays.nix → dendritic export)
+  # Validation: Verify all 5 layers present in merged pkgs, builds succeed, zero regressions
+  # Strategic importance: Completes Epic 1 architectural validation, unblocks GO/NO-GO decision (Story 1.12)
+  # Estimated effort: 1.5-2 hours (30min migration + 30min validation + 30min tests + 30min docs)
+  # Dependencies: Story 1.10D (Layer 3 foundation must work first)
+  # Can run in parallel with: Story 1.10E (feature enablement independent of overlay validation)
+  # Blocks: Epic 1 GO/NO-GO decision (Story 1.12) - architectural coverage must be complete
+  1-10da-validate-overlay-preservation: backlog
   # Story 1.10E: RENAMED (2025-11-16) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
   # Previously Story 1.10D (2025-11-14), renamed during epic reordering to resolve dependency on ccstatusline package
   # Story 1.10C already enabled 9/11 features (sops-nix patterns: direct path, sops.placeholder, runtime cat, activation scripts)
