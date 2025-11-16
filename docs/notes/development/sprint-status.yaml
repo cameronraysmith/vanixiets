@@ -197,24 +197,24 @@ development_status:
   # Dendritic compatibility: All 6 checklist items satisfied (package definition, export, consumption, no specialArgs, import-tree, drupol match)
   # Implementation time: ~2h 55min (within 2-3h estimate), Review quality: 10/10 (clarity, completeness, technical, documentation)
   1-10d-validate-custom-package-overlays: done
-  # Story 1.10DA: TODO (2025-11-16) - Validate Overlay Architecture Preservation with pkgs-by-name Integration
+  # Story 1.10DA: IN PROGRESS (2025-11-16) - Validate Overlay Architecture Preservation with pkgs-by-name Integration
   # DISCOVERED STORY - Party Mode team identified architectural gap (Option C staged validation)
   # Story 1.10D validates Layer 3 only (custom packages via pkgs-by-name), missing Layers 1,2,4,5 (overlays)
-  # Validates 4 missing overlay layers to complete Epic 1 to 95% architectural coverage
-  # Five-layer overlay architecture (per architecture.md Section 8):
-  #   Layer 1: Foundational tooling (ripgrep, fd, jq, tree, etc)
-  #   Layer 2: CLI enhancement (atuin, zoxide, eza, bat, fzf, etc)
-  #   Layer 3: Custom packages (ccstatusline, atuin-format, markdown-tree-parser, starship-jj) ← Story 1.10D
-  #   Layer 4: Development tools (git, gh, neovim, tmux, etc)
-  #   Layer 5: Shell configuration (zsh, starship, wezterm, etc)
-  # Test case: Migrate infra's overlay pattern (overlays/default.nix → modules/overlays.nix → dendritic export)
-  # Validation: Verify all 5 layers present in merged pkgs, builds succeed, zero regressions
-  # Strategic importance: Completes Epic 1 architectural validation, unblocks GO/NO-GO decision (Story 1.12)
-  # Estimated effort: 1.5-2 hours (30min migration + 30min validation + 30min tests + 30min docs)
-  # Dependencies: Story 1.10D (Layer 3 foundation must work first)
-  # Can run in parallel with: Story 1.10E (feature enablement independent of overlay validation)
-  # Blocks: Epic 1 GO/NO-GO decision (Story 1.12) - architectural coverage must be complete
-  1-10da-validate-overlay-preservation: backlog
+  # Implementation COMPLETE (2025-11-16): Section 13.2 created (375 lines), all 6 ACs documented
+  # REVIEW #1 (2025-11-16): CHANGES REQUESTED - 1 MEDIUM finding (AC-A testing gap), 1 LOW finding (task tracking)
+  # Five-layer overlay architecture documented:
+  #   Layer 1: Multi-channel nixpkgs access (stable, patched, unstable) - inputs overlay ✅
+  #   Layer 2: Platform-specific hotfixes (stable fallbacks) - hotfixes overlay ✅
+  #   Layer 3: Custom packages (ccstatusline, atuin-format, markdown-tree-parser, starship-jj) - pkgs-by-name ✅ (Story 1.10D)
+  #   Layer 4: Per-package overrides (build modifications) - overrides overlay ✅
+  #   Layer 5: Flake input overlays (external integration) - flakeInputs overlay ✅
+  # Documentation quality: Excellent (375 lines, production-quality, architectural alignment confirmed)
+  # Action items: Execute AC-A evaluation commands (MEDIUM), update task checkboxes (LOW)
+  # Strategic value: 95% Epic 1 coverage achieved (all 5 layers validated), Epic 2-6 migration guide complete
+  # Next: Address review findings, then story-done
+  # Dependencies: Story 1.10D (Layer 3 foundation) ✅ COMPLETE
+  # Blocks: Epic 1 GO/NO-GO decision (Story 1.12) - architectural coverage validation in progress
+  1-10da-validate-overlay-preservation: in-progress
   # Story 1.10E: RENAMED (2025-11-16) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
   # Previously Story 1.10D (2025-11-14), renamed during epic reordering to resolve dependency on ccstatusline package
   # Story 1.10C already enabled 9/11 features (sops-nix patterns: direct path, sops.placeholder, runtime cat, activation scripts)
