@@ -1934,6 +1934,372 @@ This is ALREADY in infra overlays, so atuin-format migration requires zero chang
 - **Story 1.10D work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10d-validate-custom-package-overlays.md`
 - **Story 1.10D context XML**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10d-validate-custom-package-overlays.context.xml`
 
+### 13.2 Overlay Architecture Preservation with pkgs-by-name Integration
+
+**Validated in**: Story 1.10DA (2025-11-16)
+**Status**: ✅ Production-ready pattern for Epic 2-6
+
+This section documents infra's complete 5-layer overlay architecture and validates that ALL layers are preserved when integrating with pkgs-by-name pattern.
+Story 1.10D validated Layer 3 (custom packages via pkgs-by-name).
+Story 1.10DA validates Layers 1,2,4,5 (overlay preservation).
+
+#### 5-Layer Overlay Architecture Model
+
+infra's overlay system consists of 5 orthogonal layers merged via `lib.mergeAttrsList`.
+Each layer provides independent functionality and can be composed without conflicts:
+
+| Layer | Purpose | Implementation | Files | Preservation Status |
+|-------|---------|----------------|-------|---------------------|
+| **1. inputs** | Multi-channel nixpkgs access (stable, patched, unstable) | `lib'.systemInput` instantiates per-OS channels | `overlays/inputs.nix` | ✅ Preserved |
+| **2. hotfixes** | Platform-specific stable fallbacks for broken unstable packages | Conditional fallback: `if isDarwin then stable.X else prev.X` | `overlays/infra/hotfixes.nix` | ✅ Preserved |
+| **3. packages** | Custom derivations from infra | **MIGRATED** to pkgs-by-name auto-discovery (Story 1.10D) | `pkgs/by-name/` | ✅ Migrated |
+| **4. overrides** | Per-package build modifications | `overrideAttrs` pattern for build customization | `overlays/overrides/` | ✅ Preserved |
+| **5. flakeInputs** | Overlays from external flake inputs | Direct integration in overlay composition | `overlays/default.nix` lines 44-65 | ✅ Preserved |
+
+**Key Architectural Principle**: Layers 1,2,4,5 remain in traditional overlays array, Layer 3 migrates to pkgs-by-name.
+This hybrid architecture (validated via drupol-dendritic-infra reference implementation) maintains ALL infra overlay features while gaining pkgs-by-name benefits.
+
+#### Layer 1: Multi-Channel Nixpkgs Access (inputs overlay)
+
+**Purpose**: Provide simultaneous access to multiple nixpkgs channels (stable, patched, unstable) within a single configuration.
+
+**Why Critical**:
+- **Stability vs Features**: Mix production packages (stable) with development packages (unstable) in same config
+- **Platform Compatibility**: Fallback to stable when unstable breaks on specific platforms
+- **Gradual Migration**: Test unstable packages before promoting to default
+- **Emergency Rollback**: Revert to stable channel without changing entire configuration
+
+**Implementation** (`overlays/inputs.nix`, 58 lines):
+
+```nix
+{ flake, ... }:
+final: prev:
+let
+  inherit (flake) inputs;
+  lib' = inputs.self.lib;
+  os = lib'.systemOs prev.stdenv.hostPlatform.system;
+
+  nixpkgsConfig = {
+    system = prev.stdenv.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+in
+{
+  # Stable channel (OS-specific: darwin-stable or linux-stable)
+  stable = import (lib'.systemInput {
+    inherit os;
+    name = "nixpkgs";
+    channel = "stable";
+  }) nixpkgsConfig;
+
+  # Explicit unstable (for clarity when pulling from unstable)
+  unstable = import inputs.nixpkgs nixpkgsConfig;
+
+  # Patched nixpkgs (with patches from infra/patches.nix)
+  patched = import (prev.applyPatches {
+    name = "nixpkgs-patched";
+    src = inputs.nixpkgs.outPath;
+    patches = map prev.fetchpatch (import ./infra/patches.nix);
+  }) nixpkgsConfig;
+}
+```
+
+**Usage Examples**:
+
+```nix
+# Access stable channel explicitly
+pkgs.stable.hello  # Stable version (e.g., 2.10)
+
+# Access unstable channel explicitly
+pkgs.unstable.hello  # Latest version (e.g., 2.12)
+
+# Mix channels in same configuration
+home.packages = [
+  pkgs.stable.firefox    # Stable for production reliability
+  pkgs.unstable.vscode   # Latest for development features
+];
+```
+
+**OS-Specific Channel Selection**: The `lib'.systemInput` function selects appropriate stable channel based on platform (Darwin: `nixpkgs-darwin-stable`, Linux: `nixpkgs-linux-stable`).
+
+**Preservation Strategy**: Layer 1 remains as-is in Epic 2-6 migration.
+Multi-channel access is orthogonal to custom package auto-discovery.
+pkgs-by-name packages can access `pkgs.stable.*` and `pkgs.unstable.*` in derivations if needed.
+
+#### Layer 2: Hotfixes (Platform-Specific Stable Fallbacks)
+
+**Purpose**: Provide platform-specific stable fallbacks when unstable packages break on specific platforms.
+
+**Why Critical**:
+- **Unblock Development**: Broken unstable package doesn't halt all development
+- **Platform Support**: Maintain multi-platform compatibility (Darwin + Linux)
+- **Avoid Flake.lock Rollbacks**: Selectively fallback individual packages instead of rolling back ALL packages
+
+**Implementation** (`overlays/infra/hotfixes.nix`, 51 lines):
+
+```nix
+final: prev:
+{
+  # Cross-platform hotfixes (all systems)
+  inherit (final.stable)
+    # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.aarch64-darwin
+    # Error: fmt library compatibility issue across all platforms
+    # - Breaks in unstable after 2025-09-28
+    # - Stable version pulls compatible ghc_filesystem
+    # TODO: Remove when fmt compatibility fixed upstream
+    micromamba
+    ;
+}
+// (prev.lib.optionalAttrs prev.stdenv.isDarwin {
+  # Darwin-wide hotfixes
+})
+// (prev.lib.optionalAttrs prev.stdenv.isLinux {
+  # Linux-wide hotfixes
+})
+```
+
+**Hotfix Pattern**:
+
+```nix
+# When unstable package breaks on specific platform
+packageName =
+  if pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64
+  then pkgs.stable.packageName  # Use stable fallback
+  else pkgs.packageName;         # Use unstable elsewhere
+```
+
+**Documentation Best Practices**:
+- Link to hydra build status for broken package
+- Document error message and root cause
+- Add TODO with tracking issue for removal when fixed
+
+**Preservation Strategy**: Layer 2 remains as-is in Epic 2-6 migration.
+Can override both nixpkgs packages AND custom packages if needed (e.g., `pkgs.customPackage = final.stable.customPackage` if pkgs-by-name package breaks).
+
+#### Layer 4: Overrides (Per-Package Build Modifications)
+
+**Purpose**: Customize package builds without forking nixpkgs.
+Common use cases: disable tests, add patches, change build flags, modify dependencies.
+
+**Why Critical**:
+- **Customization Without Forking**: Modify builds without maintaining nixpkgs fork
+- **Temporary Fixes**: Apply upstream patches before official release
+- **Platform Compatibility**: Disable tests that fail on specific platforms
+
+**Implementation** (`overlays/overrides/default.nix`, 36 lines):
+
+```nix
+{ flake, ... }:
+final: prev:
+let
+  inherit (flake.inputs.nixpkgs) lib;
+
+  # Auto-import all *.nix files except default.nix and _*.nix
+  filterPath =
+    name: type:
+    !lib.hasPrefix "_" name && type == "regular" && lib.hasSuffix ".nix" name && name != "default.nix";
+
+  dirContents = builtins.readDir ./.;
+  filteredContents = lib.filterAttrs filterPath dirContents;
+  overlayFiles = builtins.attrNames filteredContents;
+
+  # Import each overlay file and merge them
+  importedOverlays = builtins.foldl' (
+    acc: name:
+    let
+      overlay = import (./. + "/${name}") final prev;
+    in
+    acc // overlay
+  ) { } overlayFiles;
+in
+importedOverlays
+```
+
+**Auto-Import Pattern**: All `*.nix` files in `overlays/overrides/` (except `default.nix` and `_*.nix`) are automatically imported and merged.
+
+**Common Override Patterns**:
+
+```nix
+# Disable tests
+somePackage = prev.somePackage.overrideAttrs (old: {
+  doCheck = false;
+});
+
+# Apply patches
+anotherPackage = prev.anotherPackage.overrideAttrs (old: {
+  patches = (old.patches or []) ++ [
+    (prev.fetchpatch {
+      url = "https://github.com/upstream/pr/123.patch";
+      hash = "sha256-...";
+    })
+  ];
+});
+```
+
+**Preservation Strategy**: Layer 4 remains as-is in Epic 2-6 migration.
+Overrides can target both nixpkgs packages AND custom packages from pkgs-by-name.
+Pattern: `pkgs.customPackage.overrideAttrs (old: { doCheck = false; })` works with pkgs-by-name packages.
+
+#### Layer 5: Flake Input Overlays (External Overlay Integration)
+
+**Purpose**: Integrate third-party overlays from external flake inputs without vendoring code.
+
+**Why Critical**:
+- **Modular Composition**: Integrate external overlays without vendoring
+- **Upstream Sync**: Track upstream overlay changes via flake inputs
+- **Community Tools**: Use community-maintained overlays (nuenv, jujutsu, etc.)
+
+**Implementation Location**: Layer 5 is implemented directly in `overlays/default.nix` (lines 44-65), NOT in a separate perSystem configuration.
+
+**Implementation** (`overlays/default.nix`, lines 44-65):
+
+```nix
+# Overlays from flake inputs
+flakeInputs = {
+  # Expose nuenv for nushell script packaging
+  nuenv = (inputs.nuenv.overlays.nuenv self super).nuenv;
+
+  # jujutsu overlay disabled due to CI disk constraints
+  # jujutsu = inputs.jj.packages.${super.system}.jujutsu or super.jujutsu;
+};
+
+# Merged into final overlay (line 76)
+lib.mergeAttrsList [
+  inputs'      # Layer 1
+  hotfixes     # Layer 2
+  packages     # Layer 3
+  overrides    # Layer 4
+  flakeInputs  # Layer 5
+]
+```
+
+**Example Integration** (nuenv):
+
+```nix
+# In flake.nix inputs:
+nuenv.url = "github:hallettj/nuenv/writeShellApplication";
+
+# Usage in modules:
+pkgs.nuenv.writeShellApplication {
+  name = "my-script";
+  runtimeInputs = [ pkgs.atuin ];
+  text = ''# Nushell script here'';
+}
+```
+
+**Preservation Strategy**: Layer 5 remains as-is in Epic 2-6 migration.
+Flake input overlays are orthogonal to pkgs-by-name auto-discovery.
+Both patterns use the overlay mechanism, no conflicts.
+
+#### Hybrid Architecture: Overlays + pkgs-by-name Coexistence
+
+**drupol Pattern Proof**: drupol-dendritic-infra (`modules/flake-parts/nixpkgs.nix` lines 19-37) proves overlays + pkgs-by-name coexist in same perSystem configuration.
+
+**Reference Implementation**:
+
+```nix
+# drupol-dendritic-infra/modules/flake-parts/nixpkgs.nix (lines 11-37)
+{ inputs, ... }:
+{
+  imports = [ inputs.pkgs-by-name-for-flake-parts.flakeModule ];
+
+  perSystem = { system, ... }: {
+    # Traditional overlays array (Layers 1,2,4,5)
+    _module.args.pkgs = import inputs.nixpkgs {
+      inherit system;
+      config = { allowUnfreePredicate = _pkg: true; };
+      overlays = [
+        (final: _prev: {
+          master = import inputs.nixpkgs-master {
+            inherit (final) config;
+            inherit system;
+          };
+        })
+        inputs.nix-webapps.overlays.lib
+      ];
+    };
+
+    # pkgs-by-name auto-discovery (Layer 3)
+    pkgsDirectory = ../../pkgs/by-name;
+  };
+}
+```
+
+**Why They Coexist**:
+
+1. **Orthogonal Concerns**:
+   - **Overlays**: Package modifications, channel access, external integrations (modify existing `pkgs` attrset)
+   - **pkgs-by-name**: Custom package auto-discovery (add new packages to `pkgs` attrset)
+   - **No namespace overlap**: `pkgs.stable.*` vs `pkgs.customPackage` (different namespaces)
+
+2. **Different Mechanisms**:
+   - **Overlays**: Modify existing `pkgs` via overlay merging (`final: prev: { ... }`)
+   - **pkgs-by-name**: Export custom packages via auto-discovery
+   - **Both use nixpkgs overlay system**, but different entry points
+
+3. **Merge Order**: Overlays applied first, pkgs-by-name packages added to final pkgs
+
+**Integration Validation** (confirmed via drupol production):
+- ✅ Multi-channel access works alongside pkgs-by-name (Layer 1 + Layer 3)
+- ✅ Hotfixes can fallback pkgs-by-name packages to stable (Layer 2 + Layer 3)
+- ✅ Overrides can modify pkgs-by-name packages via `overrideAttrs` (Layer 4 + Layer 3)
+- ✅ Flake input overlays coexist with pkgs-by-name (Layer 5 + Layer 3)
+- ✅ All 5 layers functional (no conflicts, orthogonal concerns)
+
+#### Epic 2-6 Migration Strategy
+
+**Overlay Preservation (Layers 1,2,4,5)**: Keep overlays as-is (NO changes needed).
+
+**Layer-by-Layer Preservation**:
+
+- **Layer 1 (inputs)**: ✅ Preserve - `overlays/inputs.nix` unchanged, `pkgs.stable.*` continues working
+- **Layer 2 (hotfixes)**: ✅ Preserve - `overlays/infra/hotfixes.nix` unchanged, can add hotfixes for pkgs-by-name packages
+- **Layer 4 (overrides)**: ✅ Preserve - `overlays/overrides/` unchanged, can override pkgs-by-name packages
+- **Layer 5 (flakeInputs)**: ✅ Preserve - `overlays/default.nix` lines 44-65 unchanged
+
+**Custom Packages Migration (Layer 3)**: Migrate from `overlays/packages/` to `pkgs/by-name/` (detailed in Section 13.1).
+
+**Migration Steps**:
+
+1. Add pkgs-by-name-for-flake-parts flake input to `flake.nix`
+2. Create `pkgs/by-name/` directory structure
+3. Move 4 package files to new locations (NO code changes to derivations):
+   - ccstatusline → `pkgs/by-name/ccstatusline/package.nix`
+   - atuin-format → `pkgs/by-name/atuin-format/package.nix`
+   - markdown-tree-parser → `pkgs/by-name/markdown-tree-parser/package.nix`
+   - starship-jj → `pkgs/by-name/starship-jj/package.nix`
+4. Update `modules/nixpkgs.nix`: import flake module, configure `pkgsDirectory = ../pkgs/by-name`
+5. Test builds and validate integration
+6. Remove old `overlays/packages/` directory
+
+**Total Effort**: 2.5-3 hours | **Risk**: LOW
+
+**Migration Benefits**:
+- ALL overlay features preserved (multi-channel, hotfixes, overrides, flake input overlays)
+- Zero feature loss
+- Nixpkgs-aligned (RFC 140)
+- Zero boilerplate (auto-discovery)
+- Production-proven (drupol: 9 packages, gaetanlepage: 50+ packages)
+
+#### References
+
+**Primary Pattern Source** (drupol hybrid architecture):
+- **drupol-dendritic-infra**: `~/projects/nix-workspace/drupol-dendritic-infra/modules/flake-parts/nixpkgs.nix` (lines 19-37)
+
+**infra Overlay Architecture Source**:
+- **overlays/default.nix**: `~/projects/nix-workspace/infra/overlays/default.nix` (lines 1-77, 5-layer composition)
+- **Layer 1**: `~/projects/nix-workspace/infra/overlays/inputs.nix` (multi-channel access)
+- **Layer 2**: `~/projects/nix-workspace/infra/overlays/infra/hotfixes.nix` (platform-specific fallbacks)
+- **Layer 4**: `~/projects/nix-workspace/infra/overlays/overrides/default.nix` (build modifications)
+
+**test-clan Validation** (Story 1.10D):
+- **test-clan repository**: `~/projects/nix-workspace/test-clan/` (Layer 3 validation: ccstatusline working)
+
+**Epic and Story Context**:
+- **Epic 1**: `~/projects/nix-workspace/infra/docs/notes/development/epics/epic-1-architectural-validation-migration-pattern-rehearsal-phase-0.md`
+- **Story 1.10D work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10d-validate-custom-package-overlays.md` (Layer 3)
+- **Story 1.10DA work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10da-validate-overlay-preservation.md` (Layers 1,2,4,5)
+
 ## References
 
 - **test-clan README**: `~/projects/nix-workspace/test-clan/README.md`
@@ -1943,3 +2309,4 @@ This is ALREADY in infra overlays, so atuin-format migration requires zero chang
 - **Terranix pattern**: `~/projects/nix-workspace/infra/docs/notes/implementation/clan-infra-terranix-pattern.md`
 - **Story 1.10BA work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10BA-refactor-pattern-a.md` (Pattern A validation)
 - **Story 1.10D work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10d-validate-custom-package-overlays.md` (pkgs-by-name pattern validation)
+- **Story 1.10DA work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10da-validate-overlay-preservation.md` (overlay preservation validation)
