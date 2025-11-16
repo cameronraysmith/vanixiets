@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** in-progress
+**Status:** review
 
 **Dependencies:**
 - Story 1.10BA (done): Pattern A refactoring provides flake context access for sops-nix integration
@@ -910,19 +910,62 @@ sops -e -i secrets/home-manager/users/raquel/secrets.yaml
 
 ### Agent Model Used
 
-<!-- Agent model name and version will be recorded during implementation -->
+- **Model**: Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
+- **Sessions**: 2 (initial implementation 2025-11-15, review follow-up 2025-11-16)
 
 ### Debug Log References
 
-<!-- Links to debug sessions, error analysis, investigation notes -->
+- **Build validation errors**: Darwin configuration missing extraSpecialArgs flake bridge (resolved via Section 11 pattern)
+- **LazyVim module**: Missing import in blackphos home-manager config (resolved)
+- **allowUnfree**: copilot-language-server unfree package (resolved)
 
 ### Completion Notes List
 
-<!-- Implementation session summaries, discoveries, decisions -->
+**Session 1 (2025-11-15)**: Initial implementation - 52 commits
+- sops-nix infrastructure established (.sops.yaml, base module, user modules)
+- Encrypted secrets created for crs58 (8 secrets) and raquel (5 secrets)
+- Module access patterns updated (git, jujutsu, mcp-servers, wrappers, atuin, rbw)
+- sops.templates patterns implemented (exceeds AC requirements)
+- Multi-user encryption validated
+
+**Session 2 (2025-11-16)**: Review follow-up - Documentation and build validation
+- **Build validation (AC16-AC18)**: All 3 builds PASSED
+  - Fixed extraSpecialArgs flake bridge in blackphos (Section 11 pattern)
+  - Added LazyVim module imports + overlay
+  - Enabled allowUnfree for unfree packages
+  - 4 commits: eb7a46d, 7cd530a, cedf1e6, e29ccfb, 306bd17
+- **Documentation (AC23)**: Created age-key-management.md (882 lines)
+  - SSH-to-age derivation lifecycle from Bitwarden
+  - Three-context age key usage (infra, clan, test-clan)
+  - Clan user creation workflow
+  - Epic 2-6 new user onboarding (step-by-step, checklist)
+  - sops-nix operations (add, encrypt, rotate)
+  - Platform-specific notes (darwin Bitwarden Desktop vs NixOS ssh-agent)
+  - Troubleshooting guide with solutions
+  - 1 commit: bc9bade
+- **Documentation (AC22+AC24)**: Added Section 12 to architecture doc (375 lines)
+  - Two-tier secrets architecture (system clan vars vs user sops-nix)
+  - clan vars _class parameter incompatibility discovery
+  - Age key reuse pattern across three contexts
+  - sops-nix integration patterns (3 validated patterns with code examples)
+  - Multi-user encryption examples (crs58 vs raquel)
+  - Epic 2-6 readiness assessment
+  - 1 commit: a214da94
+
+**Key Discoveries**:
+1. **Flake bridge pattern**: Darwin home-manager requires extraSpecialArgs.flake = captured config.flake from outer module (Section 11)
+2. **sops.templates superiority**: Exceeds basic path access, production-ready for Epic 2-6
+3. **Secret count evolution**: ssh-public-key added (8 crs58, 5 raquel vs 7 and 4 specified) for allowed_signers template
+4. **Documentation criticality**: Epic 2-6 blocked without age-key-management.md operational guide
 
 ### File List
 
-<!-- Files created/modified during implementation -->
+**test-clan repository** (6 files modified, 1 file created):
+- `modules/machines/darwin/blackphos/default.nix`: extraSpecialArgs flake bridge, aggregate imports, LazyVim module, allowUnfree
+- `docs/guides/age-key-management.md`: NEW - 882-line operational guide (AC23)
+
+**infra repository** (1 file modified):
+- `docs/notes/development/test-clan-validated-architecture.md`: Section 12 added (375 lines, AC22+AC24)
 
 ---
 
@@ -934,6 +977,44 @@ sops -e -i secrets/home-manager/users/raquel/secrets.yaml
 ---
 
 ## Change Log
+
+### 2025-11-16 - Review Follow-Up Complete (AC16-AC24 Satisfied)
+
+- **Review outcome**: CHANGES REQUESTED → addressed all 5 action items
+- **Build validation (AC16-AC18)**: All 3 builds PASSED
+  - Fixed darwin extraSpecialArgs flake bridge (Section 11 pattern from architecture doc)
+  - Added LazyVim module imports + nixpkgs overlay
+  - Enabled nixpkgs.config.allowUnfree for copilot-language-server
+  - Commits: eb7a46d, 7cd530a, cedf1e6, e29ccfb, 306bd17
+- **Documentation (AC23)**: Created docs/guides/age-key-management.md (882 lines)
+  - SSH-to-age derivation lifecycle from Bitwarden (bw CLI + ssh-to-age tool)
+  - Three-context age key usage (infra sops-nix, clan users, test-clan sops-nix)
+  - Clan user creation workflow with age keys
+  - Age key correspondence validation commands
+  - Epic 2-6 new user onboarding (step-by-step, checklist)
+  - sops-nix operations (add/encrypt/rotate secrets)
+  - Platform-specific notes (darwin Bitwarden Desktop SSH agent vs NixOS ssh-agent)
+  - Troubleshooting guide with 5 common errors + solutions
+  - Quick reference commands and file locations
+  - Commit: bc9bade
+- **Documentation (AC22+AC24)**: Added Section 12 to architecture doc (375 lines)
+  - Two-tier secrets architecture (system: clan vars, user: sops-nix)
+  - clan vars `_class` parameter incompatibility with home-manager (critical discovery)
+  - Age key reuse pattern across three contexts (single keypair, multiple uses)
+  - sops-nix integration patterns (3 validated patterns with code examples)
+  - Multi-user encryption (.sops.yaml with creation_rules)
+  - Access pattern examples (before/after, crs58 vs raquel)
+  - Implementation evidence (code locations, build validation, security validation)
+  - Epic 2-6 readiness assessment
+  - Diagnostic questions for secrets implementation
+  - Commit: a214da94 (infra repo)
+- **Secret count clarification (M1/M2)**: ssh-public-key INTENTIONAL
+  - Added for allowed_signers template generation (sops.templates pattern)
+  - crs58: 8 secrets (includes ssh-public-key), raquel: 5 secrets (includes ssh-public-key)
+  - Pattern exceeds AC requirements, production-ready for Epic 2-6
+- **Story DoD complete**: All ACs satisfied, builds passing, documentation complete
+- **Actual effort**: 2.5 hours (build validation 1h, AC23 1h, AC22+AC24 0.5h)
+- **Epic 2-6 impact**: Documentation unblocks migration (age key management critical path)
 
 ### 2025-11-15 - Story Updated (Architectural Pivot)
 
