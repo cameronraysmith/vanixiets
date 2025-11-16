@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** drafted
+**Status:** ready-for-dev
 
 **Dependencies:**
 - Story 1.10D (done): pkgs-by-name pattern validated (Layer 3 foundation)
@@ -1455,7 +1455,7 @@ nix build .#checks.aarch64-darwin.home-configurations-exposed
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- Context file: `docs/notes/development/work-items/1-10db-execute-overlay-architecture-migration.context.xml` (1130 lines, comprehensive dev context)
 
 ### Agent Model Used
 
