@@ -262,12 +262,18 @@ Revert (2-3 tasks, 33% of work):
 - [ ] Include: Age key reuse pattern, .sops.yaml configuration
 - [ ] Rationale: Clan vars NixOS-specific, sops-nix home-manager compatible
 
-**AC23: sops-nix Operational Guide**
-- [ ] Adding new secrets (edit + encrypt workflow)
-- [ ] Multi-user encryption (creation_rules)
-- [ ] Secret rotation (re-encryption)
-- [ ] Troubleshooting (common errors, solutions)
-- [ ] Age key extraction from clan (for .sops.yaml)
+**AC23: Age Key Management and sops-nix Operational Guide**
+- [ ] Create docs/guides/age-key-management.md:
+  - SSH-to-age derivation pattern (infra justfile workflow)
+  - Clan user creation with SSH-derived keys (clan secrets users add)
+  - Age key correspondence validation (jq, age-keygen -y)
+  - Public key extraction for .sops.yaml (from clan user files)
+  - Epic 2-6 new user workflow (Bitwarden → infra → clan → sops-nix)
+- [ ] sops-nix operations (in age-key-management.md or separate section):
+  - Adding new secrets (edit + encrypt workflow)
+  - Multi-user encryption (creation_rules)
+  - Secret rotation (re-encryption)
+  - Troubleshooting (common errors, solutions)
 
 **AC24: Access Pattern Examples**
 - [ ] Before/after: clan vars approach vs sops-nix approach
@@ -430,7 +436,7 @@ Revert (2-3 tasks, 33% of work):
 
 ### Task 7: Documentation (AC22-AC24)
 
-**Estimated Time:** 45 minutes
+**Estimated Time:** 60 minutes (updated for age-key-management.md scope)
 
 - [ ] **7.1: Document Two-Tier Architecture (AC22)**
   - [ ] File: `test-clan-validated-architecture.md` Section 12
@@ -439,13 +445,30 @@ Revert (2-3 tasks, 33% of work):
   - [ ] .sops.yaml configuration examples
   - [ ] Rationale: Clan vars NixOS-specific incompatibility
 
-- [ ] **7.2: Create Operational Guide (AC23)**
-  - [ ] File: `docs/notes/development/sops-nix-ops-guide.md`
-  - [ ] Adding new secrets (edit + sops -e workflow)
-  - [ ] Multi-user encryption (creation_rules)
-  - [ ] Secret rotation (re-encryption)
-  - [ ] Troubleshooting (common errors)
-  - [ ] Age key extraction from clan
+- [ ] **7.2: Create Age Key Management + sops-nix Operational Guide (AC23)**
+  - [ ] File: `~/projects/nix-workspace/test-clan/docs/guides/age-key-management.md`
+  - [ ] SSH-to-age derivation pattern:
+    - Document infra justfile workflow (just sops-sync-keys)
+    - Explain Bitwarden SSH keys as source of truth
+    - Show age key extraction from ~/.config/sops/age/keys.txt
+  - [ ] Clan user creation with SSH-derived keys:
+    - clan secrets users add command with --age-key flag
+    - Public key extraction: jq -r '.[0].publickey' sops/users/*/key.json
+    - Key correspondence validation (derived public matches clan public)
+  - [ ] sops-nix .sops.yaml configuration:
+    - Extract public keys from clan user files
+    - Define creation_rules for multi-user encryption
+    - Verify private keys exist in shared keyfile
+  - [ ] Epic 2-6 new user workflow:
+    - Generate SSH key in Bitwarden (sops-${username}-ssh)
+    - Run infra justfile to derive age keys
+    - Add to test-clan clan users with derived public key
+    - Configure .sops.yaml for new user's secrets
+  - [ ] sops-nix operations:
+    - Adding new secrets (edit + sops -e workflow)
+    - Multi-user encryption (creation_rules syntax)
+    - Secret rotation (re-encryption)
+    - Troubleshooting (common errors, validation commands)
 
 - [ ] **7.3: Write Access Pattern Examples (AC24)**
   - [ ] Before/after: clan vars → sops-nix
@@ -457,7 +480,7 @@ Revert (2-3 tasks, 33% of work):
 - [ ] **7.4: Final Documentation Commit**
   - [ ] Commit: "docs(story-1.10C): sops-nix architecture and operational guides"
 
-**Total Estimated Time:** 4.5 hours (within original 3-5h estimate range)
+**Total Estimated Time:** 4.75 hours (within original 3-5h estimate range, updated for age-key-management.md scope)
 
 ---
 
@@ -826,14 +849,14 @@ sops -e -i secrets/home-manager/users/raquel/secrets.yaml
 | crs58 | `modules/home/users/crs58/sops.nix` | 7 | github-token, ssh-signing-key, glm-api-key, firecrawl-api-key, huggingface-token, bitwarden-email, atuin-key |
 | raquel | `modules/home/users/raquel/sops.nix` | 4 | github-token, ssh-signing-key, bitwarden-email, atuin-key |
 
-**Estimated Effort:** 4.5 hours (updated from 4-6h clan vars estimate)
+**Estimated Effort:** 4.75 hours (updated from 4.5h for age-key-management.md scope)
 - Infrastructure setup: ✅ SKIP (already complete)
 - sops-nix config: 1 hour (Task 2)
 - Secret files creation: 45 minutes (Task 3)
 - Module updates: 1 hour (Task 4)
 - Build validation: 30 minutes (Task 5)
 - Integration testing: 30 minutes (Task 6)
-- Documentation: 45 minutes (Task 7)
+- Documentation: 60 minutes (Task 7, expanded for age key management guide)
 
 **Risk Level:** Medium (encryption concerns, secret transfer, architectural pivot)
 
