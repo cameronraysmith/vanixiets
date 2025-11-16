@@ -2127,13 +2127,35 @@ $ nix flake show 2>&1 | grep "checks.aarch64-darwin"
    - **Reason**: hotfixes.nix references `final.stable.*` from inputs overlay
    - **Failure mode**: `final.stable undefined` if ordering reversed
 
-**Actual Implementation Time**: ~90 minutes
+6. **CRITICAL: Darwin/NixOS Configurations Need Explicit Overlays**: perSystem pkgs configuration does NOT automatically propagate to machine configurations.
+   - **Symptom**: `error: attribute 'ccstatusline' missing` when building blackphos/cinnabar
+   - **Root Cause**: nix-darwin and NixOS modules have their own `nixpkgs.overlays` configuration
+   - **Solution**: Explicitly import all overlay layers in each machine configuration's `nixpkgs.overlays` array
+   - **Pattern**: Replicate overlay imports in `modules/machines/{darwin,nixos}/*/default.nix`:
+     ```nix
+     nixpkgs.overlays = [
+       (import ../../../../overlays/inputs.nix inputs)
+       (import ../../../../overlays/hotfixes.nix)
+       (final: prev: lib.packagesFromDirectoryRecursive {
+         callPackage = final.callPackage;
+         directory = ../../../../pkgs/by-name;
+       })
+       (import ../../../../overlays/overrides.nix)
+       inputs.nuenv.overlays.nuenv
+       inputs.lazyvim.overlays.nvim-treesitter-main
+     ];
+     ```
+   - **Impact**: EVERY machine configuration in Epic 2-6 needs this pattern
+   - **Validation**: blackphos and cinnabar now build successfully with all 5 layers
+
+**Actual Implementation Time**: ~120 minutes (including critical fix)
 - Overlay migration (Layers 1,2,4): ~40 min
 - Flake inputs configuration (Layer 5): ~15 min
-- Build validation: ~15 min
+- Initial validation: ~15 min
 - Debugging import-tree conflicts: ~20 min
+- **Discovering and fixing machine config issue**: ~30 min
 
-**Comparison to Estimate**: 90 min actual vs 90 min estimated (Task Group 1) - exactly on target.
+**Comparison to Estimate**: 120 min actual vs 90 min estimated (+30 min for critical machine config discovery)
 
 #### Layer 1: Multi-Channel Nixpkgs Access (inputs overlay)
 
