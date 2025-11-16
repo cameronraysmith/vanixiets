@@ -346,15 +346,27 @@ Pattern: `pkgs.customPackage.overrideAttrs (old: { ... })` works with pkgs-by-na
 Integrate third-party overlays from external flake inputs.
 Enables modular overlay composition without vendoring code.
 
-**Implementation:**
+**Implementation Location:**
+
+Layer 5 is implemented directly in `overlays/default.nix` (lines 44-65), NOT in a separate perSystem configuration.
+The flakeInputs overlay construction imports overlays from flake inputs defined in `flake.nix` inputs section.
 
 Pattern in `overlays/default.nix`:
 ```nix
+# Overlays from flake inputs (lines 44-65)
+flakeInputs = {
+  # Expose nuenv for nushell script packaging
+  nuenv = (inputs.nuenv.overlays.nuenv self super).nuenv;
+
+  # jujutsu overlay disabled due to CI disk constraints
+  # Using nixpkgs version instead
+  # jujutsu = inputs.jj.packages.${super.system}.jujutsu or super.jujutsu;
+};
+
+# Merged into final overlay (line 76)
 lib.mergeAttrsList [
   # ... other layers ...
-  inputs.nuenv.overlays.default      # Nushell devshell builder
-  inputs.jj.overlays.default         # Jujutsu VCS overlay
-  # Add more external overlays as needed
+  flakeInputs  # Overlays from flake inputs (nuenv, etc.)
 ]
 ```
 
@@ -1262,6 +1274,7 @@ cat ~/projects/nix-workspace/drupol-dendritic-infra/modules/flake-parts/nixpkgs.
    - Verify pattern applicable to test-clan (no architectural blockers)
 
 4. **Documentation Scope:**
+   - **Documentation Location**: `~/projects/nix-workspace/test-clan/docs/architecture/test-clan-validated-architecture.md`, Section 13.2 "Overlay Architecture Preservation with pkgs-by-name Integration" (insert after Section 13.1 from Story 1.10D)
    - Section 13.2 must be comprehensive (Epic 2-6 teams depend on it)
    - Code examples must be correct (production patterns from infra)
    - Migration strategy must be clear (preserve overlays, migrate custom packages)
