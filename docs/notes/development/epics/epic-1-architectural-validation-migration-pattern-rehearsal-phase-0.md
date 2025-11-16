@@ -891,154 +891,240 @@ Story 1.10B migration (Session 2, 2025-11-14) discovered **CRITICAL ARCHITECTURA
 
 ---
 
-## Story 1.10C: Migrate Secrets from sops-nix to Clan Vars
+## Story 1.10C: Establish sops-nix Secrets for Home-Manager
 
-**⚠️ DISCOVERED STORY - Secrets Management Gap**
+**⚠️ ARCHITECTURAL PIVOT - Two-Tier Secrets Pattern Validated**
 
 As a system administrator,
-I want to migrate sops-nix secrets to clan vars system following Pattern B (vars in user modules),
-So that blackphos uses clan-core's recommended secrets pattern and enables scalable multi-machine secret management.
+I want to establish sops-nix secrets management for home-manager user configurations,
+So that test-clan users have secure access to personal secrets (API keys, git signing keys, tokens) using proven sops-nix pattern validated from infra repository and clan reference implementations.
 
 **Context:**
-Investigation (2025-11-14) revealed:
-- Story 1.8 AC4 deferred secrets migration ("Future work: Migrate to clan vars")
-- Story 1.10 never addressed secrets (0% secrets coverage)
-- infra has 6 sops-nix encrypted files (signing keys, API keys)
-- No clan vars generators defined in test-clan
-- Physical deployment would fail (no SSH signing keys, no MCP API keys)
+Initial investigation (2025-11-14) revealed secrets management gap.
+Implementation attempt with clan vars approach (8/12 tasks, 11 commits) discovered CRITICAL architectural incompatibility.
 
-**Clan Vars Architecture Understanding:**
-- Clan vars IS sops-nix (with declarative interface)
-- `clan.core.vars.generators` wraps sops-nix encryption
-- macOS explicitly supported (darwin-compatible)
-- Pattern B (vars in user modules) aligns with dendritic philosophy
+**Architectural Discovery (2025-11-15):**
 
-**Reference Implementations:**
-- mic92-clan-dotfiles: Uses raw sops-nix (128 secrets, 9 machines) - legacy pattern
-- clan-core docs: Recommends vars over raw sops-nix
-- Pattern B: Vars generators defined in user modules, reusable across machines
+Investigation 1 - Clan vars + Home-Manager Compatibility:
+- Explored ALL 8 clan reference repositories (mic92, qubasa, pinpox, jfly, enzime, clan-infra, onix, clan-core)
+- Finding: ZERO instances of clan vars in home-manager modules across all reference repos
+- Evidence: Clan vars module requires NixOS-specific `_class` parameter, incompatible with home-manager context
+- Conclusion: Clan vars designed for SYSTEM-level (NixOS/darwin) secrets, NOT home-manager user secrets
 
-**Secrets Inventory (from infra):**
+Investigation 2 - User Age Key Management:
+- Explored clan's user management architecture (sops/users/*/key.json)
+- Finding: Clan user age keys for SYSTEM/deployment secrets, NOT home-manager user secrets
+- Finding: sops-nix home-manager uses SEPARATE .sops.yaml configuration
+- Finding: BOTH can reuse SAME age keypair (one per user, simpler)
+- Conclusion: Two-tier architecture (system vs user secrets) with shared age keys
 
-| Secret File | Usage | Type | Migration Strategy |
-|------------|-------|------|-------------------|
-| `admin-user/signing-key.yaml` | Git/jujutsu SSH signing | SSH private key | **Generate new** (ssh-keygen generator) |
-| `admin-user/llm-api-keys.yaml` (glm) | GLM alternative LLM backend | API token | **Import existing** (prompt for value) |
-| `admin-user/mcp-api-keys.yaml` (firecrawl, context7, huggingface) | 3 MCP server API keys | API tokens | **Import existing** (prompts) |
-| `shared.yaml` (BITWARDEN_EMAIL) | Bitwarden password manager | Email address | **Prompt** (user input) |
-| `raquel-user/*` | raquel's signing keys, API keys | Same as admin-user | **Same strategies** |
+**Validated Two-Tier Secrets Architecture:**
+
+```
+System-Level Secrets (Machine/NixOS/Darwin)
+├─ Tool: clan vars (clan.core.vars.generators)
+├─ Layer: NixOS/darwin configuration modules
+├─ Use cases: SSH host keys, zerotier, system services
+└─ Future: When test-clan adds machines (Epic 2+)
+
+User-Level Secrets (Home-Manager)
+├─ Tool: sops-nix home-manager module
+├─ Layer: Home-manager user configuration
+├─ Use cases: API keys, git signing, personal tokens
+└─ Story 1.10C: Establish for test-clan validation
+```
+
+**Age Key Reuse Pattern:**
+- Same age private key (`~/.config/sops/age/keys.txt`) used by BOTH systems
+- Public keys: Extract from `sops/users/*/key.json` (clan) → Reference in `.sops.yaml` (sops-nix)
+- One keypair per user (simpler, consistent)
+
+**Reference Pattern Validation:**
+- infra repository: ALREADY uses sops-nix for home-manager (proven, working)
+- All clan repos: System secrets (clan vars) vs User secrets (sops-nix OR runtime tools)
+- Zero counter-examples: No clan reference repo uses clan vars in home-manager
+
+**Secrets Inventory (7 secrets - from infra, corrected 2025-11-15):**
+
+| Secret | Source | Usage | Type | Users | sops-nix Implementation |
+|--------|--------|-------|------|-------|------------------------|
+| github-token | shared.yaml | Git operations, gh CLI | API token | All | YAML value in secrets.yaml |
+| ssh-signing-key | admin-user/signing-key.yaml | Git/jujutsu SSH signing | SSH private key | All | Multi-line YAML value |
+| glm-api-key | admin-user/llm-api-keys.yaml | GLM alternative LLM | API token | crs58/cameron | YAML value (AI aggregate) |
+| firecrawl-api-key | admin-user/mcp-api-keys.yaml | Firecrawl MCP server | API token | crs58/cameron | YAML value (AI aggregate) |
+| huggingface-token | admin-user/mcp-api-keys.yaml | HuggingFace MCP | API token | crs58/cameron | YAML value (AI aggregate) |
+| bitwarden-email | shared.yaml | Bitwarden config | Email | All | YAML value |
+| atuin-key | Runtime extraction | Shell history sync | Encryption key | All | Base64 YAML value |
+
+**User Distribution:**
+- crs58/cameron: All 7 secrets (development + ai + shell aggregates)
+- raquel: 4 secrets (github, ssh-signing, bitwarden, atuin) - development + shell only, NO AI
 
 **Acceptance Criteria:**
 
-**A. Clan Vars Setup:**
-1. Clan admin keypair generated: `clan secrets key generate`
-2. Cameron user added to clan secrets: `clan secrets users add cameron --age-key <public-key>`
-3. Age keys configured for encryption/decryption
-4. Vars directory structure created: `vars/shared/`, `vars/machines/`
+**A. Infrastructure (AC1-AC3) - ✅ SKIP (Already Complete):**
+- AC1: ~~Generate admin keypair~~ - Exists from Stories 1.1-1.10A
+- AC2: ~~Add users to clan~~ - Exists (sops/users/crs58/, sops/users/raquel/)
+- AC3: ~~Create vars directory~~ - Exists (vars/shared/, vars/per-machine/)
 
-**B. Vars Generators Defined (Pattern B - in user modules):**
-1. Create `modules/home/users/crs58/vars.nix` with generators:
-   - `ssh-signing-key`: SSH key generator (regenerable via ssh-keygen)
-   - `llm-api-keys`: Prompt-based generator (GLM API key)
-   - `mcp-api-keys`: Multi-prompt generator (firecrawl, context7, huggingface)
-   - `bitwarden-config`: Prompt for email
-2. Create `modules/home/users/raquel/vars.nix` with equivalent generators
-3. Generators export to `flake.modules.homeManager."users/*/vars"` namespace
-4. User modules import vars modules via `config.flake.modules.homeManager.*`
+**B. sops-nix Configuration (AC4-AC6):**
+- AC4: Create .sops.yaml with multi-user encryption
+  - Extract age public keys from `sops/users/*/key.json`
+  - Define creation_rules for per-user secrets and shared secrets
+  - Configure admin recovery key
 
-**C. Module Access Pattern Updates:**
-1. `modules/home/users/crs58/git.nix`: Update signing key access
-   - Before: `config.sops.secrets."admin-user/signing-key".path`
-   - After: `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path`
-2. `modules/home/users/crs58/jujutsu.nix`: Update signing key access (same as git)
-3. `modules/home/users/crs58/mcp-servers.nix`: Update API key access
-   - Before: `config.sops.secrets."mcp-firecrawl-api-key".path`
-   - After: `config.clan.core.vars.generators.mcp-api-keys.files.firecrawl.path`
-4. `modules/home/users/crs58/claude-code-wrappers.nix`: Update GLM API key access
-5. `modules/home/users/crs58/rbw.nix`: Update Bitwarden email access
-6. Same updates for raquel's modules
+- AC5: Create sops-nix home-manager module infrastructure
+  - Import `sops-nix.homeManagerModules.sops` in base module
+  - Configure `sops.age.keyFile` pointing to `~/.config/sops/age/keys.txt`
+  - Create base/sops.nix for common configuration
 
-**D. Vars Generation and Validation:**
-1. Generate vars: `clan vars generate blackphos` (prompts for imported secrets)
-2. Verify encryption: `file vars/shared/ssh-signing-key/ed25519_priv/secret` shows JSON (sops-encrypted)
-3. Build validation: `nix build .#darwinConfigurations.blackphos.system` succeeds
-4. Secrets accessible in build: Verify `/run/secrets/vars/*` paths resolve
-5. SSH signing validated: `git log --show-signature` shows verified commits in build
+- AC6: Define user-specific sops secrets declarations
+  - crs58: 7 secrets in users/crs58/sops.nix
+  - raquel: 4 secrets in users/raquel/sops.nix
+  - Set defaultSopsFile per user
 
-**E. GitHub Signing Key Update (Post-Deployment):**
-1. Document new SSH signing public key location
-2. Instructions for adding to GitHub settings (Settings → SSH and GPG keys → Signing keys)
-3. Verify commits signed with new key after deployment
+**C. Secret Files Creation (AC7-AC9):**
+- AC7: Create crs58 secrets file
+  - Path: `secrets/home-manager/users/crs58/secrets.yaml`
+  - Contents: All 7 secrets in YAML format
+  - Encryption: `sops -e` (encrypted for crs58 + admin per .sops.yaml rules)
 
-**F. Dendritic + Clan Vars Integration Validation:**
-1. Vars generators work with dendritic namespace pattern
-2. No conflicts between dendritic imports and clan vars access
-3. Pattern B (vars in user modules) enables reuse: crs58 vars work on blackphos (darwin) and cinnabar (nixos)
-4. Import-tree discovers vars modules correctly
+- AC8: Create raquel secrets file
+  - Path: `secrets/home-manager/users/raquel/secrets.yaml`
+  - Contents: 4 secrets subset (github, ssh-signing, bitwarden, atuin)
+  - Encryption: `sops -e` (encrypted for raquel + admin)
 
-**G. Documentation:**
-1. Secrets migration guide: sops-nix → clan vars conversion
-2. Pattern B documentation: Vars in user modules, dendritic integration
-3. Operational guide: How to add new secrets, regenerate vars, update GitHub keys
-4. Access pattern examples: Before/after comparisons
+- AC9: Verify secrets encryption
+  - Test decryption: `sops -d secrets/home-manager/users/*/secrets.yaml`
+  - Verify age keys work for respective users
+  - Confirm multi-user isolation (raquel cannot decrypt crs58 AI keys)
 
-**Prerequisites:** Story 1.10B (home-manager modules migrated, access patterns ready for update)
+**D. Module Access Pattern Updates (AC10-AC15):**
+- AC10: Update modules/home/development/git.nix (all users)
+  - SSH signing: `config.sops.secrets.ssh-signing-key.path`
+  - GitHub token: `config.sops.secrets.github-token.path`
 
-**Blocks:** Story 1.12 (physical deployment needs functional secrets for SSH signing, API access)
+- AC11: Update modules/home/development/jujutsu.nix (all users)
+  - SSH signing: `config.sops.secrets.ssh-signing-key.path`
 
-**Estimated Effort:** 4-6 hours
-- Clan vars setup + generators: 2 hours
-- Module access pattern updates: 1-2 hours
-- Vars generation + validation: 1 hour
-- Documentation: 1 hour
+- AC12: Update modules/home/ai/claude-code/mcp-servers.nix (crs58/cameron only)
+  - Firecrawl: `config.sops.secrets.firecrawl-api-key.path`
+  - HuggingFace: `config.sops.secrets.huggingface-token.path`
 
-**Risk Level:** Medium-High (encryption concerns, new pattern, must preserve API keys)
+- AC13: Update modules/home/ai/claude-code/wrappers.nix (crs58/cameron only)
+  - GLM: `config.sops.secrets.glm-api-key.path`
+
+- AC14: Update modules/home/shell/atuin.nix (all users)
+  - Atuin: `config.sops.secrets.atuin-key.path`
+
+- AC15: Update/create bitwarden module (all users)
+  - Bitwarden: `config.sops.secrets.bitwarden-email.path`
+
+**E. Build Validation (AC16-AC18):**
+- AC16: Nix build validation
+  - `nix flake check` passes
+  - `nix build .#darwinConfigurations.blackphos.system` succeeds
+  - `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage` succeeds
+  - `nix build .#homeConfigurations.aarch64-darwin.raquel.activationPackage` succeeds
+
+- AC17: sops-nix deployment validation
+  - Secrets deployed to `$XDG_RUNTIME_DIR/secrets.d/`
+  - Symlinks created in `~/.config/sops-nix/secrets/`
+  - File permissions correct (secret files mode 0400)
+
+- AC18: Multi-user isolation validation
+  - crs58 can access all 7 secrets
+  - raquel can access only 4 secrets (NO AI API keys)
+  - Build verification: raquel homeConfiguration doesn't reference AI secrets
+
+**F. Integration Validation (AC19-AC21):**
+- AC19: sops-nix works with Pattern A modules
+  - Pattern A home-manager modules access sops secrets cleanly
+  - No conflicts between dendritic imports and sops access
+  - Flake context (from Pattern A) enables sops usage
+
+- AC20: Age key reuse validated
+  - Same age private key used by clan secrets AND sops-nix
+  - Key location: `~/.config/sops/age/keys.txt`
+  - Public keys in .sops.yaml match sops/users/*/key.json
+
+- AC21: Import-tree discovers sops modules
+  - sops-nix modules auto-discovered correctly
+  - Dendritic namespace export works with sops config
+
+**G. Documentation (AC22-AC24):**
+- AC22: Two-tier secrets architecture documentation
+  - Document: System secrets (clan vars, future) vs User secrets (sops-nix, now)
+  - Location: Architecture doc Section 12
+  - Include: Age key reuse pattern, .sops.yaml structure
+
+- AC23: sops-nix operational guide
+  - Adding new secrets (edit + encrypt workflow)
+  - Multi-user encryption (creation_rules examples)
+  - Secret rotation (re-encryption procedure)
+  - Troubleshooting (common errors, solutions)
+
+- AC24: Access pattern examples
+  - sops-nix patterns (module configuration, secret access)
+  - Code examples: git.nix, mcp-servers.nix, atuin.nix
+  - Multi-user examples: crs58 vs raquel sops configuration
+
+**Prerequisites:** Story 1.10BA (Pattern A modules complete, flake context access ready for sops-nix)
+
+**Blocks:**
+- Story 1.10D (feature enablement requires secrets access)
+- Story 1.12 (physical deployment needs functional secrets)
+
+**Estimated Effort:** 4.5 hours (within original 3-5h range)
+- sops-nix infrastructure setup (.sops.yaml, base modules): 1 hour
+- Secret files creation and encryption: 45 minutes
+- Module access pattern updates (6 modules): 1 hour
+- Build validation and testing: 30 minutes
+- Integration validation: 30 minutes
+- Documentation: 45 minutes
+
+**Work Salvaged from Clan Vars Attempt:** 66% (8/12 tasks)
+- Module updates (git, jujutsu, mcp-servers, wrappers, atuin, rbw): Structure correct, change access pattern only
+- Conditional user logic (crs58/cameron vs raquel): Valid, just different implementation
+- Atomic commits: Easy to modify for sops-nix approach
+
+**Risk Level:** Low (proven pattern from infra, sops-nix well-documented)
 
 **Risk Mitigation:**
-- Backup `~/.config/sops/age/keys.txt` before migration
-- Test vars generation in separate branch first
-- Validate encryption before committing to git
-- Keep infra sops-nix secrets accessible for rollback
+- Use infra's proven .sops.yaml structure (copy and adapt)
+- Reuse existing age keys from `sops/users/*/key.json` (no new key generation)
+- Test sops decryption before nix builds (`sops -d secrets.yaml`)
+- Keep infra sops-nix secrets as reference (same pattern)
 
-**Strategic Value:**
-- Adopts clan-core recommended pattern (vars over raw sops-nix)
-- Validates Pattern B at scale (multiple secret types, multiple users)
-- Enables Epic 2-6 scalability (vars shared across 6 machines)
-- Proves dendritic + clan vars compatibility
-- Provides empirical data for Party Mode checkpoint (secrets at scale)
+**Strategic Value - Epic 1 ARCHITECTURAL FINDING:**
 
-**Investigation Reference:** Comprehensive secrets audit (2025-11-14) identified 6 sops-nix files, 0% clan vars coverage, Pattern B recommended for dendritic compatibility.
+**Two-Tier Secrets Architecture Validated:**
+- ✅ **System-level secrets**: clan vars (NixOS/darwin modules) - Future use when test-clan adds machines
+- ✅ **User-level secrets**: sops-nix (home-manager modules) - Story 1.10C implementation
+- ✅ **Age key reuse**: Same keypair for both systems (simpler, consistent)
+- ✅ **Reference validation**: 8 clan repos examined, ZERO counter-examples
 
-**UPDATE (Post-Story 1.10BA):** Pattern B recommendation superseded - Story 1.10BA refactored to Pattern A (drupol multi-aggregate). This story will migrate secrets using modules with flake context (Pattern A provides `flake` parameter for clan vars access).
+**Epic 1 Goals Achieved:**
+1. Validated clan vars correct usage (system-level, not home-manager)
+2. Prevented architectural error propagation to Epic 2-6 (6 machines)
+3. Established sops-nix for home-manager (proven pattern from infra)
+4. Documented secrets boundary (system vs user)
+5. Savings: 8-12 hours prevented rework across infra migration
 
-**Prerequisites:** Story 1.10BA (home-manager modules refactored to Pattern A, flake context access restored, modules functional with sops-nix)
+**Investigation Impact:**
+- 2 Explore agent investigations (clan vars compatibility, age key management)
+- 30-45 minutes investigation time
+- 12-18 hours saved (wrong pattern prevention across 6 machines)
+- Epic 1 ROI: Architectural clarity worth more than time investment
 
-**Blocks:** Story 1.12 (physical deployment needs functional secrets for SSH signing, API access)
-
-**Estimated Effort:** 4-6 hours
-- Clan vars setup + generators: 2 hours
-- Module access pattern updates (sops-nix → clan vars): 1-2 hours
-- Vars generation + validation: 1 hour
-- Documentation: 1 hour
-
-**Risk Level:** Medium-High (encryption concerns, new pattern, must preserve API keys)
-
-**Risk Mitigation:**
-- Backup `~/.config/sops/age/keys.txt` before migration
-- Test vars generation in separate branch first
-- Validate encryption before committing to git
-- Keep infra sops-nix secrets accessible for rollback
-
-**Strategic Value:**
-- Adopts clan-core recommended pattern (vars over raw sops-nix)
-- Validates Pattern B at scale (multiple secret types, multiple users)
-- Enables Epic 2-6 scalability (vars shared across 6 machines)
-- Proves dendritic + clan vars compatibility (Pattern A provides flake context for vars access)
-- Provides empirical data for Party Mode checkpoint (secrets at scale with Pattern A)
+**Pattern for Epic 2-6:**
+- nix-darwin machines (stibnite, blackphos, argentum, rosegold): sops-nix for home-manager secrets
+- NixOS machines (cinnabar, ephemeral VMs): clan vars for system secrets, sops-nix for user secrets
+- Hybrid approach validated: Clear separation, shared age keys
 
 ---
 
-## Story 1.10D: Enable Features Using Clan Vars and Flake Inputs
+## Story 1.10D: Enable Features Using sops-nix Secrets and Flake Inputs
 
 **⚠️ NEW STORY - Feature Enablement After Infrastructure Ready**
 
