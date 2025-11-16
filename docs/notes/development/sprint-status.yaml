@@ -179,20 +179,24 @@ development_status:
   # Actual effort: 7.25 hours total (4.75h implementation + 2.5h review follow-up) vs 4.75h estimated
   # Strategic value: Validates sops-nix + Pattern A, unblocks Epic 2-6 migration, documents two-tier architecture
   1-10c-establish-sops-nix-secrets-home-manager: done
-  # Story 1.10D: READY-FOR-DEV (2025-11-16) - Validate Custom Package Overlays with pkgs-by-name Pattern
+  # Story 1.10D: DONE ✅ APPROVED ✅ (2025-11-16) - Validate Custom Package Overlays with pkgs-by-name Pattern
   # Epic reordering decision (2025-11-16): Infrastructure validation BEFORE feature enablement
   # Validates infra's custom package overlay pattern works with dendritic flake-parts + clan architecture
   # pkgs-by-name-for-flake-parts pattern from Dendritic Overlay Pattern Review (drupol PRIMARY reference)
   # Test case: ccstatusline (production-ready derivation from infra, settings pre-configured in test-clan)
-  # 9 ACs: Infrastructure setup, package implementation, build validation, integration, documentation
-  # Three-layer pattern: pkgs/by-name/ (definition) → modules/nixpkgs.nix (export) → dendritic modules (consumption)
-  # infra migration: SAFE TO MIGRATE (directory restructuring only, 4 packages: ccstatusline, atuin-format, markdown-tree-parser, starship-jj)
-  # Estimated effort: 2-3 hours (20min infra + 10min package + 1h validation + 1h15m docs)
-  # Dependencies: Story 1.10C (sops-nix infrastructure), Dendritic Overlay Pattern Review (2025-11-16)
-  # Blocks: Story 1.10E (ccstatusline feature enablement), Epic 1 checkpoint (overlay validation critical for GO decision)
-  # Strategic value: Completes Epic 1 architectural coverage (95%), removes Epic 2-6 migration blocker (overlay uncertainty)
-  # Story context created: 2025-11-16 (docs/notes/development/work-items/1-10d-validate-custom-package-overlays.context.xml)
-  1-10d-validate-custom-package-overlays: ready-for-dev
+  # Implementation: 8 commits in test-clan (8086e59-f21527e), 2 commits in infra (2893c872, 5bbdedeb)
+  # Drupol flat pattern validated (pkgs/by-name/ccstatusline/ NOT cc/ccstatusline/)
+  # All 9 ACs satisfied with concrete evidence, all 5 tasks verified complete
+  # 4 quality gates PASS: Infrastructure, Build, Integration, Documentation
+  # Section 13.1 comprehensive tutorial (467 lines): pattern + ccstatusline example + infra migration guide
+  # infra migration path documented: 4 packages (ccstatusline ✅, atuin-format, markdown-tree-parser, starship-jj)
+  # Effort: 2.5-3h total, Risk: LOW (directory restructuring only, SAME lib.packagesFromDirectoryRecursive)
+  # REVIEW (2025-11-16): APPROVE ✅ - Zero HIGH/MEDIUM/LOW findings, production-ready, security posture strong
+  # Strategic value: Completes Epic 1 Layer 3 validation, removes Epic 2-6 blocker (overlay uncertainty)
+  # Three-layer pattern validated: pkgs/by-name/ (definition) → modules/nixpkgs.nix (export) → dendritic modules (consumption)
+  # Dendritic compatibility: All 6 checklist items satisfied (package definition, export, consumption, no specialArgs, import-tree, drupol match)
+  # Implementation time: ~2h 55min (within 2-3h estimate), Review quality: 10/10 (clarity, completeness, technical, documentation)
+  1-10d-validate-custom-package-overlays: done
   # Story 1.10DA: TODO (2025-11-16) - Validate Overlay Architecture Preservation with pkgs-by-name Integration
   # DISCOVERED STORY - Party Mode team identified architectural gap (Option C staged validation)
   # Story 1.10D validates Layer 3 only (custom packages via pkgs-by-name), missing Layers 1,2,4,5 (overlays)
