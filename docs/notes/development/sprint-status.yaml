@@ -179,18 +179,32 @@ development_status:
   # Actual effort: 7.25 hours total (4.75h implementation + 2.5h review follow-up) vs 4.75h estimated
   # Strategic value: Validates sops-nix + Pattern A, unblocks Epic 2-6 migration, documents two-tier architecture
   1-10c-establish-sops-nix-secrets-home-manager: done
-  # Story 1.10D: NEW STORY (2025-11-14) - Enable Features Using Clan Vars and Flake Inputs
-  # Feature enablement deferred from Story 1.10BA (original AC17-AC20) - requires clan vars infrastructure first
-  # Enable 11 disabled features from Story 1.10B using Pattern A + clan vars architecture
-  # Category A (5 features): SSH signing (git, jujutsu), MCP API keys (3 servers) via clan vars
-  # Category B (3 features): GLM wrapper, claude-code package, ccstatusline via flake.inputs
-  # Category C (3 features): catppuccin tmux theme (36-line config) via flake.inputs
-  # Access patterns: config.clan.core.vars.generators.X.files.Y.path (secrets), flake.inputs.X.packages (packages)
-  # Validates Pattern A + clan vars work for production features (not just minimal structure)
-  # Estimated effort: 2-3 hours (30min SSH + 30min MCP + 1h packages/themes + 1h validation/docs)
-  # Dependencies: Story 1.10C (clan vars infrastructure), Blocks: Story 1.12 (deployment needs features)
-  # Strategic value: Completes Pattern A + clan vars validation (structure + secrets + features), Epic 2-6 reference
-  1-10d-enable-features-clan-vars: backlog
+  # Story 1.10D: NEW STORY (2025-11-16) - Validate Custom Package Overlays with pkgs-by-name Pattern
+  # Epic reordering decision (2025-11-16): Infrastructure validation BEFORE feature enablement
+  # Validates infra's custom package overlay pattern works with dendritic flake-parts + clan architecture
+  # pkgs-by-name-for-flake-parts pattern from Dendritic Overlay Pattern Review (drupol PRIMARY reference)
+  # Test case: ccstatusline (production-ready derivation from infra, settings pre-configured in test-clan)
+  # 9 ACs: Infrastructure setup, package implementation, build validation, integration, documentation
+  # Three-layer pattern: pkgs/by-name/ (definition) → modules/nixpkgs.nix (export) → dendritic modules (consumption)
+  # infra migration: SAFE TO MIGRATE (directory restructuring only, 4 packages: ccstatusline, atuin-format, markdown-tree-parser, starship-jj)
+  # Estimated effort: 2-3 hours (20min infra + 10min package + 1h validation + 1h15m docs)
+  # Dependencies: Story 1.10C (sops-nix infrastructure), Dendritic Overlay Pattern Review (2025-11-16)
+  # Blocks: Story 1.10E (ccstatusline feature enablement), Epic 1 checkpoint (overlay validation critical for GO decision)
+  # Strategic value: Completes Epic 1 architectural coverage (95%), removes Epic 2-6 migration blocker (overlay uncertainty)
+  # Status: create-story workflow in progress (work item generation), expected transition to ready-for-dev
+  1-10d-validate-custom-package-overlays: backlog
+  # Story 1.10E: RENAMED (2025-11-16) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
+  # Previously Story 1.10D (2025-11-14), renamed during epic reordering to resolve dependency on ccstatusline package
+  # Story 1.10C already enabled 9/11 features (sops-nix patterns: direct path, sops.placeholder, runtime cat, activation scripts)
+  # Remaining scope: Add flake.inputs (nix-ai-tools, catppuccin-nix), enable claude-code package, catppuccin theme, ccstatusline feature
+  # Category A (5 secrets): ✅ COMPLETE in Story 1.10C (SSH signing, MCP firecrawl/huggingface, context7 N/A)
+  # Category B (3 packages): ✅ GLM wrapper complete (Story 1.10C), ❌ claude-code (Story 1.10E), ❌ ccstatusline (Story 1.10D+1.10E)
+  # Category C (3 themes): ❌ catppuccin tmux theme (Story 1.10E, flake.inputs blocked)
+  # 8 ACs: Review 1.10C implementations (A-C), enable claude-code (D), catppuccin theme (E), ccstatusline feature (F), builds (G), docs Section 13 (H)
+  # Estimated effort: 1.5-2 hours (30min flake.inputs + 15min claude-code + 45min catppuccin + 15min ccstatusline + 30min builds + 30min docs)
+  # Dependencies: Story 1.10C (sops-nix, 9/11 features), Story 1.10D (ccstatusline package)
+  # Strategic value: Completes Pattern A + sops-nix + flake.inputs validation (structure + secrets + features), Epic 2-6 reference
+  1-10e-enable-remaining-features: backlog
   # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
   # Now includes type-safe home-manager architecture implementation (phases 1-5)
   # Implements homeHosts options with type validation, smart resolution app, CI checks
