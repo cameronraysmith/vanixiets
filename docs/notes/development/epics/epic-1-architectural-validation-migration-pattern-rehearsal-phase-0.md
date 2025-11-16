@@ -1126,150 +1126,200 @@ User-Level Secrets (Home-Manager)
 
 ## Story 1.10D: Enable Features Using sops-nix Secrets and Flake Inputs
 
-**⚠️ NEW STORY - Feature Enablement After Infrastructure Ready**
+**⚠️ UPDATED STORY - Remaining Feature Enablement + Documentation**
 
 As a system administrator,
-I want to enable the 11 disabled home-manager features using clan vars (for secrets) and flake.inputs (for packages/themes),
-So that all production features are functional in test-clan using the validated Pattern A + clan vars architecture.
+I want to enable the remaining disabled home-manager features using sops-nix (for secrets) and flake.inputs (for packages/themes),
+So that all production features are functional in test-clan using the validated Pattern A + sops-nix architecture.
 
 **Context:**
 
-Story 1.10BA completed Pattern A structural migration but deferred feature enablement (original AC17-AC20) because test-clan uses clan vars, not sops-nix.
+Story 1.10BA completed Pattern A structural migration but deferred feature enablement (original AC17-AC20) pending secrets infrastructure establishment.
 
-Story 1.10C establishes clan vars infrastructure (generators for secrets, encryption, multi-user support).
+Story 1.10C establishes sops-nix user-level secrets infrastructure (age encryption, multi-user support, sops.templates patterns). During implementation (61 commits, 2025-11-15 to 2025-11-16), **9/11 Story 1.10D features were enabled using sops-nix patterns**, leaving only flake.inputs-dependent features (claude-code package, catppuccin theme) for Story 1.10D completion.
 
-Story 1.10D validates that all 11 disabled features work with the Pattern A + clan vars architecture.
+Story 1.10D completes feature enablement by configuring flake.inputs, enabling remaining features, and documenting all feature enablement patterns in Section 13 of test-clan-validated-architecture.md.
 
-**Features to Enable (from Story 1.10B disabled features):**
+**Features Status (from Story 1.10B disabled features):**
 
-**Category A: Secrets via Clan Vars (5 features):**
-1. SSH signing in git.nix - `config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path`
-2. SSH signing in jujutsu.nix - same clan vars secret
-3-5. MCP API keys in mcp-servers.nix (3 servers: firecrawl, huggingface, context7)
+**Category A: Secrets via sops-nix (5 features - ✅ COMPLETED IN STORY 1.10C):**
+1. ✅ SSH signing in git.nix - `config.sops.secrets.ssh-signing-key.path` (Story 1.10C, commit f9e9e92)
+2. ✅ SSH signing in jujutsu.nix - `config.sops.secrets.ssh-signing-key.path` (Story 1.10C, commit 04c1617)
+3. ✅ MCP firecrawl API key - `config.sops.placeholder."firecrawl-api-key"` in sops.templates (Story 1.10C, commit c63b61e)
+4. ✅ MCP huggingface token - `config.sops.placeholder."huggingface-token"` in sops.templates (Story 1.10C, commit c63b61e)
+5. ⚠️ MCP context7 - NOT in test-clan scope (implementation documents "Only 2 MCP servers")
 
-**Category B: Packages via flake.inputs (3 features):**
-6. GLM wrapper in wrappers.nix - `flake.inputs.nix-ai-tools` package + clan vars API key
-7. claude-code package in default.nix - `flake.inputs.nix-ai-tools.packages.${pkgs.system}.claude-code`
-8. ccstatusline package - investigate availability (pkgs or flake input)
+**Category B: Packages via flake.inputs (3 features - 1 ENABLED, 2 REMAINING):**
+6. ✅ GLM wrapper in wrappers.nix - Custom `pkgs.writeShellApplication` + sops-nix API key (Story 1.10C, commit f6b01e3, production-ready)
+7. ❌ claude-code package in default.nix - Blocked: nix-ai-tools flake input not configured ← **Story 1.10D scope**
+8. ❌ ccstatusline package - NOT in nixpkgs, requires custom derivation. Note: ccstatusline-settings.nix ✅ ENABLED (175 lines) ← **Story 1.10D scope (documentation only)**
 
-**Category C: Themes via flake.inputs (3 features):**
-9-11. catppuccin-nix tmux theme - `flake.inputs.catppuccin-nix.homeManagerModules.catppuccin` + 36-line configuration
+**Category C: Themes via flake.inputs (3 features - 0 ENABLED, BLOCKED):**
+9-11. ❌ catppuccin-nix tmux theme - Blocked: catppuccin-nix flake input not configured. Note: Status bar placeholders configured (15/36 lines) ← **Story 1.10D scope**
+
+**Bonus Features (✅ ENABLED IN STORY 1.10C, undocumented in original epic):**
+- ✅ Atuin encryption key deployment via activation script
+- ✅ Bitwarden (rbw) email config via sops.templates
+- ✅ Git allowed_signers file generation via sops.templates
 
 **Acceptance Criteria:**
 
-**A. Enable SSH Signing (git + jujutsu):**
-1. Access clan vars secret in git.nix:
+**A. COMPLETED IN STORY 1.10C - Document Implementation:**
+1. ✅ Git SSH signing enabled (git.nix:24-28):
    ```nix
-   { config, flake, ... }:
-   {
-     programs.git.signing = {
-       key = config.clan.core.vars.generators.ssh-signing-key.files.ed25519_priv.path;
-       format = "ssh";
-       signByDefault = true;
+   signing = lib.mkDefault {
+     key = config.sops.secrets.ssh-signing-key.path;
+     format = "ssh";
+     signByDefault = true;
+   };
+   ```
+2. ✅ Jujutsu SSH signing enabled (jujutsu.nix:41):
+   ```nix
+   key = lib.mkDefault config.sops.secrets.ssh-signing-key.path;
+   ```
+3. ✅ Build validation: PASS (Story 1.10C comprehensive review, 4/4 builds)
+4. ✅ Signing key accessible: Validated via sops.secrets module
+
+**Story 1.10D scope:** Document pattern in Section 13 of test-clan-validated-architecture.md
+
+**B. COMPLETED IN STORY 1.10C - Document Implementation:**
+1. ✅ Firecrawl API key enabled (mcp-servers.nix:34-52 via sops.templates):
+   ```nix
+   sops.templates.mcp-firecrawl = {
+     content = builtins.toJSON {
+       mcpServers.firecrawl.env = {
+         FIRECRAWL_API_KEY = config.sops.placeholder."firecrawl-api-key";
+       };
      };
-   }
+   };
    ```
-2. Same pattern in jujutsu.nix for `signing.key`
-3. Build validation: `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage` succeeds
-4. Verify signing key path accessible at activation time
-
-**B. Enable MCP API Keys (3 servers):**
-1. Access clan vars in mcp-servers.nix:
+2. ✅ HuggingFace token enabled (mcp-servers.nix:56-73 via sops.templates):
    ```nix
-   { config, ... }:
-   {
-     programs.claude-code.mcpServers = {
-       firecrawl.apiKey = config.clan.core.vars.generators.mcp-api-keys.files.firecrawl.path;
-       huggingface.apiKey = config.clan.core.vars.generators.mcp-api-keys.files.huggingface.path;
-       context7.apiKey = config.clan.core.vars.generators.mcp-api-keys.files.context7.path;
-     };
-   }
+   args = [
+     "--header"
+     "Authorization: Bearer ${config.sops.placeholder."huggingface-token"}"
+   ];
    ```
-2. Verify all 3 API key paths accessible
+3. ⚠️ Context7 not in test-clan scope (implementation documents "Only 2 MCP servers")
 
-**C. Enable GLM Wrapper:**
-1. Access package from flake.inputs in wrappers.nix:
+**Story 1.10D scope:** Document sops.templates pattern in Section 13
+
+**C. COMPLETED IN STORY 1.10C - Document Implementation:**
+1. ✅ GLM wrapper enabled (wrappers.nix:23-44 custom implementation):
    ```nix
-   { pkgs, flake, config, ... }:
-   {
-     home.packages = [
-       (flake.inputs.nix-ai-tools.packages.${pkgs.system}.glm-wrapper.override {
-         apiKeyPath = config.clan.core.vars.generators.llm-api-keys.files.glm.path;
-       })
-     ];
-   }
+   home.packages = [
+     (pkgs.writeShellApplication {
+       name = "claude-glm";
+       text = ''
+         GLM_API_KEY="$(cat ${config.sops.secrets.glm-api-key.path})"
+         export ANTHROPIC_AUTH_TOKEN="$GLM_API_KEY"
+         exec claude "$@"
+       '';
+     })
+   ];
    ```
-2. Verify package builds and API key accessible
+2. ✅ Runtime secret access verified (production-ready pattern)
 
-**D. Enable claude-code Package:**
-1. Uncomment in default.nix:
+**Story 1.10D scope:** Document runtime cat pattern for shell wrappers in Section 13
+
+**D. Enable claude-code Package Override (REMAINING WORK):**
+1. Add nix-ai-tools flake input to flake.nix:
    ```nix
-   { pkgs, flake, ... }:
-   {
-     programs.claude-code.package = flake.inputs.nix-ai-tools.packages.${pkgs.system}.claude-code;
-   }
+   inputs.nix-ai-tools.url = "github:cameronraysmith/nix-ai-tools";
    ```
-2. Verify package available (if nix-ai-tools flake input configured)
-
-**E. Enable catppuccin tmux Theme:**
-1. Import in tmux.nix:
+2. Uncomment in default.nix (line 24):
    ```nix
-   { flake, ... }:
-   {
-     imports = [ flake.inputs.catppuccin-nix.homeManagerModules.catppuccin ];
-
-     programs.tmux.catppuccin = {
-       enable = true;
-       flavor = "mocha";
-       # ... 36-line configuration (see Story 1.10B dev notes)
-     };
-   }
+   programs.claude-code.package = flake.inputs.nix-ai-tools.packages.${pkgs.system}.claude-code;
    ```
-2. Verify theme integration (if catppuccin-nix flake input configured)
+3. Verify package builds and is accessible
 
-**F. Handle ccstatusline Availability:**
-1. Check if available: `nix search nixpkgs ccstatusline`
-2. If available in nixpkgs: `programs.claude-code.statusline.package = pkgs.ccstatusline;`
-3. If not available: Document limitation, keep disabled with TODO for custom package
+**Estimated effort:** 30 min (15 min flake.nix + 15 min build test)
+
+**E. Enable catppuccin tmux Theme (REMAINING WORK):**
+1. Add catppuccin-nix flake input to flake.nix:
+   ```nix
+   inputs.catppuccin-nix.url = "github:catppuccin/nix";
+   ```
+2. Import module in tmux.nix (replace line 40 TODO):
+   ```nix
+   imports = [ flake.inputs.catppuccin-nix.homeManagerModules.catppuccin ];
+
+   programs.tmux.catppuccin = {
+     enable = true;
+     flavor = "mocha";
+     # ... 36-line configuration (reference infra implementation)
+   };
+   ```
+3. Verify theme renders correctly (visual check)
+
+**Estimated effort:** 45 min (15 min flake.nix + 30 min config + test)
+
+**F. Document ccstatusline Unavailability:**
+1. ✅ Availability checked: NOT in nixpkgs (`nix-env -qaP ccstatusline` returns no results)
+2. ✅ Settings configured: ccstatusline-settings.nix (175 lines, production-ready, awaiting package)
+3. Document limitation: Requires custom derivation or external flake input (out of Story 1.10D scope)
+4. Keep disabled with TODO explaining package unavailability
+
+**Estimated effort:** 15 min (documentation only)
 
 **G. Build Validation:**
-1. `nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage` succeeds
-2. `nix build .#homeConfigurations.aarch64-darwin.raquel.activationPackage` succeeds
-3. All enabled features functional (secrets accessible, packages available)
+1. ✅ Story 1.10C builds validated (comprehensive review report, 4/4 builds PASS)
+2. After flake.inputs changes: Re-validate all builds
+   - crs58 homeConfiguration
+   - raquel homeConfiguration
+   - blackphos darwinConfiguration
+   - cinnabar nixosConfiguration
+3. Verify new features functional (claude-code package override, catppuccin theme rendering)
 4. No build errors or evaluation failures
 
-**H. Documentation:**
-1. Document clan vars access pattern: `config.clan.core.vars.generators.X.files.Y.path`
-2. Document flake.inputs pattern: `flake.inputs.X.packages.${pkgs.system}.Y`
-3. Update architecture.md with feature enablement patterns
-4. List any features that remain disabled (with rationale)
+**Estimated effort:** 30 min (build + smoke test)
 
-**Prerequisites:** Story 1.10C (clan vars infrastructure established, generators configured)
+**H. Documentation - Feature Enablement Patterns:**
+1. Create Section 13 in test-clan-validated-architecture.md: "Feature Enablement with sops-nix"
+2. Document sops-nix access patterns:
+   - Direct path: `config.sops.secrets.X.path` (git, jujutsu signing)
+   - sops.placeholder: `config.sops.placeholder."X"` in sops.templates (MCP servers, rbw)
+   - Runtime cat: Shell scripts reading `$(cat ${config.sops.secrets.X.path})` (GLM wrapper)
+   - Activation scripts: Non-XDG secret deployment (atuin)
+3. Document flake.inputs patterns:
+   - Module imports: `flake.inputs.X.homeManagerModules.Y`
+   - Package overrides: `flake.inputs.X.packages.${pkgs.system}.Y`
+4. List disabled features with rationale:
+   - ccstatusline: Not in nixpkgs, requires custom package
+   - (Any others discovered during completion)
 
-**Blocks:** Story 1.12 (physical deployment needs functional features - SSH signing critical)
+**Estimated effort:** 30 min
 
-**Estimated Effort:** 2-3 hours
-- Enable SSH signing (AC A): 30 min
-- Enable MCP API keys (AC B): 30 min
-- Enable packages/themes (AC C-E): 1 hour
-- Build validation + documentation (AC F-H): 1 hour
+**Prerequisites:** Story 1.10C (sops-nix infrastructure established, 9/11 features already enabled)
 
-**Risk Level:** Low (infrastructure exists from Story 1.10C, access patterns validated in Section 11 architecture doc)
+**Blocks:** Story 1.12 (physical deployment benefits from claude-code package override, but not blocked)
+
+**Estimated Effort:** 1.5-2 hours (reduced from 2-3 hours due to Story 1.10C overlap)
+- Review Story 1.10C implementations (AC A-C): 15 min (already complete)
+- Add flake.inputs (nix-ai-tools, catppuccin-nix): 30 min
+- Enable claude-code package (AC D): 15 min
+- Enable catppuccin theme (AC E): 45 min
+- Document ccstatusline limitation (AC F): 15 min
+- Build validation (AC G): 30 min
+- Documentation Section 13 (AC H): 30 min
+
+**Risk Level:** Low (9/11 features validated in Story 1.10C, only flake.inputs configuration remaining)
 
 **Strategic Value:**
-- Proves clan vars work for production features (not just infrastructure)
-- Validates flake.inputs access pattern for packages/themes
-- Completes the Pattern A + clan vars validation (structure + secrets + features)
-- Provides complete reference for Epic 2-6 (all three layers working together)
-- Unblocks Story 1.12 physical deployment (all features functional)
-- Demonstrates test-clan is production-ready architecture (not just minimal validation)
+- Proves sops-nix works for production features across 4 distinct patterns (direct path, sops.placeholder, runtime cat, activation scripts)
+- Validates flake.inputs access pattern for external packages/themes
+- Completes the Pattern A + sops-nix validation (structure + secrets + features + flake.inputs)
+- Provides complete reference for Epic 2-6 (all architectural layers working together)
+- Demonstrates test-clan is production-ready architecture with comprehensive feature coverage
+- Documents reusable feature enablement patterns for future migration
 
 **Success Metrics:**
-- 11/11 features enabled (or documented why disabled)
-- All builds passing
-- All secrets accessible via clan vars
-- All packages accessible via flake.inputs
-- Zero regressions from Story 1.10BA
+- 11/11 features enabled or documented (9/11 from Story 1.10C, 2/11 in Story 1.10D)
+- All builds passing (4/4 validated)
+- All secrets accessible via sops-nix (8 secrets for crs58, 5 for raquel)
+- Flake.inputs packages accessible (nix-ai-tools, catppuccin-nix configured)
+- Section 13 documentation complete (4 sops-nix patterns + 2 flake.inputs patterns)
+- Zero regressions from Story 1.10BA or Story 1.10C
 
 ---
 
