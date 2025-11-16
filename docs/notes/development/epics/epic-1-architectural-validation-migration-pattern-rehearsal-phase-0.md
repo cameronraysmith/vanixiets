@@ -1478,6 +1478,166 @@ This story validates the hybrid architecture works in test-clan, ensuring Epic 2
 
 ---
 
+## Story 1.10DB: Execute Overlay Architecture Migration from infra to test-clan
+
+**⚠️ DISCOVERED STORY - Empirical Validation Gap (Party Mode Ultrathink 2025-11-16)**
+
+As a system administrator,
+I want to migrate infra's overlay layers (1,2,4,5) to test-clan dendritic flake-parts structure and validate empirically,
+So that Epic 1 achieves 95% architectural coverage with REAL implementation evidence (not just documentation).
+
+**Context:**
+
+Story 1.10DA (completed 2025-11-16) documented HOW to preserve overlay architecture (Layers 1,2,4,5) when integrating with pkgs-by-name pattern, but only provided theoretical guidance without actual migration and validation.
+
+Party Mode team ultrathink (2025-11-16, 9 agents unanimous) identified critical gap:
+- **Story 1.10D**: EMPIRICAL validation (ccstatusline migrated, builds verified, Section 13.1 based on real code) ✅
+- **Story 1.10DA**: THEORETICAL documentation (overlay patterns explained, NO actual migration) ❌
+
+**Epic 1 Core Principle Violation:** "Architectural Validation via Pattern Rehearsal" requires DOING IT FOR REAL, not just documenting how to do it.
+
+**Story 1.10DB Mission:** Execute actual overlay migration from infra to test-clan, validate all 5 layers work, prove hybrid pattern (overlays + pkgs-by-name) coexists, update Section 13.2 with empirical evidence.
+
+**infra's 5-Layer Overlay Architecture (Migration Source):**
+
+1. **Layer 1 (inputs):** Multi-channel nixpkgs access (stable, patched, unstable)
+   - Source: `infra/overlays/inputs.nix`
+   - Target: `test-clan/modules/flake-parts/overlays/inputs.nix`
+   - Pattern: Dendritic overlay export via modules/flake-parts/nixpkgs.nix
+   - Validation: `pkgs.stable.*` and `pkgs.unstable.*` accessible in builds
+
+2. **Layer 2 (hotfixes):** Platform-specific stable fallbacks
+   - Source: `infra/overlays/infra/hotfixes.nix`
+   - Target: `test-clan/modules/flake-parts/overlays/hotfixes.nix`
+   - Pattern: Platform-conditional stable package selection
+   - Validation: Verify specific packages use stable versions on target platforms
+
+3. **Layer 3 (packages):** Custom derivations [COMPLETE - Story 1.10D]
+   - Migration: `infra/overlays/packages/` → `test-clan/pkgs/by-name/`
+   - Status: ✅ VALIDATED (ccstatusline proof-of-concept, Section 13.1 complete)
+
+4. **Layer 4 (overrides):** Per-package build modifications
+   - Source: `infra/overlays/overrides/default.nix`
+   - Target: `test-clan/modules/flake-parts/overlays/overrides.nix`
+   - Pattern: Package-specific overrideAttrs customizations
+   - Validation: Verify overridden packages build with modifications applied
+
+5. **Layer 5 (flakeInputs):** Overlays from flake inputs
+   - Source: `infra/flake.nix` inputs (nuenv, jujutsu, etc.)
+   - Target: `test-clan/modules/flake-parts/nixpkgs.nix` overlay composition
+   - Pattern: flake.inputs.*.overlays.default integration
+   - Validation: Packages from input overlays accessible in pkgs
+
+**drupol Hybrid Pattern Implementation:**
+
+Reference: `~/projects/nix-workspace/drupol-dendritic-infra/modules/flake-parts/nixpkgs.nix` (lines 19-37)
+
+Pattern proves overlays array + pkgsDirectory coexist in same perSystem:
+- Traditional overlays handle Layers 1,2,4,5 (via overlays = [ ... ])
+- pkgsDirectory handles Layer 3 (via pkgsDirectory = ../../pkgs/by-name)
+- Both configured in modules/flake-parts/nixpkgs.nix
+- No conflicts between overlay merging and auto-discovery
+
+**Acceptance Criteria:**
+
+**AC-A: Migrate Layer 1 (Multi-Channel Access)**
+1. Copy `infra/overlays/inputs.nix` to `test-clan/modules/flake-parts/overlays/inputs.nix`
+2. Refactor for dendritic pattern (import in modules/flake-parts/nixpkgs.nix overlays array)
+3. Validate multi-channel access works:
+   - `nix eval .#darwinConfigurations.blackphos.pkgs.stable.ripgrep` succeeds
+   - `nix eval .#darwinConfigurations.blackphos.pkgs.unstable.ripgrep` succeeds
+4. Document Layer 1 in Section 13.2 with build evidence
+
+**AC-B: Migrate Layer 2 (Hotfixes)**
+1. Copy `infra/overlays/infra/hotfixes.nix` to `test-clan/modules/flake-parts/overlays/hotfixes.nix`
+2. Refactor for dendritic pattern (import in overlays array)
+3. Validate platform-specific fallbacks active (inspect package versions)
+4. Document Layer 2 in Section 13.2 with validation evidence
+
+**AC-C: Migrate Layer 4 (Overrides)**
+1. Copy `infra/overlays/overrides/default.nix` to `test-clan/modules/flake-parts/overlays/overrides.nix`
+2. Refactor for dendritic pattern (import in overlays array)
+3. Validate package overrides applied (check specific package builds)
+4. Document Layer 4 in Section 13.2 with override examples
+
+**AC-D: Configure Layer 5 (Flake Input Overlays)**
+1. Add flake inputs with overlays (nuenv, jujutsu) to test-clan flake.nix
+2. Import input overlays in modules/flake-parts/nixpkgs.nix overlays array
+3. Validate packages from input overlays accessible
+4. Document Layer 5 in Section 13.2 with flake input examples
+
+**AC-E: Validate Hybrid Pattern (All 5 Layers Coexist)**
+1. Build all configurations with all 5 layers active:
+   - `nix build .#darwinConfigurations.blackphos.system`
+   - `nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel`
+   - `nix build .#homeConfigurations.crs58.activationPackage`
+   - `nix build .#homeConfigurations.raquel.activationPackage`
+2. Inspect merged pkgs to verify all layers present:
+   - Layer 1: `pkgs.stable.*`, `pkgs.unstable.*` accessible
+   - Layer 2: Hotfixes applied (platform-specific checks)
+   - Layer 3: Custom packages from pkgs-by-name (ccstatusline) ✅ Story 1.10D
+   - Layer 4: Overrides applied (check specific package attributes)
+   - Layer 5: Input overlay packages accessible
+3. Validate zero regressions (all 14+ tests still passing)
+4. Document hybrid pattern validation in Section 13.2
+
+**AC-F: Update Section 13.2 with Empirical Evidence**
+1. Update `test-clan/docs/architecture/test-clan-validated-architecture.md` Section 13.2
+2. Replace theoretical documentation with empirical implementation evidence:
+   - Real code examples from migrated overlays
+   - Build validation commands and outputs
+   - Package inspection showing all 5 layers
+   - Lessons learned from actual migration
+   - Troubleshooting guidance based on real issues encountered
+3. Ensure Section 13.2 matches Section 13.1 quality (empirical, production-ready)
+4. Provide Epic 2-6 teams with validated, battle-tested migration guide
+
+**Prerequisites:**
+- Story 1.10D (done): pkgs-by-name pattern validated (Layer 3 foundation)
+- Story 1.10DA (review): Documentation foundation established
+
+**Blocks:**
+- Story 1.12 (GO/NO-GO decision): Requires 95% Epic 1 coverage with empirical validation
+- Epic 2-6 migration: Teams need validated overlay migration patterns
+
+**Estimated Effort:** 2-3 hours
+- Migrate Layer 1 (inputs): 30 min
+- Migrate Layer 2 (hotfixes): 30 min
+- Migrate Layer 4 (overrides): 30 min
+- Configure Layer 5 (flake inputs): 30 min
+- Validate hybrid pattern (all 5 layers): 30 min
+- Update Section 13.2 with evidence: 30 min
+
+**Risk Level:** Low (infra overlays already working, validating refactored implementation, drupol proves pattern viable)
+
+**Strategic Value:**
+- **Epic 1 Coverage:** Achieves 95% with empirical validation (ALL 5 layers proven)
+- **Migration Confidence:** Epic 2-6 teams migrate using validated, tested patterns
+- **Risk Reduction:** Removes architectural uncertainty (hybrid pattern works)
+- **Documentation Quality:** Section 13.2 matches Section 13.1 rigor (empirical evidence)
+- **Timeline De-risking:** Epic 2-6 no overlay troubleshooting (patterns pre-validated)
+
+**Success Metrics:**
+- All 5 overlay layers migrated to test-clan dendritic structure ✅
+- All 4 builds passing with all 5 layers active ✅
+- Package inspection confirms all layers present in merged pkgs ✅
+- Section 13.2 comprehensive tutorial with empirical evidence (like Section 13.1) ✅
+- Zero regressions from Story 1.10D validation ✅
+- Epic 1 achieves 95% architectural coverage empirically ✅
+
+**References:**
+- **Primary**: `~/projects/nix-workspace/drupol-dendritic-infra/modules/flake-parts/nixpkgs.nix` (hybrid pattern, lines 19-37)
+- **infra overlays**: `~/projects/nix-workspace/infra/overlays/` (5-layer architecture source)
+  - `overlays/default.nix` - Architecture documentation and layer composition (lines 1-77)
+  - `overlays/inputs.nix` - Multi-channel access implementation (Layer 1)
+  - `overlays/infra/hotfixes.nix` - Platform-specific stable fallbacks (Layer 2)
+  - `overlays/overrides/` - Per-package build modifications (Layer 4)
+- **test-clan target**: `~/projects/nix-workspace/test-clan/` (validation environment)
+- **Story 1.10D**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10d-validate-custom-package-overlays.md` (Layer 3 reference)
+- **Story 1.10DA**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10da-validate-overlay-preservation.md` (documentation foundation)
+
+---
+
 ## Story 1.10E: Enable Features Using sops-nix Secrets and Flake Inputs
 
 **⚠️ UPDATED STORY - Feature Enablement (Unblocked by Story 1.10D)**
