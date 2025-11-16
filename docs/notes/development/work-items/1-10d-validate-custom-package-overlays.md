@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** backlog
+**Status:** ready-for-dev
 
 **Dependencies:**
 - Story 1.10C (done): sops-nix infrastructure validates secrets work with dendritic
@@ -1273,7 +1273,7 @@ nix eval .#packages.aarch64-darwin.ccstatusline.meta --json | jq
 
 ### Context Reference
 
-- Story Context XML: `docs/notes/development/work-items/1-10d-validate-custom-package-overlays.context.xml` (To be created via story-context workflow)
+- Story Context XML: `docs/notes/development/work-items/1-10d-validate-custom-package-overlays.context.xml` (Created: 2025-11-16)
 
 ### Agent Model Used
 

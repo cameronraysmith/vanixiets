@@ -179,7 +179,7 @@ development_status:
   # Actual effort: 7.25 hours total (4.75h implementation + 2.5h review follow-up) vs 4.75h estimated
   # Strategic value: Validates sops-nix + Pattern A, unblocks Epic 2-6 migration, documents two-tier architecture
   1-10c-establish-sops-nix-secrets-home-manager: done
-  # Story 1.10D: NEW STORY (2025-11-16) - Validate Custom Package Overlays with pkgs-by-name Pattern
+  # Story 1.10D: READY-FOR-DEV (2025-11-16) - Validate Custom Package Overlays with pkgs-by-name Pattern
   # Epic reordering decision (2025-11-16): Infrastructure validation BEFORE feature enablement
   # Validates infra's custom package overlay pattern works with dendritic flake-parts + clan architecture
   # pkgs-by-name-for-flake-parts pattern from Dendritic Overlay Pattern Review (drupol PRIMARY reference)
@@ -191,8 +191,8 @@ development_status:
   # Dependencies: Story 1.10C (sops-nix infrastructure), Dendritic Overlay Pattern Review (2025-11-16)
   # Blocks: Story 1.10E (ccstatusline feature enablement), Epic 1 checkpoint (overlay validation critical for GO decision)
   # Strategic value: Completes Epic 1 architectural coverage (95%), removes Epic 2-6 migration blocker (overlay uncertainty)
-  # Status: create-story workflow in progress (work item generation), expected transition to ready-for-dev
-  1-10d-validate-custom-package-overlays: backlog
+  # Story context created: 2025-11-16 (docs/notes/development/work-items/1-10d-validate-custom-package-overlays.context.xml)
+  1-10d-validate-custom-package-overlays: ready-for-dev
   # Story 1.10E: RENAMED (2025-11-16) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
   # Previously Story 1.10D (2025-11-14), renamed during epic reordering to resolve dependency on ccstatusline package
   # Story 1.10C already enabled 9/11 features (sops-nix patterns: direct path, sops.placeholder, runtime cat, activation scripts)
