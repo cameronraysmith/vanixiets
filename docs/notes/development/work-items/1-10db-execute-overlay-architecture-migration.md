@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** backlog
+**Status:** drafted
 
 **Dependencies:**
 - Story 1.10D (done): pkgs-by-name pattern validated (Layer 3 foundation)
