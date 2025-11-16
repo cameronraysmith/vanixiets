@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** ready-for-dev
+**Status:** in-progress
 
 **Dependencies:**
 - Story 1.10BA (done): Pattern A refactoring provides flake context access for sops-nix integration
@@ -968,3 +968,364 @@ sops -e -i secrets/home-manager/users/raquel/secrets.yaml
 - Module access patterns documented: sops-nix → clan vars transformations (NOW REVERSED)
 - Multi-user isolation: crs58 (all secrets) vs raquel (subset)
 - Learnings from Story 1.10BA integrated: Pattern A modules ready for secrets
+
+---
+
+## Senior Developer Review (AI)
+
+**Reviewer:** Dev
+**Date:** 2025-11-16
+**Review Outcome:** **CHANGES REQUESTED**
+**Justification:** All technical implementation complete (AC4-AC21) with exceptional code quality, but critical documentation missing (AC22-AC24). Story DoD cannot be satisfied without age-key-management.md operational guide and architecture Section 12.
+
+### Summary
+
+Story 1.10C establishes sops-nix secrets management for home-manager user configurations in test-clan, validating the user-level secrets tier of the two-tier architecture.
+The implementation demonstrates strong technical execution with 52 commits, sophisticated use of `sops.templates` patterns (exceeding AC requirements), and proper multi-user encryption.
+However, **critical documentation gaps (AC22-AC24) block DoD completion**, and minor scope deviations require clarification.
+
+### Key Findings (by Severity)
+
+#### HIGH SEVERITY (Blocking DoD)
+
+**H1: AC22-AC24 Documentation Completely Missing**
+- **Impact:** Story DoD explicitly requires documentation (Task 7, AC22-AC24)
+- **Missing artifacts:**
+  1. `docs/guides/age-key-management.md` - Age key lifecycle operational guide (AC23)
+  2. Architecture Section 12 - Two-tier secrets architecture documentation (AC22)
+  3. Access pattern examples - Before/after migration examples (AC24)
+- **Evidence:** Glob search found zero documentation files, grep found no "Section 12" references in test-clan
+- **Epic 1 Impact:** Pattern cannot be replicated in Epic 2-6 without operational documentation
+- **Action Required:** Create all 3 documentation artifacts per AC22-AC24 specifications
+
+#### MEDIUM SEVERITY (Scope Clarification Needed)
+
+**M1: Secret Count Mismatch - crs58 User (8 vs 7 secrets)**
+- **Specification:** AC6 lists 7 secrets for crs58
+- **Implementation:** 8 secrets in [modules/home/users/crs58/default.nix:24-35](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/users/crs58/default.nix#L24-L35)
+- **Added secret:** `ssh-public-key` (line 29) - used for allowed_signers template generation
+- **Rationale:** Likely discovered during implementation (Story 1.10D pattern)
+- **Evidence:** [modules/home/users/crs58/default.nix:37-46](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/users/crs58/default.nix#L37-L46) uses ssh-public-key in sops.templates
+- **Action:** Update AC6 to reflect 8 secrets, or document as Story 1.10D scope bleed
+
+**M2: Secret Count Mismatch - raquel User (5 vs 4 secrets)**
+- **Specification:** AC6 lists 4 secrets for raquel
+- **Implementation:** 5 secrets in [modules/home/users/raquel/default.nix:24-32](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/users/raquel/default.nix#L24-L32)
+- **Added secret:** `ssh-public-key` (line 29) - consistent with crs58 pattern
+- **Evidence:** [modules/home/users/raquel/default.nix:34-42](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/users/raquel/default.nix#L34-L42) uses ssh-public-key in sops.templates
+- **Action:** Update AC6 to reflect 5 secrets, or document as intentional enhancement
+
+**M3: Build Validation Evidence Missing (AC16-AC18)**
+- **Required:** AC16 requires successful builds for blackphos, crs58, raquel configurations
+- **Evidence:** No build logs, no `nix build` commits, no test output in git history
+- **Risk:** Unvalidated deployment-readiness (critical for Story 1.12 physical deployment)
+- **Action:** Provide build validation evidence or run validation commands now
+
+### Acceptance Criteria Coverage
+
+#### Section A: Infrastructure Setup (AC1-AC3) - ✅ SKIP (Complete)
+
+**AC1: Admin Keypair** - ✅ VERIFIED
+**AC2: User Setup** - ✅ VERIFIED
+**AC3: Directory Structure** - ✅ VERIFIED
+- Status: Pre-existing infrastructure from Stories 1.1-1.10A, correctly skipped
+
+#### Section B: sops-nix Configuration (AC4-AC6) - ✅ IMPLEMENTED (with scope deviations)
+
+**AC4: .sops.yaml Multi-User Encryption** - ✅ COMPLETE
+- File: [.sops.yaml:1-23](file:///Users/crs58/projects/nix-workspace/test-clan/.sops.yaml#L1-L23)
+- Age keys: admin (line 3), crs58-user (line 6), raquel-user (line 7)
+- Creation rules: crs58 path_regex (lines 11-15), raquel path_regex (lines 18-22)
+- Multi-user encryption: YAML anchors used correctly (&admin, &crs58-user, &raquel-user)
+- **Evidence:** Perfect implementation matching specification
+
+**AC5: Base sops-nix Module** - ✅ COMPLETE
+- File: [modules/home/base/sops.nix:1-27](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/base/sops.nix#L1-L27)
+- sops-nix import: line 15 (`flake.inputs.sops-nix.homeManagerModules.sops`)
+- age.keyFile config: line 20 (`"${config.xdg.configHome}/sops/age/keys.txt"`)
+- Pattern A structure: Correct outer/inner module signatures (lines 2-6, lines 12-13)
+- **Evidence:** Perfect implementation following infra reference pattern
+
+**AC6: User-Specific sops Declarations** - ⚠️ IMPLEMENTED WITH DEVIATIONS
+- **crs58:** [modules/home/users/crs58/default.nix:22-46](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/users/crs58/default.nix#L22-L46)
+  - Specified: 7 secrets
+  - Implemented: **8 secrets** (added `ssh-public-key`)
+  - defaultSopsFile: line 23 (`secrets/home-manager/users/crs58/secrets.yaml`)
+  - **Finding M1:** Extra secret requires AC update
+- **raquel:** [modules/home/users/raquel/default.nix:22-43](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/users/raquel/default.nix#L22-L43)
+  - Specified: 4 secrets
+  - Implemented: **5 secrets** (added `ssh-public-key`)
+  - NO AI secrets: Correct
+  - **Finding M2:** Extra secret requires AC update
+
+#### Section C: Secret Files Creation (AC7-AC9) - ✅ COMPLETE
+
+**AC7: crs58 Secrets File** - ✅ COMPLETE
+- Path: `secrets/home-manager/users/crs58/secrets.yaml`
+- Encryption: Verified with `file` command - "ASCII text, with very long lines (744)"
+- Format: sops-encrypted YAML
+- **Evidence:** File exists and properly encrypted
+
+**AC8: raquel Secrets File** - ✅ COMPLETE
+- Path: `secrets/home-manager/users/raquel/secrets.yaml`
+- Encryption: Verified with `file` command - "ASCII text, with very long lines (640)"
+- Format: sops-encrypted YAML (shorter = fewer secrets, correct)
+- **Evidence:** File exists and properly encrypted
+
+**AC9: Secrets Encryption Verification** - ✅ COMPLETE
+- Both files encrypted (not plaintext YAML)
+- Multi-user encryption enforced via .sops.yaml rules
+- **Evidence:** Security validated
+
+#### Section D: Module Access Pattern Updates (AC10-AC15) - ✅ COMPLETE
+
+**AC10: git.nix Update** - ✅ COMPLETE
+- File: [modules/home/development/git.nix:24-28](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/development/git.nix#L24-L28)
+- SSH signing: `config.sops.secrets.ssh-signing-key.path` (line 25)
+- Works for all users (crs58, cameron, raquel)
+- **Evidence:** Perfect sops-nix integration
+
+**AC11: jujutsu.nix Update** - ✅ COMPLETE
+- File: [modules/home/development/jujutsu.nix:38-42](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/development/jujutsu.nix#L38-L42)
+- SSH signing key: `config.sops.secrets.ssh-signing-key.path` (line 41)
+- Reuses git's allowed_signers file (line 36)
+- **Evidence:** Excellent integration with Git infrastructure
+
+**AC12: mcp-servers.nix Update** - ✅ COMPLETE (EXCEEDS REQUIREMENTS)
+- File: [modules/home/ai/claude-code/mcp-servers.nix:22-74](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/ai/claude-code/mcp-servers.nix#L22-L74)
+- Firecrawl: `sops.templates.mcp-firecrawl` with `sops.placeholder` (lines 34-52)
+- HuggingFace: `sops.templates.mcp-huggingface` with `sops.placeholder` (lines 56-73)
+- Pattern: **sops.templates** (more sophisticated than basic `.path` access)
+- **Evidence:** Exceeds AC12 with production-ready pattern
+
+**AC13: wrappers.nix Update** - ✅ COMPLETE
+- File: [modules/home/ai/claude-code/wrappers.nix:19-44](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/ai/claude-code/wrappers.nix#L19-L44)
+- GLM API key: `config.sops.secrets.glm-api-key.path` accessed at runtime (line 33)
+- Pattern: Shell script reads secret path, exports as env var
+- **Evidence:** Proper runtime secret access
+
+**AC14: atuin.nix Update** - ✅ COMPLETE
+- File: [modules/home/shell/atuin.nix:45-57](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/shell/atuin.nix#L45-L57)
+- Atuin key: Deployed via `home.activation.deployAtuinKey` activation script
+- Pattern: Symlink from sops secret to atuin's expected location
+- **Evidence:** Creative activation-time deployment
+
+**AC15: rbw.nix Update** - ✅ COMPLETE (EXCEEDS REQUIREMENTS)
+- File: [modules/home/shell/rbw.nix:25-46](file:///Users/crs58/projects/nix-workspace/test-clan/modules/home/shell/rbw.nix#L25-L46)
+- Bitwarden email: `sops.templates."rbw-config"` with `sops.placeholder`
+- Pattern: **sops.templates** generates entire rbw config.json
+- **Evidence:** Exceeds AC15 with sophisticated config generation
+
+#### Section E: Build Validation (AC16-AC18) - ❓ EVIDENCE MISSING
+
+**AC16: Nix Build Validation** - ❓ NOT VERIFIED
+- Required: blackphos system, crs58 home, raquel home builds
+- Evidence: **NONE FOUND**
+- **Finding M3:** Critical validation missing
+
+**AC17: sops-nix Deployment Validation** - ❓ NOT VERIFIED
+**AC18: Multi-User Isolation Validation** - ❓ NOT VERIFIED
+- **Finding M3:** Runtime deployment untested
+
+#### Section F: Integration Validation (AC19-AC21) - ✅ CODE COMPLETE / ❓ RUNTIME UNVERIFIED
+
+**AC19: Pattern A + sops-nix Integration** - ✅ CODE COMPLETE
+- All modules use `flake.modules = { ... }` structure
+- sops access works correctly
+- **Evidence:** Code review confirms compatibility
+
+**AC20: Age Key Integration** - ✅ CODE COMPLETE
+- Key location: `${config.xdg.configHome}/sops/age/keys.txt`
+- Public keys match sops/users/*/key.json
+- **Evidence:** Perfect age key reuse architecture
+
+**AC21: Import-Tree Discovery** - ✅ CODE COMPLETE
+- Dendritic auto-discovery compatible with sops-nix
+- **Evidence:** Pattern A exports work correctly
+
+#### Section G: Documentation (AC22-AC24) - ❌ FAILED
+
+**AC22: Two-Tier Architecture Documentation** - ❌ NOT FOUND
+**AC23: Age Key Management Operational Guide** - ❌ NOT FOUND
+**AC24: Access Pattern Examples** - ❌ NOT FOUND
+- **Finding H1:** All 3 documentation artifacts missing
+- Search evidence: Zero matches for required files in test-clan repository
+
+### Task Completion Validation
+
+| Task | Status | Evidence | Verified |
+|------|--------|----------|----------|
+| Task 1: Infrastructure Setup | ✅ SKIP | Pre-existing (Stories 1.1-1.10A) | COMPLETE |
+| Task 2: sops-nix Infrastructure | ✅ DONE | ae2023d, 20ea712, fb1b1d3 | COMPLETE |
+| Task 3: Create and Encrypt Secrets | ✅ DONE | 992d8b5 | COMPLETE |
+| Task 4: Update Module Access Patterns | ✅ DONE | 4c6278d, f83365b, c63b61e, f6b01e3, 04c1617, f9e9e92 | COMPLETE |
+| Task 5: Build and Validate | ❓ QUESTIONABLE | **NO EVIDENCE** | **QUESTIONABLE** |
+| Task 6: Integration and Testing | ✅ CODE COMPLETE | c95862b | CODE VERIFIED |
+| Task 7: Documentation | ❌ **FAILED** | **NOT FOUND** | **CRITICAL FAILURE** |
+
+**Critical Task Failure:**
+- **Task 7 (Documentation):** Marked complete but all 3 deliverables missing (AC22-AC24)
+- **Impact:** Epic 2-6 blocker - cannot replicate pattern without operational guide
+- **Action Required:** Complete Task 7 per original 60-minute estimate
+
+### Test Coverage and Gaps
+
+**Tests Implemented:** None (nix-unit tests not applicable for secrets)
+
+**Tests Missing:**
+- Build validation tests (AC16)
+- Runtime secrets access tests (AC17)
+- Multi-user isolation tests (AC18)
+
+**Gaps:** No automated validation of sops-nix integration
+
+### Architectural Alignment
+
+**Tech-Spec Compliance:**
+- ✅ Epic 1 goal: Validate sops-nix for home-manager (code-level achieved)
+- ✅ Two-tier secrets architecture: Code validates pattern
+- ✅ Age key reuse pattern: Implemented correctly
+- ✅ Pattern A integration: Verified compatible
+
+**Architecture Violations:** None detected
+
+**Pattern Adherence:**
+- ✅ Pattern A structure: PERFECT
+- ✅ sops.templates usage: EXCEEDS EXPECTATIONS
+- ✅ Multi-user isolation: CORRECT
+
+### Security Notes
+
+**✅ PASS: No Private Keys Committed**
+- Verified: Zero matches for "AGE-SECRET-KEY" or "BEGIN.*PRIVATE KEY"
+- Only public keys in .sops.yaml
+- **SECURE**
+
+**✅ PASS: Secrets Properly Encrypted**
+- Both secrets files encrypted (ASCII text, long lines)
+- No plaintext YAML committed
+- **SECURE**
+
+**✅ PASS: Gitignore Coverage**
+- Encrypted files tracked correctly
+- Private keys not in repository
+- **SECURE**
+
+**Positive Security Findings:**
+- Multi-user encryption enforced via .sops.yaml
+- sops.templates prevents secret exposure in process args
+- Age key reuse simplifies management without compromising security
+- SSH signing keys properly protected (mode 0400)
+
+**Security Concerns:**
+- HuggingFace MCP server exposes token in argv (process args visible)
+- No runtime verification of deployment
+
+**Recommendation:** Consider environment variable for HuggingFace token
+
+### Best-Practices and References
+
+**Best Practices Applied:**
+- ✅ Atomic commits (52 commits, focused changes)
+- ✅ Conventional commit messages
+- ✅ Pattern A structure
+- ✅ sops.templates for config generation
+- ✅ Multi-user isolation
+- ✅ Security protocol followed
+
+**Best Practices Violated:**
+- ❌ Documentation deferred or skipped (AC22-AC24)
+- ❌ Build validation not evidenced (AC16-AC18)
+- ⚠️ Scope creep without AC updates
+
+### Action Items
+
+#### Code Changes Required
+
+- [ ] **[High] Create docs/guides/age-key-management.md** (AC23) [Epic 2-6 blocker]
+  - SSH-to-age derivation pattern
+  - Clan user creation commands
+  - Age key correspondence validation
+  - Epic 2-6 new user workflow
+  - sops-nix operations (add, encrypt, rotate)
+  - Troubleshooting guide
+
+- [ ] **[High] Add Section 12 to test-clan-validated-architecture.md** (AC22) [Epic 2-6 blocker]
+  - Two-tier secrets model documentation
+  - Age key derivation pattern
+  - Key correspondence validation
+  - Multi-context reuse architecture
+  - sops-nix integration patterns
+
+- [ ] **[High] Create access pattern examples** (AC24) [Migration guide]
+  - Before/after: clan vars vs sops-nix
+  - Code examples: git.nix, mcp-servers.nix, atuin.nix
+  - Multi-user examples: crs58 (8 secrets) vs raquel (5 secrets)
+  - YAML secret file structure
+
+- [ ] **[Med] Update AC6 to reflect actual secret counts** [Accuracy]
+  - crs58: 8 secrets (add ssh-public-key)
+  - raquel: 5 secrets (add ssh-public-key)
+  - Document rationale (allowed_signers template)
+
+- [ ] **[Med] Run and document build validation** (AC16) [Deployment confidence]
+  ```bash
+  cd ~/projects/nix-workspace/test-clan
+  nix flake check
+  nix build .#darwinConfigurations.blackphos.system
+  nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage
+  nix build .#homeConfigurations.aarch64-darwin.raquel.activationPackage
+  ```
+
+#### Advisory Notes
+
+- Note: Excellent use of sops.templates pattern (exceeds requirements)
+- Note: 52 atomic commits demonstrate best-practice git discipline
+- Note: Age key reuse architecture validated perfectly
+- Note: Consider improving HuggingFace MCP security (env var vs argv)
+
+### Epic 1 Alignment Review
+
+**Strategic Validation:**
+
+1. **Epic 1 Mission:** Validate sops-nix for Epic 2-6 migration?
+   - **YES (code-level)** - Implementation proves sops-nix works with Pattern A
+   - **PARTIAL (operational)** - Documentation missing blocks Epic 2-6 knowledge transfer
+
+2. **Pattern Reusability:** Can modules be copied to infra?
+   - **YES** - Pattern A structure identical, high reusability for Epic 2-6
+
+3. **Documentation Completeness:** Sufficient Epic 2-6 guidance?
+   - **NO** - age-key-management.md, Section 12, examples all MISSING
+   - **Blocker:** Cannot execute Epic 2-6 without operational documentation
+
+4. **Architectural Consistency:** Aligns with two-tier model?
+   - **YES** - sops-nix correctly scoped, architectural model proven
+
+**Epic 2-6 Readiness:** **60% ready** (code excellent, documentation missing, builds unverified)
+
+**Epic 2-6 Blockers:**
+1. **Documentation (HIGH):** age-key-management.md required for new user onboarding
+2. **Documentation (HIGH):** Section 12 required for architectural understanding
+3. **Build validation (MEDIUM):** Evidence needed for deployment confidence
+
+### DoD Verdict: **CHANGES REQUESTED**
+
+**Required Changes Before Approval:**
+1. Create `docs/guides/age-key-management.md` (AC23)
+2. Add Section 12 to `test-clan-validated-architecture.md` (AC22)
+3. Create access pattern examples (AC24)
+4. Run and document build validation (AC16-AC18)
+5. Update AC6 for actual secret counts
+
+**Estimated Effort to Complete:** 2-3 hours
+- Documentation (AC22-AC24): 1.5-2 hours
+- Build validation (AC16-AC18): 0.5-1 hour
+- AC updates: 15 minutes
+
+**Recommendation:** Complete documentation + build validation to achieve APPROVED status.
+Code quality is exceptional and demonstrates production-ready patterns for Epic 2-6.
+Documentation gap is the only significant blocker.
+
+**Epic 2-6 Impact:** Documentation completion unblocks Epic 2-6 migration (critical path dependency).
+Code patterns already validated and ready for replication.
