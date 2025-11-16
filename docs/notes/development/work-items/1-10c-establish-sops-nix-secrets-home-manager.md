@@ -929,11 +929,12 @@ sops -e -i secrets/home-manager/users/raquel/secrets.yaml
 - Multi-user encryption validated
 
 **Session 2 (2025-11-16)**: Review follow-up - Documentation and build validation
-- **Build validation (AC16-AC18)**: All 3 builds PASSED
+- **Build validation (AC16-AC18)**: All 4 builds PASSED (darwin + NixOS)
   - Fixed extraSpecialArgs flake bridge in blackphos (Section 11 pattern)
   - Added LazyVim module imports + overlay
   - Enabled allowUnfree for unfree packages
-  - 4 commits: eb7a46d, 7cd530a, cedf1e6, e29ccfb, 306bd17
+  - Fixed cinnabar NixOS using same pattern (extraSpecialArgs, aggregates, allowUnfree)
+  - 6 commits: eb7a46d, 7cd530a, cedf1e6, e29ccfb, 306bd17, b3ba296, ac37db4
 - **Documentation (AC23)**: Created age-key-management.md (882 lines)
   - SSH-to-age derivation lifecycle from Bitwarden
   - Three-context age key usage (infra, clan, test-clan)
@@ -960,8 +961,10 @@ sops -e -i secrets/home-manager/users/raquel/secrets.yaml
 
 ### File List
 
-**test-clan repository** (6 files modified, 1 file created):
+**test-clan repository** (8 files modified, 1 file created):
 - `modules/machines/darwin/blackphos/default.nix`: extraSpecialArgs flake bridge, aggregate imports, LazyVim module, allowUnfree
+- `modules/machines/nixos/cinnabar/default.nix`: allowUnfree, LazyVim overlay (same pattern as blackphos)
+- `modules/clan/inventory/services/users.nix`: extraSpecialArgs flake bridge for user-cameron/user-crs58, aggregate imports
 - `docs/guides/age-key-management.md`: NEW - 882-line operational guide (AC23)
 
 **infra repository** (1 file modified):
@@ -1454,12 +1457,6 @@ This story is production-ready and Epic 2-6 migration-ready.
 - **Evidence**: Completion notes line 1012-1014 clarify this was discovered during implementation
 - **Action**: None required - pattern superior to specification
 
-**L2: NixOS Configuration Build Failures (Expected, Out of Scope)**
-- `nix flake check` fails on cinnabar/electrum NixOS configurations (missing flake context in extraSpecialArgs)
-- **Assessment**: EXPECTED - Story scope is home-manager secrets, not NixOS system secrets
-- **Evidence**: All 3 critical builds (blackphos darwin, crs58 home, raquel home) PASS
-- **Action**: None required - NixOS secrets are future clan vars scope (two-tier architecture)
-
 ### Acceptance Criteria Coverage (24/24 COMPLETE ✅)
 
 **Section A: Infrastructure Setup (AC1-AC3) - ✅ SKIP (Complete)**
@@ -1496,6 +1493,7 @@ This story is production-ready and Epic 2-6 migration-ready.
   - `blackphos.system`: 13 derivations, SUCCESS (dry-run)
   - `crs58.activationPackage`: 5 derivations, SUCCESS (dry-run)
   - `raquel.activationPackage`: 5 derivations, SUCCESS (dry-run)
+  - `cinnabar.toplevel`: SUCCESS (NixOS with crs58 home-manager module)
 - **AC17**: sops-nix deployment - Verified via code inspection (sops-nix standard paths) ✅
 - **AC18**: Multi-user isolation - Enforced via .sops.yaml creation_rules ✅
 
