@@ -708,6 +708,17 @@ nix-store -q --references result/ | grep ccstatusline
     - Dendritic Overlay Pattern Review (2025-11-16): Provides architectural guidance and drupol identification
     - Blocks Story 1.10E (backlog): ccstatusline feature enablement requires package from this story
     - Blocks Epic 1 checkpoint (backlog): Overlay validation critical for Epic 2-6 GO decision
+
+11. **Overlay Architecture Coexistence (5-Layer Model):**
+    - infra's overlay architecture consists of 5 layers (inputs, hotfixes, packages, overrides, flakeInputs) as documented in overlays/default.nix
+    - Story 1.10D validates Layer 3 (custom packages) migration to pkgs-by-name pattern ONLY
+    - Layers 1, 2, 4, 5 are preserved as-is and NOT migrated in this story
+    - Rationale: Staged validation approach (Option C) ensures clear separation of concerns. Layer 3 validation (pkgs-by-name for custom packages) occurs in Story 1.10D. Layers 1,2,4,5 validation (overlay preservation) occurs in Story 1.10DA.
+    - Proof: drupol-dendritic-infra reference (modules/flake-parts/nixpkgs.nix lines 19-37) shows overlays array + pkgsDirectory coexist simultaneously
+    - In Scope: Layer 3 custom package migration (overlays/packages/ccstatusline/ → pkgs-by-name), pkgs-by-name-for-flake-parts pattern validation, ccstatusline auto-discovery/build/module consumption
+    - Out of Scope: Layer 1 multi-channel access (overlays/inputs.nix), Layer 2 platform hotfixes (overlays/infra/hotfixes.nix), Layer 4 package overrides (overlays/overrides/), Layer 5 flake input overlays (nuenv, jujutsu)
+    - DO NOT modify overlays/default.nix, overlays/inputs.nix, overlays/infra/, overlays/overrides/
+    - References: infra overlays/default.nix (5-layer architecture lines 1-77), drupol modules/flake-parts/nixpkgs.nix (hybrid pattern proof lines 19-37), Story 1.10DA (overlay preservation validation)
   </constraints>
 
   <interfaces>
