@@ -52,6 +52,21 @@ ccstatusline chosen as proof-of-concept because:
 - Full workflow validation: package build → perSystem export → pkgs.* consumption → home-manager activation
 - Represents real infra need (Claude Code status line feature)
 
+**Architectural Scope Note:**
+
+This story validates Layer 3 (custom packages) of infra's 5-layer overlay architecture using the pkgs-by-name-for-flake-parts pattern.
+Layers 1, 2, 4, 5 (multi-channel access, hotfixes, overrides, flake input overlays) are preserved as-is and validated in a separate story (Story 1.10DA).
+
+infra's complete overlay architecture consists of 5 layers (documented in `overlays/default.nix`):
+
+1. **inputs** - Multi-channel nixpkgs access (stable, patched, unstable) via `overlays/inputs.nix`
+2. **hotfixes** - Platform-specific stable fallbacks via `overlays/infra/hotfixes.nix`
+3. **packages** - Custom derivations from `overlays/packages/` [THIS STORY - migrating to pkgs-by-name]
+4. **overrides** - Per-package build modifications via `overlays/overrides/`
+5. **flakeInputs** - Overlays from flake inputs (nuenv, jujutsu, etc.)
+
+This staged validation approach (Option C) ensures clear separation of concerns: pkgs-by-name pattern validation for custom packages (Story 1.10D) and overlay preservation validation (Story 1.10DA).
+
 ---
 
 ## Implementation Notes
@@ -78,6 +93,34 @@ ccstatusline chosen as proof-of-concept because:
 - No custom overlay code needed (flake module handles export)
 - Follows nixpkgs convention (RFC 140 compliance)
 - Production-proven in multiple dendritic repos
+
+### Overlay Architecture Preservation
+
+Story 1.10D focuses exclusively on validating custom packages migration to pkgs-by-name pattern (Layer 3 of infra's 5-layer overlay architecture).
+The existing overlay architecture is NOT migrated or modified in this story.
+
+**What IS validated in Story 1.10D:**
+- Custom package auto-discovery via pkgs-by-name-for-flake-parts
+- ccstatusline package as test case (from `overlays/packages/ccstatusline/default.nix`)
+- Build quality and module consumption in test-clan
+
+**What is NOT validated in Story 1.10D:**
+- Multi-channel access (Layer 1: `pkgs.stable.*`, `pkgs.unstable.*`)
+- Platform-specific hotfixes (Layer 2: stable fallbacks when unstable breaks)
+- Per-package overrides (Layer 4: `overrideAttrs`, build flags, test disabling)
+- Flake input overlays (Layer 5: nuenv, jujutsu overlays)
+
+These overlay layers provide critical infra functionality:
+- **Multi-channel access** enables stable/unstable package mixing
+- **Hotfixes** provide platform-specific workarounds for broken unstable packages
+- **Overrides** customize package builds (disable tests, add patches, modify dependencies)
+- **Flake input overlays** integrate third-party overlays (nuenv for devshells, jujutsu for VCS)
+
+**Overlay preservation is validated in Story 1.10DA** after pkgs-by-name pattern is proven working in this story.
+The drupol-dendritic-infra reference proves overlays + pkgs-by-name coexist (see `modules/flake-parts/nixpkgs.nix` lines 19-37 showing traditional overlays array + pkgsDirectory for custom packages).
+
+Story 1.10D validates Layer 3 in isolation.
+Story 1.10DA validates Layers 1,2,4,5 coexist with Layer 3.
 
 ### infra Compatibility Assessment
 
@@ -1267,6 +1310,20 @@ nix eval .#packages.aarch64-darwin.ccstatusline.meta --json | jq
 - Production-ready derivation (no development needed)
 - Clear three-layer architecture (prevents confusion)
 
+### Constraints
+
+11. **Overlay Architecture Coexistence (5-Layer Model):**
+    - infra overlay architecture consists of 5 layers (inputs, hotfixes, packages, overrides, flakeInputs)
+    - Story 1.10D validates Layer 3 (custom packages) migration to pkgs-by-name pattern
+    - Layers 1, 2, 4, 5 are preserved as-is (NOT migrated in this story)
+    - Validation of overlay preservation occurs in Story 1.10DA (separate work item)
+    - pkgs-by-name-for-flake-parts + traditional overlays coexist per drupol-dendritic-infra proof (`modules/flake-parts/nixpkgs.nix` lines 19-37)
+    - DO NOT migrate or modify `overlays/default.nix`, `overlays/inputs.nix`, `overlays/infra/`, or `overlays/overrides/` in this story
+    - Layer 3 validation is sufficient for Epic 1 custom package migration confidence
+    - References:
+      * infra 5-layer architecture: `~/projects/nix-workspace/infra/overlays/default.nix` (lines 1-77)
+      * drupol hybrid pattern proof: `~/projects/nix-workspace/drupol-dendritic-infra/modules/flake-parts/nixpkgs.nix` (lines 19-37)
+
 ---
 
 ## Dev Agent Record
@@ -1302,6 +1359,29 @@ nix eval .#packages.aarch64-darwin.ccstatusline.meta --json | jq
 ---
 
 ## Change Log
+
+### 2025-11-16 - Story Scope Clarification (Party Mode Consensus - Option C)
+
+**Reason for Update:**
+Party Mode team discovered architectural incompleteness in original Story 1.10D definition.
+Story only addressed Layer 3 (custom packages via pkgs-by-name) but failed to address overlay preservation (Layers 1,2,4,5), which would BREAK infra production.
+
+**Changes Made:**
+- Added architectural scope note clarifying Story 1.10D validates Layer 3 ONLY
+- Added "Overlay Architecture Preservation" subsection documenting 5-layer model
+- Added constraint #11 documenting overlay coexistence pattern
+- Documented Option C staged validation approach (Story 1.10D = Layer 3, Story 1.10DA = Layers 1,2,4,5)
+
+**Option C Rationale:**
+- Clearer separation of concerns (pkgs-by-name vs overlay preservation)
+- Faster time-to-value (Layer 3 validation first, overlay validation second)
+- Better test isolation (orthogonal failure modes)
+- Incremental architecture validation (prove one layer, then prove coexistence)
+
+**References:**
+- infra 5-layer overlay architecture: `overlays/default.nix` (lines 1-77)
+- drupol hybrid pattern proof: `drupol-dendritic-infra/modules/flake-parts/nixpkgs.nix` (lines 19-37)
+- Party Mode decision: All 9 agents voted unanimously for Option C
 
 ### 2025-11-16 - Story Created
 
