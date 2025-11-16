@@ -160,21 +160,26 @@ development_status:
   # Dependencies: Story 1.10B (done), Blocks: Story 1.10C (modules have flake context), Story 1.10D (deferred features)
   # Strategic value achieved: Validates Pattern A at scale, unblocks Story 1.10C, provides Epic 2-6 pattern
   1-10ba-refactor-pattern-a: done
-  # Story 1.10C: DISCOVERED STORY (2025-11-14) - Migrate Secrets from sops-nix to Clan Vars
+  # Story 1.10C: DISCOVERED STORY (2025-11-14) - Establish sops-nix Secrets for Home-Manager
   # Secrets management gap identified - Story 1.8 deferred, Story 1.10 never addressed (0% secrets coverage)
-  # infra has 6 sops-nix encrypted files (signing keys, API keys), test-clan has zero clan vars generators
-  # Physical deployment would fail (no SSH signing keys, no MCP API keys, no GLM API key)
-  # Pattern B migration: Vars generators in user modules (modules/home/users/*/vars.nix)
-  # Secrets inventory: signing keys (regenerable), API keys (prompt-based), bitwarden email
-  # Module access pattern updates: git.nix, jujutsu.nix, mcp-servers.nix, claude-code-wrappers.nix, rbw.nix
-  # Clan vars IS sops-nix (declarative interface wrapper), darwin-compatible, recommended by clan-core
-  # UPDATE (Post-Story 1.10BA): Pattern A provides flake context for clan vars access (sops-nix re-enabled)
-  # Estimated effort: 4-6 hours (2h setup + 1-2h access patterns + 1h validation + 1h docs)
+  # ARCHITECTURAL PIVOT (2025-11-15): Clan vars INCOMPATIBLE with home-manager (NixOS-specific _class parameter)
+  # Two-tier secrets architecture validated: System-level (clan vars, future) vs User-level (sops-nix, now)
+  # sops-nix proven pattern for home-manager across infra + 8 clan reference repos
+  # Age key reuse pattern: Same keypair for clan secrets AND sops-nix (~/.config/sops/age/keys.txt)
+  # Implementation: 52 commits, sops.templates patterns, multi-user encryption, Pattern A integration
+  # Module access pattern updates: git.nix, jujutsu.nix, mcp-servers.nix, wrappers.nix, atuin.nix, rbw.nix
+  # Estimated effort: 4.75 hours (1h sops-nix config + 45m secrets + 1h modules + 30m builds + 30m integration + 1h docs)
   # Dependencies: Story 1.10BA (done), Blocks: Story 1.10D (features need secrets), Story 1.12 (deployment needs secrets)
   # DRAFTED (2025-11-15): Comprehensive story file created with 24 ACs, 7 tasks, security protocol documented
   # READY-FOR-DEV (2025-11-15): Story context XML generated with comprehensive docs/code artifacts/constraints
-  # IN-PROGRESS (2025-11-15): Starting implementation of clan vars infrastructure
-  1-10c-migrate-secrets-clan-vars: in-progress
+  # IN-PROGRESS (2025-11-15): Implementation complete (52 commits), code excellent, documentation missing
+  # REVIEW (2025-11-16): CHANGES REQUESTED - AC4-AC21 complete, AC22-AC24 documentation missing (Epic 2-6 blocker)
+  # Technical excellence: sops.templates patterns exceed requirements, 52 atomic commits, zero security issues
+  # Required changes: age-key-management.md (AC23), Section 12 architecture (AC22), access examples (AC24)
+  # Build validation needed (AC16-AC18), scope clarification (8 secrets crs58, 5 secrets raquel vs 7 and 4 specified)
+  # Epic 2-6 readiness: 60% (code ready, documentation blocks replication, builds unverified)
+  # Estimated completion: 2-3 hours (1.5-2h docs + 0.5-1h build validation + 15m AC updates)
+  1-10c-establish-sops-nix-secrets-home-manager: in-progress
   # Story 1.10D: NEW STORY (2025-11-14) - Enable Features Using Clan Vars and Flake Inputs
   # Feature enablement deferred from Story 1.10BA (original AC17-AC20) - requires clan vars infrastructure first
   # Enable 11 disabled features from Story 1.10B using Pattern A + clan vars architecture
