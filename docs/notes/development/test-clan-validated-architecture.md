@@ -1468,6 +1468,472 @@ grep "crs58-user" .sops.yaml | awk '{print $NF}'  # sops-nix
 age-keygen -y < <(grep "AGE-SECRET-KEY" ~/.config/sops/age/keys.txt | tail -1)  # Workstation
 ```
 
+## 13. Custom Package Management with pkgs-by-name Pattern
+
+### 13.1 Custom Package Overlays with pkgs-by-name Pattern
+
+**Validated in**: Story 1.10D (2025-11-16)
+**Status**: ✅ Production-ready pattern
+
+This section documents the validated pattern for custom package management in dendritic flake-parts + clan architecture using pkgs-by-name-for-flake-parts.
+
+#### Pattern Overview
+
+**Architecture**: pkgs-by-name-for-flake-parts (drupol pattern)
+
+**Key Components**:
+- **Auto-discovery mechanism**: Uses `lib.packagesFromDirectoryRecursive` (same as nixpkgs and infra overlays)
+- **Directory convention**: `pkgs/by-name/<package-name>/package.nix` (drupol flat structure)
+- **Zero boilerplate**: Just set `pkgsDirectory` option in perSystem
+- **Dendritic compatible**: Coexists with import-tree module auto-discovery
+
+**Three-Layer Architecture** (orthogonal separation):
+1. **Layer 1 - Package Definition** (`pkgs/by-name/`): Standard Nix derivations with callPackage signature
+2. **Layer 2 - Package Export** (`modules/nixpkgs.nix`): Flake-parts module configuration
+3. **Layer 3 - Package Consumption** (dendritic modules): Access via `pkgs.*` in any module
+
+**Integration Steps**:
+
+1. Add flake input to `flake.nix`:
+   ```nix
+   inputs.pkgs-by-name-for-flake-parts.url = "github:drupol/pkgs-by-name-for-flake-parts";
+   ```
+
+2. Import flake module in `modules/nixpkgs.nix`:
+   ```nix
+   { inputs, ... }:
+   {
+     imports = [ inputs.pkgs-by-name-for-flake-parts.flakeModule ];
+
+     perSystem = { system, ... }: {
+       _module.args.pkgs = import inputs.nixpkgs {
+         inherit system;
+         config.allowUnfree = true;
+         overlays = [ /* existing overlays */ ];
+       };
+
+       # Configure pkgs-by-name auto-discovery
+       pkgsDirectory = ../pkgs/by-name;
+     };
+   }
+   ```
+
+3. Create packages in `pkgs/by-name/<package-name>/package.nix`:
+   ```nix
+   { lib, buildNpmPackage, fetchzip, ... }:
+   buildNpmPackage {
+     pname = "package-name";
+     version = "1.0.0";
+     # Standard derivation...
+   }
+   ```
+
+4. Packages auto-export to `packages.<system>.<package-name>` and available as `pkgs.<package-name>` in all modules
+
+**Pattern Benefits**:
+- **Same underlying function as infra**: Uses `lib.packagesFromDirectoryRecursive` (no architectural change)
+- **Nixpkgs-aligned**: Based on nixpkgs RFC 140 conventions (future-proof)
+- **Zero boilerplate**: No manual package lists or overlay wiring
+- **Production-proven**: drupol (9 packages), gaetanlepage (50+ packages)
+- **Dendritic compatible**: No conflicts with import-tree or module system
+- **Overlay coexistence**: Works alongside traditional overlays array (validated in drupol)
+
+#### Complete Example: ccstatusline Package
+
+**1. Package Derivation** (`pkgs/by-name/ccstatusline/package.nix`):
+
+```nix
+{
+  lib,
+  buildNpmPackage,
+  fetchzip,
+  jq,
+  nix-update-script,
+}:
+buildNpmPackage (finalAttrs: {
+  pname = "ccstatusline";
+  version = "2.0.21";
+
+  src = fetchzip {
+    url = "https://registry.npmjs.org/ccstatusline/-/ccstatusline-${finalAttrs.version}.tgz";
+    hash = "sha256-sy9ZLN7Q8m8Gx2VkmtnSSg1CkAL8o6fRjnHuOLr+Y0Q=";
+  };
+
+  npmDepsHash = "sha256-Ux1lp4++OOngrWcGcR0D1PDDADQ+pFILuqD2EiFin9w=";
+  forceEmptyCache = true;
+
+  postPatch = ''
+    ${lib.getExe jq} 'del(.devDependencies, .patchedDependencies)' package.json > package.json.tmp
+    mv package.json.tmp package.json
+
+    cat > package-lock.json <<EOF
+    {
+      "name": "ccstatusline",
+      "version": "2.0.21",
+      "lockfileVersion": 3,
+      "requires": true,
+      "packages": {
+        "": {
+          "name": "ccstatusline",
+          "version": "2.0.21",
+          "license": "MIT",
+          "bin": { "ccstatusline": "dist/ccstatusline.js" },
+          "engines": { "node": ">=14.0.0" }
+        }
+      }
+    }
+    EOF
+  '';
+
+  dontNpmBuild = true;
+
+  installPhase = ''
+    runHook preInstall
+    mkdir -p $out/bin $out/lib/node_modules/ccstatusline
+    cp -r dist package.json $out/lib/node_modules/ccstatusline/
+    cat > $out/bin/ccstatusline <<EOF
+#!/usr/bin/env node
+import('file://$out/lib/node_modules/ccstatusline/dist/ccstatusline.js');
+EOF
+    chmod +x $out/bin/ccstatusline
+    runHook postInstall
+  '';
+
+  doInstallCheck = false;
+  passthru.updateScript = nix-update-script { };
+
+  meta = {
+    description = "Highly customizable status line formatter for Claude Code CLI";
+    homepage = "https://github.com/sirmalloc/ccstatusline";
+    license = lib.licenses.mit;
+    mainProgram = "ccstatusline";
+  };
+})
+```
+
+**Key characteristics**:
+- Standard callPackage signature (no custom overlay arguments)
+- Uses `buildNpmPackage` from nixpkgs
+- npm tarball pattern (pre-built dist/, no compilation)
+- Complete metadata (description, homepage, license, mainProgram)
+
+**2. Build Commands**:
+
+```bash
+# Build package
+cd ~/projects/nix-workspace/test-clan
+nix build .#ccstatusline
+
+# Inspect contents
+ls -la result/bin/
+nix-store -q --references result/
+
+# Verify metadata
+nix eval .#ccstatusline.meta.description
+# Output: "Highly customizable status line formatter for Claude Code CLI"
+
+# Check executable
+file result/bin/ccstatusline
+test -x result/bin/ccstatusline && echo "✓ Executable"
+```
+
+**Expected build output**:
+- Executable: `result/bin/ccstatusline` (shell script wrapper for Node.js)
+- Runtime dependencies: nodejs + ccstatusline package
+- Metadata: All fields populated (description, homepage, MIT license, mainProgram)
+
+**3. Module Consumption** (`modules/home/ai/claude-code/default.nix`):
+
+```nix
+{ ... }:
+{
+  flake.modules = {
+    homeManager.ai = { pkgs, ... }: {
+      programs.claude-code = {
+        enable = true;
+        settings = {
+          statusLine = {
+            type = "command";
+            command = "${pkgs.ccstatusline}/bin/ccstatusline";
+            padding = 0;
+          };
+          # ... other settings
+        };
+      };
+    };
+  };
+}
+```
+
+**Key integration points**:
+- `pkgs.ccstatusline` accessible directly (no specialArgs needed)
+- Standard module signature `{ pkgs, ... }`
+- Pattern A dendritic module structure
+
+**4. Integration Validation**:
+
+```bash
+# Verify package resolves in module context
+cd ~/projects/nix-workspace/test-clan
+nix build .#checks.aarch64-darwin.home-module-exports
+
+# Expected: Build succeeds without errors
+# Confirms: pkgs.ccstatusline resolves correctly, no infinite recursion
+```
+
+**Dendritic Compatibility Checklist** (6 items validated):
+
+1. ✅ **Package definition is NOT a flake-parts module**
+   - File: `pkgs/by-name/ccstatusline/package.nix`
+   - Content: Standard Nix derivation (callPackage signature)
+   - Verification: No `flake-parts` imports, no `perSystem` usage
+
+2. ✅ **Package EXPORT via flake module**
+   - File: `modules/nixpkgs.nix`
+   - Content: Import pkgs-by-name-for-flake-parts, configure pkgsDirectory
+   - Verification: Package appears in `nix flake show` outputs
+
+3. ✅ **Package CONSUMPTION in dendritic module**
+   - File: `modules/home/ai/claude-code/default.nix`
+   - Content: References `pkgs.ccstatusline`
+   - Verification: Module builds successfully with package reference
+
+4. ✅ **NO specialArgs pass-thru needed**
+   - pkgs available in all dendritic modules automatically
+   - No custom `extraSpecialArgs` configuration required
+   - Verification: Standard module signature `{ pkgs, ... }:` works
+
+5. ✅ **import-tree auto-discovery compatibility**
+   - pkgs-by-name doesn't conflict with module auto-discovery
+   - Both use separate namespaces (packages vs modules)
+   - Verification: `nix flake check` passes with both systems active
+
+6. ✅ **Pattern matches drupol-dendritic-infra architecture**
+   - Directory structure identical to drupol reference
+   - Integration pattern identical (flake input + module import + perSystem config)
+   - Verification: Side-by-side comparison with `~/projects/nix-workspace/drupol-dendritic-infra/`
+
+#### infra Migration Guide
+
+**Current State (infra overlays)**:
+
+infra has 4 production custom packages in `overlays/packages/`:
+- Location: `~/projects/nix-workspace/infra/overlays/packages/`
+- Auto-discovery: `lib.packagesFromDirectoryRecursive` (same function as pkgs-by-name-for-flake-parts)
+- Export: Custom overlay configuration in flake.nix
+
+**Migration Path**:
+
+| Package | Current Location | Target Location | Build Type | Effort | Notes |
+|---------|------------------|-----------------|------------|--------|-------|
+| ccstatusline | `overlays/packages/ccstatusline.nix` | `pkgs/by-name/ccstatusline/package.nix` | npm | ✅ Validated | Proven in Story 1.10D |
+| atuin-format | `overlays/packages/atuin-format/` | `pkgs/by-name/atuin-format/package.nix` | nuenv | 30 min | Directory package → single file, nuenv dependency |
+| markdown-tree-parser | `overlays/packages/markdown-tree-parser.nix` | `pkgs/by-name/markdown-tree-parser/package.nix` | npm | 15 min | File move, npm package |
+| starship-jj | `overlays/packages/starship-jj.nix` | `pkgs/by-name/starship-jj/package.nix` | rust | 15 min | File move, rust package |
+
+**Total Migration Effort**: 2.5-3 hours (includes infrastructure setup, testing, validation)
+
+**CallPackage Signature Verification**:
+
+All packages use standard callPackage signatures (no custom overlay arguments):
+
+- **ccstatusline**: `{ lib, buildNpmPackage, fetchzip, jq, nix-update-script }`
+- **atuin-format**: `{ nuenv, atuin, ... }` (nuenv from overlays, standard pattern)
+- **markdown-tree-parser**: `{ lib, buildNpmPackage, fetchFromGitHub }`
+- **starship-jj**: `{ lib, rustPlatform, fetchCrate, nix-update-script, pkg-config, stdenv, darwin, openssl }`
+
+**Pattern Compatibility Assessment**:
+
+- **Underlying function**: SAME (`lib.packagesFromDirectoryRecursive`)
+- **Package definitions**: ZERO code changes needed
+- **Migration type**: Directory restructuring only
+- **Builders**: All use standard nixpkgs builders (buildNpmPackage, rustPlatform, nuenv)
+- **Dependencies**: All from nixpkgs or existing overlays (nuenv)
+
+**Migration Steps** (for Epic 2-6):
+
+1. **Add pkgs-by-name-for-flake-parts flake input** to infra/flake.nix
+   ```nix
+   inputs.pkgs-by-name-for-flake-parts.url = "github:drupol/pkgs-by-name-for-flake-parts";
+   ```
+
+2. **Create pkgs/by-name/ directory structure** in infra
+   ```bash
+   mkdir -p ~/projects/nix-workspace/infra/pkgs/by-name
+   ```
+
+3. **Move package files to new locations** (no code changes to derivations)
+   - ccstatusline: `overlays/packages/ccstatusline.nix` → `pkgs/by-name/ccstatusline/package.nix`
+   - atuin-format: Consolidate `overlays/packages/atuin-format/` → `pkgs/by-name/atuin-format/package.nix` (keep atuin-format.nu alongside)
+   - markdown-tree-parser: `overlays/packages/markdown-tree-parser.nix` → `pkgs/by-name/markdown-tree-parser/package.nix`
+   - starship-jj: `overlays/packages/starship-jj.nix` → `pkgs/by-name/starship-jj/package.nix`
+
+4. **Update infra modules/nixpkgs.nix** to import flake module and configure pkgsDirectory
+   ```nix
+   { inputs, ... }:
+   {
+     imports = [ inputs.pkgs-by-name-for-flake-parts.flakeModule ];
+     perSystem = { system, ... }: {
+       # Existing _module.args.pkgs configuration...
+       pkgsDirectory = ../pkgs/by-name;
+     };
+   }
+   ```
+
+5. **Test builds and module consumption**
+   ```bash
+   nix build .#ccstatusline
+   nix build .#atuin-format
+   nix build .#markdown-tree-parser
+   nix build .#starship-jj
+   ```
+
+6. **Validate integration** in system configurations
+   - Verify packages accessible via `pkgs.*` in all modules
+   - Test in nix-darwin configurations (stibnite, blackphos, argentum, rosegold)
+   - Verify no regressions in existing functionality
+
+7. **Remove old overlays/ configuration** after validation
+   - Remove `overlays/packages/` directory
+   - Update `overlays/default.nix` (remove packages layer)
+   - Clean up flake.nix custom overlay configuration
+
+**Risk Assessment**: LOW
+
+**Reasoning**:
+- SAME underlying function (`lib.packagesFromDirectoryRecursive`)
+- NO code changes to package derivations
+- Proven pattern (drupol production: 9 packages, gaetanlepage: 50+ packages)
+- test-clan validation (ccstatusline proven working in Story 1.10D)
+- Directory restructuring only (mechanical, low-risk)
+
+**Mitigation**:
+- Story 1.10D validates pattern before Epic 2-6 migration
+- test-clan serves as reference implementation
+- Comprehensive documentation in this section
+- Test builds before removing old overlays
+
+#### Critical Notes and Gotchas
+
+**Directory Structure: Drupol Flat Pattern vs RFC 140**
+
+- **Drupol pattern** (USED): `pkgs/by-name/<package-name>/package.nix`
+- **RFC 140 strict** (NOT used): `pkgs/by-name/<two-letters>/<package-name>/package.nix`
+
+**Why flat pattern?**
+- Simpler package names (exports as `ccstatusline`, not `"cc/ccstatusline"`)
+- Matches drupol reference implementation (PRIMARY pattern source)
+- Works with default `pkgsNameSeparator = "/"` setting
+- Validated in test-clan Story 1.10D
+
+**If using RFC 140 strict structure**, configure custom separator or accept quoted attribute names:
+```nix
+# Option 1: Accept quoted names
+nix build '.#"cc/ccstatusline"'
+
+# Option 2: Configure different separator (NOT validated)
+perSystem = { ... }: {
+  pkgsDirectory = ../pkgs/by-name;
+  pkgsNameSeparator = "-";  # Might create conflicts, not recommended
+};
+```
+
+**Overlay Coexistence**
+
+pkgs-by-name-for-flake-parts + traditional overlays work together:
+
+```nix
+# modules/nixpkgs.nix (proven in drupol-dendritic-infra)
+{
+  imports = [ inputs.pkgs-by-name-for-flake-parts.flakeModule ];
+
+  perSystem = { system, ... }: {
+    _module.args.pkgs = import inputs.nixpkgs {
+      inherit system;
+      config.allowUnfree = true;
+      overlays = [
+        # Traditional overlays for multi-channel, hotfixes, overrides
+        (final: prev: { stable = import inputs.nixpkgs-stable { ... }; })
+        inputs.nuenv.overlays.default
+        # ... more overlays
+      ];
+    };
+
+    # pkgs-by-name for custom packages
+    pkgsDirectory = ../pkgs/by-name;
+  };
+}
+```
+
+This validates infra's 5-layer overlay architecture can migrate incrementally:
+- **Layers 1,2,4,5** (inputs, hotfixes, overrides, flakeInputs): Keep in overlays array
+- **Layer 3** (custom packages): Migrate to pkgs-by-name
+
+**Module Signature Requirements**
+
+Packages accessible in dendritic modules via standard signature:
+```nix
+{ pkgs, ... }:  # ✅ pkgs available automatically (perSystem provides it)
+{ config, lib, pkgs, ... }:  # ✅ Also works
+```
+
+NO specialArgs pass-thru needed:
+```nix
+# ❌ NOT needed
+flake.homeModules.mymodule = {
+  extraSpecialArgs = { inherit pkgs; };  # Unnecessary complexity
+};
+```
+
+**nuenv Dependency Note**
+
+atuin-format uses `nuenv.writeShellApplication` which requires nuenv overlay:
+
+```nix
+# Ensure nuenv overlay in modules/nixpkgs.nix
+overlays = [
+  inputs.nuenv.overlays.default  # Provides nuenv.writeShellApplication
+  # ... other overlays
+];
+```
+
+This is ALREADY in infra overlays, so atuin-format migration requires zero changes beyond directory move.
+
+#### References
+
+**Primary Pattern Source**:
+- **drupol-dendritic-infra**: `~/projects/nix-workspace/drupol-dendritic-infra/` (9 packages in production)
+  - Flake input: `flake.nix` line 35
+  - Module integration: `modules/flake-parts/nixpkgs.nix` lines 7-8, 37
+  - Package examples: `pkgs/by-name/chromium-*`, `pkgs/by-name/gh-flake-update`
+
+**Compatibility Validation**:
+- **gaetanlepage-dendritic-nix-config**: `~/projects/nix-workspace/gaetanlepage-dendritic-nix-config/` (50+ packages, proves dendritic + pkgs-by-name coexistence)
+
+**infra Migration Source**:
+- **infra overlays**: `~/projects/nix-workspace/infra/overlays/packages/` (4 production packages)
+  - ccstatusline: 85 lines, npm tarball pattern
+  - atuin-format: nuenv shell application with atuin-format.nu script
+  - markdown-tree-parser: npm package from GitHub
+  - starship-jj: rust crate package
+
+**test-clan Validation (Story 1.10D)**:
+- **test-clan repository**: `~/projects/nix-workspace/test-clan/`
+  - Flake input: `flake.nix` lines 69-70
+  - Module integration: `modules/nixpkgs.nix` lines 3-4, 18
+  - Package: `pkgs/by-name/ccstatusline/package.nix`
+  - Consumption: `modules/home/ai/claude-code/default.nix` lines 32-37
+
+**External Documentation**:
+- **pkgs-by-name-for-flake-parts**: https://github.com/drupol/pkgs-by-name-for-flake-parts
+- **nixpkgs RFC 140**: https://github.com/NixOS/rfcs/pull/140 (pkgs/by-name convention)
+- **Dendritic Overlay Pattern Review**: Internal research document (2025-11-16, comprehensive analysis of 8 repositories)
+
+**Epic and Story Context**:
+- **Epic 1**: `~/projects/nix-workspace/infra/docs/notes/development/epics/epic-1-architectural-validation-migration-pattern-rehearsal-phase-0.md`
+- **Story 1.10D work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10d-validate-custom-package-overlays.md`
+- **Story 1.10D context XML**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10d-validate-custom-package-overlays.context.xml`
+
 ## References
 
 - **test-clan README**: `~/projects/nix-workspace/test-clan/README.md`
@@ -1476,3 +1942,4 @@ age-keygen -y < <(grep "AGE-SECRET-KEY" ~/.config/sops/age/keys.txt | tail -1)  
 - **Sprint status**: `~/projects/nix-workspace/infra/docs/notes/development/sprint-status.yaml`
 - **Terranix pattern**: `~/projects/nix-workspace/infra/docs/notes/implementation/clan-infra-terranix-pattern.md`
 - **Story 1.10BA work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10BA-refactor-pattern-a.md` (Pattern A validation)
+- **Story 1.10D work item**: `~/projects/nix-workspace/infra/docs/notes/development/work-items/1-10d-validate-custom-package-overlays.md` (pkgs-by-name pattern validation)
