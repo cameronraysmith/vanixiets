@@ -1124,9 +1124,246 @@ User-Level Secrets (Home-Manager)
 
 ---
 
-## Story 1.10D: Enable Features Using sops-nix Secrets and Flake Inputs
+## Story 1.10D: Validate Custom Package Overlays with pkgs-by-name Pattern
 
-**⚠️ UPDATED STORY - Remaining Feature Enablement + Documentation**
+**⚠️ NEW STORY - Infrastructure Validation (Blocks Story 1.10E)**
+
+As a system administrator,
+I want to validate that infra's custom package overlays work with dendritic flake-parts + clan architecture using the pkgs-by-name pattern,
+So that Epic 2-6 migration can proceed confidently knowing all 4 infra custom packages will migrate successfully.
+
+**Context:**
+
+Epic 1 validation mission requires proving ALL infra architectural patterns work with dendritic + clan, not just modules and secrets.
+
+infra has 4 production custom packages (ccstatusline, atuin-format, markdown-tree-parser, starship-jj) currently in `overlays/packages/` using `lib.packagesFromDirectoryRecursive` for auto-discovery.
+These packages must migrate to dendritic flake-parts structure in Epic 2-6.
+
+**Critical Discovery:** Dendritic Overlay Pattern Review (2025-11-16) identified pkgs-by-name-for-flake-parts (drupol) as optimal pattern:
+- Uses SAME underlying function as infra (`lib.packagesFromDirectoryRecursive`)
+- Follows nixpkgs RFC 140 convention (`pkgs/by-name/` directory structure)
+- Zero boilerplate (just set `pkgsDirectory` option in perSystem)
+- Proven in production: drupol-dendritic-infra (9 packages), compatible with gaetanlepage comprehensive dendritic usage
+
+**Migration Assessment:** infra overlay system is ✅ COMPATIBLE with dendritic pattern.
+Migration requires directory restructuring (`overlays/packages/` → `pkgs/by-name/`) but NO code changes to package derivations.
+Estimated effort: 2.5-3 hours for all 4 packages.
+
+**Story 1.10D validates:** Create pkgs-by-name infrastructure in test-clan, implement ccstatusline as proof-of-concept, prove pattern works end-to-end (package build → module consumption → activation).
+Success means Epic 2-6 can migrate infra's 4 packages with confidence.
+
+**Blocks Story 1.10E:** ccstatusline feature enablement requires ccstatusline package (created in this story).
+
+**Test Case: ccstatusline**
+
+ccstatusline chosen as proof-of-concept because:
+- Production-ready derivation exists in infra (copy directly, no development needed)
+- Settings pre-configured in test-clan: ccstatusline-settings.nix (175 lines, waiting for package)
+- Full workflow validation: package build → perSystem export → pkgs.* consumption → home-manager activation
+- Represents real infra need (Claude Code status line feature)
+
+**Acceptance Criteria:**
+
+**A. Add pkgs-by-name-for-flake-parts Infrastructure:**
+1. Add flake input to flake.nix:
+   ```nix
+   inputs.pkgs-by-name-for-flake-parts.url = "github:drupol/pkgs-by-name-for-flake-parts";
+   ```
+2. Import flake module in modules/nixpkgs.nix:
+   ```nix
+   imports = [ inputs.pkgs-by-name-for-flake-parts.flakeModule ];
+   ```
+3. Configure pkgsDirectory in perSystem:
+   ```nix
+   perSystem = { ... }: {
+     pkgsDirectory = ../../pkgs/by-name;
+   };
+   ```
+4. Verify flake module loads without errors
+
+**Estimated effort:** 15 min
+
+**B. Create pkgs/by-name Directory Structure:**
+1. Create directory following nixpkgs convention:
+   ```bash
+   mkdir -p pkgs/by-name/cc/ccstatusline
+   ```
+2. Structure follows RFC 140: `pkgs/by-name/<first-2-chars>/<package-name>/package.nix`
+3. Directory accessible from flake root
+4. Matches drupol-dendritic-infra pattern
+
+**Estimated effort:** 5 min
+
+**C. Implement ccstatusline Package:**
+1. Copy production-ready derivation from infra:
+   ```bash
+   cp ~/projects/nix-workspace/infra/overlays/packages/ccstatusline.nix \
+      pkgs/by-name/cc/ccstatusline/package.nix
+   ```
+2. Verify package.nix uses standard callPackage signature:
+   ```nix
+   { lib, buildNpmPackage, fetchzip, jq, nix-update-script }:
+   buildNpmPackage (finalAttrs: { ... })
+   ```
+3. No modifications needed (derivation is production-validated)
+4. Package follows npm tarball pattern (pre-built dist/, no compilation)
+
+**Estimated effort:** 10 min (copy + verify)
+
+**D. Validate Package Auto-Discovery:**
+1. Build ccstatusline package:
+   ```bash
+   nix build .#packages.aarch64-darwin.ccstatusline
+   # OR
+   nix build .#ccstatusline  # Short form
+   ```
+2. Verify package exports:
+   - `packages.<system>.ccstatusline` (flat output)
+   - `legacyPackages.<system>.<nested>` (if applicable)
+3. Check package accessible via pkgs namespace:
+   ```bash
+   nix eval .#packages.aarch64-darwin.ccstatusline.meta.description
+   # Expected: "Highly customizable status line formatter for Claude Code CLI"
+   ```
+4. Verify auto-discovery worked (no manual package list needed)
+
+**Estimated effort:** 15 min
+
+**E. Validate Package Build Quality:**
+1. Inspect package contents:
+   ```bash
+   ls -la result/bin/
+   ls -la result/lib/node_modules/ccstatusline/
+   ```
+2. Verify executable exists and is executable:
+   ```bash
+   file result/bin/ccstatusline
+   test -x result/bin/ccstatusline && echo "✓ Executable"
+   ```
+3. Check runtime dependencies:
+   ```bash
+   nix-store -q --references result/
+   # Expected: nodejs, ccstatusline package
+   ```
+4. Verify package metadata complete (description, homepage, license, mainProgram)
+
+**Estimated effort:** 15 min
+
+**F. Test Module Consumption:**
+1. Create temporary test module to verify pkgs.ccstatusline accessible:
+   ```nix
+   # modules/home/ai/claude-code/default.nix (UPDATE - uncomment ccstatusline)
+   { pkgs, ... }:
+   {
+     programs.claude-code.settings.statusLine = {
+       type = "command";
+       command = "${pkgs.ccstatusline}/bin/ccstatusline";
+       padding = 0;
+     };
+   }
+   ```
+2. Verify pkgs.ccstatusline resolves (no infinite recursion, no eval errors)
+3. Build home-manager configuration:
+   ```bash
+   nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage
+   ```
+4. Verify ccstatusline in activation closure:
+   ```bash
+   nix-store -q --references result/ | grep ccstatusline
+   ```
+
+**Estimated effort:** 30 min
+
+**G. Validate Dendritic Compatibility:**
+1. Verify package definition is NOT a flake-parts module (just derivation)
+2. Verify package EXPORT via flake module (modules/nixpkgs.nix)
+3. Verify package CONSUMPTION in dendritic module (claude-code/default.nix)
+4. Confirm NO specialArgs pass-thru needed (pkgs available in all modules)
+5. Check import-tree auto-discovery doesn't conflict with pkgs-by-name
+6. Verify pattern matches drupol-dendritic-infra architecture
+
+**Estimated effort:** 15 min
+
+**H. Validate infra Migration Readiness:**
+1. Document infra's 4 packages and migration path:
+   - ccstatusline: `overlays/packages/ccstatusline.nix` → `pkgs/by-name/cc/ccstatusline/package.nix` ✅ (validated)
+   - atuin-format: `overlays/packages/atuin-format/` → `pkgs/by-name/at/atuin-format/package.nix`
+   - markdown-tree-parser: `overlays/packages/markdown-tree-parser.nix` → `pkgs/by-name/ma/markdown-tree-parser/package.nix`
+   - starship-jj: `overlays/packages/starship-jj.nix` → `pkgs/by-name/st/starship-jj/package.nix`
+2. Verify all use standard callPackage signatures (no custom overlayArgs needed)
+3. Confirm lib.packagesFromDirectoryRecursive pattern matches pkgs-by-name-for-flake-parts
+4. Assessment: ✅ SAFE TO MIGRATE (directory restructuring only, no code changes)
+
+**Estimated effort:** 30 min (documentation + verification)
+
+**I. Documentation - Section 13.1 (Custom Package Overlays):**
+1. Create "13.1 Custom Package Overlays" subsection in test-clan-validated-architecture.md
+2. Document pkgs-by-name-for-flake-parts pattern:
+   - Directory structure (pkgs/by-name/<first-2-chars>/<package-name>/)
+   - flake.nix integration (add flake input)
+   - modules/nixpkgs.nix configuration (import module, set pkgsDirectory)
+   - Package auto-discovery mechanism
+   - Module consumption (pkgs.* namespace)
+3. Provide ccstatusline complete working example:
+   - package.nix derivation (85 lines, npm tarball pattern)
+   - Build commands
+   - Integration test commands
+4. Document infra migration path (4 packages, directory restructuring)
+5. Reference drupol-dendritic-infra and gaetanlepage compatibility proof
+
+**Estimated effort:** 45 min
+
+**Prerequisites:**
+- Story 1.10C (sops-nix infrastructure, validates secrets work with dendritic)
+- Dendritic Overlay Pattern Review (completed 2025-11-16, provides architectural guidance)
+
+**Blocks:**
+- Story 1.10E (ccstatusline feature enablement requires package from this story)
+- Epic 1 checkpoint (overlay validation critical for Epic 2-6 GO decision)
+
+**Estimated Effort:** 2-3 hours
+- flake input + module configuration (AC A-B): 20 min
+- ccstatusline package implementation (AC C): 10 min
+- Build validation (AC D-E): 30 min
+- Module consumption test (AC F): 30 min
+- Dendritic compatibility verification (AC G): 15 min
+- infra migration assessment (AC H): 30 min
+- Documentation Section 13.1 (AC I): 45 min
+
+**Risk Level:** Low (proven pattern in drupol-dendritic-infra, infra compatibility confirmed, production-ready derivation)
+
+**Strategic Value:**
+- Completes Epic 1 architectural validation (modules ✅, secrets ✅, **overlays ✅**)
+- Validates infra's 4 custom packages will migrate to dendritic + clan successfully
+- Removes last Epic 2-6 migration blocker (overlay pattern uncertainty)
+- Provides reusable pattern template for Epic 2-6 package migration
+- Proves dendritic pattern is comprehensive (handles all infra architectural components)
+- De-risks Epic 2-6 timeline (no overlay emergency fixes needed)
+- Documents migration path for 4 infra packages (2.5-3h effort in Epic 2)
+
+**Success Metrics:**
+- pkgs-by-name-for-flake-parts integrated (flake input + module import)
+- pkgs/by-name/ directory created following RFC 140 convention
+- ccstatusline package builds successfully (nix build .#ccstatusline)
+- ccstatusline accessible via pkgs.ccstatusline in modules
+- home-manager activation includes ccstatusline package
+- Zero dendritic pattern conflicts (import-tree + pkgs-by-name coexist)
+- Section 13.1 documentation complete (pattern + example + migration guide)
+- infra migration path documented (4 packages, directory restructuring)
+- Epic 1 architectural coverage: 95% (all critical infra components validated)
+
+**References:**
+- drupol-dendritic-infra: ~/projects/nix-workspace/drupol-dendritic-infra/ (PRIMARY pattern reference)
+- gaetanlepage-dendritic-nix-config: ~/projects/nix-workspace/gaetanlepage-dendritic-nix-config/ (compatibility proof)
+- infra overlays: ~/projects/nix-workspace/infra/overlays/ (migration source)
+- pkgs-by-name-for-flake-parts: https://github.com/drupol/pkgs-by-name-for-flake-parts (flake module)
+- nixpkgs RFC 140: https://github.com/NixOS/rfcs/pull/140 (pkgs/by-name convention)
+
+---
+
+## Story 1.10E: Enable Features Using sops-nix Secrets and Flake Inputs
+
+**⚠️ UPDATED STORY - Feature Enablement (Unblocked by Story 1.10D)**
 
 As a system administrator,
 I want to enable the remaining disabled home-manager features using sops-nix (for secrets) and flake.inputs (for packages/themes),
@@ -1136,9 +1373,11 @@ So that all production features are functional in test-clan using the validated 
 
 Story 1.10BA completed Pattern A structural migration but deferred feature enablement (original AC17-AC20) pending secrets infrastructure establishment.
 
-Story 1.10C establishes sops-nix user-level secrets infrastructure (age encryption, multi-user support, sops.templates patterns). During implementation (61 commits, 2025-11-15 to 2025-11-16), **9/11 Story 1.10D features were enabled using sops-nix patterns**, leaving only flake.inputs-dependent features (claude-code package, catppuccin theme) for Story 1.10D completion.
+Story 1.10C establishes sops-nix user-level secrets infrastructure (age encryption, multi-user support, sops.templates patterns). During implementation (61 commits, 2025-11-15 to 2025-11-16), **9/11 Story 1.10E features were enabled using sops-nix patterns**, leaving only flake.inputs-dependent features (claude-code package, catppuccin theme, ccstatusline package) for Story 1.10E completion.
 
-Story 1.10D completes feature enablement by configuring flake.inputs, enabling remaining features, and documenting all feature enablement patterns in Section 13 of test-clan-validated-architecture.md.
+Story 1.10D validates custom package overlays with pkgs-by-name pattern, implementing ccstatusline package infrastructure (blocks Story 1.10E AC F).
+
+Story 1.10E completes feature enablement by configuring flake.inputs, enabling remaining features (including ccstatusline from Story 1.10D), and documenting all feature enablement patterns in Section 13 of test-clan-validated-architecture.md.
 
 **Features Status (from Story 1.10B disabled features):**
 
@@ -1151,11 +1390,11 @@ Story 1.10D completes feature enablement by configuring flake.inputs, enabling r
 
 **Category B: Packages via flake.inputs (3 features - 1 ENABLED, 2 REMAINING):**
 6. ✅ GLM wrapper in wrappers.nix - Custom `pkgs.writeShellApplication` + sops-nix API key (Story 1.10C, commit f6b01e3, production-ready)
-7. ❌ claude-code package in default.nix - Blocked: nix-ai-tools flake input not configured ← **Story 1.10D scope**
-8. ❌ ccstatusline package - NOT in nixpkgs, requires custom derivation. Note: ccstatusline-settings.nix ✅ ENABLED (175 lines) ← **Story 1.10D scope (documentation only)**
+7. ❌ claude-code package in default.nix - Blocked: nix-ai-tools flake input not configured ← **Story 1.10E scope**
+8. ❌ ccstatusline package - Blocked: Package created in Story 1.10D. Note: ccstatusline-settings.nix ✅ ENABLED (175 lines) ← **Story 1.10E scope (enable feature)**
 
 **Category C: Themes via flake.inputs (3 features - 0 ENABLED, BLOCKED):**
-9-11. ❌ catppuccin-nix tmux theme - Blocked: catppuccin-nix flake input not configured. Note: Status bar placeholders configured (15/36 lines) ← **Story 1.10D scope**
+9-11. ❌ catppuccin-nix tmux theme - Blocked: catppuccin-nix flake input not configured. Note: Status bar placeholders configured (15/36 lines) ← **Story 1.10E scope**
 
 **Bonus Features (✅ ENABLED IN STORY 1.10C, undocumented in original epic):**
 - ✅ Atuin encryption key deployment via activation script
@@ -1254,13 +1493,21 @@ Story 1.10D completes feature enablement by configuring flake.inputs, enabling r
 
 **Estimated effort:** 45 min (15 min flake.nix + 30 min config + test)
 
-**F. Document ccstatusline Unavailability:**
-1. ✅ Availability checked: NOT in nixpkgs (`nix-env -qaP ccstatusline` returns no results)
-2. ✅ Settings configured: ccstatusline-settings.nix (175 lines, production-ready, awaiting package)
-3. Document limitation: Requires custom derivation or external flake input (out of Story 1.10D scope)
-4. Keep disabled with TODO explaining package unavailability
+**F. Enable ccstatusline Feature:**
+1. ✅ Package available: pkgs.ccstatusline (Story 1.10D)
+2. ✅ Settings configured: ccstatusline-settings.nix (175 lines, production-ready)
+3. Uncomment statusLine config in claude-code/default.nix:
+   ```nix
+   programs.claude-code.settings.statusLine = {
+     type = "command";
+     command = "${pkgs.ccstatusline}/bin/ccstatusline";
+     padding = 0;
+   };
+   ```
+4. Verify ccstatusline renders in Claude Code CLI status line
+5. Validate against ccstatusline-settings.nix configuration (3-line powerline style)
 
-**Estimated effort:** 15 min (documentation only)
+**Estimated effort:** 15 min (uncomment + validation)
 
 **G. Build Validation:**
 1. ✅ Story 1.10C builds validated (comprehensive review report, 4/4 builds PASS)
@@ -1284,13 +1531,16 @@ Story 1.10D completes feature enablement by configuring flake.inputs, enabling r
 3. Document flake.inputs patterns:
    - Module imports: `flake.inputs.X.homeManagerModules.Y`
    - Package overrides: `flake.inputs.X.packages.${pkgs.system}.Y`
-4. List disabled features with rationale:
-   - ccstatusline: Not in nixpkgs, requires custom package
-   - (Any others discovered during completion)
+4. List enabled features with implementation notes:
+   - ccstatusline: Custom package from Story 1.10D (pkgs-by-name pattern)
+   - claude-code: Package override from nix-ai-tools flake input
+   - catppuccin: Theme from catppuccin-nix flake input
 
 **Estimated effort:** 30 min
 
-**Prerequisites:** Story 1.10C (sops-nix infrastructure established, 9/11 features already enabled)
+**Prerequisites:**
+- Story 1.10C (sops-nix infrastructure established, 9/11 features already enabled)
+- Story 1.10D (custom packages overlay infrastructure, ccstatusline package available)
 
 **Blocks:** Story 1.12 (physical deployment benefits from claude-code package override, but not blocked)
 
@@ -1299,7 +1549,7 @@ Story 1.10D completes feature enablement by configuring flake.inputs, enabling r
 - Add flake.inputs (nix-ai-tools, catppuccin-nix): 30 min
 - Enable claude-code package (AC D): 15 min
 - Enable catppuccin theme (AC E): 45 min
-- Document ccstatusline limitation (AC F): 15 min
+- Enable ccstatusline feature (AC F): 15 min
 - Build validation (AC G): 30 min
 - Documentation Section 13 (AC H): 30 min
 
@@ -1314,12 +1564,17 @@ Story 1.10D completes feature enablement by configuring flake.inputs, enabling r
 - Documents reusable feature enablement patterns for future migration
 
 **Success Metrics:**
-- 11/11 features enabled or documented (9/11 from Story 1.10C, 2/11 in Story 1.10D)
+- 11/11 features ENABLED (all functional, none just documented)
+  - 9/11 from Story 1.10C (sops-nix patterns)
+  - 2/11 in Story 1.10E (flake.inputs: claude-code, catppuccin)
+  - 1 bonus from Story 1.10D (custom package: ccstatusline)
 - All builds passing (4/4 validated)
 - All secrets accessible via sops-nix (8 secrets for crs58, 5 for raquel)
 - Flake.inputs packages accessible (nix-ai-tools, catppuccin-nix configured)
-- Section 13 documentation complete (4 sops-nix patterns + 2 flake.inputs patterns)
-- Zero regressions from Story 1.10BA or Story 1.10C
+- Custom packages accessible (ccstatusline from Story 1.10D)
+- ccstatusline feature working (status line renders correctly)
+- Section 13 documentation complete (4 sops-nix patterns + 2 flake.inputs patterns + custom packages)
+- Zero regressions from Story 1.10BA, Story 1.10C, or Story 1.10D
 
 ---
 
