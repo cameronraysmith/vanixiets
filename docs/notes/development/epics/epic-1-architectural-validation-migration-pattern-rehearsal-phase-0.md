@@ -1361,6 +1361,123 @@ ccstatusline chosen as proof-of-concept because:
 
 ---
 
+## Story 1.10DA: Validate Overlay Architecture Preservation with pkgs-by-name Integration
+
+**Dependencies:** Story 1.10D (done) - pkgs-by-name pattern validated for custom packages
+
+**Blocks:** Epic 1 completion checkpoint (ensures ALL 5 overlay layers validated before Epic 2-6)
+
+As a system administrator,
+I want to validate that infra's overlay architecture (multi-channel access, hotfixes, overrides, flake input overlays) is preserved when integrating with pkgs-by-name pattern,
+So that Epic 2-6 migration maintains ALL infra overlay features (stable fallbacks, hotfixes, build customizations) while gaining pkgs-by-name benefits.
+
+**Context:**
+
+Story 1.10D validated Layer 3 (custom packages) migration to pkgs-by-name-for-flake-parts. This story validates Layers 1, 2, 4, 5 (overlay architecture) are preserved and functional alongside pkgs-by-name.
+
+infra's 5-Layer Overlay Architecture (from `overlays/default.nix`):
+
+1. **inputs** (`overlays/inputs.nix`) - Multi-channel nixpkgs access (stable, patched, unstable)
+2. **hotfixes** (`overlays/infra/hotfixes.nix`) - Platform-specific stable fallbacks for broken unstable packages
+3. **packages** (`overlays/packages/`) - Custom derivations [MIGRATED TO pkgs-by-name in Story 1.10D]
+4. **overrides** (`overlays/overrides/`) - Per-package build modifications
+5. **flakeInputs** - Overlays from flake inputs (nuenv, jujutsu, etc.)
+
+drupol-dendritic-infra proves overlays + pkgs-by-name coexist (see `modules/flake-parts/nixpkgs.nix` lines 19-37 showing traditional overlays array + pkgsDirectory for custom packages in the same perSystem configuration).
+
+This story validates the hybrid architecture works in test-clan, ensuring Epic 2-6 migration can confidently preserve ALL infra overlay functionality while adopting pkgs-by-name for custom packages.
+
+**Acceptance Criteria:**
+
+**A. Validate Multi-Channel Access (Layer 1) - 30 min:**
+
+1. Document `overlays/inputs.nix` pattern providing multi-channel access (stable, patched, unstable)
+2. Test stable channel access in test-clan context (`pkgs.stable.*` references)
+3. Test unstable channel access in test-clan context (`pkgs.unstable.*` explicit references)
+4. Confirm multi-channel access works alongside pkgs-by-name packages (no conflicts)
+5. Document multi-channel access pattern in Section 13.2 of test-clan-validated-architecture.md
+
+**B. Validate Hotfixes Layer (Layer 2) - 20 min:**
+
+1. Review `overlays/infra/hotfixes.nix` pattern (platform-specific stable fallbacks)
+2. Document hotfix pattern: when unstable breaks, fallback to `pkgs.stable.*` version
+3. Verify hotfix pattern is compatible with pkgs-by-name integration (no conflicts)
+4. Document hotfix preservation strategy in Section 13.2
+
+**C. Validate Overrides Layer (Layer 4) - 20 min:**
+
+1. Review `overlays/overrides/` pattern (per-package build modifications using overrideAttrs)
+2. Document override pattern examples (build flags, test disabling, dependency patches)
+3. Verify override pattern is compatible with pkgs-by-name integration (no conflicts)
+4. Document override preservation strategy in Section 13.2
+
+**D. Validate Flake Input Overlays (Layer 5) - 20 min:**
+
+1. Review flakeInputs overlay pattern (overlays from `inputs.nuenv`, `inputs.jj`, etc.)
+2. Document flake input overlay examples (nuenv devshell overlay, jujutsu VCS overlay)
+3. Verify flake input overlays are compatible with pkgs-by-name integration (no conflicts)
+4. Document flake input overlay preservation strategy in Section 13.2
+
+**E. Integration Validation (Hybrid Architecture) - 20 min:**
+
+1. Verify drupol hybrid pattern (overlays array + pkgsDirectory) applicable to test-clan
+2. Document how overlays array and pkgsDirectory coexist in same perSystem configuration
+3. Test no conflicts between overlay merging and pkgs-by-name auto-discovery
+4. Confirm ALL 5 layers functional in test-clan (multi-channel, hotfixes, custom packages, overrides, flake inputs)
+5. Document hybrid architecture integration in Section 13.2
+
+**F. Documentation - Section 13.2: Overlay Architecture Preservation - 30 min:**
+
+1. Create Section 13.2 "Overlay Architecture Preservation" in test-clan-validated-architecture.md
+2. Document 5-layer architecture model with descriptions (inputs, hotfixes, packages, overrides, flakeInputs)
+3. Explain overlay + pkgs-by-name coexistence using drupol hybrid pattern
+4. Provide code examples for each overlay layer:
+   - Multi-channel access: `pkgs.stable.packageName` vs `pkgs.unstable.packageName`
+   - Hotfixes: `stable.packageName` fallback when unstable breaks
+   - Overrides: `overrideAttrs` pattern for build modifications
+   - Flake input overlays: nuenv devshell overlay, jujutsu VCS overlay
+5. Document Epic 2-6 migration strategy: overlays preserved as-is, custom packages migrate to pkgs-by-name
+6. Link to drupol reference implementation and infra overlay architecture files
+
+**Prerequisites:**
+- Story 1.10D (done): pkgs-by-name pattern validated, ccstatusline working in test-clan
+
+**Blocks:**
+- Epic 1 checkpoint: Complete overlay architecture validation required for Epic 2-6 GO decision
+
+**Estimated Effort:** 1.5-2 hours
+
+**Risk Level:** Low (overlays already working in infra, validating preservation only, drupol proves pattern viable)
+
+**Strategic Value:**
+
+- **Architectural Completeness**: Achieves 95% Epic 1 coverage by validating ALL 5 overlay layers
+- **Migration Confidence**: Proves Epic 2-6 migration retains ALL infra features (stable fallbacks, hotfixes, customizations)
+- **Hybrid Architecture Validation**: Confirms overlays + pkgs-by-name coexist per drupol reference
+- **Documentation**: Creates comprehensive Section 13.2 overlay preservation guide for Epic 2-6 teams
+- **Risk Reduction**: Removes last architectural uncertainty before Epic 2-6 (no feature loss)
+
+**Success Metrics:**
+
+- All 5 overlay layers documented in test-clan context with code examples
+- Multi-channel access pattern explained (`pkgs.stable.*`, `pkgs.unstable.*`)
+- Hotfixes, overrides, flake input overlays preservation strategies documented
+- Section 13.2 provides comprehensive overlay architecture guide (5-layer model + hybrid pattern)
+- drupol hybrid pattern (overlays + pkgs-by-name) validated applicable to test-clan
+- Epic 1 complete: 95% architectural coverage achieved (ALL infra patterns validated)
+
+**References:**
+
+- **Primary**: `~/projects/nix-workspace/drupol-dendritic-infra/modules/flake-parts/nixpkgs.nix` (hybrid pattern, lines 19-37)
+- **infra overlays**: `~/projects/nix-workspace/infra/overlays/` (5-layer architecture source)
+  - `overlays/default.nix` - Architecture documentation and layer composition (lines 1-77)
+  - `overlays/inputs.nix` - Multi-channel access implementation (Layer 1)
+  - `overlays/infra/hotfixes.nix` - Platform-specific stable fallbacks (Layer 2)
+  - `overlays/overrides/` - Per-package build modifications (Layer 4)
+- **test-clan target**: `~/projects/nix-workspace/test-clan/` (validation environment)
+
+---
+
 ## Story 1.10E: Enable Features Using sops-nix Secrets and Flake Inputs
 
 **⚠️ UPDATED STORY - Feature Enablement (Unblocked by Story 1.10D)**
