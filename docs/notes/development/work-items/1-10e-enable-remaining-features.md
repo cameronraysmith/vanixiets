@@ -2080,7 +2080,7 @@ nix eval .#darwinConfigurations.blackphos.pkgs.stable.hello.version
 
 ### Context Reference
 
-- Context file: `docs/notes/development/work-items/1-10e-enable-remaining-features.context.xml` (will be generated via story-context workflow)
+- Context file: `docs/notes/development/work-items/1-10e-enable-remaining-features.context.xml` (generated 2025-11-16 via story-context workflow)
 
 ### Agent Model Used
 
