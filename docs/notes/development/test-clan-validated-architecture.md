@@ -2130,32 +2130,52 @@ $ nix flake show 2>&1 | grep "checks.aarch64-darwin"
 6. **CRITICAL: Darwin/NixOS Configurations Need Explicit Overlays**: perSystem pkgs configuration does NOT automatically propagate to machine configurations.
    - **Symptom**: `error: attribute 'ccstatusline' missing` when building blackphos/cinnabar
    - **Root Cause**: nix-darwin and NixOS modules have their own `nixpkgs.overlays` configuration
-   - **Solution**: Explicitly import all overlay layers in each machine configuration's `nixpkgs.overlays` array
-   - **Pattern**: Replicate overlay imports in `modules/machines/{darwin,nixos}/*/default.nix`:
+   - **Solution**: Export `flake.overlays.default` from `modules/nixpkgs.nix` (drupol pattern)
+   - **Pattern**: Define once in `modules/nixpkgs.nix`, reference in all machine configs:
      ```nix
-     nixpkgs.overlays = [
-       (import ../../../../overlays/inputs.nix inputs)
-       (import ../../../../overlays/hotfixes.nix)
-       (final: prev: lib.packagesFromDirectoryRecursive {
-         callPackage = final.callPackage;
-         directory = ../../../../pkgs/by-name;
-       })
-       (import ../../../../overlays/overrides.nix)
-       inputs.nuenv.overlays.nuenv
-       inputs.lazyvim.overlays.nvim-treesitter-main
-     ];
-     ```
-   - **Impact**: EVERY machine configuration in Epic 2-6 needs this pattern
-   - **Validation**: blackphos and cinnabar now build successfully with all 5 layers
+     # modules/nixpkgs.nix (define once)
+     flake.overlays.default = final: prev:
+       let
+         layer1 = import ../overlays/inputs.nix inputs;
+         layer2 = import ../overlays/hotfixes.nix;
+         layer4 = import ../overlays/overrides.nix;
+         layer5-nuenv = inputs.nuenv.overlays.nuenv;
+         layer5-lazyvim = inputs.lazyvim.overlays.nvim-treesitter-main;
+         layer3 = withSystem prev.stdenv.hostPlatform.system (
+           { config, ... }: config.packages or {}
+         );
+       in
+       (layer1 final prev) // (layer2 final prev) // layer3
+       // (layer4 final prev) // (layer5-nuenv final prev)
+       // (layer5-lazyvim final prev);
 
-**Actual Implementation Time**: ~120 minutes (including critical fix)
+     # blackphos/default.nix (reference once)
+     nixpkgs.overlays = [ inputs.self.overlays.default ];
+
+     # cinnabar/default.nix (reference once)
+     nixpkgs.overlays = [ inputs.self.overlays.default ];
+     ```
+   - **DRY Benefits**:
+     - Before: 13 lines × N machines = duplication hell
+     - After: 1 line per machine config (DRY!)
+     - Epic 2-6: 6 machines × 13 lines saved = 78 lines eliminated
+   - **Impact**: EVERY machine configuration uses single reference
+   - **Validation**: blackphos and cinnabar build successfully, all checks pass
+
+**Actual Implementation Time**: ~140 minutes (including critical fix + DRY refactor)
 - Overlay migration (Layers 1,2,4): ~40 min
 - Flake inputs configuration (Layer 5): ~15 min
 - Initial validation: ~15 min
 - Debugging import-tree conflicts: ~20 min
 - **Discovering and fixing machine config issue**: ~30 min
+- **DRY refactor to flake.overlays.default pattern**: ~20 min
 
-**Comparison to Estimate**: 120 min actual vs 90 min estimated (+30 min for critical machine config discovery)
+**Comparison to Estimate**: 140 min actual vs 90 min estimated (+50 min for critical discoveries and DRY refactor)
+
+**Final Commit**: `addf565` - refactor(overlays): adopt drupol pattern with flake.overlays.default
+- Eliminated 26 lines of duplication across machine configs
+- Centralized all overlay logic in modules/nixpkgs.nix
+- Established production-ready pattern for Epic 2-6
 
 #### Layer 1: Multi-Channel Nixpkgs Access (inputs overlay)
 
