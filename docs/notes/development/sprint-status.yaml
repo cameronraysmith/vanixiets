@@ -237,25 +237,22 @@ development_status:
   # Dependencies: Story 1.10D (done), Story 1.10DA (done)
   # Unblocks: Story 1.12 (GO/NO-GO decision - 95% Epic 1 coverage achieved)
   1-10db-execute-overlay-architecture-migration: done
-  # Story 1.10E: RENAMED (2025-11-16) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
+  # Story 1.10E: DONE ✅ APPROVED ✅ (2025-11-16) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
   # Previously Story 1.10D (2025-11-14), renamed during epic reordering to resolve dependency on ccstatusline package
   # Story 1.10C already enabled 9/11 features (sops-nix patterns: direct path, sops.placeholder, runtime cat, activation scripts)
   # Remaining scope: Add flake.inputs (nix-ai-tools, catppuccin-nix), enable claude-code package, catppuccin theme, ccstatusline feature
-  # Category A (5 secrets): ✅ COMPLETE in Story 1.10C (SSH signing, MCP firecrawl/huggingface, context7 N/A)
-  # Category B (3 packages): ✅ GLM wrapper complete (Story 1.10C), ❌ claude-code (Story 1.10E), ❌ ccstatusline (Story 1.10D+1.10E)
-  # Category C (3 themes): ❌ catppuccin tmux theme (Story 1.10E, flake.inputs blocked)
-  # 8 ACs: Review 1.10C implementations (A-C), enable claude-code (D), catppuccin theme (E), ccstatusline feature (F), builds (G), docs Section 13 (H)
-  # Estimated effort: 1.5-2 hours (30min flake.inputs + 15min claude-code + 45min catppuccin + 15min ccstatusline + 30min builds + 30min docs)
-  # Dependencies: Story 1.10C (sops-nix, 9/11 features), Story 1.10D (ccstatusline package)
-  # Strategic value: Completes Pattern A + sops-nix + flake.inputs validation (structure + secrets + features), Epic 2-6 reference
-  # DONE ✅ (2025-11-17) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
-  # Implementation: 6 commits in test-clan, 2 commits in infra (Section 13.3 documentation)
-  # Features enabled: claude-code package (nix-ai-tools), catppuccin tmux theme, ccstatusline integration
+  # Implementation: 7 commits total (5 test-clan, 2 infra documentation), ~2 hours (within 1.5-2h estimate)
+  # Features enabled: claude-code package (nix-ai-tools), catppuccin tmux theme (correct option structure), ccstatusline integration
   # All 8 ACs satisfied: Documentation (A-C), Features (D-F), Builds (G), Section 13.3 (H)
-  # Build validation: All 4 configurations passing (crs58, raquel, blackphos, cinnabar)
-  # Section 13.3: Complete feature enablement guide (154 lines) documenting all 7 patterns
+  # Build validation: All 4 configurations passing (crs58: 122 derivations, raquel: 105, blackphos: 177, cinnabar: 460)
+  # CRITICAL FIX: configurations.nix overlay (commit 052a2d1) - use config.flake.overlays.default for all layers
+  # Section 13.3: Complete feature enablement guide (154 lines, 7 patterns, empirical examples, Epic 2-6 migration guide)
+  # REVIEW (2025-11-16): APPROVE ✅ - Zero blocking issues, code quality 9.5/10, documentation 9/10
+  # Pattern validation: All 7 patterns coexist (sops-nix 1-4, flake.inputs 5-6, pkgs-by-name 7)
   # Epic 1 coverage: ~98% (architecture 95%, features 100%, patterns 100%)
-  # Context XML: 1,078 lines, 7 patterns, 11 features
+  # Strategic value: Completes Pattern A + sops-nix + flake.inputs validation trilogy, Epic 2-6 ready
+  # Dependencies: Story 1.10C (sops-nix ✅), Story 1.10D (ccstatusline package ✅), Story 1.10DB (overlays ✅)
+  # Context XML: 1,078 lines, 7 patterns, 11 features, empirical validation evidence
   1-10e-enable-remaining-features: done
   # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
   # Now includes type-safe home-manager architecture implementation (phases 1-5)
