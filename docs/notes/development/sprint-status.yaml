@@ -248,8 +248,15 @@ development_status:
   # Estimated effort: 1.5-2 hours (30min flake.inputs + 15min claude-code + 45min catppuccin + 15min ccstatusline + 30min builds + 30min docs)
   # Dependencies: Story 1.10C (sops-nix, 9/11 features), Story 1.10D (ccstatusline package)
   # Strategic value: Completes Pattern A + sops-nix + flake.inputs validation (structure + secrets + features), Epic 2-6 reference
-  # Context XML generated 2025-11-16 (1,086 lines, 7 patterns, 11 features, comprehensive Epic 2-6 tutorial)
-  1-10e-enable-remaining-features: in-progress
+  # DONE ✅ (2025-11-17) - Enable Remaining Features Using sops-nix Secrets and Flake Inputs
+  # Implementation: 6 commits in test-clan, 2 commits in infra (Section 13.3 documentation)
+  # Features enabled: claude-code package (nix-ai-tools), catppuccin tmux theme, ccstatusline integration
+  # All 8 ACs satisfied: Documentation (A-C), Features (D-F), Builds (G), Section 13.3 (H)
+  # Build validation: All 4 configurations passing (crs58, raquel, blackphos, cinnabar)
+  # Section 13.3: Complete feature enablement guide (154 lines) documenting all 7 patterns
+  # Epic 1 coverage: ~98% (architecture 95%, features 100%, patterns 100%)
+  # Context XML: 1,078 lines, 7 patterns, 11 features
+  1-10e-enable-remaining-features: done
   # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
   # Now includes type-safe home-manager architecture implementation (phases 1-5)
   # Implements homeHosts options with type validation, smart resolution app, CI checks
