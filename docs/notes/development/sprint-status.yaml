@@ -254,13 +254,21 @@ development_status:
   # Dependencies: Story 1.10C (sops-nix ✅), Story 1.10D (ccstatusline package ✅), Story 1.10DB (overlays ✅)
   # Context XML: 1,078 lines, 7 patterns, 11 features, empirical validation evidence
   1-10e-enable-remaining-features: done
-  # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
-  # Now includes type-safe home-manager architecture implementation (phases 1-5)
-  # Implements homeHosts options with type validation, smart resolution app, CI checks
+  # Story 1.11: Type-Safe Home-Manager Architecture [CONDITIONAL]
+  # DEFERRED (2025-11-16): Party Mode decision - empirical validation strategy
+  # Current architecture (Stories 1.8A + 1.10BA + 1.10C) proven at scale (270 pkgs, 16 modules, 4+ users)
+  # Party Mode consensus: Deploy blackphos FIRST (Story 1.12), assess type-safety necessity based on REAL evidence
+  # Re-evaluation checkpoint: Story 1.13 documentation phase (Party Mode assessment framework, epic lines 1858-1937)
+  # Decision criteria (epic lines 1894-1914):
+  #   GO: Deployment reveals typos/errors, machine-specific configs needed, homeHosts improves dendritic patterns
+  #   MODIFY: Some elements valuable (CI checks) but not full homeHosts pattern
+  #   SKIP: No issues encountered, current architecture elegant and maintainable, homeHosts adds unnecessary complexity
+  # IF Story 1.12 smooth → permanent skip (current architecture sufficient for Epic 2-6)
+  # IF Story 1.12 reveals issues → execute Story 1.11 before Story 1.14 GO/NO-GO
+  # Estimated effort: 10-16 hours (if executed after Story 1.13 assessment determines GO/MODIFY)
   # Reference: docs/notes/development/home-manager-type-safe-architecture.md
-  # Updated effort: 12-18 hours (9-14h architecture + 3-4h documentation)
-  # Establishes production-ready pattern for Epic 2+ (all 6 machines)
-  1-11-refine-home-manager-architecture-and-document-patterns: backlog
+  # Strategic value: Production-ready type-safe pattern IF empirical evidence proves necessity
+  1-11-refine-home-manager-architecture-and-document-patterns: deferred
   # Story 1.12: Deploy blackphos and Integrate into Zerotier Network
   # Physical deployment to blackphos laptop, zerotier peer configuration (darwin)
   # Heterogeneous network validation (nixos ↔ nix-darwin: cinnabar + electrum + blackphos)
