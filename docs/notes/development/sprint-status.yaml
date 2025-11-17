@@ -249,7 +249,7 @@ development_status:
   # Dependencies: Story 1.10C (sops-nix, 9/11 features), Story 1.10D (ccstatusline package)
   # Strategic value: Completes Pattern A + sops-nix + flake.inputs validation (structure + secrets + features), Epic 2-6 reference
   # Context XML generated 2025-11-16 (1,086 lines, 7 patterns, 11 features, comprehensive Epic 2-6 tutorial)
-  1-10e-enable-remaining-features: ready-for-dev
+  1-10e-enable-remaining-features: in-progress
   # Story 1.11: ENHANCED (2025-11-12) - Refine home-manager architecture and document patterns
   # Now includes type-safe home-manager architecture implementation (phases 1-5)
   # Implements homeHosts options with type validation, smart resolution app, CI checks
