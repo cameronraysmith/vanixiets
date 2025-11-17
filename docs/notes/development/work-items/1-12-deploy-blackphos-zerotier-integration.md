@@ -636,6 +636,25 @@ Create dev notes section in work item with following content:
 - Configuration build: [X minutes]
 - Activation: [Y minutes]
 - Total: [Z minutes]
+
+### Multi-Machine Workflow
+- Preparation machine: stibnite (build verification, clan machines update, git sync)
+- Deployment target: blackphos (darwin-rebuild execution, zero-regression validation)
+- Network validation: stibnite (SSH to cinnabar/electrum for reverse connectivity tests)
+- Machine switches: 3-4 total (stibnite → blackphos → stibnite → blackphos/stibnite)
+
+### Migration Pattern (infra → test-clan)
+- Current state: blackphos on infra repo config
+- Target state: blackphos on test-clan config
+- Toggle mechanism: darwin-rebuild switch --flake <config>
+- Simplified approach: Both configs build successfully → toggle is reliable
+- No elaborate rollback procedure needed (Nix principle: if build succeeds, deployment succeeds)
+- Simple recovery: darwin-rebuild switch --flake infra#blackphos OR darwin-rebuild --rollback
+
+### Fleet Synchronization
+- cinnabar updated: clan machines update cinnabar (crs58 home-manager changes)
+- electrum updated: clan machines update electrum (crs58 home-manager changes)
+- Ensures entire test-clan fleet current before blackphos integration
 ```
 
 **2. Zerotier Darwin Integration Documentation:**
@@ -794,77 +813,106 @@ Create dev notes section in work item with following content:
 
 ## Task Groups
 
-### Task Group 1: Pre-Deployment Preparation and Validation
+### Task Group 0: Preparation and System Updates
 
-**Objective:** Ensure blackphos configuration is production-ready before physical deployment.
+**Objective:** Verify builds, update cinnabar/electrum with recent crs58 home-manager changes, sync repositories across machines.
+
+**Multi-Machine Context:**
+- Execution machine: stibnite (has clan CLI setup, can SSH to cinnabar/electrum)
+- Target machine: blackphos (deployment target, needs git sync)
+- Current state: blackphos runs infra repo config, will migrate to test-clan config
 
 **Tasks:**
 
-1. **Verify Configuration Builds:**
+**Machine: stibnite**
+
+1. **Verify test-clan builds successfully:**
    ```bash
    cd ~/projects/nix-workspace/test-clan
+   git checkout phase-0-validation
+   git pull origin phase-0-validation
+
+   # Verify blackphos config builds
    nix build .#darwinConfigurations.blackphos.system
-   # Expected: Build succeeds, result symlink created
-   ```
 
-2. **Verify Home-Manager Builds:**
-   ```bash
+   # Verify home-manager builds
    nix build .#homeConfigurations.aarch64-darwin.crs58.activationPackage
+   # Expected: 122 derivations
+
    nix build .#homeConfigurations.aarch64-darwin.raquel.activationPackage
-   # Expected: Both builds succeed
+   # Expected: 105 derivations
    ```
 
-3. **Run Test Suite:**
+2. **Update cinnabar with crs58 home-manager changes:**
    ```bash
-   nix flake check
-   # Expected: All tests pass
+   clan machines update cinnabar
+
+   # Verify cinnabar operational post-update
+   ssh cameron@cinnabar "echo 'cinnabar updated successfully'"
    ```
 
-4. **Review Configuration for Darwin-Specific Issues:**
-   - Check launchd services configured correctly
-   - Verify homebrew casks list complete
-   - Confirm TouchID sudo enabled
-   - Review user UIDs (550, 551) match expectations
+3. **Update electrum with crs58 home-manager changes:**
+   ```bash
+   clan machines update electrum
 
-5. **Document Pre-Deployment State:**
-   - Current blackphos configuration (if migrating from old system)
-   - Backup strategy (if needed)
-   - Rollback plan (if deployment fails)
+   # Verify electrum operational post-update
+   ssh testuser@electrum "echo 'electrum updated successfully'"
+   ```
+
+4. **Note commit hash for blackphos sync:**
+   ```bash
+   git log --oneline -1
+   # Record commit hash - blackphos must sync to same commit
+   ```
+
+**Machine: blackphos**
+
+5. **Sync test-clan repository to blackphos:**
+   ```bash
+   cd ~/projects/nix-workspace/test-clan
+   git checkout phase-0-validation
+   git pull origin phase-0-validation
+
+   # Verify same commit as stibnite
+   git log --oneline -1
+   ```
 
 **Validation Gates:**
-- [ ] darwinConfigurations.blackphos.system builds successfully
-- [ ] crs58 home-manager builds successfully (122 derivations)
-- [ ] raquel home-manager builds successfully (105 derivations)
-- [ ] All tests passing (nix flake check)
-- [ ] Configuration reviewed for platform-specific issues
-- [ ] Pre-deployment state documented
+- [ ] blackphos config builds successfully on stibnite
+- [ ] crs58 home-manager builds (122 derivations)
+- [ ] raquel home-manager builds (105 derivations)
+- [ ] cinnabar updated and functional (SSH verification succeeds)
+- [ ] electrum updated and functional (SSH verification succeeds)
+- [ ] Git synced between stibnite and blackphos (same commit hash)
 
-**Estimated effort:** 30 minutes
+**Migration Note:**
+blackphos currently runs infra repo config. darwin-rebuild switch will toggle to test-clan config. Both configs build successfully → toggle between them is reliable. No elaborate rollback procedure needed (Nix principle: if build succeeds, activation succeeds).
+
+**Estimated effort:** 45 minutes
 
 ---
 
 ### Task Group 2: Physical Deployment to Blackphos Hardware
 
-**Objective:** Deploy configuration to physical blackphos laptop and validate zero regressions.
+**Objective:** Deploy test-clan configuration to physical blackphos laptop.
+
+**Multi-Machine Context:**
+- Execution machine: blackphos (REQUIRED - darwin-rebuild must run on target)
+- Prerequisites: Task Group 0 complete (git synced, builds verified)
+- Migration: Switching from infra config → test-clan config
 
 **Tasks:**
 
-1. **Execute Deployment:**
+1. **Execute deployment:**
    ```bash
-   # On blackphos laptop
+   # On blackphos
    cd ~/projects/nix-workspace/test-clan
    darwin-rebuild switch --flake .#blackphos
    ```
 
-   Observe:
-   - Activation script output
-   - Any error messages
-   - Service start confirmations
-   - Deployment duration
-
-2. **Post-Deployment System Validation:**
+2. **Immediate validation:**
    ```bash
-   # Verify system state
+   # Verify system functional
    darwin-rebuild --version
    # Expected: nix-darwin version displayed
 
@@ -872,28 +920,21 @@ Create dev notes section in work item with following content:
    hostname
    # Expected: blackphos
 
-   # Verify platform
-   uname -m
-   # Expected: arm64
-   ```
-
-3. **Service Validation:**
-   ```bash
-   # List running launchd services
+   # Verify services started
    launchctl list | grep -E "(homebrew|nix|sshd)"
    # Expected: Key services running
 
-   # Verify homebrew activation
+   # Verify homebrew casks installed
    brew list --cask
-   # Expected: All 8 casks installed
+   # Expected: All 8 casks present
    ```
 
-4. **Zero-Regression Validation (crs58):**
+3. **Zero-Regression Validation (crs58):**
 
    **LazyVim:**
    ```bash
    nvim --version
-   # Expected: Neovim v0.10.x with LazyVim config
+   # Expected: Neovim v0.10.x
 
    nvim test.txt
    # Expected: LazyVim UI loads, plugins functional
@@ -906,59 +947,49 @@ Create dev notes section in work item with following content:
 
    cd /tmp && git init test-repo && cd test-repo
    git commit --allow-empty -S -m "test signing"
-   # Expected: Commit succeeds with GPG signature
+   # Expected: Commit succeeds with signature
    ```
 
    **Claude Code:**
    ```bash
    cc --version
    # Expected: Claude Code version displayed
-
-   # Verify ccstatusline integration
-   cc # Launch Claude Code
-   # Expected: Status line displays with ccstatusline formatting
    ```
 
    **Tmux + Catppuccin:**
    ```bash
    tmux new-session -d -s test
-   tmux list-sessions
-   # Expected: test session listed
-
    tmux attach -t test
-   # Expected: Catppuccin theme applied (visual verification)
+   # Expected: Catppuccin theme applied
    tmux kill-session -t test
    ```
 
    **Atuin:**
    ```bash
    atuin status
-   # Expected: Atuin configured, sync status displayed
+   # Expected: Atuin configured
 
    atuin sync
-   # Expected: Sync succeeds (or reports no changes)
+   # Expected: Sync succeeds
    ```
 
-5. **Zero-Regression Validation (raquel):**
+4. **Zero-Regression Validation (raquel):**
 
-   Switch to raquel user:
    ```bash
+   # Switch to raquel user
    su - raquel
    ```
 
    **LazyVim:**
    ```bash
    nvim --version
-   # Expected: Neovim v0.10.x with LazyVim config
+   # Expected: Neovim v0.10.x
    ```
 
    **Git Configuration:**
    ```bash
    git config --get user.name
    # Expected: Raquel Smith (or configured name)
-
-   git config --get user.email
-   # Expected: raquel's email from config
    ```
 
    **Shell Environment:**
@@ -967,7 +998,7 @@ Create dev notes section in work item with following content:
    # Expected: /run/current-system/sw/bin/zsh
 
    starship --version
-   # Expected: Starship prompt version displayed
+   # Expected: Starship prompt version
    ```
 
    **Tmux:**
@@ -978,7 +1009,7 @@ Create dev notes section in work item with following content:
    tmux kill-session -t test
    ```
 
-6. **Secrets Validation:**
+5. **Secrets Validation:**
    ```bash
    # Verify /run/secrets/ populated
    ls -la /run/secrets/crs58/
@@ -992,27 +1023,25 @@ Create dev notes section in work item with following content:
    # Expected: 0400, owned by crs58 (UID 550)
    ```
 
-7. **Performance Validation:**
-   - System responsiveness: No slowdowns, no freezes
-   - Application launch times: Acceptable (LazyVim, Claude Code)
-   - Memory usage: Within normal bounds
-   - Disk usage: No unexpected growth
+**If Issues Encountered:**
 
-8. **Document Deployment Results:**
-   - Deployment duration
-   - Any errors encountered (and resolutions)
-   - Manual steps required (if any)
-   - Zero-regression checklist completion
+If deployment fails or regressions found, toggle back to infra config:
+```bash
+darwin-rebuild switch --flake ~/path/to/infra#blackphos
+# Or use previous generation rollback
+darwin-rebuild --rollback
+```
+
+Simple toggle - no elaborate rollback procedure needed.
 
 **Validation Gates:**
 - [ ] darwin-rebuild switch succeeds without errors
 - [ ] All launchd services running
 - [ ] All homebrew casks installed
 - [ ] crs58 daily workflows functional (LazyVim, git signing, Claude Code, tmux, atuin)
-- [ ] raquel daily workflows functional (LazyVim, shell, development tools)
+- [ ] raquel daily workflows functional (LazyVim, shell, development tools, tmux)
 - [ ] sops-nix secrets decrypted and accessible
 - [ ] Performance acceptable (no regressions)
-- [ ] Deployment results documented
 
 **Estimated effort:** 1-1.5 hours
 
@@ -1021,6 +1050,11 @@ Create dev notes section in work item with following content:
 ### Task Group 3: Zerotier Darwin Integration
 
 **Objective:** Configure zerotier on blackphos (darwin) and join test-clan network as peer.
+
+**Multi-Machine Context:**
+- Primary execution: blackphos (zerotier service installation, network join)
+- Verification: stibnite (SSH to cinnabar controller for peer verification)
+- Reason: stibnite has clan CLI setup and can SSH to cinnabar/electrum
 
 **Tasks:**
 
@@ -1180,6 +1214,13 @@ Create dev notes section in work item with following content:
 ### Task Group 4: Network and Integration Validation
 
 **Objective:** Validate heterogeneous network (nixos ↔ nix-darwin), cross-platform SSH, clan vars/secrets, and document findings.
+
+**Multi-Machine Context:**
+- Connectivity tests FROM blackphos: blackphos (ping/SSH to cinnabar/electrum)
+- Connectivity tests TO blackphos: stibnite (SSH to cinnabar/electrum, run ping/SSH to blackphos)
+- Reason: stibnite NOT on zerotier network but CAN SSH to cinnabar/electrum
+- Secrets validation: blackphos (validate /run/secrets/ on darwin)
+- Documentation: stibnite or blackphos (flexible)
 
 **Tasks:**
 
@@ -2339,34 +2380,33 @@ cat ~/.ssh/allowed_signers
 
 ## Estimated Effort
 
-**Total Estimated Effort:** 4-6 hours
+**Total Estimated Effort:** 4.5-6 hours
 
 **Breakdown:**
 
-**Task Group 1: Pre-Deployment (30 min):**
+**Task Group 0: Preparation and System Updates (45 min):**
 - Verify configuration builds (15 min)
-- Review darwin-specific configs (10 min)
-- Document pre-deployment state (5 min)
+- clan machines update cinnabar + electrum (20 min)
+- Git sync to blackphos (10 min)
 
 **Task Group 2: Physical Deployment (1-1.5h):**
 - Execute deployment (30 min)
-- Post-deployment system validation (15 min)
-- Zero-regression validation (crs58 + raquel) (30 min)
-- Document deployment results (15 min)
+- Zero-regression validation (crs58 + raquel) (30-45 min)
+- Secrets validation (15 min)
 
 **Task Group 3: Zerotier Darwin Integration (2-3h):**
-- Research options (A/B/C) (30 min)
-- Implement chosen approach (1h)
-- Verify service and network join (30 min)
-- Document approach and challenges (30 min)
+- Research and implement zerotier approach (1-1.5h)
+- Join network and verify (30 min)
+- Peer verification from stibnite (30 min)
+- Document approach (30 min)
 
 **Task Group 4: Network/Integration Validation (1.5-2h):**
 - Heterogeneous network connectivity (30 min)
 - Cross-platform SSH validation (30 min)
-- Clan vars/secrets validation on darwin (30 min)
+- Multi-machine coordination (stibnite SSH orchestration) (30 min)
 - Integration findings documentation (30 min)
 
-**Contingency:** +1h for unexpected issues (darwin platform quirks, zerotier challenges)
+**Contingency:** +30 min for unexpected issues
 
 **Risk Factors:**
 - Medium risk: First physical deployment (real hardware, user workflows critical)
