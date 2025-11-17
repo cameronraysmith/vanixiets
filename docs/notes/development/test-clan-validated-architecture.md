@@ -1973,21 +1973,30 @@ This hybrid architecture (validated via drupol-dendritic-infra reference impleme
 - Integration: Import overlays in `modules/nixpkgs.nix` overlays array
 - Pattern: Separate files per layer, imported sequentially
 
-**File Structure Created**:
+**File Structure Created** (Final Dendritic Pattern):
 
 ```
 test-clan/
-├── overlays/
-│   ├── inputs.nix      # Layer 1: Multi-channel access (58 lines, adapted from infra)
-│   ├── hotfixes.nix    # Layer 2: Platform hotfixes (51 lines, direct copy from infra)
-│   └── overrides.nix   # Layer 4: Package overrides (20 lines, placeholder)
 ├── modules/
-│   └── nixpkgs.nix     # Integration point (overlays array + pkgsDirectory)
+│   └── nixpkgs/                    # Dendritic subdirectory (Story 1.10DB)
+│       ├── default.nix             # Integration + flake.overlays.default export (40 lines)
+│       ├── per-system.nix          # perSystem configuration (38 lines)
+│       └── _overlays/              # Pure overlay functions (underscore excludes from import-tree)
+│           ├── inputs.nix          # Layer 1: Multi-channel access (58 lines)
+│           ├── hotfixes.nix        # Layer 2: Platform hotfixes (51 lines)
+│           └── overrides.nix       # Layer 4: Package overrides (20 lines)
 ├── pkgs/
 │   └── by-name/
-│       └── ccstatusline/  # Layer 3: Custom packages (Story 1.10D)
-└── flake.nix           # Layer 5: nuenv flake input added
+│       └── ccstatusline/           # Layer 3: Custom packages (Story 1.10D)
+└── flake.nix                       # Layer 5: nuenv flake input added
 ```
+
+**Dendritic Benefits**:
+- ✅ **Single responsibility**: Each file has clear purpose (40 lines max)
+- ✅ **Auto-discovery**: import-tree imports modules/nixpkgs/* automatically
+- ✅ **Grouped**: Related files together (nixpkgs config + overlays)
+- ✅ **Clean separation**: default.nix (integration) vs per-system.nix (config) vs _overlays/* (layers)
+- ✅ **Maintainable**: Add Layer 6? Just create _overlays/layer6.nix
 
 **Actual Migrated Code** (test-clan/overlays/inputs.nix):
 
@@ -2162,20 +2171,27 @@ $ nix flake show 2>&1 | grep "checks.aarch64-darwin"
    - **Impact**: EVERY machine configuration uses single reference
    - **Validation**: blackphos and cinnabar build successfully, all checks pass
 
-**Actual Implementation Time**: ~140 minutes (including critical fix + DRY refactor)
+**Actual Implementation Time**: ~155 minutes (including critical fix + 2 refactors)
 - Overlay migration (Layers 1,2,4): ~40 min
 - Flake inputs configuration (Layer 5): ~15 min
 - Initial validation: ~15 min
 - Debugging import-tree conflicts: ~20 min
 - **Discovering and fixing machine config issue**: ~30 min
 - **DRY refactor to flake.overlays.default pattern**: ~20 min
+- **Dendritic subdirectory refactor**: ~15 min
 
-**Comparison to Estimate**: 140 min actual vs 90 min estimated (+50 min for critical discoveries and DRY refactor)
+**Comparison to Estimate**: 155 min actual vs 90 min estimated (+65 min for critical discoveries and architectural refinements)
 
-**Final Commit**: `addf565` - refactor(overlays): adopt drupol pattern with flake.overlays.default
-- Eliminated 26 lines of duplication across machine configs
-- Centralized all overlay logic in modules/nixpkgs.nix
-- Established production-ready pattern for Epic 2-6
+**Final Commits**:
+1. `2ae78d4` - feat(overlays): migrate 5-layer overlay architecture from infra
+2. `3213bce` - fix(overlays): add 5-layer architecture to darwin/nixos configs (CRITICAL)
+3. `addf565` - refactor(overlays): adopt drupol pattern with flake.overlays.default (DRY)
+4. `e180bdb` - refactor(nixpkgs): dendritic subdirectory structure (FINAL)
+
+**Architectural Evolution**:
+- **Phase 1**: Root-level overlays/ + modules/nixpkgs.nix (scattered)
+- **Phase 2**: flake.overlays.default for DRY machine configs (centralized)
+- **Phase 3**: modules/nixpkgs/* dendritic subdirectory (organized, production-ready)
 
 #### Layer 1: Multi-Channel Nixpkgs Access (inputs overlay)
 
