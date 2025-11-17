@@ -261,8 +261,27 @@ development_status:
   # Updated effort: 12-18 hours (9-14h architecture + 3-4h documentation)
   # Establishes production-ready pattern for Epic 2+ (all 6 machines)
   1-11-refine-home-manager-architecture-and-document-patterns: backlog
-  # Story 1.12: GO/NO-GO decision based on expanded validation (nixos + darwin + transformation)
-  1-12-execute-go-no-go-decision-framework: backlog
+  # Story 1.12: Deploy blackphos and Integrate into Zerotier Network
+  # Physical deployment to blackphos laptop, zerotier peer configuration (darwin)
+  # Heterogeneous network validation (nixos ↔ nix-darwin: cinnabar + electrum + blackphos)
+  # Prerequisites: Stories 1.10BA + 1.10C (hard), Story 1.11 (soft/optional)
+  # Estimated effort: 4-6 hours (deployment, zerotier darwin, network validation)
+  # Strategic value: Proves heterogeneous networking, validates multi-platform coordination
+  1-12-deploy-blackphos-zerotier-integration: backlog
+  # Story 1.13: Document Integration Findings and Architectural Patterns
+  # Consolidate Epic 1 learnings: terraform+clan, dendritic patterns, darwin integration, heterogeneous networking
+  # Pattern confidence assessment (proven/needs-testing/uncertain), production refactoring recommendations
+  # Prerequisites: Story 1.12 (blackphos deployed, heterogeneous networking validated)
+  # Estimated effort: 3-4 hours (documentation consolidation)
+  # Strategic value: Comprehensive blueprint for Epic 2-6, captures institutional knowledge
+  1-13-document-integration-findings: backlog
+  # Story 1.14: Execute GO/NO-GO Decision Framework
+  # Evaluate Epic 1 Phase 0 results against decision criteria (infrastructure, patterns, darwin, networking, transformation)
+  # Decision: GO (proceed Epic 2+), CONDITIONAL GO (proceed with cautions), NO-GO (resolve blockers)
+  # Prerequisites: Story 1.13 (integration findings documented)
+  # Estimated effort: 1-2 hours (decision evaluation)
+  # Decision criteria: 95% coverage (achieved), all patterns validated, high confidence for production
+  1-14-execute-go-no-go-decision: backlog
   epic-1-retrospective: optional
 
   # Epic 2: VPS Infrastructure Foundation (Phase 1 - cinnabar)
