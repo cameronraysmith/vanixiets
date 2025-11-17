@@ -1503,9 +1503,283 @@ nix build .#checks.aarch64-darwin.home-configurations-exposed
 - Template source: Story 1.10D (2138 lines, 9.5/10 clarity, all 9 ACs satisfied, 4 gates PASS)
 - Work item length: 1,563 lines (within target 1,400-1,600 range, proportional to 6 ACs vs Story 1.10D's 9 ACs)
 
+### 2025-11-16 - Senior Developer Review #1 - BLOCKED
+
+- **Outcome:** BLOCKED - AC-F (Section 13.2 documentation) completely missing
+- **Code Implementation:** 83% complete (5/6 ACs satisfied) - overlays migrated and functional
+- **Validation:** All layer tests PASS, zero regressions, builds succeed
+- **Blocker:** Section 13.2 documentation does NOT exist (0 lines written)
+- **Key Findings:**
+  - HIGH-1: AC-F missing - no overlay architecture documentation in test-clan architecture.md
+  - MED-1: Directory structure deviation - `/overlays/` vs `/modules/flake-parts/overlays/` (valid but differs from spec)
+  - MED-2: Task tracking failure - 17 tasks complete but all marked `[ ]`
+- **Evidence:**
+  - Layer 1: stable/unstable channels validated (ripgrep 14.1.1 vs 15.1.0)
+  - Layer 2: micromamba hotfix validated (v1.5.8 from stable)
+  - Layer 3: ccstatusline builds (Story 1.10D regression pass)
+  - Layer 4: overrides infrastructure validated (builds pass)
+  - Layer 5: nuenv configured (6 overlays active)
+  - Hybrid pattern: overlays + pkgsDirectory coexist (drupol pattern proven)
+- **Action Required:**
+  - Create Section 13.2 in test-clan/docs/notes/development/architecture.md (30-60min)
+  - Include: Pattern Overview, 5-Layer Examples, Build Validation, Migration Guide, Lessons Learned
+  - Target: Match Story 1.10D Section 13.1 quality (467 lines, 9.5/10 clarity)
+- **Impact:** Epic 1 GO/NO-GO decision (Story 1.12) depends on this documentation
+- **Status:** Story remains "in-progress", cannot proceed to "done" until AC-F complete
+
 ---
 
 ## Senior Developer Review (AI)
 
-<!-- Placeholder for post-implementation review -->
-<!-- Will be populated after Story 1.10DB implementation complete -->
+**Reviewer:** Dev
+**Date:** 2025-11-16
+**Outcome:** BLOCKED
+**Justification:** AC-F (Section 13.2 documentation) completely missing (0 lines written). All code implementation present and functional, but critical documentation deliverable absent.
+
+### Summary
+
+Technical implementation is 83% complete (5/6 ACs satisfied) with all overlay layers functional and validated. However, Story 1.10DB is **BLOCKED** due to complete absence of AC-F (Section 13.2 empirical documentation) which was the PRIMARY strategic deliverable distinguishing this story from Story 1.10DA.
+
+**Code Quality:** Excellent (clean overlay implementations, proper layer ordering, zero regressions)
+**Architecture:** Validated (hybrid pattern works, all 5 layers coexist with pkgs-by-name)
+**Documentation:** Failed (AC-F completely missing - BLOCKER)
+
+### Outcome
+
+**BLOCKED** - AC-F (Section 13.2 documentation) completely missing
+
+**Critical Issue:** Story 1.10DB mission statement (line 39): "Execute ACTUAL overlay migration from infra to test-clan, validate all 5 layers work, prove hybrid pattern (overlays + pkgs-by-name) coexists, **update Section 13.2 with empirical evidence**."
+
+The code migration is complete and functional. The documentation is completely absent. This violates Epic 1's core principle: "Architectural Validation via Pattern Rehearsal" requires BOTH implementation AND documentation based on that implementation.
+
+### Key Findings
+
+#### HIGH Severity Issues (BLOCKERS)
+
+**[HIGH-1] AC-F COMPLETELY MISSING: Section 13.2 Overlay Architecture Documentation (0 lines written)**
+- **Evidence:** Searched test-clan/docs/notes/development/architecture.md (976 lines total)
+  - `grep -n "13\.2"` → No results
+  - `grep -n "Overlay Architecture"` → No results
+  - `grep -i "5-layer\|layer architecture"` → No results
+- **AC-F Requirement:** "Replace theoretical documentation with empirical implementation evidence matching Section 13.1 quality"
+- **AC-F Pass Criteria:** Section 13.2 exists, contains all 5 layer implementations with real code, includes build validation commands and outputs, matches Section 13.1 quality (9.5/10 clarity)
+- **Status:** **ZERO LINES WRITTEN** - Complete absence of documentation
+- **Impact:**
+  - Epic 1 GO/NO-GO decision (Story 1.12) requires "95% Epic 1 coverage with empirical validation"
+  - Epic 2-6 teams lack validated migration guide (only have theoretical Story 1.10DA docs)
+  - Party Mode ultrathink decision violated: Story 1.10DB created specifically because Story 1.10DA provided theory without empirical evidence
+- **Action Required:**
+  - Create Section 13.2 in test-clan/docs/notes/development/architecture.md
+  - Include all components specified in AC-F pass criteria (lines 770-777)
+  - Match Story 1.10D Section 13.1 quality (467 lines, empirical examples, production-ready tutorial)
+  - Estimated effort: 30-60 minutes (per AC-F estimate)
+
+#### MEDIUM Severity Issues
+
+**[MED-1] Directory Structure Deviation from Specification**
+- **Issue:** Overlays implemented in `/overlays/` instead of `/modules/flake-parts/overlays/` as specified in ALL acceptance criteria
+- **Evidence:**
+  - AC-A specifies: `modules/flake-parts/overlays/inputs.nix` (lines 318, 381)
+  - AC-B specifies: `modules/flake-parts/overlays/hotfixes.nix` (lines 398, 450)
+  - AC-C specifies: `modules/flake-parts/overlays/overrides.nix` (lines 466, 510)
+  - Actual implementation: `/overlays/inputs.nix`, `/overlays/hotfixes.nix`, `/overlays/overrides.nix`
+  - nixpkgs.nix imports use `../overlays/` not `./overlays/` (line 17: `(import ../overlays/inputs.nix inputs)`)
+- **Impact:**
+  - Deviates from dendritic flake-parts pattern specified in story
+  - Creates inconsistency for Epic 2-6 migration (infra teams will follow wrong path)
+  - Minor - code works, but specification mismatch
+- **Rationale:** Implementation chose `/overlays/` (flat structure) vs `/modules/flake-parts/overlays/` (dendritic structure)
+  - Both patterns valid (drupol uses flat `/overlays/`)
+  - Story specification explicitly called for dendritic nested structure
+- **Action Required:**
+  - Update Section 13.2 documentation to reflect ACTUAL path (`/overlays/` not `/modules/flake-parts/overlays/`)
+  - OR migrate overlays to match specification (low effort: `mkdir modules/flake-parts/overlays && mv overlays/* modules/flake-parts/overlays/`)
+  - Document architectural decision (flat vs nested overlay organization)
+
+**[MED-2] Task Completion Tracking Failure**
+- **Issue:** ALL 20 tasks show `[ ]` (unchecked) despite implementation being present and functional
+- **Evidence:**
+  - Task 1.1-1.10 (Task Group 1): All show `[ ]` - but overlays exist and work
+  - Task 2.1-2.4 (Task Group 2): All show `[ ]` - but nuenv configured and functional
+  - Task 3.1-3.3 (Task Group 3): All show `[ ]` - but builds pass, validation complete
+  - Task 3.4-3.10 (Documentation): All show `[ ]` - accurately reflects AC-F missing
+  - Git commits prove work done: `2ae78d4` (migrate overlays), `3213bce` (add to configs)
+- **Impact:**
+  - Review protocol violation: Story marked "in-progress" but task tracking doesn't reflect completion state
+  - Impossible to track actual progress vs planned work
+  - Next developer cannot determine what remains
+- **Action Required:**
+  - Update Tasks 1.1-2.4 to `[x]` (implementation complete, validated)
+  - Update Tasks 3.1-3.3 to `[x]` (validation complete)
+  - Keep Tasks 3.4-3.10 as `[ ]` (documentation not done)
+  - Maintain task tracking discipline for remaining Epic 1 stories
+
+### Acceptance Criteria Coverage
+
+| AC | Description | Status | Evidence |
+|----|-------------|--------|----------|
+| AC-A | Migrate Layer 1 (Multi-Channel Access) | ✅ IMPLEMENTED | `/overlays/inputs.nix` exists, stable/unstable channels validated (ripgrep 14.1.1 vs 15.1.0) |
+| AC-B | Migrate Layer 2 (Hotfixes) | ✅ IMPLEMENTED | `/overlays/hotfixes.nix` exists, micromamba hotfix validated (v1.5.8 from stable) |
+| AC-C | Migrate Layer 4 (Overrides) | ✅ IMPLEMENTED | `/overlays/overrides.nix` exists, placeholder infrastructure validated (builds pass) |
+| AC-D | Configure Layer 5 (Flake Input Overlays) | ✅ IMPLEMENTED | nuenv added to flake.nix, imported in nixpkgs.nix overlays array (6 overlays total) |
+| AC-E | Validate Hybrid Pattern (All 5 Layers) | ✅ IMPLEMENTED | All builds pass (blackphos, cinnabar), all layers validated, zero regressions (Story 1.10D checks pass) |
+| AC-F | Update Section 13.2 with Empirical Evidence | ❌ MISSING | **Section 13.2 does NOT exist** (0 lines written) - BLOCKER |
+
+**Summary:** 5 of 6 ACs implemented (83%), 1 of 6 ACs missing (17% - BLOCKER)
+
+### Task Completion Validation
+
+**Task Group 1:** Migrate Overlay Layers (AC-A, AC-B, AC-C)
+- Tasks 1.1-1.10: ALL marked `[ ]` but ALL implemented
+- **Verified Complete:**
+  - 1.1: Overlays directory exists (`/overlays/` not `/modules/flake-parts/overlays/`)
+  - 1.2: Layer 1 migrated (`overlays/inputs.nix` - 52 lines)
+  - 1.3: Layer 1 imported (nixpkgs.nix line 17)
+  - 1.4: Layer 1 validated (stable 14.1.1, unstable 15.1.0)
+  - 1.5: Layer 2 migrated (`overlays/hotfixes.nix` - 53 lines)
+  - 1.6: Layer 2 imported (nixpkgs.nix line 21)
+  - 1.7: Layer 2 validated (micromamba 1.5.8)
+  - 1.8: Layer 4 migrated (`overlays/overrides.nix` - 23 lines)
+  - 1.9: Layer 4 imported (nixpkgs.nix line 25)
+  - 1.10: Layer 4 validated (blackphos builds successfully)
+- **Tracking Issue:** All tasks should be marked `[x]` - implementation complete
+
+**Task Group 2:** Configure Flake Input Overlays (AC-D)
+- Tasks 2.1-2.4: ALL marked `[ ]` but ALL implemented
+- **Verified Complete:**
+  - 2.1: nuenv added to flake.nix (line with `nuenv.url = "github:DeterminateSystems/nuenv"`)
+  - 2.2: nuenv overlay imported (nixpkgs.nix line 29)
+  - 2.3: nuenv accessible (6 overlays validated, builds pass)
+  - 2.4: All 5 layers configured (inputs, hotfixes, overrides, nuenv, lazyvim + pkgsDirectory)
+- **Tracking Issue:** All tasks should be marked `[x]` - implementation complete
+
+**Task Group 3:** Validate and Document (AC-E, AC-F)
+- Tasks 3.1-3.3: Marked `[ ]`, ACTUALLY COMPLETE (validation done)
+- Tasks 3.4-3.10: Marked `[ ]`, ACCURATELY REFLECTS STATUS (documentation not done)
+- **Verified Complete:**
+  - 3.1: All builds pass (blackphos dry-run succeeds, cinnabar dry-run succeeds)
+  - 3.2: All 5 layers inspected (stable/unstable/micromamba/ccstatusline/nuenv validated)
+  - 3.3: Zero regressions (ccstatusline builds, home-module-exports check passes, home-configurations-exposed check passes)
+- **NOT DONE:**
+  - 3.4: Section 13.2 structure NOT created
+  - 3.5: 5-layer documentation NOT written
+  - 3.6: Build validation documentation NOT written
+  - 3.7: infra migration guide NOT written
+  - 3.8: Lessons learned NOT documented
+  - 3.9: References NOT added
+  - 3.10: Quality verification NOT possible (no documentation exists)
+
+**Falsely Marked Complete:** 0 tasks (all correctly marked incomplete)
+**Actually Complete but Not Marked:** 17 tasks (Tasks 1.1-1.10, 2.1-2.4, 3.1-3.3)
+
+### Test Coverage and Gaps
+
+**Layer Validation Tests (PASS):**
+- Layer 1: Multi-channel access verified (stable ripgrep 14.1.1 vs unstable 15.1.0)
+- Layer 2: Hotfix verified (micromamba 1.5.8 from stable channel)
+- Layer 3: Custom packages verified (ccstatusline builds successfully)
+- Layer 4: Overrides infrastructure verified (builds complete with no errors)
+- Layer 5: Input overlays verified (nuenv overlay imported, 6 overlays active)
+
+**Regression Tests (PASS):**
+- Story 1.10D validation: ccstatusline package still builds
+- Check `home-module-exports`: PASS (nix build succeeds)
+- Check `home-configurations-exposed`: PASS (nix build succeeds)
+
+**Build Tests (PASS):**
+- `darwinConfigurations.blackphos.system`: Dry-run succeeds (177 derivations)
+- `nixosConfigurations.cinnabar.config.system.build.toplevel`: Dry-run succeeds (460 derivations)
+
+**Documentation Tests (FAIL):**
+- Section 13.2 existence: **FAIL** - does not exist
+- Section 13.2 completeness: **N/A** - cannot validate non-existent content
+- Section 13.2 quality: **N/A** - cannot compare to Section 13.1 (target: 9.5/10 clarity)
+
+### Architectural Alignment
+
+**Hybrid Pattern Validation: ✅ PASS**
+
+Implementation successfully proves drupol hybrid pattern (overlays array + pkgsDirectory coexist):
+- 6 overlays in overlays array (inputs, hotfixes, overrides, nuenv, lazyvim-treesitter)
+- pkgsDirectory configured (`../pkgs/by-name` - Layer 3 from Story 1.10D)
+- Both integrated in same perSystem block (modules/nixpkgs.nix lines 7-39)
+- No conflicts between overlay merging and pkgs-by-name auto-discovery
+
+**Layer Merge Order: ✅ CORRECT**
+
+Implementation maintains correct dependency order:
+1. Layer 1 (inputs) - provides stable/unstable namespaces
+2. Layer 2 (hotfixes) - uses final.stable from Layer 1
+3. Layer 4 (overrides) - can reference all prior layers
+4. Layer 5 (flakeInputs) - external overlays last
+5. Layer 3 (pkgsDirectory) - standalone, no overlay dependency
+
+**Deviation from Specification: ⚠️ MINOR**
+
+Directory structure differs from spec but follows valid alternative pattern:
+- **Specified:** `/modules/flake-parts/overlays/` (dendritic nested structure)
+- **Implemented:** `/overlays/` (flat structure like drupol)
+- **Impact:** LOW - both patterns valid, implementation works, documentation must reflect actual path
+
+### Security Notes
+
+**No security concerns identified.**
+
+Overlay implementations follow secure patterns:
+- No code execution during overlay evaluation
+- No external network fetches (overlays use only flake inputs)
+- Platform-specific conditionals properly scoped (no cross-platform leakage)
+- Hotfixes use stable channel (reduces attack surface vs unstable)
+
+### Best-Practices and References
+
+**Nix Overlays Best Practices:**
+- [Nixpkgs Manual - Overlays](https://nixos.org/manual/nixpkgs/stable/#chap-overlays)
+- [Nix Pills - Overriding Packages](https://nixos.org/guides/nix-pills/override-design-pattern.html)
+
+**Pattern References:**
+- drupol-dendritic-infra: `~/projects/nix-workspace/drupol-dendritic-infra/modules/flake-parts/nixpkgs.nix` (lines 19-37 - hybrid pattern proof)
+- infra overlays: `~/projects/nix-workspace/infra/overlays/default.nix` (5-layer architecture source)
+- Story 1.10D: `docs/notes/development/work-items/1-10d-validate-custom-package-overlays.md` (Layer 3 validation)
+- Story 1.10DA: `docs/notes/development/work-items/1-10da-validate-overlay-preservation.md` (theoretical foundation)
+
+### Action Items
+
+**Code Changes Required:**
+
+None - implementation is complete and functional.
+
+**Documentation Required (CRITICAL - BLOCKER):**
+
+- [ ] [HIGH] Create Section 13.2 in test-clan/docs/notes/development/architecture.md (AC-F) [file: test-clan/docs/notes/development/architecture.md:~977]
+  - AC-F requirement: "Replace theoretical documentation with empirical implementation evidence"
+  - Must include: Pattern Overview, 5-Layer Examples (with real code), Build Validation (with actual outputs), Migration Guide, Lessons Learned, References
+  - Target quality: Match Story 1.10D Section 13.1 (467 lines, 9.5/10 clarity, production-ready tutorial)
+  - Estimated effort: 30-60 minutes
+  - **THIS IS THE BLOCKER** - Story cannot proceed to "done" without this
+
+- [ ] [MED] Update Section 13.2 to reflect ACTUAL directory structure (/overlays/ not /modules/flake-parts/overlays/)
+  - Specification called for `/modules/flake-parts/overlays/`
+  - Implementation uses `/overlays/` (valid alternative, matches drupol flat pattern)
+  - Documentation must reflect reality, not abandoned specification
+  - Include rationale for flat structure choice
+
+- [ ] [MED] Document architectural decision: flat vs nested overlay organization
+  - Why `/overlays/` chosen over `/modules/flake-parts/overlays/`
+  - Benefits: Simpler paths in imports (`../overlays/` vs `./overlays/`)
+  - Precedent: drupol-dendritic-infra uses flat `/overlays/` structure
+  - Trade-offs: Dendritic pattern usually nests everything under modules/
+
+**Task Tracking Improvements:**
+
+- [ ] [LOW] Mark Tasks 1.1-1.10 as `[x]` (Task Group 1 complete - overlays migrated and validated)
+- [ ] [LOW] Mark Tasks 2.1-2.4 as `[x]` (Task Group 2 complete - nuenv configured and validated)
+- [ ] [LOW] Mark Tasks 3.1-3.3 as `[x]` (validation complete - builds pass, zero regressions)
+- [ ] [LOW] Keep Tasks 3.4-3.10 as `[ ]` until Section 13.2 documentation written
+
+**Advisory Notes:**
+
+- Note: Implementation time was ~2 hours for code (matches 2-3h estimate), but documentation phase skipped entirely
+- Note: Directory structure deviation from spec is minor - implementation works, both patterns valid, documentation must reflect actual implementation
+- Note: Epic 1 GO/NO-GO decision (Story 1.12) depends on this documentation - "95% Epic 1 coverage with empirical validation" requires Section 13.2
+- Note: Epic 2-6 teams blocked on migration guide - theoretical Story 1.10DA docs insufficient per Party Mode decision
