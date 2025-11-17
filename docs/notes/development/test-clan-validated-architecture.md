@@ -1998,7 +1998,7 @@ test-clan/
 - ✅ **Clean separation**: default.nix (integration) vs per-system.nix (config) vs _overlays/* (layers)
 - ✅ **Maintainable**: Add Layer 6? Just create _overlays/layer6.nix
 
-**Actual Migrated Code** (test-clan/overlays/inputs.nix):
+**Actual Migrated Code** (test-clan/modules/nixpkgs/_overlays/inputs.nix):
 
 ```nix
 # Multi-channel nixpkgs access layer
@@ -2034,33 +2034,49 @@ in
 **Key Adaptation**: Removed `{ flake, ... }:` overlayArgs wrapper, replaced with direct `inputs:` parameter passed from nixpkgs.nix.
 Simplified `lib'.systemInput` to direct conditional (test-clan doesn't have infra's custom lib functions).
 
-**Integration Point** (test-clan/modules/nixpkgs.nix):
+**Integration Point** (test-clan/modules/nixpkgs/per-system.nix):
 
 ```nix
+# perSystem nixpkgs configuration
+#
+# Story 1.10DB: Separated from default.nix for single responsibility
+# This file configures pkgs for perSystem (checks, packages, devShells, etc.)
 { inputs, ... }:
 {
-  imports = [ inputs.pkgs-by-name-for-flake-parts.flakeModule ];
+  perSystem =
+    { system, ... }:
+    {
+      # Configure nixpkgs with all 5 overlay layers
+      _module.args.pkgs = import inputs.nixpkgs {
+        inherit system;
+        config.allowUnfree = true;
+        # Story 1.10DB: 5-layer overlay architecture
+        overlays = [
+          # Layer 1: Multi-channel nixpkgs access (stable, unstable, patched)
+          # Provides: pkgs.stable.*, pkgs.unstable.*, pkgs.patched.*
+          (import ./_overlays/inputs.nix inputs)
 
-  perSystem = { system, ... }: {
-    _module.args.pkgs = import inputs.nixpkgs {
-      inherit system;
-      config.allowUnfree = true;
-      # Story 1.10DB: 5-layer overlay architecture
-      overlays = [
-        # Layer 1: Multi-channel access
-        (import ../overlays/inputs.nix inputs)
-        # Layer 2: Platform hotfixes (depends on Layer 1)
-        (import ../overlays/hotfixes.nix)
-        # Layer 4: Package overrides
-        (import ../overlays/overrides.nix)
-        # Layer 5: Flake input overlays
-        inputs.nuenv.overlays.nuenv
-        inputs.lazyvim.overlays.nvim-treesitter-main  # Story 1.10B
-      ];
+          # Layer 2: Platform-specific hotfixes (stable fallbacks for broken packages)
+          # Depends on: Layer 1 (needs final.stable)
+          (import ./_overlays/hotfixes.nix)
+
+          # Layer 4: Per-package build modifications (overrideAttrs)
+          # Depends on: Layers 1-2 (can reference all prior layers)
+          (import ./_overlays/overrides.nix)
+
+          # Layer 5: Flake input overlays (external integrations)
+          # Depends on: Layers 1-4 (external overlays can reference everything)
+          inputs.nuenv.overlays.nuenv
+          # Story 1.10B: LazyVim nvim-treesitter overlay for neovim
+          inputs.lazyvim.overlays.nvim-treesitter-main
+        ];
+      };
+
+      # Layer 3: Custom packages (Story 1.10D)
+      # Provides: Custom derivations via pkgs-by-name auto-discovery
+      # Standalone: No dependencies on other layers
+      pkgsDirectory = ../../pkgs/by-name;
     };
-    # Layer 3: Custom packages (Story 1.10D)
-    pkgsDirectory = ../pkgs/by-name;
-  };
 }
 ```
 
