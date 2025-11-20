@@ -1,0 +1,34 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>Epic 1</epicId>
+    <storyId>1.14</storyId>
+    <title>Execute GO/NO-GO Decision Framework for Production Refactoring</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-20</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/notes/development/work-items/1-14-execute-go-no-go-decision.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>{{as_a}}</asA>
+    <iWant>{{i_want}}</iWant>
+    <soThat>{{so_that}}</soThat>
+    <tasks>{{story_tasks}}</tasks>
+  </story>
+
+  <acceptanceCriteria>{{acceptance_criteria}}</acceptanceCriteria>
+
+  <artifacts>
+    <docs>{{docs_artifacts}}</docs>
+    <code>{{code_artifacts}}</code>
+    <dependencies>{{dependencies_artifacts}}</dependencies>
+  </artifacts>
+
+  <constraints>{{constraints}}</constraints>
+  <interfaces>{{interfaces}}</interfaces>
+  <tests>
+    <standards>{{test_standards}}</standards>
+    <locations>{{test_locations}}</locations>
+    <ideas>{{test_ideas}}</ideas>
+  </tests>
+</story-context>
