@@ -1368,6 +1368,72 @@ Story 1.14 execution involves:
 - No build/deploy commands (assessment of existing evidence)
 - No test writing (evaluate existing test results)
 
+### Optimal Execution Pattern: Orchestrator-Subagent for Evidence Gathering
+
+**Story 1.14 Execution Recommendation:**
+
+Story 1.14 is a decision/review story requiring extensive evidence compilation from Epic 1 deliverables (Stories 1.1-1.13, test-clan docs, deployment logs).
+Optimal execution uses **orchestrator-subagent pattern** for Task 1:
+
+**Pattern:**
+1. **Developer as Orchestrator:** Designs 5 research tasks with optimal prompts
+2. **Dispatch Subagents:** Launches 5 subagents in parallel via Task tool
+3. **Subagent Report-Back:** Each subagent analyzes assigned domain, returns structured findings
+4. **Orchestrator Integration:** Developer integrates 5 reports, validates evidence completeness
+5. **Decision Execution:** Tasks 2-8 use integrated evidence to render GO/NO-GO decision
+
+**Efficiency:**
+- Sequential: ~4-5 hours (developer reads all Epic 1 evidence sequentially)
+- Orchestrated: ~2-3 hours (parallel subagent research + integration + decision)
+- Savings: ~40% execution time via parallelization
+
+**Subagent Prompt Design Best Practices:**
+
+1. **Clear Research Objective:** Specify exactly what evidence to extract
+2. **Explicit File Paths:** Provide complete paths, line ranges if applicable
+3. **Evidence Requirements:** Define PASS/FAIL criteria, confidence levels, citation format
+4. **Report-Back Format:** Structure findings (summary, evidence citations, confidence assessment, limitations)
+5. **Context Boundaries:** Each subagent analyzes ONE domain (avoid overlap, ensure coverage)
+
+**Example Subagent Prompt (Task 1.1 - Epic 1 Story Analysis):**
+
+```
+Research Epic 1 Stories 1.1-1.13 validation evidence for GO/NO-GO decision.
+
+Files: docs/notes/development/epics/epic-1-architectural-validation-migration-pattern-rehearsal-phase-0.md
+
+Extract:
+1. Story objectives (what each story validated)
+2. Acceptance criteria (how validation measured)
+3. Completion status (done/deferred with rationale)
+4. Map stories to decision criteria AC1.1-AC1.7
+
+Report Format:
+- Story-to-criteria mapping (which stories validate infrastructure, dendritic, darwin, networking, transformation, home-manager, patterns)
+- Completion evidence (all stories done except 1.11 deferred)
+- Deferred rationale (Story 1.11 - type-safe architecture unnecessary per empirical validation)
+
+Confidence: HIGH/MEDIUM/LOW for each decision criterion based on story evidence
+```
+
+**Why This Pattern for Story 1.14:**
+
+1. **Extensive Evidence:** Epic 1 = 13 stories + test-clan docs + deployment logs + integration findings
+2. **Parallelizable Research:** 5 domains independent (can be analyzed concurrently)
+3. **Orchestrator Value:** Developer integrates findings, validates consistency, renders decision
+4. **Decision Quality:** Comprehensive evidence compilation ensures informed GO/NO-GO determination
+
+**Alternative (Sequential Execution):**
+
+Developer CAN execute Task 1 sequentially (read all files directly) if:
+- Subagent dispatch not available
+- Prefer single-context evidence gathering
+- Time constraint not critical
+
+Sequential execution functional but less efficient (~40% slower).
+
+**Recommendation:** Use orchestrator-subagent pattern for Story 1.14 Task 1 execution.
+
 ### Epic 1 Evidence Summary (For Reference)
 
 **Stories 1.1-1.13 Achievements:**
