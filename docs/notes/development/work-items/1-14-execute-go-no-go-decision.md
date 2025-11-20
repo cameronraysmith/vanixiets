@@ -870,49 +870,101 @@ Document what Epic 1 failed to validate:
 
 **Note:** This is a decision/review story, NOT an implementation story. Tasks focus on evidence review, assessment, and documentation.
 
-### Task 1: Load and Review Epic 1 Evidence (AC1 Preparation)
+### Task 1: Evidence Gathering via Subagent Dispatch (AC1 Preparation)
 
-**Objective:** Gather all Epic 1 deliverables and validation evidence for decision framework evaluation.
+**Objective:** Design and dispatch parallel research tasks to gather Epic 1 evidence efficiently.
+
+**Execution Pattern:** Orchestrator-Subagent with report-back integration
 
 **Subtasks:**
 
-- [ ] **1.1: Load Epic 1 Story Summaries (Stories 1.1-1.13)**
-  - Read epic-1-architectural-validation-migration-pattern-rehearsal-phase-0.md completely
-  - Extract story objectives, acceptance criteria, and completion status for Stories 1.1-1.13
-  - Note deferred stories (Story 1.11 - type-safe architecture, rationale documented)
-  - Map stories to decision criteria (which stories validate which AC1 criteria)
+- [ ] **1.0: Design Research Task Suite**
+  - Identify 5 evidence domains requiring comprehensive analysis:
+    1. Epic 1 Story Analysis (Stories 1.1-1.13 objectives, ACs, completion status, validation evidence)
+    2. Test-Clan Documentation Review (architecture guides, operational guides, migration patterns)
+    3. Build & Test Validation (test suite status, configuration builds, zero-regression evidence)
+    4. Story 1.12 Deployment Analysis (blackphos physical deployment, zerotier darwin integration, heterogeneous networking validation)
+    5. Story 1.13 Integration Findings (pattern validation summaries, documented limitations, technical debt, Epic 2-6 guidance)
+  - For each domain, design optimal subagent prompt including:
+    - Clear research objective (what evidence to gather)
+    - Specific files to analyze (exact paths, line ranges if applicable)
+    - Evidence extraction requirements (PASS/FAIL criteria, confidence levels, citations)
+    - Report-back format (structured findings with evidence citations, pattern confidence assessments)
   - **AC Reference:** AC1 (all criteria require Epic 1 story evidence)
 
-- [ ] **1.2: Load Story 1.13 Integration Findings Documentation**
-  - Read Story 1.13 deliverables (if exists): integration-findings.md, migration-patterns.md, architecture guides
-  - Extract pattern validation summaries (dendritic, clan, home-manager, zerotier)
-  - Note documented limitations (darwin-specific challenges, platform differences)
-  - Identify known technical debt (deferred work, optimization opportunities)
-  - **AC Reference:** AC1.5 (transformation pattern), AC1.7 (pattern confidence), AC2 (blockers)
+- [ ] **1.1: Dispatch Parallel Research Tasks**
+  - Use Task tool to launch 5 subagents concurrently (parallel execution for efficiency):
 
-- [ ] **1.3: Load Test-Clan Architecture Documentation**
-  - Read ~/projects/nix-workspace/test-clan/README.md (navigation hub)
-  - Read ~/projects/nix-workspace/test-clan/docs/architecture/*.md (dendritic pattern, secrets architecture, file structure)
-  - Read ~/projects/nix-workspace/test-clan/docs/guides/*.md (machine management, age keys, user onboarding)
-  - Extract architectural pattern definitions (how dendritic + clan integration works)
-  - Note Epic 2-6 migration guidance (operational procedures, checklists)
-  - **AC Reference:** AC1.2 (dendritic validation), AC1.3 (darwin integration), AC1.5 (transformation pattern), AC4.2 (migration pattern readiness)
+  **Subagent 1: Epic 1 Story Analysis**
+  - Files: `docs/notes/development/epics/epic-1-architectural-validation-migration-pattern-rehearsal-phase-0.md`
+  - Extract: Story objectives (1.1-1.13), acceptance criteria, completion status, validation evidence
+  - Map: Stories to decision criteria (which stories validate which AC1.1-AC1.7 criteria)
+  - Note: Story 1.11 deferred (type-safe architecture - rationale documented)
+  - Report: Structured summary with story-to-criteria mapping, completion evidence, deferred items
 
-- [ ] **1.4: Review Build and Test Validation Evidence**
-  - Check test-clan test suite status (18 tests expected passing from Story 1.6-1.7)
-  - Verify configuration builds (darwinConfigurations.blackphos, homeConfigurations.crs58/raquel, nixosConfigurations.cinnabar/electrum)
-  - Review deployment logs (Story 1.5 Hetzner, Story 1.9 zerotier, Story 1.12 blackphos physical deployment)
-  - Extract zero-regression evidence (package counts, functionality preservation)
-  - **AC Reference:** AC1.2 (dendritic zero regressions), AC1.3 (darwin builds), AC1.6 (home-manager feature parity)
+  **Subagent 2: Test-Clan Documentation Review**
+  - Files: `~/projects/nix-workspace/test-clan/README.md`, `~/projects/nix-workspace/test-clan/docs/architecture/*.md`, `~/projects/nix-workspace/test-clan/docs/guides/*.md`
+  - Extract: Architectural pattern definitions (dendritic pattern, clan integration, secrets architecture)
+  - Extract: Epic 2-6 migration guidance (operational procedures, deployment checklists, user onboarding workflows)
+  - Report: Pattern documentation completeness, Epic 2-6 readiness assessment, operational guide inventory
 
-- [ ] **1.5: Review Story 1.12 Physical Deployment Experience**
-  - Read Story 1.12 work item completion notes (blackphos deployment, zerotier darwin integration)
-  - Extract heterogeneous networking validation evidence (SSH connectivity, cross-platform coordination)
-  - Note zerotier darwin solution (homebrew cask + activation script pattern)
-  - Identify any deployment issues (regressions, workarounds, platform-specific challenges)
-  - **AC Reference:** AC1.3 (darwin integration), AC1.4 (heterogeneous networking), AC2 (blockers)
+  **Subagent 3: Build & Test Validation**
+  - Check: test-clan test suite status (18 tests expected passing from Story 1.6-1.7)
+  - Verify: Configuration builds (darwinConfigurations.blackphos, homeConfigurations.crs58/raquel, nixosConfigurations.cinnabar/electrum)
+  - Review: Deployment logs (Story 1.5 Hetzner, Story 1.9 zerotier, Story 1.12 blackphos physical deployment)
+  - Extract: Zero-regression evidence (package counts, functionality preservation metrics)
+  - Report: Test suite status (pass/fail counts), build validation (all configs build successfully), regression analysis
 
-**Deliverable:** Comprehensive Epic 1 evidence inventory (stories, docs, test results, deployment logs)
+  **Subagent 4: Story 1.12 Deployment Analysis**
+  - Files: `docs/notes/development/work-items/1-12-deploy-blackphos-zerotier-integration.md`
+  - Extract: Blackphos physical deployment evidence (zero regressions, user workflows intact)
+  - Extract: Heterogeneous networking validation (SSH connectivity nixos ↔ darwin, zerotier cross-platform coordination)
+  - Extract: Zerotier darwin solution (homebrew cask + activation script pattern, platform-specific workaround)
+  - Identify: Deployment issues, regressions, workarounds, platform-specific challenges
+  - Report: Deployment success evidence, heterogeneous networking validation, darwin-specific patterns, identified limitations
+
+  **Subagent 5: Story 1.13 Integration Findings**
+  - Files: Search `docs/notes/development/` for integration-findings.md, migration-patterns.md, architecture guides (Story 1.13 deliverables)
+  - Extract: Pattern validation summaries (dendritic, clan, home-manager, zerotier, terraform, sops-nix, overlays)
+  - Extract: Documented limitations (darwin-specific challenges, platform differences, known workarounds)
+  - Extract: Technical debt (deferred work, optimization opportunities, future improvements)
+  - Extract: Epic 2-6 guidance (migration checklists, transformation steps, operational procedures)
+  - Report: Pattern confidence levels, documented limitations, technical debt inventory, Epic 2-6 readiness
+
+  - Each subagent executes independently, returns structured report with evidence citations
+  - **AC Reference:** AC1 (comprehensive evidence compilation from all domains)
+
+- [ ] **1.2: Integrate Subagent Reports**
+  - Review all 5 subagent findings upon completion
+  - Cross-reference evidence across reports (validate consistency, identify contradictions)
+  - Compile comprehensive evidence inventory:
+    - Stories evidence (1.1-1.13 objectives, ACs, completion status)
+    - Documentation evidence (test-clan architecture, guides, migration patterns)
+    - Build/test evidence (18 tests status, configuration builds, zero-regression metrics)
+    - Deployment evidence (Story 1.12 blackphos, heterogeneous networking validation)
+    - Integration findings evidence (Story 1.13 pattern summaries, limitations, Epic 2-6 guidance)
+  - Resolve any inconsistencies (if subagents report conflicting evidence, investigate source)
+  - **AC Reference:** AC1 (evidence integration for decision framework)
+
+- [ ] **1.3: Validate Evidence Completeness**
+  - Confirm all AC1 criteria (1.1-1.7) have supporting evidence:
+    - AC1.1 Infrastructure: Hetzner VMs, terraform, clan inventory, zerotier (Subagent 1, 3, 4)
+    - AC1.2 Dendritic: import-tree, module namespaces, zero regressions (Subagent 1, 2, 3)
+    - AC1.3 Darwin: blackphos migration, clan integration, home-manager (Subagent 1, 2, 4)
+    - AC1.4 Heterogeneous Networking: zerotier nixos ↔ darwin, SSH coordination (Subagent 4)
+    - AC1.5 Transformation: migration docs, checklists, pattern reusability (Subagent 2, 5)
+    - AC1.6 Home-Manager: Pattern A, multi-user, cross-platform, feature parity (Subagent 1, 4, 5)
+    - AC1.7 Pattern Confidence: 7 patterns rated HIGH/MEDIUM/LOW (Subagent 5)
+  - Verify pattern confidence assessment data available (7 patterns: dendritic, clan, terraform, sops-nix, zerotier, home-manager, overlays)
+  - Check blocker assessment data available (AC2 preparation - limitations, challenges, technical debt from Subagent 4, 5)
+  - If evidence gaps identified: Design and dispatch targeted follow-up research tasks
+  - **AC Reference:** AC1, AC2 (completeness validation before evaluation phase)
+
+**Deliverable:** Comprehensive Epic 1 evidence inventory with citations (integrated from 5 subagent reports)
+
+**Efficiency Gain:** Parallel execution reduces Task 1 from ~45-60 min sequential reading to ~15-20 min orchestrated dispatch + integration
+
+**Note:** Task 2 (Decision Framework Evaluation) will use integrated evidence inventory from Task 1 to assess PASS/FAIL for each AC1 criterion.
 
 ---
 
