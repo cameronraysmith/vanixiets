@@ -10,13 +10,34 @@
   </metadata>
 
   <story>
-    <asA>{{as_a}}</asA>
-    <iWant>{{i_want}}</iWant>
-    <soThat>{{so_that}}</soThat>
-    <tasks>{{story_tasks}}</tasks>
+    <asA>a system administrator</asA>
+    <iWant>to evaluate Epic 1 Phase 0 results against comprehensive GO/NO-GO decision criteria</iWant>
+    <soThat>I can make an informed, evidence-based decision about proceeding to Epic 2+ production refactoring with high confidence in architectural patterns and migration approach</soThat>
+    <tasks>
+      - Task 1: Load and Review Epic 1 Evidence (AC1 Preparation)
+      - Task 2: Execute Decision Framework Evaluation (AC1)
+      - Task 3: Conduct Exhaustive Blocker Assessment (AC2)
+      - Task 4: Render GO/CONDITIONAL GO/NO-GO Decision (AC3)
+      - Task 5: Document GO/CONDITIONAL GO Transition Plan (AC4, If Applicable)
+      - Task 6: Document NO-GO Alternative Approaches (AC5, If Applicable)
+      - Task 7: Define Next Steps Based on Decision Outcome (AC6)
+      - Task 8: Finalize Decision Documentation and Update Sprint Status
+    </tasks>
   </story>
 
-  <acceptanceCriteria>{{acceptance_criteria}}</acceptanceCriteria>
+  <acceptanceCriteria>
+    AC1: Decision Framework Evaluation Documented - Evaluate ALL 7 Epic 1 validation criteria (infrastructure deployment, dendritic pattern, nix-darwin integration, heterogeneous networking, transformation pattern, home-manager integration, pattern confidence) with explicit PASS/FAIL determinations and evidence citations from Stories 1.1-1.13
+
+    AC2: Blockers Identified (If Any) - Conduct exhaustive blocker assessment across CRITICAL/MAJOR/MINOR severity levels, reviewing all Epic 1 stories, Story 1.13 integration findings, Story 1.12 physical deployment, test suite results, and documentation completeness
+
+    AC3: Decision Rendered - Formalize GO/CONDITIONAL GO/NO-GO decision based on AC1 evaluation and AC2 blocker assessment with explicit rationale and evidence traceability
+
+    AC4: If GO/CONDITIONAL GO: Production Refactoring Plan Confirmed - Validate Epic 2-6 plan documented, migration pattern components ready for infra application, test-clan configs ready to migrate, blackphos management decision made
+
+    AC5: If NO-GO: Alternative Approaches Documented - Document alternative architectures (nixos-unified, hybrid, extended validation), issues requiring resolution, timeline for retry/pivot, specific validation gaps
+
+    AC6: Next Steps Clearly Defined Based on Decision Outcome - Define immediate actions conditional on GO (sprint planning, Epic 2 kickoff, success metrics), CONDITIONAL GO (conditions tracking, re-evaluation), or NO-GO (halt planning, resolution work, stakeholder communication)
+  </acceptanceCriteria>
 
   <artifacts>
     <docs>{{docs_artifacts}}</docs>
