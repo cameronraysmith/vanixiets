@@ -25,3 +25,6 @@ c2c450b11490e7dbc370d6b0ccfec1ee40a9fbf3:packages/docs/src/content/docs/guides/c
 41a9796f41373e73b3d801f227de07c6e17f4faf:docs/new-user-host.md:generic-api-key:111
 # New commit after rebase
 9a2beebd1ca0519ba7f3ae0c06628f8717387089:docs/new-user-host.md:generic-api-key:111
+
+# Story 1.14 work item - story key "1-14-execute-go-no-go-decision" flagged as API key (false positive)
+docs/notes/development/work-items/1-14-execute-go-no-go-decision.md:generic-api-key:1251
