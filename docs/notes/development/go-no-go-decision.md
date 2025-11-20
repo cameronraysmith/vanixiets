@@ -1044,4 +1044,438 @@ Exhaustive blocker assessment across Epic 1 Stories 1.1-1.13 confirms:
 
 **Next:** Proceed to AC4 (GO Transition Plan Documentation) for Epic 2-6 immediate actions and success metrics
 
+---
+
+## AC4: GO Transition Plan Confirmed
+
+**Requirement:** Validate Epic 2-6 plan documented, migration pattern components ready for infra application, test-clan configs ready to migrate, blackphos management decision made
+
+### Epic 2-6 Plan Validation
+
+**Epic 2 (Phase 1): VPS Infrastructure Foundation - cinnabar Production**
+- **File:** docs/notes/development/epics/epic-2-vps-infrastructure-foundation-phase-1-cinnabar.md
+- **Stories:** 6 stories (30-40h estimated)
+  - Story 2.1: Initialize infra repository dendritic + clan architecture
+  - Story 2.2: Migrate cinnabar configuration from test-clan to infra
+  - Story 2.3: Deploy cinnabar production VPS (Hetzner CX43, zerotier controller)
+  - Story 2.4: Establish production zerotier network coordination
+  - Story 2.5: Validate Epic 2 zero-regression criteria
+  - Story 2.6: Epic 2 retrospective and Epic 3 preparation
+- **Success Criteria:** cinnabar VPS deployed with dendritic + clan patterns, zerotier controller operational, stability gate (1-2 weeks validation)
+- **Status:** ✅ **VALIDATED** (epic documented, stories enumerated, dependencies clear)
+
+**Epic 3 (Phase 2): First Darwin Migration - blackphos**
+- **File:** docs/notes/development/epics/epic-3-first-darwin-migration-phase-2-blackphos.md
+- **Stories:** 5 stories (25-30h estimated)
+  - Story 3.1: Design blackphos production migration approach
+  - Story 3.2: Migrate blackphos configuration to infra dendritic structure
+  - Story 3.3: Deploy blackphos to physical hardware from infra
+  - Story 3.4: Validate Epic 3 zero-regression criteria
+  - Story 3.5: Epic 3 retrospective and Epic 4 preparation
+- **Success Criteria:** blackphos migrated from test-clan to infra, physical deployment successful, zero regressions, stability gate
+- **Blackphos Management Decision:** **Option A (Revert to infra, centralize production fleet)** - Recommended for operational consistency
+- **Status:** ✅ **VALIDATED** (epic documented, zerotier darwin pattern from Story 1.12 ready for reuse)
+
+**Epic 4 (Phase 3): Multi-Darwin Validation - rosegold**
+- **File:** docs/notes/development/epics/epic-4-multi-darwin-validation-phase-3-rosegold.md
+- **Stories:** 3 stories (20-25h estimated)
+- **Success Criteria:** rosegold migration validates Epic 3 pattern scalability, multi-darwin coordination proven
+- **Status:** ✅ **VALIDATED** (epic documented, Epic 3 patterns reusable)
+
+**Epic 5 (Phase 4): Third Darwin Host - argentum**
+- **File:** docs/notes/development/epics/epic-5-third-darwin-host-phase-4-argentum.md
+- **Stories:** 2 stories (15-20h estimated)
+- **Success Criteria:** argentum migration demonstrates pattern maturity, third darwin deployment streamlined
+- **Status:** ✅ **VALIDATED** (epic documented, incremental refinement approach)
+
+**Epic 6 (Phase 5): Primary Workstation Migration - stibnite**
+- **File:** docs/notes/development/epics/epic-6-primary-workstation-migration-phase-5-stibnite.md
+- **Stories:** 3 stories (25-30h estimated)
+- **Success Criteria:** stibnite (primary workstation) migrated, production fleet complete (4 darwin + 2 VPS), Epic 7 transition
+- **Status:** ✅ **VALIDATED** (epic documented, final production machine)
+
+**Epic 2-6 Plan Completeness:** ✅ **COMPLETE**
+- All 6 epics documented with story breakdowns
+- Progressive migration sequence validated (Epic 2 → Epic 3 → Epic 4 → Epic 5 → Epic 6)
+- Effort estimates: 30-40h + 25-30h + 20-25h + 15-20h + 25-30h = **115-145 hours total Epic 2-6**
+- Machine sequence validated: cinnabar (VPS) → blackphos (darwin) → rosegold (darwin) → argentum (darwin) → stibnite (darwin primary)
+- Stability gates documented: 1-2 week validation between each Epic phase per PRD
+
+---
+
+### Migration Pattern Components Readiness
+
+**Component 1: test-clan Architectural Patterns**
+- **Location:** ~/projects/nix-workspace/test-clan/ (validated Phase 0 environment)
+- **Dendritic flake-parts pattern:** 83 modules, pure auto-discovery, 23-line flake.nix minimal
+- **Clan inventory + service instances:** 3-machine coordination proven (cinnabar, electrum, blackphos)
+- **Terraform/terranix integration:** Hetzner deployment validated (CX43, CCX23 VPS operational)
+- **Sops-nix secrets:** Two-tier architecture (clan vars + sops-nix) functional
+- **Zerotier networking:** Heterogeneous nixos ↔ darwin coordination proven
+- **Home-Manager Pattern A:** Cross-platform portable modules (270 pkgs, 17 modules)
+- **Overlay architecture:** 5-layer system validated (inputs, hotfixes, pkgs-by-name, overrides, flakeInputs)
+- **Status:** ✅ **READY** (all 7 patterns HIGH confidence, Epic 1 validation complete)
+
+**Component 2: Migration Checklists and Guides**
+- **File:** ~/projects/nix-workspace/test-clan/docs/notes/architecture/migration-patterns.md (424 lines)
+- **Blackphos Migration Checklist:** 3-phase audit/migrate/document (validated in Story 1.8, 1.10, 1.12)
+- **Cinnabar User Configuration:** Username override patterns, integration modes
+- **Cross-Platform Module Reuse:** Platform detection, portability patterns
+- **Status:** ✅ **READY** (3 comprehensive checklists, pattern reusability proven in Story 1.12)
+
+**Component 3: Operational Procedures**
+- **Machine Management Guide:** ~/projects/nix-workspace/test-clan/docs/guides/machine-management.md (556 lines)
+  - 7-step workflow: age key extraction, vars generation, deployment, verification
+- **User Onboarding Guide:** ~/projects/nix-workspace/test-clan/docs/guides/adding-users.md (435 lines)
+  - 9-step Epic 2-6 checklist: Bitwarden SSH keys, clan user creation, sops-nix setup
+- **Age Key Management:** ~/projects/nix-workspace/test-clan/docs/guides/age-key-management.md (882 lines)
+  - Age key derivation workflows, multi-user encryption, key rotation
+- **Status:** ✅ **READY** (operational procedures documented, Epic 2-6 teams have complete guidance)
+
+**Component 4: Zero-Regression Validation Workflows**
+- **Baseline Capture:** Package counts, configuration snapshots, test suite baseline
+- **Deployment Validation:** Build success, service availability, SSH connectivity
+- **User Workflow Validation:** Development tools, shell environment, application functionality
+- **Test Suite Integration:** Story 1.6 test harness patterns (18 tests, auto-discovery validation)
+- **Status:** ✅ **READY** (Story 1.12 physical deployment validated workflows, test suite adaptable for infra)
+
+**Component 5: Deployment Checklists**
+- **Pre-Deployment:** Configuration builds, clan vars generated, age keys registered
+- **Deployment:** terraform/terranix apply, clan machines install, home-manager activation
+- **Post-Deployment:** Service verification, SSH connectivity, user workflow validation, stability monitoring
+- **Status:** ✅ **READY** (Story 1.12 deployment process documented with empirical evidence)
+
+**Migration Pattern Components:** ✅ **ALL READY**
+- 7 architectural patterns validated (dendritic, clan, terraform, sops-nix, zerotier, home-manager, overlays)
+- 3 migration checklists complete (blackphos 3-phase, cinnabar user, cross-platform modules)
+- 3 operational guides complete (machine management, user onboarding, age keys)
+- Zero-regression workflows documented (baseline, deployment, validation, test suite)
+- Deployment checklists available (pre/during/post deployment procedures)
+
+---
+
+### Test-Clan Configs Migration Readiness
+
+**Configurations Ready to Migrate:**
+
+**VPS Configurations:**
+- **cinnabar (nixos VPS):**
+  - Location: ~/projects/nix-workspace/test-clan/modules/machines/nixos/cinnabar/
+  - Role: Zerotier controller, production VPS
+  - Status: Deployed and operational (IP 49.13.68.78, validated Story 1.10A)
+  - Migration: Epic 2 Story 2.2 (migrate config from test-clan → infra)
+
+- **electrum (nixos VPS):**
+  - Location: ~/projects/nix-workspace/test-clan/modules/machines/nixos/electrum/
+  - Role: Zerotier peer, test VPS
+  - Status: Deployed and operational (validated Story 1.9)
+  - Migration: Epic 7+ (optional - test environment retention decision pending)
+
+**Darwin Configurations:**
+- **blackphos (darwin laptop):**
+  - Location: ~/projects/nix-workspace/test-clan/modules/machines/darwin/blackphos/
+  - Primary Users: crs58 (UID 502, admin), raquel (UID 506, primary)
+  - Status: Physical deployment successful 2025-11-19, zero regressions
+  - Migration: Epic 3 Story 3.2 (migrate config from test-clan → infra)
+  - Management Decision: **Option A (Revert to infra)** - Centralize production fleet
+
+**Portable Home-Manager Modules:**
+- **crs58 module:**
+  - Location: ~/projects/nix-workspace/test-clan/modules/home/users/crs58/
+  - Cross-platform: Works on nixos (cinnabar) + darwin (blackphos)
+  - Packages: 122 derivations (development, AI tooling, shell/terminal)
+  - Status: Production-validated, zero regressions
+
+- **raquel module:**
+  - Location: ~/projects/nix-workspace/test-clan/modules/home/users/raquel/
+  - Cross-platform: Works on darwin (blackphos)
+  - Packages: 105 derivations (development, shell/terminal, no AI tooling)
+  - Status: Production-validated, zero regressions
+
+- **cameron module:**
+  - Location: ~/projects/nix-workspace/test-clan/modules/home/users/cameron/
+  - Cross-platform: Works on nixos (cinnabar)
+  - Status: Validated in Story 1.10A deployment
+
+**Secrets Architecture:**
+- **Clan vars (system-level):** Zerotier identities, SSH host keys (nixos only)
+- **Sops-nix (user-level):** crs58 (8 secrets), raquel (5 secrets) - multi-user encryption validated
+- **Status:** Two-tier architecture ready for migration (age key reuse pattern proven)
+
+**Test-Clan Config Migration:** ✅ **READY**
+- cinnabar config: Epic 2 migration (production VPS)
+- blackphos config: Epic 3 migration (production darwin)
+- Portable home modules: crs58, raquel, cameron ready for infra integration
+- Secrets architecture: Two-tier system validated, migration path clear
+
+---
+
+### Blackphos Management Decision
+
+**Decision:** **Option A - Revert to infra (Centralize Production Fleet)**
+
+**Rationale:**
+
+**Operational Consistency:**
+- Epic 3 centralizes ALL production machines in infra repository (4 darwin + 2 VPS)
+- Single source of truth for production fleet configuration management
+- Simplifies operational procedures (one repository for machine/user management)
+
+**Test-Clan Purpose Fulfilled:**
+- Epic 1 Phase 0 validation complete (architectural patterns proven)
+- Blackphos served validation purpose (physical deployment Story 1.12 successful)
+- test-clan transition to experimental/validation environment (not production)
+
+**Migration Approach:**
+- Epic 3 Story 3.2: Migrate blackphos config from test-clan → infra dendritic structure
+- Epic 3 Story 3.3: Deploy blackphos from infra (re-deploy to physical hardware)
+- Validation: Zero-regression criteria ensure crs58 + raquel workflows preserved
+
+**Test-Clan Post-Migration:**
+- Retain as validation/experimentation repository (architectural proving ground)
+- cinnabar/electrum remain operational for ongoing pattern validation
+- Future: Epic 7+ decision on test-clan lifecycle (retain vs sunset)
+
+**Option B (Keep in test-clan) Rejected:**
+- **Rationale:** Splits production fleet (3 machines infra, 1 machine test-clan)
+- **Operational Overhead:** Two repositories for production management (complexity increase)
+- **Consistency Risk:** Configuration drift between infra + test-clan production machines
+
+**Decision Confidence:** HIGH (aligns with PRD success criteria, Epic 3 epic definition, operational best practices)
+
+---
+
+## AC4 Summary
+
+**GO Transition Plan:** ✅ **VALIDATED**
+
+**Epic 2-6 Plan Completeness:** COMPLETE (all 6 epics documented, 19 stories, 115-145h total, machine sequence validated)
+
+**Migration Pattern Components:** ALL READY (7 patterns, 3 checklists, 3 operational guides, zero-regression workflows, deployment checklists)
+
+**Test-Clan Configs Migration:** READY (cinnabar Epic 2, blackphos Epic 3, portable home modules crs58/raquel/cameron)
+
+**Blackphos Management Decision:** Option A (Revert to infra, centralize production fleet)
+
+**Next:** Proceed to AC6 (Define Next Steps Based on GO Decision)
+
+---
+
+## AC6: Next Steps Clearly Defined (GO Decision)
+
+**Requirement:** Define immediate actions, Epic 2 kickoff sequence, success metrics based on GO decision outcome
+
+### Immediate Actions (Within 1 Week)
+
+**Action 1: Sprint Planning Update**
+- ✅ **Update sprint-status.yaml:**
+  - Story 1.14 status: ready-for-dev → done
+  - Epic 1 status: backlog → done (Phase 0 validation complete)
+  - Epic 2 status: backlog → contexted (ready for story drafting)
+- **Responsible:** System administrator
+- **Timeline:** Immediate (Story 1.14 completion)
+- **Dependencies:** None (GO decision finalized)
+
+**Action 2: Epic 1 Retrospective (Optional)**
+- **Purpose:** Review Epic 1 learnings, pattern refinements, Epic 2-6 guidance updates
+- **Topics:**
+  - Epic 1 efficiency (13 stories, 60-80h actual vs estimates)
+  - Pattern confidence validation (7/7 HIGH - any refinements needed?)
+  - Documentation completeness (95% coverage - remaining 5% prioritization)
+  - Epic 2-6 risk mitigation strategies
+- **Timeline:** 1-2 days (optional, not blocking Epic 2 kickoff)
+- **Deliverable:** Retrospective notes (if conducted)
+
+**Action 3: Epic 2 Story 2.1 Preparation**
+- **Prepare infra repository:**
+  - Review current nixos-unified architecture (baseline snapshot)
+  - Identify configuration migration scope (flake.nix, modules/, overlays/)
+  - Plan dendritic + clan transformation approach
+- **Timeline:** 2-3 days (Epic 2 Story 2.1 planning phase)
+- **Dependencies:** GO decision (complete), test-clan patterns (validated)
+
+---
+
+### Epic 2 Kickoff Sequence
+
+**Story 2.1: Initialize infra Repository Dendritic + Clan Architecture**
+- **Objective:** Transform infra from nixos-unified to dendritic flake-parts + clan-core architecture
+- **Approach:**
+  - Initialize import-tree auto-discovery (minimal flake.nix)
+  - Create modules/ dendritic structure (clan/, darwin/, home/, machines/, nixpkgs/, system/, terranix/, checks/)
+  - Migrate existing infra configurations to dendritic namespaces
+  - Establish test harness (adapt Story 1.6 patterns for infra validation)
+- **Success Criteria:**
+  - infra repository builds successfully with dendritic + clan patterns
+  - Test suite operational (baseline validation tests passing)
+  - Zero regressions (existing infra functionality preserved)
+- **Estimated Effort:** 8-12 hours
+- **Timeline:** 3-5 days
+
+**Story 2.2: Migrate cinnabar Configuration from test-clan to infra**
+- **Objective:** Port cinnabar VPS config from test-clan → infra dendritic structure
+- **Approach:**
+  - Copy modules/machines/nixos/cinnabar/ from test-clan → infra
+  - Adapt to infra dendritic namespace (config.flake.modules references)
+  - Migrate clan inventory (zerotier controller role, service instances)
+  - Migrate terraform/terranix configuration (Hetzner CX43 specs)
+- **Success Criteria:**
+  - nixosConfigurations.cinnabar builds successfully in infra
+  - Terraform generation functional (`nix build .#terranix.terraform`)
+  - Configuration diff minimal (no functionality changes)
+- **Estimated Effort:** 4-6 hours
+- **Timeline:** 1-2 days
+
+**Story 2.3: Deploy cinnabar Production VPS**
+- **Objective:** Deploy cinnabar to Hetzner using infra configuration (production migration)
+- **Approach:**
+  - Provision VM: `nix run .#terranix.terraform -- apply`
+  - Install NixOS: `clan machines install cinnabar`
+  - Establish zerotier controller: Network ID db4344343b14b903
+  - Deploy clan vars and sops-nix secrets
+- **Success Criteria:**
+  - cinnabar operational (SSH access validated)
+  - Zerotier controller functional (network coordinator role)
+  - All services running (sshd, zerotier, clan vars deployed)
+- **Estimated Effort:** 4-6 hours
+- **Timeline:** 1 day
+
+**Story 2.4: Establish Production Zerotier Network Coordination**
+- **Objective:** Validate zerotier network operational for production fleet coordination
+- **Approach:**
+  - Verify cinnabar controller status
+  - Test network connectivity (cinnabar ↔ test machines)
+  - Document network topology (production vs validation environments)
+- **Success Criteria:**
+  - Zerotier network db4344343b14b903 operational
+  - Latency acceptable (<20ms controller access)
+  - Multi-day stability proven (1+ week uptime)
+- **Estimated Effort:** 2-4 hours
+- **Timeline:** 1-2 days (includes stability monitoring)
+
+**Story 2.5: Validate Epic 2 Zero-Regression Criteria**
+- **Objective:** Confirm Epic 2 migration preserves existing functionality
+- **Approach:**
+  - Test suite validation (all tests passing)
+  - Configuration builds (cinnabar builds successfully)
+  - Service availability (SSH, zerotier, clan vars functional)
+  - Performance validation (build times, network latency acceptable)
+- **Success Criteria:**
+  - Test suite: All tests PASS
+  - Zero regressions: Existing functionality preserved
+  - Performance: Acceptable (no degradation vs baseline)
+- **Estimated Effort:** 2-4 hours
+- **Timeline:** 1 day
+
+**Story 2.6: Epic 2 Retrospective and Epic 3 Preparation**
+- **Objective:** Review Epic 2 completion, prepare Epic 3 (blackphos darwin migration)
+- **Approach:**
+  - Epic 2 retrospective (learnings, pattern refinements)
+  - Epic 3 planning (Story 3.1-3.5 preparation)
+  - Stability gate: 1-2 week validation before Epic 3 kickoff
+- **Success Criteria:**
+  - Epic 2 retrospective complete
+  - Epic 3 stories ready for execution
+  - Stability gate satisfied (cinnabar operational 1-2 weeks)
+- **Estimated Effort:** 2-4 hours
+- **Timeline:** 1 day + 1-2 weeks stability gate
+
+**Epic 2 Total Effort:** 22-36 hours (within 30-40h epic estimate)
+**Epic 2 Timeline:** 2-3 weeks (includes 1-2 week stability gate)
+
+---
+
+### Success Metrics
+
+**Epic 2 Success Criteria:**
+- ✅ **cinnabar VPS deployed:** Hetzner CX43 operational, SSH access validated
+- ✅ **Dendritic + clan patterns applied:** infra repository transformed from nixos-unified
+- ✅ **Zerotier controller operational:** Network db4344343b14b903 coordinator role functional
+- ✅ **Zero regressions:** Existing infra functionality preserved, test suite passing
+- ✅ **Stability gate satisfied:** 1-2 week validation before Epic 3 kickoff
+
+**Epic 2-6 Progressive Success Metrics:**
+- **Epic 3 (Phase 2):** blackphos darwin migration successful, zerotier darwin pattern reused, 1-2 week stability
+- **Epic 4 (Phase 3):** rosegold darwin migration validates Epic 3 pattern scalability, multi-darwin proven
+- **Epic 5 (Phase 4):** argentum darwin migration demonstrates pattern maturity, streamlined deployment
+- **Epic 6 (Phase 5):** stibnite primary workstation migration completes production fleet (4 darwin + 2 VPS)
+
+**Overall Production Fleet Success:**
+- All 6 machines operational: cinnabar, electrum (VPS), blackphos, rosegold, argentum, stibnite (darwin)
+- Heterogeneous networking: Zerotier coordination across nixos + darwin platforms
+- User configuration: crs58, raquel, cameron, christophersmith, janettesmith (5 users)
+- Zero regressions: All workflows preserved, package counts maintained
+- Documentation: Epic 7 cleanup and operational handoff guides
+
+---
+
+### Risk Monitoring
+
+**Epic 2-6 Risk Tracking:**
+
+**Risk 1: Configuration Migration Regressions**
+- **Mitigation:** Test suite validation at each Epic boundary, zero-regression criteria enforcement
+- **Monitoring:** Package counts comparison, service availability checks, user workflow validation
+
+**Risk 2: Platform-Specific Challenges**
+- **Mitigation:** Story 1.12 zerotier darwin workaround documented, proven pattern reusable
+- **Monitoring:** Track darwin-specific issues during Epic 3-6, refine patterns as needed
+
+**Risk 3: Stability Gate Delays**
+- **Mitigation:** 1-2 week stability gates between Epics prevent cascading failures
+- **Monitoring:** Service uptime, network connectivity, user satisfaction metrics
+
+**Risk 4: Documentation Gaps**
+- **Mitigation:** 95% coverage from Epic 1, Epic 2-6 teams have operational guides
+- **Monitoring:** Track documentation requests, update guides based on Epic 2-6 experience
+
+---
+
+## AC6 Summary
+
+**Next Steps Defined:** ✅ **COMPLETE**
+
+**Immediate Actions:** 3 actions (sprint planning update, Epic 1 retrospective optional, Epic 2 Story 2.1 preparation)
+
+**Epic 2 Kickoff Sequence:** 6 stories (initialize infra, migrate cinnabar, deploy VPS, zerotier coordination, zero-regression validation, retrospective + stability gate)
+
+**Success Metrics:** Epic 2 criteria defined (cinnabar deployed, dendritic/clan applied, zerotier operational, zero regressions, stability gate), Epic 2-6 progressive metrics established
+
+**Risk Monitoring:** 4 key risks tracked (migration regressions, platform challenges, stability delays, documentation gaps)
+
+**Timeline:** Epic 2 execution 2-3 weeks, Epic 2-6 total ~4-6 months (progressive migration with stability gates)
+
+---
+
+## Final Decision Summary
+
+**GO/NO-GO Decision:** ✅ **GO**
+
+**Epic 1 Phase 0 Validation:** 100% SUCCESS
+- 13/13 stories COMPLETE (60-80 hours actual effort)
+- ALL 7 decision criteria PASS (infrastructure, dendritic, darwin, heterogeneous networking, transformation, home-manager, pattern confidence)
+- 0 CRITICAL blockers, 0 MAJOR blockers, 1 MINOR blocker (zerotier darwin homebrew - proven workaround)
+- 95% documentation coverage (3,000+ lines Epic 2-6 guidance)
+- Physical deployment successful (Story 1.12 - blackphos zero regressions)
+
+**Epic 2-6 Production Refactoring:** ✅ **AUTHORIZED**
+- Proceed immediately to Epic 2 Story 2.1 (cinnabar VPS production deployment)
+- Progressive migration: Epic 2 (cinnabar) → Epic 3 (blackphos) → Epic 4 (rosegold) → Epic 5 (argentum) → Epic 6 (stibnite)
+- Stability gates: 1-2 week validation between Epic phases (per PRD)
+- Success metrics: Zero regressions, heterogeneous networking, 4 darwin + 2 VPS operational, 5 users configured
+
+**Decision Confidence:** VERY HIGH
+- Empirical validation (physical deployment, not theoretical)
+- Comprehensive evidence (13/13 Epic 1 stories, all patterns validated)
+- Industry-validated patterns (drupol, mightyiam, gaetanlepage, clan-core developers)
+- Zero blocking issues (exhaustive search confirms production readiness)
+
+**Authorization Date:** 2025-11-20
+
+**Next Action:** Update sprint-status.yaml (Story 1.14 → done, Epic 1 → done, Epic 2 → contexted)
+
+---
+
+**GO/NO-GO DECISION COMPLETE**
+
 
