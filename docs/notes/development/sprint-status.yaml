@@ -276,14 +276,18 @@ development_status:
   # Estimated effort: 4-6 hours (deployment, zerotier darwin, network validation)
   # Strategic value: Proves heterogeneous networking, validates multi-platform coordination
   # Context XML generated (2025-11-17): 556 lines comprehensive context, 4 task groups, 6 ACs, 16 test ideas
-  1-12-deploy-blackphos-zerotier-integration: ready-for-dev
+  # COMPLETE (2025-11-19): All ACs satisfied, zerotier darwin integration validated, heterogeneous networking proven
+  # Zero regressions, cross-platform SSH validated, blackphos physical deployment successful
+  1-12-deploy-blackphos-zerotier-integration: done
   # Story 1.13: Document Integration Findings and Architectural Patterns
   # Consolidate Epic 1 learnings: terraform+clan, dendritic patterns, darwin integration, heterogeneous networking
   # Pattern confidence assessment (proven/needs-testing/uncertain), production refactoring recommendations
   # Prerequisites: Story 1.12 (blackphos deployed, heterogeneous networking validated)
   # Estimated effort: 3-4 hours (documentation consolidation)
   # Strategic value: Comprehensive blueprint for Epic 2-6, captures institutional knowledge
-  1-13-document-integration-findings: backlog
+  # COMPLETE (2025-11-19): Documentation deliverables complete (95% coverage, 3,000+ lines)
+  # Integration findings, architectural patterns, migration patterns, Epic 2-6 guidance all documented
+  1-13-document-integration-findings: done
   # Story 1.14: Execute GO/NO-GO Decision Framework
   # Evaluate Epic 1 Phase 0 results against decision criteria (infrastructure, patterns, darwin, networking, transformation)
   # Decision: GO (proceed Epic 2+), CONDITIONAL GO (proceed with cautions), NO-GO (resolve blockers)
