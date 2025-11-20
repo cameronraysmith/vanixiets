@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Architectural Validation + Migration Pattern Rehearsal (Phase 0)
 
-**Status:** drafted
+**Status:** ready-for-dev
 
 **Story Type:** Decision/Review Framework
 
@@ -1555,7 +1555,15 @@ Test-clan configurations:
 
 ### Context Reference
 
-<!-- Story Context XML path will be added here by story-context workflow -->
+- `docs/notes/development/work-items/1-14-execute-go-no-go-decision.context.xml` - Comprehensive Epic 1 decision framework context (387 lines)
+  - Epic 1 evidence sources (Stories 1.1-1.13 deliverables, test results, deployment logs)
+  - Epic 2-6 planning documents (transition readiness assessment)
+  - PRD and Architecture sharded docs (decision framework reference)
+  - test-clan architecture documentation (dendritic patterns, clan integration, Pattern A, secrets architecture)
+  - Story work items (1.12, 1.10BA, 1.10C, 1.10E, 1.13 validation evidence)
+  - Decision/review constraints (evidence-based, exhaustive search, traceability, pattern confidence)
+  - Decision framework interfaces (Epic 1 evidence, Epic 2-6 planning, test-clan architecture, decision document output)
+  - Testing standards (decision document validation, evidence traceability audit, AC1-AC6 validation)
 
 ### Agent Model Used
 
