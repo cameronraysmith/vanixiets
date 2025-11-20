@@ -207,11 +207,180 @@
     </dependencies>
   </artifacts>
 
-  <constraints>{{constraints}}</constraints>
-  <interfaces>{{interfaces}}</interfaces>
+  <constraints>
+    <!-- Decision/Review Story Constraints (NOT Implementation Story) -->
+    <constraint type="execution-pattern">Story 1.14 execution focuses on evidence review, assessment, and documentation - NOT code implementation, builds, or deployments</constraint>
+    <constraint type="evidence-based">ALL decision criteria evaluations (AC1) must cite specific Story 1.x deliverable, file path, test result, or deployment log - NO speculative assessments</constraint>
+    <constraint type="exhaustive-search">Blocker assessment (AC2) must document exhaustive search methodology to prove absence, not oversight - review ALL Epic 1 stories, Story 1.13 findings, Story 1.12 deployment, test suite, documentation completeness</constraint>
+    <constraint type="decision-logic">GO/CONDITIONAL GO/NO-GO decision (AC3) must follow explicit criteria: GO requires ALL AC1 PASS + zero CRITICAL/MAJOR blockers, CONDITIONAL GO requires MOST AC1 PASS + documented workarounds for MAJOR blockers, NO-GO requires ANY AC1 FAIL OR 1+ CRITICAL blocker</constraint>
+    <constraint type="traceability">Every PASS determination in AC1 must reference specific evidence location (e.g., "Story 1.7 completion notes lines 45-67, test suite passing, zero regression validation")</constraint>
+    <constraint type="pattern-confidence">AC1.7 pattern confidence assessment must evaluate ALL 7 patterns (dendritic flake-parts, clan inventory, terraform/terranix, sops-nix secrets, zerotier networking, home-manager Pattern A, overlay architecture) with HIGH/MEDIUM/LOW based on Epic 1 validation evidence</constraint>
+    <constraint type="epic-2-6-ready">AC4 transition plan must validate Epic 2-6 plan completeness (all 6 epics documented, stories enumerated, effort estimated, machine sequence validated, stability gates documented)</constraint>
+    <constraint type="migration-pattern-ready">AC4.2 must confirm migration pattern components ready for infra application: Story 1.13 migration-patterns.md (transformation steps), architecture guides (dendritic, clan, Pattern A), deployment checklists (zero-regression workflows), operational guides (user onboarding, age keys)</constraint>
+    <constraint type="blackphos-decision">AC4.4 must select blackphos management strategy: Option A (revert to infra Epic 3 migration, centralize production fleet) OR Option B (keep in test-clan, preserve validation environment) with explicit rationale</constraint>
+    <constraint type="documentation-output">Decision document output location: docs/notes/development/go-no-go-decision.md (new standalone) OR integrate into Story 1.13 integration findings doc (if comprehensive epic-level doc exists)</constraint>
+    <constraint type="sprint-status-updates">Story 1.14 completion triggers: (1) Story 1.14 status backlog → done, (2) IF GO: Epic 1 status backlog → done, Epic 2 status backlog → contexted</constraint>
+    <constraint type="zero-regression-validation">AC1.2 dendritic pattern validation must confirm zero regressions via test suite passing (18 tests) after Story 1.7 refactoring - no functionality losses acceptable</constraint>
+    <constraint type="cross-platform-validated">AC1.3 darwin integration and AC1.6 home-manager integration must confirm cross-platform proven: same modules work on both nixos (cinnabar, electrum) AND darwin (blackphos) platforms</constraint>
+    <constraint type="heterogeneous-network-proven">AC1.4 heterogeneous networking must confirm bidirectional connectivity: SSH access cinnabar ↔ electrum ↔ blackphos validated via zerotier network (network ID db4344343b14b903, <20ms latency)</constraint>
+    <constraint type="transformation-documented">AC1.5 transformation pattern must confirm infra → test-clan migration process documented with reusable checklists for Epic 2-6 (Story 1.8 blackphos transformation successful using documented approach)</constraint>
+    <constraint type="multi-user-validated">AC1.6 home-manager integration must confirm multi-user proven: crs58 (122 derivations), raquel (105 derivations), cameron, testuser configs all functional on respective platforms</constraint>
+    <constraint type="epic-1-completion-milestone">Story 1.14 is final Epic 1 story - completion = Epic 1 DONE milestone, triggers Epic 1 retrospective (optional), Epic 2 kickoff (if GO decision)</constraint>
+  </constraints>
+
+  <interfaces>
+    <!-- Decision/Review Story - No Traditional Code Interfaces -->
+    <!-- Interfaces here are Decision Framework Interaction Points -->
+
+    <interface name="Epic 1 Evidence Interface" kind="decision-input">
+      <description>Stories 1.1-1.13 deliverables, completion notes, test results, deployment logs serve as evidence inputs for AC1 decision criteria evaluation</description>
+      <location>docs/notes/development/epics/epic-1-architectural-validation-migration-pattern-rehearsal-phase-0.md + work-items/1-*.md</location>
+      <consumers>Task 1 (evidence gathering), Task 2 (decision framework evaluation)</consumers>
+    </interface>
+
+    <interface name="Epic 2-6 Planning Interface" kind="decision-input">
+      <description>Epic 2-6 planning documents validate production refactoring plan completeness for AC4 transition readiness assessment</description>
+      <location>docs/notes/development/epics/epic-{2,3,4,5,6,7}-*.md</location>
+      <consumers>Task 5 (GO/CONDITIONAL GO transition plan validation)</consumers>
+    </interface>
+
+    <interface name="test-clan Architecture Interface" kind="evidence-source">
+      <description>test-clan repository (~/projects/nix-workspace/test-clan/) contains validated architectural patterns: dendritic flake-parts, clan integration, Pattern A home-manager, two-tier secrets, infrastructure-as-code. Primary evidence source for AC1.2, AC1.3, AC1.6, AC1.7 pattern validation.</description>
+      <location>~/projects/nix-workspace/test-clan/ (README.md + docs/ + modules/ + vars/ + secrets/)</location>
+      <consumers>Task 1 (evidence gathering), Task 2 (AC1 decision criteria evaluation)</consumers>
+    </interface>
+
+    <interface name="Decision Document Interface" kind="decision-output">
+      <description>GO/NO-GO decision document (go-no-go-decision.md) produced by Story 1.14 execution containing AC1-AC6 sections: decision framework evaluation, blocker assessment, decision rendering, transition plan OR alternative approaches, next steps</description>
+      <location>docs/notes/development/go-no-go-decision.md (new) OR integrated into Story 1.13 integration findings (if exists)</location>
+      <producers>Task 4 (decision rendering), Task 5 (GO transition plan), Task 6 (NO-GO alternatives), Task 7 (next steps)</producers>
+      <consumers>Epic 2 Story 2.1 (GO decision authorization), Epic 1 retrospective (completion milestone), stakeholders (production migration authorization)</consumers>
+    </interface>
+
+    <interface name="Sprint Status Interface" kind="tracking-output">
+      <description>sprint-status.yaml updates triggered by Story 1.14 completion: Story 1.14 done, Epic 1 done (if GO), Epic 2 contexted (if GO)</description>
+      <location>docs/notes/development/sprint-status.yaml</location>
+      <producers>Task 8 (sprint status updates)</producers>
+      <consumers>Sprint planning, Epic 2 kickoff (if GO decision)</consumers>
+    </interface>
+  </interfaces>
+
   <tests>
-    <standards>{{test_standards}}</standards>
-    <locations>{{test_locations}}</locations>
-    <ideas>{{test_ideas}}</ideas>
+    <standards>
+      Story 1.14 is Decision/Review Framework - NOT implementation story. Testing focuses on decision document validation, evidence traceability, and decision logic soundness rather than code tests.
+
+      Validation Approach:
+      1. Decision document completeness: All ACs (AC1-AC6) addressed with required sections
+      2. Evidence citation traceability: Every PASS determination references specific Story 1.x deliverable, file path, test result
+      3. Decision logic soundness: GO/CONDITIONAL GO/NO-GO based on explicit criteria (AC1 evaluation + AC2 blocker assessment)
+      4. Next steps actionability: Epic 2 transition OR resolution work well-defined and executable
+      5. Sprint status accuracy: Updates match decision outcome (Story 1.14 done, Epic 1 done if GO, Epic 2 contexted if GO)
+
+      Epic 1 Test Suite Evidence (for AC1.2 dendritic pattern validation):
+      - test-clan test harness (Story 1.6): 18 tests total (12 nix-unit + 4 validation + 2 integration)
+      - Auto-discovery functional (import-tree validates module structure)
+      - Zero regressions (all tests passing after Story 1.7 dendritic refactoring)
+      - Location: ~/projects/nix-workspace/test-clan/modules/checks/ (nix-unit.nix, integration.nix, validation.nix)
+
+      Build Validation Evidence (for AC1.3 darwin integration, AC1.6 home-manager feature parity):
+      - darwinConfigurations.blackphos.system BUILDS (Story 1.10BA, 1.10E validated)
+      - homeConfigurations.aarch64-darwin.crs58 BUILDS (122 derivations, Story 1.12 validated)
+      - homeConfigurations.aarch64-darwin.raquel BUILDS (105 derivations, Story 1.12 validated)
+      - nixosConfigurations.cinnabar BUILDS (Story 1.10A validated)
+      - nixosConfigurations.electrum BUILDS (Story 1.9 validated)
+    </standards>
+
+    <locations>
+      <!-- Decision Document Validation -->
+      docs/notes/development/go-no-go-decision.md (expected output location)
+      docs/notes/development/sprint-status.yaml (tracking updates location)
+
+      <!-- Epic 1 Test Suite (Evidence Source) -->
+      ~/projects/nix-workspace/test-clan/modules/checks/nix-unit.nix (11 expression evaluation tests)
+      ~/projects/nix-workspace/test-clan/modules/checks/integration.nix (2 VM boot tests, Linux-only)
+      ~/projects/nix-workspace/test-clan/modules/checks/validation.nix (4 property validation tests)
+      ~/projects/nix-workspace/test-clan/modules/checks/performance.nix (CI tests skeleton, deferred)
+
+      <!-- Build Validation (Evidence Source) -->
+      ~/projects/nix-workspace/test-clan/flake.nix (configurations: darwinConfigurations, homeConfigurations, nixosConfigurations)
+      nix build ~/projects/nix-workspace/test-clan#darwinConfigurations.blackphos.system (darwin build validation)
+      nix build ~/projects/nix-workspace/test-clan#homeConfigurations.aarch64-darwin.crs58.activationPackage (home build validation)
+      nix build ~/projects/nix-workspace/test-clan#nixosConfigurations.cinnabar.config.system.build.toplevel (nixos build validation)
+
+      <!-- Deployment Logs (Evidence Source) -->
+      Story 1.5 completion notes (Hetzner VM deployment logs, cinnabar operational)
+      Story 1.9 completion notes (zerotier network establishment, bidirectional connectivity 1-12ms)
+      Story 1.12 completion notes (blackphos physical deployment, heterogeneous networking validation, zero regressions)
+    </locations>
+
+    <ideas>
+      <!-- AC1 Decision Framework Evaluation Validation -->
+      <test id="AC1-validation" ac="AC1">
+        Validate decision framework evaluation completeness:
+        - ALL 7 criteria assessed (AC1.1 infrastructure, AC1.2 dendritic, AC1.3 darwin, AC1.4 heterogeneous, AC1.5 transformation, AC1.6 home-manager, AC1.7 pattern confidence)
+        - Each criterion has explicit PASS/FAIL determination
+        - Each PASS cites specific Story 1.x evidence (deliverable, file path, test result, deployment log)
+        - Each confidence level (HIGH/MEDIUM/LOW) has rationale tied to Epic 1 validation scope
+        - Pattern confidence summary table includes all 7 patterns (dendritic, clan, terraform, sops-nix, zerotier, home-manager, overlays)
+      </test>
+
+      <!-- AC2 Blocker Assessment Validation -->
+      <test id="AC2-validation" ac="AC2">
+        Validate blocker assessment exhaustiveness:
+        - Methodology documented (how exhaustive search conducted across Epic 1 stories, Story 1.13 findings, Story 1.12 deployment, test suite, documentation)
+        - Blockers classified by severity (CRITICAL/MAJOR/MINOR using AC2 definitions)
+        - If zero blockers: exhaustive search process documented to prove absence, not oversight
+        - Blocker summary table includes count, severity, production readiness assessment
+      </test>
+
+      <!-- AC3 Decision Rendering Validation -->
+      <test id="AC3-validation" ac="AC3">
+        Validate decision rendering logic:
+        - Decision outcome (GO/CONDITIONAL GO/NO-GO) follows explicit criteria from AC3
+        - GO decision: Validates ALL AC1 PASS + zero CRITICAL/MAJOR blockers
+        - CONDITIONAL GO decision: Validates MOST AC1 PASS + documented workarounds for MAJOR blockers
+        - NO-GO decision: Validates ANY AC1 FAIL OR 1+ CRITICAL blocker identified
+        - Decision rationale explicitly ties to AC1 evaluation results + AC2 blocker assessment
+        - Evidence traceability complete (every decision point references specific Epic 1 validation)
+      </test>
+
+      <!-- AC4 Transition Plan Validation (if GO/CONDITIONAL GO) -->
+      <test id="AC4-validation" ac="AC4">
+        Validate GO/CONDITIONAL GO transition plan completeness:
+        - Epic 2-6 plan validated (all 6 epics documented, stories enumerated, effort estimated, machine sequence confirmed)
+        - Migration pattern components identified (Story 1.13 migration-patterns.md, architecture guides, deployment checklists, operational guides)
+        - test-clan configs readiness confirmed (cinnabar, electrum, portable home modules crs58/raquel/cameron, secrets structure)
+        - Blackphos management decision made (Option A revert to infra OR Option B keep in test-clan with rationale)
+        - Epic 2 immediate next steps defined (Story 2.1-2.6 sequence, timeline, success metrics)
+      </test>
+
+      <!-- AC6 Next Steps Validation -->
+      <test id="AC6-validation" ac="AC6">
+        Validate next steps actionability based on decision outcome:
+        - IF GO: Immediate actions defined (sprint planning update, Epic 1 retrospective, Epic 2 Story 2.1 preparation), Epic 2 kickoff sequence (Story 2.1-2.6), success metrics (cinnabar deployed, dendritic+clan applied, zerotier operational, stability gate)
+        - IF CONDITIONAL GO: Conditions tracking defined (conditions.md creation, mitigation strategies, re-evaluation checkpoints)
+        - IF NO-GO: Resolution work defined (halt Epic 2-6 planning, resolution stories Epic 1.15-1.16, stakeholder communication, retry timeline)
+        - Next steps executable without ambiguity
+      </test>
+
+      <!-- Sprint Status Update Validation -->
+      <test id="sprint-status-validation" ac="Task 8">
+        Validate sprint-status.yaml updates match decision outcome:
+        - Story 1.14 status updated: backlog → done (always, regardless of decision)
+        - IF GO: Epic 1 status updated: backlog → done (Epic 1 complete milestone)
+        - IF GO: Epic 2 status updated: backlog → contexted (ready for story drafting)
+        - ALL comments and STATUS DEFINITIONS structure preserved in sprint-status.yaml
+        - Story key 1-14-execute-go-no-go-decision found and updated correctly
+      </test>
+
+      <!-- Evidence Traceability Audit -->
+      <test id="evidence-traceability" ac="AC1+AC3">
+        Audit evidence traceability across decision document:
+        - Every AC1 PASS determination cites specific evidence location (Story 1.x, file path, line range when applicable)
+        - Example citations validate: "Story 1.7 completion, test suite passing (18/18 tests), zero regression validation per test harness results"
+        - Pattern confidence assessments tie to specific stories: "Dendritic flake-parts confidence HIGH - Stories 1.1, 1.6-1.7 validation, test harness continuous validation"
+        - No speculative assessments (all claims backed by Epic 1 deliverable evidence)
+      </test>
+    </ideas>
   </tests>
 </story-context>
