@@ -40,9 +40,171 @@
   </acceptanceCriteria>
 
   <artifacts>
-    <docs>{{docs_artifacts}}</docs>
-    <code>{{code_artifacts}}</code>
-    <dependencies>{{dependencies_artifacts}}</dependencies>
+    <docs>
+      <!-- Epic 1 Evidence Sources -->
+      <artifact path="docs/notes/development/epics/epic-1-architectural-validation-migration-pattern-rehearsal-phase-0.md" title="Epic 1: Architectural Validation + Migration Pattern Rehearsal (Phase 0)" section="Complete Epic Definition">
+        Epic 1 master document defining all 14 stories (1.1-1.14), acceptance criteria, success criteria, and Phase 0 validation objectives. Stories 1.1-1.13 COMPLETE per user context. Critical evidence source for AC1 validation criteria evaluation and AC4 pattern readiness assessment.
+      </artifact>
+
+      <!-- Epic 2-6 Planning Documents (AC4 Transition Readiness) -->
+      <artifact path="docs/notes/development/epics/epic-2-vps-infrastructure-foundation-phase-1-cinnabar.md" title="Epic 2: VPS Infrastructure Foundation (Phase 1)" section="Production Deployment Plan">
+        Epic 2 defines cinnabar VPS production deployment (6 stories, 30-40h estimated). GO decision gates Epic 2 execution. Validates Epic 2-6 plan completeness for AC4.
+      </artifact>
+
+      <artifact path="docs/notes/development/epics/epic-3-first-darwin-migration-phase-2-blackphos.md" title="Epic 3: First Darwin Migration (Phase 2)" section="Blackphos Production Migration">
+        Epic 3 defines blackphos test-clan → infra migration (5 stories, 25-30h estimated). AC4.4 blackphos management decision (Option A: revert to infra vs Option B: keep in test-clan).
+      </artifact>
+
+      <artifact path="docs/notes/development/epics/epic-4-multi-darwin-validation-phase-3-rosegold.md" title="Epic 4: Multi-Darwin Validation (Phase 3)" section="Rosegold Migration">
+        Epic 4 defines rosegold migration (3 stories, 20-25h estimated). Validates Epic 2-6 progressive migration plan documented.
+      </artifact>
+
+      <artifact path="docs/notes/development/epics/epic-5-third-darwin-host-phase-4-argentum.md" title="Epic 5: Third Darwin Host (Phase 4)" section="Argentum Migration">
+        Epic 5 defines argentum migration (2 stories, 15-20h estimated). Validates Epic 2-6 scaling approach.
+      </artifact>
+
+      <artifact path="docs/notes/development/epics/epic-6-primary-workstation-migration-phase-5-stibnite.md" title="Epic 6: Primary Workstation Migration (Phase 5)" section="Stibnite Migration">
+        Epic 6 defines stibnite (primary workstation) migration (3 stories, 25-30h estimated). Final production fleet machine.
+      </artifact>
+
+      <!-- PRD Evidence (Decision Framework Reference) -->
+      <artifact path="docs/notes/development/PRD/index.md" title="infra - Product Requirements Document" section="Complete TOC">
+        PRD index with sharded structure. References executive summary, project classification, success criteria (Phase 0 GO/NO-GO decision gate), product scope (MVP components), innovation patterns, functional requirements FR-1 through FR-5, non-functional requirements. AC1 decision framework alignment.
+      </artifact>
+
+      <artifact path="docs/notes/development/PRD/success-criteria.md" title="PRD Success Criteria" section="Phase 0-6 Success Definitions">
+        Defines Phase 0 success criteria (test-clan validation, GO/NO-GO decision gate) and Phase 1-6 progressive success criteria. AC1 evaluation must validate Phase 0 success achieved.
+      </artifact>
+
+      <!-- Architecture Evidence (Decision Framework Reference) -->
+      <artifact path="docs/notes/development/architecture/index.md" title="Architecture" section="Complete TOC">
+        Architecture index with sharded structure. References executive summary, project initialization, decision summary, architectural decisions (user management, home-manager patterns), project structure, epic-to-architecture mapping, technology stack, novel pattern designs, implementation patterns, data architecture, API contracts, security architecture, performance considerations, deployment architecture, darwin networking options, ADRs. AC1 pattern validation alignment.
+      </artifact>
+
+      <artifact path="docs/notes/development/architecture/architectural-decisions.md" title="Architectural Decisions" section="User Management + Home-Manager Pattern Decisions">
+        Documents two critical architectural decisions: (1) User Management Decision - Traditional users.users.* approach vs clan users service (selected traditional for darwin compatibility + UID control), (2) Home-Manager Pattern Decision - User-based modules (Pattern A) vs profile-based modules (Pattern B). AC1.6 home-manager integration evidence.
+      </artifact>
+
+      <artifact path="docs/notes/development/architecture/darwin-networking-options.md" title="Darwin Networking Options" section="Zerotier Integration Approaches">
+        Documents three zerotier darwin integration options: (1) Homebrew Zerotier (maintains consistency), (2) Custom Launchd Service (full Nix control), (3) Hybrid Clan Vars + Manual Zerotier (pragmatic). Story 1.12 validated Option 1 (Homebrew) approach. AC1.4 heterogeneous networking evidence.
+      </artifact>
+
+      <artifact path="docs/notes/development/architecture/architecture-decision-records-adrs.md" title="Architecture Decision Records (ADRs)" section="ADR-001 through ADR-006">
+        Six ADRs documenting major architectural decisions: ADR-001 (Adopt Dendritic + Clan), ADR-002 (ZFS Unencrypted, Defer LUKS), ADR-003 (Progressive Migration + Stability Gates), ADR-004 (Darwin Networking Options), ADR-005 (Multi-User via Standard NixOS), ADR-006 (Remove nixos-unified Post-Migration). AC1 architectural pattern validation.
+      </artifact>
+
+      <!-- test-clan Architecture Documentation (Critical for AC1 Pattern Validation) -->
+      <artifact path="~/projects/nix-workspace/test-clan/README.md" title="test-clan README" section="Complete Repository Overview">
+        test-clan Phase 0 validation environment. Documents purpose (architectural validation + infrastructure deployment), scope (dendritic + clan integration validation), architecture (7 key patterns validated including dendritic flake-parts, two-tier secrets, infrastructure-as-code), structure (83 auto-discovered modules), flake inputs, terraform/terranix setup, common pitfalls, development workflow, deployment with nh CLI, testing (comprehensive test harness), secrets/vars architecture. CRITICAL evidence source for AC1.2 (dendritic pattern), AC1.3 (darwin integration), AC1.6 (home-manager Pattern A).
+      </artifact>
+
+      <artifact path="~/projects/nix-workspace/test-clan/docs/architecture/dendritic-pattern.md" title="test-clan Dendritic Pattern Deep-Dive" section="Pattern Explanation + Validation">
+        Expected location for dendritic pattern architecture documentation. AC1.2 dendritic flake-parts pattern validation evidence. If exists: pattern definition, auto-discovery mechanics, namespace exports, module organization principles.
+      </artifact>
+
+      <artifact path="~/projects/nix-workspace/test-clan/docs/architecture/secrets-and-vars-architecture.md" title="test-clan Secrets Architecture" section="Two-Tier Secrets System">
+        Expected location for two-tier secrets architecture documentation (clan vars for system + sops-nix for user secrets, shared age keypair validated in Story 1.10C). AC1 pattern confidence assessment evidence.
+      </artifact>
+
+      <artifact path="~/projects/nix-workspace/test-clan/docs/architecture/file-structure.md" title="test-clan File Structure Reference" section="Complete Directory Tree">
+        Expected location for complete directory tree and module organization details. AC1.2 dendritic pattern validation, AC1.5 transformation pattern evidence.
+      </artifact>
+
+      <artifact path="~/projects/nix-workspace/test-clan/docs/guides/machine-management.md" title="test-clan Machine Management Guide" section="Operational Procedures">
+        Expected location for machine management operational guide (adding/updating machines, age keys, troubleshooting). AC4.2 migration pattern readiness, AC1.5 transformation pattern documentation.
+      </artifact>
+
+      <artifact path="~/projects/nix-workspace/test-clan/docs/guides/age-key-management.md" title="test-clan Age Key Management" section="SSH-to-Age Derivation + Key Rotation">
+        Expected location for age key operational guide (SSH-to-age derivation, key rotation, sops-nix integration). AC1 pattern confidence, AC4.2 migration pattern components.
+      </artifact>
+
+      <artifact path="~/projects/nix-workspace/test-clan/docs/guides/adding-users.md" title="test-clan User Onboarding Guide" section="Adding New Users with Clan Inventory">
+        Expected location for user onboarding guide. AC1.6 home-manager integration, AC4.2 migration pattern operational procedures.
+      </artifact>
+
+      <!-- Story 1.13 Integration Findings (Expected per Validation Report) -->
+      <artifact path="docs/notes/development/work-items/1-13-document-integration-findings.md" title="Story 1.13: Document Integration Findings" section="Epic 1 Phase 6 Documentation Story">
+        Story 1.13 work item documenting Epic 1 integration findings, architectural patterns, migration patterns, Epic 2-6 guidance (3,000+ lines expected). AC1.5 transformation pattern documentation, AC1.7 pattern confidence assessment, AC2 known limitations/blockers, AC4.2 migration readiness. NOTE: User validation report indicates this story COMPLETE but may not have generated separate integration findings doc - may be integrated into test-clan docs or architecture docs.
+      </artifact>
+
+      <!-- Story 1.12 Physical Deployment Evidence (AC1.3, AC1.4 Critical) -->
+      <artifact path="docs/notes/development/work-items/1-12-deploy-blackphos-zerotier-integration.md" title="Story 1.12: Deploy Blackphos + Zerotier Integration" section="Physical Hardware Deployment + Heterogeneous Networking">
+        Story 1.12 work item documenting blackphos physical deployment to hardware, zerotier darwin integration (homebrew cask + activation script pattern), heterogeneous networking validation (SSH cinnabar ↔ electrum ↔ blackphos), zero-regression validation (crs58 + raquel workflows intact). AC1.3 darwin integration PASS evidence, AC1.4 heterogeneous networking PASS evidence, AC2 zerotier homebrew dependency (MINOR blocker with documented workaround).
+      </artifact>
+
+      <!-- Additional Work Items for Evidence Gathering -->
+      <artifact path="docs/notes/development/work-items/1-10ba-refactor-home-modules-to-pattern-a.md" title="Story 1.10BA: Refactor Home Modules to Pattern A" section="Pattern A Dendritic Aggregates">
+        Story 1.10BA documenting Pattern A refactoring (17 modules in dendritic aggregates: development, ai, shell). AC1.6 home-manager integration evidence, AC1.7 pattern confidence (Pattern A HIGH).
+      </artifact>
+
+      <artifact path="docs/notes/development/work-items/1-10c-migrate-secrets-to-sops-nix.md" title="Story 1.10C: Migrate Secrets to sops-nix" section="Two-Tier Secrets Architecture Validation">
+        Story 1.10C documenting two-tier secrets architecture implementation (clan vars for system, sops-nix for user secrets, shared age keypair). AC1.7 pattern confidence (sops-nix secrets HIGH), AC4.2 secrets architecture migration readiness.
+      </artifact>
+
+      <artifact path="docs/notes/development/work-items/1-10e-enable-remaining-features.md" title="Story 1.10E: Enable Remaining Features" section="Feature Enablement Complete">
+        Story 1.10E documenting feature enablement (claude-code, catppuccin, ccstatusline all functional using two-tier secrets). AC1.6 home-manager integration (feature parity 270 packages, 17 modules preserved).
+      </artifact>
+
+      <!-- Validation Report (Independent Quality Review) -->
+      <artifact path="docs/notes/development/work-items/validation-report-2025-11-20-130959.md" title="Story 1.14 Independent Validation Report" section="Quality Review Results">
+        Independent validation report for Story 1.14 draft (94% quality score, 0 critical, 0 major, 3 minor issues). Validates Story 1.14 definition quality before context generation. User prompt indicates Story 1.14 passed quality review and ready for context generation.
+      </artifact>
+    </docs>
+
+    <code>
+      <!-- This story is Decision/Review Framework - no code implementation expected -->
+      <!-- Evidence gathering relies on documentation artifacts above -->
+      <!-- test-clan repository contains validated architectural patterns for AC1 evaluation -->
+
+      <artifact path="~/projects/nix-workspace/test-clan/flake.nix" kind="flake" symbol="flake.nix" lines="1-23" reason="Minimal flake with import-tree integration (23 lines). AC1.2 dendritic pattern validation - proves pure auto-discovery without manual imports."/>
+
+      <artifact path="~/projects/nix-workspace/test-clan/modules/" kind="directory" symbol="modules/" lines="N/A" reason="83 auto-discovered .nix modules across clan/, darwin/, home/, machines/, nixpkgs/, system/, terranix/, checks/. AC1.2 dendritic pattern validation - complete module namespace organization."/>
+
+      <artifact path="~/projects/nix-workspace/test-clan/modules/clan/machines.nix" kind="module" symbol="config.flake.machines" lines="N/A" reason="Clan inventory machine definitions (cinnabar, electrum, blackphos). AC1.1 infrastructure deployment, AC1.3 darwin integration, AC1.4 heterogeneous networking evidence."/>
+
+      <artifact path="~/projects/nix-workspace/test-clan/modules/home/users/crs58/" kind="directory" symbol="modules/home/users/crs58/" lines="N/A" reason="Portable crs58 home-manager module extracted in Story 1.8A. AC1.6 home-manager cross-platform integration - same module works nixos + darwin."/>
+
+      <artifact path="~/projects/nix-workspace/test-clan/modules/home/users/raquel/" kind="directory" symbol="modules/home/users/raquel/" lines="N/A" reason="Portable raquel home-manager module extracted in Story 1.8A. AC1.6 home-manager cross-platform integration, multi-user validation."/>
+
+      <artifact path="~/projects/nix-workspace/test-clan/modules/checks/" kind="directory" symbol="modules/checks/" lines="N/A" reason="Test suite (nix-unit.nix, integration.nix, validation.nix, performance.nix) with 18 tests. AC1.2 dendritic pattern zero-regression evidence, AC2 blocker assessment (test suite passing = zero critical issues)."/>
+
+      <artifact path="~/projects/nix-workspace/test-clan/secrets/home-manager/users/crs58/secrets.yaml" kind="file" symbol="sops secrets" lines="N/A" reason="User-level sops-nix encrypted secrets for crs58 (8 secrets). AC1.7 pattern confidence (sops-nix two-tier architecture validated)."/>
+
+      <artifact path="~/projects/nix-workspace/test-clan/vars/" kind="directory" symbol="clan vars/" lines="N/A" reason="Clan-generated system-level secrets (SSH host keys, zerotier identities, ZFS/LUKS passphrases). AC1.7 pattern confidence (clan vars tier 1 validated)."/>
+    </code>
+
+    <dependencies>
+      <!-- Nix Flake Inputs (validated in test-clan Phase 0) -->
+      <nix>
+        <input name="nixpkgs" version="unstable" reason="NixOS package collection, primary package source"/>
+        <input name="flake-parts" version="latest" reason="Module system foundation for dendritic pattern"/>
+        <input name="clan-core" version="main" reason="Multi-machine coordination, service instances, vars/secrets, inventory"/>
+        <input name="import-tree" version="latest" reason="Automatic module discovery for dendritic auto-discovery pattern"/>
+        <input name="terranix" version="latest" reason="Terraform configuration via Nix (infrastructure-as-code)"/>
+        <input name="disko" version="latest" reason="Declarative disk partitioning (ZFS, LUKS encryption)"/>
+        <input name="srvos" version="latest" reason="Server hardening modules and security baseline"/>
+        <input name="nix-unit" version="latest" reason="Expression-level testing framework (18 tests in test harness)"/>
+        <input name="sops-nix" version="latest" reason="User-level secrets management (two-tier architecture tier 2)"/>
+        <input name="home-manager" version="latest" reason="Cross-platform user configuration management (Pattern A validated)"/>
+      </nix>
+
+      <!-- Infrastructure Dependencies (Hetzner VMs deployed in Story 1.5) -->
+      <infrastructure>
+        <provider name="Hetzner Cloud" version="hcloud API" reason="VPS hosting (cinnabar CX43 deployed, electrum CCX23 deployed)"/>
+        <tool name="OpenTofu" version="latest" reason="Terraform fork used for infrastructure provisioning"/>
+        <tool name="zerotier-one" version="latest" reason="Heterogeneous VPN (nixos clan-core module + darwin homebrew cask)"/>
+      </infrastructure>
+
+      <!-- Build/Test Tools -->
+      <tools>
+        <tool name="just" version="latest" reason="Development task runner (justfile recipes)"/>
+        <tool name="nh" version="latest" reason="Improved nix deployment UX (darwin switch, home switch)"/>
+        <tool name="nom" version="latest" reason="Better nix build output"/>
+        <tool name="treefmt" version="latest" reason="Code formatting orchestration"/>
+        <tool name="nixfmt-rfc-style" version="latest" reason="Nix code formatter"/>
+        <tool name="gitleaks" version="latest" reason="Pre-commit secrets scanning"/>
+      </tools>
+    </dependencies>
   </artifacts>
 
   <constraints>{{constraints}}</constraints>
