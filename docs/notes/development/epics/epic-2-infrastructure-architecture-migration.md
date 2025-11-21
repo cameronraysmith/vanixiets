@@ -328,10 +328,10 @@ So that infra repository has continuous validation for architectural invariants.
 - ✅ Comprehensive documentation (Story 1.13, 3,000+ lines)
 
 **Enables:**
-- Epic 3 (was Epic 4): Rosegold deployment and multi-darwin validation
-- Epic 4 (was Epic 5): Argentum deployment
-- Epic 5 (was Epic 6): Extended stibnite validation [OPTIONAL]
-- Epic 6 (was Epic 7): Legacy cleanup
+- Epic 3: Rosegold deployment and multi-darwin validation
+- Epic 4: Argentum deployment
+- Epic 5: Extended stibnite validation [OPTIONAL - execute if Epic 2 Phase 2 shows instability]
+- Epic 6: Legacy cleanup
 
 ---
 
