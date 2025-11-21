@@ -312,53 +312,136 @@ development_status:
   # Epic 1 investment: 60-80h actual → Epic 2-6 ROI: 0.9x-1.4x immediate, strategic value enables 200+h Epic 2-6 with high confidence
   # Commits: 5 atomic commits (Task 1 evidence gathering, AC1 evaluation, AC2 blockers, AC3 GO decision, AC4/AC6 transition plan)
   1-14-execute-go-no-go-decision: done
-  epic-1-retrospective: optional
+  # Epic 1 Retrospective: COMPLETE (2025-11-20) - Comprehensive review of Epic 1 learnings, action items for Epic 2, course-correction workflow identified
+  epic-1-retrospective: done
 
-  # Epic 2: VPS Infrastructure Foundation (Phase 1 - cinnabar)
+  # Epic 2 (Phase 1-4) - Infrastructure Architecture Migration
   # CONTEXTED (2025-11-20): Epic 1 Story 1.14 GO decision authorizes Epic 2-6 progressive migration
-  # Ready for story drafting: 6 stories (initialize infra dendritic+clan, migrate cinnabar, deploy VPS, zerotier coordination, zero-regression validation, retrospective)
-  # Estimated effort: 30-40h (22-36h stories + 1-2 week stability gate)
+  # SPRINT CHANGE (2025-11-20): Redefined from Phase 1 only → Phase 1-4 (6 stories → 13 stories)
+  # Apply validated test-clan patterns to infra repository across 4 phases:
+  # Phase 1: Home-manager foundation (Pattern A migration, secrets two-tier)
+  # Phase 2: Darwin workstations (blackphos + stibnite config migration, zerotier darwin)
+  # Phase 3: VPS migration (cinnabar + electrum config migration, infrastructure already deployed)
+  # Phase 4: Future machines (rosegold + argentum config creation, test harness migration)
+  # "Rip the band-aid" strategy - comprehensive migration with all patterns applied
   epic-2: contexted
-  2-1-apply-phase-0-patterns-to-nix-config-and-setup-terraform-terranix: backlog
-  2-2-create-cinnabar-host-configuration-with-disko-and-luks: backlog
-  2-3-configure-zerotier-controller-and-essential-clan-services-for-cinnabar: backlog
-  2-4-initialize-clan-secrets-and-generate-vars-for-cinnabar: backlog
-  2-5-deploy-cinnabar-vps-via-terraform-and-clan-machines-install: backlog
-  2-6-validate-cinnabar-infrastructure-and-zerotier-controller: backlog
+  epic-2-notes: |
+    Apply validated test-clan patterns to infra repository.
+    4 phases: (1) Home-manager foundation, (2) Darwin workstations (blackphos+stibnite),
+    (3) VPS migration (cinnabar+electrum), (4) Future machines (rosegold+argentum).
+    13 stories total. "Rip the band-aid" strategy.
+
+  # Phase 1: Home-Manager Migration Foundation (4 stories)
+  story-2-1: backlog
+  story-2-1-title: "Identify infra-specific components to preserve"
+  story-2-2: backlog
+  story-2-2-title: "Stibnite vs blackphos configuration diff analysis"
+  story-2-3: backlog
+  story-2-3-title: "Home-manager Pattern A migration"
+  story-2-4: backlog
+  story-2-4-title: "Home-manager secrets migration"
+
+  # Phase 2: Active Darwin Workstations (4 stories)
+  story-2-5: backlog
+  story-2-5-title: "Blackphos config migration to infra"
+  story-2-6: backlog
+  story-2-6-title: "Stibnite config migration"
+  story-2-7: backlog
+  story-2-7-title: "Activate blackphos and stibnite from infra"
+  story-2-8: backlog
+  story-2-8-title: "Cleanup unused darwin configs"
+
+  # Phase 3: VPS Migration (2 stories)
+  story-2-9: backlog
+  story-2-9-title: "Cinnabar config migration"
+  story-2-10: backlog
+  story-2-10-title: "Electrum config migration"
+
+  # Phase 4: Future Machines (3 stories)
+  story-2-11: backlog
+  story-2-11-title: "Rosegold configuration creation"
+  story-2-12: backlog
+  story-2-12-title: "Argentum configuration creation"
+  story-2-13: backlog
+  story-2-13-title: "Test harness migration and validation"
+
   epic-2-retrospective: optional
 
-  # Epic 3: First Darwin Migration (Phase 2 - blackphos)
+  # Epic 3 - First Darwin Migration (blackphos) - CONSOLIDATED
+  # SPRINT CHANGE (2025-11-20): Work completed in Epic 1 Stories 1.8, 1.8A, 1.10BA-1.10E, 1.12
+  # 270 packages preserved, zerotier validated, physical deployment successful
+  # Remaining work: Epic 2 Phase 2 Stories 2.5, 2.7 (config migration to infra)
+  epic-3-consolidation: consolidated
+  epic-3-consolidation-notes: |
+    Work completed in Epic 1 Stories 1.8, 1.8A, 1.10BA-1.10E, 1.12.
+    270 packages preserved, zerotier validated, physical deployment successful.
+    Remaining: Epic 2 Phase 2 Stories 2.5, 2.7 (config migration to infra).
+    See: docs/notes/development/epics/epic-3-first-darwin-migration-phase-2-blackphos.md
+
+  # Epic 3 (Phase 2) - Multi-Darwin Validation (rosegold)
+  # SPRINT CHANGE (2025-11-20): Renumbered from Epic 4, depends on Epic 2 complete
   epic-3: backlog
-  3-1-convert-darwin-modules-to-dendritic-flake-parts-pattern-for-blackphos: backlog
-  3-2-add-blackphos-to-clan-inventory-with-zerotier-peer-role: backlog
-  3-3-generate-clan-vars-and-deploy-blackphos-configuration: backlog
-  3-4-validate-blackphos-functionality-and-network-connectivity: backlog
-  3-5-document-darwin-patterns-and-monitor-stability: backlog
+  epic-3-notes: |
+    Deploy rosegold (janettesmith's darwin workstation) and validate multi-darwin coordination.
+    Depends on Epic 2 complete.
+  story-3-1: backlog
+  story-3-1-title: "Deploy rosegold and validate functionality"
+  story-3-2: backlog
+  story-3-2-title: "Validate multi-darwin coordination"
+  story-3-3: backlog
+  story-3-3-title: "Stability validation and Epic 4 readiness"
   epic-3-retrospective: optional
 
-  # Epic 4: Multi-Darwin Validation (Phase 3 - rosegold)
+  # Epic 4 (Phase 3) - Third Darwin Host (argentum)
+  # SPRINT CHANGE (2025-11-20): Renumbered from Epic 5, depends on Epic 3 complete
   epic-4: backlog
-  4-1-create-rosegold-configuration-using-blackphos-patterns: backlog
-  4-2-add-rosegold-to-clan-inventory-and-deploy: backlog
-  4-3-validate-3-machine-network-and-multi-darwin-coordination: backlog
+  epic-4-notes: |
+    Deploy argentum (christophersmith's darwin workstation) and validate 4-machine network.
+    Depends on Epic 3 complete.
+  story-4-1: backlog
+  story-4-1-title: "Deploy argentum and validate functionality"
+  story-4-2: backlog
+  story-4-2-title: "Validate 4-machine network and assess Epic 5 readiness"
   epic-4-retrospective: optional
 
-  # Epic 5: Third Darwin Host (Phase 4 - argentum)
-  epic-5: backlog
-  5-1-create-argentum-configuration-and-deploy-to-4-machine-network: backlog
-  5-2-validate-4-machine-network-and-assess-stibnite-readiness: backlog
+  # Epic 5 (Phase 4) - Primary Workstation Validation (stibnite) - OPTIONAL
+  # SPRINT CHANGE (2025-11-20): Renumbered from Epic 6, marked OPTIONAL with execution criteria
+  epic-5: optional
+  epic-5-notes: |
+    Extended stibnite stability validation (CONDITIONAL - evaluate at Epic 4 completion).
+    Execute ONLY IF Epic 2 Phase 2 deployment shows instability requiring observation period.
+    Decision criteria: Skip if stibnite stable 2+ weeks post-Epic 2 with zero critical issues.
+    If skipped: Proceed Epic 4 → Epic 6 directly.
+  story-5-1: optional
+  story-5-1-title: "Extended stibnite stability validation [OPTIONAL]"
+  story-5-1-notes: |
+    Monitor stibnite 2-4 weeks post-Epic 2 Phase 2. Track crs58 workflow stability.
+    If issues: Create fix stories. If stable: Document success, proceed to Epic 6.
+  epic-5-execution-criteria: "Evaluate at Epic 4 completion - execute if Epic 2 Phase 2 shows instability"
   epic-5-retrospective: optional
 
-  # Epic 6: Primary Workstation Migration (Phase 5 - stibnite)
+  # Epic 6 (Phase 5) - Legacy Cleanup
+  # SPRINT CHANGE (2025-11-20): Renumbered from Epic 7, depends on Epic 4 + Epic 5 (if executed)
   epic-6: backlog
-  6-1-validate-pre-migration-readiness-and-create-stibnite-configuration: backlog
-  6-2-deploy-stibnite-and-validate-all-daily-workflows: backlog
-  6-3-complete-5-machine-network-and-monitor-productivity: backlog
+  epic-6-notes: |
+    Remove nixos-unified infrastructure, finalize secrets migration, update documentation.
+    Depends on Epic 4 + Epic 5 (if executed).
+  story-6-1: backlog
+  story-6-1-title: "Remove nixos-unified infrastructure"
+  story-6-2: backlog
+  story-6-2-title: "Finalize secrets migration strategy"
+  story-6-3: backlog
+  story-6-3-title: "Update documentation and finalize migration"
   epic-6-retrospective: optional
 
-  # Epic 7: Legacy Cleanup (Phase 6)
-  epic-7: backlog
-  7-1-remove-nixos-unified-infrastructure: backlog
-  7-2-finalize-secrets-migration-strategy: backlog
-  7-3-update-documentation-and-finalize-migration: backlog
-  epic-7-retrospective: optional
+# Sprint Change History
+sprint_change_history:
+  - date: "2025-11-20"
+    type: "epic-realignment"
+    proposal: "docs/notes/development/sprint-change-proposal-2025-11-20.md"
+    changes:
+      - "Epic 2: Redefined from Phase 1 only → Phase 1-4 (6 stories → 13 stories)"
+      - "Epic 3: Consolidated (work complete in Epic 1)"
+      - "Epic 4-7: Renumbered to Epic 3-6"
+      - "Epic 5 (was Epic 6): Marked OPTIONAL with execution criteria"
+    rationale: "Epic 1 over-delivered - infrastructure deployed, patterns validated, blackphos migrated"
