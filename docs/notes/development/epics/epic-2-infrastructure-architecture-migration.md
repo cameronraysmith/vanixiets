@@ -3,7 +3,7 @@
 **Status:** Contexted (ready for Phase 1 story drafting)
 **Dependencies:** Epic 1 complete ✅
 **Strategy:** "Rip the Band-Aid" - copy validated patterns from test-clan → infra
-**Timeline:** 4 phases, 12-15 stories, estimated 80-120 hours
+**Timeline:** 4 phases, 14 stories (13 required + 1 optional), estimated 80-120 hours
 
 ---
 
@@ -316,6 +316,31 @@ So that infra repository has continuous validation for architectural invariants.
 
 ---
 
+### Story 2.14: Consolidate agents-md module duplication [OPTIONAL]
+
+As a system administrator,
+I want to consolidate agents-md module duplication in infra home-manager configuration,
+So that the codebase maintains single source of truth for module definitions.
+
+**Acceptance Criteria:**
+1. Replace cameron.nix inline module (lines 93-126) with `../../../home/modules/_agents-md.nix` import: Follow blackphos pattern (raquel user already uses relative import)
+2. Replace crs58.nix inline module (lines 91-124) with `../../../home/modules/_agents-md.nix` import: Same consolidation pattern
+3. Validate home-manager builds for cameron and crs58 users: Zero regressions (`nix build .#homeConfigurations.cameron.activationPackage`, `nix build .#homeConfigurations.crs58.activationPackage`)
+4. Test functionality: CLAUDE.md, AGENTS.md, GEMINI.md, CRUSH.md, OPENCODE.md files generated correctly in home directories
+5. Verify pattern matches blackphos: Raquel user already uses relative import pattern, cameron and crs58 should match
+6. Result: 68 lines eliminated (34 per user), single source of truth maintained
+7. Document consolidation in commit message: Explain why duplication existed (clan inventory limitation during initial migration) and why consolidation is safe now
+
+**Prerequisites:** Story 2.13 (test harness migration complete)
+
+**Priority:** LOW (technical debt cleanup, not blocking functionality)
+**Effort:** 1-2 hours
+**Risk:** VERY LOW (blackphos proves pattern works, test harness validates zero regressions)
+
+**Note:** This story addresses technical debt inherited from test-clan where cameron.nix and crs58.nix users duplicated the agents-md option module inline instead of importing it like blackphos (raquel) does. Epic 1 validated the pattern works; this story cleans up the duplication post-migration.
+
+---
+
 ## Dependencies
 
 **Depends on Epic 1:**
@@ -337,7 +362,7 @@ So that infra repository has continuous validation for architectural invariants.
 
 ## Success Criteria
 
-- ✅ All 12-15 stories completed with acceptance criteria met
+- ✅ All 14 stories completed with acceptance criteria met (13 required + 1 optional)
 - ✅ Infra repository using dendritic+clan architecture across all machines
 - ✅ Blackphos and stibnite operational from infra (switched from test-clan)
 - ✅ Cinnabar and electrum configs migrated to infra
