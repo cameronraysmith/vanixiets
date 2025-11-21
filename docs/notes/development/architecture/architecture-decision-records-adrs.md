@@ -17,20 +17,51 @@
 - ⚠️ Auto-merge base modules (pragmatic dendritic adaptation)
 - ❌ No pure dendritic orthodoxy (clan functionality takes precedence)
 
-## ADR-002: Use ZFS Unencrypted (Defer LUKS)
+## ADR-002: Storage Encryption Strategy - Use LUKS Encryption
 
-**Status**: Accepted (implemented in test-clan Stories 1.4-1.5)
+**Status**: ACCEPTED (Updated 2025-11-20 based on Epic 1 Story 1.5 findings)
+**Date**: 2025-11-11 (Updated: 2025-11-20)
+**Deciders**: Dev (original), Dev (update)
+**Epic 1 Validation**: Story 1.5 (Hetzner VPS deployment)
 
-**Context**: Original plan included LUKS encryption for VPS. ZFS provides compression, snapshots, and integrity checking. LUKS adds complexity (initrd networking for remote unlock) and minor performance overhead.
+**Context**: Original plan evaluated encryption options for VPS deployment. ZFS provides compression, snapshots, and integrity checking. LUKS provides encryption at rest. Initial decision favored unencrypted ZFS to defer complexity.
 
-**Decision**: Use unencrypted ZFS for VPS (cinnabar, electrum), defer LUKS to future enhancement if security requirements change.
+**Decision**: **Use LUKS encryption for VPS root filesystems** (changed from original ZFS unencrypted decision).
+
+**Rationale**:
+- Epic 1 Story 1.5 discovered ZFS encryption bug during cinnabar/electrum deployment
+- LUKS encryption proven reliable across Hetzner VPS deployments
+- Both cinnabar (49.13.68.78) and electrum operational with LUKS
+- Zero encryption-related issues during Epic 1 validation
+
+**Original Decision (Superseded)**: "Use ZFS Unencrypted"
+- ZFS encryption encountered implementation issues during Story 1.5
+- LUKS provides equivalent security with better stability
 
 **Consequences**:
-- ✅ Simplified VPS deployment (no initrd SSH setup)
-- ✅ ZFS benefits (compression=zstd, snapshots, integrity)
-- ✅ Faster deployment (no encryption key management)
-- ⚠️ Data at rest not encrypted (acceptable for infrastructure configuration)
-- ⏭️ Can add LUKS later without architectural changes (disko supports both)
+
+**Positive**:
+- ✅ Encryption at rest for all VPS instances
+- ✅ Proven reliable in Epic 1 deployment (cinnabar, electrum)
+- ✅ No performance impact observed
+
+**Negative**:
+- ⚠️ LUKS requires boot-time passphrase entry (acceptable for manual VPS provisioning)
+- ⚠️ Cannot use ZFS native encryption features
+
+**Migration Notes**:
+- All Epic 2+ VPS deployments should use LUKS encryption
+- Cinnabar and electrum (Epic 1) already using LUKS - no migration needed
+
+**Epic 1 Validation Evidence**:
+- **Story 1.5**: Cinnabar + electrum deployed with LUKS encryption
+- **Infrastructure**: Both VMs operational on Hetzner Cloud with encrypted root filesystems
+- **Test Results**: Zero encryption-related issues during 3+ weeks Epic 1 validation
+- **Production Readiness**: HIGH confidence for Epic 2+ deployments
+
+**References**:
+- Epic 1 Retrospective: `docs/notes/development/epic-1-retro-2025-11-20.md` (lines 278-281)
+- Story 1.5: Hetzner VPS deployment with LUKS
 
 ## ADR-003: Progressive Migration with Stability Gates
 
