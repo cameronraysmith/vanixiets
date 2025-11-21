@@ -163,3 +163,59 @@ ssh root@cinnabar.zerotier.ip "zerotier-cli listpeers | grep blackphos"
 - Implement Option 2 (Custom Launchd) if full nix control required
 
 **Decision Deferred to Story 1.8**: Test hybrid approach, gather data, refine architecture based on findings.
+
+---
+
+## Epic 1 Validation Results
+
+**Date**: 2025-11-20
+**Epic**: Epic 1 Story 1.12 (Blackphos physical deployment and zerotier validation)
+**Validated Option**: Option 1 (Homebrew Zerotier)
+
+### Option 1 Validation Summary
+
+**Status**: ✅ VALIDATED for production use
+
+**Deployment**:
+- Zerotier network: db4344343b14b903
+- Machines: Cinnabar (nixos controller) + electrum (nixos peer) + blackphos (darwin peer)
+- Darwin integration: Homebrew cask (`zerotier-one`) + activation script
+
+**Test Results**:
+- ✅ Heterogeneous coordination: nixos ↔ darwin bidirectional SSH
+- ✅ Network latency: 1-12ms (cinnabar ↔ blackphos, electrum ↔ blackphos)
+- ✅ User workflow: Raquel's 270 packages functional on blackphos
+- ✅ Stability: 3+ weeks operation with zero connectivity issues
+
+**Implementation Pattern**:
+```nix
+# Darwin zerotier via homebrew + activation script
+homebrew.casks = [ "zerotier-one" ];
+system.activationScripts.postActivation.text = ''
+  sudo zerotier-cli join db4344343b14b903
+'';
+```
+
+**Limitations**:
+- ⚠️ MINOR: Homebrew dependency (clan-core lacks native darwin zerotier module)
+- ⚠️ Requires manual authorization on zerotier controller after join
+- ⚠️ Non-declarative join command (runs on each activation, idempotent)
+
+**Production Readiness**: HIGH confidence for Epic 2+ darwin deployments
+
+**Epic 2 Application**:
+- Reuse pattern for stibnite (Epic 2 Phase 2 Story 2.6)
+- Reuse pattern for rosegold (Epic 2 Phase 4 Story 2.11, Epic 3)
+- Reuse pattern for argentum (Epic 2 Phase 4 Story 2.12, Epic 4)
+
+**Documentation**:
+- Darwin integration guide: `~/projects/nix-workspace/test-clan/docs/guides/darwin-zerotier-integration.md`
+- Epic 1 Retrospective: `docs/notes/development/epic-1-retro-2025-11-20.md` (lines 221-236)
+- Story 1.12: Blackphos deployment validation
+
+### Options 2-3 Status
+
+**Option 2 (nix-darwin service)**: Not validated (clan-core lacks darwin support)
+**Option 3 (Manual launchd)**: Not evaluated (Option 1 sufficient)
+
+**Decision**: Proceed with Option 1 for all darwin hosts in Epic 2+.
