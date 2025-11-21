@@ -1,23 +1,40 @@
-# Epic 3: First Darwin Migration (Phase 2 - blackphos)
+# Epic 3: First Darwin Migration (Phase 2 - blackphos) - CONSOLIDATED
 
-**Goal:** Establish darwin migration patterns by converting blackphos to dendritic + clan, connecting to cinnabar zerotier network
-
-**Strategic Value:** Proves darwin + clan integration works, creates reusable patterns for remaining hosts, validates multi-machine coordination between NixOS (cinnabar) and darwin (blackphos)
-
-**Timeline:** 1 week migration + 1-2 weeks stability validation
-
-**Success Criteria:**
-- blackphos builds with dendritic + clan patterns
-- All existing functionality preserved (zero-regression requirement)
-- Zerotier peer connects to cinnabar controller
-- SSH via zerotier network functional
-- Clan vars deployed correctly
-- Darwin patterns documented for reuse
-- Stable for 1-2 weeks minimum before Phase 3
+**Status:** CONSOLIDATED INTO EPIC 2 PHASE 2
+**Date Consolidated:** 2025-11-20
+**Reason:** Epic 1 over-delivered - blackphos work completed during Phase 0 validation
 
 ---
 
-## Story 3.1: Convert darwin modules to dendritic flake-parts pattern for blackphos
+## Consolidation Summary
+
+Epic 3 was originally scoped to migrate blackphos (first darwin workstation) to the dendritic+clan architecture.
+However, Epic 1's comprehensive validation work completed all blackphos migration tasks ahead of schedule.
+
+**Epic 1 Stories That Completed Epic 3 Scope:**
+- Story 1.8: Blackphos dendritic configuration creation
+- Story 1.8A: Portable user modules (crs58, raquel)
+- Story 1.10BA-1.10E: Home-manager Pattern A refactoring, secrets, overlays, features
+- Story 1.12: Blackphos physical deployment and zerotier validation
+
+**Original Epic 3 Outcomes Achieved:**
+- ✅ 270 packages preserved (raquel's complete workflow functional)
+- ✅ Zerotier nixos ↔ darwin coordination validated
+- ✅ Home-manager Pattern A proven at scale
+- ✅ Physical hardware deployment successful
+
+**Remaining Work:**
+Epic 2 Phase 2 (Stories 2.5, 2.7) will complete the final step: migrating blackphos config from test-clan → infra repository and activating it from production infra.
+
+---
+
+## Original Epic 3 Scope (For Reference)
+
+The following stories were originally planned for Epic 3 but were completed during Epic 1's validation phase.
+
+### Story 3.1: Convert darwin modules to dendritic flake-parts pattern for blackphos
+
+**Status:** COMPLETED IN EPIC 1 (Story 1.8)
 
 As a system administrator,
 I want to convert existing blackphos darwin modules to dendritic flake-parts organization,
@@ -32,11 +49,11 @@ So that blackphos uses the validated architectural pattern with proper module na
 6. Package lists compared: pre-migration vs post-migration identical
 7. Configuration builds successfully: `nix build .#darwinConfigurations.blackphos.system`
 
-**Prerequisites:** Story 2.6 (cinnabar stable for 1-2 weeks)
-
 ---
 
-## Story 3.2: Add blackphos to clan inventory with zerotier peer role
+### Story 3.2: Add blackphos to clan inventory with zerotier peer role
+
+**Status:** COMPLETED IN EPIC 1 (Story 1.8)
 
 As a system administrator,
 I want to add blackphos to clan inventory and configure zerotier peer role,
@@ -51,11 +68,11 @@ So that blackphos connects to cinnabar controller and joins the zerotier network
 6. Clan inventory evaluates successfully: `nix eval .#clan.inventory.machines.blackphos --json`
 7. Zerotier network ID from cinnabar configured for peer connection
 
-**Prerequisites:** Story 3.1 (darwin modules converted)
-
 ---
 
-## Story 3.3: Generate clan vars and deploy blackphos configuration
+### Story 3.3: Generate clan vars and deploy blackphos configuration
+
+**Status:** COMPLETED IN EPIC 1 (Story 1.12)
 
 As a system administrator,
 I want to generate clan vars for blackphos and deploy the configuration,
@@ -71,11 +88,11 @@ So that blackphos is operational with clan-managed secrets and joined to the zer
 7. Vars deployed to /run/secrets/ with correct darwin-compatible permissions
 8. System activation successful, all services operational
 
-**Prerequisites:** Story 3.2 (inventory configured)
-
 ---
 
-## Story 3.4: Validate blackphos functionality and network connectivity
+### Story 3.4: Validate blackphos functionality and network connectivity
+
+**Status:** COMPLETED IN EPIC 1 (Story 1.12)
 
 As a system administrator,
 I want to validate all blackphos functionality and network connectivity to cinnabar,
@@ -91,11 +108,11 @@ So that I can confirm the darwin migration pattern works end-to-end.
 7. Clan vars accessible: `ls -la /run/secrets/` shows deployed secrets
 8. No regressions in daily development workflow on blackphos
 
-**Prerequisites:** Story 3.3 (blackphos deployed)
-
 ---
 
-## Story 3.5: Document darwin patterns and monitor stability
+### Story 3.5: Document darwin patterns and monitor stability
+
+**Status:** COMPLETED IN EPIC 1 (Story 1.13)
 
 As a system administrator,
 I want to document the darwin migration patterns and monitor blackphos stability,
@@ -115,8 +132,9 @@ So that I have reusable patterns for rosegold and argentum migrations.
 6. No critical issues discovered during monitoring period
 7. Patterns confirmed ready for rosegold migration
 
-**Stability gate:** blackphos stable for 1-2 weeks with no critical issues → proceed to Phase 3 (rosegold)
-
-**Prerequisites:** Story 3.4 (blackphos validated)
-
 ---
+
+**See Also:**
+- Epic 1 Retrospective: `docs/notes/development/epic-1-retro-2025-11-20.md`
+- Epic 2 Phase 2: Blackphos config migration to infra (Stories 2.5, 2.7)
+- Sprint Change Proposal: `docs/notes/development/sprint-change-proposal-2025-11-20.md`
