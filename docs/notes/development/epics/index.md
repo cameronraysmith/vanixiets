@@ -9,7 +9,7 @@
   - [Epic 3: First Darwin Migration (Phase 2 - blackphos) - CONSOLIDATED](./epic-3-first-darwin-migration-phase-2-blackphos.md)
   - [Epic 3: Multi-Darwin Validation (Phase 2 - rosegold)](./epic-3-multi-darwin-validation-phase-2-rosegold.md)
   - [Epic 4: Third Darwin Host (Phase 3 - argentum)](./epic-4-third-darwin-host-phase-3-argentum.md)
-  - [Epic 6: Primary Workstation Migration (Phase 5 - stibnite)](./epic-6-primary-workstation-migration-phase-5-stibnite.md)
+  - [Epic 5: Primary Workstation Validation (Phase 4 - stibnite) - OPTIONAL](./epic-5-primary-workstation-validation-phase-4-stibnite.md)
   - [Epic 7: Legacy Cleanup (Phase 6)](./epic-7-legacy-cleanup-phase-6.md)
   - [Story Guidelines Reference](./story-guidelines-reference.md)
   - [Summary Statistics](./summary-statistics.md)
