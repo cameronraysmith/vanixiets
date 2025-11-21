@@ -10,6 +10,6 @@
   - [Epic 3: Multi-Darwin Validation (Phase 2 - rosegold)](./epic-3-multi-darwin-validation-phase-2-rosegold.md)
   - [Epic 4: Third Darwin Host (Phase 3 - argentum)](./epic-4-third-darwin-host-phase-3-argentum.md)
   - [Epic 5: Primary Workstation Validation (Phase 4 - stibnite) - OPTIONAL](./epic-5-primary-workstation-validation-phase-4-stibnite.md)
-  - [Epic 7: Legacy Cleanup (Phase 6)](./epic-7-legacy-cleanup-phase-6.md)
+  - [Epic 6: Legacy Cleanup (Phase 5)](./epic-6-legacy-cleanup-phase-5.md)
   - [Story Guidelines Reference](./story-guidelines-reference.md)
   - [Summary Statistics](./summary-statistics.md)
