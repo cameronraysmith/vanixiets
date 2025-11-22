@@ -2,7 +2,7 @@
 
 **Epic:** Epic 2 - Infrastructure Architecture Migration (Apply test-clan patterns to infra)
 
-**Status:** drafted
+**Status:** ready-for-dev
 
 **Phase:** Phase 1 - Home-Manager Migration Foundation
 
@@ -975,7 +975,7 @@ Story 2.1 estimated: 2-4 hours (discovery + checklist creation)
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by story-context workflow -->
+- [Story 2.1 Context XML](./2-1-identify-infra-specific-components-to-preserve.context.xml) - Generated 2025-11-22
 
 ### Agent Model Used
 

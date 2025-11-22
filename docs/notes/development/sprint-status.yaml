@@ -332,7 +332,7 @@ development_status:
     13 stories total. "Rip the band-aid" strategy.
 
   # Phase 1: Home-Manager Migration Foundation (4 stories)
-  story-2-1: drafted
+  story-2-1: ready-for-dev
   story-2-1-title: "Identify infra-specific components to preserve"
   story-2-2: backlog
   story-2-2-title: "Stibnite vs blackphos configuration diff analysis"
