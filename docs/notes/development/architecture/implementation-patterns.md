@@ -1,5 +1,162 @@
 # Implementation Patterns
 
+**Last Updated**: 2025-11-21
+**Status**: Updated with Epic 1 validation evidence (Stories 1.1-1.7, dendritic pattern proven)
+
+## Dendritic Pattern Implementation (Epic 1 Validated)
+
+**Status**: ✅ VALIDATED (Epic 1 Stories 1.1-1.7, 1.10BA-1.10E - 83 modules, 18 tests passing, zero regressions)
+
+### Core Principle: Import-Tree Auto-Discovery + Namespace Merging
+
+**Single-line flake.nix pattern**:
+```nix
+# flake.nix (test-clan: lines 4-6, entire pattern in 3 lines)
+outputs = inputs@{ flake-parts, ... }:
+  flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
+```
+
+**What this does**:
+1. `import-tree ./modules` recursively discovers ALL `.nix` files in modules/
+2. Each file is evaluated as a flake-parts module
+3. Modules declaring same namespace auto-merge via eval-modules
+4. NO manual imports in flake.nix (zero boilerplate)
+
+**Epic 1 Validation**: test-clan discovered 83 modules automatically, zero import statements needed.
+
+### Module Size Heuristic: >7 Lines
+
+**Pattern**: If logical unit exceeds ~7 lines, extract to separate module.
+
+**Example** (Story 1.7 darwin/system-defaults refactoring):
+```
+Before (monolithic):
+modules/darwin/system-defaults.nix  # 143 lines, all settings in one file
+
+After (dendritic):
+modules/darwin/system-defaults/
+├── dock.nix              # 20 lines
+├── finder.nix            # 15 lines
+├── input-devices.nix     # 12 lines
+├── loginwindow.nix       # 8 lines
+├── nsglobaldomain.nix    # 18 lines
+├── window-manager.nix    # 10 lines
+├── screencapture.nix     # 8 lines
+├── custom-user-prefs.nix # 15 lines
+└── misc-defaults.nix     # 12 lines
+
+All 9 files auto-merge into: flake.modules.darwin.base
+```
+
+**Validation**: Story 1.7 refactoring maintained zero regressions, 18 tests passing.
+
+### Namespace Merging Strategies
+
+**Deep Attribute Merging** (nested attrsets):
+```nix
+# modules/darwin/system-defaults/dock.nix
+{ ... }: {
+  flake.modules.darwin.base = { ... }: {
+    system.defaults.dock.autohide = true;
+  };
+}
+
+# modules/darwin/system-defaults/finder.nix
+{ ... }: {
+  flake.modules.darwin.base = { ... }: {
+    system.defaults.finder.ShowPathbar = true;
+  };
+}
+
+# Result: Both merge into single base module
+# flake.modules.darwin.base.system.defaults = {
+#   dock.autohide = true;
+#   finder.ShowPathbar = true;
+# }
+```
+
+**List Concatenation** (overlays, imports):
+```nix
+# modules/nixpkgs/overlays/channels.nix
+{ ... }: {
+  flake.nixpkgsOverlays = [
+    (final: prev: { stable = ...; unstable = ...; })
+  ];
+}
+
+# modules/nixpkgs/overlays/hotfixes.nix
+{ ... }: {
+  flake.nixpkgsOverlays = [
+    (final: prev: { micromamba = final.stable.micromamba; })
+  ];
+}
+
+# Result: Lists concatenated in discovery order
+# flake.nixpkgsOverlays = [ overlay1, overlay2 ]
+# Composed via: lib.composeManyExtensions config.flake.nixpkgsOverlays
+```
+
+**Validation**: Five-layer overlay architecture (Stories 1.10D-1.10DB), all layers auto-discovered and composed.
+
+### DRY Configuration Pattern (lib/ shared data)
+
+**Pattern**: Extract pure data to `lib/*.nix`, import where needed.
+
+**Example** (binary caches):
+```nix
+# lib/caches.nix - Single source of truth
+{
+  substituters = [
+    "https://cache.nixos.org"
+    "https://cache.clan.lol"
+    "https://nix-community.cachix.org"
+  ];
+  publicKeys = [
+    "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+    "cache.clan.lol-1:3KztgSAB5R1M+Dz7vzkBGzXdodizbgLXGXKXlcQLA28="
+  ];
+}
+
+# flake.nix - Literal values (nix flake check requirement)
+nixConfig = {
+  extra-substituters = [ "https://cache.nixos.org" /* ... */ ];
+  extra-trusted-public-keys = [ "cache.nixos.org-1:..." /* ... */ ];
+}
+
+# modules/system/caches.nix - Import shared data
+let cacheConfig = import ../../lib/caches.nix; in {
+  flake.modules.nixos.base.nix.settings.substituters = cacheConfig.substituters;
+  flake.modules.darwin.base.nix.settings.substituters = cacheConfig.substituters;
+}
+```
+
+**Benefit**: Update caches once in `lib/caches.nix`, all three locations sync.
+
+**Validation**: test-clan uses this pattern for caches, proven reliable.
+
+### Per-Machine Module Extraction
+
+**Pattern**: Extract machine-specific configs to subdirectory modules that auto-merge.
+
+**Example** (disko configurations):
+```
+modules/machines/nixos/cinnabar/
+├── default.nix  # Main machine config
+└── disko.nix    # Disk layout (merges into machines/nixos/cinnabar namespace)
+
+Both files export: flake.modules.nixos."machines/nixos/cinnabar"
+Auto-merge via eval-modules.
+```
+
+**Validation**: test-clan cinnabar + electrum machines, disko configs extracted (Story 1.7).
+
+### References
+
+- Test-clan dendritic pattern guide: `~/projects/nix-workspace/test-clan/docs/architecture/dendritic-pattern.md` (475 lines)
+- Test-clan flake.nix: Lines 4-6 (entire pattern in 3 lines)
+- Epic 1 Retrospective: Lines 242-265 (dendritic validation)
+- Story 1.7: Dendritic refactoring with zero regressions
+
 ## Naming Conventions
 
 **Module Files**:
