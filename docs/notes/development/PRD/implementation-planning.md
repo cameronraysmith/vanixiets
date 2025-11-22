@@ -4,33 +4,35 @@
 
 Requirements must be decomposed into epics and bite-sized stories (200k context limit per story).
 
-**Epic alignment to 6 migration phases**:
+**Epic alignment to 5 migration phases** (Epic 3 consolidated into Epic 2):
 
-**Epic 1: Architectural Validation + Infrastructure Deployment** (Phase 0)
+**Epic 1: Architectural Validation + Infrastructure Deployment** (Phase 0) - **COMPLETE**
 
-- Stories: test-clan setup, dendritic + clan integration, pattern extraction, go/no-go decision, infrastructure deployment (Hetzner VPS + GCP VM), multi-machine coordination validation
+- Stories: test-clan setup, dendritic + clan integration, pattern extraction, go/no-go decision, infrastructure deployment (Hetzner VPS), multi-machine coordination validation
+- Status: 21/22 stories completed (95.5%), 1 deferred (Story 1.11 - homeHosts unnecessary)
+- Outcome: GO decision rendered 2025-11-20, all 7 patterns HIGH confidence
 
-**Epic 2: Production Integration** (Phase 1)
+**Epic 2: Infrastructure Architecture Migration** (Phase 1)
 
-- Stories: production services integration, security hardening (srvos), zerotier controller, multi-VM coordination, SSH configuration, vars deployment, production-readiness validation, stability monitoring
+- Stories: home-manager foundation migration, blackphos config migration, stibnite config migration, cinnabar + electrum config migration, rosegold + argentum config creation
+- Migration Strategy: "Rip the band-aid" approach - `clan-01` branch with wholesale nix config replacement
+- Four Phases: (1) Home-Manager Foundation, (2) Active Darwin Workstations, (3) VPS Config Migration, (4) Future Machines
 
-**Epic 3: First Darwin Migration** (Phase 2 - blackphos)
+**Epic 3: Rosegold Deployment** (Phase 2, formerly Epic 4)
 
-- Stories: module conversion, clan inventory integration, zerotier peer, vars deployment, functionality validation, pattern documentation, stability monitoring
+- Stories: rosegold deployment using proven patterns from Epic 2
+- Note: blackphos migration complete in Epic 2 Phase 2
 
-**Epic 4: Multi-Darwin Validation** (Phase 3 - rosegold)
+**Epic 4: Argentum Deployment** (Phase 3, formerly Epic 5)
 
-- Stories: pattern application, zerotier peer, multi-machine coordination testing, stability validation
+- Stories: argentum deployment using proven patterns from Epic 2-3
 
-**Epic 5: Third Darwin Host** (Phase 4 - argentum)
+**Epic 5: Stibnite Extended Validation** (Phase 4, formerly Epic 6) - **CONDITIONAL**
 
-- Stories: pattern application, zerotier peer, 4-machine network validation, readiness for stibnite
+- Stories: stibnite configuration validation, extended stability testing
+- Only execute if Epic 2 Phase 2 shows instability requiring additional validation
 
-**Epic 6: Primary Workstation Migration** (Phase 5 - stibnite)
-
-- Stories: readiness validation, migration preparation, deployment, workflow validation, productivity assessment, stability monitoring
-
-**Epic 7: Legacy Cleanup** (Phase 6)
+**Epic 6: Legacy Cleanup** (Phase 5, formerly Epic 7)
 
 - Stories: nixos-unified removal, secrets migration completion, documentation updates
 
