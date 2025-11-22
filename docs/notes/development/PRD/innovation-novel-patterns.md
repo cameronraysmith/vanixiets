@@ -9,6 +9,32 @@ Proven separately (dendritic in drupol-dendritic-infra, clan in clan-infra), but
 
 **Validation challenge**: Unknown whether dendritic's anti-specialArgs principle conflicts with clan's flakeModules integration pattern (clan-infra uses minimal `specialArgs = { inherit self; }`).
 
+---
+
+## Validated Patterns (Epic 1 Outcomes)
+
+**Dendritic + Clan Integration:** **VALIDATED (Epic 1)** - Full dendritic pattern applicable to clan, maximum type safety achieved, 18 tests passing, zero regressions. Proven across Stories 1.1-1.7 with pure pattern (no specialArgs pollution), module namespace exports functional, dendritic principle maintained.
+
+**Two-Tier Secrets:** **VALIDATED (Epic 1)** - Clan vars (system) + sops-nix (user) with shared age keypair, multi-user encryption functional (crs58: 8 secrets, raquel: 5 secrets). Age key reuse pattern proven, cross-platform validated (darwin + nixos), system vs user secrets separated appropriately (Stories 1.10A, 1.10C).
+
+**Five-Layer Overlays:** **VALIDATED (Epic 1)** - All 5 layers empirically validated: (1) inputs (multi-channel nixpkgs), (2) hotfixes (platform fallbacks), (3) pkgs-by-name (custom packages like ccstatusline), (4) overrides (package build modifications), (5) flakeInputs (nuenv, lazyvim-nix, catppuccin-nix, nix-ai-tools). Stories 1.10D-1.10DB comprehensive validation.
+
+**Home-Manager Pattern A:** **VALIDATED (Epic 1)** - Cross-platform proven at scale (270 packages, 17 modules, 4+ users), Story 1.11 deferred (homeHosts unnecessary). Pattern A design: separate option definition (`_*.nix`) from configuration (`*.nix`) for portability, flake context access validated, multi-user functional (Stories 1.8A, 1.10BA, 1.10C, 1.10E, 1.12).
+
+**Terraform/Terranix Infrastructure:** **VALIDATED (Epic 1)** - Hetzner Cloud provider validated, declarative VM provisioning functional, infrastructure-as-code proven. Cinnabar + electrum VMs deployed successfully (Stories 1.4-1.5).
+
+**Zerotier Heterogeneous Networking:** **VALIDATED (Epic 1)** - Nixos zerotier via clan-core module, darwin zerotier via homebrew + activation script, cross-platform SSH coordination proven (1-12ms latency). Network db4344343b14b903 operational, bidirectional connectivity validated. MINOR limitation: homebrew dependency (acceptable for production, documented workaround, Stories 1.9, 1.12).
+
+**Clan-Core Inventory + Service Instances:** **VALIDATED (Epic 1)** - Service roles functional (zerotier controller/peer, users, emergency-access), tag-based targeting operational, heterogeneous fleet management proven (Stories 1.3, 1.9, 1.12).
+
+---
+
+## Risks RETIRED (Epic 1)
+
+- ✅ Fundamental dendritic + clan incompatibility: **RETIRED** (7/7 patterns HIGH confidence, GO decision rendered 2025-11-20)
+- ✅ Phase 0 validation insufficient: **RETIRED** (Comprehensive validation complete, production deployment proven with 21/22 stories, 60-80 hours investment)
+- ✅ Secrets migration complexity: **MITIGATED** (Two-tier pattern validated, multi-user encryption functional, age key reuse proven)
+
 ## Validation Approach
 
 **Phase 0 as architectural proof-of-concept**: Create minimal test-clan repository to answer the critical unknown: "How much dendritic optimization is compatible with clan functionality?"
