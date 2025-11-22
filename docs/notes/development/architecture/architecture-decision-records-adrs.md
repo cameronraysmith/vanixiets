@@ -2,20 +2,57 @@
 
 ## ADR-001: Adopt Dendritic Flake-Parts + Clan-Core Integration
 
-**Status**: Accepted (validated in test-clan Stories 1.1-1.7)
+**Status**: VALIDATED (Epic 1 complete - 21/22 stories, 7/7 HIGH confidence patterns, GO decision rendered)
+**Date**: 2025-11-11 (Updated: 2025-11-21 post-Epic 1 validation)
+**Deciders**: Dev (original), Winston/Architect (Epic 1 validation update)
+**Epic 1 Validation**: Stories 1.1-1.7 (dendritic), 1.3-1.12 (clan), comprehensive validation
 
-**Context**: Current nixos-unified architecture lacks type safety, has unclear module boundaries, and doesn't support multi-machine coordination. Dendritic flake-parts provides type-safe namespace organization, clan-core provides multi-machine inventory system, but no production examples combine them.
+**Context**: Current nixos-unified architecture lacks type safety, has unclear module boundaries, and doesn't support multi-machine coordination. Dendritic flake-parts provides type-safe namespace organization, clan-core provides multi-machine inventory system, but no production examples combined them before Epic 1.
 
 **Decision**: Adopt dendritic flake-parts pattern with clan-core integration, validated through test-clan Phase 0 before production deployment.
 
-**Consequences**:
-- ✅ Maximum type safety via module system option declarations
-- ✅ Clear module namespace (`flake.modules.*`)
-- ✅ Multi-machine coordination via clan inventory
-- ✅ Zero-regression validation (17 test cases in test-clan)
-- ⚠️ Minimal specialArgs required (framework values only)
-- ⚠️ Auto-merge base modules (pragmatic dendritic adaptation)
-- ❌ No pure dendritic orthodoxy (clan functionality takes precedence)
+**Epic 1 Validation Evidence** (60-80 hours, 3+ weeks, 21 stories):
+
+**Dendritic Flake-Parts** (Stories 1.1-1.7, 1.10BA-1.10E):
+- ✅ Import-tree auto-discovery: 83 modules, zero manual imports (test-clan/flake.nix:4-6)
+- ✅ Namespace merging via eval-modules: Automatic attribute deep-merge + list concatenation
+- ✅ Zero regressions: 18 tests passing across all Epic 1 stories
+- ✅ Module size heuristic validated: >7 line granularity pattern proven (Story 1.7 refactoring)
+- ✅ Production deployment: blackphos physical deployment (270 packages preserved)
+- **Reference**: `~/projects/nix-workspace/test-clan/docs/architecture/dendritic-pattern.md` (475 lines, comprehensive guide)
+
+**Clan-Core Integration** (Stories 1.3, 1.9, 1.12):
+- ✅ Inventory + service instances: zerotier, users, emergency-access roles validated
+- ✅ Tag-based targeting: Heterogeneous fleet coordination (cinnabar, electrum, blackphos)
+- ✅ Cross-platform proven: nixos VMs + nix-darwin workstations coordinated via zerotier mesh
+- ⚠️ **Architectural limitation discovered**: Clan inventory cannot reference flake module namespaces directly - must use relative imports to home-manager modules (epic-1-retro-2025-11-20.md:342-344)
+
+**Production Infrastructure Deployed**:
+- Hetzner VMs operational: cinnabar (CX43), electrum (CCX23) with LUKS encryption
+- Physical darwin deployment: blackphos running test-clan config (Story 1.12)
+- Zerotier network: db4344343b14b903 (heterogeneous nixos ↔ darwin coordination, 1-12ms latency)
+
+**Consequences** (Updated with Epic 1 evidence):
+- ✅ Maximum type safety via module system option declarations (validated across 83 modules)
+- ✅ Clear module namespace (`flake.modules.*`) - proven at scale
+- ✅ Multi-machine coordination via clan inventory - heterogeneous fleet operational
+- ✅ Zero-regression validation maintained (18 tests passing, zero regressions across 21 stories)
+- ✅ **NEW**: Five-layer overlay architecture validated (Stories 1.10D-1.10DB)
+- ✅ **NEW**: Home-Manager Pattern A cross-platform portability (4+ users, 17 modules, 270 packages)
+- ✅ **NEW**: Two-tier secrets architecture (clan vars + sops-nix, multi-user encryption proven)
+- ⚠️ Minimal specialArgs required (framework values only) - principle maintained
+- ⚠️ Auto-merge base modules (pragmatic dendritic adaptation) - proven effective
+- ⚠️ **NEW**: Clan inventory limitation requires relative imports pattern (documented workaround)
+- ❌ No pure dendritic orthodoxy (clan functionality takes precedence) - validated in production
+
+**Epic 1 GO Decision**: 7/7 decision criteria PASS, 0 CRITICAL/0 MAJOR blockers, all patterns HIGH confidence for production use. Epic 2-6 migration (~200+ hours) AUTHORIZED.
+
+**References**:
+- Epic 1 Retrospective: `docs/notes/development/epic-1-retro-2025-11-20.md` (lines 242-362: seven validated patterns)
+- Test-clan dendritic pattern guide: `~/projects/nix-workspace/test-clan/docs/architecture/dendritic-pattern.md`
+- Test-clan flake.nix: `~/projects/nix-workspace/test-clan/flake.nix` (lines 4-6: entire pattern in 3 lines)
+- Story 1.7: Dendritic refactoring with zero regressions
+- Story 1.12: Blackphos physical deployment validation
 
 ## ADR-002: Storage Encryption Strategy - Use LUKS Encryption
 
@@ -79,20 +116,56 @@
 - ⚠️ Extended timeline (13-15 weeks conservative, 4-6 weeks aggressive)
 - ⚠️ Dual architecture maintenance (nixos-unified + dendritic during migration)
 
-## ADR-004: Darwin Networking via Multiple Options (Deferred to Story 1.8)
+## ADR-004: Darwin Zerotier via Homebrew Cask + Activation Script
 
-**Status**: Proposed (decision deferred to Story 1.8 experimental validation)
+**Status**: VALIDATED (Epic 1 Story 1.12 - production deployment proven)
+**Date**: 2025-11-11 (Updated: 2025-11-21 post-Story 1.12 validation)
+**Deciders**: Dev (original), Charlie/Senior Dev (Story 1.12 validation update)
+**Epic 1 Validation**: Story 1.12 (blackphos physical deployment)
 
-**Context**: Clan zerotier service is NixOS-only (systemd dependencies). Darwin requires alternative approach. Three options identified: Homebrew Zerotier, Custom Launchd, Hybrid Clan Vars + Manual. Tailscale eliminated due to incompatibility with darwin machines serving as VPN mesh servers.
+**Context**: Clan zerotier service is NixOS-only (systemd dependencies). Darwin requires alternative approach. Three options identified: (1) Homebrew Zerotier, (2) Custom Launchd, (3) Hybrid Clan Vars + Manual. Tailscale eliminated due to incompatibility with darwin machines serving as VPN mesh servers.
 
-**Decision**: Test hybrid approach (Option 3) in Story 1.8, defer final decision based on validation findings.
+**Decision**: Use Option 1 (Homebrew Zerotier cask + activation script) for all darwin machines.
 
-**Consequences**:
-- ✅ Validates clan vars integration with darwin
-- ✅ Proves controller auto-accept works with darwin peers
-- ✅ Multiple fallback options (homebrew, custom launchd)
-- ⚠️ Partially manual (not fully declarative initially)
-- ⏭️ Architecture refinement after Story 1.8 data collection
+**Epic 1 Validation Evidence** (Story 1.12):
+- ✅ Physical deployment: blackphos operational with zerotier via homebrew cask
+- ✅ Heterogeneous coordination: nixos VMs (cinnabar, electrum) ↔ darwin (blackphos) bidirectional SSH
+- ✅ Network performance: 1-12ms latency across zerotier network db4344343b14b903
+- ✅ Production stability: Zero zerotier-related issues during 3+ weeks Epic 1 validation
+- ✅ Documented solution: `~/projects/nix-workspace/test-clan/docs/guides/darwin-zerotier-integration.md`
+
+**Implementation Pattern**:
+```nix
+# nix-darwin activation script
+system.activationScripts.postUserActivation.text = ''
+  # Install zerotier via homebrew if not present
+  if ! command -v zerotier-cli &> /dev/null; then
+    brew install --cask zerotier-one
+  fi
+  # Join network if not already member
+  zerotier-cli join db4344343b14b903
+'';
+```
+
+**Consequences** (Updated with Story 1.12 evidence):
+- ✅ Validates clan vars integration with darwin (clan inventory users service functional)
+- ✅ Proves controller auto-accept works with darwin peers (cinnabar zerotier controller)
+- ✅ **VALIDATED**: Homebrew dependency acceptable for production use
+- ⚠️ **MINOR limitation**: Not pure nix (homebrew external dependency), documented and acceptable
+- ⚠️ Partially manual (not fully declarative), but pragmatic and proven
+- ✅ **NEW**: Cross-platform zerotier mesh validated (nixos + darwin heterogeneous fleet)
+
+**Alternative Options** (Deferred):
+- Option 2 (Custom Launchd): More nix-native, but untested - defer unless homebrew causes issues
+- Option 3 (Hybrid Manual): More manual, less desirable - Option 1 proven sufficient
+
+**Production Readiness**: HIGH confidence for Epic 2+ darwin deployments (blackphos, stibnite, rosegold, argentum).
+
+**References**:
+- Epic 1 Retrospective: `docs/notes/development/epic-1-retro-2025-11-20.md` (lines 307-322: Zerotier pattern validation)
+- Darwin zerotier guide: `~/projects/nix-workspace/test-clan/docs/guides/darwin-zerotier-integration.md`
+- Story 1.12: Blackphos deployment with zerotier validation
+- darwin-networking-options.md: Option 1 marked VALIDATED
 
 ## ADR-005: Multi-User via Standard NixOS Patterns (No Clan Magic)
 
