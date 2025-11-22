@@ -332,7 +332,19 @@ development_status:
     13 stories total. "Rip the band-aid" strategy.
 
   # Phase 1: Home-Manager Migration Foundation (4 stories)
-  story-2-1: ready-for-dev
+  # Story 2.1: DONE ✅ APPROVED ✅ (2025-11-22) - Identify infra-specific components to preserve
+  # Discovery/documentation story identifying all infra-unique components requiring preservation during Epic 2 migration
+  # Deliverable: story-2-1-preservation-checklist.md (887 lines, 10 sections covering GitHub Actions, TypeScript, Cloudflare, docs, scripts)
+  # Quality: 9.8/10 post-correction (initial 8.5/10, 5 corrections applied via 4 atomic commits)
+  # All 7 ACs satisfied, all 7 tasks verified complete, zero critical issues, zero missing components
+  # Empirical validation: workflow counts ✓, TypeScript structure ✓, Cloudflare config ✓, additional components ✓
+  # Migration directives: PRESERVE/REPLACE/CREATE categorization unambiguous, Story 2.3 execution guidance actionable
+  # Verification strategy: Git diff commands, functional validation, nix configuration checks all documented
+  # Review (2025-11-22): APPROVED - Zero blockers, production-ready, Story 2.3 can proceed with high confidence
+  # Corrections: composite actions count (2 not 3), clan components clarified (NEW not replacements), .gitleaksignore added, docs/ symlinks documented, subdirectory inventory completed
+  # Strategic value: Preservation checklist provides comprehensive safety mechanism for Epic 2 "rip the band-aid" migration
+  # Unblocks: Story 2.2 (diff analysis can begin), Story 2.3 (migration can proceed with preservation guidance)
+  story-2-1: done
   story-2-1-title: "Identify infra-specific components to preserve"
   story-2-2: backlog
   story-2-2-title: "Stibnite vs blackphos configuration diff analysis"
