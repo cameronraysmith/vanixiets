@@ -2,7 +2,7 @@
 
 **Epic:** Epic 2 - Infrastructure Architecture Migration (Apply test-clan patterns to infra)
 
-**Status:** ready-for-dev
+**Status:** done
 
 **Phase:** Phase 1 - Home-Manager Migration Foundation
 
