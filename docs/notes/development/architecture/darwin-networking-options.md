@@ -1,10 +1,13 @@
 # Darwin Networking Options
 
+**Last Updated**: 2025-11-21
+**Status**: Option 1 VALIDATED (Epic 1 Story 1.12)
+
 **Problem**: Clan's zerotier service is NixOS-only (systemd dependencies, no darwin module). Darwin machines need alternative networking approach.
 
 ## Option 1: Homebrew Zerotier (Maintains Consistency)
 
-**Status**: ⚠️ Unvalidated (theoretical, requires Story 1.8 testing)
+**Status**: ✅ VALIDATED (Epic 1 Story 1.12 - blackphos physical deployment, 3+ weeks production stability)
 
 **Setup**:
 ```nix
@@ -36,17 +39,20 @@ zerotier-cli listnetworks
 zerotier-cli listpeers
 ```
 
-**Pros**:
-- Maintains zerotier consistency with NixOS machines
-- Uses clan-generated network-id (partial integration)
-- GUI app for management
-- Same VPN as test-clan validation
+**Pros** (Epic 1 validated):
+- ✅ Maintains zerotier consistency with NixOS machines (heterogeneous fleet coordination proven)
+- ✅ Uses clan-generated network-id (partial integration)
+- ✅ Activation script automates network join (non-declarative but idempotent)
+- ✅ Same VPN as test-clan validation (network db4344343b14b903 operational)
+- ✅ Production stability: 3+ weeks zero connectivity issues
+- ✅ Bidirectional SSH: nixos ↔ darwin coordination (1-12ms latency)
 
-**Cons**:
-- Not fully nix-managed (homebrew + GUI app)
-- Manual network join required
-- No automatic peer acceptance (controller auto-accept may not work)
-- Requires testing in Story 1.8
+**Cons** (Epic 1 validated):
+- ⚠️ MINOR: Not fully nix-managed (homebrew cask dependency, acceptable limitation)
+- ⚠️ Manual authorization required on zerotier controller (one-time per machine)
+- ⚠️ Activation script runs on each switch (idempotent, no side effects)
+
+**Epic 1 Validation**: Story 1.12 blackphos deployment, Reference: darwin-zerotier-integration.md in test-clan
 
 ## Option 2: Custom Launchd Service (Full Nix Control)
 
