@@ -56,58 +56,66 @@
 
 ---
 
-## FR-2: Production Integration (Phase 1)
+## FR-2: Infrastructure Architecture Migration (Phase 1 - Epic 2)
 
-**FR-2.1**: Production services shall be integrated on deployed infrastructure with:
+Apply test-clan validated patterns to production infra repository using "rip the band-aid" wholesale replacement strategy.
 
-- Zerotier controller operational on cinnabar coordinating mesh network to orb-nixos
-- Production-grade configuration applied to both VMs (srvos hardening, security baseline)
-- Service deployment patterns validated (multi-VM coordination via clan inventory)
-- Infrastructure proven stable under production-like load
+**Four Phases:**
+1. **Home-Manager Migration Foundation** (3-4 stories) - Affects ALL hosts, foundational for everything else
+2. **Active Darwin Workstations** (4-5 stories) - blackphos + stibnite migration, activate from infra (blackphos switches test-clan → infra)
+3. **VPS Config Migration** (2-3 stories) - cinnabar + electrum config migration from test-clan → infra (infrastructure already deployed in Epic 1)
+4. **Future Machines** (3-4 stories) - rosegold + argentum configuration creation
 
-**FR-2.2**: Security hardening shall be applied with:
+**Migration Strategy:** "Rip the band-aid" approach - create `clan-01` branch, wholesale nix config replacement from test-clan, preserve infra-specific components (GitHub Actions, TypeScript monorepo, Cloudflare deployment).
 
-- srvos modules providing security baseline (both cinnabar and orb-nixos)
-- Firewall rules configured via NixOS (zerotier mesh access, external SSH only)
-- LUKS encryption validated operational on both VMs
-- Certificate-based SSH authentication enforced (no password-based auth)
-- Principle of least privilege applied to all services
+**Epic 1 Foundation:** Infrastructure deployed and operational in Epic 1 (cinnabar IP 49.13.68.78, electrum operational, blackphos physically deployed with 270 packages preserved).
 
-**FR-2.3**: Multi-VM coordination shall be operational with:
+**FR-2.1**: Home-manager migration foundation shall migrate shared home-manager configuration:
 
-- Clan inventory managing 2 machines with different roles
-- Zerotier mesh network connecting cinnabar + orb-nixos
-- SSH via zerotier functional between VMs
-- Clan vars deployed correctly to `/run/secrets/` on both machines with proper permissions
-- Service instances with roles proven across heterogeneous infrastructure
+- Migrate home-manager configuration from infra to dendritic+clan pattern
+- Affects ALL hosts (stibnite, blackphos, cinnabar, electrum, rosegold, argentum)
+- Includes LazyVim-module → lazyvim-nix migration (apply Epic 1 improvement)
+- Cross-platform modules proven (same code works nixos + darwin)
+- Foundation complete before host-specific migrations
 
-**FR-2.4**: Production secrets management shall be validated with:
+**FR-2.2**: Active darwin workstations shall migrate blackphos + stibnite configurations:
 
-- Clan vars generators producing all required secrets (SSH host keys, service credentials, API tokens)
-- Secrets encrypted at rest via age encryption in `sops/machines/<hostname>/secrets/`
-- Automatic deployment to `/run/secrets/` with correct ownership (root or specific user)
-- Shared secrets (where `share = true`) accessible across machines as configured
-- Rollback procedure for secrets tested (redeploy previous generation)
+- Migrate blackphos config in infra to match test-clan version (feature parity)
+- Migrate stibnite config in infra (apply architecture, preserve differences)
+- Both proceed together (shared home-manager foundation)
+- Activate both from infra (blackphos switches test-clan → infra)
+- Cleanup: Remove unused configs (blackphos-nixos, stibnite-nixos, rosegold-old)
+- SSH configuration (server + client) migrated to match blackphos pattern
 
-**FR-2.5**: Infrastructure monitoring and validation:
+**FR-2.3**: VPS configuration migration shall migrate cinnabar + electrum configs:
 
-- System resource utilization within expected parameters (CPU, memory, disk, network)
-- Log aggregation functional (journald, clan logging if configured)
-- Backup procedures validated (if implemented in Phase 1)
-- Disaster recovery procedure documented (rebuild from configuration)
+- Migrate cinnabar + electrum configs from test-clan → infra
+- Infrastructure already deployed and operational in test-clan (Epic 1)
+- Config migration only (no infrastructure redeployment required)
+- Preserve zerotier controller configuration (cinnabar)
+- Multi-machine coordination maintained
+
+**FR-2.4**: Future machine configurations shall be created:
+
+- Create rosegold configuration in infra (new)
+- Create argentum configuration in infra (new)
+- Apply proven patterns from blackphos/stibnite migrations
+- Prepare for Epic 3-4 deployments
 
 **Acceptance criteria**:
 
-- [ ] Zerotier controller operational with mesh network to orb-nixos
-- [ ] Production-grade hardening applied (srvos modules, firewall, LUKS)
-- [ ] Multi-VM coordination validated (clan inventory, service instances, SSH via mesh)
-- [ ] Clan vars deployed correctly on both machines (`ls /run/secrets/`)
-- [ ] Infrastructure stable for 1-2 weeks minimum before darwin migration
-- [ ] Production-readiness validated (security, monitoring, disaster recovery)
+- [ ] Home-manager foundation migrated (affects all hosts)
+- [ ] Blackphos config migrated to infra (feature parity with test-clan)
+- [ ] Stibnite config migrated to infra (architecture applied, differences preserved)
+- [ ] Both active darwin workstations activated from infra
+- [ ] Cinnabar + electrum configs migrated from test-clan → infra
+- [ ] Rosegold + argentum configurations created
+- [ ] All builds passing, zero regressions
+- [ ] Infrastructure stable for 1-2 weeks before Epic 3
 
 ---
 
-## FR-3: Darwin Host Migration (Phases 2-4)
+## FR-3: Rosegold Deployment (Phase 2 - Epic 3, formerly Epic 4)
 
 **FR-3.1**: Darwin modules shall be converted to dendritic pattern with:
 
@@ -161,85 +169,78 @@
 - [ ] SSH via zerotier works (`ssh crs58@<host-zerotier-ip>`)
 - [ ] Stable for 1-2 weeks before next host
 
-**Phase sequencing**:
-
-- Phase 2: blackphos (establish patterns)
-- Phase 3: rosegold (validate pattern reusability)
-- Phase 4: argentum (final validation before stibnite)
+**Note:** blackphos migration already complete in Epic 2. This epic focuses on rosegold deployment using proven patterns.
 
 ---
 
-## FR-4: Primary Workstation Migration (Phase 5)
+## FR-4: Argentum Deployment (Phase 3 - Epic 4, formerly Epic 5)
 
-**FR-4.1**: Pre-migration readiness shall be validated with:
+**FR-4.1**: argentum deployment shall apply proven patterns:
 
-- blackphos stable for 4-6 weeks minimum
-- rosegold stable for 2-4 weeks minimum
-- argentum stable for 2-4 weeks minimum
-- No outstanding critical bugs or issues in patterns
-- All workflows tested on other hosts (development environment, tools, system services)
-- Full backup of current stibnite configuration created
-- Rollback procedure documented and tested
-- Low-stakes timing (not before important deadline)
+- Configuration in `modules/hosts/argentum/default.nix` using patterns from Epic 2-3
+- Clan inventory integration with appropriate tags and service instances
+- Zerotier peer role connecting to cinnabar controller
+- Home-manager configuration from shared foundation (Epic 2 Phase 1)
+- User-specific customization for christophersmith
 
-**FR-4.2**: stibnite migration shall apply proven patterns with:
+**FR-4.2**: All functionality shall be validated:
 
-- Configuration in `modules/hosts/stibnite/default.nix` using blackphos patterns
-- All daily-use workflows configured: development environment, communication tools, system services, GUI applications
-- Enhanced validation before deployment (dry-run, double-check all imports)
-- Staged deployment (deploy but don't reboot immediately, test in current session)
-
-**FR-4.3**: Daily workflows shall be validated immediately post-migration:
-
-- Development environment: editors, IDEs, language environments, version control
-- Communication tools: if managed via nix (browsers, chat applications)
-- System services: essential background services
-- Shell configuration: fish, starship, aliases, functions
-- Performance: system responsiveness, build times
-
-**FR-4.4**: 5-machine network shall be complete with:
-
-- Zerotier peer role on stibnite connecting to cinnabar controller
-- Full mesh connectivity: stibnite can reach all other machines (cinnabar, blackphos, rosegold, argentum)
-- SSH via zerotier functional to/from stibnite
-- Multi-machine coordination operational (all clan services deployed across 5 machines)
-
-**FR-4.5**: Productivity shall be maintained with:
-
-- No critical regressions in daily workflows
-- Performance maintained (build times, system responsiveness)
-- All applications and tools functional
-- Subjective productivity assessment: maintained or improved
+- Host configuration builds successfully
+- Deployment succeeds without errors
+- All packages functional (zero-regression validation)
+- Zerotier peer connected and mesh network operational
+- SSH via zerotier functional
 
 **Acceptance criteria**:
 
-- [ ] Pre-migration checklist 100% complete
-- [ ] stibnite configuration builds successfully
+- [ ] argentum configuration builds successfully
 - [ ] Deployment succeeds without errors
-- [ ] All daily workflows functional (comprehensive validation)
-- [ ] 5-machine zerotier network complete
-- [ ] Productivity maintained (subjective assessment positive)
-- [ ] Stable for 1-2 weeks before Phase 6 cleanup
+- [ ] All functionality preserved (zero-regression validation)
+- [ ] Zerotier peer connected
+- [ ] SSH via zerotier works
+- [ ] Stable for 1-2 weeks before Epic 5
 
 ---
 
-## FR-5: Legacy Cleanup (Phase 6)
+## FR-5: Stibnite Extended Validation (Phase 4 - Epic 5, formerly Epic 6, CONDITIONAL)
 
-**FR-5.1**: nixos-unified infrastructure shall be removed with:
+**CONDITIONAL Epic:** Only execute if Epic 2 Phase 2 shows instability requiring additional validation before primary workstation migration.
+
+**FR-5.1**: Extended validation shall be performed if needed:
+
+- Stibnite configuration validation using proven patterns from Epic 2-4
+- Additional stability testing if Epic 2 Phase 2 revealed issues
+- Pattern refinement based on multi-host experience
+- Pre-migration checklist comprehensive validation
+
+**Acceptance criteria (if executed)**:
+
+- [ ] All previous hosts stable for cumulative 4-6 weeks
+- [ ] Stibnite configuration validated
+- [ ] No outstanding critical bugs or issues
+- [ ] Ready for legacy cleanup
+
+**Note:** This epic may be skipped if Epic 2 Phase 2 proves stable and no additional validation required.
+
+---
+
+## FR-6: Legacy Cleanup (Phase 5 - Epic 6, formerly Epic 7)
+
+**FR-6.1**: nixos-unified infrastructure shall be removed with:
 
 - Delete `configurations/` directory (host-specific nixos-unified configs)
 - Remove nixos-unified flake input from `flake.nix`
 - Remove nixos-unified flakeModules imports
 - Update documentation referencing nixos-unified
 
-**FR-5.2**: Secrets migration completion (if applicable):
+**FR-6.2**: Secrets migration completion (if applicable):
 
 - Evaluate remaining sops-nix secrets
 - Migrate generated secrets to clan vars (SSH keys, passwords)
 - Keep sops-nix for external credentials (API tokens) if hybrid approach chosen
 - Remove sops-nix entirely if full migration achieved
 
-**FR-5.3**: Documentation shall be updated with:
+**FR-6.3**: Documentation shall be updated with:
 
 - README reflecting dendritic + clan architecture
 - Migration experience documented for future reference
@@ -252,6 +253,6 @@
 - [ ] Secrets migration strategy finalized (full or hybrid)
 - [ ] Documentation updated and accurate
 - [ ] Clean dendritic + clan architecture
-- [ ] All 5 machines operational with no legacy dependencies
+- [ ] All machines operational with no legacy dependencies
 
 ---
