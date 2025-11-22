@@ -478,15 +478,17 @@ modules/**/*
 overlays/**/*
 ```
 
-**Clan Architecture Components**:
+**Clan Architecture Components** (NEW from test-clan):
 ```
-machines/**/*
-sops/**/* (clan sops structure, may need merge with secrets/)
-vars/**/* (clan vars)
-pkgs/**/* (package definitions)
-terraform/**/* (infrastructure as code)
-inventory.json (clan inventory)
+machines/**/* (NEW - clan machine definitions)
+sops/**/* (NEW - clan sops structure, may require merge with existing secrets/)
+vars/**/* (NEW - clan vars)
+pkgs/**/* (NEW - package definitions)
+terraform/**/* (NEW - infrastructure as code)
+inventory.json (NEW - clan inventory)
 ```
+
+**Important:** These directories do NOT currently exist in infra. Story 2.3 will CREATE them by copying from test-clan. Existing infra `secrets/` directory will be preserved initially, then migrated to clan's two-tier architecture in Story 2.5.
 
 **Build and Development**:
 ```
