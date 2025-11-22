@@ -198,22 +198,22 @@ cd packages/docs && nix develop -c wrangler deploy --dry-run
 
 ### 4.1 Project Documentation
 
-**Location**: `docs/notes/`
+**Location**: `docs/notes/development/`
 
-**Structure**:
-- `docs/notes/development/` - BMM workflow artifacts (PRD, architecture, epics, sprint status)
-- `docs/notes/clan/` - Clan integration planning and migration notes
-- `docs/notes/ci/` - CI/CD optimization research
-- `docs/notes/caching/` - Content-addressed builds research
-- `docs/notes/mcp/` - MCP server integration notes
-- `docs/notes/nix-rosetta/` - Rosetta builder implementation notes
-- `docs/notes/nixpkgs/` - Nixpkgs bisect guides
-- `docs/notes/sops/` - Sops migration documentation
-- `docs/notes/workflows/` - Dual-remote secrets workflow
-- `docs/notes/forking/` - Template usage documentation
-- `docs/notes/prompts/` - AI prompt engineering notes
+**Subdirectories**:
+- `PRD/` - Product requirements (sharded markdown)
+- `architecture/` - Architecture documentation (sharded markdown)
+- `epics/` - Epic breakdown and planning
+- `work-items/` - Story files and context
+- `research/` - Research artifacts and exploration
+- `implementation/` - Implementation notes
+- [other subdirectories]
 
-**Migration Action**: PRESERVE (project-specific planning and research)
+**Repository Structure Note**: The `docs/` directory at repository root contains:
+- Symlinks to `packages/docs/src/content/docs/` (documentation website source)
+- Actual subdirectory `docs/notes/` (project planning and development docs)
+
+**Migration Action**: PRESERVE `docs/notes/` entirely (infra-specific project documentation). Symlinks will be recreated by build process.
 
 **Story 2.3 Directive**: `docs/notes/**/*` (preserve all)
 
