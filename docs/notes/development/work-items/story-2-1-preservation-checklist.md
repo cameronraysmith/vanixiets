@@ -297,8 +297,9 @@ REPLACE: config.nix (superseded by clan vars)
 - `.git/` - Git repository database (NEVER touch)
 - `.gitignore` - Git ignore patterns (COMPARE with test-clan, MERGE unique patterns)
 - `.gitattributes` - Git attribute configuration (COMPARE with test-clan, MERGE if needed)
+- `.gitleaksignore` - Gitleaks secret detection ignore patterns (PRESERVE)
 
-**Migration Action**: PRESERVE `.git/`, MERGE `.gitignore` and `.gitattributes` unique patterns
+**Migration Action**: PRESERVE `.git/` and `.gitleaksignore`, MERGE `.gitignore` and `.gitattributes` unique patterns
 
 ### 4.5 Editor and IDE Configuration
 
