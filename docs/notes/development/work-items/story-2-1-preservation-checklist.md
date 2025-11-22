@@ -56,8 +56,9 @@ All files in `.github/workflows/`:
 All files in `.github/actions/`:
 
 - `setup-nix/action.yml` - Nix installer with sops integration
-- `cached-ci-job/action.yml` - Content-addressed job caching
-- `verify-no-secrets/action.yml` - Secret leak detection
+- `cached-ci-job/action.yaml` - Content-addressed job caching
+
+**Note:** verify-no-secrets functionality exists as `scripts/verify-no-secrets-in-store.sh` (script), not as a composite action.
 
 ### Story 2.3 Directive
 
