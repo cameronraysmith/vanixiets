@@ -17,7 +17,7 @@
 
 Story 2.1 is the **first Epic 2 story** and establishes the foundation for the "rip the band-aid" migration strategy.
 
-This story identifies all infra-specific components that must be preserved during Epic 2 Phase 1-4 migration from nixos-unified to dendritic+clan architecture.
+This story identifies all infra-specific components that must be preserved during Epic 2 Phase 1-4 migration from nixos-unified to dendritic flake-parts+clan architecture.
 Without this preservation checklist, Stories 2.3+ risk destroying critical infrastructure when copying configurations from test-clan → infra.
 
 **Critical Infrastructure at Risk:**
