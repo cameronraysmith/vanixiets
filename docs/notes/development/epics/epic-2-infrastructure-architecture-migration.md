@@ -70,20 +70,22 @@ So that I ensure GitHub Actions, TypeScript monorepo, and Cloudflare deployment 
 
 ---
 
-### Story 2.2: Stibnite vs blackphos configuration diff analysis
+### Story 2.2: Prepare clan-01 branch for migration
 
 As a system administrator,
-I want to understand all configuration differences between stibnite and blackphos,
-So that I can accurately migrate stibnite while preserving its unique characteristics.
+I want to create and prepare the `clan-01` branch for Epic 2 wholesale migration execution,
+So that I have a clean, documented checkpoint before applying destructive config replacement from test-clan.
+
+**Context:**
+
+Epic 2 uses a "rip the band-aid" migration strategy: create fresh `clan-01` branch, copy validated nix configs from test-clan → infra, preserve infra-specific components per Story 2.1 checklist.
 
 **Acceptance Criteria:**
-1. Document package differences: Compare `environment.systemPackages` and home-manager packages between stibnite and blackphos
-2. Document service/daemon differences: Compare system services, launchd agents, user services
-3. Document hardware-specific configuration differences: Platform-specific settings, drivers, hardware configuration
-4. Document user-specific settings: crs58 workflow differences (stibnite primary workstation vs blackphos raquel's workstation)
-5. Create stibnite migration checklist highlighting critical distinctions that must be preserved
-6. Identify any stibnite-specific modules or configurations not present in blackphos
-7. Document findings in `docs/notes/development/stibnite-blackphos-diff-analysis.md`
+1. Create clan-01 branch from clan HEAD with clean working directory
+2. Verify branch created successfully with zero divergence from parent
+3. Document branch purpose and Epic 2 migration strategy
+4. Confirm Story 2.1 preservation checklist available for Story 2.3 reference
+5. Prepare Story 2.3 execution readiness (git status clean, branch documented)
 
 **Prerequisites:** Story 2.1 (preservation checklist complete)
 
@@ -153,6 +155,8 @@ So that blackphos can be managed from production infra repository with full feat
 ---
 
 ### Story 2.6: Stibnite config migration
+
+**Note:** This story includes configuration diff analysis between stibnite and blackphos as Task 1 (originally planned as separate Story 2.2 "diff analysis", now absorbed here as preparatory work for stibnite migration).
 
 As a system administrator,
 I want to migrate stibnite configuration to dendritic+clan architecture,
