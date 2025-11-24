@@ -46,3 +46,4 @@ terraform/*.tfstate.backup
 
 # Deployment logs
 *.log
+secrets/home-manager.backup-pre-2.4/
