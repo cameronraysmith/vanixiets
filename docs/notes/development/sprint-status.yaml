@@ -355,9 +355,12 @@ development_status:
   # justfile merged, flake evaluates, test patterns working
   # Archived unmigrated packages: atuin-format, starship-jj → docs/notes/development/archived-overlays/
   # Note: CLAUDE.md update deferred to clan-01 → main merge
-  story-2-3: review
+  story-2-3: done
   story-2-3-title: "Execute wholesale migration from test-clan to infra"
-  story-2-4: backlog
+  # Story 2.4: REVIEW (2025-11-24) - Home-manager secrets migration complete
+  # Re-encrypted crs58 (8 secrets) and raquel (5 secrets) with infra age keys
+  # All 7 ACs validated, documentation created (540 lines)
+  story-2-4: review
   story-2-4-title: "Home-manager secrets migration"
 
   # Phase 2: Active Darwin Workstations (4 stories)
