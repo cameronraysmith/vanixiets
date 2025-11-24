@@ -1,6 +1,6 @@
 # Story 2.4: Home-manager secrets migration
 
-Status: review
+Status: done
 
 ## Story
 
@@ -491,3 +491,115 @@ Key accomplishments:
 |------|---------|--------|
 | 2025-11-24 | 1.0 | Story drafted from Epic 2 definition and user context |
 | 2025-11-24 | 2.0 | Story implemented - all tasks complete, AC1-AC7 satisfied, ready for review |
+| 2025-11-24 | 3.0 | Senior Developer Review notes appended |
+
+---
+
+## Senior Developer Review (AI)
+
+### Reviewer
+Dev (claude-opus-4-5-20251101)
+
+### Date
+2025-11-24
+
+### Outcome
+**APPROVE** - All acceptance criteria satisfied with evidence, all tasks verified complete, zero blocking issues.
+
+### Summary
+Story 2.4 successfully migrates home-manager secrets from test-clan age keys to infra age keys, completing Epic 2 Phase 1 (Home-Manager Migration Foundation).
+The implementation correctly uses `sops updatekeys -y` to re-encrypt secrets with the infra keys defined in `.sops.yaml`, adding the `&dev` key recipient per creation rules.
+Documentation is comprehensive (540 lines) with all 7 required sections.
+All validation commands pass.
+
+### Key Findings
+
+**No HIGH severity issues found.**
+
+**No MEDIUM severity issues found.**
+
+**LOW severity notes (advisory only):**
+
+1. **AC7 Secret Count Discrepancy in Story vs Implementation**: Story AC7 lists crs58 as 7 secrets and raquel as 4 secrets, but the actual implementation (confirmed in Dev Notes and validation) shows crs58=8 secrets and raquel=5 secrets.
+   This discrepancy reflects the ssh-public-key being an INTENTIONAL secret (used for sops.templates allowed_signers), documented in Epic 1 Story 1.10C.
+   The implementation is correct; the AC description was originally based on earlier estimates.
+
+2. **sops -i vs sops updatekeys -y**: The AC2 verification block suggests `sops -i` command, but the implementation correctly used `sops updatekeys -y` which is the proper command for adding new recipients.
+   This is a documentation improvement opportunity, not a code issue.
+
+### Acceptance Criteria Coverage
+
+| AC# | Description | Status | Evidence |
+|-----|-------------|--------|----------|
+| AC1 | Two-Tier Architecture Structure | IMPLEMENTED | `ls sops/users/*/key.json` = 3 files (crs58, raquel, cameron); `ls secrets/home-manager/users/` = 2 dirs (crs58, raquel) |
+| AC2 | Secrets Re-encrypted with Infra Keys | IMPLEMENTED | `git diff` shows &dev key added: `age1js028xag70wpwpp47elpq50mjjv7zn7sxuwuhk8yltkjzqzdvq5qq8w8cy` as new recipient in both secrets files |
+| AC3 | Age Key Correspondence Across Three Contexts | IMPLEMENTED | crs58: `age1vn8fpkmk...` matches sops/users/, .sops.yaml (&admin-user), and workstation line 2; raquel: `age12w0rmmsk...` matches all three contexts |
+| AC4 | Darwin Decryption Works | IMPLEMENTED | `sops -d` succeeds for both users; `nix build .#homeConfigurations.aarch64-darwin.{crs58,raquel}.activationPackage --dry-run` shows 5 derivations each |
+| AC5 | NixOS Config Evaluates | IMPLEMENTED | `nix eval .#nixosConfigurations.cinnabar.config.sops.secrets --json` returns 5 clan vars secrets (openssh, tor_hostname, tor_hs_ed25519_secret_key, user-password-cameron, zerotier) |
+| AC6 | Documentation Complete | IMPLEMENTED | `docs/guides/home-manager-secrets-migration.md` = 540 lines; Contains: Overview, User Setup, .sops.yaml Config, secrets.yaml Creation, Validation Workflow, Troubleshooting, Example (christophersmith) |
+| AC7 | Secret Counts Preserved | IMPLEMENTED | `sops -d crs58/secrets.yaml \| grep -c` = 8 secrets; `sops -d raquel/secrets.yaml \| grep -c` = 5 secrets |
+
+**Summary: 7 of 7 acceptance criteria fully implemented**
+
+### Task Completion Validation
+
+| Task | Marked As | Verified As | Evidence |
+|------|-----------|-------------|----------|
+| Task 1: Pre-Migration Validation | [x] Complete | VERIFIED COMPLETE | Debug log documents branch, structure verification, backup creation |
+| Task 2: Age Key Correspondence | [x] Complete | VERIFIED COMPLETE | Correspondence table in Dev Notes shows three-context match for crs58, raquel, cameron |
+| Task 3: Re-encrypt Secrets | [x] Complete | VERIFIED COMPLETE | git diff shows re-encryption, secret counts match (8/5) |
+| Task 4: Darwin Platform Testing | [x] Complete | VERIFIED COMPLETE | Debug log: decryption succeeded, builds succeeded (122/105 derivations) |
+| Task 5: NixOS Platform Testing | [x] Complete | VERIFIED COMPLETE | SSH verified (cinnabar hostname returned), sops.secrets eval shows 5 secrets |
+| Task 6: Documentation | [x] Complete | VERIFIED COMPLETE | File exists (540 lines), all 7 sections present |
+| Task 7: Final Validation and Commit | [x] Complete | VERIFIED COMPLETE | All AC verification commands documented, commits created (f4cc4ba4, c5e942db) |
+
+**Summary: 7 of 7 completed tasks verified, 0 questionable, 0 falsely marked complete**
+
+### Test Coverage and Gaps
+
+**Covered:**
+- Decryption testing on darwin (AC4)
+- NixOS config evaluation (AC5)
+- Home-manager build validation (AC4)
+- Secret count verification (AC7)
+
+**Gaps (documented in story, acceptable):**
+- Physical blackphos testing deferred (raquel secrets tested from stibnite with raquel's key)
+- Remote decryption on cinnabar deferred (would require deploying clan-01 branch)
+- These gaps are acceptable for Epic 2 Phase 1 scope; full deployment testing occurs in Phase 2+ stories
+
+### Architectural Alignment
+
+**Tech-spec compliance:**
+- Correctly implements two-tier architecture (Tier 2 user-level scope only)
+- Follows Pattern A (dendritic flake-parts with flake context access)
+- Uses sops-nix for home-manager secrets as validated in Epic 1 Story 1.10C
+
+**Architecture constraints:**
+- NO violations detected
+- Scope boundaries respected: vars/, sops/machines/, secrets/users/ untouched
+- .sops.yaml creation rules correctly configured (lines 50-64)
+
+### Security Notes
+
+- Private keys never committed (verification: no age private keys in diff)
+- Secrets files show encrypted content only (ENC[AES256_GCM,...])
+- Proper key hierarchy: admin + dev + user-specific keys per creation rule
+- Pre-migration backup created (not committed, excluded via .gitignore)
+
+### Best-Practices and References
+
+- [sops-nix documentation](https://github.com/Mic92/sops-nix) - home-manager integration patterns
+- [age encryption](https://age-encryption.org/) - key format and encryption
+- `sops updatekeys` is the correct command for adding recipients (not `sops -i` or `sops -e -i`)
+- Pattern validated in Epic 1 Story 1.10C (test-clan) with comprehensive documentation
+
+### Action Items
+
+**Code Changes Required:**
+*(none required)*
+
+**Advisory Notes:**
+- Note: AC7 secret counts in story description (7/4) differ from implementation (8/5); consider updating AC7 text to match actual counts including ssh-public-key
+- Note: AC2 verification block mentions `sops -i` but `sops updatekeys -y` is the correct command; consider updating AC2 verification example
+- Note: Remote decryption testing on cinnabar will be addressed in Story 2.9 (Cinnabar config migration) when the clan-01 branch is deployed
