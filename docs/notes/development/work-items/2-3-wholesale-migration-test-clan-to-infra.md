@@ -1,6 +1,6 @@
 # Story 2.3: Execute wholesale migration from test-clan to infra
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -546,3 +546,106 @@ infra/
 ### File List
 
 <!-- Will be filled during story execution -->
+
+---
+
+## Senior Developer Review (AI)
+
+**Reviewer:** Dev
+**Date:** 2025-11-24
+**Outcome:** APPROVE
+
+### Summary
+
+Story 2.3 "wholesale migration from test-clan to infra" successfully executed the "rip the band-aid" migration strategy.
+The implementation correctly migrates validated dendritic flake-parts + clan architecture from test-clan while preserving all infra-specific components.
+Three commits (vs expected 2) due to rsync -u flag issue discovery - this is properly documented and resolved.
+
+### Acceptance Criteria Coverage
+
+| AC# | Description | Status | Evidence |
+|-----|-------------|--------|----------|
+| AC1 | PRESERVE components unchanged | **PASS** | `git diff ace32e63..ab10e106 -- .github/ packages/ scripts/ CLAUDE.md README.md` returns empty (archived-overlays under docs/notes/ is NEW content, acceptable) |
+| AC2 | Dendritic structure + Clan config | **PASS** | machines/, sops/, vars/, pkgs/, terraform/, lib/, modules/ exist; configurations/, overlays/, tests/, config.nix deleted; 136 .nix files |
+| AC3 | Merged files correct | **PASS** | justfile 1639 lines with both clan and infra targets; .gitignore has terraform patterns; .sops.yaml has creation_rules; sops decryption works |
+| AC4 | GitHub Actions functional | **PASS** | 6 workflows listed via `gh workflow list` |
+| AC5 | Flake evaluation | **PASS** | `nix flake show --legacy` shows nixosConfigurations (cinnabar, electrum, gcp-vm), checks, apps, devShells |
+| AC6 | TypeScript build | **PASS** | `just install` + `just docs-build` complete successfully; packages/docs/dist/ contains built output |
+| AC7 | Secrets structure + patterns | **PASS** | Both secrets/ and sops/ exist; secrets/home-manager/ added (two-tier architecture); sops decryption works |
+
+**Summary:** 7 of 7 acceptance criteria fully implemented
+
+### Task Completion Validation
+
+| Task | Marked As | Verified As | Evidence |
+|------|-----------|-------------|----------|
+| rsync dry-run validation | N/A | COMPLETE | Commit ab10e106 shows successful migration |
+| rsync execution | N/A | COMPLETE | Files present in dendritic structure |
+| File structure verification | N/A | COMPLETE | AC2 verification commands all pass |
+| justfile merge | N/A | COMPLETE | 1639 lines, both target sets present |
+| .gitignore merge | N/A | COMPLETE | terraform patterns present |
+| .sops.yaml merge | N/A | COMPLETE | creation_rules present, decryption works |
+| flake.nix replacement | N/A | COMPLETE | Commit dba16c09 replaces with import-tree pattern |
+
+**Note:** Story task checkboxes were not marked during execution, but all tasks were verified complete via git commits and verification commands.
+
+### Discovered Issues Resolution
+
+| Issue | Resolution Status | Evidence |
+|-------|-------------------|----------|
+| rsync -u flag bug (flake.nix not replaced) | **RESOLVED** | Commit dba16c09 correctly replaces flake.nix with import-tree pattern |
+| terraform.tfstate security | **RESOLVED** | File not tracked by git (`git ls-files` empty), properly in .gitignore |
+| Archived overlays | **RESOLVED** | docs/notes/development/archived-overlays/ exists with README explaining reintegration path |
+
+### Infra-Specific Inputs Preservation
+
+All required infra-specific inputs preserved in flake.nix:
+- omnix ✓ (line 84)
+- flocken ✓ (line 87)
+- nix-rosetta-builder ✓ (line 90)
+- agenix ✓ (line 93)
+- landrun-nix ✓ (line 97)
+- playwright-web-flake ✓ (line 99)
+
+### Test Coverage and Gaps
+
+- Flake checks present: deployment-safety, home-configurations-exposed, home-module-exports, naming-conventions, nix-unit, pre-commit, secrets-generation, terraform-validate, treefmt, vars-user-password-validation
+- TypeScript build validated via `just docs-build`
+- No additional test requirements for migration story
+
+### Architectural Alignment
+
+- Dendritic import-tree pattern active in flake.nix (line 6)
+- Clan inventory.json references machines correctly (cinnabar, electrum)
+- Two-tier secrets architecture established (secrets/ + sops/)
+- Pattern A home-manager modules from test-clan preserved
+
+### Security Notes
+
+- terraform.tfstate properly excluded from git tracking
+- Secrets files encrypted with age (sops-nix)
+- No sensitive data exposed in commits
+
+### Advisory Notes
+
+- **Note:** Story file task checkboxes not checked during execution. Consider updating checklist post-review for completeness tracking.
+- **Note:** CLAUDE.md update deferred to clan-01 → main merge (documented as intentional).
+- **Note:** atuin-format and starship-jj packages archived, will be reintegrated in Story 2.6 (stibnite config).
+
+### Action Items
+
+**Code Changes Required:**
+- None - all critical requirements satisfied
+
+**Advisory Notes:**
+- Note: Consider checking task checkboxes in story file for completeness tracking (no action required)
+- Note: CLAUDE.md architecture section should be updated when merging clan-01 → main
+
+---
+
+## Change Log
+
+| Date | Version | Change |
+|------|---------|--------|
+| 2025-11-24 | 1.0 | Story created |
+| 2025-11-24 | 1.1 | Senior Developer Review (AI) appended - APPROVED |
