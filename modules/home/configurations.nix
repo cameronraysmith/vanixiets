@@ -69,13 +69,21 @@ in
   # Force module loading order - aggregates processed before homeConfigurations
   # This ensures config.flake.modules.homeManager.* are merged before access
   # Pattern A multi-aggregate organization (drupol-style):
+  #   - core: base config (catppuccin, fonts, bitwarden, xdg, session-variables, ssh)
   #   - development: dev environment (git, jujutsu, neovim, wezterm, zed, starship, zsh)
   #   - ai: AI-assisted tools (claude-code, mcp-servers, glm wrappers, ccstatusline)
   #   - shell: shell/terminal environment (atuin, yazi, zellij, tmux, bash, nushell)
+  #   - packages: organized package sets (terminal, development, compute, security, database, publishing)
+  #   - terminal: terminal utilities (direnv, fzf, lsd, bat, btop, htop, jq, nix-index, zoxide)
+  #   - tools: additional tools (awscli, k9s, pandoc, nix, gpg, macchina, tealdeer, texlive)
   imports = [
+    ./core
     ./development
     ./ai
     ./shell
+    ./packages
+    ./terminal
+    ./tools
     ./users
   ];
 
