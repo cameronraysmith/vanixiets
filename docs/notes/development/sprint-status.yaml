@@ -376,6 +376,8 @@ development_status:
   story-2-12-title: "Argentum configuration creation"
   story-2-13: backlog
   story-2-13-title: "Test harness migration and validation"
+  story-2-14: optional
+  story-2-14-title: "Consolidate agents-md module duplication"
 
   epic-2-retrospective: optional
 
