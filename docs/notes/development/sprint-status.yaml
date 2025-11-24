@@ -365,7 +365,12 @@ development_status:
   story-2-4-title: "Home-manager secrets migration"
 
   # Phase 2: Active Darwin Workstations (4 stories)
-  story-2-5: backlog
+  # Story 2.5: REVIEW (2025-11-24) - Blackphos config validation story
+  # Validation story complete - discovered and fixed Story 2.3 migration gap
+  # Migration gap fix: modules/home/packages/ missing, configurations.nix incomplete
+  # All 7 ACs PASS: build, packages, zerotier, secrets, eval, darwin features, docs
+  # Context: docs/notes/development/2-5-blackphos-config-migration-to-infra.context.xml
+  story-2-5: review
   story-2-5-title: "Blackphos config migration to infra"
   story-2-6: backlog
   story-2-6-title: "Stibnite config migration"
