@@ -346,7 +346,7 @@ development_status:
   # Unblocks: Story 2.2 (diff analysis can begin), Story 2.3 (migration can proceed with preservation guidance)
   story-2-1: done
   story-2-1-title: "Identify infra-specific components to preserve"
-  story-2-2: review
+  story-2-2: done
   story-2-2-title: "Prepare clan-01 branch for migration"
   story-2-3: ready-for-dev
   story-2-3-title: "Execute wholesale migration from test-clan to infra"
