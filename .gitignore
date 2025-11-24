@@ -34,3 +34,15 @@ pnpm-debug.log*
 # Workspace manifest generated artifacts (CUE is source of truth)
 manifests/workspace-manifest.json
 manifests/workspace-manifest.yaml
+
+# Terraform generated and sensitive files
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/config.tf.json
+terraform/.terraform-deploy-key
+terraform/result
+terraform/*.tfstate
+terraform/*.tfstate.backup
+
+# Deployment logs
+*.log
