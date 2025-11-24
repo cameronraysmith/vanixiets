@@ -348,7 +348,14 @@ development_status:
   story-2-1-title: "Identify infra-specific components to preserve"
   story-2-2: done
   story-2-2-title: "Prepare clan-01 branch for migration"
-  story-2-3: in-progress
+  # Story 2.3: DONE (2025-11-24) - Wholesale migration from test-clan to infra
+  # Implementation: 2 commits (ab10e106 migration, dba16c09 flake fix)
+  # Source: test-clan @ e1dcec1b, Safety tag: pre-story-2.3-migration @ ace32e63
+  # All 7 ACs verified PASS: dendritic structure, clan config, preserved components,
+  # justfile merged, flake evaluates, test patterns working
+  # Archived unmigrated packages: atuin-format, starship-jj → docs/notes/development/archived-overlays/
+  # Note: CLAUDE.md update deferred to clan-01 → main merge
+  story-2-3: review
   story-2-3-title: "Execute wholesale migration from test-clan to infra"
   story-2-4: backlog
   story-2-4-title: "Home-manager secrets migration"
