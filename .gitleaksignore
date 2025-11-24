@@ -28,3 +28,9 @@ c2c450b11490e7dbc370d6b0ccfec1ee40a9fbf3:packages/docs/src/content/docs/guides/c
 
 # Story 1.14 work item - story key "1-14-execute-go-no-go-decision" flagged as API key (false positive)
 docs/notes/development/work-items/1-14-execute-go-no-go-decision.md:generic-api-key:1251
+
+# Story 1.10C context - age public key in documentation (safe to share publicly)
+docs/notes/development/work-items/1-10c-establish-sops-nix-secrets-home-manager.context.xml:generic-api-key:404
+
+# Story 1.10C context - placeholder text in secret file structure example (not actual secret)
+docs/notes/development/work-items/1-10c-establish-sops-nix-secrets-home-manager.context.xml:private-key:526
