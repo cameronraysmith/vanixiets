@@ -47,6 +47,21 @@ creation_rules:
         - *dev
         - *raquel-user
 
+  # Home-manager user secrets (two-tier architecture from test-clan)
+  - path_regex: secrets/home-manager/users/crs58/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *admin-user
+
+  - path_regex: secrets/home-manager/users/raquel/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *raquel-user
+
   # Host-specific secrets
   - path_regex: secrets/hosts/stibnite/.*\.yaml$
     key_groups:

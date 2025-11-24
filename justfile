@@ -3,6 +3,7 @@
 # on lines preceding the recipe.
 
 ## nix
+## clan
 ## secrets
 ## sops
 ## CI/CD
@@ -257,6 +258,149 @@ update-package package="ccstatusline":
   echo "Running updateScript for {{ package }}..."
   $UPDATE_SCRIPT
   echo "Update complete. Review changes with: git diff"
+
+## clan
+# Commands for clan-based machine management (dendritic+clan architecture)
+
+# Run all tests (nix flake check)
+[group('clan')]
+test:
+  nix flake check
+
+# Run fast tests only (nix-unit + validation tests)
+[group('clan')]
+test-quick:
+  @echo "Running fast validation tests..."
+  @echo "TC-017: Naming conventions"
+  nix build .#checks.aarch64-darwin.naming-conventions --print-build-logs
+  @echo ""
+  @echo "TC-007: Secrets generation"
+  nix build .#checks.aarch64-darwin.secrets-generation --print-build-logs
+  @echo ""
+  @echo "TC-006: Deployment safety"
+  nix build .#checks.aarch64-darwin.deployment-safety --print-build-logs
+  @echo ""
+  @echo "TC-012: Terraform validation"
+  nix build .#checks.aarch64-darwin.terraform-validate --print-build-logs
+  @echo ""
+  @echo "✓ All validation tests passed"
+
+# Run integration tests (VM tests - Linux only)
+[group('clan')]
+test-integration:
+  @echo "Running VM integration tests (Linux only)..."
+  @echo ""
+  @echo "TC-005: VM test framework validation"
+  nix build .#checks.x86_64-linux.vm-test-framework --print-build-logs
+  @echo ""
+  @echo "TC-010: VM boot all machines"
+  nix build .#checks.x86_64-linux.vm-boot-all-machines --print-build-logs
+  @echo ""
+  @echo "All VM integration tests passed!"
+
+# Build all machine configurations using nom
+[group('clan')]
+build-all:
+  @echo "Building all machine configurations..."
+  nom build .#nixosConfigurations.cinnabar.config.system.build.toplevel
+  nom build .#nixosConfigurations.electrum.config.system.build.toplevel
+  nom build .#darwinConfigurations.blackphos.system
+  nom build .#darwinConfigurations.stibnite.system
+  @echo "All machines built successfully"
+
+# Build a specific machine configuration
+[group('clan')]
+build-machine machine:
+  nom build .#nixosConfigurations.{{machine}}.config.system.build.toplevel || \
+  nom build .#darwinConfigurations.{{machine}}.system
+
+# Show flake outputs
+[group('clan')]
+clan-show:
+  nix flake show
+
+# Show flake metadata
+[group('clan')]
+clan-metadata:
+  nix flake metadata
+
+# Preview darwin configuration changes (dry run)
+[group('clan')]
+clan-darwin-dry hostname:
+  @echo "Previewing darwin configuration changes for {{hostname}}..."
+  nix run .#darwin -- {{hostname}} . --dry
+  @echo ""
+  @echo "To apply these changes, run: just clan-darwin-switch {{hostname}}"
+
+# Apply darwin configuration (build + activate)
+[group('clan')]
+clan-darwin-switch hostname:
+  @echo "Applying darwin configuration for {{hostname}}..."
+  nix run .#darwin -- {{hostname}} .
+
+# Preview and apply darwin configuration (interactive)
+[group('clan')]
+clan-darwin hostname: (clan-darwin-dry hostname)
+  @echo ""
+  @read -p "Apply these changes? [y/N] " -n 1 -r; \
+  echo; \
+  if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+    just clan-darwin-switch {{hostname}}; \
+  else \
+    echo "Cancelled."; \
+  fi
+
+# Preview nixos configuration changes (dry run)
+[group('clan')]
+clan-os-dry hostname:
+  @echo "Previewing NixOS configuration changes for {{hostname}}..."
+  nix run .#os -- {{hostname}} . --dry
+  @echo ""
+  @echo "To apply these changes, run: just clan-os-switch {{hostname}}"
+
+# Apply nixos configuration (build + activate)
+[group('clan')]
+clan-os-switch hostname:
+  @echo "Applying NixOS configuration for {{hostname}}..."
+  nix run .#os -- {{hostname}} .
+
+# Preview and apply nixos configuration (interactive)
+[group('clan')]
+clan-os hostname: (clan-os-dry hostname)
+  @echo ""
+  @read -p "Apply these changes? [y/N] " -n 1 -r; \
+  echo; \
+  if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+    just clan-os-switch {{hostname}}; \
+  else \
+    echo "Cancelled."; \
+  fi
+
+# Preview home-manager configuration changes (dry run)
+[group('clan')]
+clan-home-dry username:
+  @echo "Previewing home-manager configuration changes for {{username}}..."
+  nix run .#home -- {{username}} . --dry
+  @echo ""
+  @echo "To apply these changes, run: just clan-home-switch {{username}}"
+
+# Apply home-manager configuration (build + activate)
+[group('clan')]
+clan-home-switch username:
+  @echo "Applying home-manager configuration for {{username}}..."
+  nix run .#home -- {{username}} .
+
+# Preview and apply home-manager configuration (interactive)
+[group('clan')]
+clan-home username: (clan-home-dry username)
+  @echo ""
+  @read -p "Apply these changes? [y/N] " -n 1 -r; \
+  echo; \
+  if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+    just clan-home-switch {{username}}; \
+  else \
+    echo "Cancelled."; \
+  fi
 
 ## docs
 
