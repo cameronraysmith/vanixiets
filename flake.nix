@@ -1,124 +1,128 @@
 {
-  description = "Nix configuration";
+  description = "infra: cameronraysmith-managed local and cloud infrastructure";
 
-  nixConfig = {
-    substituters = [
-      "https://cache.nixos.org"
-      "https://nix-community.cachix.org"
-      "https://numtide.cachix.org"
-      "https://cameronraysmith.cachix.org"
-      "https://pyproject-nix.cachix.org"
-      "https://om.cachix.org"
-      "https://catppuccin.cachix.org"
-    ];
-    trusted-public-keys = [
-      "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
-      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-      "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
-      "cameronraysmith.cachix.org-1:aC8ZcRCVcQql77Qn//Q1jrKkiDGir+pIUjhUunN6aio="
-      "pyproject-nix.cachix.org-1:UNzugsOlQIu2iOz0VyZNBQm2JSrL/kwxeCcFGw+jMe0="
-      "om.cachix.org-1:ifal/RLZJKN4sbpScyPGqJ2+appCslzu7ZZF/C01f2Q="
-      "catppuccin.cachix.org-1:noG/4HkbhJb+lUAdKrph6LaozJvAeEEZj4N732IysmU="
-    ];
-  };
+  outputs =
+    inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
 
   inputs = {
-    systems.url = "github:nix-systems/default";
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    nixpkgs-darwin-stable.url = "github:nixos/nixpkgs/nixpkgs-25.05-darwin";
-    nixpkgs-linux-stable.url = "github:nixos/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+
+    nixpkgs-darwin-stable.url = "github:NixOS/nixpkgs/nixpkgs-25.05-darwin";
+    nixpkgs-linux-stable.url = "github:NixOS/nixpkgs/nixos-25.05";
+
     flake-parts.url = "github:hercules-ci/flake-parts";
-    home-manager.url = "github:nix-community/home-manager";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    nix-darwin.url = "github:LnL7/nix-darwin";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+
+    nix-darwin.url = "github:nix-darwin/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+
     mac-app-util.url = "github:hraban/mac-app-util";
     mac-app-util.inputs.nixpkgs.follows = "nixpkgs";
-    nixos-unified.url = "github:srid/nixos-unified";
+
+    home-manager.url = "github:nix-community/home-manager";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
+
+    sops-nix.url = "github:Mic92/sops-nix";
+    sops-nix.inputs.nixpkgs.follows = "nixpkgs";
+
+    clan-core.url = "github:cameronraysmith/clan-core/dev";
+    clan-core.inputs.nixpkgs.follows = "nixpkgs";
+    clan-core.inputs.flake-parts.follows = "flake-parts";
+    clan-core.inputs.treefmt-nix.follows = "treefmt-nix";
+    clan-core.inputs.nix-darwin.follows = "nix-darwin";
+
+    import-tree.url = "github:vic/import-tree";
+
+    terranix.url = "github:terranix/terranix";
+    terranix.inputs.flake-parts.follows = "flake-parts";
+    terranix.inputs.nixpkgs.follows = "nixpkgs";
+
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
+
+    srvos.url = "github:nix-community/srvos";
+    srvos.inputs.nixpkgs.follows = "nixpkgs";
+
+    treefmt-nix.url = "github:numtide/treefmt-nix";
+    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+
+    git-hooks.url = "github:cachix/git-hooks.nix";
+    git-hooks.inputs.nixpkgs.follows = "nixpkgs";
+    git-hooks.inputs.flake-compat.follows = "";
+
+    nix-unit.url = "github:nix-community/nix-unit";
+    nix-unit.inputs.nixpkgs.follows = "nixpkgs";
+    nix-unit.inputs.flake-parts.follows = "flake-parts";
+    nix-unit.inputs.treefmt-nix.follows = "treefmt-nix";
+
+    pkgs-by-name-for-flake-parts.url = "github:drupol/pkgs-by-name-for-flake-parts";
+
+    nuenv.url = "github:hallettj/nuenv/writeShellApplication";
+    nuenv.inputs.nixpkgs.follows = "nixpkgs";
+
+    nix-ai-tools.url = "github:numtide/nix-ai-tools";
+    nix-ai-tools.inputs.nixpkgs.follows = "nixpkgs";
+
+    catppuccin.url = "github:catppuccin/nix";
+
+    lazyvim-nix.url = "github:pfassina/lazyvim-nix";
+    lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
+    nvim-treesitter = {
+      url = "github:nvim-treesitter/nvim-treesitter/main";
+      flake = false;
+    };
+    nvim-treesitter-textobjects = {
+      url = "github:nvim-treesitter/nvim-treesitter-textobjects/main";
+      flake = false;
+    };
+
+    nix-index-database.url = "github:nix-community/nix-index-database";
+    nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
+
+    # infra-specific inputs (preserved from legacy)
     omnix.url = "github:juspay/omnix";
-    omnix.inputs.systems.follows = "systems";
+    omnix.inputs.nixpkgs.follows = "nixpkgs";
 
     flocken.url = "github:mirkolenz/flocken/v2";
     flocken.inputs.nixpkgs.follows = "nixpkgs";
 
-    # do not enable
-    # nix-rosetta-builder.inputs.nixpkgs.follows = "nixpkgs";
-    # it is pinned to the commit of nixpkgs e9f00bd8
-    # used to build the cached bootstrap image at
-    # /nix/store/c3bav8f2.../nixos.qcow2.
     nix-rosetta-builder.url = "github:cpick/nix-rosetta-builder";
     nix-rosetta-builder.inputs.nixpkgs.url = "github:nixos/nixpkgs/e9f00bd893984bc8ce46c895c3bf7cac95331127";
 
     agenix.url = "github:ryantm/agenix";
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.home-manager.follows = "home-manager";
-    agenix.inputs.systems.follows = "systems";
-    sops-nix.url = "github:mic92/sops-nix";
-    sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
-    nix-index-database.url = "github:nix-community/nix-index-database";
-    nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
-
-    lazyvim.url = "github:cameronraysmith/LazyVim-module/dev";
-    lazyvim.inputs.nixpkgs.follows = "nixpkgs";
-    lazyvim.inputs.systems.follows = "systems";
-    catppuccin.url = "github:catppuccin/nix";
-    catppuccin.inputs.nixpkgs.follows = "nixpkgs";
-
-    git-hooks.url = "github:cachix/git-hooks.nix";
-    git-hooks.flake = false;
-    nuenv.url = "github:hallettj/nuenv/writeShellApplication";
-    nuenv.inputs.nixpkgs.follows = "nixpkgs";
-
-    # upstream jujutsu for latest SSH signing features
-    jj.url = "github:martinvonz/jj";
-    jj.inputs.nixpkgs.follows = "nixpkgs";
-
-    # do not override nixpkgs input to preserve numtide.cachix.org cache hits
-    nix-ai-tools.url = "github:numtide/nix-ai-tools";
-
-    # landlock app sandboxing on linux
     landrun-nix.url = "github:srid/landrun-nix";
 
-    # playwright browsers pinned to match package.json (@playwright/test version)
-    # sync this when upgrading @playwright/test in packages/docs/package.json
     playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.56.1";
-    # playwright-web-flake uses indirect nixpkgs
-    # safe on macOS (browsers from Microsoft CDN), but may cause issues on Linux (uses nixpkgs chromium)
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs =
-    inputs@{ self, ... }:
-    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = builtins.filter (s: builtins.elem s (import inputs.systems)) [
-        "x86_64-linux"
-        "aarch64-linux"
-        "aarch64-darwin"
-      ];
-
-      imports =
-        with builtins;
-        map (fn: ./modules/flake-parts/${fn}) (attrNames (readDir ./modules/flake-parts));
-
-      perSystem =
-        { lib, system, ... }:
-        {
-          _module.args.pkgs = import inputs.nixpkgs {
-            inherit system;
-            overlays = lib.attrValues self.overlays ++ [ inputs.lazyvim.overlays.nvim-treesitter-main ];
-            config.allowUnfree = true;
-          };
-        };
-
-      flake = {
-        lib = import ./lib { inherit inputs; };
-
-        om.ci.default.ROOT = {
-          dir = ".";
-          steps.flake-check.enable = false;
-          steps.custom = { };
-        };
-      };
-    };
+  # sync with lib/caches.nix for machine modules
+  nixConfig = {
+    extra-substituters = [
+      "https://cache.nixos.org"
+      "https://cache.clan.lol"
+      "https://nix-community.cachix.org"
+      "https://numtide.cachix.org"
+      "https://cameronraysmith.cachix.org"
+      "https://poetry2nix.cachix.org"
+      "https://pyproject-nix.cachix.org"
+      "https://om.cachix.org"
+      "https://catppuccin.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+      "cache.clan.lol-1:3KztgSAB5R1M+Dz7vzkBGzXdodizbgLXGXKXlcQLA28="
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
+      "cameronraysmith.cachix.org-1:aC8ZcRCVcQql77Qn//Q1jrKkiDGir+pIUjhUunN6aio="
+      "poetry2nix.cachix.org-1:eXpeBJl0EQjO+vs9/1cUq19BH1LLKQT9HScbJDeeHaA="
+      "pyproject-nix.cachix.org-1:UNzugsOlQIu2iOz0VyZNBQm2JSrL/kwxeCcFGw+jMe0="
+      "om.cachix.org-1:ifal/RLZJKN4sbpScyPGqJ2+appCslzu7ZZF/C01f2Q="
+      "catppuccin.cachix.org-1:noG/4HkbhJb+lUAdKrph6LaozJvAeEEZj4N732IysmU="
+    ];
+  };
 }
