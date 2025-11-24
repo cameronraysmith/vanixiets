@@ -348,7 +348,7 @@ development_status:
   story-2-1-title: "Identify infra-specific components to preserve"
   story-2-2: review
   story-2-2-title: "Prepare clan-01 branch for migration"
-  story-2-3: drafted
+  story-2-3: ready-for-dev
   story-2-3-title: "Execute wholesale migration from test-clan to infra"
   story-2-4: backlog
   story-2-4-title: "Home-manager secrets migration"

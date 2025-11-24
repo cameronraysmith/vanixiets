@@ -1,6 +1,6 @@
 # Story 2.3: Execute wholesale migration from test-clan to infra
 
-Status: backlog
+Status: ready-for-dev
 
 ## Story
 
@@ -529,7 +529,7 @@ infra/
 
 ### Context Reference
 
-<!-- Story context XML will be added here by story-context workflow -->
+- `docs/notes/development/2-3-wholesale-migration-test-clan-to-infra.context.xml` (generated 2025-11-23)
 
 ### Agent Model Used
 
