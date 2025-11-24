@@ -1,6 +1,6 @@
 # Story 2.4: Home-manager secrets migration
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -294,22 +294,22 @@ nix eval .#homeConfigurations.crs58.activationPackage --json 2>&1 | grep -v "sop
 
 ### Task 7: Final Validation and Commit (AC: #1-7)
 
-- [ ] Run all AC verification commands
-  - [ ] AC1: Structure validation
-  - [ ] AC2: Re-encryption verification
-  - [ ] AC3: Key correspondence
-  - [ ] AC4: Darwin testing
-  - [ ] AC5: NixOS testing
-  - [ ] AC6: Documentation completeness
-  - [ ] AC7: Secret preservation
-- [ ] Stage changes
-  - [ ] `git add secrets/home-manager/`
-  - [ ] `git add docs/guides/home-manager-secrets-migration.md`
-- [ ] Commit with detailed message
-  - [ ] Use conventional commit format
-  - [ ] Document re-encryption and documentation additions
-- [ ] Update sprint-status.yaml
-  - [ ] Change story-2-4: backlog → review
+- [x] Run all AC verification commands
+  - [x] AC1: Structure validation (3 key.json files, 2 secrets.yaml files)
+  - [x] AC2: Re-encryption verification (sops updatekeys -y successful)
+  - [x] AC3: Key correspondence (three contexts match for crs58, raquel)
+  - [x] AC4: Darwin testing (builds succeeded)
+  - [x] AC5: NixOS testing (SSH verified, sops.secrets evaluates)
+  - [x] AC6: Documentation completeness (540 lines, all sections present)
+  - [x] AC7: Secret preservation (crs58=8, raquel=5)
+- [x] Stage changes
+  - [x] `git add secrets/home-manager/` (re-encrypted files)
+  - [x] `git add docs/guides/home-manager-secrets-migration.md`
+- [x] Commit with detailed message
+  - [x] Use conventional commit format
+  - [x] Document re-encryption and documentation additions
+- [x] Update sprint-status.yaml
+  - [x] Change story-2-4: in-progress → review
 
 ## Dev Notes
 
@@ -456,11 +456,32 @@ claude-opus-4-5-20251101
 
 ### Completion Notes List
 
-<!-- Will be filled during story execution -->
+Story 2.4 completes Epic 2 Phase 1 (Home-Manager Migration Foundation). All home-manager secrets
+are now properly encrypted with infra age keys and can be decrypted on darwin workstations.
+Documentation created enables onboarding of future users (christophersmith, janettesmith).
+
+Key accomplishments:
+1. Validated age key correspondence across three contexts (sops/users, .sops.yaml, workstation)
+2. Re-encrypted crs58 (8 secrets) and raquel (5 secrets) using `sops updatekeys -y`
+3. Verified darwin builds succeed with zero sops-related errors
+4. Confirmed NixOS sops.secrets configuration evaluates correctly
+5. Created comprehensive migration guide (540 lines) with troubleshooting and examples
 
 ### File List
 
-<!-- Will be filled during story execution -->
+**Modified:**
+- secrets/home-manager/users/crs58/secrets.yaml (re-encrypted with &dev key added)
+- secrets/home-manager/users/raquel/secrets.yaml (re-encrypted with &dev key added)
+- .gitignore (added backup exclusion)
+- docs/notes/development/sprint-status.yaml (story-2-4: in-progress → review)
+
+**Created:**
+- docs/guides/home-manager-secrets-migration.md (540 lines)
+- docs/notes/development/work-items/2-4-home-manager-secrets-migration.md (this file)
+- docs/notes/development/2-4-home-manager-secrets-migration.context.xml
+
+**Backup (not committed):**
+- secrets/home-manager.backup-pre-2.4/ (pre-migration safety backup)
 
 ---
 
@@ -469,3 +490,4 @@ claude-opus-4-5-20251101
 | Date | Version | Change |
 |------|---------|--------|
 | 2025-11-24 | 1.0 | Story drafted from Epic 2 definition and user context |
+| 2025-11-24 | 2.0 | Story implemented - all tasks complete, AC1-AC7 satisfied, ready for review |
