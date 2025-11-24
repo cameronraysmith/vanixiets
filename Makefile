@@ -72,7 +72,7 @@ install-nix: ## Install Nix using the NixOS community installer
 	@if command -v nix >/dev/null 2>&1; then \
 		echo "Nix is already installed."; \
 	else \
-		curl --proto '=https' --tlsv1.2 -sSf -L https://artifacts.nixos.org/experimental-installer | sh -s -- install \
+		curl --proto '=https' --tlsv1.2 -sSf -L https://artifacts.nixos.org/experimental-installer/tag/0.27.0/nix-installer.sh | sh -s -- install \
 			--no-confirm \
 			--extra-conf "experimental-features = nix-command flakes" \
 			--extra-conf "auto-optimise-store = false" \
