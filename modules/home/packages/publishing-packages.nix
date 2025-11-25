@@ -10,7 +10,7 @@
         exiftool
         ghostscript
         imagemagick
-        markdown-tree-parser
+        markdown-tree-parser # pkgs/by-name
         poppler-utils
         qpdf
         quarto
