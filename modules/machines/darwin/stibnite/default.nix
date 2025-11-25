@@ -29,11 +29,13 @@ in
       imports = [
         inputs.home-manager.darwinModules.home-manager
         inputs.srvos.darwinModules.server
+        inputs.nix-rosetta-builder.darwinModules.default
         ./_zerotier.nix
       ]
       ++ (with flakeModules; [
         base
         ssh-known-hosts
+        colima
         # Note: Not importing users module (defines testuser at UID 550)
         # stibnite defines its own user (crs58)
       ]);
@@ -80,7 +82,6 @@ in
         enable = true;
 
         # Machine-specific casks (stibnite-only)
-        # Matches blackphos baseline, adjust based on actual stibnite needs
         additionalCasks = [
           "codelayer-nightly"
           "dbeaver-community"
@@ -91,6 +92,11 @@ in
           "meld"
           "postgres-unofficial"
           "zerotier-one"
+        ];
+
+        # Machine-specific brews (stibnite-only)
+        additionalBrews = [
+          "incus" # Incus client for Colima incus runtime (not available in nixpkgs)
         ];
 
         # Machine-specific Mac App Store apps
@@ -139,6 +145,37 @@ in
 
       # Enable zsh system-wide
       programs.zsh.enable = true;
+
+      # Disable native linux-builder (replaced by nix-rosetta-builder)
+      # Bootstrap step 1 complete - see docs/notes/containers/multi-arch-container-builds.md
+      nix.linux-builder.enable = false;
+
+      # nix-rosetta-builder for cross-platform Linux builds on Apple Silicon
+      # Provides x86_64-linux builder via Rosetta 2 translation
+      nix-rosetta-builder = {
+        enable = true;
+        onDemand = true; # VM powers off when idle to save resources
+        permitNonRootSshAccess = true; # Allow nix-daemon to read SSH key (safe for localhost-only VM)
+        cores = 12;
+        memory = "48GiB";
+        diskSize = "500GiB";
+      };
+
+      # Colima for OCI container management (complementary to nix-rosetta-builder)
+      services.colima = {
+        enable = true;
+        runtime = "incus";
+        profile = "default";
+        autoStart = false; # Manual control preferred
+        cpu = 12;
+        memory = 48;
+        disk = 500;
+        arch = "aarch64";
+        vmType = "vz"; # macOS Virtualization.framework
+        rosetta = true; # Rosetta 2 for x86_64 emulation
+        mountType = "virtiofs"; # High-performance mount driver
+        extraPackages = [ ];
+      };
 
       # Home-Manager configuration
       home-manager = {
