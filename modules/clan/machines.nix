@@ -20,5 +20,9 @@
     blackphos = {
       imports = [ config.flake.modules.darwin."machines/darwin/blackphos" ];
     };
+
+    stibnite = {
+      imports = [ config.flake.modules.darwin."machines/darwin/stibnite" ];
+    };
   };
 }
