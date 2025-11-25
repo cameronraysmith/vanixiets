@@ -48,5 +48,15 @@
       machineClass = "darwin";
       description = "raquel's laptop (primary user), crs58 admin";
     };
+
+    stibnite = {
+      tags = [
+        "darwin"
+        "workstation"
+        "laptop"
+      ];
+      machineClass = "darwin";
+      description = "crs58's primary workstation";
+    };
   };
 }
