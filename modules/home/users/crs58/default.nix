@@ -43,7 +43,19 @@
             cameron.ray.smith@gmail.com namespaces="git" ${config.sops.placeholder."ssh-public-key"}
           '';
         };
+
+        # Note: Radicle keys deployed via home.file below (not sops.templates due to pure eval path issues)
       };
+
+      # Deploy radicle public key (not secret - can be plaintext)
+      # This is the SSH public key used for Radicle node identity
+      home.file.".radicle/keys/radicle.pub".text = ''
+        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+ cameron.ray.smith@gmail.com
+      '';
+
+      # Note: Radicle signing key linked via activation script in radicle.nix
+      # Cannot use home.file.source with sops.secrets.path due to pure eval mode restrictions
+      # TODO: Investigate sops-nix symlink option or activation script approach
 
       home.stateVersion = "23.11";
       # Username defaults to crs58 but can be overridden (e.g., for cameron alias)
