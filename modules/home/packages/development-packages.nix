@@ -75,7 +75,7 @@
           proto # version manager NOT protobuf-related
           ratchet
           shellcheck
-          # starship-jj # custom overlay in infra, not available in test-clan
+          # starship-jj # pkgs/by-name - disabled by default (requires ~10-30min Rust compilation)
           # step-ca
           tea
           tmate
