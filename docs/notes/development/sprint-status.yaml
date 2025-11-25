@@ -373,12 +373,15 @@ development_status:
   # REVIEW (2025-11-24): APPROVED - All ACs implemented, all tasks verified, zero blockers
   story-2-5: done
   story-2-5-title: "Blackphos config migration to infra"
-  # Story 2.6: REVIEW (2025-11-24) - Stibnite config migration
+  # Story 2.6: DONE ✅ APPROVED ✅ (2025-11-24) - Stibnite config migration
   # Implementation story: Create stibnite darwin config using blackphos as template
   # Single-user pattern (crs58 only), 8 secrets, 7 aggregates including AI
   # Context: docs/notes/development/2-6-stibnite-config-migration.context.xml
   # All 7 ACs PASS: directory structure, darwin build, crs58 config, zerotier, eval, darwin features, docs
-  story-2-6: review
+  # REVIEW (2025-11-24): APPROVED - All 7 ACs implemented, all 32 tasks verified, zero blockers
+  # Implementation: 182-line darwin module (vs blackphos 217), single-user simplification
+  # Key achievements: All 7 aggregates for crs58, zerotier db4344343b14b903, darwin features validated
+  story-2-6: done
   story-2-6-title: "Stibnite config migration"
   story-2-7: backlog
   story-2-7-title: "Activate blackphos and stibnite from infra"
