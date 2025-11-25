@@ -94,11 +94,8 @@
     {
       home.packages =
         # Bash shell applications using writeShellApplication
-        (lib.mapAttrsToList makeShellApp allCommands);
-      # TODO: Requires atuin-format package from infra overlays
-      # Located at: infra/overlays/packages/atuin-format/package.nix
-      # Temporarily disabled until overlay is migrated
-      # Nushell shell applications using nuenv.writeShellApplication
-      # ++ [ pkgs.atuin-format ];
+        (lib.mapAttrsToList makeShellApp allCommands)
+        # Nushell shell applications using nuenv.writeShellApplication
+        ++ [ pkgs.atuin-format ];
     };
 }
