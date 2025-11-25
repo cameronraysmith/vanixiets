@@ -61,7 +61,6 @@
           jjui
           # lazyjj
           just
-          # markdown-tree-parser # custom overlay in infra, not available in test-clan
           mkcert
           # from nix-ai-tools
           coderabbit-cli
@@ -75,7 +74,7 @@
           proto # version manager NOT protobuf-related
           ratchet
           shellcheck
-          # starship-jj # pkgs/by-name - disabled by default (requires ~10-30min Rust compilation)
+          # starship-jj # pkgs/by-name
           # step-ca
           tea
           tmate
