@@ -1,6 +1,6 @@
 # Story 2.7: Activate blackphos and stibnite from infra
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -425,6 +425,68 @@ git checkout clan
 darwin-rebuild switch --flake .#stibnite
 ```
 
+### Multi-Host Execution Architecture
+
+Story 2.7 requires execution across TWO physical machines.
+This section documents the multi-session approach for clean execution.
+
+**Host Requirements Summary:**
+
+| Task | Required Host | Can Remote? | Notes |
+|------|---------------|-------------|-------|
+| A1 (dry-run) | Any | Yes | Builds config only |
+| A2 (switch) | blackphos | No | Activates system |
+| A3 (validation) | blackphos | No | Post-deployment checks |
+| B1 (dry-run) | Any | Yes | Builds config only |
+| B2 (gap ID) | Any | Yes | Git comparison |
+| B3 (refinement) | Any | Yes | Code changes |
+| B4 (switch) | stibnite | No | Activates system |
+| B5 (validation) | stibnite | No | Post-deployment checks |
+| C1 (zerotier) | Both | No | Run on each machine |
+| C2 (SSH) | Both | No | Run from each machine |
+| C3 (monitoring) | Both | No | Parallel observation |
+
+**Multi-Session Execution Phases:**
+
+**Session 1: Stibnite (Phase 1 - Preparation)**
+- Location: stibnite (crs58's workstation)
+- Tasks: A1, B1, B2, B3 (all dry-runs and gap fixes)
+- End state: Both configs validated via dry-run, gaps resolved
+- Git sync: `git add . && git commit && git push origin clan-01`
+
+**Session 2: Blackphos (Phase 2 - Blackphos Deployment)**
+- Location: blackphos (raquel's workstation)
+- Prerequisites: `git pull origin clan-01`
+- Tasks: A2, A3, C1 partial, C2 partial
+- End state: blackphos deployed and validated
+- Git sync: `git add . && git commit && git push origin clan-01`
+
+**Session 3: Stibnite (Phase 3 - Stibnite Deployment)**
+- Location: stibnite
+- Prerequisites: `git pull origin clan-01`
+- Tasks: B4, B5, C1 partial, C2 partial
+- End state: stibnite deployed and validated
+- Git sync: `git add . && git commit && git push origin clan-01`
+
+**Phase 4: Stability Monitoring (Parallel)**
+- Both users monitor their respective workstations
+- Document issues in story Dev Notes
+- Update story status after 24-48h stability confirmed
+
+**Git Sync Protocol:**
+
+At each session boundary:
+```bash
+# End of session (commit and push)
+git add docs/notes/development/work-items/2-7-*.md
+git add modules/  # If any config changes
+git commit -m "docs(story-2.7): complete Phase N on [hostname]"
+git push origin clan-01
+
+# Start of next session (pull latest)
+git pull origin clan-01
+```
+
 ### Project Structure Notes
 
 **Deployment Target Configs:**
@@ -490,3 +552,4 @@ claude-opus-4-5-20251101
 | Date | Version | Change |
 |------|---------|--------|
 | 2025-11-25 | 1.0 | Story drafted from Epic 2 definition and user-provided context |
+| 2025-11-25 | 1.1 | Added multi-host execution architecture documentation |
