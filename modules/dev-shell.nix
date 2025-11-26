@@ -19,6 +19,8 @@
           pkgs.age
           pkgs.ssh-to-age
           pkgs.sops
+          # Tools required by TypeScript packages CI
+          pkgs.bun
         ];
 
         passthru.meta.description = "Development environment with clan CLI and build tools";
