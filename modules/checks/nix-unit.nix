@@ -22,7 +22,7 @@
           treefmt-nix
           git-hooks
           nix-unit
-          lazyvim
+          lazyvim-nix
           pkgs-by-name-for-flake-parts
           nuenv
           nix-ai-tools
@@ -68,7 +68,7 @@
             "blackphos"
             "cinnabar"
             "electrum"
-            "gcp-vm"
+            "stibnite"
             "test-darwin"
           ];
         };
@@ -80,7 +80,6 @@
           expected = [
             "cinnabar"
             "electrum"
-            "gcp-vm"
           ];
         };
 
@@ -90,6 +89,7 @@
           expr = builtins.sort builtins.lessThan (builtins.attrNames self.darwinConfigurations);
           expected = [
             "blackphos"
+            "stibnite"
             "test-darwin"
           ];
         };

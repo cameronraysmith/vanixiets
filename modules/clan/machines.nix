@@ -9,10 +9,6 @@
       imports = [ config.flake.modules.nixos."machines/nixos/electrum" ];
     };
 
-    gcp-vm = {
-      imports = [ config.flake.modules.nixos."machines/nixos/gcp-vm" ];
-    };
-
     test-darwin = {
       imports = [ config.flake.modules.darwin."machines/darwin/test-darwin" ];
     };
