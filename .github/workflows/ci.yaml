@@ -525,14 +525,15 @@ jobs:
           # verify standalone home configurations exist
           echo ""
           echo "verifying standalone home configurations..."
-          HOME_CONFIGS=$(nix eval .#legacyPackages.x86_64-linux.homeConfigurations --apply 'x: builtins.attrNames x' --json)
+          # homeConfigurations are exported at .#homeConfigurations.{system}.{user}
+          HOME_CONFIGS_X86=$(nix eval .#homeConfigurations.x86_64-linux --apply 'x: builtins.attrNames x' --json 2>/dev/null || echo "[]")
 
-          # check for expected home configs
-          for config in "runner@stibnite" "runner@blackphos" "raquel@blackphos"; do
-            if echo "$HOME_CONFIGS" | grep -q "\"$config\""; then
-              echo "  ✅ $config exists"
+          # check for expected home config users (crs58 is admin, raquel is secondary)
+          for user in "crs58" "raquel"; do
+            if echo "$HOME_CONFIGS_X86" | grep -q "\"$user\""; then
+              echo "  ✅ homeConfigurations.x86_64-linux.$user exists"
             else
-              echo "  ❌ $config missing"
+              echo "  ❌ homeConfigurations.x86_64-linux.$user missing"
               exit 1
             fi
           done
@@ -948,11 +949,11 @@ jobs:
           - system: x86_64-linux
             runner: ubuntu-latest
             category: nixos
-            config: blackphos-nixos
+            config: cinnabar
           - system: x86_64-linux
             runner: ubuntu-latest
             category: nixos
-            config: stibnite-nixos
+            config: electrum
           # aarch64-linux builds
           - system: aarch64-linux
             runner: ubuntu-24.04-arm
@@ -963,10 +964,6 @@ jobs:
           - system: aarch64-linux
             runner: ubuntu-24.04-arm
             category: home
-          - system: aarch64-linux
-            runner: ubuntu-24.04-arm
-            category: nixos
-            config: orb-nixos
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
