@@ -57,6 +57,11 @@
             user = "crs58";
           };
 
+          "stibnite.zt" = {
+            hostname = "fddb:4344:343b:14b9:399:933e:1059:d43a";
+            user = "crs58";
+          };
+
           # Wildcard for all zerotier hosts
           "*.zt" = {
             # Enable compression for zerotier (encrypted tunnel over encrypted tunnel)
