@@ -418,15 +418,15 @@ development_status:
   story-2-10: done
   story-2-10-title: "Electrum config migration"
 
-  # Phase 4: Future Machines (3 stories)
+  # Phase 4: Infrastructure Validation and Future Machines (4 stories)
   story-2-11: backlog
-  story-2-11-title: "Rosegold configuration creation"
+  story-2-11-title: "Test harness migration and validation"
   story-2-12: backlog
-  story-2-12-title: "Argentum configuration creation"
+  story-2-12-title: "Consolidate agents-md module duplication"
   story-2-13: backlog
-  story-2-13-title: "Test harness migration and validation"
-  story-2-14: optional
-  story-2-14-title: "Consolidate agents-md module duplication"
+  story-2-13-title: "Rosegold configuration creation"
+  story-2-14: backlog
+  story-2-14-title: "Argentum configuration creation"
 
   epic-2-retrospective: optional
 
