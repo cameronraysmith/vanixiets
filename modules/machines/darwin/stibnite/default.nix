@@ -117,6 +117,16 @@ in
         MaxAuthTries 20
       '';
 
+      # SSH client fix for nix-rosetta-builder
+      # The nix-rosetta-builder module generates 100-rosetta-builder.conf without IdentitiesOnly
+      # When Bitwarden SSH agent has many keys loaded, SSH tries all agent keys first and
+      # hits "too many authentication failures" before trying the rosetta-builder identity file.
+      # This config comes BEFORE (050 < 100) and adds IdentitiesOnly to fix the issue.
+      environment.etc."ssh/ssh_config.d/050-rosetta-builder-identities.conf".text = ''
+        Host "rosetta-builder"
+          IdentitiesOnly yes
+      '';
+
       # Single-user configuration
       # crs58: admin AND primary user (UID 501 - matches existing stibnite system)
       users.users.crs58 = {
