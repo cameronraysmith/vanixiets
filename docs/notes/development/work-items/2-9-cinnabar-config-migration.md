@@ -1,6 +1,6 @@
 # Story 2.9: Cinnabar config migration
 
-Status: review
+Status: done
 
 ## Story
 

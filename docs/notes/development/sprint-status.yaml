@@ -402,12 +402,12 @@ development_status:
   story-2-8-title: "Cleanup unused darwin configs"
 
   # Phase 3: VPS Migration (2 stories)
-  # Story 2.9: REVIEW (2025-11-26) - Cinnabar config migration (deployment)
+  # Story 2.9: DONE (2025-11-26) - Cinnabar config migration (deployment)
   # Switch cinnabar VPS deployment source from test-clan to infra clan-01 branch
   # HIGH-RISK: cinnabar is zerotier controller for network db4344343b14b903
   # Config already exists in infra (migrated in Story 2.3), this is deployment switching
   # COMPLETE: Deployment successful, generation 20, all peers connected, --accept-flake-config fixed
-  story-2-9: review
+  story-2-9: done
   story-2-9-title: "Cinnabar config migration"
   story-2-10: backlog
   story-2-10-title: "Electrum config migration"
