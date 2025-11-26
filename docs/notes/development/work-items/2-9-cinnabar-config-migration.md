@@ -19,6 +19,15 @@ This is the first story in Epic 2 Phase 3 (VPS Migration). Story 2.7 activated d
 - Must switch to deploying from infra clan-01 branch
 - Pattern parallels Story 2.7 (darwin activation) but for remote NixOS VPS
 
+**Execution Model: HYBRID (User-Interactive with AI Assistance)**
+
+Similar to Story 2.7, this story involves:
+- **[AI]** tasks: Build validation, file review, vars commands, documentation
+- **[USER]** tasks: SSH sessions, interactive dry-run diffs, cross-machine validation
+- **[HYBRID]** tasks: AI executes deployment, user monitors output
+
+Some commands (SSH into cinnabar, nh dix diff review, cross-machine ping tests) are difficult for Claude Code to execute and capture feedback from. These should be executed by the developer with results reported back to the chat thread for AI analysis.
+
 **CRITICAL CONTEXT: CINNABAR IS THE ZEROTIER CONTROLLER:**
 
 cinnabar serves as the zerotier network controller for network db4344343b14b903.
@@ -193,7 +202,17 @@ Document cinnabar infrastructure details for future reference.
 
 ## Tasks / Subtasks
 
-### Task 1: Build Validation (AC: #1)
+**Execution Mode Legend:**
+- **[AI]** - Can be executed directly by Claude Code
+- **[USER]** - Should be executed by human developer, report results back to chat
+- **[HYBRID]** - AI prepares/validates, user executes interactive portions
+
+Some tasks involve SSH sessions, interactive diffs, or commands that span multiple hops.
+These are marked [USER] and should be executed by the developer with output shared in the chat thread for AI analysis.
+
+---
+
+### Task 1: Build Validation (AC: #1) [AI]
 
 - [ ] Build cinnabar config from infra
   - [ ] `nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel`
@@ -203,7 +222,7 @@ Document cinnabar infrastructure details for future reference.
   - [ ] Check key configurations match
   - [ ] Note any differences in Dev Notes
 
-### Task 2: Clan Vars/Secrets Verification (AC: #2, #5)
+### Task 2: Clan Vars/Secrets Verification (AC: #2, #5) [AI]
 
 - [ ] Audit clan inventory services
   - [ ] Review modules/clan/inventory/services/zerotier.nix
@@ -216,7 +235,9 @@ Document cinnabar infrastructure details for future reference.
   - [ ] Network ID db4344343b14b903
   - [ ] allowedIps includes blackphos + stibnite
 
-### Task 3: Pre-Deployment Checklist (AC: #4)
+### Task 3: Pre-Deployment Checklist (AC: #4) [USER]
+
+**User executes these SSH commands and reports current state to chat.**
 
 - [ ] Confirm SSH access via public IP (fallback)
   - [ ] `ssh cameron@49.13.68.78 "hostname"`
@@ -227,9 +248,11 @@ Document cinnabar infrastructure details for future reference.
 - [ ] Document current /run/secrets/ state
   - [ ] `ssh cameron@cinnabar.zt "ls -la /run/secrets/"`
 
-### Task 4: Dry-Run Analysis (AC: #3)
+### Task 4: Dry-Run Analysis (AC: #3) [USER → AI]
 
-**Phase 4a: Local dry-run ON cinnabar (safer - see diff before remote deployment)**
+**Phase 4a: Local dry-run ON cinnabar [USER]**
+
+User SSHs into cinnabar, pulls infra, runs dry-run, and shares the dix diff output in chat for AI analysis.
 
 - [ ] SSH into cinnabar and pull infra clan-01 branch
   ```bash
@@ -241,25 +264,27 @@ Document cinnabar infrastructure details for future reference.
   ```
 - [ ] Execute local dry-run on cinnabar
   - [ ] `just clan-os-dry cinnabar` (nh os switch --dry shows dix diff)
-  - [ ] Capture diff output
-- [ ] Analyze diff for expected changes
+  - [ ] **Copy/paste diff output to chat for AI review**
+- [ ] AI analyzes diff for expected changes
   - [ ] **Expected**: zerotier allowedIps adds stibnite (Story 2.7 change)
   - [ ] **Expected**: SSH config adds stibnite.zt host (Story 2.7 change)
   - [ ] Document any other package/config changes
 - [ ] Confirm no unexpected destructive changes to zerotier controller
 - [ ] Exit cinnabar SSH session
 
-**Phase 4b: Verify vars from stibnite (before remote deployment)**
+**Phase 4b: Verify vars from stibnite [AI]**
 
 - [ ] Verify vars are current
   - [ ] `clan vars list cinnabar`
   - [ ] `clan vars generate cinnabar` (if generators changed)
 
-### Task 5: Execute Deployment (AC: #3)
+### Task 5: Execute Deployment (AC: #3) [HYBRID]
+
+**AI can execute `clan machines update` from stibnite, but user should monitor and be ready to intervene.**
 
 - [ ] Execute deployment via clan CLI
   - [ ] `clan machines update cinnabar`
-  - [ ] Monitor for errors
+  - [ ] Monitor for errors (user watches terminal output)
   - [ ] DO NOT disconnect SSH during deployment
 - [ ] Verify deployment success
   - [ ] Exit code 0
@@ -267,22 +292,25 @@ Document cinnabar infrastructure details for future reference.
   - [ ] Vars deployed to /run/secrets/
 - [ ] Document deployment results
 
-### Task 6: Post-Deployment Validation (AC: #4, #5, #6)
+### Task 6: Post-Deployment Validation (AC: #4, #5, #6) [USER]
+
+**User executes validation commands and reports results to chat. AI cannot easily execute cross-machine SSH tests.**
 
 - [ ] Verify SSH access
   - [ ] zerotier: `ssh cameron@cinnabar.zt "hostname"`
   - [ ] public IP: `ssh cameron@49.13.68.78 "hostname"`
-- [ ] Verify zerotier controller status
+- [ ] Verify zerotier controller status (on cinnabar)
   - [ ] `zerotier-cli info` shows ONLINE
   - [ ] `zerotier-cli listnetworks` shows network
 - [ ] Verify all peers still connected
   - [ ] Test from blackphos → cinnabar, electrum, stibnite
   - [ ] Test from stibnite → cinnabar, electrum, blackphos
-- [ ] Verify /run/secrets/ contents
+- [ ] Verify /run/secrets/ contents (on cinnabar)
   - [ ] Secrets present
   - [ ] Permissions correct
+- [ ] **Report validation results to chat**
 
-### Task 7: Documentation (AC: #7)
+### Task 7: Documentation (AC: #7) [AI]
 
 - [ ] Update Dev Notes with deployment details
 - [ ] Document infrastructure details
@@ -566,3 +594,4 @@ claude-opus-4-5-20251101
 | 2025-11-26 | 1.1 | Updated deployment methodology: clan CLI preferred over nh os switch for VPS. Clarified distinction between `clan machines update` and `just clan-os-switch`. Updated AC3, Task 4, Task 5 to use clan CLI. Enhanced rollback strategy. |
 | 2025-11-26 | 1.2 | Added detailed SSH connection commands: .zt hostname (simple, via home-manager config) vs public IP fallback (with known_hosts clearing). Documented agent forwarding (-A) pattern. |
 | 2025-11-26 | 1.3 | Added local dry-run approach: SSH into cinnabar, pull infra, run dry-run locally to preview changes before remote deployment. Documented expected changes from test-clan → infra (stibnite zerotier/SSH additions from Story 2.7). |
+| 2025-11-26 | 1.4 | Added execution mode annotations [AI]/[USER]/[HYBRID] to all tasks. Documented hybrid execution model in Context section. Some tasks (SSH sessions, interactive diffs, cross-machine tests) require user execution with results reported to chat. |
