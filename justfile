@@ -328,7 +328,7 @@ clan-metadata:
 [group('clan')]
 clan-darwin-dry hostname:
   @echo "Previewing darwin configuration changes for {{hostname}}..."
-  nix run .#darwin -- {{hostname}} . --dry
+  nix run --accept-flake-config .#darwin -- {{hostname}} . --dry
   @echo ""
   @echo "To apply these changes, run: just clan-darwin-switch {{hostname}}"
 
@@ -336,7 +336,7 @@ clan-darwin-dry hostname:
 [group('clan')]
 clan-darwin-switch hostname:
   @echo "Applying darwin configuration for {{hostname}}..."
-  nix run .#darwin -- {{hostname}} .
+  nix run --accept-flake-config .#darwin -- {{hostname}} .
 
 # Preview and apply darwin configuration (interactive)
 [group('clan')]
@@ -354,7 +354,7 @@ clan-darwin hostname: (clan-darwin-dry hostname)
 [group('clan')]
 clan-os-dry hostname:
   @echo "Previewing NixOS configuration changes for {{hostname}}..."
-  nix run .#os -- {{hostname}} . --dry
+  nix run --accept-flake-config .#os -- {{hostname}} . --dry
   @echo ""
   @echo "To apply these changes, run: just clan-os-switch {{hostname}}"
 
@@ -362,7 +362,7 @@ clan-os-dry hostname:
 [group('clan')]
 clan-os-switch hostname:
   @echo "Applying NixOS configuration for {{hostname}}..."
-  nix run .#os -- {{hostname}} .
+  nix run --accept-flake-config .#os -- {{hostname}} .
 
 # Preview and apply nixos configuration (interactive)
 [group('clan')]
@@ -380,7 +380,7 @@ clan-os hostname: (clan-os-dry hostname)
 [group('clan')]
 clan-home-dry username:
   @echo "Previewing home-manager configuration changes for {{username}}..."
-  nix run .#home -- {{username}} . --dry
+  nix run --accept-flake-config .#home -- {{username}} . --dry
   @echo ""
   @echo "To apply these changes, run: just clan-home-switch {{username}}"
 
@@ -388,7 +388,7 @@ clan-home-dry username:
 [group('clan')]
 clan-home-switch username:
   @echo "Applying home-manager configuration for {{username}}..."
-  nix run .#home -- {{username}} .
+  nix run --accept-flake-config .#home -- {{username}} .
 
 # Preview and apply home-manager configuration (interactive)
 [group('clan')]
