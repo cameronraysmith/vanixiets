@@ -29,7 +29,6 @@ in
       imports = [
         inputs.home-manager.darwinModules.home-manager
         inputs.srvos.darwinModules.server
-        ./_zerotier.nix
       ]
       ++ (with flakeModules; [
         base

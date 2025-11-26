@@ -30,7 +30,6 @@ in
         inputs.home-manager.darwinModules.home-manager
         inputs.srvos.darwinModules.server
         inputs.nix-rosetta-builder.darwinModules.default
-        ./_zerotier.nix
       ]
       ++ (with flakeModules; [
         base
