@@ -115,7 +115,12 @@
           uv
         ]
         ++ lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
-          flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.backlog-md
+          # Override backlog-md to disable auto-patchelf (same elftools issue)
+          ((flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.backlog-md).overrideAttrs
+            (old: {
+              dontAutoPatchelf = true;
+            })
+          )
         ];
     };
 }
