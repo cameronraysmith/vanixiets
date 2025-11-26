@@ -35,14 +35,12 @@ pnpm-debug.log*
 manifests/workspace-manifest.json
 manifests/workspace-manifest.yaml
 
-# Terraform generated and sensitive files
+# Terraform generated files (tfstate is encrypted via PBKDF2, safe for git)
 terraform/.terraform/
 terraform/.terraform.lock.hcl
 terraform/config.tf.json
 terraform/.terraform-deploy-key
 terraform/result
-terraform/*.tfstate
-terraform/*.tfstate.backup
 
 # Deployment logs
 *.log
