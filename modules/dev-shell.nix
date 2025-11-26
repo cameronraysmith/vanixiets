@@ -6,12 +6,13 @@
       config,
       ...
     }:
-    let
-      playwright-driver = inputs'.playwright-web-flake.packages.playwright-driver;
-    in
     {
       devShells.default = pkgs.mkShell {
-        inputsFrom = [ config.pre-commit.devShell ];
+        inputsFrom = [
+          config.pre-commit.devShell
+          # Inherit playwright browser setup (sets PLAYWRIGHT_BROWSERS_PATH, etc.)
+          inputs'.playwright-web-flake.devShells.default
+        ];
 
         packages = [
           inputs'.clan-core.packages.default
@@ -24,13 +25,7 @@
           pkgs.sops
           # Tools required by TypeScript packages CI
           pkgs.bun
-          # Playwright browser binaries for e2e tests
-          playwright-driver
         ];
-
-        # Set Playwright to use nix-provided browsers
-        PLAYWRIGHT_BROWSERS_PATH = playwright-driver;
-        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
 
         passthru.meta.description = "Development environment with clan CLI and build tools";
       };
