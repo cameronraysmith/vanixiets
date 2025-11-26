@@ -229,18 +229,31 @@ Document cinnabar infrastructure details for future reference.
 
 ### Task 4: Dry-Run Analysis (AC: #3)
 
+**Phase 4a: Local dry-run ON cinnabar (safer - see diff before remote deployment)**
+
+- [ ] SSH into cinnabar and pull infra clan-01 branch
+  ```bash
+  ssh -A cinnabar.zt
+  cd ~/projects/nix-workspace/infra  # or wherever infra is cloned
+  git fetch origin clan-01
+  git checkout clan-01
+  git pull origin clan-01
+  ```
+- [ ] Execute local dry-run on cinnabar
+  - [ ] `just clan-os-dry cinnabar` (nh os switch --dry shows dix diff)
+  - [ ] Capture diff output
+- [ ] Analyze diff for expected changes
+  - [ ] **Expected**: zerotier allowedIps adds stibnite (Story 2.7 change)
+  - [ ] **Expected**: SSH config adds stibnite.zt host (Story 2.7 change)
+  - [ ] Document any other package/config changes
+- [ ] Confirm no unexpected destructive changes to zerotier controller
+- [ ] Exit cinnabar SSH session
+
+**Phase 4b: Verify vars from stibnite (before remote deployment)**
+
 - [ ] Verify vars are current
   - [ ] `clan vars list cinnabar`
   - [ ] `clan vars generate cinnabar` (if generators changed)
-- [ ] Execute dry-run preview
-  - [ ] `just clan-os-dry cinnabar` (uses nh os switch --dry for diff view)
-  - [ ] Capture diff output
-- [ ] Analyze diff output
-  - [ ] Document packages being added
-  - [ ] Document packages being removed
-  - [ ] Document configuration changes
-- [ ] Identify any unexpected changes
-- [ ] Confirm no destructive changes to zerotier
 
 ### Task 5: Execute Deployment (AC: #3)
 
@@ -301,6 +314,30 @@ Document cinnabar infrastructure details for future reference.
 - `62accb11` feat(zerotier): add stibnite to allowedIps for darwin member authorization
 
 [Source: docs/notes/development/work-items/2-7-activate-blackphos-and-stibnite-from-infra.md#Dev-Agent-Record]
+
+### Expected Changes: test-clan → infra
+
+cinnabar is currently deployed from test-clan. When switching to infra, the dry-run should show these **expected** changes from Story 2.7 work that was done in infra but NOT in test-clan:
+
+**1. Zerotier allowedIps (modules/clan/inventory/services/zerotier.nix):**
+- test-clan: blackphos + electrum only
+- infra: blackphos + electrum + **stibnite** (commit `62accb11`)
+
+**2. SSH config (modules/home/core/ssh.nix):**
+- test-clan: cinnabar.zt, electrum.zt, blackphos.zt
+- infra: adds **stibnite.zt** host definition (commit `30d41ee4`)
+
+**3. Potential minor differences:**
+- Package versions (if infra flake.lock differs from test-clan)
+- Any other Story 2.3-2.7 changes not backported to test-clan
+
+**What should NOT change:**
+- Zerotier controller role (cinnabar remains controller)
+- Zerotier network ID (db4344343b14b903)
+- User configuration (cameron via clan inventory)
+- Core services (sshd, networking)
+
+If the dry-run shows unexpected large changes, investigate before proceeding.
 
 ### Existing Cinnabar Configuration in Infra
 
@@ -528,3 +565,4 @@ claude-opus-4-5-20251101
 | 2025-11-26 | 1.0 | Story drafted from Epic 2 definition and user-provided context |
 | 2025-11-26 | 1.1 | Updated deployment methodology: clan CLI preferred over nh os switch for VPS. Clarified distinction between `clan machines update` and `just clan-os-switch`. Updated AC3, Task 4, Task 5 to use clan CLI. Enhanced rollback strategy. |
 | 2025-11-26 | 1.2 | Added detailed SSH connection commands: .zt hostname (simple, via home-manager config) vs public IP fallback (with known_hosts clearing). Documented agent forwarding (-A) pattern. |
+| 2025-11-26 | 1.3 | Added local dry-run approach: SSH into cinnabar, pull infra, run dry-run locally to preview changes before remote deployment. Documented expected changes from test-clan → infra (stibnite zerotier/SSH additions from Story 2.7). |
