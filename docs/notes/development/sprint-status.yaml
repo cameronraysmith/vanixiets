@@ -419,7 +419,11 @@ development_status:
   story-2-10-title: "Electrum config migration"
 
   # Phase 4: Infrastructure Validation and Future Machines (4 stories)
-  story-2-11: backlog
+  # Story 2.11: DRAFTED (2025-11-26) - Test harness and CI validation
+  # Validates test harness and CI workflow alignment with dendritic+clan architecture
+  # 8 ACs: local checks, stibnite validation, CI orphans, VPS builds, home configs, caching pattern, CI run, docs
+  # Reconnaissance complete: 23 checks identified, CI gaps documented, content-addressed caching pattern captured
+  story-2-11: drafted
   story-2-11-title: "Test harness and CI validation"
   story-2-12: backlog
   story-2-12-title: "Consolidate agents-md module duplication"
