@@ -25,17 +25,31 @@ cinnabar serves as the zerotier network controller for network db4344343b14b903.
 If deployment breaks networking, ALL mesh connectivity is lost (blackphos, stibnite, electrum).
 This is a HIGH-RISK deployment requiring careful validation at each step.
 
-**Deployment Commands:**
+**Deployment Commands (Clan CLI - PREFERRED for NixOS VPS):**
 ```bash
-# Preview changes (builds locally, shows diff)
-just clan-os-dry cinnabar
-
-# Apply changes (builds locally, deploys remotely via SSH)
-just clan-os-switch cinnabar
-
-# Or via clan CLI directly
+# Clan CLI - canonical approach for clan-managed NixOS VPS
+# Handles: config deployment + vars/secrets to /run/secrets/
 clan machines update cinnabar
+
+# Pre-deployment: regenerate vars if generators changed
+clan vars generate cinnabar
+
+# Check current vars
+clan vars list cinnabar
 ```
+
+**Alternative (Flake App - nh os switch wrapper):**
+```bash
+# Preview changes via nh os switch (nixos-rebuild style diff)
+just clan-os-dry cinnabar   # → nix run .#os -- cinnabar . --dry
+
+# Apply via nh os switch (nixos-rebuild style deployment)
+just clan-os-switch cinnabar  # → nix run .#os -- cinnabar .
+```
+
+**When to use which:**
+- **`clan machines update`**: Preferred for VPS - handles vars deployment, clan service coordination
+- **`just clan-os-*`**: Alternative if you only need config rebuild without vars regeneration
 
 ## Acceptance Criteria
 
@@ -81,12 +95,12 @@ ssh cameron@cinnabar.zt "zerotier-cli listnetworks"
 
 ### AC3: Deploy cinnabar from infra
 
-Execute deployment from infra clan-01 branch successfully.
+Execute deployment from infra clan-01 branch successfully using clan CLI.
 
 **Verification:**
 ```bash
-# Execute deployment
-just clan-os-switch cinnabar
+# Execute deployment via clan CLI (preferred for VPS)
+clan machines update cinnabar
 
 # Verify exit code
 echo $?  # Exit code 0
@@ -94,6 +108,10 @@ echo $?  # Exit code 0
 # Verify new system generation
 ssh cameron@cinnabar.zt "nixos-rebuild list-generations | head -5"
 # Expected: New generation from infra deployment
+
+# Verify vars were deployed
+ssh cameron@cinnabar.zt "ls -la /run/secrets/"
+# Expected: Secrets present from clan vars
 ```
 
 ### AC4: Validate SSH access from darwin workstations
@@ -211,8 +229,11 @@ Document cinnabar infrastructure details for future reference.
 
 ### Task 4: Dry-Run Analysis (AC: #3)
 
-- [ ] Execute dry-run
-  - [ ] `just clan-os-dry cinnabar`
+- [ ] Verify vars are current
+  - [ ] `clan vars list cinnabar`
+  - [ ] `clan vars generate cinnabar` (if generators changed)
+- [ ] Execute dry-run preview
+  - [ ] `just clan-os-dry cinnabar` (uses nh os switch --dry for diff view)
   - [ ] Capture diff output
 - [ ] Analyze diff output
   - [ ] Document packages being added
@@ -223,13 +244,14 @@ Document cinnabar infrastructure details for future reference.
 
 ### Task 5: Execute Deployment (AC: #3)
 
-- [ ] Execute deployment
-  - [ ] `just clan-os-switch cinnabar`
+- [ ] Execute deployment via clan CLI
+  - [ ] `clan machines update cinnabar`
   - [ ] Monitor for errors
   - [ ] DO NOT disconnect SSH during deployment
 - [ ] Verify deployment success
   - [ ] Exit code 0
   - [ ] New generation created
+  - [ ] Vars deployed to /run/secrets/
 - [ ] Document deployment results
 
 ### Task 6: Post-Deployment Validation (AC: #4, #5, #6)
@@ -341,19 +363,48 @@ roles.controller.machines."cinnabar" = {
 
 ### Deployment Methodology
 
-Unlike darwin (local `darwin-rebuild`), NixOS VPS uses remote deployment:
+Unlike darwin (local `darwin-rebuild`), NixOS VPS uses remote deployment. There are TWO approaches available:
 
+**1. Clan CLI (PREFERRED for NixOS VPS):**
 ```bash
-# Builds locally, copies closure over SSH, activates remotely
+# Full clan deployment - config + vars/secrets
 clan machines update cinnabar
 
-# Or via justfile wrapper
-just clan-os-switch cinnabar
+# Pre-check: list current vars
+clan vars list cinnabar
+
+# Regenerate vars if generators changed
+clan vars generate cinnabar
 ```
 
-Connection via SSH to cinnabar:
-- Zerotier IP: via .zt hostname
-- Public IP: 49.13.68.78 (Hetzner)
+**Why clan CLI is preferred:**
+- Handles vars deployment to `/run/secrets/` automatically
+- Proper clan service coordination
+- Native integration with clan inventory
+- Designed for clan-managed machines
+
+**2. Flake App (Alternative - nh os switch):**
+```bash
+# Preview changes (nixos-rebuild style diff)
+just clan-os-dry cinnabar   # → nix run .#os -- cinnabar . --dry
+
+# Apply changes (nixos-rebuild style)
+just clan-os-switch cinnabar  # → nix run .#os -- cinnabar .
+```
+
+**When to use flake app:**
+- Quick config-only rebuilds (no vars changes)
+- Preview diffs with nice nh output
+- Situations where you explicitly don't want vars regeneration
+
+**Connection via SSH to cinnabar:**
+- Zerotier IP: via .zt hostname (preferred when mesh is working)
+- Public IP: 49.13.68.78 (Hetzner fallback)
+
+**Note on justfile recipes:**
+The infra justfile `clan-os-*` recipes use `nix run .#os` which wraps `nh os switch`.
+This is different from darwin deployment where `nix run .#darwin` wraps `nh darwin switch`.
+For NixOS VPS, prefer direct `clan machines update` for full clan integration.
 
 ### Rollback Strategy
 
@@ -364,17 +415,25 @@ If deployment breaks cinnabar:
    ssh cameron@49.13.68.78
    ```
 
-2. **Redeploy from test-clan:**
+2. **Redeploy from test-clan (preferred rollback):**
    ```bash
    cd ~/projects/nix-workspace/test-clan
-   just os-switch cinnabar
-   # Or: clan machines update cinnabar
+   clan machines update cinnabar  # Full clan deployment with vars
+   # Alternative: just os-switch cinnabar (nh os switch wrapper)
    ```
 
-3. **If SSH broken:** Use Hetzner console for recovery
+3. **Local rollback on cinnabar (if SSH works):**
+   ```bash
+   ssh cameron@cinnabar.zt
+   sudo nixos-rebuild switch --rollback
+   # Or: sudo /run/current-system/bin/switch-to-configuration switch
+   ```
+
+4. **If SSH broken:** Use Hetzner console for recovery
    - Login to Hetzner Cloud console
    - Access VPS via VNC/console
-   - Rollback to previous generation or redeploy
+   - Boot previous generation from GRUB menu
+   - Or: `nixos-rebuild switch --rollback` from console
 
 ### Key Considerations
 
@@ -450,3 +509,4 @@ claude-opus-4-5-20251101
 | Date | Version | Change |
 |------|---------|--------|
 | 2025-11-26 | 1.0 | Story drafted from Epic 2 definition and user-provided context |
+| 2025-11-26 | 1.1 | Updated deployment methodology: clan CLI preferred over nh os switch for VPS. Clarified distinction between `clan machines update` and `just clan-os-switch`. Updated AC3, Task 4, Task 5 to use clan CLI. Enhanced rollback strategy. |
