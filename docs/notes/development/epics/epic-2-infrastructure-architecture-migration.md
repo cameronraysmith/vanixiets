@@ -257,51 +257,13 @@ So that electrum VPS is managed from production infra repository.
 
 ---
 
-## Phase 4: Future Machines - rosegold + argentum (3-4 stories)
+## Phase 4: Infrastructure Validation and Future Machines (4 stories)
 
-**Goal:** Create rosegold and argentum configurations in infra
+**Goal:** Validate test harness, consolidate technical debt, then create rosegold and argentum configurations in infra
 
-**Note:** These machines don't exist in test-clan - new configs based on validated patterns
+**Note:** Test harness and consolidation prepare infrastructure before new machine configs (rosegold/argentum don't exist in test-clan - will be created based on validated patterns)
 
-### Story 2.11: Rosegold configuration creation
-
-As a system administrator,
-I want to create rosegold darwin configuration in infra,
-So that rosegold is ready for deployment in Epic 3.
-
-**Acceptance Criteria:**
-1. Create rosegold darwin configuration: Use blackphos/stibnite as structural template
-2. Configure for user janettesmith: Home-manager modules, user secrets, appropriate packages
-3. Apply dendritic+clan architecture patterns: Modules, clan inventory, service instances
-4. Validate nix-darwin build success: `nix build .#darwinConfigurations.rosegold.system` (deployment deferred to Epic 3)
-5. Configure zerotier peer role: Network ID db4344343b14b903, peer role for rosegold
-6. Test configuration evaluation: `nix eval .#darwinConfigurations.rosegold.config.system.build.toplevel --json`
-7. Document rosegold-specific configuration: User preferences, package selections, hardware details
-
-**Prerequisites:** Story 2.10 (electrum migration complete)
-
----
-
-### Story 2.12: Argentum configuration creation
-
-As a system administrator,
-I want to create argentum darwin configuration in infra,
-So that argentum is ready for deployment in Epic 4.
-
-**Acceptance Criteria:**
-1. Create argentum darwin configuration: Use blackphos/stibnite as structural template
-2. Configure for user christophersmith: Home-manager modules, user secrets, appropriate packages
-3. Apply dendritic+clan architecture patterns: Modules, clan inventory, service instances
-4. Validate nix-darwin build success: `nix build .#darwinConfigurations.argentum.system` (deployment deferred to Epic 4)
-5. Configure zerotier peer role: Network ID db4344343b14b903, peer role for argentum
-6. Test configuration evaluation: `nix eval .#darwinConfigurations.argentum.config.system.build.toplevel --json`
-7. Document argentum-specific configuration: User preferences, package selections, hardware details
-
-**Prerequisites:** Story 2.11 (rosegold creation complete)
-
----
-
-### Story 2.13: Test harness migration and validation
+### Story 2.11: Test harness migration and validation
 
 As a system administrator,
 I want to migrate test-clan test harness to infra and validate zero regressions,
@@ -316,11 +278,11 @@ So that infra repository has continuous validation for architectural invariants.
 6. Establish test as validation gate: Tests must pass before Epic 3+ progression
 7. CI/CD integration: Add test execution to GitHub Actions workflow
 
-**Prerequisites:** Story 2.12 (argentum creation complete)
+**Prerequisites:** Story 2.10 (electrum migration complete)
 
 ---
 
-### Story 2.14: Consolidate agents-md module duplication [OPTIONAL]
+### Story 2.12: Consolidate agents-md module duplication
 
 As a system administrator,
 I want to consolidate agents-md module duplication in infra home-manager configuration,
@@ -335,13 +297,51 @@ So that the codebase maintains single source of truth for module definitions.
 6. Result: 68 lines eliminated (34 per user), single source of truth maintained
 7. Document consolidation in commit message: Explain why duplication existed (clan inventory limitation during initial migration) and why consolidation is safe now
 
-**Prerequisites:** Story 2.13 (test harness migration complete)
+**Prerequisites:** Story 2.11 (test harness migration complete)
 
 **Priority:** LOW (technical debt cleanup, not blocking functionality)
 **Effort:** 1-2 hours
 **Risk:** VERY LOW (blackphos proves pattern works, test harness validates zero regressions)
 
 **Note:** This story addresses technical debt inherited from test-clan where cameron.nix and crs58.nix users duplicated the agents-md option module inline instead of importing it like blackphos (raquel) does. Epic 1 validated the pattern works; this story cleans up the duplication post-migration.
+
+---
+
+### Story 2.13: Rosegold configuration creation
+
+As a system administrator,
+I want to create rosegold darwin configuration in infra,
+So that rosegold is ready for deployment in Epic 3.
+
+**Acceptance Criteria:**
+1. Create rosegold darwin configuration: Use blackphos/stibnite as structural template
+2. Configure for user janettesmith: Home-manager modules, user secrets, appropriate packages
+3. Apply dendritic+clan architecture patterns: Modules, clan inventory, service instances
+4. Validate nix-darwin build success: `nix build .#darwinConfigurations.rosegold.system` (deployment deferred to Epic 3)
+5. Configure zerotier peer role: Network ID db4344343b14b903, peer role for rosegold
+6. Test configuration evaluation: `nix eval .#darwinConfigurations.rosegold.config.system.build.toplevel --json`
+7. Document rosegold-specific configuration: User preferences, package selections, hardware details
+
+**Prerequisites:** Story 2.12 (consolidation complete)
+
+---
+
+### Story 2.14: Argentum configuration creation
+
+As a system administrator,
+I want to create argentum darwin configuration in infra,
+So that argentum is ready for deployment in Epic 4.
+
+**Acceptance Criteria:**
+1. Create argentum darwin configuration: Use blackphos/stibnite as structural template
+2. Configure for user christophersmith: Home-manager modules, user secrets, appropriate packages
+3. Apply dendritic+clan architecture patterns: Modules, clan inventory, service instances
+4. Validate nix-darwin build success: `nix build .#darwinConfigurations.argentum.system` (deployment deferred to Epic 4)
+5. Configure zerotier peer role: Network ID db4344343b14b903, peer role for argentum
+6. Test configuration evaluation: `nix eval .#darwinConfigurations.argentum.config.system.build.toplevel --json`
+7. Document argentum-specific configuration: User preferences, package selections, hardware details
+
+**Prerequisites:** Story 2.13 (rosegold creation complete)
 
 ---
 
