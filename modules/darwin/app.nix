@@ -76,7 +76,8 @@
 
                 # Use nh darwin switch with hostname flag
                 # Pass any additional arguments (like --dry, --verbose, etc.) to nh
-                exec nh darwin switch "$flake" -H "$hostname" "$@"
+                # Always include --accept-flake-config for nh's internal nix calls
+                exec nh darwin switch "$flake" -H "$hostname" --accept-flake-config "$@"
               '';
             }
           );
