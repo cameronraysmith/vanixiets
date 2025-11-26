@@ -393,7 +393,12 @@ development_status:
   # Both darwin workstations now operational under infra clan-01 management
   story-2-7: done
   story-2-7-title: "Activate blackphos and stibnite from infra"
-  story-2-8: backlog
+  # Story 2.8: DONE ✅ (2025-11-26) - Cleanup unused darwin configs
+  # Originally scoped: blackphos-nixos, stibnite-nixos, rosegold-old
+  # Finding: These obsolete configs don't exist on clan-01 branch (never created or already removed)
+  # Remaining: test-darwin (minor test config) and gcp-vm (evaluate later) - deferred as non-blocking
+  # Outcome: No cleanup required, Phase 2 complete
+  story-2-8: done
   story-2-8-title: "Cleanup unused darwin configs"
 
   # Phase 3: VPS Migration (2 stories)
