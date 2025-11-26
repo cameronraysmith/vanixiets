@@ -24,7 +24,16 @@
       coderabbit-cli =
         flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
       crush = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.crush;
-      droid = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.droid;
+      # Override droid to disable auto-patchelf which fails on rosetta-builder
+      # Error: ModuleNotFoundError: No module named 'elftools'
+      # Same underlying issue as google-cloud-sdk (auto-patchelf missing pyelftools)
+      # TODO: Remove override when upstream nix-ai-tools or nixpkgs fixes this
+      # Added: 2025-11-26
+      droid =
+        (flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.droid).overrideAttrs
+          (old: {
+            dontAutoPatchelf = true;
+          });
       gemini-cli = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
       opencode = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.opencode;
     in
