@@ -22,15 +22,6 @@
       description = "Secondary test VM, zerotier peer";
     };
 
-    gcp-vm = {
-      tags = [
-        "nixos"
-        "cloud"
-        "gcp"
-      ];
-      machineClass = "nixos";
-    };
-
     test-darwin = {
       tags = [
         "darwin"

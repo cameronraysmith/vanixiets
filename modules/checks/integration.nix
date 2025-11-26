@@ -59,7 +59,6 @@
             nodes = {
               cinnabar = mkVMNode "cinnabar";
               electrum = mkVMNode "electrum";
-              gcp-vm = mkVMNode "gcp-vm";
             };
 
             testScript = ''
@@ -68,17 +67,14 @@
               # Wait for all machines to reach multi-user target
               cinnabar.wait_for_unit("multi-user.target")
               electrum.wait_for_unit("multi-user.target")
-              gcp_vm.wait_for_unit("multi-user.target")
 
               # Verify basic services are running
               cinnabar.succeed("systemctl is-active sshd")
               electrum.succeed("systemctl is-active sshd")
-              gcp_vm.succeed("systemctl is-active sshd")
 
               # Verify networking configuration (hostnames)
               cinnabar.succeed("hostname | grep cinnabar")
               electrum.succeed("hostname | grep electrum")
-              gcp_vm.succeed("hostname | grep gcp-vm")
             '';
           };
       };
