@@ -80,7 +80,8 @@
 
                 # Use full installable path (not -c flag) for nested structure
                 # Pass any additional arguments (like --dry, --verbose, etc.) to nh
-                exec nh home switch "$flake#$config_path" "$@"
+                # Always include --accept-flake-config for nh's internal nix calls
+                exec nh home switch "$flake#$config_path" --accept-flake-config "$@"
               '';
             }
           );

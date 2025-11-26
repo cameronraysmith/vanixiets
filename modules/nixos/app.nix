@@ -76,7 +76,8 @@
 
                 # Use nh os switch with hostname flag
                 # Pass any additional arguments (like --dry, --verbose, etc.) to nh
-                exec nh os switch "$flake" -H "$hostname" "$@"
+                # Always include --accept-flake-config for nh's internal nix calls
+                exec nh os switch "$flake" -H "$hostname" --accept-flake-config "$@"
               '';
             }
           );
