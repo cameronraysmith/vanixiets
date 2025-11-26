@@ -263,22 +263,33 @@ So that electrum VPS is managed from production infra repository.
 
 **Note:** Test harness and consolidation prepare infrastructure before new machine configs (rosegold/argentum don't exist in test-clan - will be created based on validated patterns)
 
-### Story 2.11: Test harness migration and validation
+### Story 2.11: Test harness and CI validation
 
 As a system administrator,
-I want to migrate test-clan test harness to infra and validate zero regressions,
-So that infra repository has continuous validation for architectural invariants.
+I want to validate and update the test harness and CI workflow for the dendritic flake-parts + clan architecture,
+So that infra repository has continuous validation aligned with the 4-host fleet (stibnite, blackphos, cinnabar, electrum).
 
 **Acceptance Criteria:**
-1. Migrate test-clan test harness (18 tests) to infra: Copy test structure and nix-unit tests
-2. Adapt tests for infra-specific structure: Update paths, machine names, module references
-3. Validate all tests passing: `nix-unit --flake .#tests` shows zero failures
-4. Test categories validated: Regression tests (12), invariant tests (2), feature tests (2), integration tests (2)
-5. Document test execution: Create `docs/notes/development/testing.md` with test running instructions
-6. Establish test as validation gate: Tests must pass before Epic 3+ progression
-7. CI/CD integration: Add test execution to GitHub Actions workflow
+1. Validate existing checks (modules/checks/): Confirm 20+ implemented checks pass with `nix flake check`
+2. Add stibnite to explicit validation: Ensure stibnite darwin config has check coverage (not just via clan inventory)
+3. Fix CI matrix orphans: Remove non-existent `blackphos-nixos`, `stibnite-nixos`, `orb-nixos` from ci.yaml matrix
+4. Add VPS builds to CI: Add cinnabar and electrum nixosConfigurations to CI build matrix
+5. Update home config testing: Align CI home config expectations with actual users (cameron, raquel, crs58)
+6. Preserve cache strategy: Verify Cachix + GitHub Actions cache (Merkle DAG) remains functional
+7. Execute CI validation: Run `gh workflow run ci.yaml --ref clan-01` and verify all jobs pass
+8. Document test execution: Update or create testing documentation with current check inventory
 
 **Prerequisites:** Story 2.10 (electrum migration complete)
+
+**Estimated Effort:** 4-6 hours
+
+**Risk Level:** MEDIUM (CI changes could break main branch if not careful)
+
+**Key Files:**
+- modules/checks/nix-unit.nix (11 tests)
+- modules/checks/validation.nix (7 checks)
+- modules/checks/integration.nix (2 tests)
+- .github/workflows/ci.yaml (13 jobs, 1105 lines)
 
 ---
 
