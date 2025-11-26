@@ -409,7 +409,11 @@ development_status:
   # COMPLETE: Deployment successful, generation 20, all peers connected, --accept-flake-config fixed
   story-2-9: done
   story-2-9-title: "Cinnabar config migration"
-  story-2-10: backlog
+  # Story 2.10: Electrum config migration (deployment)
+  # Switch electrum VPS deployment source from test-clan to infra clan-01 branch
+  # LOWER-RISK: electrum is zerotier PEER (not controller) - network remains operational if issues
+  # Same pattern as Story 2.9 (cinnabar), --accept-flake-config fix already applied
+  story-2-10: drafted
   story-2-10-title: "Electrum config migration"
 
   # Phase 4: Future Machines (3 stories)
