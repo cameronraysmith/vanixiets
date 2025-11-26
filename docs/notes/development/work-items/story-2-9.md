@@ -1,0 +1,452 @@
+# Story 2.9: Cinnabar config migration
+
+Status: drafted
+
+## Story
+
+As a system administrator,
+I want to switch cinnabar VPS deployment source from test-clan to infra clan-01 branch,
+so that cinnabar is managed from production infra repository while maintaining zerotier controller functionality.
+
+## Context
+
+**Epic 2 Phase 3 Story 1 (VPS Migration):**
+This is the first story in Epic 2 Phase 3 (VPS Migration). Story 2.7 activated darwin workstations (blackphos, stibnite) from infra. Story 2.8 confirmed no obsolete darwin configs require cleanup. Story 2.9 switches cinnabar deployment to infra, completing the first VPS migration.
+
+**Story Type: DEPLOYMENT (Switch Deployment Source):**
+- cinnabar NixOS config ALREADY EXISTS in infra (migrated in Story 2.3)
+- Currently DEPLOYED from test-clan
+- Must switch to deploying from infra clan-01 branch
+- Pattern parallels Story 2.7 (darwin activation) but for remote NixOS VPS
+
+**CRITICAL CONTEXT: CINNABAR IS THE ZEROTIER CONTROLLER:**
+
+cinnabar serves as the zerotier network controller for network db4344343b14b903.
+If deployment breaks networking, ALL mesh connectivity is lost (blackphos, stibnite, electrum).
+This is a HIGH-RISK deployment requiring careful validation at each step.
+
+**Deployment Commands:**
+```bash
+# Preview changes (builds locally, shows diff)
+just clan-os-dry cinnabar
+
+# Apply changes (builds locally, deploys remotely via SSH)
+just clan-os-switch cinnabar
+
+# Or via clan CLI directly
+clan machines update cinnabar
+```
+
+## Acceptance Criteria
+
+### AC1: Verify cinnabar configuration in infra builds
+
+Verify the cinnabar NixOS configuration builds successfully from infra repository.
+
+**Verification:**
+```bash
+# Build nixos toplevel
+nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel
+
+# Verify build completes
+echo $?  # Exit code 0
+
+# Verify store path created
+readlink result
+# Expected: /nix/store path for cinnabar system
+```
+
+### AC2: Preserve zerotier controller configuration
+
+Ensure zerotier controller configuration is preserved after switching deployment source.
+
+**Verification:**
+```bash
+# Verify zerotier config in infra
+cat modules/clan/inventory/services/zerotier.nix
+# Expected: roles.controller.machines."cinnabar" with allowedIps for blackphos + stibnite
+
+# Verify network ID preserved
+grep "db4344343b14b903" modules/clan/inventory/services/zerotier.nix || \
+  grep -r "zerotier" modules/machines/nixos/cinnabar/
+# Expected: Network ID referenced in configuration
+
+# After deployment - verify controller operational
+ssh cameron@cinnabar.zt "zerotier-cli info"
+# Expected: 200 info ... ONLINE
+
+ssh cameron@cinnabar.zt "zerotier-cli listnetworks"
+# Expected: db4344343b14b903 with controller status
+```
+
+### AC3: Deploy cinnabar from infra
+
+Execute deployment from infra clan-01 branch successfully.
+
+**Verification:**
+```bash
+# Execute deployment
+just clan-os-switch cinnabar
+
+# Verify exit code
+echo $?  # Exit code 0
+
+# Verify new system generation
+ssh cameron@cinnabar.zt "nixos-rebuild list-generations | head -5"
+# Expected: New generation from infra deployment
+```
+
+### AC4: Validate SSH access from darwin workstations
+
+Verify SSH access via both zerotier and public IP.
+
+**Verification:**
+```bash
+# Test zerotier access
+ssh cameron@cinnabar.zt "hostname"
+# Expected: cinnabar
+
+# Test public IP fallback
+ssh cameron@49.13.68.78 "hostname"
+# Expected: cinnabar
+
+# Test from blackphos
+ssh cameron@cinnabar.zt "hostname"
+
+# Test from stibnite
+ssh cameron@cinnabar.zt "hostname"
+```
+
+### AC5: Validate clan vars deployment
+
+Verify clan vars are properly deployed to /run/secrets/.
+
+**Verification:**
+```bash
+# Check secrets directory exists
+ssh cameron@cinnabar.zt "ls -la /run/secrets/"
+# Expected: Directory exists with secrets
+
+# Check permissions
+ssh cameron@cinnabar.zt "stat -c '%a %U:%G' /run/secrets"
+# Expected: Appropriate permissions
+
+# Verify SSH keys deployed
+ssh cameron@cinnabar.zt "ls -la /run/secrets/ | grep -i ssh"
+# Expected: SSH-related secrets present
+```
+
+### AC6: Test zerotier controller status
+
+Verify zerotier controller is fully operational after deployment.
+
+**Verification:**
+```bash
+# Verify controller status
+ssh cameron@cinnabar.zt "zerotier-cli info"
+# Expected: 200 info ... ONLINE
+
+# List network members
+ssh cameron@cinnabar.zt "zerotier-cli listnetworks"
+# Expected: db4344343b14b903 OK PUBLIC
+
+# Verify peers still connected
+# From blackphos:
+ping -c 3 cinnabar.zt
+ping -c 3 electrum.zt
+ping -c 3 stibnite.zt
+
+# From stibnite:
+ping -c 3 cinnabar.zt
+ping -c 3 electrum.zt
+ping -c 3 blackphos.zt
+```
+
+### AC7: Document cinnabar-specific infrastructure
+
+Document cinnabar infrastructure details for future reference.
+
+**Verification:**
+- [ ] Hetzner Cloud CX43 specs documented (8 vCPU, 16GB RAM, fsn1 location)
+- [ ] ZFS disk layout documented (disko.nix)
+- [ ] Network configuration documented (systemd-networkd)
+- [ ] Recovery procedures documented
+- [ ] Story 2.10 handoff guidance documented
+
+## Tasks / Subtasks
+
+### Task 1: Build Validation (AC: #1)
+
+- [ ] Build cinnabar config from infra
+  - [ ] `nix build .#nixosConfigurations.cinnabar.config.system.build.toplevel`
+  - [ ] Verify build succeeds
+  - [ ] Document store path
+- [ ] Compare with test-clan config for drift
+  - [ ] Check key configurations match
+  - [ ] Note any differences in Dev Notes
+
+### Task 2: Clan Vars/Secrets Verification (AC: #2, #5)
+
+- [ ] Audit clan inventory services
+  - [ ] Review modules/clan/inventory/services/zerotier.nix
+  - [ ] Review modules/clan/inventory/services/users/cameron.nix
+  - [ ] Review modules/clan/inventory/services/sshd.nix
+- [ ] Verify user-cameron service instance
+  - [ ] Check cinnabar is targeted
+  - [ ] Verify cameron user configuration
+- [ ] Verify zerotier controller configuration
+  - [ ] Network ID db4344343b14b903
+  - [ ] allowedIps includes blackphos + stibnite
+
+### Task 3: Pre-Deployment Checklist (AC: #4)
+
+- [ ] Confirm SSH access via public IP (fallback)
+  - [ ] `ssh cameron@49.13.68.78 "hostname"`
+  - [ ] Document current IP
+- [ ] Note current zerotier status
+  - [ ] `ssh cameron@cinnabar.zt "zerotier-cli info"`
+  - [ ] `ssh cameron@cinnabar.zt "zerotier-cli listnetworks"`
+- [ ] Document current /run/secrets/ state
+  - [ ] `ssh cameron@cinnabar.zt "ls -la /run/secrets/"`
+
+### Task 4: Dry-Run Analysis (AC: #3)
+
+- [ ] Execute dry-run
+  - [ ] `just clan-os-dry cinnabar`
+  - [ ] Capture diff output
+- [ ] Analyze diff output
+  - [ ] Document packages being added
+  - [ ] Document packages being removed
+  - [ ] Document configuration changes
+- [ ] Identify any unexpected changes
+- [ ] Confirm no destructive changes to zerotier
+
+### Task 5: Execute Deployment (AC: #3)
+
+- [ ] Execute deployment
+  - [ ] `just clan-os-switch cinnabar`
+  - [ ] Monitor for errors
+  - [ ] DO NOT disconnect SSH during deployment
+- [ ] Verify deployment success
+  - [ ] Exit code 0
+  - [ ] New generation created
+- [ ] Document deployment results
+
+### Task 6: Post-Deployment Validation (AC: #4, #5, #6)
+
+- [ ] Verify SSH access
+  - [ ] zerotier: `ssh cameron@cinnabar.zt "hostname"`
+  - [ ] public IP: `ssh cameron@49.13.68.78 "hostname"`
+- [ ] Verify zerotier controller status
+  - [ ] `zerotier-cli info` shows ONLINE
+  - [ ] `zerotier-cli listnetworks` shows network
+- [ ] Verify all peers still connected
+  - [ ] Test from blackphos → cinnabar, electrum, stibnite
+  - [ ] Test from stibnite → cinnabar, electrum, blackphos
+- [ ] Verify /run/secrets/ contents
+  - [ ] Secrets present
+  - [ ] Permissions correct
+
+### Task 7: Documentation (AC: #7)
+
+- [ ] Update Dev Notes with deployment details
+- [ ] Document infrastructure details
+  - [ ] Hetzner Cloud CX43: 8 vCPU, 16GB RAM, fsn1
+  - [ ] ZFS disko layout reference
+  - [ ] systemd-networkd configuration
+- [ ] Document any issues encountered
+- [ ] Add recovery procedures
+- [ ] Story 2.10 handoff guidance
+
+## Dev Notes
+
+### Learnings from Previous Story
+
+**From Story 2.7 (Status: done)**
+
+- **Track A (Blackphos)**: Switch from test-clan successful, minimal diff
+- **Track B (Stibnite)**: Iterative migration with gap fixes (nix-rosetta-builder, colima, incus)
+- **Track C (Network)**: Zerotier mesh fully operational
+  - stibnite authorized via `zerotier-members allow` on cinnabar controller
+  - All 4 machines connected: cinnabar, electrum, blackphos, stibnite
+- **SSH bidirectional**: All .zt hostnames working
+- **Configuration persistence**: allowedIps updated in both infra and test-clan
+
+**Key Commits from Story 2.7:**
+- `9be2ddac` feat(darwin): add colima module for OCI container management
+- `f1947616` feat(stibnite): add nix-rosetta-builder and colima configuration
+- `30d41ee4` feat(ssh): add stibnite.zt to zerotier network hosts
+- `62accb11` feat(zerotier): add stibnite to allowedIps for darwin member authorization
+
+[Source: docs/notes/development/work-items/2-7-activate-blackphos-and-stibnite-from-infra.md#Dev-Agent-Record]
+
+### Existing Cinnabar Configuration in Infra
+
+**Location:** modules/machines/nixos/cinnabar/
+```
+modules/machines/nixos/cinnabar/
+├── default.nix    # 92 lines - Main NixOS configuration
+└── disko.nix      # 69 lines - ZFS disk layout
+```
+
+**Key Features Configured:**
+- srvos.nixosModules.server + hardware-hetzner-cloud
+- home-manager integration via user-cameron service
+- ZFS boot configuration (devNodes = "/dev/disk/by-path")
+- Hetzner-specific networking (systemd-networkd)
+- SSH MaxAuthTries = 20 (accommodates Bitwarden SSH agent)
+- cameron user via clan inventory (not inline config)
+
+### Infrastructure Management Stack
+
+**1. Terranix (modules/terranix/hetzner.nix):**
+- Defines cinnabar VM: cx43, 8 vCPU, 16GB RAM, fsn1 location
+- Uses `clan machines install` for initial provisioning
+- Command: `nix run .#terraform`
+
+**2. Clan CLI commands:**
+- `clan machines list` - List managed machines
+- `clan machines update cinnabar` - Update/deploy cinnabar
+- `clan vars generate cinnabar` - Generate vars for cinnabar
+- `clan secrets` - Manage secrets
+
+**3. Justfile recipes (clan group):**
+- `just clan-os-dry cinnabar` - Preview NixOS changes
+- `just clan-os-switch cinnabar` - Apply NixOS changes
+- `just clan-os cinnabar` - Interactive (dry + prompt + switch)
+
+### Clan Inventory Services for Cinnabar
+
+**Zerotier Controller (modules/clan/inventory/services/zerotier.nix):**
+```nix
+roles.controller.machines."cinnabar" = {
+  settings = {
+    allowedIps = [
+      "fddb:4344:343b:14b9:399:930e:e971:d9e0"  # blackphos
+      "fddb:4344:343b:14b9:399:933e:1059:d43a"  # stibnite
+    ];
+  };
+};
+```
+
+**User (modules/clan/inventory/services/users/cameron.nix):**
+- Targets: cinnabar, electrum
+- User: cameron
+- Groups: wheel, networkmanager
+- Home-manager: crs58 identity with all 7 aggregates
+
+**SSHD (modules/clan/inventory/services/sshd.nix):**
+- Server role for all NixOS machines
+- Basic configuration without CA certificates
+
+### Deployment Methodology
+
+Unlike darwin (local `darwin-rebuild`), NixOS VPS uses remote deployment:
+
+```bash
+# Builds locally, copies closure over SSH, activates remotely
+clan machines update cinnabar
+
+# Or via justfile wrapper
+just clan-os-switch cinnabar
+```
+
+Connection via SSH to cinnabar:
+- Zerotier IP: via .zt hostname
+- Public IP: 49.13.68.78 (Hetzner)
+
+### Rollback Strategy
+
+If deployment breaks cinnabar:
+
+1. **SSH via public IP:**
+   ```bash
+   ssh cameron@49.13.68.78
+   ```
+
+2. **Redeploy from test-clan:**
+   ```bash
+   cd ~/projects/nix-workspace/test-clan
+   just os-switch cinnabar
+   # Or: clan machines update cinnabar
+   ```
+
+3. **If SSH broken:** Use Hetzner console for recovery
+   - Login to Hetzner Cloud console
+   - Access VPS via VNC/console
+   - Rollback to previous generation or redeploy
+
+### Key Considerations
+
+1. **NO TERRAFORM STATE CONFLICT:**
+   - cinnabar VM already exists (provisioned from test-clan)
+   - Story 2.9 is about NixOS config deployment, NOT VM provisioning
+   - Do NOT run `nix run .#terraform` unless reprovisioning
+
+2. **ZEROTIER CONTROLLER CONTINUITY:**
+   - Network ID: db4344343b14b903
+   - Controller config in clan inventory (zerotier.nix)
+   - Must verify controller role preserved after switch
+
+3. **SSH ACCESS PRESERVATION:**
+   - Maintain SSH access throughout migration
+   - Fallback: Public IP 49.13.68.78
+
+### Project Structure Notes
+
+**Cinnabar Config:**
+```
+modules/machines/nixos/cinnabar/
+├── default.nix        # Main NixOS config (92 lines)
+└── disko.nix          # ZFS disk layout (69 lines)
+
+modules/clan/inventory/services/
+├── zerotier.nix       # Zerotier controller config
+├── sshd.nix           # SSH server config
+└── users/cameron.nix  # User config targeting cinnabar
+```
+
+**Zerotier Network:**
+| Machine | Role | Platform | Zerotier IP |
+|---------|------|----------|-------------|
+| cinnabar | Controller | NixOS VPS | fddb:...controller |
+| electrum | Peer | NixOS VPS | fddb:...peer |
+| blackphos | Peer | Darwin | fddb:4344:343b:14b9:399:930e:e971:d9e0 |
+| stibnite | Peer | Darwin | fddb:4344:343b:14b9:399:933e:1059:d43a |
+
+### References
+
+**Source Documentation:**
+- [Epic 2 Definition](docs/notes/development/epics/epic-2-infrastructure-architecture-migration.md) - Story 2.9 definition (lines 222-237)
+- [Architecture - Deployment](docs/notes/development/architecture/deployment-architecture.md) - NixOS VPS deployment commands
+
+**Predecessor Stories:**
+- [Story 2.7](docs/notes/development/work-items/2-7-activate-blackphos-and-stibnite-from-infra.md) - Darwin activation pattern (provides deployment methodology)
+- [Story 2.3](docs/notes/development/work-items/2-3-wholesale-migration-test-clan-to-infra.md) - Wholesale migration (cinnabar config exists in infra)
+
+**Successor Stories:**
+- Story 2.10 (backlog) - Electrum config migration
+
+## Dev Agent Record
+
+### Context Reference
+
+<!-- Path(s) to story context XML will be added here by context workflow -->
+
+### Agent Model Used
+
+claude-opus-4-5-20251101
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+
+---
+
+## Change Log
+
+| Date | Version | Change |
+|------|---------|--------|
+| 2025-11-26 | 1.0 | Story drafted from Epic 2 definition and user-provided context |
