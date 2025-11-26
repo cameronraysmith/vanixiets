@@ -34,3 +34,14 @@ docs/notes/development/work-items/1-10c-establish-sops-nix-secrets-home-manager.
 
 # Story 1.10C context - placeholder text in secret file structure example (not actual secret)
 docs/notes/development/work-items/1-10c-establish-sops-nix-secrets-home-manager.context.xml:private-key:526
+
+# Terraform encrypted state - pbkdf2 state encryption password (encrypted, not actual secret)
+410480185ebe39f9ccd4ee760432ba5b9222c8d2:terraform/terraform.tfstate:generic-api-key:1
+410480185ebe39f9ccd4ee760432ba5b9222c8d2:terraform/terraform.tfstate.backup:generic-api-key:1
+
+# Story 2.4 work item - age public key in documentation (safe to share)
+dd8bd205917cdc6cd0a62b9443ea27429a9dc62f:docs/notes/development/work-items/2-4-home-manager-secrets-migration.md:generic-api-key:535
+
+# Story 2.4 context - crs58 and raquel age public keys (safe to share publicly)
+f4cc4ba44633fc6d42eeca4ede980a80540cb142:docs/notes/development/2-4-home-manager-secrets-migration.context.xml:generic-api-key:164
+f4cc4ba44633fc6d42eeca4ede980a80540cb142:docs/notes/development/2-4-home-manager-secrets-migration.context.xml:generic-api-key:171
