@@ -406,7 +406,7 @@ development_status:
   # Switch cinnabar VPS deployment source from test-clan to infra clan-01 branch
   # HIGH-RISK: cinnabar is zerotier controller for network db4344343b14b903
   # Config already exists in infra (migrated in Story 2.3), this is deployment switching
-  story-2-9: drafted
+  story-2-9: in-progress
   story-2-9-title: "Cinnabar config migration"
   story-2-10: backlog
   story-2-10-title: "Electrum config migration"
