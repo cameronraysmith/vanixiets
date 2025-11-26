@@ -398,8 +398,23 @@ just clan-os-switch cinnabar  # → nix run .#os -- cinnabar .
 - Situations where you explicitly don't want vars regeneration
 
 **Connection via SSH to cinnabar:**
-- Zerotier IP: via .zt hostname (preferred when mesh is working)
-- Public IP: 49.13.68.78 (Hetzner fallback)
+
+Preferred (zerotier mesh via home-manager SSH config):
+```bash
+# Simple - .zt hostname configured in modules/home/core/ssh.nix
+ssh -A cinnabar.zt
+```
+
+Fallback (public IP - may need known_hosts clearing):
+```bash
+# Host key may change between deployments/reinstalls
+IP=49.13.68.78 && \
+ssh-keygen -R ${IP} && \
+ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -A cameron@${IP}
+```
+
+Note: The `.zt` hostnames work because Story 2.7 activated infra clan-01 on stibnite,
+which includes home-manager SSH config with zerotier host definitions.
 
 **Note on justfile recipes:**
 The infra justfile `clan-os-*` recipes use `nix run .#os` which wraps `nh os switch`.
@@ -410,9 +425,11 @@ For NixOS VPS, prefer direct `clan machines update` for full clan integration.
 
 If deployment breaks cinnabar:
 
-1. **SSH via public IP:**
+1. **SSH via public IP (may need known_hosts clearing):**
    ```bash
-   ssh cameron@49.13.68.78
+   IP=49.13.68.78 && \
+   ssh-keygen -R ${IP} && \
+   ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -A cameron@${IP}
    ```
 
 2. **Redeploy from test-clan (preferred rollback):**
@@ -424,7 +441,7 @@ If deployment breaks cinnabar:
 
 3. **Local rollback on cinnabar (if SSH works):**
    ```bash
-   ssh cameron@cinnabar.zt
+   ssh -A cinnabar.zt  # or via public IP if zerotier broken
    sudo nixos-rebuild switch --rollback
    # Or: sudo /run/current-system/bin/switch-to-configuration switch
    ```
@@ -510,3 +527,4 @@ claude-opus-4-5-20251101
 |------|---------|--------|
 | 2025-11-26 | 1.0 | Story drafted from Epic 2 definition and user-provided context |
 | 2025-11-26 | 1.1 | Updated deployment methodology: clan CLI preferred over nh os switch for VPS. Clarified distinction between `clan machines update` and `just clan-os-switch`. Updated AC3, Task 4, Task 5 to use clan CLI. Enhanced rollback strategy. |
+| 2025-11-26 | 1.2 | Added detailed SSH connection commands: .zt hostname (simple, via home-manager config) vs public IP fallback (with known_hosts clearing). Documented agent forwarding (-A) pattern. |
