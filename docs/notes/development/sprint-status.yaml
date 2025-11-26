@@ -420,7 +420,7 @@ development_status:
 
   # Phase 4: Infrastructure Validation and Future Machines (4 stories)
   story-2-11: backlog
-  story-2-11-title: "Test harness migration and validation"
+  story-2-11-title: "Test harness and CI validation"
   story-2-12: backlog
   story-2-12-title: "Consolidate agents-md module duplication"
   story-2-13: backlog
