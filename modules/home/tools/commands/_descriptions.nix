@@ -50,7 +50,7 @@
       order = 5;
       commands = {
         dnsreset = "Flush DNS cache and restart mDNSResponder on macOS";
-        rosetta-restart = "Restart nix-rosetta-builder VM (clears memory)";
+        rosetta-restart = "Restart nix-rosetta-builder VM and release memory";
       };
     }
   ];
