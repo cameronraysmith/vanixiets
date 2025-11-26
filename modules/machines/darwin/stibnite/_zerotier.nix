@@ -47,29 +47,33 @@ let
 
         # Wait for join to complete
         sleep 2
+      fi
 
-        # Extract and display member ID for controller authorization
-        MEMBER_INFO=$(sudo zerotier-cli info 2>/dev/null || echo "info unavailable")
-        echo "Member info: ''${MEMBER_INFO}"
+      # Always extract and display member info and calculated IPv6
+      MEMBER_INFO=$(sudo zerotier-cli info 2>/dev/null || echo "info unavailable")
+      echo "Member info: ''${MEMBER_INFO}"
 
-        # Extract 10-character member ID from info output
-        # Format: "200 info <member-id> <version> <status>"
-        MEMBER_ID=$(echo "''${MEMBER_INFO}" | awk '{print $3}')
+      # Extract 10-character member ID from info output
+      # Format: "200 info <member-id> <version> <status>"
+      MEMBER_ID=$(echo "''${MEMBER_INFO}" | awk '{print $3}')
 
-        if [ -n "''${MEMBER_ID}" ]; then
-          # Calculate deterministic IPv6 address using ZeroTier RFC4193 addressing
-          # Network db4344343b14b903 -> fddb:4344:343b:14b9
-          # Member 0ee971d9e0 -> :399:930e:e971:d9e0
-          # Format: fd<net[0:2]>:<net[2:6]>:<net[6:10]>:<net[10:14]>:399:93<member[0:2]>:<member[2:6]>:<member[6:10]>
-          NETWORK_PREFIX="fddb:4344:343b:14b9"  # Derived from network ID ${networkId}
-          MEMBER_SUFFIX="''${MEMBER_ID:0:2}:''${MEMBER_ID:2:4}:''${MEMBER_ID:6:4}"
-          CALCULATED_IPV6="''${NETWORK_PREFIX}:399:93''${MEMBER_SUFFIX}"
+      if [ -n "''${MEMBER_ID}" ]; then
+        # Calculate deterministic IPv6 address using ZeroTier RFC4193 addressing
+        # Network db4344343b14b903 -> fddb:4344:343b:14b9
+        # Member 0ee971d9e0 -> :399:930e:e971:d9e0
+        # Format: fd<net[0:2]>:<net[2:6]>:<net[6:10]>:<net[10:14]>:399:93<member[0:2]>:<member[2:6]>:<member[6:10]>
+        NETWORK_PREFIX="fddb:4344:343b:14b9"  # Derived from network ID ${networkId}
+        MEMBER_SUFFIX="''${MEMBER_ID:0:2}:''${MEMBER_ID:2:4}:''${MEMBER_ID:6:4}"
+        CALCULATED_IPV6="''${NETWORK_PREFIX}:399:93''${MEMBER_SUFFIX}"
 
+        echo ""
+        echo "Member ID: ''${MEMBER_ID}"
+        echo "Calculated IPv6: ''${CALCULATED_IPV6}"
+
+        # Check if ACCESS_DENIED (not yet authorized)
+        if echo "''${NETWORK_STATUS:-}" | grep -q "ACCESS_DENIED"; then
           echo ""
           echo "=== Authorization Required ==="
-          echo "Member ID: ''${MEMBER_ID}"
-          echo "Calculated IPv6: ''${CALCULATED_IPV6}"
-          echo ""
           echo "To authorize this machine on cinnabar controller, run ONE of:"
           echo ""
           echo "Option 1 (Declarative - recommended):"
