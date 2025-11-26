@@ -1,6 +1,6 @@
 # Story 2.10: Electrum config migration
 
-Status: drafted
+Status: done
 
 ## Story
 
@@ -183,11 +183,11 @@ ssh cameron@electrum.zt "hostname"
 Document electrum infrastructure details for future reference.
 
 **Verification:**
-- [ ] Hetzner Cloud specs documented
-- [ ] ZFS disk layout documented (disko.nix)
-- [ ] Network configuration documented (systemd-networkd)
-- [ ] Story completion notes documented
-- [ ] Phase 3 completion status documented
+- [x] Hetzner Cloud specs documented
+- [x] ZFS disk layout documented (disko.nix)
+- [x] Network configuration documented (systemd-networkd)
+- [x] Story completion notes documented
+- [x] Phase 3 completion status documented
 
 ## Tasks / Subtasks
 
@@ -200,40 +200,40 @@ Document electrum infrastructure details for future reference.
 
 ### Task 1: Build Validation (AC: #1) [AI]
 
-- [ ] Build electrum config from infra
-  - [ ] `nix build .#nixosConfigurations.electrum.config.system.build.toplevel`
-  - [ ] Verify build succeeds
-  - [ ] Document store path
-- [ ] Compare with test-clan config for drift
-  - [ ] Check key configurations match
-  - [ ] Note any differences in Dev Notes
+- [x] Build electrum config from infra
+  - [x] `nix build .#nixosConfigurations.electrum.config.system.build.toplevel`
+  - [x] Verify build succeeds
+  - [x] Document store path: /nix/store/9z6zbymrn6p7w2jh9x0621i6v2mikm86-nixos-system-electrum-25.11.20251115.1d4c883
+- [x] Compare with test-clan config for drift
+  - [x] Check key configurations match
+  - [x] Note any differences in Dev Notes
 
 ### Task 2: Clan Vars/Secrets Verification (AC: #2, #5) [AI]
 
-- [ ] Audit clan inventory services
-  - [ ] Review modules/clan/inventory/services/zerotier.nix (electrum peer role)
-  - [ ] Review modules/clan/inventory/services/users/cameron.nix (targets electrum)
-  - [ ] Review modules/clan/inventory/services/sshd.nix
-- [ ] Verify user-cameron service instance
-  - [ ] Check electrum is targeted
-  - [ ] Verify cameron user configuration
-- [ ] Verify zerotier peer configuration
-  - [ ] Network ID db4344343b14b903 (via `clan vars list electrum`)
-  - [ ] Peer role (not controller)
+- [x] Audit clan inventory services
+  - [x] Review modules/clan/inventory/services/zerotier.nix (electrum peer role)
+  - [x] Review modules/clan/inventory/services/users/cameron.nix (targets electrum)
+  - [x] Review modules/clan/inventory/services/sshd.nix
+- [x] Verify user-cameron service instance
+  - [x] Check electrum is targeted
+  - [x] Verify cameron user configuration
+- [x] Verify zerotier peer configuration
+  - [x] Network ID db4344343b14b903 (via `clan vars list electrum`)
+  - [x] Peer role (not controller)
 
 ### Task 3: Pre-Deployment Checklist (AC: #4) [USER]
 
 **User executes these SSH commands and reports current state to chat.**
 
-- [ ] Confirm SSH access via public IP (fallback)
-  - [ ] `ssh cameron@162.55.175.87 "hostname"` → electrum
-  - [ ] Document current IP: 162.55.175.87
-- [ ] Note current zerotier status
-  - [ ] `sudo zerotier-cli info` → ONLINE status
-  - [ ] `sudo zerotier-cli listnetworks` → network status
-  - [ ] Peers visible: cinnabar, blackphos, stibnite
-- [ ] Document current /run/secrets/ state
-  - [ ] Current secrets generation
+- [x] Confirm SSH access via public IP (fallback)
+  - [x] `ssh cameron@162.55.175.87 "hostname"` → electrum
+  - [x] Document current IP: 162.55.175.87
+- [x] Note current zerotier status
+  - [x] `sudo zerotier-cli info` → ONLINE status
+  - [x] `sudo zerotier-cli listnetworks` → network status
+  - [x] Peers visible: cinnabar, blackphos, stibnite
+- [x] Document current /run/secrets/ state
+  - [x] Current secrets generation
 
 ### Task 4: Dry-Run Analysis (AC: #3) [USER → AI]
 
@@ -241,7 +241,7 @@ Document electrum infrastructure details for future reference.
 
 User SSHs into electrum, pulls infra, runs dry-run, and shares the diff output in chat for AI analysis.
 
-- [ ] SSH into electrum and pull infra clan-01 branch
+- [x] SSH into electrum and pull infra clan-01 branch
   ```bash
   ssh -A electrum.zt
   cd ~/projects/nix-workspace/infra  # or wherever infra is cloned
@@ -249,63 +249,63 @@ User SSHs into electrum, pulls infra, runs dry-run, and shares the diff output i
   git checkout clan-01
   git pull origin clan-01
   ```
-- [ ] Execute local dry-run on electrum
-  - [ ] `just clan-os-dry electrum` (nh os switch --dry shows diff)
-  - [ ] **Copy/paste diff output to chat for AI review**
-- [ ] AI analyzes diff for expected changes
-  - [ ] Package updates (similar pattern to cinnabar)
-  - [ ] Any added/removed packages
-- [ ] Confirm no unexpected changes
-- [ ] Exit electrum SSH session
+- [x] Execute local dry-run on electrum
+  - [x] `just clan-os-dry electrum` (nh os switch --dry shows diff)
+  - [x] **Copy/paste diff output to chat for AI review**
+- [x] AI analyzes diff for expected changes
+  - [x] Package updates (similar pattern to cinnabar)
+  - [x] Any added/removed packages
+- [x] Confirm no unexpected changes
+- [x] Exit electrum SSH session
 
 **Phase 4b: Verify vars from stibnite [AI]**
 
-- [ ] Verify vars are current
-  - [ ] `clan vars list electrum`
-  - [ ] `clan vars generate electrum` (only if needed)
+- [x] Verify vars are current
+  - [x] `clan vars list electrum`
+  - [x] `clan vars generate electrum` (only if needed)
 
 ### Task 5: Execute Deployment (AC: #3) [HYBRID]
 
 **AI can execute `clan machines update` from stibnite, but user should monitor and be ready to intervene.**
 
-- [ ] Execute deployment via clan CLI
-  - [ ] `clan machines update electrum`
-  - [ ] Monitor for errors (user watches terminal output)
-  - [ ] DO NOT disconnect SSH during deployment
-- [ ] Verify deployment success
-  - [ ] Exit code 0
-  - [ ] New generation created
-  - [ ] Vars deployed
-- [ ] Document deployment results
+- [x] Execute deployment via clan CLI
+  - [x] `clan machines update electrum`
+  - [x] Monitor for errors (user watches terminal output)
+  - [x] DO NOT disconnect SSH during deployment
+- [x] Verify deployment success
+  - [x] Exit code 0
+  - [x] New generation created
+  - [x] Vars deployed
+- [x] Document deployment results
 
 ### Task 6: Post-Deployment Validation (AC: #4, #5, #6) [USER]
 
 **User executes validation commands and reports results to chat. AI cannot easily execute cross-machine SSH tests.**
 
-- [ ] Verify SSH access
-  - [ ] zerotier: `ssh cameron@electrum.zt` working
-  - [ ] public IP: `ssh cameron@162.55.175.87` working
-- [ ] Verify zerotier peer status (on electrum)
-  - [ ] `zerotier-cli info` → ONLINE
-  - [ ] `zerotier-cli listnetworks` → network status
-- [ ] Verify all peers still connected
-  - [ ] cinnabar (controller): connected
-  - [ ] blackphos: connected
-  - [ ] stibnite: connected
-- [ ] Verify /run/secrets/ contents (on electrum)
-  - [ ] Secrets directory updated
-- [ ] Verify new generation
-- [ ] **Report validation results to chat**
+- [x] Verify SSH access
+  - [x] zerotier: `ssh cameron@electrum.zt` working
+  - [x] public IP: `ssh cameron@162.55.175.87` working
+- [x] Verify zerotier peer status (on electrum)
+  - [x] `zerotier-cli info` → ONLINE (d17e6d27cc 1.16.0 ONLINE)
+  - [x] `zerotier-cli listnetworks` → network status (db4344343b14b903 OK PRIVATE)
+- [x] Verify all peers still connected
+  - [x] cinnabar (controller): connected (db4344343b DIRECT 4ms)
+  - [x] blackphos: connected (0ee971d9e0 DIRECT 224ms)
+  - [x] stibnite: connected (3e1059d43a DIRECT 118ms)
+- [x] Verify /run/secrets/ contents (on electrum)
+  - [x] Secrets directory updated (/run/secrets/vars/openssh, tor_tor, zerotier)
+- [x] Verify new generation
+- [x] **Report validation results to chat**
 
 ### Task 7: Documentation (AC: #7) [AI]
 
-- [ ] Update Dev Notes with deployment details
-- [ ] Document infrastructure details
-  - [ ] Hetzner Cloud specs
-  - [ ] ZFS disko layout reference
-  - [ ] systemd-networkd configuration
-- [ ] Document any issues encountered
-- [ ] Phase 3 completion status (cinnabar + electrum both migrated)
+- [x] Update Dev Notes with deployment details
+- [x] Document infrastructure details
+  - [x] Hetzner Cloud specs (see Dev Notes)
+  - [x] ZFS disko layout reference (modules/machines/nixos/electrum/disko.nix)
+  - [x] systemd-networkd configuration (Hetzner-specific via srvos)
+- [x] Document any issues encountered (rosetta-builder SSH fix)
+- [x] Phase 3 completion status (cinnabar + electrum both migrated)
 
 ## Dev Notes
 
@@ -470,9 +470,40 @@ claude-opus-4-5-20251101
 
 ### Debug Log References
 
+- Rosetta-builder SSH "too many authentication failures" diagnosed and fixed
+- Build initially failed due to rosetta-builder VM crash (memory/state issue)
+- Solution: Added `IdentitiesOnly yes` SSH config (050-rosetta-builder-identities.conf)
+
 ### Completion Notes List
 
+**Deployment Summary (2025-11-26):**
+- electrum switched from test-clan to infra clan-01 branch
+- Store path: /nix/store/9z6zbymrn6p7w2jh9x0621i6v2mikm86-nixos-system-electrum-25.11.20251115.1d4c883
+- Zerotier peer status: ONLINE on network db4344343b14b903
+- All peers connected: cinnabar (4ms), blackphos (224ms), stibnite (118ms)
+- Clan vars deployed: /run/secrets/vars/{openssh,tor_tor,zerotier}
+
+**Package Changes:**
+- Updated: claude-code 2.0.42→2.0.54, crush 0.18.1→0.18.6, gemini-cli 0.15.3→0.18.0
+- Added: atuin-format, rosetta-restart, zerotier-join
+- Removed: backlog-md, droid, opencode (disabled packages)
+
+**Infrastructure Fix (bonus):**
+- Added `rosetta-restart` shell command for nix-rosetta-builder VM management
+- Fixed SSH config for rosetta-builder (IdentitiesOnly workaround for Bitwarden SSH agent)
+
+**Phase 3 Completion:**
+- Story 2.9 (cinnabar): DONE - zerotier controller migrated
+- Story 2.10 (electrum): DONE - zerotier peer migrated
+- Both VPS machines now deployed from infra clan-01 branch
+
 ### File List
+
+**Modified:**
+- modules/machines/darwin/stibnite/default.nix (rosetta-builder SSH fix)
+- modules/home/tools/commands/_system-tools.nix (rosetta-restart command)
+- modules/home/tools/commands/_descriptions.nix (rosetta-restart description)
+- docs/notes/development/sprint-status.yaml (story status)
 
 ---
 
@@ -481,3 +512,4 @@ claude-opus-4-5-20251101
 | Date | Version | Change |
 |------|---------|--------|
 | 2025-11-26 | 1.0 | Story drafted from Epic 2 definition, Story 2.9 pattern, and user-provided context |
+| 2025-11-26 | 2.0 | Story completed - electrum deployed from infra, all ACs verified, Phase 3 complete |
