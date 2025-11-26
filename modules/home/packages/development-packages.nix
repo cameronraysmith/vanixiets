@@ -24,18 +24,11 @@
       coderabbit-cli =
         flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
       crush = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.crush;
-      # Override droid to disable auto-patchelf which fails on rosetta-builder
-      # Error: ModuleNotFoundError: No module named 'elftools'
-      # Same underlying issue as google-cloud-sdk (auto-patchelf missing pyelftools)
-      # TODO: Remove override when upstream nix-ai-tools or nixpkgs fixes this
-      # Added: 2025-11-26
-      droid =
-        (flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.droid).overrideAttrs
-          (old: {
-            dontAutoPatchelf = true;
-          });
+      # droid: disabled - auto-patchelf fails on rosetta-builder (missing pyelftools)
+      # opencode: disabled - bun node_modules cleanup fails during build
+      # TODO: Re-enable when upstream nix-ai-tools fixes these issues
+      # Disabled: 2025-11-26
       gemini-cli = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
-      opencode = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.opencode;
     in
     {
       home.packages =
@@ -74,9 +67,9 @@
           # from nix-ai-tools
           coderabbit-cli
           crush
-          droid
+          # droid      # disabled: auto-patchelf fails
           gemini-cli
-          opencode
+          # opencode   # disabled: bun cleanup fails
           #------
           plantuml-c4
           pre-commit
