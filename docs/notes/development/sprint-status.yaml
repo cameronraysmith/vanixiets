@@ -383,12 +383,15 @@ development_status:
   # Key achievements: All 7 aggregates for crs58, zerotier db4344343b14b903, darwin features validated
   story-2-6: done
   story-2-6-title: "Stibnite config migration"
-  # Story 2.7: DRAFTED (2025-11-25) - Activate blackphos and stibnite from infra
-  # Hybrid deployment story: user-executed with AI validation
-  # Two deployment profiles: blackphos (straightforward), stibnite (iterative)
-  # 7 ACs: deploy both machines, validate workflows, zerotier mesh, SSH, stability
-  # Context pending: story-context workflow for technical context XML
-  story-2-7: drafted
+  # Story 2.7: DONE ✅ (2025-11-26) - Activate blackphos and stibnite from infra
+  # Deployment story: Switch both darwin workstations to infra clan-01 branch
+  # Blackphos: Straightforward switch from test-clan (same dendritic+clan architecture)
+  # Stibnite: Iterative migration with gap fixes (nix-rosetta-builder, colima, incus)
+  # Zerotier: stibnite authorized on network db4344343b14b903, full mesh connectivity
+  # SSH: All .zt hostnames working, stibnite.zt added to home-manager SSH config
+  # Config persistence: zerotier allowedIps updated in both infra and test-clan
+  # Both darwin workstations now operational under infra clan-01 management
+  story-2-7: done
   story-2-7-title: "Activate blackphos and stibnite from infra"
   story-2-8: backlog
   story-2-8-title: "Cleanup unused darwin configs"
