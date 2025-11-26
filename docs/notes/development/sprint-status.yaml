@@ -409,11 +409,13 @@ development_status:
   # COMPLETE: Deployment successful, generation 20, all peers connected, --accept-flake-config fixed
   story-2-9: done
   story-2-9-title: "Cinnabar config migration"
-  # Story 2.10: Electrum config migration (deployment)
+  # Story 2.10: DONE (2025-11-26) - Electrum config migration (deployment)
   # Switch electrum VPS deployment source from test-clan to infra clan-01 branch
   # LOWER-RISK: electrum is zerotier PEER (not controller) - network remains operational if issues
-  # Same pattern as Story 2.9 (cinnabar), --accept-flake-config fix already applied
-  story-2-10: in-progress
+  # COMPLETE: Deployment successful, zerotier peer operational, all ACs verified
+  # Bonus: rosetta-restart command added, rosetta-builder SSH fix applied
+  # Phase 3 complete: cinnabar (controller) + electrum (peer) both on infra clan-01
+  story-2-10: done
   story-2-10-title: "Electrum config migration"
 
   # Phase 4: Future Machines (3 stories)
