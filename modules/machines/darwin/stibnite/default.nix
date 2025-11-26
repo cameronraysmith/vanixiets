@@ -85,7 +85,7 @@ in
         additionalCasks = [
           "codelayer-nightly"
           "dbeaver-community"
-          "docker-desktop"
+          # "docker-desktop" # defer to orbstack and colima/incus
           "gpg-suite"
           "inkscape"
           "keycastr"
@@ -119,9 +119,9 @@ in
       '';
 
       # Single-user configuration
-      # crs58: admin AND primary user (UID 502 - matches existing stibnite system)
+      # crs58: admin AND primary user (UID 501 - matches existing stibnite system)
       users.users.crs58 = {
-        uid = 502;
+        uid = 501;
         home = "/Users/crs58";
         shell = pkgs.zsh;
         description = "crs58";
