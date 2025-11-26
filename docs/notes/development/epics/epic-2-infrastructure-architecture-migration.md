@@ -275,7 +275,7 @@ So that infra repository has continuous validation aligned with the 4-host fleet
 3. Fix CI matrix orphans: Remove non-existent `blackphos-nixos`, `stibnite-nixos`, `orb-nixos` from ci.yaml matrix
 4. Add VPS builds to CI: Add cinnabar and electrum nixosConfigurations to CI build matrix
 5. Update home config testing: Align CI home config expectations with actual users (cameron, raquel, crs58)
-6. Preserve cache strategy: Verify Cachix + GitHub Actions cache (Merkle DAG) remains functional
+6. Preserve content-addressed job caching: Ensure new/modified jobs follow the `cached-ci-job` pattern with accurate `hash-sources` closures (see `.github/actions/cached-ci-job/`)
 7. Execute CI validation: Run `gh workflow run ci.yaml --ref clan-01` and verify all jobs pass
 8. Document test execution: Update or create testing documentation with current check inventory
 
@@ -290,6 +290,15 @@ So that infra repository has continuous validation aligned with the 4-host fleet
 - modules/checks/validation.nix (7 checks)
 - modules/checks/integration.nix (2 tests)
 - .github/workflows/ci.yaml (13 jobs, 1105 lines)
+
+**Critical Pattern: Content-Addressed Job Caching**
+
+The CI uses `.github/actions/cached-ci-job` for job-level result caching based on input file closures. New/modified jobs MUST:
+- Call `cached-ci-job` early (before expensive setup)
+- Specify accurate `hash-sources` globs (only files affecting job outcome)
+- Include matrix values in `check-name` for matrix jobs
+- Gate expensive steps with `if: steps.cache.outputs.should-run == 'true'`
+- Create result markers and save to cache on success
 
 ---
 
