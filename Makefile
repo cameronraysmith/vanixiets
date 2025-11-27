@@ -171,6 +171,10 @@ verify: ## Verify nix installation and environment setup
 		printf "❌ some tools missing from devShell\n"; \
 		exit 1; \
 	fi
+	@printf "\nnix.conf contents:\n"
+	@printf "==================\n"
+	@cat /etc/nix/nix.conf 2>/dev/null || printf "(file not found)\n"
+	@printf "==================\n"
 	@printf "\nChecking nix.conf settings: "
 	@MISSING=0; \
 	for setting in "experimental-features.*nix-command" "experimental-features.*flakes" "auto-optimise-store.*false" "max-jobs.*auto" "always-allow-substitutes.*true" "extra-nix-path.*nixpkgs=flake:nixpkgs"; do \
