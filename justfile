@@ -80,6 +80,29 @@ debug-list:
 check:
   nix flake check
 
+# Check nix flake for CI (excludes heavy VM tests)
+[group('nix')]
+check-ci system="x86_64-linux":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  echo "Running CI checks for {{system}} (excluding VM tests)..."
+
+  # Get all checks except vm-* which are heavy integration tests
+  CHECKS=$(nix eval ".#checks.{{system}}" --apply 'builtins.attrNames' --json | jq -r '.[] | select(startswith("vm-") | not)')
+
+  echo "Checks to run:"
+  echo "$CHECKS" | while read check; do echo "  - $check"; done
+  echo ""
+
+  # Build each check
+  for check in $CHECKS; do
+    echo "::group::$check"
+    nix build ".#checks.{{system}}.$check" --print-build-logs
+    echo "::endgroup::"
+  done
+
+  echo "✓ All CI checks passed"
+
 # Verify system configuration builds after updates (run before activate)
 [group('nix')]
 verify:
