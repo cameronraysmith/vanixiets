@@ -1,0 +1,80 @@
+name: Update Flake Inputs
+
+on:
+  schedule:
+    # Run every 4 hours
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+    inputs:
+      auto_merge:
+        description: "Enable auto-merge for created PRs"
+        required: false
+        type: boolean
+        default: false
+      exclude_patterns:
+        description: "Comma-separated exclude patterns (e.g., '**/flake.nix#nixpkgs')"
+        required: false
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      auto_merge:
+        description: "Enable auto-merge for created PRs"
+        required: false
+        type: boolean
+        default: false
+      exclude_patterns:
+        description: "Comma-separated exclude patterns"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      FLAKE_UPDATER_APP_ID:
+        required: true
+      FLAKE_UPDATER_PRIVATE_KEY:
+        required: true
+
+concurrency:
+  group: update-flake-inputs-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  update-flake-inputs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # ratchet:actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.FLAKE_UPDATER_APP_ID }}
+          private-key: ${{ secrets.FLAKE_UPDATER_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        with:
+          installer: quick
+          system: x86_64-linux
+
+      - name: Update flake inputs
+        uses: mic92/update-flake-inputs@885d67233b78fea2b8e53ed4e60358e42f9b969f # ratchet:mic92/update-flake-inputs@v1
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          exclude-patterns: ${{ inputs.exclude_patterns }}
+          pr-labels: "dependencies,automated,flake-update"
+          auto-merge: ${{ inputs.auto_merge && 'true' || 'false' }}
+          delete-branch: "true"
+          signoff: "true"
