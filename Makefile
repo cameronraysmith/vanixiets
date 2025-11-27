@@ -67,22 +67,33 @@ bootstrap: install-nix install-direnv
 	@printf "For detailed documentation, see docs/new-user-host.md\n"
 
 .PHONY: install-nix
-# The canonical URL https://artifacts.nixos.org/experimental-installer/tag/0.27.0/nix-installer.sh
-# frequently returns HTTP 618 errors from the Fastly CDN. Using raw.githubusercontent.com with a
-# pinned commit for reliability. To update, find the commit for the desired tag at:
-# https://github.com/NixOS/experimental-nix-installer/tags
+# Download platform-specific binary directly from GitHub Releases.
+# This bypasses both the Fastly CDN (HTTP 618 errors) and the shell wrapper
+# (which has template placeholders that aren't filled in for raw source files).
+# To update version, change NIX_INSTALLER_VERSION below.
+NIX_INSTALLER_VERSION := 0.27.0
 install-nix: ## Install Nix using the NixOS community installer
 	@echo "Installing Nix..."
 	@if command -v nix >/dev/null 2>&1; then \
 		echo "Nix is already installed."; \
 	else \
+		case "$$(uname -s)-$$(uname -m)" in \
+			Linux-x86_64)  PLATFORM="x86_64-linux" ;; \
+			Linux-aarch64) PLATFORM="aarch64-linux" ;; \
+			Darwin-x86_64) PLATFORM="x86_64-darwin" ;; \
+			Darwin-arm64)  PLATFORM="aarch64-darwin" ;; \
+			*) echo "Unsupported platform: $$(uname -s)-$$(uname -m)"; exit 1 ;; \
+		esac; \
+		INSTALLER_URL="https://github.com/NixOS/experimental-nix-installer/releases/download/$(NIX_INSTALLER_VERSION)/nix-installer-$$PLATFORM"; \
+		echo "Platform: $$PLATFORM"; \
+		echo "Downloading from: $$INSTALLER_URL"; \
 		max_attempts=3; \
 		attempt=1; \
 		while [ $$attempt -le $$max_attempts ]; do \
 			echo "Attempt $$attempt of $$max_attempts..."; \
 			if curl --proto '=https' --tlsv1.2 -sSf -L --retry 3 --retry-delay 5 \
-				https://raw.githubusercontent.com/NixOS/experimental-nix-installer/bddafc65ba2e5942e8691993efa81ed52501fbb2/nix-installer.sh -o /tmp/nix-installer.sh; then \
-				sh /tmp/nix-installer.sh install \
+				"$$INSTALLER_URL" -o /tmp/nix-installer && chmod +x /tmp/nix-installer; then \
+				/tmp/nix-installer install \
 					--no-confirm \
 					--extra-conf "experimental-features = nix-command flakes" \
 					--extra-conf "auto-optimise-store = false" \
@@ -92,12 +103,12 @@ install-nix: ## Install Nix using the NixOS community installer
 			fi; \
 			attempt=$$((attempt + 1)); \
 			if [ $$attempt -le $$max_attempts ]; then \
-				echo "Download failed, waiting 10 seconds before retry..."; \
+				echo "Download or install failed, waiting 10 seconds before retry..."; \
 				sleep 10; \
 			fi; \
 		done; \
 		if [ $$attempt -gt $$max_attempts ]; then \
-			echo "Failed to download nix-installer after $$max_attempts attempts"; \
+			echo "Failed to install nix after $$max_attempts attempts"; \
 			exit 1; \
 		fi; \
 	fi
