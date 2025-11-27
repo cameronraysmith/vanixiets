@@ -508,6 +508,9 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
+          # TEMPORARY: Use quick installer to test if nothing-but-nix /mnt tmpfs causes disk issues
+          # TODO: Revert to full installer once confirmed
+          installer: quick
           system: x86_64-linux
           enable-cachix: true
           cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
