@@ -1434,8 +1434,18 @@ cache-overlay-packages system:
     echo "Building all packages..."
     PACKAGE_TARGETS=$(echo "$PACKAGES" | sed "s|^|.#packages.$SYSTEM.|" | tr '\n' ' ')
 
+    # Use nom if available for better output, otherwise fall back to nix build
+    if command -v nom &> /dev/null; then
+        BUILD_CMD="nom build"
+        BUILD_OPTS="--no-link --print-out-paths"
+        echo "(using nom for prettier output)"
+    else
+        BUILD_CMD="nix build"
+        BUILD_OPTS="-L --no-link --print-out-paths"
+    fi
+
     # Build and capture output paths
-    STORE_PATHS=$(nix build $PACKAGE_TARGETS -L --no-link --print-out-paths)
+    STORE_PATHS=$($BUILD_CMD $PACKAGE_TARGETS $BUILD_OPTS)
 
     if [ -z "$STORE_PATHS" ]; then
         echo "❌ No store paths produced from build"
