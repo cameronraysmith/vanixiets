@@ -65,9 +65,9 @@ runs:
       with:
         hatchet-protocol: cleave
         nix-permission-edict: true
-        # Reserve 15GB on /mnt for TMPDIR (build temps)
+        # Reserve 22GB on /mnt for TMPDIR (build temps)
         # Default 1GB is insufficient for heavy rust builds like zerotierone
-        mnt-safe-haven: '15360'
+        mnt-safe-haven: '22528'
 
     - name: reclaim space (darwin)
       if: runner.os == 'macOS' && inputs.installer == 'full'
