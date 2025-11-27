@@ -981,6 +981,8 @@ ghsecrets repo="cameronraysmith/infra": # gitleaks:allow
   @echo
   sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set CACHIX_AUTH_TOKEN --repo={{ repo }} --body="$CACHIX_AUTH_TOKEN"'
   sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set FAST_FORWARD_PAT --repo={{ repo }} --body="$FAST_FORWARD_PAT"'
+  sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set FLAKE_UPDATER_APP_ID --repo={{ repo }} --body="$FLAKE_UPDATER_APP_ID"'
+  sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set FLAKE_UPDATER_PRIVATE_KEY --repo={{ repo }} --body="$FLAKE_UPDATER_PRIVATE_KEY"'
   @echo
   @echo secrets after updates:
   @echo
