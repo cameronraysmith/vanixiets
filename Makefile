@@ -72,13 +72,30 @@ install-nix: ## Install Nix using the NixOS community installer
 	@if command -v nix >/dev/null 2>&1; then \
 		echo "Nix is already installed."; \
 	else \
-		curl --proto '=https' --tlsv1.2 -sSf -L https://artifacts.nixos.org/experimental-installer/tag/0.27.0/nix-installer.sh | sh -s -- install \
-			--no-confirm \
-			--extra-conf "experimental-features = nix-command flakes" \
-			--extra-conf "auto-optimise-store = false" \
-			--extra-conf "max-jobs = auto" \
-			--extra-conf "always-allow-substitutes = true" \
-			--extra-conf "extra-nix-path = nixpkgs=flake:nixpkgs"; \
+		max_attempts=3; \
+		attempt=1; \
+		while [ $$attempt -le $$max_attempts ]; do \
+			echo "Attempt $$attempt of $$max_attempts..."; \
+			if curl --proto '=https' --tlsv1.2 -sSf -L --retry 3 --retry-delay 5 \
+				https://artifacts.nixos.org/experimental-installer/tag/0.27.0/nix-installer.sh -o /tmp/nix-installer.sh; then \
+				sh /tmp/nix-installer.sh install \
+					--no-confirm \
+					--extra-conf "experimental-features = nix-command flakes" \
+					--extra-conf "auto-optimise-store = false" \
+					--extra-conf "max-jobs = auto" \
+					--extra-conf "always-allow-substitutes = true" \
+					--extra-conf "extra-nix-path = nixpkgs=flake:nixpkgs" && break; \
+			fi; \
+			attempt=$$((attempt + 1)); \
+			if [ $$attempt -le $$max_attempts ]; then \
+				echo "Download failed, waiting 10 seconds before retry..."; \
+				sleep 10; \
+			fi; \
+		done; \
+		if [ $$attempt -gt $$max_attempts ]; then \
+			echo "Failed to download nix-installer after $$max_attempts attempts"; \
+			exit 1; \
+		fi; \
 	fi
 
 .PHONY: install-direnv
