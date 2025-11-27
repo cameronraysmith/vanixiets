@@ -175,10 +175,16 @@ runs:
         echo "Actions cache hit: $CACHE_HIT"
         echo ""
 
-        # Force run overrides everything
+        # Force run overrides should-run decision but preserves accurate cache-source
+        # This allows callers to skip cache save when cache already exists
         if [ "$FORCE" = "true" ]; then
           echo "should-run=true" >> $GITHUB_OUTPUT
-          echo "cache-source=none" >> $GITHUB_OUTPUT
+          # Report actual cache status so callers can decide whether to save
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "cache-source=actions-cache" >> $GITHUB_OUTPUT
+          else
+            echo "cache-source=none" >> $GITHUB_OUTPUT
+          fi
           SANITIZED_NAME=$(echo "$CHECK_NAME" | tr -d '()' | tr ', ' '-' | tr -s '-')
           echo "::notice title=CI Cache | ${SANITIZED_NAME}::RUN | ${CACHE_KEY} | Forced"
           echo "Decision: RUN (forced by input)"
