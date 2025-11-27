@@ -94,6 +94,16 @@
           ];
         };
 
+        # TC-006: Home Configs Exist
+        # Validates standalone home configurations are created
+        testInvariantHomeConfigurationsExist = {
+          expr = builtins.sort builtins.lessThan (builtins.attrNames self.homeConfigurations.x86_64-linux);
+          expected = [
+            "crs58"
+            "raquel"
+          ];
+        };
+
         # Feature Tests
 
         # TC-008: Dendritic Module Discovery
