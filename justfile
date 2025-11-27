@@ -78,6 +78,16 @@ debug-list:
 # Check nix flake
 [group('nix')]
 check:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  echo "Running nix flake check..."
+  echo ""
+  echo "Note: The following nix-unit warnings are expected and harmless:"
+  echo "  - 'unknown setting allowed-users/trusted-users' (daemon settings don't apply in pure eval)"
+  echo "  - '--gc-roots-dir not specified' (nix-unit doesn't persist GC roots)"
+  echo "  - 'input has an override for non-existent input self' (nix-unit internal mechanism)"
+  echo "  - 'not writing modified lock file' (expected for read-only check)"
+  echo ""
   nix flake check
 
 # Fast checks excluding heavy VM integration tests (~1-2 min vs ~7 min for full)
@@ -86,6 +96,13 @@ check-fast system="x86_64-linux":
   #!/usr/bin/env bash
   set -euo pipefail
   echo "Running fast checks for {{system}} (excluding VM tests)..."
+  echo ""
+  echo "Note: The following nix-unit warnings are expected and harmless:"
+  echo "  - 'unknown setting allowed-users/trusted-users' (daemon settings don't apply in pure eval)"
+  echo "  - '--gc-roots-dir not specified' (nix-unit doesn't persist GC roots)"
+  echo "  - 'input has an override for non-existent input self' (nix-unit internal mechanism)"
+  echo "  - 'not writing modified lock file' (expected for read-only check)"
+  echo ""
 
   # Get all checks except vm-* which are heavy integration tests
   CHECKS=$(nix eval ".#checks.{{system}}" --apply 'builtins.attrNames' --json | jq -r '.[] | select(startswith("vm-") | not)')
