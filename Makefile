@@ -74,6 +74,17 @@ bootstrap: install-nix install-direnv
 # Note: versioning jumped from 0.27.0 to 3.11.3 when experimental-nix-installer
 # aligned with previous upstream determinate nix-installer versioning.
 # https://github.com/DeterminateSystems/nix-installer/releases/tag/v3.11.3
+#
+# The experimental-nix-installer 3.11.3 defaults include settings equivalent to:
+#   --extra-conf "experimental-features = nix-command flakes"
+#   --extra-conf "auto-optimise-store = true"
+#   --extra-conf "always-allow-substitutes = true"
+#   --extra-conf "max-jobs = auto"
+#   --extra-conf "extra-nix-path = nixpkgs=flake:nixpkgs"
+#   --extra-conf "bash-prompt-prefix = (nix:\$name)\\040"
+#
+# If using the upstream nix installer (https://nixos.org/download/) which lacks
+# these defaults, add the --extra-conf flags above to the install command.
 NIX_INSTALLER_VERSION := 3.11.3
 install-nix: ## Install Nix using the NixOS community installer
 	@echo "Installing Nix..."
