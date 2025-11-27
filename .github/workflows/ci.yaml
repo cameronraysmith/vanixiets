@@ -540,9 +540,9 @@ jobs:
       - name: validate flake structure
         if: steps.cache.outputs.should-run == 'true'
         run: |
-          # Run all checks except heavy VM tests (vm-boot-all-machines, vm-test-framework)
-          # VM tests require dedicated integration test jobs with more resources
-          nix develop --command just check-ci x86_64-linux
+          # Run full nix flake check including VM integration tests
+          # Use `just check-fast` locally for quicker iteration (~1-2 min vs ~7 min)
+          nix develop --command just check
 
       - name: Create job result marker
         if: success() && steps.cache.outputs.should-run == 'true'
