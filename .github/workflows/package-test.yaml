@@ -133,7 +133,7 @@ jobs:
           key: ${{ steps.cache.outputs.cache-key }}
 
       - name: upload test results
-        if: always()
+        if: always() && steps.cache.outputs.should-run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
         with:
           name: ${{ inputs.package-name }}-playwright-report
@@ -141,7 +141,7 @@ jobs:
           retention-days: 7
 
       - name: upload coverage
-        if: always()
+        if: always() && steps.cache.outputs.should-run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
         with:
           name: ${{ inputs.package-name }}-coverage
