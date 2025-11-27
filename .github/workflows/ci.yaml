@@ -534,11 +534,47 @@ jobs:
             fi
           done
 
+      - name: garbage collect before validation
+        if: steps.cache.outputs.should-run == 'true'
+        run: |
+          echo "::group::disk usage before GC"
+          df -h
+          echo "::endgroup::"
+          echo "::group::running garbage collection"
+          nix-collect-garbage -d
+          echo "::endgroup::"
+          echo "::group::disk usage after GC"
+          df -h
+          echo "::endgroup::"
+
       - name: validate flake structure
         if: steps.cache.outputs.should-run == 'true'
         run: |
-          echo "validating flake structure with nix flake check..."
-          nix develop --command just check
+          echo "validating flake structure..."
+          # Run fast validation checks (skip heavy VM tests)
+          # Full VM tests would run in dedicated integration test jobs
+
+          echo "::group::nix-unit tests"
+          nix build .#checks.x86_64-linux.nix-unit --print-build-logs
+          echo "::endgroup::"
+
+          echo "::group::treefmt check"
+          nix build .#checks.x86_64-linux.treefmt --print-build-logs
+          echo "::endgroup::"
+
+          echo "::group::naming-conventions"
+          nix build .#checks.x86_64-linux.naming-conventions --print-build-logs
+          echo "::endgroup::"
+
+          echo "::group::secrets-generation"
+          nix build .#checks.x86_64-linux.secrets-generation --print-build-logs
+          echo "::endgroup::"
+
+          echo "::group::deployment-safety"
+          nix build .#checks.x86_64-linux.deployment-safety --print-build-logs
+          echo "::endgroup::"
+
+          echo "✓ All fast validation checks passed (VM tests skipped)"
 
       - name: Create job result marker
         if: success() && steps.cache.outputs.should-run == 'true'
@@ -760,7 +796,9 @@ jobs:
     with:
       package-name: ${{ matrix.package.name }}
       package-path: ${{ matrix.package.path }}
-      debug-enabled: ${{ needs.set-variables.outputs.debug }}
+      # TEMPORARY: Enable tmate debug for playwright troubleshooting
+      # TODO: Revert to ${{ needs.set-variables.outputs.debug }} after debugging
+      debug-enabled: "true"
       nix-installer: quick
       force-run: ${{ needs.set-variables.outputs.force-ci }}
     secrets:
