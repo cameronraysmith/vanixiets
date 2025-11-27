@@ -537,47 +537,12 @@ jobs:
             fi
           done
 
-      - name: garbage collect before validation
-        if: steps.cache.outputs.should-run == 'true'
-        run: |
-          echo "::group::disk usage before GC"
-          df -h
-          echo "::endgroup::"
-          echo "::group::running garbage collection"
-          nix-collect-garbage -d
-          echo "::endgroup::"
-          echo "::group::disk usage after GC"
-          df -h
-          echo "::endgroup::"
-
       - name: validate flake structure
         if: steps.cache.outputs.should-run == 'true'
         run: |
-          echo "validating flake structure..."
-          # Run fast validation checks (skip heavy VM tests)
-          # Full VM tests would run in dedicated integration test jobs
-
-          echo "::group::nix-unit tests"
-          nix build .#checks.x86_64-linux.nix-unit --print-build-logs
-          echo "::endgroup::"
-
-          echo "::group::treefmt check"
-          nix build .#checks.x86_64-linux.treefmt --print-build-logs
-          echo "::endgroup::"
-
-          echo "::group::naming-conventions"
-          nix build .#checks.x86_64-linux.naming-conventions --print-build-logs
-          echo "::endgroup::"
-
-          echo "::group::secrets-generation"
-          nix build .#checks.x86_64-linux.secrets-generation --print-build-logs
-          echo "::endgroup::"
-
-          echo "::group::deployment-safety"
-          nix build .#checks.x86_64-linux.deployment-safety --print-build-logs
-          echo "::endgroup::"
-
-          echo "✓ All fast validation checks passed (VM tests skipped)"
+          # Run all checks except heavy VM tests (vm-boot-all-machines, vm-test-framework)
+          # VM tests require dedicated integration test jobs with more resources
+          nix develop --command just check-ci x86_64-linux
 
       - name: Create job result marker
         if: success() && steps.cache.outputs.should-run == 'true'
