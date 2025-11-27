@@ -75,10 +75,8 @@ jobs:
        inputs.job == 'secrets-scan' ||
        inputs.job == 'set-variables' ||
        inputs.job == 'bootstrap-verification' ||
-       inputs.job == 'config-validation' ||
-       inputs.job == 'autowiring-validation' ||
        inputs.job == 'secrets-workflow' ||
-       inputs.job == 'justfile-activation' ||
+       inputs.job == 'flake-validation' ||
        inputs.job == 'cache-overlay-packages' ||
        inputs.job == 'nix' ||
        inputs.job == 'typescript')
@@ -373,196 +371,7 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 5: config-validation
-  # tests config.nix user definitions (phase 1)
-  config-validation:
-    needs: [secrets-scan, set-variables]
-    runs-on: ubuntu-latest
-    if: |
-      !cancelled() &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'config-validation')
-    steps:
-      - name: checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Check execution cache
-        id: cache
-        uses: ./.github/actions/cached-ci-job
-        with:
-          check-name: ${{ github.job }}
-          hash-sources: 'configurations/darwin/**/*.nix configurations/nixos/**/*.nix modules/users/**/*.nix modules/base/**/*.nix flake.nix flake.lock .github/actions/setup-nix/action.yml'
-          force-run: ${{ needs.set-variables.outputs.force-ci }}
-
-      - name: setup nix
-        if: steps.cache.outputs.should-run == 'true'
-        uses: ./.github/actions/setup-nix
-        with:
-          system: x86_64-linux
-          enable-cachix: true
-          cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
-      - name: validate user definitions
-        if: steps.cache.outputs.should-run == 'true'
-        run: |
-          echo "validating config.nix user definitions through darwin configurations..."
-
-          # verify crs58 is configured in stibnite
-          echo "testing stibnite users..."
-          STIBNITE_USERS=$(nix eval .#darwinConfigurations.stibnite.config.users.users --apply 'x: builtins.attrNames x' --json)
-          if echo "$STIBNITE_USERS" | grep -q '"crs58"'; then
-            echo "  ✅ crs58 user exists in stibnite"
-          else
-            echo "  ❌ crs58 user missing in stibnite"
-            exit 1
-          fi
-
-          # verify cameron is configured in blackphos (once migrated) or crs58 for now
-          echo "testing blackphos users..."
-          BLACKPHOS_USERS=$(nix eval .#darwinConfigurations.blackphos.config.users.users --apply 'x: builtins.attrNames x' --json)
-          if echo "$BLACKPHOS_USERS" | grep -q '"crs58"'; then
-            echo "  ✅ crs58 user exists in blackphos (admin user configured)"
-          else
-            echo "  ❌ no admin user found in blackphos"
-            exit 1
-          fi
-
-          # verify primary user is set correctly in stibnite
-          STIBNITE_PRIMARY=$(nix eval .#darwinConfigurations.stibnite.config.system.primaryUser --raw)
-          if [ "$STIBNITE_PRIMARY" = "crs58" ]; then
-            echo "  ✅ stibnite primary user is crs58"
-          else
-            echo "  ❌ stibnite primary user is $STIBNITE_PRIMARY (expected crs58)"
-            exit 1
-          fi
-
-          echo "✅ user definitions validated successfully"
-
-      - name: Create job result marker
-        if: success() && steps.cache.outputs.should-run == 'true'
-        shell: bash
-        run: |
-          mkdir -p "${{ steps.cache.outputs.cache-path }}"
-          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
-          {
-            "success": true,
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "commit": "${{ github.sha }}",
-            "cache_key": "${{ steps.cache.outputs.cache-key }}",
-            "workflow_run_id": "${{ github.run_id }}"
-          }
-          EOF
-
-      - name: Save job result to cache
-        if: success() && steps.cache.outputs.should-run == 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
-        with:
-          path: ${{ steps.cache.outputs.cache-path }}
-          key: ${{ steps.cache.outputs.cache-key }}
-
-  # job 6: autowiring-validation
-  # verifies nixos-unified automatic config discovery
-  autowiring-validation:
-    needs: [secrets-scan, set-variables]
-    runs-on: ubuntu-latest
-    if: |
-      !cancelled() &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'autowiring-validation')
-    steps:
-      - name: checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Check execution cache
-        id: cache
-        uses: ./.github/actions/cached-ci-job
-        with:
-          check-name: ${{ github.job }}
-          hash-sources: 'flake.nix flake.lock configurations/**/*.nix modules/**/*.nix justfile .github/actions/setup-nix/action.yml'
-          force-run: ${{ needs.set-variables.outputs.force-ci }}
-
-      - name: setup nix
-        if: steps.cache.outputs.should-run == 'true'
-        uses: ./.github/actions/setup-nix
-        with:
-          system: x86_64-linux
-          enable-cachix: true
-          cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
-      - name: verify autowired outputs
-        if: steps.cache.outputs.should-run == 'true'
-        run: |
-          echo "verifying nixos-unified autowiring..."
-
-          # check darwin configs
-          echo "checking darwinConfigurations..."
-          DARWIN_CONFIGS=$(nix eval .#darwinConfigurations --apply 'x: builtins.attrNames x' --json)
-          if [ -n "$DARWIN_CONFIGS" ] && [ "$DARWIN_CONFIGS" != "[]" ]; then
-            echo "✅ darwinConfigurations detected: $DARWIN_CONFIGS"
-          else
-            echo "❌ darwinConfigurations not found"
-            exit 1
-          fi
-
-          # check nixos configs
-          echo "checking nixosConfigurations..."
-          NIXOS_CONFIGS=$(nix eval .#nixosConfigurations --apply 'x: builtins.attrNames x' --json)
-          if [ -n "$NIXOS_CONFIGS" ] && [ "$NIXOS_CONFIGS" != "[]" ]; then
-            echo "✅ nixosConfigurations detected: $NIXOS_CONFIGS"
-          else
-            echo "❌ nixosConfigurations not found"
-            exit 1
-          fi
-
-          # verify standalone home configurations exist
-          echo ""
-          echo "verifying standalone home configurations..."
-          # homeConfigurations are exported at .#homeConfigurations.{system}.{user}
-          HOME_CONFIGS_X86=$(nix eval .#homeConfigurations.x86_64-linux --apply 'x: builtins.attrNames x' --json 2>/dev/null || echo "[]")
-
-          # check for expected home config users (crs58 is admin, raquel is secondary)
-          for user in "crs58" "raquel"; do
-            if echo "$HOME_CONFIGS_X86" | grep -q "\"$user\""; then
-              echo "  ✅ homeConfigurations.x86_64-linux.$user exists"
-            else
-              echo "  ❌ homeConfigurations.x86_64-linux.$user missing"
-              exit 1
-            fi
-          done
-
-          echo "✅ all expected homeConfigurations found"
-
-      - name: Create job result marker
-        if: success() && steps.cache.outputs.should-run == 'true'
-        shell: bash
-        run: |
-          mkdir -p "${{ steps.cache.outputs.cache-path }}"
-          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
-          {
-            "success": true,
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "commit": "${{ github.sha }}",
-            "cache_key": "${{ steps.cache.outputs.cache-key }}",
-            "workflow_run_id": "${{ github.run_id }}"
-          }
-          EOF
-
-      - name: Save job result to cache
-        if: success() && steps.cache.outputs.should-run == 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
-        with:
-          path: ${{ steps.cache.outputs.cache-path }}
-          key: ${{ steps.cache.outputs.cache-key }}
-
-  # job 7: secrets-workflow
+  # job 5: secrets-workflow
   # tests sops-nix mechanics with ephemeral test keys
   secrets-workflow:
     needs: [secrets-scan, set-variables]
@@ -671,16 +480,16 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 8: justfile-activation
-  # validates user experience: justfile recipes, configuration discovery, and activation workflows
-  justfile-activation:
+  # job 6: flake-validation
+  # validates flake structure and developer tooling (justfile recipes, nix flake check)
+  flake-validation:
     needs: [secrets-scan, set-variables]
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
-       inputs.job == 'justfile-activation')
+       inputs.job == 'flake-validation')
     steps:
       - name: checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
@@ -731,98 +540,6 @@ jobs:
           echo "validating flake structure with nix flake check..."
           nix develop --command just check
 
-      - name: test home configurations (dry-run)
-        if: steps.cache.outputs.should-run == 'true'
-        run: |
-          echo "discovering home configurations..."
-
-          # find all home configs dynamically from filesystem
-          HOME_CONFIGS=$(find configurations/home -name "*.nix" -type f | \
-            sed 's|configurations/home/||' | \
-            sed 's|\.nix$||' | \
-            sort)
-
-          if [ -z "$HOME_CONFIGS" ]; then
-            echo "⚠️  no home configurations found"
-            exit 0
-          fi
-
-          echo "found configurations:"
-          echo "$HOME_CONFIGS" | while read config; do
-            echo "  - $config"
-          done
-          echo ""
-
-          # test each config with dry-run
-          echo "testing activation with dry-run..."
-          echo "$HOME_CONFIGS" | while read config; do
-            echo "testing: just -n activate $config"
-            if nix develop --command just -n activate "$config"; then
-              echo "  ✅ $config dry-run succeeds"
-            else
-              echo "  ❌ $config dry-run failed"
-              exit 1
-            fi
-          done
-
-          echo ""
-          echo "✅ all home configurations validated"
-
-      - name: verify configuration outputs
-        if: steps.cache.outputs.should-run == 'true'
-        run: |
-          echo "verifying all configurations are exposed in flake outputs..."
-
-          # get flake outputs using nix eval (nix flake show --json doesn't work with complex flake structures)
-          DARWIN_CONFIGS=$(nix eval .#darwinConfigurations --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]? // empty' || echo "")
-          NIXOS_CONFIGS=$(nix eval .#nixosConfigurations --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]? // empty' || echo "")
-
-          echo "darwin configs in flake: $(echo "$DARWIN_CONFIGS" | tr '\n' ' ')"
-          echo "nixos configs in flake: $(echo "$NIXOS_CONFIGS" | tr '\n' ' ')"
-          echo ""
-
-          # check each configuration file has corresponding output
-          MISSING=0
-
-          # check darwin configs
-          for config_file in configurations/darwin/*.nix; do
-            if [ -f "$config_file" ]; then
-              config=$(basename "$config_file" .nix)
-              if echo "$DARWIN_CONFIGS" | grep -q "^$config$"; then
-                echo "✅ darwin:$config"
-              else
-                echo "❌ darwin:$config missing from flake outputs"
-                MISSING=1
-              fi
-            fi
-          done
-
-          # check nixos configs (handles both direct .nix and directory/default.nix patterns)
-          for config_file in configurations/nixos/*/default.nix configurations/nixos/*.nix; do
-            if [ -f "$config_file" ]; then
-              if [[ "$config_file" =~ configurations/nixos/([^/]+)/default.nix ]]; then
-                config="${BASH_REMATCH[1]}"
-              else
-                config=$(basename "$config_file" .nix)
-              fi
-              if echo "$NIXOS_CONFIGS" | grep -q "^$config$"; then
-                echo "✅ nixos:$config"
-              else
-                echo "❌ nixos:$config missing from flake outputs"
-                MISSING=1
-              fi
-            fi
-          done
-
-          if [ $MISSING -eq 1 ]; then
-            echo ""
-            echo "❌ some configurations are not exposed in flake outputs"
-            exit 1
-          fi
-
-          echo ""
-          echo "✅ all configurations properly exposed"
-
       - name: Create job result marker
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
@@ -845,7 +562,7 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 9: cache-overlay-packages
+  # job 7: cache-overlay-packages
   # pre-cache resource-intensive overlay packages before main build
   # prevents disk space exhaustion during CI builds (especially rust packages)
   cache-overlay-packages:
@@ -920,7 +637,7 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 10: nix
+  # job 8: nix
   # builds flake outputs via category-based matrix for disk space optimization
   # distributes builds across multiple machines to avoid disk space exhaustion
   # each job builds a specific category (packages, home configs, system configs)

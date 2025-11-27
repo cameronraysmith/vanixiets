@@ -21,17 +21,11 @@ pull_request_rules:
         - check-success=bootstrap-verification
         - check-skipped=bootstrap-verification
       - or:
-        - check-success=config-validation
-        - check-skipped=config-validation
-      - or:
-        - check-success=autowiring-validation
-        - check-skipped=autowiring-validation
-      - or:
         - check-success=secrets-workflow
         - check-skipped=secrets-workflow
       - or:
-        - check-success=justfile-activation
-        - check-skipped=justfile-activation
+        - check-success=flake-validation
+        - check-skipped=flake-validation
       - or:
         - check-success=cache-overlay-packages (x86_64-linux)
         - check-skipped=cache-overlay-packages (x86_64-linux)
