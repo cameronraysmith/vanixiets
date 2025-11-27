@@ -98,6 +98,12 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         run: nix develop --command just ${{ inputs.package-name }}-build
 
+      - name: Setup tmate session for debugging
+        if: steps.cache.outputs.should-run == 'true' && inputs.debug-enabled == 'true'
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
+
       - name: run e2e tests
         if: steps.cache.outputs.should-run == 'true'
         run: nix develop --command just ${{ inputs.package-name }}-test-e2e

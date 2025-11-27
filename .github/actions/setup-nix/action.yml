@@ -63,7 +63,7 @@ runs:
       if: runner.os == 'Linux' && inputs.installer == 'full'
       uses: wimpysworld/nothing-but-nix@10c936d9e46521bf923f75458e0cbd4fa309300d # ratchet:wimpysworld/nothing-but-nix@main
       with:
-        hatchet-protocol: carve
+        hatchet-protocol: cleave
         nix-permission-edict: true
 
     - name: reclaim space (darwin)
