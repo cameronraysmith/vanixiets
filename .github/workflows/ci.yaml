@@ -252,7 +252,9 @@ jobs:
           fi
 
       - name: Create job result marker
-        if: success() && steps.cache.outputs.should-run == 'true'
+        # Only create marker if cache didn't exist (cache-source == 'none')
+        # With force-run: 'true', job runs even on cache hit, but we shouldn't overwrite existing cache
+        if: success() && steps.cache.outputs.should-run == 'true' && steps.cache.outputs.cache-source == 'none'
         shell: bash
         run: |
           mkdir -p "${{ steps.cache.outputs.cache-path }}"
@@ -268,7 +270,7 @@ jobs:
           EOF
 
       - name: Save job result to cache
-        if: success() && steps.cache.outputs.should-run == 'true'
+        if: success() && steps.cache.outputs.should-run == 'true' && steps.cache.outputs.cache-source == 'none'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # ratchet:actions/cache/save@v4
         with:
           path: ${{ steps.cache.outputs.cache-path }}
