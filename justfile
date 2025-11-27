@@ -80,12 +80,12 @@ debug-list:
 check:
   nix flake check
 
-# Check nix flake for CI (excludes heavy VM tests)
+# Fast checks excluding heavy VM integration tests (~1-2 min vs ~7 min for full)
 [group('nix')]
-check-ci system="x86_64-linux":
+check-fast system="x86_64-linux":
   #!/usr/bin/env bash
   set -euo pipefail
-  echo "Running CI checks for {{system}} (excluding VM tests)..."
+  echo "Running fast checks for {{system}} (excluding VM tests)..."
 
   # Get all checks except vm-* which are heavy integration tests
   CHECKS=$(nix eval ".#checks.{{system}}" --apply 'builtins.attrNames' --json | jq -r '.[] | select(startswith("vm-") | not)')
@@ -101,7 +101,7 @@ check-ci system="x86_64-linux":
     echo "::endgroup::"
   done
 
-  echo "✓ All CI checks passed"
+  echo "✓ All fast checks passed"
 
 # Verify system configuration builds after updates (run before activate)
 [group('nix')]
