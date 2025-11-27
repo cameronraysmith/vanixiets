@@ -319,6 +319,7 @@ jobs:
             exit 1
           fi
           echo "nix found at: $(command -v nix)"
+          echo "nix store path: $(readlink -f $(which nix))"
           nix --version
 
       - name: verify direnv configured
