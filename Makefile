@@ -67,6 +67,10 @@ bootstrap: install-nix install-direnv
 	@printf "For detailed documentation, see docs/new-user-host.md\n"
 
 .PHONY: install-nix
+# The canonical URL https://artifacts.nixos.org/experimental-installer/tag/0.27.0/nix-installer.sh
+# frequently returns HTTP 618 errors from the Fastly CDN. Using raw.githubusercontent.com with a
+# pinned commit for reliability. To update, find the commit for the desired tag at:
+# https://github.com/NixOS/experimental-nix-installer/tags
 install-nix: ## Install Nix using the NixOS community installer
 	@echo "Installing Nix..."
 	@if command -v nix >/dev/null 2>&1; then \
@@ -77,7 +81,7 @@ install-nix: ## Install Nix using the NixOS community installer
 		while [ $$attempt -le $$max_attempts ]; do \
 			echo "Attempt $$attempt of $$max_attempts..."; \
 			if curl --proto '=https' --tlsv1.2 -sSf -L --retry 3 --retry-delay 5 \
-				https://artifacts.nixos.org/experimental-installer/tag/0.27.0/nix-installer.sh -o /tmp/nix-installer.sh; then \
+				https://raw.githubusercontent.com/NixOS/experimental-nix-installer/bddafc65ba2e5942e8691993efa81ed52501fbb2/nix-installer.sh -o /tmp/nix-installer.sh; then \
 				sh /tmp/nix-installer.sh install \
 					--no-confirm \
 					--extra-conf "experimental-features = nix-command flakes" \
