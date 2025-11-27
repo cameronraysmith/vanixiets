@@ -799,9 +799,7 @@ jobs:
     with:
       package-name: ${{ matrix.package.name }}
       package-path: ${{ matrix.package.path }}
-      # TEMPORARY: Enable tmate debug for playwright troubleshooting
-      # TODO: Revert to ${{ needs.set-variables.outputs.debug }} after debugging
-      debug-enabled: "true"
+      debug-enabled: ${{ needs.set-variables.outputs.debug }}
       nix-installer: quick
       force-run: ${{ needs.set-variables.outputs.force-ci }}
     secrets:
