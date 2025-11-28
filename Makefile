@@ -48,6 +48,28 @@ help-targets: ## eval "$(make help-targets HELP_TARGETS_PATTERN=bootstrap | sed 
 ##@ bootstrap
 #-------
 
+.PHONY: bootstrap-prep-darwin
+bootstrap-prep-darwin: ## Install darwin prerequisites (Xcode CLI tools + Homebrew) before 'make bootstrap'
+	@printf "Installing darwin prerequisites...\n\n"
+	@printf "Step 1: Xcode Command Line Tools\n"
+	@if xcode-select -p &>/dev/null; then \
+		printf "  ✅ Xcode CLI tools already installed\n"; \
+	else \
+		printf "  Installing Xcode CLI tools (this will open a dialog)...\n"; \
+		xcode-select --install; \
+		printf "  ⏳ Wait for installation to complete, then re-run this target\n"; \
+		exit 1; \
+	fi
+	@printf "\nStep 2: Homebrew\n"
+	@if command -v brew &>/dev/null; then \
+		printf "  ✅ Homebrew already installed\n"; \
+	else \
+		printf "  Installing Homebrew...\n"; \
+		/bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; \
+	fi
+	@printf "\n✅ Darwin prerequisites complete!\n"
+	@printf "Next: Run 'make bootstrap' to install Nix\n"
+
 .PHONY: bootstrap
 bootstrap: ## Main bootstrap target that runs all necessary setup steps
 bootstrap: install-nix install-direnv
