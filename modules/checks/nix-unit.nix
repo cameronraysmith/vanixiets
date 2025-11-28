@@ -68,6 +68,7 @@
             "blackphos"
             "cinnabar"
             "electrum"
+            "rosegold"
             "stibnite"
             "test-darwin"
           ];
@@ -89,6 +90,7 @@
           expr = builtins.sort builtins.lessThan (builtins.attrNames self.darwinConfigurations);
           expected = [
             "blackphos"
+            "rosegold"
             "stibnite"
             "test-darwin"
           ];
