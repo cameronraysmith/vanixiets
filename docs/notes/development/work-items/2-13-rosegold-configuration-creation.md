@@ -224,6 +224,27 @@ User preferences, package selections, hardware details.
 - [ ] Document simplified homebrew casks rationale
 - [ ] Update story with implementation notes
 
+### Task 9: Update nix-unit invariant tests (AC: #3, #4) [AI]
+
+Update `modules/checks/nix-unit.nix` to include rosegold in expected machine lists.
+
+- [ ] Edit TC-003 (Clan Inventory Machines) around line 67-73:
+  - [ ] Add "rosegold" to expected list (alphabetical order)
+  - [ ] New expected: `["blackphos" "cinnabar" "electrum" "rosegold" "stibnite" "test-darwin"]`
+
+- [ ] Edit TC-005 (Darwin Configurations Exist) around line 90-94:
+  - [ ] Add "rosegold" to expected list (alphabetical order)
+  - [ ] New expected: `["blackphos" "rosegold" "stibnite" "test-darwin"]`
+
+- [ ] Verify all checks pass:
+  ```bash
+  nix flake check
+  ```
+
+**Why this matters:** These are invariant tests that assert the expected machine inventory. Without this update, `nix flake check` will fail after rosegold is added, blocking CI validation.
+
+**Note:** CI runs on x86_64-linux and cannot BUILD darwin configurations, but it CAN evaluate them via `nix flake check` and nix-unit. These tests validate structure, not runtime behavior.
+
 ## Dev Notes
 
 ### Learnings from Previous Story
@@ -305,6 +326,14 @@ rosegold is a basic user machine (janettesmith's primary use case: productivity,
 - `keycastr` - Key overlay (dev presentations)
 - `meld` - Diff tool
 
+### CI/CD Considerations
+
+- CI runs on x86_64-linux runners (no aarch64-darwin)
+- Darwin configs are EVALUATED (not built) via `nix flake check`
+- nix-unit tests (TC-003, TC-005) validate machine inventory structure
+- Rosegold must be added to expected lists in `modules/checks/nix-unit.nix` or CI will fail
+- Task 9 ensures test assertions match actual configuration
+
 ### Project Structure Notes
 
 **Files to create:**
@@ -338,6 +367,7 @@ secrets/
 ```
 modules/clan/inventory/machines.nix           # Add rosegold entry
 modules/clan/inventory/services/users/cameron.nix  # Uncomment rosegold targeting
+modules/checks/nix-unit.nix                   # Add rosegold to TC-003 and TC-005 expected lists
 .sops.yaml                                    # Add janettesmith rules for BOTH paths
 ```
 
@@ -374,3 +404,4 @@ claude-opus-4-5-20251101
 |------|---------|--------|
 | 2025-11-27 | 1.0 | Story drafted from Epic 2 definition and workflow input |
 | 2025-11-27 | 1.1 | Fix two-tier secrets paths, clarify UID strategy, correct line references |
+| 2025-11-27 | 1.2 | Add Task 9 for nix-unit test updates, add CI/CD Considerations section |
