@@ -434,11 +434,12 @@ development_status:
   # No work required - marked done based on Party Mode investigation confirming clean migration
   story-2-12: done
   story-2-12-title: "Consolidate agents-md module duplication"
-  # Story 2.13: DRAFTED (2025-11-27) - Rosegold configuration creation
+  # Story 2.13: DONE (2025-11-27) - Rosegold configuration creation
   # Create rosegold darwin config using blackphos dual-user template
   # Users: janettesmith (primary, basic like raquel) + cameron (admin, crs58 alias)
-  # Context: docs/notes/development/work-items/2-13-rosegold-configuration-creation.md
-  story-2-13: drafted
+  # Implementation: 8 commits, all 7 ACs verified, 15/15 nix-unit tests pass
+  # Files: janettesmith module, rosegold darwin config, sops secrets, nix-unit updates
+  story-2-13: review
   story-2-13-title: "Rosegold configuration creation"
   story-2-14: backlog
   story-2-14-title: "Argentum configuration creation"
