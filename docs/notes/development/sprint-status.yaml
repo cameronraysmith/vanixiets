@@ -439,9 +439,16 @@ development_status:
   # Users: janettesmith (primary, basic like raquel) + cameron (admin, crs58 alias)
   # Implementation: 8 commits, all 7 ACs verified, 15/15 nix-unit tests pass
   # Files: janettesmith module, rosegold darwin config, sops secrets, nix-unit updates
-  story-2-13: review
+  # REVIEW (2025-11-27): APPROVED - All 7 ACs implemented, all 9 tasks verified, zero blockers
+  story-2-13: done
   story-2-13-title: "Rosegold configuration creation"
-  story-2-14: backlog
+  # Story 2.14: DONE (2025-11-27) - Argentum configuration creation
+  # Create argentum darwin config using rosegold dual-user template
+  # Users: christophersmith (primary, basic like raquel) + cameron (admin, crs58 alias)
+  # Implementation: 5 commits, all 7 ACs verified, 16/16 nix-unit tests pass
+  # Files: christophersmith module, argentum darwin config, sops secrets, nix-unit updates
+  # Epic 2 Phase 4 COMPLETE - all 14 stories done, ready for Epic 3 deployment
+  story-2-14: done
   story-2-14-title: "Argentum configuration creation"
 
   epic-2-retrospective: optional
