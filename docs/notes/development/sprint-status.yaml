@@ -427,7 +427,12 @@ development_status:
   # Bonus: update-flake-inputs.yaml workflow, preview-release-version improvements
   story-2-11: done
   story-2-11-title: "Test harness and CI validation"
-  story-2-12: backlog
+  # Story 2.12: DONE (2025-11-27) - Consolidate agents-md module duplication
+  # Finding: Consolidation already completed in test-clan (commit 944a2ca, 2025-11-19) before Story 2.3 migration
+  # Current state: Single canonical _agents-md.nix with 7 correct import sites, zero duplication
+  # Architecture validated: Two-tier pattern (option definition + configuration) follows dendritic conventions
+  # No work required - marked done based on Party Mode investigation confirming clean migration
+  story-2-12: done
   story-2-12-title: "Consolidate agents-md module duplication"
   story-2-13: backlog
   story-2-13-title: "Rosegold configuration creation"
