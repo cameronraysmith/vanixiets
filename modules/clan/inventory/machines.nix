@@ -59,5 +59,15 @@
       machineClass = "darwin";
       description = "janettesmith's laptop (primary user), cameron admin";
     };
+
+    argentum = {
+      tags = [
+        "darwin"
+        "workstation"
+        "laptop"
+      ];
+      machineClass = "darwin";
+      description = "christophersmith's laptop (primary user), cameron admin";
+    };
   };
 }

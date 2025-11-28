@@ -24,5 +24,9 @@
     rosegold = {
       imports = [ config.flake.modules.darwin."machines/darwin/rosegold" ];
     };
+
+    argentum = {
+      imports = [ config.flake.modules.darwin."machines/darwin/argentum" ];
+    };
   };
 }

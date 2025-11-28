@@ -23,7 +23,7 @@
     # Machine-specific targeting (modern machines)
     roles.default.machines."cinnabar" = { };
     roles.default.machines."electrum" = { };
-    # roles.default.machines."argentum" = { };  # Uncomment when argentum is configured
+    roles.default.machines."argentum" = { };
     roles.default.machines."rosegold" = { };
 
     roles.default.settings = {
