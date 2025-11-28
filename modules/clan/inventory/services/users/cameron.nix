@@ -24,7 +24,7 @@
     roles.default.machines."cinnabar" = { };
     roles.default.machines."electrum" = { };
     # roles.default.machines."argentum" = { };  # Uncomment when argentum is configured
-    # roles.default.machines."rosegold" = { };  # Uncomment when rosegold is configured
+    roles.default.machines."rosegold" = { };
 
     roles.default.settings = {
       user = "cameron";
