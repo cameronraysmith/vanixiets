@@ -334,8 +334,8 @@ I want to create rosegold darwin configuration in infra,
 So that rosegold is ready for deployment in Epic 3.
 
 **Acceptance Criteria:**
-1. Create rosegold darwin configuration: Use blackphos/stibnite as structural template
-2. Configure for user janettesmith: Home-manager modules, user secrets, appropriate packages
+1. Create rosegold darwin configuration: Use blackphos as structural template (dual-user pattern)
+2. Configure dual-user: janettesmith (primary, basic user like raquel) + cameron (admin, crs58 alias with full aggregates)
 3. Apply dendritic+clan architecture patterns: Modules, clan inventory, service instances
 4. Validate nix-darwin build success: `nix build .#darwinConfigurations.rosegold.system` (deployment deferred to Epic 3)
 5. Configure zerotier peer role: Network ID db4344343b14b903, peer role for rosegold
@@ -353,8 +353,8 @@ I want to create argentum darwin configuration in infra,
 So that argentum is ready for deployment in Epic 4.
 
 **Acceptance Criteria:**
-1. Create argentum darwin configuration: Use blackphos/stibnite as structural template
-2. Configure for user christophersmith: Home-manager modules, user secrets, appropriate packages
+1. Create argentum darwin configuration: Use blackphos as structural template (dual-user pattern)
+2. Configure dual-user: christophersmith (primary, basic user like raquel) + cameron (admin, crs58 alias with full aggregates)
 3. Apply dendritic+clan architecture patterns: Modules, clan inventory, service instances
 4. Validate nix-darwin build success: `nix build .#darwinConfigurations.argentum.system` (deployment deferred to Epic 4)
 5. Configure zerotier peer role: Network ID db4344343b14b903, peer role for argentum
