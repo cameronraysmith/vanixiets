@@ -103,12 +103,9 @@ in
       '';
 
       # Multi-user configuration
-      # UID Strategy: Set explicit UIDs for nix-darwin (required)
-      # Using standard macOS UIDs: janettesmith=501 (primary), cameron=502 (admin)
-      # During Epic 3 deployment, verify UIDs match existing accounts on rosegold,
-      # or update these values to match the actual system state.
+      # UIDs verified against rosegold system state (2025-11-28)
       users.users.janettesmith = {
-        uid = 501; # Primary user (first macOS user)
+        uid = 501; # Primary user
         home = "/Users/janettesmith";
         shell = pkgs.zsh;
         description = "janettesmith";
@@ -119,7 +116,7 @@ in
       };
 
       users.users.cameron = {
-        uid = 502; # Admin user (second macOS user)
+        uid = 502; # Admin user
         home = "/Users/cameron";
         shell = pkgs.zsh;
         description = "cameron";
