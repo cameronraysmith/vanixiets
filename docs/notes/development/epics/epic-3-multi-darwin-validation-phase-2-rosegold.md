@@ -1,76 +1,93 @@
 # Epic 3: Multi-Darwin Validation (Phase 2 - rosegold)
 
-**Goal:** Validate darwin pattern reusability by migrating rosegold with minimal customization
+**Goal:** Deploy rosegold and validate multi-darwin zerotier network
 
-**Strategic Value:** Confirms blackphos patterns are reusable, validates 3-machine zerotier network (cinnabar + 2 darwin hosts), tests multi-machine coordination
+**Status:** Ready for execution
+**Dependencies:** Epic 2 complete ✅ (rosegold config created in Story 2.13)
+**Timeline:** 1 session deployment + 1-2 weeks stability validation
 
-**Timeline:** 1 week migration + 1-2 weeks stability validation
-
-**Success Criteria:**
-- rosegold configuration builds using blackphos patterns with minimal changes
-- Zerotier peer connects to cinnabar controller
-- 3-machine network operational with full mesh connectivity
-- Patterns validated as reusable
-- Stable for 1-2 weeks minimum before Phase 4
+**Strategic Value:**
+- First deployment of Epic 2's new machine configs
+- Validates 4-machine zerotier network (cinnabar + stibnite + blackphos + rosegold)
+- Confirms janettesmith (basic user) + cameron (admin) dual-user pattern works in production
 
 ---
 
-## Story 3.1: Create rosegold configuration using blackphos patterns
+## Story 3.1: Rosegold configuration creation [COMPLETED IN EPIC 2]
+
+**Status:** ✅ Completed in Epic 2 Story 2.13
+
+This story was completed during Epic 2 Phase 4.
+The following were created:
+- modules/machines/darwin/rosegold/default.nix
+- modules/home/users/janettesmith/
+- sops/users/janettesmith/key.json
+- secrets/home-manager/users/janettesmith/secrets.yaml
+- Clan inventory entries
+- nix-unit test coverage (TC-003, TC-005)
+
+**No work required** - proceed to Story 3.2.
+
+---
+
+## Story 3.2: Deploy rosegold and validate zerotier integration
 
 As a system administrator,
-I want to create rosegold configuration by reusing blackphos patterns,
-So that I can validate pattern reusability with minimal customization.
+I want to deploy rosegold from infra clan-01 branch and integrate into the zerotier network,
+So that rosegold is operational with full mesh connectivity to all clan machines.
+
+**Execution Model:** HYBRID (physical access required on rosegold)
+- [USER] tasks: Physical login, clone repo, run deployment commands
+- [AI] tasks: Review diffs, debug issues, update configs, commit changes
 
 **Acceptance Criteria:**
-1. modules/hosts/rosegold/default.nix created by copying blackphos pattern
-2. Only host-specific values changed: networking.hostName = "rosegold"
-3. Module imports identical to blackphos (reusing darwin and homeManager modules)
-4. Package lists copied from blackphos as baseline
-5. Configuration builds successfully: `nix build .#darwinConfigurations.rosegold.system`
-6. Diff between blackphos and rosegold configs minimal (only hostname and machine-specific values)
-7. Pattern reusability confirmed: <10% customization needed beyond hostname
 
-**Prerequisites:** Epic 2 complete (blackphos stable, patterns documented)
+### Deployment (Steps 1-6)
+1. Cameron admin user logged in physically on rosegold
+2. infra repo cloned and clan-01 branch checked out on rosegold
+3. Dry-run successful: `just clan-darwin-dry rosegold` completes without errors
+4. Dry-run diff reviewed and approved (no unexpected changes)
+5. Deployment successful: `just clan-darwin-switch rosegold` completes
+6. System boots correctly after deployment, cameron and janettesmith users functional
+
+### Zerotier Integration (Steps 7-9)
+7. Rosegold joins zerotier network db4344343b14b903 via zerotier-join script
+8. Rosegold IPv6 obtained and added to cinnabar's allowedIps configuration
+9. Cinnabar updated: `clan machines update cinnabar` from stibnite
+10. Zerotier mesh verified: rosegold can reach all peers (cinnabar, stibnite, blackphos)
+
+### User Validation (Steps 10-11)
+11. janettesmith user functional: shell, home-manager packages, secrets decryption
+12. cameron admin user functional: sudo, homebrew, full aggregate packages
+13. rosegold.zt added to SSH client configs in infra (modules/home/tools/ssh.nix or similar)
+14. SSH connectivity verified: can SSH to/from rosegold.zt over zerotier network
+
+**Estimated Effort:** 2-3 hours
+
+**Risk Level:** LOW (patterns validated on stibnite/blackphos in Epic 2 Story 2.7)
+
+**Prerequisites:**
+- Epic 2 complete ✅
+- Physical access to rosegold machine
+- rosegold connected to internet
+
+**Stability Gate:** rosegold stable 1-2 weeks → proceed to Epic 4 (argentum deployment)
 
 ---
 
-## Story 3.2: Add rosegold to clan inventory and deploy
+## Success Criteria
 
-As a system administrator,
-I want to add rosegold to clan inventory and deploy the configuration,
-So that rosegold joins the multi-machine network.
-
-**Acceptance Criteria:**
-1. rosegold added to clan inventory: tags = ["darwin" "workstation"], machineClass = "darwin"
-2. Zerotier peer role assigned to rosegold in zerotier-local instance
-3. All service instances include rosegold (sshd-clan, emergency-access, users-crs58)
-4. Clan vars generated for rosegold: `clan vars generate rosegold`
-5. Configuration deployed: `darwin-rebuild switch --flake .#rosegold`
-6. Deployment succeeds without errors
-7. Zerotier peer connects to cinnabar controller automatically
-
-**Prerequisites:** Story 3.1 (rosegold configuration created)
+- [ ] rosegold deployed from infra clan-01 branch
+- [ ] 4-machine zerotier network operational (cinnabar, stibnite, blackphos, rosegold)
+- [ ] Full mesh SSH connectivity verified
+- [ ] janettesmith and cameron users functional
+- [ ] rosegold.zt hostname configured across fleet
+- [ ] No regressions on existing machines
 
 ---
 
-## Story 3.3: Validate 3-machine network and multi-darwin coordination
+## References
 
-As a system administrator,
-I want to validate the 3-machine zerotier network and coordination,
-So that I can confirm multi-machine patterns work correctly.
-
-**Acceptance Criteria:**
-1. 3-machine network operational: cinnabar (controller) + blackphos (peer) + rosegold (peer)
-2. Full mesh connectivity from rosegold: can ping cinnabar and blackphos via zerotier IPs
-3. SSH works in all directions: rosegold ↔ blackphos, rosegold ↔ cinnabar, blackphos ↔ cinnabar
-4. From cinnabar: `zerotier-cli listpeers | grep -E '(blackphos|rosegold)'` shows both peers
-5. Clan vars deployed correctly on rosegold: /run/secrets/ populated
-6. Multi-machine coordination validated: services deployed across machines via clan inventory
-7. Network latency acceptable for development use
-8. No new issues discovered compared to 2-machine network
-
-**Stability gate:** rosegold stable for 1-2 weeks, 3-machine network stable → proceed to Epic 4 (argentum)
-
-**Prerequisites:** Story 3.2 (rosegold deployed)
-
----
+- Epic 2 Story 2.13: docs/notes/development/work-items/2-13-rosegold-configuration-creation.md
+- Epic 2 Story 2.7: docs/notes/development/work-items/2-7-activate-blackphos-and-stibnite-from-infra.md (deployment pattern reference)
+- Zerotier network: db4344343b14b903
