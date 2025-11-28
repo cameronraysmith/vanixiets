@@ -105,6 +105,10 @@ bootstrap: install-nix install-direnv
 #   --extra-conf "extra-nix-path = nixpkgs=flake:nixpkgs"
 #   --extra-conf "bash-prompt-prefix = (nix:\$name)\\040"
 #
+# We add trusted-users to allow flake-specified substituters and public keys:
+#   --extra-conf "trusted-users = root @admin @wheel"
+# This enables accepting flake nixConfig without prompts or warnings.
+#
 # If using the upstream nix installer (https://nixos.org/download/) which lacks
 # these defaults, add the --extra-conf flags above to the install command.
 NIX_INSTALLER_VERSION := 3.11.3
@@ -129,7 +133,8 @@ install-nix: ## Install Nix using the NixOS community installer
 			echo "Attempt $$attempt of $$max_attempts..."; \
 			if curl --proto '=https' --tlsv1.2 -sSf -L --retry 3 --retry-delay 5 \
 				"$$INSTALLER_URL" -o /tmp/nix-installer && chmod +x /tmp/nix-installer; then \
-				/tmp/nix-installer install --no-confirm && break; \
+				/tmp/nix-installer install --no-confirm \
+					--extra-conf "trusted-users = root @admin @wheel" && break; \
 			fi; \
 			attempt=$$((attempt + 1)); \
 			if [ $$attempt -le $$max_attempts ]; then \
