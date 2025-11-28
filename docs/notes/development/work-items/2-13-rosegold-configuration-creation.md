@@ -119,7 +119,7 @@ User preferences, package selections, hardware details.
 
 **Verification:**
 - [ ] Comments in rosegold/default.nix explain configuration choices
-- [ ] User UID assignments documented (TBD - will be assigned on first deployment)
+- [ ] UID strategy documented (auto-assignment by nix-darwin during deployment)
 - [ ] Homebrew casks simplified for basic user machine
 
 ## Tasks / Subtasks
@@ -148,24 +148,32 @@ User preferences, package selections, hardware details.
 
 ### Task 2: Create janettesmith secrets structure (AC: #2) [AI]
 
-- [ ] Create `secrets/home-manager/users/janettesmith/` directory
-- [ ] Create placeholder secrets.yaml (will be populated with actual secrets during deployment)
-- [ ] Update `.sops.yaml` to include janettesmith age key encryption
+**Two-tier secrets architecture** (follows crs58/raquel/cameron pattern):
+
+- [ ] Create `sops/users/janettesmith/` directory (age key location)
+  - [ ] key.json will be generated during Epic 3 deployment
+- [ ] Create `secrets/home-manager/users/janettesmith/` directory (encrypted secrets location)
+  - [ ] Create placeholder secrets.yaml (will be populated with actual secrets during deployment)
+- [ ] Update `.sops.yaml` with rules for BOTH paths:
+  - [ ] `sops/users/janettesmith/.*` - for age key metadata
+  - [ ] `secrets/home-manager/users/janettesmith/.*\.yaml` - for encrypted home-manager secrets
+  - [ ] Reference existing patterns in .sops.yaml for crs58/raquel/cameron
 
 **Note:** Actual secrets population deferred to Epic 3 deployment when:
 - janettesmith generates SSH keypair on rosegold
-- age key derived from SSH key
-- secrets encrypted with janettesmith's public key
+- age key derived from SSH key (stored in `sops/users/janettesmith/key.json`)
+- secrets encrypted with janettesmith's public key (stored in `secrets/home-manager/users/janettesmith/secrets.yaml`)
 
 ### Task 3: Create rosegold darwin module (AC: #1, #2, #5) [AI]
 
 - [ ] Create `modules/machines/darwin/rosegold/` directory
-- [ ] Create `default.nix` based on blackphos template (217 lines)
+- [ ] Create `default.nix` based on blackphos template (~216 lines)
 - [ ] Modify for rosegold:
   - [ ] Change hostname to "rosegold"
-  - [ ] Configure janettesmith as primary user (UID TBD - placeholder)
-  - [ ] Configure cameron as admin user (UID TBD - placeholder)
+  - [ ] Configure janettesmith as primary user
+  - [ ] Configure cameron as admin user
   - [ ] Set system.primaryUser = "cameron" (admin manages homebrew)
+  - [ ] **UID strategy:** Do NOT set `users.users.janettesmith.uid` or `users.users.cameron.uid` - leave undefined for nix-darwin auto-assignment during deployment. UIDs will be assigned based on existing system state on rosegold.
 - [ ] Configure home-manager imports:
   - [ ] janettesmith: 6 aggregates (NO ai), base-sops, lazyvim-nix, nix-index-database
   - [ ] cameron: 7 aggregates + ai, base-sops, lazyvim-nix, nix-index-database
@@ -212,7 +220,7 @@ User preferences, package selections, hardware details.
 
 ### Task 8: Document configuration (AC: #7) [AI]
 
-- [ ] Add comments explaining UID placeholders (TBD on first deployment)
+- [ ] Add comments explaining UID auto-assignment strategy (no explicit UIDs set)
 - [ ] Document simplified homebrew casks rationale
 - [ ] Update story with implementation notes
 
@@ -266,14 +274,16 @@ Following raquel pattern from `modules/home/users/raquel/default.nix`:
 
 ### UID Assignment Strategy
 
-UIDs will be assigned during Epic 3 deployment based on existing macOS user accounts:
-- If janettesmith account exists on rosegold: use existing UID
-- If not: follow darwin convention (501+ for first user, 502+ for additional)
+**Do NOT set UIDs in configuration** - leave `users.users.janettesmith.uid` and `users.users.cameron.uid` undefined for nix-darwin auto-assignment during deployment.
 
-Placeholder comment in default.nix:
-```nix
-# UID TBD - will be set during Epic 3 deployment based on existing macOS user
-```
+UIDs will be assigned based on existing system state on rosegold:
+- If janettesmith/cameron accounts exist on rosegold: nix-darwin uses existing UIDs
+- If not: nix-darwin assigns from available pool (501+ for first user, 502+ for additional)
+
+This approach:
+- Avoids conflicts with existing macOS user accounts
+- Follows nix-darwin best practice for new machine onboarding
+- Matches blackphos pattern (where UIDs were set to match pre-existing system accounts)
 
 ### Homebrew Cask Simplification
 
@@ -308,26 +318,34 @@ modules/
     └── darwin/
         └── rosegold/
             └── default.nix      # NEW: Darwin config (blackphos pattern)
+```
+
+**Two-tier secrets structure** (follows crs58/raquel/cameron pattern):
+```
+sops/
+└── users/
+    └── janettesmith/
+        └── key.json             # Age key (generated during Epic 3 deployment)
 
 secrets/
 └── home-manager/
     └── users/
         └── janettesmith/
-            └── secrets.yaml     # NEW: Placeholder for secrets (populated Epic 3)
+            └── secrets.yaml     # Encrypted secrets (populated during Epic 3)
 ```
 
 **Files to modify:**
 ```
 modules/clan/inventory/machines.nix           # Add rosegold entry
 modules/clan/inventory/services/users/cameron.nix  # Uncomment rosegold targeting
-.sops.yaml                                    # Add janettesmith age key rule
+.sops.yaml                                    # Add janettesmith rules for BOTH paths
 ```
 
 ### References
 
-- [Epic 2 Definition](docs/notes/development/epics/epic-2-infrastructure-architecture-migration.md) - Story 2.13 definition (lines 330-345)
+- [Epic 2 Definition](docs/notes/development/epics/epic-2-infrastructure-architecture-migration.md) - Story 2.13 definition (lines 336-347)
 - [Architecture - Project Structure](docs/notes/development/architecture/project-structure.md) - Module organization
-- [blackphos template](modules/machines/darwin/blackphos/default.nix) - Dual-user darwin pattern (217 lines)
+- [blackphos template](modules/machines/darwin/blackphos/default.nix) - Dual-user darwin pattern (~216 lines)
 - [raquel user module](modules/home/users/raquel/default.nix) - Basic user pattern (65 lines)
 - [cameron clan service](modules/clan/inventory/services/users/cameron.nix) - Username override pattern (103 lines)
 - [crs58 user module](modules/home/users/crs58/default.nix) - Admin identity module (84 lines)
@@ -355,3 +373,4 @@ claude-opus-4-5-20251101
 | Date | Version | Change |
 |------|---------|--------|
 | 2025-11-27 | 1.0 | Story drafted from Epic 2 definition and workflow input |
+| 2025-11-27 | 1.1 | Fix two-tier secrets paths, clarify UID strategy, correct line references |
