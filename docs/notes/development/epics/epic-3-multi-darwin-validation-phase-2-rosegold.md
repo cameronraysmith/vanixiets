@@ -42,9 +42,15 @@ So that rosegold is operational with full mesh connectivity to all clan machines
 
 **Acceptance Criteria:**
 
+### Prerequisites (AC0)
+0. Verify Nix installed and infra repo cloned on rosegold, OR bootstrap fresh machine:
+   - Install Xcode CLI tools: `xcode-select --install`
+   - Clone infra: `git clone https://github.com/cameronraysmith/infra.git && cd infra && git checkout clan-01`
+   - Bootstrap Nix: `make bootstrap`
+
 ### Deployment (Steps 1-6)
 1. Cameron admin user logged in physically on rosegold
-2. infra repo cloned and clan-01 branch checked out on rosegold
+2. infra repo on clan-01 branch with latest changes: `git pull origin clan-01`
 3. Dry-run successful: `just clan-darwin-dry rosegold` completes without errors
 4. Dry-run diff reviewed and approved (no unexpected changes)
 5. Deployment successful: `just clan-darwin-switch rosegold` completes
