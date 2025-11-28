@@ -9,6 +9,7 @@ keys:
   # User identity keys (from config.nix)
   - &admin-user age1vn8fpkmkzkjttcuc3prq3jrp7t5fsrdqey74ydu5p88keqmcupvs8jtmv8  # from sops-admin-user-ssh (cameron/crs58/runner/jovyan)
   - &raquel-user age12w0rmmskrds6m334w7qrcmpms5lpe3llah6wf8ry5jtatvuxku2sarl8ut  # from sops-raquel-user-ssh (raquel)
+  - &janettesmith-user age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec  # derived from SSH key via ssh-to-age
 
   # Host keys (generated in Bitwarden, deployed to /etc/ssh/)
   - &stibnite age1a696klqy0s36a2pzlk6kyckp60k88qxcrsdh829dtk3xtc7sfs4scg05k0     # from sops-stibnite-ssh
@@ -62,6 +63,13 @@ creation_rules:
         - *dev
         - *raquel-user
 
+  - path_regex: secrets/home-manager/users/janettesmith/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *janettesmith-user
+
   # Host-specific secrets
   - path_regex: secrets/hosts/stibnite/.*\.yaml$
     key_groups:
@@ -96,6 +104,7 @@ creation_rules:
         - *ci
         - *admin-user
         - *raquel-user
+        - *janettesmith-user
         - *stibnite
         - *blackphos
         - *orb-nixos
