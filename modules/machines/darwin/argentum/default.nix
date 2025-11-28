@@ -1,0 +1,207 @@
+{
+  config,
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
+let
+  # Capture outer config for use in imports
+  flakeModules = config.flake.modules.darwin;
+  flakeModulesHome = config.flake.modules.homeManager;
+  # Capture flake for extraSpecialArgs (needed by sops-nix)
+  flakeForHomeManager = config.flake // {
+    inherit inputs;
+  };
+in
+{
+  flake.modules.darwin."machines/darwin/argentum" =
+    {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
+    {
+      # Make flake available to all darwin modules
+      _module.args.flake = inputs.self;
+
+      imports = [
+        inputs.home-manager.darwinModules.home-manager
+        inputs.srvos.darwinModules.server
+      ]
+      ++ (with flakeModules; [
+        base
+        ssh-known-hosts
+        # Note: Not importing users module (defines testuser at UID 550)
+        # argentum defines its own users (christophersmith + cameron)
+      ]);
+
+      # Re-enable documentation for laptop use
+      # Override both srvos and clan-core defaults
+      srvos.server.docs.enable = lib.mkForce true;
+      documentation.enable = lib.mkForce true;
+      documentation.doc.enable = lib.mkForce true;
+      documentation.info.enable = lib.mkForce true;
+      documentation.man.enable = lib.mkForce true;
+      programs.info.enable = lib.mkForce true;
+      programs.man.enable = lib.mkForce true;
+
+      # Host identification
+      networking.hostName = "argentum";
+      networking.computerName = "argentum";
+
+      # Platform
+      nixpkgs.hostPlatform = "aarch64-darwin";
+
+      # Allow unfree packages (required for copilot-language-server, etc.)
+      nixpkgs.config.allowUnfree = true;
+
+      # Use flake.overlays.default (drupol pattern)
+      # All 5 overlay layers + pkgs-by-name packages exported from modules/nixpkgs.nix
+      nixpkgs.overlays = [ inputs.self.overlays.default ];
+
+      # System state version (matching infra configuration)
+      # Override base.nix which sets stateVersion = 5
+      system.stateVersion = lib.mkForce 4;
+
+      # Primary user for homebrew and system-level user operations
+      # Note: cameron is the admin user on argentum (manages homebrew)
+      system.primaryUser = "cameron";
+
+      # Enable desktop profile for GUI applications
+      custom.profile.isDesktop = true;
+
+      # Homebrew configuration
+      # Base casks (40 apps) from modules/darwin/homebrew.nix
+      # Machine-specific additions below - simplified for basic user machine
+      custom.homebrew = {
+        enable = true;
+
+        # Machine-specific casks (argentum-only)
+        # Simplified for basic user - only zerotier for network connectivity
+        # Omitted developer casks: codelayer-nightly, dbeaver-community, docker-desktop,
+        # gpg-suite, inkscape, keycastr, meld, postgres-unofficial
+        additionalCasks = [
+          "zerotier-one"
+        ];
+
+        # No machine-specific Mac App Store apps for argentum
+
+        # Fonts managed via base homebrew module (manageFonts defaults to true)
+      };
+
+      # TouchID authentication for sudo
+      security.pam.services.sudo_local.touchIdAuth = true;
+
+      # SSH daemon configuration
+      # Increase MaxAuthTries to accommodate agent forwarding with many keys
+      # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
+      # nix-darwin writes this to /etc/ssh/sshd_config.d/100-nix-darwin.conf
+      services.openssh.extraConfig = ''
+        MaxAuthTries 20
+      '';
+
+      # Multi-user configuration
+      # UID Strategy: Set explicit UIDs for nix-darwin (required)
+      # Using standard macOS UIDs: christophersmith=501 (primary), cameron=502 (admin)
+      # During Epic 4 deployment, verify UIDs match existing accounts on argentum,
+      # or update these values to match the actual system state.
+      users.users.christophersmith = {
+        uid = 501; # Primary user (first macOS user)
+        home = "/Users/christophersmith";
+        shell = pkgs.zsh;
+        description = "christophersmith";
+        # SSH key for christophersmith
+        openssh.authorizedKeys.keys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKPi1aUkaTAykqzTEQI1lr8qTpPMxXcyxZwilVECIzAM"
+        ];
+      };
+
+      users.users.cameron = {
+        uid = 502; # Admin user (second macOS user)
+        home = "/Users/cameron";
+        shell = pkgs.zsh;
+        description = "cameron";
+        # SSH key from crs58 identity (cameron is crs58 alias)
+        openssh.authorizedKeys.keys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+"
+        ];
+      };
+
+      # Darwin requires explicit knownUsers
+      # Note: Not managing root user (no users.users.root definition)
+      users.knownUsers = [
+        "christophersmith"
+        "cameron"
+      ];
+
+      # System packages
+      environment.systemPackages = with pkgs; [
+        vim
+        git
+      ];
+
+      # Enable zsh system-wide
+      programs.zsh.enable = true;
+
+      # Home-Manager configuration
+      home-manager = {
+        useGlobalPkgs = true;
+        useUserPackages = true;
+
+        # Backup existing files with this extension when home-manager needs to replace them
+        backupFileExtension = "before-home-manager";
+
+        # Pass flake as extraSpecialArgs for sops-nix access
+        # Bridge from flake-parts layer to home-manager layer
+        extraSpecialArgs = {
+          flake = flakeForHomeManager;
+        };
+
+        # christophersmith (primary user): Basic user like raquel - 6 aggregates (NO ai)
+        users.christophersmith.imports = [
+          flakeModulesHome."users/christophersmith"
+          flakeModulesHome.base-sops
+          # Import aggregate modules for christophersmith
+          # Pattern A: Productivity aggregates (NO ai)
+          flakeModulesHome.core
+          flakeModulesHome.development
+          flakeModulesHome.packages
+          flakeModulesHome.shell
+          flakeModulesHome.terminal
+          flakeModulesHome.tools
+          # LazyVim home-manager module
+          inputs.lazyvim-nix.homeManagerModules.default
+          # nix-index-database for comma command-not-found
+          inputs.nix-index-database.homeModules.nix-index
+          # agents-md option module (requires flake arg from extraSpecialArgs)
+          ../../../home/modules/_agents-md.nix
+        ];
+
+        # cameron (admin user): crs58 identity with cameron username - 7 aggregates + ai
+        users.cameron.imports = [
+          flakeModulesHome."users/crs58"
+          flakeModulesHome.base-sops
+          # Import aggregate modules for cameron (crs58 identity)
+          # Pattern A: All aggregates including ai
+          flakeModulesHome.ai
+          flakeModulesHome.core
+          flakeModulesHome.development
+          flakeModulesHome.packages
+          flakeModulesHome.shell
+          flakeModulesHome.terminal
+          flakeModulesHome.tools
+          # LazyVim home-manager module
+          inputs.lazyvim-nix.homeManagerModules.default
+          # nix-index-database for comma command-not-found
+          inputs.nix-index-database.homeModules.nix-index
+          # agents-md option module (requires flake arg from extraSpecialArgs)
+          ../../../home/modules/_agents-md.nix
+        ];
+
+        # Override cameron's home.username from crs58 to cameron
+        users.cameron.home.username = "cameron";
+      };
+    };
+}
