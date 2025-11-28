@@ -468,16 +468,18 @@ development_status:
 
   # Epic 3 (Phase 2) - Multi-Darwin Validation (rosegold)
   # SPRINT CHANGE (2025-11-20): Renumbered from Epic 4, depends on Epic 2 complete
+  # SPRINT UPDATE (2025-11-28): Story 3.1 completed in Epic 2 Story 2.13, deployment stories consolidated
   epic-3: backlog
   epic-3-notes: |
     Deploy rosegold (janettesmith's darwin workstation) and validate multi-darwin coordination.
     Depends on Epic 2 complete.
-  story-3-1: backlog
-  story-3-1-title: "Deploy rosegold and validate functionality"
+    Story 3.1 completed in Epic 2 Story 2.13 (rosegold configuration creation).
+  story-3-1: done
+  story-3-1-title: "Rosegold configuration creation [COMPLETED IN EPIC 2]"
+  story-3-1-notes: "Completed in Epic 2 Story 2.13 - rosegold darwin config, janettesmith user, sops secrets, clan inventory, test coverage"
   story-3-2: backlog
-  story-3-2-title: "Validate multi-darwin coordination"
-  story-3-3: backlog
-  story-3-3-title: "Stability validation and Epic 4 readiness"
+  story-3-2-title: "Deploy rosegold and validate zerotier integration"
+  # story-3-3: Removed - consolidated into Story 3.2 (deployment + validation in single story)
   epic-3-retrospective: optional
 
   # Epic 4 (Phase 3) - Third Darwin Host (argentum)
