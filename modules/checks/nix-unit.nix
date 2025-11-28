@@ -65,6 +65,7 @@
         testInvariantClanInventoryMachines = {
           expr = builtins.sort builtins.lessThan (builtins.attrNames self.clan.inventory.machines);
           expected = [
+            "argentum"
             "blackphos"
             "cinnabar"
             "electrum"
@@ -89,6 +90,7 @@
         testInvariantDarwinConfigurationsExist = {
           expr = builtins.sort builtins.lessThan (builtins.attrNames self.darwinConfigurations);
           expected = [
+            "argentum"
             "blackphos"
             "rosegold"
             "stibnite"
