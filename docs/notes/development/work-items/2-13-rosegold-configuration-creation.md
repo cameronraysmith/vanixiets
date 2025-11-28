@@ -145,24 +145,49 @@ User preferences, package selections, hardware details.
   - [ ] home.username = "janettesmith"
   - [ ] git user.name and user.email
 - [ ] Verify module exports to `flake.modules.homeManager."users/janettesmith"`
+- [ ] Note: janettesmith SSH public key provided:
+  ```
+  ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIePSVx5J/JJ5eN4PSryuL7iP8WXow/SsZOIr96qnKP0
+  ```
+  - [ ] Private key retained securely by janettesmith (not stored in repo)
 
 ### Task 2: Create janettesmith secrets structure (AC: #2) [AI]
 
 **Two-tier secrets architecture** (follows crs58/raquel/cameron pattern):
 
-- [ ] Create `sops/users/janettesmith/` directory (age key location)
-  - [ ] key.json will be generated during Epic 3 deployment
-- [ ] Create `secrets/home-manager/users/janettesmith/` directory (encrypted secrets location)
-  - [ ] Create placeholder secrets.yaml (will be populated with actual secrets during deployment)
+- [ ] Derive age public key from SSH public key using `ssh-to-age`:
+  ```bash
+  echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIePSVx5J/JJ5eN4PSryuL7iP8WXow/SsZOIr96qnKP0" | ssh-to-age
+  # Output: age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec
+  ```
+
+- [ ] Create `sops/users/janettesmith/` directory and `key.json`:
+  ```json
+  [
+    {
+      "publickey": "age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec",
+      "type": "age"
+    }
+  ]
+  ```
+
+- [ ] Create `secrets/home-manager/users/janettesmith/` directory
+
+- [ ] Create `secrets/home-manager/users/janettesmith/secrets.yaml` with ssh-public-key:
+  ```bash
+  # Encrypt the SSH public key for allowed_signers template
+  sops --encrypt --age age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec \
+    --input-type yaml --output-type yaml \
+    <(echo 'ssh-public-key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIePSVx5J/JJ5eN4PSryuL7iP8WXow/SsZOIr96qnKP0"') \
+    > secrets/home-manager/users/janettesmith/secrets.yaml
+  ```
+
 - [ ] Update `.sops.yaml` with rules for BOTH paths:
   - [ ] `sops/users/janettesmith/.*` - for age key metadata
   - [ ] `secrets/home-manager/users/janettesmith/.*\.yaml` - for encrypted home-manager secrets
   - [ ] Reference existing patterns in .sops.yaml for crs58/raquel/cameron
 
-**Note:** Actual secrets population deferred to Epic 3 deployment when:
-- janettesmith generates SSH keypair on rosegold
-- age key derived from SSH key (stored in `sops/users/janettesmith/key.json`)
-- secrets encrypted with janettesmith's public key (stored in `secrets/home-manager/users/janettesmith/secrets.yaml`)
+**Note:** Additional secrets (github-token, ssh-signing-key, bitwarden-email, atuin-key) will be populated during Epic 3 deployment when janettesmith provides credentials. Private key decryption: janettesmith uses `ssh-to-age -private-key` on her machine during deployment.
 
 ### Task 3: Create rosegold darwin module (AC: #1, #2, #5) [AI]
 
@@ -293,6 +318,21 @@ Following raquel pattern from `modules/home/users/raquel/default.nix`:
 - 5 secrets (github-token, ssh-signing-key, ssh-public-key, bitwarden-email, atuin-key)
 - Separate sops-nix defaultSopsFile path
 
+### Age Key Derivation Pattern
+
+This repo uses `ssh-to-age` to derive age public keys from SSH public keys:
+
+- **Single identity:** SSH key is source of truth (no separate age keypair)
+- **Age key derived:** `echo "<ssh-pubkey>" | ssh-to-age`
+- **Stored in repo:** Only age PUBLIC key in `sops/users/<user>/key.json`
+- **Private key decryption:** User runs `ssh-to-age -private-key -i ~/.ssh/id_ed25519` on their machine
+
+**janettesmith keys:**
+```
+SSH public:  ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIePSVx5J/JJ5eN4PSryuL7iP8WXow/SsZOIr96qnKP0
+Age public:  age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec
+```
+
 ### UID Assignment Strategy
 
 **Do NOT set UIDs in configuration** - leave `users.users.janettesmith.uid` and `users.users.cameron.uid` undefined for nix-darwin auto-assignment during deployment.
@@ -405,3 +445,4 @@ claude-opus-4-5-20251101
 | 2025-11-27 | 1.0 | Story drafted from Epic 2 definition and workflow input |
 | 2025-11-27 | 1.1 | Fix two-tier secrets paths, clarify UID strategy, correct line references |
 | 2025-11-27 | 1.2 | Add Task 9 for nix-unit test updates, add CI/CD Considerations section |
+| 2025-11-27 | 1.3 | Use ssh-to-age pattern for age key derivation, add janettesmith keys |
