@@ -76,6 +76,14 @@ in
         "db06eedc463af208feefb7c804828fd8e1a89a88248fe46df8e3f8562dc6ded2"
       ];
 
+      # Migrate trusted-users from /etc/nix/nix.custom.conf to nix-darwin
+      # Required for accepting flake-specified substituters without prompts
+      nix.settings.trusted-users = [
+        "root"
+        "@admin"
+        "@wheel"
+      ];
+
       # Primary user for homebrew and system-level user operations
       # Note: cameron is the admin user on rosegold (manages homebrew)
       system.primaryUser = "cameron";
