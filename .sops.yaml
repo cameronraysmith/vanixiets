@@ -10,6 +10,7 @@ keys:
   - &admin-user age1vn8fpkmkzkjttcuc3prq3jrp7t5fsrdqey74ydu5p88keqmcupvs8jtmv8  # from sops-admin-user-ssh (cameron/crs58/runner/jovyan)
   - &raquel-user age12w0rmmskrds6m334w7qrcmpms5lpe3llah6wf8ry5jtatvuxku2sarl8ut  # from sops-raquel-user-ssh (raquel)
   - &janettesmith-user age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec  # derived from SSH key via ssh-to-age
+  - &christophersmith-user age1xz7gmqx7m0pn8u2nq8x05efq6dj52ym6c9gat5xj4am6x9sauq6sfzd2fn  # derived from SSH key via ssh-to-age
 
   # Host keys (generated in Bitwarden, deployed to /etc/ssh/)
   - &stibnite age1a696klqy0s36a2pzlk6kyckp60k88qxcrsdh829dtk3xtc7sfs4scg05k0     # from sops-stibnite-ssh
@@ -70,6 +71,13 @@ creation_rules:
         - *dev
         - *janettesmith-user
 
+  - path_regex: secrets/home-manager/users/christophersmith/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *christophersmith-user
+
   # Host-specific secrets
   - path_regex: secrets/hosts/stibnite/.*\.yaml$
     key_groups:
@@ -105,6 +113,7 @@ creation_rules:
         - *admin-user
         - *raquel-user
         - *janettesmith-user
+        - *christophersmith-user
         - *stibnite
         - *blackphos
         - *orb-nixos
