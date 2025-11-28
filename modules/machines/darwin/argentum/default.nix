@@ -65,6 +65,10 @@ in
       # Override base.nix which sets stateVersion = 5
       system.stateVersion = lib.mkForce 4;
 
+      # Match GID to fresh Nix installation (DeterminateSystems installer uses 350 since Aug 2024)
+      # See: https://github.com/DeterminateSystems/nix-installer/pull/1123
+      ids.gids.nixbld = 350;
+
       # Primary user for homebrew and system-level user operations
       # Note: cameron is the admin user on argentum (manages homebrew)
       system.primaryUser = "cameron";
