@@ -20,5 +20,9 @@
     stibnite = {
       imports = [ config.flake.modules.darwin."machines/darwin/stibnite" ];
     };
+
+    rosegold = {
+      imports = [ config.flake.modules.darwin."machines/darwin/rosegold" ];
+    };
   };
 }

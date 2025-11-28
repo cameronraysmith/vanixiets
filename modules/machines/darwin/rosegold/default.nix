@@ -103,13 +103,12 @@ in
       '';
 
       # Multi-user configuration
-      # UID Strategy: Do NOT set UIDs - leave undefined for nix-darwin auto-assignment
-      # During deployment, nix-darwin will:
-      # - Use existing UIDs if janettesmith/cameron accounts exist on rosegold
-      # - Assign from available pool (501+ for first user, 502+ for additional) if not
-      # This avoids conflicts with existing macOS user accounts
+      # UID Strategy: Set explicit UIDs for nix-darwin (required)
+      # Using standard macOS UIDs: janettesmith=501 (primary), cameron=502 (admin)
+      # During Epic 3 deployment, verify UIDs match existing accounts on rosegold,
+      # or update these values to match the actual system state.
       users.users.janettesmith = {
-        # UID intentionally unset - auto-assigned by nix-darwin during deployment
+        uid = 501; # Primary user (first macOS user)
         home = "/Users/janettesmith";
         shell = pkgs.zsh;
         description = "janettesmith";
@@ -120,7 +119,7 @@ in
       };
 
       users.users.cameron = {
-        # UID intentionally unset - auto-assigned by nix-darwin during deployment
+        uid = 502; # Admin user (second macOS user)
         home = "/Users/cameron";
         shell = pkgs.zsh;
         description = "cameron";
