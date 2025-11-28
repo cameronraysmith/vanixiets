@@ -1,0 +1,357 @@
+# Story 2.13: Rosegold configuration creation
+
+Status: drafted
+
+## Story
+
+As a system administrator,
+I want to create rosegold darwin configuration in infra,
+so that rosegold is ready for deployment in Epic 3.
+
+## Context
+
+**Epic 2 Phase 4 Story 3 (Future Machines):**
+
+This is the third story in Epic 2 Phase 4. Stories 2.11 (test harness) and 2.12 (agents-md consolidation) are complete. Story 2.13 creates the rosegold darwin configuration following the blackphos dual-user pattern. Rosegold is janettesmith's laptop with cameron as admin user.
+
+**Story Type: IMPLEMENTATION (New Configuration)**
+
+This story creates new configuration files from existing patterns:
+- Darwin machine config based on blackphos template
+- New user (janettesmith) based on raquel pattern
+- Admin user (cameron) reusing existing crs58 identity module with username override
+
+**Dual-User Pattern (blackphos template):**
+
+rosegold follows the blackphos dual-user pattern, NOT stibnite single-user:
+- **janettesmith** (primary user): Basic user like raquel - 6 aggregates (core, development, packages, shell, terminal, tools) - NO ai aggregate
+- **cameron** (admin user): crs58 identity alias - 7 aggregates + ai aggregate, manages homebrew
+
+**Username Override Pattern:**
+
+cameron uses the crs58 identity module with username override:
+- Import: `modules/home/users/crs58/default.nix` (shared identity: SSH keys, git config, packages)
+- Override: `home.username = "cameron"` via clan inventory service
+- The cameron clan inventory service already exists at `modules/clan/inventory/services/users/cameron.nix`
+
+**Estimated Effort:** 4-6 hours
+
+**Risk Level:** LOW (proven patterns from blackphos)
+
+## Acceptance Criteria
+
+### AC1: Create rosegold darwin configuration
+
+Use blackphos as structural template (dual-user pattern).
+
+**Verification:**
+```bash
+# Verify directory structure
+ls -la modules/machines/darwin/rosegold/
+
+# Expected: default.nix exists
+```
+
+### AC2: Configure dual-user pattern
+
+Configure janettesmith (primary, basic user like raquel) + cameron (admin, crs58 alias with full aggregates).
+
+**Verification:**
+```bash
+# Verify user configuration in module
+grep -E "(janettesmith|cameron)" modules/machines/darwin/rosegold/default.nix
+
+# Expected: Both users defined with correct aggregates
+# janettesmith: 6 aggregates (NO ai)
+# cameron: 7 aggregates + ai
+```
+
+### AC3: Apply dendritic+clan architecture patterns
+
+Modules, clan inventory, service instances.
+
+**Verification:**
+```bash
+# Verify clan inventory machine entry
+grep "rosegold" modules/clan/inventory/machines.nix
+
+# Verify cameron service targets rosegold
+grep "rosegold" modules/clan/inventory/services/users/cameron.nix
+
+# Expected: rosegold in inventory with darwin machineClass
+```
+
+### AC4: Validate nix-darwin build success
+
+Build validation (deployment deferred to Epic 3).
+
+**Verification:**
+```bash
+nix build .#darwinConfigurations.rosegold.system
+# Expected: Build succeeds without errors
+```
+
+### AC5: Configure zerotier peer role
+
+Network ID db4344343b14b903, peer role for rosegold.
+
+**Verification:**
+```bash
+# Verify zerotier-one cask in homebrew config
+grep "zerotier-one" modules/machines/darwin/rosegold/default.nix
+
+# Expected: zerotier-one in additionalCasks list
+```
+
+### AC6: Test configuration evaluation
+
+Evaluate configuration without building.
+
+**Verification:**
+```bash
+nix eval .#darwinConfigurations.rosegold.config.system.build.toplevel --json | head -c 100
+# Expected: Returns valid store path JSON
+```
+
+### AC7: Document rosegold-specific configuration
+
+User preferences, package selections, hardware details.
+
+**Verification:**
+- [ ] Comments in rosegold/default.nix explain configuration choices
+- [ ] User UID assignments documented (TBD - will be assigned on first deployment)
+- [ ] Homebrew casks simplified for basic user machine
+
+## Tasks / Subtasks
+
+**Execution Mode Legend:**
+- **[AI]** - Can be executed directly by Claude Code
+- **[USER]** - Should be executed by human developer
+- **[HYBRID]** - AI prepares/validates, user executes interactive portions
+
+---
+
+### Task 1: Create janettesmith user module (AC: #2) [AI]
+
+- [ ] Create `modules/home/users/janettesmith/default.nix`
+- [ ] Copy raquel pattern (basic user, 6 aggregates, NO ai)
+- [ ] Configure sops secrets (same pattern as raquel: 5 secrets)
+  - [ ] github-token
+  - [ ] ssh-signing-key
+  - [ ] ssh-public-key
+  - [ ] bitwarden-email
+  - [ ] atuin-key
+- [ ] Set user-specific values:
+  - [ ] home.username = "janettesmith"
+  - [ ] git user.name and user.email
+- [ ] Verify module exports to `flake.modules.homeManager."users/janettesmith"`
+
+### Task 2: Create janettesmith secrets structure (AC: #2) [AI]
+
+- [ ] Create `secrets/home-manager/users/janettesmith/` directory
+- [ ] Create placeholder secrets.yaml (will be populated with actual secrets during deployment)
+- [ ] Update `.sops.yaml` to include janettesmith age key encryption
+
+**Note:** Actual secrets population deferred to Epic 3 deployment when:
+- janettesmith generates SSH keypair on rosegold
+- age key derived from SSH key
+- secrets encrypted with janettesmith's public key
+
+### Task 3: Create rosegold darwin module (AC: #1, #2, #5) [AI]
+
+- [ ] Create `modules/machines/darwin/rosegold/` directory
+- [ ] Create `default.nix` based on blackphos template (217 lines)
+- [ ] Modify for rosegold:
+  - [ ] Change hostname to "rosegold"
+  - [ ] Configure janettesmith as primary user (UID TBD - placeholder)
+  - [ ] Configure cameron as admin user (UID TBD - placeholder)
+  - [ ] Set system.primaryUser = "cameron" (admin manages homebrew)
+- [ ] Configure home-manager imports:
+  - [ ] janettesmith: 6 aggregates (NO ai), base-sops, lazyvim-nix, nix-index-database
+  - [ ] cameron: 7 aggregates + ai, base-sops, lazyvim-nix, nix-index-database
+- [ ] Simplify homebrew casks for basic user machine:
+  - [ ] Keep essential: zerotier-one (required for network)
+  - [ ] Remove developer-specific: dbeaver-community, docker-desktop, postgres-unofficial
+  - [ ] Keep general productivity apps from base homebrew module
+
+### Task 4: Add rosegold to clan inventory (AC: #3) [AI]
+
+- [ ] Update `modules/clan/inventory/machines.nix`
+- [ ] Add rosegold entry:
+  ```nix
+  rosegold = {
+    tags = [ "darwin" "workstation" "laptop" ];
+    machineClass = "darwin";
+    description = "janettesmith's laptop (primary user), cameron admin";
+  };
+  ```
+
+### Task 5: Enable cameron service for rosegold (AC: #3) [AI]
+
+- [ ] Update `modules/clan/inventory/services/users/cameron.nix`
+- [ ] Uncomment rosegold machine targeting:
+  ```nix
+  roles.default.machines."rosegold" = { };
+  ```
+
+### Task 6: Validate builds (AC: #4, #6) [AI]
+
+- [ ] Run `nix build .#darwinConfigurations.rosegold.system`
+- [ ] Run `nix eval .#darwinConfigurations.rosegold.config.system.build.toplevel --json`
+- [ ] Verify no build errors
+- [ ] Check home configurations build:
+  - [ ] `nix build .#homeConfigurations.aarch64-darwin.janettesmith.activationPackage`
+  - [ ] Note: cameron home config may need separate validation (clan inventory provides it)
+
+### Task 7: Run flake checks (AC: #4) [AI]
+
+- [ ] Run `nix flake check`
+- [ ] Verify rosegold appears in TC-003 (clan inventory machines)
+- [ ] Verify rosegold appears in TC-005 (darwin configurations)
+- [ ] Fix any check failures
+
+### Task 8: Document configuration (AC: #7) [AI]
+
+- [ ] Add comments explaining UID placeholders (TBD on first deployment)
+- [ ] Document simplified homebrew casks rationale
+- [ ] Update story with implementation notes
+
+## Dev Notes
+
+### Learnings from Previous Story
+
+**From Story 2.12 (Status: done)**
+
+- **Pre-migrated consolidation**: Story 2.12 work was already completed in test-clan before Story 2.3 migration
+- **agents-md consolidation**: Single canonical `_agents-md.nix` with 7 correct import sites, zero duplication
+- **Architecture validated**: Two-tier pattern (option definition + configuration) follows dendritic conventions
+- **No work required**: Party Mode investigation confirmed clean migration state
+
+**From Story 2.11 (Status: done)**
+
+- **All 4 hosts operational**: stibnite, blackphos, cinnabar, electrum deployed from infra clan-01
+- **CI stabilized**: 9 iterative fixes, all jobs green
+- **Test harness validated**: 21 checks across aarch64-darwin and x86_64-linux
+- **cached-ci-job pattern**: Essential for new configurations (follow hash-sources pattern)
+
+[Source: docs/notes/development/work-items/2-11-test-harness-and-ci-validation.md#Dev-Agent-Record]
+
+### User Identity Architecture
+
+**cameron username override pattern:**
+
+The cameron clan inventory service (`modules/clan/inventory/services/users/cameron.nix`) already exists and demonstrates the username override pattern:
+
+```nix
+# Import crs58 identity, override username to cameron
+home-manager.users.cameron.imports = [
+  inputs.self.modules.homeManager."users/crs58"
+  # ... aggregates ...
+];
+home-manager.users.cameron.home.username = "cameron";
+```
+
+This pattern:
+- Reuses crs58 identity (SSH keys, git config, packages)
+- Overrides username for new machines
+- Avoids code duplication
+- cameron age key already exists: `sops/users/cameron/key.json`
+
+**janettesmith user creation:**
+
+Following raquel pattern from `modules/home/users/raquel/default.nix`:
+- Basic user (6 aggregates, NO ai)
+- 5 secrets (github-token, ssh-signing-key, ssh-public-key, bitwarden-email, atuin-key)
+- Separate sops-nix defaultSopsFile path
+
+### UID Assignment Strategy
+
+UIDs will be assigned during Epic 3 deployment based on existing macOS user accounts:
+- If janettesmith account exists on rosegold: use existing UID
+- If not: follow darwin convention (501+ for first user, 502+ for additional)
+
+Placeholder comment in default.nix:
+```nix
+# UID TBD - will be set during Epic 3 deployment based on existing macOS user
+```
+
+### Homebrew Cask Simplification
+
+rosegold is a basic user machine (janettesmith's primary use case: productivity, not development).
+
+**Keep from base homebrew module** (40 apps):
+- All base apps appropriate for general use
+
+**Additional casks for rosegold:**
+- `zerotier-one` - Required for network connectivity
+
+**Omit developer-specific casks** (unlike blackphos/stibnite):
+- `codelayer-nightly` - Dev tool
+- `dbeaver-community` - Database tool
+- `docker-desktop` - Container tool
+- `postgres-unofficial` - Database server
+- `gpg-suite` - Crypto tools (optional for basic user)
+- `inkscape` - Vector graphics (optional)
+- `keycastr` - Key overlay (dev presentations)
+- `meld` - Diff tool
+
+### Project Structure Notes
+
+**Files to create:**
+```
+modules/
+├── home/
+│   └── users/
+│       └── janettesmith/
+│           └── default.nix      # NEW: Basic user module (raquel pattern)
+└── machines/
+    └── darwin/
+        └── rosegold/
+            └── default.nix      # NEW: Darwin config (blackphos pattern)
+
+secrets/
+└── home-manager/
+    └── users/
+        └── janettesmith/
+            └── secrets.yaml     # NEW: Placeholder for secrets (populated Epic 3)
+```
+
+**Files to modify:**
+```
+modules/clan/inventory/machines.nix           # Add rosegold entry
+modules/clan/inventory/services/users/cameron.nix  # Uncomment rosegold targeting
+.sops.yaml                                    # Add janettesmith age key rule
+```
+
+### References
+
+- [Epic 2 Definition](docs/notes/development/epics/epic-2-infrastructure-architecture-migration.md) - Story 2.13 definition (lines 330-345)
+- [Architecture - Project Structure](docs/notes/development/architecture/project-structure.md) - Module organization
+- [blackphos template](modules/machines/darwin/blackphos/default.nix) - Dual-user darwin pattern (217 lines)
+- [raquel user module](modules/home/users/raquel/default.nix) - Basic user pattern (65 lines)
+- [cameron clan service](modules/clan/inventory/services/users/cameron.nix) - Username override pattern (103 lines)
+- [crs58 user module](modules/home/users/crs58/default.nix) - Admin identity module (84 lines)
+
+## Dev Agent Record
+
+### Context Reference
+
+<!-- Path(s) to story context XML will be added here by context workflow -->
+
+### Agent Model Used
+
+claude-opus-4-5-20251101
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+
+---
+
+## Change Log
+
+| Date | Version | Change |
+|------|---------|--------|
+| 2025-11-27 | 1.0 | Story drafted from Epic 2 definition and workflow input |
