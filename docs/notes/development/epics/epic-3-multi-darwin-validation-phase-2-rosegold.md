@@ -43,8 +43,9 @@ So that rosegold is operational with full mesh connectivity to all clan machines
 **Acceptance Criteria:**
 
 ### Prerequisites (AC0)
-0. Verify Nix installed and infra repo cloned on rosegold, OR bootstrap fresh machine:
+0. Verify Nix and Homebrew installed and infra repo cloned on rosegold, OR bootstrap fresh machine:
    - Install Xcode CLI tools: `xcode-select --install`
+   - Install Homebrew: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
    - Clone infra: `git clone https://github.com/cameronraysmith/infra.git && cd infra && git checkout clan-01`
    - Bootstrap Nix: `make bootstrap`
 
