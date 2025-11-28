@@ -103,12 +103,9 @@ in
       '';
 
       # Multi-user configuration
-      # UID Strategy: Set explicit UIDs for nix-darwin (required)
-      # Using standard macOS UIDs: christophersmith=501 (primary), cameron=502 (admin)
-      # During Epic 4 deployment, verify UIDs match existing accounts on argentum,
-      # or update these values to match the actual system state.
+      # Expected UIDs based on standard macOS assignment
       users.users.christophersmith = {
-        uid = 501; # Primary user (first macOS user)
+        uid = 501; # Primary user
         home = "/Users/christophersmith";
         shell = pkgs.zsh;
         description = "christophersmith";
@@ -119,7 +116,7 @@ in
       };
 
       users.users.cameron = {
-        uid = 502; # Admin user (second macOS user)
+        uid = 502; # Admin user
         home = "/Users/cameron";
         shell = pkgs.zsh;
         description = "cameron";
