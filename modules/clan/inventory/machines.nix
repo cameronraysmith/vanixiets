@@ -49,5 +49,15 @@
       machineClass = "darwin";
       description = "crs58's primary workstation";
     };
+
+    rosegold = {
+      tags = [
+        "darwin"
+        "workstation"
+        "laptop"
+      ];
+      machineClass = "darwin";
+      description = "janettesmith's laptop (primary user), cameron admin";
+    };
   };
 }
