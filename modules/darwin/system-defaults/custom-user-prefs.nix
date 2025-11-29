@@ -17,9 +17,8 @@
             NSCloseAlwaysConfirmsChanges = false;
             AppleSpacesSwitchOnActivate = true;
           };
-          "com.apple.Music" = {
-            userWantsPlaybackNotifications = false;
-          };
+          # Note: com.apple.Music removed - causes activation failure on machines
+          # where Music.app has never been opened (domain doesn't exist)
           "com.apple.ActivityMonitor" = {
             UpdatePeriod = 1;
           };
