@@ -68,7 +68,7 @@
           };
 
           "rosegold.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:9315:3431:0ee8";
+            hostname = "fddb:4344:343b:14b9:399:9315:3431:ee8";
             user = "cameron";
           };
 
