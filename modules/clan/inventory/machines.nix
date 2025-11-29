@@ -35,6 +35,7 @@
         "darwin"
         "workstation"
         "laptop"
+        "fleet"
       ];
       machineClass = "darwin";
       description = "raquel's laptop (primary user), crs58 admin";
@@ -45,9 +46,10 @@
         "darwin"
         "workstation"
         "laptop"
+        "controller"
       ];
       machineClass = "darwin";
-      description = "crs58's primary workstation";
+      description = "crs58's primary workstation, deployment controller";
     };
 
     rosegold = {
@@ -55,6 +57,7 @@
         "darwin"
         "workstation"
         "laptop"
+        "fleet"
       ];
       machineClass = "darwin";
       description = "janettesmith's laptop (primary user), cameron admin";
@@ -65,6 +68,7 @@
         "darwin"
         "workstation"
         "laptop"
+        "fleet"
       ];
       machineClass = "darwin";
       description = "christophersmith's laptop (primary user), cameron admin";

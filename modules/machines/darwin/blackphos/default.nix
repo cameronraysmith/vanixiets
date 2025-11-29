@@ -51,6 +51,9 @@ in
       networking.hostName = "blackphos";
       networking.computerName = "blackphos";
 
+      # Remote deployment target (enables `clan machines update` from stibnite)
+      clan.core.networking.targetHost = "crs58@blackphos.zt";
+
       # Platform
       nixpkgs.hostPlatform = "aarch64-darwin";
 

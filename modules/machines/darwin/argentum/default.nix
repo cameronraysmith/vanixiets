@@ -51,6 +51,9 @@ in
       networking.hostName = "argentum";
       networking.computerName = "argentum";
 
+      # Remote deployment target (enables `clan machines update` from stibnite)
+      clan.core.networking.targetHost = "cameron@argentum.zt";
+
       # Platform
       nixpkgs.hostPlatform = "aarch64-darwin";
 
