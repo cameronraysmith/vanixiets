@@ -1,11 +1,17 @@
 {
   flake.modules.darwin.base =
     {
+      config,
       pkgs,
       lib,
       ...
     }:
     {
+      # Passwordless sudo for primary admin user
+      security.sudo.extraConfig = ''
+        ${config.system.primaryUser} ALL=(ALL) NOPASSWD: ALL
+      '';
+
       # Nix configuration (from test-clan nixos base patterns)
       nix.settings = {
         experimental-features = [
