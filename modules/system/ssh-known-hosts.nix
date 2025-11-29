@@ -51,6 +51,36 @@ let
         # Verified via ssh-keyscan blackphos.local 2025-11-19
         publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOWFgVKryKvWqDDsmUXKQYLFPQFfVXZj2S8E4TZsTtFc";
       };
+
+      "stibnite.zt" = {
+        hostNames = [
+          "stibnite.zt"
+          "fddb:4344:343b:14b9:399:933e:1059:d43a" # Zerotier IPv6
+        ];
+        # Static key from /etc/ssh/ssh_host_ed25519_key.pub
+        # Verified 2025-11-29
+        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+1b1qqnXJNhxANDyc17VqKo3SzDZSn+QlgLbh7sV2e";
+      };
+
+      "argentum.zt" = {
+        hostNames = [
+          "argentum.zt"
+          "fddb:4344:343b:14b9:399:93f7:54d5:ad7e" # Zerotier IPv6
+        ];
+        # Static key from /etc/ssh/ssh_host_ed25519_key.pub
+        # Verified 2025-11-29
+        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJB6ZUkT5+4U0kcfdOUMHo6qRV9qPlzkkCKj0C7Rqh2m";
+      };
+
+      "rosegold.zt" = {
+        hostNames = [
+          "rosegold.zt"
+          "fddb:4344:343b:14b9:399:9315:3431:0ee8" # Zerotier IPv6
+        ];
+        # Static key from /etc/ssh/ssh_host_ed25519_key.pub
+        # Verified 2025-11-29
+        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII6X063DuDUFScs6Za6nx3TnvG9dlJDrTthx7e2aX1XA";
+      };
     };
 in
 {
