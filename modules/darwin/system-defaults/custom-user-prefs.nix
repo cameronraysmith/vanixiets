@@ -17,14 +17,11 @@
             NSCloseAlwaysConfirmsChanges = false;
             AppleSpacesSwitchOnActivate = true;
           };
-          # Note: com.apple.Music removed - causes activation failure on machines
-          # where Music.app has never been opened (domain doesn't exist)
+          # Note: Removed sandboxed/problematic app preferences that block remote deployment:
+          # - com.apple.Music: domain doesn't exist if app never opened
+          # - com.apple.TextEdit: sandboxed, can't write via sudo
           "com.apple.ActivityMonitor" = {
             UpdatePeriod = 1;
-          };
-          "com.apple.TextEdit" = {
-            SmartQuotes = false;
-            RichText = false;
           };
           "com.apple.spaces" = {
             "spans-displays" = false;
