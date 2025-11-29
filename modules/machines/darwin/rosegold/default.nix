@@ -51,6 +51,9 @@ in
       networking.hostName = "rosegold";
       networking.computerName = "rosegold";
 
+      # Remote deployment target (enables `clan machines update` from stibnite)
+      clan.core.networking.targetHost = "cameron@rosegold.zt";
+
       # Platform
       nixpkgs.hostPlatform = "aarch64-darwin";
 

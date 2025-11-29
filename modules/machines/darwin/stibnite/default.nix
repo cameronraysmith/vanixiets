@@ -53,6 +53,9 @@ in
       networking.hostName = "stibnite";
       networking.computerName = "stibnite";
 
+      # Remote deployment target (enables `clan machines update` from other machines)
+      clan.core.networking.targetHost = "crs58@stibnite.zt";
+
       # Platform
       nixpkgs.hostPlatform = "aarch64-darwin";
 
