@@ -75,7 +75,7 @@ let
       "rosegold.zt" = {
         hostNames = [
           "rosegold.zt"
-          "fddb:4344:343b:14b9:399:9315:3431:0ee8" # Zerotier IPv6
+          "fddb:4344:343b:14b9:399:9315:3431:ee8" # Zerotier IPv6
         ];
         # Static key from /etc/ssh/ssh_host_ed25519_key.pub
         # Verified 2025-11-29
