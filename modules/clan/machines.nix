@@ -9,10 +9,6 @@
       imports = [ config.flake.modules.nixos."machines/nixos/electrum" ];
     };
 
-    test-darwin = {
-      imports = [ config.flake.modules.darwin."machines/darwin/test-darwin" ];
-    };
-
     blackphos = {
       imports = [ config.flake.modules.darwin."machines/darwin/blackphos" ];
     };
