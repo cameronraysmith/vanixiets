@@ -17,9 +17,16 @@
             NSCloseAlwaysConfirmsChanges = false;
             AppleSpacesSwitchOnActivate = true;
           };
-          # Note: Removed sandboxed/problematic app preferences that block remote deployment:
+          # Disabled: blocks remote deployment via `clan machines update`
           # - com.apple.Music: domain doesn't exist if app never opened
-          # - com.apple.TextEdit: sandboxed, can't write via sudo
+          # "com.apple.Music" = {
+          #   userWantsPlaybackNotifications = false;
+          # };
+          # - com.apple.TextEdit: sandboxed app, can't write via sudo
+          # "com.apple.TextEdit" = {
+          #   SmartQuotes = false;
+          #   RichText = false;
+          # };
           "com.apple.ActivityMonitor" = {
             UpdatePeriod = 1;
           };
