@@ -60,7 +60,11 @@
             # Member 0ee971d9e0 -> :399:930e:e971:d9e0
             # Format: fd<net[0:2]>:<net[2:6]>:<net[6:10]>:<net[10:14]>:399:93<member[0:2]>:<member[2:6]>:<member[6:10]>
             NETWORK_PREFIX="fddb:4344:343b:14b9"  # Derived from network ID ${networkId}
-            MEMBER_SUFFIX="''${MEMBER_ID:0:2}:''${MEMBER_ID:2:4}:''${MEMBER_ID:6:4}"
+            # Use printf %x to strip leading zeros from each group (canonical IPv6 form)
+            PART1=$(printf "%x" "0x''${MEMBER_ID:0:2}")
+            PART2=$(printf "%x" "0x''${MEMBER_ID:2:4}")
+            PART3=$(printf "%x" "0x''${MEMBER_ID:6:4}")
+            MEMBER_SUFFIX="''${PART1}:''${PART2}:''${PART3}"
             CALCULATED_IPV6="''${NETWORK_PREFIX}:399:93''${MEMBER_SUFFIX}"
 
             echo ""
