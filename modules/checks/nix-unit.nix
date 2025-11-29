@@ -71,7 +71,6 @@
             "electrum"
             "rosegold"
             "stibnite"
-            "test-darwin"
           ];
         };
 
@@ -94,7 +93,6 @@
             "blackphos"
             "rosegold"
             "stibnite"
-            "test-darwin"
           ];
         };
 
@@ -125,7 +123,7 @@
           expr =
             (builtins.hasAttr "base" self.modules.darwin)
             && (builtins.hasAttr "users" self.modules.darwin)
-            && (builtins.hasAttr "machines/darwin/test-darwin" self.modules.darwin);
+            && (builtins.hasAttr "machines/darwin/stibnite" self.modules.darwin);
           expected = true;
         };
 

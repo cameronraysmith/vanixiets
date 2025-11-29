@@ -22,14 +22,6 @@
       description = "Secondary test VM, zerotier peer";
     };
 
-    test-darwin = {
-      tags = [
-        "darwin"
-        "test"
-      ];
-      machineClass = "darwin";
-    };
-
     blackphos = {
       tags = [
         "darwin"
