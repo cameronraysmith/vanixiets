@@ -62,6 +62,11 @@
             user = "crs58";
           };
 
+          "argentum.zt" = {
+            hostname = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
+            user = "cameron";
+          };
+
           # Wildcard for all zerotier hosts
           "*.zt" = {
             # Enable compression for zerotier (encrypted tunnel over encrypted tunnel)
