@@ -18,8 +18,7 @@
         ];
       };
     };
-    # Peers of the network
-    # tags.all means 'all machines' will joined
-    roles.peer.tags."all" = { };
+    # Peers of the network (NixOS machines only - darwin uses external zerotier-one)
+    roles.peer.tags."peer" = { };
   };
 }
