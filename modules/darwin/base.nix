@@ -21,6 +21,9 @@
       # System state version
       system.stateVersion = 5;
 
+      # Timezone for all darwin machines
+      time.timeZone = "America/New_York";
+
       # Basic packages
       environment.systemPackages = with pkgs; [
         vim
