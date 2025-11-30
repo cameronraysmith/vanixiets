@@ -135,4 +135,38 @@ The MVP encompasses the complete 6-phase migration delivering a fully operationa
 - Multi-machine coordination operational
 - Ready for legacy cleanup (Phase 6)
 
+## Post-MVP Expansion Phases
+
+Upon MVP completion (Epics 1-6), the following expansion phases extend the infrastructure:
+
+**Phase 6 - GCP Multi-Cloud Infrastructure** (Epic 7):
+
+- Deploy togglable CPU-only and GPU-capable nodes on GCP via terranix
+- Primary business objective: GCP contract obligations, GPU availability for ML workloads
+- Proven patterns: Apply terranix patterns validated on Hetzner (cinnabar, electrum)
+- Cost management via enabled/disabled toggle (disabled nodes incur zero cost)
+- Clan inventory integration with zerotier mesh
+
+**Phase 7 - Documentation Alignment** (Epic 8):
+
+- Comprehensive Starlight docs site update (packages/docs/src/content/docs/)
+- Architecture documentation reflecting dendritic + clan patterns
+- Host onboarding guides for darwin vs nixos deployment paths
+- Secrets management documentation for two-tier pattern
+- Zero references to deprecated nixos-unified architecture
+
+**Phase 8 - Branch Consolidation and Release** (Epic 9):
+
+- Bookmark tags at branch boundaries (docs, clan, clan-01)
+- CI/CD workflow validation on clan-01
+- Merge clan-01 to main with full history preservation
+- Semantic versioning release with changelog
+- Dependency: docs accurate before merge (Epic 8 complete)
+
+**Post-MVP success criteria**:
+
+- GCP nodes operational with toggleable provisioning
+- Documentation accurate and aligned with implemented architecture
+- clan-01 merged to main with clean release
+
 ---
