@@ -20,7 +20,7 @@
       machines = {
         # CPU-only node (Story 7.2) - metallurgical naming theme
         galena = {
-          enabled = true; # Enabled for deployment validation
+          enabled = false; # Disabled for redeployment with user config
           machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
           zone = "us-central1-b";
           image = "debian-12";
