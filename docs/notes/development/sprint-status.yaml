@@ -552,7 +552,8 @@ development_status:
   # Implementation: modules/terranix/gcp.nix (172 lines) following hetzner.nix pattern
   # All 11 ACs satisfied: provider, firewall, SSH key, instance template, validation
   # Secret prerequisite: gcp-service-account-json required before Stories 7.2-7.4 deployment
-  story-7-1: review
+  # REVIEW (2025-11-30): APPROVED - 11/11 ACs, 6/6 tasks verified, 0 HIGH/MEDIUM findings
+  story-7-1: done
   story-7-1-title: "Terranix GCP provider and base configuration"
   story-7-2: backlog
   story-7-2-title: "CPU-only togglable node definition and deployment"
