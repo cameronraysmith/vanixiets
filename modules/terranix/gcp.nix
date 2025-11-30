@@ -18,13 +18,13 @@
       # Set enabled = true to deploy, false to destroy
       # Run: nix run .#terraform (regenerates config and applies)
       machines = {
-        # CPU-only node (Story 7.2)
-        gcp-cpu-1 = {
-          enabled = false; # Default disabled for cost control
+        # CPU-only node (Story 7.2) - metallurgical naming theme
+        galena = {
+          enabled = true; # Enabled for deployment validation
           machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
           zone = "us-central1-b";
           image = "debian-12";
-          comment = "CPU-only node for general workloads (~$0.27/hr)";
+          comment = "CPU-only GCP node (~$0.27/hr) - named for lead ore mineral";
         };
         # Example: GPU-capable node (Story 7.3 will populate)
         # gcp-gpu-1 = {
