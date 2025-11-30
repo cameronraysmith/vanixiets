@@ -11,5 +11,8 @@
   - [Epic 4: Third Darwin Host (Phase 3 - argentum)](./epic-4-third-darwin-host-phase-3-argentum.md)
   - [Epic 5: Primary Workstation Validation (Phase 4 - stibnite) - OPTIONAL](./epic-5-primary-workstation-validation-phase-4-stibnite.md)
   - [Epic 6: Legacy Cleanup (Phase 5)](./epic-6-legacy-cleanup-phase-5.md)
+  - [Epic 7: GCP Multi-Node Infrastructure (Post-MVP Phase 6)](./epic-7-gcp-multi-node-infrastructure.md)
+  - [Epic 8: Documentation Alignment (Post-MVP Phase 7)](./epic-8-documentation-alignment.md)
+  - [Epic 9: Branch Consolidation and Release (Post-MVP Phase 8)](./epic-9-branch-consolidation-and-release.md)
   - [Story Guidelines Reference](./story-guidelines-reference.md)
   - [Summary Statistics](./summary-statistics.md)
