@@ -25,6 +25,7 @@
     roles.default.machines."electrum" = { };
     roles.default.machines."argentum" = { };
     roles.default.machines."rosegold" = { };
+    roles.default.machines."galena" = { }; # GCP cloud VM (Story 7.2)
 
     roles.default.settings = {
       user = "cameron";
