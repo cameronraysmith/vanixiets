@@ -256,7 +256,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 4. **SSH key format** documented: `"root:${public_key}"` in metadata.ssh-keys
 5. **GPU support** prepared: `guest_accelerator` block with `scheduling.on_host_maintenance = "TERMINATE"`
 6. **Instance IP access** pattern: `network_interface[0].access_config[0].nat_ip` for external IP
-7. **Secret prerequisite**: `gcp-service-account-json` clan secret required before Stories 7.2-7.4 deployment
+7. **Secret prerequisite**: `gcp-service-account-json` clan secret ✅ CREATED (2025-11-30)
 
 ### File List
 
