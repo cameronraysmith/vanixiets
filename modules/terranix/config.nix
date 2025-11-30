@@ -16,6 +16,7 @@
         p.hashicorp_null
         p.hashicorp_tls
         p.hetznercloud_hcloud
+        p.hashicorp_google
       ]);
     in
     {
@@ -25,6 +26,7 @@
           modules = [
             self.modules.terranix.base
             self.modules.terranix.hetzner
+            self.modules.terranix.gcp
           ];
           terraformWrapper.package = package;
           terraformWrapper.extraRuntimeInputs = [ inputs'.clan-core.packages.default ];
@@ -59,7 +61,7 @@
       packages.terraform = lib.mkForce (
         config.terranix.terranixConfigurations.terraform.result.app.overrideAttrs (old: {
           meta = (old.meta or { }) // {
-            description = "OpenTofu with Hetzner Cloud provider and encrypted state";
+            description = "OpenTofu with Hetzner Cloud and GCP providers and encrypted state";
           };
         })
       );
