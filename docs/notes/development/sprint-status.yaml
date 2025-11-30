@@ -562,10 +562,14 @@ development_status:
   # REVIEW (2025-11-30): APPROVED - 10/10 ACs, 6/6 tasks verified, 0 HIGH/MEDIUM findings
   story-7-2: done
   story-7-2-title: "CPU-only togglable node definition and deployment"
-  story-7-3: backlog
-  story-7-3-title: "GPU-capable togglable node definition and deployment"
+  # Story 7.3/7.4 REORDERED (2025-11-30): Zerotier before GPU per Party Mode decision
+  # Rationale: Zerotier is infrastructure-level; test on cheap CPU node before expensive GPU
+  # Story 7.3: DRAFTED (2025-11-30) - Clan inventory entry + zerotier peer role for galena
+  # Adapts Epic 7 Story 7.4 content for new Story 7.3 numbering
+  story-7-3: drafted
+  story-7-3-title: "Clan integration and zerotier mesh for GCP nodes"
   story-7-4: backlog
-  story-7-4-title: "Clan integration and zerotier mesh for GCP nodes"
+  story-7-4-title: "GPU-capable togglable node definition and deployment"
   epic-7-retrospective: optional
 
   # Epic 8 - Documentation Alignment
@@ -603,6 +607,13 @@ development_status:
 
 # Sprint Change History
 sprint_change_history:
+  - date: "2025-11-30"
+    type: "story-reorder"
+    changes:
+      - "Epic 7: Story 7.3/7.4 swapped - zerotier before GPU"
+      - "Story 7.3: Now 'Clan integration and zerotier mesh for GCP nodes' (was 7.4)"
+      - "Story 7.4: Now 'GPU-capable togglable node definition and deployment' (was 7.3)"
+    rationale: "Party Mode decision - zerotier is infrastructure-level, test on cheap CPU node (galena) before expensive GPU (scheelite)"
   - date: "2025-11-29"
     type: "epic-completion-and-expansion"
     changes:
