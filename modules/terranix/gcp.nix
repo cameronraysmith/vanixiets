@@ -43,9 +43,10 @@
     in
     {
       # Required providers for GCP
+      # Version must match nixpkgs terraform-providers.hashicorp_google (currently 7.10.0)
       terraform.required_providers.google = {
         source = "hashicorp/google";
-        version = "~> 5.0";
+        version = "~> 7.0";
       };
       terraform.required_providers.tls.source = "hashicorp/tls";
       terraform.required_providers.null.source = "hashicorp/null";
