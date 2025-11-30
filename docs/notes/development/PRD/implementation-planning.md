@@ -36,6 +36,27 @@ Requirements must be decomposed into epics and bite-sized stories (200k context 
 
 - Stories: nixos-unified removal, secrets migration completion, documentation updates
 
+**Epic 7: GCP Multi-Node Infrastructure** (Post-MVP Phase 6)
+
+- Stories: Terranix GCP provider configuration, CPU-only togglable node, GPU-capable togglable node, clan integration and zerotier mesh
+- Primary business objective: GCP contract obligations, GPU availability
+- Pattern: Replicate `modules/terranix/hetzner.nix` for GCP provider
+- Depends on: Epic 6 complete
+
+**Epic 8: Documentation Alignment** (Post-MVP Phase 7)
+
+- Stories: Audit existing docs, update architecture/patterns docs, update host onboarding guides, update secrets management docs
+- Comprehensive Starlight docs site update
+- Zero references to deprecated nixos-unified architecture
+- Depends on: Epic 7 complete (document what exists)
+
+**Epic 9: Branch Consolidation and Release** (Post-MVP Phase 8)
+
+- Stories: Create bookmark tags, validate CI/CD, merge clan-01 to main
+- Semantic versioning release with changelog
+- Full history preservation (no force-push)
+- Depends on: Epic 8 complete (docs accurate before merge)
+
 **Next Step:** Run `workflow create-epics-and-stories` to create the implementation breakdown.
 
 ---
