@@ -18,14 +18,14 @@
       # Set enabled = true to deploy, false to destroy
       # Run: nix run .#terraform (regenerates config and applies)
       machines = {
-        # Example: CPU-only node (Story 7.2 will populate)
-        # gcp-node-1 = {
-        #   enabled = false;
-        #   machineType = "n1-standard-4";
-        #   zone = "us-central1-b";
-        #   image = "debian-12";
-        #   comment = "4 vCPU, 15GB RAM, standard instance";
-        # };
+        # CPU-only node (Story 7.2)
+        gcp-cpu-1 = {
+          enabled = false; # Default disabled for cost control
+          machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
+          zone = "us-central1-b";
+          image = "debian-12";
+          comment = "CPU-only node for general workloads (~$0.27/hr)";
+        };
         # Example: GPU-capable node (Story 7.3 will populate)
         # gcp-gpu-1 = {
         #   enabled = false;
