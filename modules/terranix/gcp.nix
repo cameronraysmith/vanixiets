@@ -141,6 +141,23 @@
           # Format: "username:ssh-key-type key-data comment"
           metadata = {
             ssh-keys = "root:${config.resource.tls_private_key.gcp_deploy_key "public_key_openssh"}";
+            # Startup script to enable root SSH (Debian defaults to PermitRootLogin no)
+            # Required for nixos-anywhere/clan machines install
+            startup-script = ''
+              #!/bin/bash
+              set -e
+              # Enable root login for nixos-anywhere installation
+              sed -i 's/^PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+              sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+              # Ensure root authorized_keys is set from metadata
+              mkdir -p /root/.ssh
+              chmod 700 /root/.ssh
+              curl -sf "http://metadata.google.internal/computeMetadata/v1/instance/attributes/ssh-keys" \
+                -H "Metadata-Flavor: Google" | grep "^root:" | cut -d: -f2- > /root/.ssh/authorized_keys
+              chmod 600 /root/.ssh/authorized_keys
+              # Restart sshd
+              systemctl restart sshd
+            '';
           };
         }
         // lib.optionalAttrs (cfg ? gpuType && cfg ? gpuCount) {
