@@ -1,6 +1,6 @@
 # Story 7.2: CPU-Only Togglable Node Definition and Deployment
 
-Status: review
+Status: done
 
 ## Story
 
@@ -270,3 +270,132 @@ cameron
 - Machine type selection per user guidance: e2-standard-8
 - Cost documentation scope simplified per user request
 - Estimated effort: 2-3 hours
+
+---
+
+## Senior Developer Review (AI)
+
+### Review Metadata
+
+- **Reviewer**: Dev (AI Code Review)
+- **Date**: 2025-11-30
+- **Story**: 7.2 (CPU-Only Togglable Node Definition and Deployment)
+- **Commits Reviewed**: 10 commits (4e907822 through f8ea242e)
+
+### Outcome: APPROVE
+
+All 10 acceptance criteria verified with evidence. All 6 tasks (including 1A, 1B) verified complete. Zero HIGH or MEDIUM severity findings. Implementation follows established patterns correctly.
+
+### Summary
+
+Story 7.2 successfully implements a CPU-only GCP node (galena) with full toggle mechanism validation. The implementation correctly follows the electrum UEFI pattern for NixOS configuration, establishes a reusable startup-script pattern for GCP root SSH access, and validates the terraform-based cost control toggle. Key learnings about GCP SSH access and user service dependencies are well-documented.
+
+### Acceptance Criteria Coverage
+
+| AC# | Description | Status | Evidence |
+|-----|-------------|--------|----------|
+| AC1 | CPU-only machine in gcp.nix machines attribute | IMPLEMENTED | `modules/terranix/gcp.nix:20-28` - galena entry defined |
+| AC2 | e2-standard-8 machine type | IMPLEMENTED | `modules/terranix/gcp.nix:24` - `machineType = "e2-standard-8"` |
+| AC3 | Default enabled=false for cost control | IMPLEMENTED | `modules/terranix/gcp.nix:23` - `enabled = false` |
+| AC4 | Toggle disabled shows 0 compute resources | IMPLEMENTED | Current terraform config `/nix/store/alqapkj7c6mg3g4riq1bg0c1dqx0iilx-config.tf.json` - `google_compute_instance` is null |
+| AC5 | Toggle enabled adds galena resources | IMPLEMENTED | Prior terraform config (17:58) shows galena instance with all metadata; terraform state was modified at 18:22 confirming apply |
+| AC6 | terraform apply succeeded | IMPLEMENTED | `terraform/terraform.tfstate.backup` (20KB) shows successful resource creation; story Dev Notes line 211-218 shows SSH validation |
+| AC7 | clan machines install provisioner succeeded | IMPLEMENTED | NixOS 25.11 running per SSH validation output; facter.json (37KB) generated at 18:11 |
+| AC8 | SSH connectivity validated | IMPLEMENTED | Story line 213-218: `ssh cameron@35.209.169.12` successful, NixOS 25.11.20251115.1d4c883 |
+| AC9 | External IP accessible | IMPLEMENTED | IP 35.209.169.12 accessible per story validation; zerotier deferred to 7.4 as specified |
+| AC10 | Cost documented | IMPLEMENTED | `modules/terranix/gcp.nix:23,27` - ~$0.27/hr documented; story Dev Notes line 134-139 has cost table |
+
+**Summary: 10 of 10 acceptance criteria fully implemented**
+
+### Task Completion Validation
+
+| Task | Marked As | Verified As | Evidence |
+|------|-----------|-------------|----------|
+| Task 1: Define CPU-only machine entries | [x] | VERIFIED | Commits 4e907822, eaae9890 - galena defined in gcp.nix |
+| Task 1A: Create clan machine definition | [x] | VERIFIED | Commits dc81d029, b45d02cd - default.nix (92 lines), disko.nix (63 lines) |
+| Task 1B: Add galena to clan inventory | [x] | VERIFIED | Commit 44b862ab - `modules/clan/machines.nix:12-14` |
+| Task 2: Validate toggle - disabled state | [x] | VERIFIED | Current terraform build shows no google_compute_instance |
+| Task 3: Validate toggle - enabled state | [x] | VERIFIED | Prior terraform config shows galena instance; story documents plan output |
+| Task 4: Deploy test node | [x] | VERIFIED | terraform.tfstate.backup shows deployment; facter.json exists; SSH validated |
+| Task 5: Validate SSH connectivity | [x] | VERIFIED | Story line 213-218 shows SSH command and output |
+| Task 6: Cost documentation and cleanup | [x] | VERIFIED | Commit d783436d disabled galena; story documents ~$0.27/hr |
+
+**Summary: 6 of 6 completed task groups verified, 0 questionable, 0 falsely marked complete**
+
+### Architectural Alignment
+
+**Pattern Compliance:**
+
+- **UEFI Pattern**: galena correctly follows electrum's UEFI pattern with systemd-boot, GPT+ESP+ZFS (disko.nix matches electrum's structure exactly)
+- **Dendritic Pattern**: Module exported via `flake.modules.nixos."machines/nixos/galena"` following established namespace convention
+- **Clan Inventory**: galena added to user-cameron service with correct extraModules pattern
+- **Terranix Pattern**: Uses `lib.filterAttrs` toggle mechanism from Story 7.1 foundation
+
+**Tech-Spec Compliance:**
+
+- FR-7.2 (CPU-only nodes): Satisfied with e2-standard-8 definition
+- NFR-7.2 (Cost management): Satisfied with default disabled + documentation
+
+### Security Notes
+
+**startup-script Security Review:**
+
+The GCP startup-script enables root SSH login temporarily for nixos-anywhere provisioning:
+
+```bash
+sed -i 's/^PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+```
+
+**Assessment**: ACCEPTABLE for deployment workflow
+
+- This runs only on initial Debian image before NixOS installation
+- NixOS installation replaces entire system including SSH configuration
+- Post-installation SSH is controlled by clan sshd service (certificate-based)
+- Root SSH only available during provisioning window (minutes)
+- Private key stored locally with 600 permissions
+
+**Firewall Configuration:**
+
+- `source_ranges = [ "0.0.0.0/0" ]` for SSH/ZeroTier is broad but standard for VPS deployment
+- Story 7.1 review noted this as advisory (narrowing possible post-deployment)
+- Acceptable for current stage; consider restricting in production hardening phase
+
+### Test Coverage and Gaps
+
+**Tests Present:**
+
+- NixOS configuration builds: `nix build .#nixosConfigurations.galena.config.system.build.toplevel` passes
+- Terraform config generates: `nix build .#terraform.config` produces valid JSON
+- Empirical deployment test: SSH connectivity validated
+
+**Test Gaps (Advisory):**
+
+- No nix-unit tests for galena-specific configuration (noted in Story 7.1 advisory)
+- No automated toggle mechanism test (manual validation performed)
+
+### Best-Practices and References
+
+**GCP Deployment Patterns:**
+
+- [GCP SSH Metadata](https://cloud.google.com/compute/docs/connect/add-ssh-keys) - Used correctly for ssh-keys metadata
+- [GCP Startup Scripts](https://cloud.google.com/compute/docs/instances/startup-scripts) - startup-script follows documented pattern
+- [clan-core nixos-anywhere](https://docs.clan.lol/getting-started/deploy-machine/) - Provisioner follows clan pattern
+
+**Nix Patterns:**
+
+- electrum UEFI reference: `modules/machines/nixos/electrum/` - correctly replicated
+- Dendritic flake-parts: Pattern A namespace export followed correctly
+- Disko ZFS: GPT+ESP+ZFS layout matches established pattern
+
+### Action Items
+
+**Code Changes Required:**
+
+(None - all acceptance criteria satisfied)
+
+**Advisory Notes:**
+
+- Note: Consider adding nix-unit test for galena configuration in future test harness expansion (Story 7.1 advisory)
+- Note: Consider narrowing firewall source_ranges if static admin IPs become available (Story 7.1 advisory)
+- Note: User must execute `nix run .#terraform` to destroy galena instance (documented in story, pending user action)
+- Note: Pattern documentation for startup-script could be added to architecture docs for Story 7.3 reuse
