@@ -543,7 +543,7 @@ development_status:
 
   # Epic 7 - GCP Multi-Node Infrastructure
   # PRIMARY OBJECTIVE: Togglable CPU and GPU compute nodes on GCP
-  epic-7: backlog
+  epic-7: contexted
   epic-7-notes: |
     Deploy togglable CPU-only and GPU-capable nodes on GCP using terranix.
     Primary business objective - GCP contract, GPU availability, cost management.
@@ -560,7 +560,7 @@ development_status:
 
   # Epic 8 - Documentation Alignment
   # Update Starlight docs to reflect dendritic+clan architecture
-  epic-8: backlog
+  epic-8: contexted
   epic-8-notes: |
     Comprehensive update of packages/docs/src/content/docs/ Starlight site.
     Align with dendritic flake-parts + clan architecture.
@@ -578,7 +578,7 @@ development_status:
 
   # Epic 9 - Branch Consolidation and Release
   # Merge clan-01 to main with proper tagging
-  epic-9: backlog
+  epic-9: contexted
   epic-9-notes: |
     Merge clan-01 branch to main with bookmark tags at branch boundaries.
     CI/CD validation, release tagging automation.
