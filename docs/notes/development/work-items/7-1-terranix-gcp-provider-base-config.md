@@ -25,7 +25,7 @@ Story 7.1 is the foundation story for Epic 7 (GCP Multi-Node Infrastructure), th
 ## Acceptance Criteria
 
 1. `modules/terranix/gcp.nix` created following dendritic flake-parts namespace (`flake.modules.terranix.gcp`)
-2. GCP provider configured using `hashicorp/google` (NOT google-beta) with version constraint `~> 5.0`
+2. GCP provider configured using `hashicorp/google` (NOT google-beta) with version constraint `~> 7.0` (matches nixpkgs 7.10.0)
 3. Service account credentials integration via clan secrets (similar to Hetzner API token pattern)
 4. ED25519 SSH key generation using `tls_private_key` resource (matching hetzner.nix pattern)
 5. Private key stored locally via `local_sensitive_file` for `clan machines install`
@@ -257,6 +257,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 5. **GPU support** prepared: `guest_accelerator` block with `scheduling.on_host_maintenance = "TERMINATE"`
 6. **Instance IP access** pattern: `network_interface[0].access_config[0].nat_ip` for external IP
 7. **Secret prerequisite**: `gcp-service-account-json` clan secret ✅ CREATED (2025-11-30)
+8. **Terraform plan validated** (2025-11-30): 4 resources to add (2 firewall rules, SSH key pair), credentials read successfully
 
 ### File List
 
@@ -269,6 +270,13 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - `docs/notes/development/work-items/7-1-terranix-gcp-provider-base-config.md` - Task checkboxes, Dev Agent Record
 
 ## Change Log
+
+**2025-11-30 (Validation Complete)**:
+- Provider version constraint fixed: `~> 5.0` → `~> 7.0` (nixpkgs provides 7.10.0)
+- `gcp-service-account-json` clan secret created
+- `nix run .#terraform.plan` executed successfully
+- Plan output: 4 to add (2 firewall rules + SSH keypair), credentials validated
+- Investigation documented: terranix wrapper mechanism, passthru scripts
 
 **2025-11-30 (Implementation Complete)**:
 - All 6 tasks completed, all 11 ACs satisfied
