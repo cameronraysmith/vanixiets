@@ -27,8 +27,10 @@ Deploy togglable CPU-only and GPU-capable compute nodes on GCP using terranix, i
 |-------|-------------------------|
 | Story 7.1 | FR-7.1 (Terranix GCP provider) |
 | Story 7.2 | FR-7.2 (CPU-only nodes) |
-| Story 7.3 | FR-7.3 (GPU-capable nodes) |
-| Story 7.4 | FR-7.4 (Clan + zerotier integration) |
+| Story 7.3 | FR-7.4 (Clan + zerotier integration) |
+| Story 7.4 | FR-7.3 (GPU-capable nodes) |
+
+*Note: Stories 7.3/7.4 reordered 2025-11-30 - zerotier before GPU per Party Mode decision.*
 
 ---
 
@@ -117,7 +119,51 @@ machines = {
 
 ---
 
-## Story 7.3: GPU-capable togglable node definition and deployment
+## Story 7.3: Clan integration and zerotier mesh for GCP nodes
+
+*Reordered from Story 7.4 on 2025-11-30 - zerotier integration before GPU to test on cheap CPU node first.*
+
+As a system administrator,
+I want GCP nodes to join the clan inventory and zerotier mesh network,
+So that GCP nodes are managed consistently with Hetzner VPS and darwin workstations.
+
+**Acceptance Criteria:**
+
+**Given** deployed GCP node galena from Story 7.2
+**When** galena is configured for zerotier via clan inventory
+**Then** clan integration should:
+- Add galena entry in `modules/clan/inventory/machines.nix`
+- Assign appropriate tags: `["nixos", "cloud", "gcp", "peer"]`
+- Inherit zerotier peer role via `roles.peer.tags."peer"` pattern
+- Deploy clan vars to `/run/secrets/` with proper permissions
+
+**And** zerotier mesh should:
+- Configure peer role connecting to cinnabar controller (network ID db4344343b14b903)
+- Establish mesh connectivity with all existing nodes (darwin + Hetzner)
+- Validate bidirectional SSH access via zerotier IPs
+
+**And** operational validation should:
+- `clan machines list` includes galena
+- `zerotier-cli status` shows network membership on galena
+- SSH access via zerotier IP (galena.zt) functional from all other hosts
+- galena.zt added to home-manager SSH config
+
+**Prerequisites:** Story 7.2 (galena CPU node validated)
+
+**Technical Notes:**
+- Zerotier role: Peer (like electrum), not controller (cinnabar is controller)
+- Tags: `["nixos", "cloud", "gcp", "peer"]` - peer tag triggers zerotier service
+- Pattern reference: `modules/clan/inventory/machines.nix` electrum entry
+- Service inheritance: zerotier peer role via tag-based selection
+- Cost control: Re-enable galena only for testing, disable after validation
+
+**NFR Coverage:** NFR-7.3 (Deployment consistency with Hetzner pattern)
+
+---
+
+## Story 7.4: GPU-capable togglable node definition and deployment
+
+*Reordered from Story 7.3 on 2025-11-30 - GPU after zerotier integration validated.*
 
 As a system administrator,
 I want to define GPU-capable GCP compute instances with NVIDIA accelerators,
@@ -125,7 +171,7 @@ So that I can run ML workloads requiring GPU acceleration with cost-conscious to
 
 **Acceptance Criteria:**
 
-**Given** the GCP terranix module from Story 7.1
+**Given** the GCP terranix module from Story 7.1 and zerotier integration from Story 7.3
 **When** I define GPU-capable machine configurations
 **Then** the module should:
 - Support n1-standard machine types with GPU attachment
@@ -144,10 +190,10 @@ So that I can run ML workloads requiring GPU acceleration with cost-conscious to
 - Default to `enabled = false` for GPU nodes
 - Include cost comparison table in documentation
 
-Example GPU machine definition:
+Example GPU machine definition (scheelite):
 ```nix
 machines = {
-  gcp-gpu-1 = {
+  scheelite = {
     enabled = false;  # Default disabled for cost control
     machineType = "n1-standard-4";
     zone = "us-central1-a";
@@ -156,12 +202,12 @@ machines = {
       type = "nvidia-tesla-t4";
       count = 1;
     };
-    comment = "T4 GPU node for ML inference";
+    comment = "T4 GPU node for ML inference (~$0.35/hr + base)";
   };
 };
 ```
 
-**Prerequisites:** Story 7.2 (CPU-only nodes validated)
+**Prerequisites:** Story 7.3 (zerotier integration validated on galena)
 
 **Technical Notes:**
 - GPU machine types: n1-standard-4/8/16 with attached GPUs
@@ -170,47 +216,9 @@ machines = {
 - NVIDIA driver: `hardware.nvidia.modesetting.enable = true`
 - CUDA modules: `environment.systemPackages = [ pkgs.cudaPackages.cudatoolkit ]`
 - Zone constraints: Not all zones have GPU availability
+- Naming: scheelite (tungsten ore mineral, continuing metallurgical theme)
 
 **NFR Coverage:** NFR-7.2 (Cost management - especially critical for GPUs)
-
----
-
-## Story 7.4: Clan integration and zerotier mesh for GCP nodes
-
-As a system administrator,
-I want GCP nodes to join the clan inventory and zerotier mesh network,
-So that GCP nodes are managed consistently with Hetzner VPS and darwin workstations.
-
-**Acceptance Criteria:**
-
-**Given** deployed GCP nodes from Stories 7.2 and 7.3
-**When** nodes are provisioned via `clan machines install`
-**Then** clan integration should:
-- Add machine entries in clan inventory
-- Assign appropriate tags: `["nixos", "vps", "cloud", "gcp"]`
-- Configure service instances for zerotier (peer role)
-- Deploy clan vars to `/run/secrets/` with proper permissions
-
-**And** zerotier mesh should:
-- Configure peer role connecting to cinnabar controller (network ID db4344343b14b903)
-- Establish mesh connectivity with all existing nodes (darwin + Hetzner)
-- Validate bidirectional SSH access via zerotier IPs
-
-**And** operational validation should:
-- `clan machines list` includes GCP nodes
-- `zerotier-cli status` shows network membership
-- SSH access via zerotier IP functional from all other hosts
-- Secrets deployed and accessible in `/run/secrets/`
-
-**Prerequisites:** Story 7.3 (GPU nodes defined) or Story 7.2 (CPU nodes) - at least one node type
-
-**Technical Notes:**
-- Zerotier role: Peer (like electrum), not controller (cinnabar is controller)
-- Tags: `["nixos", "vps", "cloud", "gcp"]` distinguishes from Hetzner `["nixos", "vps", "cloud", "hetzner"]`
-- Service instances: `zerotier.peer`, `sshd.server`, `emergency-access.default`, `users.default`
-- Clan inventory path: `modules/clan/inventory/machines/gcp-*.nix`
-
-**NFR Coverage:** NFR-7.3 (Deployment consistency with Hetzner pattern)
 
 ---
 
