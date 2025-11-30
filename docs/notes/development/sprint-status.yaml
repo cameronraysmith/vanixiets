@@ -555,7 +555,11 @@ development_status:
   # REVIEW (2025-11-30): APPROVED - 11/11 ACs, 6/6 tasks verified, 0 HIGH/MEDIUM findings
   story-7-1: done
   story-7-1-title: "Terranix GCP provider and base configuration"
-  story-7-2: backlog
+  # Story 7.2: COMPLETE (2025-11-30) - CPU-only machine definitions and deployment validation
+  # galena (e2-standard-8) deployed, SSH validated, NixOS 25.11 operational
+  # Key learnings: GCP root SSH startup-script, user service dependency, toggle mechanism
+  # galena disabled for cost control, terraform destroy pending user execution
+  story-7-2: review
   story-7-2-title: "CPU-only togglable node definition and deployment"
   story-7-3: backlog
   story-7-3-title: "GPU-capable togglable node definition and deployment"
