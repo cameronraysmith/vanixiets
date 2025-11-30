@@ -256,3 +256,113 @@ Apply test-clan validated patterns to production infra repository using "rip the
 - [ ] All machines operational with no legacy dependencies
 
 ---
+
+## FR-7: GCP Multi-Node Infrastructure (Post-MVP Phase 6 - Epic 7)
+
+GCP compute infrastructure expansion for contract obligations and GPU availability using proven terranix patterns.
+
+**FR-7.1**: System shall provision GCP compute instances via terranix with enabled/disabled toggle:
+
+- Terranix GCP module following patterns established in `modules/terranix/hetzner.nix`
+- Machine definitions with `enabled = true/false` toggle for cost control
+- Terraform state management consistent with Hetzner deployment
+
+**FR-7.2**: CPU-only nodes shall use cost-effective machine types:
+
+- e2-standard or n2-standard machine families for general compute
+- Location selection based on cost and latency requirements
+- Debian base image for NixOS installation consistency
+
+**FR-7.3**: GPU-capable nodes shall support NVIDIA accelerators for ML workloads:
+
+- T4 and A100 GPU accelerator options
+- GPU-specific machine types (n1-standard with GPU attachment)
+- CUDA/driver configuration via NixOS modules
+
+**FR-7.4**: GCP nodes shall join clan inventory with zerotier mesh integration:
+
+- Machine entries in clan inventory with appropriate tags ("nixos", "vps", "cloud", "gcp")
+- Zerotier peer role connecting to cinnabar controller
+- Clan vars deployment for secrets
+- `clan machines install` deployment consistent with Hetzner pattern
+
+**Acceptance criteria**:
+
+- [ ] Terranix GCP module builds (`nix eval .#terranixConfigurations.gcp`)
+- [ ] CPU-only node deploys successfully with toggle enabled
+- [ ] GPU-capable node deploys successfully with toggle enabled
+- [ ] Both node types join zerotier mesh and clan inventory
+- [ ] Disabled nodes incur zero ongoing cost
+
+---
+
+## FR-8: Documentation Alignment (Post-MVP Phase 7 - Epic 8)
+
+Comprehensive documentation update to reflect dendritic + clan architecture after GCP infrastructure deployment.
+
+**FR-8.1**: Starlight docs site shall be updated for dendritic + clan architecture:
+
+- packages/docs/src/content/docs/ updated with current patterns
+- Architecture diagrams reflecting implemented patterns (not legacy nixos-unified)
+- Module organization documentation for dendritic flake-parts
+
+**FR-8.2**: Architecture documentation shall reflect implemented patterns:
+
+- docs/notes/development/architecture/ sections updated
+- ADRs added for GCP infrastructure decisions
+- Deployment patterns documented for multi-cloud (Hetzner + GCP)
+
+**FR-8.3**: Host onboarding guides shall differentiate darwin vs nixos deployment:
+
+- Darwin deployment path: `darwin-rebuild switch --flake`
+- NixOS VPS deployment path: `clan machines install`
+- Prerequisites and environment setup for each path
+
+**FR-8.4**: Secrets management documentation shall cover two-tier pattern:
+
+- Clan vars for generated secrets (SSH keys, service passwords)
+- sops-nix for external credentials (API tokens, if hybrid approach)
+- Migration path from pure sops-nix to clan vars
+
+**Acceptance criteria**:
+
+- [ ] Starlight docs site builds without errors
+- [ ] Zero references to deprecated nixos-unified architecture
+- [ ] Host onboarding guides accurate for both darwin and nixos
+- [ ] Secrets management docs cover implemented two-tier pattern
+- [ ] Documentation testable against actual infrastructure state
+
+---
+
+## FR-9: Branch Consolidation and Release (Post-MVP Phase 8 - Epic 9)
+
+Merge clan-01 branch to main with proper tagging and CI/CD validation.
+
+**FR-9.1**: Bookmark tags shall be created at key branch boundaries:
+
+- Tag at docs branch merge point
+- Tag at clan branch merge point
+- Tag at clan-01 branch merge point
+- Semantic versioning for release tag
+
+**FR-9.2**: CI/CD workflows shall pass on clan-01 before merge authorization:
+
+- All GitHub Actions workflows green
+- `nix flake check` passing
+- All host configurations building successfully
+
+**FR-9.3**: clan-01 shall be merged to main with full history preservation:
+
+- Fast-forward merge if possible
+- No force-push or history rewriting
+- Changelog generated from commit history
+
+**Acceptance criteria**:
+
+- [ ] Bookmark tags created at branch boundaries
+- [ ] All CI/CD workflows passing on clan-01
+- [ ] clan-01 merged to main successfully
+- [ ] Release tag with semantic version applied
+- [ ] Changelog published with release
+
+---
