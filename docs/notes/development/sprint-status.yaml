@@ -548,7 +548,11 @@ development_status:
     Deploy togglable CPU-only and GPU-capable nodes on GCP using terranix.
     Primary business objective - GCP contract, GPU availability, cost management.
     Depends on Epic 6 complete.
-  story-7-1: in-progress
+  # Story 7.1: DONE (2025-11-30) - GCP terranix module created and validated
+  # Implementation: modules/terranix/gcp.nix (172 lines) following hetzner.nix pattern
+  # All 11 ACs satisfied: provider, firewall, SSH key, instance template, validation
+  # Secret prerequisite: gcp-service-account-json required before Stories 7.2-7.4 deployment
+  story-7-1: review
   story-7-1-title: "Terranix GCP provider and base configuration"
   story-7-2: backlog
   story-7-2-title: "CPU-only togglable node definition and deployment"
