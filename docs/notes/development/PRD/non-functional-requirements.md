@@ -94,3 +94,56 @@
 - Separate secret paths (`/run/secrets-sops/`) to avoid conflicts with clan vars
 
 ---
+
+## Post-MVP Expansion NFRs
+
+### GCP Infrastructure (Epic 7)
+
+**Pattern consistency**: Terranix GCP module shall follow patterns established in hetzner.nix:
+
+- Machine definition structure with enabled/disabled toggle
+- SSH key generation and registration
+- null_resource provisioner for `clan machines install`
+- Consistent naming conventions
+
+**Cost management**: Disabled nodes shall incur zero ongoing cost:
+
+- Infrastructure as code defines desired state
+- Disabled machines not provisioned (terraform destroy behavior)
+- GPU nodes especially costly when idle - toggle critical for cost control
+
+**Deployment consistency**: GCP deployment shall use `clan machines install` pattern:
+
+- Consistent with Hetzner deployment workflow
+- Same secrets management via clan vars
+- Same zerotier mesh integration
+
+### Documentation (Epic 8)
+
+**Accuracy**: Zero references to deprecated nixos-unified architecture in published docs:
+
+- All architecture references updated to dendritic + clan
+- Legacy patterns removed or marked as deprecated
+- Current implementation reflected in examples
+
+**Testability**: Documentation shall be testable against actual infrastructure state:
+
+- Commands in docs should work when executed
+- Configuration examples should build successfully
+- Screenshots/diagrams reflect current implementation
+
+### Release (Epic 9)
+
+**Semantic versioning**: Release shall follow semantic versioning with changelog:
+
+- MAJOR.MINOR.PATCH versioning
+- Changelog generated from conventional commits
+- Breaking changes documented
+
+**History preservation**: No force-push or history rewriting during merge:
+
+- Clean merge preserving all commit history
+- Branch boundaries tagged for reference
+- Rollback possible via tag reference
+
+---
