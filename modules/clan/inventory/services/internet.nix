@@ -3,6 +3,6 @@
     roles.default.machines.cinnabar.settings.host = "49.13.68.78";
     roles.default.machines.electrum.settings.host = "162.55.175.87";
     # GCP IP is ephemeral - update after each enable/deploy cycle
-    roles.default.machines.galena.settings.host = "35.209.166.137";
+    roles.default.machines.galena.settings.host = "35.206.81.165";
   };
 }
