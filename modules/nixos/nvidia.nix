@@ -1,10 +1,11 @@
 # Datacenter-optimized NVIDIA configuration for headless ML servers
-# Target: GCP L4 GPU nodes (scheelite) for JAX/PyTorch training/inference
+# Target: GCP T4/L4 GPU nodes (scheelite) for JAX/PyTorch training/inference
 #
 # CRITICAL NOTES:
 # - DO NOT enable datacenter.enable (Bug #454772 - GSP firmware missing)
 # - nvidiaPersistenced is MANDATORY for headless servers
 # - This module is for COMPUTE ONLY, not desktop/display
+# - DO NOT set nixpkgs.config.cudaSupport = true (causes mass rebuild of ALL packages)
 #
 # Reference: docs/notes/development/nvidia-module-analysis.md
 {
@@ -14,8 +15,39 @@
       # Allow unfree packages (required for NVIDIA proprietary drivers)
       nixpkgs.config.allowUnfree = true;
 
-      # Enable CUDA support in nixpkgs for building CUDA-enabled packages
-      nixpkgs.config.cudaSupport = true;
+      # IMPORTANT: We do NOT set nixpkgs.config.cudaSupport = true globally.
+      # That would change derivation hashes for ALL packages, causing mass rebuilds
+      # since cache.nixos.org doesn't build with cudaSupport enabled (unfree).
+      #
+      # Instead, enable CUDA support only for specific ML packages via overlays.
+      # This preserves cache hits for system packages (nix, nixd, etc.)
+      nixpkgs.overlays = [
+        (final: prev: {
+          pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
+            (python-final: python-prev: {
+              # PyTorch with CUDA support
+              torch = python-prev.torch.override {
+                cudaSupport = true;
+                triton = python-prev.triton-cuda;
+                rocmSupport = false;
+              };
+
+              # JAX with CUDA support
+              jax = python-prev.jax.override {
+                cudaSupport = true;
+              };
+
+              jaxlib = python-prev.jaxlib.override {
+                cudaSupport = true;
+              };
+
+              # Additional ML packages can be added here as needed:
+              # tensorflow = python-prev.tensorflow.override { cudaSupport = true; };
+              # numba = python-prev.numba.override { cudaSupport = true; };
+            })
+          ];
+        })
+      ];
 
       # Enable graphics infrastructure (required even for headless compute)
       # Provides OpenGL/Vulkan compute APIs and /run/opengl-driver paths
