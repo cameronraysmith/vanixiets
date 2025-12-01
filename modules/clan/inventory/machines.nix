@@ -22,6 +22,17 @@
       description = "Secondary test VM, zerotier peer";
     };
 
+    galena = {
+      tags = [
+        "nixos"
+        "cloud"
+        "gcp"
+        "peer"
+      ];
+      machineClass = "nixos";
+      description = "GCP CPU node (e2-standard-8), zerotier peer";
+    };
+
     blackphos = {
       tags = [
         "darwin"
