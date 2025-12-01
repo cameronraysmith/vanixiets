@@ -4,6 +4,6 @@
     roles.default.machines.electrum.settings.host = "162.55.175.87";
     # GCP IPs are ephemeral - update after each enable/deploy cycle
     roles.default.machines.galena.settings.host = "35.206.81.165";
-    roles.default.machines.scheelite.settings.host = "35.209.246.27";
+    roles.default.machines.scheelite.settings.host = "35.208.97.48";
   };
 }
