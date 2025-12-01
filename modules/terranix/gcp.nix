@@ -33,17 +33,15 @@
       # Enable only for active use, disable immediately after workload completion.
       #
       machines = {
-        # CPU-only node (Story 7.2) - metallurgical naming theme
+        # CPU-only node
         galena = {
           enabled = false; # Default disabled for cost control (~$0.27/hr)
           machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
           zone = "us-central1-b";
           image = "debian-12";
-          comment = "CPU-only GCP node (~$0.27/hr) - named for lead ore mineral";
+          comment = "CPU-only node";
         };
-        # GPU-capable node (Story 7.4) - metallurgical naming theme
-        # scheelite: tungsten ore mineral (CaWO4)
-        # COST WARNING: ~$0.37/hr when running, disable when not in use
+        # GPU-capable node
         scheelite = {
           enabled = false; # Default disabled for cost control (~$0.37/hr total)
           machineType = "g2-standard-4"; # 4 vCPU, 16GB RAM, optimized for L4
@@ -51,7 +49,7 @@
           image = "debian-12";
           gpuType = "nvidia-l4"; # Ada Lovelace, optimal for inference
           gpuCount = 1;
-          comment = "L4 GPU node for ML inference (~$0.24/hr GPU + ~$0.13/hr base)";
+          comment = "L4 GPU node";
         };
       };
 
