@@ -1,6 +1,6 @@
 # Story 8.1: Audit Existing Starlight Docs for Staleness
 
-Status: drafted
+Status: done
 
 ## Story
 
@@ -54,52 +54,52 @@ No modifications to Starlight docs occur in this story.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create file inventory (AC: #1)
-  - [ ] List all .md files in `packages/docs/src/content/docs/` with category breakdown
-  - [ ] Count files per category (About, Concepts, Development, Guides, Reference)
-  - [ ] Create inventory table in audit results document
+- [x] Task 1: Create file inventory (AC: #1)
+  - [x] List all .md files in `packages/docs/src/content/docs/` with category breakdown
+  - [x] Count files per category (About, Concepts, Development, Guides, Reference)
+  - [x] Create inventory table in audit results document
 
-- [ ] Task 2: Search for staleness indicators (AC: #3)
-  - [ ] Search for `nixos-unified` references: `rg "nixos-unified" packages/docs/`
-  - [ ] Search for `configurations/` references: `rg "configurations/" packages/docs/`
-  - [ ] Search for `LazyVim-module` references: `rg "LazyVim-module" packages/docs/`
-  - [ ] Search for obsolete machine references (stibnite-nixos, blackphos-nixos, etc.)
-  - [ ] Identify commands that reference old directory structures
-  - [ ] Note missing coverage for dendritic, clan-core, zerotier patterns
+- [x] Task 2: Search for staleness indicators (AC: #3)
+  - [x] Search for `nixos-unified` references: `rg "nixos-unified" packages/docs/`
+  - [x] Search for `configurations/` references: `rg "configurations/" packages/docs/`
+  - [x] Search for `LazyVim-module` references: `rg "LazyVim-module" packages/docs/`
+  - [x] Search for obsolete machine references (stibnite-nixos, blackphos-nixos, etc.)
+  - [x] Identify commands that reference old directory structures
+  - [x] Note missing coverage for dendritic, clan-core, zerotier patterns
 
-- [ ] Task 3: Classify each document (AC: #2)
-  - [ ] Review each file for staleness indicators
-  - [ ] Assign status: Current, Stale, Obsolete, or Missing
-  - [ ] Document specific issues per file
+- [x] Task 3: Classify each document (AC: #2)
+  - [x] Review each file for staleness indicators
+  - [x] Assign status: Current, Stale, Obsolete, or Missing
+  - [x] Document specific issues per file
 
-- [ ] Task 4: Identify missing documentation (AC: #2, #3)
-  - [ ] Compare current architecture against documented patterns
-  - [ ] List undocumented patterns from Epic 7 retrospective
-  - [ ] Identify gaps in darwin vs nixos onboarding
-  - [ ] Note missing two-tier secrets documentation
+- [x] Task 4: Identify missing documentation (AC: #2, #3)
+  - [x] Compare current architecture against documented patterns
+  - [x] List undocumented patterns from Epic 7 retrospective
+  - [x] Identify gaps in darwin vs nixos onboarding
+  - [x] Note missing two-tier secrets documentation
 
-- [ ] Task 5: Assign priority rankings (AC: #4)
-  - [ ] Critical: Documents blocking Story 8.2-8.4
-  - [ ] High: Major gaps affecting user experience
-  - [ ] Medium: Improvements for completeness
-  - [ ] Low: Cosmetic or minor updates
+- [x] Task 5: Assign priority rankings (AC: #4)
+  - [x] Critical: Documents blocking Story 8.2-8.4
+  - [x] High: Major gaps affecting user experience
+  - [x] Medium: Improvements for completeness
+  - [x] Low: Cosmetic or minor updates
 
-- [ ] Task 6: Estimate effort per document (AC: #5)
-  - [ ] Small: < 30 min (minor updates)
-  - [ ] Medium: 30 min - 2 hours (section rewrites)
-  - [ ] Large: > 2 hours (major overhaul or new document)
+- [x] Task 6: Estimate effort per document (AC: #5)
+  - [x] Small: < 30 min (minor updates)
+  - [x] Medium: 30 min - 2 hours (section rewrites)
+  - [x] Large: > 2 hours (major overhaul or new document)
 
-- [ ] Task 7: Assign target stories (AC: #7)
-  - [ ] Story 8.2: Architecture and patterns documentation
-  - [ ] Story 8.3: Host onboarding guides (darwin vs nixos)
-  - [ ] Story 8.4: Secrets management documentation
+- [x] Task 7: Assign target stories (AC: #7)
+  - [x] Story 8.2: Architecture and patterns documentation
+  - [x] Story 8.3: Host onboarding guides (darwin vs nixos)
+  - [x] Story 8.4: Secrets management documentation
 
-- [ ] Task 8: Create audit results document (AC: #6)
-  - [ ] Write `docs/notes/development/work-items/story-8.1-audit-results.md`
-  - [ ] Include inventory table
-  - [ ] Include classification table with columns: File, Status, Key Issues, Priority, Effort, Target Story
-  - [ ] Include missing documentation section
-  - [ ] Include summary statistics
+- [x] Task 8: Create audit results document (AC: #6)
+  - [x] Write `docs/notes/development/work-items/story-8.1-audit-results.md`
+  - [x] Include inventory table
+  - [x] Include classification table with columns: File, Status, Key Issues, Priority, Effort, Target Story
+  - [x] Include missing documentation section
+  - [x] Include summary statistics
 
 ## Dev Notes
 
@@ -234,9 +234,69 @@ No files modified in Starlight docs (audit-only story).
 
 ### Completion Notes List
 
+**2025-12-01: Story 8.1 Completed**
+
+Comprehensive audit of 59 Starlight documentation files completed. Key findings:
+
+**Status Distribution:**
+- Current: 22 files (37%) - No updates needed
+- Stale: 21 files (36%) - Outdated but partially relevant
+- Obsolete: 9 files (15%) - Need complete rewrites
+- Missing: 7 topics identified - Need new documentation
+
+**Priority Distribution:**
+- Critical: 6 files (blocks Stories 8.2-8.4)
+- High: 12 files (significant gaps)
+- Medium: 12 files (nice-to-have)
+- Low: 10 files (cosmetic)
+
+**Most Common Staleness Patterns:**
+1. `nixos-unified` references (80+ occurrences across 35+ files)
+2. `configurations/` paths (60+ occurrences across 20+ files)
+3. Bitwarden/3-tier secrets pattern (14 occurrences)
+
+**Critical Path Items:**
+1. `concepts/nix-config-architecture.md` - Foundation for all docs
+2. `reference/repository-structure.md` - Core directory reference
+3. `index.mdx` - Landing page with wrong tagline
+4. `guides/host-onboarding.md` - Main operational guide
+
+**Total Effort Estimate:**
+- Story 8.2 (Architecture/Concepts): 34-38h
+- Story 8.3 (Host Onboarding): 18-20h
+- Story 8.4 (Secrets Management): 5-6h
+- **Total: 57-64 hours**
+
+**Missing Documentation (from Epic 7 retrospective):**
+- Dendritic flake-parts architecture
+- Clan-core integration
+- Two-tier secrets (clan vars + sops-nix)
+- GCP deployment patterns
+- Zerotier authorization flow
+- NVIDIA datacenter anti-patterns
+
+Full results: `docs/notes/development/work-items/story-8.1-audit-results.md`
+
 ### File List
 
+**Files Created:**
+- `docs/notes/development/work-items/story-8.1-audit-results.md`
+
+**Files Updated:**
+- `docs/notes/development/sprint-status.yaml` (story-8-1: drafted → in-progress → done)
+- `docs/notes/development/work-items/8-1-audit-existing-starlight-docs-for-staleness.md` (this file)
+
 ## Change Log
+
+**2025-12-01 (Story Completed)**:
+- Comprehensive audit of 59 Starlight documentation files
+- Ran 8 parallel searches for staleness indicators
+- Classified all documents: 22 current, 21 stale, 9 obsolete, 7 missing
+- Identified 6 critical path items blocking Stories 8.2-8.4
+- Total effort estimate: 57-64 hours across Stories 8.2-8.4
+- Created audit results document with actionable checklist
+- All 7 acceptance criteria met
+- All 8 tasks completed
 
 **2025-12-01 (Story Drafted)**:
 - Story file created from Epic 8 Story 8.1 specification
