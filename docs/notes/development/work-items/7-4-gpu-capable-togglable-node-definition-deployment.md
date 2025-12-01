@@ -236,62 +236,69 @@ The gcp.nix module already contains GPU support infrastructure (lines 163-175):
 
 This pattern automatically activates when a machine definition includes `gpuType` and `gpuCount`.
 
-### NixOS NVIDIA Configuration Pattern
+### Datacenter-Optimal NVIDIA Configuration for scheelite
 
-**Reference: gaetanlepage-dendritic-nix-config `modules/nixos/nvidia.nix`**
-
-The gaetanlepage repo uses a dendritic module pattern for NVIDIA configuration that we should adapt:
+Based on source code analysis of `~/projects/nix-workspace/nixpkgs/nixos/modules/hardware/video/nvidia.nix` and web research, use this configuration:
 
 ```nix
-# gaetanlepage pattern: modules/nixos/nvidia.nix
+# modules/nixos/nvidia.nix (or inline in scheelite module)
+{ config, pkgs, lib, ... }:
 {
-  flake.modules.nixos.nvidia =
-    { pkgs, config, ... }:
-    {
-      # Enable CUDA support globally
-      nixpkgs.config.cudaSupport = true;
+  # Allow unfree packages (required for NVIDIA drivers)
+  nixpkgs.config.allowUnfree = true;
+  nixpkgs.config.cudaSupport = true;
 
-      # NVIDIA driver
-      services.xserver.videoDrivers = [ "nvidia" ];
-      environment.systemPackages = [ pkgs.nvtopPackages.nvidia ];
+  # Enable graphics infrastructure (required even for headless compute)
+  hardware.graphics.enable = true;
+  hardware.graphics.enable32Bit = false;  # No 32-bit needed for server
 
-      # Enable CUDA sandbox support for nix builds
-      programs.nix-required-mounts = {
-        enable = true;
-        presets.nvidia-gpu.enable = true;
-      };
+  # NVIDIA drivers via X11 path (datacenter.enable has bug #454772)
+  services.xserver.videoDrivers = [ "nvidia" ];
 
-      hardware = {
-        graphics = {
-          enable = true;
-          enable32Bit = true;
-        };
+  # NVIDIA hardware configuration - DATACENTER OPTIMIZED
+  hardware.nvidia = {
+    # Driver package: use production for stability
+    # Options: stable, production, latest, beta
+    # For L4 (Ada Lovelace): production or stable recommended
+    package = config.boot.kernelPackages.nvidiaPackages.production;
 
-        nvidia = {
-          # Use latest drivers (L4 is Ada Lovelace - needs recent drivers)
-          package = config.boot.kernelPackages.nvidiaPackages.latest;
-          modesetting.enable = true;
+    # Open-source kernel modules (RECOMMENDED for L4/Ada Lovelace)
+    # Required for Grace Hopper/Blackwell, recommended for Ampere+
+    open = true;
 
-          # Power management (disable for cloud VMs)
-          powerManagement.enable = false;
-          powerManagement.finegrained = false;
+    # GSP firmware (auto-enabled with open modules or driver >= 555)
+    gsp.enable = true;
 
-          # Open source kernel module
-          # L4 (Ada Lovelace) supports open drivers, but proprietary may be more stable
-          open = true;  # or false for proprietary
+    # CRITICAL: Enable persistence daemon for headless servers
+    # Keeps GPU initialized between compute jobs
+    nvidiaPersistenced = true;
 
-          nvidiaSettings = true;
-        };
-      };
-    };
+    # DISABLE: Desktop-only features
+    nvidiaSettings = false;        # GUI configuration tool
+    modesetting.enable = false;    # Display/framebuffer (adds overhead)
+
+    # DISABLE: Power management (experimental, for laptops)
+    powerManagement.enable = false;
+    powerManagement.finegrained = false;
+
+    # DO NOT ENABLE: datacenter mode (bug #454772)
+    # datacenter.enable = false;  # This is the default, don't set explicitly
+  };
+
+  # DISABLE: X11 display server (headless compute)
+  services.xserver.enable = false;
+
+  # GPU monitoring tools
+  environment.systemPackages = with pkgs; [
+    nvtopPackages.nvidia  # Better than nvidia-smi for monitoring
+    pciutils              # lspci for debugging
+  ];
 }
 ```
 
-**Key differences for our scheelite (GCP L4 GPU):**
-1. No desktop/sway configuration needed (headless compute node)
-2. L4 is Ada Lovelace architecture (newer than T4 Turing) - `nvidiaPackages.latest` preferred
-3. Consider `open = true` for L4 (Ada Lovelace supports open drivers better than older GPUs)
-4. Add CUDA cache substituter for faster builds
+**Option Reference:** For complete option documentation, see:
+- Source: `~/projects/nix-workspace/nixpkgs/nixos/modules/hardware/video/nvidia.nix`
+- Analysis: `docs/notes/development/nvidia-module-analysis.md`
 
 ### Dendritic Module Auto-Discovery Pattern
 
