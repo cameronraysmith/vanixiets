@@ -72,6 +72,11 @@
             user = "cameron";
           };
 
+          "galena.zt" = {
+            hostname = "fddb:4344:343b:14b9:399:9315:c67a:dec9";
+            user = "cameron";
+          };
+
           # Wildcard for all zerotier hosts
           "*.zt" = {
             # Enable compression for zerotier (encrypted tunnel over encrypted tunnel)
