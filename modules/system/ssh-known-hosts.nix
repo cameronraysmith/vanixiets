@@ -36,6 +36,15 @@ let
           flake.nixosConfigurations.electrum.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
       };
 
+      "galena.zt" = {
+        hostNames = [
+          "galena.zt"
+          "fddb:4344:343b:14b9:399:9315:c67a:dec9" # Zerotier IPv6
+        ];
+        publicKey =
+          flake.nixosConfigurations.galena.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
+      };
+
       # ====================
       # Darwin Machines (static SSH host keys)
       # ====================
