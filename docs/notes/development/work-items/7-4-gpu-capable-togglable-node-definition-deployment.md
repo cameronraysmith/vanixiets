@@ -506,6 +506,19 @@ scheelite: A tungsten ore mineral (CaWO4), continuing the metallurgical theme:
 - cinnabar: mercury ore (zerotier controller)
 - electrum: gold-silver alloy (Hetzner peer)
 
+### Datacenter NVIDIA Anti-Patterns (Avoid These)
+
+| Anti-Pattern | Why It's Wrong | Correct Approach |
+|--------------|----------------|------------------|
+| `datacenter.enable = true` | Bug #454772, GSP firmware missing | Use standard driver via `videoDrivers` |
+| `powerManagement.enable = true` | Experimental, causes failures | `false` + use persistenced |
+| Missing `nvidiaPersistenced` | GPU teardown latency | Always `true` for headless |
+| `nvidiaSettings = true` | GUI tool, wastes resources | `false` for servers |
+| `modesetting.enable = true` | Display overhead | `false` for compute-only |
+| Compiling PyTorch/JAX | Multi-hour builds | Use pre-built binaries |
+| Proprietary drivers on L4 | Open modules recommended | `open = true` |
+| Full X11 on compute server | Unnecessary overhead | `services.xserver.enable = false` |
+
 ### Project Structure Notes
 
 Files to create:
