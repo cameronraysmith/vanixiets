@@ -407,6 +407,45 @@ nix.settings = {
 };
 ```
 
+### Manual Datacenter Tuning (Not Exposed via NixOS Options)
+
+The following GPU optimizations are **not available** as NixOS module options and require manual `nvidia-smi` commands.
+Consider adding these to a systemd oneshot service or activation script:
+
+```bash
+# Set compute-exclusive mode (single process per GPU)
+nvidia-smi -c EXCLUSIVE_PROCESS
+
+# Verify ECC memory enabled (should be default on L4)
+nvidia-smi --query-gpu=ecc.mode.current --format=csv
+# Enable if needed: nvidia-smi -e 1
+
+# Optional: Set application clocks for consistent performance
+# Check supported clocks: nvidia-smi -q -d SUPPORTED_CLOCKS
+# nvidia-smi -ac <mem_clock>,<graphics_clock>
+
+# Optional: Set power limit (default is max TDP)
+# nvidia-smi -pl <watts>
+```
+
+**Systemd oneshot service pattern:**
+```nix
+systemd.services.nvidia-datacenter-tuning = {
+  description = "Configure NVIDIA GPU for datacenter workloads";
+  after = [ "nvidia-persistenced.service" ];
+  wantedBy = [ "multi-user.target" ];
+  serviceConfig = {
+    Type = "oneshot";
+    RemainAfterExit = true;
+    ExecStart = pkgs.writeShellScript "nvidia-tune" ''
+      ${pkgs.linuxPackages.nvidia_x11}/bin/nvidia-smi -c EXCLUSIVE_PROCESS
+    '';
+  };
+};
+```
+
+**Note:** These settings reset on reboot, hence the systemd service approach.
+
 ### Dendritic Module Pattern for scheelite
 
 Following the gaetanlepage `modules/hosts/cuda/default.nix` pattern, our scheelite should import the nvidia module:
