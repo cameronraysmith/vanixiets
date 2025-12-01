@@ -5,8 +5,8 @@
   ...
 }:
 {
-  # Restart nix-rosetta-builder VM
-  rosetta-restart = {
+  # Manage nix-rosetta-builder VM (stop/start/restart/gc)
+  rosetta-manage = {
     runtimeInputs = with pkgs; [
       openssh
       nix
