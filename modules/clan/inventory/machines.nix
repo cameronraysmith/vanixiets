@@ -33,6 +33,18 @@
       description = "GCP CPU node (e2-standard-8), zerotier peer";
     };
 
+    scheelite = {
+      tags = [
+        "nixos"
+        "cloud"
+        "gcp"
+        "gpu"
+        "peer"
+      ];
+      machineClass = "nixos";
+      description = "GCP GPU node (g2-standard-4, L4), zerotier peer";
+    };
+
     blackphos = {
       tags = [
         "darwin"
