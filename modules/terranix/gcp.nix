@@ -43,7 +43,7 @@
         };
         # GPU-capable node
         scheelite = {
-          enabled = false; # Default disabled for cost control (~$0.37/hr total)
+          enabled = true; # Default disabled for cost control (~$0.37/hr total)
           machineType = "g2-standard-4"; # 4 vCPU, 16GB RAM, optimized for L4
           zone = "us-central1-a"; # Zone with L4 GPU quota
           image = "debian-12";
