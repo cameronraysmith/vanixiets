@@ -543,7 +543,10 @@ development_status:
 
   # Epic 7 - GCP Multi-Node Infrastructure
   # PRIMARY OBJECTIVE: Togglable CPU and GPU compute nodes on GCP
-  epic-7: contexted
+  # COMPLETE (2025-12-01): All 4 stories DONE and APPROVED
+  # Duration: 2 days intensive implementation (2025-11-30 to 2025-12-01)
+  # Deliverables: galena (CPU), scheelite (GPU), 10 patterns established
+  epic-7: done
   epic-7-notes: |
     Deploy togglable CPU-only and GPU-capable nodes on GCP using terranix.
     Primary business objective - GCP contract, GPU availability, cost management.
@@ -580,7 +583,10 @@ development_status:
   story-7-4: done
   story-7-4-title: "GPU-capable togglable node definition and deployment"
   story-7-4-notes: "APPROVED 2025-12-01 - All 11 ACs implemented, Tesla T4 GPU deployed and validated, zerotier mesh integrated, datacenter NVIDIA patterns documented"
-  epic-7-retrospective: optional
+  # Epic 7 Retrospective: COMPLETE (2025-12-01)
+  # Document: docs/notes/development/retrospectives/epic-7-gcp-multi-node-infrastructure.md
+  # Key outcomes: 10 patterns formalized, 9 technical discoveries documented, action items for Epic 8
+  epic-7-retrospective: done
 
   # Epic 8 - Documentation Alignment
   # Update Starlight docs to reflect dendritic+clan architecture
