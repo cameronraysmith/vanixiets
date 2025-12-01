@@ -69,7 +69,9 @@
             "blackphos"
             "cinnabar"
             "electrum"
+            "galena" # GCP CPU node (Story 7.2)
             "rosegold"
+            "scheelite" # GCP GPU node (Story 7.4)
             "stibnite"
           ];
         };
@@ -81,6 +83,8 @@
           expected = [
             "cinnabar"
             "electrum"
+            "galena" # GCP CPU node (Story 7.2)
+            "scheelite" # GCP GPU node (Story 7.4)
           ];
         };
 
