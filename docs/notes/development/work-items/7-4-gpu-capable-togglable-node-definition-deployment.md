@@ -81,8 +81,25 @@ Rationale: Test zerotier on cheaper CPU node (galena, ~$0.27/hr) before expensiv
   - `hardware.nvidia.nvidiaSettings = true` (GUI configuration tool - no GUI)
   - `hardware.graphics.enable32Bit = true` (32-bit graphics for gaming - server doesn't need)
 
+  **CRITICAL for Headless Servers - nvidiaPersistenced:**
+
+  The gaetanlepage desktop reference **omits** `hardware.nvidia.nvidiaPersistenced` because X11 keeps the GPU initialized.
+  On headless servers without X11, the GPU state tears down between compute jobs.
+
+  **Why this matters:**
+  - Without persistenced: ~100ms+ GPU reinitialization latency per CUDA job launch
+  - With persistenced: GPU stays initialized, near-instant job startup
+  - For ML training with many small jobs or interactive development, this latency compounds significantly
+
+  **Required setting:**
+  ```nix
+  hardware.nvidia.nvidiaPersistenced = true;  # MANDATORY for headless
+  ```
+
+  The `nvidia-persistenced.service` systemd unit will be created automatically.
+
   **ADD for headless compute (not in gaetanlepage):**
-  - `hardware.nvidia.nvidiaPersistenced = true` (headless daemon for GPU persistence)
+  - `hardware.nvidia.nvidiaPersistenced = true` (CRITICAL - see above)
   - `hardware.nvidia.nvidiaSettings = false` (explicitly disable GUI tool)
   - `hardware.graphics.enable32Bit = false` (no 32-bit support needed)
 
