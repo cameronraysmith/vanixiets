@@ -571,7 +571,13 @@ development_status:
   # REVIEW (2025-12-01): APPROVE - 7/7 ACs verified, 0 HIGH/MEDIUM findings, 3 advisory notes
   story-7-3: done
   story-7-3-title: "Clan integration and zerotier mesh for GCP nodes"
-  story-7-4: drafted
+  # Story 7.4: IMPLEMENTATION COMPLETE (2025-12-01)
+  # Tasks 1-4, 6-7 complete; Task 5 (deploy) deferred pending user decision
+  # Configuration validated: nix build .#nixosConfigurations.scheelite passes
+  # Commits: e79e19ea..8d02d57f (20 commits including clan vars auto-commits)
+  # Zerotier IP: fddb:4344:343b:14b9:399:9380:46d5:3400
+  # To deploy: set scheelite.enabled = true in gcp.nix, run nix run .#terraform
+  story-7-4: review
   story-7-4-title: "GPU-capable togglable node definition and deployment"
   epic-7-retrospective: optional
 
