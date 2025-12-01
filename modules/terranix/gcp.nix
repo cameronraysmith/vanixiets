@@ -26,16 +26,18 @@
           image = "debian-12";
           comment = "CPU-only GCP node (~$0.27/hr) - named for lead ore mineral";
         };
-        # Example: GPU-capable node (Story 7.3 will populate)
-        # gcp-gpu-1 = {
-        #   enabled = false;
-        #   machineType = "n1-standard-8";
-        #   zone = "us-central1-a"; # Zone must have GPU quota
-        #   image = "debian-12";
-        #   gpuType = "nvidia-tesla-t4";
-        #   gpuCount = 1;
-        #   comment = "8 vCPU, 30GB RAM, 1x T4 GPU";
-        # };
+        # GPU-capable node (Story 7.4) - metallurgical naming theme
+        # scheelite: tungsten ore mineral (CaWO4)
+        # COST WARNING: ~$0.37/hr when running, disable when not in use
+        scheelite = {
+          enabled = false; # Default disabled for cost control (~$0.37/hr total)
+          machineType = "g2-standard-4"; # 4 vCPU, 16GB RAM, optimized for L4
+          zone = "us-central1-a"; # Zone with L4 GPU quota
+          image = "debian-12";
+          gpuType = "nvidia-l4"; # Ada Lovelace, optimal for inference
+          gpuCount = 1;
+          comment = "L4 GPU node for ML inference (~$0.24/hr GPU + ~$0.13/hr base)";
+        };
       };
 
       # Filter to only enabled machines
