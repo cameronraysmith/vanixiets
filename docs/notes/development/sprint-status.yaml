@@ -577,8 +577,9 @@ development_status:
   # Commits: e79e19ea..8d02d57f (20 commits including clan vars auto-commits)
   # Zerotier IP: fddb:4344:343b:14b9:399:9380:46d5:3400
   # To deploy: set scheelite.enabled = true in gcp.nix, run nix run .#terraform
-  story-7-4: review
+  story-7-4: done
   story-7-4-title: "GPU-capable togglable node definition and deployment"
+  story-7-4-notes: "APPROVED 2025-12-01 - All 11 ACs implemented, Tesla T4 GPU deployed and validated, zerotier mesh integrated, datacenter NVIDIA patterns documented"
   epic-7-retrospective: optional
 
   # Epic 8 - Documentation Alignment
