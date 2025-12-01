@@ -190,6 +190,11 @@ Rationale: Test zerotier on cheaper CPU node (galena, ~$0.27/hr) before expensiv
     ssh cameron@<IP> "systemctl status nvidia-persistenced"
     # Expect: active (running)
     ```
+  - [ ] Validate GPU persistence mode:
+    ```bash
+    ssh cameron@<IP> "nvidia-smi -q | grep 'Persistence Mode'"
+    # Expect: Persistence Mode: Enabled
+    ```
 
 - [ ] Task 6: Configure SSH and zerotier mesh access (AC: related to integration)
   - [ ] Get scheelite zerotier IP from `zerotier-cli listnetworks`
