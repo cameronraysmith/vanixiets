@@ -300,6 +300,29 @@ Based on source code analysis of `~/projects/nix-workspace/nixpkgs/nixos/modules
 - Source: `~/projects/nix-workspace/nixpkgs/nixos/modules/hardware/video/nvidia.nix`
 - Analysis: `docs/notes/development/nvidia-module-analysis.md`
 
+### Environment Variables for JAX/PyTorch
+
+Configure system-wide environment variables for ML framework CUDA access:
+
+```nix
+# Add to scheelite's configuration
+environment.variables = {
+  # CUDA library path (set by videoDrivers, but explicit for clarity)
+  LD_LIBRARY_PATH = "/run/opengl-driver/lib";
+
+  # JAX XLA compiler CUDA path
+  XLA_FLAGS = "--xla_gpu_cuda_data_dir=${pkgs.cudaPackages.cudatoolkit}";
+
+  # PyTorch Triton compiler
+  TRITON_LIBCUDA_PATH = "/run/opengl-driver/lib";
+
+  # GCC for CUDA compilation
+  CC = "${pkgs.gcc}/bin/gcc";
+};
+```
+
+**Note:** For development environments, prefer user-level configuration via devenv/direnv flakes rather than system-wide variables.
+
 ### Dendritic Module Auto-Discovery Pattern
 
 **CRITICAL UNDERSTANDING for Task 2 → Task 3 workflow:**
