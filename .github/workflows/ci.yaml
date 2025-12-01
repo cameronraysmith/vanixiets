@@ -103,6 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
+      needs.secrets-scan.result == 'success' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'set-variables')
@@ -301,6 +302,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
+      needs.secrets-scan.result == 'success' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'bootstrap-verification')
@@ -390,6 +392,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
+      needs.secrets-scan.result == 'success' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'secrets-workflow')
@@ -500,6 +503,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
+      needs.secrets-scan.result == 'success' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'flake-validation')
@@ -584,6 +588,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     if: |
       !cancelled() &&
+      needs.secrets-scan.result == 'success' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'cache-overlay-packages' ||
@@ -660,6 +665,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     if: |
       !cancelled() &&
+      needs.secrets-scan.result == 'success' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'nix')
@@ -763,6 +769,7 @@ jobs:
     needs: [secrets-scan, set-variables]
     if: |
       !cancelled() &&
+      needs.secrets-scan.result == 'success' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'typescript')
