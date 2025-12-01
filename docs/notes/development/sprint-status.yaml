@@ -571,7 +571,7 @@ development_status:
   # REVIEW (2025-12-01): APPROVE - 7/7 ACs verified, 0 HIGH/MEDIUM findings, 3 advisory notes
   story-7-3: done
   story-7-3-title: "Clan integration and zerotier mesh for GCP nodes"
-  story-7-4: backlog
+  story-7-4: drafted
   story-7-4-title: "GPU-capable togglable node definition and deployment"
   epic-7-retrospective: optional
 
