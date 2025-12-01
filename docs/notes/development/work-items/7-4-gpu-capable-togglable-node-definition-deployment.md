@@ -298,6 +298,12 @@ The gaetanlepage repo uses a dendritic module pattern for NVIDIA configuration t
 
 The dev agent MUST read these files before implementation:
 
+**NVIDIA Module Source Code (AUTHORITATIVE REFERENCE):**
+0. `~/projects/nix-workspace/nixpkgs/nixos/modules/hardware/video/nvidia.nix` - The authoritative source for ALL `hardware.nvidia.*` options. When in doubt about any NVIDIA configuration option, consult this file directly. It contains 28 options with full type definitions, defaults, and descriptions.
+
+**Local Analysis Document:**
+0a. `docs/notes/development/nvidia-module-analysis.md` - Comprehensive analysis of nvidia.nix options with datacenter relevance assessment, created during Story 7.4 research.
+
 **Infra Architecture Patterns (MUST READ):**
 1. `flake.nix` - Dendritic import-tree integration with clan
 2. `modules/machines/nixos/galena/default.nix` - EXACT pattern for scheelite (outer config capture, flakeModules)
