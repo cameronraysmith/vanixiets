@@ -187,7 +187,7 @@ No new files created, following existing patterns.
 - [Pattern: modules/clan/inventory/machines.nix (electrum peer entry)]
 - [Pattern: modules/clan/inventory/services/zerotier.nix (peer role definition)]
 - [Story 7.2: docs/notes/development/work-items/7-2-cpu-only-togglable-node-definition-deployment.md]
-- [Epic 7: docs/notes/development/epics/epic-7-gcp-multi-node-infrastructure.md#Story-7.4]
+- [Epic 7: docs/notes/development/epics/epic-7-gcp-multi-node-infrastructure.md#Story-7.3]
 - [Source: Sprint change history 2025-11-30 - Story 7.3/7.4 swap rationale]
 
 ### NFR Coverage
