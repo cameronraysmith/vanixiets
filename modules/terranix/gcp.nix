@@ -45,7 +45,7 @@
         scheelite = {
           enabled = true; # Default disabled for cost control (~$0.37/hr total)
           machineType = "g2-standard-4"; # 4 vCPU, 16GB RAM, optimized for L4
-          zone = "us-central1-a"; # Zone with L4 GPU quota
+          zone = "us-central1-b"; # Zone with L4 GPU quota
           image = "debian-12";
           gpuType = "nvidia-l4"; # Ada Lovelace, optimal for inference
           gpuCount = 1;
