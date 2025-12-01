@@ -42,7 +42,7 @@
         "peer"
       ];
       machineClass = "nixos";
-      description = "GCP GPU node (g2-standard-4, L4), zerotier peer";
+      description = "GCP GPU node (n1-standard-8, T4), zerotier peer";
     };
 
     blackphos = {
