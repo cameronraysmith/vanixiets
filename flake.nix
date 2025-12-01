@@ -80,7 +80,7 @@
     nix-index-database.url = "github:nix-community/nix-index-database";
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
 
-    # infra-specific inputs (preserved from legacy)
+    # TODO: remove
     omnix.url = "github:juspay/omnix";
     omnix.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -94,10 +94,11 @@
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.home-manager.follows = "home-manager";
 
+    # TODO: enable in nixos configurations
     landrun-nix.url = "github:srid/landrun-nix";
 
     # Using fork with fix for chromium headless shell path structure (playwright 1.57+)
-    # TODO: Switch back to upstream once https://github.com/pietdevries94/playwright-web-flake/pull/XX is merged
+    # TODO: Switch back to upstream: https://github.com/pietdevries94/playwright-web-flake
     playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/fix-headless-shell-path";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
