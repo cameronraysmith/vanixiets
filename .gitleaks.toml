@@ -1,0 +1,14 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+[allowlist]
+  description = "Global allowlist for false positives"
+
+  # Terraform encrypted state files
+  # The state is encrypted via PBKDF2 - the detected "secret" is just
+  # derivation parameters (salt, iterations, hash function), not actual secrets.
+  # Actual sensitive data is in the encrypted_data field.
+  paths = [
+    '''terraform/terraform\.tfstate''',
+    '''terraform/terraform\.tfstate\.backup''',
+  ]
