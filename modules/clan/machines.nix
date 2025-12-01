@@ -13,6 +13,10 @@
       imports = [ config.flake.modules.nixos."machines/nixos/galena" ];
     };
 
+    scheelite = {
+      imports = [ config.flake.modules.nixos."machines/nixos/scheelite" ];
+    };
+
     blackphos = {
       imports = [ config.flake.modules.darwin."machines/darwin/blackphos" ];
     };
