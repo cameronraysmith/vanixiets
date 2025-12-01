@@ -17,6 +17,21 @@
       # Machine deployment definitions
       # Set enabled = true to deploy, false to destroy
       # Run: nix run .#terraform (regenerates config and applies)
+      #
+      # COST REFERENCE TABLE (Story 7.4 AC #11):
+      # =========================================
+      # | Machine     | Type          | GPU       | Hourly  | Monthly (730h) |
+      # |-------------|---------------|-----------|---------|----------------|
+      # | galena      | e2-standard-8 | None      | ~$0.27  | ~$197          |
+      # | scheelite   | g2-standard-4 | 1x L4     | ~$0.37  | ~$270          |
+      # | (future)    | g2-standard-8 | 1x L4     | ~$0.50  | ~$365          |
+      # | (future)    | n1-standard-4 | 1x T4     | ~$0.54  | ~$394          |
+      # | (future)    | a2-highgpu-1g | 1x A100   | ~$3.14  | ~$2,292        |
+      # =========================================
+      # L4 (Ada Lovelace) is ~30% faster than T4 (Turing) at lower cost.
+      # CRITICAL: GPU nodes should remain enabled = false by default.
+      # Enable only for active use, disable immediately after workload completion.
+      #
       machines = {
         # CPU-only node (Story 7.2) - metallurgical naming theme
         galena = {
