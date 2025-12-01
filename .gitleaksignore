@@ -35,9 +35,24 @@ docs/notes/development/work-items/1-10c-establish-sops-nix-secrets-home-manager.
 # Story 1.10C context - placeholder text in secret file structure example (not actual secret)
 docs/notes/development/work-items/1-10c-establish-sops-nix-secrets-home-manager.context.xml:private-key:526
 
-# Terraform encrypted state - pbkdf2 state encryption password (encrypted, not actual secret)
+# Terraform encrypted state - pbkdf2 state encryption password metadata (NOT the actual password)
+# The detected field contains PBKDF2 derivation parameters (salt, iterations, hash function)
+# The actual sensitive data is encrypted in the "encrypted_data" field
+# Safe to commit: state is encrypted via PBKDF2, password stored in clan secrets
 410480185ebe39f9ccd4ee760432ba5b9222c8d2:terraform/terraform.tfstate:generic-api-key:1
 410480185ebe39f9ccd4ee760432ba5b9222c8d2:terraform/terraform.tfstate.backup:generic-api-key:1
+# Story 7.4 terraform state commits (scheelite GPU node)
+7d8e6c50a103f2d1934f9d8d6f0994fcb7df9258:terraform/terraform.tfstate:generic-api-key:1
+eaf2e12b57229647cfc78fd51e847e695344ddbe:terraform/terraform.tfstate:generic-api-key:1
+23b556ae52ed4f038980f577be0e09b6ea0f6cd9:terraform/terraform.tfstate.backup:generic-api-key:1
+87c9b77329e13620a35ee8d78fe1f35a87b3ce49:terraform/terraform.tfstate:generic-api-key:1
+87c9b77329e13620a35ee8d78fe1f35a87b3ce49:terraform/terraform.tfstate.backup:generic-api-key:1
+f07147c22a83c8479773ded0c27c44b278af0a92:terraform/terraform.tfstate:generic-api-key:1
+f07147c22a83c8479773ded0c27c44b278af0a92:terraform/terraform.tfstate.backup:generic-api-key:1
+dafc14f8eea6735dbe3449d34c83868078d5a325:terraform/terraform.tfstate:generic-api-key:1
+dafc14f8eea6735dbe3449d34c83868078d5a325:terraform/terraform.tfstate.backup:generic-api-key:1
+e60e72a3dfe62d3523cf2b7141cace42ade241ef:terraform/terraform.tfstate:generic-api-key:1
+e60e72a3dfe62d3523cf2b7141cace42ade241ef:terraform/terraform.tfstate.backup:generic-api-key:1
 
 # Story 2.4 work item - age public key in documentation (safe to share)
 dd8bd205917cdc6cd0a62b9443ea27429a9dc62f:docs/notes/development/work-items/2-4-home-manager-secrets-migration.md:generic-api-key:535
