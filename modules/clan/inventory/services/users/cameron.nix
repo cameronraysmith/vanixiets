@@ -65,6 +65,8 @@
           home-manager = {
             useGlobalPkgs = true;
             useUserPackages = true;
+            # Backup conflicting files instead of failing (prevents race condition on GCP)
+            backupFileExtension = "before-home-manager";
 
             # Pass flake as extraSpecialArgs for sops-nix access
             # Bridge from outer inputs to home-manager modules
