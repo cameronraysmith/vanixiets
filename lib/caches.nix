@@ -10,7 +10,7 @@
     "https://pyproject-nix.cachix.org"
     "https://om.cachix.org"
     "https://catppuccin.cachix.org"
-    "https://cuda-maintainers.cachix.org" # CUDA/GPU packages (Story 7.4)
+    "https://cuda-maintainers.cachix.org"
   ];
 
   publicKeys = [
@@ -23,6 +23,6 @@
     "pyproject-nix.cachix.org-1:UNzugsOlQIu2iOz0VyZNBQm2JSrL/kwxeCcFGw+jMe0="
     "om.cachix.org-1:ifal/RLZJKN4sbpScyPGqJ2+appCslzu7ZZF/C01f2Q="
     "catppuccin.cachix.org-1:noG/4HkbhJb+lUAdKrph6LaozJvAeEEZj4N732IysmU="
-    "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E=" # CUDA cache (Story 7.4)
+    "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
   ];
 }

@@ -18,7 +18,7 @@
       # Set enabled = true to deploy, false to destroy
       # Run: nix run .#terraform (regenerates config and applies)
       #
-      # COST REFERENCE TABLE (Story 7.4 AC #11):
+      # COST REFERENCE TABLE:
       # =========================================
       # | Machine     | Type          | GPU       | Hourly  | Monthly (730h) |
       # |-------------|---------------|-----------|---------|----------------|
@@ -35,7 +35,7 @@
       # If deployment fails with "RESOURCE_EXHAUSTED", try next zone in list.
       #
       machines = {
-        # CPU-only node (Story 7.2) - metallurgical naming theme
+        # galena: lead ore mineral (PbS) - metallurgical naming theme
         galena = {
           enabled = false; # Default disabled for cost control (~$0.27/hr)
           machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
@@ -44,8 +44,7 @@
           comment = "CPU-only GCP node (~$0.27/hr) - named for lead ore mineral";
         };
 
-        # GPU-capable node (Story 7.4) - T4 configuration (widely available)
-        # scheelite: tungsten ore mineral (CaWO4)
+        # scheelite: tungsten ore mineral (CaWO4) - T4 GPU node
         scheelite = {
           enabled = false; # Default disabled for cost control (~$0.54/hr total)
           machineType = "n1-standard-8"; # 8 vCPU, 30GB RAM (T4 requires N1 series)
@@ -192,7 +191,6 @@
           };
         }
         // lib.optionalAttrs (cfg ? gpuType && cfg ? gpuCount) {
-          # GPU configuration (Story 7.3 preparation)
           guest_accelerator = [
             {
               type = cfg.gpuType;
