@@ -33,7 +33,7 @@ e2-* family is typically 20-30% cheaper than n2-* for equivalent specs.
 6. At least one node deployed successfully via `nix run .#terraform.apply`
 7. `clan machines install` provisioner executes successfully for deployed node
 8. SSH connectivity validated from darwin workstation to deployed GCP node
-9. Zerotier not required for this story (Story 7.4 scope), but machine should be SSH-accessible via external IP
+9. Zerotier not required for this story (Story 7.3 scope), but machine should be SSH-accessible via external IP
 10. Basic cost documentation in Dev Notes (approximate hourly rate for e2-standard-8)
 
 ## Tasks / Subtasks
@@ -54,7 +54,7 @@ e2-* family is typically 20-30% cheaper than n2-* for equivalent specs.
 - [x] Task 1B: Add galena to clan inventory (AC: #7)
   - [x] Add galena entry to `modules/clan/machines.nix`
   - [x] NixOS configuration builds successfully
-  - [x] Note: Zerotier service instance deferred to Story 7.4
+  - [x] Note: Zerotier service instance deferred to Story 7.3
 
 - [x] Task 2: Validate toggle mechanism - disabled state (AC: #4)
   - [x] Run `nix run .#terraform.plan` with all machines disabled
@@ -76,7 +76,7 @@ e2-* family is typically 20-30% cheaper than n2-* for equivalent specs.
 - [x] Task 5: Validate SSH connectivity (AC: #8, #9)
   - [x] SSH to deployed node: `ssh cameron@35.209.169.12`
   - [x] Verify NixOS installed and operational (NixOS 25.11.20251115.1d4c883)
-  - [x] Note: zerotier integration deferred to Story 7.4
+  - [x] Note: zerotier integration deferred to Story 7.3
 
 - [x] Task 6: Cost documentation and cleanup (AC: #10)
   - [x] Document e2-standard-8 hourly cost in Dev Notes (~$0.27/hr)
@@ -102,7 +102,7 @@ Story 7.1 created the complete GCP terranix module (`modules/terranix/gcp.nix`, 
 
 ### Gap Resolution (Party Mode Decision)
 
-During implementation, the `dev-story` agent discovered a planning gap: Acceptance Criteria #7 requires `clan machines install` to succeed, but the original story scope explicitly excluded clan integration ("Clan inventory integration (Story 7.4)").
+During implementation, the `dev-story` agent discovered a planning gap: Acceptance Criteria #7 requires `clan machines install` to succeed, but the original story scope explicitly excluded clan integration ("Clan inventory integration (Story 7.3)").
 
 **The Party Mode team resolved this on 2025-11-30:**
 
@@ -115,17 +115,17 @@ During implementation, the `dev-story` agent discovered a planning gap: Acceptan
    - Clan inventory entry (`modules/clan/machines.nix`)
    - Basic NixOS configuration for GCP deployment (bootloader, networking, SSH)
 
-3. **What remains OUT OF SCOPE (Story 7.4)**:
+3. **What remains OUT OF SCOPE (Story 7.3)**:
    - Zerotier service integration and mesh networking
    - Full clan vars deployment and configuration management
    - Multi-machine coordination features
 
 4. **Naming Decision**: Metallurgical naming theme
    - CPU node: `galena` (lead ore mineral, replacing generic `gcp-cpu-1`)
-   - GPU node: `scheelite` (tungsten ore mineral, for Story 7.3 reference)
+   - GPU node: `scheelite` (tungsten ore mineral, for Story 7.4 reference)
 
 **Rationale**: The terraform provisioner pattern established in Story 7.1 calls `clan machines install`, which requires a valid clan machine definition.
-Minimal clan configuration is necessary infrastructure, distinct from full clan orchestration features deferred to Story 7.4.
+Minimal clan configuration is necessary infrastructure, distinct from full clan orchestration features deferred to Story 7.3.
 
 **Pattern Reference**: Follow `modules/machines/nixos/cinnabar/default.nix` structure for GCP-specific adaptations (console access, metadata service, GRUB BIOS bootloader).
 
@@ -261,8 +261,8 @@ cameron
 - Scope expanded: Minimal clan machine definition now in scope (required for AC #7)
 - Naming updated: gcp-cpu-1 → galena (metallurgical naming theme)
 - New tasks added: Task 1A (clan machine definition), Task 1B (clan inventory)
-- Story 7.4 scope clarified: Zerotier integration, mesh networking remain deferred
-- GPU node name established: scheelite (for Story 7.3 reference)
+- Story 7.3 scope clarified: Zerotier integration, mesh networking remain deferred
+- GPU node name established: scheelite (for Story 7.4 reference)
 
 **2025-11-30 (Story Drafted)**:
 - Story file created from Epic 7, Story 7.2 specification
@@ -302,7 +302,7 @@ Story 7.2 successfully implements a CPU-only GCP node (galena) with full toggle 
 | AC6 | terraform apply succeeded | IMPLEMENTED | `terraform/terraform.tfstate.backup` (20KB) shows successful resource creation; story Dev Notes line 211-218 shows SSH validation |
 | AC7 | clan machines install provisioner succeeded | IMPLEMENTED | NixOS 25.11 running per SSH validation output; facter.json (37KB) generated at 18:11 |
 | AC8 | SSH connectivity validated | IMPLEMENTED | Story line 213-218: `ssh cameron@35.209.169.12` successful, NixOS 25.11.20251115.1d4c883 |
-| AC9 | External IP accessible | IMPLEMENTED | IP 35.209.169.12 accessible per story validation; zerotier deferred to 7.4 as specified |
+| AC9 | External IP accessible | IMPLEMENTED | IP 35.209.169.12 accessible per story validation; zerotier deferred to 7.3 as specified |
 | AC10 | Cost documented | IMPLEMENTED | `modules/terranix/gcp.nix:23,27` - ~$0.27/hr documented; story Dev Notes line 134-139 has cost table |
 
 **Summary: 10 of 10 acceptance criteria fully implemented**
@@ -398,4 +398,4 @@ sed -i 's/^PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 - Note: Consider adding nix-unit test for galena configuration in future test harness expansion (Story 7.1 advisory)
 - Note: Consider narrowing firewall source_ranges if static admin IPs become available (Story 7.1 advisory)
 - Note: User must execute `nix run .#terraform` to destroy galena instance (documented in story, pending user action)
-- Note: Pattern documentation for startup-script could be added to architecture docs for Story 7.3 reuse
+- Note: Pattern documentation for startup-script could be added to architecture docs for Story 7.4 reuse
