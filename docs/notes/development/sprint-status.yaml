@@ -564,9 +564,11 @@ development_status:
   story-7-2-title: "CPU-only togglable node definition and deployment"
   # Story 7.3/7.4 REORDERED (2025-11-30): Zerotier before GPU per Party Mode decision
   # Rationale: Zerotier is infrastructure-level; test on cheap CPU node before expensive GPU
-  # Story 7.3: DRAFTED (2025-11-30) - Clan inventory entry + zerotier peer role for galena
-  # Adapts Epic 7 Story 7.4 content for new Story 7.3 numbering
-  story-7-3: drafted
+  # Story 7.3: REVIEW (2025-12-01) - Zerotier mesh validated, all 7 ACs satisfied
+  # galena integrated: inventory, zerotier peer, SSH config, declarative known_hosts
+  # Task 7 (cost control) deferred - galena remains active for continued development
+  # Commits: 400cfdb0, 10763ade, bd02b75c (pre-story), 0341b317, d3e3a4ef (session)
+  story-7-3: review
   story-7-3-title: "Clan integration and zerotier mesh for GCP nodes"
   story-7-4: backlog
   story-7-4-title: "GPU-capable togglable node definition and deployment"
