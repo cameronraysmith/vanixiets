@@ -25,8 +25,8 @@
     roles.default.machines."electrum" = { };
     roles.default.machines."argentum" = { };
     roles.default.machines."rosegold" = { };
-    roles.default.machines."galena" = { }; # GCP CPU cloud VM (Story 7.2)
-    roles.default.machines."scheelite" = { }; # GCP GPU cloud VM (Story 7.4)
+    roles.default.machines."galena" = { };
+    roles.default.machines."scheelite" = { };
 
     roles.default.settings = {
       user = "cameron";

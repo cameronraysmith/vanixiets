@@ -58,7 +58,6 @@ in
       system.stateVersion = "25.05";
 
       # User configuration managed via clan inventory users service
-      # Note: Zerotier deferred to Story 7.4
 
       # Allow wheel group sudo without password
       security.sudo.wheelNeedsPassword = false;
