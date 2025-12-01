@@ -77,6 +77,11 @@
             user = "cameron";
           };
 
+          "scheelite.zt" = {
+            hostname = "fddb:4344:343b:14b9:399:9380:46d5:3400";
+            user = "cameron";
+          };
+
           # Wildcard for all zerotier hosts
           "*.zt" = {
             # Enable compression for zerotier (encrypted tunnel over encrypted tunnel)
