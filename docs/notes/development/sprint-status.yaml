@@ -596,8 +596,9 @@ development_status:
     Align with dendritic flake-parts + clan architecture.
     Update secrets management, host onboarding, architecture docs.
     Depends on Epic 7 complete (document what exists).
-  story-8-1: drafted
+  story-8-1: done
   story-8-1-title: "Audit existing Starlight docs for staleness"
+  story-8-1-notes: "Completed 2025-12-01 - 59 files audited, 22 current, 21 stale, 9 obsolete, 7 missing topics identified. Results: story-8.1-audit-results.md"
   story-8-2: backlog
   story-8-2-title: "Update architecture and patterns documentation"
   story-8-3: backlog
