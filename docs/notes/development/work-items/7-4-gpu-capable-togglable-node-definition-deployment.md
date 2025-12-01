@@ -60,6 +60,21 @@ Rationale: Test zerotier on cheaper CPU node (galena, ~$0.27/hr) before expensiv
   scheelite is a headless GPU compute node for ML inference/training (JAX, PyTorch), NOT a desktop workstation.
   The gaetanlepage reference is a DESKTOP configuration. You MUST filter appropriately.
 
+  **CRITICAL BUG WARNING - DO NOT USE `datacenter.enable`:**
+  NixOS Bug [#454772](https://github.com/nixos/nixpkgs/issues/454772) prevents GSP firmware installation when `hardware.nvidia.datacenter.enable = true`.
+
+  **Symptom:** Boot failure with error:
+  ```
+  nvidia 0000:00:1e.0: Direct firmware load for nvidia/565.57.01/gsp_tu10x.bin failed with error -2
+  ```
+
+  **Impact:** The datacenter driver mode is currently broken on NixOS.
+
+  **Workaround:** Use standard driver configuration:
+  - Set `services.xserver.videoDrivers = [ "nvidia" ]` (even for headless)
+  - Do NOT set `hardware.nvidia.datacenter.enable = true`
+  - The standard driver works correctly for L4/T4/A100 compute workloads
+
   **DO NOT COPY from gaetanlepage nvidia.nix:**
   - `services.xserver.videoDrivers = [ "nvidia" ]` (display server - scheelite is headless)
   - `programs.sway.package = pkgs.sway.override { ... }` (Wayland compositor - no display)
