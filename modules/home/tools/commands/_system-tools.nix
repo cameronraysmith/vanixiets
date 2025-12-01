@@ -24,7 +24,7 @@
             cat <<'HELP'
       Manage nix-rosetta-builder VM service
 
-      Usage: rosetta-restart [--gc] [--idle] [--stop] [--start]
+      Usage: rosetta-manage [--gc] [--idle] [--stop] [--start]
 
       Options:
         --gc     Run garbage collection on rosetta-builder before restart
@@ -38,9 +38,9 @@
         --build-on auto fall back to remote since local can't build x86_64.
 
         Workflow for remote cloud VM deployment:
-          rosetta-restart --stop       # Disable local x86_64 builds
+          rosetta-manage --stop        # Disable local x86_64 builds
           nix run .#terraform          # auto → remote (can't build locally)
-          rosetta-restart --start      # Re-enable rosetta-builder
+          rosetta-manage --start       # Re-enable rosetta-builder
 
       Restart Mode (default):
         Restarts the rosetta-builderd launchd service, which kills the
@@ -54,11 +54,11 @@
       (does not share with host). Use --gc to free disk space on the VM.
 
       Examples:
-        rosetta-restart             # Restart and verify (fresh VM ready)
-        rosetta-restart --idle      # Restart only (VM stays stopped)
-        rosetta-restart --gc        # GC on VM, then restart and verify
-        rosetta-restart --stop      # Disable for remote builds
-        rosetta-restart --start     # Re-enable after remote builds
+        rosetta-manage              # Restart and verify (fresh VM ready)
+        rosetta-manage --idle       # Restart only (VM stays stopped)
+        rosetta-manage --gc         # GC on VM, then restart and verify
+        rosetta-manage --stop       # Disable for remote builds
+        rosetta-manage --start      # Re-enable after remote builds
       HELP
             exit 0
             ;;
@@ -96,7 +96,7 @@
           echo "Local x86_64-linux builds are now unavailable."
           echo "clan/nix --build-on auto will fall back to remote builds."
           echo ""
-          echo "To re-enable: rosetta-restart --start"
+          echo "To re-enable: rosetta-manage --start"
         else
           echo "Warning: Service may already be stopped or not found."
           echo "Check status: sudo launchctl list | grep rosetta"
