@@ -20,7 +20,7 @@
       machines = {
         # CPU-only node (Story 7.2) - metallurgical naming theme
         galena = {
-          enabled = false; # Default disabled for cost control (~$0.27/hr)
+          enabled = true; # Default disabled for cost control (~$0.27/hr)
           machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
           zone = "us-central1-b";
           image = "debian-12";
