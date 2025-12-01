@@ -45,6 +45,15 @@ let
           flake.nixosConfigurations.galena.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
       };
 
+      "scheelite.zt" = {
+        hostNames = [
+          "scheelite.zt"
+          "fddb:4344:343b:14b9:399:9380:46d5:3400" # Zerotier IPv6
+        ];
+        publicKey =
+          flake.nixosConfigurations.scheelite.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
+      };
+
       # ====================
       # Darwin Machines (static SSH host keys)
       # ====================
