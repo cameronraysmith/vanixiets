@@ -607,7 +607,7 @@ development_status:
   story-8-2: done
   story-8-2-title: "Update architecture and patterns documentation"
   story-8-2-notes: "Completed 2025-12-01 - Created dendritic-architecture.md, clan-integration.md; rewrote nix-config-architecture.md, repository-structure.md, multi-user-patterns.md; updated index.mdx, credits.md, concepts/index.md; deleted understanding-autowiring.md. 9 commits."
-  story-8-3: backlog
+  story-8-3: drafted
   story-8-3-title: "Update host onboarding guides (darwin vs nixos)"
   story-8-4: backlog
   story-8-4-title: "Update secrets management documentation"
