@@ -4,20 +4,26 @@ sidebar:
   order: 1
 ---
 
-Task-oriented guides for common operations and workflows with this nix-config.
+Task-oriented guides for common operations and workflows with this infrastructure.
 
-## Setup & Onboarding
+## Setup and Onboarding
 
-- [Getting started](getting-started) - Bootstrap nix and activate your first configuration
-- [Host onboarding](host-onboarding) - Add a new macOS or NixOS system to the config
-- [User onboarding](home-manager-onboarding) - Set up standalone home-manager for non-admin users
+- [Getting started](getting-started) - Bootstrap Nix and activate your first configuration
+- [Host onboarding](host-onboarding) - Add a new darwin (macOS) or NixOS host with platform-specific workflows
+- [User onboarding](home-manager-onboarding) - Set up user environments with home-manager
 
 ## Customization
 
-- [Adding custom packages](adding-custom-packages) - Create your own package derivations using overlays
+- [Adding custom packages](adding-custom-packages) - Create your own package derivations using the pkgs-by-name pattern
 
-## Operations & Maintenance
+## Operations and Maintenance
 
-- [Secrets management](secrets-management) - Manage encrypted secrets with SOPS and age
+- [Secrets management](secrets-management) - Manage encrypted secrets with the two-tier model (clan vars + sops-nix)
 - [Handling broken packages](handling-broken-packages) - Fix broken packages from nixpkgs unstable with surgical hotfixes
 - [MCP servers usage](mcp-servers-usage) - Configure and use Model Context Protocol servers
+
+## Architecture References
+
+For understanding the underlying patterns:
+- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization pattern
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and secrets
