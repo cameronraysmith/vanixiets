@@ -590,12 +590,15 @@ development_status:
 
   # Epic 8 - Documentation Alignment
   # Update Starlight docs to reflect dendritic+clan architecture
-  epic-8: contexted
+  epic-8: done
   epic-8-notes: |
-    Comprehensive update of packages/docs/src/content/docs/ Starlight site.
-    Align with dendritic flake-parts + clan architecture.
-    Update secrets management, host onboarding, architecture docs.
-    Depends on Epic 7 complete (document what exists).
+    COMPLETE 2025-12-01 - Comprehensive update of packages/docs/src/content/docs/ Starlight site.
+    Aligned with dendritic flake-parts + clan architecture.
+    Updated secrets management, host onboarding, architecture docs.
+    4/4 stories done: audit (8.1), architecture (8.2), onboarding (8.3), secrets (8.4).
+    Created dendritic-architecture.md, clan-integration.md; rewrote 4 major guides.
+    Verification audit achieved 100% code-documentation alignment after corrections.
+    Retrospective: docs/notes/development/retrospectives/epic-8-documentation-alignment.md
   story-8-1: done
   story-8-1-title: "Audit existing Starlight docs for staleness"
   story-8-1-notes: "Completed 2025-12-01 - 59 files audited, 22 current, 21 stale, 9 obsolete, 7 missing topics identified. Results: story-8.1-audit-results.md"
@@ -607,13 +610,13 @@ development_status:
   story-8-2: done
   story-8-2-title: "Update architecture and patterns documentation"
   story-8-2-notes: "Completed 2025-12-01 - Created dendritic-architecture.md, clan-integration.md; rewrote nix-config-architecture.md, repository-structure.md, multi-user-patterns.md; updated index.mdx, credits.md, concepts/index.md; deleted understanding-autowiring.md. 9 commits."
-  story-8-3: review
+  story-8-3: done
   story-8-3-title: "Update host onboarding guides (darwin vs nixos)"
-  story-8-3-notes: "Implementation complete 2025-12-01 - Rewrote host-onboarding.md (darwin vs NixOS), home-manager-onboarding.md (portable modules, aggregates), getting-started.md (dendritic pattern), index.md (navigation). 4 atomic commits, zero deprecated references, all links valid."
-  story-8-4: review
+  story-8-3-notes: "DONE 2025-12-01 - Rewrote host-onboarding.md (darwin vs NixOS), home-manager-onboarding.md (portable modules, aggregates), getting-started.md (dendritic pattern), index.md (navigation). 4 atomic commits, zero deprecated references, all links valid."
+  story-8-4: done
   story-8-4-title: "Update secrets management documentation"
-  story-8-4-notes: "Implementation complete 2025-12-01 - Rewrote secrets-management.md for two-tier architecture (clan vars + sops-nix), documented Bitwarden → ssh-to-age bootstrap workflow, platform differences (Darwin/NixOS), troubleshooting. 1 atomic commit, zero deprecated references, Starlight build passes."
-  epic-8-retrospective: optional
+  story-8-4-notes: "DONE 2025-12-01 - Rewrote secrets-management.md for two-tier architecture (clan vars + sops-nix), documented Bitwarden → ssh-to-age bootstrap workflow, platform differences (Darwin/NixOS), troubleshooting. 1 atomic commit, zero deprecated references, Starlight build passes."
+  epic-8-retrospective: done
 
   # Epic 9 - Branch Consolidation and Release
   # Merge clan-01 to main with proper tagging
