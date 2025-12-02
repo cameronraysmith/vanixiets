@@ -1,0 +1,51 @@
+---
+title: Reference
+description: Technical reference documentation for the infra repository
+---
+
+This section provides comprehensive reference documentation for the infra repository's CLI tooling, automation, and structure.
+
+## CLI tooling
+
+Reference documentation for command-line tools and automation:
+
+- [Justfile Recipes](/reference/justfile-recipes/) - Complete reference for all ~100 justfile recipes organized by functional group, with CI-tested indicators
+- [Flake Apps](/reference/flake-apps/) - Reference for nix flake apps (`darwin`, `os`, `home`) that wrap configuration activation
+- [CI Jobs](/reference/ci-jobs/) - GitHub Actions CI job reference with local equivalents and troubleshooting
+
+## Repository structure
+
+- [Repository Structure](/reference/repository-structure/) - Directory layout for dendritic flake-parts + clan-core architecture
+
+## Quick start
+
+Common operations using the CLI tooling:
+
+```bash
+# Activate current machine (auto-detects platform)
+just activate
+
+# Preview changes before applying
+just activate --dry
+
+# Run all tests
+just check
+
+# Fast checks (skip VM tests)
+just check-fast
+
+# Build documentation
+just docs-build
+
+# View available recipes
+just --list
+```
+
+## Related documentation
+
+For conceptual understanding and guides:
+
+- [Getting Started](/guides/getting-started/) - Initial setup and onboarding
+- [Nix Config Architecture](/concepts/nix-config-architecture/) - How the nix configuration is structured
+- [Clan Integration](/concepts/clan-integration/) - Understanding clan-core integration
+- [CI Philosophy](/development/traceability/ci-philosophy/) - Design principles behind the CI system
