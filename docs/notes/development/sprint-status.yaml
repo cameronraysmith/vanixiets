@@ -610,7 +610,7 @@ development_status:
   story-8-3: review
   story-8-3-title: "Update host onboarding guides (darwin vs nixos)"
   story-8-3-notes: "Implementation complete 2025-12-01 - Rewrote host-onboarding.md (darwin vs NixOS), home-manager-onboarding.md (portable modules, aggregates), getting-started.md (dendritic pattern), index.md (navigation). 4 atomic commits, zero deprecated references, all links valid."
-  story-8-4: drafted
+  story-8-4: in-progress
   story-8-4-title: "Update secrets management documentation"
   epic-8-retrospective: optional
 
