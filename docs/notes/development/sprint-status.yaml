@@ -617,15 +617,15 @@ development_status:
   # Phase 2: Documentation Completeness (Stories 8.5-8.10)
   # Added 2025-12-02 based on Party Mode documentation coverage analysis
   # Research: docs/notes/development/research/documentation-coverage-analysis.md
-  story-8-5: backlog
+  story-8-5: drafted
   story-8-5-title: "Audit documentation structure against Diataxis/AMDiRE frameworks"
-  story-8-5-notes: "Research streams R8, R9, R10, R14, R15 - identify structural gaps in tutorials/, reference/, development/operations/, development/traceability/"
+  story-8-5-notes: "Research streams R8, R9, R10, R14, R15 - identify structural gaps in tutorials/, reference/, development/operations/, development/traceability/. Story file: work-items/8-5-audit-documentation-structure-against-diataxis-amdire-frameworks.md"
   story-8-6: backlog
   story-8-6-title: "Rationalize and document CLI tooling"
   story-8-6-notes: "Research streams R16, R17, R18 - RATIONALIZE (rename/remove stale nixos-unified recipes, improve naming) THEN document. Dev agent must pause-and-discuss for ambiguous decisions, verify CI/CD coverage before removals."
-  story-8-7: backlog
+  story-8-7: drafted
   story-8-7-title: "Audit AMDiRE development documentation alignment"
-  story-8-7-notes: "Research streams R11, R12, R13 - context, requirements, ADRs alignment with post-migration reality"
+  story-8-7-notes: "Research streams R11, R12, R13 - context, requirements, ADRs alignment with post-migration reality. Story file: work-items/8-7-audit-amdire-development-documentation-alignment.md"
   story-8-8: backlog
   story-8-8-title: "Create tutorials for common user workflows"
   story-8-8-notes: "Research streams R1, R2, R3, R4 - populate empty tutorials/ with bootstrap, secrets, darwin, nixos journeys"
