@@ -626,7 +626,12 @@ development_status:
   story-8-7: review
   story-8-7-title: "Audit AMDiRE development documentation alignment"
   story-8-7-notes: "Research streams R11, R12, R13 - context, requirements, ADRs alignment with post-migration reality. Story file: work-items/8-7-audit-amdire-development-documentation-alignment.md"
-  story-8-8: backlog
+  # Story 8.8: DRAFTED (2025-12-02) - Create tutorials for common user workflows
+  # Addresses CRITICAL gap: tutorials/ directory completely empty (blocks new users)
+  # 4 tutorials: bootstrap-to-activation, secrets-setup, darwin-deployment, nixos-deployment
+  # Diataxis framework: learning-oriented (not task-oriented like guides)
+  # Story file: work-items/8-8-create-tutorials-for-common-user-workflows.md
+  story-8-8: review
   story-8-8-title: "Create tutorials for common user workflows"
   story-8-8-notes: "Research streams R1, R2, R3, R4 - populate empty tutorials/ with bootstrap, secrets, darwin, nixos journeys"
   story-8-9: backlog
