@@ -503,6 +503,7 @@ claude-opus-4-5-20251101
 ### File List
 
 - Modified: `packages/docs/src/content/docs/guides/secrets-management.md` (373 insertions, 435 deletions)
+- Modified: `packages/docs/src/content/docs/about/contributing/ci-cd-setup.md` (removed broken link to deleted section)
 - Modified: `docs/notes/development/sprint-status.yaml` (story 8-4 status: drafted → in-progress → review)
 - Modified: `docs/notes/development/work-items/8-4-update-secrets-management-documentation.md` (this file)
 
@@ -512,8 +513,10 @@ claude-opus-4-5-20251101
 - Complete rewrite of secrets-management.md for two-tier architecture
 - All 8 tasks completed, all 18 acceptance criteria satisfied
 - Verification: Zero deprecated patterns, valid Bitwarden references in SSH context
-- Starlight build passes (62 pages indexed)
-- Commit: ecac333f - docs(secrets): rewrite for two-tier architecture (clan vars + sops-nix)
+- Starlight build and linkcheck pass (62 pages indexed)
+- Commits:
+  - ecac333f - docs(secrets): rewrite for two-tier architecture (clan vars + sops-nix)
+  - e5a39750 - docs(ci-cd): remove broken link to removed secrets section
 - Status: review
 
 **2025-12-01 (Story Amended - Bitwarden Role Correction)**:
