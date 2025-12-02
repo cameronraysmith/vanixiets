@@ -182,19 +182,19 @@ sidebar:
 Content goes here (no duplicate H1 needed, title becomes H1)...
 ```
 
-### Adding a development document
+### Adding a troubleshooting guide
 
-Create `src/content/docs/development/operations/my-procedure.md`:
+Create `src/content/docs/guides/troubleshooting/my-issue.md`:
 
 ```markdown
 ---
-title: My Procedure
+title: Troubleshooting My Issue
 ---
 
-Operational procedure content...
+Troubleshooting content...
 ```
 
-The file will be auto-discovered and added to the Operations section.
+The file will be auto-discovered and added to the Troubleshooting section under Guides.
 
 ### Adding to notes (working documents)
 
