@@ -92,45 +92,61 @@ The key insight:
 - No manual aggregate definition needed - directory structure creates the namespace
 - Each file contributes different programs to the same aggregate module
 
-### Aggregate modules
+### Directory-based aggregation
 
-Related features are grouped into aggregates:
+Related features are automatically grouped by directory structure without requiring explicit aggregate definitions.
+Each directory becomes an aggregate through import-tree's auto-discovery and namespace merging:
 
 ```nix
-# modules/home/_aggregates.nix
+# modules/home/configurations.nix - imports directory aggregates
 { config, ... }:
 {
-  flake.modules.homeManager = {
-    aggregate-ai = {
-      imports = with config.flake.modules.homeManager; [
-        ai-claude-code
-        ai-mcp-servers
-        ai-llm-wrappers
-      ];
-    };
-    aggregate-development = {
-      imports = with config.flake.modules.homeManager; [
-        development-git
-        development-editors
-        development-languages
-      ];
-    };
-  };
+  # Force module loading order - aggregates processed before homeConfigurations
+  # Pattern A multi-aggregate organization (drupol-style):
+  #   - core: base config (catppuccin, fonts, bitwarden, xdg, session-variables, ssh)
+  #   - development: dev environment (git, jujutsu, neovim, wezterm, zed, starship, zsh)
+  #   - ai: AI-assisted tools (claude-code, mcp-servers, glm wrappers, ccstatusline)
+  #   - shell: shell/terminal environment (atuin, yazi, zellij, tmux, bash, nushell)
+  #   - packages: organized package sets (terminal, development, compute, security, database, publishing)
+  #   - terminal: terminal utilities (direnv, fzf, lsd, bat, btop, htop, jq, nix-index, zoxide)
+  #   - tools: additional tools (awscli, k9s, pandoc, nix, gpg, macchina, tealdeer, texlive)
+  imports = [
+    ./core
+    ./development
+    ./ai
+    ./shell
+    ./packages
+    ./terminal
+    ./tools
+    ./users
+  ];
 }
 ```
 
-Machine configurations import aggregates, not individual modules:
+How it works:
+- Each directory import (e.g., `./ai`) triggers import-tree to discover all `*.nix` files inside
+- Files in `ai/` that export to `flake.modules.homeManager.ai` auto-merge into a single aggregate
+- No explicit aggregate definition needed - the directory IS the aggregate boundary
+- Machine configurations can import entire aggregates or specific parts
+
+Machine configurations import aggregates by referencing the auto-merged namespace:
 
 ```nix
-# modules/machines/darwin/stibnite.nix
+# modules/machines/darwin/stibnite/default.nix
 {
-  home-manager.users.crs58 = {
-    imports = with config.flake.modules.homeManager; [
-      aggregate-ai
-      aggregate-development
-      aggregate-shell
-    ];
-  };
+  home-manager.users.crs58.imports = [
+    flakeModulesHome."users/crs58"
+    flakeModulesHome.base-sops
+    # Import aggregate modules for crs58
+    # Pattern A: All aggregates via auto-merge
+    flakeModulesHome.ai          # All files from modules/home/ai/*
+    flakeModulesHome.core        # All files from modules/home/core/*
+    flakeModulesHome.development # All files from modules/home/development/*
+    flakeModulesHome.packages    # All files from modules/home/packages/*
+    flakeModulesHome.shell       # All files from modules/home/shell/*
+    flakeModulesHome.terminal    # All files from modules/home/terminal/*
+    flakeModulesHome.tools       # All files from modules/home/tools/*
+  ];
 }
 ```
 
