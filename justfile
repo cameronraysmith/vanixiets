@@ -154,23 +154,6 @@ bisect-nixpkgs:
 bisect-nixpkgs-manual command="status":
   @./scripts/bisect-nixpkgs.sh {{ command }}
 
-# Run nix flake to execute `nix run .#activate` for the current host.
-[group('nix')]
-switch:
-  nix run
-
-# Run nix flake to execute `nix run .#activate-home` for the current user.
-[group('nix')]
-switch-home:
-  nix run .#activate-home
-
-# https://discourse.nixos.org/t/sudo-run-current-system-sw-bin-sudo-must-be-owned-by-uid-0-and-have-the-setuid-bit-set-and-cannot-chdir-var-cron-bailing-out-var-cron-permission-denied/20463
-# sudo: /run/current-system/sw/bin/sudo must be owned by uid 0 and have the setuid bit set
-# Run nix flake with explicit use of the sudo in `/run/wrappers`
-[group('nix')]
-switch-wrapper:
-  /run/wrappers/bin/sudo nix run
-
 # Shell with bootstrap dependencies
 [group('nix')]
 bootstrap-shell:
@@ -223,11 +206,6 @@ darwin-bootstrap profile="aarch64":
 [group('nix-darwin')]
 darwin-build profile="aarch64":
   just build "darwinConfigurations.{{ profile }}.config.system.build.toplevel"
-
-# Switch darwin from flake
-[group('nix-darwin')]
-darwin-switch profile="aarch64":
-  darwin-rebuild switch --flake ".#{{ profile }}"
 
 # Test darwin from flake
 [group('nix-darwin')]
@@ -292,20 +270,10 @@ nixos-build profile="aarch64":
 nixos-test profile="aarch64":
   nixos-rebuild test --flake ".#{{ profile }}"
 
-# Switch nixos from flake
-[group('nixos')]
-nixos-switch profile="aarch64":
-  nixos-rebuild switch --flake ".#{{ profile }}"
-
 # Update nix flake
 [group('nix')]
 update:
   nix flake update
-
-# Update primary nix flake inputs (see flake.nix)
-[group('nix')]
-update-primary-inputs:
-  nix run .#update
 
 # Update a package using its updateScript
 # Note: claude-code-bin is now from nix-ai-tools and updates automatically
@@ -382,84 +350,6 @@ clan-show:
 [group('clan')]
 clan-metadata:
   nix flake metadata
-
-# Preview darwin configuration changes (dry run)
-[group('clan')]
-clan-darwin-dry hostname:
-  @echo "Previewing darwin configuration changes for {{hostname}}..."
-  nix run --accept-flake-config .#darwin -- {{hostname}} . --dry
-  @echo ""
-  @echo "To apply these changes, run: just clan-darwin-switch {{hostname}}"
-
-# Apply darwin configuration (build + activate)
-[group('clan')]
-clan-darwin-switch hostname:
-  @echo "Applying darwin configuration for {{hostname}}..."
-  nix run --accept-flake-config .#darwin -- {{hostname}} .
-
-# Preview and apply darwin configuration (interactive)
-[group('clan')]
-clan-darwin hostname: (clan-darwin-dry hostname)
-  @echo ""
-  @read -p "Apply these changes? [y/N] " -n 1 -r; \
-  echo; \
-  if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-    just clan-darwin-switch {{hostname}}; \
-  else \
-    echo "Cancelled."; \
-  fi
-
-# Preview nixos configuration changes (dry run)
-[group('clan')]
-clan-os-dry hostname:
-  @echo "Previewing NixOS configuration changes for {{hostname}}..."
-  nix run --accept-flake-config .#os -- {{hostname}} . --dry
-  @echo ""
-  @echo "To apply these changes, run: just clan-os-switch {{hostname}}"
-
-# Apply nixos configuration (build + activate)
-[group('clan')]
-clan-os-switch hostname:
-  @echo "Applying NixOS configuration for {{hostname}}..."
-  nix run --accept-flake-config .#os -- {{hostname}} .
-
-# Preview and apply nixos configuration (interactive)
-[group('clan')]
-clan-os hostname: (clan-os-dry hostname)
-  @echo ""
-  @read -p "Apply these changes? [y/N] " -n 1 -r; \
-  echo; \
-  if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-    just clan-os-switch {{hostname}}; \
-  else \
-    echo "Cancelled."; \
-  fi
-
-# Preview home-manager configuration changes (dry run)
-[group('clan')]
-clan-home-dry username:
-  @echo "Previewing home-manager configuration changes for {{username}}..."
-  nix run --accept-flake-config .#home -- {{username}} . --dry
-  @echo ""
-  @echo "To apply these changes, run: just clan-home-switch {{username}}"
-
-# Apply home-manager configuration (build + activate)
-[group('clan')]
-clan-home-switch username:
-  @echo "Applying home-manager configuration for {{username}}..."
-  nix run --accept-flake-config .#home -- {{username}} .
-
-# Preview and apply home-manager configuration (interactive)
-[group('clan')]
-clan-home username: (clan-home-dry username)
-  @echo ""
-  @read -p "Apply these changes? [y/N] " -n 1 -r; \
-  echo; \
-  if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-    just clan-home-switch {{username}}; \
-  else \
-    echo "Cancelled."; \
-  fi
 
 ## docs
 
