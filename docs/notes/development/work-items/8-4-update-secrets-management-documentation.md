@@ -20,7 +20,7 @@ so that I can properly manage system and user secrets.
 ### Deprecated Content Removal (AC5-AC8)
 
 5. **No 3-tier references**: Remove all references to "3-tier key architecture" terminology
-6. **No Bitwarden patterns**: Remove Bitwarden as "single source of truth" pattern (retain only as optional offline backup mention)
+6. **Correct Bitwarden scope**: Remove Bitwarden as "single source of truth for ALL secrets" pattern, but KEEP Bitwarden as SSH key source for Tier 2 age key derivation via ssh-to-age
 7. **No outdated SOPS workflows**: Replace GitHub Actions CI-focused SOPS workflow with machine secrets workflow
 8. **No sopsIdentifier patterns**: Update to current sops.secrets pattern from clan-integration.md
 
@@ -48,15 +48,22 @@ so that I can properly manage system and user secrets.
 ### Task 1: Analyze Current State and Plan Rewrite (AC: #5-8)
 
 - [ ] Read `packages/docs/src/content/docs/guides/secrets-management.md` completely
-- [ ] Identify all content to remove:
+- [ ] Identify all content to REMOVE:
+  - [ ] "3-tier key architecture" terminology
+  - [ ] "Bitwarden as single source of truth for ALL secrets" pattern
   - [ ] Dev key / CI key architecture (wrong model - not machine/user tier)
-  - [ ] Bitwarden references beyond optional backup
+  - [ ] CI-focused Dev/CI key model
   - [ ] GitHub Actions SOPS workflow (CI secrets, not machine secrets)
   - [ ] sopsIdentifier patterns
-- [ ] Identify content to preserve:
+  - [ ] Old SOPS-only workflow without clan vars distinction
+- [ ] Identify content to KEEP/UPDATE:
   - [ ] Age encryption basics
   - [ ] SOPS CLI usage for editing
   - [ ] File structure concepts
+  - [ ] Bitwarden as source for SSH keys (for age key derivation)
+  - [ ] `bw` CLI commands for retrieving SSH keys
+  - [ ] `ssh-to-age` derivation workflow
+  - [ ] Manual bootstrap requirement and security rationale
 - [ ] Document removal list in completion notes
 
 ### Task 2: Rewrite Architecture Section (AC: #1-4)
@@ -98,9 +105,55 @@ so that I can properly manage system and user secrets.
   - [ ] API keys (Anthropic, OpenAI, etc.)
   - [ ] Personal credentials
   - [ ] Service credentials tied to user identity
-- [ ] Document age key setup:
-  ```bash
-  age-keygen -o ~/.config/sops/age/keys.txt  # Generate personal age key
+- [ ] Document age key bootstrap workflow (Bitwarden → ssh-to-age):
+  ```markdown
+  **Source:** SSH keys stored in Bitwarden, derived to age keys via ssh-to-age
+
+  **Bootstrap Workflow (Manual - Required for Security):**
+
+  The age private key used by sops-nix is derived from your Bitwarden-managed SSH key:
+
+  1. **Retrieve SSH key from Bitwarden:**
+     ```bash
+     # Login to Bitwarden CLI
+     bw login
+
+     # Unlock vault and set session
+     export BW_SESSION=$(bw unlock --raw)
+
+     # Retrieve your SSH private key (adjust item name as needed)
+     bw get item "ssh-key-name" | jq -r '.notes' > /tmp/ssh_key
+     # OR if stored as attachment:
+     bw get attachment "id_ed25519" --itemid <item-id> --output /tmp/ssh_key
+     ```
+
+  2. **Derive age key from SSH key:**
+     ```bash
+     # Install ssh-to-age if needed
+     nix-shell -p ssh-to-age
+
+     # Derive age private key
+     ssh-to-age -private-key -i /tmp/ssh_key > ~/.config/sops/age/keys.txt
+
+     # Get public key for .sops.yaml
+     ssh-to-age -i /tmp/ssh_key.pub
+
+     # Clean up
+     rm /tmp/ssh_key
+     ```
+
+  3. **Verify setup:**
+     ```bash
+     # Check age key exists
+     cat ~/.config/sops/age/keys.txt | head -1
+     # Should show: AGE-SECRET-KEY-...
+     ```
+
+  **Security Note:** This manual bootstrap step is intentional. The age private key derivation from Bitwarden-managed SSH keys ensures:
+  - SSH keys remain in Bitwarden (not in nix store)
+  - Age keys are derived locally, never transmitted
+  - Each user controls their own key bootstrap
+  - Compromising the nix config doesn't expose keys
   ```
 - [ ] Document sops secrets workflow:
   ```bash
@@ -115,6 +168,17 @@ so that I can properly manage system and user secrets.
 - [ ] Document `.sops.yaml` configuration
 - [ ] Document rotation procedure for sops-nix secrets
 - [ ] Include examples with crs58, raquel users
+- [ ] Document required tools table:
+  ```markdown
+  ## Required Tools for Tier 2 Bootstrap
+
+  | Tool | Purpose | Installation |
+  |------|---------|--------------|
+  | `bw` | Bitwarden CLI for SSH key retrieval | `nix-shell -p bitwarden-cli` |
+  | `ssh-to-age` | Derive age keys from SSH keys | `nix-shell -p ssh-to-age` |
+  | `sops` | Encrypt/decrypt secrets files | `nix-shell -p sops` |
+  | `age` | Age encryption (for verification) | `nix-shell -p age` |
+  ```
 - [ ] Commit: `docs(secrets): add Tier 2 sops-nix documentation`
 
 ### Task 5: Document Platform Differences (AC: #16)
@@ -169,12 +233,27 @@ so that I can properly manage system and user secrets.
 
 ### Task 8: Final Verification (AC: #17-18)
 
-- [ ] Run verification commands:
+- [ ] Run verification commands for deprecated patterns (should return zero):
   ```bash
+  # These patterns should NOT appear:
   rg "3-tier|three-tier" packages/docs/src/content/docs/guides/secrets-management.md
-  rg "bitwarden|Bitwarden" packages/docs/src/content/docs/guides/secrets-management.md
+  rg "single source of truth" packages/docs/src/content/docs/guides/secrets-management.md
+  rg "Dev key|CI key" packages/docs/src/content/docs/guides/secrets-management.md
+  rg "GitHub Actions" packages/docs/src/content/docs/guides/secrets-management.md
   rg "sopsIdentifier" packages/docs/src/content/docs/guides/secrets-management.md
   rg "configurations/" packages/docs/src/content/docs/guides/secrets-management.md
+  ```
+- [ ] Verify Bitwarden usage is ONLY for SSH key context:
+  ```bash
+  # Should return matches - verify they are in SSH key retrieval context:
+  rg "Bitwarden|bitwarden|bw" packages/docs/src/content/docs/guides/secrets-management.md
+  # Manual review: each match should be related to SSH key storage/retrieval
+  ```
+- [ ] Verify required tooling documented:
+  ```bash
+  # Should return matches:
+  rg "ssh-to-age" packages/docs/src/content/docs/guides/secrets-management.md
+  rg "bitwarden-cli" packages/docs/src/content/docs/guides/secrets-management.md
   ```
 - [ ] Verify Starlight build: `nix build .#docs`
 - [ ] Verify internal links work
@@ -204,10 +283,21 @@ The current `secrets-management.md` (591 lines) is entirely CI-focused:
 - Lines 316-498: "Recipe reference" + "File structure" + "Security checklist" (CI recipes)
 - Lines 499-591: "Quick reference" (CI operations)
 
-**Content to Preserve/Adapt:**
+**Content to REMOVE - Terminology:**
+- "3-tier key architecture" as overall model
+- "Bitwarden as single source of truth for ALL secrets"
+- CI-focused Dev/CI key model
+- GitHub Actions secrets workflow
+- Old SOPS-only workflow without clan vars distinction
+
+**Content to KEEP/UPDATE:**
 - Age encryption concepts (lines 14-17 key storage concept)
 - SOPS CLI usage patterns
 - General file structure concepts (adapted for two-tier)
+- Bitwarden as source for SSH keys (for age key derivation)
+- `bw` CLI commands for retrieving SSH keys
+- `ssh-to-age` derivation workflow
+- Manual bootstrap requirement and security rationale
 
 ### Two-Tier Architecture (From Story 8.2)
 
@@ -226,6 +316,7 @@ From `clan-integration.md` lines 173-186:
 - GitHub tokens, API keys, signing keys, personal credentials
 - Managed via: `sops secrets/users/username.sops.yaml`
 - Storage: `secrets/` directory, encrypted with age
+- Age keys derived from Bitwarden-managed SSH keys via ssh-to-age
 
 ### Age Key Reuse Pattern
 
@@ -233,6 +324,44 @@ From Epic 1 Story 1.10C findings:
 - Same age keypair used for BOTH tiers
 - Key location: `~/.config/sops/age/keys.txt`
 - This enables single key management for both clan vars decryption and sops-nix
+
+### Bitwarden Role in Tier 2 (CORRECTED)
+
+**Critical Correction:** Bitwarden is NOT removed from documentation. It plays a LIMITED but ESSENTIAL role in Tier 2 secrets bootstrap.
+
+**Correct Workflow:**
+```
+Bitwarden (stores SSH keys per user)
+    ↓
+bw CLI (retrieves SSH private key)
+    ↓
+ssh-to-age (derives age key from SSH key)
+    ↓
+~/.config/sops/age/keys.txt (age private key stored here)
+    ↓
+sops-nix (uses age key for decryption at home-manager activation)
+```
+
+**What to REMOVE:**
+- "3-tier key architecture" terminology
+- "Bitwarden as single source of truth for ALL secrets"
+- CI-focused Dev/CI key model
+- Old SOPS-only workflow documentation
+
+**What to KEEP/ADD:**
+- Bitwarden as source for SSH keys
+- `bw` CLI usage for retrieving SSH keys
+- `ssh-to-age` for deriving age keys
+- Manual bootstrap step requirement
+- Security rationale for manual step (SSH keys stay in Bitwarden, age keys derived locally)
+
+**Required Tools for Documentation:**
+| Tool | Purpose | Installation |
+|------|---------|--------------|
+| `bw` | Bitwarden CLI for SSH key retrieval | `nix-shell -p bitwarden-cli` |
+| `ssh-to-age` | Derive age keys from SSH keys | `nix-shell -p ssh-to-age` |
+| `sops` | Encrypt/decrypt secrets files | `nix-shell -p sops` |
+| `age` | Age encryption (for verification) | `nix-shell -p age` |
 
 ### Machine Fleet for Examples
 
@@ -254,7 +383,9 @@ From Epic 1 Story 1.10C findings:
 |--------|--------------|
 | 3-tier key architecture | Two-tier secrets architecture |
 | Dev key / CI key | Tier 1 (clan vars) / Tier 2 (sops-nix) |
-| Bitwarden as single source | Age keys at `~/.config/sops/age/keys.txt` |
+| Age key (derived from Bitwarden SSH) | Standalone age-keygen workflow |
+| Bitwarden → ssh-to-age workflow | 3-tier key architecture |
+| Bitwarden as single source of truth for ALL secrets | Age keys at `~/.config/sops/age/keys.txt` (derived from Bitwarden SSH) |
 | SOPS-only workflow | Clan vars (Tier 1) + sops-nix (Tier 2) |
 | sopsIdentifier pattern | Clan vars generators |
 | Manual secret deployment | `clan machines update` |
@@ -360,6 +491,19 @@ From Epic 1 Story 1.10C findings:
 ### File List
 
 ## Change Log
+
+**2025-12-01 (Story Amended - Bitwarden Role Correction)**:
+- **Amendment 1**: Updated Tier 2 description in Two-Tier Architecture section to include age key derivation from Bitwarden SSH keys via ssh-to-age
+- **Amendment 2**: Updated Terminology Replacement Table to clarify Bitwarden's LIMITED role (SSH key source, not removed entirely)
+- **Amendment 3**: Updated Task 1 to specify what Bitwarden content to KEEP vs REMOVE
+- **Amendment 4**: Updated Task 4 to add complete Bitwarden → ssh-to-age → age key bootstrap workflow with commands, security rationale, and required tools table
+- **Amendment 5**: Updated Task 8 verification commands to check for deprecated patterns (should be zero) vs valid Bitwarden usage in SSH key context (should exist)
+- **Amendment 6**: Updated AC6 to clarify "Correct Bitwarden scope" instead of "No Bitwarden patterns"
+- **Amendment 7**: Added "Bitwarden Role in Tier 2 (CORRECTED)" section in Dev Notes documenting the correct workflow
+- **Amendment 8**: Updated "Content to REMOVE/KEEP" lists in Dev Notes to preserve Bitwarden SSH key source documentation
+
+**Critical Correction Summary:**
+Bitwarden is NOT being removed from documentation. It is the SOURCE for SSH keys used to derive age private keys for sops-nix Tier 2 secrets. The manual bootstrap workflow (Bitwarden → bw CLI → ssh-to-age → age key) is a security feature by design. Only the incorrect "Bitwarden as single source of truth for ALL secrets" pattern is being removed.
 
 **2025-12-01 (Story Drafted)**:
 - Story file created from Epic 8 Story 8.4 specification
