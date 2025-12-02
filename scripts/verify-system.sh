@@ -25,63 +25,63 @@ fi
 echo ""
 
 if [ $FAILED -eq 0 ]; then
-    # Step 2: Build configuration (auto-detects home-manager vs system)
+    # Step 2: Build configuration (auto-detects platform)
     echo "Step 2/2: Building configuration (without activation)..."
 
-    # Check for home-manager-only configuration first (matches just activate logic)
-    if [ -f ./configurations/home/$USER@$(hostname).nix ]; then
-        echo "Detected home-manager-only configuration: $USER@$(hostname)"
-        # Use nom (nix output manager) for better build output if available
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        HOSTNAME=$(hostname -s)
+        echo "Detected darwin system configuration: $HOSTNAME"
         if command -v nom &> /dev/null; then
-            if nom build '.#homeConfigurations.'"$USER@$(hostname)"'.activationPackage'; then
-                echo "✓ Home-manager configuration builds successfully"
-            else
-                echo "✗ Home-manager build failed"
-                FAILED=1
-            fi
-        else
-            if nix build '.#homeConfigurations.'"$USER@$(hostname)"'.activationPackage'; then
-                echo "✓ Home-manager configuration builds successfully"
-            else
-                echo "✗ Home-manager build failed"
-                FAILED=1
-            fi
-        fi
-    elif command -v darwin-rebuild &> /dev/null; then
-        # Darwin system configuration
-        echo "Detected darwin system configuration: $(hostname)"
-        # Use nom (nix output manager) for better build output if available
-        if command -v nom &> /dev/null; then
-            if nom build '.#darwinConfigurations.'"$(hostname)"'.system'; then
+            if nom build ".#darwinConfigurations.$HOSTNAME.system"; then
                 echo "✓ Darwin system builds successfully"
             else
                 echo "✗ Darwin build failed"
                 FAILED=1
             fi
         else
-            if darwin-rebuild build --flake .; then
+            if nix build ".#darwinConfigurations.$HOSTNAME.system"; then
                 echo "✓ Darwin system builds successfully"
             else
                 echo "✗ Darwin build failed"
                 FAILED=1
             fi
         fi
-    elif command -v nixos-rebuild &> /dev/null; then
-        # NixOS system configuration
-        echo "Detected NixOS system configuration: $(hostname)"
-        if nixos-rebuild build --flake .; then
-            echo "✓ NixOS system builds successfully"
+    elif [ -f /etc/NIXOS ]; then
+        HOSTNAME=$(hostname)
+        echo "Detected NixOS system configuration: $HOSTNAME"
+        if command -v nom &> /dev/null; then
+            if nom build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel"; then
+                echo "✓ NixOS system builds successfully"
+            else
+                echo "✗ NixOS build failed"
+                FAILED=1
+            fi
         else
-            echo "✗ NixOS build failed"
-            FAILED=1
+            if nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel"; then
+                echo "✓ NixOS system builds successfully"
+            else
+                echo "✗ NixOS build failed"
+                FAILED=1
+            fi
         fi
     else
-        echo "✗ Could not detect configuration type"
-        echo "  Expected one of:"
-        echo "    - ./configurations/home/$USER@$(hostname).nix (home-manager)"
-        echo "    - darwin-rebuild command (nix-darwin)"
-        echo "    - nixos-rebuild command (NixOS)"
-        FAILED=1
+        echo "Detected home-manager-only configuration: $USER"
+        SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+        if command -v nom &> /dev/null; then
+            if nom build ".#legacyPackages.$SYSTEM.homeConfigurations.$USER.activationPackage"; then
+                echo "✓ Home-manager configuration builds successfully"
+            else
+                echo "✗ Home-manager build failed"
+                FAILED=1
+            fi
+        else
+            if nix build ".#legacyPackages.$SYSTEM.homeConfigurations.$USER.activationPackage"; then
+                echo "✓ Home-manager configuration builds successfully"
+            else
+                echo "✗ Home-manager build failed"
+                FAILED=1
+            fi
+        fi
     fi
 fi
 
