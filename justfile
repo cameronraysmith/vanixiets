@@ -615,9 +615,6 @@ container-all-multiarch container binary:
 
 ## secrets
 
-# Define the project variable
-gcp_project_id := env_var_or_default('GCP_PROJECT_ID', 'development')
-
 # Scan repository for hardcoded secrets (full history)
 [group('secrets')]
 scan-secrets:
@@ -636,42 +633,6 @@ show:
   @echo
   @echo "=== Test secrets (secrets/test.yaml) ==="
   @sops -d secrets/test.yaml
-
-# Create a secret with the given name
-[group('secrets')]
-create-secret name:
-  @gcloud secrets create {{name}} --replication-policy="automatic" --project {{gcp_project_id}}
-
-# Populate a single secret with the contents of a dotenv-formatted file
-[group('secrets')]
-populate-single-secret name path:
-  @gcloud secrets versions add {{name}} --data-file={{path}} --project {{gcp_project_id}}
-
-# Populate each line of a dotenv-formatted file as a separate secret
-[group('secrets')]
-populate-separate-secrets path:
-  @while IFS= read -r line; do \
-     KEY=$(echo $line | cut -d '=' -f 1); \
-     VALUE=$(echo $line | cut -d '=' -f 2); \
-     gcloud secrets create $KEY --replication-policy="automatic" --project {{gcp_project_id}} 2>/dev/null; \
-     printf "$VALUE" | gcloud secrets versions add $KEY --data-file=- --project {{gcp_project_id}}; \
-   done < {{path}}
-
-# Complete process: Create a secret and populate it with the entire contents of a dotenv file
-[group('secrets')]
-create-and-populate-single-secret name path:
-  @just create-secret {{name}}
-  @just populate-single-secret {{name}} {{path}}
-
-# Complete process: Create and populate separate secrets for each line in the dotenv file
-[group('secrets')]
-create-and-populate-separate-secrets path:
-  @just populate-separate-secrets {{path}}
-
-# Retrieve the contents of a given secret
-[group('secrets')]
-get-secret name:
-  @gcloud secrets versions access latest --secret={{name}} --project={{gcp_project_id}}
 
 # Create empty dotenv from template
 [group('secrets')]
