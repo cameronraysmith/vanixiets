@@ -309,4 +309,4 @@ just ci-debug-job ci.yaml "nix (x86_64-linux, packages)"
 
 - [Justfile Recipes](/reference/justfile-recipes/) - Local recipe reference
 - [CI Philosophy](/development/traceability/ci-philosophy/) - Design principles
-- [Troubleshooting CI Cache](/development/operations/troubleshooting-ci-cache/) - Cache issues
+- [Troubleshooting CI Cache](/guides/troubleshooting/troubleshooting-ci-cache/) - Cache issues
