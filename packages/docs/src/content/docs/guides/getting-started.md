@@ -30,7 +30,7 @@ make bootstrap && exec $SHELL
 ```
 
 **What this does:**
-- Installs Nix using the [NixOS community installer](https://github.com/NixOS/experimental-nix-installer)
+- Installs Nix using the [Determinate Systems installer](https://github.com/DeterminateSystems/nix-installer)
 - Configures Nix with comprehensive settings for optimal performance:
   - Enables flakes and nix-command experimental features
   - Disables store optimization (auto-optimise-store=false) to prevent corruption on Darwin
@@ -75,19 +75,25 @@ make setup-user
 
 ### Step 6: Activate configuration
 
-**For admin users** (Darwin/NixOS with integrated home-manager):
+**For darwin hosts** (macOS):
 ```bash
-nix run . hostname
-# Example: nix run . stibnite
+darwin-rebuild switch --flake .#<hostname>
+
+# Examples:
+darwin-rebuild switch --flake .#stibnite
+darwin-rebuild switch --flake .#blackphos
 ```
 
-**For non-admin users** (standalone home-manager, no sudo required):
+**For NixOS hosts** (via clan):
 ```bash
-nix run . user@hostname
-# Example: nix run . runner@stibnite
+clan machines update <hostname>
+
+# Examples:
+clan machines update cinnabar
+clan machines update electrum
 ```
 
-Or use the justfile shortcut:
+Or use the justfile shortcut for darwin:
 ```bash
 just activate
 ```
@@ -137,18 +143,32 @@ See the full command reference by running `just help` after activating the dev s
 
 ## Understanding the structure
 
-This nix-config uses directory-based autowiring:
+This configuration uses the [dendritic flake-parts pattern](/concepts/dendritic-architecture) where every Nix file is a flake-parts module organized by *aspect* (feature) rather than by *host*:
 
 ```
 infra/
-├── configurations/   # System and home configurations
-│   ├── darwin/       # macOS (nix-darwin)
-│   ├── nixos/        # Linux (NixOS)
-│   └── home/         # Standalone home-manager
-├── modules/          # Reusable modules
+├── modules/
+│   ├── clan/         # Clan integration (machines, inventory, services)
+│   ├── darwin/       # nix-darwin modules (all darwin hosts)
+│   ├── home/         # Home-manager modules (all users)
+│   │   ├── ai/       # AI tooling (claude-code, MCP servers)
+│   │   ├── development/ # Dev environment (git, editors)
+│   │   ├── shell/    # Shell configuration (zsh, fish)
+│   │   └── users/    # User-specific modules
+│   ├── machines/     # Machine-specific configurations
+│   │   ├── darwin/   # Darwin hosts (stibnite, blackphos, rosegold, argentum)
+│   │   └── nixos/    # NixOS hosts (cinnabar, electrum, galena, scheelite)
+│   └── nixos/        # NixOS modules (all nixos hosts)
 ├── overlays/         # Package overlays
-└── lib/              # Shared library functions
+├── pkgs/             # Custom packages (pkgs-by-name pattern)
+├── secrets/          # Encrypted secrets (sops-nix)
+└── vars/             # Clan-generated secrets (Tier 1)
 ```
+
+Key concepts:
+- **Aspect-based organization**: Features (git, shell, AI tools) defined once, shared across hosts
+- **Machine-specific configs**: Only truly unique settings in `modules/machines/`
+- **Auto-discovery**: [import-tree](https://github.com/vic/import-tree) automatically imports all modules
 
 See [Repository Structure](/reference/repository-structure) for complete directory mapping.
 
@@ -156,18 +176,18 @@ See [Repository Structure](/reference/repository-structure) for complete directo
 
 ### Learn the architecture
 
-- [Nix-Config Architecture](/concepts/nix-config-architecture) - Understand the three-layer design
-- [Understanding Autowiring](/concepts/understanding-autowiring) - How directory-based autowiring works
+- [Dendritic Architecture](/concepts/dendritic-architecture) - Core pattern where every file is a flake-parts module
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and two-tier secrets
 - [Multi-User Patterns](/concepts/multi-user-patterns) - Admin vs non-admin users
 
 ### Set up a new machine
 
-- [Host Onboarding](/guides/host-onboarding) - Add a new Darwin/NixOS host
-- [Home Manager Onboarding](/guides/home-manager-onboarding) - Add a new standalone user
+- [Host Onboarding](/guides/host-onboarding) - Add a new Darwin or NixOS host
+- [User Onboarding](/guides/home-manager-onboarding) - Add a new user to an existing host
 
 ### Operational tasks
 
-- [Secrets Management](/guides/secrets-management) - Managing encrypted secrets with SOPS
+- [Secrets Management](/guides/secrets-management) - Managing encrypted secrets with sops-nix
 - [Handling broken packages](/guides/handling-broken-packages) - Fixing broken packages from nixpkgs unstable
 
 ## Troubleshooting
@@ -222,6 +242,7 @@ See [Secrets Management](/guides/secrets-management) for detailed troubleshootin
 - [NixOS wiki](https://nixos.wiki/) - Community documentation
 - [nix-darwin](https://github.com/LnL7/nix-darwin) - macOS system configuration
 - [home-manager](https://github.com/nix-community/home-manager) - User environment management
+- [clan documentation](https://clan.lol/) - Multi-machine coordination
 
 ### Community
 
