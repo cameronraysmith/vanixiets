@@ -634,9 +634,9 @@ development_status:
   story-8-8: done
   story-8-8-title: "Create tutorials for common user workflows"
   story-8-8-notes: "DONE 2025-12-02 - Created 5 tutorials (2,073 lines total): index.md, bootstrap-to-activation.md, secrets-setup.md, darwin-deployment.md, nixos-deployment.md. 26/26 ACs satisfied. Diataxis compliant (learning-oriented). 31 cross-references to guides. Build + linkcheck pass. 6 commits."
-  story-8-9: backlog
+  story-8-9: drafted
   story-8-9-title: "Validate cross-references and navigation discoverability"
-  story-8-9-notes: "Research streams R20, R21 - link validation, bidirectional references, navigation paths"
+  story-8-9-notes: "DRAFTED 2025-12-02 - Research streams R20, R21, 16 ACs, 6 task groups, 7-12h estimated. Validates Story 8.8 cross-refs + adds bidirectional links + 8.7 partial traceability"
   story-8-10: backlog
   story-8-10-title: "Audit test harness and CI documentation"
   story-8-10-notes: "Research streams R19, R22 - CI-local parity, test philosophy, troubleshooting"
