@@ -1,6 +1,6 @@
 # Story 8.3: Update Host Onboarding Guides (Darwin vs NixOS)
 
-Status: drafted
+Status: review
 
 ## Story
 
@@ -44,73 +44,73 @@ so that I can deploy my machine using the correct workflow.
 
 ### Task 1: Rewrite guides/host-onboarding.md (AC: #1-6, #7-11, #12-15)
 
-- [ ] Read current file and identify all deprecated patterns
-- [ ] Create new document structure with darwin vs NixOS separation
-- [ ] **Darwin onboarding section:**
-  - [ ] Document prerequisites (Nix installer, flakes, Xcode CLT)
-  - [ ] Document repository setup and direnv activation
-  - [ ] Document build validation with `nix build` command
-  - [ ] Document `darwin-rebuild switch` deployment
-  - [ ] Document zerotier homebrew cask and network join
-  - [ ] Document sops-nix age key setup (Tier 2 secrets)
-- [ ] **NixOS VPS onboarding section:**
-  - [ ] Document prerequisites (terraform, cloud credentials)
-  - [ ] Document `nix run .#terraform` infrastructure provisioning
-  - [ ] Document `clan machines install` workflow
-  - [ ] Document zerotier inventory configuration
-  - [ ] Document clan vars (Tier 1 secrets)
-- [ ] **Common sections:**
-  - [ ] Add dendritic module structure overview with links
-  - [ ] Add clan inventory integration explanation
-  - [ ] Add two-tier secrets architecture summary
-- [ ] Remove all Bitwarden, 3-tier, `configurations/` references
-- [ ] Update examples to use current machine fleet (stibnite, cinnabar, etc.)
-- [ ] Verify all internal links work
-- [ ] Commit: `docs(guides): rewrite host-onboarding.md for darwin vs nixos`
+- [x] Read current file and identify all deprecated patterns
+- [x] Create new document structure with darwin vs NixOS separation
+- [x] **Darwin onboarding section:**
+  - [x] Document prerequisites (Nix installer, flakes, Xcode CLT)
+  - [x] Document repository setup and direnv activation
+  - [x] Document build validation with `nix build` command
+  - [x] Document `darwin-rebuild switch` deployment
+  - [x] Document zerotier homebrew cask and network join
+  - [x] Document sops-nix age key setup (Tier 2 secrets)
+- [x] **NixOS VPS onboarding section:**
+  - [x] Document prerequisites (terraform, cloud credentials)
+  - [x] Document `nix run .#terraform` infrastructure provisioning
+  - [x] Document `clan machines install` workflow
+  - [x] Document zerotier inventory configuration
+  - [x] Document clan vars (Tier 1 secrets)
+- [x] **Common sections:**
+  - [x] Add dendritic module structure overview with links
+  - [x] Add clan inventory integration explanation
+  - [x] Add two-tier secrets architecture summary
+- [x] Remove all Bitwarden, 3-tier, `configurations/` references
+- [x] Update examples to use current machine fleet (stibnite, cinnabar, etc.)
+- [x] Verify all internal links work
+- [x] Commit: `docs(guides): rewrite host-onboarding.md for darwin vs nixos`
 
 ### Task 2: Update guides/home-manager-onboarding.md (AC: #12, #14, #16)
 
-- [ ] Read current file and identify deprecated paths
-- [ ] Replace `configurations/home/` with `modules/machines/` and `modules/home/users/`
-- [ ] Replace Bitwarden workflow with sops-nix age key workflow
-- [ ] Replace `sopsIdentifier` pattern with current sops.secrets pattern
-- [ ] Reference dendritic aggregates for user configuration
-- [ ] Link to dendritic-architecture.md for module pattern explanation
-- [ ] Remove all deprecated references
-- [ ] Update examples with current usernames (crs58, raquel, cameron)
-- [ ] Commit: `docs(guides): update home-manager-onboarding.md paths and patterns`
+- [x] Read current file and identify deprecated paths
+- [x] Replace `configurations/home/` with `modules/machines/` and `modules/home/users/`
+- [x] Replace Bitwarden workflow with sops-nix age key workflow
+- [x] Replace `sopsIdentifier` pattern with current sops.secrets pattern
+- [x] Reference dendritic aggregates for user configuration
+- [x] Link to dendritic-architecture.md for module pattern explanation
+- [x] Remove all deprecated references
+- [x] Update examples with current usernames (crs58, raquel, cameron)
+- [x] Commit: `docs(guides): update home-manager-onboarding.md paths and patterns`
 
 ### Task 3: Update guides/getting-started.md (AC: #12, #14, #16)
 
-- [ ] Read current file and identify deprecated sections
-- [ ] Replace "Understanding the structure" section:
-  - [ ] Remove `configurations/` directory structure
-  - [ ] Add `modules/` dendritic structure
-  - [ ] Remove "directory-based autowiring" mention
-  - [ ] Reference dendritic-architecture.md
-- [ ] Update "Next steps" links section:
-  - [ ] Replace "Understanding Autowiring" with dendritic-architecture.md link
-  - [ ] Add clan-integration.md link
-- [ ] Verify all linked pages exist
-- [ ] Commit: `docs(guides): update getting-started.md for dendritic pattern`
+- [x] Read current file and identify deprecated sections
+- [x] Replace "Understanding the structure" section:
+  - [x] Remove `configurations/` directory structure
+  - [x] Add `modules/` dendritic structure
+  - [x] Remove "directory-based autowiring" mention
+  - [x] Reference dendritic-architecture.md
+- [x] Update "Next steps" links section:
+  - [x] Replace "Understanding Autowiring" with dendritic-architecture.md link
+  - [x] Add clan-integration.md link
+- [x] Verify all linked pages exist
+- [x] Commit: `docs(guides): update getting-started.md for dendritic pattern`
 
 ### Task 4: Update guides/index.md (AC: #14)
 
-- [ ] Add new guide listings:
-  - [ ] Zerotier setup guide (if created)
-  - [ ] GCP deployment guide (if created in future)
-  - [ ] Clan integration reference
-- [ ] Update existing guide descriptions
-- [ ] Commit: `docs(guides): update index.md navigation listings`
+- [x] Add new guide listings:
+  - [x] Zerotier setup guide (if created) - N/A, not created
+  - [x] GCP deployment guide (if created in future) - N/A, not created
+  - [x] Clan integration reference - Added via Architecture References section
+- [x] Update existing guide descriptions
+- [x] Commit: `docs(guides): update index.md navigation listings`
 
 ### Task 5: Verify zero deprecated references (AC: #16)
 
-- [ ] Run `rg "nixos-unified" packages/docs/src/content/docs/guides/`
-- [ ] Run `rg "configurations/" packages/docs/src/content/docs/guides/`
-- [ ] Run `rg "bitwarden|3-tier" packages/docs/src/content/docs/guides/`
-- [ ] Fix any remaining deprecated references
-- [ ] Run Starlight build validation: `nix build .#docs`
-- [ ] Commit any final fixes
+- [x] Run `rg "nixos-unified" packages/docs/src/content/docs/guides/` - Zero matches
+- [x] Run `rg "configurations/" packages/docs/src/content/docs/guides/` - Only intentional reference explaining what NOT to use
+- [x] Run `rg "bitwarden|3-tier" packages/docs/src/content/docs/guides/` - Zero matches in updated files (secrets-management.md is Story 8.4 scope)
+- [x] Fix any remaining deprecated references - None needed
+- [x] Run Starlight build validation: `bun run build` - Passed, all 62 pages indexed
+- [x] Link validation: `bun run linkcheck` - All internal links valid
 
 ## Dev Notes
 
@@ -213,13 +213,13 @@ clan machines update <hostname>
 ### Verification Checklist
 
 Before marking complete:
-- [ ] No references to `configurations/darwin/`, `configurations/nixos/`, `configurations/home/`
-- [ ] Darwin examples use `darwin-rebuild` and reference `modules/machines/darwin/`
-- [ ] NixOS examples use `clan machines` commands
-- [ ] Two-tier secrets documented with Tier 1/Tier 2 labels
-- [ ] Zerotier integrated into both darwin and NixOS paths
-- [ ] All internal links work (to 8.2 docs, between guides)
-- [ ] Commands are copy-paste ready with real hostnames
+- [x] No references to `configurations/darwin/`, `configurations/nixos/`, `configurations/home/`
+- [x] Darwin examples use `darwin-rebuild` and reference `modules/machines/darwin/`
+- [x] NixOS examples use `clan machines` commands
+- [x] Two-tier secrets documented with Tier 1/Tier 2 labels
+- [x] Zerotier integrated into both darwin and NixOS paths
+- [x] All internal links work (to 8.2 docs, between guides)
+- [x] Commands are copy-paste ready with real hostnames
 
 ### Learnings from Previous Story
 
@@ -284,13 +284,34 @@ Before marking complete:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-5-20251101
 
 ### Debug Log References
 
 ### Completion Notes List
 
+1. **host-onboarding.md complete rewrite**: 640 lines → platform-differentiated with darwin vs NixOS sections
+2. **home-manager-onboarding.md rewrite**: 462 lines → portable user modules, aggregates, sops-nix patterns
+3. **getting-started.md updated**: Structure section replaced with dendritic pattern, links updated
+4. **index.md updated**: Navigation listings updated, Architecture References section added
+5. **Validation passed**: Zero deprecated patterns, all internal links valid, docs build successful
+
 ### File List
+
+| File | Action | Lines | Key Changes |
+|------|--------|-------|-------------|
+| `packages/docs/src/content/docs/guides/host-onboarding.md` | Rewritten | 640 | Platform differentiation (darwin vs NixOS), two-tier secrets, clan integration |
+| `packages/docs/src/content/docs/guides/home-manager-onboarding.md` | Rewritten | 462 | Portable user modules, aggregates, sops-nix age key workflow |
+| `packages/docs/src/content/docs/guides/getting-started.md` | Updated | 259 | Dendritic structure section, updated links |
+| `packages/docs/src/content/docs/guides/index.md` | Updated | 30 | Navigation descriptions, Architecture References section |
+| `docs/notes/development/sprint-status.yaml` | Updated | - | story-8-3: drafted → in-progress → review |
+
+### Commits Created
+
+1. `32ce2ce1` - docs(guides): rewrite host-onboarding.md for darwin vs nixos
+2. `33d3a7cb` - docs(guides): update home-manager-onboarding.md paths and patterns
+3. `ed5aac22` - docs(guides): update getting-started.md for dendritic pattern
+4. `b8d59d2b` - docs(guides): update index.md navigation listings
 
 ## Change Log
 
@@ -305,3 +326,13 @@ Before marking complete:
 - Current machine fleet documented for examples
 - Verification checklist included
 - Estimated effort: 18-20 hours
+
+**2025-12-01 (Story Implementation)**:
+- All 5 tasks completed (100%)
+- 4 guide files updated with 4 atomic commits
+- Platform differentiation achieved (darwin vs NixOS workflows)
+- Two-tier secrets documented (Tier 1: clan vars, Tier 2: sops-nix)
+- Zero deprecated references in target files
+- All internal links validated
+- Docs build successful (62 pages indexed)
+- Status: review
