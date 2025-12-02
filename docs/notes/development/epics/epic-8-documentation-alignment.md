@@ -39,6 +39,7 @@ Comprehensively update all documentation to reflect the dendritic flake-parts + 
 | Story 8.8 | FR-8.8 (Tutorial content creation) |
 | Story 8.9 | FR-8.9 (Cross-reference validation) |
 | Story 8.10 | FR-8.10 (Test harness documentation) |
+| Story 8.11 | FR-8.11 (AMDiRE development docs remediation) |
 
 ---
 
@@ -417,6 +418,53 @@ So that I can validate changes before pushing and troubleshoot failures.
 - Reference ci.yaml job structure
 
 **NFR Coverage:** NFR-8.10 (Test reproducibility)
+
+---
+
+## Story 8.11: Remediate AMDiRE development documentation staleness
+
+As a contributor,
+I want development documentation that accurately reflects the current project state,
+So that I understand the actual goals, constraints, and architectural decisions when contributing.
+
+**Acceptance Criteria:**
+
+**Given** the Story 8.7 audit results (`docs/notes/development/work-items/story-8.7-amdire-audit-results.md`)
+**When** I remediate the identified staleness issues
+**Then** critical priority files should be updated:
+- domain-model.md: Remove nixos-unified section, update to 8-machine fleet, fix current/target inversion
+- goals-and-objectives.md: Move achieved goals to "Achieved" section, update statuses
+- project-scope.md: Swap current/target sections, add 8-machine fleet
+- system-vision.md: Rewrite current/target vision, update machine diagram
+
+**And** high priority files should be updated:
+- constraints-and-rules.md: Remove migration-specific rules, update host inventory
+- glossary.md: Add 3 hosts, mark nixos-unified deprecated, add Pattern A term
+- deployment-requirements.md: Update to 8-machine fleet, remove current/target framing
+- functional-hierarchy.md: Reframe migration functions as historical
+- usage-model.md: Update UC-007 as historical, update examples to 8 machines
+- ADR-0003: Update or supersede with dendritic overlay patterns
+
+**And** medium/low priority files should be addressed as time permits:
+- risk-list.md: Update risk statuses for Epics 1-7 completion
+- system-constraints.md: Update SC-010 for migration completion
+- stakeholders.md, quality-requirements.md, requirements/index.md: Minor updates
+
+**And** validation should confirm:
+- Zero nixos-unified references describing it as "current" architecture
+- All files reference 8-machine fleet (stibnite, blackphos, rosegold, argentum, cinnabar, electrum, galena, scheelite)
+- Starlight build passes
+
+**Prerequisites:** Story 8.7 (audit complete with prioritized remediation roadmap)
+
+**Technical Notes:**
+- Story 8.7 audit artifact: `docs/notes/development/work-items/story-8.7-amdire-audit-results.md`
+- Primary staleness pattern: "current/target state inversion" (9 files describe nixos-unified as current)
+- Estimated effort from audit: 18-24 hours total
+- Priority order: Critical (4 files) → High (6 files) → Medium (2 files) → Low (3 files)
+- Location: `packages/docs/src/content/docs/development/context/` and `development/requirements/`
+
+**NFR Coverage:** NFR-8.7 (Development documentation accuracy)
 
 ---
 

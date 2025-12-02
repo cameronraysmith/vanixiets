@@ -593,10 +593,10 @@ development_status:
   epic-8: in-progress
   epic-8-notes: |
     Phase 1 COMPLETE 2025-12-01 - Stories 8.1-8.4 aligned docs with dendritic+clan architecture.
-    Phase 2 IN PROGRESS 2025-12-02 - Stories 8.5-8.10 address structural completeness gaps.
+    Phase 2 IN PROGRESS 2025-12-02 - Stories 8.5-8.11 address structural completeness gaps.
     Research document: docs/notes/development/research/documentation-coverage-analysis.md
     Phase 1: audit (8.1), architecture (8.2), onboarding (8.3), secrets (8.4) - all DONE.
-    Phase 2: structure audit (8.5), CLI reference (8.6), AMDiRE audit (8.7), tutorials (8.8), cross-refs (8.9), test docs (8.10).
+    Phase 2: structure audit (8.5), CLI reference (8.6), AMDiRE audit (8.7), tutorials (8.8), cross-refs (8.9), test docs (8.10), AMDiRE remediation (8.11).
   story-8-1: done
   story-8-1-title: "Audit existing Starlight docs for staleness"
   story-8-1-notes: "Completed 2025-12-01 - 59 files audited, 22 current, 21 stale, 9 obsolete, 7 missing topics identified. Results: story-8.1-audit-results.md"
@@ -640,7 +640,15 @@ development_status:
   story-8-10: backlog
   story-8-10-title: "Audit test harness and CI documentation"
   story-8-10-notes: "Research streams R19, R22 - CI-local parity, test philosophy, troubleshooting"
-  # Phase 1 retrospective complete, Phase 2 retrospective pending after Stories 8.5-8.10
+  # Story 8.11: Remediate AMDiRE development documentation staleness
+  # Addresses Story 8.7 audit findings: 37.5% of development docs stale (12/32 files)
+  # Primary issue: "current/target state inversion" - 9 files describe nixos-unified as current
+  # Scope: 4 critical + 6 high + 2 medium + 3 low priority files = 15 files
+  # Estimated effort: 18-24 hours (from Story 8.7 audit)
+  story-8-11: backlog
+  story-8-11-title: "Remediate AMDiRE development documentation staleness"
+  story-8-11-notes: "Remediate Story 8.7 findings: fix current/target inversion in 9 files, update to 8-machine fleet, update ADR-0003. Audit artifact: story-8.7-amdire-audit-results.md. 18-24h estimated."
+  # Phase 1 retrospective complete, Phase 2 retrospective pending after Stories 8.5-8.11
   epic-8-phase-1-retrospective: done
   epic-8-retrospective: pending
 
