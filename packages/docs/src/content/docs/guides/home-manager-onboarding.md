@@ -4,335 +4,458 @@ sidebar:
   order: 4
 ---
 
-This guide covers onboarding non-admin users (like runner, raquel) on hosts where an admin user already has nix-darwin/NixOS configured.
+This guide covers onboarding users to machines where nix-darwin or NixOS is already configured by an admin.
 
 ## When to use this guide
 
 Use this procedure when:
-
-- An admin user (crs58/cameron) has already configured nix-darwin on the host
-- You need to set up a non-admin user's environment with home-manager only
-- The host already has nix, SOPS infrastructure, and secrets deployed by the admin
+- An admin (crs58/cameron) has already deployed nix-darwin or clan on the host
+- You need to set up a non-admin user's environment
+- The host already has the nix daemon and secrets infrastructure configured
 
 This guide assumes:
-
-- The admin user has completed host onboarding (see [`onboarding.md`](./onboarding.md))
+- Host onboarding is complete (see [Host Onboarding](host-onboarding))
 - The nix daemon is running and `/nix/store` is available
-- Host SSH keys are deployed to `/etc/ssh/ssh_host_ed25519_key`
-
-**For SOPS secrets architecture details**, see the "Architecture overview" section in [`onboarding.md`](./onboarding.md).
-This guide focuses only on user-specific home-manager setup.
+- User configuration exists in the repository
 
 ## Architecture overview
 
-**Admin user** (crs58/cameron):
+Users in this infrastructure are configured in one of two ways:
 
-- Managed via nix-darwin (macOS) or NixOS (Linux)
-- Controls system-level configuration
-- Manages the nix daemon and shared `/nix/store`
+**Integrated users** (most common):
+- Configured within darwin/NixOS machine configs
+- Home-manager activates automatically with system deployment
+- Examples: crs58 on stibnite, raquel on blackphos
 
-**Non-admin users** (runner, raquel):
+**Standalone users** (rare):
+- Use home-manager independently from system config
+- Useful for non-admin users on shared machines
+- Manage their own home-manager generations
 
-- Managed via home-manager only (standalone mode)
-- Personal environment in their home directory
-- Use shared `/nix/store` and nix daemon
-- Independent home-manager generations in `/nix/var/nix/profiles/per-user/<username>/`
+### User module locations
 
-## Prerequisites
+User configurations follow the [dendritic pattern](/concepts/dendritic-architecture):
 
-Before starting, ensure:
-
-- [ ] You can SSH or have physical access to the host
-- [ ] The admin user has completed host onboarding
-- [ ] Your user account exists on the host: `id <username>`
-- [ ] Nix is available: `which nix`
-- [ ] Your user configuration exists in `config.nix`
-- [ ] Your SOPS user key exists in Bitwarden (e.g., `sops-raquel-user-ssh`)
-- [ ] Your secrets are encrypted in `.sops.yaml` for your user identity
-
-## User configuration setup
-
-### Step 1: Verify user in config.nix
-
-Check that your user is defined in `config.nix`:
-
-```nix
-# Example for raquel
-raquel = {
-  username = "raquel";
-  fullname = "Someone Local";
-  email = "raquel@localhost";
-  sshKey = "ssh-ed25519 AAAAC3...";  # Your SSH public key
-  sopsIdentifier = "raquel-user";     # Maps to secrets/users/raquel-user/
-  isAdmin = false;
-};
+```
+modules/
+├── home/
+│   └── users/
+│       ├── crs58/           # crs58's portable home-manager module
+│       ├── raquel/          # raquel's portable home-manager module
+│       ├── cameron/         # cameron alias module
+│       ├── janettesmith/    # janettesmith's module
+│       └── christophersmith/ # christophersmith's module
+└── machines/
+    └── darwin/
+        ├── stibnite.nix     # imports users/crs58
+        └── blackphos.nix    # imports users/crs58, users/raquel
 ```
 
-### Step 2: Create home configuration
+User modules are **portable** - they can be imported by any machine configuration.
+Machine configs select which user modules to include.
 
-Create `configurations/home/<username>@<hostname>.nix`:
+## Integrated user setup
+
+For users configured within machine configs (the normal case).
+
+### Step 1: Create user module
+
+Create a user module in `modules/home/users/<username>/`:
 
 ```nix
-# configurations/home/raquel@blackphos.nix
+# modules/home/users/raquel/default.nix
+{ config, ... }:
 {
-  flake,
-  pkgs,
-  lib,
-  ...
-}:
-let
-  inherit (flake) config inputs;
-  inherit (inputs) self;
-  user = config.raquel;  # Reference from config.nix
-in
-{
-  imports = [
-    self.homeModules.default
-    self.homeModules.darwin-only  # or linux-only for NixOS hosts
-    self.homeModules.standalone
-  ];
+  flake.modules.homeManager."users/raquel" = { pkgs, lib, ... }: {
+    # User identity
+    home.username = lib.mkDefault "raquel";
+    home.homeDirectory = lib.mkDefault "/Users/raquel";
 
-  home.username = user.username;
-  home.homeDirectory = "/Users/${user.username}";  # or /home/ for Linux
-  home.stateVersion = "23.11";
+    # Import aggregate modules for features
+    imports = with config.flake.modules.homeManager; [
+      aggregate-core
+      aggregate-shell
+      # aggregate-development  # Optional - enable if needed
+    ];
 
-  # User-specific overrides
-  programs.git = {
-    userName = lib.mkForce user.fullname;
-    userEmail = lib.mkForce user.email;
+    # User-specific overrides
+    programs.git = {
+      userName = lib.mkForce "Raquel";
+      userEmail = lib.mkForce "raquel@example.com";
+    };
   };
-
-  # Disable heavy tools if not needed
-  programs.lazyvim.enable = lib.mkForce false;
 }
 ```
 
-### Step 3: Create user secrets
+Key points:
+- Module exports to `flake.modules.homeManager."users/raquel"`
+- Uses `lib.mkDefault` for values that machines can override
+- Imports aggregates rather than individual modules
+- User-specific settings use `lib.mkForce` to override defaults
 
-Your secrets directory structure should follow:
+### Step 2: Import user in machine config
 
+Add the user to the machine configuration:
+
+```nix
+# modules/machines/darwin/blackphos.nix
+{ config, ... }:
+{
+  flake.darwinConfigurations.blackphos = {
+    # ... system config ...
+
+    home-manager.users.raquel = {
+      imports = [
+        config.flake.modules.homeManager."users/raquel"
+      ];
+    };
+  };
+}
 ```
-secrets/
-└── users/
-    └── <sopsIdentifier>/
-        ├── signing-key.yaml      # SSH key for git/jujutsu/radicle signing
-        ├── llm-api-keys.yaml     # LLM API keys (if using Claude Code)
-        └── mcp-api-keys.yaml     # MCP server keys (if using Claude Code)
-```
 
-**For new users**: Copy from the template:
+### Step 3: Create user secrets (Tier 2)
+
+User secrets are managed via sops-nix.
+
+Create the secrets file:
 
 ```bash
-cp -r secrets/users/template-user secrets/users/<sopsIdentifier>
+# Create encrypted secrets file
+sops secrets/users/raquel.sops.yaml
 ```
 
-Then edit and encrypt the files for your keys.
+Example structure:
 
-### Step 4: Update .sops.yaml
+```yaml
+# secrets/users/raquel.sops.yaml
+github-token: ghp_xxxx
+ssh-signing-key: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  ...
+  -----END OPENSSH PRIVATE KEY-----
+```
 
-Ensure `.sops.yaml` has rules for your user:
+Add the user's age public key to `.sops.yaml`:
 
 ```yaml
 keys:
-  - &<your-user> age1abc...  # from sops-<user>-ssh in Bitwarden
+  - &raquel-blackphos age1xxx...
 
 creation_rules:
-  - path_regex: secrets/users/<sopsIdentifier>/.*\.yaml$
+  - path_regex: secrets/users/raquel\.sops\.yaml$
     key_groups:
       - age:
-        - *admin
-        - *dev
-        - *<your-user>
+        - *raquel-blackphos
+        - *admin  # Allow admin to manage
 ```
 
-### Step 5: Sync age keys
+### Step 4: Reference secrets in user module
 
-On the host, as your user:
+Use sops in the user module:
+
+```nix
+# modules/home/users/raquel/default.nix
+{ config, inputs, ... }:
+{
+  flake.modules.homeManager."users/raquel" = { pkgs, lib, ... }: {
+    sops = {
+      age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
+      defaultSopsFile = "${inputs.self}/secrets/users/raquel.sops.yaml";
+      secrets = {
+        "github-token" = { };
+        "ssh-signing-key" = {
+          path = "${config.home.homeDirectory}/.ssh/id_ed25519_signing";
+          mode = "0600";
+        };
+      };
+    };
+  };
+}
+```
+
+### Step 5: Generate age key on target machine
+
+On the machine where this user will be active:
 
 ```bash
-# Enter devshell (provides bitwarden-cli, sops, etc.)
-cd ~/projects/nix-config
-nix develop
+# As the user (raquel)
+mkdir -p ~/.config/sops/age
+age-keygen -o ~/.config/sops/age/keys.txt
 
-# Unlock Bitwarden
-export BW_SESSION=$(bw unlock --raw)
-
-# Sync age keys to ~/.config/sops/age/keys.txt
-just sops-sync-keys
-
-# Lock Bitwarden
-bw lock
+# Display public key - add this to .sops.yaml
+age-keygen -y ~/.config/sops/age/keys.txt
 ```
 
-This creates `~/.config/sops/age/keys.txt` containing:
+### Step 6: Deploy
 
-- Repository dev key (all users)
-- Your user identity key
-- Host key (for this machine)
+Deploy the machine configuration:
 
-### Step 6: Test secrets decryption
+**Darwin:**
+```bash
+darwin-rebuild switch --flake .#blackphos
+```
+
+**NixOS:**
+```bash
+clan machines update <hostname>
+```
+
+Home-manager activates automatically as part of system activation.
+
+---
+
+## Standalone user setup
+
+For users who manage home-manager independently from system config.
+This is rare - most users should use integrated setup above.
+
+### When to use standalone
+
+- User doesn't have admin access to modify machine config
+- Testing home-manager configurations in isolation
+- Shared machines where users manage their own environments
+
+### Step 1: Verify user exists in system
+
+The user account must exist on the system:
 
 ```bash
-SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/users/<sopsIdentifier>/signing-key.yaml | head -5
+id raquel
 ```
 
-If successful, you'll see your decrypted signing key.
+### Step 2: Create standalone home configuration
 
-### Step 7: Verify configuration builds
+Create a home configuration:
+
+```nix
+# modules/machines/home/raquel-standalone.nix
+{ config, ... }:
+{
+  flake.homeConfigurations."raquel" = config.lib.mkHomeConfiguration {
+    pkgs = config.flake.pkgs.aarch64-darwin;
+    modules = [
+      config.flake.modules.homeManager."users/raquel"
+      {
+        home.username = "raquel";
+        home.homeDirectory = "/Users/raquel";
+        home.stateVersion = "24.05";
+      }
+    ];
+  };
+}
+```
+
+### Step 3: Activate standalone home-manager
+
+Build and activate:
 
 ```bash
-# Verify flake and build configuration (auto-detects home-manager)
-just verify
+# Build the configuration
+nix build .#homeConfigurations.raquel.activationPackage
+
+# Activate
+./result/activate
 ```
 
-This runs:
-
-- `nix flake check` to validate the entire flake
-- Auto-detects and builds your home-manager configuration
-
-### Step 8: Activate
-
-**The user must run activation interactively:**
+Or use the home-manager CLI:
 
 ```bash
-# Using just (auto-detects <username>@<hostname>)
-just activate
+nix run home-manager/master -- switch --flake .#raquel
 ```
 
-The `just activate` recipe automatically detects whether to use:
+### Step 4: Ongoing updates
 
-- Home-manager-only config (if `./configurations/home/$USER@$(hostname).nix` exists)
-- System-level config (otherwise)
-
-After activation:
-
-- Home-manager generation is in `/nix/var/nix/profiles/per-user/<username>/home-manager`
-- Dotfiles and configurations are in your home directory
-- SOPS plist is deployed to `~/Library/LaunchAgents/` (darwin) or systemd unit (linux)
-
-### Step 9: Load SOPS agent (standalone home-manager only)
-
-**CRITICAL STEP for standalone home-manager on darwin:**
+For subsequent updates:
 
 ```bash
-# Load the SOPS launchd agent (one-time setup)
-just sops-load-agent
+# Rebuild and activate
+home-manager switch --flake .#raquel
 ```
 
-**Why this is necessary:**
+---
 
-- nix-darwin automatically loads SOPS agents during system activation
-- Standalone home-manager creates the plist but **does not load it automatically**
-- Without loading the agent, secrets won't be decrypted and deployed
-- Symptoms: `~/.radicle/keys/radicle` symlink missing, git signing fails
+## Aggregate modules
 
-**One-time vs per-login:**
+Users import aggregates rather than individual modules.
+Aggregates group related features:
 
-- The `launchctl load` command is **one-time** (persists across reboots)
-- The plist in `~/Library/LaunchAgents/` ensures the agent starts on login
-- Only run `just sops-load-agent` once after initial activation
-- Re-run only if you unload the agent or the plist changes significantly
+| Aggregate | Contents | Use case |
+|-----------|----------|----------|
+| `aggregate-core` | XDG, SSH, fonts, basic tools | All users |
+| `aggregate-shell` | zsh, fish, nushell, starship | All users |
+| `aggregate-development` | git, editors, languages | Developers |
+| `aggregate-ai` | claude-code, MCP servers | AI tool users |
 
-**Linux (NixOS) users:** Skip this step - systemd automatically starts the sops-nix user service.
+Example usage in user module:
 
-After loading the agent:
-
-- Secrets directory created: `~/.config/sops-nix/secrets/`
-- Private keys deployed (e.g., `~/.radicle/keys/radicle` symlink to secrets directory)
-- Git signing, jujutsu, radicle keys available
-
-## Validation
-
-After activation and loading SOPS agent, verify:
-
-- [ ] SOPS agent loaded: `launchctl list | grep sops` (darwin only)
-- [ ] Secrets directory exists: `ls -la ~/.config/sops-nix/secrets/`
-- [ ] Git signing key: `git config --get user.signingkey`
-- [ ] Signing key symlink: `ls -la ~/.radicle/keys/radicle`
-- [ ] Age keys synced: `ls -la ~/.config/sops/age/keys.txt`
-- [ ] Shell configured: Check your shell prompt, aliases
-- [ ] Tools available: `which git gh just ripgrep fd bat`
-
-## Relationship to nix-darwin
-
-**How they coexist:**
-
-```
-/nix/store/                    # Shared nix store (admin manages)
-├── <hash>-git-2.x/           # Packages used by all users
-└── <hash>-home-manager-gen/  # Per-user generations
-
-/nix/var/nix/profiles/
-├── system/                    # nix-darwin system profile (admin only)
-└── per-user/
-    ├── crs58/
-    │   └── home-manager -> /nix/store/<hash>  # Admin's home-manager
-    ├── runner/
-    │   └── home-manager -> /nix/store/<hash>  # Runner's home-manager
-    └── raquel/
-        └── home-manager -> /nix/store/<hash>  # Raquel's home-manager
+```nix
+imports = with config.flake.modules.homeManager; [
+  aggregate-core        # Everyone needs this
+  aggregate-shell       # Shell configuration
+  aggregate-development # Only for developers
+  # aggregate-ai        # Only for AI tool users
+];
 ```
 
-**Key points:**
+Aggregates are defined in `modules/home/_aggregates.nix`.
 
-- Admin's nix-darwin controls system-level configuration
-- Each user's home-manager controls their personal environment
-- All users share the same `/nix/store` (deduplication)
-- Users have independent home-manager generations
-- No conflicts - each user manages their own profile
+---
+
+## Secrets setup
+
+All users use [Tier 2 (sops-nix)](/concepts/clan-integration#two-tier-secrets-architecture) for personal secrets.
+
+### Generate age key
+
+```bash
+mkdir -p ~/.config/sops/age
+age-keygen -o ~/.config/sops/age/keys.txt
+```
+
+### Get public key
+
+```bash
+age-keygen -y ~/.config/sops/age/keys.txt
+```
+
+### Add to .sops.yaml
+
+Edit `.sops.yaml` to include the public key:
+
+```yaml
+keys:
+  - &raquel-blackphos age1xxx...  # Add your key
+
+creation_rules:
+  - path_regex: secrets/users/raquel\.sops\.yaml$
+    key_groups:
+      - age:
+        - *raquel-blackphos
+```
+
+### Create secrets file
+
+```bash
+sops secrets/users/raquel.sops.yaml
+```
+
+### Verify decryption
+
+```bash
+sops -d secrets/users/raquel.sops.yaml
+```
+
+---
+
+## Platform differences
+
+### Darwin (macOS)
+
+- Home directory: `/Users/<username>`
+- sops-nix uses launchd agent for secret deployment
+- After first activation, may need: `launchctl load ~/Library/LaunchAgents/com.sops-nix.service.plist`
+
+### NixOS (Linux)
+
+- Home directory: `/home/<username>`
+- sops-nix uses systemd user service
+- Secrets automatically deployed on activation
+
+---
 
 ## Troubleshooting
 
-### SOPS secrets not deployed (symlinks missing)
+### Home-manager activation fails
 
-If `~/.radicle/keys/radicle` or other secret symlinks are missing:
+**Symptom**: `home-manager switch` or system activation fails
 
+**Diagnosis**:
 ```bash
-# Check if SOPS agent is loaded (darwin)
+# Check home-manager generations
+ls -la ~/.local/state/nix/profiles/home-manager*
+
+# Verify user module builds
+nix build .#homeConfigurations.<user>.activationPackage
+```
+
+### Secrets not available
+
+**Symptom**: Files in `~/.config/sops-nix/secrets/` missing
+
+**Diagnosis**:
+```bash
+# Darwin: Check launchd agent
 launchctl list | grep sops
 
-# If not loaded, load it
-just sops-load-agent
-
-# Verify secrets directory created
-ls -la ~/.config/sops-nix/secrets/
+# NixOS: Check systemd service
+systemctl --user status sops-nix
 ```
 
-The SOPS launchd agent (darwin) or systemd service (linux) must be running to deploy secrets.
-
-### Secrets won't decrypt
-
+**Solution**:
 ```bash
-# Check keys.txt exists
+# Darwin: Load agent manually
+launchctl load ~/Library/LaunchAgents/com.sops-nix.service.plist
+
+# NixOS: Start service
+systemctl --user start sops-nix
+```
+
+### Age key not found
+
+**Symptom**: sops decryption fails with "no key found"
+
+**Solution**:
+```bash
+# Verify key exists
 cat ~/.config/sops/age/keys.txt
 
-# Regenerate from Bitwarden
-export BW_SESSION=$(bw unlock --raw)
-just sops-sync-keys
-bw lock
+# Regenerate if needed
+age-keygen -o ~/.config/sops/age/keys.txt
+
+# Add public key to .sops.yaml
+age-keygen -y ~/.config/sops/age/keys.txt
 ```
 
-### Build fails with "no such file" for secrets
+### User module not found
 
-Ensure secrets files exist and are committed:
+**Symptom**: Build fails with missing module error
 
+**Diagnosis**:
 ```bash
-ls secrets/users/<sopsIdentifier>/
-git status
+# Check module exists
+ls modules/home/users/<username>/
+
+# Check export in module
+grep "flake.modules.homeManager" modules/home/users/<username>/default.nix
 ```
 
-If missing, copy from template and re-encrypt.
+---
 
-### Activation permission errors
+## Relationship to system configuration
 
-Home-manager-only activation should not require `sudo`. If you see permission errors:
+```
+System Config (darwin/NixOS)
+├── System packages
+├── System settings
+└── Home-manager integration
+    ├── crs58's home config
+    │   ├── Aggregates (core, shell, dev, ai)
+    │   └── User secrets (sops-nix)
+    └── raquel's home config
+        ├── Aggregates (core, shell)
+        └── User secrets (sops-nix)
+```
 
-- Check you're not trying to modify system files
-- Verify you own your home directory: `ls -ld ~`
-- Ensure nix daemon is running: `pgrep nix-daemon`
+Key points:
+- System config controls which users are configured
+- Each user imports portable user modules
+- User modules import aggregates for features
+- Secrets are per-user via sops-nix
+
+---
 
 ## See also
 
-- Host onboarding (admin): `docs/notes/hosts/onboarding.md`
-- SOPS architecture: `docs/notes/secrets/sops-migration-summary.md`
-- Creating new users: See "Template user directory" section below
+- [Host Onboarding](host-onboarding) - Initial machine setup
+- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization
+- [Clan Integration](/concepts/clan-integration) - Two-tier secrets architecture
