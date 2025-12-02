@@ -1,6 +1,6 @@
 # Story 8.7: Audit AMDiRE Development Documentation Alignment
 
-Status: drafted
+Status: review
 
 ## Story
 
@@ -54,138 +54,140 @@ so that I understand the project's goals, constraints, and design rationale when
 
 ### Task 1: Audit Context Documentation (AC: #1-7)
 
-- [ ] Read `packages/docs/src/content/docs/development/context/constraints-and-rules.md` completely
-  - [ ] Check for nixos-unified references
-  - [ ] Verify dendritic + clan constraints documented
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/context/domain-model.md` completely
-  - [ ] Verify machine fleet matches: stibnite, blackphos, rosegold, argentum, cinnabar, electrum, galena, scheelite
-  - [ ] Verify user model: crs58, raquel, cameron, janettesmith, christophersmith
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/context/glossary.md` completely
-  - [ ] Check for deprecated terms (nixos-unified, configurations/)
-  - [ ] Verify new terms documented (dendritic, clan vars, Pattern A)
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/context/goals-and-objectives.md` completely
-  - [ ] Verify goals reflect post-migration state
-  - [ ] Check if Epic 1-6 outcomes incorporated
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/context/project-scope.md` completely
-  - [ ] Verify scope includes current machine fleet
-  - [ ] Verify GCP expansion documented
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/context/stakeholders.md` completely
-  - [ ] Verify user roles current
-  - [ ] Verify machine ownership documented
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/context/index.md` completely
-  - [ ] Verify navigation links work
-  - [ ] Verify descriptions accurate
-  - [ ] Classify: current/stale/obsolete
+- [x] Read `packages/docs/src/content/docs/development/context/constraints-and-rules.md` completely
+  - [x] Check for nixos-unified references
+  - [x] Verify dendritic + clan constraints documented
+  - [x] Classify: current/stale/obsolete → **STALE** (nixos-unified refs L95, migration rules L200-218)
+- [x] Read `packages/docs/src/content/docs/development/context/domain-model.md` completely
+  - [x] Verify machine fleet matches: stibnite, blackphos, rosegold, argentum, cinnabar, electrum, galena, scheelite
+  - [x] Verify user model: crs58, raquel, cameron, janettesmith, christophersmith
+  - [x] Classify: current/stale/obsolete → **STALE** (nixos-unified section L28-56, missing 3 hosts)
+- [x] Read `packages/docs/src/content/docs/development/context/glossary.md` completely
+  - [x] Check for deprecated terms (nixos-unified, configurations/)
+  - [x] Verify new terms documented (dendritic, clan vars, Pattern A)
+  - [x] Classify: current/stale/obsolete → **STALE** (nixos-unified as current L124-127, only 5 hosts)
+- [x] Read `packages/docs/src/content/docs/development/context/goals-and-objectives.md` completely
+  - [x] Verify goals reflect post-migration state
+  - [x] Check if Epic 1-6 outcomes incorporated
+  - [x] Classify: current/stale/obsolete → **STALE** (achieved goals marked in-progress L464-518)
+- [x] Read `packages/docs/src/content/docs/development/context/project-scope.md` completely
+  - [x] Verify scope includes current machine fleet
+  - [x] Verify GCP expansion documented
+  - [x] Classify: current/stale/obsolete → **STALE** (nixos-unified as current L7-11, only 4 hosts)
+- [x] Read `packages/docs/src/content/docs/development/context/stakeholders.md` completely
+  - [x] Verify user roles current
+  - [x] Verify machine ownership documented
+  - [x] Classify: current/stale/obsolete → **CURRENT** (minor update L88 nixos-unified status)
+- [x] Read `packages/docs/src/content/docs/development/context/index.md` completely
+  - [x] Verify navigation links work
+  - [x] Verify descriptions accurate
+  - [x] Classify: current/stale/obsolete → **CURRENT** (correctly reflects 8 machines, dendritic+clan)
 
 ### Task 2: Audit Requirements Documentation (AC: #8-15)
 
-- [ ] Read `packages/docs/src/content/docs/development/requirements/deployment-requirements.md` completely
-  - [ ] Verify clan deployment patterns documented
-  - [ ] Check for nixos-unified deployment references
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/requirements/functional-hierarchy.md` completely
-  - [ ] Verify features match implementation
-  - [ ] Check for dendritic module features
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/requirements/quality-requirements.md` completely
-  - [ ] Verify NFRs reflect current architecture
-  - [ ] Check for stale performance/security requirements
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/requirements/risk-list.md` completely
-  - [ ] Verify risks updated post-migration
-  - [ ] Check for mitigated risks still listed as active
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/requirements/system-constraints.md` completely
-  - [ ] Verify constraints reflect clan + dendritic patterns
-  - [ ] Check for outdated constraints
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/requirements/system-vision.md` completely
-  - [ ] Verify vision aligns with implemented architecture
-  - [ ] Check for outdated vision statements
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/requirements/usage-model.md` completely
-  - [ ] Verify usage patterns match actual workflows
-  - [ ] Check for outdated CLI commands
-  - [ ] Classify: current/stale/obsolete
-- [ ] Read `packages/docs/src/content/docs/development/requirements/index.md` completely
-  - [ ] Verify navigation links work
-  - [ ] Verify descriptions accurate
-  - [ ] Classify: current/stale/obsolete
+- [x] Read `packages/docs/src/content/docs/development/requirements/deployment-requirements.md` completely
+  - [x] Verify clan deployment patterns documented
+  - [x] Check for nixos-unified deployment references
+  - [x] Classify: current/stale/obsolete → **STALE** (current/target framing L10, only 5 hosts L368)
+- [x] Read `packages/docs/src/content/docs/development/requirements/functional-hierarchy.md` completely
+  - [x] Verify features match implementation
+  - [x] Check for dendritic module features
+  - [x] Classify: current/stale/obsolete → **STALE** (migration functions L649-722 as pending)
+- [x] Read `packages/docs/src/content/docs/development/requirements/quality-requirements.md` completely
+  - [x] Verify NFRs reflect current architecture
+  - [x] Check for stale performance/security requirements
+  - [x] Classify: current/stale/obsolete → **CURRENT** (well-structured, minor updates to examples)
+- [x] Read `packages/docs/src/content/docs/development/requirements/risk-list.md` completely
+  - [x] Verify risks updated post-migration
+  - [x] Check for mitigated risks still listed as active
+  - [x] Classify: current/stale/obsolete → **CURRENT** (risk statuses need status update)
+- [x] Read `packages/docs/src/content/docs/development/requirements/system-constraints.md` completely
+  - [x] Verify constraints reflect clan + dendritic patterns
+  - [x] Check for outdated constraints
+  - [x] Classify: current/stale/obsolete → **CURRENT** (SC-010 L560-597 needs completion update)
+- [x] Read `packages/docs/src/content/docs/development/requirements/system-vision.md` completely
+  - [x] Verify vision aligns with implemented architecture
+  - [x] Check for outdated vision statements
+  - [x] Classify: current/stale/obsolete → **STALE** (current/target inverted L29-47, only 5 machines)
+- [x] Read `packages/docs/src/content/docs/development/requirements/usage-model.md` completely
+  - [x] Verify usage patterns match actual workflows
+  - [x] Check for outdated CLI commands
+  - [x] Classify: current/stale/obsolete → **STALE** (nixos-unified as current L12, UC-007 as future)
+- [x] Read `packages/docs/src/content/docs/development/requirements/index.md` completely
+  - [x] Verify navigation links work
+  - [x] Verify descriptions accurate
+  - [x] Classify: current/stale/obsolete → **CURRENT** (meta-document, minor updates)
 
 ### Task 3: Audit ADRs (AC: #16-20)
 
-- [ ] Read `packages/docs/src/content/docs/development/architecture/adrs/index.md` completely
-  - [ ] Verify ADR list is complete and accurate
-  - [ ] Check navigation and descriptions
-- [ ] Read and assess each ADR for currency:
-  - [ ] 0001-claude-code-multi-profile-system.md
-  - [ ] 0002-use-generic-just-recipes.md
-  - [ ] 0003-overlay-composition-patterns.md
-  - [ ] 0004-monorepo-structure.md
-  - [ ] 0005-semantic-versioning.md
-  - [ ] 0006-monorepo-tag-strategy.md
-  - [ ] 0007-bun-workspaces.md
-  - [ ] 0008-typescript-configuration.md
-  - [ ] 0009-nix-development-environment.md
-  - [ ] 0010-testing-architecture.md
-  - [ ] 0011-sops-secrets-management.md
-  - [ ] 0012-github-actions-pipeline.md
-  - [ ] 0013-cloudflare-workers-deployment.md
-  - [ ] 0014-design-principles.md
-  - [ ] 0015-ci-caching-optimization.md
-  - [ ] 0016-per-job-content-addressed-caching.md
-- [ ] For each ADR, assess:
-  - [ ] Does decision match current implementation?
-  - [ ] Are cross-references to related ADRs present?
-  - [ ] Should ADR be updated or superseded?
-  - [ ] Classify: current/needs-update/superseded
+- [x] Read `packages/docs/src/content/docs/development/architecture/adrs/index.md` completely
+  - [x] Verify ADR list is complete and accurate → **CURRENT**
+  - [x] Check navigation and descriptions → All 16 ADRs linked, superseded correctly noted
+- [x] Read and assess each ADR for currency:
+  - [x] 0001-claude-code-multi-profile-system.md → **CURRENT**
+  - [x] 0002-use-generic-just-recipes.md → **CURRENT**
+  - [x] 0003-overlay-composition-patterns.md → **NEEDS-UPDATE** (nixos-unified refs, configurations/, overlays/ at root)
+  - [x] 0004-monorepo-structure.md → **CURRENT**
+  - [x] 0005-semantic-versioning.md → **CURRENT**
+  - [x] 0006-monorepo-tag-strategy.md → **CURRENT**
+  - [x] 0007-bun-workspaces.md → **CURRENT**
+  - [x] 0008-typescript-configuration.md → **CURRENT**
+  - [x] 0009-nix-development-environment.md → **CURRENT**
+  - [x] 0010-testing-architecture.md → **CURRENT**
+  - [x] 0011-sops-secrets-management.md → **CURRENT**
+  - [x] 0012-github-actions-pipeline.md → **CURRENT**
+  - [x] 0013-cloudflare-workers-deployment.md → **CURRENT**
+  - [x] 0014-design-principles.md → **CURRENT**
+  - [x] 0015-ci-caching-optimization.md → **SUPERSEDED** (correctly marked, superseded by ADR-0016)
+  - [x] 0016-per-job-content-addressed-caching.md → **CURRENT**
+- [x] For each ADR, assess:
+  - [x] Does decision match current implementation? → 14/16 yes, ADR-0003 partially
+  - [x] Are cross-references to related ADRs present? → ADR-0003 missing dendritic/pkgs-by-name refs
+  - [x] Should ADR be updated or superseded? → ADR-0003 needs major update or supersession
+  - [x] Classify: current/needs-update/superseded → 14 current, 1 needs-update, 1 superseded
 
 ### Task 4: Identify Traceability Gaps (AC: #22)
 
-- [ ] Check for requirements → ADR traceability
-  - [ ] Each major requirement should link to relevant ADR
-  - [ ] Document missing links
-- [ ] Check for ADR → code traceability
-  - [ ] Key ADR decisions should reference implementation files
-  - [ ] Document missing implementation references
-- [ ] Check for context → requirements alignment
-  - [ ] Context documents should inform requirements
-  - [ ] Document contradictions or gaps
+- [x] Check for requirements → ADR traceability
+  - [x] Each major requirement should link to relevant ADR
+  - [x] Document missing links → 6 gaps identified (dendritic, clan-core, two-tier, multi-platform, fleet ops, terranix)
+- [x] Check for ADR → code traceability
+  - [x] Key ADR decisions should reference implementation files
+  - [x] Document missing implementation references → ADR-0003 refs overlays/ not modules/nixpkgs/overlays/
+- [x] Check for context → requirements alignment
+  - [x] Context documents should inform requirements
+  - [x] Document contradictions or gaps → 4 gaps (domain→ops model, glossary→functions, goals→metrics, scope→usage)
 
 ### Task 5: Create Audit Results Document (AC: #21, #23)
 
-- [ ] Create `docs/notes/development/work-items/story-8.7-amdire-audit-results.md`
-- [ ] Include per-file assessment table:
-  - [ ] File path
-  - [ ] Status (current/stale/obsolete)
-  - [ ] Specific issues found
-  - [ ] Recommended action
-  - [ ] Priority (critical/high/medium/low)
-- [ ] Include ADR assessment summary:
-  - [ ] ADRs needing updates
-  - [ ] ADRs needing supersession
-  - [ ] Cross-reference gaps
-- [ ] Include traceability gap inventory:
-  - [ ] Requirements → ADR gaps
-  - [ ] ADR → implementation gaps
-  - [ ] Context → requirements gaps
+- [x] Create `docs/notes/development/work-items/story-8.7-amdire-audit-results.md`
+- [x] Include per-file assessment table:
+  - [x] File path → 32 files documented
+  - [x] Status (current/stale/obsolete) → 20 current, 9 stale, 1 needs-update, 1 superseded, 1 obsolete (none)
+  - [x] Specific issues found → Evidence with line numbers for each stale file
+  - [x] Recommended action → 15 actions documented
+  - [x] Priority (critical/high/medium/low) → 4 critical, 6 high, 2 medium, 3 low
+- [x] Include ADR assessment summary:
+  - [x] ADRs needing updates → 1 (ADR-0003)
+  - [x] ADRs needing supersession → 1 (ADR-0015 already correctly superseded)
+  - [x] Cross-reference gaps → ADR-0003 missing dendritic/pkgs-by-name patterns
+- [x] Include traceability gap inventory:
+  - [x] Requirements → ADR gaps → 6 missing ADRs documented
+  - [x] ADR → implementation gaps → ADR-0003 path issues
+  - [x] Context → requirements gaps → 4 alignment issues
 
 ### Task 6: Final Verification (AC: #24-25)
 
-- [ ] Run verification commands for deprecated patterns:
+- [x] Run verification commands for deprecated patterns:
   ```bash
-  # These patterns should NOT appear in development/ docs:
+  # These patterns found in development/ docs (confirming audit findings):
   rg "nixos-unified|configurations/" packages/docs/src/content/docs/development/
+  # Result: 20 files with matches (expected - this is AUDIT not fix)
   rg "LazyVim-module" packages/docs/src/content/docs/development/
+  # Result: 1 file (nixpkgs-hotfixes.md) - additional finding outside audit scope
   ```
-- [ ] Verify Starlight build: `bun run build` (docs should build successfully)
-- [ ] Update story status to review
+- [x] Verify Starlight build: `bun run build` (docs should build successfully) → **PASSED**
+- [x] Update story status to review → Status updated to "review"
 
 ## Dev Notes
 
@@ -385,19 +387,59 @@ The audit should verify documents reflect these completed migrations:
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+No context file generated (proceeded with story file only per workflow step 1)
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+- Dispatched 3 parallel subagent tasks for context/requirements/ADR audits
+- Audit methodology: complete file reads, evidence-based assessments with line numbers
+- Verification commands executed to confirm deprecated pattern presence
+
 ### Completion Notes List
+
+**Audit Execution (2025-12-02):**
+- 32 files audited across context (7), requirements (8), and ADRs (17)
+- Overall currency: 62.5% current (20/32), 37.5% requiring updates (12/32)
+- Primary staleness pattern: "current/target state inversion" where docs describe dendritic + clan as "target" and nixos-unified as "current"
+- 5 common staleness patterns identified across documents
+- 15 prioritized recommended actions (4 critical, 6 high, 2 medium, 3 low)
+- 4 new ADRs recommended to close traceability gaps
+- Estimated total remediation effort: 18-24 hours
+
+**Verification Results:**
+- `rg "nixos-unified|configurations/"` found matches in 20 files (confirms audit)
+- `rg "LazyVim-module"` found 1 additional file outside audit scope (nixpkgs-hotfixes.md)
+- `bun run build` passed successfully
+
+**AC24 Clarification:**
+- AC24 states "Zero nixos-unified references" but this is an AUDIT story (identifies issues, doesn't fix them)
+- The verification confirms deprecated patterns exist and documents them for future remediation
+- Per story constraints section: "Audit only, no fixes: This story identifies issues, does NOT fix them"
 
 ### File List
 
+**Created:**
+- docs/notes/development/work-items/story-8.7-amdire-audit-results.md (primary deliverable)
+
+**Modified:**
+- docs/notes/development/sprint-status.yaml (story-8-7: drafted → in-progress → review)
+- docs/notes/development/work-items/8-7-audit-amdire-development-documentation-alignment.md (this file)
+
 ## Change Log
+
+**2025-12-02 (Story Completed)**:
+- All 6 tasks executed, all 25 acceptance criteria addressed
+- Primary deliverable created: story-8.7-amdire-audit-results.md
+- 32 files audited: 20 current, 9 stale, 1 needs-update, 1 superseded (correct), 0 obsolete
+- 15 prioritized recommended actions documented
+- Traceability gaps identified: 6 missing ADRs, context→requirements alignment issues
+- Verification: deprecated patterns confirmed present (expected for audit), Starlight build passed
+- Status: drafted → in-progress → review
+- Actual effort: ~3 hours (parallel subagent dispatch optimized execution)
 
 **2025-12-02 (Story Drafted)**:
 - Story file created from Epic 8 Story 8.7 specification
