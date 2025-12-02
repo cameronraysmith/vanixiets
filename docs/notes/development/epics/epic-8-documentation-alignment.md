@@ -233,26 +233,42 @@ So that I have a prioritized list of structural gaps to address.
 
 ---
 
-## Story 8.6: Create reference documentation for CLI tooling
+## Story 8.6: Rationalize and document CLI tooling
 
 As a user or developer,
-I want comprehensive reference documentation for CLI tools,
-So that I can discover and use justfile recipes, flake apps, and CI workflows.
+I want a curated, well-named set of CLI tools with comprehensive reference documentation,
+So that I can discover and use the correct recipes without confusion from legacy or poorly-named options.
 
 **Acceptance Criteria:**
 
 **Given** the justfile with 100+ recipes across 10 groups
-**When** I create reference documentation
-**Then** documentation should include:
+**When** I rationalize and document CLI tooling
+**Then** the rationalization phase should:
+- Audit all recipes for relevance to dendritic + clan architecture
+- Identify stale recipes from nixos-unified era that are no longer applicable
+- Identify important recipes with suboptimal names needing rename for clarity
+- Verify which recipes are tested by CI/CD workflow jobs
+- Verify which recipes are covered by `nix flake check` / nix-unit tests
+- Propose rename/refactor/remove actions for team approval
+
+**And** the implementation phase should:
+- Remove deprecated/stale recipes (with git history preserving rationale)
+- Rename recipes for semantic clarity (e.g., cryptic names → descriptive names)
+- Update any documentation referencing renamed/removed recipes
+- Ensure CI/CD workflows reference correct recipe names post-rename
+
+**And** the documentation phase should:
 - Justfile recipe reference organized by group (nix, clan, docs, containers, secrets, sops, CI/CD, nix-home-manager, nix-darwin, nixos)
 - Flake apps reference (darwin, os, home, update, activate, activate-home)
 - CI job reference with local equivalents
+- Clear indication of which recipes are CI-tested vs manual-only
 
 **And** each recipe/app should document:
 - Purpose and usage
 - Prerequisites
 - Example invocations
 - Related recipes/apps
+- CI/CD coverage status (tested/untested)
 
 **Prerequisites:** Story 8.5 (structural audit complete)
 
@@ -260,8 +276,18 @@ So that I can discover and use justfile recipes, flake apps, and CI workflows.
 - Location: `packages/docs/src/content/docs/reference/`
 - Research streams R16, R17, R18 provide detailed scope
 - Consider auto-generation from justfile comments where possible
+- Rationalization before documentation prevents documenting technical debt
 
-**NFR Coverage:** NFR-8.6 (CLI discoverability)
+**Dev Agent Directive:**
+When executing this story, the implementing agent MUST:
+1. Pause and discuss with user if uncertain which recipes should be preferred over alternatives
+2. Confirm which recipes are/aren't tested by CI/CD before proposing removals
+3. Present rename/remove proposals for approval before executing changes
+4. Document rationale for any recipes retained despite appearing stale
+
+This pause-and-discuss pattern prevents accidental removal of recipes that appear unused but serve important edge cases.
+
+**NFR Coverage:** NFR-8.6 (CLI discoverability, CLI hygiene)
 
 ---
 
