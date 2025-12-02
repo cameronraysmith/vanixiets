@@ -248,7 +248,7 @@ Create `modules/home/tools/newtool.nix`:
 ```nix
 { ... }:
 {
-  flake.modules.homeManager.tools-newtool = { pkgs, ... }: {
+  flake.modules.homeManager.tools = { pkgs, ... }: {
     home.packages = [ pkgs.newtool ];
     programs.newtool = {
       enable = true;
@@ -258,48 +258,76 @@ Create `modules/home/tools/newtool.nix`:
 }
 ```
 
-Add to relevant aggregate:
-
-```nix
-# In aggregate definition
-aggregate-development = {
-  imports = with config.flake.modules.homeManager; [
-    # ... existing
-    tools-newtool
-  ];
-};
-```
-
-All users importing `aggregate-development` now have `newtool`.
+That's it!
+The file is automatically discovered by import-tree, merged into the `tools` aggregate with other files in `modules/home/tools/`, and available to all users importing `flakeModulesHome.tools`.
+No manual aggregate registration needed.
 
 ### Adding a new darwin host
 
-Create `modules/machines/darwin/newhost.nix`:
+Machine configuration is a two-step process: export as module, then register with clan.
+
+**Step 1:** Create `modules/machines/darwin/newhost/default.nix` exporting machine configuration:
 
 ```nix
 { config, ... }:
+let
+  flakeModules = config.flake.modules.darwin;
+  flakeModulesHome = config.flake.modules.homeManager;
+in
 {
-  flake.darwinConfigurations.newhost =
-    config.lib.mkDarwinConfiguration {
-      system = "aarch64-darwin";
-      modules = [
-        config.flake.modules.darwin.core
-        config.flake.modules.darwin.apps
-      ];
-      home-manager.users.myuser = {
-        imports = with config.flake.modules.homeManager; [
-          aggregate-core
-          aggregate-development
-        ];
+  # Export as flake.modules.darwin."machines/darwin/newhost"
+  flake.modules.darwin."machines/darwin/newhost" =
+    { pkgs, lib, inputs, ... }:
+    {
+      imports = [
+        inputs.home-manager.darwinModules.home-manager
+      ]
+      ++ (with flakeModules; [
+        base
+        ssh-known-hosts
+      ]);
+
+      networking.hostName = "newhost";
+      nixpkgs.hostPlatform = "aarch64-darwin";
+
+      # User configuration
+      users.users.myuser = {
+        home = "/Users/myuser";
+        shell = pkgs.zsh;
       };
+
+      # Home-Manager for myuser
+      home-manager.users.myuser.imports = [
+        flakeModulesHome."users/myuser"
+        flakeModulesHome.base-sops
+        # Import aggregates
+        flakeModulesHome.ai
+        flakeModulesHome.core
+        flakeModulesHome.development
+        flakeModulesHome.shell
+      ];
     };
 }
 ```
 
-The host automatically:
-- Gets all darwin modules specified
-- Gets all home-manager aggregates for the user
-- Is available as `darwinConfigurations.newhost`
+**Step 2:** Register in `modules/clan/machines.nix`:
+
+```nix
+{ config, ... }:
+{
+  clan.machines = {
+    # ... existing machines
+    newhost = {
+      imports = [ config.flake.modules.darwin."machines/darwin/newhost" ];
+    };
+  };
+}
+```
+
+The host is now:
+- Available as `clan.machines.newhost` for clan orchestration
+- Composed from auto-merged directory aggregates
+- Ready for deployment with `clan machines update newhost`
 
 ## External resources
 
