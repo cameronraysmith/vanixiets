@@ -599,7 +599,12 @@ development_status:
   story-8-1: done
   story-8-1-title: "Audit existing Starlight docs for staleness"
   story-8-1-notes: "Completed 2025-12-01 - 59 files audited, 22 current, 21 stale, 9 obsolete, 7 missing topics identified. Results: story-8.1-audit-results.md"
-  story-8-2: backlog
+  # Story 8.2: DRAFTED (2025-12-01) - Architecture and Concepts Documentation Update
+  # Scope: Create dendritic-architecture.md, clan-integration.md, rewrite nix-config-architecture.md,
+  # repository-structure.md, index.mdx, handle obsolete concepts, update credits.md
+  # 8 ACs, 9 task groups, 47 subtasks, estimated 34-38 hours
+  # Dependencies: Story 8.1 (done), Blocks: Stories 8.3, 8.4
+  story-8-2: drafted
   story-8-2-title: "Update architecture and patterns documentation"
   story-8-3: backlog
   story-8-3-title: "Update host onboarding guides (darwin vs nixos)"
