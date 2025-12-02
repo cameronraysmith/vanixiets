@@ -21,21 +21,40 @@ help:
 
 ## nix
 
-# Activate the appropriate configuration for current user and host
-[group('nix')]
-activate target="":
+## activation
+# Unified activation commands using nh via flake apps
+# All recipes accept nh flags: --dry (preview), --ask (confirm), --verbose
+
+# Auto-detect platform and activate current machine
+[group('activation')]
+activate *FLAGS:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -n "{{target}}" ]; then
-        echo "activating {{target}} ..."
-        nix run . {{target}} --accept-flake-config
-    elif [ -f ./configurations/home/$USER@$(hostname).nix ]; then
-        echo "activating home configuration $USER@$(hostname) ..."
-        nix run . $USER@$(hostname) --accept-flake-config
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        exec just activate-darwin "$(hostname -s)" {{FLAGS}}
+    elif [ -f /etc/NIXOS ]; then
+        exec just activate-os "$(hostname)" {{FLAGS}}
     else
-        echo "activating system configuration $(hostname) ..."
-        nix run . $(hostname) --accept-flake-config
+        exec just activate-home "$USER" {{FLAGS}}
     fi
+
+# Activate darwin configuration
+[group('activation')]
+activate-darwin hostname *FLAGS:
+    @echo "Activating darwin configuration for {{hostname}}..."
+    nix run --accept-flake-config .#darwin -- {{hostname}} . {{FLAGS}}
+
+# Activate NixOS configuration
+[group('activation')]
+activate-os hostname *FLAGS:
+    @echo "Activating NixOS configuration for {{hostname}}..."
+    nix run --accept-flake-config .#os -- {{hostname}} . {{FLAGS}}
+
+# Activate home-manager configuration
+[group('activation')]
+activate-home username *FLAGS:
+    @echo "Activating home-manager configuration for {{username}}..."
+    nix run --accept-flake-config .#home -- {{username}} . {{FLAGS}}
 
 # Print nix flake inputs and outputs
 [group('nix')]
