@@ -10,34 +10,32 @@ The context layer considers the context of the system under consideration, inclu
 
 ## Overview
 
-This documentation captures the problem space for migrating from flake-parts + nixos-unified architecture to dendritic flake-parts pattern with clan-core integration.
+This documentation captures the architecture and operational context for the dendritic flake-parts + clan-core infrastructure.
 
-**Current state**: Working flake-parts + nixos-unified configuration managing four darwin hosts with manual per-host coordination.
+**Current state**: Dendritic flake-parts pattern with clan-core integration managing 8 hosts (4 darwin, 4 nixos) with multi-machine coordination, declarative secrets, and overlay networking.
 
-**Target state**: Dendritic flake-parts pattern maximizing type safety through module system, with clan-core enabling multi-host coordination, declarative secrets, and overlay networking.
-
-**Migration approach**: Validation-first (test-clan) → VPS infrastructure (cinnabar) → progressive darwin host migration (blackphos → rosegold → argentum → stibnite).
+**Architecture migration complete**: The migration from nixos-unified to dendritic + clan completed in Epic 2 (November 2024). All documentation reflects current state.
 
 ## Context documents
 
 ### [Project scope](project-scope/)
 
-Problem description and statement of intent for the migration from nixos-unified to dendritic + clan.
+Description of the infrastructure scope and capabilities.
 
 **Key topics**:
-- Current architecture limitations (type safety, multi-host coordination)
-- Target architecture benefits (maximized module system usage, clan capabilities)
-- Migration strategy and risk mitigation
-- Architectural compatibility analysis
+- Current architecture (dendritic flake-parts, clan-core, multi-channel overlays)
+- Multi-machine coordination capabilities
+- Cross-platform deployment (darwin + nixos)
+- Future expansion areas
 
 ### [Stakeholders](stakeholders/)
 
 Individuals, groups, and institutions with interest in the project.
 
 **Key stakeholders**:
-- Primary: User/maintainer (crs58) - all roles
-- Secondary: Potential contributors, template users
-- Reference: Upstream projects (flake-parts, clan-core, dendritic pattern, nixos-unified, home-manager, nix-darwin)
+- Primary: User/maintainer (crs58/cameron) - all roles
+- Secondary: Family users (raquel, janettesmith, christophersmith)
+- Reference: Upstream projects (flake-parts, clan-core, dendritic pattern, home-manager, nix-darwin)
 
 ### [Constraints and rules](constraints-and-rules/)
 
@@ -52,8 +50,7 @@ Restrictions influencing the system, distinguishing non-negotiable constraints f
 **Rules** (conditional procedures):
 - Git workflow (atomic commits, conventional messages)
 - Code style (markdown formatting, naming conventions)
-- Architecture principles (framework independence, type safety, bias toward removal)
-- Migration stability gates (1-2 weeks between hosts)
+- Architecture principles (dendritic organization, type safety)
 
 ### [Goals and objectives](goals-and-objectives/)
 
@@ -66,31 +63,30 @@ Goals issued by stakeholders organized by business, usage, and system categories
 
 **Usage goals**:
 - G-U01: Efficient development workflows
-- G-U02: Multi-host coordination (target)
-- G-U03: Declarative secrets management (target)
-- G-U04: Cross-platform module composition (target)
-- G-U05: Surgical package fixes (preserve)
-- G-U06: Secure overlay networking (target)
+- G-U02: Multi-host coordination (achieved via clan)
+- G-U03: Declarative secrets management (achieved via two-tier)
+- G-U04: Cross-platform module composition (achieved via dendritic)
+- G-U05: Surgical package fixes (preserved via multi-channel)
+- G-U06: Secure overlay networking (achieved via zerotier)
 - G-U07: Fast, cached builds
 
 **System goals**:
 - G-S01: Maintainable codebase structure
 - G-S02: Clear, idiomatic patterns
-- G-S03: Maximum type safety through module system (target)
-- G-S04: Dendritic flake-parts pattern adoption (target)
+- G-S03: Maximum type safety through module system (achieved)
+- G-S04: Dendritic flake-parts pattern (adopted)
 - G-S05: Comprehensive development environment (achieved)
-- G-S06: Clan-core integration (target)
-- G-S07: Clan vars system adoption (target)
-- G-S08: Multi-channel resilience preservation (preserve)
+- G-S06: Clan-core integration (achieved)
+- G-S07: Two-tier secrets (clan vars + sops-nix) (achieved)
+- G-S08: Multi-channel resilience (preserved)
 
 ### [Domain model](domain-model/)
 
-Description of the Nix ecosystem domain, current architecture components, and target architecture components.
+Description of the Nix ecosystem domain and current architecture components.
 
 **Key domains**:
 - Nix ecosystem overview (core concepts, package channels)
-- Current architecture (flake-parts, nixos-unified, multi-channel resilience, sops-nix)
-- Target architecture (dendritic pattern, clan-core, inventory, vars, zerotier)
+- Current architecture (dendritic flake-parts, clan-core, multi-channel resilience, sops-nix)
 - Domain processes (workflows for configuration, secrets, multi-host coordination)
 
 ### [Glossary](glossary/)
@@ -99,11 +95,8 @@ Important terms, abbreviations, synonyms, and descriptions.
 
 **Term categories**:
 - Nix ecosystem terms (flake, derivation, module system, nixpkgs)
-- Current architecture terms (autowiring, nixos-unified, multi-channel resilience)
-- Target architecture terms (dendritic, clan, inventory, vars, zerotier)
-- Host names (stibnite, blackphos, rosegold, argentum, cinnabar)
-- Migration terms (phases 0-6, stability gates, test-clan)
-- Architectural terms (AMDiRE, atomic commit, type safety)
+- Architecture terms (dendritic, clan, inventory, vars, zerotier)
+- Host names (stibnite, blackphos, rosegold, argentum, cinnabar, electrum, galena, scheelite)
 
 ## Navigation
 
@@ -127,10 +120,9 @@ This provides the foundation for the requirements layer, which specifies what th
 
 ## Using context documentation
 
-**For migration planning**:
-- Review project scope to understand current limitations and target benefits
+**For system understanding**:
+- Review project scope for architecture overview
 - Check constraints to identify non-negotiable requirements
-- Validate goals alignment with migration phases
 - Reference domain model for architectural understanding
 
 **For decision-making**:
@@ -146,7 +138,7 @@ This provides the foundation for the requirements layer, which specifies what th
 - Understand stakeholders and their roles
 
 **For maintenance**:
-- Update as system evolves (especially during migration)
+- Update as system evolves
 - Document new terms in glossary
 - Revise goals as priorities change
 - Keep constraints current with platform requirements
@@ -154,7 +146,6 @@ This provides the foundation for the requirements layer, which specifies what th
 ## Context review and updates
 
 **Review frequency**:
-- During each migration phase completion
 - When significant architectural changes occur
 - Quarterly for general maintenance
 - As needed when context changes
@@ -168,17 +159,12 @@ This provides the foundation for the requirements layer, which specifies what th
 
 ## References
 
-**Internal**:
-- Migration plan: `docs/notes/clan/integration-plan.md` (internal planning, not published)
-- Migration phases: `docs/notes/clan/phase-*.md` (internal planning, not published)
-- Global preferences: `~/.claude/commands/preferences/` (development guidelines)
-
 **Architecture**:
-- ADRs: `docs/development/architecture/adrs/`
-- Nixpkgs hotfixes: `docs/development/architecture/nixpkgs-hotfixes.md`
+- ADRs: `packages/docs/src/content/docs/development/architecture/adrs/`
+- Nixpkgs hotfixes: `packages/docs/src/content/docs/development/architecture/nixpkgs-hotfixes.md`
 
 **External**:
 - AMDiRE framework: Research paper on artefact-based requirements engineering
 - dendritic pattern: <https://github.com/mightyiam/dendritic>
-- clan-core: <https://docs.clan.lol/>
+- clan-core: <https://clan.lol/>
 - flake-parts: <https://flake.parts/>
