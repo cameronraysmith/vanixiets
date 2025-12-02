@@ -4,601 +4,636 @@ sidebar:
   order: 3
 ---
 
-This guide covers the procedure for onboarding a new host (nix-darwin or NixOS) to this nix-config repository.
+This guide covers onboarding a new host to this infrastructure.
+The workflow differs significantly between darwin (macOS) and NixOS platforms.
 
-## When to use this guide
+## Platform overview
 
-Use this procedure when:
-- Setting up a new machine with this nix-config for the first time
-- Re-onboarding a machine after a clean OS installation
-- Adding a machine that has a host configuration defined in `configurations/darwin/` or `configurations/nixos/`
+| Platform | Hosts | Deployment command | Secrets |
+|----------|-------|-------------------|---------|
+| Darwin (nix-darwin) | stibnite, blackphos, rosegold, argentum | `darwin-rebuild switch` | Tier 2 only (sops-nix) |
+| NixOS (clan-managed) | cinnabar, electrum, galena, scheelite | `clan machines update` | Tier 1 + Tier 2 |
 
-This guide assumes the host configuration already exists in the repository.
-If you need to create a new host configuration first, do that before following these steps.
+Darwin hosts use nix-darwin with standalone builds.
+NixOS hosts are managed by [clan](/concepts/clan-integration) which handles deployment, secrets generation, and multi-machine coordination.
 
-## Architecture overview
+## Architecture references
 
-This nix-config uses SOPS (Secrets OPerationS) for encrypted secrets management with a 3-tier key architecture:
+Before proceeding, understand the configuration patterns:
+- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization (aspect-based, not host-based)
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and two-tier secrets
 
-1. **Repository keys** - for development and CI/CD
-2. **User identity keys** - tied to user SSH keys in `config.nix`
-3. **Host keys** - unique per machine, stored at `/etc/ssh/ssh_host_ed25519_key`
+Configuration files live in `modules/machines/darwin/` and `modules/machines/nixos/`, not `configurations/`.
 
-The critical requirement: host keys must be deployed before nix-config activation.
-This is because sops-nix derives the age decryption key from the host's SSH key at `/etc/ssh/ssh_host_ed25519_key`.
-Without it, secrets cannot be decrypted and activation will fail.
+## Darwin host onboarding (macOS)
 
-All keys are stored in Bitwarden as the single source of truth, with the exception of an offline admin recovery key.
+Use this for Apple Silicon Macs: stibnite, blackphos, rosegold, argentum.
 
-## Prerequisites
+### Prerequisites
 
 Before starting, ensure you have:
+- macOS with admin access
+- Nix installed with flakes enabled (see Step 1)
+- Git access to this repository
+- Homebrew installed (for zerotier)
 
-- [ ] Physical access or SSH access to the target host
-- [ ] Nix installed on the host (with flakes enabled)
-- [ ] Bitwarden CLI access with master password
-- [ ] Git access to this repository
-- [ ] Host configuration exists in `configurations/darwin/<hostname>.nix` or `configurations/nixos/<hostname>/`
-- [ ] Host key generated in Bitwarden as `sops-<hostname>-ssh`
-- [ ] Secrets already encrypted for the host (check `.sops.yaml`)
+### Step 1: Install Nix
 
-## Procedure
+Use the Determinate Systems installer for reliable macOS support:
 
-### Step 1: Clone or update repository
+```bash
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+```
 
-On the target host:
+After installation, restart your shell or source the profile:
+
+```bash
+exec $SHELL
+```
+
+Verify Nix installation:
+
+```bash
+nix --version
+```
+
+### Step 2: Clone and enter repository
 
 ```bash
 cd ~/projects
 git clone https://github.com/cameronraysmith/infra
-# OR if already cloned:
-cd ~/projects/infra && git pull
-
 cd infra
-git checkout <branch>  # Use main or current development branch
+
+# Allow direnv to activate the development shell
+direnv allow
 ```
 
-### Step 2: Enter development shell
+The devshell provides all required tools (just, sops, age, gh).
+First entry may take several minutes as Nix builds dependencies.
 
-The devshell provides all required tools (bitwarden-cli, jq, sops, just, gh) without requiring nix-config activation:
+### Step 3: Verify host configuration exists
+
+Check that a darwin configuration exists for this hostname:
 
 ```bash
-nix develop
+ls modules/machines/darwin/
 ```
 
-This may take several minutes on first run as Nix downloads and builds dependencies.
+Expected: A file named `<hostname>.nix` (e.g., `stibnite.nix`, `blackphos.nix`).
 
-### Step 3: Unlock Bitwarden
+If your host configuration doesn't exist, create one following the pattern in existing files.
+
+### Step 4: Build validation
+
+Test that the configuration builds before deploying:
 
 ```bash
-export BW_SESSION=$(bw unlock --raw)
+# Replace <hostname> with your machine name
+nix build .#darwinConfigurations.<hostname>.system
+
+# Examples:
+nix build .#darwinConfigurations.stibnite.system
+nix build .#darwinConfigurations.blackphos.system
 ```
 
-Enter your Bitwarden master password when prompted.
-The session token allows scripts to access keys without repeated password entry.
+This builds the configuration without applying it.
+If this succeeds, deployment should work.
 
-### Step 4: Verify host key exists in Bitwarden
+### Step 5: Deploy configuration
+
+Apply the nix-darwin configuration:
 
 ```bash
-bw get item sops-<hostname>-ssh | jq -r '.sshKey.publicKey'
+darwin-rebuild switch --flake .#<hostname>
+
+# Examples:
+darwin-rebuild switch --flake .#stibnite
+darwin-rebuild switch --flake .#blackphos
 ```
 
-Expected output: an SSH public key starting with `ssh-ed25519 AAAAC3Nza...`
+On first run, you may be prompted to:
+- Accept flake configuration trust prompts (answer `y` to all)
+- Enter your password for sudo operations
+- Accept Xcode license (run `sudo xcodebuild -license accept` if needed)
 
-If this fails, the host key hasn't been generated yet.
-See the "Adding new hosts" section in `docs/notes/secrets/sops-migration-summary.md` for key generation instructions.
+After deployment:
+- System packages installed
+- nix-darwin system profile active
+- Home-manager configurations applied
+- Shell and environment configured
 
-### Step 5: Deploy host key
+### Step 6: Set up secrets (Tier 2 - sops-nix)
+
+Darwin hosts use Tier 2 (sops-nix) secrets for user-level credentials.
+Tier 1 (clan vars) is not available on darwin.
+
+#### Generate age key
 
 ```bash
-just sops-deploy-host-key <hostname>
+# Create sops directory
+mkdir -p ~/.config/sops/age
+
+# Generate age keypair
+age-keygen -o ~/.config/sops/age/keys.txt
+
+# Display public key (you'll need this)
+age-keygen -y ~/.config/sops/age/keys.txt
 ```
 
-This script will:
-1. Extract the private key from Bitwarden
-2. Backup any existing key to `/etc/ssh/ssh_host_ed25519_key.old`
-3. Deploy the new key with correct permissions (private: 600, public: 644)
-4. Attempt to restart SSH service (may warn if sshd not running - this is fine)
-5. Display the key fingerprint for verification
+Save the public key output (starts with `age1...`).
 
-Expected output:
+#### Add public key to .sops.yaml
+
+Edit `.sops.yaml` and add your age public key:
+
+```yaml
+keys:
+  - &stibnite-crs58 age1your-public-key-here...
+
+creation_rules:
+  - path_regex: secrets/users/crs58\.sops\.yaml$
+    key_groups:
+      - age:
+        - *stibnite-crs58
+        # ... other keys
 ```
-Host key deployed successfully to /etc/ssh/ssh_host_ed25519_key
-Fingerprint: 256 SHA256:... (ED25519)
-```
 
-### Step 6: Verify host key deployment
-
-Verify the deployed key matches what's expected in `.sops.yaml`:
+#### Verify secrets decrypt
 
 ```bash
-# Get the age key from the deployed SSH public key
-ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub
-
-# Find the age key for this host in .sops.yaml
-grep <hostname> .sops.yaml
+# Test decryption
+sops -d secrets/users/crs58.sops.yaml | head -5
 ```
 
-The age key from the first command should match the age key in `.sops.yaml`.
-If they don't match, the deployment failed or the wrong key was deployed.
+If decryption fails, verify:
+- Age key exists at `~/.config/sops/age/keys.txt`
+- Your public key is listed in `.sops.yaml`
+- The secrets file is encrypted for your key
 
-Optionally, also check the SSH fingerprint:
-```bash
-sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
-```
+### Step 7: Install zerotier (darwin-specific)
 
-### Step 7: Synchronize age keys
+Darwin hosts use Homebrew for zerotier (not managed by clan):
 
 ```bash
-just sops-sync-keys
+# Install zerotier cask
+brew install --cask zerotier-one
+
+# Join the network
+sudo zerotier-cli join db4344343b14b903
 ```
 
-This extracts keys from Bitwarden and writes them to `~/.config/sops/age/keys.txt`:
-- Repository development key
-- User identity key (based on your username)
-- Host key (for this machine)
-
-The file includes public key comments above each private key for easy identification.
-
-### Step 8: Verify age keys format
+After joining, the network controller (cinnabar) must authorize this peer.
+Contact the network admin or run:
 
 ```bash
-cat ~/.config/sops/age/keys.txt
+# On cinnabar (controller)
+clan machines update cinnabar
 ```
 
-Expected format:
-```
-# SOPS Age Keys - Generated <timestamp>
-# DO NOT COMMIT THIS FILE
-
-# Repository development key
-# public key: age1js028xag...
-AGE-SECRET-KEY-1...
-
-# User identity key (<username>)
-# public key: age1vn8fpkm...
-AGE-SECRET-KEY-1...
-
-# Host key (<hostname>)
-# public key: age1ez8lkuk...
-AGE-SECRET-KEY-1...
-```
-
-You should see exactly 3 keys with public key comments.
-
-### Step 9: Test secrets decryption
-
-On a fresh machine, explicitly tell SOPS where to find the age keys:
+Verify network connectivity:
 
 ```bash
-SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml | head -5
+# Check zerotier status
+sudo zerotier-cli listnetworks
+
+# Test connectivity to another host
+ping stibnite.zt
+ping cinnabar.zt
 ```
 
-If this succeeds and displays decrypted secret values, the SOPS infrastructure is working correctly.
+### Step 8: Verify deployment
 
-After nix-config activation, the `SOPS_AGE_KEY_FILE` environment variable will be set automatically and you won't need to specify it.
-
-If decryption fails with "no key could be found to decrypt the data key", check:
-- Host key deployed: `ls -la /etc/ssh/ssh_host_ed25519_key`
-- Age keys present: `cat ~/.config/sops/age/keys.txt`
-- Host in `.sops.yaml`: `grep <hostname> .sops.yaml`
-
-### Step 10: Lock Bitwarden
+Check that everything is working:
 
 ```bash
-bw lock
+# System packages available
+which git gh just rg fd bat
+
+# Home-manager active
+echo $HOME_MANAGER_GENERATION
+
+# Shell configured correctly
+echo $SHELL
+
+# Secrets accessible (if configured)
+ls ~/.config/sops-nix/secrets/
 ```
 
-This clears the session token from memory.
+### Darwin onboarding complete
 
-### Step 11: Run validation (optional)
+Your darwin host is now:
+- Running nix-darwin with your configuration
+- Connected to the zerotier network
+- Using sops-nix for user secrets
 
-For comprehensive validation:
+For updates, run:
 
 ```bash
-export BW_SESSION=$(bw unlock --raw)
-just sops-validate-correspondences
-bw lock
+darwin-rebuild switch --flake .#<hostname>
 ```
 
-This checks:
-- `config.nix` SSH keys match Bitwarden
-- Bitwarden age keys match `.sops.yaml`
-- Host keys exist and correspond
-- All required keys present
+---
 
-### Step 12: Activate nix-config
+## NixOS host onboarding (clan-managed)
 
-When ready to activate:
+Use this for NixOS servers: cinnabar, electrum, galena, scheelite.
+
+NixOS hosts are managed by [clan](/concepts/clan-integration), which provides:
+- Unified deployment commands
+- Automatic secrets generation (Tier 1)
+- Multi-machine service coordination
+- Zerotier mesh networking
+
+### Prerequisites
+
+Before starting, ensure you have:
+- SSH access to deploy machine (or physical access for initial install)
+- Age key at `~/.config/sops/age/keys.txt` for Tier 2 secrets
+- Cloud provider credentials (for new VMs):
+  - Hetzner: API token
+  - GCP: Service account JSON
+
+### Step 1: Provision infrastructure (new VMs only)
+
+For cloud VMs, provision the infrastructure first using terranix:
 
 ```bash
-just activate <hostname>
+# Provision Hetzner or GCP infrastructure
+nix run .#terraform
+
+# This creates the VM and outputs the IP address
 ```
 
-This applies the nix-darwin or NixOS configuration to the system.
+For Hetzner VMs (cinnabar, electrum):
+- Creates VPS with specified server type
+- Configures networking and SSH keys
+- Outputs IP address for deployment
 
-On first activation, this will:
-- Install system packages
-- Configure system settings
-- Set up home-manager for your user
-- Deploy secrets via sops-nix
+For GCP VMs (galena, scheelite):
+- Creates compute instance
+- Configures firewall and SSH
+- Outputs external IP
 
-**Important: SOPS_AGE_KEY_FILE is not needed for activation**
+Skip this step if deploying to existing infrastructure.
 
-The `SOPS_AGE_KEY_FILE` environment variable is only for manual `sops` CLI commands.
-During activation, sops-nix uses its own configuration (`sops.age.keyFile` in `modules/home/all/core/sops.nix`) to find keys.
-The key file at `~/.config/sops/age/keys.txt` was created in Step 7 and will be found automatically by sops-nix.
+### Step 2: Verify clan machine configuration
 
-Note: After activation, you'll still need to set `SOPS_AGE_KEY_FILE` manually when using `sops` commands directly.
-You can add this to your shell profile or set it per-session:
-```bash
-export SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt
-```
-
-**Troubleshooting activation:**
-
-If activation fails with secrets-related errors, verify:
-- Host key exists: `ls -la /etc/ssh/ssh_host_ed25519_key`
-- Age keys exist: `cat ~/.config/sops/age/keys.txt`
-- Keys can decrypt: `SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml`
-
-If the manual decryption test works but activation still fails, this may indicate a sops-nix configuration issue rather than a key problem.
-Check the activation output for specific error messages.
-
-## Platform-specific considerations
-
-### nix-darwin hosts (macOS)
-
-- Host key deployment requires `sudo` password
-- SSH server (sshd) may not be running - this is normal for development machines
-- The deploy script will warn but continue if SSH restart fails
-- First activation may require accepting Xcode license or other macOS prompts
-
-### NixOS hosts (Linux)
-
-- Host key deployment requires root access
-- SSH server typically runs on servers but may not on desktops
-- First activation will rebuild the entire system configuration
-- May require reboot after first activation for some system-level changes
-
-### Remote hosts
-
-If onboarding via SSH rather than physical access:
+Check that the machine is registered in clan:
 
 ```bash
-# From your local machine
-ssh <username>@<hostname>
+# List all registered machines
+clan machines list
 
-# Then follow the procedure above
-# Note: nix develop will work over SSH
+# Verify specific machine configuration exists
+ls modules/machines/nixos/<hostname>.nix
 ```
 
-Ensure the host SSH key deployment doesn't disrupt your current SSH connection.
-The host key at `/etc/ssh/ssh_host_ed25519_key` is used for server identity, not client authentication.
+Machine configurations live in `modules/machines/nixos/`.
+Clan machine registry is in `modules/clan/machines.nix`.
 
-## Validation
+### Step 3: Generate secrets (Tier 1 - clan vars)
 
-After activation, verify:
+Clan vars handles system-level secrets automatically:
 
-- [ ] Secrets decrypt: `SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml`
-- [ ] Host key present: `ls -la /etc/ssh/ssh_host_ed25519_key`
-- [ ] Age keys present: `cat ~/.config/sops/age/keys.txt`
-- [ ] System packages available: `which <expected-package>`
-- [ ] Home-manager active: check home directory for expected configs
-- [ ] No activation errors in system logs
+```bash
+# Generate secrets for the machine
+clan vars generate <hostname>
 
-Note: After full activation, `SOPS_AGE_KEY_FILE` is set automatically and the prefix is unnecessary.
+# Examples:
+clan vars generate cinnabar
+clan vars generate galena
+```
+
+This generates:
+- SSH host keys
+- Zerotier network identity
+- Other machine-specific secrets
+
+Generated secrets are stored in `vars/<hostname>/` encrypted with age.
+
+### Step 4: Initial installation (new machines)
+
+For fresh machines (bare metal or new VMs):
+
+```bash
+# Install NixOS via clan
+clan machines install <hostname> --target-host root@<ip>
+
+# Examples:
+clan machines install cinnabar --target-host root@49.13.68.78
+clan machines install galena --target-host root@34.82.xxx.xxx
+```
+
+This:
+- Partitions disks (if using disko)
+- Installs NixOS with your configuration
+- Deploys Tier 1 secrets to `/run/secrets/`
+- Configures zerotier automatically
+
+### Step 5: Update existing machines
+
+For machines already running NixOS:
+
+```bash
+# Update configuration
+clan machines update <hostname>
+
+# Examples:
+clan machines update cinnabar
+clan machines update electrum
+```
+
+This:
+- Rebuilds and deploys NixOS configuration
+- Updates secrets if changed
+- Restarts affected services
+
+### Step 6: Set up Tier 2 secrets (sops-nix)
+
+For user-level secrets (API keys, tokens), configure sops-nix:
+
+```bash
+# Generate age key (if not already done)
+age-keygen -o ~/.config/sops/age/keys.txt
+
+# Display public key
+age-keygen -y ~/.config/sops/age/keys.txt
+```
+
+Add the public key to `.sops.yaml` and create encrypted secrets files.
+See [Tier 2 secrets](#tier-2-sops-nix-user-level) below for details.
+
+### Step 7: Verify zerotier mesh
+
+NixOS hosts get zerotier configuration automatically via clan inventory:
+
+```bash
+# SSH to the host
+ssh cameron@cinnabar.zt
+
+# Check zerotier status
+sudo zerotier-cli listnetworks
+sudo zerotier-cli listpeers
+```
+
+Zerotier roles are defined in `modules/clan/inventory/services/zerotier.nix`:
+- **Controller**: cinnabar (authorizes peers)
+- **Peers**: electrum, galena, scheelite, stibnite, blackphos, rosegold, argentum
+
+### Step 8: Verify deployment
+
+On the deployed machine:
+
+```bash
+# System packages
+which git gh just
+
+# Secrets available
+ls /run/secrets/
+
+# Zerotier connected
+sudo zerotier-cli info
+
+# Home-manager (if configured)
+echo $HOME_MANAGER_GENERATION
+```
+
+### NixOS onboarding complete
+
+Your NixOS host is now:
+- Running clan-managed NixOS configuration
+- Using Tier 1 secrets (clan vars) for system secrets
+- Connected to the zerotier mesh network
+
+For updates, run:
+
+```bash
+clan machines update <hostname>
+```
+
+---
+
+## Two-tier secrets architecture
+
+This infrastructure uses a two-tier secrets model.
+See [Clan Integration](/concepts/clan-integration#two-tier-secrets-architecture) for the complete explanation.
+
+### Tier 1: Clan vars (system-level)
+
+**Purpose**: Machine-specific, auto-generated secrets
+
+**Contents**:
+- SSH host keys
+- Zerotier network identities
+- LUKS/ZFS encryption passphrases
+- Service credentials
+
+**Generation**:
+```bash
+clan vars generate <machine>
+```
+
+**Deployment**: Automatic via `clan machines install` or `clan machines update`
+
+**Location on target**: `/run/secrets/`
+
+**Platforms**: NixOS only (not available on darwin)
+
+### Tier 2: sops-nix (user-level)
+
+**Purpose**: User-specific, manually-created secrets
+
+**Contents**:
+- GitHub tokens and API keys
+- Git signing keys
+- Personal credentials
+- MCP server secrets
+
+**Setup**:
+```bash
+# Generate age key
+age-keygen -o ~/.config/sops/age/keys.txt
+
+# Add public key to .sops.yaml
+age-keygen -y ~/.config/sops/age/keys.txt
+
+# Create encrypted secrets
+sops secrets/users/<username>.sops.yaml
+```
+
+**Configuration**: Home-manager sops module
+
+**Location on target**: `~/.config/sops-nix/secrets/`
+
+**Platforms**: All (darwin and NixOS)
+
+### Platform secret comparison
+
+| Aspect | Darwin | NixOS |
+|--------|--------|-------|
+| Tier 1 (clan vars) | Not available | `clan vars generate`, `/run/secrets/` |
+| Tier 2 (sops-nix) | Age key + home-manager | Age key + home-manager |
+| SSH host keys | Manual or existing | Clan vars generated |
+| Zerotier identity | Homebrew installation generates | Clan vars generated |
+| User API keys | sops-nix | sops-nix |
+
+---
+
+## Dendritic module structure
+
+Host configurations follow the [dendritic pattern](/concepts/dendritic-architecture):
+
+```
+modules/
+├── machines/
+│   ├── darwin/
+│   │   ├── stibnite.nix      # stibnite-specific config
+│   │   ├── blackphos.nix     # blackphos-specific config
+│   │   ├── rosegold.nix      # rosegold-specific config
+│   │   └── argentum.nix      # argentum-specific config
+│   └── nixos/
+│       ├── cinnabar.nix      # cinnabar-specific config
+│       ├── electrum.nix      # electrum-specific config
+│       ├── galena.nix        # galena-specific config
+│       └── scheelite.nix     # scheelite-specific config
+├── darwin/                    # Shared darwin modules (all hosts)
+├── nixos/                     # Shared nixos modules (all hosts)
+└── home/                      # Shared home-manager modules (all users)
+```
+
+Machine-specific files contain only truly unique settings.
+Shared features are defined in aspect-based modules (`darwin/`, `nixos/`, `home/`).
+
+---
+
+## Clan inventory integration
+
+NixOS hosts are registered in the clan inventory for multi-machine coordination:
+
+```nix
+# modules/clan/machines.nix
+clan.machines = {
+  cinnabar = {
+    nixpkgs.hostPlatform = "x86_64-linux";
+    imports = [ config.flake.modules.nixos."machines/nixos/cinnabar" ];
+  };
+  # ... other machines
+};
+```
+
+Service instances assign machines to roles:
+
+```nix
+# modules/clan/inventory/services/zerotier.nix
+inventory.instances.zerotier = {
+  roles.controller.machines."cinnabar" = { };
+  roles.peer.machines = {
+    "electrum" = { };
+    "stibnite" = { };
+  };
+};
+```
+
+This enables coordinated multi-machine deployments and service discovery.
+
+---
 
 ## Troubleshooting
 
-### Secrets won't decrypt
+### Darwin: darwin-rebuild fails
 
-**Symptom:** `sops -d` fails with "no key could be found to decrypt the data key"
+**Symptom**: `darwin-rebuild switch` fails with build errors
 
-**Diagnosis:**
+**Diagnosis**:
 ```bash
-# Check keys.txt exists and has content
-ls -la ~/.config/sops/age/keys.txt
+# Verify configuration builds
+nix build .#darwinConfigurations.<hostname>.system --show-trace
+```
+
+**Common causes**:
+- Missing Xcode CLT: `xcode-select --install`
+- Flake not trusted: Answer `y` to trust prompts
+- Nix store corruption: `sudo nix-store --verify --repair`
+
+### Darwin: Secrets not decrypting
+
+**Symptom**: `sops -d` fails with "no key could be found"
+
+**Diagnosis**:
+```bash
+# Check age key exists
 cat ~/.config/sops/age/keys.txt
 
-# Check host key deployed
-ls -la /etc/ssh/ssh_host_ed25519_key
-
-# Check host in .sops.yaml
-grep <hostname> .sops.yaml
+# Check public key in .sops.yaml
+grep "$(age-keygen -y ~/.config/sops/age/keys.txt)" .sops.yaml
 ```
 
-**Solution:**
+**Solution**: Add your age public key to `.sops.yaml` creation rules.
+
+### NixOS: clan machines install fails
+
+**Symptom**: Installation fails or hangs
+
+**Diagnosis**:
 ```bash
-# Regenerate age keys
-export BW_SESSION=$(bw unlock --raw)
-just sops-sync-keys
-bw lock
+# Verify SSH access
+ssh root@<ip> 'echo ok'
 
-# Retry decryption (on fresh machines, set key file path explicitly)
-SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml
+# Check clan vars generated
+ls vars/<hostname>/
 ```
 
-### Host key deployment fails
+**Common causes**:
+- SSH key not authorized on target
+- Vars not generated: Run `clan vars generate <hostname>` first
+- Network issues: Check firewall allows SSH
 
-**Symptom:** `just sops-deploy-host-key` fails or reports errors
+### NixOS: Zerotier not connecting
 
-**Diagnosis:**
+**Symptom**: Host not appearing in zerotier network
+
+**Diagnosis**:
 ```bash
-# Check Bitwarden access
-bw get item sops-<hostname>-ssh | jq -r '.sshKey.publicKey'
-
-# Check sudo access
-sudo ls -la /etc/ssh/
-
-# Check script exists
-ls -la scripts/sops/deploy-host-key.sh
+# On the target host
+sudo zerotier-cli info
+sudo zerotier-cli listnetworks
 ```
 
-**Solution:**
-- Ensure `BW_SESSION` is set: `export BW_SESSION=$(bw unlock --raw)`
-- Verify host key exists in Bitwarden with correct name
-- Check sudo permissions for writing to `/etc/ssh/`
-- Review script output for specific error messages
-
-### Activation fails
-
-**Symptom:** `just activate <hostname>` fails with errors
-
-**Common causes and solutions:**
-
-1. **Secrets not decrypting**
-   - Follow "Secrets won't decrypt" troubleshooting above
-   - Ensure host key deployed before activation
-
-2. **Missing packages or dependencies**
-   - Run `nix flake check` to validate flake
-   - Check for errors in host configuration
-   - Ensure all inputs in `flake.lock` are accessible
-
-3. **Permission errors**
-   - nix-darwin may require running with appropriate privileges
-   - Check file permissions on config files
-   - Verify user has necessary system access
-
-4. **First-time activation issues**
-   - Some system changes require logout/login or reboot
-   - MacOS may require granting permissions to terminal
-   - Try activation again after addressing prompts
-
-### SSH authorized keys migration error
-
-**Symptom:** Activation fails with error about `/etc/ssh/authorized_keys.d exists` and a security notice
-
-**Full error message:**
-```
-error: /etc/ssh/authorized_keys.d exists, aborting activation
-SECURITY NOTICE: The previous implementation of the
-`users.users.<name>.openssh.authorizedKeys.*` options would not delete
-authorized keys files when the setting for a given user was removed.
-[...]
-```
-
-**Cause:** This is a one-time nix-darwin security migration for systems that previously had nix-darwin installed.
-The old SSH key management implementation didn't properly clean up keys, so nix-darwin now requires manual cleanup before proceeding.
-
-**Solution:**
+**Solution**: Ensure controller has authorized the peer:
 ```bash
-# 1. Inspect existing keys (optional but recommended)
-ls -la /etc/ssh/authorized_keys.d/
-cat /etc/ssh/authorized_keys.d/*
-
-# 2. Remove the directory
-sudo rm -rf /etc/ssh/authorized_keys.d
-
-# 3. Retry activation
-just activate <hostname>
+# Update cinnabar to authorize new peers
+clan machines update cinnabar
 ```
 
-This is safe - your SSH keys in `~/.ssh/authorized_keys` are unaffected, and nix-darwin will recreate the directory with correctly managed keys from your configuration.
+### Both: Flake trust prompts
 
-**Note:** This error typically occurs when re-onboarding a host that previously had nix-darwin installed.
-Fresh installations won't have this directory and won't encounter this error.
+**Symptom**: Repeated prompts about substituters and trusted-public-keys
 
-### Flake configuration trust prompts
+**Solution**: Answer `y` to all four prompts (allow + permanently trust for both settings).
+This is a one-time setup per machine.
 
-**Symptom:** During activation, prompted to allow and trust configuration settings
-
-**Prompts shown:**
-```
-do you want to allow configuration setting 'substituters' to be set to '...'? (y/N)
-do you want to permanently mark this value as trusted (y/N)?
-do you want to allow configuration setting 'trusted-public-keys' to be set to '...'? (y/N)
-do you want to permanently mark this value as trusted (y/N)?
-```
-
-**Cause:** Nix security feature verifying flake configuration settings (nixConfig in flake.nix).
-This ensures you trust the binary caches and their signing keys before using them.
-
-**Solution:**
-Answer `y` to all four prompts (allow both settings and permanently mark both as trusted).
-
-**Why this is safe:**
-- These are official Nix caches configured in the flake.nix
-- Includes cache.nixos.org, nix-community.cachix.org, and project-specific caches
-- Public keys ensure cache integrity (prevents tampered binaries)
-- "Permanently trust" saves your decision and prevents future prompts
-
-**Note:** This only happens once per machine per flake configuration.
-
-### Nix store corruption
-
-**Symptom:** Build failures with errors about linking in `/nix/store/.links/`
-
-**Error message:**
-```
-error: cannot link '/nix/store/.tmp-link-12345-67890' to '/nix/store/.links/abc123...': File exists
-error: some substitutes for the outputs of derivation '...' failed
-```
-
-**Cause:** Corruption in Nix's content-addressable deduplication system.
-The `/nix/store/.links/` directory manages hard links for identical files.
-Usually caused by interrupted builds or disk I/O issues.
-
-**Solution:**
-
-Step 1: Verify and repair the store
-```bash
-sudo nix-store --verify --check-contents --repair
-```
-
-This checks all store paths and repairs corruption (may take 5-15 minutes).
-
-Step 2: Retry activation
-```bash
-just activate <hostname>
-```
-
-**If still failing:**
-
-Step 3: Remove deduplication links (safe - will be recreated)
-```bash
-sudo rm -rf /nix/store/.links
-sudo nix-store --verify --check-contents
-just activate <hostname>
-```
-
-**Fallback option:**
-Build from source instead of using caches:
-```bash
-sudo darwin-rebuild switch --flake .#<hostname> --fallback
-```
-
-### Insufficient disk space
-
-**Symptom:** Build failures, downloads abort, or "No space left on device" errors during activation
-
-**Diagnosis:**
-```bash
-# Check available disk space
-df -h /nix
-
-# Check size of Nix store
-du -sh /nix/store
-```
-
-First activation typically requires 10-20GB of free space (downloads packages, builds derivations).
-
-**Solution:**
-
-Clean up old Nix store generations:
-```bash
-# Remove old user environment generations
-nix-collect-garbage -d
-
-# For system-level cleanup (nix-darwin)
-sudo nix-collect-garbage -d
-
-# Check space freed
-df -h /nix
-```
-
-**Prevention:**
-- Ensure at least 20GB free before first activation
-- Run garbage collection periodically: `nix-collect-garbage --delete-older-than 30d`
-- Subsequent activations require less space (only new/changed packages)
-
-**Note:** If disk is full, you may need to free space outside the Nix store first (clean up Downloads, caches, etc.).
-
-### Missing Xcode Command Line Tools (macOS only)
-
-**Symptom:** Build failures with compiler errors during activation
-
-**Error messages:**
-```
-xcrun: error: invalid active developer path
-xcrun: error: unable to find utility "clang"
-error: builder for '...' failed with exit code 1
-```
-
-**Cause:** Xcode Command Line Tools not installed or path not set correctly.
-Required for building native packages on macOS.
-
-**Solution:**
-
-Install Xcode Command Line Tools:
-```bash
-xcode-select --install
-```
-
-This opens a GUI installer. Follow the prompts to complete installation (may take 10-15 minutes).
-
-**If already installed but still failing:**
-
-Reset the developer directory path:
-```bash
-sudo xcode-select --reset
-```
-
-**Accept license if needed:**
-```bash
-sudo xcodebuild -license accept
-```
-
-**Verify installation:**
-```bash
-xcode-select -p
-# Should output: /Library/Developer/CommandLineTools
-```
-
-After installation, retry activation:
-```bash
-just activate <hostname>
-```
-
-**Note:** This is macOS-specific. NixOS hosts have build tools managed by Nix directly.
-
-### Bitwarden session expires
-
-**Symptom:** Commands fail with "Unauthorized" or "Session expired"
-
-**Solution:**
-```bash
-bw lock  # Clear stale session
-export BW_SESSION=$(bw unlock --raw)  # Create new session
-# Retry command
-```
-
-### Wrong age keys in keys.txt
-
-**Symptom:** Keys.txt has wrong keys or wrong number of keys
-
-**Solution:**
-```bash
-# Remove old keys.txt
-rm ~/.config/sops/age/keys.txt
-
-# Regenerate from Bitwarden
-export BW_SESSION=$(bw unlock --raw)
-just sops-sync-keys
-bw lock
-
-# Verify format
-cat ~/.config/sops/age/keys.txt
-```
+---
 
 ## Success criteria
 
-A successful onboarding is complete when:
+A successful darwin onboarding:
+- [ ] Nix installed with flakes enabled
+- [ ] `darwin-rebuild switch` completes without errors
+- [ ] Age key at `~/.config/sops/age/keys.txt`
+- [ ] Zerotier connected to network `db4344343b14b903`
+- [ ] Secrets decrypting via sops-nix
 
-- Host key deployed to `/etc/ssh/ssh_host_ed25519_key` with correct permissions
-- Backup created at `/etc/ssh/ssh_host_ed25519_key.old`
-- Age keys present at `~/.config/sops/age/keys.txt` with 3 keys and public key comments
-- Secrets decrypt successfully: `sops -d secrets/shared.yaml`
-- Validation passes: `just sops-validate-correspondences`
-- Nix-config activation succeeds: `just activate <hostname>`
-- System operates normally with expected packages and configurations
+A successful NixOS onboarding:
+- [ ] `clan machines install` completes without errors
+- [ ] Tier 1 secrets at `/run/secrets/`
+- [ ] Zerotier mesh connected
+- [ ] SSH access via `.zt` hostname
+
+---
 
 ## See also
 
-- SOPS migration summary: `docs/notes/secrets/sops-migration-summary.md`
-- SOPS key rotation: `just sops-rotate` workflow
-- Adding new hosts: see "Adding new hosts" in migration summary
-- Justfile recipes: run `just --list` to see all available commands
-- SOPS documentation: https://github.com/getsops/sops
-- Age encryption: https://age-encryption.org/
+- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization pattern
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination
+- [Getting Started](getting-started) - Initial repository setup
+- [User Onboarding](home-manager-onboarding) - Standalone home-manager for non-admin users
