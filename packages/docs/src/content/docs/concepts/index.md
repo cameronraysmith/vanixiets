@@ -4,13 +4,14 @@ sidebar:
   order: 1
 ---
 
-Conceptual documentation to help you understand the architecture and design patterns used in this nix-config.
+Conceptual documentation to help you understand the architecture and design patterns used in this infrastructure.
 
 ## Architecture
 
-- [Nix-Config Architecture](nix-config-architecture) - Three-layer architecture combining flake-parts, nixos-unified, and multi-channel resilience patterns
-- [Understanding Autowiring](understanding-autowiring) - How nixos-unified directory-based autowiring eliminates configuration boilerplate
+- [Nix-Config Architecture](nix-config-architecture) - Four-layer architecture combining flake-parts, dendritic pattern, clan-core, and multi-channel overlays
+- [Dendritic Architecture](dendritic-architecture) - Aspect-based module organization where every file is a flake-parts module
+- [Clan Integration](clan-integration) - Multi-machine coordination, deployment, and service orchestration
 
 ## Patterns
 
-- [Multi-User Patterns](multi-user-patterns) - Admin users with integrated home-manager vs non-admin standalone users
+- [Multi-User Patterns](multi-user-patterns) - Admin users with integrated home-manager vs standalone users

@@ -3,255 +3,299 @@ title: Multi-User Patterns
 description: Understanding admin users with integrated home-manager vs non-admin standalone users
 ---
 
-This nix-config supports two distinct user patterns, each optimized for different access levels and use cases.
+This infrastructure supports multiple user patterns optimized for different access levels and use cases.
 
 ## Pattern overview
 
-### Admin users: Integrated home-manager
+### Admin users with integrated home-manager
 
 **Characteristics:**
-- One admin user per host
+- One or more admin users per host
 - Full system and home-manager configuration
-- Requires sudo for activation
-- Configurations live in `configurations/darwin/` or `configurations/nixos/`
+- Requires sudo for system activation
+- Configurations live in `modules/machines/darwin/` or `modules/machines/nixos/`
 
 **When to use:**
-- Primary user of the machine
+- Primary users of the machine
 - Need system-level configuration changes
 - Managing nix-darwin or NixOS system settings
 
-**Activation:**
+**Deployment:**
 ```bash
-nix run . hostname  # e.g., nix run . stibnite
+clan machines update <hostname>  # e.g., clan machines update stibnite
 ```
 
-### Non-admin users: Standalone home-manager
+### Standalone home-manager users
 
 **Characteristics:**
-- Multiple non-admin users per host supported
+- Additional users on shared machines
 - Home environment only, no system access
-- No sudo required for activation
-- Configurations live in `configurations/home/`
+- No sudo required for home-manager activation
+- User modules live in `modules/home/users/`
 
 **When to use:**
 - Secondary users on a shared machine
-- CI/CD runners (e.g., GitHub Actions runners)
-- Guest users needing consistent environment
+- Users needing consistent environment across machines
+- Development/staging users
 
-**Activation:**
+**Deployment:**
 ```bash
-nix run . user@hostname  # e.g., nix run . runner@stibnite
+nh home switch  # For standalone home-manager activation
 ```
 
 ## Directory organization
 
 ```
-configurations/
-├── darwin/                # Admin users on macOS
-│   ├── stibnite.nix       # Admin user on stibnite host
-│   └── blackphos.nix      # Admin user on blackphos host
-├── nixos/                 # Admin users on NixOS
-│   └── orb-nixos.nix      # Admin user on orb-nixos host
-└── home/                  # Non-admin users (standalone)
-    ├── runner@stibnite.nix    # Runner user on stibnite
-    ├── runner@blackphos.nix   # Same runner user, different host
-    └── raquel@blackphos.nix   # Another user on blackphos
+modules/
+├── home/
+│   └── users/               # User-specific home-manager modules
+│       ├── crs58.nix        # Primary admin user module
+│       ├── cameron.nix      # Cameron user module (admin alias)
+│       ├── raquel.nix       # Raquel user module
+│       ├── janettesmith.nix # Janet user module
+│       └── christophersmith.nix  # Christopher user module
+└── machines/
+    ├── darwin/              # Darwin host configurations
+    │   ├── stibnite.nix     # Single-user (crs58)
+    │   ├── blackphos.nix    # Multi-user (raquel primary, crs58 admin)
+    │   ├── rosegold.nix     # Multi-user (janettesmith primary, cameron admin)
+    │   └── argentum.nix     # Multi-user (christophersmith primary, cameron admin)
+    └── nixos/               # NixOS host configurations
+        ├── cinnabar.nix     # Server (cameron)
+        ├── electrum.nix     # Server (cameron)
+        ├── galena.nix       # Compute (cameron)
+        └── scheelite.nix    # GPU compute (cameron)
 ```
 
-## Configuration structure
+## Configuration patterns
 
-### Admin user configuration
+### Single-user darwin host
 
-**File**: `configurations/darwin/${hostname}.nix` or `configurations/nixos/${hostname}.nix`
+**Example**: stibnite (crs58's primary workstation)
 
 ```nix
+# modules/machines/darwin/stibnite.nix
+{ config, ... }:
 {
-  inputs,
-  config,
-  lib,
-  pkgs,
-  ...
-}: {
-  # System-level settings
-  networking.hostName = "hostname";
-
-  # User account (defined in config.nix)
-  users.users.admin = {
-    home = "/Users/admin";  # or /home/admin on Linux
-    # ... system user configuration
+  flake.darwinConfigurations.stibnite = config.lib.mkDarwinConfiguration {
+    system = "aarch64-darwin";
+    modules = [
+      config.flake.modules.darwin.core
+      config.flake.modules.darwin.apps
+    ];
+    home-manager.users.crs58 = {
+      imports = with config.flake.modules.homeManager; [
+        aggregate-core
+        aggregate-ai
+        aggregate-development
+        aggregate-shell
+      ];
+    };
   };
-
-  # Integrated home-manager
-  home-manager.users.admin = { ... };
 }
 ```
 
 **Key points:**
-- Single file defines both system and home config
-- Admin user defined in `config.nix`
-- home-manager runs as part of system activation
-- Changes require sudo
+- Single user defined in machine config
+- All home-manager aggregates for the user
+- System activation deploys both system and home config
 
-### Non-admin user configuration
+### Multi-user darwin host
 
-**File**: `configurations/home/${user}@${host}.nix`
+**Example**: blackphos (raquel's workstation, crs58 as admin)
 
 ```nix
+# modules/machines/darwin/blackphos.nix
+{ config, ... }:
 {
-  inputs,
-  config,
-  pkgs,
-  ...
-}: {
-  # Home-manager only
-  home = {
-    username = "runner";
-    homeDirectory = "/Users/runner";  # or /home/runner on Linux
-    stateVersion = "24.05";
+  flake.darwinConfigurations.blackphos = config.lib.mkDarwinConfiguration {
+    system = "aarch64-darwin";
+    modules = [
+      config.flake.modules.darwin.core
+      config.flake.modules.darwin.apps
+    ];
+    home-manager.users = {
+      raquel = {
+        imports = with config.flake.modules.homeManager; [
+          aggregate-core
+          aggregate-shell
+        ];
+      };
+      crs58 = {
+        imports = with config.flake.modules.homeManager; [
+          aggregate-core
+          aggregate-ai
+          aggregate-development
+          aggregate-shell
+        ];
+      };
+    };
   };
-
-  # User environment configuration
-  programs = { ... };
-  home.packages = [ ... ];
 }
 ```
 
 **Key points:**
-- Standalone home-manager configuration
-- No system-level settings (no sudo needed)
-- User defined in `config.nix`
-- Independent of system configuration
+- Multiple users defined in machine config
+- Each user gets appropriate aggregates for their role
+- Primary user (raquel) has basic config
+- Admin user (crs58) has full development config
 
-## User definition in config.nix
+### NixOS server host
 
-All users (both admin and non-admin) are defined in the central `config.nix`:
+**Example**: cinnabar (zerotier controller)
 
 ```nix
+# modules/machines/nixos/cinnabar.nix
+{ config, ... }:
 {
-  users = {
-    # Admin user
-    admin = {
-      username = "admin";
-      fullname = "Admin User";
-      email = "admin@example.com";
-      sshKey = "ssh-ed25519 AAAAC3Nza...";
-      isAdmin = true;
-    };
-
-    # Non-admin users
-    runner = {
-      username = "runner";
-      fullname = "CI Runner";
-      email = "runner@example.com";
-      sshKey = "ssh-ed25519 AAAAC3Nza...";
-      isAdmin = false;
-    };
-
-    raquel = {
-      username = "raquel";
-      fullname = "Raquel User";
-      email = "raquel@example.com";
-      sshKey = "ssh-ed25519 AAAAC3Nza...";
-      isAdmin = false;
+  flake.nixosConfigurations.cinnabar = config.lib.mkNixosConfiguration {
+    system = "x86_64-linux";
+    modules = [
+      config.flake.modules.nixos.core
+      config.flake.modules.nixos.services
+    ];
+    home-manager.users.cameron = {
+      imports = with config.flake.modules.homeManager; [
+        aggregate-core
+        aggregate-development
+        aggregate-shell
+      ];
     };
   };
 }
 ```
 
-## Secrets management differences
+## User modules
+
+### User-specific configuration
+
+Each user has a module in `modules/home/users/`:
+
+```nix
+# modules/home/users/crs58.nix
+{ ... }:
+{
+  flake.modules.homeManager."users/crs58" = { config, pkgs, ... }: {
+    home.username = "crs58";
+    home.homeDirectory = "/Users/crs58";
+
+    # User-specific settings
+    programs.git = {
+      userName = "Cameron Smith";
+      userEmail = "cameron@example.com";
+    };
+
+    # sops-nix user secrets
+    sops.secrets."users/crs58/github-token" = {
+      sopsFile = ./../../secrets/users/crs58.sops.yaml;
+    };
+  };
+}
+```
+
+### Cameron/crs58 alias pattern
+
+On new machines, `cameron` is the preferred username (alias for crs58):
+
+```nix
+# modules/home/users/cameron.nix
+{ ... }:
+{
+  flake.modules.homeManager."users/cameron" = { config, pkgs, ... }: {
+    home.username = "cameron";
+    home.homeDirectory = "/Users/cameron";
+
+    # Same config as crs58, different username
+    imports = [
+      # Shared settings from crs58
+    ];
+  };
+}
+```
+
+## Secrets management by user type
 
 ### Admin users
 
-Secrets are decrypted using:
+Admin users access secrets via:
 1. User's age key (from `~/.config/sops/age/keys.txt`)
-2. Host's SSH key (from `/etc/ssh/ssh_host_ed25519_key`)
+2. Host's SSH key (can decrypt system secrets)
 
-Both keys must be in `.sops.yaml` for the secrets the admin needs.
+```yaml
+# .sops.yaml
+keys:
+  - &crs58 age1...
+  - &stibnite-host age1...
+
+creation_rules:
+  - path_regex: secrets/users/crs58\.sops\.yaml$
+    key_groups:
+      - age:
+          - *crs58
+          - *stibnite-host
+```
 
 ### Non-admin users
 
-Secrets are decrypted using:
-1. User's age key only (from `~/.config/sops/age/keys.txt`)
+Non-admin users access only their personal secrets:
 
-Non-admin users cannot access host SSH keys, so they rely solely on their personal age keys.
+```yaml
+# .sops.yaml
+keys:
+  - &raquel age1...
 
-## Practical scenarios
-
-### Scenario 1: Single-user macOS machine
-
-**Setup**: One admin user, full control
-
-```
-stibnite (macOS)
-└── admin user "crs58" (configurations/darwin/stibnite.nix)
+creation_rules:
+  - path_regex: secrets/users/raquel\.sops\.yaml$
+    key_groups:
+      - age:
+          - *raquel
 ```
 
-**Activation:**
-```bash
-nix run . stibnite  # Applies system + home config for crs58
-```
+## Machine fleet user assignments
 
-### Scenario 2: Shared macOS machine
-
-**Setup**: One admin, one non-admin user
-
-```
-blackphos (macOS)
-├── admin user "cameron" (configurations/darwin/blackphos.nix)
-└── non-admin user "raquel" (configurations/home/raquel@blackphos.nix)
-```
-
-**Activation:**
-```bash
-# Cameron (admin) activates system + home
-nix run . blackphos
-
-# Raquel (non-admin) activates home only (no sudo)
-nix run . raquel@blackphos
-```
-
-### Scenario 3: CI/CD runner on multiple hosts
-
-**Setup**: Same runner user on different machines
-
-```
-stibnite (macOS)
-├── admin "crs58" (configurations/darwin/stibnite.nix)
-└── runner "runner" (configurations/home/runner@stibnite.nix)
-
-blackphos (macOS)
-├── admin "cameron" (configurations/darwin/blackphos.nix)
-└── runner "runner" (configurations/home/runner@blackphos.nix)
-```
-
-The runner user has consistent environment across hosts but host-specific configuration when needed.
-
-**Activation on each host:**
-```bash
-# On stibnite
-nix run . runner@stibnite
-
-# On blackphos
-nix run . runner@blackphos
-```
+| Host | Primary User | Admin User | Platform |
+|------|--------------|------------|----------|
+| stibnite | crs58 | crs58 | Darwin |
+| blackphos | raquel | crs58 | Darwin |
+| rosegold | janettesmith | cameron | Darwin |
+| argentum | christophersmith | cameron | Darwin |
+| cinnabar | cameron | cameron | NixOS |
+| electrum | cameron | cameron | NixOS |
+| galena | cameron | cameron | NixOS |
+| scheelite | cameron | cameron | NixOS |
 
 ## When to choose each pattern
 
-### Use admin pattern (integrated home-manager) when:
-- You are the primary/sole user of the machine
-- You need to configure system-level settings
+### Use integrated home-manager when:
+- You are the primary user of the machine
+- You need system-level configuration changes
 - You want unified activation (system + home in one command)
 - You have sudo access
 
-### Use non-admin pattern (standalone home-manager) when:
+### Use standalone home-manager when:
 - You are a secondary user on a shared machine
-- You don't have or don't need sudo access
-- You want independent home environment management
-- You're setting up CI/CD runner accounts
+- You don't need system-level configuration
 - Multiple users need isolated environments on the same host
+
+## Aggregate-based composition
+
+Users receive features through aggregate imports rather than individual modules:
+
+```nix
+# Example aggregates
+aggregate-core      # XDG, fonts, SSH, basic tools
+aggregate-ai        # Claude Code, MCP servers, AI tooling
+aggregate-development  # Git, editors, languages
+aggregate-shell     # Zsh, fish, starship, tmux
+```
+
+This pattern:
+- Reduces duplication across user configs
+- Makes feature sets consistent
+- Simplifies adding/removing features
 
 ## See also
 
-- [Host Onboarding Guide](/guides/host-onboarding) - Setting up a new admin user host
-- [Home Manager Onboarding](/guides/home-manager-onboarding) - Setting up non-admin users
-- [Secrets Management](/guides/secrets-management) - Managing user and host secrets
+- [Host Onboarding Guide](/guides/host-onboarding) - Adding new hosts
+- [Home Manager Onboarding](/guides/home-manager-onboarding) - User setup
+- [Clan Integration](/concepts/clan-integration) - Deployment coordination
