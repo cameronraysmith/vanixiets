@@ -1,0 +1,375 @@
+# Story 8.4: Update Secrets Management Documentation
+
+Status: drafted
+
+## Story
+
+As a system administrator,
+I want accurate secrets management documentation that reflects the two-tier architecture (clan vars + sops-nix),
+so that I can properly manage system and user secrets.
+
+## Acceptance Criteria
+
+### Two-Tier Architecture Documentation (AC1-AC4)
+
+1. **Tier 1 (clan vars) documented**: System-level secrets including SSH host keys, zerotier identities, LUKS passphrases, machine-specific generated secrets with `clan vars generate` and automatic deployment via `clan machines install/update`
+2. **Tier 2 (sops-nix) documented**: User-level secrets including API keys/tokens, personal credentials, signing keys, age key generation, and home-manager integration patterns
+3. **Architecture overview section**: Clear explanation of why two tiers exist, when to use each, and how they complement each other
+4. **Secrets location mapping**: Document where secrets end up (`/run/secrets/` for NixOS clan vars, home-manager managed for sops-nix)
+
+### Deprecated Content Removal (AC5-AC8)
+
+5. **No 3-tier references**: Remove all references to "3-tier key architecture" terminology
+6. **No Bitwarden patterns**: Remove Bitwarden as "single source of truth" pattern (retain only as optional offline backup mention)
+7. **No outdated SOPS workflows**: Replace GitHub Actions CI-focused SOPS workflow with machine secrets workflow
+8. **No sopsIdentifier patterns**: Update to current sops.secrets pattern from clan-integration.md
+
+### Cross-References (AC9-AC11)
+
+9. **Architecture link**: Link to `concepts/clan-integration.md` for two-tier architecture overview (lines 156-234)
+10. **Host onboarding link**: Link to `guides/host-onboarding.md` for practical setup steps
+11. **Consistency verified**: Terminology matches Story 8.2 (clan-integration.md) and Story 8.3 (host onboarding guides)
+
+### Practical Guidance (AC12-AC16)
+
+12. **Copy-paste ready commands**: All commands use actual hostnames and paths from current implementation
+13. **Secret rotation procedures**: Document rotation for both Tier 1 (clan vars regenerate) and Tier 2 (sops re-encrypt)
+14. **Troubleshooting section**: Common issues and solutions for both tiers
+15. **Age key management**: Document age key generation, storage (`~/.config/sops/age/keys.txt`), and key reuse pattern
+16. **Darwin vs NixOS differences**: Document platform-specific secret deployment paths and considerations
+
+### Documentation Quality (AC17-AC18)
+
+17. **Zero deprecated references**: Final verification passes grep checks
+18. **Starlight build passes**: `nix build .#docs` succeeds
+
+## Tasks / Subtasks
+
+### Task 1: Analyze Current State and Plan Rewrite (AC: #5-8)
+
+- [ ] Read `packages/docs/src/content/docs/guides/secrets-management.md` completely
+- [ ] Identify all content to remove:
+  - [ ] Dev key / CI key architecture (wrong model - not machine/user tier)
+  - [ ] Bitwarden references beyond optional backup
+  - [ ] GitHub Actions SOPS workflow (CI secrets, not machine secrets)
+  - [ ] sopsIdentifier patterns
+- [ ] Identify content to preserve:
+  - [ ] Age encryption basics
+  - [ ] SOPS CLI usage for editing
+  - [ ] File structure concepts
+- [ ] Document removal list in completion notes
+
+### Task 2: Rewrite Architecture Section (AC: #1-4)
+
+- [ ] Replace "Security architecture" with "Secrets Architecture Overview"
+- [ ] Add two-tier architecture diagram/table:
+  - [ ] Tier 1: Clan vars - what, why, where, how
+  - [ ] Tier 2: sops-nix - what, why, where, how
+- [ ] Document secret locations:
+  - [ ] NixOS: `/run/secrets/` (clan vars), home-manager managed (sops-nix)
+  - [ ] Darwin: home-manager managed only (no clan vars for darwin secrets)
+- [ ] Link to `concepts/clan-integration.md#two-tier-secrets-architecture`
+- [ ] Commit: `docs(secrets): rewrite architecture section for two-tier model`
+
+### Task 3: Document Tier 1 (Clan Vars) Operations (AC: #1, #12, #13)
+
+- [ ] Create "Tier 1: Clan Vars (System-Level)" section
+- [ ] Document what belongs in Tier 1:
+  - [ ] SSH host keys (`ssh.id_ed25519`)
+  - [ ] Zerotier identities
+  - [ ] LUKS disk encryption passphrases
+  - [ ] Machine-specific service credentials
+- [ ] Document commands:
+  ```bash
+  clan vars generate <machine>           # Generate machine secrets
+  clan vars get <machine> <secret>       # Retrieve a secret value
+  clan machines update <machine>         # Deploy secrets to machine
+  ```
+- [ ] Document vars directory structure: `machines/<hostname>/vars/`
+- [ ] Document rotation procedure for clan vars
+- [ ] Include examples with cinnabar, galena, scheelite
+- [ ] Commit: `docs(secrets): add Tier 1 clan vars documentation`
+
+### Task 4: Document Tier 2 (sops-nix) Operations (AC: #2, #12, #13, #15)
+
+- [ ] Create "Tier 2: sops-nix (User-Level)" section
+- [ ] Document what belongs in Tier 2:
+  - [ ] GitHub tokens and signing keys
+  - [ ] API keys (Anthropic, OpenAI, etc.)
+  - [ ] Personal credentials
+  - [ ] Service credentials tied to user identity
+- [ ] Document age key setup:
+  ```bash
+  age-keygen -o ~/.config/sops/age/keys.txt  # Generate personal age key
+  ```
+- [ ] Document sops secrets workflow:
+  ```bash
+  sops secrets/users/crs58.sops.yaml         # Edit encrypted secrets
+  ```
+- [ ] Document home-manager integration pattern:
+  ```nix
+  sops.secrets."users/crs58/github-signing-key" = {
+    sopsFile = "${inputs.self}/secrets/users/crs58.sops.yaml";
+  };
+  ```
+- [ ] Document `.sops.yaml` configuration
+- [ ] Document rotation procedure for sops-nix secrets
+- [ ] Include examples with crs58, raquel users
+- [ ] Commit: `docs(secrets): add Tier 2 sops-nix documentation`
+
+### Task 5: Document Platform Differences (AC: #16)
+
+- [ ] Create "Platform-Specific Considerations" section
+- [ ] Document NixOS path:
+  - [ ] Clan vars available for system secrets
+  - [ ] sops-nix for user secrets via home-manager
+  - [ ] Secrets deployed to `/run/secrets/`
+- [ ] Document Darwin path:
+  - [ ] No clan vars for darwin (clan-specific limitation)
+  - [ ] sops-nix only for all user secrets
+  - [ ] Secrets managed via home-manager activation
+- [ ] Include cross-platform secret sharing considerations
+- [ ] Commit: `docs(secrets): add platform-specific secrets documentation`
+
+### Task 6: Add Troubleshooting Section (AC: #14)
+
+- [ ] Create "Troubleshooting" section with common issues:
+  - [ ] Tier 1: clan vars not deploying
+  - [ ] Tier 1: Permission issues on `/run/secrets/`
+  - [ ] Tier 2: Cannot decrypt sops file
+  - [ ] Tier 2: Age key not found
+  - [ ] Tier 2: sops.secrets not appearing in home-manager
+- [ ] Include diagnostic commands:
+  ```bash
+  # Tier 1 diagnostics
+  ls -la /run/secrets/
+  clan vars get <machine> <secret>
+
+  # Tier 2 diagnostics
+  grep "public key:" ~/.config/sops/age/keys.txt
+  sops -d secrets/users/<user>.sops.yaml
+  ```
+- [ ] Commit: `docs(secrets): add troubleshooting section`
+
+### Task 7: Update Cross-References and Remove Deprecated Content (AC: #9-11, #5-8)
+
+- [ ] Add "See also" section with links:
+  - [ ] [Clan Integration](/concepts/clan-integration) - Two-tier architecture overview
+  - [ ] [Host Onboarding](/guides/host-onboarding) - Practical setup steps
+  - [ ] [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization
+- [ ] Remove all deprecated content:
+  - [ ] "Key roles" section (Dev key / CI key architecture)
+  - [ ] "Secret categories" section (bootstrap/SOPS-managed/GitHub variables)
+  - [ ] "Design decisions" section (CI-focused rationale)
+  - [ ] "Workflows" section entirely (bootstrap, rotation focused on CI)
+  - [ ] "Recipe reference" section (justfile CI recipes)
+  - [ ] "Quick reference" section (CI-focused operations)
+- [ ] Update sidebar order if needed
+- [ ] Commit: `docs(secrets): remove deprecated patterns and add cross-references`
+
+### Task 8: Final Verification (AC: #17-18)
+
+- [ ] Run verification commands:
+  ```bash
+  rg "3-tier|three-tier" packages/docs/src/content/docs/guides/secrets-management.md
+  rg "bitwarden|Bitwarden" packages/docs/src/content/docs/guides/secrets-management.md
+  rg "sopsIdentifier" packages/docs/src/content/docs/guides/secrets-management.md
+  rg "configurations/" packages/docs/src/content/docs/guides/secrets-management.md
+  ```
+- [ ] Verify Starlight build: `nix build .#docs`
+- [ ] Verify internal links work
+- [ ] Test commands are copy-paste ready
+- [ ] Commit any final fixes
+
+## Dev Notes
+
+### Current Document Analysis
+
+The current `secrets-management.md` (591 lines) is entirely CI-focused:
+
+**Wrong Model:**
+- "Dev key" + "CI key" architecture (not Tier 1/Tier 2)
+- Bitwarden as backup location throughout
+- GitHub Actions SOPS workflow for CI secrets
+- `secrets/shared.yaml` for CI tokens (CACHIX, GITGUARDIAN, CLOUDFLARE)
+- No mention of clan vars, `/run/secrets/`, or machine secrets
+
+**Content to Remove (90%):**
+- Lines 10-56: "Security architecture" (dev/CI key model)
+- Lines 57-99: "Workflows - Initial bootstrap" (CI-focused)
+- Lines 100-152: "Key rotation" sections (CI key rotation)
+- Lines 153-210: "GitHub PAT rotation" (CI automation)
+- Lines 211-259: "Adding new secrets" + "Onboarding new developer" (CI workflow)
+- Lines 260-315: "Emergency key recovery" (CI key recovery)
+- Lines 316-498: "Recipe reference" + "File structure" + "Security checklist" (CI recipes)
+- Lines 499-591: "Quick reference" (CI operations)
+
+**Content to Preserve/Adapt:**
+- Age encryption concepts (lines 14-17 key storage concept)
+- SOPS CLI usage patterns
+- General file structure concepts (adapted for two-tier)
+
+### Two-Tier Architecture (From Story 8.2)
+
+**Tier 1: Clan Vars (System-Level)**
+From `clan-integration.md` lines 160-171:
+- Generated by clan vars system
+- Machine-specific secrets
+- SSH host keys, zerotier identities, LUKS passphrases
+- Managed via: `clan vars generate`
+- Storage: `vars/` directory, encrypted
+
+**Tier 2: sops-nix (User-Level)**
+From `clan-integration.md` lines 173-186:
+- Manually created via sops CLI
+- User-specific secrets
+- GitHub tokens, API keys, signing keys, personal credentials
+- Managed via: `sops secrets/users/username.sops.yaml`
+- Storage: `secrets/` directory, encrypted with age
+
+### Age Key Reuse Pattern
+
+From Epic 1 Story 1.10C findings:
+- Same age keypair used for BOTH tiers
+- Key location: `~/.config/sops/age/keys.txt`
+- This enables single key management for both clan vars decryption and sops-nix
+
+### Machine Fleet for Examples
+
+**NixOS (both tiers available):**
+- cinnabar (Hetzner VPS, zerotier controller)
+- electrum (Hetzner VPS)
+- galena (GCP, CPU)
+- scheelite (GCP, GPU)
+
+**Darwin (Tier 2 only):**
+- stibnite (crs58)
+- blackphos (raquel)
+- rosegold (janettesmith)
+- argentum (christophersmith)
+
+### Terminology Replacement Table
+
+| Remove | Replace With |
+|--------|--------------|
+| 3-tier key architecture | Two-tier secrets architecture |
+| Dev key / CI key | Tier 1 (clan vars) / Tier 2 (sops-nix) |
+| Bitwarden as single source | Age keys at `~/.config/sops/age/keys.txt` |
+| SOPS-only workflow | Clan vars (Tier 1) + sops-nix (Tier 2) |
+| sopsIdentifier pattern | Clan vars generators |
+| Manual secret deployment | `clan machines update` |
+| secrets/shared.yaml (CI) | secrets/users/*.sops.yaml (user) |
+| SOPS_AGE_KEY GitHub secret | N/A (not CI-focused) |
+
+### Project Structure Notes
+
+**Output File:** `packages/docs/src/content/docs/guides/secrets-management.md`
+
+**Related Files (Don't Duplicate):**
+- `concepts/clan-integration.md` - Two-tier architecture explanation (link, don't copy)
+- `guides/host-onboarding.md` - Practical setup context (link, don't copy)
+
+**Target Document Structure:**
+1. Introduction (what this doc covers)
+2. Secrets Architecture Overview (two-tier explanation)
+3. Tier 1: Clan Vars (System-Level)
+   - What belongs here
+   - Key commands
+   - Directory structure
+   - Rotation procedures
+4. Tier 2: sops-nix (User-Level)
+   - What belongs here
+   - Age key setup
+   - Sops CLI usage
+   - Home-manager integration
+   - Rotation procedures
+5. Platform-Specific Considerations
+   - NixOS (both tiers)
+   - Darwin (Tier 2 only)
+6. Troubleshooting
+7. See Also
+
+### Learnings from Previous Story
+
+**From Story 8.3 (Status: drafted)**
+
+- **Two-tier secrets architecture pattern**: Tier 1/Tier 2 terminology established
+- **Platform differentiation**: Darwin uses sops-nix only, NixOS uses both tiers
+- **Terminology consistency table**: Follow established replacements
+- **Zero deprecated patterns policy**: rg verification commands established
+- **Story 8.2 docs created**:
+  - `concepts/dendritic-architecture.md` - Link for module context
+  - `concepts/clan-integration.md` - Link for secrets architecture (PRIMARY reference)
+- **Atomic commits per section**: Follow same pattern
+
+[Source: docs/notes/development/work-items/8-3-update-host-onboarding-guides-darwin-vs-nixos.md]
+
+### References
+
+- [Epic 8: docs/notes/development/epics/epic-8-documentation-alignment.md]
+- [Story 8.1 Audit: docs/notes/development/work-items/story-8.1-audit-results.md]
+- [Story 8.2 Architecture Docs: docs/notes/development/work-items/8-2-update-architecture-and-patterns-documentation.md]
+- [Story 8.3 Host Onboarding: docs/notes/development/work-items/8-3-update-host-onboarding-guides-darwin-vs-nixos.md]
+- [Clan Integration (Two-Tier Secrets): packages/docs/src/content/docs/concepts/clan-integration.md#two-tier-secrets-architecture]
+- [Current Secrets Doc: packages/docs/src/content/docs/guides/secrets-management.md]
+
+### Constraints
+
+1. **Align with Story 8.2** - Use exact terminology from clan-integration.md
+2. **Two-tier only** - No 3-tier or CI-focused content
+3. **Practical focus** - Copy-paste ready commands with real hostnames
+4. **Cross-reference** - Link to architecture docs, don't duplicate content
+5. **Atomic commits** - One commit per logical section
+6. **Platform awareness** - Document darwin limitations clearly
+
+### NFR Coverage
+
+| NFR | Coverage |
+|-----|----------|
+| NFR-8.1 | Zero references to deprecated architecture |
+| NFR-8.2 | Testability - commands should work |
+| NFR-8.4 | Two-tier pattern documentation |
+
+### Estimated Effort
+
+**5-6 hours** (from Story 8.1 audit)
+
+- Task 1 (analysis): 0.5h
+- Task 2 (architecture rewrite): 1h
+- Task 3 (Tier 1 docs): 1h
+- Task 4 (Tier 2 docs): 1.5h
+- Task 5 (platform differences): 0.5h
+- Task 6 (troubleshooting): 0.5h
+- Task 7 (cross-references): 0.5h
+- Task 8 (verification): 0.5h
+
+## Dev Agent Record
+
+### Context Reference
+
+<!-- Path(s) to story context XML will be added here by context workflow -->
+
+### Agent Model Used
+
+{{agent_model_name_version}}
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+
+## Change Log
+
+**2025-12-01 (Story Drafted)**:
+- Story file created from Epic 8 Story 8.4 specification
+- Incorporated detailed acceptance criteria from user-provided context
+- 18 acceptance criteria mapped to 8 task groups
+- Current document analysis included (591 lines, 90% to be rewritten)
+- Two-tier architecture pattern documented from clan-integration.md
+- Terminology replacement table established
+- Age key reuse pattern documented
+- Platform differences (darwin vs NixOS) captured
+- Machine fleet documented for examples
+- Learnings from Story 8.3 incorporated
+- Estimated effort: 5-6 hours
