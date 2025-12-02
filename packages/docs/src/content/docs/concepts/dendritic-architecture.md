@@ -57,24 +57,40 @@ Machine-specific configs contain only truly unique settings.
 
 ## Module structure
 
-### Dendritic module pattern
+### Dendritic module pattern with namespace merging
 
-Every file exports to a namespace under `flake.modules.*`:
+Every file exports to a namespace under `flake.modules.*`, and files within the same directory automatically merge into a shared namespace:
 
 ```nix
 # modules/home/tools/bottom.nix
 { ... }:
 {
-  flake.modules.homeManager.tools-bottom = { ... }: {
-    programs.bottom.enable = true;
+  flake.modules.homeManager.tools = { ... }: {
+    programs.bottom = {
+      enable = true;
+      settings = {
+        flags.enable_gpu_memory = true;
+        # ... configuration
+      };
+    };
+  };
+}
+
+# modules/home/tools/pandoc.nix
+{ ... }:
+{
+  flake.modules.homeManager.tools = { ... }: {
+    programs.pandoc.enable = true;
   };
 }
 ```
 
-The module:
-- Lives at `modules/home/tools/bottom.nix`
-- Exports as `flake.modules.homeManager.tools-bottom`
-- Can be imported by any home-manager configuration
+The key insight:
+- Both files live in `modules/home/tools/`
+- Both export to the same namespace: `flake.modules.homeManager.tools`
+- import-tree auto-merges them into a single `tools` aggregate
+- No manual aggregate definition needed - directory structure creates the namespace
+- Each file contributes different programs to the same aggregate module
 
 ### Aggregate modules
 
