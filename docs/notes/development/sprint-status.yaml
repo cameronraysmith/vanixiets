@@ -617,13 +617,13 @@ development_status:
   # Phase 2: Documentation Completeness (Stories 8.5-8.10)
   # Added 2025-12-02 based on Party Mode documentation coverage analysis
   # Research: docs/notes/development/research/documentation-coverage-analysis.md
-  story-8-5: review
+  story-8-5: done
   story-8-5-title: "Audit documentation structure against Diataxis/AMDiRE frameworks"
-  story-8-5-notes: "Research streams R8, R9, R10, R14, R15 - identify structural gaps in tutorials/, reference/, development/operations/, development/traceability/. Story file: work-items/8-5-audit-documentation-structure-against-diataxis-amdire-frameworks.md"
+  story-8-5-notes: "DONE 2025-12-02 - Audit artifact: story-8.5-structure-audit-results.md. Identified gaps: tutorials/ EMPTY (CRITICAL), reference/ sparse (addressed by 8.6), development/operations/ minimal, development/traceability/ minimal. Findings drove Phase 2 story definitions."
   story-8-6: done
   story-8-6-title: "Rationalize and document CLI tooling"
   story-8-6-notes: "DONE 2025-12-02 - Phase 1: Audited ~100 recipes, identified GCP legacy + naming issues. Phase 2: Removed 6 GCP secrets recipes + gcp_project_id variable, renamed io → flake-info. Phase 3: Created 4 reference docs (justfile-recipes.md, flake-apps.md, ci-jobs.md, index.md). Activation rationalization completed by Party Mode team (4 unified recipes). Build + linkcheck validated."
-  story-8-7: drafted
+  story-8-7: review
   story-8-7-title: "Audit AMDiRE development documentation alignment"
   story-8-7-notes: "Research streams R11, R12, R13 - context, requirements, ADRs alignment with post-migration reality. Story file: work-items/8-7-audit-amdire-development-documentation-alignment.md"
   story-8-8: backlog
