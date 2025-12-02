@@ -623,17 +623,17 @@ development_status:
   story-8-6: done
   story-8-6-title: "Rationalize and document CLI tooling"
   story-8-6-notes: "DONE 2025-12-02 - Phase 1: Audited ~100 recipes, identified GCP legacy + naming issues. Phase 2: Removed 6 GCP secrets recipes + gcp_project_id variable, renamed io → flake-info. Phase 3: Created 4 reference docs (justfile-recipes.md, flake-apps.md, ci-jobs.md, index.md). Activation rationalization completed by Party Mode team (4 unified recipes). Build + linkcheck validated."
-  story-8-7: review
+  story-8-7: done
   story-8-7-title: "Audit AMDiRE development documentation alignment"
-  story-8-7-notes: "Research streams R11, R12, R13 - context, requirements, ADRs alignment with post-migration reality. Story file: work-items/8-7-audit-amdire-development-documentation-alignment.md"
-  # Story 8.8: DRAFTED (2025-12-02) - Create tutorials for common user workflows
+  story-8-7-notes: "DONE 2025-12-02 - 32 files audited (7 context, 8 requirements, 17 ADRs). 62.5% current, 37.5% stale. Primary finding: current/target state inversion in 9 files. 4 critical, 6 high priority files identified. Audit artifact: story-8.7-amdire-audit-results.md. 18-24h remediation effort estimated."
+  # Story 8.8: DONE (2025-12-02) - Create tutorials for common user workflows
   # Addresses CRITICAL gap: tutorials/ directory completely empty (blocks new users)
-  # 4 tutorials: bootstrap-to-activation, secrets-setup, darwin-deployment, nixos-deployment
+  # 5 tutorials created: index, bootstrap-to-activation, secrets-setup, darwin-deployment, nixos-deployment
   # Diataxis framework: learning-oriented (not task-oriented like guides)
   # Story file: work-items/8-8-create-tutorials-for-common-user-workflows.md
-  story-8-8: review
+  story-8-8: done
   story-8-8-title: "Create tutorials for common user workflows"
-  story-8-8-notes: "Research streams R1, R2, R3, R4 - populate empty tutorials/ with bootstrap, secrets, darwin, nixos journeys"
+  story-8-8-notes: "DONE 2025-12-02 - Created 5 tutorials (2,073 lines total): index.md, bootstrap-to-activation.md, secrets-setup.md, darwin-deployment.md, nixos-deployment.md. 26/26 ACs satisfied. Diataxis compliant (learning-oriented). 31 cross-references to guides. Build + linkcheck pass. 6 commits."
   story-8-9: backlog
   story-8-9-title: "Validate cross-references and navigation discoverability"
   story-8-9-notes: "Research streams R20, R21 - link validation, bidirectional references, navigation paths"
