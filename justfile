@@ -56,9 +56,9 @@ activate-home username *FLAGS:
     @echo "Activating home-manager configuration for {{username}}..."
     nix run --accept-flake-config .#home -- {{username}} . {{FLAGS}}
 
-# Print nix flake inputs and outputs
+# Print nix flake inputs, outputs, and omnix info
 [group('nix')]
-io:
+flake-info:
   nix flake metadata
   nix flake show --legacy --all-systems
   om show .
