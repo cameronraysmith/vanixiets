@@ -1,590 +1,528 @@
 ---
-title: Secrets management
-description: Managing encrypted secrets with SOPS and age encryption
+title: Secrets Management
+description: Managing secrets with the two-tier architecture using clan vars and sops-nix
 sidebar:
   order: 6
 ---
 
-This guide documents the complete workflow for managing SOPS keys and secrets for the nix-config, supporting both initial bootstrap and key rotation.
+This guide documents secrets management in the infrastructure using the two-tier architecture.
+System-level secrets use clan vars (Tier 1), user-level secrets use sops-nix (Tier 2).
 
-## Security architecture
+## Secrets architecture overview
 
-### Key roles
+The infrastructure uses a two-tier secrets model.
+See [Clan Integration](/concepts/clan-integration#two-tier-secrets-architecture) for the complete architectural explanation.
 
-1. **Dev key** (`age1dn8...ghptu3`): Developer workstation key
-   - Stored in `~/.config/sops/age/keys.txt`
-   - Can be shared among small team (or individual per developer)
-   - Can decrypt all secrets in secrets/
+| Tier | Tool | Purpose | Platforms | Generation |
+|------|------|---------|-----------|------------|
+| Tier 1 | Clan vars | System-level, machine-specific | NixOS only | Automatic (`clan vars generate`) |
+| Tier 2 | sops-nix | User-level, personal | All (darwin + NixOS) | Manual (age key derivation) |
 
-2. **CI key** (`age1m9m...22j3p8`): GitHub Actions key
-   - Stored in GitHub Secrets as `SOPS_AGE_KEY`
-   - Backup stored in Bitwarden
-   - Can decrypt all secrets in secrets/
+### Why two tiers?
 
-### Secret categories
+**Clan vars** excel at generated, machine-specific secrets.
+The vars generator creates SSH keys, zerotier IDs, and other secrets that machines need automatically.
 
-1. **Bootstrap secrets** (must exist before SOPS works):
-   - `SOPS_AGE_KEY` - GitHub secret containing CI private age key
-   - Uploaded directly via `gh secret set`
+**sops-nix** excels at user-specific, manually-entered secrets.
+API tokens, personal credentials, and signing keys must be created by humans, not generated.
 
-2. **SOPS-managed secrets** (in `secrets/shared.yaml`):
-   - `CACHIX_AUTH_TOKEN` - Nix binary cache auth
-   - `GITGUARDIAN_API_KEY` - Secret scanning
-   - `CLOUDFLARE_API_TOKEN` - Cloudflare Workers deployment
-   - `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account
-   - `CI_AGE_KEY` - Backup of CI private key (for re-uploading)
+The tiers are complementary, not competing.
+Clan vars for system infrastructure, sops-nix for user credentials.
 
-3. **GitHub variables** (non-secret):
-   - `CACHIX_CACHE_NAME` - Name of cachix cache
+## Tier 1: Clan vars (system-level)
 
-### Design decisions
+Clan vars handles system-level secrets that can be auto-generated.
+This tier is only available on NixOS hosts (cinnabar, electrum, galena, scheelite).
 
-**Why store `CI_AGE_KEY` in secrets/shared.yaml?**
-- Allows rotating SOPS_AGE_KEY GitHub secret from dev workstation
-- Still requires dev key to decrypt
-- Bitwarden serves as offline backup
+### What belongs in Tier 1
 
-**Why separate `sops-upload-github-key` from `ghsecrets`?**
-- Avoids chicken-and-egg: can't use SOPS to get key needed to use SOPS
-- During rotation, new key may not be in secrets/shared.yaml yet
-- Supports pasting from Bitwarden during initial bootstrap
+- **SSH host keys** - Machine identity for SSH
+- **Zerotier identities** - Network identity for mesh VPN
+- **LUKS passphrases** - Disk encryption secrets
+- **Service credentials** - Machine-specific service secrets
 
-**Why support both SSH and age key generation?**
-- If CI needs SSH access (deploy, git push as bot), can derive age key from SSH key
-- Single source of truth in Bitwarden
-- Age-only is simpler if SSH not needed
-
-## Workflows
-
-### Initial bootstrap (new project)
+### Key commands
 
 ```bash
-# 1. Generate dev key
-just sops-bootstrap dev
+# Generate secrets for a machine
+clan vars generate cinnabar
 
-# Output shows private key - copy to password manager
-# Then install locally:
-just sops-add-key
-# Paste the private key when prompted
+# View a specific secret
+clan vars get cinnabar ssh.id_ed25519.pub
 
-# 2. Generate CI key
-just sops-bootstrap ci
-
-# Output shows private key - save to Bitwarden
-# The recipe automatically adds it to secrets/shared.yaml
-
-# 3. Edit secrets with actual values
-just edit-secrets
-# Replace all REPLACE_ME values with actual secrets
-
-# 4. Check requirements
-just sops-check-requirements
-# Verify all required secrets are present
-
-# 5. Upload SOPS_AGE_KEY to GitHub
-just sops-upload-github-key
-# Choose option 2 to extract from secrets/shared.yaml
-
-# 6. Upload other secrets to GitHub
-just sops-setup-github
-# Uploads CACHIX_AUTH_TOKEN, GITGUARDIAN_API_KEY, etc.
-
-# 7. Verify
-gh secret list
-gh variable list
-just show-secrets
-
-# 8. Test CI
-just gh-ci-run --debug=true
+# Deploy secrets to machine (secrets deploy automatically)
+clan machines update cinnabar
 ```
 
-### Key rotation (dev key)
+### Directory structure
 
-```bash
-# Option A: Quick rotation (guided)
-just sops-rotate dev
+Generated secrets are stored encrypted in the vars directory:
 
-# Option B: Manual steps
-# 1. Bootstrap new dev key
-just sops-bootstrap dev
-# Adds as dev-next, saves private key
-
-# 2. Install new key locally
-just sops-add-key
-# Paste the new private key
-
-# 3. Verify decryption works with new key
-just show-secrets
-
-# 4. Finalize rotation (remove old key)
-just sops-finalize-rotation dev
-
-# 5. Update Bitwarden - mark old key as revoked
+```
+machines/
+└── nixos/
+    └── cinnabar/
+        └── vars/
+            ├── ssh.id_ed25519/
+            │   ├── secret   # Private key (encrypted)
+            │   └── public   # Public key
+            └── zerotier/
+                └── identity.secret
 ```
 
-### Key rotation (CI key)
+### Secrets location on target
+
+Clan vars deploys secrets to `/run/secrets/` on NixOS machines during system activation.
 
 ```bash
-# 1. Bootstrap new CI key
-just sops-bootstrap ci
-# Adds as ci-next, saves private key to Bitwarden
-
-# 2. Add new key to secrets/shared.yaml
-just edit-secrets
-# Update CI_AGE_KEY field with new private key
-
-# 3. Upload new key to GitHub
-just sops-upload-github-key
-# Choose option 1, paste from Bitwarden
-
-# 4. Test CI with new key
-just gh-ci-run --debug=true
-
-# 5. Verify workflow succeeds with new key
-just gh-workflow-status
-
-# 6. Finalize rotation (remove old key)
-just sops-finalize-rotation ci
-
-# 7. Update secrets/shared.yaml to remove old CI_AGE_KEY
-just edit-secrets
-# (The old value is fine to keep or remove)
+# On cinnabar (NixOS)
+ls /run/secrets/
+# ssh.id_ed25519  zerotier/identity.secret
 ```
 
-### GitHub PAT rotation (fast-forward merge)
+### Rotation procedure
 
-The fast-forward merge workflow (`pr-merge.yaml`) uses a GitHub Personal Access Token stored in `secrets/shared.yaml` as `FAST_FORWARD_PAT`.
+To rotate Tier 1 secrets:
 
 ```bash
-# 1. Create new fine-grained PAT
-# Visit: https://github.com/settings/personal-access-tokens/new
-# Repository access: Select the specific repository
-# Permissions:
-#   - Contents: Read and write
-#   - Issues: Read and write
-#   - Pull requests: Read and write
-# Set expiration according to security policy (90 days recommended)
-# Copy the generated token
+# Regenerate secrets for a machine
+clan vars generate cinnabar
 
-# 2. Update encrypted secrets
-just edit-secrets
-# Update FAST_FORWARD_PAT field with new token value
-
-# 3. Upload to GitHub
-just ghsecrets
-# Uploads FAST_FORWARD_PAT along with other secrets
-
-# 4. Test fast-forward workflow
-# Create a test PR, comment '/fast-forward' to trigger merge
-# Verify workflow succeeds with new token
-
-# 5. Revoke old PAT
-# Visit: https://github.com/settings/tokens
-# Find the old token and click "Revoke"
+# Deploy the new secrets
+clan machines update cinnabar
 ```
 
-**Why fine-grained PAT over classic?**
-- Fine-grained PATs provide repository-specific access with minimal permissions.
-- Reduces blast radius if token is compromised.
-- Classic PATs grant broad `repo` scope across all repositories.
+Service restart may be required after rotation depending on which secrets changed.
 
-**Token lifecycle:**
-- Set expiration date (90 days recommended)
-- Rotate before expiration using this workflow
-- Backed up in `secrets/shared.yaml` (encrypted with SOPS)
+## Tier 2: sops-nix (user-level)
 
-### Adding new secrets
+sops-nix handles user-level secrets that require manual creation.
+This tier is available on all platforms (darwin and NixOS).
+
+### What belongs in Tier 2
+
+- **GitHub tokens** - Personal access tokens, signing keys
+- **API keys** - Anthropic, OpenAI, and other service credentials
+- **Personal credentials** - User-specific service passwords
+- **MCP server secrets** - Model Context Protocol authentication
+
+### Age key bootstrap workflow
+
+The age private key used by sops-nix is derived from your Bitwarden-managed SSH key using `ssh-to-age`.
+This manual bootstrap step is intentional for security.
+
+#### Required tools
+
+| Tool | Purpose | Installation |
+|------|---------|--------------|
+| `bw` | Bitwarden CLI for SSH key retrieval | `nix-shell -p bitwarden-cli` |
+| `ssh-to-age` | Derive age keys from SSH keys | `nix-shell -p ssh-to-age` |
+| `sops` | Encrypt/decrypt secrets files | `nix-shell -p sops` |
+| `age` | Age encryption (for verification) | `nix-shell -p age` |
+
+#### Bootstrap procedure
+
+**Step 1: Retrieve SSH key from Bitwarden**
 
 ```bash
-# 1. Edit encrypted file
-just edit-secrets
+# Login to Bitwarden CLI
+bw login
 
-# 2. Add new secret
-# NEW_SECRET_NAME: new_secret_value
+# Unlock vault and set session
+export BW_SESSION=$(bw unlock --raw)
 
-# 3. If needed in CI, upload to GitHub
-sops exec-env secrets/shared.yaml \
-  'gh secret set NEW_SECRET_NAME --body="$NEW_SECRET_NAME"'
+# Retrieve your SSH private key (adjust item name as needed)
+# If stored in notes field:
+bw get item "ssh-key-name" | jq -r '.notes' > /tmp/ssh_key
 
-# Or add to ghsecrets recipe
+# OR if stored as attachment:
+bw get attachment "id_ed25519" --itemid <item-id> --output /tmp/ssh_key
+
+# Set correct permissions
+chmod 600 /tmp/ssh_key
 ```
 
-### Onboarding new developer
+**Step 2: Derive age key from SSH key**
 
 ```bash
-# Option 1: Share existing dev key (small team)
-# Send developer the dev private key via secure channel
-just sops-add-key
-# Paste the shared dev key
-
-# Option 2: Generate individual dev key (recommended)
-# 1. Add developer's public key to .sops.yaml
-cat >> .sops.yaml << EOF
-  - &dev-alice age1abc...xyz
-EOF
-
-# Update creation_rules
-sed -i '/- \*dev/a\          - \*dev-alice' .sops.yaml
-
-# 2. Re-encrypt all files with new key
-just updatekeys
-
-# 3. Commit and push .sops.yaml
-
-# 4. Developer adds their private key
-just sops-add-key
-```
-
-### Emergency key recovery
-
-```bash
-# If dev key lost but CI key backed up:
-# 1. Get CI private key from Bitwarden
-
-# 2. Install as temporary dev key
+# Create sops directory
 mkdir -p ~/.config/sops/age
-cat >> ~/.config/sops/age/keys.txt << EOF
-# Temporary CI key
-# public key: age1m9m...22j3p8
-AGE-SECRET-KEY-...
-EOF
 
-# 3. Now can decrypt secrets
-just show-secrets
+# Derive age private key from SSH key
+ssh-to-age -private-key -i /tmp/ssh_key > ~/.config/sops/age/keys.txt
 
-# 4. Rotate dev key
-just sops-bootstrap dev
-
-# 5. Remove temporary CI key from ~/.config/sops/age/keys.txt
+# Get public key (you'll need this for .sops.yaml)
+ssh-to-age -i /tmp/ssh_key.pub
+# Output: age1abc...xyz (save this)
 ```
 
-## Recipe reference
+**Step 3: Clean up and verify**
 
-### Bootstrap and rotation
-- `just sops-bootstrap <role> [method]` - Generate new key (role: dev|ci, method: age|ssh)
-- `just sops-rotate <role>` - Quick rotation workflow with guided steps
-- `just sops-finalize-rotation <role>` - Remove old key after verifying new one
+```bash
+# IMPORTANT: Remove temporary SSH key
+rm /tmp/ssh_key
 
-### Secret management
-- `just edit-secrets` - Edit secrets/shared.yaml (decrypts, opens editor, re-encrypts)
-- `just show-secrets` - Display decrypted secrets
-- `just set-secret <name> <value>` - Set specific secret value
-- `just rotate-secret <name>` - Rotate specific secret value
-- `just validate-secrets` - Verify all encrypted files can be decrypted
+# Verify age key exists
+cat ~/.config/sops/age/keys.txt | head -1
+# Should show: AGE-SECRET-KEY-...
 
-### GitHub integration
-- `just sops-check-requirements` - Analyze workflows and show required secrets
-- `just sops-upload-github-key [repo]` - Upload SOPS_AGE_KEY to GitHub
-- `just sops-setup-github [repo]` - Upload all secrets and variables (except SOPS_AGE_KEY)
-- `just ghsecrets [repo]` - Upload specific secrets from secrets/shared.yaml
-- `just ghvars [repo]` - Upload variables from environment
-
-### Key management
-- `just sops-init` - Generate new age key for current user
-- `just sops-add-key` - Add existing age key to local config
-- `just updatekeys` - Update all encrypted files with current keys from .sops.yaml
-
-### Testing
-- `just test-build` - Test CI build job locally with act
-- `just test-deploy` - Test CI deploy job locally with act
-- `just gh-ci-run` - Trigger CI workflow on GitHub
-
-## File structure
-
-```
-.
-├── .sops.yaml                    # SOPS config with public keys (committed)
-├── secrets/
-│   ├── shared.yaml              # Encrypted secrets (committed)
-│   └── README.md                # Documentation
-├── .github/workflows/
-│   └── ci.yaml                  # CI workflow that uses SOPS_AGE_KEY
-└── justfile                     # Recipes for secret management
+# Lock Bitwarden vault
+bw lock
 ```
 
-## Security checklist
+#### Security rationale
 
-- [ ] Dev private keys stored in `~/.config/sops/age/keys.txt` with `600` permissions
-- [ ] CI private key backed up in Bitwarden
-- [ ] `SOPS_AGE_KEY` GitHub secret set
-- [ ] No unencrypted secrets committed to git
-- [ ] `.sops.yaml` only contains public keys
-- [ ] All secrets in `secrets/shared.yaml` have non-REPLACE_ME values
-- [ ] GitHub Actions logs don't expose `SOPS_AGE_KEY` or decrypted secrets
-- [ ] Key rotation procedure documented and tested
-- [ ] Recovery procedure documented (CI key in Bitwarden)
+The manual bootstrap is intentional for security:
+
+1. **SSH keys remain in Bitwarden** - Not stored in nix store or git
+2. **Age keys derived locally** - Private key material never transmitted
+3. **User controls bootstrap** - Each user manages their own key derivation
+4. **Defense in depth** - Compromising the nix config doesn't expose private keys
+
+### Adding your key to .sops.yaml
+
+After generating your age public key, add it to `.sops.yaml`:
+
+```yaml
+keys:
+  # User keys (Tier 2)
+  - &crs58-stibnite age1abc...xyz
+  - &raquel-blackphos age1def...uvw
+
+creation_rules:
+  - path_regex: secrets/users/crs58\.sops\.yaml$
+    key_groups:
+      - age:
+        - *crs58-stibnite
+
+  - path_regex: secrets/users/raquel\.sops\.yaml$
+    key_groups:
+      - age:
+        - *raquel-blackphos
+```
+
+### Creating and editing secrets
+
+```bash
+# Create new secrets file
+sops secrets/users/crs58.sops.yaml
+
+# Edit existing secrets
+sops secrets/users/crs58.sops.yaml
+
+# View decrypted secrets (read-only)
+sops -d secrets/users/crs58.sops.yaml
+```
+
+Example secrets file structure:
+
+```yaml
+# secrets/users/crs58.sops.yaml
+github-signing-key: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  ...
+  -----END OPENSSH PRIVATE KEY-----
+github-token: ghp_xxxxxxxxxxxxxxxxxxxx
+anthropic-api-key: sk-ant-xxxxxxxxxxxxxxxx
+ssh-public-key: ssh-ed25519 AAAA... crs58@stibnite
+```
+
+### Home-manager integration
+
+Reference secrets in home-manager modules using `sops.secrets`:
+
+```nix
+# modules/home/users/crs58/default.nix
+{ config, inputs, ... }:
+{
+  sops.secrets = {
+    "users/crs58/github-signing-key" = {
+      sopsFile = "${inputs.self}/secrets/users/crs58.sops.yaml";
+    };
+    "users/crs58/github-token" = {
+      sopsFile = "${inputs.self}/secrets/users/crs58.sops.yaml";
+    };
+  };
+}
+```
+
+Use secrets in configuration:
+
+```nix
+# Git signing key
+programs.git.signing.key = config.sops.secrets."users/crs58/github-signing-key".path;
+
+# Environment variable from secret
+home.sessionVariables = {
+  ANTHROPIC_API_KEY = "$(cat ${config.sops.secrets."users/crs58/anthropic-api-key".path})";
+};
+```
+
+### Secrets location on target
+
+sops-nix decrypts secrets during home-manager activation to:
+
+```bash
+# Check decrypted secrets location
+ls ~/.config/sops-nix/secrets/
+
+# Secrets are symlinked from this location
+readlink -f ~/.config/sops-nix/secrets/users-crs58-github-token
+```
+
+### Rotation procedure
+
+To rotate Tier 2 secrets:
+
+```bash
+# 1. Edit the encrypted secrets file
+sops secrets/users/crs58.sops.yaml
+
+# 2. Update the secret value
+
+# 3. Save and exit (sops re-encrypts automatically)
+
+# 4. Rebuild configuration to deploy
+darwin-rebuild switch --flake .#stibnite  # darwin
+# OR
+clan machines update cinnabar  # NixOS (includes home-manager)
+```
+
+### Adding a new key recipient
+
+When adding a new machine or user that needs access to existing secrets:
+
+```bash
+# 1. Add public key to .sops.yaml
+# Edit .sops.yaml and add the new key anchor
+
+# 2. Update all affected secrets files with the new key
+sops updatekeys secrets/users/crs58.sops.yaml
+
+# 3. Commit the updated .sops.yaml and re-encrypted files
+```
+
+## Platform-specific workflows
+
+### Darwin (stibnite, blackphos, rosegold, argentum)
+
+Darwin hosts use **Tier 2 only** (sops-nix).
+Clan vars (Tier 1) is not available on darwin.
+
+**Secrets workflow:**
+
+1. Bootstrap age key from Bitwarden SSH key (see [Age key bootstrap](#age-key-bootstrap-workflow))
+2. Create user secrets file: `sops secrets/users/<username>.sops.yaml`
+3. Configure home-manager sops module
+4. Deploy: `darwin-rebuild switch --flake .#<hostname>`
+
+**Secrets deployment:**
+
+- Automatic during home-manager activation
+- Location: `~/.config/sops-nix/secrets/`
+- No system-level secrets (no `/run/secrets/`)
+
+### NixOS (cinnabar, electrum, galena, scheelite)
+
+NixOS hosts use **both tiers**.
+
+**Tier 1 workflow (system secrets):**
+
+```bash
+# Generate machine secrets
+clan vars generate cinnabar
+
+# Deploy (includes secrets)
+clan machines update cinnabar
+```
+
+**Tier 2 workflow (user secrets):**
+
+Same as darwin - bootstrap age key, create sops secrets, configure home-manager.
+
+**Secrets deployment:**
+
+- Tier 1: `/run/secrets/` (system activation)
+- Tier 2: `~/.config/sops-nix/secrets/` (home-manager activation)
+
+### Platform comparison
+
+| Aspect | Darwin | NixOS |
+|--------|--------|-------|
+| Tier 1 (clan vars) | Not available | `clan vars generate`, `/run/secrets/` |
+| Tier 2 (sops-nix) | Age key + home-manager | Age key + home-manager |
+| SSH host keys | Manual or existing | Clan vars generated |
+| Zerotier identity | Homebrew generates | Clan vars generated |
+| User API keys | sops-nix | sops-nix |
+| Deployment | `darwin-rebuild switch` | `clan machines update` |
+
+## Working with secrets
+
+### Creating new secrets
+
+**For user-level secrets (Tier 2):**
+
+```bash
+# 1. Edit or create secrets file
+sops secrets/users/<username>.sops.yaml
+
+# 2. Add the new secret
+# my-new-secret: secret-value-here
+
+# 3. Reference in home-manager module
+# sops.secrets."users/<username>/my-new-secret" = { ... };
+
+# 4. Deploy configuration
+darwin-rebuild switch --flake .#<hostname>
+```
+
+**For system-level secrets (Tier 1 - NixOS only):**
+
+System secrets are typically auto-generated by clan vars.
+For custom system secrets, use clan vars generators or add to the machine's vars configuration.
+
+### Editing existing secrets
+
+```bash
+# Open in editor (decrypts → edit → re-encrypts)
+sops secrets/users/crs58.sops.yaml
+
+# Make changes and save
+# sops handles encryption automatically
+```
+
+### Viewing secrets
+
+```bash
+# View decrypted content
+sops -d secrets/users/crs58.sops.yaml
+
+# View specific secret (requires jq)
+sops -d secrets/users/crs58.sops.yaml | yq '.github-token'
+```
+
+### Verifying encryption
+
+```bash
+# Check file is encrypted (should show sops metadata)
+head secrets/users/crs58.sops.yaml
+
+# Expected: sops: section with mac, lastmodified, etc.
+```
 
 ## Troubleshooting
 
-### Cannot decrypt secrets/shared.yaml
+### Tier 1 issues (clan vars - NixOS)
+
+**Vars not generating:**
 
 ```bash
-# Check if you have a valid key
-grep "public key:" ~/.config/sops/age/keys.txt
+# Verify machine is registered in clan
+clan machines list
 
-# Check if your public key is in .sops.yaml
-cat .sops.yaml
+# Check vars generator configuration
+cat modules/clan/machines.nix
 
-# Verify file is encrypted
-head secrets/shared.yaml  # Should show SOPS metadata
-
-# Try decrypting with explicit key
-SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/shared.yaml
+# Regenerate vars
+clan vars generate <hostname>
 ```
 
-### CI fails with "could not decrypt data key"
+**Secrets not appearing at /run/secrets/:**
 
 ```bash
-# Verify SOPS_AGE_KEY is set in GitHub
-gh secret list | grep SOPS_AGE_KEY
+# Verify deployment
+clan machines update <hostname>
 
-# Verify CI public key in .sops.yaml matches private key
-# Get public key from private key:
-age-keygen -y <<< "AGE-SECRET-KEY-..."
+# Check systemd service
+systemctl status sops-nix
 
-# Re-upload key
-just sops-upload-github-key
+# Check secrets directory permissions
+ls -la /run/secrets/
 ```
 
-### Rotation left system in inconsistent state
+**Permission denied on secrets:**
 
 ```bash
-# Restore from backup
-cp .sops.yaml.backup .sops.yaml
+# Check owner/group on secret
+ls -la /run/secrets/<secret-name>
 
-# Or manually fix .sops.yaml
-# - Remove -next suffix from new key
-# - Remove old key line
-# - Update all files
-just updatekeys
+# Verify user is in correct group
+groups $(whoami)
 ```
 
-## Advanced usage
+### Tier 2 issues (sops-nix - all platforms)
 
-### SSH-derived keys for CI bot
-
-If CI needs SSH access (e.g., to push commits as bot user):
+**Cannot decrypt sops file:**
 
 ```bash
-# Generate SSH key
-ssh-keygen -t ed25519 -f /tmp/ci-bot -N "" -C "ci-bot@nix-config"
+# Verify age key exists
+cat ~/.config/sops/age/keys.txt | head -1
+# Should show: AGE-SECRET-KEY-...
 
-# Derive age key
-ssh-to-age < /tmp/ci-bot.pub
-# Output: age1abc...xyz
+# Check your public key is in .sops.yaml
+age-keygen -y ~/.config/sops/age/keys.txt
+# Compare output with keys in .sops.yaml
 
-# Add to .sops.yaml as ci key
-
-# Save SSH private key to Bitwarden as "nix-config CI SSH key"
-
-# For SOPS, derive age private key
-ssh-to-age -private-key -i /tmp/ci-bot
-# Output: AGE-SECRET-KEY-...
-
-# Upload to GitHub
-echo "AGE-SECRET-KEY-..." | gh secret set SOPS_AGE_KEY
-
-# For SSH access, also upload SSH key
-gh secret set CI_SSH_KEY < /tmp/ci-bot
-
-# Clean up
-rm /tmp/ci-bot /tmp/ci-bot.pub
+# Test decryption explicitly
+SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/users/<user>.sops.yaml
 ```
 
-### Environment-specific secrets (dev/staging/prod)
-
-```yaml
-# .sops.yaml
-keys:
-  - &dev age1dn8...
-  - &ci age1m9m...
-  - &prod-admin age1xyz...
-
-creation_rules:
-  - path_regex: secrets/dev\.yaml$
-    key_groups:
-      - age: [*dev, *ci]
-
-  - path_regex: secrets/prod\.yaml$
-    key_groups:
-      - age: [*prod-admin, *ci]
-```
+**Age key not found:**
 
 ```bash
-# Edit environment-specific secrets
-just edit-secrets secrets/dev.yaml
-just edit-secrets secrets/prod.yaml
+# Check key file location
+ls -la ~/.config/sops/age/keys.txt
+
+# If missing, re-bootstrap from Bitwarden (see Age key bootstrap workflow)
 ```
 
-### Multi-repository shared secrets
-
-For secrets shared across multiple repos (e.g., CACHIX_AUTH_TOKEN):
+**sops.secrets not appearing in home-manager:**
 
 ```bash
-# Create shared secrets repo
-mkdir ~/.sops-shared
-cd ~/.sops-shared
+# Verify sops module is imported
+# Check home-manager configuration includes sops-nix
 
-# Copy .sops.yaml and create shared.yaml
-cp ~/projects/nix-config/.sops.yaml .
-sops shared.yaml
+# Verify sopsFile path is correct
+# Path should be: "${inputs.self}/secrets/users/<username>.sops.yaml"
 
-# Upload to multiple repos
-for repo in org/repo1 org/repo2; do
-  sops exec-env shared.yaml "gh secret set CACHIX_AUTH_TOKEN --repo=$repo --body=\$CACHIX_AUTH_TOKEN"
-done
+# Rebuild and check for errors
+darwin-rebuild switch --flake .#<hostname> 2>&1 | grep -i sops
 ```
 
-## Quick reference
-
-### Common operations
-
-#### First-time setup
+**Secret path mismatch:**
 
 ```bash
-# 1. Generate and install dev key
-just sops-bootstrap dev
-just sops-add-key  # Paste private key
+# Check actual decrypted secret location
+ls ~/.config/sops-nix/secrets/
 
-# 2. Generate CI key
-just sops-bootstrap ci
-# Save private key to Bitwarden
-
-# 3. Edit secrets
-just edit-secrets
-# Replace all REPLACE_ME values
-
-# 4. Upload to GitHub
-just sops-upload-github-key  # Option 2: from secrets/shared.yaml
-just sops-setup-github       # Other secrets and variables
-
-# 5. Verify
-just sops-check-requirements
-gh secret list
-just gh-ci-run
+# Secret names use dashes instead of slashes
+# users/crs58/github-token → users-crs58-github-token
 ```
 
-#### Daily usage
+### Common errors
 
-```bash
-# View secrets
-just show-secrets
+**"could not decrypt data key":**
+- Your age public key is not in the creation rules for this file
+- Solution: Add key to `.sops.yaml` and run `sops updatekeys <file>`
 
-# Edit secrets
-just edit-secrets
+**"no key could be found":**
+- Age key file missing or empty
+- Solution: Re-bootstrap age key from Bitwarden
 
-# Set specific secret
-just set-secret CLOUDFLARE_API_TOKEN "new-value"
+**"MAC mismatch":**
+- File was modified without proper re-encryption
+- Solution: Re-encrypt the file: `sops -e -i <file>`
 
-# Run command with secrets
-just run-with-secrets 'echo $CLOUDFLARE_API_TOKEN'
+## See also
 
-# Validate all secrets decrypt
-just validate-secrets
-```
+- [Clan Integration](/concepts/clan-integration) - Two-tier architecture overview
+- [Host Onboarding](/guides/host-onboarding) - Platform-specific setup steps
+- [Home-Manager Onboarding](/guides/home-manager-onboarding) - User module patterns
 
-#### Key rotation
+## External references
 
-```bash
-# Quick rotation (guided)
-just sops-rotate dev    # or 'ci'
-
-# Manual rotation
-just sops-bootstrap dev
-just sops-add-key
-just show-secrets  # Verify works
-just sops-finalize-rotation dev
-```
-
-#### GitHub sync
-
-```bash
-# Check what secrets are needed
-just sops-check-requirements
-
-# Upload SOPS_AGE_KEY
-just sops-upload-github-key
-
-# Upload all other secrets
-just sops-setup-github
-
-# Or upload individually
-just ghsecrets  # Secrets from secrets/shared.yaml
-just ghvars     # Variables from environment
-```
-
-#### Troubleshooting
-
-```bash
-# Can't decrypt?
-grep "public key:" ~/.config/sops/age/keys.txt
-cat .sops.yaml  # Is your key listed?
-
-# Update keys after changing .sops.yaml
-just updatekeys
-
-# CI failing?
-gh secret list | grep SOPS_AGE_KEY
-just gh-logs  # Check error message
-```
-
-### Recipe quick reference
-
-| Recipe | Purpose |
-|--------|---------|
-| `sops-bootstrap <role>` | Generate new dev/ci key |
-| `sops-rotate <role>` | Quick rotation workflow |
-| `sops-finalize-rotation <role>` | Remove old key after rotation |
-| `sops-add-key` | Install key locally |
-| `sops-init` | Generate new age key |
-| `edit-secrets` | Edit secrets/shared.yaml |
-| `show-secrets` | View decrypted secrets |
-| `set-secret <name> <value>` | Set specific secret |
-| `rotate-secret <name>` | Rotate specific secret value |
-| `validate-secrets` | Verify all files decrypt |
-| `updatekeys` | Update encrypted files after key changes |
-| `sops-check-requirements` | Show required secrets from workflows |
-| `sops-upload-github-key` | Upload SOPS_AGE_KEY to GitHub |
-| `sops-setup-github` | Upload all secrets/vars to GitHub |
-| `ghsecrets [repo]` | Upload secrets from SOPS |
-| `ghvars [repo]` | Upload variables |
-
-### File locations
-
-| File | Purpose |
-|------|---------|
-| `.sops.yaml` | SOPS config (public keys only) |
-| `secrets/shared.yaml` | Encrypted secrets (committed) |
-| `~/.config/sops/age/keys.txt` | Your private keys (NOT committed) |
-| GitHub Secrets: `SOPS_AGE_KEY` | CI private key |
-
-### Key public keys (from .sops.yaml)
-
-- **Dev**: `age1dn8w7y4t4h23fmeenr3dghfz5qh53jcjq9qfv26km3mnv8l44g0sghptu3`
-- **CI**: `age1m9m8h5vqr7dqlmvnzcwshmm4uk8umcllazum6eaulkdp3qc88ugs22j3p8`
-
-### Required secrets (from ci.yaml)
-
-| Secret | Location | Purpose |
-|--------|----------|---------|
-| `SOPS_AGE_KEY` | GitHub Secret | CI age private key |
-| `CACHIX_AUTH_TOKEN` | secrets/shared.yaml → GitHub Secret | Nix cache auth |
-| `CACHIX_CACHE_NAME` | secrets/shared.yaml → GitHub Variable | Nix cache name |
-| `GITGUARDIAN_API_KEY` | secrets/shared.yaml → GitHub Secret | Secret scanning |
-| `CLOUDFLARE_API_TOKEN` | secrets/shared.yaml | Cloudflare deploy |
-| `CLOUDFLARE_ACCOUNT_ID` | secrets/shared.yaml | Cloudflare account |
-| `CI_AGE_KEY` | secrets/shared.yaml | Backup of SOPS_AGE_KEY |
-
-### Emergency contacts
-
-- Bitwarden: CI key backup
-- `.sops.yaml.backup`: Rollback point
-- `secrets/shared.yaml.backup`: Rollback point
-- SOPS-WORKFLOW-GUIDE.md: Full documentation
-
-## References
-
-- [SOPS documentation](https://github.com/getsops/sops)
-- [age encryption tool](https://age-encryption.org/)
-- [GitHub CLI](https://cli.github.com/)
-- [ssh-to-age](https://github.com/Mic92/ssh-to-age)
+- [sops documentation](https://github.com/getsops/sops) - SOPS encryption tool
+- [age encryption](https://age-encryption.org/) - Age key management
+- [ssh-to-age](https://github.com/Mic92/ssh-to-age) - SSH to age key derivation
+- [sops-nix](https://github.com/Mic92/sops-nix) - Nix integration for sops
+- [clan vars documentation](https://clan.lol/) - Clan vars system
