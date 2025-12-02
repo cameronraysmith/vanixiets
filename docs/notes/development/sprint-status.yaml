@@ -617,7 +617,7 @@ development_status:
   # Phase 2: Documentation Completeness (Stories 8.5-8.10)
   # Added 2025-12-02 based on Party Mode documentation coverage analysis
   # Research: docs/notes/development/research/documentation-coverage-analysis.md
-  story-8-5: drafted
+  story-8-5: review
   story-8-5-title: "Audit documentation structure against Diataxis/AMDiRE frameworks"
   story-8-5-notes: "Research streams R8, R9, R10, R14, R15 - identify structural gaps in tutorials/, reference/, development/operations/, development/traceability/. Story file: work-items/8-5-audit-documentation-structure-against-diataxis-amdire-frameworks.md"
   story-8-6: backlog

@@ -1,6 +1,6 @@
 # Story 8.5: Audit Documentation Structure Against Diataxis/AMDiRE Frameworks
 
-Status: drafted
+Status: review
 
 ## Story
 
@@ -323,15 +323,59 @@ From `docs/notes/development/research/documentation-coverage-analysis.md`:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-5-20251101
 
 ### Debug Log References
 
+- Workflow initialized: 2025-12-02
+- Inventory complete: 62 files across 17 directories confirmed
+- Diataxis audit: CRITICAL gap in tutorials/, HIGH gap in reference/
+- AMDiRE audit: HIGH gaps in traceability/ and operations/
+- Cross-reference analysis: development/index.md incomplete, missing 2-click paths
+
 ### Completion Notes List
+
+**Story 8.5 COMPLETE** - Documentation structure audit executed successfully.
+
+**Key findings:**
+1. **tutorials/** EMPTY (CRITICAL) - Only .keep file, no tutorial content exists
+2. **reference/** SPARSE (HIGH) - Only repository-structure.md, missing CLI reference
+3. **operations/** SPARSE (HIGH) - Only CI cache troubleshooting, missing runbooks
+4. **traceability/** SPARSE (HIGH) - Only CI philosophy, missing test harness docs
+5. **work-items/** EXTERNAL (MEDIUM) - Structure exists but content tracked in docs/notes/
+
+**Recommended story sequence:**
+- Story 8.6: CLI reference (rationalize justfile + document recipes/apps)
+- Story 8.8: Tutorials (populate empty directory with 4 tutorials)
+- Story 8.7: AMDiRE audit (validate context/requirements/ADRs currency)
+- Story 8.10: Test docs (document test harness, CI-local parity)
+- Story 8.9: Cross-references (navigation improvements, link validation)
+
+**Audit methodology:**
+- File discovery via fd
+- Content analysis of index files and key documents
+- Cross-reference to research document (documentation-coverage-analysis.md)
+- Framework alignment (Diataxis + AMDiRE)
 
 ### File List
 
+**Created:**
+- docs/notes/development/work-items/story-8.5-structure-audit-results.md (primary deliverable)
+
+**Modified:**
+- docs/notes/development/sprint-status.yaml (story-8-5: drafted → in-progress → review)
+- docs/notes/development/work-items/8-5-audit-documentation-structure-against-diataxis-amdire-frameworks.md (this file)
+
 ## Change Log
+
+**2025-12-02 (Implementation Complete)**:
+- Audit executed: 62 files inventoried across 17 directories
+- Diataxis gaps identified: tutorials/ CRITICAL, reference/ HIGH
+- AMDiRE gaps identified: operations/ HIGH, traceability/ HIGH
+- Cross-reference assessment complete
+- Primary artifact created: story-8.5-structure-audit-results.md
+- All 12 acceptance criteria satisfied
+- Status: review
 
 **2025-12-02 (Story Drafted)**:
 - Story file created from Epic 8 Story 8.5 specification
