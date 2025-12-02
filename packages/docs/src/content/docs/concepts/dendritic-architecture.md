@@ -338,5 +338,5 @@ The host is now:
 
 ## See also
 
-- [Clan Integration](clan-integration) - Multi-machine coordination with clan-core
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination with clan-core
 - [Repository Structure](/reference/repository-structure) - Complete directory layout
