@@ -1,216 +1,302 @@
 ---
 title: Repository Structure
-description: Directory layout and file-to-flake-output mapping
+description: Directory layout for dendritic flake-parts + clan-core architecture
 ---
 
-Complete reference for the repository structure and how files map to flake outputs through nixos-unified autowiring.
+Complete reference for the repository structure using dendritic flake-parts organization with clan-core integration.
 
 ## Directory tree
 
 ```
 infra/
-├── configurations/      # System and user configurations (autowired)
-│   ├── darwin/          # → darwinConfigurations.*
-│   ├── nixos/           # → nixosConfigurations.*
-│   └── home/            # → legacyPackages.${system}.homeConfigurations.*
-├── modules/             # Reusable nix modules (autowired)
-│   ├── flake-parts/     # → flakeModules.* (system-agnostic)
-│   ├── darwin/          # → darwinModules.* (macOS-specific)
-│   ├── nixos/           # → nixosModules.* (Linux-specific)
-│   └── home/            # home-manager modules (imported, not autowired)
-├── overlays/            # Package modifications (autowired)
-│   ├── default.nix      # → overlays.default (5-layer composition)
-│   ├── inputs.nix       # → overlays.inputs (multi-channel nixpkgs)
-│   ├── infra/           # Infrastructure files (not autowired)
-│   ├── overrides/       # Per-package build modifications
-│   ├── packages/        # Custom derivations (6 packages)
-│   └── debug-packages/  # Experimental packages (see legacyPackages.debug)
-├── lib/                 # Shared library functions
-│   └── default.nix      # → flake.lib (exported for external use)
-├── packages/            # Standalone typescript packages (docs site, etc)
-├── scripts/             # Maintenance and utility scripts
-│   ├── bisect-nixpkgs.sh    # Find breaking nixpkgs commits
-│   ├── verify-system.sh     # Verify system configuration builds
-│   └── sops/                # Secrets management helpers
-├── secrets/             # Encrypted configuration data (sops-nix)
+├── modules/             # Dendritic flake-parts modules (auto-discovered)
+│   ├── clan/            # Clan integration
+│   │   ├── core.nix     # Clan flakeModule import
+│   │   ├── machines.nix # Machine registry
+│   │   ├── meta.nix     # Clan metadata
+│   │   └── inventory/   # Service instances and roles
+│   ├── darwin/          # nix-darwin modules (per-aspect)
+│   │   ├── core/        # Core darwin settings
+│   │   ├── apps/        # Application configurations
+│   │   └── homebrew/    # Homebrew cask management
+│   ├── home/            # home-manager modules (per-aspect)
+│   │   ├── ai/          # AI tooling (claude-code, MCP servers)
+│   │   ├── core/        # Core settings (XDG, SSH, fonts)
+│   │   ├── development/ # Dev tools (git, editors, languages)
+│   │   ├── shell/       # Shell configuration
+│   │   ├── tools/       # Miscellaneous tools
+│   │   ├── packages/    # Package bundles
+│   │   ├── users/       # User-specific modules
+│   │   └── _aggregates.nix  # Module composition
+│   ├── machines/        # Machine-specific configurations
+│   │   ├── darwin/      # Darwin hosts
+│   │   │   ├── stibnite.nix
+│   │   │   ├── blackphos.nix
+│   │   │   ├── rosegold.nix
+│   │   │   └── argentum.nix
+│   │   └── nixos/       # NixOS hosts
+│   │       ├── cinnabar.nix
+│   │       ├── electrum.nix
+│   │       ├── galena.nix
+│   │       └── scheelite.nix
+│   ├── nixos/           # NixOS modules (per-aspect)
+│   │   ├── core/        # Core NixOS settings
+│   │   └── services/    # System services
+│   ├── nixpkgs/         # Nixpkgs configuration
+│   │   ├── configuration.nix
+│   │   └── _overlays/   # Overlay definitions
+│   ├── system/          # Cross-platform system modules
+│   └── terranix/        # Infrastructure as code
+│       ├── base.nix     # Common infrastructure
+│       ├── hetzner.nix  # Hetzner VPS definitions
+│       └── gcp.nix      # GCP VM definitions
+├── pkgs/                # Custom package derivations
+│   └── by-name/         # pkgs-by-name pattern
+│       ├── ccstatusline/
+│       ├── atuin-format/
+│       ├── markdown-tree-parser/
+│       └── starship-jj/
+├── vars/                # Clan vars (generated secrets)
+│   └── per-machine/     # Machine-specific vars
+├── secrets/             # sops-nix secrets (manual)
 │   ├── hosts/           # Host-specific secrets
-│   ├── users/           # User-specific secrets
-│   └── services/        # Service credentials
+│   └── users/           # User-specific secrets
+├── lib/                 # Shared library functions
+│   └── default.nix      # → flake.lib
+├── packages/            # Standalone packages
+│   └── docs/            # Starlight documentation site
+├── scripts/             # Maintenance and utility scripts
 ├── docs/                # Symlink to packages/docs/src/content/docs
-└── tests/               # Integration tests
+└── .github/             # GitHub Actions workflows
 ```
 
-## Directory-to-output mapping
+## Machine fleet
 
-### Configurations (autowired by nixos-unified)
+### Darwin hosts (nix-darwin)
 
-| File | Flake output | Activation command |
-|------|--------------|-------------------|
-| `configurations/darwin/stibnite.nix` | `darwinConfigurations.stibnite` | `darwin-rebuild switch --flake .#stibnite` |
-| `configurations/darwin/blackphos.nix` | `darwinConfigurations.blackphos` | `darwin-rebuild switch --flake .#blackphos` |
-| `configurations/nixos/orb-nixos/` | `nixosConfigurations.orb-nixos` | `nixos-rebuild switch --flake .#orb-nixos` |
-| `configurations/nixos/stibnite-nixos.nix` | `nixosConfigurations.stibnite-nixos` | `nixos-rebuild switch --flake .#stibnite-nixos` |
-| `configurations/nixos/blackphos-nixos.nix` | `nixosConfigurations.blackphos-nixos` | `nixos-rebuild switch --flake .#blackphos-nixos` |
-| `configurations/home/runner@stibnite.nix` | `legacyPackages.${system}.homeConfigurations.runner@stibnite` | `nix run .#activate-home -- runner@stibnite` |
-| `configurations/home/runner@blackphos.nix` | `legacyPackages.${system}.homeConfigurations.runner@blackphos` | `nix run .#activate-home -- runner@blackphos` |
-| `configurations/home/raquel@stibnite.nix` | `legacyPackages.${system}.homeConfigurations.raquel@stibnite` | `nix run .#activate-home -- raquel@stibnite` |
-| `configurations/home/raquel@blackphos.nix` | `legacyPackages.${system}.homeConfigurations.raquel@blackphos` | `nix run .#activate-home -- raquel@blackphos` |
+| File | Machine | User | Description |
+|------|---------|------|-------------|
+| `modules/machines/darwin/stibnite.nix` | stibnite | crs58 | Primary workstation |
+| `modules/machines/darwin/blackphos.nix` | blackphos | raquel, crs58 | Secondary workstation |
+| `modules/machines/darwin/rosegold.nix` | rosegold | janettesmith, cameron | Family workstation |
+| `modules/machines/darwin/argentum.nix` | argentum | christophersmith, cameron | Family workstation |
 
-**Pattern**: File names become configuration names. No manual registration required.
+**Deployment**: `clan machines update <hostname>`
 
-### Modules (autowired by nixos-unified)
+### NixOS hosts
 
-| Directory | Flake output | Usage |
-|-----------|--------------|-------|
-| `modules/flake-parts/*.nix` | `flakeModules.*` | Imported automatically in flake.nix |
-| `modules/darwin/*.nix` | `darwinModules.*` | Available for darwin configurations |
-| `modules/nixos/*.nix` | `nixosModules.*` | Available for nixos configurations |
-| `modules/home/` | (imported directly) | Not autowired; imported via `modules/home/default.nix` |
+| File | Machine | Type | Description |
+|------|---------|------|-------------|
+| `modules/machines/nixos/cinnabar.nix` | cinnabar | Hetzner VPS | Zerotier controller |
+| `modules/machines/nixos/electrum.nix` | electrum | Hetzner VPS | Server |
+| `modules/machines/nixos/galena.nix` | galena | GCP VM | CPU compute (togglable) |
+| `modules/machines/nixos/scheelite.nix` | scheelite | GCP VM | GPU compute (togglable) |
 
-**Example**: `modules/flake-parts/devshell.nix` defines the development shell, automatically available as `flakeModules.devshell`.
+**Deployment**: `clan machines update <hostname>`
 
-### Overlays (autowired by nixos-unified)
+## Module organization
 
-| File | Flake output | Purpose |
-|------|--------------|---------|
-| `overlays/default.nix` | `overlays.default` | 5-layer composition (inputs → hotfixes → packages → overrides → flakeInputs) |
-| `overlays/inputs.nix` | `overlays.inputs` | Multi-channel nixpkgs access (stable, unstable, patched) |
-| `overlays/overrides/default.nix` | `overlays.overrides` | Auto-imported per-package build modifications |
+### Dendritic modules (auto-discovered)
 
-**Custom packages** (defined in overlays, exposed via packages output):
-- From `overlays/packages/`: cc-statusline-rs, starship-jj, markdown-tree-parser, atuin-format
-- From `nix-ai-tools` (flake input): claude-code-bin (auto-updated daily)
-- From `landrun-nix` (flake input): Landlock-based sandboxing for applications (Linux only)
+Every file in `modules/` is a flake-parts module, auto-discovered via import-tree.
+File path determines module organization, not flake output names.
 
-**Experimental packages** (not in overlay, manual build only):
-- From `overlays/debug-packages/` → `legacyPackages.debug`: conda-lock, holos, quarto
-- Access: `nix build .#debug.<package>` or `just debug-build <package>`
-
-**Note**: The `overlays/infra/` subdirectory is intentionally excluded from autowiring to avoid conflicts:
-- `infra/hotfixes.nix`: Platform-specific stable fallbacks
-- `infra/patches.nix`: Upstream patch infrastructure
-
-### Library functions
-
-| File | Flake output | Exported functions |
-|------|--------------|-------------------|
-| `lib/default.nix` | `flake.lib` | `mdFormat`, `systemInput`, `systemOs`, `importOverlays` |
-
-**Usage in other files**:
 ```nix
-# flake.lib is available throughout the configuration
-inherit (flake.lib) systemInput systemOs;
+# modules/home/tools/bottom.nix
+{ ... }:
+{
+  flake.modules.homeManager.tools-bottom = { ... }: {
+    programs.bottom.enable = true;
+  };
+}
 ```
 
-## Current flake outputs
+### Module aggregates
 
-Complete output listing from `om show .`:
+Related modules composed into aggregates for easier imports:
 
-**Packages** (nix build .#<name>):
-- nvim-treesitter-main
-- starship-jj - starship plugin for jj
-- atuin-format - Format atuin history with Catppuccin Mocha
-- claude-code-bin - Agentic coding tool (auto-updated daily)
-- activate - Activate NixOS/nix-darwin/home-manager configurations
-- cc-statusline-rs - Claude Code statusline implementation in Rust
-- default - Activate configurations (alias)
-- markdown-tree-parser - Markdown tree structure parser
-- update - Update primary flake inputs
+```nix
+# modules/home/_aggregates.nix
+flake.modules.homeManager = {
+  aggregate-ai = { imports = with config.flake.modules.homeManager; [ ai-claude-code ai-mcp-servers ]; };
+  aggregate-development = { imports = with config.flake.modules.homeManager; [ development-git development-editors ]; };
+  aggregate-shell = { imports = with config.flake.modules.homeManager; [ shell-zsh shell-starship ]; };
+};
+```
 
-**Devshells** (nix develop .#<name>):
-- default - Dev environment for infra
+Machine configs import aggregates:
 
-**Checks** (nix flake check):
-- pre-commit
+```nix
+# modules/machines/darwin/stibnite.nix
+home-manager.users.crs58.imports = with config.flake.modules.homeManager; [
+  aggregate-core
+  aggregate-ai
+  aggregate-development
+  aggregate-shell
+];
+```
 
-**NixOS Configurations** (nixos-rebuild switch --flake .#<name>):
-- blackphos-nixos
-- orb-nixos
-- stibnite-nixos
+## Clan integration
 
-**Darwin Configurations** (darwin-rebuild switch --flake .#<name>):
-- stibnite
-- blackphos
+### Machine registry
 
-**NixOS Modules**:
-- default
-- common
+```nix
+# modules/clan/machines.nix
+clan.machines = {
+  stibnite = {
+    nixpkgs.hostPlatform = "aarch64-darwin";
+    imports = [ config.flake.modules.darwin."machines/darwin/stibnite" ];
+  };
+  cinnabar = {
+    nixpkgs.hostPlatform = "x86_64-linux";
+    imports = [ config.flake.modules.nixos."machines/nixos/cinnabar" ];
+  };
+};
+```
 
-**Overlays**:
-- inputs - Multi-channel nixpkgs access
-- overrides - Build modifications
-- default - 5-layer composition
+### Inventory services
 
-## Import mechanics
+```nix
+# modules/clan/inventory/services/zerotier.nix
+inventory.instances.zerotier = {
+  roles.controller.machines."cinnabar" = { };
+  roles.peer.machines = {
+    "electrum" = { };
+    "stibnite" = { };
+    "blackphos" = { };
+    "rosegold" = { };
+    "argentum" = { };
+    "galena" = { };
+    "scheelite" = { };
+  };
+};
+```
+
+## Overlay architecture
+
+### Five-layer composition
+
+```nix
+# modules/nixpkgs/overlays/default.nix
+lib.mergeAttrsList [
+  inputs'        # Layer 1: Multi-channel nixpkgs access
+  hotfixes       # Layer 2: Platform-specific stable fallbacks
+  packages       # Layer 3: Custom derivations (pkgs/by-name/)
+  overrides      # Layer 4: Build modifications
+  flakeInputs    # Layer 5: Overlays from flake inputs
+]
+```
+
+### Custom packages
+
+Packages defined using pkgs-by-name pattern:
+
+| Package | Location | Description |
+|---------|----------|-------------|
+| ccstatusline | `pkgs/by-name/ccstatusline/` | Claude Code statusline |
+| atuin-format | `pkgs/by-name/atuin-format/` | Atuin history formatter |
+| markdown-tree-parser | `pkgs/by-name/markdown-tree-parser/` | Markdown tree parser |
+| starship-jj | `pkgs/by-name/starship-jj/` | Starship jj plugin |
+
+## Secrets structure
+
+### Tier 1: Clan vars (system-level)
+
+```
+vars/
+├── per-machine/
+│   ├── cinnabar/
+│   │   ├── zerotier/    # Zerotier identity
+│   │   └── ssh/         # SSH host keys
+│   └── electrum/
+│       └── ...
+```
+
+Generated via `clan vars generate`, encrypted with machine age keys.
+
+### Tier 2: sops-nix (user-level)
+
+```
+secrets/
+├── hosts/
+│   └── cinnabar.sops.yaml
+├── users/
+│   ├── crs58.sops.yaml
+│   ├── raquel.sops.yaml
+│   └── cameron.sops.yaml
+└── .sops.yaml           # Encryption rules
+```
+
+Manually created, encrypted with user age keys.
+
+## Infrastructure as code
+
+### Terranix modules
+
+```nix
+# modules/terranix/hetzner.nix
+resource.hcloud_server.cinnabar = {
+  name = "cinnabar";
+  server_type = "cx22";
+  image = "ubuntu-24.04";
+};
+
+# modules/terranix/gcp.nix
+resource.google_compute_instance.galena = {
+  name = "galena";
+  machine_type = "e2-standard-8";
+  zone = "us-west1-b";
+};
+```
+
+**Deployment**: `nix run .#terraform -- apply`
+
+## Key flake outputs
 
 ### Configurations
 
-Configurations import modules and overlays:
+| Output | Command |
+|--------|---------|
+| `darwinConfigurations.stibnite` | `clan machines update stibnite` |
+| `darwinConfigurations.blackphos` | `clan machines update blackphos` |
+| `nixosConfigurations.cinnabar` | `clan machines update cinnabar` |
+| `homeConfigurations.crs58` | `nh home switch` |
 
-```nix
-# configurations/darwin/hostname.nix
-{
-  inputs,
-  config,
-  lib,
-  pkgs,
-  ...
-}: {
-  # Modules imported via nixpkgs module system
-  imports = [
-    inputs.self.darwinModules.common
-  ];
+### Packages
 
-  # Overlays applied via nixpkgs.overlays
-  nixpkgs.overlays = [
-    inputs.self.overlays.default
-  ];
-}
-```
+| Output | Description |
+|--------|-------------|
+| `packages.${system}.ccstatusline` | Claude Code statusline |
+| `packages.${system}.claude-code-bin` | Claude Code (from nix-ai-tools) |
+| `packages.${system}.activate` | Configuration activation script |
 
-### Modules
+### Development
 
-Modules are composable and can import other modules:
+| Output | Command |
+|--------|---------|
+| `devShells.${system}.default` | `nix develop` |
+| `checks.${system}.pre-commit` | `nix flake check` |
 
-```nix
-# modules/nixos/common.nix
-{ config, lib, pkgs, ... }: {
-  # Module configuration
-}
-```
+## Directory naming conventions
 
-### Overlays
+### Underscore prefix
 
-Overlays modify or add packages to nixpkgs:
+Files/directories starting with `_` have special meaning:
 
-```nix
-# overlays/packages/mypackage.nix
-final: prev: {
-  mypackage = final.callPackage ./derivation.nix { };
-}
-```
+- `_aggregates.nix` - Module composition definitions
+- `_overlays/` - Overlay definitions (not auto-exported as separate outputs)
 
-## What gets autowired vs manual
+### Module paths
 
-### Autowired (file → output automatic)
+Module paths follow pattern: `modules/{platform}/{aspect}/{feature}.nix`
 
-- `configurations/darwin/` → darwinConfigurations
-- `configurations/nixos/` → nixosConfigurations
-- `configurations/home/` → homeConfigurations
-- `modules/flake-parts/` → flakeModules
-- `modules/darwin/` → darwinModules
-- `modules/nixos/` → nixosModules
-- `overlays/*.nix` → overlays
-
-### Manual (explicit specification required)
-
-- `modules/home/` - Imported via default.nix, not autowired
-- `overlays/infra/` - Excluded from autowiring (helper infrastructure)
-- `lib/` - Exported as flake.lib via flake-parts
-- `packages/` - TypeScript packages (not nix derivations)
+Examples:
+- `modules/home/ai/claude-code.nix` - AI tooling for home-manager
+- `modules/darwin/core/defaults.nix` - Core darwin settings
+- `modules/nixos/services/zerotier.nix` - Zerotier service for NixOS
 
 ## See also
 
-- [Understanding Autowiring](/concepts/understanding-autowiring) - How directory-based autowiring works
-- [Nix-Config Architecture](/concepts/nix-config-architecture) - Three-layer architecture explanation
-- [Multi-User Patterns](/concepts/multi-user-patterns) - Admin vs non-admin user organization
+- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization pattern
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination
+- [Nix-Config Architecture](/concepts/nix-config-architecture) - Overall architecture
