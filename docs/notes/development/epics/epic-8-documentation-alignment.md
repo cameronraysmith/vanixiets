@@ -1,6 +1,6 @@
 # Epic 8: Documentation Alignment (Post-MVP Phase 7)
 
-**Status:** Backlog
+**Status:** In Progress (Phase 2)
 **Dependencies:** Epic 7 complete
 **Strategy:** Audit-first approach - identify staleness before updating
 
@@ -16,6 +16,10 @@ Comprehensively update all documentation to reflect the dendritic flake-parts + 
 - Host onboarding guides differentiate darwin vs nixos deployment paths
 - Secrets management documentation covers two-tier pattern (clan vars + sops-nix)
 - Zero references to deprecated nixos-unified architecture
+- Reference documentation covers CLI tooling (justfile, flake apps, CI jobs)
+- AMDiRE development documentation aligned with implementation
+- Tutorial content exists for common user journeys
+- Cross-references validated and navigation discoverable
 
 **Business Objective:** Documentation accuracy enables new contributors and reduces support burden.
 
@@ -29,6 +33,12 @@ Comprehensively update all documentation to reflect the dendritic flake-parts + 
 | Story 8.2 | FR-8.2 (Architecture documentation) |
 | Story 8.3 | FR-8.3 (Host onboarding guides) |
 | Story 8.4 | FR-8.4 (Secrets management docs) |
+| Story 8.5 | FR-8.5 (Documentation structure audit) |
+| Story 8.6 | FR-8.6 (CLI tooling reference docs) |
+| Story 8.7 | FR-8.7 (AMDiRE development docs audit) |
+| Story 8.8 | FR-8.8 (Tutorial content creation) |
+| Story 8.9 | FR-8.9 (Cross-reference validation) |
+| Story 8.10 | FR-8.10 (Test harness documentation) |
 
 ---
 
@@ -193,6 +203,197 @@ So that I understand how to manage generated and external secrets.
 
 ---
 
+## Story 8.5: Audit documentation structure against Diataxis/AMDiRE frameworks
+
+As a documentation maintainer,
+I want to audit the documentation structure against Diataxis and AMDiRE frameworks,
+So that I have a prioritized list of structural gaps to address.
+
+**Acceptance Criteria:**
+
+**Given** the Starlight docs at `packages/docs/src/content/docs/`
+**When** I audit against framework requirements
+**Then** the audit should identify:
+- Diataxis gaps: tutorials/ (empty), reference/ (sparse), guides completeness
+- AMDiRE gaps: development/operations/, development/traceability/ completeness
+- Structural recommendations for each gap
+
+**And** output should reference the research document:
+- `docs/notes/development/research/documentation-coverage-analysis.md`
+- Research streams R8, R9, R10, R14, R15 provide detailed scope
+
+**Prerequisites:** Stories 8.1-8.4 (initial alignment complete)
+
+**Technical Notes:**
+- Diataxis framework: tutorials, guides, concepts, reference
+- AMDiRE framework: context, requirements, architecture, traceability, work-items
+- Focus on structural gaps, not content accuracy (8.1-8.4 addressed accuracy)
+
+**NFR Coverage:** NFR-8.5 (Framework compliance)
+
+---
+
+## Story 8.6: Create reference documentation for CLI tooling
+
+As a user or developer,
+I want comprehensive reference documentation for CLI tools,
+So that I can discover and use justfile recipes, flake apps, and CI workflows.
+
+**Acceptance Criteria:**
+
+**Given** the justfile with 100+ recipes across 10 groups
+**When** I create reference documentation
+**Then** documentation should include:
+- Justfile recipe reference organized by group (nix, clan, docs, containers, secrets, sops, CI/CD, nix-home-manager, nix-darwin, nixos)
+- Flake apps reference (darwin, os, home, update, activate, activate-home)
+- CI job reference with local equivalents
+
+**And** each recipe/app should document:
+- Purpose and usage
+- Prerequisites
+- Example invocations
+- Related recipes/apps
+
+**Prerequisites:** Story 8.5 (structural audit complete)
+
+**Technical Notes:**
+- Location: `packages/docs/src/content/docs/reference/`
+- Research streams R16, R17, R18 provide detailed scope
+- Consider auto-generation from justfile comments where possible
+
+**NFR Coverage:** NFR-8.6 (CLI discoverability)
+
+---
+
+## Story 8.7: Audit AMDiRE development documentation alignment
+
+As a contributor,
+I want development documentation that accurately reflects project context and requirements,
+So that I understand the project's goals, constraints, and architectural decisions.
+
+**Acceptance Criteria:**
+
+**Given** the development/ documentation tree
+**When** I audit context, requirements, and ADR documentation
+**Then** the audit should verify:
+- development/context/ (6 files) reflects current project state
+- development/requirements/ (7 files) aligns with implemented functionality
+- development/architecture/adrs/ (16 ADRs) are current and cross-referenced
+
+**And** identify:
+- Outdated context or requirements
+- ADRs needing updates or supersession
+- Missing traceability links
+
+**Prerequisites:** Story 8.5 (structural audit complete)
+
+**Technical Notes:**
+- Research streams R11, R12, R13 provide detailed scope
+- Focus on alignment with post-clan-migration reality
+- ADRs should reference each other where decisions relate
+
+**NFR Coverage:** NFR-8.7 (Development documentation accuracy)
+
+---
+
+## Story 8.8: Create tutorials for common user workflows
+
+As a new user,
+I want step-by-step tutorials for common workflows,
+So that I can learn the system through guided practice.
+
+**Acceptance Criteria:**
+
+**Given** the empty tutorials/ directory
+**When** I create tutorial content
+**Then** tutorials should cover:
+- Bootstrap-to-activation journey (new user onboarding)
+- Secrets setup workflow (Bitwarden → ssh-to-age → sops-nix)
+- Darwin host deployment (macOS-specific workflow)
+- NixOS host deployment (VPS-specific workflow)
+
+**And** each tutorial should:
+- Be learning-oriented (not task-oriented like guides)
+- Include complete working examples
+- Build skills progressively
+- Reference related guides and concepts
+
+**Prerequisites:** Stories 8.5, 8.6 (structure and reference docs established)
+
+**Technical Notes:**
+- Location: `packages/docs/src/content/docs/tutorials/`
+- Research streams R1, R2, R3, R4 define user journeys
+- Diataxis: tutorials are for learning, guides are for accomplishing tasks
+
+**NFR Coverage:** NFR-8.8 (New user learning path)
+
+---
+
+## Story 8.9: Validate cross-references and navigation discoverability
+
+As a documentation user,
+I want to easily navigate between related documentation,
+So that I can find information without getting lost.
+
+**Acceptance Criteria:**
+
+**Given** all documentation files
+**When** I audit cross-references and navigation
+**Then** validation should confirm:
+- All internal links are valid (no broken links)
+- Related documents link to each other bidirectionally
+- Index pages provide clear navigation paths
+- Prerequisites are linked from dependent documents
+
+**And** discoverability audit should verify:
+- Homepage provides clear entry points for each persona
+- Sidebar navigation is logical and complete
+- Common tasks are findable within 2 clicks
+- Error messages reference relevant troubleshooting docs
+
+**Prerequisites:** Stories 8.6, 8.7, 8.8 (content created/updated)
+
+**Technical Notes:**
+- Research streams R20, R21 provide detailed scope
+- Use `just docs-linkcheck` for automated link validation
+- Manual review needed for navigation quality
+
+**NFR Coverage:** NFR-8.9 (Documentation discoverability)
+
+---
+
+## Story 8.10: Audit test harness and CI documentation
+
+As a developer,
+I want documentation that explains how to run tests locally and debug CI,
+So that I can validate changes before pushing and troubleshoot failures.
+
+**Acceptance Criteria:**
+
+**Given** the CI workflow (ci.yaml) and justfile test recipes
+**When** I audit test documentation
+**Then** documentation should cover:
+- Every CI job has documented local equivalent
+- Test philosophy explained (risk-based, depth scaling)
+- Common failure modes and troubleshooting documented
+- Module options that affect tests are documented
+
+**And** parity matrix should exist:
+- CI job → local justfile recipe mapping
+- When to use `just check` vs `just check-fast`
+- How to run category-specific builds locally
+
+**Prerequisites:** Story 8.6 (CLI reference includes test recipes)
+
+**Technical Notes:**
+- Research streams R19, R22 provide detailed scope
+- Location: Enhance about/contributing/testing.md and development/traceability/
+- Reference ci.yaml job structure
+
+**NFR Coverage:** NFR-8.10 (Test reproducibility)
+
+---
+
 ## Dependencies
 
 **Depends on:**
@@ -232,3 +433,4 @@ So that I understand how to manage generated and external secrets.
 - NFRs: `docs/notes/development/PRD/non-functional-requirements.md` (NFR-8)
 - Starlight docs: `packages/docs/src/content/docs/`
 - Architecture docs: `docs/notes/development/architecture/`
+- Research document: `docs/notes/development/research/documentation-coverage-analysis.md`
