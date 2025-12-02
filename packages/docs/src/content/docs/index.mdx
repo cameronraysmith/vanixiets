@@ -1,9 +1,9 @@
 ---
 title: infra
-description: Nix flake-based system configurations for NixOS, nix-darwin, and home-manager using three-layer architecture
+description: Multi-machine Nix infrastructure using dendritic flake-parts and clan-core
 template: splash
 hero:
-  tagline: "Nix flake-based system configurations for NixOS, nix-darwin, and home-manager using three-layer architecture: flake-parts modular composition, nixos-unified directory-based autowiring, and multi-channel overlay composition."
+  tagline: "Multi-machine Nix infrastructure for NixOS, nix-darwin, and home-manager using dendritic flake-parts module organization and clan-core deployment coordination."
   image:
     file: ../../assets/nix-snowflake-colours.svg
   actions:
@@ -22,34 +22,33 @@ import { Card, CardGrid } from "@astrojs/starlight/components";
 ## Features
 
 <CardGrid stagger>
-  <Card title="Directory-based autowiring" icon="puzzle">
-    nixos-unified scans filesystem structure to automatically generate flake outputs.
-    Configurations map to darwinConfigurations/nixosConfigurations/homeConfigurations.
-    Modules map to flakeModules/darwinModules/nixosModules, overlays to overlays.*.
+  <Card title="Dendritic module organization" icon="puzzle">
+    Every Nix file is a flake-parts module organized by aspect (feature) rather than host.
+    Cross-cutting configuration spans NixOS, nix-darwin, and home-manager from unified modules.
+  </Card>
+  <Card title="Clan-core deployment" icon="rocket">
+    Multi-machine coordination with unified deployment across 8 machines (4 darwin, 4 nixos).
+    Service orchestration via inventory system with role-based assignments.
   </Card>
   <Card title="Per-package nixpkgs channel selection" icon="shield">
-    Multi-channel overlay architecture enables unstable default with selective stable fallbacks via overlays/infra/hotfixes.nix.
-    Apply surgical fixes for broken packages without requiring full flake.lock rollback affecting O(10^5) packages.
+    Multi-channel overlay architecture enables unstable default with selective stable fallbacks.
+    Apply surgical fixes for broken packages without requiring full flake.lock rollback.
   </Card>
   <Card title="Cross-platform deployment targets" icon="laptop">
     Deploy to NixOS, nix-darwin, or home-manager configurations.
     Consistent architecture across Linux and macOS systems with platform-specific modules.
   </Card>
-  <Card title="Multi-user configuration patterns" icon="user">
-    Admin users with integrated system/home-manager configurations.
-    Non-admin users with standalone home-manager deployments.
-  </Card>
-  <Card title="Declarative secrets management" icon="lock">
-    sops-nix integration with age encryption for managing encrypted secrets.
-    Git-committed encrypted secrets with declarative key rotation support.
+  <Card title="Two-tier secrets management" icon="lock">
+    Clan vars for system-level generated secrets (SSH keys, zerotier identities).
+    sops-nix for user-level manual secrets (API tokens, personal credentials).
   </Card>
   <Card title="Composable package overlays" icon="puzzle">
-    Layered overlay composition: multi-channel access → hotfixes → custom packages → build overrides → flake input overlays.
-    Five-layer architecture for package customization and dependency management.
+    Five-layer overlay composition: multi-channel access, hotfixes, custom packages, overrides, flake inputs.
+    pkgs-by-name pattern for custom package definitions.
   </Card>
-  <Card title="Reproducible development environments" icon="seti:config">
-    Nix development shell with direnv activation and just task runner.
-    Hermetic builds with declarative development dependencies.
+  <Card title="Infrastructure as code" icon="cloud">
+    Terranix modules for Hetzner and GCP infrastructure provisioning.
+    Togglable compute nodes for cost-controlled cloud resources.
   </Card>
 </CardGrid>
 
@@ -74,13 +73,12 @@ See [Getting started guide](/guides/getting-started/) for complete setup instruc
 
 ## Architecture
 
-Three-layer architecture combining complementary patterns:
+Multi-layer architecture combining complementary patterns:
 
 1. **flake-parts** - Modular flake composition framework
-2. **nixos-unified** - Directory-based autowiring (filesystem structure → flake outputs)
-3. **Multi-channel overlay composition** - Per-package nixpkgs channel selection via overlays/infra/hotfixes.nix
-
-Per-package channel selection enables selective stable fallbacks for broken packages without full flake.lock rollback affecting O(10^5) packages.
+2. **dendritic pattern** - Aspect-based module organization with import-tree auto-discovery
+3. **clan-core** - Multi-machine coordination and deployment
+4. **multi-channel overlays** - Per-package nixpkgs channel selection for resilience
 
 Learn more in [Nix-Config Architecture](/concepts/nix-config-architecture/).
 
@@ -95,19 +93,19 @@ Learn more in [Nix-Config Architecture](/concepts/nix-config-architecture/).
 
 <CardGrid>
   <Card title="Understand the architecture" icon="open-book">
-    Three-layer design combining flake-parts, nixos-unified, and multi-channel overlay composition.
+    Dendritic flake-parts + clan-core architecture for multi-machine deployments.
     [Nix-Config Architecture →](/concepts/nix-config-architecture/)
+  </Card>
+  <Card title="Learn dendritic pattern" icon="puzzle">
+    Aspect-based module organization where every file is a flake-parts module.
+    [Dendritic Architecture →](/concepts/dendritic-architecture/)
+  </Card>
+  <Card title="Understand clan integration" icon="rocket">
+    Multi-machine coordination, deployment, and service orchestration.
+    [Clan Integration →](/concepts/clan-integration/)
   </Card>
   <Card title="Add a new host" icon="laptop">
     Onboard a new NixOS or nix-darwin system with this configuration.
     [Host onboarding guide →](/guides/host-onboarding/)
-  </Card>
-  <Card title="Configure secrets" icon="lock">
-    sops-nix integration with age encryption for declarative secrets management.
-    [Secrets management guide →](/guides/secrets-management/)
-  </Card>
-  <Card title="Handle broken packages" icon="warning">
-    Systematic workflow for per-package channel selection when nixpkgs unstable packages fail.
-    [Handling broken packages →](/guides/handling-broken-packages/)
   </Card>
 </CardGrid>
