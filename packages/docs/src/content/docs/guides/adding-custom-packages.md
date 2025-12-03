@@ -10,10 +10,10 @@ Packages you add will be automatically available system-wide and in your develop
 
 ## Quick start
 
-The simplest way to add a package is to create a single nix file in `overlays/packages/`.
-The filename (without `.nix`) becomes the package name, and the file is automatically discovered and built.
+The simplest way to add a package is to create a directory in `pkgs/by-name/` with a `package.nix` file.
+The directory name becomes the package name, and the file is automatically discovered and built.
 
-For example, creating `overlays/packages/hello-world.nix` makes the package available as `pkgs.hello-world`.
+For example, creating `pkgs/by-name/hello-world/package.nix` makes the package available as `pkgs.hello-world`.
 
 ## Understanding how this works
 
@@ -26,22 +26,21 @@ An overlay is a function that takes two arguments (`final` and `prev`) and retur
 
 **This repository automates the overlay boilerplate.**
 Instead of writing overlay functions directly, you write standard package derivations.
-The file `overlays/default.nix` uses `lib.packagesFromDirectoryRecursive` to automatically discover your package files, call them with the necessary dependencies, and merge them into an overlay layer.
+The dendritic flake-parts pattern uses `lib.packagesFromDirectoryRecursive` in `modules/nixpkgs/per-system.nix` to automatically discover your package files, call them with the necessary dependencies, and merge them into an overlay layer.
 
 **What packagesFromDirectoryRecursive does.**
-This nixpkgs library function scans the `overlays/packages/` directory and transforms it into an attribute set of packages.
-For each `.nix` file, it uses `callPackage` to inject dependencies automatically based on the function arguments you declare.
-For each directory containing `package.nix`, it calls that file and uses the directory name as the package name.
+This nixpkgs library function scans the `pkgs/by-name/` directory and transforms it into an attribute set of packages.
+For each directory containing `package.nix`, it uses `callPackage` to inject dependencies automatically based on the function arguments you declare, and uses the directory name as the package name.
 
 **You write package derivations, not overlays.**
-When you create a file in `overlays/packages/`, you're writing a standard nix derivation using functions like `rustPlatform.buildRustPackage` or `buildNpmPackage`.
-The overlay mechanism happens automatically in `overlays/default.nix` where your derivations are merged into the package set.
+When you create a directory in `pkgs/by-name/`, you're writing a standard nix derivation using functions like `rustPlatform.buildRustPackage` or `buildNpmPackage`.
+The overlay mechanism happens automatically in `modules/nixpkgs/per-system.nix` where your derivations are merged into the package set.
 This is why your packages become available as `pkgs.your-package-name` throughout your system configuration.
 
-## Single-file packages
+## Simple packages
 
-Single-file packages work well for most use cases.
-Create a `.nix` file in `overlays/packages/` that exports a standard nix derivation.
+Simple packages with a single derivation file work well for most use cases.
+Create a directory in `pkgs/by-name/` with a `package.nix` file that exports a standard nix derivation.
 
 Here's a complete example for a Rust package from crates.io:
 
@@ -117,16 +116,14 @@ buildNpmPackage rec {
 
 ## Multi-file packages
 
-When your package needs multiple files (scripts, configuration, assets), use a directory structure.
-Create a directory in `overlays/packages/` with a `package.nix` entry point.
-
+When your package needs multiple files (scripts, configuration, assets), add them alongside `package.nix`.
 The directory name becomes the package name.
 You can reference sibling files using `./filename` or `builtins.readFile ./filename`.
 
 Example structure for a nushell script wrapper:
 
 ```
-overlays/packages/atuin-format/
+pkgs/by-name/atuin-format/
 ├── package.nix
 └── atuin-format.nu
 ```
@@ -203,25 +200,23 @@ For npm packages, you also need `npmDepsHash` which works the same way.
 
 ## How packages are discovered
 
-The discovery process happens in `overlays/default.nix`:
+The discovery process happens in `modules/nixpkgs/per-system.nix` using the dendritic flake-parts pattern:
 
 ```nix
-fromDirectory = directory:
-  lib.packagesFromDirectoryRecursive {
-    callPackage = lib.callPackageWith self;
-    inherit directory;
-  };
+pkgsDirectory = ../../../pkgs/by-name;
 
-packages = fromDirectory ./packages;
+packagesFromDirectory = lib.packagesFromDirectoryRecursive {
+  callPackage = pkgs.callPackage;
+  directory = pkgsDirectory;
+};
 ```
 
 This means:
-- Files like `foo.nix` become `pkgs.foo`
-- Directories like `bar/package.nix` become `pkgs.bar`
+- Directories like `foo/package.nix` become `pkgs.foo`
 - Non-nix files and empty directories are ignored
 - The `callPackage` mechanism handles dependency injection automatically
 
-The resulting package set is merged into the overlay's fifth layer (after inputs, hotfixes, and before overrides), making your packages available throughout your system configuration.
+The resulting package set is merged into the overlay composition as Layer 3 (after channels and hotfixes, before overrides), making your packages available throughout your system configuration.
 
 ## Common build functions
 
@@ -241,8 +236,8 @@ Check the [nixpkgs manual](https://nixos.org/manual/nixpkgs/stable/) for details
 
 Once you're comfortable adding packages, you might want to:
 
-- Override existing nixpkgs packages with custom build options (see `overlays/overrides/`)
-- Use stable channel fallbacks for broken packages (see `overlays/infra/hotfixes.nix`)
+- Override existing nixpkgs packages with custom build options (see `modules/nixpkgs/overlays/overrides.nix`)
+- Use stable channel fallbacks for broken packages (see `modules/nixpkgs/overlays/hotfixes.nix`)
 - Apply upstream patches to nixpkgs packages (see [nixpkgs hotfixes](/development/architecture/nixpkgs-hotfixes))
 
-For deeper understanding of the overlay architecture, see [ADR-0003: Overlay composition patterns](/development/architecture/adrs/0003-overlay-composition-patterns).
+For deeper understanding of the overlay architecture, see [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns).
