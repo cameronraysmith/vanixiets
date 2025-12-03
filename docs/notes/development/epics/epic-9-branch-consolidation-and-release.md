@@ -25,9 +25,106 @@ Merge the clan-01 branch to main with proper semantic versioning, preserving ful
 
 | Story | Functional Requirements |
 |-------|-------------------------|
+| Story 9.0a | Documentation alignment (post-migration) |
+| Story 9.0b | Documentation alignment (content triage) |
 | Story 9.1 | FR-9.1 (Bookmark tags) |
 | Story 9.2 | FR-9.2 (CI/CD validation) |
 | Story 9.3 | FR-9.3 (Merge and release) |
+
+---
+
+## Story 9.0a: Update stale migration guides for dendritic architecture
+
+As a documentation maintainer,
+I want to update migration guides that reference old nixos-unified architecture,
+So that developers have accurate documentation matching the current dendritic flake-parts structure.
+
+**Acceptance Criteria:**
+
+**Given** guides written during nixos-unified architecture
+**When** I audit and rewrite stale migration guides
+**Then** the following files should be updated:
+- `guides/handling-broken-packages.md` - all paths reference old `overlays/` structure
+- `guides/adding-custom-packages.md` - references old `overlays/packages/` pattern
+
+**And** path mappings should be corrected:
+
+| Old Path | Current Path |
+|----------|--------------|
+| `overlays/packages/` | `pkgs/by-name/` |
+| `overlays/infra/hotfixes.nix` | `modules/nixpkgs/overlays/hotfixes.nix` |
+| `overlays/overrides/*.nix` | `modules/nixpkgs/overlays/overrides.nix` |
+
+**And** ADR references should be updated:
+- Replace references to ADR-0003 (superseded) with ADR-0017
+- Fix "multi-channel resilience" terminology → "multi-channel fallback" (or similar Nix-appropriate term)
+
+**And** documentation validation should pass:
+- `just docs-build` succeeds
+- `just docs-linkcheck` passes (no broken links)
+
+**And** audit should check:
+- Other guides for stale architecture references
+- Examples use current patterns (pkgs/by-name/, modules/nixpkgs/overlays/)
+- Terminology uses proper Nix concepts (overlays, overrides, channels, fallbacks)
+
+**Prerequisites:** Epic 8 complete (dendritic migration finished)
+
+**Technical Notes:**
+- Focus on guides/, not references/ (reference docs handled separately)
+- Validate examples with `nix eval` where practical
+- Ensure file path examples are discoverable via `fd` or `rg`
+- Reference: ADR-0017 (overlays architecture)
+
+**NFR Coverage:** Documentation accuracy
+
+---
+
+## Story 9.0b: Clean up migration artifacts and migrate essential content
+
+As a repository maintainer,
+I want to triage content in docs/notes/development/ and migrate essential content,
+So that ephemeral migration artifacts are cleaned up while preserving valuable reference material.
+
+**Important clarification:** The docs/ directory is NOT being deleted. This story cleans up migration artifacts and makes selective migrations.
+
+**Acceptance Criteria:**
+
+**Given** content in `docs/notes/development/` from architecture migration
+**When** I triage content for retention, migration, or deletion
+**Then** I should categorize content:
+
+**Content triage categories:**
+- NVIDIA docs (`nvidia-module-analysis.md`, 671 lines): EVALUATE placement (development reference, may not belong in public Starlight)
+- Retrospectives (epic-7, epic-8 retros): EVALUATE preservation value
+- Epic definitions: DELETE (superseded by PRD and Starlight dev docs)
+- Research docs: EVALUATE case-by-case
+- Sprint artifacts (`sprint-status.yaml`, `work-items/*.md`): DELETE (ephemeral by design)
+
+**And** content triage decisions should be documented:
+- Create content triage matrix with decisions
+- Document rationale for EVALUATE items
+- Identify which content migrates to Starlight vs stays in docs/notes/
+
+**And** essential content should be:
+- Migrated to appropriate Starlight sections (if applicable)
+- OR explicitly retained in docs/notes/ with rationale
+- Validated that Starlight build passes after migrations
+
+**And** deletable content should be:
+- Explicitly approved before removal
+- Listed in triage matrix
+
+**Prerequisites:** Story 9.0a complete (ensures guides are updated before any cleanup)
+
+**Technical Notes:**
+- docs/notes/ is NOT being deleted - this is selective cleanup
+- Sprint artifacts are ephemeral by design (safe to delete post-merge)
+- NVIDIA docs may be valuable development reference (decide placement)
+- Retrospectives may inform future work (evaluate preservation)
+- Use `fd` and `rg` to audit for stale cross-references
+
+**NFR Coverage:** Documentation hygiene
 
 ---
 
@@ -59,7 +156,7 @@ So that I can reference specific points in history for debugging or rollback.
 - Explain what each bookmark represents
 - Document rollback procedure using bookmarks
 
-**Prerequisites:** Epic 8 complete (documentation accurate)
+**Prerequisites:** Story 9.0b complete (content cleanup done before tagging)
 
 **Technical Notes:**
 - Git tag creation: `git tag bookmark/<name> <commit-hash>`
@@ -76,6 +173,8 @@ So that I can reference specific points in history for debugging or rollback.
 As a release engineer,
 I want all CI/CD workflows passing on clan-01 before merge authorization,
 So that the main branch remains stable and deployable.
+
+**Note:** Epic 2 Story 2.11 already validated CI on clan-01. This story is a pre-merge verification gate, not full re-validation. Scope simplified to "verify CI still green before merge."
 
 **Acceptance Criteria:**
 
@@ -96,7 +195,7 @@ So that the main branch remains stable and deployable.
 **And** workflow execution should:
 - Trigger via: `gh workflow run ci.yaml --ref clan-01`
 - Wait for completion and verify all green
-- Document any fixed issues
+- Document any fixed issues (if any)
 
 **Prerequisites:** Story 9.1 (bookmark tags created)
 
@@ -143,7 +242,7 @@ So that the dendritic + clan architecture is officially released.
 - Confirm release tag pushed
 - Verify changelog published
 
-**Prerequisites:** Story 9.2 (CI/CD validated)
+**Prerequisites:** Stories 9.0a, 9.0b, 9.1, 9.2 complete (documentation updated, content cleaned, bookmarks created, CI validated)
 
 **Technical Notes:**
 - Merge preference: `git checkout main && git merge --ff-only clan-01`
@@ -168,6 +267,9 @@ So that the dendritic + clan architecture is officially released.
 
 ## Success Criteria
 
+- [ ] Stale migration guides updated for dendritic architecture
+- [ ] Content triage decisions documented
+- [ ] Essential content preserved or migrated before any cleanup
 - [ ] Bookmark tags created at all branch boundaries
 - [ ] All CI/CD workflows passing on clan-01
 - [ ] clan-01 merged to main successfully
