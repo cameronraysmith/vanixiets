@@ -7,11 +7,11 @@ This infrastructure uses the **dendritic flake-parts pattern**, a module organiz
 
 ## Credits and attribution
 
-The dendritic flake-parts pattern was created and documented by **Shahar "Dawn" Or** ([@mightyiam](https://github.com/mightyiam)), establishing a configuration approach where every Nix file is a flake-parts module organized by feature rather than host.
+The dendritic flake-parts pattern was created and documented by Shahar "Dawn" Or (@mightyiam), establishing a configuration approach where every Nix file is a flake-parts module organized by feature rather than host.
 
 ### Foundational projects
 
-- **[flake-parts](https://flake.parts)** by Robert Hensing and Hercules CI - The modular flake framework that enables the dendritic pattern
+- **[flake-parts](https://flake.parts)** by Robert Hensing (@roberth) and Hercules CI - The modular flake framework that enables the dendritic pattern
 
 - **[dendritic](https://github.com/mightyiam/dendritic)** by Shahar "Dawn" Or - Pattern definition, documentation, and reference implementation
 
