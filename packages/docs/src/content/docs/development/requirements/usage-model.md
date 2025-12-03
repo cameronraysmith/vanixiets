@@ -604,7 +604,7 @@ UC-007 (Migration)
 
 ## Quality attributes
 
-The usage model supports the following quality attributes from [quality requirements](quality-requirements/):
+The usage model supports the following quality attributes from [quality requirements](/development/requirements/quality-requirements/):
 
 - **Reproducibility**: Use cases produce deterministic outcomes via Nix evaluation and locked inputs
 - **Type safety**: Module system type checking validates configurations at evaluation time

@@ -18,7 +18,7 @@ This documentation captures the architecture and operational context for the den
 
 ## Context documents
 
-### [Project scope](project-scope/)
+### [Project scope](/development/context/project-scope/)
 
 Description of the infrastructure scope and capabilities.
 
@@ -28,7 +28,7 @@ Description of the infrastructure scope and capabilities.
 - Cross-platform deployment (darwin + nixos)
 - Future expansion areas
 
-### [Stakeholders](stakeholders/)
+### [Stakeholders](/development/context/stakeholders/)
 
 Individuals, groups, and institutions with interest in the project.
 
@@ -37,7 +37,7 @@ Individuals, groups, and institutions with interest in the project.
 - Secondary: Family users (raquel, janettesmith, christophersmith)
 - Reference: Upstream projects (flake-parts, clan-core, dendritic pattern, home-manager, nix-darwin)
 
-### [Constraints and rules](constraints-and-rules/)
+### [Constraints and rules](/development/context/constraints-and-rules/)
 
 Restrictions influencing the system, distinguishing non-negotiable constraints from conditional rules.
 
@@ -52,7 +52,7 @@ Restrictions influencing the system, distinguishing non-negotiable constraints f
 - Code style (markdown formatting, naming conventions)
 - Architecture principles (dendritic organization, type safety)
 
-### [Goals and objectives](goals-and-objectives/)
+### [Goals and objectives](/development/context/goals-and-objectives/)
 
 Goals issued by stakeholders organized by business, usage, and system categories.
 
@@ -80,7 +80,7 @@ Goals issued by stakeholders organized by business, usage, and system categories
 - G-S07: Two-tier secrets (clan vars + sops-nix) (achieved)
 - G-S08: Multi-channel resilience (preserved)
 
-### [Domain model](domain-model/)
+### [Domain model](/development/context/domain-model/)
 
 Description of the Nix ecosystem domain and current architecture components.
 
@@ -89,7 +89,7 @@ Description of the Nix ecosystem domain and current architecture components.
 - Current architecture (dendritic flake-parts, clan-core, multi-channel resilience, sops-nix)
 - Domain processes (workflows for configuration, secrets, multi-host coordination)
 
-### [Glossary](glossary/)
+### [Glossary](/development/context/glossary/)
 
 Important terms, abbreviations, synonyms, and descriptions.
 

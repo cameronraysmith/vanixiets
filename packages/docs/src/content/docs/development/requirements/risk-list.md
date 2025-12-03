@@ -218,7 +218,7 @@ Incremental migration strategy and rollback procedures validated across entire f
 ### References
 
 - Migration assessment: docs/notes/clan/migration-assessment.md
-- [Usage model](usage-model/) - UC-007: Migration use case
+- [Usage model](/development/requirements/usage-model/) - UC-007: Migration use case
 
 ## R-004: Primary workstation (stibnite) migration risk
 
@@ -374,8 +374,8 @@ Both systems coexist as designed in Epics 1-7.
 ### References
 
 - Migration plan: Appendix on secrets migration strategy
-- [Usage model](usage-model/) - UC-003: Declarative secrets management
-- [Security](quality-requirements/) - QR-005: Secrets encryption requirements
+- [Usage model](/development/requirements/usage-model/) - UC-003: Declarative secrets management
+- [Security](/development/requirements/quality-requirements/) - QR-005: Secrets encryption requirements
 
 ## R-006: Breaking changes in upstream dependencies
 
@@ -450,7 +450,7 @@ Updates to nixpkgs, dendritic-flake-parts, or clan-core could introduce breaking
 ### References
 
 - [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Multi-channel resilience
-- [System constraints](system-constraints/) - SC-003: Input locking
+- [System constraints](/development/requirements/system-constraints/) - SC-003: Input locking
 
 ## R-007: Phase 0 validation revealing architectural incompatibility
 
@@ -598,8 +598,8 @@ NAT traversal functioning, connectivity reliable across fleet in Epics 1-7.
 
 ### References
 
-- [Usage model](usage-model/) - UC-006: Overlay network use case
-- [System constraints](system-constraints/) - SC-009: Network constraints
+- [Usage model](/development/requirements/usage-model/) - UC-006: Overlay network use case
+- [System constraints](/development/requirements/system-constraints/) - SC-009: Network constraints
 
 ## R-009: Multi-host synchronization failures
 
@@ -675,7 +675,7 @@ Deployment coordination and role-based configuration validated in Epics 1-7.
 
 ### References
 
-- [Usage model](usage-model/) - UC-004: Multi-host services
+- [Usage model](/development/requirements/usage-model/) - UC-004: Multi-host services
 - [Domain model](../context/domain-model/) - Clan service instances
 
 ## R-010: Learning curve for dendritic + clan patterns
@@ -796,9 +796,9 @@ Comprehensive documentation created, patterns validated across 8-machine product
 - [Stakeholders](../context/stakeholders/) - Risk decision authority
 
 **Requirements**:
-- [Usage model](usage-model/) - Use cases affected by risks
-- [Quality requirements](quality-requirements/) - Quality attributes at risk
-- [Deployment requirements](deployment-requirements/) - Deployment failure risks
+- [Usage model](/development/requirements/usage-model/) - Use cases affected by risks
+- [Quality requirements](/development/requirements/quality-requirements/) - Quality attributes at risk
+- [Deployment requirements](/development/requirements/deployment-requirements/) - Deployment failure risks
 
 **Migration planning** (internal):
 - docs/notes/clan/integration-plan.md - Complete migration strategy

@@ -8,6 +8,6 @@ Development documentation organized using AMDiRE (Architecture, Monitoring, Deve
 
 ## Sections
 
-- [Architecture](architecture/) - Architectural decisions and technical design documentation
-- [Traceability](traceability/) - Requirements traceability and CI/CD philosophy
-- [Work items](work-items/) - Project task tracking and backlog management
+- [Architecture](/development/architecture/) - Architectural decisions and technical design documentation
+- [Traceability](/development/traceability/) - Requirements traceability and CI/CD philosophy
+- [Work items](/development/work-items/) - Project task tracking and backlog management
