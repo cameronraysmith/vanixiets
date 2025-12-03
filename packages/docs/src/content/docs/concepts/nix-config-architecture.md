@@ -19,7 +19,7 @@ This enables perSystem configurations and composable flake modules, providing th
 
 ### Layer 2: Module organization (dendritic pattern)
 
-Uses the [dendritic flake-parts pattern](dendritic-architecture) for module organization.
+Uses the [dendritic flake-parts pattern](/concepts/dendritic-architecture/) for module organization.
 Every Nix file is a flake-parts module, organized by *aspect* (feature) rather than by *host*.
 
 **Key principle**: Configuration is organized by what it does, not which machine it runs on.
@@ -30,7 +30,7 @@ Every Nix file is a flake-parts module, organized by *aspect* (feature) rather t
 - Cross-cutting configuration spanning NixOS, nix-darwin, and home-manager
 - Aggregate modules for composing related features
 
-See [Dendritic Architecture](dendritic-architecture) for detailed explanation.
+See [Dendritic Architecture](/concepts/dendritic-architecture/) for detailed explanation.
 
 ### Layer 3: Multi-machine coordination (clan-core)
 
@@ -43,7 +43,7 @@ Clan orchestrates deployments across the machine fleet but doesn't replace under
 - System-level secrets generation (clan vars)
 - Unified deployment tooling
 
-See [Clan Integration](clan-integration) for detailed explanation.
+See [Clan Integration](/concepts/clan-integration/) for detailed explanation.
 
 ### Layer 4: Overlay composition (multi-channel resilience)
 
@@ -140,7 +140,7 @@ Two-tier secrets model:
 **Tier 1 examples**: SSH host keys, zerotier identities, LUKS passphrases
 **Tier 2 examples**: GitHub tokens, API keys, signing keys
 
-See [Clan Integration](clan-integration) for details on two-tier secrets.
+See [Clan Integration](/concepts/clan-integration/) for details on two-tier secrets.
 
 ## Integration points
 
@@ -201,6 +201,6 @@ The combination provides:
 
 ## See also
 
-- [Dendritic Architecture](dendritic-architecture) - Module organization pattern details
-- [Clan Integration](clan-integration) - Multi-machine coordination details
+- [Dendritic Architecture](/concepts/dendritic-architecture/) - Module organization pattern details
+- [Clan Integration](/concepts/clan-integration/) - Multi-machine coordination details
 - [Repository Structure](/reference/repository-structure) - Complete directory layout
