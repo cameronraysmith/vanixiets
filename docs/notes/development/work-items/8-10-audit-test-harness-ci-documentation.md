@@ -1,6 +1,6 @@
 # Story 8.10: Audit Test Harness and CI Documentation
 
-Status: drafted
+Status: review
 
 ## Story
 
@@ -181,18 +181,18 @@ Story 8.5 structural audit identified `development/traceability/` as a HIGH prio
 
 ### Task 6: Validation (AC: 9, 10)
 
-- [ ] 6.1 Validate Starlight build
-  - [ ] 6.1.1 Run `just docs-build`
-  - [ ] 6.1.2 Verify all new pages render correctly
-  - [ ] 6.1.3 Check for frontmatter warnings
-- [ ] 6.2 Validate links
-  - [ ] 6.2.1 Run `just docs-linkcheck`
-  - [ ] 6.2.2 Fix any broken internal links
-  - [ ] 6.2.3 Verify cross-references work bidirectionally
-- [ ] 6.3 Manual review
-  - [ ] 6.3.1 Verify contributing/testing.md reads coherently
-  - [ ] 6.3.2 Verify test-harness.md parity matrix is accurate
-  - [ ] 6.3.3 Confirm no placeholder content remains
+- [x] 6.1 Validate Starlight build
+  - [x] 6.1.1 Run `just docs-build` - 77 pages indexed
+  - [x] 6.1.2 Verify all new pages render correctly - testing.md, test-harness.md included
+  - [x] 6.1.3 Check for frontmatter warnings - none
+- [x] 6.2 Validate links
+  - [x] 6.2.1 Run `just docs-linkcheck` - "All internal links are valid"
+  - [x] 6.2.2 Fix any broken internal links - none found
+  - [x] 6.2.3 Verify cross-references work bidirectionally - confirmed
+- [x] 6.3 Manual review
+  - [x] 6.3.1 Verify contributing/testing.md reads coherently - structured with philosophy, categories, troubleshooting
+  - [x] 6.3.2 Verify test-harness.md parity matrix is accurate - 15 CI jobs mapped
+  - [x] 6.3.3 Confirm no placeholder content remains - all content complete
 
 ## Dev Notes
 
