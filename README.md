@@ -20,7 +20,7 @@
 
 ## What This Provides
 
-Nix flake-based system configurations for NixOS, nix-darwin, and home-manager using three-layer architecture: flake-parts modular composition, nixos-unified directory-based autowiring, and multi-channel overlay composition.
+Nix flake-based system configurations for NixOS, nix-darwin, and home-manager using dendritic flake-parts pattern with clan-core integration for multi-machine coordination and multi-channel overlay composition.
 
 ## Quick Start
 
@@ -46,9 +46,9 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ## Features
 
-⊕ **Directory-based autowiring** - nixos-unified scans filesystem structure to automatically generate flake outputs (configurations → darwinConfigurations/nixosConfigurations/homeConfigurations, modules → flakeModules/darwinModules/nixosModules, overlays → overlays.*)
+⊕ **Dendritic module organization** - import-tree auto-discovers Nix files organized by aspect (feature) rather than host, with every file being a flake-parts module that exports to dendritic namespaces (flake.modules.darwin.*, flake.modules.home.*, flake.modules.nixos.*)
 
-⋈ **Per-package nixpkgs channel selection** - Multi-channel overlay architecture enables unstable default with selective stable fallbacks via overlays/infra/hotfixes.nix without requiring full flake.lock rollback
+⋈ **Per-package nixpkgs channel selection** - Multi-channel overlay architecture enables unstable default with selective stable fallbacks via modules/nixpkgs/overlays/hotfixes.nix without requiring full flake.lock rollback
 
 ⊛ **Cross-platform deployment targets** - NixOS, nix-darwin, or home-manager configurations
 
@@ -66,7 +66,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 [Bootstrap Guide](https://infra.cameronraysmith.net/guides/getting-started) • [Host Onboarding](https://infra.cameronraysmith.net/guides/host-onboarding) • [Home Manager Onboarding](https://infra.cameronraysmith.net/guides/home-manager-onboarding)
 
 **Architecture:**
-[Nix-Config Architecture](https://infra.cameronraysmith.net/concepts/nix-config-architecture) • [Understanding Autowiring](https://infra.cameronraysmith.net/concepts/understanding-autowiring) • [Multi-User Patterns](https://infra.cameronraysmith.net/concepts/multi-user-patterns) • [Repository Structure](https://infra.cameronraysmith.net/reference/repository-structure)
+[Nix-Config Architecture](https://infra.cameronraysmith.net/concepts/nix-config-architecture) • [Dendritic Architecture](https://infra.cameronraysmith.net/concepts/dendritic-architecture) • [Multi-User Patterns](https://infra.cameronraysmith.net/concepts/multi-user-patterns) • [Repository Structure](https://infra.cameronraysmith.net/reference/repository-structure)
 
 **Operations:**
 [Secrets Management](https://infra.cameronraysmith.net/guides/secrets-management) • [Nixpkgs Hotfixes](https://infra.cameronraysmith.net/development/architecture/nixpkgs-hotfixes) • [Handling Broken Packages](https://infra.cameronraysmith.net/guides/handling-broken-packages)
@@ -79,7 +79,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ## Credits
 
-Built with [flake-parts](https://github.com/hercules-ci/flake-parts), [nixos-unified](https://github.com/srid/nixos-unified), and overlay pattern from [mirkolenz/nixos](https://github.com/mirkolenz/nixos).
+Built with [flake-parts](https://github.com/hercules-ci/flake-parts), [import-tree](https://github.com/vic/import-tree), [clan-core](https://clan.lol), and overlay patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos).
 
 See [complete credits](https://infra.cameronraysmith.net/about/credits) for full acknowledgments.
 
