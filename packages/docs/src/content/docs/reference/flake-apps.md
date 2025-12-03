@@ -1,6 +1,8 @@
 ---
 title: Flake Apps
 description: Reference for nix flake apps that wrap configuration activation
+sidebar:
+  order: 3
 ---
 
 This reference documents the flake apps provided by the infra repository.

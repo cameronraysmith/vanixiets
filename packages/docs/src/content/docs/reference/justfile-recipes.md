@@ -1,6 +1,8 @@
 ---
 title: Justfile Recipes
 description: Complete reference for all justfile recipes organized by functional group
+sidebar:
+  order: 4
 ---
 
 This reference documents all justfile recipes available in the infra repository.
