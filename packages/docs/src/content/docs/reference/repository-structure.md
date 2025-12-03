@@ -1,6 +1,8 @@
 ---
 title: Repository Structure
 description: Directory layout for dendritic flake-parts + clan-core architecture
+sidebar:
+  order: 2
 ---
 
 Complete reference for the repository structure using dendritic flake-parts organization with clan-core integration.

@@ -1,6 +1,8 @@
 ---
 title: CI Jobs
 description: Reference for GitHub Actions CI jobs and their local equivalents
+sidebar:
+  order: 5
 ---
 
 This reference documents the CI jobs defined in `.github/workflows/ci.yaml` and how to run equivalent checks locally.
