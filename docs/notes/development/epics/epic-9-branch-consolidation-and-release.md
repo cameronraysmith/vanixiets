@@ -99,9 +99,9 @@ So that ephemeral migration artifacts are cleaned up while preserving valuable r
 **Content triage categories:**
 - NVIDIA docs (`nvidia-module-analysis.md`, 671 lines): EVALUATE placement (development reference, may not belong in public Starlight)
 - Retrospectives (epic-7, epic-8 retros): EVALUATE preservation value
-- Epic definitions: DELETE (superseded by PRD and Starlight dev docs)
+- Epic definitions: DEFER deletion to Story 9.3 (needed for tracking until merge)
 - Research docs: EVALUATE case-by-case
-- Sprint artifacts (`sprint-status.yaml`, `work-items/*.md`): DELETE (ephemeral by design)
+- Sprint artifacts (`sprint-status.yaml`, `work-items/*.md`, `epics/*.md`): DEFER deletion to Story 9.3 (needed for tracking until merge)
 
 **And** content triage decisions should be documented:
 - Create content triage matrix with decisions
@@ -121,7 +121,8 @@ So that ephemeral migration artifacts are cleaned up while preserving valuable r
 
 **Technical Notes:**
 - docs/notes/ is NOT being deleted - this is selective cleanup
-- Sprint artifacts are ephemeral by design (safe to delete post-merge)
+- Sprint management files (`sprint-status.yaml`, `work-items/*.md`, `epics/*.md`) are RETAINED until Story 9.3
+- Deletion of ephemeral sprint artifacts happens as final pre-merge cleanup in Story 9.3
 - NVIDIA docs may be valuable development reference (decide placement)
 - Retrospectives may inform future work (evaluate preservation)
 - Use `fd` and `rg` to audit for stale cross-references
@@ -220,7 +221,13 @@ So that the dendritic + clan architecture is officially released.
 **Acceptance Criteria:**
 
 **Given** CI/CD validation passed (Story 9.2)
-**When** I merge clan-01 to main
+**When** I prepare for merge
+**Then** pre-merge cleanup should:
+- Delete ephemeral sprint artifacts (`docs/notes/development/sprint-status.yaml`, `work-items/*.md`, `epics/*.md`)
+- Commit cleanup with message: `chore: remove ephemeral sprint management artifacts`
+- Verify `nix flake check` still passes after cleanup
+
+**And when** I merge clan-01 to main
 **Then** merge should:
 - Use fast-forward merge if possible (`git merge --ff-only`)
 - Fall back to merge commit if fast-forward not possible
@@ -247,6 +254,8 @@ So that the dendritic + clan architecture is officially released.
 **Prerequisites:** Stories 9.0a, 9.0b, 9.1, 9.2 complete (documentation updated, content cleaned, bookmarks created, CI validated)
 
 **Technical Notes:**
+- Pre-merge cleanup removes sprint management files that were only needed during Epic 9 execution
+- Sprint artifacts are ephemeral by design - their purpose ends when the epic completes
 - Merge preference: `git checkout main && git merge --ff-only clan-01`
 - If ff not possible: `git merge clan-01` (creates merge commit)
 - Release tag: `git tag -a v1.0.0 -m "Release message"`
@@ -274,6 +283,7 @@ So that the dendritic + clan architecture is officially released.
 - [ ] Essential content preserved or migrated before any cleanup
 - [ ] Bookmark tags created at all branch boundaries
 - [ ] All CI/CD workflows passing on clan-01
+- [ ] Ephemeral sprint artifacts deleted in pre-merge cleanup
 - [ ] clan-01 merged to main successfully
 - [ ] Release tag with semantic version applied
 - [ ] Changelog published with release
