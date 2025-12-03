@@ -2,10 +2,10 @@
 title: "ADR-0017: Dendritic Overlay Patterns"
 ---
 
-**Status**: Accepted
-**Date**: 2024-12-02
-**Scope**: Nix configuration
-**Supersedes**: [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/)
+- **Status**: Accepted
+- **Date**: 2024-12-02
+- **Scope**: Nix configuration
+- **Supersedes**: [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/)
 
 ## Context
 
