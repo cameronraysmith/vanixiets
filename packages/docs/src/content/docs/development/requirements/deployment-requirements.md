@@ -736,5 +736,6 @@ darwin-rebuild switch --flake .#<hostname>
 
 **Architecture**:
 - [CI philosophy](../../traceability/ci-philosophy/) - Validation approach
+- [ADR-0021: Terranix Infrastructure Provisioning](/development/architecture/adrs/0021-terranix-infrastructure-provisioning/) - VPS deployment architecture decisions
 - nix-darwin documentation: https://github.com/LnL7/nix-darwin
 - NixOS manual: https://nixos.org/manual/nixos/stable/

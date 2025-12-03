@@ -49,6 +49,8 @@ This hierarchy documents the current dendritic flake-parts + clan-core architect
 
 **Related use cases**: UC-002 (Add feature module)
 
+See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adrs/0018-dendritic-flake-parts-architecture/) for module auto-discovery patterns.
+
 ### CM-003: Host configuration generation
 
 **Purpose**: Generate system configurations for specific hosts
