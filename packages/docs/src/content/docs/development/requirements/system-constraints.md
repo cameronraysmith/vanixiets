@@ -364,6 +364,8 @@ inventory = {
 - Clan validates inventory structure at evaluation
 - Type errors reported during nix flake check
 
+See [ADR-0019: Clan-Core Orchestration](/development/architecture/adrs/0019-clan-core-orchestration/) for architectural decisions regarding clan integration.
+
 ### Vars system constraints
 
 **Generator script requirements**:
