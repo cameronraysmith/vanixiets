@@ -652,7 +652,7 @@ development_status:
   # Addresses Story 8.7 traceability gaps: missing ADRs for dendritic, clan-core, integration
   # Scope: ADR-0018 (dendritic), ADR-0019 (clan), ADR-0020 (integration), ADR-0021 (terranix, optional)
   # These are the most important architectural decisions, yet were undocumented
-  story-8-12: drafted
+  story-8-12: in-progress
   story-8-12-title: "Create foundational architecture decision records"
   story-8-12-notes: "DRAFTED 2025-12-02 - Addresses Story 8.7 traceability gaps. 4 ADRs: ADR-0018 (dendritic flake-parts), ADR-0019 (clan-core), ADR-0020 (dendritic+clan integration), ADR-0021 (terranix, optional). 28 ACs, 6 task groups, 8-14h estimated. Story file: work-items/8-12-create-foundational-architecture-decision-records.md"
   # Phase 1 retrospective complete, Phase 2 retrospective pending after Stories 8.5-8.12
