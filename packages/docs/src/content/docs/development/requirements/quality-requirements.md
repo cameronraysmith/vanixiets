@@ -507,8 +507,8 @@ fd -e yaml sops/ -x file {} | rg "ASCII text"
 - [Constraints and rules](../context/constraints-and-rules/) - Architectural restrictions
 
 **Requirements**:
-- [Usage model](usage-model/) - Use cases supporting quality attributes
-- [Functional hierarchy](functional-hierarchy/) - Functions organized by quality
+- [Usage model](/development/requirements/usage-model/) - Use cases supporting quality attributes
+- [Functional hierarchy](/development/requirements/functional-hierarchy/) - Functions organized by quality
 
 **Architecture**:
 - [ADR-0014: Design principles](../../architecture/adrs/0014-design-principles/) - Framework independence, type safety, template duality, bias toward removal

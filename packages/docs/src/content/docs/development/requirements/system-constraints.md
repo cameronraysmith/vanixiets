@@ -620,8 +620,8 @@ nix-store --query --tree $(nix eval --raw .#darwinConfigurations.<hostname>.conf
 - [Domain model](../context/domain-model/) - Technical architecture
 
 **Requirements**:
-- [Quality requirements](quality-requirements/) - Quality attributes shaped by constraints
-- [Deployment requirements](deployment-requirements/) - Operational constraints
+- [Quality requirements](/development/requirements/quality-requirements/) - Quality attributes shaped by constraints
+- [Deployment requirements](/development/requirements/deployment-requirements/) - Operational constraints
 
 **Architecture**:
 - ADRs - Architectural decisions within constraints

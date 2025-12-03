@@ -994,9 +994,9 @@ Operational Functions (OF) [8-machine fleet operations]
 - [Goals and objectives](../context/goals-and-objectives/) - System goals
 
 **Requirements**:
-- [Usage model](usage-model/) - Use cases invoking these functions
-- [Quality requirements](quality-requirements/) - Non-functional requirements
-- [System vision](system-vision/) - Feature overview
+- [Usage model](/development/requirements/usage-model/) - Use cases invoking these functions
+- [Quality requirements](/development/requirements/quality-requirements/) - Non-functional requirements
+- [System vision](/development/requirements/system-vision/) - Feature overview
 
 **Architecture**:
 - [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Package management implementation

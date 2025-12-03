@@ -730,9 +730,9 @@ darwin-rebuild switch --flake .#<hostname>
 - [Domain model](../context/domain-model/) - Technical architecture
 
 **Requirements**:
-- [Usage model](usage-model/) - Deployment use cases (UC-001, UC-007)
-- [Quality requirements](quality-requirements/) - Reliability, performance
-- [System constraints](system-constraints/) - Platform limitations
+- [Usage model](/development/requirements/usage-model/) - Deployment use cases (UC-001, UC-007)
+- [Quality requirements](/development/requirements/quality-requirements/) - Reliability, performance
+- [System constraints](/development/requirements/system-constraints/) - Platform limitations
 
 **Architecture**:
 - [CI philosophy](../../traceability/ci-philosophy/) - Validation approach

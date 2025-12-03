@@ -41,7 +41,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 **Read this first**: Provides orientation to the entire Requirements layer.
 
-**Document**: [System vision](system-vision/)
+**Document**: [System vision](/development/requirements/system-vision/)
 
 ### Usage model
 
@@ -66,7 +66,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 **Use when**: Understanding user workflows, planning features, validating implementations.
 
-**Document**: [Usage model](usage-model/)
+**Document**: [Usage model](/development/requirements/usage-model/)
 
 ### Functional hierarchy
 
@@ -91,7 +91,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 **Use when**: Understanding system capabilities, planning testing, documenting features.
 
-**Document**: [Functional hierarchy](functional-hierarchy/)
+**Document**: [Functional hierarchy](/development/requirements/functional-hierarchy/)
 
 ### Quality requirements
 
@@ -116,7 +116,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 **Use when**: Evaluating architectural decisions, planning quality assurance, measuring success.
 
-**Document**: [Quality requirements](quality-requirements/)
+**Document**: [Quality requirements](/development/requirements/quality-requirements/)
 
 ### Deployment requirements
 
@@ -143,7 +143,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 **Use when**: Planning deployments, troubleshooting activation issues, designing rollback procedures.
 
-**Document**: [Deployment requirements](deployment-requirements/)
+**Document**: [Deployment requirements](/development/requirements/deployment-requirements/)
 
 ### System constraints
 
@@ -170,7 +170,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 **Use when**: Understanding system boundaries, troubleshooting limitations, planning workarounds.
 
-**Document**: [System constraints](system-constraints/)
+**Document**: [System constraints](/development/requirements/system-constraints/)
 
 ### Risk list
 
@@ -197,28 +197,28 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 **Use when**: Planning migration phases, preparing contingencies, managing project risk.
 
-**Document**: [Risk list](risk-list/)
+**Document**: [Risk list](/development/requirements/risk-list/)
 
 ## Using Requirements documentation
 
 ### For migration planning
 
 **Phase 0 preparation** (Validation):
-1. Review [system vision](system-vision/) for overall goals
-2. Study UC-001, UC-002, UC-003 in [usage model](usage-model/) for basic patterns
-3. Review R-001, R-007 in [risk list](risk-list/) for validation objectives
-4. Understand SC-005, SC-006 in [system constraints](system-constraints/) for integration constraints
+1. Review [system vision](/development/requirements/system-vision/) for overall goals
+2. Study UC-001, UC-002, UC-003 in [usage model](/development/requirements/usage-model/) for basic patterns
+3. Review R-001, R-007 in [risk list](/development/requirements/risk-list/) for validation objectives
+4. Understand SC-005, SC-006 in [system constraints](/development/requirements/system-constraints/) for integration constraints
 
 **Phase 1 preparation** (VPS deployment):
-1. Review UC-001, UC-006 in [usage model](usage-model/) for bootstrap and networking
-2. Study DR-002 in [deployment requirements](deployment-requirements/) for NixOS deployment
-3. Review R-002, R-008 in [risk list](risk-list/) for VPS and network risks
+1. Review UC-001, UC-006 in [usage model](/development/requirements/usage-model/) for bootstrap and networking
+2. Study DR-002 in [deployment requirements](/development/requirements/deployment-requirements/) for NixOS deployment
+3. Review R-002, R-008 in [risk list](/development/requirements/risk-list/) for VPS and network risks
 
 **Phase 2-5 preparation** (Darwin host migrations):
-1. Review UC-007 in [usage model](usage-model/) for migration workflow
-2. Study DR-001 in [deployment requirements](deployment-requirements/) for darwin deployment
-3. Review R-003, R-004 in [risk list](risk-list/) for workflow and stibnite risks
-4. Reference MF-* functions in [functional hierarchy](functional-hierarchy/) for migration operations
+1. Review UC-007 in [usage model](/development/requirements/usage-model/) for migration workflow
+2. Study DR-001 in [deployment requirements](/development/requirements/deployment-requirements/) for darwin deployment
+3. Review R-003, R-004 in [risk list](/development/requirements/risk-list/) for workflow and stibnite risks
+4. Reference MF-* functions in [functional hierarchy](/development/requirements/functional-hierarchy/) for migration operations
 
 ### For feature development
 
@@ -230,10 +230,10 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 5. Implement following patterns from usage model examples
 
 **Handling broken package**:
-1. Follow UC-005 in [usage model](usage-model/)
-2. Reference PM-* functions in [functional hierarchy](functional-hierarchy/)
-3. Apply mitigation from R-006 in [risk list](risk-list/)
-4. Consult SC-007 in [system constraints](system-constraints/) for build system limitations
+1. Follow UC-005 in [usage model](/development/requirements/usage-model/)
+2. Reference PM-* functions in [functional hierarchy](/development/requirements/functional-hierarchy/)
+3. Apply mitigation from R-006 in [risk list](/development/requirements/risk-list/)
+4. Consult SC-007 in [system constraints](/development/requirements/system-constraints/) for build system limitations
 
 ### For validation and testing
 
