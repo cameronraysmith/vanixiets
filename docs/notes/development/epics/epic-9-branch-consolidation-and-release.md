@@ -44,6 +44,7 @@ So that developers have accurate documentation matching the current dendritic fl
 **Given** guides written during nixos-unified architecture
 **When** I audit and rewrite stale migration guides
 **Then** the following files should be updated:
+- `README.md` - update to reflect dendritic flake-parts + clan architecture, remove nixos-unified references
 - `guides/handling-broken-packages.md` - all paths reference old `overlays/` structure
 - `guides/adding-custom-packages.md` - references old `overlays/packages/` pattern
 
@@ -71,6 +72,7 @@ So that developers have accurate documentation matching the current dendritic fl
 **Prerequisites:** Epic 8 complete (dendritic migration finished)
 
 **Technical Notes:**
+- README.md is top-level repository documentation (first thing users see)
 - Focus on guides/, not references/ (reference docs handled separately)
 - Validate examples with `nix eval` where practical
 - Ensure file path examples are discoverable via `fd` or `rg`
