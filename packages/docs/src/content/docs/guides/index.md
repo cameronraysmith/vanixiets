@@ -25,5 +25,5 @@ Task-oriented guides for common operations and workflows with this infrastructur
 ## Architecture References
 
 For understanding the underlying patterns:
-- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization pattern
+- [Dendritic flake-parts Architecture](/concepts/dendritic-architecture) - Module organization pattern
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and secrets
