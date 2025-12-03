@@ -262,12 +262,12 @@ Secrets Flow:
 
 ### Core workflows (operational)
 
-**UC-001**: Bootstrap new host with minimal configuration (see [usage-model](/development/requirements/usage-model/#uc-001-bootstrap-new-host)).
-**UC-002**: Add feature module spanning multiple platforms (see [usage-model](/development/requirements/usage-model/#uc-002-add-cross-platform-feature-module)).
-**UC-003**: Manage secrets via declarative generators (see [usage-model](/development/requirements/usage-model/#uc-003-manage-secrets-declaratively)).
-**UC-004**: Deploy coordinated service across hosts (see [usage-model](/development/requirements/usage-model/#uc-004-deploy-coordinated-multi-host-service)).
-**UC-005**: Handle broken packages with multi-channel resilience (see [usage-model](/development/requirements/usage-model/#uc-005-handle-broken-package)).
-**UC-006**: Establish secure overlay network (see [usage-model](/development/requirements/usage-model/#uc-006-establish-overlay-network)).
+**UC-001**: Bootstrap new host with minimal configuration (see [usage-model](/development/requirements/usage-model/#uc-001-bootstrap-new-host-with-minimal-configuration)).
+**UC-002**: Add feature module spanning multiple platforms (see [usage-model](/development/requirements/usage-model/#uc-002-add-feature-module-spanning-multiple-platforms)).
+**UC-003**: Manage secrets via declarative generators (see [usage-model](/development/requirements/usage-model/#uc-003-manage-secrets-via-declarative-generators)).
+**UC-004**: Deploy coordinated service across hosts (see [usage-model](/development/requirements/usage-model/#uc-004-deploy-coordinated-service-across-hosts)).
+**UC-005**: Handle broken packages with multi-channel resilience (see [usage-model](/development/requirements/usage-model/#uc-005-handle-broken-package-with-multi-channel-resilience)).
+**UC-006**: Establish secure overlay network (see [usage-model](/development/requirements/usage-model/#uc-006-establish-secure-overlay-network)).
 **UC-007**: Update packages across all 8 hosts.
 **UC-008**: Deploy configuration changes with rollback capability.
 **UC-009**: Set up development environment on new machine.
