@@ -671,16 +671,29 @@ development_status:
     Merge clan-01 branch to main with bookmark tags at branch boundaries.
     CI/CD validation, release tagging automation.
     Depends on Epic 8 complete (docs accurate before merge).
+    Stories 9.0a and 9.0b added from Epic 8 retrospective findings.
+  story-9-0a: backlog
+  story-9-0a-title: "Update stale migration guides for dendritic architecture"
+  story-9-0b: backlog
+  story-9-0b-title: "Clean up migration artifacts and migrate essential content"
   story-9-1: backlog
   story-9-1-title: "Create bookmark tags at branch boundaries (docs, clan, clan-01)"
   story-9-2: backlog
   story-9-2-title: "Validate CI/CD workflows on clan-01"
   story-9-3: backlog
   story-9-3-title: "Merge clan-01 to main and trigger release"
-  epic-9-retrospective: optional
+  epic-9-retrospective: none
 
 # Sprint Change History
 sprint_change_history:
+  - date: "2025-12-03"
+    type: "epic-extension"
+    changes:
+      - "Epic 9: Added Stories 9.0a and 9.0b from Epic 8 retrospective findings"
+      - "Story 9.0a: Update stale migration guides for dendritic architecture"
+      - "Story 9.0b: Clean up migration artifacts and migrate essential content"
+      - "Epic 9 retrospective: Changed from optional to none"
+    rationale: "Epic 8 retrospective identified stale guides and content triage needs before branch merge"
   - date: "2025-12-02"
     type: "epic-extension"
     changes:
