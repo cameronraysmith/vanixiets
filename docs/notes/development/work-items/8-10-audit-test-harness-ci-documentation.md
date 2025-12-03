@@ -136,21 +136,21 @@ Story 8.5 structural audit identified `development/traceability/` as a HIGH prio
 
 ### Task 3: Create CI-Local Parity Documentation (AC: 4, 5, 6, 7)
 
-- [ ] 3.1 Create `packages/docs/src/content/docs/development/traceability/test-harness.md`
-  - [ ] 3.1.1 Add Starlight frontmatter (title, description)
-  - [ ] 3.1.2 Write introduction explaining CI-local parity purpose
-- [ ] 3.2 Build CI job → local recipe mapping table
-  - [ ] 3.2.1 Map each CI job to equivalent local command
-  - [ ] 3.2.2 Document required environment (platform, secrets)
-  - [ ] 3.2.3 Note expected runtime per job category
-- [ ] 3.3 Document CI-tested vs manual-only recipes
-  - [ ] 3.3.1 List recipes exercised by CI with job references
-  - [ ] 3.3.2 List manual-only recipes with rationale
-  - [ ] 3.3.3 Document exclusion reasons (cost, platform, flakiness)
-- [ ] 3.4 Document skip conditions
-  - [ ] 3.4.1 Platform-specific skips
-  - [ ] 3.4.2 Content-addressed caching logic (hash-sources)
-  - [ ] 3.4.3 Manual skip/force mechanisms
+- [x] 3.1 Create `packages/docs/src/content/docs/development/traceability/test-harness.md`
+  - [x] 3.1.1 Add Starlight frontmatter (title, description)
+  - [x] 3.1.2 Write introduction explaining CI-local parity purpose
+- [x] 3.2 Build CI job → local recipe mapping table
+  - [x] 3.2.1 Map each CI job to equivalent local command
+  - [x] 3.2.2 Document required environment (platform, secrets)
+  - [x] 3.2.3 Note expected runtime per job category
+- [x] 3.3 Document CI-tested vs manual-only recipes
+  - [x] 3.3.1 List recipes exercised by CI with job references
+  - [x] 3.3.2 List manual-only recipes with rationale
+  - [x] 3.3.3 Document exclusion reasons (cost, platform, flakiness)
+- [x] 3.4 Document skip conditions
+  - [x] 3.4.1 Platform-specific skips
+  - [x] 3.4.2 Content-addressed caching logic (hash-sources)
+  - [x] 3.4.3 Manual skip/force mechanisms
 
 ### Task 4: Document Module Test Options (AC: 8)
 
