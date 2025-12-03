@@ -6,10 +6,11 @@ This document catalogs migration risks with likelihood, impact, risk factors, an
 
 ## Overview
 
-The risk list identifies potential problems during the migration from nixos-unified to dendritic + clan architecture.
-Each risk includes assessment, affected phases, and concrete mitigation approaches.
+This document catalogs risks from the migration from nixos-unified to dendritic + clan architecture completed in November 2024 (Epics 1-7).
+Each risk includes original assessment, affected phases, mitigation strategies, and final status.
 
-Risks are organized by category and severity, enabling proactive management throughout the migration process.
+The migration successfully addressed all critical risks through Phase 0 validation, incremental deployment across 8 machines, and comprehensive testing.
+These risks are now primarily historical, documenting how challenges were anticipated and mitigated during the architectural transition.
 
 ## R-001: Dendritic + clan integration complexity
 
@@ -65,7 +66,8 @@ No production examples exist of dendritic flake-parts combined with clan-core, c
 
 ### Status
 
-**Not started** - Phase 0 validation pending
+**Mitigated** - Phase 0 validation completed (November 2024).
+Integration patterns validated in test-clan workspace, comprehensive documentation created, and patterns successfully applied across 8-machine production fleet in Epics 1-7.
 
 ### References
 
@@ -134,7 +136,8 @@ Deploying cinnabar VPS introduces ongoing costs and operational responsibilities
 
 ### Status
 
-**Not started** - Phase 1 pending
+**Mitigated** - VPS infrastructure deployed and operational (November 2024).
+Cinnabar VPS successfully deployed on Hetzner, zerotier controller operational, costs and management overhead within acceptable bounds as validated in Epics 1-7.
 
 ### References
 
@@ -208,7 +211,9 @@ Configuration changes during migration could break critical development workflow
 
 ### Status
 
-**Not started** - Phase 2 pending
+**Mitigated** - All darwin hosts successfully migrated (November 2024).
+Blackphos, rosegold, argentum, and stibnite all migrated to dendritic + clan architecture with minimal workflow disruption.
+Incremental migration strategy and rollback procedures validated across entire fleet in Epics 1-7.
 
 ### References
 
@@ -283,7 +288,9 @@ Migration of stibnite (primary workstation) has highest impact if problems occur
 
 ### Status
 
-**Not started** - Phase 5 pending (last migration phase)
+**Mitigated** - Stibnite successfully migrated (November 2024).
+Migration completed as final phase with minimal disruption.
+Prior validation on blackphos, rosegold, and argentum enabled confident migration of primary workstation in Epics 1-7.
 
 ### References
 
@@ -359,7 +366,10 @@ Transitioning from manual sops-nix secrets to declarative clan vars generation c
 
 ### Status
 
-**Not started** - Phase 1 begins secrets migration
+**Partially mitigated** - Hybrid approach implemented (November 2024).
+Generated secrets successfully migrated to clan vars across 8-machine fleet.
+External secrets remain in sops-nix as planned.
+Both systems coexist as designed in Epics 1-7.
 
 ### References
 
@@ -505,7 +515,9 @@ Test-clan validation could uncover fundamental incompatibilities requiring archi
 
 ### Status
 
-**Not started** - Phase 0 will discover if risk materializes
+**Mitigated** - Phase 0 validation confirmed compatibility (November 2024).
+No fundamental incompatibilities discovered.
+Dendritic + clan integration successful across 8-machine production deployment in Epics 1-7.
 
 ### References
 
@@ -580,7 +592,9 @@ Overlay network dependency introduces new failure modes: controller outages, pee
 
 ### Status
 
-**Not started** - Phase 1 introduces zerotier
+**Mitigated** - Zerotier network deployed and operational (November 2024).
+Cinnabar controller stable, all 8 machines connected via overlay network.
+NAT traversal functioning, connectivity reliable across fleet in Epics 1-7.
 
 ### References
 
@@ -655,7 +669,9 @@ Service instances spanning multiple hosts could have inconsistent configuration 
 
 ### Status
 
-**Not started** - Phase 1 begins multi-host coordination
+**Mitigated** - Multi-host services deployed successfully (November 2024).
+Zerotier and other multi-host services operational across 8-machine fleet.
+Deployment coordination and role-based configuration validated in Epics 1-7.
 
 ### References
 
@@ -730,7 +746,9 @@ Mastering new patterns requires time investment and could lead to suboptimal ear
 
 ### Status
 
-**Not started** - Phase 0 begins learning process
+**Mitigated** - Learning curve successfully navigated (November 2024).
+Dendritic + clan patterns mastered through Epics 1-7.
+Comprehensive documentation created, patterns validated across 8-machine production deployment.
 
 ### References
 
@@ -739,40 +757,36 @@ Mastering new patterns requires time investment and could lead to suboptimal ear
 
 ## Risk summary matrix
 
-| Risk | Likelihood | Impact | Phase | Priority |
-|------|-----------|--------|-------|----------|
-| R-001: Integration complexity | Medium | High | P0 | Critical |
-| R-002: VPS costs | High | Medium | P1 | Medium |
-| R-003: Workflow breakage | High | Variable | P2-5 | High |
-| R-004: Stibnite migration | Medium | Critical | P5 | Critical |
-| R-005: Secrets migration | Medium | High | P1-5 | High |
-| R-006: Dependency breakage | High | Medium | All | Medium |
-| R-007: Architecture incompatibility | Low-Medium | Very High | P0 | Critical |
-| R-008: Network issues | Medium | Low-Medium | P1+ | Low |
-| R-009: Multi-host sync | Low-Medium | Medium | P1+ | Low |
-| R-010: Learning curve | High | Low-Medium | All | Low |
+| Risk | Likelihood | Impact | Phase | Priority | Status (Nov 2024) |
+|------|-----------|--------|-------|----------|-------------------|
+| R-001: Integration complexity | Medium | High | P0 | Critical | **Mitigated** |
+| R-002: VPS costs | High | Medium | P1 | Medium | **Mitigated** |
+| R-003: Workflow breakage | High | Variable | P2-5 | High | **Mitigated** |
+| R-004: Stibnite migration | Medium | Critical | P5 | Critical | **Mitigated** |
+| R-005: Secrets migration | Medium | High | P1-5 | High | **Partially mitigated** |
+| R-006: Dependency breakage | High | Medium | All | Medium | **Ongoing** |
+| R-007: Architecture incompatibility | Low-Medium | Very High | P0 | Critical | **Mitigated** |
+| R-008: Network issues | Medium | Low-Medium | P1+ | Low | **Mitigated** |
+| R-009: Multi-host sync | Low-Medium | Medium | P1+ | Low | **Mitigated** |
+| R-010: Learning curve | High | Low-Medium | All | Low | **Mitigated** |
 
 ## Risk response strategy
 
-### Critical risks (must address proactively)
+### Historical risks (successfully mitigated in Epics 1-7, November 2024)
 
-- **R-001, R-007**: Phase 0 validation exists specifically to address
-- **R-004**: Migration order designed to minimize (stibnite last)
+- **R-001**: Integration complexity mitigated through Phase 0 validation in test-clan
+- **R-002**: VPS costs managed, cinnabar operational with minimal overhead
+- **R-003**: Workflow preservation achieved across all 4 darwin hosts
+- **R-004**: Stibnite migration successful as final phase
+- **R-005**: Hybrid secrets approach implemented (generated→clan vars, external→sops-nix)
+- **R-007**: Architecture compatibility confirmed, no fundamental issues found
+- **R-008**: Zerotier network stable across 8-machine fleet
+- **R-009**: Multi-host coordination working reliably
+- **R-010**: Learning curve navigated, comprehensive documentation created
 
-### High priority risks (active mitigation)
+### Ongoing risks (active monitoring)
 
-- **R-003**: Careful validation, rollback procedures, migration order
-- **R-005**: Hybrid approach, incremental migration
-
-### Medium priority risks (monitoring)
-
-- **R-002**: Cost-benefit analysis, automation
-- **R-006**: Input locking, conservative updates
-
-### Low priority risks (accept with awareness)
-
-- **R-008, R-009**: Graceful degradation, can operate without
-- **R-010**: Time allocation, documentation
+- **R-006**: Dependency breakage - continues to require input locking discipline and conservative update policy
 
 ## References
 
