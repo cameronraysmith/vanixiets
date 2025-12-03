@@ -172,43 +172,23 @@ modules/
 Each user has a module in `modules/home/users/`:
 
 ```nix
-# modules/home/users/crs58.nix
+# modules/home/users/user.nix
 { ... }:
 {
-  flake.modules.homeManager."users/crs58" = { config, pkgs, ... }: {
-    home.username = "crs58";
-    home.homeDirectory = "/Users/crs58";
+  flake.modules.homeManager."users/user" = { config, pkgs, ... }: {
+    home.username = "user";
+    home.homeDirectory = "/Users/user";
 
     # User-specific settings
     programs.git = {
-      userName = "Cameron Smith";
-      userEmail = "cameron@example.com";
+      userName = "User Name";
+      userEmail = "user@example.com";
     };
 
     # sops-nix user secrets
-    sops.secrets."users/crs58/github-token" = {
-      sopsFile = ./../../secrets/users/crs58.sops.yaml;
+    sops.secrets."users/user/github-token" = {
+      sopsFile = ./../../secrets/users/user.sops.yaml;
     };
-  };
-}
-```
-
-### Cameron/crs58 alias pattern
-
-On new machines, `cameron` is the preferred username (alias for crs58):
-
-```nix
-# modules/home/users/cameron.nix
-{ ... }:
-{
-  flake.modules.homeManager."users/cameron" = { config, pkgs, ... }: {
-    home.username = "cameron";
-    home.homeDirectory = "/Users/cameron";
-
-    # Same config as crs58, different username
-    imports = [
-      # Shared settings from crs58
-    ];
   };
 }
 ```
@@ -224,14 +204,14 @@ Admin users access secrets via:
 ```yaml
 # .sops.yaml
 keys:
-  - &crs58 age1...
+  - &admin age1...
   - &stibnite-host age1...
 
 creation_rules:
-  - path_regex: secrets/users/crs58\.sops\.yaml$
+  - path_regex: secrets/users/admin\.sops\.yaml$
     key_groups:
       - age:
-          - *crs58
+          - *admin
           - *stibnite-host
 ```
 
@@ -242,13 +222,13 @@ Non-admin users access only their personal secrets:
 ```yaml
 # .sops.yaml
 keys:
-  - &raquel age1...
+  - &user age1...
 
 creation_rules:
-  - path_regex: secrets/users/raquel\.sops\.yaml$
+  - path_regex: secrets/users/user\.sops\.yaml$
     key_groups:
       - age:
-          - *raquel
+          - *user
 ```
 
 ## Machine fleet user assignments
