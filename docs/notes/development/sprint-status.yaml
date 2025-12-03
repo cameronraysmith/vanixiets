@@ -645,7 +645,7 @@ development_status:
   # Primary issue: "current/target state inversion" - 9 files describe nixos-unified as current
   # Scope: 4 critical + 6 high + 2 medium + 3 low priority files = 15 files
   # Estimated effort: 18-24 hours (from Story 8.7 audit)
-  story-8-11: drafted
+  story-8-11: review
   story-8-11-title: "Remediate AMDiRE development documentation staleness"
   story-8-11-notes: "DRAFTED 2025-12-02 - Remediate Story 8.7 findings: fix current/target inversion in 9 files, update to 8-machine fleet, update ADR-0003. 18 ACs, 5 task groups, 15 files affected. 18-24h estimated."
   # Phase 1 retrospective complete, Phase 2 retrospective pending after Stories 8.5-8.11
