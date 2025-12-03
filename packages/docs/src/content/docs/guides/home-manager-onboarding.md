@@ -14,11 +14,11 @@ Use this procedure when:
 - The host already has the nix daemon and secrets infrastructure configured
 
 This guide assumes:
-- Host onboarding is complete (see [Host Onboarding](host-onboarding))
+- Host onboarding is complete (see [Host Onboarding](/guides/host-onboarding/))
 - The nix daemon is running and `/nix/store` is available
 - User configuration exists in the repository
 
-For initial setup, see [Bootstrap to Activation Tutorial](/tutorials/bootstrap-to-activation/) or ensure host onboarding is complete via [Host Onboarding](host-onboarding/).
+For initial setup, see [Bootstrap to Activation Tutorial](/tutorials/bootstrap-to-activation/) or ensure host onboarding is complete via [Host Onboarding](/guides/host-onboarding/).
 
 ## Architecture overview
 
@@ -458,6 +458,6 @@ Key points:
 
 ## See also
 
-- [Host Onboarding](host-onboarding) - Initial machine setup
+- [Host Onboarding](/guides/host-onboarding/) - Initial machine setup
 - [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization
 - [Clan Integration](/concepts/clan-integration) - Two-tier secrets architecture
