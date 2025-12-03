@@ -2,10 +2,10 @@
 title: "ADR-0020: Dendritic + Clan Integration"
 ---
 
-**Status**: Accepted
-**Date**: 2024-11-20
-**Scope**: Architecture integration
-**Synthesizes**: [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/), [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
+- **Status**: Accepted
+- **Date**: 2024-11-20
+- **Scope**: Architecture integration
+- **Synthesizes**: [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/), [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 
 ## Context
 
