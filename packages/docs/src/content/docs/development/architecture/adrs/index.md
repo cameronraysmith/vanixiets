@@ -15,6 +15,13 @@ Architecture Decision Records (ADRs) documenting key technical and design decisi
 - [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/) (Superseded by ADR-0017)
 - [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
 
+## Nix Fleet Architecture
+
+- [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
+- [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
+- [ADR-0020: Dendritic + Clan integration](0020-dendritic-clan-integration/)
+- [ADR-0021: Terranix infrastructure provisioning](0021-terranix-infrastructure-provisioning/)
+
 ## Monorepo Architecture
 
 - [ADR-0004: Monorepo structure](0004-monorepo-structure/)
