@@ -1,73 +1,172 @@
 ---
 title: Testing
-description: Comprehensive testing with Vitest and Playwright
+description: Comprehensive testing guide for infrastructure and documentation
 sidebar:
   order: 5
 ---
 
-Comprehensive testing documentation for the nix-config project.
+This guide covers the complete testing strategy for the infra repository, including infrastructure validation (nix-unit, validation checks, VM tests) and documentation testing (Vitest, Playwright).
 
-## Overview
+## Test philosophy
 
-This project uses a robust testing stack with type-safe patterns and functional programming principles:
+### Risk-based testing
 
-- **Vitest 3.x**: Fast unit and component testing with Astro integration
-- **Playwright**: Multi-browser E2E testing with type-safe APIs
-- **Astro Container API**: Component rendering and testing
-- **Nix**: Reproducible test environments with browser binaries
+Testing effort scales with change risk.
+Not all changes require the same validation depth.
 
-## Quick Start
+The testing strategy focuses on three principles:
+
+1. **Critical path first**: Validate core functionality that, if broken, would block all development.
+2. **Depth matches risk**: Configuration-only changes need less validation than module logic changes.
+3. **Trust boundaries**: Local validation for high-risk changes; trust CI for well-tested patterns.
+
+### Depth scaling by change type
+
+Match your validation depth to what you changed:
+
+| Change type | Recommended check | Rationale |
+|-------------|-------------------|-----------|
+| Config values only | `just check-fast` | Low risk, fast feedback (~1-2 min) |
+| Module logic | `just check` | Medium risk, need full validation (~5-7 min) |
+| New host/user | `just check` + manual deploy | High risk, full validation + real deployment |
+| CI workflow changes | Push to trigger CI | CI is the test |
+| Documentation only | `just docs-build` | Starlight validation, no nix checks needed |
+| Test infrastructure | `just check` | Test the tests |
+
+### When to run full checks
+
+Run comprehensive validation (`just check` or `nix flake check`) before:
+
+- Creating or updating a pull request
+- After rebasing on main
+- When touching test infrastructure (`modules/checks/`)
+- When adding new machines or users
+- After significant flake.lock updates
+
+For routine development iteration, `just check-fast` provides faster feedback by skipping VM integration tests.
+
+## Infrastructure testing
+
+Infrastructure tests validate the nix flake structure, machine configurations, and deployment safety.
+
+### Test categories
+
+| Category | File | Count | Purpose |
+|----------|------|-------|---------|
+| nix-unit | `modules/checks/nix-unit.nix` | 15 | Unit tests for flake structure and invariants |
+| validation | `modules/checks/validation.nix` | 7 | Configuration validation and naming conventions |
+| integration | `modules/checks/integration.nix` | 2 | VM boot tests for NixOS machines |
+| treefmt | (flake-parts) | 1 | Code formatting validation |
+| pre-commit | (flake-parts) | 1 | Pre-commit hook validation |
+
+### Running infrastructure tests
 
 ```bash
-# Enter nix development environment (manages all dependencies)
-nix develop
+# Run all checks (includes VM tests, ~5-7 minutes)
+just check
 
-# Install npm dependencies
-bun install
+# Run fast checks only (excludes VM tests, ~1-2 minutes)
+just check-fast
 
-# Run all tests
-just test
+# Run specific check
+nix build .#checks.aarch64-darwin.nix-unit
 
-# Run tests in watch mode
-just test-watch
-
-# Run E2E tests with UI
-just test-ui
-
-# Generate coverage report
-just test-coverage
+# Run with verbose output for debugging
+nix flake check --show-trace
 ```
 
-## Test structure
+### nix-unit tests
+
+nix-unit tests validate flake structure and configuration invariants without building derivations.
+
+| Test ID | Name | Type | What it validates |
+|---------|------|------|-------------------|
+| - | testFrameworkWorks | sanity | nix-unit framework functions correctly |
+| TC-001 | testRegressionTerraformModulesExist | regression | Terraform module exports exist |
+| TC-002 | testRegressionNixosConfigExists | regression | NixOS config structure valid |
+| TC-003 | testInvariantClanInventoryMachines | invariant | Expected machines in clan inventory |
+| TC-004 | testInvariantNixosConfigurationsExist | invariant | Expected NixOS configs present |
+| TC-005 | testInvariantDarwinConfigurationsExist | invariant | Expected Darwin configs present |
+| TC-006 | testInvariantHomeConfigurationsExist | invariant | Expected home configs present |
+| TC-008 | testFeatureDendriticModuleDiscovery | feature | import-tree discovers nixos modules |
+| TC-009 | testFeatureDarwinModuleDiscovery | feature | import-tree discovers darwin modules |
+| TC-010 | testFeatureNamespaceExports | feature | Modules export to correct namespaces |
+| TC-013 | testTypeSafetyModuleEvaluationIsolation | type-safety | Module structure validation |
+| TC-014 | testTypeSafetySpecialargsProgpagation | type-safety | inputs available via specialArgs |
+| TC-015 | testTypeSafetyNixosConfigStructure | type-safety | All configs have config attribute |
+| TC-016 | testTypeSafetyTerranixModulesStructured | type-safety | Terranix modules properly structured |
+| TC-021 | testMetadataFlakeOutputsExist | metadata | Core flake outputs exist |
+
+### Validation checks
+
+Validation checks run shell commands to verify configuration correctness.
+
+| Check | Purpose |
+|-------|---------|
+| home-module-exports | Home-manager modules export correctly to dendritic namespace |
+| home-configurations-exposed | Standalone homeConfigurations available for nh CLI |
+| naming-conventions | Module naming follows kebab-case conventions |
+| terraform-validate | Terraform configuration is syntactically valid |
+| secrets-generation | Clan CLI is available for secrets operations |
+| deployment-safety | Terraform configuration has no destructive patterns |
+| vars-user-password-validation | Clan vars for user password management are valid |
+
+### Integration tests (Linux only)
+
+VM integration tests require QEMU/KVM and only run on Linux systems.
+
+| Test | Purpose |
+|------|---------|
+| vm-test-framework | Verifies VM test framework works |
+| vm-boot-all-machines | Validates NixOS machines boot correctly |
+
+These tests are automatically skipped on Darwin.
+Use `just check-fast` to skip them locally on Linux when iterating quickly.
+
+## Documentation testing
+
+Documentation uses Vitest for unit testing and Playwright for E2E testing.
+
+### Test structure
 
 ```
 packages/docs/
 ├── src/
 │   ├── components/
-│   │   ├── Card.astro
-│   │   └── Card.test.ts          # Component tests (co-located)
+│   │   └── Card.test.ts         # Component tests (co-located)
 │   └── utils/
-│       ├── formatters.ts
-│       └── formatters.test.ts    # Unit tests (co-located)
+│       └── formatters.test.ts   # Unit tests (co-located)
 ├── e2e/
-│   └── homepage.spec.ts          # E2E tests
+│   └── homepage.spec.ts         # E2E tests
 ├── tests/
-│   ├── fixtures/                 # Shared test data
-│   │   ├── components.ts
-│   │   └── README.md
-│   └── types/                    # Test type definitions
-│       ├── test-helpers.ts
-│       └── README.md
-├── vitest.config.ts              # Vitest configuration
-├── playwright.config.ts          # Playwright configuration
-└── coverage/                     # Coverage reports (generated)
+│   ├── fixtures/                # Shared test data
+│   └── types/                   # Test type definitions
+├── vitest.config.ts             # Vitest configuration
+└── playwright.config.ts         # Playwright configuration
 ```
 
-## Unit Testing with Vitest
+### Running documentation tests
 
-### Writing Unit Tests
+```bash
+# Run all documentation tests
+just docs-test
 
-Unit tests use Vitest's global API and are co-located with source files:
+# Run unit tests only
+just docs-test-unit
+
+# Run E2E tests
+just docs-test-e2e
+
+# Generate coverage report
+just docs-test-coverage
+
+# Watch mode for development
+cd packages/docs && bun run test:watch
+```
+
+### Writing unit tests
+
+Unit tests use Vitest and are co-located with source files:
 
 ```typescript
 // src/utils/formatters.test.ts
@@ -78,39 +177,10 @@ describe("capitalizeFirst", () => {
   it("capitalizes the first letter", () => {
     expect(capitalizeFirst("hello")).toBe("Hello");
   });
-
-  it("handles empty strings", () => {
-    expect(capitalizeFirst("")).toBe("");
-  });
 });
 ```
 
-### Running Unit Tests
-
-```bash
-# Run all unit tests
-just test-unit
-
-# Watch mode for development
-just test-watch
-
-# With coverage
-just test-coverage
-```
-
-### Test Patterns
-
-Follow these patterns for unit tests:
-
-- **Pure functions**: Test inputs and outputs without side effects
-- **Type safety**: No `any` types, leverage TypeScript inference
-- **Descriptive names**: Use `describe` blocks for organization
-- **Edge cases**: Test empty, null, and boundary conditions
-- **Co-location**: Place tests next to source files
-
-## Component Testing with Astro Container API
-
-### Writing Component Tests
+### Writing component tests
 
 Use the Astro Container API to test Astro components:
 
@@ -121,38 +191,19 @@ import { describe, expect, it } from "vitest";
 import Card from "./Card.astro";
 
 describe("Card component", () => {
-  it("renders with props and slots", async () => {
+  it("renders with props", async () => {
     const container = await AstroContainer.create();
     const result = await container.renderToString(Card, {
       props: { title: "Test Card" },
-      slots: { default: "Content" },
     });
-
     expect(result).toContain("Test Card");
-    expect(result).toContain("Content");
   });
 });
 ```
 
-### Container API Methods
+### Writing E2E tests
 
-- `AstroContainer.create()`: Create container instance
-- `container.renderToString(Component, options)`: Render to HTML string
-- `container.renderToResponse(Component, options)`: Render to Response object
-
-### Component Test Patterns
-
-- **Props validation**: Test all prop variations
-- **Slot rendering**: Verify slot content appears correctly
-- **Conditional rendering**: Test dynamic element rendering
-- **Class application**: Verify CSS class logic
-- **Type safety**: Use proper prop types from component
-
-## E2E Testing with Playwright
-
-### Writing E2E Tests
-
-E2E tests use Playwright's test runner and live in the `e2e/` directory:
+E2E tests use Playwright and live in the `e2e/` directory:
 
 ```typescript
 // e2e/homepage.spec.ts
@@ -161,164 +212,128 @@ import { expect, test } from "@playwright/test";
 test.describe("Homepage", () => {
   test("has correct title", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle(/My Docs/);
-  });
-
-  test("navigates to guide", async ({ page }) => {
-    await page.goto("/");
-    const link = page.getByRole("link", { name: /example guide/i });
-    await link.click();
-    await expect(page).toHaveURL(/\/guides\/example/);
+    await expect(page).toHaveTitle(/infra/);
   });
 });
 ```
 
-### Running E2E Tests
+## Choosing check depth
 
-```bash
-# Run E2E tests
-just test-e2e
+Use this decision tree to select the appropriate validation level:
 
-# Run with UI (interactive mode)
-just test-ui
+```
+Changed documentation only?
+  └─ Yes → just docs-build && just docs-linkcheck
+  └─ No → Continue...
 
-# Run specific test file
-bun run test:e2e e2e/homepage.spec.ts
+Changed config values only (no module logic)?
+  └─ Yes → just check-fast
+  └─ No → Continue...
 
-# Run in specific browser
-bun run test:e2e --project=firefox
+Changed module logic, added host/user, or touched tests?
+  └─ Yes → just check
+  └─ No → Continue...
+
+Changed CI workflow?
+  └─ Yes → Push to trigger CI (CI is the test)
 ```
 
-### E2E Test Patterns
+### `just check` vs `just check-fast`
 
-- **Page objects**: Use locators for maintainability
-- **Accessibility**: Use `getByRole` for semantic selectors
-- **Assertions**: Use Playwright's async assertions
-- **Multi-browser**: Tests run in Chromium, Firefox, WebKit
-- **Visual regression**: Use screenshots for visual testing
+| Command | Runtime | VM tests | Use when |
+|---------|---------|----------|----------|
+| `just check` | ~5-7 min | Included | Before PR, after rebase, full validation |
+| `just check-fast` | ~1-2 min | Excluded | Development iteration, config-only changes |
 
-## Test Configuration
-
-### Vitest Configuration
-
-Key configuration in `vitest.config.ts`:
-
-- **Environment**: `node` for SSR component testing
-- **Globals**: `true` for auto-imported test APIs
-- **Coverage**: v8 provider with text, JSON, HTML, LCOV reporters
-- **Include**: `src/**/*.{test,spec}.{ts,tsx}`, `tests/**/*.{test,spec}.{ts,tsx}`
-- **Exclude**: `node_modules`, `dist`, `.astro`, `e2e`
-
-### Playwright Configuration
-
-Key configuration in `playwright.config.ts`:
-
-- **Test directory**: `./e2e`
-- **Browsers**: Chromium, Firefox, WebKit
-- **Workers**: 1 in CI, unlimited locally
-- **Retries**: 2 in CI, 0 locally
-- **Base URL**: `http://localhost:4321`
-- **Web server**: Starts Astro preview automatically
-
-### Nix Integration
-
-Playwright browsers are managed by Nix for reproducibility:
-
-```nix
-# nix/modules/devshell.nix
-packages = [ playwright-driver.browsers ];
-
-shellHook = ''
-  export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
-  export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
-'';
-```
-
-## CI/CD Integration
-
-Tests run automatically in GitHub Actions on pull requests and pushes to main.
-
-### CI Test Job
-
-The test job runs after `nixci` and before `build`:
-
-1. Install Nix and dependencies
-2. Run unit tests with Vitest
-3. Install Playwright browsers
-4. Build site for E2E testing
-5. Run E2E tests across all browsers
-6. Upload test results and coverage artifacts
-
-### Viewing CI Results
-
-```bash
-# Check workflow status
-just gh-workflow-status
-
-# View logs for latest run
-just gh-logs
-
-# Download test artifacts from GitHub
-gh run download
-```
-
-## Writing New Tests
-
-### Unit Test Checklist
-
-- [ ] Create test file next to source file (e.g., `foo.test.ts` next to `foo.ts`)
-- [ ] Use `describe` blocks to organize related tests
-- [ ] Test happy path and edge cases
-- [ ] Use type-safe assertions
-- [ ] Avoid `any` types
-- [ ] Run tests in watch mode during development
-
-### Component Test Checklist
-
-- [ ] Create test file next to component (e.g., `Card.test.ts` next to `Card.astro`)
-- [ ] Create container with `AstroContainer.create()`
-- [ ] Test all prop variations
-- [ ] Test slot content rendering
-- [ ] Verify conditional rendering logic
-- [ ] Check CSS class application
-
-### E2E Test Checklist
-
-- [ ] Create test file in `e2e/` directory
-- [ ] Use `test.describe` for grouping
-- [ ] Use accessible selectors (`getByRole`, `getByLabel`)
-- [ ] Test user workflows, not implementation details
-- [ ] Add assertions for page state changes
-- [ ] Consider responsive design (mobile viewports)
+The difference is VM integration tests, which:
+- Require QEMU/KVM (Linux only)
+- Boot NixOS VMs to validate machine configurations
+- Are automatically skipped on Darwin
 
 ## Troubleshooting
 
-### Vitest Issues
+### nix-unit test failures
 
-**Tests not found**
-- Check file patterns in `vitest.config.ts`
-- Ensure test files match `*.test.ts` or `*.spec.ts`
-- Verify files are not in exclude list
+**Symptom:** nix-unit tests fail with attribute errors
 
-**Import errors**
-- Check TypeScript configuration
-- Ensure dependencies are installed with `bun install`
-- Verify Astro integration with `getViteConfig()`
-
-### Playwright Issues
-
-**Browsers not installed**
-```bash
-just playwright-install
-# or
-bunx playwright install --with-deps
+```
+error: attribute 'cinnabar' missing
 ```
 
-**Port already in use**
-- Stop other development servers on port 4321
-- Or change `baseURL` in `playwright.config.ts`
+**Solution:** Check that expected machine names match your configuration.
+Update test expectations in `modules/checks/nix-unit.nix` if you've renamed machines.
 
-**Nix environment issues**
+**Symptom:** Warnings about unknown settings
+
+```
+warning: unknown setting 'allowed-users'
+```
+
+**Context:** These warnings are expected and harmless.
+nix-unit runs in pure evaluation mode where daemon settings don't apply.
+
+### Cross-platform issues
+
+**Symptom:** VM tests fail on Darwin
+
+**Context:** VM integration tests require QEMU/KVM and only work on Linux.
+They're automatically skipped on Darwin via `lib.optionalAttrs isLinux`.
+
+**Solution:** Use `just check-fast` on Darwin.
+CI runs VM tests on Linux runners.
+
+**Symptom:** Different derivation hashes between systems
+
+**Context:** Some packages have platform-specific closures.
+This is expected for darwin-specific and linux-specific configurations.
+
+### CI cache issues
+
+**Symptom:** CI job runs when it should skip (or vice versa)
+
+**Context:** CI uses content-addressed caching based on file hashes.
+
+**Solutions:**
+- Force rerun: `gh workflow run ci.yaml --ref $(git branch --show-current) -f force_run=true`
+- Or add `force-ci` label to PR
+- Check hash-sources patterns in CI job definitions
+
+**Symptom:** Cache hit but build still fails
+
+**Context:** Cache key may match but cached result may be stale.
+
+**Solution:** Force rerun with `force_run=true` to bypass cache.
+
+### Running/skipping specific checks
+
+```bash
+# Run single check by name
+nix build .#checks.aarch64-darwin.nix-unit
+
+# List all available checks
+nix flake show --json | jq '.checks'
+
+# Skip VM tests (fast mode)
+just check-fast x86_64-linux
+```
+
+### Documentation test issues
+
+**Symptom:** Playwright browsers not found
+
+```bash
+# Install Playwright browsers
+just playwright-install
+# or
+cd packages/docs && bunx playwright install --with-deps
+```
+
+**Symptom:** Port 4321 already in use
+
+**Solution:** Stop other development servers on port 4321.
+
+**Symptom:** Nix environment issues with Playwright
+
 ```bash
 # Rebuild nix shell
 nix develop --rebuild
@@ -327,52 +342,49 @@ nix develop --rebuild
 echo $PLAYWRIGHT_BROWSERS_PATH
 ```
 
-### Coverage Issues
+## Module options affecting tests
 
-**Low coverage warnings**
-- Add tests for uncovered files
-- Check coverage thresholds in `vitest.config.ts`
-- Review coverage report in `coverage/index.html`
+Test behavior can be configured via module options in `modules/checks/`:
 
-**Coverage not generated**
-```bash
-# Ensure coverage dependency is installed
-bun install @vitest/coverage-v8
+### Enable flags
 
-# Run with coverage flag
-just test-coverage
+Tests are enabled by default.
+To disable specific test categories during development:
+
+```nix
+# In a flake module (not recommended for production)
+perSystem = { ... }: {
+  checks = lib.optionalAttrs false { /* disabled checks */ };
+};
 ```
 
-## Best Practices
+### Environment variables
 
-### Type Safety
+| Variable | Purpose |
+|----------|---------|
+| `PLAYWRIGHT_BROWSERS_PATH` | Path to Playwright browser binaries |
+| `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` | Skip host validation for Nix |
+| `SOPS_AGE_KEY_FILE` | Path to age key for secrets tests |
 
-- **No `any` types**: Use proper TypeScript types everywhere
-- **Strict mode**: Project uses Astro's strict tsconfig
-- **Type imports**: Import types explicitly when needed
+### Test selection patterns
 
-### Functional Patterns
+Run specific test categories:
 
-- **Pure functions**: Test functions without side effects
-- **Immutable data**: Use const and readonly where appropriate
-- **Composition**: Build complex tests from simple, reusable pieces
+```bash
+# nix-unit tests only
+nix build .#checks.aarch64-darwin.nix-unit
 
-### Test Organization
+# Validation checks only
+nix build .#checks.aarch64-darwin.naming-conventions
+nix build .#checks.aarch64-darwin.terraform-validate
 
-- **Co-location**: Keep tests near source code
-- **Fixtures**: Share test data in `tests/fixtures/`
-- **Types**: Define test types in `tests/types/`
-- **DRY**: Extract common patterns to shared utilities
+# Integration tests (Linux only)
+nix build .#checks.x86_64-linux.vm-boot-all-machines
+```
 
-### Performance
+## See also
 
-- **Parallel execution**: Tests run in parallel by default
-- **Watch mode**: Use for rapid feedback during development
-- **CI optimization**: Tests run with retries and proper workers in CI
-
-## Resources
-
-- [Vitest Documentation](https://vitest.dev/)
-- [Playwright Documentation](https://playwright.dev/)
-- [Astro Testing Guide](https://docs.astro.build/en/guides/testing/)
-- [Astro Container API Reference](https://docs.astro.build/en/reference/container-reference/)
+- [Justfile Recipes](/reference/justfile-recipes/) - All available test recipes
+- [CI Jobs](/reference/ci-jobs/) - CI job to local command mapping
+- [Test Harness Reference](/development/traceability/test-harness/) - CI-local parity matrix
+- [ADR-0010: Testing Architecture](/development/architecture/adrs/0010-testing-architecture/) - Testing strategy decisions
