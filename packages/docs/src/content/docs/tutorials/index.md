@@ -1,17 +1,20 @@
 ---
 title: "Tutorials"
-description: "Learn to work with this infrastructure through guided, progressive tutorials."
+description: "Learn to work with this infrastructure through tutorials."
 sidebar:
   order: 1
 ---
 
-Welcome to the tutorials section.
-These guides teach you how this infrastructure works through hands-on learning, building your understanding progressively from fundamentals to advanced topics.
+These tutorials intend to explain how this infrastructure works through hands-on learning, building your understanding progressively from fundamentals to advanced topics. 
+
+:::note
+This repository pertains to a particular set of users and machines and is not directly structured as a template, but could relatively easily be treated as such via renaming.
+:::
 
 ## About these tutorials
 
-Tutorials are **learning-oriented**.
-They guide you through exercises that build skills and understanding, explaining *why* things work the way they do, not just *how* to do them.
+In accordance with the [diataxis](https://diataxis.fr/) user documentation framework, these tutorials are **learning-oriented**.
+They guide you through exercises that build skills and understanding, explaining *why* things work the way they do, as opposed to only *how* to do them.
 
 This differs from the [Guides](/guides/) section, which is **task-oriented**.
 Guides help you accomplish specific goals when you already understand the system.
@@ -144,16 +147,16 @@ The [Guides](/guides/) section provides task-oriented procedures:
 ### Deepen your understanding
 
 The [Concepts](/concepts/) section explains the architecture:
-- [Dendritic Architecture](/concepts/dendritic-architecture) — Module organization pattern
-- [Clan Integration](/concepts/clan-integration) — Multi-machine coordination
-- [Multi-User Patterns](/concepts/multi-user-patterns) — User configuration approaches
+- [Dendritic flake-parts Architecture](/concepts/dendritic-architecture) — Module organization pattern
+- [Clan Machine Management](/concepts/clan-integration) — Multi-machine coordination
+- [Multi-user Management](/concepts/multi-user-patterns) — User configuration approaches
 
 ### Reference the CLI
 
 The [Reference](/reference/) section documents tools:
-- [Justfile Recipes](/reference/justfile-recipes) — Task runner commands
-- [Flake Apps](/reference/flake-apps) — Nix-wrapped activation commands
-- [CI Jobs](/reference/ci-jobs) — Continuous integration reference
+- [justfile recipes](/reference/justfile-recipes) — Task runner commands
+- [nix flake apps](/reference/flake-apps) — Nix-wrapped activation commands
+- [CI jobs](/reference/ci-jobs) — Continuous integration reference
 
 ## Getting help
 
