@@ -659,7 +659,10 @@ development_status:
   story-8-12-notes: "DONE 2025-12-02 - 4 ADRs created: ADR-0018 (dendritic, 285 lines), ADR-0019 (clan, 280 lines), ADR-0020 (integration, 320 lines), ADR-0021 (terranix, 265 lines). 28/28 ACs satisfied. Validation passed: docs-build (76 pages), linkcheck (all valid). 6 commits."
   # Phase 1 retrospective complete, Phase 2 retrospective pending after Stories 8.5-8.12
   epic-8-phase-1-retrospective: done
-  epic-8-retrospective: pending
+  # Epic 8 Retrospective: COMPLETE (2025-12-03)
+  # Critical discovery: docs/ deletion in Epic 9 requires content migration story
+  # See: docs/notes/development/retrospectives/epic-8-documentation-alignment.md
+  epic-8-retrospective: done
 
   # Epic 9 - Branch Consolidation and Release
   # Merge clan-01 to main with proper tagging
