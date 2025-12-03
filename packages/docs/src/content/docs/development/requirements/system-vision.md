@@ -28,48 +28,41 @@ The nix-config system operates within the Nix ecosystem providing declarative, r
 
 ### Current state vision
 
-**Foundation**: flake-parts + nixos-unified providing modular, multi-platform configuration.
+**Foundation**: Dendritic flake-parts pattern + clan-core integration providing maximum type safety and multi-host coordination.
 
 **Key capabilities**:
-- Declarative system configuration for macOS and NixOS
-- Directory-based autowiring for host discovery
-- Multi-channel nixpkgs resilience (surgical package fixes)
-- Secrets management via sops-nix with age encryption
-- Development environment with automatic activation
-- CI/CD pipeline with binary caching
-
-**Limitations**:
-- Manual per-host coordination (no systematic multi-host management)
-- Limited type safety (specialArgs bypasses module system type checking)
-- Manual secrets management (no declarative generation)
-- Cross-platform module composition requires duplication
-- No overlay networking between hosts
-
-### Target state vision
-
-**Foundation**: Dendritic flake-parts pattern + clan-core integration.
-
-**Enhanced capabilities**:
-- **Maximum type safety**: Every file is a flake-parts module, eliminating specialArgs antipattern
-- **Multi-host coordination**: Clan inventory system managing machines, services, and relationships
+- **Type-safe configuration**: Every file is a flake-parts module, eliminating specialArgs antipattern
+- **Multi-host coordination**: Clan inventory system managing 8 machines (4 darwin + 4 nixos), services, and relationships
 - **Declarative secrets**: Clan vars system with automatic generation and deployment
-- **Overlay networking**: Zerotier VPN providing secure communication between all hosts
+- **Overlay networking**: Zerotier VPN providing secure communication between all 8 hosts
 - **Cross-platform composition**: Single modules targeting multiple platforms (darwin + nixos + home-manager)
-- **Systematic service deployment**: Service instances with roles spanning multiple machines
+- **Multi-channel nixpkgs resilience**: Surgical package fixes without system rollback
+- **VPS infrastructure**: Always-on NixOS servers (cinnabar, electrum, galena, scheelite)
+- **Development environment**: Automatic activation via direnv + just task runner
+- **CI/CD pipeline**: Automated testing with binary caching
 
-**Preserved capabilities**:
-- Multi-channel nixpkgs resilience (surgical package fixes without system rollback)
-- Development environment and workflow automation
-- CI/CD integration with binary caching
-- All existing functionality maintained
+### Achieved architecture features
 
-**Infrastructure evolution**:
-- Add VPS infrastructure (cinnabar) as foundation for always-on services
-- Zerotier controller role on VPS (independent of darwin hosts)
-- Progressive migration of darwin hosts to new architecture
-- Five-machine overlay network (1 VPS + 4 darwin workstations)
+**Foundation**: Dendritic flake-parts pattern + clan-core integration (OPERATIONAL).
 
-## Rich picture: Target architecture
+**Achieved capabilities**:
+- **Maximum type safety**: Every file is a flake-parts module, specialArgs antipattern eliminated ✓
+- **Multi-host coordination**: Clan inventory system managing 8 machines, services, and relationships ✓
+- **Declarative secrets**: Clan vars system with automatic generation and deployment ✓
+- **Overlay networking**: Zerotier VPN providing secure 8-machine mesh network ✓
+- **Cross-platform composition**: Single modules targeting multiple platforms (darwin + nixos + home-manager) ✓
+- **Systematic service deployment**: Service instances with roles spanning multiple machines ✓
+- **Multi-channel nixpkgs resilience**: Surgical package fixes without system rollback ✓
+- **Development environment**: Workflow automation with direnv and just ✓
+- **CI/CD integration**: Automated testing with binary caching ✓
+
+**Infrastructure deployment**:
+- **4 NixOS VPS machines**: cinnabar (Hetzner zerotier controller), electrum (Hetzner), galena (GCP CPU), scheelite (GCP GPU) ✓
+- **4 Darwin workstations**: stibnite, blackphos, rosegold, argentum (all aarch64-darwin) ✓
+- **8-machine overlay network**: Zerotier mesh with cinnabar as controller, all others as peers ✓
+- **Migration complete**: All hosts migrated from nixos-unified to dendritic+clan architecture ✓
+
+## Rich picture: Current architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -101,12 +94,17 @@ External Dependencies                System Boundary
                                      ┌──────────────▼──────────────────┐
                                      │   Clan Inventory System          │
                                      │  ┌───────────────────────────┐  │
-                                     │  │ Machines:                 │  │
-                                     │  │  - cinnabar (nixos/vps)   │  │
-                                     │  │  - blackphos (darwin)     │  │
-                                     │  │  - rosegold (darwin)      │  │
-                                     │  │  - argentum (darwin)      │  │
-                                     │  │  - stibnite (darwin)      │  │
+                                     │  │ Machines (8 total):       │  │
+                                     │  │ NixOS VPS:                │  │
+                                     │  │  - cinnabar (hetzner)     │  │
+                                     │  │  - electrum (hetzner)     │  │
+                                     │  │  - galena (gcp-cpu)       │  │
+                                     │  │  - scheelite (gcp-gpu)    │  │
+                                     │  │ Darwin Workstations:      │  │
+                                     │  │  - stibnite (aarch64)     │  │
+                                     │  │  - blackphos (aarch64)    │  │
+                                     │  │  - rosegold (aarch64)     │  │
+                                     │  │  - argentum (aarch64)     │  │
                                      │  └───────────────────────────┘  │
                                      │  ┌───────────────────────────┐  │
                                      │  │ Service Instances:        │  │
@@ -121,20 +119,45 @@ External Dependencies                System Boundary
               │                                                          │
    ┌──────────▼─────────┐                              ┌────────────────▼────────┐
    │  VPS Infrastructure│                              │  Darwin Workstations    │
+   │  (4 machines)      │                              │  (4 machines)           │
+   │                    │                              │                         │
    │  ┌──────────────┐  │                              │  ┌──────────────────┐   │
-   │  │ cinnabar     │  │                              │  │ blackphos        │   │
-   │  │ (NixOS)      │  │                              │  │ rosegold         │   │
-   │  │              │  │                              │  │ argentum         │   │
-   │  │ Roles:       │  │                              │  │ stibnite         │   │
+   │  │ cinnabar     │  │                              │  │ stibnite         │   │
+   │  │ (Hetzner)    │  │                              │  │ blackphos        │   │
+   │  │              │  │                              │  │ rosegold         │   │
+   │  │ Roles:       │  │                              │  │ argentum         │   │
    │  │ - ZT ctrl    │◄─┼──────────────────────────────┼─►│ (all aarch64)    │   │
-   │  │ - SSH server │  │    Zerotier Overlay Network  │  │                  │   │
+   │  │ - SSH server │  │    Zerotier 8-Machine Mesh   │  │                  │   │
    │  │ - Core svcs  │  │    (Encrypted, Private)      │  │ Roles:           │   │
    │  └──────────────┘  │                              │  │ - ZT peer        │   │
-   │                    │                              │  │ - SSH client     │   │
-   │ Hetzner Cloud CX53 │                              │  │ - Development    │   │
-   │ x86_64-linux       │                              │  │ - Daily use      │   │
-   │ Always-on          │                              │  └──────────────────┘   │
-   └────────────────────┘                              └─────────────────────────┘
+   │  ┌──────────────┐  │                              │  │ - SSH client     │   │
+   │  │ electrum     │  │                              │  │ - Development    │   │
+   │  │ (Hetzner)    │  │                              │  │ - Daily use      │   │
+   │  │              │  │                              │  └──────────────────┘   │
+   │  │ Roles:       │  │                              └─────────────────────────┘
+   │  │ - ZT peer    │  │
+   │  │ - Secondary  │  │
+   │  └──────────────┘  │
+   │  ┌──────────────┐  │
+   │  │ galena       │  │
+   │  │ (GCP CPU)    │  │
+   │  │              │  │
+   │  │ Roles:       │  │
+   │  │ - ZT peer    │  │
+   │  │ - Compute    │  │
+   │  └──────────────┘  │
+   │  ┌──────────────┐  │
+   │  │ scheelite    │  │
+   │  │ (GCP GPU)    │  │
+   │  │              │  │
+   │  │ Roles:       │  │
+   │  │ - ZT peer    │  │
+   │  │ - GPU jobs   │  │
+   │  └──────────────┘  │
+   │                    │
+   │ x86_64-linux       │
+   │ Always-on          │
+   └────────────────────┘
 
 Configuration Flow:
   Developer ──► Edit modules/ ──► Git commit ──► CI checks ──► Deploy
@@ -157,9 +180,7 @@ Secrets Flow:
 
 **Description**: Define entire system configuration in version-controlled Nix files.
 
-**Current state**: Achieved via flake-parts + nixos-unified.
-
-**Target state**: Enhanced with dendritic pattern for better organization.
+**Status**: OPERATIONAL - Implemented via dendritic flake-parts pattern.
 
 **User benefit**: Reproducible systems, easy rollback, configuration as documentation.
 
@@ -167,9 +188,7 @@ Secrets Flow:
 
 **Description**: Use multiple nixpkgs channels to fix individual packages without system-wide rollback.
 
-**Current state**: Implemented via overlays and multiple nixpkgs inputs.
-
-**Target state**: Preserved without modification.
+**Status**: OPERATIONAL - Implemented via overlays and multiple nixpkgs inputs.
 
 **User benefit**: Latest packages without sacrificing stability.
 
@@ -179,9 +198,7 @@ Secrets Flow:
 
 **Description**: Encrypted secrets in version control with secure deployment.
 
-**Current state**: sops-nix with age encryption, manual generation.
-
-**Target state**: Clan vars with declarative generation and automatic deployment.
+**Status**: OPERATIONAL - Clan vars with declarative generation and automatic deployment.
 
 **User benefit**: Secure secret storage, simplified rotation, declarative workflow.
 
@@ -189,9 +206,7 @@ Secrets Flow:
 
 **Description**: Reproducible development environment with automatic activation.
 
-**Current state**: Nix develop + direnv + just task runner.
-
-**Target state**: Preserved without modification.
+**Status**: OPERATIONAL - Nix develop + direnv + just task runner.
 
 **User benefit**: Consistent environment across hosts, no manual tool installation.
 
@@ -199,9 +214,7 @@ Secrets Flow:
 
 **Description**: Coordinated management of multiple hosts with shared services.
 
-**Current state**: Not available (manual per-host management).
-
-**Target state**: Clan inventory system with machines, tags, roles, service instances.
+**Status**: OPERATIONAL - Clan inventory system managing 8 machines with tags, roles, and service instances.
 
 **User benefit**: Single source of truth, automated service deployment across hosts.
 
@@ -209,9 +222,7 @@ Secrets Flow:
 
 **Description**: Secure private network connecting all hosts regardless of physical location.
 
-**Current state**: Not available.
-
-**Target state**: Zerotier VPN via clan service instance, controller on VPS.
+**Status**: OPERATIONAL - Zerotier VPN 8-machine mesh via clan service instance, controller on cinnabar.
 
 **User benefit**: Secure inter-host communication, works across networks/NAT.
 
@@ -219,9 +230,7 @@ Secrets Flow:
 
 **Description**: Share modules across darwin, nixos, and home-manager.
 
-**Current state**: Partial (some duplication required).
-
-**Target state**: Dendritic pattern enables single module targeting multiple platforms.
+**Status**: OPERATIONAL - Dendritic pattern enables single module targeting multiple platforms.
 
 **User benefit**: Reduced duplication, clear separation of platform-specific vs shared code.
 
@@ -229,9 +238,7 @@ Secrets Flow:
 
 **Description**: Catch configuration errors at evaluation time through module system.
 
-**Current state**: Partial (specialArgs bypasses type checking).
-
-**Target state**: Maximized via dendritic pattern (every file is module).
+**Status**: OPERATIONAL - Maximized via dendritic pattern (every file is module, specialArgs eliminated).
 
 **User benefit**: Earlier error detection, better error messages, safer refactoring.
 
@@ -239,42 +246,31 @@ Secrets Flow:
 
 **Description**: Always-on server infrastructure for services requiring high availability.
 
-**Current state**: Not available.
+**Status**: OPERATIONAL - 4 VPS machines deployed (cinnabar/electrum on Hetzner, galena/scheelite on GCP).
 
-**Target state**: Hetzner Cloud VPS (cinnabar) with core services.
-
-**User benefit**: Zerotier controller independent of darwin hosts, foundation for future services.
+**User benefit**: Zerotier controller independent of darwin hosts, compute infrastructure for CPU/GPU workloads.
 
 ### F-010: Progressive deployment
 
 **Description**: Deploy configuration changes with validation and rollback capability.
 
-**Current state**: darwin-rebuild/nixos-rebuild with rollback.
-
-**Target state**: Enhanced with clan deployment workflow.
+**Status**: OPERATIONAL - Clan deployment workflow with darwin-rebuild/nixos-rebuild integration.
 
 **User benefit**: Safe updates, easy rollback, dry-run capability.
 
 ## Use case overview
 
-### Core workflows (current state)
+### Core workflows (operational)
 
-**UC-Current-001**: Configure new darwin host.
-**UC-Current-002**: Update packages across all hosts.
-**UC-Current-003**: Fix broken package without system rollback.
-**UC-Current-004**: Deploy configuration changes.
-**UC-Current-005**: Manage secrets.
-**UC-Current-006**: Set up development environment.
-
-### Enhanced workflows (target state)
-
-**UC-Target-001**: Bootstrap new host with minimal configuration (see [usage-model](usage-model/#uc-001-bootstrap-new-host)).
-**UC-Target-002**: Add feature module spanning multiple platforms (see [usage-model](usage-model/#uc-002-add-cross-platform-feature-module)).
-**UC-Target-003**: Manage secrets via declarative generators (see [usage-model](usage-model/#uc-003-manage-secrets-declaratively)).
-**UC-Target-004**: Deploy coordinated service across hosts (see [usage-model](usage-model/#uc-004-deploy-coordinated-multi-host-service)).
-**UC-Target-005**: Handle broken packages with multi-channel resilience (see [usage-model](usage-model/#uc-005-handle-broken-package)).
-**UC-Target-006**: Establish secure overlay network (see [usage-model](usage-model/#uc-006-establish-overlay-network)).
-**UC-Target-007**: Migrate host to new architecture (see [usage-model](usage-model/#uc-007-migrate-host-to-dendritic-clan)).
+**UC-001**: Bootstrap new host with minimal configuration (see [usage-model](usage-model/#uc-001-bootstrap-new-host)).
+**UC-002**: Add feature module spanning multiple platforms (see [usage-model](usage-model/#uc-002-add-cross-platform-feature-module)).
+**UC-003**: Manage secrets via declarative generators (see [usage-model](usage-model/#uc-003-manage-secrets-declaratively)).
+**UC-004**: Deploy coordinated service across hosts (see [usage-model](usage-model/#uc-004-deploy-coordinated-multi-host-service)).
+**UC-005**: Handle broken packages with multi-channel resilience (see [usage-model](usage-model/#uc-005-handle-broken-package)).
+**UC-006**: Establish secure overlay network (see [usage-model](usage-model/#uc-006-establish-overlay-network)).
+**UC-007**: Update packages across all 8 hosts.
+**UC-008**: Deploy configuration changes with rollback capability.
+**UC-009**: Set up development environment on new machine.
 
 Detailed use cases are documented in [usage-model](usage-model/).
 
@@ -319,74 +315,83 @@ Detailed use cases are documented in [usage-model](usage-model/).
 - Module system: Configuration composition
 - Clan inventory: Multi-host coordination
 
-## Migration vision
+## Migration history
 
-### Phase 0: Validation
+### Phase 0: Validation (COMPLETE)
 
 **Objective**: Prove dendritic + clan integration works in test environment.
 
-**Outcome**: Validated patterns ready for production deployment.
+**Outcome**: Validated patterns ready for production deployment via test-clan repository.
 
-**Status**: Not started (next step).
+**Status**: COMPLETE (Epic 1, Stories 1.1-1.14).
 
-### Phase 1: Foundation infrastructure
+**Completion**: November 2024.
 
-**Objective**: Deploy cinnabar VPS as foundation with core services.
+### Phase 1: Foundation infrastructure (COMPLETE)
+
+**Objective**: Deploy VPS infrastructure as foundation with core services.
 
 **Key features enabled**:
-- F-009: VPS infrastructure
-- F-006: Overlay networking (controller role)
+- F-009: VPS infrastructure (4 machines: cinnabar, electrum, galena, scheelite)
+- F-006: Overlay networking (controller role on cinnabar)
 - F-008: Type-safe configuration (dendritic on NixOS)
 
-**Status**: Planned after Phase 0 validation.
+**Status**: COMPLETE (Epic 2).
 
-### Phases 2-5: Darwin migration
+**Completion**: November 2024.
+
+### Phases 2-5: Darwin migration (COMPLETE)
 
 **Objective**: Migrate darwin hosts progressively (blackphos → rosegold → argentum → stibnite).
 
 **Key features enabled**:
 - F-007: Cross-platform module composition
 - F-008: Type-safe configuration (dendritic on darwin)
-- F-005: Multi-host coordination
-- F-006: Overlay networking (peer role)
+- F-005: Multi-host coordination (8-machine inventory)
+- F-006: Overlay networking (peer role on all darwin hosts)
 - F-003: Declarative secrets (clan vars)
 
-**Status**: Planned after Phase 1 stable.
+**Status**: COMPLETE (Epics 3-6).
 
-### Phase 6: Cleanup
+**Completion**: November 2024.
 
-**Objective**: Remove nixos-unified, complete migration.
+### Phase 6: Cleanup (COMPLETE)
 
-**Outcome**: Full dendritic + clan architecture operational.
+**Objective**: Remove nixos-unified, complete migration to dendritic+clan.
 
-**Status**: Planned after all hosts migrated and stable.
+**Outcome**: Full dendritic + clan architecture operational across all 8 machines.
 
-## Success criteria
+**Status**: COMPLETE (Epic 7).
 
-### Current state preservation
+**Completion**: November 2024.
+
+## Success criteria (ACHIEVED)
+
+### Current state preservation (ACHIEVED)
 
 - ✓ All existing functionality maintained
 - ✓ Multi-channel resilience preserved (F-002)
 - ✓ Development environment functional (F-004)
 - ✓ No regressions in daily workflows
 
-### Target state achievement
+### Architecture achievement (COMPLETE)
 
-- ✓ Dendritic pattern adopted (every file is module)
-- ✓ Clan integration functional (inventory, vars, services)
-- ✓ Type safety maximized through module system (F-008)
-- ✓ Multi-host coordination operational (F-005)
-- ✓ Overlay network established (F-006)
-- ✓ Cross-platform composition enabled (F-007)
-- ✓ VPS infrastructure deployed (F-009)
-- ✓ Declarative secrets working (F-003 enhanced)
+- ✓ Dendritic pattern adopted (every file is module) - OPERATIONAL
+- ✓ Clan integration functional (inventory, vars, services) - OPERATIONAL
+- ✓ Type safety maximized through module system (F-008) - OPERATIONAL
+- ✓ Multi-host coordination operational (F-005) - 8 machines managed
+- ✓ Overlay network established (F-006) - 8-machine zerotier mesh
+- ✓ Cross-platform composition enabled (F-007) - OPERATIONAL
+- ✓ VPS infrastructure deployed (F-009) - 4 VPS machines operational
+- ✓ Declarative secrets working (F-003) - Clan vars operational
 
-### Migration validation
+### Migration validation (COMPLETE)
 
-- ✓ Each phase completes successfully
-- ✓ Stability demonstrated (1-2 weeks per host minimum)
+- ✓ Each phase completed successfully (Phases 0-6)
+- ✓ Stability demonstrated (all hosts stable in production)
 - ✓ Rollback capability preserved throughout migration
 - ✓ Primary workstation (stibnite) migrated last after all others proven
+- ✓ nixos-unified removed, dendritic+clan architecture fully operational
 
 ## References
 
