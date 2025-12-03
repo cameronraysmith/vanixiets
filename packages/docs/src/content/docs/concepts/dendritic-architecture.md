@@ -237,7 +237,7 @@ Dendritic enables fine-grained modules that can be composed, reused, and tested 
 Clan coordinates multi-machine deployments while dendritic organizes the modules being deployed.
 They're orthogonal patterns that work together.
 
-See [Clan Integration](clan-integration) for how clan orchestrates deployments of dendritic-organized configurations.
+See [Clan Integration](/concepts/clan-integration/) for how clan orchestrates deployments of dendritic-organized configurations.
 
 ## Practical examples
 
