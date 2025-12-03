@@ -201,6 +201,6 @@ The combination provides:
 
 ## See also
 
-- [Dendritic Architecture](/concepts/dendritic-architecture/) - Module organization pattern details
+- [Dendritic flake-parts Architecture](/concepts/dendritic-architecture/) - Module organization pattern details
 - [Clan Integration](/concepts/clan-integration/) - Multi-machine coordination details
 - [Repository Structure](/reference/repository-structure) - Complete directory layout
