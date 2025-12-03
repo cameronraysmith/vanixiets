@@ -116,23 +116,23 @@ Story 8.5 structural audit identified `development/traceability/` as a HIGH prio
 
 ### Task 2: Update Contributing Test Documentation (AC: 1, 2, 3)
 
-- [ ] 2.1 Revise `packages/docs/src/content/docs/about/contributing/testing.md`
-  - [ ] 2.1.1 Preserve web app test content (Vitest/Playwright) in dedicated section
-  - [ ] 2.1.2 Add infrastructure test section (nix-unit, validation, integration)
-  - [ ] 2.1.3 Add "Running Tests" section with platform-specific instructions
-- [ ] 2.2 Add test philosophy section
-  - [ ] 2.2.1 Document risk-based testing approach
-  - [ ] 2.2.2 Document depth scaling by change type
-  - [ ] 2.2.3 Include decision tree: when to use which check level
-- [ ] 2.3 Add `just check` vs `just check-fast` guidance
-  - [ ] 2.3.1 Document what each recipe validates
-  - [ ] 2.3.2 Provide change-type → recipe mapping guidance
-  - [ ] 2.3.3 Include timing expectations (check: ~5min, check-fast: ~1min)
-- [ ] 2.4 Add troubleshooting section
-  - [ ] 2.4.1 Common nix-unit failures and solutions
-  - [ ] 2.4.2 Cross-platform issues (darwin vs linux evaluation)
-  - [ ] 2.4.3 CI caching issues and cache invalidation
-  - [ ] 2.4.4 How to run/skip specific checks
+- [x] 2.1 Revise `packages/docs/src/content/docs/about/contributing/testing.md`
+  - [x] 2.1.1 Preserve web app test content (Vitest/Playwright) in dedicated section
+  - [x] 2.1.2 Add infrastructure test section (nix-unit, validation, integration)
+  - [x] 2.1.3 Add "Running Tests" section with platform-specific instructions
+- [x] 2.2 Add test philosophy section
+  - [x] 2.2.1 Document risk-based testing approach
+  - [x] 2.2.2 Document depth scaling by change type
+  - [x] 2.2.3 Include decision tree: when to use which check level
+- [x] 2.3 Add `just check` vs `just check-fast` guidance
+  - [x] 2.3.1 Document what each recipe validates
+  - [x] 2.3.2 Provide change-type → recipe mapping guidance
+  - [x] 2.3.3 Include timing expectations (check: ~5min, check-fast: ~1min)
+- [x] 2.4 Add troubleshooting section
+  - [x] 2.4.1 Common nix-unit failures and solutions
+  - [x] 2.4.2 Cross-platform issues (darwin vs linux evaluation)
+  - [x] 2.4.3 CI caching issues and cache invalidation
+  - [x] 2.4.4 How to run/skip specific checks
 
 ### Task 3: Create CI-Local Parity Documentation (AC: 4, 5, 6, 7)
 
