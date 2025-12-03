@@ -9,7 +9,7 @@ This document details the use cases from the system vision with complete scenari
 The usage model specifies how the system is intended to be used from a black-box perspective.
 Each use case describes user-visible interactions without constraining internal implementation.
 
-Use cases build upon the migration strategy outlined in [project scope](../context/project-scope/), targeting the dendritic flake-parts + clan-core architecture while preserving critical capabilities from the current nixos-unified system.
+Use cases describe the operational dendritic flake-parts + clan-core architecture managing an 8-machine fleet (4 darwin laptops, 4 NixOS VPS) with terranix-provisioned cloud infrastructure.
 
 ## Use case catalog
 
@@ -19,6 +19,7 @@ Use cases build upon the migration strategy outlined in [project scope](../conte
 
 **Preconditions**:
 - Nix installed on target host (darwin or NixOS)
+- For VPS: Host provisioned via terranix (Hetzner, GCP)
 - Repository cloned locally
 - Age key generated for secrets
 - Target host accessible (physical or via SSH)
@@ -254,10 +255,22 @@ inventory.instances.zerotier-local = {
 # Machines tagged with "workstation" automatically become zerotier peers
 inventory.machines = {
   cinnabar = {
-    tags = [ "nixos" "vps" ];
+    tags = [ "nixos" "vps" "hetzner" ];
     machineClass = "nixos";
   };
+  stibnite = {
+    tags = [ "darwin" "workstation" ];
+    machineClass = "darwin";
+  };
   blackphos = {
+    tags = [ "darwin" "workstation" ];
+    machineClass = "darwin";
+  };
+  rosegold = {
+    tags = [ "darwin" "workstation" ];
+    machineClass = "darwin";
+  };
+  argentum = {
     tags = [ "darwin" "workstation" ];
     machineClass = "darwin";
   };
@@ -324,24 +337,25 @@ inventory.machines = {
 **Actor**: System Administrator (crs58)
 
 **Preconditions**:
-- VPS infrastructure deployed (cinnabar) as foundation
+- VPS infrastructure deployed (cinnabar as permanent controller, electrum/galena/scheelite as optional peers)
 - Clan zerotier service module available
 - All hosts have clan vars generated
 - Network configuration understood (controller vs peer roles)
 
 **Main flow**:
-1. Administrator defines zerotier service instance in clan inventory
-2. System registers cinnabar as controller role (always-on VPS)
-3. Administrator assigns darwin hosts as peer role via tags
-4. System generates zerotier credentials and network configuration
-5. Administrator deploys configuration to controller: `clan machines update cinnabar`
-6. System activates zerotier controller on cinnabar, creates network
-7. Administrator deploys configuration to peers: `clan machines update <hostname>` for each
-8. System activates zerotier peer on each darwin host, joins network
-9. Peers authenticate with controller, establish encrypted tunnels
-10. System assigns private IP addresses to each peer in overlay network
-11. Administrator tests connectivity: `ping <peer-zerotier-ip>` from any host
-12. Overlay network operational with encrypted communication between all hosts
+1. Administrator provisions VPS infrastructure via terranix (Hetzner for cinnabar, optional Hetzner/GCP for others)
+2. Administrator defines zerotier service instance in clan inventory
+3. System registers cinnabar as controller role (always-on VPS)
+4. Administrator assigns darwin hosts as peer role via tags
+5. System generates zerotier credentials and network configuration
+6. Administrator deploys configuration to controller: `clan machines update cinnabar`
+7. System activates zerotier controller on cinnabar, creates network
+8. Administrator deploys configuration to peers: `clan machines update <hostname>` for each
+9. System activates zerotier peer on each darwin host, joins network
+10. Peers authenticate with controller, establish encrypted tunnels
+11. System assigns private IP addresses to each peer in overlay network
+12. Administrator tests connectivity: `ping <peer-zerotier-ip>` from any host
+13. Overlay network operational with encrypted communication between all hosts
 
 **Alternate flows**:
 - **A1**: If peer fails to connect, administrator checks firewall rules and network accessibility
@@ -351,7 +365,8 @@ inventory.machines = {
 
 **Postconditions**:
 - Zerotier controller operational on cinnabar VPS
-- All darwin hosts connected as peers
+- All darwin hosts (stibnite, blackphos, rosegold, argentum) connected as peers
+- Optional VPS peers (electrum, galena, scheelite) connected when active
 - Private overlay network established (e.g., 10.147.17.0/24)
 - Encrypted communication between all hosts
 - Network survives host reboots and network changes
@@ -381,7 +396,9 @@ inventory.instances.zerotier-local = {
 # - Network member authorization
 ```
 
-### UC-007: Migrate host to dendritic + clan architecture
+### UC-007: Migrate host to dendritic + clan architecture (Historical - completed Epics 1-7)
+
+**Status**: COMPLETE (November 2024) - This use case describes the historical migration workflow from nixos-unified to dendritic + clan architecture. All machines have been migrated. Preserved as reference for understanding the migration patterns used.
 
 **Actor**: System Administrator (crs58)
 
@@ -436,14 +453,14 @@ inventory.instances.zerotier-local = {
 - Migration plan: Phase-specific guides (phase-2-blackphos-guide.md, etc.)
 - Migration assessment: docs/notes/clan/migration-assessment.md - Per-host considerations
 
-**Migration order** (from context):
-- Phase 0: test-clan (validation environment) - validate integration
-- Phase 1: cinnabar (VPS) - foundation infrastructure
-- Phase 2: blackphos (darwin) - first darwin, establishes patterns
-- Phase 3: rosegold (darwin) - validates pattern reusability
-- Phase 4: argentum (darwin) - final validation
-- Phase 5: stibnite (darwin) - primary workstation (last, highest risk)
-- Phase 6: Cleanup - remove nixos-unified
+**Migration order** (completed November 2024):
+- Phase 0: test-clan (validation environment) - COMPLETE - validated integration
+- Phase 1: VPS infrastructure (cinnabar, electrum, galena, scheelite) - COMPLETE - foundation deployed via terranix
+- Phase 2: blackphos (darwin) - COMPLETE - first darwin, established patterns
+- Phase 3: rosegold (darwin) - COMPLETE - validated pattern reusability
+- Phase 4: argentum (darwin) - COMPLETE - final validation
+- Phase 5: stibnite (darwin) - COMPLETE - primary workstation migrated
+- Phase 6: Cleanup - COMPLETE - nixos-unified removed
 
 **Example dendritic conversion**:
 ```nix
