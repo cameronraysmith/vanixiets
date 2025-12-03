@@ -503,19 +503,21 @@ nix.settings = {
 nix-store --query --tree $(nix eval --raw .#darwinConfigurations.<hostname>.config.system.build.toplevel) | rg "password|secret|token"
 ```
 
-### Hybrid secrets management (current → target)
+### Hybrid secrets management (active design)
 
-**Constraint**: Support both sops-nix and clan vars during migration
+**Constraint**: Both sops-nix and clan vars operate simultaneously by design
 
-**Current**: sops-nix for all secrets (manually managed)
+**Architecture**: Hybrid approach divides responsibility by secret type
 
-**Target**: clan vars for generated secrets, sops-nix for external secrets
+**Division of responsibility**:
+- Clan vars: Generated secrets (SSH host keys, service credentials)
+- Sops-nix: External secrets (API tokens, cloud credentials, user keys)
 
 **Coexistence requirements**:
 - Both systems operational simultaneously
 - No conflicts in secret paths
 - Clear documentation of which system manages which secrets
-- Migration path defined per secret type
+- Explicit ownership per secret type
 
 ## SC-009: Network and connectivity constraints
 
