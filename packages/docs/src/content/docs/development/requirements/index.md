@@ -341,7 +341,6 @@ Each layer provides different views appropriate for different stakeholders and p
 - Enables systematic requirements management
 
 **References**:
-- AMDiRE cheat sheet: /Users/crs58/projects/planning-workspace/archidocs/reference/AMDiRE_CheatSheet.md
 - AMDiRE paper: [arxiv.org/abs/1611.10024](https://arxiv.org/abs/1611.10024)
 
 ## Document statistics
