@@ -429,10 +429,14 @@ Supports ADR-0014 principle 2 (Template duality): forces us to use what we build
 
 ## Measurement approach
 
+Fleet configuration: 4 darwin machines (stibnite, blackphos, rosegold, argentum) and 4 nixos machines (cinnabar, electrum, galena, scheelite).
+
 ### Reproducibility metrics
 
 ```bash
-# Verify identical builds
+# Verify identical builds across fleet
+# Darwin: stibnite, blackphos, rosegold, argentum
+# NixOS: cinnabar, electrum, galena, scheelite
 nix build .#darwinConfigurations.<hostname>.system
 hash1=$(nix path-info .#darwinConfigurations.<hostname>.system)
 nix flake update --commit-lock-file
