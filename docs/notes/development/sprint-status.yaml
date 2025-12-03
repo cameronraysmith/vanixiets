@@ -593,10 +593,10 @@ development_status:
   epic-8: in-progress
   epic-8-notes: |
     Phase 1 COMPLETE 2025-12-01 - Stories 8.1-8.4 aligned docs with dendritic+clan architecture.
-    Phase 2 IN PROGRESS 2025-12-02 - Stories 8.5-8.11 address structural completeness gaps.
+    Phase 2 IN PROGRESS 2025-12-02 - Stories 8.5-8.12 address structural completeness gaps.
     Research document: docs/notes/development/research/documentation-coverage-analysis.md
     Phase 1: audit (8.1), architecture (8.2), onboarding (8.3), secrets (8.4) - all DONE.
-    Phase 2: structure audit (8.5), CLI reference (8.6), AMDiRE audit (8.7), tutorials (8.8), cross-refs (8.9), test docs (8.10), AMDiRE remediation (8.11).
+    Phase 2: structure audit (8.5), CLI reference (8.6), AMDiRE audit (8.7), tutorials (8.8), cross-refs (8.9), test docs (8.10), AMDiRE remediation (8.11), foundational ADRs (8.12).
   story-8-1: done
   story-8-1-title: "Audit existing Starlight docs for staleness"
   story-8-1-notes: "Completed 2025-12-01 - 59 files audited, 22 current, 21 stale, 9 obsolete, 7 missing topics identified. Results: story-8.1-audit-results.md"
@@ -644,11 +644,18 @@ development_status:
   # Addresses Story 8.7 audit findings: 37.5% of development docs stale (12/32 files)
   # Primary issue: "current/target state inversion" - 9 files describe nixos-unified as current
   # Scope: 4 critical + 6 high + 2 medium + 3 low priority files = 15 files
-  # Estimated effort: 18-24 hours (from Story 8.7 audit)
-  story-8-11: review
+  # COMPLETE (2025-12-02): 19 commits, 15 files updated, ADR-0017 created superseding ADR-0003
+  story-8-11: done
   story-8-11-title: "Remediate AMDiRE development documentation staleness"
-  story-8-11-notes: "DRAFTED 2025-12-02 - Remediate Story 8.7 findings: fix current/target inversion in 9 files, update to 8-machine fleet, update ADR-0003. 18 ACs, 5 task groups, 15 files affected. 18-24h estimated."
-  # Phase 1 retrospective complete, Phase 2 retrospective pending after Stories 8.5-8.11
+  story-8-11-notes: "DONE 2025-12-02 - 18/18 ACs satisfied. 15 files updated, 19 commits. Fixed current/target inversion, updated to 8-machine fleet, created ADR-0017 (supersedes ADR-0003). Code review: APPROVED with 0 issues."
+  # Story 8.12: Create Foundational Architecture Decision Records
+  # Addresses Story 8.7 traceability gaps: missing ADRs for dendritic, clan-core, integration
+  # Scope: ADR-0018 (dendritic), ADR-0019 (clan), ADR-0020 (integration), ADR-0021 (terranix, optional)
+  # These are the most important architectural decisions, yet were undocumented
+  story-8-12: backlog
+  story-8-12-title: "Create foundational architecture decision records"
+  story-8-12-notes: "Addresses Story 8.7 traceability gaps. Create ADR-0018 (dendritic flake-parts), ADR-0019 (clan-core), ADR-0020 (dendritic+clan integration), ADR-0021 (terranix, optional)."
+  # Phase 1 retrospective complete, Phase 2 retrospective pending after Stories 8.5-8.12
   epic-8-phase-1-retrospective: done
   epic-8-retrospective: pending
 
