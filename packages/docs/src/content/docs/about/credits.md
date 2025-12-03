@@ -33,7 +33,7 @@ These implementations informed the architectural patterns:
 
 ### Dendritic pattern references
 
-- **[drupol/nixos-x260](https://github.com/drupol/nixos-x260)** by Pol Dellaiera (@drupol) - Comprehensive dendritic implementation
+- **[drupol/infra](https://github.com/drupol/infra)** by Pol Dellaiera (@drupol) - Comprehensive dendritic implementation
 - **[mightyiam/infra](https://github.com/mightyiam/infra)** by Shahar "Dawn" Or - Original dendritic reference
 - **[gaetanlepage/nix-config](https://github.com/gaetanlepage/nix-config)** by Gaétan Lepage - Dendritic pattern at scale
 
