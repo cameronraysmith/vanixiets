@@ -72,19 +72,21 @@ Aligns with G-S02: Type safety via module system and ADR-0014 principle 3 (Type 
 - **No specialArgs**: Type-safe module imports via config.flake.modules.* (target)
 - **Explicit dependencies**: No implicit coupling via specialArgs passthrough
 
-### Current state (nixos-unified)
+### Current state
 
 **Achieved**:
 - Module system type checking operational
 - Options defined with types (bool, str, int, attrs, etc.)
 - Invalid option values rejected at evaluation time
+- Dendritic pattern eliminates specialArgs in new modules
+- Cross-module references via config.flake.modules.* namespace
 
 **Limitations**:
-- specialArgs used for cross-module communication (loses type safety)
-- Some modules accept untyped attrsets
-- Limited use of submodules for complex nested configuration
+- Legacy nixos-unified patterns still use specialArgs (being migrated)
+- Some older modules accept untyped attrsets
+- Submodule coverage incomplete in legacy code
 
-### Target state (dendritic + clan)
+### Target state
 
 **Goals**:
 - Eliminate specialArgs entirely (dendritic pattern enforces this)
@@ -125,9 +127,9 @@ Maintainability directly impacts long-term viability and aligns with G-S03: Redu
 - Atomic commits per file reduce review complexity
 
 **Limitations**:
-- Two architectures in parallel during migration (temporary complexity)
-- Some nixos-unified patterns not well-documented
-- Legacy modules need refactoring to dendritic pattern
+- Two architectures in parallel during migration (being resolved)
+- Legacy nixos-unified patterns documented but marked for migration
+- Legacy modules being incrementally refactored to dendritic pattern
 
 ### Target state
 
@@ -163,32 +165,34 @@ Aligns with G-S04: Modular architecture for scalability and ADR-0014 principle 1
 - **Minimal coupling**: Modules depend on abstractions, not implementations
 - **Independent testing**: Modules testable in isolation
 
-### Current state (nixos-unified)
+### Current state
 
 **Achieved**:
 - Module system provides composition mechanism
 - Platform-specific modules organized separately
-- Some cross-platform sharing via home-manager
+- Cross-platform sharing via home-manager
+- Dendritic pattern enables single-file cross-cutting concerns
+- Explicit module boundaries via flake.modules.* namespace
+- Clan service instances enable multi-host feature coordination
 
 **Limitations**:
-- Cross-platform modules require duplication or indirection
-- Tight coupling via specialArgs
-- Host-specific overrides scattered
+- Legacy modules still use specialArgs coupling (being migrated)
+- Some host-specific overrides remain scattered in nixos-unified code
 
-### Target state (dendritic + clan)
+### Target state
 
 **Goals**:
-- Cross-cutting concerns: single file, multiple platforms (dendritic)
-- Explicit module boundaries via flake.modules.* namespace
-- Zero coupling via specialArgs (type-safe imports only)
-- Features composable through imports, not inheritance
-- Clan service instances enable multi-host feature coordination
+- Eliminate all specialArgs (complete migration to dendritic pattern)
+- Every module composed via typed flake.modules.* imports
+- Features composable without inheritance patterns
+- Clan services fully integrated across 8-machine fleet
+- Cross-cutting concerns maintainable in single files
 
 **Validation**:
 - Feature module spans darwin + nixos + home-manager in single file
 - Adding new host: <10 lines of configuration
-- No specialArgs in any module signature
-- Module dependency graph is acyclic and shallow
+- Zero specialArgs in any module signature
+- Module dependency graph remains acyclic and shallow
 
 ## QR-005: Security
 
