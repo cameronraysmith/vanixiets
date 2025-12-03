@@ -84,7 +84,7 @@ These projects provide the foundation and influence architectural decisions:
 - Defines module system extensions for flakes
 - Influences: Configuration structure, module organization patterns
 
-**nixos-unified** (srid/nixos-unified) [current, being replaced]:
+**nixos-unified** (srid/nixos-unified) [deprecated November 2024]:
 - Provides directory-based autowiring
 - Enables multi-platform support (darwin, nixos, home-manager)
 - Influences: Current configuration structure (configurations/ directory)
