@@ -646,9 +646,12 @@ This hierarchy supports both current (nixos-unified) and target (dendritic + cla
 
 **Related use cases**: Build performance optimization
 
-## Migration functions (target architecture)
+## Migration functions (HISTORICAL - COMPLETED)
 
-### MF-001: Convert modules to dendritic pattern
+These functions describe the migration from nixos-unified to dendritic + clan architecture.
+Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, rosegold, argentum; 4 nixos VPS: cinnabar, electrum, galena, scheelite).
+
+### MF-001: Convert modules to dendritic pattern [COMPLETE]
 
 **Purpose**: Transform nixos-unified modules to dendritic
 
@@ -662,11 +665,11 @@ This hierarchy supports both current (nixos-unified) and target (dendritic + cla
 - Cross-platform capability
 - Type-safe imports via config.flake.modules.*
 
-**Invocation**: Manual refactoring
+**Status**: COMPLETE - All modules converted to dendritic pattern with auto-discovery via import-tree
 
 **Related use cases**: UC-007 (Migration)
 
-### MF-002: Migrate secrets to clan vars
+### MF-002: Migrate secrets to clan vars [COMPLETE]
 
 **Purpose**: Convert sops-nix secrets to clan vars generators
 
@@ -678,13 +681,13 @@ This hierarchy supports both current (nixos-unified) and target (dendritic + cla
 **Outputs**:
 - Generated secrets via clan vars
 - External secrets remain in sops-nix
-- Hybrid approach supported
+- Two-tier hybrid architecture operational
 
-**Invocation**: Manual migration per secret type
+**Status**: COMPLETE - Clan vars generators operational for generated secrets, sops-nix retained for external secrets
 
 **Related use cases**: UC-007 (Migration), UC-003 (Secrets)
 
-### MF-003: Validate migration readiness
+### MF-003: Validate migration readiness [COMPLETE]
 
 **Purpose**: Ensure host ready for migration
 
@@ -698,11 +701,11 @@ This hierarchy supports both current (nixos-unified) and target (dendritic + cla
 - Risk assessment
 - Prerequisites confirmation
 
-**Invocation**: Manual assessment
+**Status**: COMPLETE - All 8 machines validated and migrated successfully
 
 **Related use cases**: UC-007 (Migration)
 
-### MF-004: Monitor post-migration stability
+### MF-004: Monitor post-migration stability [COMPLETE]
 
 **Purpose**: Track system stability after migration
 
@@ -711,35 +714,202 @@ This hierarchy supports both current (nixos-unified) and target (dendritic + cla
 - Functionality validation tests
 - Stability time window (1-2 weeks)
 
-**Outputs**:
-- Stability assessment
-- Issue identification
-- Approval for next migration
-
-**Invocation**: Continuous monitoring
+**Status**: COMPLETE - Fleet stable on dendritic + clan architecture
 
 **Related use cases**: UC-007 (Migration)
+
+## Infrastructure provisioning functions
+
+### IF-001: Provision Hetzner VPS instances
+
+**Purpose**: Create and configure Hetzner Cloud VPS instances via terraform
+
+**Inputs**:
+- Terranix configuration in terranix/
+- Instance specifications (cinnabar, electrum)
+- SSH keys and initial configuration
+- Hetzner API credentials (from secrets)
+
+**Outputs**:
+- Running Hetzner VPS instances
+- Public IP addresses assigned
+- Initial NixOS installation ready
+- Terraform state tracked
+
+**Invocation**: `terraform apply` after terranix generation
+
+**Related use cases**: Infrastructure deployment and expansion
+
+### IF-002: Provision GCP instances
+
+**Purpose**: Create and configure Google Cloud Platform instances via terraform
+
+**Inputs**:
+- Terranix configuration in terranix/
+- Instance specifications (galena, scheelite)
+- GCP project and credentials
+- Network configuration
+
+**Outputs**:
+- Running GCP instances
+- Network configuration applied
+- Initial NixOS installation ready
+- Terraform state tracked
+
+**Invocation**: `terraform apply` after terranix generation
+
+**Related use cases**: Infrastructure deployment and expansion
+
+### IF-003: Manage infrastructure toggle state
+
+**Purpose**: Enable/disable ephemeral infrastructure declaratively
+
+**Inputs**:
+- Infrastructure desired state (enabled/disabled flags)
+- Terranix configuration
+- Terraform state
+
+**Outputs**:
+- Infrastructure created or destroyed based on toggle
+- Cost optimization via disabled ephemeral resources
+- Permanent infrastructure (cinnabar) always maintained
+
+**Invocation**: Configuration-driven via terranix toggle flags
+
+**Related use cases**: Cost management, testing infrastructure
+
+### IF-004: Generate terraform configuration from terranix
+
+**Purpose**: Convert declarative Nix terranix to terraform JSON
+
+**Inputs**:
+- Terranix Nix expressions
+- Provider configurations (Hetzner, GCP)
+- Variable definitions
+
+**Outputs**:
+- terraform.tf.json with all resources
+- Provider configurations
+- Variable files
+
+**Invocation**: `nix eval` or terranix build commands
+
+**Related use cases**: All infrastructure provisioning workflows
+
+## Operational functions
+
+### OF-001: Deploy configuration to 8-machine fleet
+
+**Purpose**: Update system configurations across darwin and NixOS machines
+
+**Inputs**:
+- Target machine(s) specification
+- Updated flake configuration
+- Generated secrets and vars
+- Deployment method (darwin-rebuild or clan machines)
+
+**Outputs**:
+- Darwin machines (stibnite, blackphos, rosegold, argentum) updated via darwin-rebuild
+- NixOS VPS (cinnabar, electrum, galena, scheelite) updated via clan machines
+- Services restarted as needed
+- New generation activated
+
+**Invocation**:
+- Darwin: `darwin-rebuild switch --flake .#<hostname>`
+- NixOS: `clan machines update <hostname>` or batch operations
+
+**Related use cases**: Daily operations, configuration updates
+
+### OF-002: Manage zerotier mesh network
+
+**Purpose**: Maintain overlay network connecting entire 8-machine fleet
+
+**Inputs**:
+- Zerotier controller (cinnabar)
+- Peer configurations (7 other machines)
+- Network membership rules
+- Authorization credentials
+
+**Outputs**:
+- All 8 machines connected via zerotier mesh
+- Private IPs assigned and stable
+- Encrypted communication established
+- NAT traversal operational
+
+**Invocation**: Automated via service instance deployment (DF-007, MC-002)
+
+**Related use cases**: UC-006 (Overlay network), UC-004 (Multi-host services)
+
+### OF-003: Rotate secrets across fleet
+
+**Purpose**: Update secrets and credentials for all machines
+
+**Inputs**:
+- New secret values
+- Clan vars generators for rotated secrets
+- Sops-nix configuration for external secrets
+- Machine age keys
+
+**Outputs**:
+- Secrets regenerated via clan vars
+- External secrets re-encrypted via sops-nix
+- Updated secrets deployed to all affected machines
+- Services restarted with new credentials
+
+**Invocation**:
+- Clan vars: `clan vars generate <hostname>` per machine
+- Sops-nix: Manual re-encryption and deployment
+
+**Related use cases**: UC-003 (Secrets), security operations
+
+### OF-004: Propagate configuration updates across fleet
+
+**Purpose**: Coordinate updates across multiple machines with dependencies
+
+**Inputs**:
+- Configuration changes affecting multiple machines
+- Service instance definitions
+- Role dependencies (e.g., controller must update before peers)
+- Update orchestration plan
+
+**Outputs**:
+- Updates applied in correct order
+- Service instances remain coordinated
+- Zerotier mesh stability maintained
+- Multi-host services continue operating
+
+**Invocation**: Manual orchestration or clan machines batch commands
+
+**Related use cases**: UC-004 (Multi-host services), fleet maintenance
 
 ## Function cross-reference
 
 ### By use case
 
-- **UC-001 (Bootstrap)**: CM-003, SM-001, SM-002, DF-001, DF-002, DF-003, DF-004
+- **UC-001 (Bootstrap)**: CM-003, SM-001, SM-002, DF-001, DF-002, DF-003, DF-004, IF-001, IF-002
 - **UC-002 (Add feature module)**: CM-002, CM-004
-- **UC-003 (Manage secrets declaratively)**: SM-001, SM-002, SM-003, SM-004
-- **UC-004 (Multi-host services)**: MC-001, MC-002, MC-003, MC-004, DF-007
+- **UC-003 (Manage secrets declaratively)**: SM-001, SM-002, SM-003, SM-004, OF-003
+- **UC-004 (Multi-host services)**: MC-001, MC-002, MC-003, MC-004, DF-007, OF-001, OF-002, OF-004
 - **UC-005 (Handle broken packages)**: PM-001, PM-002, PM-003, PM-004
-- **UC-006 (Overlay network)**: ON-001, ON-002, ON-003, ON-004, MC-002, DF-007
-- **UC-007 (Migration)**: MF-001, MF-002, MF-003, MF-004, DF-001, DF-002, DF-005, DF-006
+- **UC-006 (Overlay network)**: ON-001, ON-002, ON-003, ON-004, MC-002, DF-007, OF-002
+- **UC-007 (Migration - HISTORICAL)**: MF-001, MF-002, MF-003, MF-004, DF-001, DF-002, DF-005, DF-006
+
+### By operational category
+
+- **Daily operations**: OF-001, OF-004, DF-001, DF-002, DF-003, DF-004, DF-007
+- **Infrastructure provisioning**: IF-001, IF-002, IF-003, IF-004
+- **Fleet management**: OF-001, OF-002, OF-004
+- **Security operations**: OF-003, SM-001, SM-002, SM-003, SM-004
 
 ### By quality attribute
 
-- **Reproducibility**: CM-001, CM-002, PM-001, CI-001
+- **Reproducibility**: CM-001, CM-002, PM-001, CI-001, IF-004
 - **Type safety**: CM-001, CM-004, MC-004
-- **Security**: SM-001, SM-002, SM-003, SM-004, ON-004
-- **Maintainability**: CM-002, CM-004, PM-004, MF-001
+- **Security**: SM-001, SM-002, SM-003, SM-004, ON-004, OF-003
+- **Maintainability**: CM-002, CM-004, PM-004, MF-001 (historical)
 - **Modularity**: CM-004, MC-002, MC-003
 - **Performance**: PM-006, CI-004
+- **Scalability**: OF-001, OF-004, MC-001, MC-002
 
 ## Function hierarchy visualization
 
@@ -796,11 +966,23 @@ CI/CD (CI)
 ├── CI-003: Run static analysis
 └── CI-004: Cache build outputs
 
-Migration (MF) [Target Architecture]
-├── MF-001: Convert modules to dendritic pattern
-├── MF-002: Migrate secrets to clan vars
-├── MF-003: Validate migration readiness
-└── MF-004: Monitor post-migration stability
+Migration (MF) [HISTORICAL - COMPLETED]
+├── MF-001: Convert modules to dendritic pattern [COMPLETE]
+├── MF-002: Migrate secrets to clan vars [COMPLETE]
+├── MF-003: Validate migration readiness [COMPLETE]
+└── MF-004: Monitor post-migration stability [COMPLETE]
+
+Infrastructure Provisioning (IF)
+├── IF-001: Provision Hetzner VPS instances
+├── IF-002: Provision GCP instances
+├── IF-003: Manage infrastructure toggle state
+└── IF-004: Generate terraform configuration from terranix
+
+Operational Functions (OF) [8-machine fleet operations]
+├── OF-001: Deploy configuration to 8-machine fleet
+├── OF-002: Manage zerotier mesh network
+├── OF-003: Rotate secrets across fleet
+└── OF-004: Propagate configuration updates across fleet
 ```
 
 ## References
