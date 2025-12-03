@@ -1,5 +1,5 @@
 ---
-title: Reference
+title: Contents
 description: Technical reference documentation for the infra repository
 sidebar:
   order: 1
