@@ -637,5 +637,5 @@ A successful NixOS onboarding:
 
 - [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization pattern
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination
-- [Getting Started](getting-started) - Initial repository setup
-- [User Onboarding](home-manager-onboarding) - Standalone home-manager for non-admin users
+- [Getting Started](/guides/getting-started/) - Initial repository setup
+- [User Onboarding](/guides/home-manager-onboarding/) - Standalone home-manager for non-admin users
