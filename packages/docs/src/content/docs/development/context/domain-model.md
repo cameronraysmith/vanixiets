@@ -8,29 +8,29 @@ This document describes the domain in which the system operates, including the N
 
 ### Core concepts
 
-**Nix**: Functional package manager providing declarative, reproducible package management.
-**NixOS**: Linux distribution built on Nix package manager.
-**nix-darwin**: System configuration management for macOS using Nix.
-**home-manager**: User environment management working across NixOS, nix-darwin, and standalone installations.
+- **Nix**: Functional package manager providing declarative, reproducible package management.
+- **NixOS**: Linux distribution built on Nix package manager.
+- **nix-darwin**: System configuration management for macOS using Nix.
+- **home-manager**: User environment management working across NixOS, nix-darwin, and standalone installations.
 
-**Flakes**: Modern Nix feature providing hermetic, reproducible builds with lock files.
-**Derivations**: Build recipes describing how to produce outputs from inputs.
-**Overlays**: Mechanism to modify or extend nixpkgs package set.
-**Module system**: Type-safe configuration composition system with options, types, and validation.
+- **Flakes**: Modern Nix feature providing hermetic, reproducible builds with lock files.
+- **Derivations**: Build recipes describing how to produce outputs from inputs.
+- **Overlays**: Mechanism to modify or extend nixpkgs package set.
+- **Module system**: Type-safe configuration composition system with options, types, and validation.
 
 ### Package channels
 
-**nixpkgs**: Official Nix packages repository.
-**nixpkgs-unstable**: Rolling release channel with latest packages.
-**nixpkgs-stable**: Point releases (24.05, 24.11, etc.) with backported security fixes.
-**Following inputs**: Flake mechanism to ensure consistent dependency versions across composition.
+- **nixpkgs**: Official Nix packages repository.
+- **nixpkgs-unstable**: Rolling release channel with latest packages.
+- **nixpkgs-stable**: Point releases (24.05, 24.11, etc.) with backported security fixes.
+- **Following inputs**: Flake mechanism to ensure consistent dependency versions across composition.
 
 ## Current architecture domain model
 
 ### Dendritic flake-parts pattern
 
-**Core principle**: Every file is a flake-parts module.
-**Namespace**: Modules contribute to `flake.modules.<type>.*` where type is `nixos`, `darwin`, or `homeManager`.
+- **Core principle**: Every file is a flake-parts module.
+- **Namespace**: Modules contribute to `flake.modules.<type>.*` where type is `nixos`, `darwin`, or `homeManager`.
 
 **File organization**:
 ```
@@ -94,27 +94,27 @@ Application values use `config.flake.*` namespace.
 
 ### Flake-parts integration
 
-**flake-parts**: Framework for modular flake composition using Nix module system.
-**perSystem**: Per-system configuration (packages, devShells, etc. for each platform).
-**flake.nix structure**: Uses `flake-parts.lib.mkFlake` with imports via import-tree from `./modules/`.
-**Module auto-loading**: import-tree automatically discovers and imports all `.nix` files from `./modules/` directory.
+- **flake-parts**: Framework for modular flake composition using Nix module system.
+- **perSystem**: Per-system configuration (packages, devShells, etc. for each platform).
+- **flake.nix structure**: Uses `flake-parts.lib.mkFlake` with imports via import-tree from `./modules/`.
+- **Module auto-loading**: import-tree automatically discovers and imports all `.nix` files from `./modules/` directory.
 
 ### Module organization
 
-**modules/flake-parts/**: Flake-level configuration modules.
-**modules/darwin/**: Darwin-specific system modules.
-**modules/nixos/**: NixOS-specific system modules.
-**modules/home/**: Home-manager modules (user environment).
-**modules/hosts/**: Per-host configuration directories.
-**modules/nixpkgs/overlays/**: Package overlays and modifications.
+- **modules/flake-parts/**: Flake-level configuration modules.
+- **modules/darwin/**: Darwin-specific system modules.
+- **modules/nixos/**: NixOS-specific system modules.
+- **modules/home/**: Home-manager modules (user environment).
+- **modules/hosts/**: Per-host configuration directories.
+- **modules/nixpkgs/overlays/**: Package overlays and modifications.
 
-**Import pattern**: Modules imported via import-tree auto-discovery, composed through module system.
-**specialArgs usage**: Minimal - only framework values (inputs, self). Application values via `config.flake.*`.
+- **Import pattern**: Modules imported via import-tree auto-discovery, composed through module system.
+- **specialArgs usage**: Minimal - only framework values (inputs, self). Application values via `config.flake.*`.
 
 ### Multi-channel resilience pattern
 
-**Problem**: Single channel can have broken packages.
-**Solution**: Multiple nixpkgs inputs with overlay-based selection.
+- **Problem**: Single channel can have broken packages.
+- **Solution**: Multiple nixpkgs inputs with overlay-based selection.
 
 **Implementation**:
 - Multiple channel inputs: `nixpkgs` (unstable), `nixpkgs-stable` (24.11), potentially others
@@ -144,8 +144,8 @@ Components:
 - `secret = true`: Encrypted, deployed to `/run/secrets/`, accessed via `.path`
 - `secret = false`: Plain text, stored in nix store, accessed via `.value`
 
-**Sharing**: `share = true` allows cross-machine secret access.
-**Storage**: SOPS-encrypted in `sops/machines/<hostname>/secrets/` (secrets) and `sops/machines/<hostname>/facts/` (public).
+- **Sharing**: `share = true` allows cross-machine secret access.
+- **Storage**: SOPS-encrypted in `sops/machines/<hostname>/secrets/` (secrets) and `sops/machines/<hostname>/facts/` (public).
 
 **Deployment**: Automatic during `clan machines update <hostname>`.
 
@@ -167,9 +167,9 @@ clan.core.vars.generators.ssh-key = {
 
 ### Development environment
 
-**nix develop**: Flake-based development shells.
-**direnv**: Automatic environment activation on directory entry.
-**just**: Task runner for common operations (check, build, activate, test, lint).
+- **nix develop**: Flake-based development shells.
+- **direnv**: Automatic environment activation on directory entry.
+- **just**: Task runner for common operations (check, build, activate, test, lint).
 
 **Provided tools** (via devShell):
 - Bun (package manager and runtime)
@@ -242,13 +242,13 @@ nixos-rebuild switch --flake .#cinnabar
 
 **Purpose**: Centralized definition of machines, services, and their relationships.
 
-**Machines**: `inventory.machines.<name>` with tags and machineClass.
-**Tags**: Labels for grouping machines (e.g., "workstation", "server", "nixos", "darwin").
-**machineClass**: Platform type ("nixos" or "darwin").
+- **Machines**: `inventory.machines.<name>` with tags and machineClass.
+- **Tags**: Labels for grouping machines (e.g., "workstation", "server", "nixos", "darwin").
+- **machineClass**: Platform type ("nixos" or "darwin").
 
-**Instances**: `inventory.instances.<name>` define service instances.
-**Roles**: Different functions within service (server, client, peer, controller).
-**Role assignment**: Via `roles.<name>.machines.<hostname>` or `roles.<name>.tags.<tag>`.
+- **Instances**: `inventory.instances.<name>` define service instances.
+- **Roles**: Different functions within service (server, client, peer, controller).
+- **Role assignment**: Via `roles.<name>.machines.<hostname>` or `roles.<name>.tags.<tag>`.
 
 **Configuration hierarchy**:
 - Instance-wide settings apply to all roles
@@ -270,8 +270,8 @@ See "Secrets management" section above for full details on the clan vars system.
 
 #### Clan services
 
-**Service instances**: Multiple instances of same service type.
-**Role-based configuration**: Different roles per instance (client/server/peer/controller).
+- **Service instances**: Multiple instances of same service type.
+- **Role-based configuration**: Different roles per instance (client/server/peer/controller).
 
 **Service module structure**:
 - `roles.<name>.interface`: Define configuration options for role
@@ -309,8 +309,8 @@ See "Secrets management" section above for full details on the clan vars system.
 
 **Purpose**: Declarative cloud infrastructure provisioning for VPS.
 
-**terranix**: Nix-based Terraform configuration generator.
-**Hetzner Cloud API**: VPS provisioning via terraform provider.
+- **terranix**: Nix-based Terraform configuration generator.
+- **Hetzner Cloud API**: VPS provisioning via terraform provider.
 
 **Workflow**:
 1. Define infrastructure in `modules/terranix/` (Nix expressions)
