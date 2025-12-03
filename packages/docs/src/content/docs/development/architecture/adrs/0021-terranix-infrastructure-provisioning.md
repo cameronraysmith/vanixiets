@@ -2,10 +2,10 @@
 title: "ADR-0021: Terranix Infrastructure Provisioning"
 ---
 
-**Status**: Accepted
-**Date**: 2024-12-01
-**Scope**: Cloud infrastructure provisioning
-**Related**: [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
+- **Status**: Accepted
+- **Date**: 2024-12-01
+- **Scope**: Cloud infrastructure provisioning
+- **Related**: [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 
 ## Context
 
