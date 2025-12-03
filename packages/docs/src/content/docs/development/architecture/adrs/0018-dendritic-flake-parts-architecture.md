@@ -2,10 +2,10 @@
 title: "ADR-0018: Dendritic Flake-Parts Architecture"
 ---
 
-**Status**: Accepted
-**Date**: 2024-11-20
-**Scope**: Nix configuration architecture
-**Related**: [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
+- **Status**: Accepted
+- **Date**: 2024-11-20
+- **Scope**: Nix configuration architecture
+- **Related**: [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
 
 ## Context
 
