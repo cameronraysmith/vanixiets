@@ -25,6 +25,8 @@ Before proceeding, understand the configuration patterns:
 
 Configuration files live in `modules/machines/darwin/` and `modules/machines/nixos/`, not `configurations/`.
 
+For detailed learning-oriented walkthroughs, see the [Darwin Deployment Tutorial](/tutorials/darwin-deployment/) for macOS or [NixOS Deployment Tutorial](/tutorials/nixos-deployment/) for servers.
+
 ## Darwin host onboarding (macOS)
 
 Use this for Apple Silicon Macs: stibnite, blackphos, rosegold, argentum.

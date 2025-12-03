@@ -18,6 +18,8 @@ This guide assumes:
 - The nix daemon is running and `/nix/store` is available
 - User configuration exists in the repository
 
+For initial setup, see [Bootstrap to Activation Tutorial](/tutorials/bootstrap-to-activation/) or ensure host onboarding is complete via [Host Onboarding](host-onboarding/).
+
 ## Architecture overview
 
 Users in this infrastructure are configured in one of two ways:

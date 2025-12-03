@@ -13,6 +13,8 @@ System-level secrets use clan vars (Tier 1), user-level secrets use sops-nix (Ti
 The infrastructure uses a two-tier secrets model.
 See [Clan Integration](/concepts/clan-integration#two-tier-secrets-architecture) for the complete architectural explanation.
 
+For a learning-oriented walkthrough of setting up secrets from scratch, see the [Secrets Setup Tutorial](/tutorials/secrets-setup/).
+
 | Tier | Tool | Purpose | Platforms | Generation |
 |------|------|---------|-----------|------------|
 | Tier 1 | Clan vars | System-level, machine-specific | NixOS only | Automatic (`clan vars generate`) |
