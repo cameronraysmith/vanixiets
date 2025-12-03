@@ -555,45 +555,40 @@ nix-store --query --tree $(nix eval --raw .#darwinConfigurations.<hostname>.conf
 - Preserve SSH configuration during activation
 - Use separate session for monitoring
 
-## SC-010: Migration-specific constraints
+## SC-010: Historical migration constraints (completed)
 
-### Phased migration requirement
+### Phased migration execution (completed November 2024)
 
-**Constraint**: Migration must proceed host-by-host with stability validation
+**Historical constraint**: Migration proceeded host-by-host with stability validation through Epics 1-7
 
-**Rationale**: Risk mitigation - avoid simultaneous failures
+**Completed phases**:
+0. Validation in test-clan environment (Epic 1)
+1. VPS foundation deployment - cinnabar, electrum, galena, scheelite (Epics 2-3)
+2-5. Darwin host migrations - stibnite, blackphos, rosegold, argentum (Epics 4-7)
+6. Architecture cleanup - nixos-unified deprecated (Epic 7)
 
-**Phases**:
-0. Validation in test environment
-1. VPS foundation (cinnabar)
-2-5. Darwin hosts one at a time
-6. Cleanup
+**Risk mitigation approach**:
+- Each host stabilized 1-2 weeks before next migration
+- Primary workstation (stibnite) migrated last in sequence
+- Rollback procedures tested and validated per host
+- Total migration duration: approximately 6 months
 
-**Stability requirement**:
-- Each host stable 1-2 weeks before next migration
-- Primary workstation (stibnite) migrated last
-- Rollback procedure tested per host
+**Legacy reference only**: This section documents the completed migration constraints for historical context and future large-scale changes.
 
-**Implications**:
-- Migration takes months (not days)
-- Two architectures coexist during migration
-- Patience required for risk management
+### Current architecture (post-migration)
 
-### Architectural coexistence
+**Architecture**: Dendritic flake-parts + clan-core is the active framework
 
-**Constraint**: nixos-unified and dendritic + clan must coexist during migration
+**Deprecated**: nixos-unified removed from active use (November 2024)
 
-**Implications**:
-- Two module systems active
-- Two host definition locations
-- Two deployment workflows
-- Increased cognitive load
+**Machine fleet** (8 total):
+- Darwin hosts (4): stibnite, blackphos, rosegold, argentum
+- NixOS hosts (4): cinnabar (permanent VPS), electrum, galena, scheelite (ephemeral VPS)
 
-**Mitigation**:
-- Clear documentation of which hosts on which architecture
-- Separate host directories for clarity
-- Gradual module migration as hosts transition
-- Remove nixos-unified after all hosts migrated (Phase 6)
+**Module organization**:
+- All modules follow dendritic pattern (every file is flake-parts module)
+- Clan inventory manages multi-machine coordination
+- No architectural coexistence - single unified system
 
 ## Constraint traceability
 
