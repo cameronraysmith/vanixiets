@@ -190,6 +190,15 @@ See [Repository Structure](/reference/repository-structure) for complete directo
 - [Secrets Management](/guides/secrets-management) - Managing encrypted secrets with sops-nix
 - [Handling broken packages](/guides/handling-broken-packages) - Fixing broken packages from nixpkgs unstable
 
+## Tutorials
+
+For in-depth learning-oriented walkthroughs, see:
+
+- [Bootstrap to Activation](/tutorials/bootstrap-to-activation/) - Step-by-step initial setup and activation
+- [Secrets Setup](/tutorials/secrets-setup/) - Two-tier secrets architecture configuration
+- [Darwin Deployment](/tutorials/darwin-deployment/) - Complete macOS deployment workflow
+- [NixOS Deployment](/tutorials/nixos-deployment/) - Cloud server provisioning and deployment
+
 ## Troubleshooting
 
 ### Nix not found after bootstrap
