@@ -232,7 +232,7 @@ The `DOCKER_HOST` environment variable is automatically configured to point to t
 
 ```bash
 echo $DOCKER_HOST
-# unix:///Users/crs58/.colima/default/docker.sock
+# unix:///Users/user/.colima/default/docker.sock
 ```
 
 ### Legacy tools requiring /var/run/docker.sock
@@ -378,7 +378,7 @@ colima list --json | jq '.[0].mounts'
 
 # Files in your home directory are accessible
 incus launch images:nixos/unstable builder
-incus exec builder -- ls /Users/crs58/
+incus exec builder -- ls ~/
 ```
 
 ### Custom runtime configuration
