@@ -9,7 +9,8 @@ This section contains the Requirements layer of the AMDiRE (Artefact Model for D
 The Requirements layer specifies what the system should do from a black-box perspective - the user-visible functionality and quality attributes without constraining internal implementation.
 This layer bridges the Context layer (problem space) and the System layer (solution space, when implemented).
 
-All requirements support the migration from nixos-unified to dendritic flake-parts + clan-core architecture, capturing both current capabilities and target state.
+All requirements support the dendritic flake-parts + clan-core architecture, which is now the current operational architecture as of Epic 6 (November 2024).
+This documentation reflects the complete migration from nixos-unified, with all eight machines in the fleet operating under the new architecture.
 
 ## AMDiRE Requirements layer purpose
 
@@ -355,7 +356,7 @@ Each layer provides different views appropriate for different stakeholders and p
 
 ## Summary
 
-The Requirements layer provides a complete black-box specification of the nix-config system, supporting the migration from nixos-unified to dendritic + clan architecture.
+The Requirements layer provides a complete black-box specification of the nix-config system under the dendritic + clan architecture that is now operational across an eight-machine fleet (as of Epic 6, November 2024).
 
 **Key takeaways**:
 - Seven core use cases capture all major workflows
@@ -363,16 +364,16 @@ The Requirements layer provides a complete black-box specification of the nix-co
 - Eight quality attributes define system excellence
 - Ten deployment scenarios cover all platforms
 - Ten constraints bound the design space
-- Ten risks identified with mitigation strategies
+- Ten risks identified with mitigation strategies (legacy migration risks now closed)
 - All requirements traceable to Context layer goals
 
-**Next steps**:
-1. Read [system vision](system-vision/) for orientation
-2. Study relevant use cases for your current phase
-3. Reference functional hierarchy as implementation guide
-4. Monitor quality requirements throughout development
-5. Follow deployment requirements for reliable operations
+**Current focus**:
+1. Maintain Requirements layer accuracy as reference for ongoing operations
+2. Ensure system behavior matches documented requirements
+3. Monitor quality attributes in production
+4. Update requirements when system capabilities evolve
+5. Reference functional hierarchy for feature planning
 6. Respect constraints in design decisions
-7. Actively manage risks during migration
+7. Track and resolve any emerging operational risks
 
 The Requirements layer serves as the authoritative specification for what the system must accomplish, guiding all implementation and validation efforts.
