@@ -54,8 +54,8 @@ Constraints are non-negotiable restrictions arising from business context, laws,
 ### Hardware constraints
 
 **Existing hosts**:
-- Four darwin hosts: stibnite, blackphos, rosegold, argentum (all aarch64)
-- VPS infrastructure: Hetzner Cloud (x86_64-linux)
+- Four darwin hosts: stibnite, blackphos, rosegold, argentum (all aarch64-darwin)
+- Four NixOS VPS hosts: cinnabar, electrum (Hetzner), galena, scheelite (GCP) (all x86_64-linux)
 - Cannot change existing hardware architecture
 - Reason: Physical hardware availability
 
@@ -90,9 +90,9 @@ Constraints are non-negotiable restrictions arising from business context, laws,
 ### Compatibility constraints
 
 **Breaking changes**:
-- Cannot break existing darwin host functionality during migration
-- Must maintain rollback capability until migration complete
-- Must preserve nixos-unified configurations until all hosts migrated
+- Cannot break existing host functionality during configuration changes
+- Must maintain rollback capability for all configuration deployments
+- Historical note: nixos-unified configurations were preserved until migration completed in November 2024
 - Reason: Operational continuity and risk management
 
 **Upstream compatibility**:
@@ -195,22 +195,23 @@ Rules are conditional standard procedures that guide implementation but can be a
 - Disk usage: use `diskus` instead of `du -sh`
 - Condition: Can use standard tools in contexts where Nix tools unavailable
 
-### Migration-specific rules
+### Historical: Migration rules (completed November 2024)
 
-**Progressive migration order**:
-- Phase 0: Validate in test-clan (required before infrastructure commitment)
-- Phase 1: Deploy VPS infrastructure (cinnabar)
-- Phases 2-5: Migrate darwin hosts (blackphos → rosegold → argentum → stibnite)
-- Phase 6: Cleanup (remove nixos-unified)
-- Condition: Can adjust order if technical issues discovered
+These rules governed the nixos-unified → clan+dendritic migration (Phases 0-6) completed in November 2024.
+They remain documented for historical context and potential future migrations.
 
-**Stability gates**:
-- Each host must be stable for 1-2 weeks before proceeding to next
+**Progressive migration order** (completed):
+- Phase 0: Validated in test-clan (required before infrastructure commitment)
+- Phase 1: Deployed VPS infrastructure (cinnabar)
+- Phases 2-5: Migrated darwin hosts (blackphos → rosegold → argentum → stibnite)
+- Phase 6: Cleanup (removed nixos-unified)
+
+**Stability gates** (applied during migration):
+- Each host was stable for 1-2 weeks before proceeding to next
 - Primary workstation (stibnite) migrated last
-- Rollback available until migration complete
-- Condition: Can expedite if stability proven faster, but conservative approach recommended
+- Rollback capability maintained until migration complete
 
-**Priority hierarchy for pattern conflicts**:
+**Priority hierarchy for pattern conflicts** (remains current):
 1. Clan functionality (non-negotiable)
 2. Dendritic flake-parts pattern (best-effort)
 3. Pattern purity (flexible)
