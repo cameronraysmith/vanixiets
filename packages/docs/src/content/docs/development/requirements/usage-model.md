@@ -1,5 +1,7 @@
 ---
 title: Usage model
+sidebar:
+  order: 4
 ---
 
 This document details the use cases from the system vision with complete scenarios, actors, preconditions, flows, and postconditions.

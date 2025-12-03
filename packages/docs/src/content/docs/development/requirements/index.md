@@ -1,5 +1,7 @@
 ---
-title: Requirements layer
+title: Requirements
+sidebar:
+  order: 1
 ---
 
 This section contains the Requirements layer of the AMDiRE (Artefact Model for Domain-independent Requirements Engineering) documentation framework.

@@ -1,5 +1,7 @@
 ---
-title: Quality requirements
+title: Quality
+sidebar:
+  order: 6
 ---
 
 This document defines non-functional requirements covering measurable quality attributes of the system.
