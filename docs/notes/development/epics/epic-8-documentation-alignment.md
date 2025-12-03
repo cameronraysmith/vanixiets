@@ -40,6 +40,7 @@ Comprehensively update all documentation to reflect the dendritic flake-parts + 
 | Story 8.9 | FR-8.9 (Cross-reference validation) |
 | Story 8.10 | FR-8.10 (Test harness documentation) |
 | Story 8.11 | FR-8.11 (AMDiRE development docs remediation) |
+| Story 8.12 | FR-8.12 (Foundational architecture decision records) |
 
 ---
 
@@ -465,6 +466,59 @@ So that I understand the actual goals, constraints, and architectural decisions 
 - Location: `packages/docs/src/content/docs/development/context/` and `development/requirements/`
 
 **NFR Coverage:** NFR-8.7 (Development documentation accuracy)
+
+---
+
+## Story 8.12: Create Foundational Architecture Decision Records
+
+As a contributor or future maintainer,
+I want ADRs documenting the foundational architectural decisions,
+So that I understand why dendritic flake-parts and clan-core were adopted and how they integrate.
+
+**Acceptance Criteria:**
+
+**Given** the Story 8.7 audit identified missing ADRs for foundational decisions
+**When** I create the foundational ADRs
+**Then** ADR-0018 (Dendritic Flake-Parts Architecture) should document:
+- Migration rationale from nixos-unified to dendritic pattern
+- Alternatives considered (nixos-unified, raw flake-parts, other frameworks)
+- Trade-offs and decision criteria
+- References to dendritic flake-parts source repos (import-tree, dendrix-dendritic-nix, etc.)
+
+**And** ADR-0019 (Clan-Core Orchestration) should document:
+- Adoption rationale for clan-core over alternatives
+- Alternatives considered (colmena, deploy-rs, morph, manual coordination)
+- Clan inventory, vars, and services patterns
+- Integration with sops-nix for two-tier secrets
+
+**And** ADR-0020 (Dendritic + Clan Integration) should document:
+- How dendritic flake-parts and clan-core work together
+- The synthesis that makes this architecture unique
+- Module namespace patterns across darwin/nixos/home-manager
+- Cross-references to ADR-0018 and ADR-0019
+
+**And** ADR-0021 (Terranix Infrastructure Provisioning) should document (optional):
+- Why terranix for infrastructure-as-code
+- Multi-cloud patterns (Hetzner + GCP)
+- Toggle mechanism for ephemeral resources
+- Integration with clan deployment workflow
+
+**And** validation should confirm:
+- All new ADRs follow existing ADR format
+- ADR index updated with new entries
+- Cross-references between related ADRs
+- Starlight build passes
+
+**Prerequisites:** Story 8.11 (development docs accurate, provides context)
+
+**Technical Notes:**
+- Story 8.7 audit identified these gaps at lines 145-152, 214-222
+- ADR-0017 was used for overlay patterns, not dendritic architecture
+- Reference repos for context: ~/projects/nix-workspace/{dendritic-flake-parts,clan-core,import-tree}
+- Epic 1 GO/NO-GO decision document provides validation evidence
+- Location: `packages/docs/src/content/docs/development/architecture/adrs/`
+
+**NFR Coverage:** NFR-8.12 (Architectural decision traceability)
 
 ---
 
