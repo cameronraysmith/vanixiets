@@ -10,7 +10,7 @@ Functions describe what the system does from a black-box perspective without spe
 The functional hierarchy captures user-visible functions accessible through commands, configuration options, and flake outputs.
 Functions are organized by purpose rather than technical implementation, reflecting the artefact-based requirements engineering approach.
 
-This hierarchy supports both current (nixos-unified) and target (dendritic + clan) architectures, with target-specific functions noted explicitly.
+This hierarchy documents the current dendritic flake-parts + clan-core architecture. Historical migration functions (MF-001 to MF-004) are preserved for reference, marked as completed.
 
 ## Configuration management functions
 
