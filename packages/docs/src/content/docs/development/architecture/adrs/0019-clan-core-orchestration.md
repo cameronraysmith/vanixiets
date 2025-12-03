@@ -2,10 +2,10 @@
 title: "ADR-0019: Clan-Core Orchestration"
 ---
 
-**Status**: Accepted
-**Date**: 2024-11-20
-**Scope**: Multi-machine coordination and deployment
-**Related**: [ADR-0011: SOPS secrets management](0011-sops-secrets-management/), [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
+- **Status**: Accepted
+- **Date**: 2024-11-20
+- **Scope**: Multi-machine coordination and deployment
+- **Related**: [ADR-0011: SOPS secrets management](0011-sops-secrets-management/), [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
 
 ## Context
 
