@@ -1,6 +1,6 @@
 # Story 8.12: Create Foundational Architecture Decision Records
 
-Status: drafted
+Status: review
 
 ## Story
 
@@ -126,95 +126,95 @@ The migration was validated and approved on 2025-11-20 with ALL 7 decision crite
 
 ### Task 1: Research and Context Gathering (AC: all)
 
-- [ ] 1.1 Read Epic 1 GO/NO-GO decision document completely [Source: docs/notes/development/go-no-go-decision.md]
-- [ ] 1.2 Review concepts/dendritic-architecture.md for existing documentation
-- [ ] 1.3 Review concepts/clan-integration.md for existing documentation
-- [ ] 1.4 Read ADR-0017 as template reference [Source: packages/docs/src/content/docs/development/architecture/adrs/0017-dendritic-overlay-patterns.md]
-- [ ] 1.5 Read ADR-0011 as comprehensive example [Source: packages/docs/src/content/docs/development/architecture/adrs/0011-sops-secrets-management.md]
-- [ ] 1.6 Review reference repositories for pattern context (optional, as needed)
+- [x] 1.1 Read Epic 1 GO/NO-GO decision document completely [Source: docs/notes/development/go-no-go-decision.md]
+- [x] 1.2 Review concepts/dendritic-architecture.md for existing documentation
+- [x] 1.3 Review concepts/clan-integration.md for existing documentation
+- [x] 1.4 Read ADR-0017 as template reference [Source: packages/docs/src/content/docs/development/architecture/adrs/0017-dendritic-overlay-patterns.md]
+- [x] 1.5 Read ADR-0011 as comprehensive example [Source: packages/docs/src/content/docs/development/architecture/adrs/0011-sops-secrets-management.md]
+- [x] 1.6 Review reference repositories for pattern context (optional, as needed)
 
 ### Task 2: Create ADR-0018 Dendritic Flake-Parts Architecture (AC: 18.1-18.6)
 
-- [ ] 2.1 Create file with frontmatter (title, Status: Accepted, Date: 2024-11-XX, Scope: Nix configuration)
-- [ ] 2.2 Write Context section:
-  - [ ] 2.2.1 Document nixos-unified limitations from Epic 1 findings
-  - [ ] 2.2.2 Document dendritic pattern benefits identified during migration
-  - [ ] 2.2.3 Reference Epic 1 validation evidence (Stories 1.1, 1.2, 1.6, 1.7)
-- [ ] 2.3 Write Decision section:
-  - [ ] 2.3.1 Document import-tree adoption decision
-  - [ ] 2.3.2 Document flake.modules namespace pattern
-  - [ ] 2.3.3 Document module directory organization
-- [ ] 2.4 Write Alternatives section:
-  - [ ] 2.4.1 Stay with nixos-unified (rejected, reasons)
-  - [ ] 2.4.2 Raw flake-parts without dendritic (rejected, reasons)
-- [ ] 2.5 Write Consequences section (positive, negative, neutral)
-- [ ] 2.6 Write References section with internal/external links
+- [x] 2.1 Create file with frontmatter (title, Status: Accepted, Date: 2024-11-XX, Scope: Nix configuration)
+- [x] 2.2 Write Context section:
+  - [x] 2.2.1 Document nixos-unified limitations from Epic 1 findings
+  - [x] 2.2.2 Document dendritic pattern benefits identified during migration
+  - [x] 2.2.3 Reference Epic 1 validation evidence (Stories 1.1, 1.2, 1.6, 1.7)
+- [x] 2.3 Write Decision section:
+  - [x] 2.3.1 Document import-tree adoption decision
+  - [x] 2.3.2 Document flake.modules namespace pattern
+  - [x] 2.3.3 Document module directory organization
+- [x] 2.4 Write Alternatives section:
+  - [x] 2.4.1 Stay with nixos-unified (rejected, reasons)
+  - [x] 2.4.2 Raw flake-parts without dendritic (rejected, reasons)
+- [x] 2.5 Write Consequences section (positive, negative, neutral)
+- [x] 2.6 Write References section with internal/external links
 
 ### Task 3: Create ADR-0019 Clan-Core Orchestration (AC: 19.1-19.6)
 
-- [ ] 3.1 Create file with frontmatter
-- [ ] 3.2 Write Context section:
-  - [ ] 3.2.1 Document multi-machine coordination requirements (8 machines)
-  - [ ] 3.2.2 Document secrets management needs
-  - [ ] 3.2.3 Document zerotier VPN mesh requirements
-- [ ] 3.3 Write Decision section:
-  - [ ] 3.3.1 Document clan inventory pattern
-  - [ ] 3.3.2 Document clan vars for Tier 1 secrets
-  - [ ] 3.3.3 Document clan services for coordination
-- [ ] 3.4 Write Alternatives section:
-  - [ ] 3.4.1 colmena (rejected, reasons)
-  - [ ] 3.4.2 deploy-rs (rejected, reasons)
-  - [ ] 3.4.3 morph (rejected, reasons)
-  - [ ] 3.4.4 Manual coordination (rejected, reasons)
-- [ ] 3.5 Write Consequences section
-- [ ] 3.6 Write References section with cross-references to ADR-0018
+- [x] 3.1 Create file with frontmatter
+- [x] 3.2 Write Context section:
+  - [x] 3.2.1 Document multi-machine coordination requirements (8 machines)
+  - [x] 3.2.2 Document secrets management needs
+  - [x] 3.2.3 Document zerotier VPN mesh requirements
+- [x] 3.3 Write Decision section:
+  - [x] 3.3.1 Document clan inventory pattern
+  - [x] 3.3.2 Document clan vars for Tier 1 secrets
+  - [x] 3.3.3 Document clan services for coordination
+- [x] 3.4 Write Alternatives section:
+  - [x] 3.4.1 colmena (rejected, reasons)
+  - [x] 3.4.2 deploy-rs (rejected, reasons)
+  - [x] 3.4.3 morph (rejected, reasons)
+  - [x] 3.4.4 Manual coordination (rejected, reasons)
+- [x] 3.5 Write Consequences section
+- [x] 3.6 Write References section with cross-references to ADR-0018
 
 ### Task 4: Create ADR-0020 Dendritic + Clan Integration (AC: 20.1-20.6)
 
-- [ ] 4.1 Create file with frontmatter
-- [ ] 4.2 Write Context section:
-  - [ ] 4.2.1 Document dendritic module organization role
-  - [ ] 4.2.2 Document clan orchestration role
-  - [ ] 4.2.3 Document integration challenges (neither designed for other)
-  - [ ] 4.2.4 Reference Epic 1 synthesis validation
-- [ ] 4.3 Write Decision section:
-  - [ ] 4.3.1 Clan as flake-parts module pattern
-  - [ ] 4.3.2 Module namespace exports to clan inventory
-  - [ ] 4.3.3 Two-tier secrets architecture
-  - [ ] 4.3.4 Zerotier integration approach
-- [ ] 4.4 Write Synthesis patterns section:
-  - [ ] 4.4.1 flake.clan within flake-parts
-  - [ ] 4.4.2 clanModules importing from flake.modules
-  - [ ] 4.4.3 Cross-platform module reuse
-- [ ] 4.5 Write Consequences section
-- [ ] 4.6 Write References section with cross-references to ADR-0018 and ADR-0019
+- [x] 4.1 Create file with frontmatter
+- [x] 4.2 Write Context section:
+  - [x] 4.2.1 Document dendritic module organization role
+  - [x] 4.2.2 Document clan orchestration role
+  - [x] 4.2.3 Document integration challenges (neither designed for other)
+  - [x] 4.2.4 Reference Epic 1 synthesis validation
+- [x] 4.3 Write Decision section:
+  - [x] 4.3.1 Clan as flake-parts module pattern
+  - [x] 4.3.2 Module namespace exports to clan inventory
+  - [x] 4.3.3 Two-tier secrets architecture
+  - [x] 4.3.4 Zerotier integration approach
+- [x] 4.4 Write Synthesis patterns section:
+  - [x] 4.4.1 flake.clan within flake-parts
+  - [x] 4.4.2 clanModules importing from flake.modules
+  - [x] 4.4.3 Cross-platform module reuse
+- [x] 4.5 Write Consequences section
+- [x] 4.6 Write References section with cross-references to ADR-0018 and ADR-0019
 
 ### Task 5: Create ADR-0021 Terranix Infrastructure (AC: 21.1-21.5, Optional)
 
-- [ ] 5.1 Create file with frontmatter
-- [ ] 5.2 Write Context section:
-  - [ ] 5.2.1 Multi-cloud requirement (Hetzner, GCP)
-  - [ ] 5.2.2 Infrastructure-as-code preference
-  - [ ] 5.2.3 Cost control via toggle patterns
-- [ ] 5.3 Write Decision section:
-  - [ ] 5.3.1 Terranix over raw Terraform (Nix benefits)
-  - [ ] 5.3.2 Provider modules pattern
-  - [ ] 5.3.3 Toggle mechanism for ephemeral resources
-- [ ] 5.4 Write Consequences section
-- [ ] 5.5 Write References section (Epic 7 stories)
+- [x] 5.1 Create file with frontmatter
+- [x] 5.2 Write Context section:
+  - [x] 5.2.1 Multi-cloud requirement (Hetzner, GCP)
+  - [x] 5.2.2 Infrastructure-as-code preference
+  - [x] 5.2.3 Cost control via toggle patterns
+- [x] 5.3 Write Decision section:
+  - [x] 5.3.1 Terranix over raw Terraform (Nix benefits)
+  - [x] 5.3.2 Provider modules pattern
+  - [x] 5.3.3 Toggle mechanism for ephemeral resources
+- [x] 5.4 Write Consequences section
+- [x] 5.5 Write References section (Epic 7 stories)
 
 ### Task 6: Update ADR Index and Validation (AC: IDX.1-IDX.5)
 
-- [ ] 6.1 Update ADR index.md with new entries
-  - [ ] 6.1.1 Add section header if needed (e.g., "Architecture Patterns")
-  - [ ] 6.1.2 Add ADR-0018 entry
-  - [ ] 6.1.3 Add ADR-0019 entry
-  - [ ] 6.1.4 Add ADR-0020 entry
-  - [ ] 6.1.5 Add ADR-0021 entry (if created)
-- [ ] 6.2 Verify all ADRs follow consistent format
-- [ ] 6.3 Verify cross-references between ADRs are valid
-- [ ] 6.4 Run `just docs-build` to validate Starlight build
-- [ ] 6.5 Run `just docs-linkcheck` to validate all links
+- [x] 6.1 Update ADR index.md with new entries
+  - [x] 6.1.1 Add section header if needed (e.g., "Architecture Patterns")
+  - [x] 6.1.2 Add ADR-0018 entry
+  - [x] 6.1.3 Add ADR-0019 entry
+  - [x] 6.1.4 Add ADR-0020 entry
+  - [x] 6.1.5 Add ADR-0021 entry (if created)
+- [x] 6.2 Verify all ADRs follow consistent format
+- [x] 6.3 Verify cross-references between ADRs are valid
+- [x] 6.4 Run `just docs-build` to validate Starlight build
+- [x] 6.5 Run `just docs-linkcheck` to validate all links
 
 ## Dev Notes
 
@@ -374,10 +374,59 @@ ADR-0021 (Terranix) is marked optional because:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+**2025-12-02 Task 1 Complete:**
+- Read GO/NO-GO decision (1,482 lines) - extracted all AC1.1-AC1.7 evidence, pattern confidence data
+- Reviewed ADR-0017 (399 lines) as structural template - adopted five-layer pattern format
+- Reviewed ADR-0011 (117 lines) for sops-nix cross-reference context
+- Read concepts/dendritic-architecture.md (343 lines) - confirms dendritic pattern documentation exists
+- Read concepts/clan-integration.md (293 lines) - confirms clan documentation exists
+- Read ADR index to understand current organization (4 sections, 17 ADRs)
+- Key dates: Epic 1 GO decision 2025-11-20, Pattern validation Stories 1.1-1.13
+
 ### Completion Notes List
 
+**2025-12-02 Story 8.12 Implementation Complete:**
+
+ADRs created (all 4, including optional):
+- ADR-0018: Dendritic Flake-Parts Architecture (285 lines)
+- ADR-0019: Clan-Core Orchestration (280 lines)
+- ADR-0020: Dendritic + Clan Integration (320 lines)
+- ADR-0021: Terranix Infrastructure Provisioning (265 lines)
+
+Total: ~1,150 lines of foundational ADR documentation
+
+Validation results:
+- `just docs-build`: PASSED (76 pages indexed)
+- `just docs-linkcheck`: PASSED (all internal links valid)
+
+Cross-references established:
+- ADR-0018 ↔ ADR-0017 (overlay patterns), ADR-0019, ADR-0020
+- ADR-0019 ↔ ADR-0011 (sops), ADR-0018, ADR-0020
+- ADR-0020 ↔ ADR-0018, ADR-0019, ADR-0011, ADR-0017
+- ADR-0021 ↔ ADR-0019
+- All ADRs reference concepts/dendritic-architecture.md and/or concepts/clan-integration.md
+
+Commits (6 atomic):
+1. ADR-0018 dendritic flake-parts
+2. ADR-0019 clan-core orchestration
+3. ADR-0020 dendritic + clan integration
+4. ADR-0021 terranix infrastructure
+5. ADR index update with "Nix Fleet Architecture" section
+6. Story file updates (this commit)
+
 ### File List
+
+**Created:**
+- packages/docs/src/content/docs/development/architecture/adrs/0018-dendritic-flake-parts-architecture.md
+- packages/docs/src/content/docs/development/architecture/adrs/0019-clan-core-orchestration.md
+- packages/docs/src/content/docs/development/architecture/adrs/0020-dendritic-clan-integration.md
+- packages/docs/src/content/docs/development/architecture/adrs/0021-terranix-infrastructure-provisioning.md
+
+**Modified:**
+- packages/docs/src/content/docs/development/architecture/adrs/index.md
+- docs/notes/development/sprint-status.yaml
+- docs/notes/development/work-items/8-12-create-foundational-architecture-decision-records.md
