@@ -1,6 +1,6 @@
 ---
-title: "Tutorials"
-description: "Learn to work with this infrastructure through tutorials."
+title: "Contents"
+description: "Learn to work with this infrastructure repository through tutorials."
 sidebar:
   order: 1
 ---

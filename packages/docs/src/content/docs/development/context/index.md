@@ -1,5 +1,6 @@
 ---
-title: Context
+title: Contents
+description: "AMDiRE context layer"
 sidebar:
   order: 1
 ---
