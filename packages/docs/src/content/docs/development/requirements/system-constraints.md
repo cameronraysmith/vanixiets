@@ -319,9 +319,9 @@ imports = [ config.flake.modules.darwin.shell-fish ];
 
 **Constraint**: Dendritic pattern eliminates specialArgs for type safety
 
-**Current architecture (nixos-unified)**: Uses specialArgs to pass custom arguments
+**Legacy architecture (nixos-unified, deprecated)**: Used specialArgs to pass custom arguments
 
-**Target architecture (dendritic)**: All arguments via module system
+**Current architecture (dendritic)**: All arguments via module system
 
 **Implications**:
 - Module signatures: { config, pkgs, lib, ... }
