@@ -590,13 +590,15 @@ development_status:
 
   # Epic 8 - Documentation Alignment
   # Update Starlight docs to reflect dendritic+clan architecture
-  epic-8: in-progress
+  # COMPLETE (2025-12-02): Phase 1 + Phase 2 all 12 stories done
+  epic-8: done
   epic-8-notes: |
     Phase 1 COMPLETE 2025-12-01 - Stories 8.1-8.4 aligned docs with dendritic+clan architecture.
-    Phase 2 IN PROGRESS 2025-12-02 - Stories 8.5-8.12 address structural completeness gaps.
+    Phase 2 COMPLETE 2025-12-02 - Stories 8.5-8.12 addressed structural completeness gaps.
     Research document: docs/notes/development/research/documentation-coverage-analysis.md
     Phase 1: audit (8.1), architecture (8.2), onboarding (8.3), secrets (8.4) - all DONE.
-    Phase 2: structure audit (8.5), CLI reference (8.6), AMDiRE audit (8.7), tutorials (8.8), cross-refs (8.9), test docs (8.10), AMDiRE remediation (8.11), foundational ADRs (8.12).
+    Phase 2: structure audit (8.5), CLI reference (8.6), AMDiRE audit (8.7), tutorials (8.8), cross-refs (8.9), test docs (8.10), AMDiRE remediation (8.11), foundational ADRs (8.12) - all DONE.
+    Completion date: 2025-12-02
   story-8-1: done
   story-8-1-title: "Audit existing Starlight docs for staleness"
   story-8-1-notes: "Completed 2025-12-01 - 59 files audited, 22 current, 21 stale, 9 obsolete, 7 missing topics identified. Results: story-8.1-audit-results.md"
@@ -634,12 +636,12 @@ development_status:
   story-8-8: done
   story-8-8-title: "Create tutorials for common user workflows"
   story-8-8-notes: "DONE 2025-12-02 - Created 5 tutorials (2,073 lines total): index.md, bootstrap-to-activation.md, secrets-setup.md, darwin-deployment.md, nixos-deployment.md. 26/26 ACs satisfied. Diataxis compliant (learning-oriented). 31 cross-references to guides. Build + linkcheck pass. 6 commits."
-  story-8-9: review
+  story-8-9: done
   story-8-9-title: "Validate cross-references and navigation discoverability"
-  story-8-9-notes: "REVIEW 2025-12-02 - 16/16 ACs complete. Validated 32 files across Stories 8.8, 8.10, 8.11, 8.12. Added 22 cross-reference links. Final validation: 77 pages indexed, all links valid. 3 commits: b7afef81, 8acea2ad, 7aab2989."
-  story-8-10: review
+  story-8-9-notes: "DONE 2025-12-02 - 16/16 ACs complete. Validated 32 files across Stories 8.8, 8.10, 8.11, 8.12. Added 22 cross-reference links. Final validation: 77 pages indexed, all links valid. 3 commits: b7afef81, 8acea2ad, 7aab2989."
+  story-8-10: done
   story-8-10-title: "Audit test harness and CI documentation"
-  story-8-10-notes: "REVIEW 2025-12-02 - 10 ACs complete. Created testing.md (391 lines, test philosophy + infrastructure + docs testing) and test-harness.md (257 lines, CI-local parity matrix). 4 docs cross-referenced. Validation: 77 pages indexed, all links valid. 5 commits."
+  story-8-10-notes: "DONE 2025-12-02 - 10 ACs complete. Created testing.md (391 lines, test philosophy + infrastructure + docs testing) and test-harness.md (257 lines, CI-local parity matrix). 4 docs cross-referenced. Validation: 77 pages indexed, all links valid. 5 commits."
   # Story 8.11: Remediate AMDiRE development documentation staleness
   # Addresses Story 8.7 audit findings: 37.5% of development docs stale (12/32 files)
   # Primary issue: "current/target state inversion" - 9 files describe nixos-unified as current
@@ -652,9 +654,9 @@ development_status:
   # Addresses Story 8.7 traceability gaps: missing ADRs for dendritic, clan-core, integration
   # Scope: ADR-0018 (dendritic), ADR-0019 (clan), ADR-0020 (integration), ADR-0021 (terranix, optional)
   # These are the most important architectural decisions, yet were undocumented
-  story-8-12: review
+  story-8-12: done
   story-8-12-title: "Create foundational architecture decision records"
-  story-8-12-notes: "REVIEW 2025-12-02 - 4 ADRs created: ADR-0018 (dendritic, 285 lines), ADR-0019 (clan, 280 lines), ADR-0020 (integration, 320 lines), ADR-0021 (terranix, 265 lines). 28/28 ACs satisfied. Validation passed: docs-build (76 pages), linkcheck (all valid). 6 commits."
+  story-8-12-notes: "DONE 2025-12-02 - 4 ADRs created: ADR-0018 (dendritic, 285 lines), ADR-0019 (clan, 280 lines), ADR-0020 (integration, 320 lines), ADR-0021 (terranix, 265 lines). 28/28 ACs satisfied. Validation passed: docs-build (76 pages), linkcheck (all valid). 6 commits."
   # Phase 1 retrospective complete, Phase 2 retrospective pending after Stories 8.5-8.12
   epic-8-phase-1-retrospective: done
   epic-8-retrospective: pending
