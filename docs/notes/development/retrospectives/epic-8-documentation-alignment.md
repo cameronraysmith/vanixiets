@@ -1,319 +1,272 @@
 # Epic 8 Retrospective: Documentation Alignment
 
-**Date**: 2025-12-01
+**Date**: 2025-12-03
 **Epic**: 8 - Documentation Alignment (Post-MVP Phase 7)
-**Status**: COMPLETE - All 4 stories DONE
-**Facilitator**: Retrospective generated post-completion
+**Status**: COMPLETE - All 12 stories DONE
+**Duration**: 2 days (2025-12-01 to 2025-12-02), Sessions A, B, C
+**Facilitator**: Bob (Scrum Master)
 
 ---
 
 ## Executive Summary
 
-Epic 8 successfully updated all Starlight documentation to reflect the dendritic flake-parts + clan-core architecture, eliminating references to deprecated nixos-unified patterns.
-The implementation occurred in a single intensive day, achieving all business objectives with proper attribution, accurate patterns, and verified code-documentation alignment.
+Epic 8 successfully aligned all documentation with the dendritic flake-parts + clan-core architecture, filling critical structural gaps identified through systematic audits. The epic delivered 12 stories across two phases: Phase 1 (alignment, Stories 8.1-8.4) and Phase 2 (structural completeness, Stories 8.5-8.12).
 
 **Key Outcomes:**
-- 59 files audited with prioritized staleness inventory
-- 2 new concept documents created (dendritic-architecture.md, clan-integration.md)
-- 4 major documents rewritten (host-onboarding, home-manager-onboarding, getting-started, secrets-management)
-- 7 additional files updated with consistent patterns
-- 1 obsolete file removed (understanding-autowiring.md)
-- Proper attribution established for external projects (mightyiam, vic, Hercules CI)
-- Verification audit achieved 100% code-documentation alignment
+- 77 pages of Starlight documentation indexed and validated
+- 2,073 lines of tutorial content (5 files) - filling CRITICAL Diataxis gap
+- 1,150 lines of foundational ADRs (4 files) - documenting dendritic + clan decisions
+- 91 files audited (59 Starlight + 32 AMDiRE)
+- 15 files remediated for staleness
+- Zero deprecated nixos-unified references as "current"
 
-**Business Objective Achievement:** Documentation accuracy enables new contributors and reduces support burden.
-Zero references to deprecated nixos-unified architecture remain.
+**Critical Discovery**: Epic 9's clan-01 → main merge will delete `docs/` directory, requiring content migration story before merge.
+
+---
+
+## Story Completion
+
+### Phase 1: Documentation Alignment (Stories 8.1-8.4)
+
+| Story | Description | Deliverable | Status |
+|-------|-------------|-------------|--------|
+| 8.1 | Audit existing Starlight docs for staleness | 59 files audited (22 current, 21 stale, 9 obsolete, 7 missing) | DONE |
+| 8.2 | Update architecture and patterns documentation | dendritic-architecture.md, clan-integration.md, 9 commits | DONE |
+| 8.3 | Update host onboarding guides (darwin vs nixos) | host-onboarding.md, home-manager-onboarding.md rewritten | DONE |
+| 8.4 | Update secrets management documentation | Two-tier architecture documented (clan vars + sops-nix) | DONE |
+
+### Phase 2: Structural Completeness (Stories 8.5-8.12)
+
+| Story | Description | Deliverable | Metrics |
+|-------|-------------|-------------|---------|
+| 8.5 | Audit documentation structure against Diataxis/AMDiRE | Gap analysis artifact | tutorials/ EMPTY identified as CRITICAL |
+| 8.6 | Rationalize and document CLI tooling | Reference docs | 827 lines, 4 files, 6 stale recipes removed |
+| 8.7 | Audit AMDiRE development documentation alignment | Audit artifact | 32 files, 62.5% current, 37.5% stale |
+| 8.8 | Create tutorials for common user workflows | Tutorial content | 2,073 lines, 5 files, Diataxis compliant |
+| 8.9 | Validate cross-references and navigation discoverability | Validation pass | 32 files validated, 19 fixes, 22 cross-refs added |
+| 8.10 | Audit test harness and CI documentation | Test docs | 648 lines, 2 files, CI-local parity matrix |
+| 8.11 | Remediate AMDiRE development documentation staleness | Remediation | 15 files updated, 19 commits, ADR-0017 created |
+| 8.12 | Create foundational architecture decision records | ADRs | 1,150 lines, ADRs 0018-0021 |
+
+**Total: 12/12 stories complete (100%)**
+
+### Post-Completion Fix
+
+- **Issue**: Definition list formatting escaped validation (102 items, 11 files)
+- **Resolution**: 4 commits fixing ADRs 0019, 0020, 0021, and ADR-0003
+- **Root cause**: Validation suite checks structure/links, not rendering correctness
 
 ---
 
 ## Achievements and Metrics
 
-### Story Completion
+### Documentation Output
 
-| Story | Description | Status | Key Deliverable |
-|-------|-------------|--------|-----------------|
-| 8.1 | Audit Existing Starlight Docs for Staleness | DONE | story-8.1-audit-results.md |
-| 8.2 | Update Architecture and Patterns Documentation | DONE (after corrections) | dendritic-architecture.md, clan-integration.md |
-| 8.3 | Update Host Onboarding Guides | DONE | host-onboarding.md (640 lines, rewritten) |
-| 8.4 | Update Secrets Management Documentation | DONE (after amendment) | secrets-management.md (529 lines, rewritten) |
+| Category | Lines | Files | Notes |
+|----------|-------|-------|-------|
+| Tutorials | 2,073 | 5 | Learning-oriented, Diataxis compliant |
+| ADRs (foundational) | 1,150 | 4 | ADRs 0018-0021 |
+| CLI Reference | 827 | 4 | justfile, flake apps, CI jobs |
+| Test Harness Docs | 648 | 2 | testing.md, test-harness.md |
+| **Total New Content** | **4,698** | **15** | |
 
-**Total: 4 stories, 4 completed (100%)**
+### Audit and Remediation
 
-### Metrics Summary
-
-| Metric | Value |
-|--------|-------|
-| Files Audited | 59 |
-| Files Created | 2 |
-| Files Rewritten | 4 |
-| Files Updated | 8 |
-| Files Removed | 1 |
-| Commits (approx) | 25+ |
-| Corrections Applied | 4 (1 amendment + 3 pattern fixes) |
-| Verification Accuracy | 92% → 100% |
-
-### Audit Breakdown (Story 8.1)
-
-| Status | Count | Percentage |
-|--------|-------|------------|
-| Current | 22 | 37% |
-| Stale | 21 | 36% |
-| Obsolete | 9 | 15% |
-| Other | 7 | 12% |
-
-**Priority Distribution:** 6 critical, 12 high, 12 medium priority updates identified
-
-### Deliverables Created
-
-| Artifact | Lines | Purpose |
+| Activity | Files | Outcome |
 |----------|-------|---------|
-| `concepts/dendritic-architecture.md` | 282 | Dendritic flake-parts pattern explanation |
-| `concepts/clan-integration.md` | 292 | Clan-core integration documentation |
-| `guides/host-onboarding.md` | 640 | Complete platform differentiation (darwin vs NixOS) |
-| `guides/home-manager-onboarding.md` | 462 | Portable modules and aggregates |
-| `guides/getting-started.md` | 259 | Updated dendritic pattern introduction |
-| `guides/secrets-management.md` | 529 | Two-tier architecture (clan vars + sops-nix) |
-| `story-8.1-audit-results.md` | ~500 | Comprehensive staleness audit |
+| Starlight audit (8.1) | 59 | 22 current, 21 stale, 9 obsolete, 7 missing |
+| AMDiRE audit (8.7) | 32 | 62.5% current, 37.5% stale |
+| Cross-ref validation (8.9) | 32 | 19 fixes applied |
+| AMDiRE remediation (8.11) | 15 | All staleness patterns resolved |
+
+### Quality Gates
+
+| Gate | Result |
+|------|--------|
+| Starlight build | PASS (77 pages indexed) |
+| Link validation | PASS (all internal links valid) |
+| Diataxis compliance | PASS (tutorials learning-oriented) |
+| AMDiRE alignment | IMPROVED (staleness remediated) |
 
 ---
 
-## Correction Patterns
+## What Went Well
 
-### Corrections Applied During Epic 8
+### 1. Audit-First Approach
+Stories 8.1, 8.5, and 8.7 provided data-driven roadmaps. We weren't guessing what needed work - we had evidence. This should become standard practice for documentation epics.
 
-Epic 8 required 4 corrections across 2 categories: pre-execution amendments and post-execution fixes.
+### 2. Process Flexibility
+- Story 8.12 (foundational ADRs) was discovered mid-epic when Story 8.7 audit revealed the gap
+- Definition list formatting issue was caught and fixed post-completion
+- The process adapted gracefully without derailing the epic
 
-#### Pre-Execution Amendment: Story 8.4 Bitwarden Workflow
+### 3. Diataxis Framework Compliance
+Tutorial content (Story 8.8) is learning-oriented, not task-oriented. Clear differentiation from existing guides. Progressive skill building within each tutorial.
 
-**Issue Discovered:** Initial Story 8.4 draft instructed removing ALL Bitwarden references from secrets documentation.
+### 4. Foundational ADRs Created
+ADRs 0018-0021 document the most important architectural decisions:
+- ADR-0018: Dendritic Flake-Parts Architecture
+- ADR-0019: Clan-Core Orchestration
+- ADR-0020: Dendritic + Clan Integration
+- ADR-0021: Terranix Infrastructure Provisioning
 
-**Reality:** Bitwarden plays a legitimate role in the Tier 2 secrets workflow:
-- Bitwarden stores SSH keys securely
-- `bw` CLI retrieves keys during age key derivation
-- `ssh-to-age` converts SSH keys to age keys
-- This manual bootstrap is a security feature by design
+### 5. Party Mode Orchestration
+Multi-story coordination across Sessions A, B, C with subagent delegation preserving orchestrator context. The create-story → dev-story → code-review workflow sequence matured.
 
-**When Caught:** Party Mode review, before dev-story execution
-
-**Impact Avoided:** Would have removed critical documentation for age key bootstrap workflow
-
-**Resolution:** Story 8.4 amended to preserve Bitwarden → ssh-to-age workflow documentation
-
-#### Post-Execution Fix: Dendritic Pattern Examples
-
-**Issue Discovered:** Verification audit found 6 documentation-code discrepancies in Story 8.2 deliverables
-
-**Discrepancies:**
-1. Documentation showed explicit `_aggregates.nix` files - actual implementation uses directory-based auto-merging via import-tree
-2. Module export pattern showed individual namespace exports - actual uses namespace merging (multiple files contribute to shared namespace)
-3. Machine registration documented as direct `flake.darwinConfigurations` export - actual uses `flake.modules.darwin` export → clan registry import
-
-**When Caught:** Post-Story 8.2 verification audit
-
-**Initial Accuracy:** 92%
-
-**Final Accuracy:** 100% after corrections
-
-**Resolution:** 3 follow-up commits correcting pattern examples to match actual implementation
+### 6. Story 8.9 as Validation Gate
+Cross-reference validation caught 19 issues across 32 files before epic completion. Comprehensive final validation gate proved valuable.
 
 ---
 
-## Lessons Learned
+## Challenges and Learnings
 
-### Technical Discoveries
+### 1. Definition List Formatting Escape
+- **Issue**: 102 items across 11 files rendered incorrectly
+- **Cause**: Validation suite checks structure/links, not visual rendering
+- **Learning**: Add visual spot-check to Definition of Done for docs stories
 
-#### 1. Bitwarden Role in Tier 2 Secrets
+### 2. Mid-Epic Story Discovery
+- **Issue**: Story 8.12 (foundational ADRs) wasn't in original scope
+- **Cause**: Gap only visible after Story 8.7 audit ran
+- **Learning**: This is expected behavior for audits - flexibility is the success metric
 
-The two-tier secrets architecture has a nuanced bootstrap workflow:
+### 3. Effort Variance
+- Story effort ranged from 1 commit (8.4) to 19 commits (8.11)
+- Documentation stories are inherently hard to estimate
+- Audit artifacts help calibrate but don't eliminate variance
 
-- **Tier 1 (Clan Vars):** Generated automatically by clan infrastructure
-- **Tier 2 (sops-nix):** Requires age keys derived from SSH keys stored in Bitwarden
-
-The manual Bitwarden → SSH → age derivation is intentional, not a legacy artifact.
-It provides cryptographic separation between key storage (Bitwarden) and key usage (sops-nix).
-
-#### 2. Dendritic Pattern Implementation Elegance
-
-The actual implementation is more elegant than initially documented:
-
-- **Documented:** Explicit `_aggregates.nix` files defining namespace aggregation
-- **Actual:** Directory-based auto-merging via import-tree - no manual aggregate definitions needed
-
-This discovery validated the architecture choice while correcting the documentation.
-
-#### 3. Machine Registration Two-Step Pattern
-
-Darwin machines follow a two-step registration pattern:
-
-1. Export to `flake.modules.darwin` namespace (dendritic pattern)
-2. Clan registry imports from namespace (clan coordination)
-
-This enables both dendritic module organization and clan-based machine coordination.
-
-#### 4. Namespace Merging Pattern
-
-Multiple files in the same directory contribute to a shared namespace:
-
-- `tools/bottom.nix` → exports to `homeManager.tools`
-- `tools/pandoc.nix` → exports to `homeManager.tools`
-
-Both merge into the same namespace automatically, not individual exports like `tools-bottom`.
-
-### Process Insights
-
-#### What Went Well
-
-1. **Attribution Research First** - Researched external project origins (mightyiam for dendritic, vic for import-tree/dendrix, Hercules CI for flake-parts) before writing documentation. Proper credits established from the start.
-
-2. **Audit-First Approach** - Story 8.1 audit provided clear priorities and actionable checklist for Stories 8.2-8.4. The 59-file inventory with staleness classification prevented random documentation updates.
-
-3. **Platform Differentiation** - Clear darwin vs NixOS workflows documented with distinct sections. Eliminates confusion for new users.
-
-4. **Two-Tier Secrets Architecture** - Complex pattern documented clearly with both conceptual explanation and operational procedures.
-
-5. **Verification Audit Investment** - The 2-3 hour post-Story 8.2 verification caught 6 discrepancies. Worth the investment for foundational documentation.
-
-6. **Mid-Stream Corrections** - Both the Bitwarden workflow (pre-execution) and dendritic patterns (post-execution) were caught and fixed before the epic closed.
-
-7. **Cross-Referencing** - All new documents link to related concepts and guides appropriately.
-
-#### What Could Be Improved
-
-1. **Initial Story 8.4 Draft Accuracy** - Missed Bitwarden's legitimate role in the secrets workflow. Should have traced the actual key derivation chain during story drafting.
-
-2. **Dendritic Pattern Verification Timing** - Should have verified code examples against actual implementation BEFORE Story 8.2 execution, not after.
-
-3. **Aggregate Pattern Understanding** - Fictional `_aggregates.nix` pattern made it into initial documentation. Need better codebase exploration before documenting patterns.
-
-4. **Story 8.1 Scope Limitation** - The staleness audit didn't catch that documented patterns might not match actual implementation. Pattern accuracy should be a separate verification dimension.
+### 4. "Current/Target State Inversion" Pattern
+- 9 AMDiRE files described nixos-unified as "current" and dendritic+clan as "target"
+- **Clarification**: This was NOT drift - docs were written during planning, before migration completed
+- Epic 8 was the scheduled update pass after migration (Epics 1-7) completed
 
 ---
 
-## Process Assessment: Party Mode Orchestration
+## Epic 7 Action Item Follow-Through
 
-### Research → Story → Execute → Verify Cycle
+| Action Item | Status | Evidence |
+|-------------|--------|----------|
+| Document GCP deployment patterns | ✅ Done | Story 8.2 architecture, Story 8.8 nixos-deployment tutorial |
+| Document zerotier authorization flow | ✅ Done | Story 8.3 onboarding, Story 8.8 tutorials |
+| Document NVIDIA datacenter anti-patterns | ⏳ Partial | nvidia-module-analysis.md exists in dev notes (671 lines), not Starlight |
+| GPU onboarding guide | ⚠️ Out of scope | Epic 8 was alignment, not new guides |
+| Cost control toggle pattern | ✅ Done | Story 8.8 nixos-deployment tutorial |
 
-Epic 8 used a Party Mode orchestration pattern with the following stages:
-
-1. **Research Phase** - Parallel subagents gathered context on dendritic attribution, clan boundaries, and codebase patterns
-2. **Story Creation** - PM agent drafted stories with full context from research
-3. **Review Phase** - Story drafts reviewed before execution, catching Bitwarden amendment
-4. **Execution** - Developer executed stories with clear acceptance criteria
-5. **Verification** - Post-execution audit validated code-documentation alignment
-
-### Effectiveness Assessment
-
-**Strengths:**
-- Parallel research subagents gathered context efficiently (multiple sources simultaneously)
-- Story creation with full context produced accurate acceptance criteria
-- Review cycles caught the Bitwarden workflow error before it propagated
-- Verification audit validated documentation quality objectively
-
-**Areas for Improvement:**
-- Research phase should include pattern verification (not just existence checks)
-- Consider adding "examples match implementation?" as explicit story acceptance criterion
-- Verification audit should be standard for foundational documentation, not optional
-
-### Recommendations
-
-1. **Standard Verification for Foundational Docs** - Any documentation describing architectural patterns should include a verification audit as a story step
-2. **Pattern Trace Requirement** - Before documenting a pattern, trace it through actual codebase with specific file references
-3. **Research Agent Scope** - Include "verify documented patterns match implementation" in research agent prompts
+**Assessment**: Documentation-related action items addressed. NVIDIA anti-patterns doc exists but needs migration to Starlight (deferred to Epic 9).
 
 ---
 
-## Attribution Approach
+## Critical Discovery: Content Migration Required
 
-### External Project Attribution Pattern
+### The Issue
 
-Epic 8 established a proper attribution pattern for external projects that influenced the architecture:
+Epic 9's clan-01 → main merge will **delete the `docs/` directory**. This directory contains:
 
-| Project | Attribution | Documented In |
-|---------|-------------|---------------|
-| mightyiam/infra | Dendritic flake-parts pattern originator | dendritic-architecture.md |
-| vic (dendrix, import-tree) | Auto-discovery mechanism | dendritic-architecture.md |
-| Hercules CI | flake-parts framework | dendritic-architecture.md |
-| clan-core | Multi-machine coordination | clan-integration.md |
+- `docs/notes/development/` - development artifacts
+- nvidia-module-analysis.md (671 lines) - **permanent value, will be lost**
+- Architecture notes, research documents, retrospectives
+- Sprint tracking, story files, epic definitions
 
-### Attribution Principles
+### Impact on Epic 9
 
-1. **Credit Original Sources** - Link to original repositories, not just reference the pattern
-2. **Explain Adaptations** - Document how the pattern was adapted for this codebase
-3. **Maintain Accuracy** - Update attribution if understanding of origins changes
-4. **Separate Concepts from Implementation** - Attribution for concepts, implementation is local
+Current Epic 9 stories (9.1, 9.2, 9.3) don't account for content migration. Essential content will be **permanently lost** without intervention.
+
+### Recommended Action
+
+Add **Story 9.0: Content Migration** before Story 9.3 (merge):
+
+1. Audit `docs/notes/development/**` - triage ephemeral vs. essential
+2. Migrate nvidia-module-analysis.md → Starlight reference/guides
+3. Migrate other essential architecture/pattern docs
+4. Decide: preserve retrospectives? epic definitions?
+5. Explicitly mark remaining content as "deleted by design"
+
+### Content Triage Matrix
+
+| Category | Example Files | Recommendation |
+|----------|---------------|----------------|
+| NVIDIA docs | nvidia-module-analysis.md | MIGRATE (671 lines, permanent value) |
+| Architecture notes | migration-patterns.md, dendritic-patterns.md | EVALUATE (may duplicate Starlight) |
+| Retrospectives | epic-7-retro.md, epic-8-retro.md | DECIDE (institutional memory?) |
+| Research | documentation-coverage-analysis.md | EVALUATE (historical vs. ongoing) |
+| Sprint artifacts | sprint-status.yaml, work-items/*.md | DELETE (ephemeral) |
+| Epic definitions | epics/*.md | DECIDE (historical record?) |
 
 ---
 
 ## Action Items
 
-### Immediate (Before Epic 9)
+### Process Improvements
 
-| Priority | Action | Owner | Target |
-|----------|--------|-------|--------|
-| HIGH | Update sprint-status.yaml: story-8-3 review → done | Dev | sprint-status.yaml |
-| HIGH | Update sprint-status.yaml: story-8-4 review → done | Dev | sprint-status.yaml |
-| HIGH | Update sprint-status.yaml: epic-8 contexted → done | Dev | sprint-status.yaml |
-| MEDIUM | Validate Starlight build passes | Dev | `nix build .#docs` |
+| Priority | Action | Owner | Deadline | Success Criteria |
+|----------|--------|-------|----------|------------------|
+| HIGH | Add visual spot-check to DoD for documentation stories | SM (Bob) | Before Epic 9 docs work | DoD includes "Render and visually verify" |
+| MEDIUM | Document audit-first pattern as standard practice | Tech Writer (Paige) | During Epic 9 | Pattern in contributing guide |
 
-### Process Improvements for Future Documentation Epics
+### Technical Debt
 
-| Priority | Action | Description |
-|----------|--------|-------------|
-| HIGH | Pattern Verification Checklist | Add "examples match implementation?" to documentation story ACs |
-| HIGH | Research Phase Scope | Include pattern verification in research agent prompts |
-| MEDIUM | Verification Audit Standard | Require verification audit for foundational documentation stories |
-| MEDIUM | Secrets Workflow Trace | When documenting secrets, trace actual key derivation chain |
+| Priority | Item | Owner | Notes |
+|----------|------|-------|-------|
+| HIGH | NVIDIA documentation incomplete in Starlight | Dev team | Part of Epic 9 content migration |
 
-### Documentation Maintenance
+### Epic 7 Closure
 
-| Priority | Action | Owner |
-|----------|--------|-------|
-| LOW | Periodic staleness audit | Schedule quarterly doc review |
-| LOW | Link validation | Add link checker to CI |
+| Item | Status | Action |
+|------|--------|--------|
+| NVIDIA anti-patterns | ⏳ Partial | Migrate in Epic 9 |
+| GPU onboarding guide | ⚠️ Deferred | Future epic if needed |
 
 ---
 
-## Recommendations for Future Documentation Work
+## Epic 9 Preparation Requirements
 
-### 1. Verify Before Documenting
+### Critical (Blocking Story 9.3)
 
-Before writing technical documentation, verify example patterns against actual codebase:
+1. **Content migration story required**
+   - Must precede merge
+   - Scope: Triage and migrate essential content from `docs/` to Starlight
+   - Key file: nvidia-module-analysis.md (671 lines)
 
-- Find actual files implementing the pattern
-- Confirm the pattern matches documented approach
-- Include file references in documentation
+2. **Story sequence reordering**
+   - Proposed: 9.0 (migration) → 9.1 (tags) → 9.2 (CI) → 9.3 (merge)
 
-### 2. Trace Complex Workflows
+### Clarifications Needed
 
-For complex workflows (secrets, deployment, networking):
+3. **Story 9.2 scope**
+   - Epic 2 Story 2.11 already validated CI on clan-01
+   - What additional validation is needed?
 
-- Trace the actual data/command flow
-- Document each step with concrete file/command references
-- Test the workflow before documenting
+### Decisions Needed
 
-### 3. Attribution Research
+4. **Content triage**
+   - What has permanent value vs. ephemeral?
+   - Preserve retrospectives in Starlight?
+   - Preserve epic definitions as historical record?
 
-When documenting patterns from external sources:
+---
 
-- Research original authors and repositories
-- Document adaptations clearly
-- Link to upstream sources
+## Next Steps
 
-### 4. Audit-First Approach
+1. ✅ **Save this retrospective**
+2. **Update sprint-status.yaml** - mark epic-8-retrospective as done
+3. **Generate optimal prompt** for Party Mode Epic 9 planning session
+4. **Execute Party Mode session** to:
+   - Add content migration story (9.0)
+   - Clarify Story 9.2 scope
+   - Make content triage decisions
+   - Finalize story sequence
+5. **Begin Epic 9** after planning session completes
 
-For comprehensive documentation updates:
+---
 
-- Start with staleness audit (Story 8.1 pattern)
-- Prioritize based on impact and staleness
-- Create actionable checklist for subsequent stories
+## Team Performance Summary
 
-### 5. Verification as Standard Practice
+Epic 8 delivered 12 stories with 100% completion across 2 phases in 2 days. The epic produced over 4,500 lines of new documentation content, audited 91 files, and remediated 15 files of staleness. The audit-first approach provided data-driven execution. Process flexibility handled mid-epic discoveries gracefully. A critical discovery regarding Epic 9 content migration was surfaced before it became a disaster.
 
-For foundational documentation:
+The documentation is now at a "reviewable baseline" - structurally complete, cross-referenced, and validated. Human iteration will optimize for consumption, but the foundation is solid.
 
-- Include verification step in story ACs
-- Budget time for verification audit
-- Document any discrepancies found and resolutions
+**Epic 8 Status: COMPLETE**
+**Next Epic: 9 - Branch Consolidation (requires planning session first)**
 
 ---
 
@@ -323,40 +276,29 @@ For foundational documentation:
 - `docs/notes/development/epics/epic-8-documentation-alignment.md`
 
 **Story Work Items:**
+- `docs/notes/development/work-items/8-*.md` (12 files)
+
+**Key Artifacts:**
 - `docs/notes/development/work-items/story-8.1-audit-results.md`
-- `docs/notes/development/work-items/8-2-update-architecture-and-patterns-documentation.md`
-- `docs/notes/development/work-items/8-3-update-host-onboarding-guides-darwin-vs-nixos.md`
-- `docs/notes/development/work-items/8-4-update-secrets-management-documentation.md`
+- `docs/notes/development/work-items/story-8.5-structure-audit-results.md`
+- `docs/notes/development/work-items/story-8.7-amdire-audit-results.md`
+- `docs/notes/development/research/documentation-coverage-analysis.md`
 
-**Key Starlight Docs Created/Updated:**
-- `packages/docs/src/content/docs/concepts/dendritic-architecture.md`
-- `packages/docs/src/content/docs/concepts/clan-integration.md`
-- `packages/docs/src/content/docs/guides/host-onboarding.md`
-- `packages/docs/src/content/docs/guides/secrets-management.md`
-
-**Research Artifacts:**
-- `docs/notes/research/clan-boundaries-research.md`
-
-**Sprint Status:**
-- `docs/notes/development/sprint-status.yaml`
+**ADRs Created:**
+- ADR-0017: Dendritic Overlay Patterns (Story 8.11)
+- ADR-0018: Dendritic Flake-Parts Architecture (Story 8.12)
+- ADR-0019: Clan-Core Orchestration (Story 8.12)
+- ADR-0020: Dendritic + Clan Integration (Story 8.12)
+- ADR-0021: Terranix Infrastructure Provisioning (Story 8.12)
 
 ---
 
-## Retrospective Summary
+## Retrospective Participants
 
-Epic 8 successfully aligned all Starlight documentation with the dendritic flake-parts + clan-core architecture implemented during Epics 1-7.
-The intensive single-day effort (~35-40 hours) produced comprehensive updates with proper attribution, accurate patterns, and verified code-documentation alignment.
-
-The correction patterns observed (Bitwarden amendment, dendritic pattern fixes) demonstrate the value of multi-stage review: Party Mode review caught a pre-execution error, and verification audit caught post-execution inaccuracies.
-Both corrections were applied before epic closure, achieving 100% accuracy.
-
-Key process improvements identified:
-1. Pattern verification should occur before documentation, not after
-2. Complex workflows require explicit tracing before documenting
-3. Verification audits should be standard for foundational documentation
-
-The epic demonstrates documentation maturity: audit-first approach, proper attribution, platform differentiation, and verification-backed accuracy.
-Future documentation work can follow this pattern for consistent quality.
-
-**Epic 8 Status: COMPLETE**
-**Next Epic: 9 - Branch Consolidation and Release**
+- Alice (Product Owner)
+- Bob (Scrum Master) - Facilitator
+- Charlie (Senior Dev)
+- Dana (QA Engineer)
+- Elena (Junior Dev)
+- Paige (Tech Writer)
+- Dev (Project Lead)
