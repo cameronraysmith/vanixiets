@@ -323,6 +323,7 @@ GCP provisioning validated:
 ### Internal
 
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
+- [ADR-0020: Dendritic + Clan Integration](0020-dendritic-clan-integration/) - How terranix integrates with the dendritic+clan architecture
 - Epic 7 retrospective: `docs/notes/development/retrospectives/epic-7-gcp-multi-node-infrastructure.md`
 - Terranix modules: `modules/terranix/`
 
