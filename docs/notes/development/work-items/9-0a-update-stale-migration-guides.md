@@ -104,9 +104,11 @@ The dendritic flake-parts + clan migration completed in Epic 2 (2025-11-28), but
 - [ ] 3.2 Update Strategy A (lines 78-129)
   - [ ] 3.2.1 Replace all `overlays/infra/hotfixes.nix` paths
   - [ ] 3.2.2 Update example commands
-- [ ] 3.3 Update Strategy B (lines 131-188)
-  - [ ] 3.3.1 Replace `overlays/overrides/packageName.nix` paths
-  - [ ] 3.3.2 Update git add/commit commands
+- [ ] 3.3 Rewrite Strategy B for consolidated overrides file (lines 131-188)
+  - [ ] 3.3.1 Change workflow: "Create overlays/overrides/packageName.nix" → "Add to modules/nixpkgs/overlays/overrides.nix"
+  - [ ] 3.3.2 Update code examples to show inline override syntax in single file
+  - [ ] 3.3.3 Update git add/commit commands (single file, not per-package files)
+  - [ ] 3.3.4 Update cleanup instructions (no `rm` needed, just remove from file)
 - [ ] 3.4 Rewrite Strategy C for channels.nix integration (lines 190-259)
   - [ ] 3.4.1 Replace `overlays/infra/patches.nix` → `modules/nixpkgs/overlays/channels.nix`
   - [ ] 3.4.2 Update instructions: patches are now inline in `patched` attr (lines 41-46)
@@ -115,9 +117,10 @@ The dendritic flake-parts + clan migration completed in Epic 2 (2025-11-28), but
 - [ ] 3.5 Update Phase 3 verification section (lines 326-398)
   - [ ] 3.5.1 Update grep commands with correct paths
   - [ ] 3.5.2 Update ls commands with correct paths
-- [ ] 3.6 Update Phase 4 cleanup section (lines 400-427)
-  - [ ] 3.6.1 Replace rm command paths
-  - [ ] 3.6.2 Update git add/commit commands
+- [ ] 3.6 Rewrite Phase 4 cleanup section for consolidated files (lines 400-427)
+  - [ ] 3.6.1 Change override cleanup: `rm overlays/overrides/packageName.nix` → "remove entry from modules/nixpkgs/overlays/overrides.nix"
+  - [ ] 3.6.2 Change patch cleanup: "remove from patches.nix" → "remove from channels.nix patches list"
+  - [ ] 3.6.3 Update git add/commit commands
 - [ ] 3.7 Update templates section (lines 488-549)
   - [ ] 3.7.1 Update hotfix template paths
   - [ ] 3.7.2 Update override template paths
