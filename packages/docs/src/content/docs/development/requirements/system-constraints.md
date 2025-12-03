@@ -1,5 +1,7 @@
 ---
 title: System constraints
+sidebar:
+  order: 3
 ---
 
 This document defines grey-box restrictions on system architecture and quality.

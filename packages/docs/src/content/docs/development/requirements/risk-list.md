@@ -1,5 +1,7 @@
 ---
-title: Risk list
+title: Risks catalog
+sidebar:
+  order: 8
 ---
 
 This document catalogs migration risks with likelihood, impact, risk factors, and mitigation strategies.

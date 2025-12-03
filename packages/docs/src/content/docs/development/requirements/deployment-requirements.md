@@ -1,5 +1,7 @@
 ---
-title: Deployment requirements
+title: Deployment
+sidebar:
+  order: 7
 ---
 
 This document specifies requirements for deploying configurations to target systems across different platforms.

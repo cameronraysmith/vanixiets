@@ -1,5 +1,7 @@
 ---
 title: System vision
+sidebar:
+  order: 2
 ---
 
 This document comprehends the system context and vision for the nix-config, capturing features and a high-level overview of use cases.

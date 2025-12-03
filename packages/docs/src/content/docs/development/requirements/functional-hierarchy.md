@@ -1,5 +1,7 @@
 ---
 title: Functional hierarchy
+sidebar:
+  order: 5
 ---
 
 This document organizes user-visible functions hierarchically by category.
