@@ -307,6 +307,8 @@ just ci-debug-job ci.yaml "nix (x86_64-linux, packages)"
 
 ## See also
 
+- [Testing Guide](/about/contributing/testing/) - How to run tests and testing philosophy
+- [Test Harness Reference](/development/traceability/test-harness/) - CI-local parity matrix
 - [Justfile Recipes](/reference/justfile-recipes/) - Local recipe reference
 - [CI Philosophy](/development/traceability/ci-philosophy/) - Design principles
 - [Troubleshooting CI Cache](/development/operations/troubleshooting-ci-cache/) - Cache issues

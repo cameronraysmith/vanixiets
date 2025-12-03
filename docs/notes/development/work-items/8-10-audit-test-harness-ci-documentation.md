@@ -154,30 +154,30 @@ Story 8.5 structural audit identified `development/traceability/` as a HIGH prio
 
 ### Task 4: Document Module Test Options (AC: 8)
 
-- [ ] 4.1 Document `modules/checks/` structure
-  - [ ] 4.1.1 Explain check aggregation pattern (default.nix)
-  - [ ] 4.1.2 Document nix-unit test definitions (TC-001 to TC-021 IDs)
-  - [ ] 4.1.3 Document validation check purposes
-  - [ ] 4.1.4 Document integration test VM configuration
-- [ ] 4.2 Document module enable flags
-  - [ ] 4.2.1 List configurable options per check module
-  - [ ] 4.2.2 Document environment variables affecting tests
-  - [ ] 4.2.3 Document test selection patterns
+- [x] 4.1 Document `modules/checks/` structure
+  - [x] 4.1.1 Explain check aggregation pattern (perSystem direct composition, not default.nix)
+  - [x] 4.1.2 Document nix-unit test definitions (15 tests, TC-001 to TC-021 IDs) - in testing.md
+  - [x] 4.1.3 Document validation check purposes (7 checks) - in testing.md
+  - [x] 4.1.4 Document integration test VM configuration (2 tests, Linux only) - in testing.md
+- [x] 4.2 Document module enable flags
+  - [x] 4.2.1 List configurable options per check module - in testing.md "Module options"
+  - [x] 4.2.2 Document environment variables affecting tests - in testing.md "Environment variables"
+  - [x] 4.2.3 Document test selection patterns - in testing.md "Test selection patterns"
 
 ### Task 5: Cross-Reference and Navigation (AC: 4, 9, 10)
 
-- [ ] 5.1 Add cross-references from new docs to existing docs
-  - [ ] 5.1.1 Link to CLI reference (`reference/justfile-recipes.md`)
-  - [ ] 5.1.2 Link to CI jobs reference (`reference/ci-jobs.md`)
-  - [ ] 5.1.3 Link to flake apps reference (`reference/flake-apps.md`)
-  - [ ] 5.1.4 Link to ADR-0010 (testing architecture)
-- [ ] 5.2 Add backlinks from existing docs to new docs
-  - [ ] 5.2.1 Update `reference/justfile-recipes.md` to link test-harness.md
-  - [ ] 5.2.2 Update `reference/ci-jobs.md` to link test-harness.md
-  - [ ] 5.2.3 Update `about/contributing/testing.md` to link test-harness.md
-- [ ] 5.3 Update navigation/index files
-  - [ ] 5.3.1 Add test-harness.md to development/traceability/index.md (create if needed)
-  - [ ] 5.3.2 Verify sidebar includes new documentation
+- [x] 5.1 Add cross-references from new docs to existing docs
+  - [x] 5.1.1 Link to CLI reference (`reference/justfile-recipes.md`) - in testing.md, test-harness.md
+  - [x] 5.1.2 Link to CI jobs reference (`reference/ci-jobs.md`) - in testing.md, test-harness.md
+  - [x] 5.1.3 Link to flake apps reference (`reference/flake-apps.md`) - via justfile-recipes.md
+  - [x] 5.1.4 Link to ADR-0010 (testing architecture) - in testing.md
+- [x] 5.2 Add backlinks from existing docs to new docs
+  - [x] 5.2.1 Update `reference/justfile-recipes.md` to link testing.md, test-harness.md
+  - [x] 5.2.2 Update `reference/ci-jobs.md` to link testing.md, test-harness.md
+  - [x] 5.2.3 testing.md already includes test-harness.md link in "See also"
+- [x] 5.3 Update navigation/index files
+  - [x] 5.3.1 Add test-harness.md to development/traceability/index.md
+  - [x] 5.3.2 Sidebar auto-discovers from Starlight content structure
 
 ### Task 6: Validation (AC: 9, 10)
 
