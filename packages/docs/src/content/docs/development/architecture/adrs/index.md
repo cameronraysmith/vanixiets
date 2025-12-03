@@ -12,7 +12,8 @@ Architecture Decision Records (ADRs) documenting key technical and design decisi
 
 ## Nix Configuration
 
-- [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/)
+- [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/) (Superseded by ADR-0017)
+- [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
 
 ## Monorepo Architecture
 
