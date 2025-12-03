@@ -2,7 +2,7 @@
 title: Domain model
 ---
 
-This document describes the domain in which the system operates, including the Nix ecosystem, current architecture components, and target architecture components.
+This document describes the domain in which the system operates, including the Nix ecosystem and current architecture components based on dendritic flake-parts + clan-core.
 
 ## Nix ecosystem overview
 
@@ -27,127 +27,6 @@ This document describes the domain in which the system operates, including the N
 
 ## Current architecture domain model
 
-### Flake-parts integration
-
-**flake-parts**: Framework for modular flake composition using Nix module system.
-**perSystem**: Per-system configuration (packages, devShells, etc. for each platform).
-**flake.nix structure**: Uses `flake-parts.lib.mkFlake` with imports from `./modules/flake-parts/`.
-**Module auto-loading**: Current implementation auto-wires imports from `./modules/flake-parts/` directory.
-
-### nixos-unified autowiring
-
-**Directory-based discovery**: Scans `configurations/{darwin,nixos,home}/` for host configurations.
-**specialArgs**: Passes values (like inputs, self) through to configuration evaluations.
-**Platform outputs**:
-- `darwinConfigurations.*` from `configurations/darwin/`
-- `nixosConfigurations.*` from `configurations/nixos/`
-- `legacyPackages.<system>.homeConfigurations.*` from `configurations/home/`
-
-**Autowiring mechanism**: nixos-unified automatically generates flake outputs from directory structure.
-
-### Module organization (current)
-
-**modules/flake-parts/**: Flake-level configuration modules.
-**modules/darwin/**: Darwin-specific system modules.
-**modules/nixos/**: NixOS-specific system modules.
-**modules/home/**: Home-manager modules (user environment).
-
-**Import pattern**: Modules imported via directory scanning, composed through module system.
-**specialArgs usage**: Values passed through specialArgs to access inputs, config, lib in nested modules.
-
-### Multi-channel resilience pattern
-
-**Problem**: Single channel can have broken packages.
-**Solution**: Multiple nixpkgs inputs with overlay-based selection.
-
-**Implementation**:
-- Multiple channel inputs: `nixpkgs` (unstable), `nixpkgs-stable` (24.11), potentially others
-- Overlay composition in `overlays/` directory
-- Per-package channel selection or custom builds
-- No system-wide channel rollback required for individual package issues
-
-**Patterns**:
-- **Stable fallback**: Use stable channel version when unstable broken
-- **Upstream patch**: Apply patch from upstream PR to current version
-- **Build override**: Custom build parameters or dependencies
-
-**Reference**: `docs/development/architecture/nixpkgs-hotfixes.md`, ADR nixpkgs-hotfixes
-
-### Secrets management (current)
-
-**sops-nix**: Integration of SOPS (Secrets OPerationS) with NixOS/nix-darwin.
-**age encryption**: Modern encryption tool (simpler than GPG).
-**Storage**: Encrypted YAML files in `secrets/` directory.
-
-**Structure**:
-```
-secrets/
-├── .sops.yaml                 # Encryption rules
-├── shared.yaml                # Shared secrets
-├── hosts/<hostname>/          # Per-host secrets
-├── services/                  # Service-specific secrets
-└── users/<user>/              # Per-user secrets
-```
-
-**Key management**:
-- Developer age keys in `~/.config/sops/age/keys.txt`
-- Public keys in `.sops.yaml` for encryption
-- Private keys never committed to repository
-
-**Deployment**: sops-nix decrypts secrets at activation time, deploys to paths like `/run/secrets-sops/<name>`.
-
-### Development environment
-
-**nix develop**: Flake-based development shells.
-**direnv**: Automatic environment activation on directory entry.
-**just**: Task runner for common operations (check, build, activate, test, lint).
-
-**Provided tools** (via devShell):
-- Bun (package manager and runtime)
-- Node.js (compatibility)
-- Playwright browsers (E2E testing)
-- Development utilities (gh, sops, git, editors)
-
-**Reference**: ADR-0009 (Nix flake-based development environment)
-
-### Build and deployment
-
-**darwin-rebuild**: Tool for activating nix-darwin configurations.
-**nixos-rebuild**: Tool for activating NixOS configurations.
-**home-manager**: Standalone tool or integrated module for user environment.
-
-**Activation command examples**:
-```bash
-darwin-rebuild switch --flake .#stibnite
-nixos-rebuild switch --flake .#cinnabar
-home-manager switch --flake .#crs58@stibnite
-```
-
-**CI/CD**:
-- GitHub Actions workflows in `.github/workflows/`
-- Automated checks: flake evaluation, builds, linting, tests
-- Cachix for binary cache
-- justfile integration for local/CI parity
-
-**Reference**: `docs/development/traceability/ci-philosophy.md`, ADR-0012 (GitHub Actions pipeline)
-
-### Host inventory (current)
-
-**Darwin hosts** (all aarch64):
-- `stibnite`: Primary daily workstation
-- `blackphos`: Secondary development environment
-- `rosegold`: Testing and experimental
-- `argentum`: Testing and backup
-
-**CI validation mirrors**:
-- `stibnite-nixos`: NixOS mirror for CI testing
-- `blackphos-nixos`: NixOS mirror for CI testing
-- `orb-nixos`: OrbStack/LXD test configurations
-
-**Configuration location**: `configurations/{darwin,nixos}/<hostname>.nix`
-
-## Target architecture domain model
-
 ### Dendritic flake-parts pattern
 
 **Core principle**: Every file is a flake-parts module.
@@ -169,7 +48,10 @@ modules/
 │   ├── rosegold/
 │   ├── argentum/
 │   ├── stibnite/
-│   └── cinnabar/
+│   ├── cinnabar/
+│   ├── electrum/
+│   ├── galena/
+│   └── scheelite/
 ├── flake-parts/       # Flake-level configuration
 │   ├── nixpkgs.nix
 │   ├── clan.nix
@@ -210,6 +92,141 @@ Application values use `config.flake.*` namespace.
 
 **Reference**: `~/projects/nix-workspace/dendritic-flake-parts/README.md`
 
+### Flake-parts integration
+
+**flake-parts**: Framework for modular flake composition using Nix module system.
+**perSystem**: Per-system configuration (packages, devShells, etc. for each platform).
+**flake.nix structure**: Uses `flake-parts.lib.mkFlake` with imports via import-tree from `./modules/`.
+**Module auto-loading**: import-tree automatically discovers and imports all `.nix` files from `./modules/` directory.
+
+### Module organization
+
+**modules/flake-parts/**: Flake-level configuration modules.
+**modules/darwin/**: Darwin-specific system modules.
+**modules/nixos/**: NixOS-specific system modules.
+**modules/home/**: Home-manager modules (user environment).
+**modules/hosts/**: Per-host configuration directories.
+**modules/nixpkgs/overlays/**: Package overlays and modifications.
+
+**Import pattern**: Modules imported via import-tree auto-discovery, composed through module system.
+**specialArgs usage**: Minimal - only framework values (inputs, self). Application values via `config.flake.*`.
+
+### Multi-channel resilience pattern
+
+**Problem**: Single channel can have broken packages.
+**Solution**: Multiple nixpkgs inputs with overlay-based selection.
+
+**Implementation**:
+- Multiple channel inputs: `nixpkgs` (unstable), `nixpkgs-stable` (24.11), potentially others
+- Overlay composition in `modules/nixpkgs/overlays/` directory
+- Per-package channel selection or custom builds
+- No system-wide channel rollback required for individual package issues
+
+**Patterns**:
+- **Stable fallback**: Use stable channel version when unstable broken
+- **Upstream patch**: Apply patch from upstream PR to current version
+- **Build override**: Custom build parameters or dependencies
+
+**Reference**: `docs/development/architecture/nixpkgs-hotfixes.md`, ADR nixpkgs-hotfixes
+
+### Secrets management
+
+**clan vars system**: Declarative secret and file generation with automatic deployment.
+
+**Generators**: `clan.core.vars.generators.<name>` define generation logic.
+Components:
+- `prompts`: User input requirements
+- `dependencies`: Other generators (DAG composition)
+- `script`: Generation logic producing files in `$out/`
+- `files.<name>`: Output file definitions with `secret` flag
+
+**Secret vs public files**:
+- `secret = true`: Encrypted, deployed to `/run/secrets/`, accessed via `.path`
+- `secret = false`: Plain text, stored in nix store, accessed via `.value`
+
+**Sharing**: `share = true` allows cross-machine secret access.
+**Storage**: SOPS-encrypted in `sops/machines/<hostname>/secrets/` (secrets) and `sops/machines/<hostname>/facts/` (public).
+
+**Deployment**: Automatic during `clan machines update <hostname>`.
+
+**Manual generation**: `clan vars generate <hostname>`.
+
+Example:
+```nix
+clan.core.vars.generators.ssh-key = {
+  prompts = {};
+  script = ''
+    ssh-keygen -t ed25519 -f $out/id_ed25519 -N ""
+  '';
+  files = {
+    id_ed25519 = { secret = true; };
+    id_ed25519_pub = { secret = false; };
+  };
+};
+```
+
+### Development environment
+
+**nix develop**: Flake-based development shells.
+**direnv**: Automatic environment activation on directory entry.
+**just**: Task runner for common operations (check, build, activate, test, lint).
+
+**Provided tools** (via devShell):
+- Bun (package manager and runtime)
+- Node.js (compatibility)
+- Playwright browsers (E2E testing)
+- Development utilities (gh, sops, git, editors)
+
+**Reference**: ADR-0009 (Nix flake-based development environment)
+
+### Build and deployment
+
+**Clan-based deployment**:
+- `clan machines update <hostname>`: Deploy configuration to machine
+- `clan machines install <hostname>`: Install NixOS on new machine
+- `clan vars generate <hostname>`: Generate secrets and vars
+
+**Traditional rebuild tools** (still supported):
+- `darwin-rebuild switch --flake .#<hostname>`: Activate nix-darwin configuration
+- `nixos-rebuild switch --flake .#<hostname>`: Activate NixOS configuration
+
+**Activation command examples**:
+```bash
+# Clan deployment (recommended)
+clan machines update stibnite
+clan machines update cinnabar
+
+# Traditional rebuild (legacy)
+darwin-rebuild switch --flake .#stibnite
+nixos-rebuild switch --flake .#cinnabar
+```
+
+**CI/CD**:
+- GitHub Actions workflows in `.github/workflows/`
+- Automated checks: flake evaluation, builds, linting, tests
+- Cachix for binary cache
+- justfile integration for local/CI parity
+
+**Reference**: `docs/development/traceability/ci-philosophy.md`, ADR-0012 (GitHub Actions pipeline)
+
+### Host inventory
+
+**Darwin hosts** (all aarch64-darwin):
+- `stibnite`: crs58's primary workstation
+- `blackphos`: raquel's primary workstation
+- `rosegold`: janettesmith's primary workstation
+- `argentum`: christophersmith's primary workstation
+
+**NixOS VPS hosts** (all x86_64-linux):
+- `cinnabar`: Permanent Hetzner VPS, zerotier controller, core services
+- `electrum`: Secondary Hetzner VPS
+- `galena`: GCP CPU compute instance
+- `scheelite`: GCP GPU compute instance
+
+**Configuration location**: `modules/hosts/<hostname>/default.nix`
+
+**Inventory definition**: `modules/flake-parts/clan.nix` (clan inventory with tags and service instances)
+
 ### Clan-core architecture
 
 **Foundation**: Library-centric design with NixOS modules, Python CLI, multiple frontends.
@@ -249,39 +266,7 @@ inventory.instances.zerotier-local = {
 
 #### Vars system
 
-**Purpose**: Declarative secret and file generation with automatic deployment.
-
-**Generators**: `clan.core.vars.generators.<name>` define generation logic.
-Components:
-- `prompts`: User input requirements
-- `dependencies`: Other generators (DAG composition)
-- `script`: Generation logic producing files in `$out/`
-- `files.<name>`: Output file definitions with `secret` flag
-
-**Secret vs public files**:
-- `secret = true`: Encrypted, deployed to `/run/secrets/`, accessed via `.path`
-- `secret = false`: Plain text, stored in nix store, accessed via `.value`
-
-**Sharing**: `share = true` allows cross-machine secret access.
-**Storage**: SOPS-encrypted in `sops/machines/<hostname>/secrets/` (secrets) and `sops/machines/<hostname>/facts/` (public).
-
-**Deployment**: Automatic during `clan machines update <hostname>`.
-
-**Manual generation**: `clan vars generate <hostname>`.
-
-Example:
-```nix
-clan.core.vars.generators.ssh-key = {
-  prompts = {};
-  script = ''
-    ssh-keygen -t ed25519 -f $out/id_ed25519 -N ""
-  '';
-  files = {
-    id_ed25519 = { secret = true; };
-    id_ed25519_pub = { secret = false; };
-  };
-};
-```
+See "Secrets management" section above for full details on the clan vars system.
 
 #### Clan services
 
@@ -319,19 +304,6 @@ clan.core.vars.generators.ssh-key = {
 - Works across different networks
 - Automatic reconnection
 - Private IP space for inter-host communication
-
-### Target host inventory
-
-**VPS infrastructure** (new):
-- `cinnabar` (nixos, x86_64-linux): Hetzner Cloud CX53, zerotier controller, always-on core services
-
-**Darwin hosts** (existing, to be migrated):
-- `blackphos` (darwin, aarch64): Secondary development, Phase 2 migration
-- `rosegold` (darwin, aarch64): Testing, Phase 3 migration
-- `argentum` (darwin, aarch64): Backup, Phase 4 migration
-- `stibnite` (darwin, aarch64): Primary workstation, Phase 5 migration (last)
-
-**Configuration location** (target): `modules/hosts/<hostname>/default.nix`
 
 ### Terraform/terranix provisioning
 
@@ -381,25 +353,19 @@ clan.core.vars.generators.ssh-key = {
 2. **Test locally**: `nix flake check`, `just check`
 3. **Validate**: `just verify` (dry-run builds)
 4. **Commit**: Atomic commits per file with conventional messages
-5. **Deploy**: `darwin-rebuild switch --flake .#<hostname>` or equivalent
+5. **Deploy**: `clan machines update <hostname>` or traditional rebuild tools
 6. **Monitor**: Check logs, verify functionality
-7. **Rollback if needed**: `darwin-rebuild switch --rollback` or git revert + redeploy
+7. **Rollback if needed**: `clan machines update <hostname>` with previous commit, or git revert + redeploy
 
 ### Secret management workflow
 
-**Current** (sops-nix):
-1. Edit secret: `sops secrets/path/to/file.yaml`
-2. SOPS encrypts on save
-3. Commit encrypted file
-4. Deploy: sops-nix decrypts at activation
-
-**Target** (clan vars):
+**Clan vars** (current):
 1. Define generator in configuration
 2. Generate vars: `clan vars generate <hostname>`
 3. Commit encrypted vars to `sops/machines/<hostname>/`
 4. Deploy: clan deploys vars to `/run/secrets/`
 
-### Multi-host coordination workflow (target)
+### Multi-host coordination workflow
 
 1. **Define inventory**: Machines, tags, service instances in `modules/flake-parts/clan.nix`
 2. **Assign roles**: Via tags or specific machine names
@@ -417,33 +383,35 @@ clan.core.vars.generators.ssh-key = {
 2. **Upstream patch**: Apply patch from upstream repository or PR
 3. **Custom build**: Override build inputs, patches, or parameters
 
-**Implementation**: Overlay in `overlays/` directory modifying specific package.
+**Implementation**: Overlay in `modules/nixpkgs/overlays/` directory modifying specific package.
 
 **Example**:
 ```nix
-# overlays/fix-broken-package.nix
+# modules/nixpkgs/overlays/fix-broken-package.nix
 final: prev: {
   broken-package = prev.nixpkgs-stable.broken-package;  # Stable fallback
 }
 ```
 
-### Migration workflow
+### Historical note: migration from nixos-unified
 
-**Progressive host-by-host**:
-1. **Phase 0**: Validate dendritic + clan in test-clan repository
-2. **Phase 1**: Deploy cinnabar VPS using validated patterns
-3. **Phase 2-5**: Migrate darwin hosts incrementally (blackphos → rosegold → argentum → stibnite)
-4. **Phase 6**: Remove nixos-unified, complete cleanup
+The infrastructure completed migration from nixos-unified to dendritic flake-parts + clan-core in November 2024.
 
-**Per-host migration**:
-1. Create `modules/hosts/<hostname>/default.nix` using dendritic pattern
-2. Define in clan inventory
-3. Generate clan vars
-4. Test build: `nix build .#darwinConfigurations.<hostname>.system`
-5. Deploy: `darwin-rebuild switch --flake .#<hostname>`
-6. Validate functionality
-7. Monitor stability for 1-2 weeks
-8. Proceed to next host
+**Migration was progressive host-by-host**:
+1. **Phase 0**: Validated dendritic + clan in test-clan repository
+2. **Phase 1**: Deployed cinnabar VPS using validated patterns
+3. **Phase 2-5**: Migrated darwin hosts incrementally (blackphos → rosegold → argentum → stibnite)
+4. **Phase 6**: Removed nixos-unified, completed cleanup
+
+**Per-host migration steps**:
+1. Created `modules/hosts/<hostname>/default.nix` using dendritic pattern
+2. Defined in clan inventory
+3. Generated clan vars
+4. Tested build: `nix build .#darwinConfigurations.<hostname>.system`
+5. Deployed: `darwin-rebuild switch --flake .#<hostname>`
+6. Validated functionality
+7. Monitored stability for 1-2 weeks
+8. Proceeded to next host
 
 ## Domain constraints
 
@@ -497,25 +465,25 @@ See `glossary.md` for comprehensive term definitions.
 
 ## References
 
-### Current architecture
+### Architecture components
 
 - flake-parts: <https://flake.parts/>
-- nixos-unified: <https://github.com/srid/nixos-unified>
-- sops-nix: <https://github.com/Mic92/sops-nix>
-- Multi-channel resilience: `docs/development/architecture/nixpkgs-hotfixes.md`
-
-### Target architecture
-
 - Dendritic pattern: <https://github.com/mightyiam/dendritic>
-- Clan-core: <https://docs.clan.lol/>
 - import-tree: <https://github.com/vic/import-tree>
+- Clan-core: <https://docs.clan.lol/>
 - terranix: <https://terranix.org/>
 - disko: <https://github.com/nix-community/disko>
 - srvos: <https://github.com/nix-community/srvos>
+- Multi-channel resilience: `docs/development/architecture/nixpkgs-hotfixes.md`
 
-### Ecosystem projects
+### Nix ecosystem
 
 - Nix: <https://nixos.org/>
+- nixpkgs: <https://github.com/NixOS/nixpkgs>
 - nix-darwin: <https://github.com/LnL7/nix-darwin>
 - home-manager: <https://github.com/nix-community/home-manager>
-- nixpkgs: <https://github.com/NixOS/nixpkgs>
+
+### Historical/deprecated
+
+- nixos-unified: <https://github.com/srid/nixos-unified> (deprecated November 2024, replaced by dendritic + clan)
+- sops-nix: <https://github.com/Mic92/sops-nix> (replaced by clan vars system)
