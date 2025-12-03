@@ -22,8 +22,8 @@ No manual bootstrap process is required thanks to `nixConfig` in the flake.
 If you're setting up on a fresh machine:
 
 ```bash
-cd /Users/crs58/projects/nix-workspace/nix-config
-darwin-rebuild switch
+cd [PATH TO THIS REPO]
+just activate --ask
 ```
 
 The VM image (~2GB) will be downloaded from cache automatically.
