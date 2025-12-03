@@ -16,7 +16,7 @@ Based on exploration of `nix-config` and `mirkolenz-nixos`, overlay organization
 
 nixos-unified's `autoWire` module automatically creates `flake.overlays` by scanning `${self}/overlays` directory:
 
-**File**: `/Users/crs58/projects/nix-workspace/nixos-unified/nix/modules/flake-parts/autowire.nix` (lines 54-56)
+**File**: `~/projects/nix-workspace/nixos-unified/nix/modules/flake-parts/autowire.nix` (lines 54-56)
 
 ```nix
 overlays =
@@ -92,7 +92,7 @@ overrides = import ./overrides overlayArgs self super;
 
 ## Pattern 1: Multi-Channel Nixpkgs (inputs.nix)
 
-**File**: `/Users/crs58/projects/nix-workspace/nix-config/overlays/inputs.nix`
+**File**: `~/projects/nix-workspace/nix-config/overlays/inputs.nix`
 
 **Purpose**: Provide stable fallback and multiple nixpkgs channels
 
@@ -134,7 +134,7 @@ in
 
 ## Pattern 2: Platform-Specific Hotfixes (hotfixes.nix)
 
-**File**: `/Users/crs58/projects/nix-workspace/nix-config/overlays/infra/hotfixes.nix`
+**File**: `~/projects/nix-workspace/nix-config/overlays/infra/hotfixes.nix`
 
 **Purpose**: Selectively use stable versions when unstable breaks
 
@@ -201,7 +201,7 @@ nuenv.writeShellApplication {
 
 ## Pattern 4: Overrides (Auto-imported)
 
-**File**: `/Users/crs58/projects/nix-workspace/nix-config/overlays/overrides/default.nix`
+**File**: `~/projects/nix-workspace/nix-config/overlays/overrides/default.nix`
 
 **Purpose**: Per-package build modifications (overrideAttrs, test disabling, etc.)
 
@@ -519,4 +519,3 @@ The `...` captures any additional arguments from import context.
 | Lib Access | Via `inputs.self.lib` | Via `lib'` in args |
 | Override Filter | `_*.nix` disabled files | Same pattern |
 | Package Scopes | Flat structure | Supports scoped (vimPlugins, etc.) |
-
