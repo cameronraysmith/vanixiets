@@ -89,9 +89,9 @@ Related: module system, extraSpecialArgs.
 Synonym: auto-wiring, directory-based discovery.
 Related: nixos-unified, configurations directory.
 
-**configurations directory**: Directory containing host-specific configurations (`configurations/{darwin,nixos,home}/`).
+**configurations directory**: OBSOLETE (November 2024). Legacy directory structure replaced by `modules/{darwin,nixos,home}/` in dendritic migration.
 Synonym: configs directory.
-Related: nixos-unified, autowiring.
+Related: nixos-unified, modules directory.
 
 **darwin-rebuild**: Command-line tool for activating nix-darwin configurations.
 Synonym: none.
@@ -121,9 +121,9 @@ Related: flake, devShell, development environment.
 Synonym: none.
 Related: NixOS, activation.
 
-**nixos-unified**: Framework providing directory-based autowiring for multi-platform Nix configurations.
+**nixos-unified**: DEPRECATED (November 2024). Framework that provided directory-based autowiring for multi-platform Nix configurations, replaced by dendritic flake-parts + clan-core architecture.
 Abbreviation: none.
-Related: flake-parts, autowiring, specialArgs.
+Related: flake-parts, autowiring, specialArgs, dendritic flake-parts pattern.
 
 ## Target architecture terms
 
@@ -133,7 +133,11 @@ Related: inventory, vars, service instance.
 
 **clan-core**: Framework providing multi-host coordination, inventory system, vars, and service instances.
 Synonym: clan.
-Related: inventory, vars, zerotier.
+Related: inventory, vars, zerotier, clan vars.
+
+**clan vars**: Two-tier secrets system in clan-core with centralized generators creating machine-specific outputs.
+Synonym: vars system.
+Related: clan-core, vars generator, secrets, sops.
 
 **controller**: Zerotier role managing network and authorizing peers.
 Synonym: zerotier controller.
@@ -154,6 +158,10 @@ Related: dendritic pattern, flake-parts.
 **import-tree**: Auto-discovery mechanism recursively importing all `.nix` files from a directory.
 Synonym: none.
 Related: dendritic pattern, auto-discovery.
+
+**Pattern A**: Dendritic aggregate pattern using explicit `flake.modules = { ... }` structure for organizing configurations.
+Synonym: dendritic aggregate pattern.
+Related: dendritic flake-parts pattern, flake.modules.
 
 **instance**: Clan service instance, potentially spanning multiple machines with different roles.
 Synonym: service instance.
@@ -222,8 +230,17 @@ Meaning: Black phosphorus (allotrope of element P), continuing element naming th
 **cinnabar**: NixOS VPS (x86_64), Hetzner Cloud CX53, Phase 1 deployment target, zerotier controller, foundation infrastructure.
 Meaning: Mercury sulfide mineral (HgS), red color, continuing mineral/element naming theme.
 
+**electrum**: NixOS VPS (x86_64), Hetzner Cloud secondary infrastructure host for distributed services.
+Meaning: Natural alloy of gold and silver (Au+Ag), continuing metal/element naming theme.
+
+**galena**: NixOS VPS (x86_64), GCP compute instance for CPU-based compute workloads.
+Meaning: Lead sulfide mineral (PbS), primary ore of lead, continuing mineral/element naming theme.
+
 **rosegold**: Darwin host (aarch64), testing and experimental environment, Phase 3 migration target.
 Meaning: Gold-copper alloy, continuing metal/element naming theme.
+
+**scheelite**: NixOS VPS (x86_64), GCP compute instance for GPU-based compute workloads.
+Meaning: Calcium tungstate mineral (CaWO4), ore of tungsten, continuing mineral/element naming theme.
 
 **stibnite**: Darwin host (aarch64), primary daily workstation, Phase 5 migration target (last, highest risk).
 Meaning: Antimony sulfide mineral (Sb2S3), continuing element/mineral naming theme.
