@@ -7,7 +7,7 @@ This document specifies requirements for deploying configurations to target syst
 ## Overview
 
 Deployment requirements define how configurations are built, activated, validated, and rolled back on darwin (macOS) and NixOS systems.
-Requirements cover both current (nixos-unified) and target (dendritic + clan) architectures.
+Requirements reflect the dendritic + clan architecture currently used across the infrastructure.
 
 ## DR-001: Darwin deployment
 
@@ -258,7 +258,7 @@ ssh <user>@<host> 'nix-env --list-generations --profile /nix/var/nix/profiles/sy
 
 ### Integrated deployment
 
-**Requirement**: Deploy home-manager as part of system configuration (darwin-unified, target architecture)
+**Requirement**: Deploy home-manager as part of system configuration
 
 **Process**:
 - home-manager integrated into darwinConfiguration or nixosConfiguration
@@ -283,7 +283,7 @@ launchctl list | grep home-manager  # darwin
 
 ### Vars generation requirements
 
-**Requirement**: Generate secrets and configuration values before deployment (target architecture)
+**Requirement**: Generate secrets and configuration values before deployment
 
 **Command**: `clan vars generate <hostname>`
 
@@ -316,7 +316,7 @@ ls sops/machines/<hostname>/facts/
 
 ### Machine deployment requirements
 
-**Requirement**: Deploy configuration via clan orchestration workflow (target architecture)
+**Requirement**: Deploy configuration via clan orchestration workflow
 
 **Command**: `clan machines update <hostname>`
 
@@ -347,7 +347,7 @@ launchctl list | grep <service>  # darwin
 
 ### Multi-host deployment requirements
 
-**Requirement**: Deploy service instance across multiple hosts (target architecture)
+**Requirement**: Deploy service instance across multiple hosts
 
 **Process**:
 1. Define service instance in inventory
@@ -362,20 +362,28 @@ launchctl list | grep <service>  # darwin
 - Service coordination operational
 - Inter-host communication functional
 
-**Example** (zerotier deployment):
+**Example** (zerotier deployment across 8-machine fleet):
 ```bash
 # Generate vars for all hosts
-for host in cinnabar blackphos rosegold argentum stibnite; do
+# NixOS VPS: cinnabar (controller), electrum, galena, scheelite (peers)
+# Darwin: stibnite, blackphos, rosegold, argentum (peers)
+for host in cinnabar electrum galena scheelite stibnite blackphos rosegold argentum; do
   clan vars generate $host
 done
 
-# Deploy controller first (VPS)
+# Deploy controller first (NixOS VPS)
 clan machines update cinnabar
 
-# Deploy peers
+# Deploy NixOS peers
+clan machines update electrum
+clan machines update galena
+clan machines update scheelite
+
+# Deploy Darwin peers
+clan machines update stibnite
 clan machines update blackphos
 clan machines update rosegold
-# etc.
+clan machines update argentum
 
 # Verify zerotier network
 zerotier-cli listnetworks
@@ -492,7 +500,7 @@ log show --predicate 'processImagePath contains "nix"' --last 5m  # darwin
 journalctl -xe  # NixOS
 ```
 
-### Health monitoring requirements (target architecture)
+### Health monitoring requirements
 
 **Requirement**: Monitor system health post-migration (UC-007)
 
@@ -513,9 +521,9 @@ journalctl -xe  # NixOS
 
 ## DR-007: Secrets deployment requirements
 
-### Current architecture (sops-nix)
+### Legacy secrets (sops-nix)
 
-**Requirement**: Deploy secrets via sops-nix during activation
+**Requirement**: Deploy manually-managed secrets via sops-nix during activation
 
 **Process**:
 1. Secrets defined in secrets/ directory
@@ -536,7 +544,7 @@ sops.secrets."example-secret" = {
 services.example.passwordFile = config.sops.secrets."example-secret".path;
 ```
 
-### Target architecture (clan vars)
+### Generated secrets (clan vars)
 
 **Requirement**: Deploy generated and external secrets via clan vars
 
@@ -593,11 +601,11 @@ services.example.passwordFile = config.clan.core.vars.generators.example.files.s
 - Bootloader failures may prevent boot (mitigated by previous entries)
 - Remote deployment requires SSH + sudo
 
-### VPS-specific (cinnabar)
+### VPS-specific
 
 **Requirements**:
 - Remote deployment supported via SSH
-- Hetzner-specific initialization (if fresh install)
+- Platform-specific initialization (Hetzner for cinnabar/electrum, GCP for galena/scheelite)
 - Network configuration preserved during activation
 - SSH access maintained throughout deployment
 
@@ -605,6 +613,12 @@ services.example.passwordFile = config.clan.core.vars.generators.example.files.s
 - No physical access for recovery
 - Network interruption = loss of access
 - Backup strategy critical
+
+**Fleet VPS machines**:
+- cinnabar (Hetzner, permanent zerotier controller)
+- electrum (Hetzner, peer)
+- galena (GCP, peer)
+- scheelite (GCP, peer)
 
 ## DR-009: Rollback and recovery requirements
 
