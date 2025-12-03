@@ -350,20 +350,20 @@ When considering a new recipe, ask:
 ## Examples of Good Judgment Calls
 
 ### Cache Rosetta Builder → Wrapper ✅
-**Complex**: Multi-step build + push + pin + config update
-**Justified**: Too complex to expect users to remember all steps
+- **Complex**: Multi-step build + push + pin + config update
+- **Justified**: Too complex to expect users to remember all steps
 
 ### Cache Any Package → Generic ✅
-**Simple**: One parameter, straightforward operation
-**Not Justified**: Users can easily remember `just cache-linux-package <name>`
+- **Simple**: One parameter, straightforward operation
+- **Not Justified**: Users can easily remember `just cache-linux-package <name>`
 
 ### Build Multiarch → Wrapper ✅
-**Pattern**: Common to build both architectures
-**Justified**: Saves remembering architecture names and order
+- **Pattern**: Common to build both architectures
+- **Justified**: Saves remembering architecture names and order
 
 ### Cache Specific Package → No Wrapper ✅
-**Hardcoding**: Just passes parameter to generic recipe
-**Not Justified**: No complexity reduction, just shorter name
+- **Hardcoding**: Just passes parameter to generic recipe
+- **Not Justified**: No complexity reduction, just shorter name
 
 ---
 
