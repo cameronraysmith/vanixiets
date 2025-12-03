@@ -247,20 +247,20 @@ Meaning: Antimony sulfide mineral (Sb2S3), continuing element/mineral naming the
 
 ## Acronyms and abbreviations
 
-**ADR**: Architecture Decision Record.
-**API**: Application Programming Interface.
-**CI/CD**: Continuous Integration / Continuous Deployment.
-**CLI**: Command-Line Interface.
-**DAG**: Directed Acyclic Graph.
-**GPG**: GNU Privacy Guard (encryption tool, predecessor to age).
-**GPT**: GUID Partition Table.
-**HM**: home-manager.
-**LUKS**: Linux Unified Key Setup.
-**SOPS**: Secrets OPerationS.
-**SSH**: Secure Shell.
-**VPN**: Virtual Private Network.
-**VPS**: Virtual Private Server.
-**ZT**: Zerotier.
+- **ADR**: Architecture Decision Record.
+- **API**: Application Programming Interface.
+- **CI/CD**: Continuous Integration / Continuous Deployment.
+- **CLI**: Command-Line Interface.
+- **DAG**: Directed Acyclic Graph.
+- **GPG**: GNU Privacy Guard (encryption tool, predecessor to age).
+- **GPT**: GUID Partition Table.
+- **HM**: home-manager.
+- **LUKS**: Linux Unified Key Setup.
+- **SOPS**: Secrets OPerationS.
+- **SSH**: Secure Shell.
+- **VPN**: Virtual Private Network.
+- **VPS**: Virtual Private Server.
+- **ZT**: Zerotier.
 
 ## Architectural terms
 
