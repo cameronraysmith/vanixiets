@@ -637,9 +637,9 @@ development_status:
   story-8-9: drafted
   story-8-9-title: "Validate cross-references and navigation discoverability"
   story-8-9-notes: "DRAFTED 2025-12-02 - Research streams R20, R21, 16 ACs, 6 task groups, 7-12h estimated. Validates Story 8.8 cross-refs + adds bidirectional links + 8.7 partial traceability"
-  story-8-10: backlog
+  story-8-10: in-progress
   story-8-10-title: "Audit test harness and CI documentation"
-  story-8-10-notes: "Research streams R19, R22 - CI-local parity, test philosophy, troubleshooting"
+  story-8-10-notes: "IN-PROGRESS 2025-12-02 - 10 ACs, 6 task groups (38 subtasks). Covers contributing docs update, test-harness.md creation, CI-local parity matrix, test philosophy, troubleshooting"
   # Story 8.11: Remediate AMDiRE development documentation staleness
   # Addresses Story 8.7 audit findings: 37.5% of development docs stale (12/32 files)
   # Primary issue: "current/target state inversion" - 9 files describe nixos-unified as current
