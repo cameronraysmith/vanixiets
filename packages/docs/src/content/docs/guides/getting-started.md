@@ -7,6 +7,10 @@ sidebar:
 
 This guide walks through bootstrapping a new machine with this configuration.
 
+:::note
+This repository pertains to a particular set of users and machines and is not directly structured as a template, but could relatively easily be treated as such via renaming.
+:::
+
 ## Prerequisites
 
 Before you begin, ensure you have:
@@ -30,7 +34,7 @@ make bootstrap && exec $SHELL
 ```
 
 **What this does:**
-- Installs Nix using the [Determinate Systems installer](https://github.com/DeterminateSystems/nix-installer)
+- Installs Nix using the [NixOS fork](https://github.com/NixOS/experimental-nix-installer) of the [Determinate Systems nix installer](https://github.com/DeterminateSystems/nix-installer)
 - Configures Nix with comprehensive settings for optimal performance:
   - Enables flakes and nix-command experimental features
   - Disables store optimization (auto-optimise-store=false) to prevent corruption on Darwin
@@ -75,6 +79,39 @@ make setup-user
 
 ### Step 6: Activate configuration
 
+If you are locally connected to the machine where you'd like to activate your configuration, you should be able to use the justfile `activate` recipe:
+
+:::caution
+review the contents of the `justfile` to confirm you understand precisely what this will do or do not use it
+
+:::
+
+```bash
+just activate --ask
+```
+
+It would be best to first understand the more verbose ways of accomplishing similar tasks described below and then revert to using various relevant variations of the above command as the output is much more informative and easier to understand thanks to use of nix flake apps that call relevant subcommands of the [nh cli](https://github.com/nix-community/nh) and thus utilize the [nix-output-monitor](https://github.com/maralorn/nix-output-monitor) and [dix diff](https://github.com/faukah/dix).
+
+**For NixOS hosts** (local access):
+```bash
+nixos-rebuild switch --flake .#cinnabar
+nixos-rebuild switch --flake .#electrum
+```
+
+**For NixOS hosts** (remote or local via clan):
+:::note
+If you are activating a configuration on a remote machine that has the same system platform and architecture
+as your local machine, the default behavior is to build on the local machine and transfer the build outputs
+to the remote machine over ssh.
+:::
+```bash
+clan machines update <hostname>
+
+# Examples:
+clan machines update cinnabar
+clan machines update electrum
+```
+
 **For darwin hosts** (macOS):
 ```bash
 darwin-rebuild switch --flake .#<hostname>
@@ -84,19 +121,6 @@ darwin-rebuild switch --flake .#stibnite
 darwin-rebuild switch --flake .#blackphos
 ```
 
-**For NixOS hosts** (via clan):
-```bash
-clan machines update <hostname>
-
-# Examples:
-clan machines update cinnabar
-clan machines update electrum
-```
-
-Or use the justfile shortcut for darwin:
-```bash
-just activate
-```
 
 ## Essential commands
 
