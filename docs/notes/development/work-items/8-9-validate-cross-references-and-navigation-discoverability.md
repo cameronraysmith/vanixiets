@@ -52,6 +52,7 @@ so that I can find information without getting lost in disconnected pages.
 
 ### Task 2: Bidirectional Reference Audit (AC: #4-7)
 
+**Story 8.8 baseline validation (tutorials ↔ guides ↔ concepts):**
 - [ ] Audit tutorials/*.md for links TO guides (Story 8.8 created 15 guide links)
 - [ ] Audit guides/*.md for reciprocal links TO tutorials
   - [ ] getting-started.md → bootstrap-to-activation.md
@@ -62,16 +63,35 @@ so that I can find information without getting lost in disconnected pages.
   - [ ] dendritic-architecture.md → adding-custom-packages.md, handling-broken-packages.md
   - [ ] clan-integration.md → host-onboarding.md, secrets-management.md
   - [ ] multi-user-patterns.md → home-manager-onboarding.md
-- [ ] Audit reference/*.md for links to usage guides
-  - [ ] justfile-recipes.md → guides showing recipe usage
-  - [ ] flake-apps.md → host-onboarding.md (darwin/os apps)
-  - [ ] ci-jobs.md → about/contributing/testing.md
+
+**Story 8.10 test documentation cross-references:**
+- [ ] Audit reference/justfile-recipes.md → development/traceability/test-harness.md
+- [ ] Audit reference/ci-jobs.md → about/contributing/testing.md, development/traceability/test-harness.md
+- [ ] Audit about/contributing/testing.md → development/traceability/test-harness.md
+- [ ] Audit development/traceability/test-harness.md → reference/ci-jobs.md, reference/justfile-recipes.md
+
+**Story 8.12 ADR cross-references:**
+- [ ] Audit ADR-0018 through ADR-0021 for internal cross-references
+- [ ] Audit development/requirements/*.md → ADR-0018, ADR-0019, ADR-0020, ADR-0021 references
+- [ ] Audit development/context/*.md → ADR-0018, ADR-0019, ADR-0020, ADR-0021 references
+- [ ] Audit concepts/*.md → ADR-0018, ADR-0020 (architectural concepts)
+- [ ] Audit guides/*.md → ADR-0019, ADR-0020 (clan/dendritic usage)
+
+**Story 8.11 AMDiRE internal consistency:**
+- [ ] Audit development/context/*.md for mutual consistency (17 files updated)
+- [ ] Audit development/requirements/*.md for mutual consistency
+- [ ] Audit development/context/*.md ↔ development/requirements/*.md alignment
+
+**Index completeness verification:**
 - [ ] Verify all section index.md files enumerate children
-  - [ ] tutorials/index.md
+  - [ ] tutorials/index.md (5 tutorials)
   - [ ] guides/index.md (if exists, create if missing)
   - [ ] concepts/index.md
   - [ ] reference/index.md
-  - [ ] development/index.md subdirectories
+  - [ ] development/architecture/adrs/index.md (ADRs 0001-0021)
+  - [ ] development/traceability/index.md (includes test-harness.md)
+  - [ ] development/context/index.md
+  - [ ] development/requirements/index.md
 
 ### Task 3: Navigation Path Analysis (AC: #8-10)
 
@@ -100,13 +120,37 @@ so that I can find information without getting lost in disconnected pages.
 
 ### Task 5: Fix Implementation (AC: #14-16)
 
+**Broken link fixes:**
 - [ ] Fix broken links discovered in Task 1
-- [ ] Add missing bidirectional links identified in Task 2
-  - [ ] Add tutorial references to guides
-  - [ ] Add guide references to concepts
-  - [ ] Add usage links to reference docs
+
+**Story 8.8 bidirectional links:**
+- [ ] Add tutorial references to guides (tutorials ← guides)
+- [ ] Add guide references to concepts (guides ← concepts)
+- [ ] Add usage links to reference docs (guides ← reference)
+
+**Story 8.10 test documentation links:**
+- [ ] Add test-harness.md references to reference/justfile-recipes.md if missing
+- [ ] Add test-harness.md references to reference/ci-jobs.md if missing
+- [ ] Ensure bidirectional links between testing.md ↔ test-harness.md
+
+**Story 8.12 ADR cross-references:**
+- [ ] Add ADR-0018 through ADR-0021 references to requirements/*.md where architectural decisions are discussed
+- [ ] Add ADR-0018 through ADR-0021 references to context/*.md where architecture context is provided
+- [ ] Add ADR-0018, ADR-0020 references to concepts/*.md for dendritic/clan patterns
+- [ ] Add ADR-0019, ADR-0020 references to guides/*.md for clan usage patterns
+
+**Story 8.11 consistency fixes:**
+- [ ] Fix any inconsistencies found in development/context/*.md mutual references
+- [ ] Fix any inconsistencies found in development/requirements/*.md mutual references
+- [ ] Fix any context ↔ requirements alignment issues
+
+**Index updates:**
 - [ ] Update section index files if incomplete
 - [ ] Create guides/index.md if missing
+- [ ] Verify development/architecture/adrs/index.md includes ADRs 0018-0021
+- [ ] Verify development/traceability/index.md includes test-harness.md
+
+**Navigation improvements:**
 - [ ] Update homepage entry points if needed
 - [ ] Add selected traceability links from Task 4
 
@@ -116,6 +160,83 @@ so that I can find information without getting lost in disconnected pages.
 - [ ] Re-run `bun run build` after fixes
 - [ ] Verify all AC#1-16 with explicit evidence
 - [ ] Update story status to review
+
+## Phase 2 Artifacts to Validate
+
+This section lists all documentation files created or substantially modified during Epic 8 Phase 2 (Stories 8.8, 8.10, 8.11, 8.12) that require cross-reference validation.
+
+### Story 8.8: Tutorial Creation (5 files)
+
+**Created files:**
+- `tutorials/index.md` - Learning path overview and tutorial index
+- `tutorials/bootstrap-to-activation.md` - Bootstrap and initial activation tutorial
+- `tutorials/secrets-setup.md` - Secrets configuration tutorial
+- `tutorials/darwin-deployment.md` - macOS deployment tutorial
+- `tutorials/nixos-deployment.md` - NixOS deployment tutorial
+
+**Cross-reference baseline:** 31 cross-references created (15 to guides, 12 to concepts, 4 to reference)
+
+### Story 8.10: Test Harness Documentation (5 files)
+
+**Created files:**
+- `development/traceability/test-harness.md` - Test harness implementation and CI-local parity matrix
+
+**Rewritten files:**
+- `about/contributing/testing.md` - Infrastructure tests and test philosophy
+
+**Updated files:**
+- `development/traceability/index.md` - Updated to include test harness reference
+- `reference/ci-jobs.md` - Added cross-references to testing and test-harness docs
+- `reference/justfile-recipes.md` - Added cross-references to testing and test-harness docs
+
+### Story 8.11: AMDiRE Development Docs Remediation (17 files)
+
+**Context documentation updates:**
+- `development/context/constraints-and-rules.md` - 8-machine fleet and migration status
+- `development/context/domain-model.md` - Current architecture alignment
+- `development/context/glossary.md` - Deprecated terms and new concepts
+- `development/context/goals-and-objectives.md` - Current operational state
+- `development/context/project-scope.md` - Architecture staleness fixes
+- `development/context/stakeholders.md` - nixos-unified deprecation status
+
+**Requirements documentation updates:**
+- `development/requirements/deployment-requirements.md` - 8-machine fleet and dendritic+clan
+- `development/requirements/functional-hierarchy.md` - Migration completion status
+- `development/requirements/index.md` - Migration completion references
+- `development/requirements/quality-requirements.md` - State labels and migration progress
+- `development/requirements/risk-list.md` - Current risk assessment
+- `development/requirements/system-constraints.md` - Active/deprecated constraints
+- `development/requirements/system-vision.md` - Current operational state
+- `development/requirements/usage-model.md` - 8-machine fleet and current workflows
+
+**Architecture documentation updates:**
+- `development/architecture/adrs/0003-overlay-composition-patterns.md` - Marked as superseded
+- `development/architecture/adrs/0017-dendritic-overlay-patterns.md` - New ADR created
+- `development/architecture/adrs/index.md` - Updated ADR index
+
+### Story 8.12: Foundational ADRs (5 files)
+
+**Created ADRs:**
+- `development/architecture/adrs/0018-dendritic-flake-parts-architecture.md` - Foundational architecture pattern
+- `development/architecture/adrs/0019-clan-core-orchestration.md` - Multi-machine coordination
+- `development/architecture/adrs/0020-dendritic-clan-integration.md` - Integration patterns
+- `development/architecture/adrs/0021-terranix-infrastructure-provisioning.md` - Cloud infrastructure
+
+**Updated files:**
+- `development/architecture/adrs/index.md` - Added ADRs 0018-0021 to index
+
+### Phase 2 Summary
+
+**Total files requiring validation: 32 files**
+- New files: 10 (5 tutorials, 1 test harness, 4 ADRs)
+- Substantially rewritten: 1 (testing.md)
+- Updated: 21 (development docs, references, indices)
+
+**Cross-reference validation priority:**
+1. **Bidirectional links** - Tutorials ↔ Guides ↔ Concepts (Story 8.8 baseline)
+2. **ADR references** - Requirements/Context → ADRs 0018-0021 (Story 8.12)
+3. **Test documentation** - Reference → Testing/Test Harness (Story 8.10)
+4. **AMDiRE updates** - Internal consistency within development/ tree (Story 8.11)
 
 ## Dev Notes
 
@@ -244,20 +365,26 @@ packages/docs/src/content/docs/
 
 ### Estimated Effort
 
-| Task | Estimate | Notes |
-|------|----------|-------|
-| Task 1 (Link validation) | 0.5-1h | Automated + capture output |
-| Task 2 (Bidirectional audit) | 2-3h | Manual review across sections |
-| Task 3 (Navigation analysis) | 1-1.5h | Homepage + sidebar review |
-| Task 4 (8.7 gap assessment) | 1-1.5h | Scope determination only |
-| Task 5 (Fix implementation) | 2-4h | Depends on findings |
-| Task 6 (Re-validation) | 0.5-1h | Verification pass |
-| **Total** | **7-12 hours** | |
+| Task | Original Estimate | Revised Estimate | Notes |
+|------|-------------------|------------------|-------|
+| Task 1 (Link validation) | 0.5-1h | 1-1.5h | Automated + capture output (32 files vs ~15) |
+| Task 2 (Bidirectional audit) | 2-3h | 4-6h | Manual review expanded for Phase 2 artifacts |
+| Task 3 (Navigation analysis) | 1-1.5h | 1-1.5h | Homepage + sidebar review (unchanged) |
+| Task 4 (8.7 gap assessment) | 1-1.5h | 1-1.5h | Scope determination only (unchanged) |
+| Task 5 (Fix implementation) | 2-4h | 4-8h | Depends on findings, larger scope |
+| Task 6 (Re-validation) | 0.5-1h | 1-1.5h | Verification pass (32 files) |
+| **Total** | **7-12 hours** | **12-20 hours** | Expanded for 32-file scope |
 
-**Effort breakdown by type:**
-- Validation effort: 3-5h (automated + manual review)
-- Fix effort: 2-4h (depends on validation findings)
-- Documentation updates: 1-2h (if needed)
+**Revised effort breakdown by type:**
+- Validation effort: 6-9h (automated + manual review of 32 files)
+- Fix effort: 4-8h (depends on validation findings, 4 story areas)
+- Documentation updates: 2-3h (Phase 2 cross-references)
+
+**Scope expansion rationale:**
+- Original estimate assumed ~15 files from Story 8.8
+- Phase 2 added 32 files total (5 tutorials + 5 test docs + 5 ADRs + 17 AMDiRE updates)
+- Bidirectional audit now covers 4 story areas instead of 1
+- ADR cross-references require systematic review of requirements/context docs
 
 ## Dev Agent Record
 
@@ -276,6 +403,18 @@ packages/docs/src/content/docs/
 ### File List
 
 ## Change Log
+
+**2025-12-02 (Scope Expansion for Phase 2 Artifacts):**
+- Added "Phase 2 Artifacts to Validate" section documenting all 32 files from Stories 8.8, 8.10, 8.11, 8.12
+- Expanded Task 2 (Bidirectional Reference Audit) to cover:
+  - Story 8.10 test documentation cross-references (5 subtasks)
+  - Story 8.12 ADR cross-references (5 subtasks)
+  - Story 8.11 AMDiRE internal consistency (3 subtasks)
+  - Index completeness for 8 index files (vs 5 originally)
+- Expanded Task 5 (Fix Implementation) to cover all 4 Phase 2 story areas
+- Updated effort estimate from 7-12h to 12-20h to reflect 32-file scope
+- Documented scope expansion rationale (15 files → 32 files)
+- Cross-reference validation priorities established for 4 story areas
 
 **2025-12-02 (Story Drafted):**
 - Story file created from Epic 8 Story 8.9 specification
