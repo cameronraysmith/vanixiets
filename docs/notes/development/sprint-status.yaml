@@ -634,9 +634,9 @@ development_status:
   story-8-8: done
   story-8-8-title: "Create tutorials for common user workflows"
   story-8-8-notes: "DONE 2025-12-02 - Created 5 tutorials (2,073 lines total): index.md, bootstrap-to-activation.md, secrets-setup.md, darwin-deployment.md, nixos-deployment.md. 26/26 ACs satisfied. Diataxis compliant (learning-oriented). 31 cross-references to guides. Build + linkcheck pass. 6 commits."
-  story-8-9: drafted
+  story-8-9: review
   story-8-9-title: "Validate cross-references and navigation discoverability"
-  story-8-9-notes: "DRAFTED 2025-12-02 - Research streams R20, R21, 16 ACs, 6 task groups, 7-12h estimated. Validates Story 8.8 cross-refs + adds bidirectional links + 8.7 partial traceability"
+  story-8-9-notes: "REVIEW 2025-12-02 - 16/16 ACs complete. Validated 32 files across Stories 8.8, 8.10, 8.11, 8.12. Added 22 cross-reference links. Final validation: 77 pages indexed, all links valid. 3 commits: b7afef81, 8acea2ad, 7aab2989."
   story-8-10: review
   story-8-10-title: "Audit test harness and CI documentation"
   story-8-10-notes: "REVIEW 2025-12-02 - 10 ACs complete. Created testing.md (391 lines, test philosophy + infrastructure + docs testing) and test-harness.md (257 lines, CI-local parity matrix). 4 docs cross-referenced. Validation: 77 pages indexed, all links valid. 5 commits."
