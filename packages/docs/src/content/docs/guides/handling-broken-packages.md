@@ -10,11 +10,11 @@ Systematic approach to fixing broken packages from nixpkgs unstable using the ho
 
 | Scenario | Strategy | File | Recovery time |
 |----------|----------|------|---------------|
-| Single package broken | Stable fallback | overlays/infra/hotfixes.nix | 5 minutes |
-| Tests fail only | Build modification | overlays/overrides/*.nix | 5 minutes |
-| Fix exists in PR | Upstream patch | overlays/infra/patches.nix | 10 minutes |
+| Single package broken | Stable fallback | modules/nixpkgs/overlays/hotfixes.nix | 5 minutes |
+| Tests fail only | Build modification | modules/nixpkgs/overlays/overrides.nix | 5 minutes |
+| Fix exists in PR | Upstream patch | modules/nixpkgs/overlays/channels.nix (patches list) | 10 minutes |
 | Multiple packages broken | Flake.lock rollback | flake.lock | 2 minutes |
-| Darwin-specific issue | Platform hotfix | overlays/infra/hotfixes.nix (darwin section) | 5 minutes |
+| Darwin-specific issue | Platform hotfix | modules/nixpkgs/overlays/hotfixes.nix (darwin section) | 5 minutes |
 
 ## Incident workflow
 
@@ -84,7 +84,7 @@ When to use:
 
 Steps:
 
-1. Edit overlays/infra/hotfixes.nix:
+1. Edit modules/nixpkgs/overlays/hotfixes.nix:
 
 ```nix
 // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
@@ -117,7 +117,7 @@ darwin-rebuild switch --flake .
 3. Commit the hotfix:
 
 ```bash
-git add overlays/infra/hotfixes.nix
+git add modules/nixpkgs/overlays/hotfixes.nix
 git commit -m "fix(overlays): add packageName stable hotfix for llvm 21.x issue
 
 - Package fails to compile with llvm 21.x in unstable
@@ -137,24 +137,20 @@ When to use:
 
 Steps:
 
-1. Create overlays/overrides/packageName.nix:
+1. Add override to modules/nixpkgs/overlays/overrides.nix:
 
 ```nix
+# In the overlay's attribute set, add:
 # packageName: [brief issue description]
-#
 # Issue: Tests fail with [compiler/runtime] version X
-# Symptom: [specific test failure or error]
 # Reference: [link to upstream issue]
 # TODO: Remove when [specific condition]
 # Date added: $(date +%Y-%m-%d)
-#
-final: prev: {
-  packageName = prev.packageName.overrideAttrs (old: {
-    doCheck = false;
-    # If also marked broken:
-    # meta = (old.meta or {}) // { broken = false; };
-  });
-}
+packageName = prev.packageName.overrideAttrs (old: {
+  doCheck = false;
+  # If also marked broken:
+  # meta = (old.meta or {}) // { broken = false; };
+});
 ```
 
 2. Test (auto-imported, no rebuild needed):
@@ -176,7 +172,7 @@ darwin-rebuild switch --flake .
 3. Commit the override:
 
 ```bash
-git add overlays/overrides/packageName.nix
+git add modules/nixpkgs/overlays/overrides.nix
 git commit -m "fix(overlays): disable packageName tests due to clang 21.x
 
 - Tests fail with -Werror on new warnings
@@ -194,6 +190,8 @@ When to use:
 - Fix not yet merged or not in your channel
 - Need specific fix without full stable fallback
 
+Patches are now integrated directly into the channels.nix overlay, which provides a `patched` attribute containing nixpkgs with all patches applied.
+
 Steps:
 
 1. Find the PR patch URL:
@@ -203,15 +201,22 @@ Steps:
 # URL: https://github.com/NixOS/nixpkgs/pull/123456.patch
 ```
 
-2. Edit overlays/infra/patches.nix:
+2. Edit modules/nixpkgs/overlays/channels.nix to add the patch:
 
 ```nix
-[
-  {
-    url = "https://github.com/NixOS/nixpkgs/pull/123456.patch";
-    hash = "";  # Leave empty initially
-  }
-]
+# In the patched section (around lines 41-46), add to the patches list:
+patched = import (prev.applyPatches {
+  name = "nixpkgs-patched";
+  src = inputs.nixpkgs.outPath;
+  patches = [
+    # nixpkgs PR#123456: Fix packageName compilation on darwin
+    # TODO: Remove when merged to unstable
+    (prev.fetchpatch {
+      url = "https://github.com/NixOS/nixpkgs/pull/123456.patch";
+      hash = "";  # Leave empty initially
+    })
+  ];
+}) nixpkgsConfig;
 ```
 
 3. Get the hash:
@@ -225,7 +230,7 @@ nix build .#packages.aarch64-darwin.patched.hello 2>&1 | grep "got:"
 # Output example:
 # got:    sha256-ABC123...
 
-# Copy the hash and update patches.nix
+# Copy the hash and update channels.nix
 ```
 
 4. Use patched package in hotfixes.nix:
@@ -248,7 +253,7 @@ nix flake check
 darwin-rebuild build --flake . --dry-run
 
 # Commit both files
-git add overlays/infra/patches.nix overlays/infra/hotfixes.nix
+git add modules/nixpkgs/overlays/channels.nix modules/nixpkgs/overlays/hotfixes.nix
 git commit -m "fix(overlays): apply nixpkgs#123456 for packageName
 
 - Applies upstream fix from PR#123456
@@ -385,15 +390,15 @@ cd ~/projects/nix-workspace/infra
 
 # List active hotfixes
 echo "=== Active Hotfixes ==="
-grep -B2 -A2 "inherit.*stable" overlays/infra/hotfixes.nix
+grep -B2 -A2 "inherit.*stable" modules/nixpkgs/overlays/hotfixes.nix
 
 # List active overrides
 echo "=== Active Overrides ==="
-ls -1 overlays/overrides/*.nix | grep -v "default.nix\|README.md"
+grep -B2 -A2 "overrideAttrs" modules/nixpkgs/overlays/overrides.nix
 
 # List active patches
 echo "=== Active Patches ==="
-cat overlays/infra/patches.nix
+grep -A5 "patches = \[" modules/nixpkgs/overlays/channels.nix
 ```
 
 For each hotfix/override/patch:
@@ -407,18 +412,18 @@ For each hotfix/override/patch:
 ```bash
 cd ~/projects/nix-workspace/infra
 
-# Remove from hotfixes.nix or delete override file
-# For overrides:
-rm overlays/overrides/packageName.nix
+# For hotfixes: Remove inherit entry from modules/nixpkgs/overlays/hotfixes.nix
 
-# For patches: remove from patches.nix
+# For overrides: Remove override entry from modules/nixpkgs/overlays/overrides.nix
+
+# For patches: Remove fetchpatch entry from modules/nixpkgs/overlays/channels.nix
 
 # Test
 nix flake check
 darwin-rebuild build --flake . --dry-run
 
 # Commit
-git add overlays/
+git add modules/nixpkgs/overlays/
 git commit -m "fix(overlays): remove packageName hotfix after upstream fix
 
 - Upstream fix merged in nixpkgs commit abc123
@@ -489,7 +494,7 @@ When package A breaks because dependency B broke:
 
 ## Templates
 
-### Hotfix template
+### Hotfix template (modules/nixpkgs/overlays/hotfixes.nix)
 
 ```nix
 // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
@@ -504,36 +509,32 @@ When package A breaks because dependency B broke:
 })
 ```
 
-### Override template
+### Override template (modules/nixpkgs/overlays/overrides.nix)
 
 ```nix
+# Add to the overlay's attribute set:
 # packageName: [brief description of issue]
-#
 # Issue: [detailed description]
 # Symptom: [what fails]
 # Reference: [upstream issue/PR link]
 # TODO: Remove when [condition]
 # Date added: YYYY-MM-DD
-#
-final: prev: {
-  packageName = prev.packageName.overrideAttrs (old: {
-    # Modifications here
-    doCheck = false;
-  });
-}
+packageName = prev.packageName.overrideAttrs (old: {
+  # Modifications here
+  doCheck = false;
+});
 ```
 
-### Patch template
+### Patch template (modules/nixpkgs/overlays/channels.nix)
 
 ```nix
-[
-  {
-    # nixpkgs PR#12345: Fix packageName compilation on darwin
-    # TODO: Remove when merged to unstable
-    url = "https://github.com/NixOS/nixpkgs/pull/12345.patch";
-    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-  }
-]
+# Add to the patches list in the patched section:
+(prev.fetchpatch {
+  # nixpkgs PR#12345: Fix packageName compilation on darwin
+  # TODO: Remove when merged to unstable
+  url = "https://github.com/NixOS/nixpkgs/pull/12345.patch";
+  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+})
 ```
 
 ### Commit message template
@@ -560,13 +561,13 @@ Solution: Check overlay order in default.nix, ensure inputs' comes first
 
 Cause: Overlay not applied or wrong order
 
-Solution: Verify overlays/inputs.nix is in overlay list, check composition order
+Solution: Verify modules/nixpkgs/overlays/channels.nix is loaded (it provides stable, unstable, patched attrs), check overlay composition order
 
-### Error: hash mismatch in patches.nix
+### Error: hash mismatch in patch
 
-Expected: This happens on first build
+Expected: This happens on first build when adding a new patch
 
-Solution: Copy the "got:" hash from error output to patches.nix
+Solution: Copy the "got:" hash from error output to the fetchpatch in channels.nix
 
 ### Error: package not found in stable
 
