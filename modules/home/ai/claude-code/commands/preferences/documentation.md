@@ -148,6 +148,9 @@ Plain markdown systems (GitHub, static markdown) also support frontmatter titles
 When working in a documentation directory, check for frontmatter in existing files to confirm the convention in use.
 If files contain `title:` in YAML frontmatter, use `##` to start content sections to avoid duplicate titles in rendered output.
 
+Consecutive `**Term**: description` lines merge into one paragraph when rendered.
+Use `- **Term**: description` bullet format for 2+ definitions.
+
 ### Key principles
 
 - Separate user documentation (diataxis framework) from development
