@@ -49,103 +49,100 @@ so that I understand the actual goals, constraints, and architectural decisions 
 
 Estimated effort: 7-10 hours
 
-- [ ] **1.1** Update domain-model.md (AC: C1)
-  - [ ] Remove nixos-unified autowiring section (lines 38-56)
-  - [ ] Remove configurations/ directory references (line 46)
-  - [ ] Update host inventory (lines 135-147) to 8 machines
-  - [ ] Fix current/target inversion throughout
-  - [ ] Verify all dendritic pattern references are current
-- [ ] **1.2** Update goals-and-objectives.md (AC: C2)
-  - [ ] Move G-S04 (dendritic) from in-progress to achieved
-  - [ ] Move G-S06 (clan) from in-progress to achieved
-  - [ ] Move G-U02 (multi-host) from in-progress to achieved
-  - [ ] Move G-U03 from in-progress to achieved
-  - [ ] Move G-U06 from in-progress to achieved
-  - [ ] Remove future migration framing (lines 491-527)
-  - [ ] Update all status markers to reflect current state
-- [ ] **1.3** Update project-scope.md (AC: C3)
-  - [ ] Rename "Target state architecture" section to "Current architecture"
-  - [ ] Rename or remove "Current state architecture" section (nixos-unified)
-  - [ ] Add 8-machine fleet to scope (lines 33-38 currently show 4)
-  - [ ] Update conclusion to reflect migration completion
-- [ ] **1.4** Update system-vision.md (AC: C4)
-  - [ ] Rewrite current state vision (lines 29-47) to reflect dendritic + clan
-  - [ ] Update machine diagram (lines 74-151) to show 8 machines
-  - [ ] Mark Phase 0-6 as complete (lines 325-362)
-  - [ ] Update target vision to reflect future expansion goals
+- [x] **1.1** Update domain-model.md (AC: C1)
+  - [x] Remove nixos-unified autowiring section (lines 38-56)
+  - [x] Remove configurations/ directory references (line 46)
+  - [x] Update host inventory (lines 135-147) to 8 machines
+  - [x] Fix current/target inversion throughout
+  - [x] Verify all dendritic pattern references are current
+- [x] **1.2** Update goals-and-objectives.md (AC: C2)
+  - [x] Move G-S04 (dendritic) from in-progress to achieved
+  - [x] Move G-S06 (clan) from in-progress to achieved
+  - [x] Move G-U02 (multi-host) from in-progress to achieved
+  - [x] Move G-U03 from in-progress to achieved
+  - [x] Move G-U06 from in-progress to achieved
+  - [x] Remove future migration framing (lines 491-527)
+  - [x] Update all status markers to reflect current state
+- [x] **1.3** Update project-scope.md (AC: C3)
+  - [x] Rename "Target state architecture" section to "Current architecture"
+  - [x] Rename or remove "Current state architecture" section (nixos-unified)
+  - [x] Add 8-machine fleet to scope (lines 33-38 currently show 4)
+  - [x] Update conclusion to reflect migration completion
+- [x] **1.4** Update system-vision.md (AC: C4)
+  - [x] Rewrite current state vision (lines 29-47) to reflect dendritic + clan
+  - [x] Update machine diagram (lines 74-151) to show 8 machines
+  - [x] Mark Phase 0-6 as complete (lines 325-362)
+  - [x] Update target vision to reflect future expansion goals
 
 ### Task 2: Remediate High Priority Files (AC: H1-H6)
 
 Estimated effort: 8-10 hours
 
-- [ ] **2.1** Update constraints-and-rules.md (AC: H1)
-  - [ ] Remove or mark historical: migration-specific rules (lines 200-218)
-  - [ ] Update host inventory (lines 57-60) from 4 to 8 machines
-  - [ ] Remove "preserve nixos-unified" constraint (line 95)
-- [ ] **2.2** Update glossary.md (AC: H2)
-  - [ ] Add electrum definition
-  - [ ] Add galena definition
-  - [ ] Add scheelite definition
-  - [ ] Update nixos-unified definition (lines 124-127) to mark deprecated
-  - [ ] Add Pattern A term (dendritic aggregate pattern)
-  - [ ] Update migration-related terms to reflect completion
-- [ ] **2.3** Update deployment-requirements.md (AC: H3)
-  - [ ] Update introduction (line 10) to remove current/target framing
-  - [ ] Update zerotier example (lines 368-382) to show 8 hosts
-  - [ ] Update all other examples to reference 8-machine fleet
-- [ ] **2.4** Update functional-hierarchy.md (AC: H4)
-  - [ ] Reframe MF-001 to MF-004 (lines 649-722) as historical/completed
-  - [ ] Add or reference current operations functions for 8-machine fleet
-  - [ ] Add terranix/terraform functions if not present
-- [ ] **2.5** Update usage-model.md (AC: H5)
-  - [ ] Update introduction (line 12) to remove current/target framing
-  - [ ] Mark UC-007 as historical migration use case
-  - [ ] Update Phase 0-6 references (lines 440-474) to reflect completion
-  - [ ] Update all machine examples to 8-machine fleet
-- [ ] **2.6** Resolve ADR-0003 (AC: H6)
-  - [ ] Assess delta between current ADR-0003 and dendritic overlay patterns
-  - [ ] If delta < 50%: Update ADR-0003 with dendritic patterns, pkgs-by-name, correct paths
-  - [ ] If delta >= 50%: Create ADR-0017 (Dendritic Overlay Patterns), mark ADR-0003 superseded
-  - [ ] Remove nixos-unified references (lines 12-20, 30-42, 373-424)
-  - [ ] Update overlay paths from `overlays/` to `modules/nixpkgs/overlays/`
-  - [ ] Document five-layer overlay architecture
+- [x] **2.1** Update constraints-and-rules.md (AC: H1)
+  - [x] Remove or mark historical: migration-specific rules (lines 200-218)
+  - [x] Update host inventory (lines 57-60) from 4 to 8 machines
+  - [x] Remove "preserve nixos-unified" constraint (line 95)
+- [x] **2.2** Update glossary.md (AC: H2)
+  - [x] Add electrum definition
+  - [x] Add galena definition
+  - [x] Add scheelite definition
+  - [x] Update nixos-unified definition (lines 124-127) to mark deprecated
+  - [x] Add Pattern A term (dendritic aggregate pattern)
+  - [x] Update migration-related terms to reflect completion
+- [x] **2.3** Update deployment-requirements.md (AC: H3)
+  - [x] Update introduction (line 10) to remove current/target framing
+  - [x] Update zerotier example (lines 368-382) to show 8 hosts
+  - [x] Update all other examples to reference 8-machine fleet
+- [x] **2.4** Update functional-hierarchy.md (AC: H4)
+  - [x] Reframe MF-001 to MF-004 (lines 649-722) as historical/completed
+  - [x] Add or reference current operations functions for 8-machine fleet
+  - [x] Add terranix/terraform functions if not present
+- [x] **2.5** Update usage-model.md (AC: H5)
+  - [x] Update introduction (line 12) to remove current/target framing
+  - [x] Mark UC-007 as historical migration use case
+  - [x] Update Phase 0-6 references (lines 440-474) to reflect completion
+  - [x] Update all machine examples to 8-machine fleet
+- [x] **2.6** Resolve ADR-0003 (AC: H6)
+  - [x] Assess delta between current ADR-0003 and dendritic overlay patterns
+  - [x] If delta >= 50%: Create ADR-0017 (Dendritic Overlay Patterns), mark ADR-0003 superseded
+  - [x] Document five-layer overlay architecture in ADR-0017
 
 ### Task 3: Remediate Medium Priority Files (AC: M1-M2)
 
 Estimated effort: 1.5 hours
 
-- [ ] **3.1** Update risk-list.md (AC: M1)
-  - [ ] Update R-001 status (line 68) from "Not started" to reflect Epic 1 completion
-  - [ ] Update R-007 status (line 508) from "Not started" to reflect completion
-  - [ ] Review all risk statuses for alignment with Epics 1-7 completion
-- [ ] **3.2** Update system-constraints.md (AC: M2)
-  - [ ] Update SC-010 (lines 560-597) to reflect migration completion
-  - [ ] Remove "ongoing migration" framing
+- [x] **3.1** Update risk-list.md (AC: M1)
+  - [x] Update R-001 status (line 68) from "Not started" to reflect Epic 1 completion
+  - [x] Update R-007 status (line 508) from "Not started" to reflect completion
+  - [x] Review all risk statuses for alignment with Epics 1-7 completion
+- [x] **3.2** Update system-constraints.md (AC: M2)
+  - [x] Update SC-010 (lines 560-597) to reflect migration completion
+  - [x] Remove "ongoing migration" framing
 
 ### Task 4: Remediate Low Priority Files (AC: L1-L3)
 
 Estimated effort: 1 hour
 
-- [ ] **4.1** Update stakeholders.md (AC: L1)
-  - [ ] Update nixos-unified status (line 88) from "being replaced" to "deprecated Nov 2024"
-- [ ] **4.2** Update quality-requirements.md (AC: L2)
-  - [ ] Update measurement examples to reference 8 machines where applicable
-- [ ] **4.3** Update requirements/index.md (AC: L3)
-  - [ ] Add note that migration is complete as of Epic 6
+- [x] **4.1** Update stakeholders.md (AC: L1)
+  - [x] Update nixos-unified status (line 88) from "being replaced" to "deprecated Nov 2024"
+- [x] **4.2** Update quality-requirements.md (AC: L2)
+  - [x] Update measurement examples to reference 8 machines where applicable
+- [x] **4.3** Update requirements/index.md (AC: L3)
+  - [x] Add note that migration is complete as of Epic 6
 
 ### Task 5: Validation (AC: V1-V3)
 
 Estimated effort: 0.5-1 hour
 
-- [ ] **5.1** Verify zero nixos-unified "current" references (AC: V1)
-  - [ ] Run: `rg "nixos-unified" packages/docs/src/content/docs/development/`
-  - [ ] For each match, verify it describes nixos-unified as deprecated/historical, not current
-- [ ] **5.2** Verify 8-machine fleet references (AC: V2)
-  - [ ] Run: `rg "stibnite|blackphos|rosegold|argentum|cinnabar" packages/docs/src/content/docs/development/`
-  - [ ] Verify all machine lists include: electrum, galena, scheelite
-- [ ] **5.3** Verify Starlight build (AC: V3)
-  - [ ] Run: `cd packages/docs && bun run build`
-  - [ ] Verify zero errors
+- [x] **5.1** Verify zero nixos-unified "current" references (AC: V1)
+  - [x] Run: `rg "nixos-unified" packages/docs/src/content/docs/development/`
+  - [x] For each match, verify it describes nixos-unified as deprecated/historical, not current
+- [x] **5.2** Verify 8-machine fleet references (AC: V2)
+  - [x] Run: `rg "stibnite|blackphos|rosegold|argentum|cinnabar" packages/docs/src/content/docs/development/`
+  - [x] Verify all machine lists include: electrum, galena, scheelite
+- [x] **5.3** Verify Starlight build (AC: V3)
+  - [x] Run: `cd packages/docs && bun run build`
+  - [x] Verify zero errors (Build Complete! - 72 pages indexed)
 
 ## Dev Notes
 
