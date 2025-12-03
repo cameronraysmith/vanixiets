@@ -256,6 +256,8 @@ Only use for initial physical machine setup.
 
 ## See also
 
+- [Testing Guide](/about/contributing/testing/) - How to run tests and testing philosophy
+- [Test Harness Reference](/development/traceability/test-harness/) - CI-local parity matrix
 - [Flake Apps](/reference/flake-apps/) - Flake app reference
 - [CI Jobs](/reference/ci-jobs/) - CI job to recipe mapping
 - [Getting Started](/guides/getting-started/) - Initial setup guide
