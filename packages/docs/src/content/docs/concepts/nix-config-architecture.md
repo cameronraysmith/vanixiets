@@ -137,8 +137,8 @@ Two-tier secrets model:
 | **Tier 1** | Clan vars | System-level generated secrets | `clan vars generate` |
 | **Tier 2** | sops-nix | User-level manual secrets | `sops secrets/...` |
 
-**Tier 1 examples**: SSH host keys, zerotier identities, LUKS passphrases
-**Tier 2 examples**: GitHub tokens, API keys, signing keys
+- **Tier 1 examples**: SSH host keys, zerotier identities, LUKS passphrases
+- **Tier 2 examples**: GitHub tokens, API keys, signing keys
 
 See [Clan Integration](/concepts/clan-integration/) for details on two-tier secrets.
 
