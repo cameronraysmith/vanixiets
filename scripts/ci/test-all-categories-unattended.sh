@@ -61,12 +61,12 @@ test_category() {
     if just ci-cache-category "$system" "$category" "$config" >> "$LOG_FILE" 2>&1; then
         local end=$(date +%s)
         local duration=$((end - start))
-        log "✅ SUCCESS: $display_name (${duration}s)"
+        log "● SUCCESS: $display_name (${duration}s)"
         SUCCEEDED+=("$display_name (${duration}s)")
     else
         local end=$(date +%s)
         local duration=$((end - start))
-        log "❌ FAILED: $display_name (${duration}s)"
+        log "⊘ FAILED: $display_name (${duration}s)"
         FAILED+=("$display_name (${duration}s)")
     fi
 
@@ -90,12 +90,12 @@ log ""
 log "Checking prerequisites..."
 
 if ! sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME' &>/dev/null; then
-    log "❌ ERROR: Cannot access secrets/shared.yaml or CACHIX_CACHE_NAME not set"
+    log "⊘ ERROR: Cannot access secrets/shared.yaml or CACHIX_CACHE_NAME not set"
     exit 1
 fi
 
 CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
-log "✅ Cachix cache: $CACHE_NAME"
+log "● Cachix cache: $CACHE_NAME"
 log "   View at: https://app.cachix.org/cache/$CACHE_NAME"
 log ""
 
@@ -137,7 +137,7 @@ log "Completed: $(date)"
 log ""
 
 if [ ${#SUCCEEDED[@]} -gt 0 ]; then
-    log "✅ Succeeded (${#SUCCEEDED[@]}):"
+    log "● Succeeded (${#SUCCEEDED[@]}):"
     for item in "${SUCCEEDED[@]}"; do
         log "   • $item"
     done
@@ -145,13 +145,13 @@ if [ ${#SUCCEEDED[@]} -gt 0 ]; then
 fi
 
 if [ ${#FAILED[@]} -gt 0 ]; then
-    log "❌ Failed (${#FAILED[@]}):"
+    log "⊘ Failed (${#FAILED[@]}):"
     for item in "${FAILED[@]}"; do
         log "   • $item"
     done
     log ""
     log "Review failures in: $LOG_FILE"
-    log "Search for '❌ FAILED' or check logs above each failed category"
+    log "Search for '⊘ FAILED' or check logs above each failed category"
     log ""
     exit 1
 else
