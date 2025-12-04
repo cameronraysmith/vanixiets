@@ -48,31 +48,31 @@ jobs:
 
           # Validate required outputs present
           if [ -z "${{ steps.cache-test.outputs.should-run }}" ]; then
-            echo "❌ Missing required output: should-run"
+            echo "⊘ Missing required output: should-run"
             exit 1
           fi
 
           if [ -z "${{ steps.cache-test.outputs.cache-key }}" ]; then
-            echo "❌ Missing required output: cache-key"
+            echo "⊘ Missing required output: cache-key"
             exit 1
           fi
 
           if [ -z "${{ steps.cache-test.outputs.cache-path }}" ]; then
-            echo "❌ Missing required output: cache-path"
+            echo "⊘ Missing required output: cache-path"
             exit 1
           fi
 
-          echo "✅ All required outputs present"
+          echo "● All required outputs present"
 
       - name: Validate cache key format
         run: |
           KEY="${{ steps.cache-test.outputs.cache-key }}"
           if ! echo "$KEY" | grep -qE '^job-result-.*-[a-f0-9]{12}$'; then
-            echo "❌ Invalid cache key format: $KEY"
+            echo "⊘ Invalid cache key format: $KEY"
             echo "Expected: job-result-{name}-{12-char-sha}"
             exit 1
           fi
-          echo "✅ Cache key format valid: $KEY"
+          echo "● Cache key format valid: $KEY"
 
   test-path-filters:
     name: Test path filter logic
@@ -98,11 +98,11 @@ jobs:
           echo "any-changed: ${{ steps.filter-test.outputs.any-changed }}"
 
           if [ -z "${{ steps.filter-test.outputs.relevant-changes }}" ]; then
-            echo "❌ Missing relevant-changes output"
+            echo "⊘ Missing relevant-changes output"
             exit 1
           fi
 
-          echo "✅ Path filter outputs valid"
+          echo "● Path filter outputs valid"
 
   test-workflow-change-detection:
     name: Test workflow change detection
@@ -134,7 +134,7 @@ jobs:
           # Even though path-filters won't match, workflow change should force relevant-changes=true
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "$RELEVANT_CHANGES" = "true" ]; then
-              echo "✅ Workflow change correctly detected on PR"
+              echo "● Workflow change correctly detected on PR"
             else
               echo "⚠️ Workflow change not detected (may not be in changeset)"
               # Don't fail - workflow might not be in this PR's changeset
@@ -170,16 +170,16 @@ jobs:
           echo "cache-source: $CACHE_SOURCE"
 
           if [ "$SHOULD_RUN" != "true" ]; then
-            echo "❌ force-run=true should set should-run=true"
+            echo "⊘ force-run=true should set should-run=true"
             exit 1
           fi
 
           if [ "$CACHE_SOURCE" != "none" ]; then
-            echo "❌ force-run=true should set cache-source=none"
+            echo "⊘ force-run=true should set cache-source=none"
             exit 1
           fi
 
-          echo "✅ Force-run parameter working correctly"
+          echo "● Force-run parameter working correctly"
 
   test-check-name-sanitization:
     name: Test check name sanitization
@@ -207,19 +207,19 @@ jobs:
           # Should sanitize: remove parens, convert ", " to "-", collapse dashes
           # Expected: job-result-test-job-ubuntu-latest-3.11-{12-char-sha}
           if echo "$CACHE_KEY" | grep -q '('; then
-            echo "❌ Cache key contains parentheses: $CACHE_KEY"
+            echo "⊘ Cache key contains parentheses: $CACHE_KEY"
             exit 1
           fi
 
           if echo "$CACHE_KEY" | grep -q ', '; then
-            echo "❌ Cache key contains comma-space: $CACHE_KEY"
+            echo "⊘ Cache key contains comma-space: $CACHE_KEY"
             exit 1
           fi
 
           if ! echo "$CACHE_KEY" | grep -qE '^job-result-test-job-ubuntu-latest-3\.11-[a-f0-9]{12}$'; then
-            echo "❌ Cache key not properly sanitized: $CACHE_KEY"
+            echo "⊘ Cache key not properly sanitized: $CACHE_KEY"
             echo "Expected: job-result-test-job-ubuntu-latest-3.11-{12-char-sha}"
             exit 1
           fi
 
-          echo "✅ Check name sanitization working correctly"
+          echo "● Check name sanitization working correctly"
