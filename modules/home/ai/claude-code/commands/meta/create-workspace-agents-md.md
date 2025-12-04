@@ -142,33 +142,33 @@ fi
 case $MODE in
     "create")
         if [ "$CLAUDE_EXISTS" = true ]; then
-            echo "❌ ERROR: CREATE mode specified but CLAUDE.md already exists"
+            echo "⊘ ERROR: CREATE mode specified but CLAUDE.md already exists"
             echo "   Use 'update' mode to modify existing file, or 'auto' for smart detection"
             exit 1
         fi
-        echo "✅ CREATE MODE: Will generate new CLAUDE.md"
+        echo "● CREATE MODE: Will generate new CLAUDE.md"
         EXECUTION_MODE="CREATE"
         ;;
     "update") 
         if [ "$CLAUDE_EXISTS" = false ]; then
-            echo "❌ ERROR: UPDATE mode specified but no CLAUDE.md found"
+            echo "⊘ ERROR: UPDATE mode specified but no CLAUDE.md found"
             echo "   Use 'create' mode to generate new file, or 'auto' for smart detection"
             exit 1
         fi
-        echo "✅ UPDATE MODE: Will analyze and update existing CLAUDE.md"
+        echo "● UPDATE MODE: Will analyze and update existing CLAUDE.md"
         EXECUTION_MODE="UPDATE"
         ;;
     "auto")
         if [ "$CLAUDE_EXISTS" = true ]; then
-            echo "✅ AUTO MODE: Detected existing CLAUDE.md - switching to UPDATE"
+            echo "● AUTO MODE: Detected existing CLAUDE.md - switching to UPDATE"
             EXECUTION_MODE="UPDATE"
         else
-            echo "✅ AUTO MODE: No existing CLAUDE.md - switching to CREATE"
+            echo "● AUTO MODE: No existing CLAUDE.md - switching to CREATE"
             EXECUTION_MODE="CREATE"  
         fi
         ;;
     *)
-        echo "❌ ERROR: Invalid mode '$MODE'. Use 'create', 'update', or 'auto'"
+        echo "⊘ ERROR: Invalid mode '$MODE'. Use 'create', 'update', or 'auto'"
         exit 1
         ;;
 esac
@@ -645,7 +645,7 @@ The updated CLAUDE.md should:
 ### CREATE MODE Success Output
 
 ```
-✅ **Workspace CLAUDE.md Created Successfully**
+● **Workspace CLAUDE.md Created Successfully**
 
 **Mode**: CREATE - Generated new workspace documentation
 **File**: `/[workspace-path]/CLAUDE.md`
@@ -682,7 +682,7 @@ The updated CLAUDE.md should:
 ### UPDATE MODE Success Output  
 
 ```
-✅ **Workspace CLAUDE.md Updated Successfully**
+● **Workspace CLAUDE.md Updated Successfully**
 
 **Mode**: UPDATE - Analyzed and improved existing documentation
 **File**: `/[workspace-path]/CLAUDE.md` 
