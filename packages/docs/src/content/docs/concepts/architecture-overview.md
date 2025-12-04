@@ -1,9 +1,9 @@
 ---
-title: Nix-Config Architecture
+title: Architecture overview
 description: Understanding the architecture combining dendritic flake-parts, clan-core, and multi-channel overlay composition
 ---
 
-This infrastructure combines three complementary architectural patterns to create a maintainable, multi-machine nix-config that works across macOS and NixOS systems.
+This infrastructure combines three complementary architectural patterns to create a maintainable, multi-machine configuration that works across macOS and NixOS systems.
 
 ## Architecture overview
 
