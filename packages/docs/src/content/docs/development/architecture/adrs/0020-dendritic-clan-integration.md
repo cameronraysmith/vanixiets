@@ -323,23 +323,22 @@ Standard flake-parts patterns apply.
 
 ## Validation evidence
 
-### Epic 1 (November 2024)
+### Initial validation (November 2024)
 
 Integration validated in test-clan:
 
-- **Story 1.8**: blackphos migration proved darwin namespace export pattern
-- **Story 1.8A**: Portable home modules extracted to dendritic aggregates
-- **Story 1.10**: Complete migration validated two-step machine registration
-- **Story 1.10C**: Two-tier secrets architecture established
-- **Story 1.12**: Physical deployment validated end-to-end integration
+- blackphos migration proved darwin namespace export pattern
+- Portable home modules extracted to dendritic aggregates
+- Complete migration validated two-step machine registration
+- Two-tier secrets architecture established
+- Physical deployment validated end-to-end integration
 
-**GO/NO-GO metrics**:
+Validation metrics:
 - 3 machines integrated (darwin + nixos)
 - 17 home-manager modules in dendritic aggregates
 - Two-tier secrets operational
-- All 7 patterns HIGH confidence
 
-### Epic 2 (November 2024)
+### Production migration (November 2024)
 
 Production migration:
 
@@ -348,7 +347,7 @@ Production migration:
 - Home-manager aggregates shared across all users
 - Secrets working across both tiers
 
-### Epic 7 (December 2024)
+### GCP infrastructure (December 2024)
 
 GCP nodes validated pattern at scale:
 
@@ -366,7 +365,6 @@ GCP nodes validated pattern at scale:
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 - [ADR-0011: SOPS secrets management](0011-sops-secrets-management/)
 - [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
-- Epic 1 GO/NO-GO decision: `docs/notes/development/go-no-go-decision.md`
 
 ### External
 
