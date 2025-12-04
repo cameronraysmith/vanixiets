@@ -1274,72 +1274,10 @@ cache-darwin-system:
     echo ""
     echo "Other machines can now pull from cachix instead of rebuilding."
 
-# Build and cache all overlay packages for a specific system (avoids CI disk space issues)
+# Build and cache all overlay packages for a specific system
 [group('CI/CD')]
 cache-overlay-packages system:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    SYSTEM="{{system}}"
-    echo "Building all overlay packages for $SYSTEM..."
-    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
-    echo "Cache: https://app.cachix.org/cache/$CACHE_NAME"
-    echo ""
-
-    # Discover all packages via nix eval
-    echo "Discovering packages..."
-    PACKAGES=$(nix eval ".#packages.$SYSTEM" --apply 'builtins.attrNames' --json | jq -r '.[]')
-
-    if [ -z "$PACKAGES" ]; then
-        echo "⊘ No packages found for $SYSTEM"
-        exit 1
-    fi
-
-    PACKAGE_COUNT=$(echo "$PACKAGES" | wc -l | tr -d ' ')
-    echo "Found $PACKAGE_COUNT packages:"
-    echo "$PACKAGES" | while read pkg; do echo "  - $pkg"; done
-    echo ""
-
-    # Build all packages with single nix build command
-    echo "Building all packages..."
-    PACKAGE_TARGETS=$(echo "$PACKAGES" | sed "s|^|.#packages.$SYSTEM.|" | tr '\n' ' ')
-
-    # Use nom if available for better output, otherwise fall back to nix build
-    if command -v nom &> /dev/null; then
-        BUILD_CMD="nom build"
-        BUILD_OPTS="--no-link --print-out-paths"
-        echo "(using nom for prettier output)"
-    else
-        BUILD_CMD="nix build"
-        BUILD_OPTS="-L --no-link --print-out-paths"
-    fi
-
-    # Build and capture output paths
-    STORE_PATHS=$($BUILD_CMD $PACKAGE_TARGETS $BUILD_OPTS)
-
-    if [ -z "$STORE_PATHS" ]; then
-        echo "⊘ No store paths produced from build"
-        exit 1
-    fi
-
-    PATHS_COUNT=$(echo "$STORE_PATHS" | wc -l | tr -d ' ')
-    echo ""
-    echo "Built $PATHS_COUNT store paths"
-    echo ""
-
-    # Query all dependencies and push to cachix
-    echo "Querying dependencies and pushing to cachix..."
-    echo "(This includes all build dependencies for cache efficiency)"
-
-    echo "$STORE_PATHS" | while read path; do
-        nix-store --query --requisites --include-outputs "$path"
-    done | sort -u | sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
-
-    echo ""
-    echo "● Successfully cached all overlay packages for $SYSTEM"
-    echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
-    echo ""
-    echo "CI will now fetch from cachix instead of building."
+    @./scripts/ci/ci-cache-category.sh "{{system}}" packages
 
 # List all packages in packages/ directory
 [group('CI/CD')]
