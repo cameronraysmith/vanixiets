@@ -20,7 +20,7 @@
 
 ## What This Provides
 
-Nix flake-based system configurations for NixOS, nix-darwin, and home-manager using dendritic flake-parts pattern with clan-core integration for multi-machine coordination and multi-channel overlay composition.
+Nix flake-based system configurations for NixOS, nix-darwin, and home-manager using the dendritic flake-parts architecture and clan.
 
 ## Quick Start
 
@@ -42,34 +42,35 @@ direnv allow
 just activate
 ```
 
-See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting-started) for complete setup instructions.
+See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting-started) for illustrative setup instructions.
 
 ## Features
 
-⊕ **Dendritic module organization** - import-tree auto-discovers Nix files organized by aspect (feature) rather than host, with every file being a flake-parts module that exports to dendritic namespaces (flake.modules.darwin.*, flake.modules.home.*, flake.modules.nixos.*)
+⊕ **Dendritic module organization** - import-tree auto-discovers Nix files organized by feature category (aspect) rather than host, with the intent that each file qualifies as a flake-parts module that exports to semantically meaningful namespaces (`flake.modules.darwin.*`, `flake.modules.home.*`, `flake.modules.nixos.*`)
 
-⋈ **Per-package nixpkgs channel selection** - Multi-channel overlay architecture enables unstable default with selective stable fallbacks via modules/nixpkgs/overlays/hotfixes.nix without requiring full flake.lock rollback
+⋈ **Per-package nixpkgs channel selection** - Multi-channel overlay architecture enables unstable default with selective stable fallbacks via `modules/nixpkgs/overlays/hotfixes.nix` without holding back rolling upgrades for the entire package set.
 
 ⊛ **Cross-platform deployment targets** - NixOS, nix-darwin, or home-manager configurations
 
-⊎ **Multi-user configuration patterns** - Admin users with integrated system/home-manager configurations and non-admin users with standalone home-manager deployments
+⊎ **Multi-user configuration patterns** - Admin users with integrated system/home-manager configurations and non-admin users with system-integrated or standalone home-manager deployments
 
-⊢ **Declarative secrets management** - sops-nix integration with age encryption for managing encrypted secrets
+⊢ **Declarative secrets management** - sops-nix integration with age encryption for managing encrypted secrets and integration with clan vars.
 
 ⊠ **Composable package overlays** - layered overlay composition (multi-channel access → hotfixes → custom packages → build overrides → flake input overlays) for package customization and dependency management
 
-↯ **Reproducible development environments** - Nix development shell with direnv activation and just task runner
+↯ **Reproducible development environments** - Standard nix development shell(s) with direnv auto-activation and just task runner recipe for each CI job to support reproducible local 
+development testing
 
 ## Documentation
 
 **Getting Started:**
-[Bootstrap Guide](https://infra.cameronraysmith.net/guides/getting-started) • [Host Onboarding](https://infra.cameronraysmith.net/guides/host-onboarding) • [Home Manager Onboarding](https://infra.cameronraysmith.net/guides/home-manager-onboarding)
+[Setup Guide](https://infra.cameronraysmith.net/guides/getting-started) • [Host Onboarding](https://infra.cameronraysmith.net/guides/host-onboarding) • [Home Manager Onboarding](https://infra.cameronraysmith.net/guides/home-manager-onboarding)
 
 **Architecture:**
-[Nix-Config Architecture](https://infra.cameronraysmith.net/concepts/nix-config-architecture) • [Dendritic Architecture](https://infra.cameronraysmith.net/concepts/dendritic-architecture) • [Multi-User Patterns](https://infra.cameronraysmith.net/concepts/multi-user-patterns) • [Repository Structure](https://infra.cameronraysmith.net/reference/repository-structure)
+[Nix flake-parts + clan integration](https://infra.cameronraysmith.net/concepts/nix-config-architecture) • [Dendritic flake-parts architecture](https://infra.cameronraysmith.net/concepts/dendritic-architecture) • [Multi-user setup](https://infra.cameronraysmith.net/concepts/multi-user-patterns) • [Repository structure](https://infra.cameronraysmith.net/reference/repository-structure)
 
 **Operations:**
-[Secrets Management](https://infra.cameronraysmith.net/guides/secrets-management) • [Nixpkgs Hotfixes](https://infra.cameronraysmith.net/development/architecture/nixpkgs-hotfixes) • [Handling Broken Packages](https://infra.cameronraysmith.net/guides/handling-broken-packages)
+[Secrets management](https://infra.cameronraysmith.net/guides/secrets-management) • [Nixpkgs hotfixes](https://infra.cameronraysmith.net/development/architecture/nixpkgs-hotfixes) • [Handling broken packages](https://infra.cameronraysmith.net/guides/handling-broken-packages)
 
 📘 **Full documentation:** <https://infra.cameronraysmith.net/>
 
