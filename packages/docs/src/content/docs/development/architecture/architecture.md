@@ -24,7 +24,7 @@ The infrastructure coordinates 6 permanent machines plus ephemeral cloud instanc
 - 1 permanent nixos server: cinnabar (Hetzner VPS, zerotier coordinator)
 - 1 ephemeral nixos server: electrum (Hetzner VPS, usually disabled in terranix)
 
-Note that galena (GCP CPU) and scheelite (GCP GPU) are introduced in Epic 7, not part of the initial Epic 2 validation.
+Note that galena (GCP CPU) and scheelite (GCP GPU) were added as GCP infrastructure expansion, not part of the initial November 2024 validation.
 All machines managed through single configuration repository with cross-platform module sharing.
 
 ### User management
@@ -757,32 +757,32 @@ Home-manager secrets: modules/home/ modules reference sops.secrets.
 
 ## Validation Evidence
 
-Architectural patterns validated through multi-epic implementation effort.
+Architectural patterns validated through phased implementation effort.
 
-### Epic 1 (November 2024)
+### Initial validation (November 2024)
 
 Pattern validation in test-clan repository before production migration.
 
-Stories 1.1-1.7 established dendritic structure, clan integration, and testing infrastructure.
-Stories 1.8-1.12 validated cross-platform modules, secrets, and physical deployment.
+Established dendritic structure, clan integration, and testing infrastructure.
+Validated cross-platform modules, secrets, and physical deployment.
 
-Metrics: 83 auto-discovered modules, 23-line minimal flake.nix, 270 packages preserved across migration, all 7 patterns rated HIGH confidence in GO/NO-GO decision.
+Metrics: 83 auto-discovered modules, 23-line minimal flake.nix, 270 packages preserved across migration, all 7 patterns rated HIGH confidence in validation decision.
 
-### Epic 2 (November 2024)
+### Production migration (November 2024)
 
 Production migration to infra repository.
 
-Stories 2.1-2.14 migrated all machines to dendritic + clan architecture.
+Migrated all machines to dendritic + clan architecture.
 Darwin workstations (stibnite, blackphos) and NixOS VPS (cinnabar, electrum) operational.
 New machines (rosegold, argentum) created using established patterns.
 
-Result: 6-machine permanent fleet fully operational under new architecture (note that galena and scheelite are added in Epic 7, not Epic 2).
+Result: 6-machine permanent fleet fully operational under new architecture (note that galena and scheelite were added December 2024, not November 2024).
 
-### Epic 7 (December 2024)
+### GCP infrastructure expansion (December 2024)
 
 GCP infrastructure integration.
 
-Stories 7.1-7.4 added terranix GCP support, deployed CPU (galena) and GPU (scheelite) instances.
+Added terranix GCP support, deployed CPU (galena) and GPU (scheelite) instances.
 Toggle mechanism validated with expensive GPU resources.
 
 Metrics: 172-line GCP terranix module, GPU instance operational, 10 patterns established for GCP integration.
@@ -806,8 +806,8 @@ Limited module composition for cross-cutting concerns.
 
 Migration approach:
 
-Epic 1 validated patterns in test-clan repository.
-Epic 2 migrated production infrastructure.
+Patterns validated in test-clan repository.
+Production infrastructure migrated November 2024.
 Zero downtime for critical services (zerotier, VPN).
 
 Migration outcomes:
