@@ -146,10 +146,10 @@ Provide your analysis and proposed commits in this structured format:
 - **Project Conventions:** [specific patterns observed]
 
 ### Pre-Commit Validation
-- **Security Scan:** ✅ No sensitive data detected / ⚠️ [specific concerns]
-- **Debug Code Check:** ✅ Clean / ⚠️ [items found requiring attention]
-- **File Validation:** ✅ All appropriate / ⚠️ [questionable inclusions]
-- **Permission Check:** ✅ Proper permissions / ⚠️ [permission issues]
+- **Security Scan:** ● No sensitive data detected / ⚠️ [specific concerns]
+- **Debug Code Check:** ● Clean / ⚠️ [items found requiring attention]
+- **File Validation:** ● All appropriate / ⚠️ [questionable inclusions]
+- **Permission Check:** ● Proper permissions / ⚠️ [permission issues]
 
 ### Proposed Commit Sequence
 ```
@@ -196,7 +196,7 @@ motivation and implementation approach.
 
 ---
 
-**✅ Ready to proceed with atomic commits? [y/N]**
+**● Ready to proceed with atomic commits? [y/N]**
 
 *Type 'y' to execute the planned sequence, 'e' to edit the plan, or 'n' to abort and make manual changes.*
 
