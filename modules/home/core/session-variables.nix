@@ -1,5 +1,5 @@
 # Session environment variables
-# Extracted from infra/modules/home/all/terminal/default.nix lines 294-299
+# Extracted from vanixiets/modules/home/all/terminal/default.nix lines 294-299
 { ... }:
 {
   flake.modules.homeManager.core =

@@ -91,8 +91,8 @@ Let's start by getting the configuration onto your machine.
 
 ```bash
 cd ~/projects  # Or wherever you keep your code
-git clone git@github.com:cameronraysmith/infra.git
-cd infra
+git clone git@github.com:cameronraysmith/vanixiets.git
+cd vanixiets
 ```
 
 Take a moment to explore the structure:

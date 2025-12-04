@@ -1,5 +1,5 @@
 # XDG base directory specification
-# Migrated from infra/modules/home/all/core/xdg.nix
+# Migrated from vanixiets/modules/home/all/core/xdg.nix
 { ... }:
 {
   flake.modules.homeManager.core =

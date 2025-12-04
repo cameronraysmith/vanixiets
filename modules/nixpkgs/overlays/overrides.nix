@@ -9,10 +9,10 @@
 # - Build flag modifications
 # - Patch applications
 #
-# infra has auto-import infrastructure but no actual overrides yet.
+# vanixiets has auto-import infrastructure but no actual overrides yet.
 # This is a placeholder for future package build modifications.
 #
-# See infra overlays README.md for when to use overrides vs hotfixes vs patches
+# See vanixiets overlays README.md for when to use overrides vs hotfixes vs patches
 #
 { ... }:
 {

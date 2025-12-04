@@ -1,4 +1,4 @@
-# This is a jusfile for the infra repository.
+# This is a jusfile for the vanixiets repository.
 # Sections are separated by ## and recipes are documented with a single #
 # on lines preceding the recipe.
 
@@ -257,7 +257,7 @@ nixos-vm-sync user destination:
   --exclude='.direnv' \
   --exclude='result' \
   . \
-  {{ user }}@{{ destination }}:~/infra
+  {{ user }}@{{ destination }}:~/vanixiets
 
 # Build nixos from flake
 [group('nixos')]
@@ -843,7 +843,7 @@ ci-debug-job workflow="ci.yaml" job_name="nix (aarch64-darwin)":
 
 # Update github secrets for repo from environment variables
 [group('CI/CD')]
-ghsecrets repo="cameronraysmith/infra": # gitleaks:allow
+ghsecrets repo="cameronraysmith/vanixiets": # gitleaks:allow
   @echo "secrets before updates:"
   @echo
   PAGER=cat gh secret list --repo={{ repo }}

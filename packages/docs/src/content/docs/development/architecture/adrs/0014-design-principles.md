@@ -27,8 +27,8 @@ Establish four core design principles for this template.
 **Principle:** Avoid framework-specific naming in core identifiers.
 
 **Example:**
-- ● Package name: `@infra/docs`
-- ⊘ Package name: `@infra/starlight` or `@infra/astro-docs`
+- ● Package name: `@vanixiets/docs`
+- ⊘ Package name: `@vanixiets/starlight` or `@vanixiets/astro-docs`
 
 **Rationale:**
 - Astro/Starlight are implementation details that may change

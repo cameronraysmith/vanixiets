@@ -38,7 +38,7 @@
         # Note: prev is already from nixpkgs, this is explicit
         nixpkgs = import inputs.nixpkgs nixpkgsConfig;
 
-        # Patched nixpkgs (empty patches in test-clan, infra uses infra/patches.nix)
+        # Patched nixpkgs (empty patches in test-clan, vanixiets uses vanixiets/patches.nix)
         patched = import (prev.applyPatches {
           name = "nixpkgs-patched";
           src = inputs.nixpkgs.outPath;

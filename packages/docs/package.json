@@ -1,12 +1,12 @@
 {
-  "name": "@infra/docs",
+  "name": "@vanixiets/docs",
   "version": "0.0.0-development",
   "private": true,
-  "description": "Documentation site for cameronraysmith nix infra",
+  "description": "Documentation site for vanixiets",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cameronraysmith/infra.git"
+    "url": "https://github.com/cameronraysmith/vanixiets.git"
   },
   "license": "MIT",
   "packageManager": "bun@1.1.38",

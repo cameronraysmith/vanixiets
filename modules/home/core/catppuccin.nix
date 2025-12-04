@@ -1,5 +1,5 @@
 # Catppuccin theme configuration
-# Extracted from infra/modules/home/all/terminal/default.nix lines 302-303
+# Extracted from vanixiets/modules/home/all/terminal/default.nix lines 302-303
 { ... }:
 {
   flake.modules.homeManager.core =

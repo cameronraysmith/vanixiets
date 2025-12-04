@@ -1,11 +1,11 @@
 {
-  "name": "infra",
+  "name": "vanixiets",
   "version": "0.0.0-development",
   "private": true,
   "description": "NixOS and home-manager configuration",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cameronraysmith/infra.git"
+    "url": "https://github.com/cameronraysmith/vanixiets.git"
   },
   "license": "MIT",
   "workspaces": [

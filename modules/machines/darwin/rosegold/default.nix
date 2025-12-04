@@ -64,7 +64,7 @@ in
       # All 5 overlay layers + pkgs-by-name packages exported from modules/nixpkgs.nix
       nixpkgs.overlays = [ inputs.self.overlays.default ];
 
-      # System state version (matching infra configuration)
+      # System state version (matching vanixiets configuration)
       # Override base.nix which sets stateVersion = 5
       system.stateVersion = lib.mkForce 4;
 

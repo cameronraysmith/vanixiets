@@ -29,7 +29,7 @@
             # - Basic starship configuration provides 95% of value without starship-jj overhead
             # - Enhanced jujutsu prompt can be added later if needed without blocking deployment
             #
-            # Original infra configuration (commented out):
+            # Original vanixiets configuration (commented out):
             # custom.jj = {
             #   command = "prompt";
             #   format = "$output";
