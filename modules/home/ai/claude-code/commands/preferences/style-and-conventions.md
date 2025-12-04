@@ -12,9 +12,9 @@
 ## Naming and case conventions
 
 - Prefer lowercase except when replicating code conventions like PascalCase or camelCase, in acronyms, or in proper nouns.
-- Do prefer to capitalize the first letter of the first word of
+- Do prefer to capitalize the first letter of the first word and use Chicago Manual sentence-style capitalization for
     - complete sentences that end with punctuation marks
-    - markdown file section and subsection headings
+    - markdown file title frontmatter, section headings, and any level of subsection heading
 - Do not use uppercase words for emphasis or notification purposes like "IMPORTANT", "URGENT", "WARNING", etc except in relevant situations like error handling, logging, or quoting usage by other sources.
 - Do not name files with all uppercase letters. Use lowercase kebab-case specifically for markdown filenames or if there is no specific convention for the programming language or filetype (e.g. python uses snake_case).
 
