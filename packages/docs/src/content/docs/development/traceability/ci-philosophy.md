@@ -96,9 +96,9 @@ nix flake show --json | jq '...'  # Get flake outputs
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| "❌ activate recipe not found" | Justfile missing `activate` recipe | Check justfile:25 exists |
-| "❌ $config dry-run failed" | Config syntax error or missing dependency | Run locally: `just -n activate $config` |
-| "❌ darwin:foo missing from flake outputs" | Config file exists but not in flake | Check nixos-unified autowiring |
+| "⊘ activate recipe not found" | Justfile missing `activate` recipe | Check justfile:25 exists |
+| "⊘ $config dry-run failed" | Config syntax error or missing dependency | Run locally: `just -n activate $config` |
+| "⊘ darwin:foo missing from flake outputs" | Config file exists but not in flake | Check nixos-unified autowiring |
 | "⚠️  no home configurations found" | Empty configurations/home/ directory | Expected on fresh clone |
 
 ## Job: nix
