@@ -279,7 +279,7 @@ validate-secrets:
   @echo "Validating sops encrypted files..."
   @for file in $(find vars -name "*.yaml"); do \
     echo "Testing: $file"; \
-    sops -d "$file" > /dev/null && echo "  ✅ Valid" || echo "  ❌ Failed"; \
+    sops -d "$file" > /dev/null && echo "  ● Valid" || echo "  ⊘ Failed"; \
   done
 
 # Initialize age key for new developers
@@ -291,10 +291,10 @@ sops-init:
     mkdir -p ~/.config/sops/age; \
     age-keygen -o ~/.config/sops/age/keys.txt; \
     echo ""; \
-    echo "✅ Age key generated. Add this public key to .sops.yaml:"; \
+    echo "● Age key generated. Add this public key to .sops.yaml:"; \
     grep "public key:" ~/.config/sops/age/keys.txt; \
   else \
-    echo "✅ Age key already exists"; \
+    echo "● Age key already exists"; \
     grep "public key:" ~/.config/sops/age/keys.txt; \
   fi
 
@@ -310,7 +310,7 @@ sops-add-key:
 
   printf "Enter age key description (e.g., 'project [dev|ci|admin]'): "
   read -r key_description
-  [[ -z "${key_description}" ]] && { echo "❌ Description cannot be empty"; exit 1; }
+  [[ -z "${key_description}" ]] && { echo "⊘ Description cannot be empty"; exit 1; }
 
   printf "Paste age PRIVATE key (starts with AGE-SECRET-KEY-): "
   read -rs private_key
@@ -331,14 +331,14 @@ sops-add-key:
     echo ""
   } >> ~/.config/sops/age/keys.txt
 
-  echo "✅ Age key added successfully for: ${key_description}"
+  echo "● Age key added successfully for: ${key_description}"
   echo "   Public key: ${public_key}"
 
 # Set or update secret non-interactively
 [group('secrets')]
 set-secret secret_name secret_value:
   @sops set vars/shared.yaml '["{{ secret_name }}"]' '"{{ secret_value }}"'
-  @echo "✅ {{ secret_name }} has been set/updated"
+  @echo "● {{ secret_name }} has been set/updated"
 
 # Rotate secret interactively
 [group('secrets')]
@@ -348,7 +348,7 @@ rotate-secret secret_name:
   read -rs NEW_VALUE
   echo ""
   sops set vars/shared.yaml '["{{ secret_name }}"]' "\"$NEW_VALUE\"" && \
-    echo "✅ {{ secret_name }} rotated successfully"
+    echo "● {{ secret_name }} rotated successfully"
 
 # Update keys for existing secrets files
 [group('secrets')]
@@ -358,7 +358,7 @@ updatekeys:
     echo "Updating: $file"; \
     sops updatekeys "$file"; \
   done
-  @echo "✅ Keys updated for all secrets files"
+  @echo "● Keys updated for all secrets files"
 ```
 
 ### Git pre-commit hooks
@@ -376,7 +376,7 @@ if git diff --cached --name-only | grep -E '(\.env$|vars/.*\.yaml$)'; then
 
   for file in $(git diff --cached --name-only | grep -E '(vars/.*\.yaml$)'); do
     if ! grep -q "sops:" "$file"; then
-      echo "❌ File $file does not appear to be encrypted with sops"
+      echo "⊘ File $file does not appear to be encrypted with sops"
       echo "Run: sops -e $file > $file.enc && mv $file.enc $file"
       exit 1
     fi
