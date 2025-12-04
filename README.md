@@ -67,7 +67,7 @@ development testing
 [Setup Guide](https://infra.cameronraysmith.net/guides/getting-started) • [Host Onboarding](https://infra.cameronraysmith.net/guides/host-onboarding) • [Home Manager Onboarding](https://infra.cameronraysmith.net/guides/home-manager-onboarding)
 
 **Architecture:**
-[Architecture overview](https://infra.cameronraysmith.net/concepts/architecture-overview) • [Dendritic flake-parts architecture](https://infra.cameronraysmith.net/concepts/dendritic-architecture) • [Multi-user setup](https://infra.cameronraysmith.net/concepts/multi-user-patterns) • [Repository structure](https://infra.cameronraysmith.net/reference/repository-structure)
+[Architecture overview](https://infra.cameronraysmith.net/concepts/architecture-overview) • [Dendritic flake-parts architecture](https://infra.cameronraysmith.net/concepts/dendritic-architecture) • [System-user integration](https://infra.cameronraysmith.net/concepts/system-user-integration) • [Repository structure](https://infra.cameronraysmith.net/reference/repository-structure)
 
 **Operations:**
 [Secrets management](https://infra.cameronraysmith.net/guides/secrets-management) • [Nixpkgs hotfixes](https://infra.cameronraysmith.net/development/architecture/nixpkgs-hotfixes) • [Handling broken packages](https://infra.cameronraysmith.net/guides/handling-broken-packages)
