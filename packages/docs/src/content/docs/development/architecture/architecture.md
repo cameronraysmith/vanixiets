@@ -902,6 +902,5 @@ Future: Unified secrets interface abstracting tier selection, automated secret r
 
 ### Related specifications
 
-- [PRD](/development/prd/) - Product requirements
-- [Epics](/development/epics/) - Implementation breakdown
-- [Sprint status](/development/sprint-status.yaml) - Current progress
+- [Context](/development/context/) - Problem domain and objectives
+- [Requirements](/development/requirements/) - System requirements
