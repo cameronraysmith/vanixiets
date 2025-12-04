@@ -97,8 +97,6 @@ The name pays homage to Eelco Dolstra's etymology for Nix itself:
 >
 > — Dolstra, de Jonge & Visser (2004)[^1]
 
-[^1]: Dolstra E, de Jonge M, Visser E. Nix: A Safe and Policy-Free System for Software Deployment. *LISA '04: 18th USENIX Large Installation System Administration Conference*. 2004;79–92. <https://www.usenix.org/conference/lisa-04/nix-safe-and-policy-free-system-software-deployment>
-
 </details>
 
 [ci-badge]: https://github.com/cameronraysmith/vanixiets/actions/workflows/ci.yaml/badge.svg
@@ -107,3 +105,5 @@ The name pays homage to Eelco Dolstra's etymology for Nix itself:
 [docs-link]: https://infra.cameronraysmith.net
 [license-badge]: https://img.shields.io/badge/license-MIT-blue
 [license-link]: https://spdx.org/licenses/MIT.html
+
+[^1]: Dolstra E, de Jonge M, Visser E. Nix: A Safe and Policy-Free System for Software Deployment. *LISA '04: 18th USENIX Large Installation System Administration Conference*. 2004;79–92. <https://www.usenix.org/conference/lisa-04/nix-safe-and-policy-free-system-software-deployment>
