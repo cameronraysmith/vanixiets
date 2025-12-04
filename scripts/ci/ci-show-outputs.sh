@@ -37,7 +37,7 @@ else
 fi
 echo ""
 
-echo "✅ Checks ($SYSTEM):"
+echo "● Checks ($SYSTEM):"
 if [ "$CHECKS" = "none" ]; then
     echo "  (none found)"
 else
