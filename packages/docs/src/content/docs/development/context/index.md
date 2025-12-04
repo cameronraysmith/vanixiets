@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-Context documentation for the nix-config system following AMDiRE (Artefact Model for Domain-independent Requirements Engineering) principles.
+Context documentation for infra following AMDiRE (Artefact Model for Domain-independent Requirements Engineering) principles.
 
 The context layer considers the context of the system under consideration, including the domain in which it operates, stakeholders, goals, constraints, and business processes.
 
