@@ -2,7 +2,7 @@
   "name": "@infra/docs",
   "version": "0.0.0-development",
   "private": true,
-  "description": "Documentation site for nix homelab",
+  "description": "Documentation site for cameronraysmith nix infra",
   "type": "module",
   "repository": {
     "type": "git",
