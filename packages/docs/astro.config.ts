@@ -8,6 +8,7 @@ import justGrammar from "./src/grammars/just.tmLanguage.json";
 
 // https://astro.build/config
 export default defineConfig({
+  site: "https://infra.cameronraysmith.net",
   integrations: [
     starlight({
       title: "infra",
