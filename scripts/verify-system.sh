@@ -11,7 +11,7 @@ set -uo pipefail
 
 FAILED=0
 
-echo "=== Verifying nix-config after updates ==="
+echo "=== Verifying infra after updates ==="
 echo ""
 
 # Step 1: Flake check
