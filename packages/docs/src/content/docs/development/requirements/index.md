@@ -55,7 +55,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 - UC-002: Add feature module spanning multiple platforms
 - UC-003: Manage secrets via declarative generators
 - UC-004: Deploy coordinated service across hosts
-- UC-005: Handle broken package with multi-channel resilience
+- UC-005: Handle broken package with multi-channel fallback
 - UC-006: Establish secure overlay network
 - UC-007: Migrate host to dendritic + clan architecture
 

@@ -279,7 +279,7 @@ inventory.machines = {
 };
 ```
 
-### UC-005: Handle broken package with multi-channel resilience
+### UC-005: Handle broken package with multi-channel fallback
 
 **Actor**: Developer/Maintainer (crs58)
 
