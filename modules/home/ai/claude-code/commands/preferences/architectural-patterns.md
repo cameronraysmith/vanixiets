@@ -67,8 +67,8 @@ Infrastructure → Application → Domain
 
 Never:
 ```
-Domain → Infrastructure  ❌
-Domain → Application     ❌
+Domain → Infrastructure  ⊘
+Domain → Application     ⊘
 ```
 
 This ensures:
@@ -289,14 +289,14 @@ Define dependencies as simple function types, not heavyweight interfaces:
 
 ```python
 # Instead of interface with many methods:
-class IProductCatalog(Protocol):  ❌
+class IProductCatalog(Protocol):  ⊘
     def get_product(self, code: ProductCode) -> Product: ...
     def list_products(self) -> List[Product]: ...
     def update_stock(self, code: ProductCode, qty: int) -> None: ...
     # ... many methods
 
 # Use specific function types:
-GetProductPrice = Callable[[ProductCode], Price]  ✅
+GetProductPrice = Callable[[ProductCode], Price]  ●
 CheckProductExists = Callable[[ProductCode], bool]
 
 def price_order(
@@ -533,14 +533,14 @@ ResultOption[T, E] = Result[Option[T], E]
 
 ```python
 # Too many effects - hard to reason about
-ReaderStateAsyncResultOption[Config, State, T, E] = ...  ❌
+ReaderStateAsyncResultOption[Config, State, T, E] = ...  ⊘
 ```
 
 **Better approach**:
 
 ```python
 # Limit to essential effects
-WorkflowResult[T] = AsyncResult[T, WorkflowError]  ✅
+WorkflowResult[T] = AsyncResult[T, WorkflowError]  ●
 
 # Pass config/state as parameters
 def workflow(
