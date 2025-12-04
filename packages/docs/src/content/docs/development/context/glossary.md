@@ -221,13 +221,13 @@ Related: overlay network, controller, peer, VPN.
 
 ## Host names
 
-**argentum**: Darwin host (aarch64), testing and backup environment, Phase 4 migration target.
+**argentum**: Darwin host (aarch64), testing and backup environment.
 Meaning: Silver (element Ag), continuing precious metal naming theme.
 
-**blackphos**: Darwin host (aarch64), secondary development environment, Phase 2 migration target (first darwin migration).
+**blackphos**: Darwin host (aarch64), secondary development environment, first darwin migration in November 2024.
 Meaning: Black phosphorus (allotrope of element P), continuing element naming theme.
 
-**cinnabar**: NixOS VPS (x86_64), Hetzner Cloud CX53, Phase 1 deployment target, zerotier controller, foundation infrastructure.
+**cinnabar**: NixOS VPS (x86_64), Hetzner Cloud CX53, zerotier controller, foundation infrastructure.
 Meaning: Mercury sulfide mineral (HgS), red color, continuing mineral/element naming theme.
 
 **electrum**: NixOS VPS (x86_64), Hetzner Cloud secondary infrastructure host for distributed services.
@@ -236,13 +236,13 @@ Meaning: Natural alloy of gold and silver (Au+Ag), continuing metal/element nami
 **galena**: NixOS VPS (x86_64), GCP compute instance for CPU-based compute workloads.
 Meaning: Lead sulfide mineral (PbS), primary ore of lead, continuing mineral/element naming theme.
 
-**rosegold**: Darwin host (aarch64), testing and experimental environment, Phase 3 migration target.
+**rosegold**: Darwin host (aarch64), testing and experimental environment.
 Meaning: Gold-copper alloy, continuing metal/element naming theme.
 
 **scheelite**: NixOS VPS (x86_64), GCP compute instance for GPU-based compute workloads.
 Meaning: Calcium tungstate mineral (CaWO4), ore of tungsten, continuing mineral/element naming theme.
 
-**stibnite**: Darwin host (aarch64), primary daily workstation, Phase 5 migration target (last, highest risk).
+**stibnite**: Darwin host (aarch64), primary daily workstation, migrated last after all others proven stable.
 Meaning: Antimony sulfide mineral (Sb2S3), continuing element/mineral naming theme.
 
 ## Acronyms and abbreviations
@@ -300,35 +300,14 @@ Related: module system, dendritic pattern.
 
 ## Migration terms
 
-**Phase 0**: Validation phase in test-clan repository proving dendritic + clan integration works.
-Related: migration phases, test-clan.
-
-**Phase 1**: VPS infrastructure deployment (cinnabar) using validated patterns.
-Related: migration phases, cinnabar, VPS.
-
-**Phase 2**: First darwin migration (blackphos), establishing darwin patterns.
-Related: migration phases, blackphos.
-
-**Phase 3**: Second darwin migration (rosegold), validating pattern reusability.
-Related: migration phases, rosegold.
-
-**Phase 4**: Third darwin migration (argentum), final validation before primary workstation.
-Related: migration phases, argentum.
-
-**Phase 5**: Primary workstation migration (stibnite), last after all others proven stable.
-Related: migration phases, stibnite.
-
-**Phase 6**: Cleanup phase removing nixos-unified and completing migration.
-Related: migration phases, nixos-unified.
-
 **progressive migration**: Strategy of migrating hosts one at a time with validation between each.
-Related: migration phases, stability gate.
+Related: stability gate, risk mitigation.
 
 **stability gate**: Requirement for each migrated host to remain stable for 1-2 weeks before proceeding to next.
-Related: migration phases, risk mitigation.
+Related: progressive migration, risk mitigation.
 
 **test-clan**: Experimental repository for validating dendritic + clan integration before production deployment.
-Related: Phase 0, validation.
+Related: validation.
 
 ## Workflow terms
 
