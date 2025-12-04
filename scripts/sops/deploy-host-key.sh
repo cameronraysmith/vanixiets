@@ -42,10 +42,10 @@ echo ""
 # Verify key exists in Bitwarden
 echo "Checking Bitwarden for key: $BW_KEY_NAME"
 if ! bw get item "$BW_KEY_NAME" &>/dev/null; then
-  echo -e "${RED}❌ ERROR: Key '$BW_KEY_NAME' not found in Bitwarden${NC}" >&2
+  echo -e "${RED}⊘ ERROR: Key '$BW_KEY_NAME' not found in Bitwarden${NC}" >&2
   exit 1
 fi
-echo -e "${GREEN}✅ Key found in Bitwarden${NC}"
+echo -e "${GREEN}● Key found in Bitwarden${NC}"
 echo ""
 
 # Backup existing keys
@@ -64,22 +64,22 @@ echo ""
 echo "Deploying private key from Bitwarden..."
 bw get item "$BW_KEY_NAME" | jq -r '.sshKey.privateKey' | sudo tee "$PRIVATE_KEY_PATH" > /dev/null
 sudo chmod 600 "$PRIVATE_KEY_PATH"
-echo -e "${GREEN}✅ Private key deployed with permissions 600${NC}"
+echo -e "${GREEN}● Private key deployed with permissions 600${NC}"
 
 # Deploy public key
 echo "Deploying public key from Bitwarden..."
 bw get item "$BW_KEY_NAME" | jq -r '.sshKey.publicKey' | sudo tee "$PUBLIC_KEY_PATH" > /dev/null
 sudo chmod 644 "$PUBLIC_KEY_PATH"
-echo -e "${GREEN}✅ Public key deployed with permissions 644${NC}"
+echo -e "${GREEN}● Public key deployed with permissions 644${NC}"
 echo ""
 
 # Verify key integrity
 echo "Verifying key integrity..."
 if sudo ssh-keygen -lf "$PUBLIC_KEY_PATH" &>/dev/null; then
-  echo -e "${GREEN}✅ Key integrity verified${NC}"
+  echo -e "${GREEN}● Key integrity verified${NC}"
   sudo ssh-keygen -lf "$PUBLIC_KEY_PATH"
 else
-  echo -e "${RED}❌ ERROR: Key integrity check failed${NC}" >&2
+  echo -e "${RED}⊘ ERROR: Key integrity check failed${NC}" >&2
   echo "Restoring from backup..." >&2
   sudo cp "${PRIVATE_KEY_PATH}.old" "$PRIVATE_KEY_PATH"
   sudo cp "${PUBLIC_KEY_PATH}.old" "$PUBLIC_KEY_PATH"
@@ -92,7 +92,7 @@ echo "Restarting SSH service (if running)..."
 if [ "$OS_TYPE" = "darwin" ]; then
   if sudo launchctl list | grep -q com.openssh.sshd; then
     sudo launchctl kickstart -kp system/com.openssh.sshd
-    echo -e "${GREEN}✅ SSH service restarted (Darwin)${NC}"
+    echo -e "${GREEN}● SSH service restarted (Darwin)${NC}"
   else
     echo -e "${YELLOW}⚠️  SSH service not running (sshd not loaded)${NC}"
     echo -e "${YELLOW}   Host key deployed but SSH server not active${NC}"
@@ -100,7 +100,7 @@ if [ "$OS_TYPE" = "darwin" ]; then
 elif [ "$OS_TYPE" = "nixos" ]; then
   if sudo systemctl is-active --quiet sshd; then
     sudo systemctl restart sshd
-    echo -e "${GREEN}✅ SSH service restarted (NixOS)${NC}"
+    echo -e "${GREEN}● SSH service restarted (NixOS)${NC}"
   else
     echo -e "${YELLOW}⚠️  SSH service not running${NC}"
     echo -e "${YELLOW}   Host key deployed but SSH server not active${NC}"
