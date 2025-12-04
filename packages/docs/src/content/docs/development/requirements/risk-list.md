@@ -8,10 +8,10 @@ This document catalogs migration risks with likelihood, impact, risk factors, an
 
 ## Overview
 
-This document catalogs risks from the migration from nixos-unified to dendritic + clan architecture completed in November 2024 (Epics 1-7).
-Each risk includes original assessment, affected phases, mitigation strategies, and final status.
+This document catalogs risks from the migration from nixos-unified to dendritic + clan architecture completed in November 2024.
+Each risk includes original assessment, migration timeline relevance, mitigation strategies, and final status.
 
-The migration successfully addressed all critical risks through Phase 0 validation, incremental deployment across 8 machines, and comprehensive testing.
+The migration successfully addressed all critical risks through initial validation, incremental deployment across 8 machines, and comprehensive testing.
 These risks are now primarily historical, documenting how challenges were anticipated and mitigated during the architectural transition.
 
 ## R-001: Dendritic + clan integration complexity
@@ -36,14 +36,14 @@ No production examples exist of dendritic flake-parts combined with clan-core, c
 
 **High** - Integration failures could block migration entirely or require significant rework.
 
-### Affected phases
+### Migration timeline relevance
 
-- Phase 0: Validation (primary impact - this phase exists to catch this risk)
+- Initial validation (primary impact - this phase exists to catch this risk)
 - All subsequent phases depend on successful validation
 
 ### Mitigation strategies
 
-**Phase 0 validation environment**:
+**Initial validation environment**:
 - Create test-clan/ workspace isolated from production
 - Validate integration patterns before infrastructure investment
 - Test all expected features (secrets, services, cross-platform modules)
@@ -57,7 +57,7 @@ No production examples exist of dendritic flake-parts combined with clan-core, c
 - Create reference examples for future use
 
 **De-risk before commitment**:
-- Phase 0 has no infrastructure costs
+- Initial validation has no infrastructure costs
 - Can abandon or redesign without losing production capability
 - Preserves ability to stay on nixos-unified if integration fails
 
@@ -68,8 +68,8 @@ No production examples exist of dendritic flake-parts combined with clan-core, c
 
 ### Status
 
-**Mitigated** - Phase 0 validation completed (November 2024).
-Integration patterns validated in test-clan workspace, comprehensive documentation created, and patterns successfully applied across 8-machine production fleet in Epics 1-7.
+**Mitigated** - Initial validation completed (November 2024).
+Integration patterns validated in test-clan workspace, comprehensive documentation created, and patterns successfully applied across 8-machine production fleet.
 
 ### References
 
@@ -99,9 +99,9 @@ Deploying cinnabar VPS introduces ongoing costs and operational responsibilities
 
 **Medium** - Manageable costs and effort, but permanent ongoing commitment.
 
-### Affected phases
+### Migration timeline relevance
 
-- Phase 1: VPS deployment (introduces risk)
+- VPS deployment phase (introduces risk)
 - All subsequent phases depend on VPS stability
 - Long-term operational phase after migration
 
@@ -139,7 +139,7 @@ Deploying cinnabar VPS introduces ongoing costs and operational responsibilities
 ### Status
 
 **Mitigated** - VPS infrastructure deployed and operational (November 2024).
-Cinnabar VPS successfully deployed on Hetzner, zerotier controller operational, costs and management overhead within acceptable bounds as validated in Epics 1-7.
+Cinnabar VPS successfully deployed on Hetzner, zerotier controller operational, costs and management overhead within acceptable bounds.
 
 ### References
 
@@ -170,12 +170,12 @@ Configuration changes during migration could break critical development workflow
 - blackphos, rosegold, argentum: **Medium** (secondary workstations, can tolerate issues)
 - stibnite: **High** (primary workstation, productivity-critical)
 
-### Affected phases
+### Migration timeline relevance
 
-- Phase 2: blackphos (first darwin, highest migration risk)
-- Phase 3: rosegold (validation of pattern reusability)
-- Phase 4: argentum (final validation before primary)
-- Phase 5: stibnite (highest impact if issues occur)
+- Blackphos migration (first darwin, highest migration risk)
+- Rosegold migration (validation of pattern reusability)
+- Argentum migration (final validation before primary)
+- Stibnite migration (highest impact if issues occur)
 
 ### Mitigation strategies
 
@@ -215,7 +215,7 @@ Configuration changes during migration could break critical development workflow
 
 **Mitigated** - All darwin hosts successfully migrated (November 2024).
 Blackphos, rosegold, argentum, and stibnite all migrated to dendritic + clan architecture with minimal workflow disruption.
-Incremental migration strategy and rollback procedures validated across entire fleet in Epics 1-7.
+Incremental migration strategy and rollback procedures validated across entire fleet.
 
 ### References
 
@@ -244,15 +244,15 @@ Migration of stibnite (primary workstation) has highest impact if problems occur
 
 **Critical** - Work disruption could be severe if migration fails or causes instability.
 
-### Affected phases
+### Migration timeline relevance
 
-- Phase 5: stibnite migration (primary risk event)
+- Stibnite migration (primary risk event)
 - Post-migration stability monitoring
 
 ### Mitigation strategies
 
 **Maximum preparation**:
-- Wait until all other hosts migrated successfully (Phases 2-4)
+- Wait until all other hosts migrated successfully
 - Learn from issues encountered on earlier hosts
 - Comprehensive testing on secondary hosts first
 - Full backup before migration
@@ -282,7 +282,7 @@ Migration of stibnite (primary workstation) has highest impact if problems occur
 - Pair with time for recovery (not before critical deliverables)
 
 **Success criteria before attempting**:
-- Phases 2-4 completed successfully
+- All other darwin hosts migrated successfully
 - All hosts stable 1-2 weeks post-migration
 - No unresolved issues from earlier migrations
 - Clear understanding of dendritic + clan patterns
@@ -292,7 +292,7 @@ Migration of stibnite (primary workstation) has highest impact if problems occur
 
 **Mitigated** - Stibnite successfully migrated (November 2024).
 Migration completed as final phase with minimal disruption.
-Prior validation on blackphos, rosegold, and argentum enabled confident migration of primary workstation in Epics 1-7.
+Prior validation on blackphos, rosegold, and argentum enabled confident migration of primary workstation.
 
 ### References
 
@@ -322,10 +322,10 @@ Transitioning from manual sops-nix secrets to declarative clan vars generation c
 
 **High** - Secret exposure is critical security issue; service failures impact functionality.
 
-### Affected phases
+### Migration timeline relevance
 
-- Phase 1: VPS deployment (first clan vars usage)
-- Phase 2-5: Progressive secrets migration during host migrations
+- VPS deployment (first clan vars usage)
+- Progressive secrets migration during host migrations
 - Post-migration: Hybrid sops-nix + clan vars operation
 
 ### Mitigation strategies
@@ -371,7 +371,7 @@ Transitioning from manual sops-nix secrets to declarative clan vars generation c
 **Partially mitigated** - Hybrid approach implemented (November 2024).
 Generated secrets successfully migrated to clan vars across 8-machine fleet.
 External secrets remain in sops-nix as planned.
-Both systems coexist as designed in Epics 1-7.
+Both systems coexist as designed.
 
 ### References
 
@@ -401,23 +401,23 @@ Updates to nixpkgs, dendritic-flake-parts, or clan-core could introduce breaking
 
 **Medium** - Can delay migration or require rework, but not catastrophic.
 
-### Affected phases
+### Migration timeline relevance
 
-- All phases (ongoing risk)
-- Particularly Phase 0 (validation against current versions)
+- Ongoing risk throughout migration
+- Particularly relevant during initial validation (validation against current versions)
 - Risk increases with migration duration
 
 ### Mitigation strategies
 
 **Input locking discipline**:
-- Lock all inputs at Phase 0 start
+- Lock all inputs at migration start
 - Only update inputs intentionally
 - Document reason for each update
 - Test thoroughly after updates
 
 **Conservative update policy**:
-- Don't update inputs during active migration phase
-- Update between phases only
+- Don't update inputs during active migration work
+- Update between major milestones only
 - Read changelogs before updating
 - Test in validation environment before production
 
@@ -454,7 +454,7 @@ Updates to nixpkgs, dendritic-flake-parts, or clan-core could introduce breaking
 - [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Multi-channel resilience
 - [System constraints](/development/requirements/system-constraints/) - SC-003: Input locking
 
-## R-007: Phase 0 validation revealing architectural incompatibility
+## R-007: Initial validation revealing architectural incompatibility
 
 ### Description
 
@@ -476,14 +476,14 @@ Test-clan validation could uncover fundamental incompatibilities requiring archi
 
 **Very High** - Could force complete architecture redesign or migration abandonment.
 
-### Affected phases
+### Migration timeline relevance
 
-- Phase 0: Validation (discovery phase)
-- If discovered: all subsequent phases blocked pending redesign
+- Initial validation (discovery phase)
+- If discovered: all subsequent work blocked pending redesign
 
 ### Mitigation strategies
 
-**Purpose of Phase 0**:
+**Purpose of initial validation**:
 - Exists specifically to catch this risk
 - Isolated validation before infrastructure investment
 - No production impact if issues found
@@ -517,9 +517,9 @@ Test-clan validation could uncover fundamental incompatibilities requiring archi
 
 ### Status
 
-**Mitigated** - Phase 0 validation confirmed compatibility (November 2024).
+**Mitigated** - Initial validation confirmed compatibility (November 2024).
 No fundamental incompatibilities discovered.
-Dendritic + clan integration successful across 8-machine production deployment in Epics 1-7.
+Dendritic + clan integration successful across 8-machine production deployment.
 
 ### References
 
@@ -548,10 +548,10 @@ Overlay network dependency introduces new failure modes: controller outages, pee
 
 **Low-Medium** - Degrades multi-host coordination but doesn't break individual hosts.
 
-### Affected phases
+### Migration timeline relevance
 
-- Phase 1: VPS deployment (controller setup)
-- Phase 2-5: Peer additions during host migrations
+- VPS deployment (controller setup)
+- Peer additions during host migrations
 - Post-migration: Ongoing operational risk
 
 ### Mitigation strategies
@@ -596,7 +596,7 @@ Overlay network dependency introduces new failure modes: controller outages, pee
 
 **Mitigated** - Zerotier network deployed and operational (November 2024).
 Cinnabar controller stable, all 8 machines connected via overlay network.
-NAT traversal functioning, connectivity reliable across fleet in Epics 1-7.
+NAT traversal functioning, connectivity reliable across fleet.
 
 ### References
 
@@ -625,10 +625,10 @@ Service instances spanning multiple hosts could have inconsistent configuration 
 
 **Medium** - Service malfunction but individual hosts remain operational.
 
-### Affected phases
+### Migration timeline relevance
 
-- Phase 1: VPS deployment (first multi-host service - zerotier)
-- Phases 2-5: Additional hosts joining services
+- VPS deployment (first multi-host service - zerotier)
+- Additional hosts joining services
 - Post-migration: Ongoing coordination
 
 ### Mitigation strategies
@@ -673,7 +673,7 @@ Service instances spanning multiple hosts could have inconsistent configuration 
 
 **Mitigated** - Multi-host services deployed successfully (November 2024).
 Zerotier and other multi-host services operational across 8-machine fleet.
-Deployment coordination and role-based configuration validated in Epics 1-7.
+Deployment coordination and role-based configuration validated.
 
 ### References
 
@@ -702,16 +702,16 @@ Mastering new patterns requires time investment and could lead to suboptimal ear
 
 **Low-Medium** - Time investment and potential rework, but not blocking.
 
-### Affected phases
+### Migration timeline relevance
 
-- Phase 0: Validation (steepest learning)
-- All phases: Ongoing learning and refinement
+- Initial validation (steepest learning)
+- Ongoing learning and refinement throughout migration
 - Post-migration: Consolidation and optimization
 
 ### Mitigation strategies
 
 **Structured learning**:
-- Phase 0 dedicated to experimentation
+- Initial validation dedicated to experimentation
 - Document learnings immediately
 - Create reference examples
 - Build pattern library
@@ -736,7 +736,7 @@ Mastering new patterns requires time investment and could lead to suboptimal ear
 
 **Time allocation**:
 - Budget learning time in migration schedule
-- Don't rush early phases
+- Don't rush early work
 - Allow experimentation time
 - Patience with learning process
 
@@ -749,7 +749,7 @@ Mastering new patterns requires time investment and could lead to suboptimal ear
 ### Status
 
 **Mitigated** - Learning curve successfully navigated (November 2024).
-Dendritic + clan patterns mastered through Epics 1-7.
+Dendritic + clan patterns mastered through migration.
 Comprehensive documentation created, patterns validated across 8-machine production deployment.
 
 ### References
@@ -759,27 +759,27 @@ Comprehensive documentation created, patterns validated across 8-machine product
 
 ## Risk summary matrix
 
-| Risk | Likelihood | Impact | Phase | Priority | Status (Nov 2024) |
-|------|-----------|--------|-------|----------|-------------------|
-| R-001: Integration complexity | Medium | High | P0 | Critical | **Mitigated** |
-| R-002: VPS costs | High | Medium | P1 | Medium | **Mitigated** |
-| R-003: Workflow breakage | High | Variable | P2-5 | High | **Mitigated** |
-| R-004: Stibnite migration | Medium | Critical | P5 | Critical | **Mitigated** |
-| R-005: Secrets migration | Medium | High | P1-5 | High | **Partially mitigated** |
-| R-006: Dependency breakage | High | Medium | All | Medium | **Ongoing** |
-| R-007: Architecture incompatibility | Low-Medium | Very High | P0 | Critical | **Mitigated** |
-| R-008: Network issues | Medium | Low-Medium | P1+ | Low | **Mitigated** |
-| R-009: Multi-host sync | Low-Medium | Medium | P1+ | Low | **Mitigated** |
-| R-010: Learning curve | High | Low-Medium | All | Low | **Mitigated** |
+| Risk | Likelihood | Impact | Timeline Relevance | Priority | Status (Nov 2024) |
+|------|-----------|--------|-------------------|----------|-------------------|
+| R-001: Integration complexity | Medium | High | Initial validation | Critical | **Mitigated** |
+| R-002: VPS costs | High | Medium | VPS deployment | Medium | **Mitigated** |
+| R-003: Workflow breakage | High | Variable | Darwin migrations | High | **Mitigated** |
+| R-004: Stibnite migration | Medium | Critical | Stibnite migration | Critical | **Mitigated** |
+| R-005: Secrets migration | Medium | High | Progressive | High | **Partially mitigated** |
+| R-006: Dependency breakage | High | Medium | Ongoing | Medium | **Ongoing** |
+| R-007: Architecture incompatibility | Low-Medium | Very High | Initial validation | Critical | **Mitigated** |
+| R-008: Network issues | Medium | Low-Medium | VPS + migrations | Low | **Mitigated** |
+| R-009: Multi-host sync | Low-Medium | Medium | VPS + migrations | Low | **Mitigated** |
+| R-010: Learning curve | High | Low-Medium | Ongoing | Low | **Mitigated** |
 
 ## Risk response strategy
 
-### Historical risks (successfully mitigated in Epics 1-7, November 2024)
+### Historical risks (successfully mitigated, November 2024)
 
-- **R-001**: Integration complexity mitigated through Phase 0 validation in test-clan
+- **R-001**: Integration complexity mitigated through initial validation in test-clan
 - **R-002**: VPS costs managed, cinnabar operational with minimal overhead
 - **R-003**: Workflow preservation achieved across all 4 darwin hosts
-- **R-004**: Stibnite migration successful as final phase
+- **R-004**: Stibnite migration successful as final host
 - **R-005**: Hybrid secrets approach implemented (generated→clan vars, external→sops-nix)
 - **R-007**: Architecture compatibility confirmed, no fundamental issues found
 - **R-008**: Zerotier network stable across 8-machine fleet
