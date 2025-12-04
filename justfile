@@ -56,12 +56,11 @@ activate-home username *FLAGS:
     @echo "Activating home-manager configuration for {{username}}..."
     nix run --accept-flake-config .#home -- {{username}} . {{FLAGS}}
 
-# Print nix flake inputs, outputs, and omnix info
+# Print nix flake inputs and outputs
 [group('nix')]
 flake-info:
   nix flake metadata
   nix flake show --legacy --all-systems
-  om show .
 
 # Lint nix files
 [group('nix')]
@@ -808,7 +807,7 @@ ci-logs-failed workflow="ci.yaml":
 ci-show-outputs system="":
     @./scripts/ci/ci-show-outputs.sh "{{system}}"
 
-# Build all flake outputs locally with nom (inefficient manual version of om ci for debugging builds)
+# Build all flake outputs locally with nom (for debugging builds)
 [group('CI/CD')]
 ci-build-local category="" system="":
     @./scripts/ci/ci-build-local.sh "{{category}}" "{{system}}"
@@ -1246,18 +1245,69 @@ cache-ci-outputs system="":
     echo "Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo ""
     echo "This will:"
-    echo "  1. Build all flake outputs for $TARGET_SYSTEM via 'om ci run'"
-    echo "  2. Include all build dependencies (--include-all-dependencies)"
-    echo "  3. Stream output to console while pushing to cachix"
+    echo "  1. Build all flake outputs for $TARGET_SYSTEM"
+    echo "  2. Push all build outputs and dependencies to cachix"
     echo ""
     echo "Starting build + push (this may take 10-30 minutes)..."
     echo ""
 
-    # Run om ci with dependency tracking, show output, and push to cachix
-    # This matches the CI workflow for darwin builds (line 464 in ci.yaml)
-    om ci run --systems "$TARGET_SYSTEM" --include-all-dependencies 2>&1 | \
-        tee /dev/tty | \
-        sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
+    # Phase 1: Build everything with nom for nice output
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Phase 1: Building all outputs"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    ./scripts/ci/ci-build-local.sh "" "$TARGET_SYSTEM"
+
+    # Phase 2: Collect store paths and push to cachix
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Phase 2: Pushing to cachix"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # Collect all store paths from built outputs
+    STORE_PATHS=""
+
+    # Packages
+    for pkg in $(nix eval ".#packages.$TARGET_SYSTEM" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+        path=$(nix build ".#packages.$TARGET_SYSTEM.$pkg" --no-link --print-out-paths 2>/dev/null || true)
+        [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
+    done
+
+    # DevShells
+    for shell in $(nix eval ".#devShells.$TARGET_SYSTEM" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+        path=$(nix build ".#devShells.$TARGET_SYSTEM.$shell" --no-link --print-out-paths 2>/dev/null || true)
+        [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
+    done
+
+    # Checks
+    for check in $(nix eval ".#checks.$TARGET_SYSTEM" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+        path=$(nix build ".#checks.$TARGET_SYSTEM.$check" --no-link --print-out-paths 2>/dev/null || true)
+        [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
+    done
+
+    # Darwin configurations (only on darwin)
+    if [[ "$TARGET_SYSTEM" == *-darwin ]]; then
+        for cfg in $(nix eval ".#darwinConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+            path=$(nix build ".#darwinConfigurations.$cfg.system" --no-link --print-out-paths 2>/dev/null || true)
+            [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
+        done
+    fi
+
+    # NixOS configurations (only on linux)
+    if [[ "$TARGET_SYSTEM" == *-linux ]]; then
+        for cfg in $(nix eval ".#nixosConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+            path=$(nix build ".#nixosConfigurations.$cfg.config.system.build.toplevel" --no-link --print-out-paths 2>/dev/null || true)
+            [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
+        done
+    fi
+
+    # Push all paths to cachix
+    if [ -n "$STORE_PATHS" ]; then
+        echo "Pushing $(echo $STORE_PATHS | wc -w | tr -d ' ') store paths to cachix..."
+        echo $STORE_PATHS | tr ' ' '\n' | grep -v '^$' | \
+            sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
+    else
+        echo "No store paths to push"
+    fi
 
     echo ""
     echo "✅ Successfully built and cached all CI outputs for $TARGET_SYSTEM"
