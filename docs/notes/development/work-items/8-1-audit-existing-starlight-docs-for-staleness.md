@@ -127,7 +127,7 @@ The documentation site uses Astro Starlight and is located at `packages/docs/src
 |------|------------|
 | `guides/host-onboarding.md` | References `configurations/` directory, missing clan patterns |
 | `guides/secrets-management.md` | Old 3-tier Bitwarden pattern, not two-tier clan vars + sops-nix |
-| `concepts/nix-config-architecture.md` | References nixos-unified, missing dendritic + clan |
+| `concepts/architecture-overview.md` | References nixos-unified, missing dendritic + clan |
 
 ### Current Architecture (Reference for Comparison)
 
@@ -256,7 +256,7 @@ Comprehensive audit of 59 Starlight documentation files completed. Key findings:
 3. Bitwarden/3-tier secrets pattern (14 occurrences)
 
 **Critical Path Items:**
-1. `concepts/nix-config-architecture.md` - Foundation for all docs
+1. `concepts/architecture-overview.md` - Foundation for all docs
 2. `reference/repository-structure.md` - Core directory reference
 3. `index.mdx` - Landing page with wrong tagline
 4. `guides/host-onboarding.md` - Main operational guide
