@@ -174,7 +174,8 @@ While deploy-rs is simpler than clan-core in some ways, that simplicity comes fr
 Morph was eliminated primarily due to its lack of darwin support - with 4 darwin laptops in the fleet, requiring a separate deployment mechanism for half the machines would fragment the operational model.
 Beyond the cross-platform issue, morph doesn't provide the inventory abstraction that this fleet needs for service coordination.
 The project also sees less active development compared to clan-core, and while that doesn't automatically disqualify a tool, it matters when you need ecosystem support for integration with newer tools like dendritic flake-parts patterns.
-The smaller community means fewer examples of morph integration with the architectural patterns this infrastructure uses.
+Unlike the clan ecosystem with documented production deployments (clan-infra coordinating multiple Hetzner VPS, qubasa's dotfiles managing personal infrastructure, mic92's multi-machine research environment, pinpox's homelab setup), morph lacks examples of darwin + nixos fleet coordination that this infrastructure requires.
+The clan examples demonstrate proven patterns for exactly this use case - heterogeneous fleets with cross-platform coordination - while morph examples focus primarily on homogeneous NixOS deployments.
 
 ### Manual coordination
 
@@ -219,42 +220,46 @@ The clan machine registry consumes the same namespace exports (`flake.modules.da
 
 ### Negative
 
-darwin support requires workarounds:
-clan-core zerotier module is NixOS-specific (systemd dependencies).
-Darwin machines use homebrew + activation script pattern.
-Documented workaround (101-line module) but not native.
+Darwin support requires workarounds because clan-core's zerotier module assumes systemd, which doesn't exist on darwin platforms.
+The 4 darwin laptops in this fleet (stibnite, blackphos, rosegold, argentum) cannot use clan's native zerotier module and instead rely on a custom 101-line workaround that combines homebrew package installation with activation scripts to start the zerotier daemon.
+This workaround functions reliably in practice - all darwin machines maintain stable zerotier connections - but it represents platform-specific complexity that wouldn't exist if clan-core provided darwin-native modules.
+More problematically, the workaround requires maintenance when clan updates its zerotier abstractions, and contributors working on darwin configurations must understand both the standard clan patterns and the darwin-specific deviations.
 
-Learning curve for clan concepts:
-Inventory, vars, generators are new abstractions.
-Documentation improving but not as comprehensive as NixOS.
-Contributors need to understand clan patterns.
+The clan-core abstractions (inventory, vars, generators) impose a learning curve that compounds the flake-parts learning investment required by the dendritic pattern.
+Contributors must understand how the inventory system maps services to machines (`roles.controller.machines."cinnabar"`), how vars generators create secrets from templates, and how the two-tier secrets architecture divides responsibilities between clan vars (machine identities) and sops-nix (user credentials).
+While clan documentation has improved substantially during 2024, it remains less comprehensive than NixOS module documentation - many patterns are documented primarily through example configurations rather than thorough conceptual guides.
+This means new contributors face a steeper ramp-up period before they can confidently modify clan configurations or add new machines to the inventory.
 
-Vars encryption tied to age keys:
-Vars system uses age encryption.
-Key management required (same keys as sops-nix).
-Lost keys require secret regeneration.
+Vars encryption ties secret lifecycle to age key management, which introduces operational risk if keys are lost or compromised.
+The vars system encrypts all generated secrets using age keys that are stored in `vars/` and must be carefully backed up.
+These are the same age keys used by sops-nix for user-level secrets, which provides consistency but also means a single key management failure affects both tiers of the secrets architecture.
+If age keys are lost, all vars-managed secrets must be regenerated, which for this fleet means recreating SSH host keys (breaking known_hosts), regenerating zerotier network identities (breaking VPN connectivity), and potentially recreating LUKS/ZFS passphrases (preventing disk access).
+The vars system provides no key recovery mechanism - the encryption is designed to be unbreakable, which is exactly what makes key loss catastrophic.
 
-Deployment requires network access:
-`clan machines update` requires SSH to target.
-No offline deployment capability.
-VPN (zerotier) must be operational for remote machines.
+Deployment requires network access to target machines, which creates operational dependencies that can block urgent updates.
+Running `clan machines update cinnabar` requires SSH connectivity to cinnabar, and if the zerotier VPN is down or the target machine is unreachable, deployment cannot proceed.
+This contrasts with alternative deployment models where configurations could be prepared offline and applied later when connectivity is restored.
+For this fleet's remote VPS infrastructure (cinnabar and electrum on Hetzner, galena and scheelite on GCP), the zerotier network must be operational to reach machines, which creates a bootstrapping challenge - if zerotier configuration breaks, deploying the fix requires zerotier to be working.
+The solution requires maintaining out-of-band SSH access through cloud provider consoles, but this represents an additional operational burden and potential failure mode.
 
 ### Neutral
 
-Terranix still handles infrastructure:
-Clan deploys to VMs, doesn't create them.
-Terranix/terraform provisioning unchanged.
-Clear separation of concerns.
+Terranix continues to handle cloud infrastructure provisioning, operating at a layer below clan's orchestration concerns.
+Clan deploys configurations to VMs but doesn't create those VMs - terranix/terraform handles the infrastructure provisioning (Hetzner VPS creation, GCP instance configuration, network setup), and clan treats the resulting machines as deployment targets.
+This separation of concerns is architecturally clean - terranix answers "what infrastructure exists" while clan answers "what configuration does each machine run."
+The boundary is well-defined and creates no impedance mismatch - terranix creates machines and outputs their SSH connection details, clan consumes those details to deploy configurations.
+However, this does mean contributors need to understand both systems and their interaction, as adding a new machine requires terranix changes (create the infrastructure) followed by clan changes (add to inventory and deploy configuration).
 
-Home-manager unchanged:
-Home-manager configurations defined in dendritic modules.
-Clan deploys full system config including home-manager.
-No home-manager-specific clan integration.
+Home-manager configurations remain unchanged in their definition and authoring - they're still standard home-manager modules defined in the dendritic module structure.
+Clan's role is purely deployment - it imports and deploys the full system configuration including home-manager, but provides no home-manager-specific abstractions or integration beyond that.
+User environment configuration continues to be written using standard home-manager patterns, and clan simply ensures those configurations are activated on the appropriate machines.
+This means home-manager expertise remains directly applicable - contributors don't need to learn clan-specific approaches to home-manager configuration, they just write normal home-manager modules in the dendritic structure and clan handles the deployment mechanics.
 
-NixOS modules unchanged:
-System configuration still uses standard NixOS modules.
-Clan imports and deploys configs.
-Module authoring skills transfer directly.
+NixOS modules similarly remain standard NixOS modules in their implementation, with clan providing deployment orchestration rather than configuration abstraction.
+System configuration continues to use the NixOS module system with its familiar option declarations, configuration merging, and module composition patterns.
+Clan imports these modules (via the dendritic namespace exports) and deploys the resulting configurations, but the modules themselves are written using pure NixOS module patterns.
+This architectural separation means NixOS module authoring skills transfer directly - a contributor who understands NixOS modules can immediately work on this infrastructure's system configurations without learning clan-specific configuration patterns.
+Clan's contribution is the inventory abstraction for coordinating which machines receive which modules, not in how those modules are written.
 
 ## Validation evidence
 
