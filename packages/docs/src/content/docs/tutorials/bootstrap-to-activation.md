@@ -59,7 +59,7 @@ This infrastructure combines four complementary technologies:
 You don't need to understand all of this deeply right now.
 The key insight is that your machine configuration is just one piece of a larger, well-organized system.
 
-For deeper understanding, see [Nix Configuration Architecture](/concepts/nix-config-architecture).
+For deeper understanding, see [Architecture overview](/concepts/architecture-overview).
 
 ### Dendritic organization
 
