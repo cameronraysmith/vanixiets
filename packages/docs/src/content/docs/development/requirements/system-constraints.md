@@ -565,13 +565,13 @@ nix-store --query --tree $(nix eval --raw .#darwinConfigurations.<hostname>.conf
 
 ### Phased migration execution (completed November 2024)
 
-**Historical constraint**: Migration proceeded host-by-host with stability validation through Epics 1-7
+**Historical constraint**: Migration proceeded host-by-host with stability validation
 
 **Completed phases**:
-0. Validation in test-clan environment (Epic 1)
-1. VPS foundation deployment - cinnabar, electrum, galena, scheelite (Epics 2-3)
-2-5. Darwin host migrations - stibnite, blackphos, rosegold, argentum (Epics 4-7)
-6. Architecture cleanup - nixos-unified deprecated (Epic 7)
+0. Validation in test-clan environment
+1. VPS foundation deployment - cinnabar, electrum, galena, scheelite
+2-5. Darwin host migrations - stibnite, blackphos, rosegold, argentum
+6. Architecture cleanup - nixos-unified deprecated
 
 **Risk mitigation approach**:
 - Each host stabilized 1-2 weeks before next migration
