@@ -46,7 +46,7 @@ echo ""
 
 # Helper function
 check_pass() {
-  echo -e "${GREEN}✅ $1${NC}"
+  echo -e "${GREEN}● $1${NC}"
 }
 
 # Get SSH private key from Bitwarden and convert to age private key
@@ -56,7 +56,7 @@ get_age_private_key() {
   local age_private
 
   if ! bw get item "$bw_name" &>/dev/null; then
-    echo -e "${RED}❌ ERROR: Key '$bw_name' not found in Bitwarden${NC}" >&2
+    echo -e "${RED}⊘ ERROR: Key '$bw_name' not found in Bitwarden${NC}" >&2
     return 1
   fi
 
@@ -65,7 +65,7 @@ get_age_private_key() {
 
   # Validate format
   if [[ ! $age_private =~ ^AGE-SECRET-KEY-[0-9A-Z]+$ ]]; then
-    echo -e "${RED}❌ ERROR: Invalid age private key format${NC}" >&2
+    echo -e "${RED}⊘ ERROR: Invalid age private key format${NC}" >&2
     return 1
   fi
 
@@ -79,7 +79,7 @@ get_age_public_key() {
   local age_pub
 
   if ! bw get item "$bw_name" &>/dev/null; then
-    echo -e "${RED}❌ ERROR: Key '$bw_name' not found in Bitwarden${NC}" >&2
+    echo -e "${RED}⊘ ERROR: Key '$bw_name' not found in Bitwarden${NC}" >&2
     return 1
   fi
 
@@ -88,7 +88,7 @@ get_age_public_key() {
 
   # Validate format
   if [[ ! $age_pub =~ ^age1[a-z0-9]{58}$ ]]; then
-    echo -e "${RED}❌ ERROR: Invalid age public key format${NC}" >&2
+    echo -e "${RED}⊘ ERROR: Invalid age public key format${NC}" >&2
     return 1
   fi
 
@@ -169,7 +169,7 @@ case "$CURRENT_HOST" in
       echo ""
       echo -e "${YELLOW}Deploying host key to /etc/ssh/...${NC}"
       if ! $(dirname "$0")/deploy-host-key.sh "$CURRENT_HOST"; then
-        echo -e "${RED}❌ Host key deployment failed${NC}" >&2
+        echo -e "${RED}⊘ Host key deployment failed${NC}" >&2
         exit 1
       fi
     fi
@@ -180,7 +180,7 @@ case "$CURRENT_HOST" in
 esac
 
 echo ""
-echo -e "${GREEN}✅ Age keys synchronization complete${NC}"
+echo -e "${GREEN}● Age keys synchronization complete${NC}"
 echo ""
 echo "Keys file: $AGE_KEYS_FILE"
 echo "Keys added:"
