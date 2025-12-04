@@ -155,7 +155,7 @@ if [ ${#FAILED[@]} -gt 0 ]; then
     log ""
     exit 1
 else
-    log "🎉 All categories tested successfully!"
+    log "★ All categories tested successfully!"
     log ""
     log "Next steps:"
     log "  1. Verify cachix: https://app.cachix.org/cache/$CACHE_NAME"
