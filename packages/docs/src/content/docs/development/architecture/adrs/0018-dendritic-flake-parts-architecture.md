@@ -245,9 +245,9 @@ This is less immediately intuitive than nixos-unified's "file at path X creates 
 However, the explicit imports make debugging straightforward once the pattern is understood - reading a machine configuration shows exactly which aggregates it imports, and reading those aggregates shows which modules contribute.
 The trade-off is initial complexity for long-term maintainability, which becomes favorable as the configuration scales beyond a handful of machines.
 
-Converting from nixos-unified required restructuring all configurations, which consumed substantial engineering effort during Epic 2 (November 2024).
+Converting from nixos-unified required restructuring all configurations, which consumed substantial engineering effort during the production migration (November 2024).
 The migration involved moving approximately 83 modules from host-centric organization to aspect-based organization, reorganizing imports to use namespace exports, and validating that every module continued to function correctly after the transition.
-This ~40 hours of migration work was necessary because the two architectures organize configuration fundamentally differently - nixos-unified's implicit autowiring cannot be mechanically transformed into dendritic's explicit namespace exports.
+This migration work was necessary because the two architectures organize configuration fundamentally differently - nixos-unified's implicit autowiring cannot be mechanically transformed into dendritic's explicit namespace exports.
 The investment pays dividends in ongoing maintenance burden reduction, but it represents real upfront cost that delayed other development work.
 
 Namespace discipline failures create silent build failures that can be difficult to diagnose without understanding the auto-merging mechanism.
@@ -276,30 +276,29 @@ The scattered ecosystem documentation remains valuable for seeing how different 
 
 ## Validation evidence
 
-### Epic 1 (November 2024)
+### Initial validation (November 2024)
 
 Pattern validated in test-clan repository before production migration:
 
-- Story 1.1-1.2: Initial dendritic structure established
-- Story 1.6: Test harness with 18 tests validating auto-discovery
-- Story 1.7: Pure dendritic pattern achieved with zero regressions
-- Stories 1.8-1.10: Cross-platform modules validated (darwin + nixos)
-- Story 1.12: Physical deployment successful (blackphos darwin laptop)
+- Initial dendritic structure established
+- Test harness with 18 tests validating auto-discovery
+- Pure dendritic pattern achieved with zero regressions
+- Cross-platform modules validated (darwin + nixos)
+- Physical deployment successful (blackphos darwin laptop)
 
-Metrics:
+Validation metrics:
 - 83 auto-discovered modules
 - 23-line minimal flake.nix
 - 270 packages preserved across migration (zero regression)
-- All 7 patterns rated HIGH confidence in GO/NO-GO decision
 
-### Epic 2 (November 2024)
+### Production migration (November 2024)
 
 Production migration to infra repository:
 
-- Stories 2.1-2.3: Wholesale migration from test-clan patterns
-- Stories 2.5-2.7: Darwin workstations (stibnite, blackphos) operational
-- Stories 2.9-2.10: NixOS VPS (cinnabar, electrum) operational
-- Stories 2.13-2.14: New machines (rosegold, argentum) created using patterns
+- Wholesale migration from test-clan patterns
+- Darwin workstations (stibnite, blackphos) operational
+- NixOS VPS (cinnabar, electrum) operational
+- New machines (rosegold, argentum) created using patterns
 
 Result: 8-machine fleet fully operational under dendritic architecture.
 
@@ -311,7 +310,6 @@ Result: 8-machine fleet fully operational under dendritic architecture.
 - [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 - [ADR-0020: Dendritic + Clan integration](0020-dendritic-clan-integration/)
-- Epic 1 GO/NO-GO decision: `docs/notes/development/go-no-go-decision.md`
 
 ### External
 
