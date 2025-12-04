@@ -107,7 +107,7 @@ should_build_config() {
 get_category_emoji() {
     case "$1" in
         packages) echo "📦" ;;
-        checks) echo "✅" ;;
+        checks) echo "●" ;;
         devshells) echo "🐚" ;;
         nixos) echo "🐧" ;;
         darwin) echo "🍎" ;;
@@ -163,7 +163,7 @@ build_category_simple() {
     done
 
     echo ""
-    echo "✅ Done building $(get_category_display "$category")"
+    echo "● Done building $(get_category_display "$category")"
 }
 
 build_all_categories() {
@@ -272,10 +272,10 @@ build_all_categories() {
                     build_path=$(get_build_path "$category" "$item" "$target_system")
 
                     if nom build "$build_path" --print-build-logs 2>&1; then
-                        echo "    ✅ Success"
+                        echo "    ● Success"
                         echo "$category.$item" >> "$build_log"
                     else
-                        echo "    ❌ Failed"
+                        echo "    ⊘ Failed"
                         echo "$category.$item" >> "$failed_log"
                     fi
                 fi
@@ -300,13 +300,13 @@ build_all_categories() {
     echo ""
 
     if [ "$built_count" -gt 0 ]; then
-        echo "✅ Successfully built:"
+        echo "● Successfully built:"
         sed 's/^/   • /' < "$build_log"
         echo ""
     fi
 
     if [ "$failed_count" -gt 0 ]; then
-        echo "❌ Failed builds:"
+        echo "⊘ Failed builds:"
         sed 's/^/   • /' < "$failed_log"
         echo ""
         echo "💡 Tip: Rebuild individually with:"
@@ -318,11 +318,11 @@ build_all_categories() {
 
     if [ "$failed_count" -gt 0 ]; then
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "❌ Build completed with failures"
+        echo "⊘ Build completed with failures"
         exit 1
     else
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "✅ All outputs built successfully!"
+        echo "● All outputs built successfully!"
         echo ""
         echo "🎉 All flake outputs built successfully for $target_system"
         echo ""
@@ -341,7 +341,7 @@ TARGET_SYSTEM=$(get_target_system "$SYSTEM")
 
 # Check for nom
 if ! command -v nom &> /dev/null; then
-    echo "❌ Error: 'nom' not found in PATH"
+    echo "⊘ Error: 'nom' not found in PATH"
     echo "   Install with: nix profile install nixpkgs#nix-output-monitor"
     exit 1
 fi
@@ -353,7 +353,7 @@ if [ -n "$CATEGORY" ]; then
             build_category_simple "$CATEGORY" "$TARGET_SYSTEM"
             ;;
         *)
-            echo "❌ Unknown category: $CATEGORY"
+            echo "⊘ Unknown category: $CATEGORY"
             echo "Valid categories: packages, checks, devshells, nixos, darwin, home"
             exit 1
             ;;
