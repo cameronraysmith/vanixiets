@@ -238,28 +238,28 @@ gh run view --web
 The workflow executes these jobs with intelligent per-job caching (jobs skip if already succeeded for this commit):
 
 **Core jobs (always run on PR/push):**
-1. ✅ **secrets-scan**: Gitleaks secret scanning (security critical, no caching)
-2. ✅ **set-variables**: Configure workflow variables (produces outputs, always runs)
+1. ● **secrets-scan**: Gitleaks secret scanning (security critical, no caching)
+2. ● **set-variables**: Configure workflow variables (produces outputs, always runs)
 
 **Preview jobs (PR only, fast feedback):**
-3. ✅ **preview-release-version**: Show what version would be released
-4. ✅ **preview-docs-deploy**: Deploy docs to branch-specific preview URL
+3. ● **preview-release-version**: Show what version would be released
+4. ● **preview-docs-deploy**: Deploy docs to branch-specific preview URL
 
 **Validation jobs (run based on file changes):**
-5. ✅ **bootstrap-verification**: Validate Makefile bootstrap workflow
-6. ✅ **config-validation**: Test config.nix user definitions
-7. ✅ **autowiring-validation**: Verify nixos-unified autowiring
-8. ✅ **secrets-workflow**: Test sops-nix mechanics
-9. ✅ **justfile-activation**: Validate justfile recipes
+5. ● **bootstrap-verification**: Validate Makefile bootstrap workflow
+6. ● **config-validation**: Test config.nix user definitions
+7. ● **autowiring-validation**: Verify nixos-unified autowiring
+8. ● **secrets-workflow**: Test sops-nix mechanics
+9. ● **justfile-activation**: Validate justfile recipes
 
 **Build jobs (run based on file changes, with matrix):**
-10. ✅ **cache-overlay-packages**: Pre-cache overlay packages (per system)
-11. ✅ **nix**: Build all flake outputs (per category/system)
-12. ✅ **typescript**: Test TypeScript packages (per package)
+10. ● **cache-overlay-packages**: Pre-cache overlay packages (per system)
+11. ● **nix**: Build all flake outputs (per category/system)
+12. ● **typescript**: Test TypeScript packages (per package)
 
 **Production jobs (main/beta only):**
-13. ✅ **production-release-packages**: Release packages to production
-14. ✅ **production-docs-deploy**: Deploy documentation to production
+13. ● **production-release-packages**: Release packages to production
+14. ● **production-docs-deploy**: Deploy documentation to production
 
 Jobs use path-based filtering to skip when irrelevant files change (e.g., nix jobs skip on markdown-only changes).
 Each job queries GitHub Checks API to skip if it already succeeded for the current commit SHA.
