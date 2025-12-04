@@ -1,6 +1,6 @@
 ---
 title: Getting started
-description: Quick start guide for bootstrapping and using this nix-config
+description: Quick start guide for bootstrapping and using this configuration
 sidebar:
   order: 2
 ---
