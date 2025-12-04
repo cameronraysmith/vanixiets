@@ -42,7 +42,7 @@ All original functionality maintained while gaining enhanced modularity, type sa
 - `modules/{darwin,nixos,home}/` modular configurations (dendritic pattern)
 - `machines/` clan inventory system with host configurations
 - `secrets/` clan vars with declarative secret generation
-- `overlays/`, `packages/` custom package definitions and multi-channel resilience
+- `overlays/`, `packages/` custom package definitions and multi-channel fallback
 
 **Current hosts** (8-machine fleet):
 
@@ -90,7 +90,7 @@ NixOS VPS hosts (x86_64-linux):
 - `configurations/{darwin,home,nixos}/` host-specific configurations via nixos-unified autowire
 - `modules/{darwin,home,nixos}/` modular system and home-manager configurations
 - `secrets/` sops-nix with age encryption for secret management
-- `overlays/`, `packages/` custom package definitions and multi-channel resilience
+- `overlays/`, `packages/` custom package definitions and multi-channel fallback
 
 **Historical hosts** (pre-migration, 4 darwin machines only):
 - `stibnite` (darwin, aarch64) primary daily workstation
