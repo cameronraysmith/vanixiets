@@ -30,7 +30,7 @@ get_age_key() {
 
   # Validate format
   if [[ ! $age_pub =~ ^age1[a-z0-9]{58}$ ]]; then
-    echo -e "${RED}❌ ERROR: Invalid age key format for $bw_name: $age_pub${NC}" >&2
+    echo -e "${RED}⊘ ERROR: Invalid age key format for $bw_name: $age_pub${NC}" >&2
     exit 1
   fi
 
@@ -152,7 +152,7 @@ creation_rules:
         - *orb-nixos
 EOF
 
-echo -e "${GREEN}✅ .sops.yaml updated successfully${NC}"
+echo -e "${GREEN}● .sops.yaml updated successfully${NC}"
 echo ""
 echo "Summary:"
 echo "  - 8 keys total (2 repo + 1 admin + 2 user + 3 host)"
