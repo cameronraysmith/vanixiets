@@ -761,7 +761,7 @@ def send_password_reset(email: VerifiedEmail) -> None:
     send_email(email.email, "Password reset...")
 
 # Type error if try to pass UnverifiedEmail:
-# send_password_reset(unverified_email)  # ❌ Type error!
+# send_password_reset(unverified_email)  # ⊘ Type error!
 ```
 
 ### Pattern: Document approval workflow
@@ -917,7 +917,7 @@ class Order(BaseModel):
     customer: Customer  # Order depends on Customer
 
 class Customer(BaseModel):
-    orders: list[Order]  # Customer depends on Order ❌
+    orders: list[Order]  # Customer depends on Order ⊘
 ```
 
 **Fix**: Use IDs for references across aggregates
