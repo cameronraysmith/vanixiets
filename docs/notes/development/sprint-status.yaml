@@ -674,7 +674,7 @@ development_status:
     Stories 9.0a and 9.0b added from Epic 8 retrospective findings.
   story-9-0a: done
   story-9-0a-title: "Update stale migration guides for dendritic architecture"
-  story-9-0b: backlog
+  story-9-0b: done
   story-9-0b-title: "Clean up migration artifacts and migrate essential content"
   story-9-1: backlog
   story-9-1-title: "Create bookmark tags at branch boundaries (docs, clan, clan-01)"
