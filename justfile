@@ -762,7 +762,7 @@ validate-secrets:
   @echo "Validating sops encrypted files..."
   @for file in $(find secrets -name "*.yaml" -not -name ".sops.yaml"); do \
     echo "Testing: $file"; \
-    sops -d "$file" > /dev/null && echo "  ✅ Valid" || echo "  ❌ Failed"; \
+    sops -d "$file" > /dev/null && echo "  ● Valid" || echo "  ⊘ Failed"; \
   done
 
 ## CI/CD
@@ -920,7 +920,7 @@ cache-rosetta-builder:
     YAML_PATH=$(nix-store --query --requisites /run/current-system | grep 'rosetta-builder.yaml$' || true)
 
     if [ -z "$YAML_PATH" ]; then
-        echo "❌ nix-rosetta-builder not found in current system"
+        echo "⊘ nix-rosetta-builder not found in current system"
         echo "   Is nix-rosetta-builder.enable = true in your configuration?"
         exit 1
     fi
@@ -931,7 +931,7 @@ cache-rosetta-builder:
     IMAGE_PATH=$(grep -A1 "images:" "$YAML_PATH" | grep "location:" | awk '{print $3}')
 
     if [ -z "$IMAGE_PATH" ]; then
-        echo "❌ Could not extract image path from $YAML_PATH"
+        echo "⊘ Could not extract image path from $YAML_PATH"
         exit 1
     fi
 
@@ -952,7 +952,7 @@ cache-rosetta-builder:
     sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $IMAGE_PATH --keep-forever"
 
     echo ""
-    echo "✅ Successfully pushed and pinned nix-rosetta-builder to Cachix"
+    echo "● Successfully pushed and pinned nix-rosetta-builder to Cachix"
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
     echo "   View at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "   Image: $IMAGE_PATH"
@@ -979,7 +979,7 @@ check-rosetta-cache:
     IMAGE_PATH=$(grep -A1 "images:" "$YAML_PATH" | grep "location:" | awk '{print $3}')
 
     if [ -z "$IMAGE_PATH" ]; then
-        echo "❌ Could not extract image path"
+        echo "⊘ Could not extract image path"
         exit 1
     fi
 
@@ -989,11 +989,11 @@ check-rosetta-cache:
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
 
     if nix path-info --store "https://$CACHE_NAME.cachix.org" "$IMAGE_PATH" &>/dev/null; then
-        echo "✅ Image is cached"
+        echo "● Image is cached"
         echo "   Cache: https://$CACHE_NAME.cachix.org"
         echo "   Path: $IMAGE_PATH"
     else
-        echo "❌ Image NOT in cache"
+        echo "⊘ Image NOT in cache"
         echo "   Path: $IMAGE_PATH"
         echo "   Run: just cache-rosetta-builder"
         exit 1
@@ -1085,7 +1085,7 @@ cache-linux-package package:
 
     if [[ "$AARCH64_CACHED" == true && "$X86_64_CACHED" == true ]]; then
         echo ""
-        echo "✅ Both architectures already cached. Nothing to do."
+        echo "● Both architectures already cached. Nothing to do."
         exit 0
     fi
 
@@ -1187,7 +1187,7 @@ cache-linux-package package:
         echo ""
         echo "Your CI will fetch from cache.nixos.org automatically."
     else
-        echo "✅ Successfully built and cached $PACKAGE for Linux architectures"
+        echo "● Successfully built and cached $PACKAGE for Linux architectures"
         echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
         echo ""
         echo "CI will now fetch from cachix instead of building, avoiding disk space issues."
@@ -1210,7 +1210,7 @@ test-cachix:
 
     # Verify it's in the cache by trying to pull it from another location
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
-    echo "✅ Push completed. Verify at: https://app.cachix.org/cache/$CACHE_NAME"
+    echo "● Push completed. Verify at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "Store path: $STORE_PATH"
 
 # Build all CI outputs for a system and push to cachix (mimics CI workflow with caching)
@@ -1232,7 +1232,7 @@ cache-ci-outputs system="":
             echo "Building all CI outputs for $TARGET_SYSTEM..."
             ;;
         *)
-            echo "❌ Error: Unsupported system '$TARGET_SYSTEM'"
+            echo "⊘ Error: Unsupported system '$TARGET_SYSTEM'"
             echo "Supported systems:"
             echo "  • x86_64-linux   (Intel/AMD Linux)"
             echo "  • aarch64-linux  (ARM Linux)"
@@ -1310,7 +1310,7 @@ cache-ci-outputs system="":
     fi
 
     echo ""
-    echo "✅ Successfully built and cached all CI outputs for $TARGET_SYSTEM"
+    echo "● Successfully built and cached all CI outputs for $TARGET_SYSTEM"
     echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo ""
     echo "Other machines can now pull from cachix instead of rebuilding."
@@ -1346,7 +1346,7 @@ cache-darwin-system:
     SYSTEM_PATH=$(nom build "$FLAKE_OUTPUT" --no-link --print-out-paths 2>&1 | tail -1)
 
     if [ -z "$SYSTEM_PATH" ] || [ ! -e "$SYSTEM_PATH" ]; then
-        echo "❌ Failed to build system or get store path"
+        echo "⊘ Failed to build system or get store path"
         exit 1
     fi
 
@@ -1360,7 +1360,7 @@ cache-darwin-system:
         sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
 
     echo ""
-    echo "✅ Successfully pushed darwin system to cachix"
+    echo "● Successfully pushed darwin system to cachix"
     echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo "   System: $SYSTEM_PATH"
     echo ""
@@ -1383,7 +1383,7 @@ cache-overlay-packages system:
     PACKAGES=$(nix eval ".#packages.$SYSTEM" --apply 'builtins.attrNames' --json | jq -r '.[]')
 
     if [ -z "$PACKAGES" ]; then
-        echo "❌ No packages found for $SYSTEM"
+        echo "⊘ No packages found for $SYSTEM"
         exit 1
     fi
 
@@ -1410,7 +1410,7 @@ cache-overlay-packages system:
     STORE_PATHS=$($BUILD_CMD $PACKAGE_TARGETS $BUILD_OPTS)
 
     if [ -z "$STORE_PATHS" ]; then
-        echo "❌ No store paths produced from build"
+        echo "⊘ No store paths produced from build"
         exit 1
     fi
 
@@ -1428,7 +1428,7 @@ cache-overlay-packages system:
     done | sort -u | sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
 
     echo ""
-    echo "✅ Successfully cached all overlay packages for $SYSTEM"
+    echo "● Successfully cached all overlay packages for $SYSTEM"
     echo "   Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo ""
     echo "CI will now fetch from cachix instead of building."
@@ -1577,7 +1577,7 @@ sops-load-agent:
 
   # Check if plist exists
   if [ ! -f "$PLIST" ]; then
-    echo "❌ SOPS plist not found: $PLIST"
+    echo "⊘ SOPS plist not found: $PLIST"
     echo "   Run 'just activate' first to create the plist"
     exit 1
   fi
@@ -1606,6 +1606,6 @@ sops-load-agent:
     echo "  • Automatically decrypt and deploy secrets"
     echo "  • Create symlinks from module paths to secrets directory"
   else
-    echo "❌ Failed to load SOPS agent"
+    echo "⊘ Failed to load SOPS agent"
     exit 1
   fi
