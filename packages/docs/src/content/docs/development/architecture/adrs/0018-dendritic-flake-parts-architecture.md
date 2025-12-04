@@ -240,33 +240,39 @@ The drupol, mightyiam, and gaetanlepage configurations demonstrate the pattern a
 
 ### Negative
 
-Learning curve for contributors:
-Understanding `flake.modules.*` namespace exports requires familiarity with flake-parts.
-Not as immediately intuitive as "file at path X creates output Y".
+The pattern requires understanding flake.modules.* namespace exports, which imposes a learning curve for contributors unfamiliar with flake-parts.
+This is less immediately intuitive than nixos-unified's "file at path X creates output Y" convention where the filesystem structure directly determines flake outputs.
+However, the explicit imports make debugging straightforward once the pattern is understood - reading a machine configuration shows exactly which aggregates it imports, and reading those aggregates shows which modules contribute.
+The trade-off is initial complexity for long-term maintainability, which becomes favorable as the configuration scales beyond a handful of machines.
 
-Migration effort required:
-Converting from nixos-unified involved restructuring all configurations.
-Epic 2 (November 2024) dedicated to migration (~40 hours effort).
+Converting from nixos-unified required restructuring all configurations, which consumed substantial engineering effort during Epic 2 (November 2024).
+The migration involved moving approximately 83 modules from host-centric organization to aspect-based organization, reorganizing imports to use namespace exports, and validating that every module continued to function correctly after the transition.
+This ~40 hours of migration work was necessary because the two architectures organize configuration fundamentally differently - nixos-unified's implicit autowiring cannot be mechanically transformed into dendritic's explicit namespace exports.
+The investment pays dividends in ongoing maintenance burden reduction, but it represents real upfront cost that delayed other development work.
 
-Namespace discipline required:
-Incorrect namespace exports create silent failures.
-Must ensure files in same directory export to same namespace for auto-merging.
+Namespace discipline failures create silent build failures that can be difficult to diagnose without understanding the auto-merging mechanism.
+When multiple files in the same directory export to different namespaces, import-tree imports them all but they don't merge into a single aggregate.
+Machine configurations that import the expected aggregate name then fail to receive the modules that exported to incorrect namespaces, and the error manifests as missing packages or services rather than an obvious "wrong namespace" message.
+Contributors must learn that directory structure determines namespace identity - all files under `modules/home/ai/` must export to `flake.modules.homeManager.ai` for the aggregation to work correctly.
 
-Directory structure conventions:
-Underscore prefix (`_overlays/`) excludes from import-tree.
-Contributors must learn these conventions.
+Directory structure conventions use syntactic markers that aren't self-documenting without external knowledge.
+The underscore prefix convention (`_overlays/`) excludes directories from import-tree scanning, which is useful for organizing code that shouldn't be auto-discovered but requires contributors to know that underscore has semantic meaning.
+Similarly, the namespace export pattern (`flake.modules.homeManager.ai`) follows a convention that must be learned rather than inferred.
+These conventions are documented in this ADR and the concepts documentation, but they represent tribal knowledge that new contributors must acquire before they can confidently add modules.
 
 ### Neutral
 
-Conceptual alignment with NixOS modules:
-Dendritic modules are still NixOS/home-manager modules at the core.
-The pattern adds organizational structure, not new abstractions.
-Skills transfer from standard NixOS module development.
+Dendritic modules remain NixOS/home-manager modules at their core, which means the pattern adds organizational structure rather than introducing fundamentally new abstractions.
+A contributor who understands NixOS module development already possesses most of the knowledge needed to work with dendritic modules - the same option declarations, the same configuration merging semantics, the same module system features all work identically.
+The dendritic pattern simply prescribes where modules should live in the filesystem and how they should export to namespaces for consumption by machine configurations.
+This conceptual alignment means skills transfer directly from standard NixOS module development, and existing documentation about NixOS module patterns remains applicable.
+The learning investment focuses narrowly on organizational conventions rather than requiring mastery of an entirely new configuration system.
 
-Documentation exists but scattered:
-Pattern documented across multiple sources (dendrix, mightyiam, drupol).
-No single authoritative reference.
-This ADR and concepts documentation fill that gap for this repository.
+Documentation for the dendritic pattern exists but is scattered across multiple reference implementations rather than consolidated in a single authoritative source.
+The dendrix documentation, mightyiam's configuration, and drupol's setup each demonstrate aspects of the pattern, but newcomers must synthesize understanding from these distributed examples.
+This fragmentation creates a steeper initial learning curve than a framework with comprehensive official documentation would provide.
+However, this ADR and the concepts documentation in this repository fill that gap for contributors to this specific infrastructure, providing a single reference that explains the pattern's application to this fleet's needs.
+The scattered ecosystem documentation remains valuable for seeing how different implementations adapt the pattern to their specific requirements.
 
 ## Validation evidence
 
