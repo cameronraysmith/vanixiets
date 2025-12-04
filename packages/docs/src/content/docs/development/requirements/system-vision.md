@@ -268,7 +268,7 @@ Secrets Flow:
 - **UC-002**: Add feature module spanning multiple platforms (see [usage-model](/development/requirements/usage-model/#uc-002-add-feature-module-spanning-multiple-platforms)).
 - **UC-003**: Manage secrets via declarative generators (see [usage-model](/development/requirements/usage-model/#uc-003-manage-secrets-via-declarative-generators)).
 - **UC-004**: Deploy coordinated service across hosts (see [usage-model](/development/requirements/usage-model/#uc-004-deploy-coordinated-service-across-hosts)).
-- **UC-005**: Handle broken packages with multi-channel resilience (see [usage-model](/development/requirements/usage-model/#uc-005-handle-broken-package-with-multi-channel-resilience)).
+- **UC-005**: Handle broken packages with multi-channel fallback (see [usage-model](/development/requirements/usage-model/#uc-005-handle-broken-package-with-multi-channel-resilience)).
 - **UC-006**: Establish secure overlay network (see [usage-model](/development/requirements/usage-model/#uc-006-establish-secure-overlay-network)).
 - **UC-007**: Update packages across all 8 hosts.
 - **UC-008**: Deploy configuration changes with rollback capability.
