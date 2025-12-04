@@ -9,7 +9,7 @@ title: "ADR-0017: Dendritic Overlay Patterns"
 
 ## Context
 
-The migration from nixos-unified to dendritic flake-parts + clan-core architecture (Epics 1-7, November 2024) required restructuring overlay organization to align with dendritic module patterns and eliminate nixos-unified-specific conventions.
+The migration from nixos-unified to dendritic flake-parts + clan-core architecture (November 2024) required restructuring overlay organization to align with dendritic module patterns and eliminate nixos-unified-specific conventions.
 
 ### Key architectural changes
 
@@ -393,6 +393,6 @@ nixpkgs.overlays = [ inputs.self.overlays.default ];
 
 ### Migration Evidence
 
-- Epics 1-7 (November 2024): nixos-unified → dendritic + clan-core
-- Story 1.1-1.7 (test-clan validation): Architecture validated
+- November 2024 migration: nixos-unified → dendritic + clan-core
+- test-clan validation: Architecture validated
 - Current implementation: `modules/nixpkgs/` in infra repository
