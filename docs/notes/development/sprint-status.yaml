@@ -678,7 +678,7 @@ development_status:
   story-9-0b-title: "Clean up migration artifacts and migrate essential content"
   story-9-1: done
   story-9-1-title: "Create bookmark tags at branch boundaries (docs, clan, clan-01)"
-  story-9-2: backlog
+  story-9-2: done
   story-9-2-title: "Validate CI/CD workflows on clan-01"
   story-9-3: backlog
   story-9-3-title: "Merge clan-01 to main and trigger release"
