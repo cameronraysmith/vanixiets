@@ -301,4 +301,4 @@ Examples:
 
 - [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization pattern
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination
-- [Nix-Config Architecture](/concepts/nix-config-architecture) - Overall architecture
+- [Architecture overview](/concepts/architecture-overview) - Overall architecture
