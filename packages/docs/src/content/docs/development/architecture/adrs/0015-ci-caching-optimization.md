@@ -37,11 +37,11 @@ PR #17 run https://github.com/cameronraysmith/infra/actions/runs/18946909588:
 
 ### Current caching layers
 
-1. **Nixpkgs binary cache** (cache.nixos.org) - ✅ works well
-2. **Cachix** (cameronraysmith.cachix.org) - ✅ works for custom packages
+1. **Nixpkgs binary cache** (cache.nixos.org) - ● works well
+2. **Cachix** (cameronraysmith.cachix.org) - ● works for custom packages
 3. **GitHub Actions cache** (actions/cache) - ⚠️ underutilized
-4. **Nix flake evaluation** - ❌ not cached effectively
-5. **Job-level path filtering** - ❌ not implemented
+4. **Nix flake evaluation** - ⊘ not cached effectively
+5. **Job-level path filtering** - ⊘ not implemented
 
 ## Decision
 
@@ -162,10 +162,10 @@ concurrency:
 ```
 
 **This is already excellent:**
-- ✅ Intelligent cache keys (flake.lock + *.nix hash)
-- ✅ Garbage collection to manage size
-- ✅ Restore prefix matching for cache reuse
-- ✅ Integrated with Cachix
+- ● Intelligent cache keys (flake.lock + *.nix hash)
+- ● Garbage collection to manage size
+- ● Restore prefix matching for cache reuse
+- ● Integrated with Cachix
 
 **No changes needed** - keep current setup.
 
