@@ -437,7 +437,7 @@ Now that your darwin machine is deployed:
 
 4. **Understand the architecture** more deeply:
    - [Dendritic Architecture](/concepts/dendritic-architecture) for module organization
-   - [Multi-User Patterns](/concepts/multi-user-patterns) for user configuration approaches
+   - [System-user Integration](/concepts/system-user-integration) for user configuration approaches
 
 ## Troubleshooting
 
