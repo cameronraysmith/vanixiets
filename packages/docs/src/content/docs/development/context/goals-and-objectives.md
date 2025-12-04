@@ -438,46 +438,46 @@ System Goals
 **Conflict (resolved)**: G-S04 (dendritic) + G-S06 (clan) vs. nixos-unified architecture
 
 **Resolution (completed in Epics 1-7)**: Migrated to dendritic + clan, abandoned nixos-unified
-- ✅ Dendritic and clan both eliminate specialArgs antipattern
-- ✅ Both use flake-parts as foundation
-- ✅ nixos-unified replaced completely
-- ✅ Phased migration (Phases 0-6) completed successfully
+- ● Dendritic and clan both eliminate specialArgs antipattern
+- ● Both use flake-parts as foundation
+- ● nixos-unified replaced completely
+- ● Phased migration (Phases 0-6) completed successfully
 
 **Conflict (resolved)**: G-U03 (declarative secrets) vs. manual sops-nix
 
 **Resolution (completed in Epics 1-7)**: Two-tier architecture implemented
-- ✅ sops-nix preserved for home-manager secrets (user-level)
-- ✅ clan vars deployed for system secrets (declarative generation)
-- ✅ Hybrid approach operational across 8-machine fleet
-- ✅ Both systems coexist successfully
+- ● sops-nix preserved for home-manager secrets (user-level)
+- ● clan vars deployed for system secrets (declarative generation)
+- ● Hybrid approach operational across 8-machine fleet
+- ● Both systems coexist successfully
 
 **Conflict (resolved)**: G-U02 (multi-host coordination) vs. per-host management
 
 **Resolution (completed in Epics 1-7)**: VPS infrastructure deployed, fleet operational
-- ✅ cinnabar deployed as zerotier controller
-- ✅ 7 peers connected (4 darwin + 3 nixos VPS)
-- ✅ Single source of truth in clan inventory
-- ✅ All hosts migrated successfully
+- ● cinnabar deployed as zerotier controller
+- ● 7 peers connected (4 darwin + 3 nixos VPS)
+- ● Single source of truth in clan inventory
+- ● All hosts migrated successfully
 
 ## Goals tracking and validation
 
 ### Achieved goals
 
-- ✅ G-S01: Maintainable codebase structure (dendritic pattern, Epics 1-7)
-- ✅ G-S03: Maximum type safety (dendritic maximizes module system, Epics 1-7)
-- ✅ G-S04: Dendritic flake-parts pattern adoption (Epics 1-7)
-- ✅ G-S05: Comprehensive development environment (ADR-0009)
-- ✅ G-S06: Clan-core integration (inventory, vars, services, Epics 1-7)
-- ✅ G-S07: Clan vars system adoption (two-tier with sops-nix, Epics 1-7)
-- ✅ G-S08: Multi-channel resilience (nixpkgs-hotfixes pattern)
-- ✅ G-U01: Efficient development workflows (preserved through migration)
-- ✅ G-U02: Multi-host coordination (8-machine fleet, Epics 1-7)
-- ✅ G-U03: Declarative secrets management (two-tier architecture, Epics 1-7)
-- ✅ G-U04: Cross-platform module composition (dendritic pattern, Epics 1-7)
-- ✅ G-U05: Surgical package fixes (via G-S08)
-- ✅ G-U06: Secure overlay networking (zerotier mesh, Epics 1-7)
-- ✅ G-U07: Fast, cached builds (cachix integration)
-- ✅ G-B01: Reliable infrastructure (stable through migration)
+- ● G-S01: Maintainable codebase structure (dendritic pattern, Epics 1-7)
+- ● G-S03: Maximum type safety (dendritic maximizes module system, Epics 1-7)
+- ● G-S04: Dendritic flake-parts pattern adoption (Epics 1-7)
+- ● G-S05: Comprehensive development environment (ADR-0009)
+- ● G-S06: Clan-core integration (inventory, vars, services, Epics 1-7)
+- ● G-S07: Clan vars system adoption (two-tier with sops-nix, Epics 1-7)
+- ● G-S08: Multi-channel resilience (nixpkgs-hotfixes pattern)
+- ● G-U01: Efficient development workflows (preserved through migration)
+- ● G-U02: Multi-host coordination (8-machine fleet, Epics 1-7)
+- ● G-U03: Declarative secrets management (two-tier architecture, Epics 1-7)
+- ● G-U04: Cross-platform module composition (dendritic pattern, Epics 1-7)
+- ● G-U05: Surgical package fixes (via G-S08)
+- ● G-U06: Secure overlay networking (zerotier mesh, Epics 1-7)
+- ● G-U07: Fast, cached builds (cachix integration)
+- ● G-B01: Reliable infrastructure (stable through migration)
 
 ### Ongoing goals
 
@@ -490,33 +490,33 @@ System Goals
 ### Goals preserved through migration
 
 Successfully maintained:
-- ✅ G-S08: Multi-channel resilience (nixpkgs hotfixes pattern preserved)
-- ✅ G-U05: Surgical package fixes (overlay composition maintained)
-- ✅ G-U01: Efficient workflows (all functionality preserved)
-- ✅ G-B01: Reliable infrastructure (stability maintained)
+- ● G-S08: Multi-channel resilience (nixpkgs hotfixes pattern preserved)
+- ● G-U05: Surgical package fixes (overlay composition maintained)
+- ● G-U01: Efficient workflows (all functionality preserved)
+- ● G-B01: Reliable infrastructure (stability maintained)
 
 ### Goals achieved by migration
 
 Enabled through dendritic + clan architecture:
-- ✅ G-S03: Maximum type safety (dendritic maximizes module system)
-- ✅ G-S04: Dendritic pattern adoption (all configurations migrated)
-- ✅ G-S06: Clan-core integration (inventory, vars, services operational)
-- ✅ G-S07: Clan vars system (two-tier architecture with sops-nix)
-- ✅ G-U02: Multi-host coordination (8-machine fleet operational)
-- ✅ G-U03: Declarative secrets (two-tier: clan vars + sops-nix)
-- ✅ G-U04: Cross-platform composition (dendritic cross-cutting modules)
-- ✅ G-U06: Overlay networking (zerotier mesh: cinnabar + 7 peers)
+- ● G-S03: Maximum type safety (dendritic maximizes module system)
+- ● G-S04: Dendritic pattern adoption (all configurations migrated)
+- ● G-S06: Clan-core integration (inventory, vars, services operational)
+- ● G-S07: Clan vars system (two-tier architecture with sops-nix)
+- ● G-U02: Multi-host coordination (8-machine fleet operational)
+- ● G-U03: Declarative secrets (two-tier: clan vars + sops-nix)
+- ● G-U04: Cross-platform composition (dendritic cross-cutting modules)
+- ● G-U06: Overlay networking (zerotier mesh: cinnabar + 7 peers)
 
 ### Migration validation results
 
 All phases completed successfully:
-- **Phase 0** (Epic 1): ✅ Validated G-S04 + G-S06 compatibility in test-clan
-- **Phase 1** (Epic 2): ✅ Validated G-U06 (zerotier), G-S07 (vars) on cinnabar
-- **Phase 2** (Epic 3): ✅ Validated G-U04 (cross-platform), G-S03 (type safety) on stibnite
-- **Phase 3** (Epic 4): ✅ Validated G-U02 (multi-host) with blackphos
-- **Phase 4** (Epic 5): ✅ Validated with rosegold and argentum
-- **Phase 5** (Epic 6): ✅ Validated with electrum, galena, scheelite
-- **Phase 6** (Epic 7): ✅ Confirmed all goals achieved, G-B02 sustainable
+- **Phase 0** (Epic 1): ● Validated G-S04 + G-S06 compatibility in test-clan
+- **Phase 1** (Epic 2): ● Validated G-U06 (zerotier), G-S07 (vars) on cinnabar
+- **Phase 2** (Epic 3): ● Validated G-U04 (cross-platform), G-S03 (type safety) on stibnite
+- **Phase 3** (Epic 4): ● Validated G-U02 (multi-host) with blackphos
+- **Phase 4** (Epic 5): ● Validated with rosegold and argentum
+- **Phase 5** (Epic 6): ● Validated with electrum, galena, scheelite
+- **Phase 6** (Epic 7): ● Confirmed all goals achieved, G-B02 sustainable
 
 ## References
 
