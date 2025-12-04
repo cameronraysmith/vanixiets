@@ -1,5 +1,5 @@
 ---
-title: Multi-User Patterns
+title: System-user integration
 description: Understanding admin users with integrated home-manager vs non-admin standalone users
 ---
 
