@@ -23,10 +23,10 @@ Current CI workflow exhibits suboptimal caching behavior:
 
 ### Example scenario
 
-PR #17 run https://github.com/cameronraysmith/infra/actions/runs/18946909588:
+PR #17 run https://github.com/cameronraysmith/vanixiets/actions/runs/18946909588:
 - Single job failed (linkcheck)
 - Fixed with one-line markdown change
-- New commit triggered: https://github.com/cameronraysmith/infra/actions/runs/18947384715
+- New commit triggered: https://github.com/cameronraysmith/vanixiets/actions/runs/18947384715
 - **All jobs reran** including:
   - secrets-scan (unnecessary - no code changes affecting security)
   - bootstrap-verification (unnecessary - no Makefile/bootstrap changes)

@@ -1,5 +1,5 @@
 {
-  description = "infra: cameronraysmith-managed local and cloud infrastructure";
+  description = "vanixiets: cameronraysmith-managed local and cloud infrastructure";
 
   outputs =
     inputs@{ flake-parts, ... }:

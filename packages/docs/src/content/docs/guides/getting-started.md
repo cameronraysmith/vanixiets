@@ -23,8 +23,8 @@ Before you begin, ensure you have:
 ### Step 1: Clone the repository
 
 ```bash
-git clone https://github.com/cameronraysmith/infra.git
-cd infra
+git clone https://github.com/cameronraysmith/vanixiets.git
+cd vanixiets
 ```
 
 ### Step 2: Bootstrap Nix and essential tools
@@ -279,8 +279,8 @@ See [Secrets Management](/guides/secrets-management) for detailed troubleshootin
 
 ### Community
 
-- [GitHub Discussions](https://github.com/cameronraysmith/infra/discussions) - Ask questions
-- [GitHub Issues](https://github.com/cameronraysmith/infra/issues) - Report bugs
+- [GitHub Discussions](https://github.com/cameronraysmith/vanixiets/discussions) - Ask questions
+- [GitHub Issues](https://github.com/cameronraysmith/vanixiets/issues) - Report bugs
 
 ## What's next?
 

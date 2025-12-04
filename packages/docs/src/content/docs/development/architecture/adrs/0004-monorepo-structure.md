@@ -27,7 +27,7 @@ Use a single `packages/` directory rather than separating `apps/` and `packages/
 - **Simpler structure** appropriate for current scope (2 packages)
 - **Follows python-nix-template pattern** for consistency across our templates
 - **Equal importance** - both packages are relatively equal in importance
-- **Clear package naming** indicates purpose without directory-level categorization (`@infra/docs` is self-explanatory)
+- **Clear package naming** indicates purpose without directory-level categorization (`@vanixiets/docs` is self-explanatory)
 - **Refactor-friendly** - can split later if needed without breaking the pattern
 
 ## When to use apps/ + packages/

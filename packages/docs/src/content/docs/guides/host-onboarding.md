@@ -63,8 +63,8 @@ nix --version
 
 ```bash
 cd ~/projects
-git clone https://github.com/cameronraysmith/infra
-cd infra
+git clone https://github.com/cameronraysmith/vanixiets
+cd vanixiets
 
 # Allow direnv to activate the development shell
 direnv allow

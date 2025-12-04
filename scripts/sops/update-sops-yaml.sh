@@ -71,7 +71,7 @@ echo "Generating new .sops.yaml..."
 
 cat > "$SOPS_YAML" << EOF
 keys:
-  # Repository-specific keys (working on infra source)
+  # Repository-specific keys (working on vanixiets source)
   - &dev $DEV_KEY      # from sops-dev-ssh in Bitwarden
   - &ci $CI_KEY        # from sops-ci-ssh in Bitwarden
 

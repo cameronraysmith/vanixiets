@@ -11,7 +11,7 @@ export default defineConfig({
   site: "https://infra.cameronraysmith.net",
   integrations: [
     starlight({
-      title: "infra",
+      title: "vanixiets",
       prerender: true,
       plugins: process.env.CHECK_LINKS
         ? [
@@ -28,7 +28,7 @@ export default defineConfig({
         {
           icon: "github",
           label: "GitHub",
-          href: "https://github.com/cameronraysmith/infra",
+          href: "https://github.com/cameronraysmith/vanixiets",
         },
       ],
       expressiveCode: {

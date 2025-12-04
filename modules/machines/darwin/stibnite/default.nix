@@ -66,7 +66,7 @@ in
       # All 5 overlay layers + pkgs-by-name packages exported from modules/nixpkgs.nix
       nixpkgs.overlays = [ inputs.self.overlays.default ];
 
-      # System state version (matching infra configuration)
+      # System state version (matching vanixiets configuration)
       # Override base.nix which sets stateVersion = 5
       system.stateVersion = lib.mkForce 4;
 
@@ -137,7 +137,7 @@ in
         home = "/Users/crs58";
         shell = pkgs.zsh;
         description = "crs58";
-        # SSH key from infra config.nix
+        # SSH key from vanixiets config.nix
         openssh.authorizedKeys.keys = [
           "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+"
         ];

@@ -37,7 +37,7 @@ Builds and activates a nix-darwin configuration for the specified hostname.
 
 ```bash
 # Remote usage (default flake)
-nix run github:cameronraysmith/infra#darwin -- <hostname>
+nix run github:cameronraysmith/vanixiets#darwin -- <hostname>
 
 # Local development
 nix run .#darwin -- <hostname> .
@@ -75,7 +75,7 @@ Builds and activates a NixOS configuration for the specified hostname.
 
 ```bash
 # Remote usage (default flake)
-nix run github:cameronraysmith/infra#os -- <hostname>
+nix run github:cameronraysmith/vanixiets#os -- <hostname>
 
 # Local development
 nix run .#os -- <hostname> .
@@ -111,10 +111,10 @@ This is also the **default app** for the flake.
 
 ```bash
 # Remote usage (as default app)
-nix run github:cameronraysmith/infra -- <username>
+nix run github:cameronraysmith/vanixiets -- <username>
 
 # Explicit app reference
-nix run github:cameronraysmith/infra#home -- <username>
+nix run github:cameronraysmith/vanixiets#home -- <username>
 
 # Local development
 nix run .#home -- <username> .
@@ -159,8 +159,8 @@ The `default` app is an alias for `home`, enabling ergonomic usage:
 
 ```bash
 # These are equivalent:
-nix run github:cameronraysmith/infra -- crs58
-nix run github:cameronraysmith/infra#home -- crs58
+nix run github:cameronraysmith/vanixiets -- crs58
+nix run github:cameronraysmith/vanixiets#home -- crs58
 ```
 
 This makes home-manager activation the most convenient operation since it's the most common use case.

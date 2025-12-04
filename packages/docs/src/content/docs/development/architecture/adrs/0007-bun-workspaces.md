@@ -39,10 +39,10 @@ Use Bun workspaces for monorepo package management.
 
 ```bash
 # Run command in specific package
-bun run --filter '@infra/docs' dev
+bun run --filter '@vanixiets/docs' dev
 
 # Run command in all packages
-bun run --filter '@infra/*' test
+bun run --filter '@vanixiets/*' test
 ```
 
 ## Rationale

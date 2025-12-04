@@ -1,6 +1,6 @@
 <div align="center">
 
-# infra
+# vanixiets
 
 <a href="https://nix.dev/concepts/flakes" target="_blank">
   <img alt="Nix Flakes Ready" src="https://img.shields.io/static/v1?logo=nixos&logoColor=d8dee9&label=Nix%20Flakes&labelColor=5e81ac&message=infrastructure&color=d8dee9&style=for-the-badge">
@@ -12,7 +12,7 @@
 
 > And all this to realize compositional algebras of graded effects, structured as indexed monad transformer stacks over effectful computations, from heterogeneous components to support experimentation, discovery, and understanding of the past in the present for the future.
 
-[Documentation][docs-link] • [Getting Started](https://infra.cameronraysmith.net/guides/getting-started) • [Architecture](https://infra.cameronraysmith.net/concepts/architecture-overview) • [Discussions](https://github.com/cameronraysmith/infra/discussions)
+[Documentation][docs-link] • [Getting Started](https://infra.cameronraysmith.net/guides/getting-started) • [Architecture](https://infra.cameronraysmith.net/concepts/architecture-overview) • [Discussions](https://github.com/cameronraysmith/vanixiets/discussions)
 
 </div>
 
@@ -29,8 +29,8 @@ Nix flake-based system configurations for NixOS, nix-darwin, and home-manager us
 
 ```bash
 # Clone repository
-git clone https://github.com/cameronraysmith/infra.git
-cd infra
+git clone https://github.com/cameronraysmith/vanixiets.git
+cd vanixiets
 
 # Bootstrap nix and essential tools
 make bootstrap && exec $SHELL
@@ -84,8 +84,8 @@ Built with [flake-parts](https://github.com/hercules-ci/flake-parts), [import-tr
 
 See [complete credits](https://infra.cameronraysmith.net/about/credits) for full acknowledgments.
 
-[ci-badge]: https://github.com/cameronraysmith/infra/actions/workflows/ci.yaml/badge.svg
-[ci-link]: https://github.com/cameronraysmith/infra/actions/workflows/ci.yaml
+[ci-badge]: https://github.com/cameronraysmith/vanixiets/actions/workflows/ci.yaml/badge.svg
+[ci-link]: https://github.com/cameronraysmith/vanixiets/actions/workflows/ci.yaml
 [docs-badge]: https://img.shields.io/badge/docs-infra.cameronraysmith.net-blue
 [docs-link]: https://infra.cameronraysmith.net
 [license-badge]: https://img.shields.io/badge/license-MIT-blue

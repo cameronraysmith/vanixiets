@@ -1,5 +1,5 @@
 # Bitwarden SSH agent configuration
-# Migrated from infra/modules/home/all/core/bitwarden.nix
+# Migrated from vanixiets/modules/home/all/core/bitwarden.nix
 { ... }:
 {
   flake.modules.homeManager.core =

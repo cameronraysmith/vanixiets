@@ -1,5 +1,5 @@
 keys:
-  # Repository-specific keys (working on infra source)
+  # Repository-specific keys (working on vanixiets source)
   - &dev age1js028xag70wpwpp47elpq50mjjv7zn7sxuwuhk8yltkjzqzdvq5qq8w8cy      # from sops-dev-ssh in Bitwarden
   - &ci age1ldx73kk4kvl3mycjdhngxrrv69wn7cvhreqwzl0gphuftnj5pulqaprgel        # from sops-ci-ssh in Bitwarden
 
