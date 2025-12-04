@@ -113,6 +113,81 @@ This tier is available on all platforms (darwin and NixOS).
 The age private key used by sops-nix is derived from your Bitwarden-managed SSH key using `ssh-to-age`.
 This manual bootstrap step is intentional for security.
 
+#### Bitwarden as source of truth
+
+This infrastructure uses Bitwarden as the authoritative source for SSH keys from which age keys are deterministically derived.
+SSH keys are stored in Bitwarden as items named `sops-{identifier}-ssh` (e.g., `sops-crs58-ssh`, `sops-raquel-ssh`).
+Age keys are derived using `ssh-to-age`, which means the same SSH key always produces the same age key.
+
+Three contexts must have corresponding keys for proper secrets management:
+
+1. **Clan user key** in `sops/users/{user}/key.json` (age public key)
+2. **YAML anchor** in `.sops.yaml` (age public key, e.g., `&admin-user`)
+3. **Workstation keyfile** at `~/.config/sops/age/keys.txt` (age private key)
+
+All three must correspond to the same SSH keypair stored in Bitwarden.
+The justfile provides automation for maintaining this correspondence.
+
+#### Justfile automation
+
+The infrastructure provides justfile recipes for managing Bitwarden-derived age keys:
+
+**Extract and display all age public keys:**
+```bash
+just sops-extract-keys
+```
+This retrieves all `sops-*-ssh` items from Bitwarden and displays their corresponding age public keys.
+
+**Regenerate workstation keyfile from Bitwarden:**
+```bash
+just sops-sync-keys
+```
+This extracts your SSH private key from Bitwarden and regenerates `~/.config/sops/age/keys.txt`.
+
+**Validate three-context correspondence:**
+```bash
+just sops-validate-correspondences
+```
+This checks that clan user keys, `.sops.yaml` anchors, and workstation keyfiles all correspond to the same Bitwarden SSH keys.
+
+**Full key rotation workflow:**
+```bash
+just sops-rotate
+```
+This orchestrates the complete key rotation process including validation, re-encryption, and deployment.
+
+#### Three-context validation
+
+Proper secrets management requires consistency across three distinct contexts:
+
+**Context 1: Clan user key** (`sops/users/{user}/key.json`)
+This file contains the age public key for the user's clan identity.
+It is used by clan commands and must match the user's Bitwarden SSH key.
+
+**Context 2: YAML anchor** (`.sops.yaml`)
+The age public key is referenced as a YAML anchor (e.g., `&admin-user`) in creation rules.
+This controls which keys can decrypt specific secrets files.
+
+**Context 3: Workstation keyfile** (`~/.config/sops/age/keys.txt`)
+The age private key must exist on the workstation to decrypt secrets during configuration builds.
+This is generated from the SSH private key in Bitwarden.
+
+**Validation example:**
+```bash
+# Extract public key from clan user
+cat sops/users/crs58/key.json | jq -r '.publickey'
+
+# Extract public key from .sops.yaml
+grep "admin-user" .sops.yaml | awk '{print $3}'
+
+# Derive public key from workstation keyfile
+age-keygen -y ~/.config/sops/age/keys.txt
+
+# All three outputs must match for proper operation
+```
+
+The `just sops-validate-correspondences` recipe automates this verification.
+
 #### Required tools
 
 | Tool | Purpose | Installation |
@@ -124,53 +199,86 @@ This manual bootstrap step is intentional for security.
 
 #### Bootstrap procedure
 
-**Step 1: Retrieve SSH key from Bitwarden**
+**Step 1: Unlock Bitwarden vault**
 
 ```bash
-# Login to Bitwarden CLI
+# Login to Bitwarden CLI (if not already logged in)
 bw login
 
 # Unlock vault and set session
 export BW_SESSION=$(bw unlock --raw)
-
-# Retrieve your SSH private key (adjust item name as needed)
-# If stored in notes field:
-bw get item "ssh-key-name" | jq -r '.notes' > /tmp/ssh_key
-
-# OR if stored as attachment:
-bw get attachment "id_ed25519" --itemid <item-id> --output /tmp/ssh_key
-
-# Set correct permissions
-chmod 600 /tmp/ssh_key
 ```
 
-**Step 2: Derive age key from SSH key**
+**Step 2: Derive age keys from Bitwarden SSH key**
 
 ```bash
-# Create sops directory
+# Derive age public key (for .sops.yaml and clan user)
+age_pub=$(bw get item "sops-myuser-ssh" | jq -r '.login.password' | ssh-to-age)
+
+# Derive age private key (for workstation keyfile)
+age_priv=$(bw get item "sops-myuser-ssh" | jq -r '.notes' | ssh-to-age -private-key)
+
+# Validate format (age public keys are 63 characters starting with 'age1')
+[[ $age_pub =~ ^age1[a-z0-9]{58}$ ]] && echo "Valid public key format"
+
+# Validate private key format
+[[ $age_priv =~ ^AGE-SECRET-KEY- ]] && echo "Valid private key format"
+```
+
+**Step 3: Deploy age private key to workstation**
+
+```bash
+# Create sops directory if it doesn't exist
 mkdir -p ~/.config/sops/age
 
-# Derive age private key from SSH key
-ssh-to-age -private-key -i /tmp/ssh_key > ~/.config/sops/age/keys.txt
+# Write age private key to workstation keyfile
+echo "$age_priv" > ~/.config/sops/age/keys.txt
 
-# Get public key (you'll need this for .sops.yaml)
-ssh-to-age -i /tmp/ssh_key.pub
-# Output: age1abc...xyz (save this)
-```
-
-**Step 3: Clean up and verify**
-
-```bash
-# IMPORTANT: Remove temporary SSH key
-rm /tmp/ssh_key
+# Set restrictive permissions
+chmod 600 ~/.config/sops/age/keys.txt
 
 # Verify age key exists
 cat ~/.config/sops/age/keys.txt | head -1
 # Should show: AGE-SECRET-KEY-...
+```
+
+**Step 4: Update clan user and .sops.yaml with public key**
+
+```bash
+# Add public key to .sops.yaml as YAML anchor
+# Edit .sops.yaml and add line like:
+#   - &myuser age1abc...xyz
+
+# Create or update clan user key file
+mkdir -p sops/users/myuser
+echo "{\"publickey\": \"$age_pub\"}" > sops/users/myuser/key.json
 
 # Lock Bitwarden vault
 bw lock
 ```
+
+**Step 5: Validate three-context correspondence**
+
+```bash
+# Use justfile validation recipe
+just sops-validate-correspondences
+
+# Or validate manually (see "Three-context validation" above)
+```
+
+#### Platform-specific notes
+
+**Darwin laptops (stibnite, blackphos, rosegold, argentum):**
+Bitwarden Desktop can serve as an SSH agent, allowing age keys to be derived on-demand without storing SSH private keys on disk.
+The workstation keyfile (`~/.config/sops/age/keys.txt`) must still be manually created using the bootstrap procedure.
+
+**NixOS servers (cinnabar, electrum, galena, scheelite):**
+No GUI available, so use `bw` CLI to extract SSH keys and derive age keys.
+Deploy the age private key to `~/.config/sops/age/keys.txt` before running configuration builds that require secrets decryption.
+
+**CI/CD environments:**
+Store the age private key as a repository secret (e.g., `SOPS_AGE_KEY` in GitHub Actions).
+The CI runner exports this as `SOPS_AGE_KEY_FILE` environment variable for sops to use during builds.
 
 #### Security rationale
 
@@ -180,6 +288,7 @@ The manual bootstrap is intentional for security:
 2. **Age keys derived locally** - Private key material never transmitted
 3. **User controls bootstrap** - Each user manages their own key derivation
 4. **Defense in depth** - Compromising the nix config doesn't expose private keys
+5. **Deterministic derivation** - Same SSH key always produces same age key, enabling validation
 
 ### Adding your key to .sops.yaml
 
