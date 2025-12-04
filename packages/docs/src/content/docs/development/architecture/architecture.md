@@ -6,7 +6,7 @@ Comprehensive architecture specification for the vanixiets multi-machine infrast
 
 ## Scope and Boundaries
 
-This infrastructure manages a heterogeneous fleet of 8 machines across 2 platforms with 5 users through declarative Nix configuration.
+This infrastructure manages a heterogeneous fleet of 6 permanent machines plus ephemeral cloud instances across 2 platforms with 5 users through declarative Nix configuration.
 The system provides unified deployment, configuration management, secrets distribution, and cloud infrastructure provisioning for both personal workstations and cloud servers.
 
 ### System boundary
@@ -18,33 +18,41 @@ These capabilities may run ON the infrastructure but are not managed BY the infr
 
 ### Machine fleet
 
-The infrastructure coordinates:
+The infrastructure coordinates 6 permanent machines plus ephemeral cloud instances:
 
 - 4 nix-darwin laptops: stibnite (crs58), blackphos (raquel), argentum (christophersmith), rosegold (janettesmith)
-- 4 nixos servers: cinnabar (permanent zerotier coordinator), electrum (Hetzner VPS), galena (GCP CPU), scheelite (GCP GPU)
+- 1 permanent nixos server: cinnabar (Hetzner VPS, zerotier coordinator)
+- 1 ephemeral nixos server: electrum (Hetzner VPS, usually disabled in terranix)
 
+Note that galena (GCP CPU) and scheelite (GCP GPU) are introduced in Epic 7, not part of the initial Epic 2 validation.
 All machines managed through single configuration repository with cross-platform module sharing.
 
 ### User management
 
-5 users across the fleet: crs58 (global admin, stibnite/blackphos), cameron (admin alias, new machines), raquel (blackphos primary), christophersmith (argentum primary), janettesmith (rosegold primary).
+The infrastructure manages 5 users across the fleet.
+The crs58 user serves as global admin on legacy machines stibnite and blackphos.
+The cameron user operates as an admin alias on new machines.
+The raquel user is the primary user on blackphos.
+The christophersmith user is the primary user on argentum.
+The janettesmith user is the primary user on rosegold.
 
 User configurations defined once in home-manager modules, deployed across relevant machines.
 
 ### Architectural principles
 
-**Feature-based organization**: Define capabilities once in aspect directories, import in machine configurations.
-Adding AI tooling across all machines requires creating a single module, not editing 8 host files.
+Feature-based organization means defining capabilities once in aspect directories and importing them in machine configurations.
+Adding AI tooling across all machines requires creating a single module, not editing multiple host files.
 
-**Explicit dependencies**: No implicit wiring through specialArgs or hidden autowiring.
+Explicit dependencies ensure no implicit wiring through specialArgs or hidden autowiring.
 Module imports show exactly what each configuration depends on.
 
-**Separation of concerns**: Infrastructure provisioning (terranix), deployment orchestration (clan), system configuration (nixos/nix-darwin), and user environment (home-manager) are distinct layers with clear boundaries.
+Separation of concerns means infrastructure provisioning (terranix), deployment orchestration (clan), system configuration (nixos/nix-darwin), and user environment (home-manager) are distinct layers with clear boundaries.
 
-**Declarative infrastructure**: All configuration in Nix expressions under version control.
+Declarative infrastructure stores all configuration in Nix expressions under version control.
 Infrastructure state is derivable from repository content, not manual procedures.
 
-**Surgical fixes over system-wide rollbacks**: Multi-channel overlay architecture enables stable fallbacks for broken packages without rolling back the entire nixpkgs flake.lock.
+Surgical fixes over system-wide rollbacks leverage multi-channel overlay architecture.
+This enables stable fallbacks for broken packages without rolling back the entire nixpkgs flake.lock.
 
 ## Component Model
 
@@ -52,11 +60,11 @@ The infrastructure composes four major subsystems that integrate through well-de
 
 ### Dendritic flake-parts subsystem
 
-Provides module organization and auto-discovery through the dendritic pattern.
+The dendritic subsystem provides module organization and auto-discovery through the dendritic pattern.
 Every nix file under modules/ is a flake-parts module that exports to flake.modules.* namespaces.
 The import-tree mechanism by Victor Borja auto-discovers modules without manual registration.
 
-**Directory structure**:
+Directory structure:
 
 ```
 modules/
@@ -71,91 +79,92 @@ modules/
 └── checks/            # Validation and testing
 ```
 
-**Namespace exports**:
+Namespace exports:
 
 Modules export to namespaces for consumption by other modules.
 Files in modules/home/ai/ export to flake.modules.homeManager.ai.
 Multiple files in the same directory auto-merge into aggregates.
 
-**Machine configuration pattern**:
+Machine configuration pattern:
 
 Machine configurations import aggregates from namespaces rather than individual files.
 This enables feature-based organization where capabilities are defined once and consumed everywhere.
 
 ### Clan-core subsystem
 
-Orchestrates deployment across the machine fleet and manages system-level secrets.
+The clan-core subsystem orchestrates deployment across the machine fleet and manages system-level secrets.
 Clan provides machine registry, inventory system for service coordination, vars/generators for secret generation, and deployment tooling.
 
-**Machine registry**:
+Machine registry:
 
 All machines registered in clan.machines.* with platform specification and configuration imports.
 Registry serves as authoritative list of infrastructure members.
 
-**Inventory system**:
+Inventory system:
 
 Service instances defined with roles assigned to specific machines.
 Zerotier instance has controller role (cinnabar) and peer roles (all other machines).
 User instances assign user accounts to relevant machines.
 
-**Vars and generators**:
+Vars and generators:
 
 System-level generated secrets including SSH host keys, zerotier network identities, LUKS/ZFS encryption passphrases, and service credentials.
 Generated via clan vars generate, stored encrypted in vars/ directory with age encryption.
 
-**Deployment tooling**:
+Deployment tooling:
 
 Unified command interface for installation (clan machines install), updates (clan machines update), and secret management (clan vars generate).
 Same commands work across darwin and nixos platforms.
 
 ### Terranix subsystem
 
-Provisions cloud infrastructure by converting Nix module configuration to Terraform JSON.
-Manages VM creation on Hetzner Cloud and GCP with toggle mechanism for cost control.
+The terranix subsystem provisions cloud infrastructure by converting Nix module configuration to Terraform JSON.
+It manages VM creation on Hetzner Cloud and GCP with toggle mechanism for cost control.
 
-**Provider modules**:
+Provider modules:
 
 Separate modules for each cloud provider (modules/terranix/hetzner.nix, modules/terranix/gcp.nix) with shared base configuration.
 Each provider defines resources, networking, and provisioning logic in Nix expressions.
 
-**Toggle mechanism**:
+Toggle mechanism:
 
 Boolean options control resource creation (machines.scheelite.enabled).
 Disabling expensive GPU instances removes them from Terraform state without destroying configuration.
 Re-enabling recreates resources from same Nix expressions.
 
-**Clan handoff**:
+Clan handoff:
 
 Terranix creates VMs with base images, clan installs NixOS and deploys configuration.
 Clear separation between infrastructure provisioning and system deployment.
 
 ### Overlay composition subsystem
 
-Five-layer nixpkgs overlay architecture enables surgical package fixes without system-wide flake.lock rollbacks.
+The overlay composition subsystem implements a five-layer nixpkgs overlay architecture.
+This architecture enables surgical package fixes without system-wide flake.lock rollbacks.
 
-**Layer 1 - Multi-channel access** (modules/nixpkgs/overlays/channels.nix):
+Layer 1 - Multi-channel access (modules/nixpkgs/overlays/channels.nix):
 
-Provides pkgs.stable (OS-specific stable nixpkgs), pkgs.unstable (explicit unstable), pkgs.patched (unstable with upstream patches applied), and pkgs.nixpkgs (main unstable).
+The first layer provides pkgs.stable (OS-specific stable nixpkgs), pkgs.unstable (explicit unstable), pkgs.patched (unstable with upstream patches applied), and pkgs.nixpkgs (main unstable).
 
-**Layer 2 - Platform-specific hotfixes** (modules/nixpkgs/overlays/hotfixes.nix):
+Layer 2 - Platform-specific hotfixes (modules/nixpkgs/overlays/hotfixes.nix):
 
-Selectively uses stable versions for completely broken unstable packages.
+The second layer selectively uses stable versions for completely broken unstable packages.
 Platform conditionals isolate fixes to affected systems (isDarwin, isLinux, specific architecture).
 
-**Layer 3 - Custom packages** (pkgs/by-name/):
+Layer 3 - Custom packages (pkgs/by-name/):
 
-Custom derivations organized in flat pkgs-by-name structure following nixpkgs RFC 140.
+The third layer provides custom derivations organized in flat pkgs-by-name structure following nixpkgs RFC 140.
 Packages like atuin-format, ccstatusline, markdown-tree-parser, starship-jj auto-discovered via pkgs-by-name-for-flake-parts.
 
-**Layer 4 - Per-package overrides** (modules/nixpkgs/overlays/overrides.nix):
+Layer 4 - Per-package overrides (modules/nixpkgs/overlays/overrides.nix):
 
-Build modifications using overrideAttrs for test disabling, flag changes, and compilation fixes.
+The fourth layer applies build modifications using overrideAttrs for test disabling, flag changes, and compilation fixes.
 
-**Layer 5 - External flake overlays** (modules/nixpkgs/compose.nix):
+Layer 5 - External flake overlays (modules/nixpkgs/compose.nix):
 
-Overlays from flake inputs (nuenv for nushell script packaging) composed after internal overlays.
+The fifth layer composes overlays from flake inputs (nuenv for nushell script packaging) after internal overlays.
 
-**Composition order**:
+Composition order:
 
 Internal overlays (channels → hotfixes) → custom packages → overrides → external overlays.
 Later layers can reference packages from earlier layers.
@@ -166,32 +175,51 @@ Each subsystem provides distinct capabilities that compose to deliver the comple
 
 ### Dendritic flake-parts functions
 
-**Module auto-discovery**: import-tree scans modules/ recursively and imports every .nix file as flake-parts module.
+Module auto-discovery:
+
+The import-tree mechanism scans modules/ recursively and imports every .nix file as flake-parts module.
 Adding new module requires only creating file, no flake.nix updates.
 
-**Namespace aggregation**: Multiple files in same directory export to same namespace and auto-merge.
-modules/home/ai/claude-code.nix + modules/home/ai/mcp-servers.nix merge into flake.modules.homeManager.ai.
+Namespace aggregation:
 
-**Cross-platform module sharing**: Home-manager modules work on both darwin and nixos through namespace imports.
+Multiple files in same directory export to same namespace and auto-merge.
+The files modules/home/ai/claude-code.nix + modules/home/ai/mcp-servers.nix merge into flake.modules.homeManager.ai.
+
+Cross-platform module sharing:
+
+Home-manager modules work on both darwin and nixos through namespace imports.
 Same flakeModulesHome.ai imported in darwin (stibnite) and nixos (cinnabar) machine configurations.
 
-**Feature composition**: Machine configurations import aggregates rather than individual modules.
+Feature composition:
+
+Machine configurations import aggregates rather than individual modules.
 Changes to feature modules propagate automatically to all consuming machines.
 
 ### Clan-core functions
 
-**Unified deployment**: Single command interface deploys to any machine regardless of platform.
-clan machines update stibnite deploys to darwin laptop, clan machines update cinnabar deploys to nixos server.
+Unified deployment:
 
-**Service coordination**: Inventory instances coordinate multi-machine services.
+Single command interface deploys to any machine regardless of platform.
+The command clan machines update stibnite deploys to darwin laptop.
+The command clan machines update cinnabar deploys to nixos server.
+
+Service coordination:
+
+Inventory instances coordinate multi-machine services.
 Zerotier controller on cinnabar, peers on all other machines, configured through single inventory definition.
 
-**Secret generation**: Vars system generates machine-specific secrets automatically.
+Secret generation:
+
+Vars system generates machine-specific secrets automatically.
 SSH host keys, zerotier identities, encryption passphrases created by clan vars generate.
 
-**Secret distribution**: Generated secrets encrypted with age keys and distributed to machines during deployment.
+Secret distribution:
 
-**Rollback capability**: Deployment failures can roll back to previous configuration.
+Generated secrets encrypted with age keys and distributed to machines during deployment.
+
+Rollback capability:
+
+Deployment failures can roll back to previous configuration.
 
 ### Terranix functions
 
