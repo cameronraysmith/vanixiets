@@ -48,6 +48,6 @@ just --list
 For conceptual understanding and guides:
 
 - [Getting Started](/guides/getting-started/) - Initial setup and onboarding
-- [Nix Config Architecture](/concepts/nix-config-architecture/) - How the nix configuration is structured
+- [Architecture overview](/concepts/architecture-overview/) - How the nix configuration is structured
 - [Clan Integration](/concepts/clan-integration/) - Understanding clan-core integration
 - [CI Philosophy](/development/traceability/ci-philosophy/) - Design principles behind the CI system
