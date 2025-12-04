@@ -290,29 +290,29 @@ Infrastructure-as-code is non-negotiable for this fleet.
 
 ## Validation evidence
 
-### Epic 1 (November 2024)
+### Hetzner provisioning (November 2024)
 
 Hetzner provisioning validated:
 
-- **Story 1.4**: Terranix Hetzner module created
-- **Story 1.5**: cinnabar VPS provisioned and deployed
-- **Story 1.9**: electrum VPS added to fleet
+- Terranix Hetzner module created
+- cinnabar VPS provisioned and deployed
+- electrum VPS added to fleet
 
-**Metrics**:
+Validation metrics:
 - CX22 instance provisioned
 - NixOS installed via clan
 - Zerotier controller operational
 
-### Epic 7 (December 2024)
+### GCP infrastructure (December 2024)
 
 GCP provisioning validated:
 
-- **Story 7.1**: Terranix GCP module created (172 lines)
-- **Story 7.2**: galena CPU instance deployed
-- **Story 7.3**: Zerotier integration for GCP nodes
-- **Story 7.4**: scheelite GPU instance with Tesla T4
+- Terranix GCP module created (172 lines)
+- galena CPU instance deployed
+- Zerotier integration for GCP nodes
+- scheelite GPU instance with Tesla T4
 
-**Metrics**:
+Validation metrics:
 - GCP provider functional
 - Toggle mechanism validated
 - GPU instance operational
@@ -324,7 +324,6 @@ GCP provisioning validated:
 
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 - [ADR-0020: Dendritic + Clan Integration](0020-dendritic-clan-integration/) - How terranix integrates with the dendritic+clan architecture
-- Epic 7 retrospective: `docs/notes/development/retrospectives/epic-7-gcp-multi-node-infrastructure.md`
 - Terranix modules: `modules/terranix/`
 
 ### External
