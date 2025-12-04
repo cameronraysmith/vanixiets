@@ -276,6 +276,226 @@ home-manager switch --flake .#raquel
 
 ---
 
+## Clan inventory user instances (NixOS)
+
+For NixOS machines managed via clan, user configuration uses the inventory pattern.
+This complements the home-manager user modules by handling system-level user creation (username, groups, password) while home-manager handles environment configuration.
+
+### When to use this pattern
+
+Use clan inventory user instances when:
+- Deploying users to NixOS machines via clan
+- You need declarative system user creation with encrypted password management
+- Managing users across multiple machines with shared credentials
+- Integrating with clan's vars-based secrets infrastructure (Tier 1)
+
+This pattern is NixOS-specific.
+For darwin machines, continue using the integrated user setup described above.
+
+### The clan.inventory.instances.user-* pattern
+
+Clan inventory instances combine system user creation with home-manager integration:
+
+```nix
+# modules/clan/inventory/services/users/myuser.nix
+{ inputs, ... }:
+{
+  clan.inventory.instances.user-myuser = {
+    module = {
+      name = "users";
+      input = "clan-core";
+    };
+
+    # Target specific machines
+    roles.default.machines."myhost" = { };
+
+    roles.default.settings = {
+      user = "myuser";
+      groups = [ "wheel" "networkmanager" ];
+      share = true;   # Same password across machines
+      prompt = false; # Auto-generate via xkcdpass
+    };
+
+    roles.default.extraModules = [
+      inputs.home-manager.nixosModules.home-manager
+      ({ pkgs, ... }: {
+        # System user configuration
+        users.users.myuser.shell = pkgs.zsh;
+        programs.zsh.enable = true;
+
+        # Home-manager integration
+        home-manager.users.myuser = {
+          imports = [
+            inputs.self.modules.homeManager."users/myuser"
+          ];
+          home.username = "myuser";
+        };
+      })
+    ];
+  };
+}
+```
+
+### Settings options
+
+The `roles.default.settings` block controls system user creation:
+
+**`user`**: Username string (required)
+- Creates system user with this name
+- Must match username in home-manager configuration
+
+**`groups`**: List of system groups (required)
+- Common groups: `["wheel" "networkmanager"]`
+- `wheel`: sudo access (admin users)
+- `networkmanager`: network configuration
+
+**`share = true`**: Share password across machines (optional)
+- When `true`, all machines with this user instance use the same encrypted password
+- Password stored in clan vars (Tier 1 secrets)
+- When `false`, each machine has unique password
+
+**`prompt = false`**: Password generation method (optional)
+- When `false`, auto-generate password using xkcdpass (recommended)
+- When `true`, prompt interactively during `clan vars generate`
+- Auto-generation is preferred for reproducible deployments
+
+### Machine targeting options
+
+Target machines using either direct machine names or tags:
+
+**Machine-specific targeting**:
+```nix
+roles.default.machines."hostname" = { };
+```
+
+**Tag-based targeting**:
+```nix
+roles.default.tags."tagname" = { };
+```
+
+Tags are defined in machine configurations and allow bulk targeting (e.g., all NixOS servers, all laptops).
+
+### Integration with home-manager
+
+The `extraModules` block bridges system user creation with home-manager:
+
+```nix
+roles.default.extraModules = [
+  inputs.home-manager.nixosModules.home-manager
+  ({ pkgs, ... }: {
+    # System-level user settings
+    users.users.myuser.shell = pkgs.zsh;
+    programs.zsh.enable = true;
+
+    # Home-manager configuration
+    home-manager = {
+      useGlobalPkgs = true;
+      useUserPackages = true;
+      backupFileExtension = "before-home-manager";
+
+      extraSpecialArgs = {
+        flake = inputs.self // { inherit inputs; };
+      };
+
+      users.myuser = {
+        imports = [
+          inputs.self.modules.homeManager."users/myuser"
+          # Import aggregates or other home modules
+        ];
+        home.username = "myuser";
+      };
+    };
+  })
+];
+```
+
+This pattern:
+- Imports the portable user module from `modules/home/users/myuser/`
+- Passes flake inputs via `extraSpecialArgs` for sops-nix and other modules
+- Uses `backupFileExtension` to handle file conflicts gracefully
+- Enables `useGlobalPkgs` and `useUserPackages` for efficiency
+
+### Vars generation
+
+After defining user instances, generate encrypted passwords:
+
+```bash
+# Generate vars for a machine
+clan vars generate myhost
+
+# Generates encrypted password in .clan/vars/myhost/user-myuser/password.yaml
+```
+
+With `share = true`, the password is shared across all machines with this user instance.
+With `prompt = false`, the password is auto-generated using xkcdpass.
+
+### Complete example
+
+Here's a complete user instance configuration:
+
+```nix
+{ inputs, ... }:
+{
+  clan.inventory.instances.user-admin = {
+    module = {
+      name = "users";
+      input = "clan-core";
+    };
+
+    # Deploy to multiple machines
+    roles.default.machines."server1" = { };
+    roles.default.machines."server2" = { };
+
+    roles.default.settings = {
+      user = "admin";
+      groups = [ "wheel" "networkmanager" ];
+      share = true;
+      prompt = false;
+    };
+
+    roles.default.extraModules = [
+      inputs.home-manager.nixosModules.home-manager
+      ({ pkgs, ... }: {
+        users.users.admin.shell = pkgs.zsh;
+
+        users.users.admin.openssh.authorizedKeys.keys = [
+          "ssh-ed25519 AAAA..."
+        ];
+
+        programs.zsh.enable = true;
+
+        home-manager = {
+          useGlobalPkgs = true;
+          useUserPackages = true;
+          backupFileExtension = "before-home-manager";
+
+          extraSpecialArgs = {
+            flake = inputs.self // { inherit inputs; };
+          };
+
+          users.admin = {
+            imports = [
+              inputs.self.modules.homeManager."users/admin"
+              inputs.self.modules.homeManager.base-sops
+            ];
+            home.username = "admin";
+          };
+        };
+      })
+    ];
+  };
+}
+```
+
+This creates an admin user on server1 and server2 with:
+- System user with wheel group access
+- Auto-generated shared password
+- SSH key for authentication
+- zsh as default shell
+- Full home-manager environment from portable user module
+
+---
+
 ## Aggregate modules
 
 Users import aggregates rather than individual modules.
