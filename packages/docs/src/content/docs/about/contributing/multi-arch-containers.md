@@ -54,7 +54,7 @@ Update the cached image when:
 
 3. **When upstream changes affect the image** (detected during flake updates)
 
-Note: nix-config nixpkgs updates do NOT require cache updates.
+Note: infra nixpkgs updates do NOT require cache updates.
 The VM uses pinned nixpkgs (`e9f00bd8`) and evolves independently from system updates.
 
 ### Checking cache status
