@@ -672,7 +672,7 @@ development_status:
     CI/CD validation, release tagging automation.
     Depends on Epic 8 complete (docs accurate before merge).
     Stories 9.0a and 9.0b added from Epic 8 retrospective findings.
-  story-9-0a: drafted
+  story-9-0a: ready-for-review
   story-9-0a-title: "Update stale migration guides for dendritic architecture"
   story-9-0b: backlog
   story-9-0b-title: "Clean up migration artifacts and migrate essential content"
