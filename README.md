@@ -12,7 +12,7 @@
 
 > And all this to realize compositional algebras of graded effects, structured as indexed monad transformer stacks over effectful computations, from heterogeneous components to support experimentation, discovery, and understanding of the past in the present for the future.
 
-[Documentation][docs-link] • [Getting Started](https://infra.cameronraysmith.net/guides/getting-started) • [Architecture](https://infra.cameronraysmith.net/concepts/nix-config-architecture) • [Discussions](https://github.com/cameronraysmith/infra/discussions)
+[Documentation][docs-link] • [Getting Started](https://infra.cameronraysmith.net/guides/getting-started) • [Architecture](https://infra.cameronraysmith.net/concepts/architecture-overview) • [Discussions](https://github.com/cameronraysmith/infra/discussions)
 
 </div>
 
@@ -67,7 +67,7 @@ development testing
 [Setup Guide](https://infra.cameronraysmith.net/guides/getting-started) • [Host Onboarding](https://infra.cameronraysmith.net/guides/host-onboarding) • [Home Manager Onboarding](https://infra.cameronraysmith.net/guides/home-manager-onboarding)
 
 **Architecture:**
-[Nix flake-parts + clan integration](https://infra.cameronraysmith.net/concepts/nix-config-architecture) • [Dendritic flake-parts architecture](https://infra.cameronraysmith.net/concepts/dendritic-architecture) • [Multi-user setup](https://infra.cameronraysmith.net/concepts/multi-user-patterns) • [Repository structure](https://infra.cameronraysmith.net/reference/repository-structure)
+[Architecture overview](https://infra.cameronraysmith.net/concepts/architecture-overview) • [Dendritic flake-parts architecture](https://infra.cameronraysmith.net/concepts/dendritic-architecture) • [Multi-user setup](https://infra.cameronraysmith.net/concepts/multi-user-patterns) • [Repository structure](https://infra.cameronraysmith.net/reference/repository-structure)
 
 **Operations:**
 [Secrets management](https://infra.cameronraysmith.net/guides/secrets-management) • [Nixpkgs hotfixes](https://infra.cameronraysmith.net/development/architecture/nixpkgs-hotfixes) • [Handling broken packages](https://infra.cameronraysmith.net/guides/handling-broken-packages)
