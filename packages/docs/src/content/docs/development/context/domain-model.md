@@ -398,10 +398,10 @@ final: prev: {
 The infrastructure completed migration from nixos-unified to dendritic flake-parts + clan-core in November 2024.
 
 **Migration was progressive host-by-host**:
-1. **Phase 0**: Validated dendritic + clan in test-clan repository
-2. **Phase 1**: Deployed cinnabar VPS using validated patterns
-3. **Phase 2-5**: Migrated darwin hosts incrementally (blackphos → rosegold → argentum → stibnite)
-4. **Phase 6**: Removed nixos-unified, completed cleanup
+1. **Initial validation**: Validated dendritic + clan in test-clan repository
+2. **VPS foundation**: Deployed cinnabar VPS using validated patterns
+3. **Darwin migrations**: Migrated darwin hosts incrementally (blackphos → rosegold → argentum → stibnite)
+4. **Architecture cleanup**: Removed nixos-unified, completed cleanup
 
 **Per-host migration steps**:
 1. Created `modules/hosts/<hostname>/default.nix` using dendritic pattern

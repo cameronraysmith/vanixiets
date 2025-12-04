@@ -319,17 +319,17 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 
 ## Migration history
 
-### Phase 0: Validation (COMPLETE)
+### Initial validation (COMPLETE)
 
 **Objective**: Prove dendritic + clan integration works in test environment.
 
 **Outcome**: Validated patterns ready for production deployment via test-clan repository.
 
-**Status**: COMPLETE (Epic 1, Stories 1.1-1.14).
+**Status**: COMPLETE.
 
 **Completion**: November 2024.
 
-### Phase 1: Foundation infrastructure (COMPLETE)
+### Foundation infrastructure (COMPLETE)
 
 **Objective**: Deploy VPS infrastructure as foundation with core services.
 
@@ -338,11 +338,11 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 - F-006: Overlay networking (controller role on cinnabar)
 - F-008: Type-safe configuration (dendritic on NixOS)
 
-**Status**: COMPLETE (Epic 2).
+**Status**: COMPLETE.
 
 **Completion**: November 2024.
 
-### Phases 2-5: Darwin migration (COMPLETE)
+### Darwin migration (COMPLETE)
 
 **Objective**: Migrate darwin hosts progressively (blackphos → rosegold → argentum → stibnite).
 
@@ -353,17 +353,17 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 - F-006: Overlay networking (peer role on all darwin hosts)
 - F-003: Declarative secrets (clan vars)
 
-**Status**: COMPLETE (Epics 3-6).
+**Status**: COMPLETE.
 
 **Completion**: November 2024.
 
-### Phase 6: Cleanup (COMPLETE)
+### Architecture cleanup (COMPLETE)
 
 **Objective**: Remove nixos-unified, complete migration to dendritic+clan.
 
 **Outcome**: Full dendritic + clan architecture operational across all 8 machines.
 
-**Status**: COMPLETE (Epic 7).
+**Status**: COMPLETE.
 
 **Completion**: November 2024.
 
