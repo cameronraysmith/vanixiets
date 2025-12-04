@@ -456,13 +456,13 @@ jobs:
           cd test-secrets
           SOPS_AGE_KEY_FILE=test-key.txt \
             nix develop --command sops -d test.yaml | grep -q "test_secret: test-value-12345"
-          echo "✅ test secret decryption successful"
+          echo "● test secret decryption successful"
 
       - name: validate sops structure
         if: steps.cache.outputs.should-run == 'true'
         run: |
           if [ -f .sops.yaml ]; then
-            echo "✅ .sops.yaml exists in repository"
+            echo "● .sops.yaml exists in repository"
             nix develop --command sops --version
           else
             echo "⚠️  .sops.yaml not found (may need creation)"
@@ -472,7 +472,7 @@ jobs:
         if: always()
         run: |
           rm -rf test-secrets
-          echo "✅ ephemeral test secrets cleaned up"
+          echo "● ephemeral test secrets cleaned up"
 
       - name: Create job result marker
         if: success() && steps.cache.outputs.should-run == 'true'
@@ -544,9 +544,9 @@ jobs:
           echo "verifying core recipes..."
           for recipe in activate verify check lint; do
             if echo "$JUST_RECIPES" | grep -qw "$recipe"; then
-              echo "✅ $recipe recipe found"
+              echo "● $recipe recipe found"
             else
-              echo "❌ $recipe recipe not found"
+              echo "⊘ $recipe recipe not found"
               exit 1
             fi
           done
