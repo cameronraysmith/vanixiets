@@ -149,7 +149,7 @@ The [Guides](/guides/) section provides task-oriented procedures:
 The [Concepts](/concepts/) section explains the architecture:
 - [Dendritic flake-parts Architecture](/concepts/dendritic-architecture) — Module organization pattern
 - [Clan Machine Management](/concepts/clan-integration) — Multi-machine coordination
-- [Multi-user Management](/concepts/multi-user-patterns) — User configuration approaches
+- [System-user Integration](/concepts/system-user-integration) — User configuration approaches
 
 ### Reference the CLI
 
