@@ -4,11 +4,11 @@ sidebar:
   order: 2
 ---
 
-This document comprehends the system context and vision for the nix-config, capturing features and a high-level overview of use cases.
+This document comprehends the system context and vision for infra, capturing features and a high-level overview of use cases.
 
 ## System context
 
-The nix-config system operates within the Nix ecosystem providing declarative, reproducible infrastructure management across multiple hosts and platforms.
+Infra operates within the Nix ecosystem providing declarative, reproducible infrastructure management across multiple hosts and platforms.
 
 - **Primary platform**: macOS (nix-darwin) for daily workstations.
 - **Secondary platform**: NixOS for server infrastructure (VPS).
