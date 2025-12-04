@@ -880,33 +880,25 @@ ratchet_base := "ratchet"
 # List of GitHub Actions workflows
 gha_workflows := "./.github/workflows/flake.yaml"
 
-# Pin all workflow versions to hash values (requires Docker)
+# Pin GitHub Actions workflow versions to commit SHAs
 [group('CI/CD')]
 ratchet-pin:
-  @for workflow in {{gha_workflows}}; do \
-    eval "{{ratchet_base}} pin $workflow"; \
-  done
+    @RATCHET_BASE="{{ratchet_base}}" GHA_WORKFLOWS="{{gha_workflows}}" ./scripts/ci/ratchet-workflow.sh pin
 
-# Unpin hashed workflow versions to semantic values (requires Docker)
+# Unpin GitHub Actions workflow versions to semantic versions
 [group('CI/CD')]
 ratchet-unpin:
-  @for workflow in {{gha_workflows}}; do \
-    eval "{{ratchet_base}} unpin $workflow"; \
-  done
+    @RATCHET_BASE="{{ratchet_base}}" GHA_WORKFLOWS="{{gha_workflows}}" ./scripts/ci/ratchet-workflow.sh unpin
 
-# Update GitHub Actions workflows to the latest version (requires Docker)
+# Update GitHub Actions workflow versions to latest
 [group('CI/CD')]
 ratchet-update:
-  @for workflow in {{gha_workflows}}; do \
-    eval "{{ratchet_base}} update $workflow"; \
-  done
+    @RATCHET_BASE="{{ratchet_base}}" GHA_WORKFLOWS="{{gha_workflows}}" ./scripts/ci/ratchet-workflow.sh update
 
-# Upgrade GitHub Actions workflows across major versions (requires careful review)
+# Upgrade GitHub Actions workflow versions across major versions
 [group('CI/CD')]
 ratchet-upgrade:
-  @for workflow in {{gha_workflows}}; do \
-    eval "{{ratchet_base}} upgrade $workflow"; \
-  done
+    @RATCHET_BASE="{{ratchet_base}}" GHA_WORKFLOWS="{{gha_workflows}}" ./scripts/ci/ratchet-workflow.sh upgrade
 
 # Push nix-rosetta-builder VM image to Cachix and pin it (run after system updates)
 [group('CI/CD')]
