@@ -175,7 +175,7 @@ Show comprehensive summary including:
 ## Output Formats
 
 <success-output>
-✅ Git worktree created successfully!
+● Git worktree created successfully!
 
 📁 Repository: {repository_name}
 🌿 Branch: {branch_name}
@@ -209,44 +209,44 @@ Status: {success/failed}
 
 <error-outputs>
 <error condition="repository-not-found">
-❌ Error: Repository '{path}' not found or not accessible
+⊘ Error: Repository '{path}' not found or not accessible
 💡 Tip: Use '.' for current directory or provide valid path
 </error>
 
 <error condition="not-git-repository">
-❌ Error: '{path}' is not a git repository
+⊘ Error: '{path}' is not a git repository
 💡 Tip: Initialize with 'git init' or specify correct repository path
 </error>
 
 <error condition="branch-exists">
-❌ Error: Branch '{branch}' already exists
+⊘ Error: Branch '{branch}' already exists
 💡 Tip: Use different branch name or checkout existing: git worktree add <path> {branch}
 </error>
 
 <error condition="worktree-exists">
-❌ Error: Worktree for branch '{branch}' already exists
+⊘ Error: Worktree for branch '{branch}' already exists
 💡 Tip: Remove with: git worktree remove {path}
 </error>
 
 <error condition="file-not-found">
-❌ Error: Cannot copy file '{filename}' - file not found in source repository
+⊘ Error: Cannot copy file '{filename}' - file not found in source repository
 💡 Tip: Check file exists or remove from --copy-files list
 </error>
 
 <error condition="file-copy-failed">
-❌ Error: Failed to copy file '{filename}' to worktree
+⊘ Error: Failed to copy file '{filename}' to worktree
 💡 Tip: Check file permissions and available disk space
 </error>
 
 <error condition="install-command-failed">
-❌ Error: Installation command failed with exit code {code}
+⊘ Error: Installation command failed with exit code {code}
 Command: {command}
 Output: {error_output}
 💡 Tip: Check command syntax and dependencies
 </error>
 
 <error condition="invalid-install-command">
-❌ Error: Invalid installation command format
+⊘ Error: Invalid installation command format
 💡 Tip: Ensure command is properly quoted: --install-cmd "your command here"
 </error>
 </error-outputs>
