@@ -4,20 +4,20 @@ title: Architecture
 
 Architecture documentation for the vanixiets multi-machine infrastructure configuration.
 
-This repository manages a heterogeneous fleet of 8 machines across 2 platforms using declarative Nix configuration.
-The infrastructure coordinates 4 nix-darwin laptops and 4 nixos servers through dendritic flake-parts module organization, clan-core multi-machine orchestration, and terranix cloud provisioning.
+This repository manages a heterogeneous fleet of 6 permanent machines plus ephemeral cloud instances across 2 platforms using declarative Nix configuration.
+The infrastructure coordinates 4 nix-darwin laptops and permanent nixos servers (cinnabar plus ephemeral instances like electrum) through dendritic flake-parts module organization, clan-core multi-machine orchestration, and terranix cloud provisioning.
 
 ## Overview
 
 The architecture follows a feature-based organizational pattern where capabilities are defined once and consumed by machine configurations.
 Infrastructure provisioning, system deployment, and secrets management are separated into distinct layers with clear boundaries.
 
-Key architectural components:
-- Dendritic flake-parts provides feature-based module organization with auto-discovery
-- Clan-core orchestrates deployment across darwin and nixos machines
-- Terranix provisions cloud infrastructure on Hetzner and GCP
-- Five-layer overlay composition enables surgical package fixes without system-wide rollbacks
-- Two-tier secrets architecture separates system-level generated secrets from user credentials
+The system integrates four major architectural components.
+Dendritic flake-parts provides feature-based module organization with auto-discovery mechanisms that eliminate manual registration.
+Clan-core orchestrates deployment across darwin and nixos machines through a unified command interface.
+Terranix provisions cloud infrastructure on Hetzner and GCP with toggle mechanisms for cost control.
+Five-layer overlay composition enables surgical package fixes without system-wide rollbacks when nixpkgs packages break.
+A two-tier secrets architecture separates system-level generated secrets from user credentials using age encryption.
 
 ## System Specification
 
