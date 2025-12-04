@@ -107,7 +107,7 @@ nix flake show --json | jq '...'  # Get flake outputs
 
 ### What It Tests
 
-Handled by omnix CI - builds all outputs for all systems:
+Builds all outputs for all systems:
 - `nixosConfigurations.*`
 - `darwinConfigurations.*`
 - `packages.*`

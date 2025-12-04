@@ -58,7 +58,7 @@ Core nix operations for building, checking, and managing the flake.
 
 | Recipe | Arguments | Description | CI-tested |
 |--------|-----------|-------------|-----------|
-| `flake-info` | - | Print nix flake inputs, outputs, and omnix info | No |
+| `flake-info` | - | Print nix flake inputs and outputs | No |
 | `lint` | - | Lint nix files with pre-commit | No |
 | `dev` | - | Manually enter dev shell | No |
 | `clean` | - | Remove build output link (no garbage collection) | No |

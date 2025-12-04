@@ -172,8 +172,7 @@ build_all_categories() {
     echo "╔═══════════════════════════════════════════════════════════════╗"
     echo "║          Building All Flake Outputs (nom mode)                ║"
     echo "║                                                               ║"
-    echo "║  This mimics 'om ci run' but uses direct nix commands         ║"
-    echo "║  with nom for interpretable build status monitoring.          ║"
+    echo "║  Uses direct nix commands with nom for build monitoring.       ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
     echo "🎯 Target system: $target_system"
@@ -325,7 +324,7 @@ build_all_categories() {
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "✅ All outputs built successfully!"
         echo ""
-        echo "🎉 This is equivalent to: om ci run --systems $target_system"
+        echo "🎉 All flake outputs built successfully for $target_system"
         echo ""
     fi
 }
