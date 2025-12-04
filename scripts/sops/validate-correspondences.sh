@@ -22,11 +22,11 @@ print_header() {
 }
 
 check_pass() {
-  echo -e "${GREEN}✅ $1${NC}"
+  echo -e "${GREEN}● $1${NC}"
 }
 
 check_fail() {
-  echo -e "${RED}❌ $1${NC}" >&2
+  echo -e "${RED}⊘ $1${NC}" >&2
   FAILED=1
 }
 
@@ -211,9 +211,9 @@ done
 print_header "Validation Summary"
 
 if [ $FAILED -eq 0 ]; then
-  echo -e "${GREEN}✅ All correspondence validations passed${NC}"
+  echo -e "${GREEN}● All correspondence validations passed${NC}"
   exit 0
 else
-  echo -e "${RED}❌ Some validations failed${NC}" >&2
+  echo -e "${RED}⊘ Some validations failed${NC}" >&2
   exit 1
 fi
