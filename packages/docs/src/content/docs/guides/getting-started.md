@@ -202,7 +202,7 @@ See [Repository Structure](/reference/repository-structure) for complete directo
 
 - [Dendritic Architecture](/concepts/dendritic-architecture) - Core pattern where every file is a flake-parts module
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and two-tier secrets
-- [Multi-User Patterns](/concepts/multi-user-patterns) - Admin vs non-admin users
+- [System-user Integration](/concepts/system-user-integration) - Admin vs non-admin users
 
 ### Set up a new machine
 
