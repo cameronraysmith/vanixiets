@@ -153,15 +153,15 @@ Provide your analysis and proposed commits in this structured format:
 
 ### Proposed Commit Sequence
 ```
-📝 Commit 1: [type(scope): description]
+• Commit 1: [type(scope): description]
    Files: [list of files]
    Reasoning: [why these files are grouped together]
 
-📝 Commit 2: [type(scope): description]
+• Commit 2: [type(scope): description]
    Files: [list of files]
    Reasoning: [why these files are grouped together]
 
-📝 Commit 3: [type(scope): description]
+• Commit 3: [type(scope): description]
    Files: [list of files]
    Reasoning: [why these files are grouped together]
 ```
@@ -200,7 +200,7 @@ motivation and implementation approach.
 
 *Type 'y' to execute the planned sequence, 'e' to edit the plan, or 'n' to abort and make manual changes.*
 
-### 🎯 How to Use This Sub-agent
+### ◎ How to Use This Sub-agent
 
 **Automatic Invocation:**
 This sub-agent will be automatically invoked when you mention git commits or ask for commit assistance.
