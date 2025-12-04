@@ -12,7 +12,7 @@ Infrastructure coordination leverages clan's inventory system with tags, roles, 
 
 ## Statement of intent
 
-Migration from flake-parts + nixos-unified architecture to dendritic flake-parts pattern with clan-core integration is complete (Epics 1-7, November 2024).
+Migration from flake-parts + nixos-unified architecture to dendritic flake-parts pattern with clan-core integration is complete (November 2024).
 Current infrastructure achieves maximum type safety through "every file is a flake-parts module" organizational pattern, eliminating specialArgs anti-pattern.
 Systematic multi-host management operational through clan's inventory system, service instances, and overlay networking (zerotier).
 Declarative secrets management deployed through clan vars system with automatic generation and deployment.
@@ -83,7 +83,7 @@ NixOS VPS hosts (x86_64-linux):
 
 **Foundation**: flake-parts (modular composition) + nixos-unified (directory-based autowiring)
 
-**Deprecation**: nixos-unified architecture deprecated November 2024, removed during Epics 1-7 migration.
+**Deprecation**: nixos-unified architecture deprecated November 2024, removed during migration.
 
 **Historical repository structure**:
 - `flake.nix` used `flake-parts.lib.mkFlake` with auto-wired imports from `./modules/flake-parts/`
@@ -106,13 +106,10 @@ NixOS VPS hosts (x86_64-linux):
 - clan-infra production infrastructure uses clan + flake-parts with manual imports, not nixos-unified
 
 **Migration completed**: Validation-first, then VPS infrastructure, then progressive darwin host migration
-- **Phase 0**: COMPLETE - validated dendritic + clan integration in test-clan/ repository (isolated testing)
-- **Phase 1**: COMPLETE - deployed cinnabar VPS using validated patterns (foundation infrastructure)
-- **Phase 2**: COMPLETE - migrated blackphos (established darwin patterns)
-- **Phase 3**: COMPLETE - migrated rosegold (validated pattern reusability)
-- **Phase 4**: COMPLETE - migrated argentum (final validation)
-- **Phase 5**: COMPLETE - migrated stibnite (primary workstation, last after all others proven stable)
-- **Phase 6**: COMPLETE - removed nixos-unified, completed migration
+- **Initial validation**: COMPLETE - validated dendritic + clan integration in test-clan/ repository (isolated testing)
+- **VPS foundation**: COMPLETE - deployed cinnabar VPS using validated patterns (foundation infrastructure)
+- **Darwin migrations**: COMPLETE - migrated darwin hosts progressively (blackphos → rosegold → argentum → stibnite, primary workstation last after all others proven stable)
+- **Architecture cleanup**: COMPLETE - removed nixos-unified, completed migration
 
 **Migration rationale**:
 - **Type safety**: Nix lacks native type system; module system provides type checking at evaluation time; dendritic maximizes module system usage
@@ -136,11 +133,11 @@ NixOS VPS hosts (x86_64-linux):
 2. **Secondary**: Dendritic flake-parts pattern (best-effort) - apply where feasible without compromising clan
 3. **Tertiary**: Pattern purity (flexible) - some specialArgs acceptable if clan requires, pragmatism over orthodoxy
 
-**Validated in production**: 8-machine fleet operational since November 2024 (Epics 1-7 completion)
+**Validated in production**: 8-machine fleet operational since November 2024
 
 ## Risk mitigation strategy (historical)
 
-**Phase 0 validation completed**: No production examples existed combining dendritic + clan patterns.
+**Validation completed**: No production examples existed combining dendritic + clan patterns.
 test-clan/ repository validated integration in minimal environment before infrastructure commitment.
 Reduced compound debugging complexity across 8 simultaneous layers (dendritic, clan, terraform, hetzner, disko, LUKS, zerotier, NixOS).
 Outcome: proven patterns successfully deployed to cinnabar and all 8 machines.
@@ -150,7 +147,7 @@ Outcome: proven patterns successfully deployed to cinnabar and all 8 machines.
 - Kept stibnite on nixos-unified until others proven stable
 - Each host migration verified independently
 - Multi-machine testing validated with multiple test hosts
-- Each phase validated patterns before proceeding to next
+- Each host validated patterns before proceeding to next
 
 **Stability validation**: Each host remained stable for 1-2 weeks before migrating next host.
 
@@ -158,10 +155,10 @@ Outcome: proven patterns successfully deployed to cinnabar and all 8 machines.
 
 ## Conclusion
 
-Migration from flake-parts + nixos-unified to dendritic + clan architecture completed successfully (Epics 1-7, November 2024).
+Migration from flake-parts + nixos-unified to dendritic + clan architecture completed successfully (November 2024).
 Current architecture maximizes type safety through deeper module system integration and enables systematic multi-host management across 8-machine fleet.
 Validation-first approach with progressive host-by-host deployment minimized risk to primary workstation.
-Success achieved through careful validation at each phase, stability monitoring between phases (1-2 weeks per host), and proven rollback capabilities.
+Success achieved through careful validation at each host, stability monitoring between hosts (1-2 weeks per host), and proven rollback capabilities.
 
 Infrastructure now operational with:
 - 4 darwin hosts (stibnite, blackphos, rosegold, argentum) on aarch64-darwin
