@@ -15,7 +15,7 @@
           comment = "8 vCPU, 16GB RAM, 160GB SSD, legacy BIOS";
         };
         electrum = {
-          enabled = true; # Secondary test VM, zerotier peer (CCX23: UEFI + systemd-boot)
+          enabled = false; # Secondary test VM, zerotier peer (CCX23: UEFI + systemd-boot)
           serverType = "ccx23";
           location = "fsn1";
           image = "debian-12";
