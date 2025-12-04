@@ -363,10 +363,10 @@ Keep bookmark-only when:
 
 ```bash
 # Graduate experiment 1 from bookmark to workspace
-jj workspace add ../nix-config-exp-1 -r exp-1-nix-flakes
+jj workspace add ../myproject-exp-1 -r exp-1-nix-flakes
 
 # Workspace created with working-copy commit (exp1@) starting from exp-1-nix-flakes
-cd ../nix-config-exp-1
+cd ../myproject-exp-1
 
 # Now exp1@ is your working copy
 # Files are persistent on disk
@@ -377,7 +377,7 @@ jj new
 nix build .# &
 
 # Work on other experiments in parallel
-cd ../nix-config
+cd ../myproject
 jj new exp-2-home-manager
 jj describe -m "[exp-2] feat(home): configure programs"
 ```
@@ -417,9 +417,9 @@ jj workspace forget <workspace-name>
 rm -rf <workspace-path>
 
 # Workspace naming convention
-nix-config/           # Primary workspace
-nix-config-exp-1/     # Experiment 1 workspace
-nix-config-exp-2/     # Experiment 2 workspace
+myproject/           # Primary workspace
+myproject-exp-1/     # Experiment 1 workspace
+myproject-exp-2/     # Experiment 2 workspace
 ```
 
 ## Experiment lifecycle management
@@ -434,7 +434,7 @@ Bookmarks:
 
 Workspaces (when needed):
 - `{repo}-exp-{number}`
-- Examples: `nix-config-exp-1`, `nix-config-exp-2`
+- Examples: `myproject-exp-1`, `myproject-exp-2`
 
 Commit descriptions:
 - Active: `[exp-N] type: description`
@@ -487,7 +487,7 @@ Maintain `docs/experiments.md` in repository:
 ### exp-1-refactor-parser
 - Status: Active
 - Bookmark: `exp-1-refactor-parser`
-- Workspace: `nix-config-exp-1`
+- Workspace: `myproject-exp-1`
 - Goal: Rewrite parser for 10x performance
 - Created: 2025-10-15
 - PR: #123
@@ -505,7 +505,7 @@ Maintain `docs/experiments.md` in repository:
 ### exp-3-optimize-cache
 - Status: Ready for review
 - Bookmark: `exp-3-optimize-cache`
-- Workspace: `nix-config-exp-3`
+- Workspace: `myproject-exp-3`
 - Goal: LRU cache for 30% speedup
 - Created: 2025-10-10
 - PR: #120
@@ -992,7 +992,7 @@ jj bookmark set main -r @
 jj git push --bookmark main
 
 # Continue improving in workspace
-jj workspace add ../nix-config-exp-4-cache -r @
+jj workspace add ../myproject-exp-4-cache -r @
 # Iterate on implementation
 # When stable, remove flag in follow-up commits
 ```
