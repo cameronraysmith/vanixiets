@@ -2,6 +2,8 @@
 
 # vanixiets
 
+**/vɑn.ɪks.its/** — something from nothing
+
 <a href="https://nix.dev/concepts/flakes" target="_blank">
   <img alt="Nix Flakes Ready" src="https://img.shields.io/static/v1?logo=nixos&logoColor=d8dee9&label=Nix%20Flakes&labelColor=5e81ac&message=infrastructure&color=d8dee9&style=for-the-badge">
 </a>
@@ -83,6 +85,21 @@ development testing
 Built with [flake-parts](https://github.com/hercules-ci/flake-parts), [import-tree](https://github.com/vic/import-tree), [clan-core](https://clan.lol), and overlay patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos).
 
 See [complete credits](https://infra.cameronraysmith.net/about/credits) for full acknowledgments.
+
+<details>
+<summary>Origin of the name</summary>
+
+**vanixiets** is a contraction of *van niets iets* ("from nothing, something"), capturing the Nix philosophy that build environments start empty and all dependencies must be explicitly declared.
+
+The name pays homage to Eelco Dolstra's etymology for Nix itself:
+
+> "The name Nix is derived from the Dutch word *niks*, meaning nothing; build actions do not see anything that has not been explicitly declared as an input."
+>
+> — Dolstra, de Jonge & Visser (2004)[^1]
+
+[^1]: Dolstra E, de Jonge M, Visser E. Nix: A Safe and Policy-Free System for Software Deployment. *LISA '04: 18th USENIX Large Installation System Administration Conference*. 2004;79–92. <https://www.usenix.org/conference/lisa-04/nix-safe-and-policy-free-system-software-deployment>
+
+</details>
 
 [ci-badge]: https://github.com/cameronraysmith/vanixiets/actions/workflows/ci.yaml/badge.svg
 [ci-link]: https://github.com/cameronraysmith/vanixiets/actions/workflows/ci.yaml
