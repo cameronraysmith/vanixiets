@@ -30,7 +30,7 @@ extract_key_details() {
 
   # Check if key exists
   if ! bw get item "$key_name" &>/dev/null; then
-    echo -e "${RED}❌ ERROR: Key '$key_name' not found in Bitwarden${NC}" >&2
+    echo -e "${RED}⊘ ERROR: Key '$key_name' not found in Bitwarden${NC}" >&2
     return 1
   fi
 
@@ -51,9 +51,9 @@ extract_key_details() {
 
   # Validate age key format (age1 + 58 lowercase alphanumeric chars)
   if [[ $age_pub =~ ^age1[a-z0-9]{58}$ ]]; then
-    echo -e "${GREEN}✅ Age key format valid${NC}"
+    echo -e "${GREEN}● Age key format valid${NC}"
   else
-    echo -e "${RED}❌ WARNING: Age key format invalid!${NC}" >&2
+    echo -e "${RED}⊘ WARNING: Age key format invalid!${NC}" >&2
     echo "Expected: age1[a-z0-9]{58}" >&2
     echo "Got: $age_pub" >&2
     return 1
@@ -79,11 +79,11 @@ main() {
     done
 
     if [ $failed -eq 1 ]; then
-      echo -e "${RED}❌ Some keys failed validation${NC}" >&2
+      echo -e "${RED}⊘ Some keys failed validation${NC}" >&2
       exit 1
     fi
 
-    echo -e "${GREEN}✅ All keys extracted and validated successfully${NC}"
+    echo -e "${GREEN}● All keys extracted and validated successfully${NC}"
   fi
 }
 
