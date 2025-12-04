@@ -106,13 +106,13 @@ should_build_config() {
 
 get_category_emoji() {
     case "$1" in
-        packages) echo "📦" ;;
+        packages) echo "◼" ;;
         checks) echo "●" ;;
-        devshells) echo "🐚" ;;
+        devshells) echo "◇" ;;
         nixos) echo "🐧" ;;
         darwin) echo "🍎" ;;
-        home) echo "🏠" ;;
-        *) echo "🔨" ;;
+        home) echo "⌂" ;;
+        *) echo "▶" ;;
     esac
 }
 
@@ -175,8 +175,8 @@ build_all_categories() {
     echo "║  Uses direct nix commands with nom for build monitoring.       ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "🎯 Target system: $target_system"
-    echo "📍 Flake: $(pwd)"
+    echo "◎ Target system: $target_system"
+    echo "▸ Flake: $(pwd)"
     echo ""
 
     # Initialize tracking
@@ -185,10 +185,10 @@ build_all_categories() {
     failed_log=$(mktemp)
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "📋 Phase 1: Discovery"
+    echo "≡ Phase 1: Discovery"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
-    echo "🔍 Discovering flake outputs for $target_system..."
+    echo "◉ Discovering flake outputs for $target_system..."
 
     # Discover all categories
     local packages checks devshells nixos_configs darwin_configs home_configs
@@ -209,7 +209,7 @@ build_all_categories() {
     total_count=$((pkg_count + check_count + devshell_count + nixos_count + darwin_count + home_count))
 
     echo ""
-    echo "📊 Discovery summary:"
+    echo "≡ Discovery summary:"
     echo "   • Packages:           $pkg_count"
     echo "   • Checks:             $check_count"
     echo "   • DevShells:          $devshell_count"
@@ -226,7 +226,7 @@ build_all_categories() {
     fi
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "🔨 Phase 2: Building"
+    echo "▶ Phase 2: Building"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 
@@ -285,7 +285,7 @@ build_all_categories() {
     done
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "📈 Phase 3: Summary"
+    echo "△ Phase 3: Summary"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 
@@ -293,7 +293,7 @@ build_all_categories() {
     built_count=$(wc -l < "$build_log" | tr -d ' ' || echo "0")
     failed_count=$(wc -l < "$failed_log" | tr -d ' ' || echo "0")
 
-    echo "📊 Build results:"
+    echo "≡ Build results:"
     echo "   • Total outputs:      $total_count"
     echo "   • Successfully built: $built_count"
     echo "   • Failed:             $failed_count"
@@ -309,7 +309,7 @@ build_all_categories() {
         echo "⊘ Failed builds:"
         sed 's/^/   • /' < "$failed_log"
         echo ""
-        echo "💡 Tip: Rebuild individually with:"
+        echo "→ Tip: Rebuild individually with:"
         sed 's/^/   nom build .#/' < "$failed_log"
         echo ""
     fi
@@ -324,7 +324,7 @@ build_all_categories() {
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "● All outputs built successfully!"
         echo ""
-        echo "🎉 All flake outputs built successfully for $target_system"
+        echo "★ All flake outputs built successfully for $target_system"
         echo ""
     fi
 }
