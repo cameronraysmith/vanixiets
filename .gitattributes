@@ -1,2 +1,3 @@
 flake.lock linguist-generated=true
+machines/*/facter.json linguist-generated=true
 *.nix text eol=lf
