@@ -161,7 +161,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-B01 (reliable infrastructure)
 
-**Status**: Achieved in current state (multi-channel resilience), must be preserved during migration
+**Status**: Achieved in current state (multi-channel fallback), must be preserved during migration
 
 **Reference**: ADR nixpkgs-hotfixes, `docs/development/architecture/nixpkgs-hotfixes.md`
 

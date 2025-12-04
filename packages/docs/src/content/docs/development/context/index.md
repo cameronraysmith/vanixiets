@@ -87,7 +87,7 @@ Description of the Nix ecosystem domain and current architecture components.
 
 **Key domains**:
 - Nix ecosystem overview (core concepts, package channels)
-- Current architecture (dendritic flake-parts, clan-core, multi-channel resilience, sops-nix)
+- Current architecture (dendritic flake-parts, clan-core, multi-channel fallback, sops-nix)
 - Domain processes (workflows for configuration, secrets, multi-host coordination)
 
 ### [Glossary](/development/context/glossary/)

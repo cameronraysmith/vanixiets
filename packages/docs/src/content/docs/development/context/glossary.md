@@ -109,7 +109,7 @@ Related: justfile, task runner.
 Synonym: none.
 Related: just, task automation.
 
-**multi-channel resilience**: Pattern using multiple nixpkgs inputs to handle broken packages without system-wide rollback.
+**multi-channel fallback**: Pattern using multiple nixpkgs inputs to handle broken packages without system-wide rollback.
 Synonym: nixpkgs hotfixes pattern.
 Related: nixpkgs, overlay, stable fallback.
 
@@ -290,7 +290,7 @@ Related: design principles, ADR-0014.
 Related: AMDiRE, context layer.
 
 **stable fallback**: Multi-channel resilience pattern using stable channel version when unstable broken.
-Related: multi-channel resilience, nixpkgs.
+Related: multi-channel fallback, nixpkgs.
 
 **template duality**: Design principle where repository serves as both working deployment and forkable template.
 Related: design principles, ADR-0014.
@@ -373,7 +373,7 @@ Related: module organization, dendritic pattern.
 Related: derivation, overlay.
 
 **overlays directory**: `overlays/` containing nixpkgs overlays for package modifications.
-Related: overlay, multi-channel resilience.
+Related: overlay, multi-channel fallback.
 
 ## Glossary maintenance
 
