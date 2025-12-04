@@ -45,7 +45,7 @@ Clan orchestrates deployments across the machine fleet but doesn't replace under
 
 See [Clan Integration](/concepts/clan-integration/) for detailed explanation.
 
-### Layer 4: Overlay composition (multi-channel resilience)
+### Layer 4: Overlay composition (multi-channel fallback)
 
 Adopts proven resilience patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos) for handling nixpkgs unstable breakage.
 
