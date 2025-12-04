@@ -53,7 +53,7 @@ bootstrap-prep-darwin: ## Install darwin prerequisites (Xcode CLI tools + Homebr
 	@printf "Installing darwin prerequisites...\n\n"
 	@printf "Step 1: Xcode Command Line Tools\n"
 	@if xcode-select -p &>/dev/null; then \
-		printf "  ✅ Xcode CLI tools already installed\n"; \
+		printf "  ● Xcode CLI tools already installed\n"; \
 	else \
 		printf "  Installing Xcode CLI tools (this will open a dialog)...\n"; \
 		xcode-select --install; \
@@ -62,18 +62,18 @@ bootstrap-prep-darwin: ## Install darwin prerequisites (Xcode CLI tools + Homebr
 	fi
 	@printf "\nStep 2: Homebrew\n"
 	@if command -v brew &>/dev/null; then \
-		printf "  ✅ Homebrew already installed\n"; \
+		printf "  ● Homebrew already installed\n"; \
 	else \
 		printf "  Installing Homebrew...\n"; \
 		/bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; \
 	fi
-	@printf "\n✅ Darwin prerequisites complete!\n"
+	@printf "\n● Darwin prerequisites complete!\n"
 	@printf "Next: Run 'make bootstrap' to install Nix\n"
 
 .PHONY: bootstrap
 bootstrap: ## Main bootstrap target that runs all necessary setup steps
 bootstrap: install-nix install-direnv
-	@printf "\n✅ Bootstrap of nix and direnv complete!\n\n"
+	@printf "\n● Bootstrap of nix and direnv complete!\n\n"
 	@printf "Next steps:\n"
 	@echo "1. Start a new shell session (to load nix in PATH)"
 	@echo "2. Run 'make verify' to check your installation"
@@ -168,39 +168,39 @@ verify: ## Verify nix installation and environment setup
 	@printf "\nVerifying installation...\n\n"
 	@printf "Checking nix installation: "
 	@if command -v nix >/dev/null 2>&1; then \
-		printf "✅ nix found at %s\n" "$$(command -v nix)"; \
+		printf "● nix found at %s\n" "$$(command -v nix)"; \
 		nix --version; \
 	else \
-		printf "❌ nix not found\n"; \
+		printf "⊘ nix not found\n"; \
 		printf "Run 'make install-nix' to install nix\n"; \
 		exit 1; \
 	fi
 	@printf "\nChecking nix flakes support: "
 	@if nix flake --help >/dev/null 2>&1; then \
-		printf "✅ flakes enabled\n"; \
+		printf "● flakes enabled\n"; \
 	else \
-		printf "❌ flakes not enabled\n"; \
+		printf "⊘ flakes not enabled\n"; \
 		exit 1; \
 	fi
 	@printf "\nChecking direnv installation: "
 	@if command -v direnv >/dev/null 2>&1; then \
-		printf "✅ direnv found\n"; \
+		printf "● direnv found\n"; \
 	else \
 		printf "⚠️  direnv not found (optional but recommended)\n"; \
 		printf "Run 'make install-direnv' to install\n"; \
 	fi
 	@printf "\nChecking flake validity: "
 	@if nix flake metadata . >/dev/null 2>&1; then \
-		printf "✅ flake is valid\n"; \
+		printf "● flake is valid\n"; \
 	else \
-		printf "❌ flake has errors\n"; \
+		printf "⊘ flake has errors\n"; \
 		exit 1; \
 	fi
 	@printf "\nChecking required tools in devShell: "
 	@if nix develop --command bash -c 'command -v age-keygen && command -v ssh-to-age && command -v sops && command -v just' >/dev/null 2>&1; then \
-		printf "✅ age-keygen, ssh-to-age, sops, just available\n"; \
+		printf "● age-keygen, ssh-to-age, sops, just available\n"; \
 	else \
-		printf "❌ some tools missing from devShell\n"; \
+		printf "⊘ some tools missing from devShell\n"; \
 		exit 1; \
 	fi
 	@printf "\n/etc/nix/nix.conf:\n"
@@ -213,7 +213,7 @@ verify: ## Verify nix installation and environment setup
 		cat /etc/nix/nix.custom.conf; \
 		printf "==================\n"; \
 	fi
-	@printf "\n✅ All verification checks passed!\n\n"
+	@printf "\n● All verification checks passed!\n\n"
 
 #-------
 ##@ setup
@@ -232,7 +232,7 @@ setup-user: ## Generate age key for sops-nix secrets (first time user setup)
 		mkdir -p ~/.config/sops/age; \
 		nix shell nixpkgs#age -c age-keygen -o ~/.config/sops/age/keys.txt; \
 		chmod 600 ~/.config/sops/age/keys.txt; \
-		printf "\n✅ Age key generated successfully!\n\n"; \
+		printf "\n● Age key generated successfully!\n\n"; \
 		printf "Your public key is:\n"; \
 		nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt; \
 		printf "\n⚠️  IMPORTANT: Back up your private key to Bitwarden!\n"; \
@@ -246,14 +246,14 @@ setup-user: ## Generate age key for sops-nix secrets (first time user setup)
 check-secrets: ## Check if you can decrypt shared secrets (requires age key and admin setup)
 	@printf "\nChecking secrets access...\n\n"
 	@if [ ! -f ~/.config/sops/age/keys.txt ]; then \
-		printf "❌ No age key found. Run 'make setup-user' first\n"; \
+		printf "⊘ No age key found. Run 'make setup-user' first\n"; \
 		exit 1; \
 	fi
 	@if nix develop --command sops -d secrets/shared.yaml >/dev/null 2>&1; then \
-		printf "✅ Successfully decrypted shared secrets!\n"; \
+		printf "● Successfully decrypted shared secrets!\n"; \
 		printf "You have proper access to the secrets system\n"; \
 	else \
-		printf "❌ Cannot decrypt shared secrets\n"; \
+		printf "⊘ Cannot decrypt shared secrets\n"; \
 		printf "Possible reasons:\n"; \
 		printf "1. Admin hasn't added your key to .sops.yaml yet\n"; \
 		printf "2. Admin hasn't run 'sops updatekeys' after adding you\n"; \
