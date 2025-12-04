@@ -177,9 +177,9 @@ Show comprehensive summary including:
 <success-output>
 ● Git worktree created successfully!
 
-📁 Repository: {repository_name}
-🌿 Branch: {branch_name}
-📍 Location: {full_worktree_path}
+▸ Repository: {repository_name}
+⊢ Branch: {branch_name}
+▸ Location: {full_worktree_path}
 
 {copied_files_section}
 {installation_results_section}
@@ -195,12 +195,12 @@ All worktrees for this repository:
 
 <conditional-outputs>
 <copied-files-output condition="--copy-files used">
-📋 Copied files:
+▸ Copied files:
 {list_of_copied_files}
 </copied-files-output>
 
 <installation-output condition="--install-cmd used">
-⚙️ Installation completed:
+▸ Installation completed:
 Command: {install_command}
 Status: {success/failed}
 {command_output}
@@ -210,44 +210,44 @@ Status: {success/failed}
 <error-outputs>
 <error condition="repository-not-found">
 ⊘ Error: Repository '{path}' not found or not accessible
-💡 Tip: Use '.' for current directory or provide valid path
+→ Tip: Use '.' for current directory or provide valid path
 </error>
 
 <error condition="not-git-repository">
 ⊘ Error: '{path}' is not a git repository
-💡 Tip: Initialize with 'git init' or specify correct repository path
+→ Tip: Initialize with 'git init' or specify correct repository path
 </error>
 
 <error condition="branch-exists">
 ⊘ Error: Branch '{branch}' already exists
-💡 Tip: Use different branch name or checkout existing: git worktree add <path> {branch}
+→ Tip: Use different branch name or checkout existing: git worktree add <path> {branch}
 </error>
 
 <error condition="worktree-exists">
 ⊘ Error: Worktree for branch '{branch}' already exists
-💡 Tip: Remove with: git worktree remove {path}
+→ Tip: Remove with: git worktree remove {path}
 </error>
 
 <error condition="file-not-found">
 ⊘ Error: Cannot copy file '{filename}' - file not found in source repository
-💡 Tip: Check file exists or remove from --copy-files list
+→ Tip: Check file exists or remove from --copy-files list
 </error>
 
 <error condition="file-copy-failed">
 ⊘ Error: Failed to copy file '{filename}' to worktree
-💡 Tip: Check file permissions and available disk space
+→ Tip: Check file permissions and available disk space
 </error>
 
 <error condition="install-command-failed">
 ⊘ Error: Installation command failed with exit code {code}
 Command: {command}
 Output: {error_output}
-💡 Tip: Check command syntax and dependencies
+→ Tip: Check command syntax and dependencies
 </error>
 
 <error condition="invalid-install-command">
 ⊘ Error: Invalid installation command format
-💡 Tip: Ensure command is properly quoted: --install-cmd "your command here"
+→ Tip: Ensure command is properly quoted: --install-cmd "your command here"
 </error>
 </error-outputs>
 
