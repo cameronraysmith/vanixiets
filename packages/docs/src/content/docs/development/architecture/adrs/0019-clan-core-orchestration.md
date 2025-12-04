@@ -263,35 +263,34 @@ Clan's contribution is the inventory abstraction for coordinating which machines
 
 ## Validation evidence
 
-### Epic 1 (November 2024)
+### Initial validation (November 2024)
 
 Clan validated in test-clan repository:
 
-- Story 1.3: Clan inventory configured for Hetzner VMs
-- Story 1.5: VM deployment via clan (`clan machines install hetzner-vm`)
-- Story 1.9: Zerotier network coordination (controller + peer roles)
-- Story 1.10A: User management via clan inventory pattern
-- Story 1.12: Heterogeneous deployment (darwin + nixos)
+- Clan inventory configured for Hetzner VMs
+- VM deployment via clan (`clan machines install hetzner-vm`)
+- Zerotier network coordination (controller + peer roles)
+- User management via clan inventory pattern
+- Heterogeneous deployment (darwin + nixos)
 
-Metrics from GO/NO-GO decision:
+Validation metrics:
 - 3 machines operational (cinnabar, electrum, blackphos)
 - Zerotier network db4344343b14b903 coordinated
-- Pattern confidence: HIGH
 
-### Epic 2 (November 2024)
+### Production deployment (November 2024)
 
 Production deployment:
 
-- Stories 2.5-2.7: Darwin workstations deployed via clan
-- Stories 2.9-2.10: VPS deployment switched to clan
-- Stories 2.13-2.14: New machines added to inventory
+- Darwin workstations deployed via clan
+- VPS deployment switched to clan
+- New machines added to inventory
 
-### Epic 7 (December 2024)
+### GCP infrastructure (December 2024)
 
 GCP infrastructure:
 
-- Story 7.3: GCP nodes integrated into clan inventory
-- Story 7.4: GPU compute (scheelite) orchestrated via clan
+- GCP nodes integrated into clan inventory
+- GPU compute (scheelite) orchestrated via clan
 
 Result: 8-machine fleet fully operational under clan orchestration.
 
@@ -303,7 +302,6 @@ Result: 8-machine fleet fully operational under clan orchestration.
 - [ADR-0011: SOPS secrets management](0011-sops-secrets-management/)
 - [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
 - [ADR-0020: Dendritic + Clan integration](0020-dendritic-clan-integration/)
-- Epic 1 GO/NO-GO decision: `docs/notes/development/go-no-go-decision.md`
 
 ### External
 
