@@ -12,7 +12,7 @@ This section contains the Requirements layer of the AMDiRE (Artefact Model for D
 The Requirements layer specifies what the system should do from a black-box perspective - the user-visible functionality and quality attributes without constraining internal implementation.
 This layer bridges the Context layer (problem space) and the System layer (solution space, when implemented).
 
-All requirements support the dendritic flake-parts + clan-core architecture, which is now the current operational architecture as of Epic 6 (November 2024).
+All requirements support the dendritic flake-parts + clan-core architecture, which is now the current operational architecture as of November 2024.
 This documentation reflects the complete migration from nixos-unified, with all eight machines in the fleet operating under the new architecture.
 
 ## AMDiRE Requirements layer purpose
@@ -186,7 +186,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 - R-004: Primary workstation (stibnite) migration risk
 - R-005: Secrets migration from sops-nix to clan vars
 - R-006: Breaking changes in upstream dependencies
-- R-007: Phase 0 validation revealing architectural incompatibility
+- R-007: Initial validation revealing architectural incompatibility
 - R-008: Zerotier network reliability and connectivity issues
 - R-009: Multi-host synchronization failures
 - R-010: Learning curve for dendritic + clan patterns
@@ -194,7 +194,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 **For each risk**:
 - Description and risk factors
 - Likelihood and impact assessment
-- Affected migration phases
+- Migration timeline relevance
 - Mitigation strategies
 - Current status
 
@@ -206,18 +206,18 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 ### For migration planning
 
-**Phase 0 preparation** (Validation):
+**Initial validation preparation**:
 1. Review [system vision](/development/requirements/system-vision/) for overall goals
 2. Study UC-001, UC-002, UC-003 in [usage model](/development/requirements/usage-model/) for basic patterns
 3. Review R-001, R-007 in [risk list](/development/requirements/risk-list/) for validation objectives
 4. Understand SC-005, SC-006 in [system constraints](/development/requirements/system-constraints/) for integration constraints
 
-**Phase 1 preparation** (VPS deployment):
+**VPS deployment preparation**:
 1. Review UC-001, UC-006 in [usage model](/development/requirements/usage-model/) for bootstrap and networking
 2. Study DR-002 in [deployment requirements](/development/requirements/deployment-requirements/) for NixOS deployment
 3. Review R-002, R-008 in [risk list](/development/requirements/risk-list/) for VPS and network risks
 
-**Phase 2-5 preparation** (Darwin host migrations):
+**Darwin host migration preparation**:
 1. Review UC-007 in [usage model](/development/requirements/usage-model/) for migration workflow
 2. Study DR-001 in [deployment requirements](/development/requirements/deployment-requirements/) for darwin deployment
 3. Review R-003, R-004 in [risk list](/development/requirements/risk-list/) for workflow and stibnite risks
@@ -270,8 +270,8 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 ### Review frequency
 
-- **During migration**: Review before each phase
-- **Post-migration**: Annual review or on significant change
+- **During major changes**: Review before significant system modifications
+- **Routine**: Annual review or on significant change
 - **Continuous**: Update risks as status changes
 
 ### Update triggers
@@ -358,7 +358,7 @@ Each layer provides different views appropriate for different stakeholders and p
 
 ## Summary
 
-The Requirements layer provides a complete black-box specification of infra under the dendritic + clan architecture that is now operational across an eight-machine fleet (as of Epic 6, November 2024).
+The Requirements layer provides a complete black-box specification of infra under the dendritic + clan architecture that is now operational across an eight-machine fleet (as of November 2024).
 
 **Key takeaways**:
 - Seven core use cases capture all major workflows
