@@ -41,7 +41,6 @@
         nixd
         nixfmt
         nixpkgs-reviewFull
-        omnix
 
         # dev
         act
