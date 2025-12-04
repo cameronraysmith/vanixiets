@@ -223,29 +223,47 @@ Deployment failures can roll back to previous configuration.
 
 ### Terranix functions
 
-**Infrastructure provisioning**: Creates cloud VMs with networking, storage, and base OS.
+Infrastructure provisioning:
 
-**Cost control**: Toggle mechanism enables/disables expensive resources without destroying configuration.
+Creates cloud VMs with networking, storage, and base OS.
+
+Cost control:
+
+Toggle mechanism enables/disables expensive resources without destroying configuration.
 Setting machines.scheelite.enabled = false removes GPU instance from terraform state.
 
-**Multi-cloud abstraction**: Same Nix patterns work across Hetzner and GCP.
+Multi-cloud abstraction:
+
+Same Nix patterns work across Hetzner and GCP.
 Provider differences isolated in provider modules.
 
-**State management**: Terraform state persisted and encrypted for infrastructure tracking.
+State management:
+
+Terraform state persisted and encrypted for infrastructure tracking.
 
 ### Overlay composition functions
 
-**Stable fallback**: Broken unstable packages use stable versions without rolling back entire nixpkgs.
+Stable fallback:
+
+Broken unstable packages use stable versions without rolling back entire nixpkgs.
 Layer 2 hotfixes enable per-package channel selection.
 
-**Upstream patch application**: Layer 1 patched channel applies upstream PR patches before they reach nixpkgs channel.
+Upstream patch application:
 
-**Platform-specific fixes**: Conditionals in Layer 2 isolate fixes to affected systems.
+Layer 1 patched channel applies upstream PR patches before they reach nixpkgs channel.
+
+Platform-specific fixes:
+
+Conditionals in Layer 2 isolate fixes to affected systems.
 Darwin-only issues don't affect linux builds.
 
-**Custom package distribution**: Layer 3 provides packages unavailable in nixpkgs.
+Custom package distribution:
 
-**Build customization**: Layer 4 modifies package builds without forking nixpkgs.
+Layer 3 provides packages unavailable in nixpkgs.
+
+Build customization:
+
+Layer 4 modifies package builds without forking nixpkgs.
 
 ## Behavior Model
 
@@ -255,7 +273,7 @@ Key workflows that demonstrate how the subsystems interact to accomplish infrast
 
 Initial machine installation from bare metal or cloud VM to fully configured system.
 
-**Terranix provisioning** (cloud machines only):
+Terranix provisioning (cloud machines only):
 
 1. Define machine in modules/terranix/\{hetzner,gcp\}.nix with resource specification
 2. Run nix build .#terraform to generate terraform JSON
@@ -263,7 +281,7 @@ Initial machine installation from bare metal or cloud VM to fully configured sys
 4. Terraform provisioner waits for SSH availability
 5. Handoff to clan installation
 
-**Clan installation** (all machines):
+Clan installation (all machines):
 
 1. Machine registered in modules/clan/machines.nix importing configuration from dendritic namespace
 2. Run clan machines install \<machine\> --target-host root@\<ip\>
@@ -272,7 +290,7 @@ Initial machine installation from bare metal or cloud VM to fully configured sys
 5. Clan deploys initial configuration with generated secrets
 6. Machine boots into configured system
 
-**Ongoing updates**:
+Ongoing updates:
 
 1. Edit configuration in modules/
 2. Commit changes to git
@@ -285,7 +303,7 @@ Initial machine installation from bare metal or cloud VM to fully configured sys
 
 Managing secrets across two-tier architecture separating system and user secrets.
 
-**Tier 1 - System secrets** (clan vars):
+Tier 1 - System secrets (clan vars):
 
 1. Define secret generators in clan vars configuration
 2. Run clan vars generate to create/update secrets
@@ -294,7 +312,7 @@ Managing secrets across two-tier architecture separating system and user secrets
 5. Clan deployment decrypts and installs secrets on target machine
 6. Services access secrets through standard nixos/darwin secret paths
 
-**Tier 2 - User secrets** (sops-nix):
+Tier 2 - User secrets (sops-nix):
 
 1. Create secrets/users/\<username\>.sops.yaml file
 2. Edit with sops secrets/users/\<username\>.sops.yaml
@@ -303,7 +321,7 @@ Managing secrets across two-tier architecture separating system and user secrets
 5. Reference secrets in home-manager modules via sops.secrets
 6. Deployment decrypts secrets to home directory
 
-**Age key reuse**:
+Age key reuse:
 
 Both tiers use same age key infrastructure.
 Machine keys derived from SSH host keys.
@@ -313,7 +331,7 @@ User keys stored in standard age location.
 
 Handling broken nixpkgs packages through overlay composition without system-wide rollbacks.
 
-**Decision tree**:
+Decision tree:
 
 When package breaks after nixpkgs update:
 
@@ -322,7 +340,7 @@ When package breaks after nixpkgs update:
 3. Package completely broken → Use Layer 2 hotfixes (stable fallback)
 4. Package builds but has issues → Use Layer 4 overrides (build modifications)
 
-**Stable fallback** (Layer 2):
+Stable fallback (Layer 2):
 
 1. Edit modules/nixpkgs/overlays/hotfixes.nix
 2. Add package to appropriate platform conditional (isDarwin, isLinux)
@@ -331,7 +349,7 @@ When package breaks after nixpkgs update:
 5. Commit change
 6. Remove when upstream fix lands in unstable
 
-**Upstream patch** (Layer 1):
+Upstream patch (Layer 1):
 
 1. Identify upstream PR with fix
 2. Add patch URL to modules/nixpkgs/overlays/channels.nix patches list
@@ -341,7 +359,7 @@ When package breaks after nixpkgs update:
 6. Commit change
 7. Remove when PR merges and reaches channel
 
-**Build modification** (Layer 4):
+Build modification (Layer 4):
 
 1. Edit modules/nixpkgs/overlays/overrides.nix
 2. Add package = prev.package.overrideAttrs customization
@@ -354,7 +372,7 @@ When package breaks after nixpkgs update:
 
 Deploying multi-machine services through clan inventory.
 
-**Zerotier VPN mesh**:
+Zerotier VPN mesh:
 
 1. Define inventory instance in modules/clan/inventory/services/zerotier.nix
 2. Assign controller role to cinnabar
@@ -364,7 +382,7 @@ Deploying multi-machine services through clan inventory.
 6. Peers join network using generated identities
 7. VPN mesh operational across fleet
 
-**User account distribution**:
+User account distribution:
 
 1. Create user module in modules/home/users/\<username\>.nix
 2. Define inventory instance in modules/clan/inventory/services/user-\<username\>.nix
@@ -377,7 +395,7 @@ Deploying multi-machine services through clan inventory.
 
 Adding new machines to the fleet.
 
-**Cloud machine**:
+Cloud machine:
 
 1. Add resource definition to modules/terranix/\{hetzner,gcp\}.nix
 2. Run terraform apply to provision VM
@@ -388,7 +406,7 @@ Adding new machines to the fleet.
 7. Run clan machines install \<hostname\> --target-host root@\<ip\>
 8. Machine joins fleet with full configuration
 
-**Local machine** (darwin laptop):
+Local machine (darwin laptop):
 
 1. Create machine module at modules/machines/darwin/\<hostname\>/default.nix
 2. Export to namespace: flake.modules.darwin."machines/darwin/\<hostname\>"
@@ -404,7 +422,7 @@ Integration points where subsystems exchange data and coordinate behavior.
 
 ### Dendritic to clan interface
 
-**Namespace export → clan import pattern**:
+Namespace export → clan import pattern:
 
 Machine modules export to flake.modules.\{darwin,nixos\}.* namespaces.
 Clan registry (modules/clan/machines.nix) imports from these namespaces.
@@ -413,7 +431,7 @@ Integration point: config.flake.modules.\{darwin,nixos\}."machines/\{darwin,nixo
 
 This two-step registration enables dendritic auto-discovery while maintaining explicit clan registry control.
 
-**ClanModules importing dendritic modules**:
+ClanModules importing dendritic modules:
 
 Clan inventory instances can import shared configuration from dendritic namespaces.
 Service modules reference config.flake.modules.common.* for cross-machine shared configuration.
@@ -422,7 +440,7 @@ Integration point: clan.inventory.instances.\<service\>.module imports from dend
 
 ### Terranix to clan interface
 
-**Infrastructure provisioning to deployment handoff**:
+Infrastructure provisioning to deployment handoff:
 
 Terranix provisions cloud VMs with base OS (Ubuntu).
 Terraform provisioner waits for SSH availability.
@@ -430,7 +448,7 @@ Clan installation deploys NixOS over base OS.
 
 Integration point: Terraform provisioner.local-exec executes clan machines install.
 
-**Output coordination**:
+Output coordination:
 
 Terranix outputs (IP addresses, resource IDs) available for clan configuration.
 Machine networking configured using terraform output values.
@@ -439,23 +457,23 @@ Integration point: Terraform output variables consumed in nix configuration.
 
 ### Overlay to system interface
 
-**Composed overlay to machine configuration**:
+Composed overlay to machine configuration:
 
-modules/nixpkgs/compose.nix composes all five layers into flake.overlays.default.
+The file modules/nixpkgs/compose.nix composes all five layers into flake.overlays.default.
 Machine configurations import inputs.self.overlays.default.
 
 Integration point: Machine nixpkgs.overlays = [ inputs.self.overlays.default ];
 
-**perSystem packages to overlay**:
+perSystem packages to overlay:
 
 Custom packages from Layer 3 (pkgs/by-name/) flow through perSystem.packages.
-compose.nix integrates custom packages using withSystem pattern.
+The file compose.nix integrates custom packages using withSystem pattern.
 
 Integration point: customPackages = withSystem prev.stdenv.hostPlatform.system ({ config, ... }: config.packages or {});
 
 ### Secrets interfaces
 
-**Clan vars to machine deployment**:
+Clan vars to machine deployment:
 
 Vars system generates secrets during clan vars generate.
 Secrets encrypted with machine age keys derived from SSH host keys.
@@ -463,7 +481,7 @@ Deployment decrypts secrets to machine paths.
 
 Integration point: clan.core.facts and age decryption during activation.
 
-**sops-nix to home-manager**:
+sops-nix to home-manager:
 
 User secrets defined in secrets/users/\<username\>.sops.yaml.
 Home-manager modules reference sops.secrets."\<path\>".
@@ -471,7 +489,7 @@ Deployment decrypts secrets to home directory.
 
 Integration point: sops.secrets configuration in home-manager modules.
 
-**Age key infrastructure**:
+Age key infrastructure:
 
 Both clan vars and sops-nix use age encryption with shared key infrastructure.
 Machine keys: Derived from SSH host keys via ssh-to-age.
@@ -485,31 +503,31 @@ Configuration flow from Nix expressions through evaluation to deployed system st
 
 ### Configuration layers
 
-**Source layer** (git repository):
+Source layer (git repository):
 
 Nix expressions in modules/, pkgs/, and configuration files.
 Version controlled, human-editable, declarative specifications.
 
-**Evaluation layer** (nix evaluation):
+Evaluation layer (nix evaluation):
 
 Nix expressions evaluated to attribute sets.
 Dendritic auto-discovery imports modules.
 Flake-parts composition merges configurations.
 Overlays compose packages.
 
-**Build layer** (nix build):
+Build layer (nix build):
 
 Evaluated configurations build derivations.
 System closures assembled with all dependencies.
 Packages built with overlay modifications applied.
 
-**Deployment layer** (clan/nix-darwin):
+Deployment layer (clan/nix-darwin):
 
 Built system closures deployed to target machines.
 Secrets decrypted and installed.
 System activation switches to new configuration.
 
-**Runtime layer** (running system):
+Runtime layer (running system):
 
 Deployed configuration active on machine.
 Services running, packages available, secrets accessible.
@@ -571,7 +589,7 @@ Each layer is a function: final: prev: {...} composing via lib.composeManyExtens
 
 ### Secrets data flow
 
-**Clan vars (Tier 1)**:
+Clan vars (Tier 1):
 
 ```
 Generator specification (nix)
@@ -593,7 +611,7 @@ Secret installation (/run/secrets/*)
 Service access (via paths)
 ```
 
-**sops-nix (Tier 2)**:
+sops-nix (Tier 2):
 
 ```
 Manual secret creation (sops editor)
@@ -687,55 +705,55 @@ Links to implementation artifacts demonstrating how architectural decisions mani
 
 ### Dendritic implementation
 
-**Module auto-discovery**: flake.nix imports inputs.import-tree.flakeModule and configures flake.autoImport.
+Module auto-discovery: flake.nix imports inputs.import-tree.flakeModule and configures flake.autoImport.
 
-**Namespace exports**: All modules/ files define flake.modules.* exports.
+Namespace exports: All modules/ files define flake.modules.* exports.
 
-**Machine configurations**: modules/machines/darwin/ and modules/machines/nixos/ export to namespaces.
+Machine configurations: modules/machines/darwin/ and modules/machines/nixos/ export to namespaces.
 
-**Home aggregates**: modules/home/ organized by aspect with auto-merging exports.
+Home aggregates: modules/home/ organized by aspect with auto-merging exports.
 
 ### Clan implementation
 
-**Machine registry**: modules/clan/machines.nix defines clan.machines.* with imports from dendritic namespaces.
+Machine registry: modules/clan/machines.nix defines clan.machines.* with imports from dendritic namespaces.
 
-**Inventory instances**: modules/clan/inventory/services/ defines service coordination.
+Inventory instances: modules/clan/inventory/services/ defines service coordination.
 
-**Vars configuration**: clan vars definitions in machine modules and inventory.
+Vars configuration: clan vars definitions in machine modules and inventory.
 
-**Deployment scripts**: justfile contains clan machines install/update wrappers.
+Deployment scripts: justfile contains clan machines install/update wrappers.
 
 ### Terranix implementation
 
-**Provider modules**: modules/terranix/hetzner.nix and modules/terranix/gcp.nix define cloud resources.
+Provider modules: modules/terranix/hetzner.nix and modules/terranix/gcp.nix define cloud resources.
 
-**Toggle options**: machines.\<hostname\>.enabled options control resource creation.
+Toggle options: machines.\<hostname\>.enabled options control resource creation.
 
-**Terraform output**: perSystem.packages.terraform generates terraform JSON.
+Terraform output: perSystem.packages.terraform generates terraform JSON.
 
 ### Overlay implementation
 
-**Layer 1 channels**: modules/nixpkgs/overlays/channels.nix exports stable/unstable/patched.
+Layer 1 channels: modules/nixpkgs/overlays/channels.nix exports stable/unstable/patched.
 
-**Layer 2 hotfixes**: modules/nixpkgs/overlays/hotfixes.nix with platform conditionals.
+Layer 2 hotfixes: modules/nixpkgs/overlays/hotfixes.nix with platform conditionals.
 
-**Layer 3 custom packages**: pkgs/by-name/ with pkgs-by-name-for-flake-parts integration.
+Layer 3 custom packages: pkgs/by-name/ with pkgs-by-name-for-flake-parts integration.
 
-**Layer 4 overrides**: modules/nixpkgs/overlays/overrides.nix with overrideAttrs patterns.
+Layer 4 overrides: modules/nixpkgs/overlays/overrides.nix with overrideAttrs patterns.
 
-**Layer 5 external**: modules/nixpkgs/compose.nix imports nuenv overlay.
+Layer 5 external: modules/nixpkgs/compose.nix imports nuenv overlay.
 
-**Composition**: modules/nixpkgs/compose.nix defines flake.overlays.default.
+Composition: modules/nixpkgs/compose.nix defines flake.overlays.default.
 
 ### Secrets implementation
 
-**Clan vars**: vars/ directory with encrypted generated secrets.
+Clan vars: vars/ directory with encrypted generated secrets.
 
-**sops-nix**: secrets/users/ with encrypted user credentials.
+sops-nix: secrets/users/ with encrypted user credentials.
 
-**Age keys**: .sops.yaml defines machine and user age keys.
+Age keys: .sops.yaml defines machine and user age keys.
 
-**Home-manager secrets**: modules/home/ modules reference sops.secrets.
+Home-manager secrets: modules/home/ modules reference sops.secrets.
 
 ## Validation Evidence
 
@@ -758,7 +776,7 @@ Stories 2.1-2.14 migrated all machines to dendritic + clan architecture.
 Darwin workstations (stibnite, blackphos) and NixOS VPS (cinnabar, electrum) operational.
 New machines (rosegold, argentum) created using established patterns.
 
-Result: 8-machine fleet fully operational under new architecture.
+Result: 6-machine permanent fleet fully operational under new architecture (note that galena and scheelite are added in Epic 7, not Epic 2).
 
 ### Epic 7 (December 2024)
 
@@ -780,21 +798,49 @@ Per-job content-addressed caching optimizes CI without sacrificing validation.
 
 November 2024 architectural migration addressing scalability limitations.
 
-**nixos-unified limitations**: specialArgs anti-pattern created implicit dependencies, host-centric organization led to duplication across machines, limited module composition for cross-cutting concerns.
+nixos-unified limitations:
 
-**Migration approach**: Epic 1 validated patterns in test-clan repository, Epic 2 migrated production infrastructure, zero downtime for critical services (zerotier, VPN).
+The specialArgs anti-pattern created implicit dependencies.
+Host-centric organization led to duplication across machines.
+Limited module composition for cross-cutting concerns.
 
-**Migration outcomes**: Feature-based organization eliminates duplication, explicit imports make dependencies visible, auto-discovery scales gracefully to 100+ modules, cross-platform consistency across darwin and nixos.
+Migration approach:
+
+Epic 1 validated patterns in test-clan repository.
+Epic 2 migrated production infrastructure.
+Zero downtime for critical services (zerotier, VPN).
+
+Migration outcomes:
+
+Feature-based organization eliminates duplication.
+Explicit imports make dependencies visible.
+Auto-discovery scales gracefully to 100+ modules.
+Cross-platform consistency across darwin and nixos.
 
 ### From three-layer to five-layer overlays
 
 December 2024 overlay architecture enhancement following dendritic migration.
 
-**Previous architecture** (ADR-0003): inputs.nix (multi-channel), infra/hotfixes.nix (platform fixes), packages/ (custom derivations), nested in overlays/ directory.
+Previous architecture (ADR-0003):
 
-**Migration to dendritic** (ADR-0017): Moved overlays/ to modules/nixpkgs/overlays/, adopted pkgs-by-name pattern for custom packages, introduced dendritic list concatenation, added Layer 4 overrides, explicit Layer 5 external overlay composition.
+The file inputs.nix provided multi-channel access.
+The file infra/hotfixes.nix provided platform fixes.
+The directory packages/ contained custom derivations.
+All nested in overlays/ directory.
 
-**Preservation**: Multi-channel resilience patterns preserved, stable fallback mechanism unchanged, hydra documentation patterns maintained.
+Migration to dendritic (ADR-0017):
+
+Moved overlays/ to modules/nixpkgs/overlays/.
+Adopted pkgs-by-name pattern for custom packages.
+Introduced dendritic list concatenation.
+Added Layer 4 overrides.
+Explicit Layer 5 external overlay composition.
+
+Preservation:
+
+Multi-channel resilience patterns preserved.
+Stable fallback mechanism unchanged.
+Hydra documentation patterns maintained.
 
 ## Future Directions
 
