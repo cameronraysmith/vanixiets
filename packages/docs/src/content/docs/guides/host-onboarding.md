@@ -313,6 +313,32 @@ This generates:
 
 Generated secrets are stored in `vars/<hostname>/` encrypted with age.
 
+#### Machine age keys (critical distinction)
+
+**Important**: Machine age keys are NOT derived from SSH host keys.
+Understanding this distinction prevents a common configuration mistake.
+
+**Two separate key types**:
+- **SSH host keys**: `/etc/ssh/ssh_host_ed25519_key.pub` - Used for SSH connection authentication
+- **sops-nix age keys**: `/var/lib/sops-nix/key.txt` - Used for decrypting clan vars secrets
+
+**Common mistake to avoid**:
+```bash
+# WRONG: This gets SSH host key, not the sops-nix age key
+ssh-keyscan -t ed25519 <machine-ip> | ssh-to-age
+```
+
+This extracts the SSH host key and converts it to age format, but the machine's actual age private key at `/var/lib/sops-nix/key.txt` is different.
+
+**Correct method**:
+```bash
+# CORRECT: Extract from deployed machine's sops-nix age key
+ssh root@<machine> 'cat /var/lib/sops-nix/key.txt | age-keygen -y'
+```
+
+**Why this matters**: If you register the SSH host key as the machine's age key in the repository, clan vars encrypted with that key cannot be decrypted on the machine.
+The machine has a different age private key at `/var/lib/sops-nix/key.txt`, so decryption will fail with "Error getting data key: 0 successful groups required, got 0".
+
 ### Step 4: Initial installation (new machines)
 
 For fresh machines (bare metal or new VMs):
@@ -412,6 +438,113 @@ For updates, run:
 ```bash
 clan machines update <hostname>
 ```
+
+---
+
+## Machine maintenance operations
+
+After initial onboarding, you may need to manage machine age keys and re-encrypt secrets.
+This section covers critical maintenance operations that preserve existing secret values while updating encryption.
+
+### Re-encrypting vars after key changes
+
+Understand when to use `clan vars fix` versus `clan vars generate`:
+
+| Command | Purpose | Effect |
+|---------|---------|--------|
+| `clan vars generate <machine>` | Initial generation or regeneration | Creates NEW secret values |
+| `clan vars fix <machine>` | Re-encryption only | Preserves existing values, updates encryption keys |
+
+**When to use each**:
+- Use `generate` for: New machines, intentional secret rotation
+- Use `fix` for: Correcting registered age key, adding machines to shared vars
+
+**Example workflow**: After correcting a machine's registered age key:
+```bash
+# Update the registered key in the repository
+clan secrets machines add <machine> --age-key "age1..."
+
+# Re-encrypt existing vars with the new key (preserves values)
+clan vars fix <machine>
+
+# Deploy the updated configuration
+clan machines update <machine>
+```
+
+### Verifying age key correspondence
+
+Before troubleshooting decryption issues, verify the registered key matches the deployed key:
+
+```bash
+# Get registered key from repository
+registered=$(jq -r '.[0].publickey' sops/machines/<machine>/key.json)
+
+# Get actual key from deployed machine
+actual=$(ssh root@<machine> 'cat /var/lib/sops-nix/key.txt | age-keygen -y')
+
+# Compare
+if [ "$registered" = "$actual" ]; then
+  echo "Keys match - decryption should work"
+else
+  echo "MISMATCH - run: clan secrets machines add <machine> --age-key \"$actual\""
+  echo "Then: clan vars fix <machine>"
+fi
+```
+
+This verification script shows exactly which key is wrong and how to fix it.
+
+### Troubleshooting machine secrets
+
+Common issues when working with machine age keys and clan vars:
+
+**"Error getting data key: 0 successful groups required, got 0"**
+
+This error means the machine cannot decrypt vars because the registered age key doesn't match the actual key on the machine.
+
+Diagnosis:
+```bash
+# Check which key is registered
+jq -r '.[0].publickey' sops/machines/<machine>/key.json
+
+# Check which key the machine actually has
+ssh root@<machine> 'cat /var/lib/sops-nix/key.txt | age-keygen -y'
+```
+
+Solution:
+```bash
+# Extract the correct key from the machine
+actual_key=$(ssh root@<machine> 'cat /var/lib/sops-nix/key.txt | age-keygen -y')
+
+# Update the registered key
+clan secrets machines add <machine> --age-key "$actual_key"
+
+# Re-encrypt vars (preserves values)
+clan vars fix <machine>
+
+# Deploy
+clan machines update <machine>
+```
+
+**"WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED"**
+
+This warning appears when clan vars deploys a new SSH host key but the SSH daemon hasn't restarted yet.
+
+Cause: The vars deployment updated `/etc/ssh/ssh_host_ed25519_key`, but sshd is still using the old key in memory.
+
+Solution:
+```bash
+# Restart SSH daemon on the machine
+ssh root@<machine> 'systemctl restart sshd'
+
+# Or reboot the machine
+ssh root@<machine> 'reboot'
+
+# Update your known_hosts
+ssh-keygen -R <machine-hostname>
+ssh-keygen -R <machine-ip>
+```
+
+After the SSH daemon restarts with the new key, SSH connections will work normally.
 
 ---
 
