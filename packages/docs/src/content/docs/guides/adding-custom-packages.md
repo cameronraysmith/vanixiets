@@ -1,11 +1,11 @@
 ---
 title: Adding custom packages
-description: How to add your own package derivations to the nix-config
+description: How to add your own package derivations to this configuration
 sidebar:
   order: 5
 ---
 
-This guide shows you how to add custom package derivations to your nix-config.
+This guide shows you how to add custom package derivations to your configuration.
 Packages you add will be automatically available system-wide and in your development shell.
 
 ## Quick start
