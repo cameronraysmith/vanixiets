@@ -14,4 +14,4 @@ Conceptual documentation to help you understand the architecture and design patt
 
 ## Patterns
 
-- [Multi-User Patterns](/concepts/multi-user-patterns/) - Admin users with integrated home-manager vs standalone users
+- [System-user Integration](/concepts/system-user-integration/) - Admin users with integrated home-manager vs standalone users
