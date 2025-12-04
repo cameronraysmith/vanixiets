@@ -16,7 +16,7 @@ else
     SYSTEM="$SYSTEM_ARG"
 fi
 
-echo "🔍 nix eval"
+echo "◉ nix eval"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -27,7 +27,7 @@ NIXOS_CONFIGS=$(nix eval ".#nixosConfigurations" --apply 'x: builtins.attrNames 
 DARWIN_CONFIGS=$(nix eval ".#darwinConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo "none")
 HOME_CONFIGS=$(nix eval ".#legacyPackages.$SYSTEM.homeConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo "none")
 
-echo "📦 Packages ($SYSTEM):"
+echo "◼ Packages ($SYSTEM):"
 if [ "$PACKAGES" = "none" ]; then
     echo "  (none found)"
 else
@@ -47,7 +47,7 @@ else
 fi
 echo ""
 
-echo "🐚 DevShells ($SYSTEM):"
+echo "◇ DevShells ($SYSTEM):"
 if [ "$DEVSHELLS" = "none" ]; then
     echo "  (none found)"
 else
@@ -79,7 +79,7 @@ else
 fi
 echo ""
 
-echo "🏠 Home Configurations ($SYSTEM):"
+echo "⌂ Home Configurations ($SYSTEM):"
 if [ "$HOME_CONFIGS" = "none" ]; then
     echo "  (none found)"
 else
