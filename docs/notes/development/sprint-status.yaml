@@ -676,7 +676,7 @@ development_status:
   story-9-0a-title: "Update stale migration guides for dendritic architecture"
   story-9-0b: done
   story-9-0b-title: "Clean up migration artifacts and migrate essential content"
-  story-9-1: backlog
+  story-9-1: done
   story-9-1-title: "Create bookmark tags at branch boundaries (docs, clan, clan-01)"
   story-9-2: backlog
   story-9-2-title: "Validate CI/CD workflows on clan-01"
