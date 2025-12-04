@@ -358,7 +358,7 @@ Each layer provides different views appropriate for different stakeholders and p
 
 ## Summary
 
-The Requirements layer provides a complete black-box specification of the nix-config system under the dendritic + clan architecture that is now operational across an eight-machine fleet (as of Epic 6, November 2024).
+The Requirements layer provides a complete black-box specification of infra under the dendritic + clan architecture that is now operational across an eight-machine fleet (as of Epic 6, November 2024).
 
 **Key takeaways**:
 - Seven core use cases capture all major workflows
