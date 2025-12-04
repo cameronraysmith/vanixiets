@@ -722,13 +722,13 @@ const form = useForm({
 ### Avoiding unnecessary re-renders
 
 ```typescript
-// ❌ Bad: Subscribes to entire store
+// ⊘ Bad: Subscribes to entire store
 function BadComponent() {
   const store = useUIStore() // Re-renders on ANY state change
   return <div>{store.someValue}</div>
 }
 
-// ✅ Good: Subscribe to specific values
+// ● Good: Subscribe to specific values
 function GoodComponent() {
   const someValue = useUIStore((state) => state.someValue) // Only re-renders when someValue changes
   return <div>{someValue}</div>
@@ -1070,17 +1070,17 @@ function ClientOnly({ children }: { children: React.ReactNode }) {
 - Random values generated server-side not matching client-side
 
 ```typescript
-// ❌ Causes hydration mismatch
+// ⊘ Causes hydration mismatch
 function BadComponent() {
   return <div>{Math.random()}</div>
 }
 
-// ✅ Use suppressHydrationWarning for intentional mismatch
+// ● Use suppressHydrationWarning for intentional mismatch
 function GoodComponent() {
   return <div suppressHydrationWarning>{Math.random()}</div>
 }
 
-// ✅ Or use ClientOnly wrapper
+// ● Or use ClientOnly wrapper
 function BestComponent() {
   return (
     <ClientOnly>
