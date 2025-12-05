@@ -89,7 +89,7 @@ These projects provide the foundation and influence architectural decisions:
 - Enables multi-platform support (darwin, nixos, home-manager)
 - Influences: Current configuration structure (configurations/ directory)
 
-**clan-core** (clan.lol/clan/clan-core) [migration target]:
+**clan** (clan.lol/clan/clan-core) [migration target]:
 - Provides multi-host coordination
 - Defines inventory system, vars system, service instances
 - Influences: Target architecture, multi-host patterns, secrets management
