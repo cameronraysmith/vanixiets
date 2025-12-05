@@ -50,10 +50,10 @@ modules/
 ├── home/
 │   └── users/               # User-specific home-manager modules
 │       ├── crs58.nix        # Primary admin user module
-│       ├── cameron.nix      # Cameron user module (admin alias)
-│       ├── raquel.nix       # Raquel user module
-│       ├── janettesmith.nix # Janet user module
-│       └── christophersmith.nix  # Christopher user module
+│       ├── cameron.nix      # admin alias
+│       ├── raquel.nix       # additional users...
+│       ├── janettesmith.nix
+│       └── christophersmith.nix
 └── machines/
     ├── darwin/              # Darwin host configurations
     │   ├── stibnite.nix     # Single-user (crs58)
