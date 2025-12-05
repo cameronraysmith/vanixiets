@@ -101,7 +101,7 @@ runs:
           /Users/runner/hostedtoolcache &
 
     - name: install nix
-      uses: cachix/install-nix-action@ed706ab2cdb9d2f5533fd430f2c531e7340ed650 # ratchet:cachix/install-nix-action@v31
+      uses: cachix/install-nix-action@0b0e072294b088b73964f1d72dfdac0951439dbd # v31
       with:
         # Use install_url to pin specific Nix version
         # Switched from nix-quick-install-action (single-user) to install-nix-action (multi-user with daemon)
