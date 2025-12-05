@@ -81,10 +81,6 @@ export default defineConfig({
                   collapsed: true,
                   autogenerate: { directory: "development/architecture/adrs" },
                 },
-                {
-                  label: "Nixpkgs fixes",
-                  link: "/development/architecture/nixpkgs-hotfixes",
-                },
               ],
             },
             {
