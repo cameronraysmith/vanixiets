@@ -18,7 +18,7 @@ These risks are now primarily historical, documenting how challenges were antici
 
 ### Description
 
-No production examples exist of dendritic flake-parts combined with clan-core, creating uncertainty about integration challenges and edge cases.
+No production examples exist of dendritic flake-parts combined with clan, creating uncertainty about integration challenges and edge cases.
 
 ### Risk factors
 
@@ -383,11 +383,11 @@ Both systems coexist as designed.
 
 ### Description
 
-Updates to nixpkgs, dendritic-flake-parts, or clan-core could introduce breaking changes during migration.
+Updates to nixpkgs, dendritic-flake-parts, or clan could introduce breaking changes during migration.
 
 ### Risk factors
 
-- Dendritic and clan-core both actively developed
+- Dendritic and clan both actively developed
 - nixpkgs-unstable inherently unstable
 - API changes between versions
 - Documentation lag behind implementation
@@ -434,7 +434,7 @@ Updates to nixpkgs, dendritic-flake-parts, or clan-core could introduce breaking
 - Maintain working flake.lock in git
 
 **Monitoring and awareness**:
-- Subscribe to clan-core and dendritic releases
+- Subscribe to clan and dendritic releases
 - Review nixpkgs weekly summary
 - Track upstream issues affecting our use case
 - Participate in community discussions
@@ -496,7 +496,7 @@ Test-clan validation could uncover fundamental incompatibilities requiring archi
 - Engage community if issues found
 
 **Fallback options if incompatibility found**:
-1. **Clan without dendritic**: Use clan-core with standard flake-parts
+1. **Clan without dendritic**: Use clan with standard flake-parts
 2. **Dendritic without clan**: Use dendritic with enhanced sops-nix
 3. **Hybrid approach**: Dendritic for modules, traditional flake for clan
 4. **Stay on nixos-unified**: Abort migration, enhance current architecture
@@ -646,7 +646,7 @@ Service instances spanning multiple hosts could have inconsistent configuration 
 - Check tag-based assignments match expectations
 
 **Idempotent deployment**:
-- Re-running deployment safe (clan-core property)
+- Re-running deployment safe (clan property)
 - Can re-deploy host without affecting others
 - Incremental convergence to desired state
 - No harm from repeated deployment
