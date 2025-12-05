@@ -19,9 +19,9 @@ The dendritic pattern provides aspect-based module organization where every Nix 
 
 - **[hercules-ci/flake-parts](https://flake.parts)** by Robert Hensing and Hercules CI - Modular flake composition framework
 
-### Clan-core
+### Clan
 
-- **[clan-core](https://clan.lol/)** - Multi-machine coordination and deployment framework
+- **[clan](https://clan.lol/)** - Multi-machine coordination and deployment framework
 
 ### Multi-channel resilience
 
@@ -37,7 +37,7 @@ These implementations informed the architectural patterns:
 - **[mightyiam/infra](https://github.com/mightyiam/infra)** by Shahar "Dawn" Or - Original dendritic reference
 - **[gaetanlepage/nix-config](https://github.com/gaetanlepage/nix-config)** by Gaétan Lepage - Dendritic pattern at scale
 
-### Clan-core references
+### Clan references
 
 - **[clan-infra](https://git.clan.lol/clan/clan-infra)** - Production clan usage by clan team
 - **[qubasa/nixos-configs](https://git.clan.lol/Qubasa/nixos-configs)** - Clan core developer reference
