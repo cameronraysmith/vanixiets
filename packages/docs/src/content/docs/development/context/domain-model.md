@@ -2,7 +2,7 @@
 title: Domain model
 ---
 
-This document describes the domain in which the system operates, including the Nix ecosystem and current architecture components based on dendritic flake-parts + clan-core.
+This document describes the domain in which the system operates, including the Nix ecosystem and current architecture components based on dendritic flake-parts + clan.
 
 ## Nix ecosystem overview
 
@@ -278,7 +278,7 @@ See "Secrets management" section above for full details on the clan vars system.
 - `roles.<name>.perInstance`: Map over instances, produce nixosModule
 - `perMachine`: Map over machines, produce nixosModule
 
-**Built-in services** (from clan-core):
+**Built-in services** (from clan):
 - `emergency-access`: Root access recovery
 - `sshd`: SSH daemon with certificate authority
 - `zerotier`: Overlay VPN networking
@@ -395,7 +395,7 @@ final: prev: {
 
 ### Historical note: migration from nixos-unified
 
-The infrastructure completed migration from nixos-unified to dendritic flake-parts + clan-core in November 2024.
+The infrastructure completed migration from nixos-unified to dendritic flake-parts + clan in November 2024.
 
 **Migration was progressive host-by-host**:
 1. **Initial validation**: Validated dendritic + clan in test-clan repository
@@ -470,7 +470,7 @@ See `glossary.md` for comprehensive term definitions.
 - flake-parts: <https://flake.parts/>
 - Dendritic pattern: <https://github.com/mightyiam/dendritic>
 - import-tree: <https://github.com/vic/import-tree>
-- Clan-core: <https://docs.clan.lol/>
+- clan: <https://docs.clan.lol/>
 - terranix: <https://terranix.org/>
 - disko: <https://github.com/nix-community/disko>
 - srvos: <https://github.com/nix-community/srvos>
