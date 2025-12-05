@@ -1,9 +1,9 @@
 ---
 title: vanixiets
-description: Multi-machine Nix infrastructure using dendritic flake-parts and clan-core
+description: Multi-machine Nix infrastructure using dendritic flake-parts and clan
 template: splash
 hero:
-  tagline: "Multi-machine Nix infrastructure for NixOS, nix-darwin, and home-manager using dendritic flake-parts module organization and clan-core deployment coordination."
+  tagline: "Multi-machine Nix infrastructure for NixOS, nix-darwin, and home-manager using dendritic flake-parts module organization and clan deployment coordination."
   image:
     file: ../../assets/nix-snowflake-colours.svg
   actions:
@@ -26,7 +26,7 @@ import { Card, CardGrid } from "@astrojs/starlight/components";
     Every Nix file is a flake-parts module organized by aspect (feature) rather than host.
     Cross-cutting configuration spans NixOS, nix-darwin, and home-manager from unified modules.
   </Card>
-  <Card title="Clan-core deployment" icon="rocket">
+  <Card title="Clan deployment" icon="rocket">
     Multi-machine coordination with unified deployment across 8 machines (4 darwin, 4 nixos).
     Service orchestration via inventory system with role-based assignments.
   </Card>
@@ -77,7 +77,7 @@ Multi-layer architecture combining complementary patterns:
 
 1. **flake-parts** - Modular flake composition framework
 2. **dendritic pattern** - Aspect-based module organization with import-tree auto-discovery
-3. **clan-core** - Multi-machine coordination and deployment
+3. **clan** - Multi-machine coordination and deployment
 4. **multi-channel overlays** - Per-package nixpkgs channel selection for resilience
 
 Learn more in [Architecture overview](/concepts/architecture-overview/).
@@ -93,7 +93,7 @@ Learn more in [Architecture overview](/concepts/architecture-overview/).
 
 <CardGrid>
   <Card title="Understand the architecture" icon="open-book">
-    Dendritic flake-parts + clan-core architecture for multi-machine deployments.
+    Dendritic flake-parts + clan architecture for multi-machine deployments.
     [Architecture overview →](/concepts/architecture-overview/)
   </Card>
   <Card title="Learn dendritic pattern" icon="puzzle">
