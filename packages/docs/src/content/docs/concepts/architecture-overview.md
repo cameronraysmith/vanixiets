@@ -104,7 +104,7 @@ lib.mergeAttrsList [
 ### Multi-channel nixpkgs access
 
 ```nix
-# modules/nixpkgs/overlays/inputs.nix
+# modules/nixpkgs/overlays/channels.nix
 final: prev: {
   inherit inputs nixpkgs patched;
   stable = systemInput system;   # darwin-stable or linux-stable
@@ -117,7 +117,7 @@ All channels available throughout the configuration for selective package sourci
 ### Hotfixes pattern
 
 ```nix
-# modules/nixpkgs/overlays/infra/hotfixes.nix
+# modules/nixpkgs/overlays/hotfixes.nix
 final: prev: {
   # Platform-conditional stable fallbacks
   inherit (final.stable) packageName;  # Use stable version
