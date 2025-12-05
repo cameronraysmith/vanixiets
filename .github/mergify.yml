@@ -8,12 +8,28 @@ pull_request_rules:
       assign:
         add_users:
           - "{{ author }}"
-  - name: automatic merge to queue
+
+  # Optional: uncomment to auto-approve bot PRs (currently requires manual approval)
+  # - name: auto-approve bot PRs
+  #   conditions:
+  #     - or:
+  #       - author=renovate[bot]
+  #       - author=mergify[bot]
+  #       - author=github-actions[bot]
+  #   actions:
+  #     review:
+  #       type: APPROVE
+  #       message: Automated approval for bot PR
+
+  - name: queue human PRs
     conditions:
       - "#approved-reviews-by>=1"
       - label!=work-in-progress
       - -draft
       - -conflict
+      - author!=renovate[bot]
+      - author!=mergify[bot]
+      - author!=github-actions[bot]
       - check-success=secrets-scan
       - check-success=set-variables
       - check-success=check-fast-forward
@@ -63,12 +79,86 @@ pull_request_rules:
       queue:
         name: default
 
+  - name: queue bot PRs
+    conditions:
+      - "#approved-reviews-by>=1"
+      - label!=work-in-progress
+      - -draft
+      - -conflict
+      - or:
+        - author=renovate[bot]
+        - author=mergify[bot]
+        - author=github-actions[bot]
+      - check-success=secrets-scan
+      - check-success=set-variables
+      - check-success=check-fast-forward
+      - or:
+        - check-success=bootstrap-verification
+        - check-skipped=bootstrap-verification
+      - or:
+        - check-success=secrets-workflow
+        - check-skipped=secrets-workflow
+      - or:
+        - check-success=flake-validation
+        - check-skipped=flake-validation
+      - or:
+        - check-success=cache-overlay-packages (x86_64-linux, ubuntu-latest)
+        - check-skipped=cache-overlay-packages (x86_64-linux, ubuntu-latest)
+      - or:
+        - check-success=cache-overlay-packages (aarch64-linux, ubuntu-24.04-arm)
+        - check-skipped=cache-overlay-packages (aarch64-linux, ubuntu-24.04-arm)
+      - or:
+        - check-success=nix (x86_64-linux, ubuntu-latest, packages)
+        - check-skipped=nix (x86_64-linux, ubuntu-latest, packages)
+      - or:
+        - check-success=nix (x86_64-linux, ubuntu-latest, checks-devshells)
+        - check-skipped=nix (x86_64-linux, ubuntu-latest, checks-devshells)
+      - or:
+        - check-success=nix (x86_64-linux, ubuntu-latest, home)
+        - check-skipped=nix (x86_64-linux, ubuntu-latest, home)
+      - or:
+        - check-success=nix (x86_64-linux, ubuntu-latest, nixos, cinnabar)
+        - check-skipped=nix (x86_64-linux, ubuntu-latest, nixos, cinnabar)
+      - or:
+        - check-success=nix (x86_64-linux, ubuntu-latest, nixos, electrum)
+        - check-skipped=nix (x86_64-linux, ubuntu-latest, nixos, electrum)
+      - or:
+        - check-success=nix (aarch64-linux, ubuntu-24.04-arm, packages)
+        - check-skipped=nix (aarch64-linux, ubuntu-24.04-arm, packages)
+      - or:
+        - check-success=nix (aarch64-linux, ubuntu-24.04-arm, checks-devshells)
+        - check-skipped=nix (aarch64-linux, ubuntu-24.04-arm, checks-devshells)
+      - or:
+        - check-success=nix (aarch64-linux, ubuntu-24.04-arm, home)
+        - check-skipped=nix (aarch64-linux, ubuntu-24.04-arm, home)
+      - or:
+        - "check-success=typescript (docs, packages/docs) / test"
+        - "check-skipped=typescript (docs, packages/docs) / test"
+    actions:
+      queue:
+        name: bot-updates
+
 queue_rules:
+  # Human PRs: fast-forward merge preserves original commits
   - name: default
     merge_method: fast-forward
     update_method: rebase
     update_bot_account: cameronraysmith
     batch_size: 1
+    checks_timeout: 3600
+    queue_conditions:
+      - check-success=check-fast-forward
+    merge_conditions:
+      - check-success=check-fast-forward
+      - check-success=secrets-scan
+
+  # Bot PRs: squash merge with batching for CI efficiency
+  - name: bot-updates
+    merge_method: squash
+    update_method: rebase
+    update_bot_account: cameronraysmith
+    batch_size: 5
+    batch_max_wait_time: 30 min
     checks_timeout: 3600
     queue_conditions:
       - check-success=check-fast-forward
