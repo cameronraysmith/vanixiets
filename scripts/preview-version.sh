@@ -199,3 +199,7 @@ else
 fi
 
 echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}\n"
+
+# Preview completed successfully - exit 0 regardless of whether a version bump is pending.
+# "No version bump required" is a valid outcome, not an error.
+exit 0
