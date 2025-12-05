@@ -1,9 +1,9 @@
 ---
 title: vanixiets
-description: Multi-machine Nix infrastructure using dendritic flake-parts and clan
+description: Multi-machine nix infrastructure using dendritic flake-parts and clan
 template: splash
 hero:
-  tagline: "Multi-machine Nix infrastructure for NixOS, nix-darwin, and home-manager using dendritic flake-parts module organization and clan deployment coordination."
+  tagline: "Multi-machine nix infrastructure for nixos, nix-darwin, and home-manager using dendritic flake-parts module architecture and clan fleet coordination."
   image:
     file: ../../assets/nix-snowflake-colours.svg
   actions:
@@ -23,32 +23,32 @@ import { Card, CardGrid } from "@astrojs/starlight/components";
 
 <CardGrid stagger>
   <Card title="Dendritic module organization" icon="puzzle">
-    Every Nix file is a flake-parts module organized by aspect (feature) rather than host.
-    Cross-cutting configuration spans NixOS, nix-darwin, and home-manager from unified modules.
+    Every nix file is a flake-parts module organized by feature category rather than by host.
+    Cross-cutting configuration via unified modules spans nixos, nix-darwin, and home-manager.
   </Card>
   <Card title="Clan deployment" icon="rocket">
-    Multi-machine coordination with unified deployment across 8 machines (4 darwin, 4 nixos).
-    Service orchestration via inventory system with role-based assignments.
+    Multi-machine coordination with unified deployment across N machines (4 darwin, 4 nixos).
+    Service orchestration via clan inventory system with role-based assignments.
   </Card>
   <Card title="Per-package nixpkgs channel selection" icon="shield">
     Multi-channel overlay architecture enables unstable default with selective stable fallbacks.
-    Apply surgical fixes for broken packages without requiring full flake.lock rollback.
+    Apply surgical fixes for broken packages without requiring full flake lockfile rollback.
   </Card>
   <Card title="Cross-platform deployment targets" icon="laptop">
-    Deploy to NixOS, nix-darwin, or home-manager configurations.
-    Consistent architecture across Linux and macOS systems with platform-specific modules.
+    Deploy to nixos, nix-darwin, or home-manager configurations.
+    Consistent architecture across linux and macos systems with platform-specific modules.
   </Card>
   <Card title="Two-tier secrets management" icon="lock">
-    Clan vars for system-level generated secrets (SSH keys, zerotier identities).
-    sops-nix for user-level manual secrets (API tokens, personal credentials).
+    Clan vars manage system-level generated secrets (SSH keys, zerotier identities).
+    sops-nix can be used directly for user-level manual secrets (API tokens, personal credentials).
   </Card>
   <Card title="Composable package overlays" icon="puzzle">
-    Five-layer overlay composition: multi-channel access, hotfixes, custom packages, overrides, flake inputs.
-    pkgs-by-name pattern for custom package definitions.
+    Multi-layer overlay composition: simultaneously use multiple upstream nixpkgs channels, apply hotfixes, and define custom packages and overrides.
+    Integrates a flake-parts-compatible pkgs-by-name pattern for custom package definitions.
   </Card>
   <Card title="Infrastructure as code" icon="cloud">
-    Terranix modules for Hetzner and GCP infrastructure provisioning.
-    Togglable compute nodes for cost-controlled cloud resources.
+    Terranix modules support deployment to multiple cloud providers including Hetzner, GCP, AWS, Azure infrastructure provisioning.
+    Togglable compute nodes for cost-controlled cloud resource usage.
   </Card>
 </CardGrid>
 
@@ -78,7 +78,7 @@ Multi-layer architecture combining complementary patterns:
 1. **flake-parts** - Modular flake composition framework
 2. **dendritic pattern** - Aspect-based module organization with import-tree auto-discovery
 3. **clan** - Multi-machine coordination and deployment
-4. **multi-channel overlays** - Per-package nixpkgs channel selection for resilience
+4. **simultaneously use multi multiple nixpkgs channels** - Per-package nixpkgs channel selection for resilience
 
 Learn more in [Architecture overview](/concepts/architecture-overview/).
 
@@ -96,16 +96,16 @@ Learn more in [Architecture overview](/concepts/architecture-overview/).
     Dendritic flake-parts + clan architecture for multi-machine deployments.
     [Architecture overview →](/concepts/architecture-overview/)
   </Card>
-  <Card title="Learn dendritic pattern" icon="puzzle">
-    Aspect-based module organization where every file is a flake-parts module.
-    [Dendritic Architecture →](/concepts/dendritic-architecture/)
+  <Card title="See the dendritic flake-parts pattern in action" icon="puzzle">
+    Feature-based flake-parts module organization.
+    [Dendritic flake-parts architecture →](/concepts/dendritic-architecture/)
   </Card>
   <Card title="Understand clan integration" icon="rocket">
     Multi-machine coordination, deployment, and service orchestration.
     [Clan Integration →](/concepts/clan-integration/)
   </Card>
   <Card title="Add a new host" icon="laptop">
-    Onboard a new NixOS or nix-darwin system with this configuration.
+    Onboard a new NixOS or nix-darwin system.
     [Host onboarding guide →](/guides/host-onboarding/)
   </Card>
 </CardGrid>
