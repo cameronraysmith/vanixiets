@@ -72,7 +72,10 @@ development testing
 [Architecture overview](https://infra.cameronraysmith.net/concepts/architecture-overview) • [Dendritic flake-parts architecture](https://infra.cameronraysmith.net/concepts/dendritic-architecture) • [System-user integration](https://infra.cameronraysmith.net/concepts/system-user-integration) • [Repository structure](https://infra.cameronraysmith.net/reference/repository-structure)
 
 **Operations:**
-[Secrets management](https://infra.cameronraysmith.net/guides/secrets-management) • [Nixpkgs hotfixes](https://infra.cameronraysmith.net/development/architecture/nixpkgs-hotfixes) • [Handling broken packages](https://infra.cameronraysmith.net/guides/handling-broken-packages)
+[Secrets management](https://infra.cameronraysmith.net/guides/secrets-management) • [Handling broken packages](https://infra.cameronraysmith.net/guides/handling-broken-packages) • [Adding custom packages](https://infra.cameronraysmith.net/guides/adding-custom-packages)
+
+**Reference:**
+[CI jobs](https://infra.cameronraysmith.net/reference/ci-jobs) • [Justfile recipes](https://infra.cameronraysmith.net/reference/justfile-recipes) • [Flake apps](https://infra.cameronraysmith.net/reference/flake-apps)
 
 📘 **Full documentation:** <https://infra.cameronraysmith.net/>
 
