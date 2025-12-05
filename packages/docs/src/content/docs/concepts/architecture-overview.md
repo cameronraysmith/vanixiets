@@ -1,6 +1,6 @@
 ---
 title: Architecture overview
-description: Understanding the architecture combining dendritic flake-parts, clan-core, and multi-channel overlay composition
+description: Understanding the architecture combining dendritic flake-parts, clan, and multi-channel overlay composition
 ---
 
 This infrastructure combines three complementary architectural patterns to create a maintainable, multi-machine configuration that works across macOS and NixOS systems.
@@ -32,9 +32,9 @@ Every Nix file is a flake-parts module, organized by *aspect* (feature) rather t
 
 See [Dendritic Architecture](/concepts/dendritic-architecture/) for detailed explanation.
 
-### Layer 3: Multi-machine coordination (clan-core)
+### Layer 3: Multi-machine coordination (clan)
 
-Uses [clan-core](https://clan.lol/) for multi-machine coordination and deployment.
+Uses [clan](https://clan.lol/) for multi-machine coordination and deployment.
 Clan orchestrates deployments across the machine fleet but doesn't replace underlying NixOS/nix-darwin configuration.
 
 **What it provides:**
@@ -196,7 +196,7 @@ The combination provides:
 
 - [flake-parts](https://flake.parts) - Modular flake composition
 - [dendritic pattern](https://vic.github.io/dendrix/Dendritic.html) - Module organization
-- [clan-core](https://clan.lol/) - Multi-machine coordination
+- [clan](https://clan.lol/) - Multi-machine coordination
 - [mirkolenz/nixos](https://github.com/mirkolenz/nixos) - Multi-channel resilience patterns
 
 ## See also
