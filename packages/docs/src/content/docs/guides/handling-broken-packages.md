@@ -323,7 +323,7 @@ After system is stable, update specific packages:
 nix flake lock --update-input some-other-input
 
 # Add hotfixes for packages that need unstable features
-# Edit overlays/infra/hotfixes.nix with unstable packages you need
+# Edit modules/nixpkgs/overlays/hotfixes.nix with unstable packages you need
 ```
 
 Time: 2 minutes for rollback, additional time for selective updates

@@ -285,7 +285,7 @@ inventory.machines = {
 
 **Preconditions**:
 - Multi-channel nixpkgs inputs configured (unstable, stable, patched)
-- Overlays infrastructure operational (`overlays/infra/hotfixes.nix`, `overlays/infra/patches.nix`)
+- Overlays infrastructure operational (`modules/nixpkgs/overlays/hotfixes.nix`, `modules/nixpkgs/overlays/channels.nix`)
 - Package broken in nixpkgs-unstable
 - Understanding of overlay composition layers
 
@@ -317,12 +317,12 @@ inventory.machines = {
 **References**:
 - [Context: Goals](../context/goals-and-objectives/) - G-U05: Surgical package fixes, G-S08: Multi-channel resilience
 - [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Complete implementation guide
-- overlays/infra/hotfixes.nix - Platform-specific stable fallbacks
-- overlays/infra/patches.nix - Upstream patch list
+- modules/nixpkgs/overlays/hotfixes.nix - Platform-specific stable fallbacks
+- modules/nixpkgs/overlays/channels.nix - Upstream patch list
 
 **Example**:
 ```nix
-# overlays/infra/hotfixes.nix
+# modules/nixpkgs/overlays/hotfixes.nix
 // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
   inherit (final.stable)
     # https://hydra.nixos.org/job/nixpkgs/trunk/buf.aarch64-darwin
