@@ -99,7 +99,7 @@ These goals focus on how the system is intended to be used.
 - Host-specific overrides remain clear and maintainable
 - Service instances can span multiple hosts
 
-**Dependencies**: G-S06 (clan-core integration)
+**Dependencies**: G-S06 (clan integration)
 
 **Conflicts**: Current architecture (manual per-host management)
 
@@ -177,7 +177,7 @@ These goals focus on how the system is intended to be used.
 - Reachable even when hosts on different networks
 - Automatic reconnection on network changes
 
-**Dependencies**: G-S06 (clan-core integration), VPS infrastructure (cinnabar as controller)
+**Dependencies**: G-S06 (clan integration), VPS infrastructure (cinnabar as controller)
 
 **Supports**: G-U02 (multi-host coordination)
 
@@ -308,7 +308,7 @@ These goals focus on system architecture, design, and technical properties.
 
 ### G-S06: Clan-core integration
 
-**Description**: Integrate clan-core for multi-host management, inventory, vars, and services.
+**Description**: Integrate clan for multi-host management, inventory, vars, and services.
 
 **Stakeholder**: User/maintainer (crs58)
 
@@ -325,7 +325,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-U02 (multi-host coordination), G-U03 (declarative secrets), G-U06 (overlay networking)
 
-**Status**: Achieved (clan-core integrated with inventory, vars, and services, November 2024)
+**Status**: Achieved (clan integrated with inventory, vars, and services, November 2024)
 
 ### G-S07: Clan vars system adoption
 
@@ -339,7 +339,7 @@ These goals focus on system architecture, design, and technical properties.
 - Proper permissions and encryption
 - DAG composition for complex secret dependencies
 
-**Dependencies**: G-S06 (clan-core integration)
+**Dependencies**: G-S06 (clan integration)
 
 **Conflicts**: Current manual sops-nix workflow
 
@@ -523,4 +523,4 @@ All hosts migrated successfully:
 - nixpkgs-hotfixes: Multi-channel resilience pattern
 - Migration plan: Phased dendritic + clan adoption
 - dendritic pattern: Type safety through module system maximization
-- clan-core: Multi-host coordination capabilities
+- clan: Multi-host coordination capabilities
