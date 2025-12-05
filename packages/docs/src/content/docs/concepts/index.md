@@ -8,7 +8,7 @@ Conceptual documentation to help you understand the architecture and design patt
 
 ## Architecture
 
-- [Architecture overview](/concepts/architecture-overview/) - Four-layer architecture combining flake-parts, dendritic pattern, clan-core, and multi-channel overlays
+- [Architecture overview](/concepts/architecture-overview/) - Four-layer architecture combining flake-parts, dendritic pattern, clan, and multi-channel overlays
 - [Dendritic Architecture](/concepts/dendritic-architecture/) - Aspect-based module organization where every file is a flake-parts module
 - [Clan Integration](/concepts/clan-integration/) - Multi-machine coordination, deployment, and service orchestration
 
