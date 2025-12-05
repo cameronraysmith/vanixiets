@@ -172,7 +172,7 @@ See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adr
 - pkgs.stable, pkgs.unstable, pkgs.patched namespaces
 - Overlay-accessible in all expressions
 
-**Invocation**: Via overlay composition in overlays/inputs.nix
+**Invocation**: Via overlay composition in modules/nixpkgs/overlays/channels.nix
 
 **Related use cases**: UC-005 (Handle broken packages)
 
