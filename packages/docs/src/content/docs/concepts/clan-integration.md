@@ -1,6 +1,6 @@
 ---
 title: Clan Integration
-description: Multi-machine coordination with clan-core and clear boundaries with other tools
+description: Multi-machine coordination with clan and clear boundaries with other tools
 ---
 
 [Clan](https://clan.lol/) is our multi-machine coordination and deployment framework.
@@ -282,8 +282,8 @@ Dendritic provides auto-discovery for ALL modules, not just clan.
 
 ## External resources
 
-- [Clan documentation](https://clan.lol/) - Official clan-core documentation
-- [clan-core repository](https://github.com/clan-core/clan-core) - Source code and examples
+- [Clan documentation](https://clan.lol/) - Official clan documentation
+- [clan repository](https://github.com/clan-lol/clan-core) - Source code and examples
 - [clan-infra](https://git.clan.lol/clan/clan-infra) - Production clan usage reference
 
 ## See also
