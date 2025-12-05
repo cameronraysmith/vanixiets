@@ -5,14 +5,14 @@ title: Project scope
 ## Problem description
 
 Managing personal infrastructure across multiple platforms (macOS, NixOS) with reproducible, type-safe configurations presents inherent complexity.
-Current architecture uses dendritic flake-parts pattern with clan-core integration, providing systematic multi-host management with maximized type safety through deep module system integration.
+Current architecture uses dendritic flake-parts pattern with clan integration, providing systematic multi-host management with maximized type safety through deep module system integration.
 The system manages 8 machines across darwin and NixOS platforms with declarative secrets via clan vars, zerotier overlay networking, and coordinated service deployment.
 This architecture eliminates specialArgs anti-patterns, enabling cross-platform module composition (darwin + nixos + home-manager) with full module system type checking.
 Infrastructure coordination leverages clan's inventory system with tags, roles, and service instances for multi-machine orchestration.
 
 ## Statement of intent
 
-Migration from flake-parts + nixos-unified architecture to dendritic flake-parts pattern with clan-core integration is complete (November 2024).
+Migration from flake-parts + nixos-unified architecture to dendritic flake-parts pattern with clan integration is complete (November 2024).
 Current infrastructure achieves maximum type safety through "every file is a flake-parts module" organizational pattern, eliminating specialArgs anti-pattern.
 Systematic multi-host management operational through clan's inventory system, service instances, and overlay networking (zerotier).
 Declarative secrets management deployed through clan vars system with automatic generation and deployment.
@@ -21,7 +21,7 @@ All original functionality maintained while gaining enhanced modularity, type sa
 
 ## Current state architecture
 
-**Foundation**: dendritic flake-parts pattern + clan-core integration
+**Foundation**: dendritic flake-parts pattern + clan integration
 
 **Dendritic flake-parts pattern**:
 - Every Nix file is a flake-parts module contributing to `flake.modules.*` namespace
@@ -30,7 +30,7 @@ All original functionality maintained while gaining enhanced modularity, type sa
 - Maximum type safety through consistent module system usage
 - Cross-cutting concerns: single module can target multiple configuration classes (darwin + nixos + home-manager)
 
-**Clan-core capabilities**:
+**Clan capabilities**:
 - **Inventory system**: Abstract service layer for multi-machine coordination via tags, roles, instances
 - **Vars system**: Declarative secret and file generation with automatic deployment
 - **Service instances**: Multiple instances of same service type with role-based configuration
