@@ -878,7 +878,7 @@ Future: Unified secrets interface abstracting tier selection, automated secret r
 - [Dendritic Architecture concept documentation](/concepts/dendritic-architecture)
 - [Clan Integration concept documentation](/concepts/clan-integration)
 - [Architecture Decision Records](/development/architecture/adrs/)
-- [Nixpkgs Hotfixes reference](/development/architecture/nixpkgs-hotfixes/)
+- [Handling Broken Packages guide](/guides/handling-broken-packages)
 
 ### External references
 

@@ -162,7 +162,7 @@ This provides the foundation for the requirements layer, which specifies what th
 
 **Architecture**:
 - ADRs: `packages/docs/src/content/docs/development/architecture/adrs/`
-- Nixpkgs hotfixes: `packages/docs/src/content/docs/development/architecture/nixpkgs-hotfixes.md`
+- [Handling broken packages](/guides/handling-broken-packages): Multi-channel resilience guide
 
 **External**:
 - AMDiRE framework: Research paper on artefact-based requirements engineering

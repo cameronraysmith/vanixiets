@@ -637,7 +637,7 @@ EOF
 
 ## See also
 
-- [Nixpkgs Hotfixes](/development/architecture/nixpkgs-hotfixes) (architecture documentation)
+- [ADR-0017: Dendritic Overlay Patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns) (architecture documentation)
 - https://hydra.nixos.org/jobset/nixpkgs/trunk (build status)
 - https://github.com/NixOS/nixpkgs/issues (upstream issues)
 - https://nixos.org/manual/nixpkgs/stable/#chap-overlays (overlay documentation)

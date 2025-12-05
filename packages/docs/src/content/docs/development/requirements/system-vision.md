@@ -194,7 +194,7 @@ Secrets Flow:
 
 **User benefit**: Latest packages without sacrificing stability.
 
-**Reference**: `docs/development/architecture/nixpkgs-hotfixes.md`
+**Reference**: [Handling broken packages](/guides/handling-broken-packages)
 
 ### F-003: Secrets management
 

@@ -1001,5 +1001,5 @@ Operational Functions (OF) [8-machine fleet operations]
 - [System vision](/development/requirements/system-vision/) - Feature overview
 
 **Architecture**:
-- [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Package management implementation
+- [Handling broken packages](/guides/handling-broken-packages) - Package management implementation
 - ADRs - Architectural decision records

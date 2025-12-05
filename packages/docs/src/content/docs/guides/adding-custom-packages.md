@@ -238,6 +238,6 @@ Once you're comfortable adding packages, you might want to:
 
 - Override existing nixpkgs packages with custom build options (see `modules/nixpkgs/overlays/overrides.nix`)
 - Use stable channel fallbacks for broken packages (see `modules/nixpkgs/overlays/hotfixes.nix`)
-- Apply upstream patches to nixpkgs packages (see [nixpkgs hotfixes](/development/architecture/nixpkgs-hotfixes))
+- Apply upstream patches to nixpkgs packages (see [handling broken packages](/guides/handling-broken-packages))
 
 For deeper understanding of the overlay architecture, see [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns).

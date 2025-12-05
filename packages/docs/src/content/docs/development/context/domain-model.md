@@ -127,7 +127,7 @@ Application values use `config.flake.*` namespace.
 - **Upstream patch**: Apply patch from upstream PR to current version
 - **Build override**: Custom build parameters or dependencies
 
-**Reference**: `docs/development/architecture/nixpkgs-hotfixes.md`, ADR nixpkgs-hotfixes
+**Reference**: [Handling broken packages](/guides/handling-broken-packages), [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns)
 
 ### Secrets management
 
@@ -474,7 +474,7 @@ See `glossary.md` for comprehensive term definitions.
 - terranix: <https://terranix.org/>
 - disko: <https://github.com/nix-community/disko>
 - srvos: <https://github.com/nix-community/srvos>
-- Multi-channel resilience: `docs/development/architecture/nixpkgs-hotfixes.md`
+- Multi-channel resilience: [Handling broken packages](/guides/handling-broken-packages)
 
 ### Nix ecosystem
 

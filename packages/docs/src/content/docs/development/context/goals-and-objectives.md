@@ -163,7 +163,7 @@ These goals focus on how the system is intended to be used.
 
 **Status**: Achieved in current state (multi-channel fallback), must be preserved during migration
 
-**Reference**: ADR nixpkgs-hotfixes, `docs/development/architecture/nixpkgs-hotfixes.md`
+**Reference**: [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
 
 ### G-U06: Secure overlay networking
 
@@ -365,7 +365,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Status**: Achieved, must be preserved during migration
 
-**Reference**: ADR nixpkgs-hotfixes, docs/development/architecture/nixpkgs-hotfixes.md
+**Reference**: [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
 
 ## Goal hierarchy and relationships
 
@@ -469,7 +469,7 @@ System Goals
 - ● G-S05: Comprehensive development environment (ADR-0009)
 - ● G-S06: Clan-core integration (inventory, vars, services, November 2024)
 - ● G-S07: Clan vars system adoption (two-tier with sops-nix, November 2024)
-- ● G-S08: Multi-channel resilience (nixpkgs-hotfixes pattern)
+- ● G-S08: Multi-channel resilience (multi-channel overlay pattern)
 - ● G-U01: Efficient development workflows (preserved through migration)
 - ● G-U02: Multi-host coordination (8-machine fleet, November 2024)
 - ● G-U03: Declarative secrets management (two-tier architecture, November 2024)
@@ -520,7 +520,8 @@ All hosts migrated successfully:
 
 - ADR-0009: Nix development environment
 - ADR-0014: Design principles
-- nixpkgs-hotfixes: Multi-channel resilience pattern
+- [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns): Multi-channel resilience pattern
+- [Handling broken packages](/guides/handling-broken-packages): Operational guide
 - Migration plan: Phased dendritic + clan adoption
 - dendritic pattern: Type safety through module system maximization
 - clan: Multi-host coordination capabilities
