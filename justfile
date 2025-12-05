@@ -419,6 +419,12 @@ docs-deploy-preview branch=`git branch --show-current`:
   set -euo pipefail
   cd packages/docs
 
+  # Sanitize branch name for Cloudflare alias (must be valid subdomain component)
+  # - Replace / and other non-alphanumeric chars with -
+  # - Collapse consecutive hyphens, remove leading/trailing hyphens
+  # - Truncate to 40 chars (safe for subdomain label limit of 63)
+  SAFE_BRANCH=$(echo "{{branch}}" | tr '/' '-' | tr -c 'a-zA-Z0-9-' '-' | sed 's/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
+
   # Capture git metadata (use 12-char SHA for tag - fits in 25 char limit, extremely collision-resistant)
   COMMIT_SHA=$(git rev-parse HEAD)
   COMMIT_TAG=$(git rev-parse --short=12 HEAD)
@@ -432,6 +438,7 @@ docs-deploy-preview branch=`git branch --show-current`:
   MESSAGE="[{{branch}}] ${COMMIT_MSG} (${COMMIT_TAG}, ${GIT_STATUS})"
 
   echo "Deploying preview for branch: {{branch}}"
+  echo "Sanitized alias: b-${SAFE_BRANCH}"
   echo "Commit: ${COMMIT_SHORT} (${GIT_STATUS})"
   echo "Full SHA: ${COMMIT_SHA}"
   echo "Tag: ${COMMIT_TAG}"
@@ -441,13 +448,14 @@ docs-deploy-preview branch=`git branch --show-current`:
   # Export variables for use in sops exec-env
   export VERSION_TAG="${TAG}"
   export VERSION_MESSAGE="${MESSAGE}"
+  export SAFE_BRANCH="${SAFE_BRANCH}"
 
   sops exec-env ../../secrets/shared.yaml '
     echo "Building..."
     bun run build
     echo "Uploading version with preview alias and metadata..."
     bunx wrangler versions upload \
-      --preview-alias b-{{branch}} \
+      --preview-alias "b-${SAFE_BRANCH}" \
       --tag "$VERSION_TAG" \
       --message "$VERSION_MESSAGE"
   '
@@ -457,7 +465,7 @@ docs-deploy-preview branch=`git branch --show-current`:
   echo "  Tag: ${COMMIT_TAG}"
   echo "  Full SHA: ${COMMIT_SHA}"
   echo "  Message: ${MESSAGE}"
-  echo "  Preview URL: https://b-{{branch}}-infra-docs.sciexp.workers.dev"
+  echo "  Preview URL: https://b-${SAFE_BRANCH}-infra-docs.sciexp.workers.dev"
 
 # Deploy documentation to Cloudflare Workers (production)
 [group('docs')]
