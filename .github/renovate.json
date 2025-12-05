@@ -1,13 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
   ],
   "nix": {
     "enabled": true
   },
-  "labels": ["dependencies"],
-  "github-actions": {
-    "pinDigests": false
-  }
+  "labels": ["dependencies"]
 }
