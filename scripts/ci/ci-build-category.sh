@@ -268,7 +268,10 @@ build_nixos() {
     print_step "building system"
     echo ""
     echo "building nixosConfigurations.$config.config.system.build.toplevel"
-    if ! nix build ".#nixosConfigurations.$config.config.system.build.toplevel" -L --no-link; then
+    # NOTE: --max-substitution-jobs 1 works around Nix race condition bug
+    # https://github.com/NixOS/nix/issues/13484 - assertion failure in callback.hh
+    # when multiple substitutions run in parallel
+    if ! nix build ".#nixosConfigurations.$config.config.system.build.toplevel" -L --no-link --max-substitution-jobs 1; then
         echo "failed to build nixos configuration: $config"
         return 1
     fi
