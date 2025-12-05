@@ -822,40 +822,6 @@
         "type": "github"
       }
     },
-    "nvim-treesitter": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1763374633,
-        "narHash": "sha256-HwQTSSEW2yW3T0XbongCaOL+/STOuaAZhLkII/evoKM=",
-        "owner": "nvim-treesitter",
-        "repo": "nvim-treesitter",
-        "rev": "c682a239a9404ce5f90a2d0da34790eff1ed2932",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nvim-treesitter",
-        "ref": "main",
-        "repo": "nvim-treesitter",
-        "type": "github"
-      }
-    },
-    "nvim-treesitter-textobjects": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1763121392,
-        "narHash": "sha256-VUrpzaazSSo5KYJ/oOi2WH/QtpFDNFKs9CqqgO/tnmw=",
-        "owner": "nvim-treesitter",
-        "repo": "nvim-treesitter-textobjects",
-        "rev": "227165aaeb07b567fb9c066f224816aa8f3ce63f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nvim-treesitter",
-        "ref": "main",
-        "repo": "nvim-treesitter-textobjects",
-        "type": "github"
-      }
-    },
     "pkgs-by-name-for-flake-parts": {
       "locked": {
         "lastModified": 1743779435,
@@ -916,8 +882,6 @@
         "nixpkgs-darwin-stable": "nixpkgs-darwin-stable",
         "nixpkgs-linux-stable": "nixpkgs-linux-stable",
         "nuenv": "nuenv",
-        "nvim-treesitter": "nvim-treesitter",
-        "nvim-treesitter-textobjects": "nvim-treesitter-textobjects",
         "pkgs-by-name-for-flake-parts": "pkgs-by-name-for-flake-parts",
         "playwright-web-flake": "playwright-web-flake",
         "sops-nix": "sops-nix_2",
