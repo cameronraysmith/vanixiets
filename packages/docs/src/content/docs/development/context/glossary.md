@@ -121,23 +121,19 @@ Related: flake, devShell, development environment.
 Synonym: none.
 Related: NixOS, activation.
 
-**nixos-unified**: DEPRECATED (November 2024). Framework that provided directory-based autowiring for multi-platform Nix configurations, replaced by dendritic flake-parts + clan-core architecture.
+**nixos-unified**: DEPRECATED (November 2024). Framework that provided directory-based autowiring for multi-platform Nix configurations, replaced by dendritic flake-parts + clan architecture.
 Abbreviation: none.
 Related: flake-parts, autowiring, specialArgs, dendritic flake-parts pattern.
 
 ## Target architecture terms
 
-**clan**: Short for clan-core, framework for multi-host NixOS/nix-darwin management.
-Synonym: clan-core.
-Related: inventory, vars, service instance.
+**clan**: Framework for multi-host NixOS/nix-darwin management providing coordination, inventory system, vars, and service instances. Repository name: clan-core.
+Synonym: none (clan-core is the repository name, not an alternative term).
+Related: inventory, vars, zerotier, clan vars, service instance.
 
-**clan-core**: Framework providing multi-host coordination, inventory system, vars, and service instances.
-Synonym: clan.
-Related: inventory, vars, zerotier, clan vars.
-
-**clan vars**: Two-tier secrets system in clan-core with centralized generators creating machine-specific outputs.
+**clan vars**: Two-tier secrets system in clan with centralized generators creating machine-specific outputs.
 Synonym: vars system.
-Related: clan-core, vars generator, secrets, sops.
+Related: clan, vars generator, secrets, sops.
 
 **controller**: Zerotier role managing network and authorizing peers.
 Synonym: zerotier controller.
