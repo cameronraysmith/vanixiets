@@ -20,7 +20,7 @@ Task-oriented guides for common operations and workflows with this infrastructur
 
 - [Secrets management](/guides/secrets-management/) - Manage encrypted secrets with the two-tier model (clan vars + sops-nix)
 - [Handling broken packages](/guides/handling-broken-packages/) - Fix broken packages from nixpkgs unstable with surgical hotfixes
-- [MCP servers usage](/guides/mcp-servers-usage/) - Configure and use Model Context Protocol servers
+- [MCP servers usage](/guides/mcp-server-usage/) - Configure and use Model Context Protocol servers
 
 ## Architecture References
 
