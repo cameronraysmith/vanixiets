@@ -244,8 +244,8 @@ jobs:
           OUTPUT=$(nix develop -c just preview-version main ${{ matrix.package.path }} 2>&1 | tee /dev/stderr)
           echo "::endgroup::"
 
-          # Extract and annotate the next version
-          VERSION=$(echo "$OUTPUT" | grep "next version:" | awk '{print $3}')
+          # Extract and annotate the next version (grep returns 1 on no match, so suppress with || true)
+          VERSION=$(echo "$OUTPUT" | grep "next version:" | awk '{print $3}') || true
           if [ -n "$VERSION" ]; then
             echo "::notice title=Next Version (${{ matrix.package.name }})::$VERSION"
           else
