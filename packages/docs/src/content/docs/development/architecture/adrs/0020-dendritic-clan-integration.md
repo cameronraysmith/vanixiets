@@ -9,7 +9,7 @@ title: "ADR-0020: Dendritic + Clan Integration"
 
 ## Context
 
-Adopting both dendritic flake-parts ([ADR-0018](0018-dendritic-flake-parts-architecture/)) and clan-core ([ADR-0019](0019-clan-core-orchestration/)) required solving integration challenges.
+Adopting both dendritic flake-parts ([ADR-0018](0018-dendritic-flake-parts-architecture/)) and clan ([ADR-0019](0019-clan-core-orchestration/)) required solving integration challenges.
 Neither was designed with the other in mind.
 
 ### Integration challenges
@@ -369,5 +369,5 @@ GCP nodes validated pattern at scale:
 ### External
 
 - [dendritic pattern](https://github.com/mightyiam/dendritic)
-- [clan-core](https://github.com/clan-lol/clan-core)
+- [clan](https://github.com/clan-lol/clan-core)
 - [nixpkgs.molybdenum.software-dendritic-clan](https://github.com/nixpkgs-community/nixpkgs.molybdenum.software) - Dendritic + clan combination reference
