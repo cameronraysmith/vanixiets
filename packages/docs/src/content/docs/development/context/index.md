@@ -11,9 +11,9 @@ The context layer considers the context of the system under consideration, inclu
 
 ## Overview
 
-This documentation captures the architecture and operational context for the dendritic flake-parts + clan-core infrastructure.
+This documentation captures the architecture and operational context for the dendritic flake-parts + clan infrastructure.
 
-**Current state**: Dendritic flake-parts pattern with clan-core integration managing 8 hosts (4 darwin, 4 nixos) with multi-machine coordination, declarative secrets, and overlay networking.
+**Current state**: Dendritic flake-parts pattern with clan integration managing 8 hosts (4 darwin, 4 nixos) with multi-machine coordination, declarative secrets, and overlay networking.
 
 **Architecture migration complete**: The migration from nixos-unified to dendritic + clan completed November 2024. All documentation reflects current state.
 
@@ -24,7 +24,7 @@ This documentation captures the architecture and operational context for the den
 Description of the infrastructure scope and capabilities.
 
 **Key topics**:
-- Current architecture (dendritic flake-parts, clan-core, multi-channel overlays)
+- Current architecture (dendritic flake-parts, clan, multi-channel overlays)
 - Multi-machine coordination capabilities
 - Cross-platform deployment (darwin + nixos)
 - Future expansion areas
@@ -36,7 +36,7 @@ Individuals, groups, and institutions with interest in the project.
 **Key stakeholders**:
 - Primary: User/maintainer (crs58/cameron) - all roles
 - Secondary: Family users (raquel, janettesmith, christophersmith)
-- Reference: Upstream projects (flake-parts, clan-core, dendritic pattern, home-manager, nix-darwin)
+- Reference: Upstream projects (flake-parts, clan, dendritic pattern, home-manager, nix-darwin)
 
 ### [Constraints and rules](/development/context/constraints-and-rules/)
 
@@ -87,7 +87,7 @@ Description of the Nix ecosystem domain and current architecture components.
 
 **Key domains**:
 - Nix ecosystem overview (core concepts, package channels)
-- Current architecture (dendritic flake-parts, clan-core, multi-channel fallback, sops-nix)
+- Current architecture (dendritic flake-parts, clan, multi-channel fallback, sops-nix)
 - Domain processes (workflows for configuration, secrets, multi-host coordination)
 
 ### [Glossary](/development/context/glossary/)
@@ -167,5 +167,5 @@ This provides the foundation for the requirements layer, which specifies what th
 **External**:
 - AMDiRE framework: Research paper on artefact-based requirements engineering
 - dendritic pattern: <https://github.com/mightyiam/dendritic>
-- clan-core: <https://clan.lol/>
+- clan: <https://clan.lol/>
 - flake-parts: <https://flake.parts/>
