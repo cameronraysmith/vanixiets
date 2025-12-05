@@ -134,7 +134,7 @@ jobs:
 
       - name: upload test results
         if: always() && steps.cache.outputs.should-run == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: ${{ inputs.package-name }}-playwright-report
           path: packages/${{ inputs.package-name }}/playwright-report/
@@ -142,7 +142,7 @@ jobs:
 
       - name: upload coverage
         if: always() && steps.cache.outputs.should-run == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: ${{ inputs.package-name }}-coverage
           path: packages/${{ inputs.package-name }}/coverage/
