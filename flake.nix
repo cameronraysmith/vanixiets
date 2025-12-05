@@ -68,14 +68,6 @@
 
     lazyvim-nix.url = "github:cameronraysmith/lazyvim-nix/dev";
     lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
-    nvim-treesitter = {
-      url = "github:nvim-treesitter/nvim-treesitter/main";
-      flake = false;
-    };
-    nvim-treesitter-textobjects = {
-      url = "github:nvim-treesitter/nvim-treesitter-textobjects/main";
-      flake = false;
-    };
 
     nix-index-database.url = "github:nix-community/nix-index-database";
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
