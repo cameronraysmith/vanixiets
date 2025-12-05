@@ -4,7 +4,7 @@ title: "ADR-0003: Overlay Composition Patterns"
 
 **Status**: Superseded by [ADR-0017: Dendritic Overlay Patterns](0017-dendritic-overlay-patterns/)
 
-**Historical Context**: This ADR documents nixos-unified overlay patterns used prior to November 2024 migration to dendritic flake-parts + clan-core architecture.
+**Historical Context**: This ADR documents nixos-unified overlay patterns used prior to November 2024 migration to dendritic flake-parts + clan architecture.
 
 ## Summary
 
