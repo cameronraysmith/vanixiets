@@ -51,7 +51,7 @@ inputs:
     description: nix version to install (e.g., 2.31.2, 2.24.15)
     type: string
     required: false
-    default: "2.24.15"
+    default: "2.31.2"
 
 outputs:
   cache-hit:
@@ -109,9 +109,6 @@ runs:
           system = ${{ inputs.system }}
           keep-env-derivations = true
           keep-outputs = true
-          # Serialize cache operations to avoid NixOS/nix#13484 race condition
-          http-connections = 1
-          max-substitution-jobs = 1
 
     - name: setup cache
       if: runner.os == 'Linux' && inputs.installer == 'full'
