@@ -5,7 +5,7 @@ title: Architecture
 Architecture documentation for the vanixiets multi-machine infrastructure configuration.
 
 This repository manages a heterogeneous fleet of 6 permanent machines plus ephemeral cloud instances across 2 platforms using declarative Nix configuration.
-The infrastructure coordinates 4 nix-darwin laptops and permanent nixos servers (cinnabar plus ephemeral instances like electrum) through dendritic flake-parts module organization, clan-core multi-machine orchestration, and terranix cloud provisioning.
+The infrastructure coordinates 4 nix-darwin laptops and permanent nixos servers (cinnabar plus ephemeral instances like electrum) through dendritic flake-parts module organization, clan multi-machine orchestration, and terranix cloud provisioning.
 
 ## Overview
 
@@ -14,7 +14,7 @@ Infrastructure provisioning, system deployment, and secrets management are separ
 
 The system integrates four major architectural components.
 Dendritic flake-parts provides feature-based module organization with auto-discovery mechanisms that eliminate manual registration.
-Clan-core orchestrates deployment across darwin and nixos machines through a unified command interface.
+Clan orchestrates deployment across darwin and nixos machines through a unified command interface.
 Terranix provisions cloud infrastructure on Hetzner and GCP with toggle mechanisms for cost control.
 Five-layer overlay composition enables surgical package fixes without system-wide rollbacks when nixpkgs packages break.
 A two-tier secrets architecture separates system-level generated secrets from user credentials using age encryption.
