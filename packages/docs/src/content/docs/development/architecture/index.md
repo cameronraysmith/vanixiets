@@ -29,4 +29,4 @@ A two-tier secrets architecture separates system-level generated secrets from us
 
 ## Reference Documentation
 
-- [Nixpkgs Hotfixes](/development/architecture/nixpkgs-hotfixes/) - Multi-channel nixpkgs resilience system with five-layer overlay composition
+- [Handling Broken Packages](/guides/handling-broken-packages) - Operational guide for multi-channel nixpkgs resilience

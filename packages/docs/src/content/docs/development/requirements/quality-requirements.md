@@ -514,5 +514,5 @@ fd -e yaml sops/ -x file {} | rg "ASCII text"
 
 **Architecture**:
 - [ADR-0014: Design principles](../../architecture/adrs/0014-design-principles/) - Framework independence, type safety, template duality, bias toward removal
-- [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Multi-channel resilience implementation
+- [Handling broken packages](/guides/handling-broken-packages) - Multi-channel resilience implementation
 - [CI philosophy](../../traceability/ci-philosophy/) - Continuous integration approach

@@ -451,7 +451,7 @@ Updates to nixpkgs, dendritic-flake-parts, or clan could introduce breaking chan
 
 ### References
 
-- [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Multi-channel resilience
+- [Handling broken packages](/guides/handling-broken-packages) - Multi-channel resilience
 - [System constraints](/development/requirements/system-constraints/) - SC-003: Input locking
 
 ## R-007: Initial validation revealing architectural incompatibility

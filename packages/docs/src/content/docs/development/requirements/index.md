@@ -315,7 +315,7 @@ The Context layer defines the problem space that Requirements address:
 Architecture documentation describes the solution space:
 - [Architecture overview](../../architecture/)
 - [ADRs](../../architecture/adrs/)
-- [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/)
+- [Handling broken packages](/guides/handling-broken-packages)
 
 ### Peer: Traceability documentation
 

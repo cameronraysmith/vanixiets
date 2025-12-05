@@ -316,7 +316,7 @@ inventory.machines = {
 
 **References**:
 - [Context: Goals](../context/goals-and-objectives/) - G-U05: Surgical package fixes, G-S08: Multi-channel resilience
-- [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Complete implementation guide
+- [Handling broken packages](/guides/handling-broken-packages) - Complete implementation guide
 - modules/nixpkgs/overlays/hotfixes.nix - Platform-specific stable fallbacks
 - modules/nixpkgs/overlays/channels.nix - Upstream patch list
 
@@ -623,7 +623,7 @@ The usage model supports the following quality attributes from [quality requirem
 - [Goals and objectives](../context/goals-and-objectives/) - Strategic goals driving use cases
 
 **Architecture**:
-- [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Multi-channel resilience implementation
+- [Handling broken packages](/guides/handling-broken-packages) - Multi-channel resilience implementation
 - ADR-0014: Design principles - Framework independence, type safety
 
 **Migration planning** (internal, not published):

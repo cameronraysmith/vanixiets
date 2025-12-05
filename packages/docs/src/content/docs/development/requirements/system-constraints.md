@@ -627,7 +627,7 @@ nix-store --query --tree $(nix eval --raw .#darwinConfigurations.<hostname>.conf
 
 **Architecture**:
 - ADRs - Architectural decisions within constraints
-- [Nixpkgs hotfixes](../../architecture/nixpkgs-hotfixes/) - Working within build system constraints
+- [Handling broken packages](/guides/handling-broken-packages) - Working within build system constraints
 
 **External**:
 - Nix manual: https://nixos.org/manual/nix/stable/

@@ -54,7 +54,7 @@ Adopts proven resilience patterns from [mirkolenz/nixos](https://github.com/mirk
 - **Hotfixes infrastructure**: Platform-specific stable fallbacks
 - **Five-layer overlay composition**: Structured package and overlay merging
 
-See [Nixpkgs Hotfixes Infrastructure](/development/architecture/nixpkgs-hotfixes) for operational details.
+See [Handling Broken Packages](/guides/handling-broken-packages) for operational details.
 
 ## Platform support
 
