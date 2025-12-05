@@ -583,7 +583,7 @@ nix-store --query --tree $(nix eval --raw .#darwinConfigurations.<hostname>.conf
 
 ### Current architecture (post-migration)
 
-**Architecture**: Dendritic flake-parts + clan-core is the active framework
+**Architecture**: Dendritic flake-parts + clan is the active framework
 
 **Deprecated**: nixos-unified removed from active use (November 2024)
 
