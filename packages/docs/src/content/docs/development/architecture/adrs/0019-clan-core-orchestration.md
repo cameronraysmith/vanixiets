@@ -41,7 +41,7 @@ Service coordination needs:
 
 ### Prior approach limitations
 
-Before clan-core, multi-machine coordination required:
+Before clan, multi-machine coordination required:
 - Manual deployment scripts per machine
 - Separate secrets management (sops-nix only, no generated secrets)
 - Ad-hoc service coordination
@@ -49,11 +49,11 @@ Before clan-core, multi-machine coordination required:
 
 ## Decision
 
-Adopt **clan-core** for multi-machine orchestration, secrets generation, and service coordination.
+Adopt **clan** for multi-machine orchestration, secrets generation, and service coordination.
 
 ### Mental model: Kubernetes for NixOS
 
-Understanding clan-core's role requires drawing an analogy to Kubernetes in the container ecosystem.
+Understanding clan's role requires drawing an analogy to Kubernetes in the container ecosystem.
 Kubernetes orchestrates containers across a cluster but doesn't replace Docker - it uses Docker (or other runtimes) to actually run the containers.
 Similarly, clan orchestrates NixOS deployments across machines but doesn't replace the NixOS module system or home-manager - it uses these tools to actually build and activate configurations.
 This separation of concerns means clan handles the coordination layer (which machine gets which configuration, how secrets are distributed, how services discover each other) while the underlying module system handles the configuration layer (what packages are installed, which services are enabled, how they're configured).
@@ -167,13 +167,13 @@ Deploy-rs focuses narrowly on the deployment mechanics - it excels at reliably p
 For this fleet's coordination needs, we would need to build the orchestration layer ourselves on top of deploy-rs.
 The zerotier network coordination requires machines to discover each other's roles and configure themselves accordingly, and deploy-rs provides no inventory concept to express "cinnabar is the controller, these 7 other machines are peers."
 Secret management would also require a completely separate system, and we'd still need to solve the generated secrets problem (SSH host keys for 8 machines) through some other mechanism.
-While deploy-rs is simpler than clan-core in some ways, that simplicity comes from not solving problems we actually have.
+While deploy-rs is simpler than clan in some ways, that simplicity comes from not solving problems we actually have.
 
 ### morph
 
 Morph was eliminated primarily due to its lack of darwin support - with 4 darwin laptops in the fleet, requiring a separate deployment mechanism for half the machines would fragment the operational model.
 Beyond the cross-platform issue, morph doesn't provide the inventory abstraction that this fleet needs for service coordination.
-The project also sees less active development compared to clan-core, and while that doesn't automatically disqualify a tool, it matters when you need ecosystem support for integration with newer tools like dendritic flake-parts patterns.
+The project also sees less active development compared to clan, and while that doesn't automatically disqualify a tool, it matters when you need ecosystem support for integration with newer tools like dendritic flake-parts patterns.
 Unlike the clan ecosystem with documented production deployments (clan-infra coordinating multiple Hetzner VPS, qubasa's dotfiles managing personal infrastructure, mic92's multi-machine research environment, pinpox's homelab setup), morph lacks examples of darwin + nixos fleet coordination that this infrastructure requires.
 The clan examples demonstrate proven patterns for exactly this use case - heterogeneous fleets with cross-platform coordination - while morph examples focus primarily on homogeneous NixOS deployments.
 
@@ -189,7 +189,7 @@ The lack of declarative service coordination meant no single source of truth for
 
 NixOps was not evaluated deeply because its stateful deployment model conflicts with this infrastructure's preference for stateless, git-tracked configuration.
 NixOps maintains deployment state in a database that must be carefully preserved and backed up, introducing an additional failure mode and coordination burden.
-The project has also seen reduced development activity compared to newer alternatives like clan-core and deploy-rs, and its architecture predates many modern NixOS patterns like flakes and flake-parts.
+The project has also seen reduced development activity compared to newer alternatives like clan and deploy-rs, and its architecture predates many modern NixOS patterns like flakes and flake-parts.
 Clan-core's stateless approach - where all configuration lives in git and deployment state is ephemeral - aligns better with the infrastructure's goal of maintaining a single source of truth in version control.
 
 ## Consequences
@@ -213,19 +213,19 @@ The zerotier VPN configuration demonstrates the pattern clearly - the inventory 
 Adding a new machine to the VPN requires one line in the inventory file rather than editing configuration on multiple machines to update peer lists and controller assignments.
 This declarative coordination scales naturally - the complexity of adding machine 9 is identical to the complexity of adding machine 2, whereas manual coordination complexity grows quadratically with fleet size.
 
-The architecture benefits from clan-core's active development by Chaos Computer Club members and the growing ecosystem of clan modules.
+The architecture benefits from clan's active development by Chaos Computer Club members and the growing ecosystem of clan modules.
 Regular releases provide new features and bug fixes, and the responsive issue handling means blockers can be resolved quickly.
 More importantly, clan is built as a flake-parts module, which means it integrates naturally with the dendritic pattern this infrastructure uses.
 The clan machine registry consumes the same namespace exports (`flake.modules.darwin.*`, `flake.modules.nixos.*`) that the dendritic organization produces, creating seamless architectural coherence without impedance mismatch between layers.
 
 ### Negative
 
-Darwin support requires workarounds because clan-core's zerotier module assumes systemd, which doesn't exist on darwin platforms.
+Darwin support requires workarounds because clan's zerotier module assumes systemd, which doesn't exist on darwin platforms.
 The 4 darwin laptops in this fleet (stibnite, blackphos, rosegold, argentum) cannot use clan's native zerotier module and instead rely on a custom 101-line workaround that combines homebrew package installation with activation scripts to start the zerotier daemon.
-This workaround functions reliably in practice - all darwin machines maintain stable zerotier connections - but it represents platform-specific complexity that wouldn't exist if clan-core provided darwin-native modules.
+This workaround functions reliably in practice - all darwin machines maintain stable zerotier connections - but it represents platform-specific complexity that wouldn't exist if clan provided darwin-native modules.
 More problematically, the workaround requires maintenance when clan updates its zerotier abstractions, and contributors working on darwin configurations must understand both the standard clan patterns and the darwin-specific deviations.
 
-The clan-core abstractions (inventory, vars, generators) impose a learning curve that compounds the flake-parts learning investment required by the dendritic pattern.
+The clan abstractions (inventory, vars, generators) impose a learning curve that compounds the flake-parts learning investment required by the dendritic pattern.
 Contributors must understand how the inventory system maps services to machines (`roles.controller.machines."cinnabar"`), how vars generators create secrets from templates, and how the two-tier secrets architecture divides responsibilities between clan vars (machine identities) and sops-nix (user credentials).
 While clan documentation has improved substantially during 2024, it remains less comprehensive than NixOS module documentation - many patterns are documented primarily through example configurations rather than thorough conceptual guides.
 This means new contributors face a steeper ramp-up period before they can confidently modify clan configurations or add new machines to the inventory.
@@ -305,7 +305,7 @@ Result: 8-machine fleet fully operational under clan orchestration.
 
 ### External
 
-- [Clan documentation](https://clan.lol/) - Official clan-core docs
+- [Clan documentation](https://clan.lol/) - Official clan docs
 - [clan-core repository](https://github.com/clan-lol/clan-core) - Source code
 - [clan-infra](https://git.clan.lol/clan/clan-infra) - Production reference
 - [qubasa-clan-infra](https://github.com/qubasa/dotfiles) - Developer personal clan
