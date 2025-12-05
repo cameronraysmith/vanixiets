@@ -66,7 +66,7 @@ runs:
   steps:
     - name: reclaim space (linux)
       if: runner.os == 'Linux' && inputs.installer == 'full'
-      uses: wimpysworld/nothing-but-nix@10c936d9e46521bf923f75458e0cbd4fa309300d # ratchet:wimpysworld/nothing-but-nix@main
+      uses: wimpysworld/nothing-but-nix@6af122a9403f936ef689e44cc013ae3f3e2f1c3b # v6
       with:
         hatchet-protocol: cleave
         nix-permission-edict: true
@@ -123,7 +123,7 @@ runs:
     - name: setup cache
       if: runner.os == 'Linux' && inputs.installer == 'full'
       id: cache
-      uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a # ratchet:nix-community/cache-nix-action@v6
+      uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a # v6
       with:
         primary-key: ${{ inputs.cache-key != '' && inputs.cache-key || format('nix-{0}-{1}', runner.os, hashFiles('**/*.nix', '**/flake.lock')) }}
         restore-prefixes-first-match: ${{ format('nix-{0}-', runner.os) }}
@@ -137,7 +137,7 @@ runs:
 
     - name: setup cachix
       if: inputs.enable-cachix == 'true'
-      uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # ratchet:cachix/cachix-action@v16
+      uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
       continue-on-error: true
       with:
         name: ${{ inputs.cachix-name }}
@@ -146,7 +146,7 @@ runs:
 
     - name: post setup-nix
       if: runner.os == 'macOS' && inputs.installer == 'full'
-      uses: srz-zumix/post-run-action@2bf288bc024acd0341914f792a811080ebd0f252 # ratchet:srz-zumix/post-run-action@v2
+      uses: srz-zumix/post-run-action@2bf288bc024acd0341914f792a811080ebd0f252 # v2
       with:
         shell: bash -e {0}
         post-run: |
