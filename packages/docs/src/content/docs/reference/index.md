@@ -9,7 +9,7 @@ This section provides comprehensive reference documentation for the infra reposi
 
 ## Repository structure
 
-- [Repository Structure](/reference/repository-structure/) - Directory layout for dendritic flake-parts + clan-core architecture
+- [Repository Structure](/reference/repository-structure/) - Directory layout for dendritic flake-parts + clan architecture
 
 ## CLI tooling
 
@@ -49,5 +49,5 @@ For conceptual understanding and guides:
 
 - [Getting Started](/guides/getting-started/) - Initial setup and onboarding
 - [Architecture overview](/concepts/architecture-overview/) - How the nix configuration is structured
-- [Clan Integration](/concepts/clan-integration/) - Understanding clan-core integration
+- [Clan Integration](/concepts/clan-integration/) - Understanding clan integration
 - [CI Philosophy](/development/traceability/ci-philosophy/) - Design principles behind the CI system
