@@ -11,7 +11,7 @@ This document details the use cases from the system vision with complete scenari
 The usage model specifies how the system is intended to be used from a black-box perspective.
 Each use case describes user-visible interactions without constraining internal implementation.
 
-Use cases describe the operational dendritic flake-parts + clan-core architecture managing an 8-machine fleet (4 darwin laptops, 4 NixOS VPS) with terranix-provisioned cloud infrastructure.
+Use cases describe the operational dendritic flake-parts + clan architecture managing an 8-machine fleet (4 darwin laptops, 4 NixOS VPS) with terranix-provisioned cloud infrastructure.
 
 ## Use case catalog
 
@@ -537,7 +537,7 @@ UC-007 (Migration)
 **Skills required**:
 - Nix language and module system proficiency
 - Understanding of dendritic flake-parts pattern
-- Familiarity with clan-core architecture
+- Familiarity with clan architecture
 - System administration (darwin and NixOS)
 - Network configuration (zerotier, SSH)
 - Git version control
@@ -635,6 +635,6 @@ The usage model supports the following quality attributes from [quality requirem
 
 **External**:
 - Dendritic pattern: https://github.com/mightyiam/dendritic
-- Clan-core docs: https://docs.clan.lol/
+- Clan docs: https://docs.clan.lol/
 - Clan inventory guide: clan-core/docs/site/guides/inventory/
 - Clan vars guide: clan-core/docs/site/guides/vars/
