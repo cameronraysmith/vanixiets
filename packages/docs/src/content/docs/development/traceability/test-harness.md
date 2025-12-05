@@ -5,7 +5,7 @@ description: CI-local parity matrix and test infrastructure reference
 
 This reference documents the relationship between CI jobs and local test commands, enabling developers to reproduce CI behavior locally.
 
-## CI-local parity matrix
+## CI-local execution parity matrix
 
 The following table maps each CI job to its local equivalent command.
 All local commands can be run from the repository root.
