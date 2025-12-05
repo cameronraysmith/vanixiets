@@ -47,6 +47,11 @@ inputs:
     description: skip pushing to cachix (read-only)
     type: boolean
     default: false
+  nix-version:
+    description: nix version to install (e.g., 2.31.2, 2.24.15)
+    type: string
+    required: false
+    default: "2.24.15"
 
 outputs:
   cache-hit:
@@ -98,11 +103,15 @@ runs:
     - name: install nix
       uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # ratchet:nixbuild/nix-quick-install-action@v34
       with:
+        nix_version: ${{ inputs.nix-version }}
         nix_conf: |
           sandbox = ${{ inputs.sandbox }}
           system = ${{ inputs.system }}
           keep-env-derivations = true
           keep-outputs = true
+          # Serialize cache operations to avoid NixOS/nix#13484 race condition
+          http-connections = 1
+          max-substitution-jobs = 1
 
     - name: setup cache
       if: runner.os == 'Linux' && inputs.installer == 'full'
