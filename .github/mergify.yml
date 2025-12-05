@@ -138,15 +138,10 @@ pull_request_rules:
       queue:
         name: bot-updates
 
-merge_queue:
-  # Fast-forward requires in-place checks (no parallel testing)
-  max_parallel_checks: 1
-
 queue_rules:
-  # Human PRs: fast-forward merge preserves original commits
-  # Fast-forward requires identical queue/merge conditions
+  # Human PRs: rebase merge preserves original commits with linear history
   - name: default
-    merge_method: fast-forward
+    merge_method: rebase
     update_method: rebase
     update_bot_account: cameronraysmith
     batch_size: 1
