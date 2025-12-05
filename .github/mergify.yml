@@ -139,15 +139,16 @@ pull_request_rules:
         name: bot-updates
 
 queue_rules:
-  # Human PRs: fast-forward merge preserves original commits
+  # Human PRs: rebase merge preserves original commits with linear history
   - name: default
-    merge_method: fast-forward
+    merge_method: rebase
     update_method: rebase
     update_bot_account: cameronraysmith
     batch_size: 1
     checks_timeout: 3600
     queue_conditions:
       - check-success=check-fast-forward
+      - check-success=secrets-scan
     merge_conditions:
       - check-success=check-fast-forward
       - check-success=secrets-scan
