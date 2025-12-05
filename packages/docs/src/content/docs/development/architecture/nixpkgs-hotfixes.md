@@ -1,5 +1,5 @@
 ---
-title: Nixpkgs Hotfixes
+title: Nixpkgs fixes
 ---
 
 Multi-channel nixpkgs resilience system for handling unstable breakage without full rollbacks.
