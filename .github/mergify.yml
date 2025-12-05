@@ -140,14 +140,17 @@ pull_request_rules:
 
 queue_rules:
   # Human PRs: fast-forward merge preserves original commits
+  # Fast-forward requires in-place checks (identical queue/merge conditions, no parallelism)
   - name: default
     merge_method: fast-forward
     update_method: rebase
     update_bot_account: cameronraysmith
     batch_size: 1
+    speculative_checks: 1
     checks_timeout: 3600
     queue_conditions:
       - check-success=check-fast-forward
+      - check-success=secrets-scan
     merge_conditions:
       - check-success=check-fast-forward
       - check-success=secrets-scan
