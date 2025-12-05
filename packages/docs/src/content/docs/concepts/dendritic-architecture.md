@@ -338,7 +338,7 @@ The host is now:
 
 ## See also
 
-- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination with clan-core
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination with clan
 - [Repository Structure](/reference/repository-structure) - Complete directory layout
 - [Adding Custom Packages](/guides/adding-custom-packages/) - Practical guide to package customization
 - [Handling Broken Packages](/guides/handling-broken-packages/) - Fixing broken packages from nixpkgs
