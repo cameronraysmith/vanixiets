@@ -39,7 +39,7 @@ No standardized pattern for shared modules.
 - Support 8 machines across darwin and nixos platforms
 - Enable feature-based organization (add once, available everywhere)
 - Eliminate implicit dependencies (explicit imports only)
-- Support clan-core for multi-machine orchestration (see [ADR-0019](0019-clan-core-orchestration/))
+- Support clan for multi-machine orchestration (see [ADR-0019](0019-clan-core-orchestration/))
 - Scale to 100+ modules without manual registration
 
 ## Decision
@@ -179,7 +179,7 @@ in
 The existing nixos-unified architecture worked adequately when this infrastructure managed 2-3 machines, but scaling to 8 machines across two platforms exposed fundamental organizational problems.
 Adding AI tooling meant editing 8 separate host configuration files, each time risking inconsistencies in which tools appeared on which machines.
 The specialArgs mechanism became a debugging nightmare - when a module failed, tracing the failure required understanding which implicit dependencies were injected and in what order.
-More critically, nixos-unified provided no inventory abstraction for clan-core integration, which this fleet requires for zerotier VPN coordination across darwin laptops and nixos servers.
+More critically, nixos-unified provided no inventory abstraction for clan integration, which this fleet requires for zerotier VPN coordination across darwin laptops and nixos servers.
 The path-based autowiring rules were convenient for the initial setup but became a liability when restructuring was needed - renaming a directory meant understanding the implicit mapping from filesystem paths to flake outputs.
 
 ### Raw flake-parts without dendritic pattern
@@ -193,7 +193,7 @@ The dendritic pattern brings a proven structure that works across multiple produ
 ### Snowfall lib
 
 Snowfall lib offers an alternative organizational framework with its own opinionated structure and conventions.
-We chose the dendritic pattern instead because it aligns more closely with the flake-parts ecosystem that clan-core is built on.
+We chose the dendritic pattern instead because it aligns more closely with the flake-parts ecosystem that clan is built on.
 Clan is itself a flake-parts module, and the dendritic namespace exports (`flake.modules.*`) integrate naturally with clan's inventory system.
 Additionally, import-tree's discovery mechanism is simpler and more transparent than Snowfall's loader - it's easier to reason about "every .nix file under modules/ is imported" than to learn Snowfall's specific directory naming conventions.
 The existence of multiple high-quality production implementations (drupol, mightyiam, gaetanlepage) using the dendritic pattern provided confidence that the architecture scales and integrates well with common NixOS patterns.
