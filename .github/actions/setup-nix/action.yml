@@ -48,10 +48,10 @@ inputs:
     type: boolean
     default: false
   nix-version:
-    description: nix version to install (e.g., 2.31.2, 2.24.15)
+    description: nix version to install (e.g., 2.32.4, 2.31.2)
     type: string
     required: false
-    default: "2.31.2"
+    default: "2.32.4"
 
 outputs:
   cache-hit:
@@ -101,14 +101,24 @@ runs:
           /Users/runner/hostedtoolcache &
 
     - name: install nix
-      uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # ratchet:nixbuild/nix-quick-install-action@v34
+      uses: cachix/install-nix-action@ed706ab2cdb9d2f5533fd430f2c531e7340ed650 # ratchet:cachix/install-nix-action@v31
       with:
-        nix_version: ${{ inputs.nix-version }}
-        nix_conf: |
+        # Use install_url to pin specific Nix version
+        # Switched from nix-quick-install-action (single-user) to install-nix-action (multi-user with daemon)
+        # to get access to Nix 2.32.4 which fixes callback race condition (NixOS/nix#13484)
+        install_url: https://releases.nixos.org/nix/nix-${{ inputs.nix-version }}/install
+        # build-dir on /nix is workaround for https://github.com/wimpysworld/nothing-but-nix/issues/18
+        extra_nix_config: |
+          build-dir = /nix/build
           sandbox = ${{ inputs.sandbox }}
           system = ${{ inputs.system }}
           keep-env-derivations = true
           keep-outputs = true
+
+    - name: create build-dir
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo mkdir -p /nix/build
 
     - name: setup cache
       if: runner.os == 'Linux' && inputs.installer == 'full'
