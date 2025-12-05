@@ -30,7 +30,7 @@ Infra operates within the Nix ecosystem providing declarative, reproducible infr
 
 ### Current state vision
 
-**Foundation**: Dendritic flake-parts pattern + clan-core integration providing maximum type safety and multi-host coordination.
+**Foundation**: Dendritic flake-parts pattern + clan integration providing maximum type safety and multi-host coordination.
 
 **Key capabilities**:
 - **Type-safe configuration**: Every file is a flake-parts module, eliminating specialArgs antipattern
@@ -45,7 +45,7 @@ Infra operates within the Nix ecosystem providing declarative, reproducible infr
 
 ### Achieved architecture features
 
-**Foundation**: Dendritic flake-parts pattern + clan-core integration (OPERATIONAL).
+**Foundation**: Dendritic flake-parts pattern + clan integration (OPERATIONAL).
 
 **Achieved capabilities**:
 - **Maximum type safety**: Every file is a flake-parts module, specialArgs antipattern eliminated ✓
