@@ -90,9 +90,9 @@ Machine configuration pattern:
 Machine configurations import aggregates from namespaces rather than individual files.
 This enables feature-based organization where capabilities are defined once and consumed everywhere.
 
-### Clan-core subsystem
+### Clan subsystem
 
-The clan-core subsystem orchestrates deployment across the machine fleet and manages system-level secrets.
+The clan subsystem orchestrates deployment across the machine fleet and manages system-level secrets.
 Clan provides machine registry, inventory system for service coordination, vars/generators for secret generation, and deployment tooling.
 
 Machine registry:
@@ -853,10 +853,10 @@ Planned: nix-unit integration for pure function testing, per-module validation i
 
 ### Darwin clan support
 
-Current limitation: clan-core zerotier module is NixOS-specific with systemd dependencies.
+Current limitation: clan zerotier module is NixOS-specific with systemd dependencies.
 Darwin machines use homebrew + activation script workaround (101-line module).
 
-Future: Upstream darwin support in clan-core zerotier module, native clan deployment for darwin machines, unified service patterns across platforms.
+Future: Upstream darwin support in clan zerotier module, native clan deployment for darwin machines, unified service patterns across platforms.
 
 ### Documentation generation
 
@@ -886,7 +886,7 @@ Future: Unified secrets interface abstracting tier selection, automated secret r
 - [import-tree](https://github.com/vic/import-tree) - Auto-discovery mechanism
 - [dendrix documentation](https://vic.github.io/dendrix/Dendritic.html) - Pattern documentation
 - [flake.parts](https://flake.parts) - Foundation framework
-- [clan-core](https://github.com/clan-lol/clan-core) - Orchestration system
+- [clan](https://github.com/clan-lol/clan-core) - Orchestration system
 - [Clan documentation](https://clan.lol/) - Official clan docs
 - [terranix](https://terranix.org/) - Infrastructure provisioning
 - [nixpkgs RFC 140](https://github.com/NixOS/rfcs/pull/140) - pkgs-by-name pattern
