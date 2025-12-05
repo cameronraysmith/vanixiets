@@ -75,13 +75,14 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { label: "Contents", link: "/development/architecture/" },
+                { label: "Architecture", link: "/development/architecture/architecture" },
                 {
-                  label: "ADRs",
+                  label: "Decision records",
                   collapsed: true,
                   autogenerate: { directory: "development/architecture/adrs" },
                 },
                 {
-                  label: "Nixpkgs Hotfixes",
+                  label: "Nixpkgs fixes",
                   link: "/development/architecture/nixpkgs-hotfixes",
                 },
               ],
