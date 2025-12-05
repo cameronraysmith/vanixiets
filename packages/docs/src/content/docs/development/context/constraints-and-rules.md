@@ -96,7 +96,7 @@ Constraints are non-negotiable restrictions arising from business context, laws,
 - Reason: Operational continuity and risk management
 
 **Upstream compatibility**:
-- Must follow upstream project conventions (flake-parts, clan-core, nix-darwin, home-manager)
+- Must follow upstream project conventions (flake-parts, clan, nix-darwin, home-manager)
 - Cannot fork or heavily patch upstream projects without strong justification
 - Must track upstream changes and update accordingly
 - Reason: Maintainability and community support
