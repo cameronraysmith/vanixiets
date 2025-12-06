@@ -275,9 +275,9 @@ update:
   nix flake update
 
 # Update a package using its updateScript
-# Note: claude-code-bin is now from llm-agents and updates automatically
+# Note: claude-code-bin and ccstatusline are now from llm-agents and update via flake update
 [group('nix')]
-update-package package="ccstatusline":
+update-package package="atuin-format":
   #!/usr/bin/env bash
   set -euo pipefail
   UPDATE_SCRIPT=$(nix build .#{{ package }}.updateScript --no-link --print-out-paths)
