@@ -108,16 +108,17 @@ Adopt five-layer overlay architecture using dendritic flake-parts list concatena
 **Location**: `pkgs/by-name/<package>/package.nix`
 
 **Pattern**: drupol flat structure (NOT nested like nixpkgs)
-- `pkgs/by-name/ccstatusline/package.nix` (correct)
-- NOT `pkgs/by-name/cc/ccstatusline/package.nix` (nixpkgs nesting)
+- `pkgs/by-name/starship-jj/package.nix` (correct)
+- NOT `pkgs/by-name/st/starship-jj/package.nix` (nixpkgs nesting)
 
 **Auto-discovery**: `pkgs-by-name-for-flake-parts.flakeModule` provides `perSystem.packages` from directory structure.
 
 **Current packages**:
 - `atuin-format/` - Multi-file package (package.nix + atuin-format.nu)
-- `ccstatusline/` - Single-file rust package
 - `markdown-tree-parser/` - Single-file python package
 - `starship-jj/` - Single-file rust package
+
+Note: ccstatusline was previously a custom package but is now sourced from the llm-agents flake input.
 
 **Integration**: Custom packages exported via `withSystem` in `compose.nix`:
 ```nix
@@ -306,8 +307,6 @@ pkgs/
     ├── atuin-format/
     │   ├── package.nix
     │   └── atuin-format.nu
-    ├── ccstatusline/
-    │   └── package.nix
     ├── markdown-tree-parser/
     │   └── package.nix
     └── starship-jj/
