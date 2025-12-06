@@ -1,4 +1,4 @@
-# Claude Code CLI configuration with MCP servers and ccstatusline
+# Claude Code CLI configuration with MCP servers and ccstatusline (from llm-agents)
 # Pattern A: flake.modules (plural) with homeManager.ai aggregate
 { ... }:
 {
@@ -27,10 +27,12 @@
 
           # https://schemastore.org/claude-code-settings.json
           settings = {
-            # Enable ccstatusline (package now available via pkgs-by-name)
+            # Enable ccstatusline (from llm-agents flake input)
             statusLine = {
               type = "command";
-              command = "${pkgs.ccstatusline}/bin/ccstatusline";
+              command = "${
+                flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.ccstatusline
+              }/bin/ccstatusline";
               padding = 0;
             };
 
