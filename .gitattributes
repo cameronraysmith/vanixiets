@@ -2,6 +2,6 @@ flake.lock linguist-generated=true
 bun.lock linguist-generated=true
 machines/*/facter.json linguist-generated=true
 packages/docs/src/grammars/*.json linguist-vendored=true
-scripts/* linguist-detectable=false
+scripts/** linguist-detectable=false
 .envrc linguist-detectable=false
 *.nix text eol=lf
