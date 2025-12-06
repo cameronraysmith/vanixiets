@@ -154,7 +154,7 @@ Platform conditionals isolate fixes to affected systems (isDarwin, isLinux, spec
 Layer 3 - Custom packages (pkgs/by-name/):
 
 The third layer provides custom derivations organized in flat pkgs-by-name structure following nixpkgs RFC 140.
-Packages like atuin-format, ccstatusline, markdown-tree-parser, starship-jj auto-discovered via pkgs-by-name-for-flake-parts.
+Packages like atuin-format, markdown-tree-parser, starship-jj auto-discovered via pkgs-by-name-for-flake-parts.
 
 Layer 4 - Per-package overrides (modules/nixpkgs/overlays/overrides.nix):
 

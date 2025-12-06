@@ -54,7 +54,6 @@ infra/
 │       └── gcp.nix      # GCP VM definitions
 ├── pkgs/                # Custom package derivations
 │   └── by-name/         # pkgs-by-name pattern
-│       ├── ccstatusline/
 │       ├── atuin-format/
 │       ├── markdown-tree-parser/
 │       └── starship-jj/
@@ -195,10 +194,11 @@ Packages defined using pkgs-by-name pattern:
 
 | Package | Location | Description |
 |---------|----------|-------------|
-| ccstatusline | `pkgs/by-name/ccstatusline/` | Claude Code statusline |
 | atuin-format | `pkgs/by-name/atuin-format/` | Atuin history formatter |
 | markdown-tree-parser | `pkgs/by-name/markdown-tree-parser/` | Markdown tree parser |
 | starship-jj | `pkgs/by-name/starship-jj/` | Starship jj plugin |
+
+Note: ccstatusline was previously a custom package but is now sourced from the llm-agents flake input.
 
 ## Secrets structure
 
@@ -268,9 +268,10 @@ resource.google_compute_instance.galena = {
 
 | Output | Description |
 |--------|-------------|
-| `packages.${system}.ccstatusline` | Claude Code statusline |
 | `packages.${system}.claude-code-bin` | Claude Code (from llm-agents) |
 | `packages.${system}.activate` | Configuration activation script |
+| `packages.${system}.atuin-format` | Atuin history formatter |
+| `packages.${system}.starship-jj` | Starship jj plugin |
 
 ### Development
 
