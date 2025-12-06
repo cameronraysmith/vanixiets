@@ -102,11 +102,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1764914976,
-        "narHash": "sha256-gY1/fwRuytTnXgpTgbJwtdCzy1vQQj7K5pO6U+Uq69Y=",
+        "lastModified": 1765032644,
+        "narHash": "sha256-scTDrKI8rkXLQh1Qp5tklDnphW1sO20xSFLAhucaE68=",
         "owner": "cameronraysmith",
         "repo": "clan-core",
-        "rev": "1cecab7747f96b0f2aa91db66ce534f00153bdaf",
+        "rev": "ae3388c8908d4e3e15b05427266ea443471a03a6",
         "type": "github"
       },
       "original": {
