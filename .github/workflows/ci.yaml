@@ -298,6 +298,7 @@ jobs:
     uses: ./.github/workflows/deploy-docs.yaml
     with:
       branch: ${{ github.head_ref }}
+      sanitized_branch: ${{ needs.set-variables.outputs.sanitized_branch }}
       environment: preview
       debug_enabled: ${{ needs.set-variables.outputs.debug }}
       force_run: ${{ needs.set-variables.outputs.force-ci }}
@@ -842,6 +843,7 @@ jobs:
     with:
       debug_enabled: ${{ needs.set-variables.outputs.debug }}
       branch: ${{ needs.set-variables.outputs.checkout_ref }}
+      sanitized_branch: ${{ needs.set-variables.outputs.sanitized_branch }}
       environment: ${{ needs.set-variables.outputs.deploy_environment }}
       force_run: ${{ needs.set-variables.outputs.force-ci }}
     secrets: inherit
