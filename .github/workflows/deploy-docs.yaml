@@ -12,6 +12,11 @@ on:
         description: "Git branch or ref to checkout"
         required: true
         type: string
+      sanitized_branch:
+        description: "URL-safe branch name for preview alias (auto-computed if empty)"
+        required: false
+        type: string
+        default: ""
       environment:
         description: "Deployment environment (preview or production)"
         required: false
@@ -33,6 +38,11 @@ on:
         description: "Git branch or ref to checkout"
         required: true
         type: string
+      sanitized_branch:
+        description: "URL-safe branch name for preview alias (auto-computed if empty)"
+        required: false
+        type: string
+        default: ""
       environment:
         description: "Deployment environment (preview or production)"
         required: false
@@ -57,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
-      url: ${{ inputs.environment == 'preview' && format('https://b-{0}-infra-docs.sciexp.workers.dev', inputs.branch) || 'https://infra.cameronraysmith.net' }}
+      url: ${{ inputs.environment == 'preview' && format('https://b-{0}-infra-docs.sciexp.workers.dev', inputs.sanitized_branch || inputs.branch) || 'https://infra.cameronraysmith.net' }}
     permissions:
       contents: read
       deployments: write
