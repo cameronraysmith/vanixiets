@@ -21,6 +21,7 @@
         enableSSH = true;
       };
       # from llm-agents
+      beads = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.beads;
       coderabbit-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
       crush = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.crush;
       # droid: disabled - auto-patchelf fails on rosetta-builder (missing pyelftools)
@@ -61,6 +62,7 @@
         just
         mkcert
         # from llm-agents
+        beads
         coderabbit-cli
         crush
         # droid      # disabled: auto-patchelf fails
