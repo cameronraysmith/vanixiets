@@ -4,4 +4,6 @@ machines/*/facter.json linguist-generated=true
 packages/docs/src/grammars/*.json linguist-vendored=true
 scripts/** linguist-detectable=false
 .envrc linguist-detectable=false
+justfile linguist-detectable=false
+Makefile linguist-detectable=false
 *.nix text eol=lf
