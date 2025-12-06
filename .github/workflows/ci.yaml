@@ -113,6 +113,7 @@ jobs:
       deploy_environment: ${{ steps.set-variables.outputs.deploy_environment }}
       checkout_ref: ${{ steps.set-variables.outputs.checkout_ref }}
       checkout_rev: ${{ steps.set-variables.outputs.checkout_rev }}
+      sanitized_branch: ${{ steps.set-variables.outputs.sanitized_branch }}
       packages: ${{ steps.discover-packages.outputs.packages }}
       force-ci: ${{ steps.compute-force-ci.outputs.force-ci }}
 
@@ -143,11 +144,18 @@ jobs:
             DEPLOY_ENVIRONMENT="production"
           fi
 
+          # Sanitize branch name for Cloudflare preview alias (must be valid subdomain component)
+          # - Replace / and other non-alphanumeric chars with -
+          # - Collapse consecutive hyphens, remove leading/trailing hyphens
+          # - Truncate to 40 chars (safe for subdomain label limit of 63)
+          SANITIZED_BRANCH=$(echo "$CHECKOUT_REF" | tr '/' '-' | tr -c 'a-zA-Z0-9-' '-' | sed 's/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
+
           echo "debug=$DEBUG" >> $GITHUB_OUTPUT
           echo "deploy_enabled=$DEPLOY_ENABLED" >> $GITHUB_OUTPUT
           echo "deploy_environment=$DEPLOY_ENVIRONMENT" >> $GITHUB_OUTPUT
           echo "checkout_ref=$CHECKOUT_REF" >> $GITHUB_OUTPUT
           echo "checkout_rev=$CHECKOUT_REV" >> $GITHUB_OUTPUT
+          echo "sanitized_branch=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
 
       - name: Compute force-ci flag
         id: compute-force-ci
