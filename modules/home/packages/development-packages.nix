@@ -20,15 +20,14 @@
         enableAzure = true;
         enableSSH = true;
       };
-      # from nix-ai-tools
-      coderabbit-cli =
-        flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
-      crush = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.crush;
+      # from llm-agents
+      coderabbit-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
+      crush = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.crush;
       # droid: disabled - auto-patchelf fails on rosetta-builder (missing pyelftools)
       # opencode: disabled - bun node_modules cleanup fails during build
-      # TODO: Re-enable when upstream nix-ai-tools fixes these issues
+      # TODO: Re-enable when upstream llm-agents fixes these issues
       # Disabled: 2025-11-26
-      gemini-cli = flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
+      gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
     in
     {
       home.packages = with pkgs; [
@@ -61,7 +60,7 @@
         # lazyjj
         just
         mkcert
-        # from nix-ai-tools
+        # from llm-agents
         coderabbit-cli
         crush
         # droid      # disabled: auto-patchelf fails
@@ -113,7 +112,7 @@
       ]
       # backlog-md disabled: auto-patchelf fails on rosetta-builder (elftools issue)
       # ++ lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
-      #   flake.inputs.nix-ai-tools.packages.${pkgs.stdenv.hostPlatform.system}.backlog-md
+      #   flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.backlog-md
       # ]
       ;
     };

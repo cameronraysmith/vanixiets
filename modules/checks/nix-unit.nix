@@ -25,7 +25,7 @@
           lazyvim-nix
           pkgs-by-name-for-flake-parts
           nuenv
-          nix-ai-tools
+          llm-agents
           catppuccin
           ;
         inherit self;
