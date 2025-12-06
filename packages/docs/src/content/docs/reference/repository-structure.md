@@ -269,7 +269,7 @@ resource.google_compute_instance.galena = {
 | Output | Description |
 |--------|-------------|
 | `packages.${system}.ccstatusline` | Claude Code statusline |
-| `packages.${system}.claude-code-bin` | Claude Code (from nix-ai-tools) |
+| `packages.${system}.claude-code-bin` | Claude Code (from llm-agents) |
 | `packages.${system}.activate` | Configuration activation script |
 
 ### Development

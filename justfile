@@ -275,7 +275,7 @@ update:
   nix flake update
 
 # Update a package using its updateScript
-# Note: claude-code-bin is now from nix-ai-tools and updates automatically
+# Note: claude-code-bin is now from llm-agents and updates automatically
 [group('nix')]
 update-package package="ccstatusline":
   #!/usr/bin/env bash

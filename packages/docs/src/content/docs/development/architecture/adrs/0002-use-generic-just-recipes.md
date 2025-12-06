@@ -148,7 +148,7 @@ just cache-linux-package <any-package>
 update-package package="ccstatusline":
     # Generic package updater
     # Works with any package that has updateScript
-    # Note: claude-code-bin now from nix-ai-tools, auto-updates daily
+    # Note: claude-code-bin now from llm-agents, auto-updates daily
 ```
 
 **Usage**:
