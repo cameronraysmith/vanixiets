@@ -36,7 +36,10 @@
               astro.enable = true;
               go.enable = true;
               json.enable = true;
-              markdown.enable = true;
+              markdown = {
+                enable = true;
+                installDependencies = true;
+              };
               nix.enable = true;
               python.enable = true;
               tailwind.enable = true;
