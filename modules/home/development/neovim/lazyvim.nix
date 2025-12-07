@@ -57,6 +57,8 @@
             vimPlugins.blink-copilot
             # astro-language-server for Astro LSP support (Mason is disabled)
             astro-language-server
+            # markdown-toc for conform.nvim formatter (no lazyvim-nix mapping exists)
+            markdown-toc
           ];
 
           plugins = {
