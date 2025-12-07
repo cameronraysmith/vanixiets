@@ -43,6 +43,7 @@
           nixd
           nixfmt
           nixpkgs-reviewFull
+          statix
 
           # dev
           act
