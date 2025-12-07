@@ -1,5 +1,3 @@
-# LazyVim configuration
-# Pattern A: flake.modules (plural) with homeManager.development aggregate
 { ... }:
 {
   flake.modules = {
@@ -15,14 +13,13 @@
         programs.lazyvim = {
           enable = true;
 
-          # Dependencies installed automatically (default: true)
           installCoreDependencies = true;
 
           extras = {
             ai.copilot.enable = true;
             coding = {
               blink.enable = true;
-              mini_surround.enable = true; # underscore not hyphen
+              mini_surround.enable = true;
               yanky.enable = true;
             };
             # TODO: Re-enable DAP when vscode-js-debug builds with clang 21.x
@@ -36,10 +33,10 @@
             dap.core.enable = false;
             editor.snacks_picker.enable = true;
             lang = {
-              astro.enable = true; # NOW ENABLED (lazyvim-nix supports Darwin)
+              astro.enable = true;
               go.enable = true;
               json.enable = true;
-              markdown.enable = true; # NOW ENABLED (lazyvim-nix supports Darwin)
+              markdown.enable = true;
               nix.enable = true;
               python.enable = true;
               tailwind.enable = true;
@@ -49,12 +46,10 @@
             util.dot.enable = true;
           };
 
-          # Custom packages (was `plugins`)
           extraPackages = with pkgs.vimPlugins; [
             blink-copilot
           ];
 
-          # Custom plugin configs (was `pluginsFile` and `lazySpecs`)
           plugins = {
             lazyvim = ''
               return {
