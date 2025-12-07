@@ -9,6 +9,7 @@
     "https://pyproject-nix.cachix.org"
     "https://catppuccin.cachix.org"
     "https://cuda-maintainers.cachix.org"
+    "https://nvim-treesitter-main.cachix.org"
   ];
 
   publicKeys = [
@@ -20,5 +21,6 @@
     "pyproject-nix.cachix.org-1:UNzugsOlQIu2iOz0VyZNBQm2JSrL/kwxeCcFGw+jMe0="
     "catppuccin.cachix.org-1:noG/4HkbhJb+lUAdKrph6LaozJvAeEEZj4N732IysmU="
     "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
+    "nvim-treesitter-main.cachix.org-1:cbwE6blfW5+BkXXyeAXoVSu1gliqPLHo2m98E4hWfZQ="
   ];
 }
