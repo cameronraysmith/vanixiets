@@ -37,7 +37,10 @@
             dap.core.enable = false;
             editor.snacks_picker.enable = true;
             lang = {
-              astro.enable = true;
+              # TODO: Re-enable astro when Mason path lookup can be bypassed
+              # Disabled due to "Mason package path not found for astro-language-server"
+              # LazyVim.get_pkg_path() checks Mason directories even with Mason disabled
+              astro.enable = false;
               go.enable = true;
               json.enable = true;
               markdown = {
@@ -55,8 +58,6 @@
 
           extraPackages = with pkgs; [
             vimPlugins.blink-copilot
-            # astro-language-server for Astro LSP support (Mason is disabled)
-            astro-language-server
             # markdown-toc for conform.nvim formatter (no lazyvim-nix mapping exists)
             markdown-toc
           ];
@@ -82,35 +83,17 @@
               }
             '';
 
-            # blink.cmp: use Lua fuzzy implementation as fallback
-            # nixpkgs blink-cmp should have Rust binary, but Lua is safe fallback
+            # blink.cmp: use Lua fuzzy implementation to silence Rust binary warning
+            # Rust binary requires runtime download which fails in Nix's read-only store
             blink = ''
               return {
                 {
                   "saghen/blink.cmp",
                   opts = {
                     fuzzy = {
-                      -- Use "prefer_rust" to try Rust first, silently fall back to Lua
-                      -- Use "lua" to always use Lua (no warnings)
-                      implementation = "prefer_rust",
+                      implementation = "lua",
                     },
                   },
-                },
-              }
-            '';
-
-            # astro: configure LSP without Mason path lookup
-            # Bypasses LazyVim.get_pkg_path() which checks Mason directories
-            astro = ''
-              return {
-                {
-                  "neovim/nvim-lspconfig",
-                  opts = function(_, opts)
-                    -- Configure astro LSP server directly (Mason is disabled)
-                    opts.servers = opts.servers or {}
-                    opts.servers.astro = opts.servers.astro or {}
-                    opts.servers.astro.cmd = { "astro-ls", "--stdio" }
-                  end,
                 },
               }
             '';
