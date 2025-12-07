@@ -13,6 +13,10 @@
         programs.lazyvim = {
           enable = true;
 
+          # Prefer nixpkgs plugin versions for better Nix integration
+          # Specifically helps blink.cmp get proper Rust fuzzy library from nixpkgs
+          pluginSource = "nixpkgs";
+
           installCoreDependencies = true;
 
           extras = {
@@ -49,8 +53,10 @@
             util.dot.enable = true;
           };
 
-          extraPackages = with pkgs.vimPlugins; [
-            blink-copilot
+          extraPackages = with pkgs; [
+            vimPlugins.blink-copilot
+            # astro-language-server for Astro LSP support (Mason is disabled)
+            astro-language-server
           ];
 
           plugins = {
@@ -70,6 +76,39 @@
                 "nvim-treesitter/nvim-treesitter",
                 opts = {
                   auto_install = false,
+                },
+              }
+            '';
+
+            # blink.cmp: use Lua fuzzy implementation as fallback
+            # nixpkgs blink-cmp should have Rust binary, but Lua is safe fallback
+            blink = ''
+              return {
+                {
+                  "saghen/blink.cmp",
+                  opts = {
+                    fuzzy = {
+                      -- Use "prefer_rust" to try Rust first, silently fall back to Lua
+                      -- Use "lua" to always use Lua (no warnings)
+                      implementation = "prefer_rust",
+                    },
+                  },
+                },
+              }
+            '';
+
+            # astro: configure LSP without Mason path lookup
+            # Bypasses LazyVim.get_pkg_path() which checks Mason directories
+            astro = ''
+              return {
+                {
+                  "neovim/nvim-lspconfig",
+                  opts = function(_, opts)
+                    -- Configure astro LSP server directly (Mason is disabled)
+                    opts.servers = opts.servers or {}
+                    opts.servers.astro = opts.servers.astro or {}
+                    opts.servers.astro.cmd = { "astro-ls", "--stdio" }
+                  end,
                 },
               }
             '';
