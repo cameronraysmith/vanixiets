@@ -36,6 +36,7 @@
         [
           # nix dev
           cachix
+          deadnix
           nil
           nix-info
           nix-output-monitor
