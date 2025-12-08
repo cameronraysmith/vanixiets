@@ -153,21 +153,28 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 
 ### Layer 5: External Flake Overlays
 
-**Location**: `modules/nixpkgs/compose.nix`
+**Location**: `modules/nixpkgs/overlays/*.nix` (wrapper modules)
 
-**Purpose**: Integrate overlays from external flake inputs.
+**Purpose**: Integrate overlays from external flake inputs using the same dendritic pattern as internal overlays.
 
-**Pattern**:
+**Pattern**: Each external overlay gets a wrapper module that appends to `flake.nixpkgsOverlays`:
 ```nix
-# External flake overlays
-nuenvOverlay = inputs.nuenv.overlays.nuenv;
-
-# Composed in final overlay
-(nuenvOverlay final prev)
+{ inputs, ... }:
+{
+  flake.nixpkgsOverlays = [
+    inputs.nuenv.overlays.nuenv
+  ];
+}
 ```
 
 **Current external overlays**:
-- `nuenv` - Nushell script packaging (from inputs.nuenv.overlays.nuenv)
+- `nuenv.nix` - Nushell script packaging (from inputs.nuenv.overlays.nuenv)
+- `nvim-treesitter.nix` - Neovim treesitter grammars (from inputs.nvim-treesitter-main.overlays.default)
+
+**Key properties**:
+- External overlays use wrapper modules in `overlays/*.nix`, not hardcoded in `compose.nix`
+- Same list concatenation pattern as internal overlays
+- Unified composition via `lib.composeManyExtensions`
 
 ### Dendritic List Concatenation Pattern
 
@@ -205,13 +212,14 @@ nuenvOverlay = inputs.nuenv.overlays.nuenv;
 {
   flake.overlays.default = final: prev:
     let
+      # All overlays (internal + external) composed together
       internalOverlays = lib.composeManyExtensions config.flake.nixpkgsOverlays;
-      nuenvOverlay = inputs.nuenv.overlays.nuenv;
+      # Custom packages from pkgs-by-name
       customPackages = withSystem prev.stdenv.hostPlatform.system (
         { config, ... }: config.packages or {}
       );
     in
-    (internalOverlays final prev) // customPackages // (nuenvOverlay final prev);
+    (internalOverlays final prev) // customPackages;
 }
 ```
 
@@ -248,9 +256,10 @@ nuenvOverlay = inputs.nuenv.overlays.nuenv;
 - Supports both single-file and multi-file packages
 
 **External overlays cleanly integrated**:
-- Explicit composition in `compose.nix`
-- Clear separation from internal overlays
-- Easy to add/remove external dependencies
+- Same dendritic wrapper module pattern as internal overlays
+- Unified composition via `lib.composeManyExtensions`
+- Easy to add/remove external dependencies (just add/remove wrapper module)
+- No special-casing in `compose.nix`
 
 ### Negative
 
@@ -266,8 +275,8 @@ nuenvOverlay = inputs.nuenv.overlays.nuenv;
 - List concatenation pattern not immediately obvious
 
 **Composition order must be understood**:
-- Internal overlays → custom packages → external overlays
-- Order matters (later layers can reference earlier layers)
+- All overlays (internal + external) composed together → custom packages applied
+- Order matters within overlay list (later entries can reference earlier entries)
 - Not enforced by type system (runtime composition)
 
 ### Neutral
@@ -296,10 +305,11 @@ modules/nixpkgs/
 ├── per-system.nix       # Configures perSystem pkgs
 ├── compose.nix          # Composes overlays into flake.overlays.default
 └── overlays/
-    ├── channels.nix     # Layer 1: Multi-channel access
-    ├── hotfixes.nix     # Layer 2: Platform fixes
-    ├── overrides.nix    # Layer 4: Build modifications
-    ├── nvim-treesitter-main.nix  # Special overlay
+    ├── channels.nix         # Layer 1: Multi-channel access
+    ├── hotfixes.nix         # Layer 2: Platform fixes
+    ├── overrides.nix        # Layer 4: Build modifications
+    ├── nuenv.nix            # Layer 5: External overlay (nushell packaging)
+    ├── nvim-treesitter.nix  # Layer 5: External overlay (treesitter grammars)
     └── fish-stable-darwin.nix    # Special overlay
 
 pkgs/
