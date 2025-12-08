@@ -12,8 +12,7 @@
     in
     {
       checks = lib.optionalAttrs isLinux {
-        # TC-005: VM Test Framework Validation
-        # Minimal smoke test to verify VM test framework works
+        # TC-040: VM test framework smoke test
         vm-test-framework = pkgs.testers.runNixOSTest {
           name = "vm-test-framework-validation";
           nodes.machine = {
@@ -27,10 +26,7 @@
           '';
         };
 
-        # TC-010: VM Boot All Machines
-        # Validates all three machine configurations can boot in VM environment
-        # Note: Uses simplified configs without full machine imports to avoid
-        # hardware-specific conflicts (disko, ZFS, bootloader settings)
+        # TC-041: VM boot validation for NixOS machines
         vm-boot-all-machines =
           let
             # Create a VM node with basic config matching a machine name
