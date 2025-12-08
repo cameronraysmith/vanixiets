@@ -14,7 +14,7 @@
       ...
     }:
     {
-      # Pattern A: All aggregates imported via configurations.nix mkHomeConfig
+      # All aggregates imported via configurations.nix mkHomeConfig
       # No local imports needed - all 17 modules available via aggregate merging
 
       # sops-nix configuration for crs58/cameron user
