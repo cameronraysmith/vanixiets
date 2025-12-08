@@ -19,14 +19,8 @@
         inherit system;
         config.allowUnfree = true;
         # Overlay composition from flake.nixpkgsOverlays list
-        # Auto-populated by overlays/*.nix
-        overlays =
-          # Internal overlays (channels, hotfixes, overrides)
-          config.flake.nixpkgsOverlays
-          # External overlays
-          ++ [
-            inputs.nuenv.overlays.nuenv
-          ];
+        # Auto-populated by overlays/*.nix modules (including nuenv.nix)
+        overlays = config.flake.nixpkgsOverlays;
       };
     in
     {
