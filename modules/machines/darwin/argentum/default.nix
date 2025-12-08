@@ -203,7 +203,7 @@ in
           flakeModulesHome."users/crs58"
           flakeModulesHome.base-sops
           # Import aggregate modules for cameron (crs58 identity)
-          # Pattern A: All aggregates including ai
+          # All aggregates including ai
           flakeModulesHome.ai
           flakeModulesHome.core
           flakeModulesHome.development
