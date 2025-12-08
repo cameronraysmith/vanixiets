@@ -155,10 +155,6 @@ Related: dendritic pattern, flake-parts.
 Synonym: none.
 Related: dendritic pattern, auto-discovery.
 
-**Pattern A**: Dendritic aggregate pattern using explicit `flake.modules = { ... }` structure for organizing configurations.
-Synonym: dendritic aggregate pattern.
-Related: dendritic flake-parts pattern, flake.modules.
-
 **instance**: Clan service instance, potentially spanning multiple machines with different roles.
 Synonym: service instance.
 Related: clan inventory, role, service.
