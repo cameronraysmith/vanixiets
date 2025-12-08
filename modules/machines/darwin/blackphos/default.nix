@@ -173,7 +173,7 @@ in
           flakeModulesHome."users/crs58"
           flakeModulesHome.base-sops
           # Import aggregate modules for crs58
-          # Pattern A: All aggregates via auto-merge
+          # All aggregates via auto-merge
           flakeModulesHome.ai
           flakeModulesHome.core
           flakeModulesHome.development
@@ -197,7 +197,7 @@ in
           flakeModulesHome."users/raquel"
           flakeModulesHome.base-sops
           # Import aggregate modules for raquel
-          # Pattern A: All aggregates except ai
+          # All aggregates except ai
           flakeModulesHome.core
           flakeModulesHome.development
           flakeModulesHome.packages
