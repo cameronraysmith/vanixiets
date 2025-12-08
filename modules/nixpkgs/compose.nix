@@ -13,7 +13,6 @@
 {
   config,
   lib,
-  inputs,
   withSystem,
   ...
 }:
@@ -26,10 +25,6 @@
       # overlays/*.nix modules append to this list automatically
       internalOverlays = lib.composeManyExtensions config.flake.nixpkgsOverlays;
 
-      # External flake overlays
-      # Provides: pkgs.nuenv (nushell script packaging)
-      nuenvOverlay = inputs.nuenv.overlays.nuenv;
-
       # Custom packages from pkgs-by-name
       # Provides: Project-specific packages (ccstatusline, etc.)
       # Use withSystem to access perSystem packages for the target system
@@ -38,8 +33,7 @@
       );
     in
     # Compose all (order matters!)
-    # 1. Internal overlays (channels, hotfixes, overrides, nvim-treesitter-main) via composeManyExtensions
+    # 1. Internal overlays (channels, hotfixes, overrides, nvim-treesitter, nuenv) via composeManyExtensions
     # 2. Custom packages (standalone derivations)
-    # 3. External overlays (nuenv)
-    (internalOverlays final prev) // customPackages // (nuenvOverlay final prev);
+    (internalOverlays final prev) // customPackages;
 }
