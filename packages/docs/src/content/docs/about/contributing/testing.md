@@ -53,9 +53,10 @@ Infrastructure tests validate the nix flake structure, machine configurations, a
 
 | Category | File | Count | Purpose |
 |----------|------|-------|---------|
-| nix-unit | `modules/checks/nix-unit.nix` | 15 | Unit tests for flake structure and invariants |
-| validation | `modules/checks/validation.nix` | 7 | Configuration validation and naming conventions |
+| nix-unit | `modules/checks/nix-unit.nix` | 12 | Unit tests for flake structure and invariants |
+| validation | `modules/checks/validation.nix` | 6 | Configuration validation and naming conventions |
 | integration | `modules/checks/integration.nix` | 2 | VM boot tests for NixOS machines |
+| performance | `modules/checks/performance.nix` | 4 | Performance benchmarks and optimization (planned) |
 | treefmt | (flake-parts) | 1 | Code formatting validation |
 | pre-commit | (flake-parts) | 1 | Pre-commit hook validation |
 
@@ -79,49 +80,58 @@ nix flake check --show-trace
 
 nix-unit tests validate flake structure and configuration invariants without building derivations.
 
-| Test ID | Name | Type | What it validates |
-|---------|------|------|-------------------|
-| - | testFrameworkWorks | sanity | nix-unit framework functions correctly |
-| TC-001 | testRegressionTerraformModulesExist | regression | Terraform module exports exist |
-| TC-002 | testRegressionNixosConfigExists | regression | NixOS config structure valid |
-| TC-003 | testInvariantClanInventoryMachines | invariant | Expected machines in clan inventory |
-| TC-004 | testInvariantNixosConfigurationsExist | invariant | Expected NixOS configs present |
-| TC-005 | testInvariantDarwinConfigurationsExist | invariant | Expected Darwin configs present |
-| TC-006 | testInvariantHomeConfigurationsExist | invariant | Expected home configs present |
+| TC-ID | Test Name | Type | Description |
+|-------|-----------|------|-------------|
+| TC-001 | testMetadataFlakeOutputsExist | smoke | Flake structure smoke test |
+| TC-002 | testRegressionTerraformModulesExist | regression | Terraform module exports exist |
+| TC-003 | testRegressionNixosConfigExists | regression | NixOS config structure valid |
+| TC-004 | testInvariantClanInventoryMachines | invariant | Expected machines in clan inventory |
+| TC-005 | testInvariantNixosConfigurationsExist | invariant | Expected NixOS configs present |
+| TC-006 | testInvariantDarwinConfigurationsExist | invariant | Expected Darwin configs present |
+| TC-007 | testInvariantHomeConfigurationsExist | invariant | Expected home configs present |
 | TC-008 | testFeatureDendriticModuleDiscovery | feature | import-tree discovers nixos modules |
 | TC-009 | testFeatureDarwinModuleDiscovery | feature | import-tree discovers darwin modules |
 | TC-010 | testFeatureNamespaceExports | feature | Modules export to correct namespaces |
-| TC-013 | testTypeSafetyModuleEvaluationIsolation | type-safety | Module structure validation |
-| TC-014 | testTypeSafetySpecialargsProgpagation | type-safety | inputs available via specialArgs |
-| TC-015 | testTypeSafetyNixosConfigStructure | type-safety | All configs have config attribute |
-| TC-016 | testTypeSafetyTerranixModulesStructured | type-safety | Terranix modules properly structured |
-| TC-021 | testMetadataFlakeOutputsExist | metadata | Core flake outputs exist |
+| TC-011 | testTypeSafetySpecialargsPropagation | type-safety | inputs available via specialArgs |
+| TC-012 | testTypeSafetyNixosConfigStructure | type-safety | All configs have config attribute |
 
 ### Validation checks
 
 Validation checks run shell commands to verify configuration correctness.
 
-| Check | Purpose |
-|-------|---------|
-| home-module-exports | Home-manager modules export correctly to dendritic namespace |
-| home-configurations-exposed | Standalone homeConfigurations available for nh CLI |
-| naming-conventions | Module naming follows kebab-case conventions |
-| terraform-validate | Terraform configuration is syntactically valid |
-| secrets-generation | Clan CLI is available for secrets operations |
-| deployment-safety | Terraform configuration has no destructive patterns |
-| vars-user-password-validation | Clan vars for user password management are valid |
+| TC-ID | Check Name | Description |
+|-------|------------|-------------|
+| TC-020 | home-module-exports | Home modules exported to dendritic namespace |
+| TC-021 | home-configurations-exposed | Nested homeConfigurations exposed for nh CLI |
+| TC-022 | naming-conventions | Machine names follow kebab-case |
+| TC-023 | terraform-validate | Terraform configuration syntactically valid |
+| TC-024 | terraform-config-structure | Terraform config has expected resources |
+| TC-025 | vars-user-password-validation | Clan vars system for user passwords |
 
 ### Integration tests (Linux only)
 
 VM integration tests require QEMU/KVM and only run on Linux systems.
 
-| Test | Purpose |
-|------|---------|
-| vm-test-framework | Verifies VM test framework works |
-| vm-boot-all-machines | Validates NixOS machines boot correctly |
+| TC-ID | Check Name | Description |
+|-------|------------|-------------|
+| TC-040 | vm-test-framework | VM test framework smoke test |
+| TC-041 | vm-boot-all-machines | VM boot validation for NixOS machines |
 
 These tests are automatically skipped on Darwin.
 Use `just check-fast` to skip them locally on Linux when iterating quickly.
+
+### Performance tests (planned)
+
+Performance tests validate build efficiency and closure sizes.
+
+| TC-ID | Check Name | Description |
+|-------|------------|-------------|
+| TC-050 | closure-size-validation | Closure size validation (planned) |
+| TC-051 | ci-build-matrix | CI build matrix optimization (planned) |
+| TC-052 | build-performance-benchmarks | Build performance benchmarks (planned) |
+| TC-053 | binary-cache-efficiency | Binary cache efficiency (planned) |
+
+These tests are currently in planning phase and not yet implemented.
 
 ## Documentation testing
 
