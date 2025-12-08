@@ -14,7 +14,7 @@
       ...
     }:
     {
-      # Pattern A: Aggregates imported via configurations.nix mkHomeConfig
+      # Aggregates imported via configurations.nix mkHomeConfig
       # Productivity subset: development + shell (no ai tools)
       # Basic user like raquel - 6 aggregates (core, development, packages, shell, terminal, tools)
 
