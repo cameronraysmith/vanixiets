@@ -1,5 +1,4 @@
 # Yazi terminal file manager with shell integrations
-# Pattern A: flake.modules (plural) with homeManager.shell aggregate
 { ... }:
 {
   flake.modules = {
