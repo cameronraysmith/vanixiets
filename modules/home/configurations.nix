@@ -14,7 +14,7 @@ let
   mkHomeConfig =
     username: system:
     let
-      # Pattern A: Selective aggregate imports per user
+      # Selective aggregate imports per user
       # crs58: all aggregates (development, ai, shell)
       # raquel: development + shell only (no ai tools)
       aggregateImports =
@@ -42,7 +42,7 @@ let
           config.flake.overlays.default
         ];
       };
-      # Pattern A: Pass flake as extraSpecialArgs for module access
+      # Pass flake as extraSpecialArgs for module access
       # Include inputs so home-manager modules can access flake.inputs.*
       extraSpecialArgs = {
         flake = config.flake // {
@@ -68,7 +68,7 @@ in
 {
   # Force module loading order - aggregates processed before homeConfigurations
   # This ensures config.flake.modules.homeManager.* are merged before access
-  # Pattern A multi-aggregate organization (drupol-style):
+  # Multi-aggregate organization (drupol-style):
   #   - core: base config (catppuccin, fonts, bitwarden, xdg, session-variables, ssh)
   #   - development: dev environment (git, jujutsu, neovim, wezterm, zed, starship, zsh)
   #   - ai: AI-assisted tools (claude-code, mcp-servers, glm wrappers, ccstatusline)

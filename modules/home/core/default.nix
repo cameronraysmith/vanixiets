@@ -3,7 +3,7 @@
 # and merged into homeManager.core aggregate namespace
 { ... }:
 {
-  # Pattern A empty stub - defines flake module namespace
+  # Namespace stub for import-tree aggregate discovery
   # All configuration in core/*.nix files:
   # - catppuccin.nix (global theme enable)
   # - fonts.nix (fontconfig enable)
