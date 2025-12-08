@@ -1,20 +1,14 @@
 # Platform-specific hotfixes for broken unstable packages
 #
-# Dendritic flake-parts module exporting hotfix overlays via list concatenation
+# flake-parts module exporting hotfix overlays via list concatenation
 #
-# Adapted from _overlays/hotfixes.nix using dendritic list composition pattern
+# Selectively inherits from final.stable when unstable packages break
 #
-# Strategy: Selectively inherit from final.stable when unstable packages break
-# This avoids flake.lock rollbacks that affect ALL packages
-#
-# Pattern:
 # - Use final.stable.packageName for stable fallback
-# - Document with hydra link: https://hydra.nixos.org/job/nixpkgs/trunk/PACKAGE.SYSTEM
-# - Remove when upstream fixes land in unstable
+# - Document build failure with hydra job link from https://hydra.nixos.org/job/nixpkgs/trunk/PACKAGE.SYSTEM
+# - Should be removed when upstream fixes land in unstable
 #
-# Prefer this over:
-# - Flake.lock rollback (affects all packages)
-# - Inline overrides in nixpkgs.nix (clutters configuration)
+# This is preferred over flake.lock rollback or inline overrides in nixpkgs.nix
 #
 { ... }:
 {
@@ -29,13 +23,13 @@
           # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.aarch64-linux
           # Error: fmt library compatibility issue across all platforms
           # - Formatter<fs::u8path> missing const qualifier on format method
-          # - Darwin: clang 21.x exposes issue immediately
+          # - Darwin: clang 21.x build fails
           # - Linux: Same underlying fmt library issue affects all platforms
           # - Breaks in unstable after 2025-09-28 (last successful hydra build)
-          # - Stable version pulls compatible ghc_filesystem, solving both issues
-          # - CI confirmed failure on Linux builds, not just Darwin
+          # - Stable version pulls compatible ghc_filesystem
+          # - CI confirmed failure on both Linux and Darwin
           # TODO: Remove when fmt compatibility fixed upstream
-          # Added: 2025-10-13, expanded to all platforms: 2025-10-14
+          # Added: 2025-10-14
           micromamba
           ;
       }
