@@ -50,12 +50,12 @@ infra/
 │   │   ├── overlays-option.nix  # flake.nixpkgsOverlays declaration
 │   │   ├── per-system.nix   # Per-system nixpkgs configuration
 │   │   └── overlays/    # Overlay modules (auto-discovered, appended to list)
-│   │       ├── channels.nix  # Multi-channel nixpkgs access (Layer 1)
-│   │       ├── hotfixes.nix  # Platform-specific stable fallbacks (Layer 2)
-│   │       ├── overrides.nix  # Per-package build modifications (Layer 3)
-│   │       ├── nvim-treesitter.nix  # nvim-treesitter-main overlay (Layer 4)
-│   │       ├── fish-stable-darwin.nix  # Fish stable fallback for darwin
-│   │       └── nuenv.nix  # Nushell utilities wrapper (Layer 4)
+│   │       ├── channels.nix  # Multi-channel nixpkgs access
+│   │       ├── hotfixes.nix  # Platform-specific stable fallbacks
+│   │       ├── overrides.nix  # Per-package build modifications
+│   │       ├── nvim-treesitter.nix  # nvim-treesitter-main external overlay
+│   │       ├── fish-stable-darwin.nix  # Darwin-specific stable fallback
+│   │       └── nuenv.nix  # Nushell utilities external overlay
 │   ├── system/          # Cross-platform system modules
 │   └── terranix/        # Infrastructure as code
 │       ├── base.nix     # Common infrastructure

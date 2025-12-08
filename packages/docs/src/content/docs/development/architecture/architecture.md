@@ -160,13 +160,14 @@ Layer 4 - Per-package overrides (modules/nixpkgs/overlays/overrides.nix):
 
 The fourth layer applies build modifications using overrideAttrs for test disabling, flag changes, and compilation fixes.
 
-Layer 5 - External flake overlays (modules/nixpkgs/compose.nix):
+Layer 5 - External flake overlays (wrapper modules):
 
-The fifth layer composes overlays from flake inputs (nuenv for nushell script packaging) after internal overlays.
+The fifth layer integrates overlays from flake inputs through wrapper modules in modules/nixpkgs/overlays/.
+Each wrapper module (nuenv.nix, nvim-treesitter.nix) appends external overlays to the flake.nixpkgsOverlays list for uniform composition.
 
 Composition order:
 
-Internal overlays (channels → hotfixes) → custom packages → overrides → external overlays.
+All overlays (internal and external) compose via lib.composeManyExtensions on the flake.nixpkgsOverlays list: channels → hotfixes → overrides → external (nuenv, nvim-treesitter) → custom packages.
 Later layers can reference packages from earlier layers.
 
 ## Function Model
