@@ -189,16 +189,15 @@ inventory.instances.zerotier = {
 All overlays are collected into `flake.nixpkgsOverlays` via dendritic list concatenation, then composed in order using `lib.composeManyExtensions`, followed by merging custom packages:
 
 ```nix
-# modules/nixpkgs/compose.nix
+# modules/nixpkgs/compose.nix - composed via lib.composeManyExtensions
 [
-  channels.nix              # Layer 1: Multi-channel nixpkgs access
-  hotfixes.nix              # Layer 2: Platform-specific stable fallbacks
-  overrides.nix             # Layer 3: Per-package build modifications
-  nvim-treesitter.nix       # Layer 4: External overlay (nvim-treesitter-main)
-  nuenv.nix                 # Layer 4: External overlay (nuenv)
-  fish-stable-darwin.nix    # Conditional darwin fix
-  + custom packages         # Final: Merge pkgs-by-name derivations
-]
+  channels.nix              # Multi-channel nixpkgs access (stable, unstable, patched)
+  hotfixes.nix              # Platform-specific stable fallbacks
+  overrides.nix             # Per-package build modifications
+  nvim-treesitter.nix       # External overlay: nvim-treesitter-main
+  nuenv.nix                 # External overlay: nushell utilities
+  fish-stable-darwin.nix    # External overlay: darwin-specific stable fallback
+] // customPackages         # Merge pkgs-by-name derivations
 ```
 
 Each overlay module appends to `flake.nixpkgsOverlays` via:
