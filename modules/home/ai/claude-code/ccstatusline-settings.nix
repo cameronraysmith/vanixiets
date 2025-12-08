@@ -1,5 +1,4 @@
 # ccstatusline configuration for Claude Code CLI
-# Pattern A: flake.modules (plural) with homeManager.ai aggregate
 { ... }:
 {
   flake.modules = {

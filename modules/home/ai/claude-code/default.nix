@@ -1,5 +1,4 @@
 # Claude Code CLI configuration with MCP servers and ccstatusline (from llm-agents)
-# Pattern A: flake.modules (plural) with homeManager.ai aggregate
 { ... }:
 {
   flake.modules = {

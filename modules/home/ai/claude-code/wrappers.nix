@@ -1,5 +1,4 @@
 # GLM (zhipu.ai) alternative LLM backend wrapper for Claude Code
-# Pattern A: flake.modules (plural) with homeManager.ai aggregate
 { ... }:
 {
   flake.modules = {
