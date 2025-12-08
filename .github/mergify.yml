@@ -31,7 +31,7 @@ pull_request_rules:
       - author!=renovate[bot]
       - author!=mergify[bot]
       - author!=github-actions[bot]
-      - -author~=^vanixiets-flake-updater
+      - author!=vanixiets-flake-updater[bot]
       - check-success=secrets-scan
       - check-success=set-variables
       - check-success=check-fast-forward
@@ -91,7 +91,7 @@ pull_request_rules:
         - author=renovate[bot]
         - author=mergify[bot]
         - author=github-actions[bot]
-        - author~=^vanixiets-flake-updater
+        - author=vanixiets-flake-updater[bot]
       - check-success=secrets-scan
       - check-success=set-variables
       - check-success=check-fast-forward
