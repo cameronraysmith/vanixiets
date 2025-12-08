@@ -53,8 +53,8 @@ Infrastructure tests validate the nix flake structure, machine configurations, a
 
 | Category | File | Count | Purpose |
 |----------|------|-------|---------|
-| nix-unit | `modules/checks/nix-unit.nix` | 12 | Unit tests for flake structure and invariants |
-| validation | `modules/checks/validation.nix` | 6 | Configuration validation and naming conventions |
+| nix-unit | `modules/checks/nix-unit.nix` | 16 | Unit tests for flake structure and invariants |
+| validation | `modules/checks/validation.nix` | 10 | Configuration validation and naming conventions |
 | integration | `modules/checks/integration.nix` | 2 | VM boot tests for NixOS machines |
 | performance | `modules/checks/performance.nix` | 4 | Performance benchmarks and optimization (planned) |
 | treefmt | (flake-parts) | 1 | Code formatting validation |
@@ -94,6 +94,10 @@ nix-unit tests validate flake structure and configuration invariants without bui
 | TC-010 | testFeatureNamespaceExports | feature | Modules export to correct namespaces |
 | TC-011 | testTypeSafetySpecialargsPropagation | type-safety | inputs available via specialArgs |
 | TC-012 | testTypeSafetyNixosConfigStructure | type-safety | All configs have config attribute |
+| TC-013 | testInvariantNamespaceMerging | invariant | Dendritic namespace auto-merging works |
+| TC-014 | testInvariantClanDendriticIntegration | invariant | Clan machines have dendritic module exports |
+| TC-015 | testFeatureImportTreeCompleteness | feature | import-tree discovers all namespace modules |
+| TC-016 | testInvariantCrossplatformHomeModules | invariant | Home modules available for darwin and linux |
 
 ### Validation checks
 
@@ -107,6 +111,10 @@ Validation checks run shell commands to verify configuration correctness.
 | TC-023 | terraform-validate | Terraform configuration syntactically valid |
 | TC-024 | terraform-config-structure | Terraform config has expected resources |
 | TC-025 | vars-user-password-validation | Clan vars system for user passwords |
+| TC-026 | secrets-tier-separation | Secrets organized in correct tiers (vars vs secrets) |
+| TC-027 | clan-inventory-consistency | Inventory references only valid machines |
+| TC-028 | secrets-encryption-integrity | All secret files are SOPS-encrypted |
+| TC-029 | machine-registry-completeness | All machine modules registered in clan |
 
 ### Integration tests (Linux only)
 
