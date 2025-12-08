@@ -125,7 +125,7 @@ queue_rules:
 
   # Bot PRs: squash merge with batching for CI efficiency
   - name: bot-updates
-    merge_method: squash
+    merge_method: rebase
     update_method: rebase
     update_bot_account: cameronraysmith
     batch_size: 5
@@ -135,7 +135,4 @@ queue_rules:
       - -conflict
     merge_conditions:
       - and: *required_checks
-    commit_message_template: |
-      {{ title }} (#{{ number }})
 
-      {{ body }}
