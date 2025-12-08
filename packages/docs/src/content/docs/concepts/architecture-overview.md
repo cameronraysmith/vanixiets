@@ -88,17 +88,18 @@ pkgs/
 
 ## Multi-channel overlay architecture
 
-The overlay system provides resilience against nixpkgs breakage through five layers:
+The overlay system provides resilience against nixpkgs breakage through internal and external overlays composed in a single pass:
 
 ```nix
-# Layer composition order
-lib.mergeAttrsList [
-  inputs'        # Layer 1: Multi-channel nixpkgs access
-  hotfixes       # Layer 2: Platform-specific stable fallbacks
-  packages       # Layer 3: Custom derivations
-  overrides      # Layer 4: Build modifications
-  flakeInputs    # Layer 5: Overlays from flake inputs
-]
+# Overlay composition order (via lib.composeManyExtensions)
+lib.composeManyExtensions [
+  channels       # Multi-channel nixpkgs access (stable, unstable, patched)
+  hotfixes       # Platform-specific stable fallbacks
+  overrides      # Build modifications
+  nvim-treesitter # External overlay: nvim-treesitter from flake input
+  nuenv          # External overlay: nushell utilities from flake input
+  # ... other external overlays from flake inputs
+] // customPackages  # Custom derivations from pkgs-by-name
 ```
 
 ### Multi-channel nixpkgs access
