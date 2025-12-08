@@ -1,5 +1,4 @@
 # Cross-platform GUI applications (NixOS and nix-darwin)
-# Pattern A: flake.modules (plural) with homeManager.development aggregate
 { ... }:
 {
   flake.modules.homeManager.development =
