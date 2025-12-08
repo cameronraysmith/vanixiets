@@ -1,5 +1,4 @@
 # Git configuration with SSH signing, delta diff, lazygit, allowed_signers
-# Pattern A: flake.modules (plural) with homeManager.development aggregate
 # Note: User-specific values (name, email, ssh key) should be set in user modules
 { ... }:
 {
