@@ -1,5 +1,4 @@
 # Enhanced zsh configuration with oh-my-zsh, syntax highlighting, completions
-# Pattern A: flake.modules (plural) with homeManager.development aggregate
 { ... }:
 {
   flake.modules = {
