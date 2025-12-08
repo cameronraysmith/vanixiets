@@ -3,7 +3,7 @@
 # and merged into homeManager.tools aggregate namespace
 { ... }:
 {
-  # Pattern A empty stub - defines flake module namespace
+  # Namespace stub for import-tree aggregate discovery
   # All configuration in tools/*.nix files:
   # - awscli.nix (AWS CLI)
   # - k9s.nix (Kubernetes UI)
