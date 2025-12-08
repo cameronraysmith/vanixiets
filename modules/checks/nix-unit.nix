@@ -165,6 +165,62 @@
           );
           expected = true;
         };
+
+        # Architectural Invariant Tests
+
+        # TC-013: Namespace Merging
+        # Validates files in same dendritic directory auto-merge into single namespace
+        testInvariantNamespaceMerging = {
+          expr =
+            (builtins.hasAttr "ai" self.modules.homeManager)
+            && (builtins.hasAttr "development" self.modules.homeManager)
+            && (builtins.hasAttr "shell" self.modules.homeManager);
+          expected = true;
+        };
+
+        # TC-014: Clan-Dendritic Integration
+        # Validates clan machines have corresponding dendritic module exports
+        testInvariantClanDendriticIntegration = {
+          expr =
+            let
+              darwinMachines = [
+                "stibnite"
+                "blackphos"
+                "rosegold"
+                "argentum"
+              ];
+              nixosMachines = [
+                "cinnabar"
+                "electrum"
+                "galena"
+                "scheelite"
+              ];
+              hasDarwinModule = m: builtins.hasAttr "machines/darwin/${m}" self.modules.darwin;
+              hasNixosModule = m: builtins.hasAttr "machines/nixos/${m}" self.modules.nixos;
+            in
+            builtins.all hasDarwinModule darwinMachines && builtins.all hasNixosModule nixosMachines;
+          expected = true;
+        };
+
+        # TC-015: Import-Tree Completeness
+        # Validates import-tree discovers key modules from each namespace
+        testFeatureImportTreeCompleteness = {
+          expr =
+            (builtins.hasAttr "base" self.modules.darwin)
+            && (builtins.hasAttr "base" self.modules.nixos)
+            && (builtins.hasAttr "core" self.modules.homeManager)
+            && (builtins.hasAttr "base" self.modules.terranix);
+          expected = true;
+        };
+
+        # TC-016: Crossplatform Home Modules
+        # Validates home-manager aggregates available for both darwin and linux contexts
+        testInvariantCrossplatformHomeModules = {
+          expr =
+            (builtins.hasAttr "x86_64-linux" self.homeConfigurations)
+            && (builtins.hasAttr "aarch64-darwin" self.homeConfigurations);
+          expected = true;
+        };
       };
     };
 }
