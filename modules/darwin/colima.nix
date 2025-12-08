@@ -1,6 +1,3 @@
-# Colima container runtime module for darwin
-# Provides OCI container management via Colima with configurable runtimes
-# Ported from clan branch (nixos-unified) to dendritic flake-parts pattern
 { ... }:
 {
   flake.modules.darwin.colima =
@@ -232,9 +229,6 @@
             StandardOutPath = "/tmp/colima-${cfg.profile}.out.log";
           };
         };
-
-        # Note: Shell completions are configured in home-manager
-        # See modules/home/darwin-only/colima.nix
 
         # Environment setup for Docker runtime
         environment.variables = lib.mkIf (cfg.runtime == "docker" || cfg.runtime == "containerd") {
