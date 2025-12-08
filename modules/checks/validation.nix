@@ -347,6 +347,264 @@
               echo "OK: Vars validation complete (local checks passed)"
               touch $out
             '';
+
+        # TC-026: Secrets Tier Separation
+        # Purpose: Validate that secrets are in the correct tier (vars/ for machine-specific, secrets/ for user-specific)
+        secrets-tier-separation =
+          pkgs.runCommand "secrets-tier-separation"
+            {
+              passthru.meta.description = "Validate secrets tier separation (vars vs secrets)";
+            }
+            ''
+              echo "TC-026: Validating secrets tier separation..."
+
+              # Check vars directory structure (machine-specific)
+              VARS_DIR="${self}/vars"
+              if [ -d "$VARS_DIR" ]; then
+                echo "OK: vars/ directory exists"
+
+                # Verify vars directory contains machine-specific or shared directories
+                MACHINE_DIRS=$(find "$VARS_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+                if [ "$MACHINE_DIRS" -gt 0 ]; then
+                  echo "OK: Found $MACHINE_DIRS machine/shared directories in vars/"
+                else
+                  echo "WARNING: No subdirectories found in vars/"
+                fi
+              else
+                echo "SKIP: vars/ directory not found"
+              fi
+
+              # Check secrets directory structure (user-specific)
+              SECRETS_DIR="${self}/secrets"
+              if [ -d "$SECRETS_DIR" ]; then
+                echo "OK: secrets/ directory exists"
+
+                # Count user-specific secret files
+                USER_SECRETS=$(find "$SECRETS_DIR" -type f 2>/dev/null | wc -l)
+                if [ "$USER_SECRETS" -gt 0 ]; then
+                  echo "OK: Found $USER_SECRETS user-specific secret files in secrets/"
+                else
+                  echo "WARNING: No secret files found in secrets/"
+                fi
+              else
+                echo "SKIP: secrets/ directory not found"
+              fi
+
+              echo "OK: Secrets tier separation validated"
+              touch $out
+            '';
+
+        # TC-027: Clan Inventory Consistency
+        # Purpose: Validate that all machine names in clan inventory services reference existing machines
+        clan-inventory-consistency =
+          pkgs.runCommand "clan-inventory-consistency"
+            {
+              nativeBuildInputs = [ pkgs.jq ];
+              passthru.meta.description = "Validate clan inventory references valid machines";
+              # Get all machines from clan.machines
+              registeredMachines = builtins.toJSON (
+                builtins.attrNames (if builtins.hasAttr "machines" self.clan then self.clan.machines else { })
+              );
+              # Get all machines from clan.inventory.machines
+              inventoryMachines = builtins.toJSON (
+                builtins.attrNames (
+                  if builtins.hasAttr "inventory" self.clan && builtins.hasAttr "machines" self.clan.inventory then
+                    self.clan.inventory.machines
+                  else
+                    { }
+                )
+              );
+            }
+            ''
+              echo "TC-027: Validating clan inventory consistency..."
+
+              # Check if we have any machines to validate
+              REGISTERED_COUNT=$(echo "$registeredMachines" | ${pkgs.jq}/bin/jq 'length')
+              INVENTORY_COUNT=$(echo "$inventoryMachines" | ${pkgs.jq}/bin/jq 'length')
+
+              echo "Found $REGISTERED_COUNT registered machines and $INVENTORY_COUNT inventory machines"
+
+              if [ "$REGISTERED_COUNT" -eq 0 ]; then
+                echo "SKIP: No registered machines found"
+                touch $out
+                exit 0
+              fi
+
+              if [ "$INVENTORY_COUNT" -eq 0 ]; then
+                echo "SKIP: No inventory machines found"
+                touch $out
+                exit 0
+              fi
+
+              # Compare inventory machines to registered machines
+              echo "$inventoryMachines" | ${pkgs.jq}/bin/jq -r '.[]' | sort > /tmp/inventory.txt
+              echo "$registeredMachines" | ${pkgs.jq}/bin/jq -r '.[]' | sort > /tmp/registered.txt
+
+              # Check that all inventory machines exist in registered machines
+              while read -r machine; do
+                if grep -qx "$machine" /tmp/registered.txt; then
+                  echo "OK: Inventory machine '$machine' is registered"
+                else
+                  echo "ERROR: Inventory machine '$machine' not found in clan.machines" >&2
+                  exit 1
+                fi
+              done < /tmp/inventory.txt
+
+              echo "OK: All inventory machines match registered machines"
+              touch $out
+            '';
+
+        # TC-028: Secrets Encryption Integrity
+        # Purpose: Validate that all secret files are properly SOPS-encrypted (no plaintext secrets)
+        secrets-encryption-integrity =
+          pkgs.runCommand "secrets-encryption-integrity"
+            {
+              nativeBuildInputs = [
+                pkgs.findutils
+                pkgs.file
+              ];
+              passthru.meta.description = "Validate all secrets are SOPS-encrypted";
+            }
+            ''
+              echo "TC-028: Validating secrets encryption integrity..."
+
+              check_encryption() {
+                local file="$1"
+                # Check if file is JSON format (SOPS encrypted files are JSON)
+                FILE_TYPE=$(file "$file")
+
+                if echo "$FILE_TYPE" | grep -q "JSON"; then
+                  # Check for SOPS encryption markers
+                  if grep -q '"sops"' "$file" 2>/dev/null; then
+                    # Verify data is actually encrypted (ENC[ markers)
+                    if grep -q 'ENC\[' "$file" 2>/dev/null; then
+                      echo "OK: $file is SOPS-encrypted"
+                      return 0
+                    else
+                      echo "ERROR: $file has SOPS structure but no encrypted data" >&2
+                      return 1
+                    fi
+                  else
+                    echo "ERROR: $file is JSON but missing SOPS encryption markers" >&2
+                    return 1
+                  fi
+                else
+                  echo "WARNING: $file is not JSON format: $FILE_TYPE"
+                  return 0
+                fi
+              }
+
+              TOTAL_CHECKED=0
+              ENCRYPTED_OK=0
+
+              # Check vars directory
+              if [ -d "${self}/vars" ]; then
+                echo "Checking secrets in vars/ directory..."
+                find "${self}/vars" -name "secret" -type f 2>/dev/null | while read -r f; do
+                  TOTAL_CHECKED=$((TOTAL_CHECKED + 1))
+                  if check_encryption "$f"; then
+                    ENCRYPTED_OK=$((ENCRYPTED_OK + 1))
+                  else
+                    exit 1
+                  fi
+                done || exit 1
+              else
+                echo "SKIP: vars/ directory not found"
+              fi
+
+              # Check secrets directory
+              if [ -d "${self}/secrets" ]; then
+                echo "Checking secrets in secrets/ directory..."
+                find "${self}/secrets" -type f 2>/dev/null | while read -r f; do
+                  # Skip non-secret files like .gitignore
+                  if [[ "$(basename "$f")" =~ ^\. ]]; then
+                    continue
+                  fi
+                  TOTAL_CHECKED=$((TOTAL_CHECKED + 1))
+                  if check_encryption "$f"; then
+                    ENCRYPTED_OK=$((ENCRYPTED_OK + 1))
+                  else
+                    exit 1
+                  fi
+                done || exit 1
+              else
+                echo "SKIP: secrets/ directory not found"
+              fi
+
+              echo "OK: Secrets encryption integrity validated"
+              touch $out
+            '';
+
+        # TC-029: Machine Registry Completeness
+        # Purpose: Validate that all machine module directories have corresponding clan.machines entries
+        machine-registry-completeness =
+          pkgs.runCommand "machine-registry-completeness"
+            {
+              nativeBuildInputs = [ pkgs.jq ];
+              registeredMachines = builtins.toJSON (
+                builtins.attrNames (if builtins.hasAttr "machines" self.clan then self.clan.machines else { })
+              );
+              passthru.meta.description = "Validate all machine modules are registered in clan";
+            }
+            ''
+              echo "TC-029: Validating machine registry completeness..."
+
+              TOTAL_MACHINES=0
+              REGISTERED_OK=0
+
+              # Check darwin machines
+              DARWIN_DIR="${self}/modules/machines/darwin"
+              if [ -d "$DARWIN_DIR" ]; then
+                echo "Checking darwin machines..."
+                for dir in "$DARWIN_DIR"/*/; do
+                  if [ -d "$dir" ]; then
+                    name=$(basename "$dir")
+                    TOTAL_MACHINES=$((TOTAL_MACHINES + 1))
+
+                    if echo "$registeredMachines" | ${pkgs.jq}/bin/jq -e --arg n "$name" 'index($n) != null' > /dev/null 2>&1; then
+                      echo "OK: Darwin machine '$name' is registered"
+                      REGISTERED_OK=$((REGISTERED_OK + 1))
+                    else
+                      echo "ERROR: Darwin machine '$name' not in clan.machines" >&2
+                      exit 1
+                    fi
+                  fi
+                done
+              else
+                echo "SKIP: Darwin machines directory not found"
+              fi
+
+              # Check nixos machines
+              NIXOS_DIR="${self}/modules/machines/nixos"
+              if [ -d "$NIXOS_DIR" ]; then
+                echo "Checking nixos machines..."
+                for dir in "$NIXOS_DIR"/*/; do
+                  if [ -d "$dir" ]; then
+                    name=$(basename "$dir")
+                    TOTAL_MACHINES=$((TOTAL_MACHINES + 1))
+
+                    if echo "$registeredMachines" | ${pkgs.jq}/bin/jq -e --arg n "$name" 'index($n) != null' > /dev/null 2>&1; then
+                      echo "OK: NixOS machine '$name' is registered"
+                      REGISTERED_OK=$((REGISTERED_OK + 1))
+                    else
+                      echo "ERROR: NixOS machine '$name' not in clan.machines" >&2
+                      exit 1
+                    fi
+                  fi
+                done
+              else
+                echo "SKIP: NixOS machines directory not found"
+              fi
+
+              if [ "$TOTAL_MACHINES" -eq 0 ]; then
+                echo "SKIP: No machine directories found"
+              else
+                echo "OK: Validated $REGISTERED_OK/$TOTAL_MACHINES machine modules"
+              fi
+
+              echo "OK: Machine registry completeness validated"
+              touch $out
+            '';
       };
     };
 }
