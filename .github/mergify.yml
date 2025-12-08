@@ -119,7 +119,7 @@ queue_rules:
     batch_size: 1
     checks_timeout: 3600
     queue_conditions:
-      - and: *required_checks
+      - -conflict
     merge_conditions:
       - and: *required_checks
 
@@ -129,10 +129,10 @@ queue_rules:
     update_method: rebase
     update_bot_account: cameronraysmith
     batch_size: 5
-    batch_max_wait_time: 30 min
+    batch_max_wait_time: 5 min
     checks_timeout: 3600
     queue_conditions:
-      - and: *required_checks
+      - -conflict
     merge_conditions:
       - and: *required_checks
     commit_message_template: |
