@@ -1,9 +1,8 @@
 # perSystem nixpkgs configuration
 #
-# Separated from default.nix for single responsibility
-# This file configures pkgs for perSystem (checks, packages, devShells, etc.)
+# configures pkgs for flake-parts perSystem (checks, packages, devShells, etc.)
 #
-# Dendritic pattern: Uses config.flake.nixpkgsOverlays for overlay composition
+# Use config.flake.nixpkgsOverlays for overlay composition
 # overlays/*.nix modules append to this list automatically via import-tree
 {
   inputs,
@@ -15,16 +14,16 @@
   perSystem =
     { system, ... }:
     let
-      # Configure nixpkgs with dendritic overlay architecture
+      # Configure nixpkgs with overlays
       pkgs = import inputs.nixpkgs {
         inherit system;
         config.allowUnfree = true;
         # Overlay composition from flake.nixpkgsOverlays list
-        # Auto-populated by overlays/*.nix via dendritic list concatenation
+        # Auto-populated by overlays/*.nix
         overlays =
-          # Internal overlays (channels, hotfixes, overrides, nvim-treesitter-main)
+          # Internal overlays (channels, hotfixes, overrides)
           config.flake.nixpkgsOverlays
-          # External overlays (nuenv)
+          # External overlays
           ++ [
             inputs.nuenv.overlays.nuenv
           ];
@@ -42,8 +41,7 @@
       legacyPackages = lib.mkForce pkgs;
 
       # Custom packages via pkgs-by-name auto-discovery
-      # Provides: Custom derivations (ccstatusline, etc.)
-      # Standalone: No dependencies on other overlay layers
+      # Integrates custom derivations without depending on other overlay layers
       pkgsDirectory = ../../pkgs/by-name;
     };
 }
