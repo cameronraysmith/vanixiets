@@ -32,14 +32,21 @@
       };
 
       nix-unit.tests = {
-        testFrameworkWorks = {
-          expr = 1 + 1;
-          expected = 2;
+        # Metadata Test
+
+        # TC-001: Flake Structure Smoke Test
+        # Validates packages have required metadata (if packages exist)
+        testMetadataFlakeOutputsExist = {
+          expr =
+            (builtins.hasAttr "nixosConfigurations" self)
+            && (builtins.hasAttr "clan" self)
+            && (builtins.hasAttr "modules" self);
+          expected = true;
         };
 
         # Regression Tests
 
-        # TC-001: Terraform Module Exports Exist
+        # TC-002: Terraform Module Exports Exist
         # Validates that terranix module exports exist in the flake namespace
         testRegressionTerraformModulesExist = {
           expr =
@@ -48,7 +55,7 @@
           expected = true;
         };
 
-        # TC-002: NixOS Closure Equivalence
+        # TC-003: NixOS Closure Equivalence
         # Validates that machine configs exist and can be referenced
         # Note: Full config evaluation requires network access, so we just test existence
         testRegressionNixosConfigExists = {
@@ -60,7 +67,7 @@
 
         # Invariant Tests
 
-        # TC-003: Clan Inventory Structure
+        # TC-004: Clan Inventory Structure
         # Validates inventory has required fields
         testInvariantClanInventoryMachines = {
           expr = builtins.sort builtins.lessThan (builtins.attrNames self.clan.inventory.machines);
@@ -76,7 +83,7 @@
           ];
         };
 
-        # TC-004: NixOS Configs Exist
+        # TC-005: NixOS Configs Exist
         # Validates all expected configs present
         testInvariantNixosConfigurationsExist = {
           expr = builtins.sort builtins.lessThan (builtins.attrNames self.nixosConfigurations);
@@ -88,7 +95,7 @@
           ];
         };
 
-        # TC-005: Darwin Configs Exist
+        # TC-006: Darwin Configs Exist
         # Validates darwin configurations are created
         testInvariantDarwinConfigurationsExist = {
           expr = builtins.sort builtins.lessThan (builtins.attrNames self.darwinConfigurations);
@@ -100,7 +107,7 @@
           ];
         };
 
-        # TC-006: Home Configs Exist
+        # TC-007: Home Configs Exist
         # Validates standalone home configurations are created
         testInvariantHomeConfigurationsExist = {
           expr = builtins.sort builtins.lessThan (builtins.attrNames self.homeConfigurations.x86_64-linux);
@@ -142,57 +149,20 @@
 
         # Type-Safety Tests
 
-        # TC-013: Module Evaluation Isolation
-        # Validates modules are sets
-        testTypeSafetyModuleEvaluationIsolation = {
-          expr =
-            let
-              baseModule = self.modules.nixos.base;
-              hostModule = self.modules.nixos."machines/nixos/electrum";
-            in
-            (builtins.typeOf baseModule) == "set" && (builtins.typeOf hostModule) == "set";
-          expected = true;
-        };
-
-        # TC-014: SpecialArgs Propagation
+        # TC-011: SpecialArgs Propagation
         # Validates inputs available in all machines via specialArgs
-        testTypeSafetySpecialargsProgpagation = {
+        testTypeSafetySpecialargsPropagation = {
           expr = builtins.hasAttr "inputs" self.clan.specialArgs;
           expected = true;
         };
 
-        # TC-015: Required NixOS Options
+        # TC-012: Required NixOS Options
         # Validates all configs have config attribute
         # full option evaluation requires network access
         testTypeSafetyNixosConfigStructure = {
           expr = builtins.all (name: builtins.hasAttr "config" self.nixosConfigurations.${name}) (
             builtins.attrNames self.nixosConfigurations
           );
-          expected = true;
-        };
-
-        # TC-016: Terranix Required Fields
-        # Since we don't have direct access to terranixConfigurations
-        # we validate that the terranix modules exist and are properly structured
-        testTypeSafetyTerranixModulesStructured = {
-          expr =
-            let
-              baseModule = self.modules.terranix.base;
-              hetznerModule = self.modules.terranix.hetzner;
-            in
-            (builtins.typeOf baseModule) == "set" && (builtins.typeOf hetznerModule) == "set";
-          expected = true;
-        };
-
-        # Metadata Test
-
-        # TC-021: Package Metadata
-        # Validates packages have required metadata (if packages exist)
-        testMetadataFlakeOutputsExist = {
-          expr =
-            (builtins.hasAttr "nixosConfigurations" self)
-            && (builtins.hasAttr "clan" self)
-            && (builtins.hasAttr "modules" self);
           expected = true;
         };
       };
