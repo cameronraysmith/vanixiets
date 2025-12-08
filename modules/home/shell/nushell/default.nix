@@ -1,5 +1,4 @@
 # Nushell modern structured shell with config files
-# Pattern A: flake.modules (plural) with homeManager.shell aggregate
 { ... }:
 {
   flake.modules = {
