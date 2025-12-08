@@ -183,7 +183,7 @@ in
           flakeModulesHome."users/janettesmith"
           flakeModulesHome.base-sops
           # Import aggregate modules for janettesmith
-          # Pattern A: Productivity aggregates (NO ai)
+          # Productivity aggregates (NO ai)
           flakeModulesHome.core
           flakeModulesHome.development
           flakeModulesHome.packages
@@ -203,7 +203,7 @@ in
           flakeModulesHome."users/crs58"
           flakeModulesHome.base-sops
           # Import aggregate modules for cameron (crs58 identity)
-          # Pattern A: All aggregates including ai
+          # All aggregates including ai
           flakeModulesHome.ai
           flakeModulesHome.core
           flakeModulesHome.development

@@ -14,7 +14,7 @@
       ...
     }:
     {
-      # Pattern A: Aggregates imported via configurations.nix mkHomeConfig
+      # Aggregates imported via configurations.nix mkHomeConfig
       # Productivity subset: development + shell (no ai tools)
 
       # sops-nix configuration for raquel user
