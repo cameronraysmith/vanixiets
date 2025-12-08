@@ -82,7 +82,7 @@
                 inputs.self.modules.homeManager."users/crs58"
                 inputs.self.modules.homeManager.base-sops
                 # Import aggregate modules for crs58/cameron
-                # Pattern A: All aggregates (matches blackphos configuration)
+                # All aggregates (matches blackphos configuration)
                 inputs.self.modules.homeManager.ai
                 inputs.self.modules.homeManager.core
                 inputs.self.modules.homeManager.development
