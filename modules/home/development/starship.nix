@@ -1,5 +1,4 @@
 # Enhanced starship prompt configuration
-# Pattern A: flake.modules (plural) with homeManager.development aggregate
 # Note: starship-jj intentionally EXCLUDED (see rationale below)
 { ... }:
 {
