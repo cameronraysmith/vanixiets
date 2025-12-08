@@ -3,7 +3,7 @@
 # and merged into homeManager.packages aggregate namespace
 { ... }:
 {
-  # Pattern A empty stub - defines flake module namespace
+  # Namespace stub for import-tree aggregate discovery
   # All configuration in packages/*.nix files:
   # - terminal.nix (unix tools, fonts)
   # - development.nix (dev tools, languages)
