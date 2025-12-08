@@ -46,7 +46,16 @@ infra/
 │   │   └── services/    # System services
 │   ├── nixpkgs/         # Nixpkgs configuration
 │   │   ├── configuration.nix
-│   │   └── _overlays/   # Overlay definitions
+│   │   ├── compose.nix   # Overlay composition into flake.overlays.default
+│   │   ├── overlays-option.nix  # flake.nixpkgsOverlays declaration
+│   │   ├── per-system.nix   # Per-system nixpkgs configuration
+│   │   └── overlays/    # Overlay modules (auto-discovered, appended to list)
+│   │       ├── channels.nix  # Multi-channel nixpkgs access (Layer 1)
+│   │       ├── hotfixes.nix  # Platform-specific stable fallbacks (Layer 2)
+│   │       ├── overrides.nix  # Per-package build modifications (Layer 3)
+│   │       ├── nvim-treesitter.nix  # nvim-treesitter-main overlay (Layer 4)
+│   │       ├── fish-stable-darwin.nix  # Fish stable fallback for darwin
+│   │       └── nuenv.nix  # Nushell utilities wrapper (Layer 4)
 │   ├── system/          # Cross-platform system modules
 │   └── terranix/        # Infrastructure as code
 │       ├── base.nix     # Common infrastructure
@@ -175,18 +184,34 @@ inventory.instances.zerotier = {
 
 ## Overlay architecture
 
-### Five-layer composition
+### Overlay composition
+
+All overlays are collected into `flake.nixpkgsOverlays` via dendritic list concatenation, then composed in order using `lib.composeManyExtensions`, followed by merging custom packages:
 
 ```nix
-# modules/nixpkgs/overlays/default.nix
-lib.mergeAttrsList [
-  inputs'        # Layer 1: Multi-channel nixpkgs access
-  hotfixes       # Layer 2: Platform-specific stable fallbacks
-  packages       # Layer 3: Custom derivations (pkgs/by-name/)
-  overrides      # Layer 4: Build modifications
-  flakeInputs    # Layer 5: Overlays from flake inputs
+# modules/nixpkgs/compose.nix
+[
+  channels.nix              # Layer 1: Multi-channel nixpkgs access
+  hotfixes.nix              # Layer 2: Platform-specific stable fallbacks
+  overrides.nix             # Layer 3: Per-package build modifications
+  nvim-treesitter.nix       # Layer 4: External overlay (nvim-treesitter-main)
+  nuenv.nix                 # Layer 4: External overlay (nuenv)
+  fish-stable-darwin.nix    # Conditional darwin fix
+  + custom packages         # Final: Merge pkgs-by-name derivations
 ]
 ```
+
+Each overlay module appends to `flake.nixpkgsOverlays` via:
+```nix
+{ inputs, ... }:
+{
+  flake.nixpkgsOverlays = [
+    inputs.flakeInput.overlays.exported
+  ];
+}
+```
+
+This pattern enables both internal overlays (pure functions) and external overlays (from flake inputs) to be composed together without hardcoding input selection at the point of composition.
 
 ### Custom packages
 
