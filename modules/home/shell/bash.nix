@@ -1,5 +1,4 @@
 # Bash shell with PATH configuration
-# Pattern A: flake.modules (plural) with homeManager.shell aggregate
 { ... }:
 {
   flake.modules = {
