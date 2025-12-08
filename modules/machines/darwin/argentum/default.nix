@@ -183,7 +183,7 @@ in
           flakeModulesHome."users/christophersmith"
           flakeModulesHome.base-sops
           # Import aggregate modules for christophersmith
-          # Pattern A: Productivity aggregates (NO ai)
+          # Productivity aggregates (NO ai)
           flakeModulesHome.core
           flakeModulesHome.development
           flakeModulesHome.packages
