@@ -3,7 +3,7 @@
 # and merged into homeManager.terminal aggregate namespace
 { ... }:
 {
-  # Pattern A empty stub - defines flake module namespace
+  # Namespace stub for import-tree aggregate discovery
   # All configuration in terminal/*.nix files:
   # - direnv.nix (direnv + nix-direnv)
   # - fzf.nix (fuzzy finder)
