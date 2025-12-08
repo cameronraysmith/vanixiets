@@ -1,5 +1,4 @@
 # Zellij terminal multiplexer with catppuccin theme
-# Pattern A: flake.modules (plural) with homeManager.shell aggregate
 { ... }:
 {
   flake.modules = {
