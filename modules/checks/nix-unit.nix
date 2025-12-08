@@ -113,7 +113,7 @@
         # Feature Tests
 
         # TC-008: Dendritic Module Discovery
-        # Validates import-tree discovers all modules
+        # Validates import-tree discovers nixos modules
         testFeatureDendriticModuleDiscovery = {
           expr =
             (builtins.hasAttr "base" self.modules.nixos)
@@ -143,7 +143,7 @@
         # Type-Safety Tests
 
         # TC-013: Module Evaluation Isolation
-        # Validates modules are properly structured
+        # Validates modules are sets
         testTypeSafetyModuleEvaluationIsolation = {
           expr =
             let
@@ -162,8 +162,8 @@
         };
 
         # TC-015: Required NixOS Options
-        # Validates all configs have config attribute (structure test)
-        # Note: Full option evaluation requires network access, so we test structure only
+        # Validates all configs have config attribute
+        # full option evaluation requires network access
         testTypeSafetyNixosConfigStructure = {
           expr = builtins.all (name: builtins.hasAttr "config" self.nixosConfigurations.${name}) (
             builtins.attrNames self.nixosConfigurations
@@ -172,8 +172,8 @@
         };
 
         # TC-016: Terranix Required Fields
-        # Note: This test is adapted since we don't have direct access to terranixConfigurations
-        # We validate that the terranix modules exist and are properly structured
+        # Since we don't have direct access to terranixConfigurations
+        # we validate that the terranix modules exist and are properly structured
         testTypeSafetyTerranixModulesStructured = {
           expr =
             let
@@ -196,10 +196,5 @@
           expected = true;
         };
       };
-
-      # Note: Cannot override nix-unit check to add metadata due to circular dependency
-      # The nix-unit flakeModule sets checks.nix-unit directly without exposing
-      # an intermediate config option, making it impossible to override without recursion
-      # TODO: Upstream feature request to nix-unit for metadata support
     };
 }
