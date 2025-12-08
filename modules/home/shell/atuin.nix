@@ -1,5 +1,4 @@
 # Atuin shell history with sync, search, and context
-# Pattern A: flake.modules (plural) with homeManager.shell aggregate
 # Encryption key from sops-nix (manually extracted base64 key)
 { ... }:
 {
