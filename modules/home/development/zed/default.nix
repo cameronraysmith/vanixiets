@@ -1,5 +1,4 @@
 # Zed editor with vim mode and Catppuccin theme
-# Pattern A: flake.modules (plural) with homeManager.development aggregate
 # Reference: https://github.com/nix-community/home-manager/blob/master/modules/programs/zed-editor.nix
 { ... }:
 {

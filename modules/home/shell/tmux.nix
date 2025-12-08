@@ -1,5 +1,4 @@
 # Tmux terminal multiplexer with extensive plugins and catppuccin theme
-# Pattern A: flake.modules (plural) with homeManager.shell aggregate
 { ... }:
 {
   flake.modules = {
