@@ -102,7 +102,7 @@ Each directory becomes an aggregate through import-tree's auto-discovery and nam
 { config, ... }:
 {
   # Force module loading order - aggregates processed before homeConfigurations
-  # Pattern A multi-aggregate organization (drupol-style):
+  # Multi-aggregate organization (drupol-style):
   #   - core: base config (catppuccin, fonts, bitwarden, xdg, session-variables, ssh)
   #   - development: dev environment (git, jujutsu, neovim, wezterm, zed, starship, zsh)
   #   - ai: AI-assisted tools (claude-code, mcp-servers, glm wrappers, ccstatusline)
@@ -138,7 +138,7 @@ Machine configurations import aggregates by referencing the auto-merged namespac
     flakeModulesHome."users/crs58"
     flakeModulesHome.base-sops
     # Import aggregate modules for crs58
-    # Pattern A: All aggregates via auto-merge
+    # All aggregates via auto-merge
     flakeModulesHome.ai          # All files from modules/home/ai/*
     flakeModulesHome.core        # All files from modules/home/core/*
     flakeModulesHome.development # All files from modules/home/development/*
