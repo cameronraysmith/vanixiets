@@ -460,7 +460,7 @@ Integration point: Terraform output variables consumed in nix configuration.
 
 Composed overlay to machine configuration:
 
-The file modules/nixpkgs/compose.nix composes all five layers into flake.overlays.default.
+The file modules/nixpkgs/compose.nix composes all overlays from the flake.nixpkgsOverlays list (populated by wrapper modules in overlays/*.nix) into flake.overlays.default.
 Machine configurations import inputs.self.overlays.default.
 
 Integration point: Machine nixpkgs.overlays = [ inputs.self.overlays.default ];
@@ -571,22 +571,24 @@ Machine configurations traverse this structure via config.flake.modules.* to acc
 ```
 inputs (flake inputs)
   ↓
-channels overlay (Layer 1): Export stable/unstable/patched nixpkgs
+overlays/*.nix wrapper modules append to flake.nixpkgsOverlays list:
+  ├─ channels.nix (Layer 1): Export stable/unstable/patched nixpkgs
+  ├─ hotfixes.nix (Layer 2): Selective stable fallbacks
+  ├─ overrides.nix (Layer 4): Package build modifications
+  ├─ nuenv.nix (Layer 5): External nuenv overlay
+  └─ nvim-treesitter.nix (Layer 5): External nvim-treesitter overlay
   ↓
-hotfixes overlay (Layer 2): Selective stable fallbacks
+compose.nix: lib.composeManyExtensions config.flake.nixpkgsOverlays
   ↓
-custom packages (Layer 3): pkgs/by-name/ derivations
-  ↓
-overrides overlay (Layer 4): Package build modifications
-  ↓
-external overlays (Layer 5): Flake input overlays
+custom packages (Layer 3): pkgs/by-name/ derivations merged via //
   ↓
 composed overlay (flake.overlays.default)
   ↓
 machine nixpkgs (final package set)
 ```
 
-Each layer is a function: final: prev: {...} composing via lib.composeManyExtensions.
+Internal and external overlays compose uniformly via lib.composeManyExtensions on flake.nixpkgsOverlays.
+Custom packages merge last using attribute set merge (//).
 
 ### Secrets data flow
 
@@ -742,7 +744,7 @@ Layer 3 custom packages: pkgs/by-name/ with pkgs-by-name-for-flake-parts integra
 
 Layer 4 overrides: modules/nixpkgs/overlays/overrides.nix with overrideAttrs patterns.
 
-Layer 5 external: modules/nixpkgs/compose.nix imports nuenv overlay.
+Layer 5 external: modules/nixpkgs/overlays/nuenv.nix and nvim-treesitter.nix wrapper modules append external overlays to flake.nixpkgsOverlays.
 
 Composition: modules/nixpkgs/compose.nix defines flake.overlays.default.
 
