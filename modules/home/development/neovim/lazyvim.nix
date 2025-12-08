@@ -13,8 +13,6 @@
         programs.lazyvim = {
           enable = true;
 
-          # Prefer nixpkgs plugin versions for better Nix integration
-          # Specifically helps blink.cmp get proper Rust fuzzy library from nixpkgs
           pluginSource = "nixpkgs";
 
           installCoreDependencies = true;
@@ -58,7 +56,6 @@
 
           extraPackages = with pkgs; [
             vimPlugins.blink-copilot
-            # markdown-toc for conform.nvim formatter (no lazyvim-nix mapping exists)
             markdown-toc
           ];
 
@@ -83,8 +80,6 @@
               }
             '';
 
-            # blink.cmp: use Lua fuzzy implementation to silence Rust binary warning
-            # Rust binary requires runtime download which fails in Nix's read-only store
             blink = ''
               return {
                 {
