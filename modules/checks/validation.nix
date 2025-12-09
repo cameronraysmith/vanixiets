@@ -10,6 +10,16 @@
     let
       terraformPkg = self.packages.${system}.terraform;
       terraformConfig = terraformPkg.passthru.config;
+
+      # match providers defined in modules/terranix/config.nix
+      tofuWithProviders = pkgs.opentofu.withPlugins (p: [
+        p.hashicorp_external
+        p.hashicorp_local
+        p.hashicorp_null
+        p.hashicorp_tls
+        p.hetznercloud_hcloud
+        p.hashicorp_google
+      ]);
     in
     {
       checks = {
@@ -152,7 +162,7 @@
         terraform-validate =
           pkgs.runCommand "terraform-validate"
             {
-              nativeBuildInputs = [ pkgs.opentofu ];
+              nativeBuildInputs = [ tofuWithProviders ];
               passthru.meta.description = "Validate generated terraform is syntactically correct";
             }
             ''
@@ -165,10 +175,11 @@
               # Link the generated terraform config
               ln -s ${terraformConfig} config.tf.json
 
-              # Initialize terraform (backend=false to avoid network/state)
-              tofu init -backend=false
+              # Initialize with pre-bundled providers (no network access needed)
+              # -plugin-dir ensures tofu uses only local providers, skipping registry
+              tofu init -backend=false -plugin-dir=${tofuWithProviders}/libexec/terraform-providers
 
-              # Validate configuration
+              # Validate configuration against provider schemas
               tofu validate
 
               echo "OK: Terraform configuration is valid"
