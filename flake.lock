@@ -106,15 +106,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1765291105,
-        "narHash": "sha256-LzdeJHdL2YlRlSOvAQW9Sb5huEtWJg6ms8Ywu4JkyqI=",
-        "rev": "6438fd98866ec7696acb95b1f8aa672c257cb8fd",
-        "type": "tarball",
-        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/6438fd98866ec7696acb95b1f8aa672c257cb8fd.tar.gz"
+        "lastModified": 1765234412,
+        "narHash": "sha256-GDcm6yje64hN51MqCD8ZsCjkus/T503Ov7I/SMCoWFs=",
+        "owner": "cameronraysmith",
+        "repo": "clan-core",
+        "rev": "9140018a5970abf34c102b7933250deebf7c1e1f",
+        "type": "github"
       },
       "original": {
-        "type": "tarball",
-        "url": "https://git.clan.lol/clan/clan-core/archive/main.tar.gz"
+        "owner": "cameronraysmith",
+        "ref": "dev",
+        "repo": "clan-core",
+        "type": "github"
       }
     },
     "darwin": {
