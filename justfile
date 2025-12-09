@@ -285,6 +285,26 @@ update-package package="atuin-format":
   $UPDATE_SCRIPT
   echo "Update complete. Review changes with: git diff"
 
+## terraform/terranix
+
+# Run terraform apply (removes stale lockfile first to sync with nix-provided providers)
+[group('terraform')]
+terraform *ARGS:
+  rm -f terraform/.terraform.lock.hcl
+  nix run .#terraform -- {{ARGS}}
+
+# Run terraform plan only
+[group('terraform')]
+terraform-plan *ARGS:
+  rm -f terraform/.terraform.lock.hcl
+  nix run .#terraform.plan -- {{ARGS}}
+
+# Run terraform destroy
+[group('terraform')]
+terraform-destroy *ARGS:
+  rm -f terraform/.terraform.lock.hcl
+  nix run .#terraform.destroy -- {{ARGS}}
+
 ## clan
 # Commands for clan-based machine management (dendritic+clan architecture)
 
