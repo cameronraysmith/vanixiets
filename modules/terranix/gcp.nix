@@ -46,7 +46,7 @@
 
         # scheelite: tungsten ore mineral (CaWO4) - T4 GPU node
         scheelite = {
-          enabled = false; # Default disabled for cost control (~$0.54/hr total)
+          enabled = true; # Default disabled for cost control (~$0.54/hr total)
           machineType = "n1-standard-8"; # 8 vCPU, 30GB RAM (T4 requires N1 series)
           zone = "us-central1-c"; # Try: a -> b -> c -> f if RESOURCE_EXHAUSTED
           image = "debian-12";
