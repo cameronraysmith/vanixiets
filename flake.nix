@@ -66,7 +66,7 @@
 
     catppuccin.url = "github:catppuccin/nix";
 
-    lazyvim-nix.url = "github:cameronraysmith/lazyvim-nix/dev";
+    lazyvim-nix.url = "github:pfassina/lazyvim-nix";
     lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     nvim-treesitter-main.url = "github:iofq/nvim-treesitter-main";
