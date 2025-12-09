@@ -106,7 +106,6 @@ Important terms, abbreviations, synonyms, and descriptions.
 **Related**:
 - [Architecture](../architecture/) - Architectural decisions and technical design
 - [Traceability](../traceability/) - Requirements traceability and CI philosophy
-- [Work items](../work-items/) - Project task tracking
 
 ## AMDiRE context layer purpose
 
