@@ -28,15 +28,13 @@ packages/docs/
 │   │       │   ├── decisions/      # Architecture Decision Records
 │   │       │   ├── operations/     # Operational procedures
 │   │       │   ├── traceability/   # CI philosophy and testing
-│   │       │   ├── work-items/     # Implementation tracking
 │   │       │   └── workflows/      # Development workflows
 │   │       └── notes/       # Working notes (excluded from sidebar)
 │   │           ├── clan/           # Clan integration planning
 │   │           ├── mcp/            # MCP integration notes
 │   │           ├── nix-rosetta/    # Cross-arch build planning
 │   │           ├── nixpkgs/        # Nixpkgs troubleshooting
-│   │           ├── prompts/        # LLM session templates
-│   │           └── work-items/     # Meta-documentation
+│   │           └── prompts/        # LLM session templates
 │   ├── components/          # Astro components
 │   ├── grammars/            # Syntax highlighting (Justfile)
 │   └── utils/               # Utility functions
@@ -151,7 +149,6 @@ Located in `development/` with capitalized subsections via hybrid sidebar config
 - **Decisions** - Architecture Decision Records (ADRs)
 - **Operations** - Operational procedures and incident response
 - **Traceability** - Requirements traceability and testing philosophy
-- **Work Items** - Implementation tracking (active/completed/backlog)
 - **Workflows** - Development workflows and processes
 
 ### Working notes (excluded from main site)
