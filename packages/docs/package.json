@@ -9,7 +9,7 @@
     "url": "https://github.com/cameronraysmith/vanixiets.git"
   },
   "license": "MIT",
-  "packageManager": "bun@1.1.38",
+  "packageManager": "bun@1.3.4",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
