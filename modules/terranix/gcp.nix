@@ -37,7 +37,7 @@
       machines = {
         # galena: lead ore mineral (PbS) - metallurgical naming theme
         galena = {
-          enabled = false; # Default disabled for cost control (~$0.27/hr)
+          enabled = true; # Default disabled for cost control (~$0.27/hr)
           machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
           zone = "us-central1-b";
           image = "debian-12";
@@ -46,7 +46,7 @@
 
         # scheelite: tungsten ore mineral (CaWO4) - T4 GPU node
         scheelite = {
-          enabled = true; # Default disabled for cost control (~$0.54/hr total)
+          enabled = false; # Default disabled for cost control (~$0.54/hr total)
           machineType = "n1-standard-8"; # 8 vCPU, 30GB RAM (T4 requires N1 series)
           zone = "us-central1-f"; # Try: a -> b -> c -> f if RESOURCE_EXHAUSTED
           image = "debian-12";
