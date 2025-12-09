@@ -290,18 +290,21 @@ update-package package="atuin-format":
 # Run terraform apply (removes stale lockfile first to sync with nix-provided providers)
 [group('terraform')]
 terraform *ARGS:
+  rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
   nix run .#terraform -- {{ARGS}}
 
 # Run terraform plan only
 [group('terraform')]
 terraform-plan *ARGS:
+  rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
   nix run .#terraform.plan -- {{ARGS}}
 
 # Run terraform destroy
 [group('terraform')]
 terraform-destroy *ARGS:
+  rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
   nix run .#terraform.destroy -- {{ARGS}}
 
