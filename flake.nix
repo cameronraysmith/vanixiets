@@ -28,7 +28,7 @@
 
     # TODO: switch back to upstream after resolving cross-platform vars/secrets/builds/installs
     # clan-core.url = "https://git.clan.lol/clan/clan-core/archive/main.tar.gz";
-    clan-core.url = "github:cameronraysmith/clan-core/dev";
+    clan-core.url = "github:cameronraysmith/clan-core/fix-install-secret-upload-path";
     clan-core.inputs.nixpkgs.follows = "nixpkgs";
     clan-core.inputs.sops-nix.follows = "sops-nix";
     clan-core.inputs.disko.follows = "disko";

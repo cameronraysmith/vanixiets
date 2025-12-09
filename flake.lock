@@ -106,16 +106,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1765310570,
-        "narHash": "sha256-9iCMlDQEWUKiZRIKwHh+fMQ124PdhGktssNQnAI43vM=",
+        "lastModified": 1765310568,
+        "narHash": "sha256-S0W9gmIf88UIehdmP+MSwMk0z12UNvK5fb8xPHJHfPI=",
         "owner": "cameronraysmith",
         "repo": "clan-core",
-        "rev": "71cf95615256079dcba9cad1ee20edfae9be1176",
+        "rev": "407238172f1b7a154f078b9d9bfdb8fd46aea010",
         "type": "github"
       },
       "original": {
         "owner": "cameronraysmith",
-        "ref": "dev",
+        "ref": "fix-install-secret-upload-path",
         "repo": "clan-core",
         "type": "github"
       }
