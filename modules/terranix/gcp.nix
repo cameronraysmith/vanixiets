@@ -37,7 +37,7 @@
       machines = {
         # galena: lead ore mineral (PbS) - metallurgical naming theme
         galena = {
-          enabled = true; # Default disabled for cost control (~$0.27/hr)
+          enabled = false; # Default disabled for cost control (~$0.27/hr)
           machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
           zone = "us-central1-b";
           image = "debian-12";
