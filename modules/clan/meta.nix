@@ -3,7 +3,7 @@
   clan = {
     meta.name = "test-clan";
     meta.description = "Phase 0: Architectural validation + infrastructure deployment";
-    meta.tld = "clan";
+    meta.domain = "clan";
 
     # Pass inputs to all machines via specialArgs
     specialArgs = { inherit inputs; };
