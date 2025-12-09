@@ -88,11 +88,6 @@ export default defineConfig({
               collapsed: true,
               autogenerate: { directory: "development/traceability" },
             },
-            {
-              label: "Work Items",
-              collapsed: true,
-              autogenerate: { directory: "development/work-items" },
-            },
           ],
         },
         {
