@@ -48,7 +48,7 @@
         scheelite = {
           enabled = true; # Default disabled for cost control (~$0.54/hr total)
           machineType = "n1-standard-8"; # 8 vCPU, 30GB RAM (T4 requires N1 series)
-          zone = "us-central1-c"; # Try: a -> b -> c -> f if RESOURCE_EXHAUSTED
+          zone = "us-central1-f"; # Try: a -> b -> c -> f if RESOURCE_EXHAUSTED
           image = "debian-12";
           gpuType = "nvidia-tesla-t4"; # Turing architecture, 16GB VRAM
           gpuCount = 1;
