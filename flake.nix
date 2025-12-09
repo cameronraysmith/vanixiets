@@ -26,8 +26,10 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
-    clan-core.url = "github:cameronraysmith/clan-core/dev";
+    clan-core.url = "https://git.clan.lol/clan/clan-core/archive/main.tar.gz";
     clan-core.inputs.nixpkgs.follows = "nixpkgs";
+    clan-core.inputs.sops-nix.follows = "sops-nix";
+    clan-core.inputs.disko.follows = "disko";
     clan-core.inputs.flake-parts.follows = "flake-parts";
     clan-core.inputs.treefmt-nix.follows = "treefmt-nix";
     clan-core.inputs.nix-darwin.follows = "nix-darwin";
