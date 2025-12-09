@@ -296,7 +296,7 @@
           "bhi",
           "its"
         ],
-        "bogo": 4400.28,
+        "bogo": 4399.99,
         "cache": 56320,
         "units": 8,
         "physical_id": 0,
@@ -431,7 +431,7 @@
           {
             "type": "mem",
             "base": 0,
-            "range": 33654648832,
+            "range": 33654644736,
             "enabled": true,
             "access": "read_write",
             "prefetch": "unknown"
