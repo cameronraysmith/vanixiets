@@ -88,9 +88,7 @@
     # TODO: enable in nixos configurations
     landrun-nix.url = "github:srid/landrun-nix";
 
-    # Using fork with fix for chromium headless shell path structure (playwright 1.57+)
-    # TODO: Switch back to upstream: https://github.com/pietdevries94/playwright-web-flake
-    playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/fix-headless-shell-path";
+    playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.57.0";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
 
