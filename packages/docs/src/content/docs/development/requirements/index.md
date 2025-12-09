@@ -175,33 +175,6 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 
 **Document**: [System constraints](/development/requirements/system-constraints/)
 
-### Risk list
-
-**Purpose**: Migration risks with likelihood, impact, and mitigation strategies.
-
-**Key content**:
-- R-001: Dendritic + clan integration complexity
-- R-002: VPS infrastructure costs and management overhead
-- R-003: Darwin host migration breaking daily workflows
-- R-004: Primary workstation (stibnite) migration risk
-- R-005: Secrets migration from sops-nix to clan vars
-- R-006: Breaking changes in upstream dependencies
-- R-007: Initial validation revealing architectural incompatibility
-- R-008: Zerotier network reliability and connectivity issues
-- R-009: Multi-host synchronization failures
-- R-010: Learning curve for dendritic + clan patterns
-
-**For each risk**:
-- Description and risk factors
-- Likelihood and impact assessment
-- Migration timeline relevance
-- Mitigation strategies
-- Current status
-
-**Use when**: Planning migration phases, preparing contingencies, managing project risk.
-
-**Document**: [Risk list](/development/requirements/risk-list/)
-
 ## Using Requirements documentation
 
 ### For migration planning
@@ -209,19 +182,16 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 **Initial validation preparation**:
 1. Review [system vision](/development/requirements/system-vision/) for overall goals
 2. Study UC-001, UC-002, UC-003 in [usage model](/development/requirements/usage-model/) for basic patterns
-3. Review R-001, R-007 in [risk list](/development/requirements/risk-list/) for validation objectives
-4. Understand SC-005, SC-006 in [system constraints](/development/requirements/system-constraints/) for integration constraints
+3. Understand SC-005, SC-006 in [system constraints](/development/requirements/system-constraints/) for integration constraints
 
 **VPS deployment preparation**:
 1. Review UC-001, UC-006 in [usage model](/development/requirements/usage-model/) for bootstrap and networking
 2. Study DR-002 in [deployment requirements](/development/requirements/deployment-requirements/) for NixOS deployment
-3. Review R-002, R-008 in [risk list](/development/requirements/risk-list/) for VPS and network risks
 
 **Darwin host migration preparation**:
 1. Review UC-007 in [usage model](/development/requirements/usage-model/) for migration workflow
 2. Study DR-001 in [deployment requirements](/development/requirements/deployment-requirements/) for darwin deployment
-3. Review R-003, R-004 in [risk list](/development/requirements/risk-list/) for workflow and stibnite risks
-4. Reference MF-* functions in [functional hierarchy](/development/requirements/functional-hierarchy/) for migration operations
+3. Reference MF-* functions in [functional hierarchy](/development/requirements/functional-hierarchy/) for migration operations
 
 ### For feature development
 
@@ -235,8 +205,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 **Handling broken package**:
 1. Follow UC-005 in [usage model](/development/requirements/usage-model/)
 2. Reference PM-* functions in [functional hierarchy](/development/requirements/functional-hierarchy/)
-3. Apply mitigation from R-006 in [risk list](/development/requirements/risk-list/)
-4. Consult SC-007 in [system constraints](/development/requirements/system-constraints/) for build system limitations
+3. Consult SC-007 in [system constraints](/development/requirements/system-constraints/) for build system limitations
 
 ### For validation and testing
 
@@ -351,10 +320,9 @@ Each layer provides different views appropriate for different stakeholders and p
 - **Quality requirements**: 508 lines (8 quality attributes)
 - **Deployment requirements**: 726 lines (10 deployment scenarios)
 - **System constraints**: 634 lines (10 constraint categories)
-- **Risk list**: 792 lines (10 risks with mitigation)
 - **Index** (this document): Overview and navigation
 
-**Total**: ~4,300 lines of comprehensive Requirements layer documentation
+**Total**: ~3,500 lines of comprehensive Requirements layer documentation
 
 ## Summary
 
