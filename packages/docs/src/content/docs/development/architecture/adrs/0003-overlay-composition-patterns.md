@@ -43,7 +43,7 @@ overlays/
 ├── inputs.nix           # Multi-channel nixpkgs access (inputs, patched, stable, unstable)
 ├── infra/              # Phase 1: Infrastructure NOT auto-wired
 │   ├── patches.nix      # List of nixpkgs patches to apply (empty in Phase 1)
-│   └── hotfixes.nix     # Platform-specific stable fallbacks for broken packages
+│   └── stable-fallbacks.nix     # Platform-specific stable fallbacks for broken packages
 ├── overrides/          # Per-package build modifications (auto-imported)
 │   └── default.nix      # Auto-imports *.nix files, merges them
 ├── packages/           # Custom derivations (auto-imported by lib.packagesFromDirectoryRecursive)
@@ -63,7 +63,7 @@ overlays/
 
 **Architecture** (lines 1-12 comments define structure):
 1. `inputs` - Multi-channel nixpkgs access (stable, patched, etc.)
-2. `hotfixes` - Platform-specific stable fallbacks for broken packages
+2. `stable-fallbacks` - Platform-specific stable fallbacks for broken packages
 3. `packages` - Custom derivations
 4. `overrides` - Per-package build modifications
 5. `flakeInputs` - Overlays from flake inputs (nuenv, etc.)
@@ -84,7 +84,7 @@ packages = fromDirectory ./packages;
 
 # Import overlay layers
 inputs' = import ./inputs.nix overlayArgs self super;
-hotfixes = import ./infra/hotfixes.nix self super;
+stableFallbacks = import ./infra/stable-fallbacks.nix self super;
 overrides = import ./overrides overlayArgs self super;
 ```
 
@@ -132,9 +132,9 @@ in
 
 ---
 
-## Pattern 2: Platform-Specific Hotfixes (hotfixes.nix)
+## Pattern 2: Platform-Specific Stable Fallbacks (stable-fallbacks.nix)
 
-**File**: `~/projects/nix-workspace/nix-config/overlays/infra/hotfixes.nix`
+**File**: `~/projects/nix-workspace/nix-config/overlays/infra/stable-fallbacks.nix`
 
 **Purpose**: Selectively use stable versions when unstable breaks
 
@@ -142,7 +142,7 @@ in
 ```nix
 final: prev:
 {
-  # Cross-platform hotfixes
+  # Cross-platform stable fallbacks
   inherit (final.stable)
     # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.aarch64-darwin
     micromamba  # fmt library compatibility issue across all platforms
@@ -155,7 +155,7 @@ final: prev:
 
 **Key Points**:
 - Uses `final.stable.packageName` for stable fallback
-- Documents with hydra link for each hotfix
+- Documents with hydra link for each stable fallback
 - Platform conditionals: `isDarwin`, `isLinux`, specific system checks
 - Prevents flake.lock rollbacks affecting all packages
 
@@ -245,7 +245,7 @@ importedOverlays
 pkgs/
 ├── default.nix          # Main composition
 ├── inputs.nix           # Multi-channel nixpkgs + external packages
-├── hotfixes.nix         # Platform-specific stable fallbacks
+├── stable-fallbacks.nix         # Platform-specific stable fallbacks
 ├── patches.nix          # List of patches (empty)
 ├── overrides/           # Per-package modifications
 │   ├── caddyWithPlugins.nix
@@ -300,7 +300,7 @@ in
 lib.mergeAttrsList [
   (args.inputs.nix-darwin.overlays.default final prev)
   (import ./inputs.nix args final prev)
-  (import ./hotfixes.nix final prev)
+  (import ./stable-fallbacks.nix final prev)
   pkgs
   overrides
   { drvsExport = drvs // flatScopeDrvs // overrides; }
@@ -318,7 +318,7 @@ lib.mergeAttrsList [
 **nix-config** (nixos-unified-based):
 - Multiple named overlays (one per file/directory in `overlays/`)
 - Uses `lib.packagesFromDirectoryRecursive` for packages
-- Cleaner separation: one overlay per concerns (inputs, hotfixes, packages, overrides)
+- Cleaner separation: one overlay per concerns (inputs, stable-fallbacks, packages, overrides)
 
 ---
 
@@ -363,11 +363,11 @@ import fn self.nixos-unified.lib.specialArgsFor.common
 
 ```nix
 lib.mergeAttrsList [
-  inputs'        # Multi-channel nixpkgs access
-  hotfixes       # Platform-specific stable fallbacks
-  packages       # Custom derivations
-  overrides      # Per-package build modifications
-  flakeInputs    # Overlays from flake inputs
+  inputs'           # Multi-channel nixpkgs access
+  stableFallbacks   # Platform-specific stable fallbacks
+  packages          # Custom derivations
+  overrides         # Per-package build modifications
+  flakeInputs       # Overlays from flake inputs
 ]
 ```
 
@@ -377,7 +377,7 @@ lib.mergeAttrsList [
 
 ### Phase 1 Architecture (Current - nix-config)
 
-**Design Decision**: Infrastructure files (`inputs.nix`, `hotfixes.nix`) placed in `overlays/infra/` subdirectory to avoid nixos-unified autowiring conflicts.
+**Design Decision**: Infrastructure files (`inputs.nix`, `stable-fallbacks.nix`) placed in `overlays/infra/` subdirectory to avoid nixos-unified autowiring conflicts.
 
 **Reason**: 
 - nixos-unified autoWires all `.nix` files in `overlays/` as separate named overlays
@@ -399,13 +399,13 @@ let
   packages = fromDirectory ./packages;
   
   inputs' = import ./inputs.nix overlayArgs self super;
-  hotfixes = import ./infra/hotfixes.nix self super;
+  stableFallbacks = import ./infra/stable-fallbacks.nix self super;
   overrides = import ./overrides overlayArgs self super;
   flakeInputs = { nuenv = ...; };
 in
 lib.mergeAttrsList [
   inputs'
-  hotfixes
+  stableFallbacks
   packages
   overrides
   flakeInputs
@@ -435,13 +435,13 @@ perSystem = { lib, system, ... }: {
 
 Keep infrastructure files in subdirectory to avoid autowiring:
 - `overlays/infra/patches.nix`
-- `overlays/infra/hotfixes.nix`
+- `overlays/infra/stable-fallbacks.nix`
 
 ### 2. Multi-Layer Overlay Composition
 
 Maintain separation of concerns:
 - **inputs**: Multi-channel nixpkgs access
-- **hotfixes**: Platform-specific fallbacks
+- **stable-fallbacks**: Platform-specific fallbacks
 - **packages**: Custom derivations
 - **overrides**: Per-package modifications
 - **flakeInputs**: External overlay integration
@@ -469,9 +469,9 @@ Use lib functions for platform conditionals:
 - `prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "x86_64-darwin") { ... }`
 - `prev.lib.optionalAttrs prev.stdenv.isLinux { ... }`
 
-### 6. hotfixes Pattern
+### 6. Stable Fallbacks Pattern
 
-Keep commented hydra links for each hotfix:
+Keep commented hydra links for each stable fallback:
 ```nix
 inherit (final.stable)
   # https://hydra.nixos.org/job/nixpkgs/trunk/PACKAGE.SYSTEM
@@ -514,7 +514,7 @@ The `...` captures any additional arguments from import context.
 | Overlay Count | Multiple (auto-wired) | Single default |
 | Package Directory | `overlays/packages/` | `pkgs/derivations/` |
 | Override Directory | `overlays/overrides/` | `pkgs/overrides/` |
-| Infrastructure | `overlays/infra/` | `pkgs/inputs.nix` + `hotfixes.nix` |
+| Infrastructure | `overlays/infra/` | `pkgs/inputs.nix` + `stable-fallbacks.nix` |
 | Main Composition | `overlays/default.nix` | `pkgs/default.nix` |
 | Lib Access | Via `inputs.self.lib` | Via `lib'` in args |
 | Override Filter | `_*.nix` disabled files | Same pattern |
