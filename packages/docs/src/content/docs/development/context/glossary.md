@@ -35,9 +35,29 @@ Related: user environment, dotfiles.
 Synonym: dependency, flake input.
 Related: flake, follows.
 
-**module system**: Nix's type-safe configuration composition system with options, types, and validation.
+**module system**: Nix's configuration composition system (nixpkgs `lib.evalModules`) with options, types, and validation.
+Core primitives: deferredModule (delays evaluation for fixpoint resolution), evalModules (computes configuration fixpoint), option merging (type-specific merge functions).
+See [Module System Primitives](/notes/development/modulesystem/primitives.md).
 Synonym: none.
-Related: options, types, configuration.
+Related: options, types, configuration, deferredModule, evalModules.
+
+**deferredModule**: Module system type that delays evaluation until configuration is computed.
+Enables modules to reference final merged configuration via fixpoint resolution.
+Foundation of dendritic pattern and flake-parts module composition.
+Synonym: none.
+Related: evalModules, module system, flake-parts.
+
+**evalModules**: Core function that evaluates modules via fixpoint computation.
+Takes modules and specialArgs, returns configuration with options and type checking.
+Used by NixOS, nix-darwin, home-manager, and flake-parts.
+Synonym: none.
+Related: deferredModule, module system.
+
+**fixpoint**: Self-referential computation where config references resolve to final merged result.
+The module system computes a least fixpoint via lazy evaluation.
+Enables modules to reference each other's configuration without strict circular dependencies.
+Synonym: none.
+Related: evalModules, deferredModule.
 
 **nix-darwin**: System configuration management for macOS using Nix.
 Abbreviation: darwin.
@@ -67,9 +87,11 @@ Related: nixpkgs, nixpkgs-stable, channel.
 Synonym: nixpkgs overlay.
 Related: nixpkgs, package override.
 
-**perSystem**: Flake-parts construct for per-system configuration (packages, devShells for each platform).
+**perSystem**: Flake-parts option for per-architecture module evaluation.
+Evaluates deferred modules once for each system in the systems list.
+Provides system, config, inputs' arguments specific to each architecture.
 Synonym: none.
-Related: flake-parts, system.
+Related: flake-parts, deferredModule, system.
 
 **SOPS**: Secrets OPerationS, tool for encrypting secrets in version control.
 Abbreviation: SOPS (Secrets OPerationS).
@@ -139,17 +161,23 @@ Related: clan, vars generator, secrets, sops.
 Synonym: zerotier controller.
 Related: zerotier, peer, overlay network.
 
-**dendritic flake-parts pattern**: Organizational pattern where every file is a flake-parts module.
+**dendritic flake-parts pattern**: Organizational pattern where every file is a deferred module.
+Foundation: nixpkgs module system (deferredModule type, evalModules fixpoint).
+Implementation: flake-parts evaluation + import-tree auto-discovery.
+Convention: directory-based namespace merging via flake.modules.*.
+See [Dendritic Architecture](/concepts/dendritic-architecture/).
 Synonym: dendritic pattern, every-file-is-module.
-Related: flake-parts, import-tree, flake.modules.
+Related: flake-parts, import-tree, flake.modules, deferredModule, evalModules.
 
 **disko**: Tool for declarative disk partitioning and formatting.
 Synonym: none.
 Related: partitioning, LUKS, installation.
 
-**flake.modules**: Namespace in dendritic pattern where modules contribute configuration (`flake.modules.{nixos,darwin,homeManager}.*`).
+**flake.modules**: Flake-parts namespace for publishing deferred modules by class.
+Type: `lazyAttrsOf (lazyAttrsOf deferredModule)` - attribute sets of deferred modules organized by class (nixos, darwin, homeManager).
+Delays evaluation until consumer imports the module into their evalModules call.
 Synonym: modules namespace.
-Related: dendritic pattern, flake-parts.
+Related: deferredModule, dendritic pattern, flake-parts.
 
 **import-tree**: Auto-discovery mechanism recursively importing all `.nix` files from a directory.
 Synonym: none.
