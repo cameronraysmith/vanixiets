@@ -33,7 +33,7 @@
       );
     in
     # Compose all (order matters!)
-    # 1. Internal overlays (channels, hotfixes, overrides, nvim-treesitter, nuenv) via composeManyExtensions
+    # 1. Internal overlays (channels, stable-fallbacks, overrides, nvim-treesitter, nuenv) via composeManyExtensions
     # 2. Custom packages (standalone derivations)
     (internalOverlays final prev) // customPackages;
 }
