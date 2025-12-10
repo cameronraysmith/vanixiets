@@ -310,7 +310,7 @@ git commit -m "fix(flake): rollback nixpkgs to working version
 
 - Multiple packages broken in latest unstable
 - Rolled back to nixpkgs commit from $(git log COMMIT -1 --format=%ci)
-- Will apply selective hotfixes as needed"
+- Will apply selective stable fallbacks as needed"
 
 darwin-rebuild switch --flake .
 ```
