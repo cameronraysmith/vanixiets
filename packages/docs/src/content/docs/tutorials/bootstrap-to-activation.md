@@ -56,6 +56,10 @@ This infrastructure combines four complementary technologies:
 3. **Clan-core** coordinates multi-machine deployments with inventory-based service assignment
 4. **Overlays** provide resilience through multi-channel nixpkgs access and stable fallbacks
 
+**Module system foundation**: The dendritic pattern uses deferred modules that delay evaluation until fixpoint computation.
+This enables the cross-cutting configuration patterns you'll see below.
+See [Dendritic Architecture](/concepts/dendritic-architecture/) for conceptual explanation.
+
 You don't need to understand all of this deeply right now.
 The key insight is that your machine configuration is just one piece of a larger, well-organized system.
 
