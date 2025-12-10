@@ -66,7 +66,7 @@ It collects all option declarations, collects all configuration definitions, com
 Deferred modules form a monoid under concatenation, which is why multiple files can export to the same namespace and merge correctly.
 Fixpoint computation is why modules can reference each other's configuration decisions without evaluation order mattering.
 
-For detailed treatment, see [Module System Primitives](/notes/development/modulesystem/primitives.md).
+For detailed treatment, see [Module System Primitives](/concepts/module-system-primitives/).
 
 ### Pattern overview
 
@@ -361,9 +361,9 @@ Result: 8-machine fleet fully operational under dendritic architecture.
 
 #### Module system foundations
 
-- [Module System Primitives](/notes/development/modulesystem/primitives.md) - deferredModule and evalModules with three-tier explanations
-- [Flake-parts as Module System Abstraction](/notes/development/modulesystem/flake-parts-abstraction.md) - What flake-parts adds to module system
-- [Terminology Glossary](/notes/development/modulesystem/terminology-glossary.md) - Module system vs flake-parts vs dendritic terminology
+- [Module System Primitives](/concepts/module-system-primitives/) - deferredModule and evalModules with three-tier explanations
+- [Flake-parts as Module System Abstraction](/concepts/flake-parts-module-system/) - What flake-parts adds to module system
+- [Terminology Glossary](/development/context/glossary/) - Module system vs flake-parts vs dendritic terminology
 
 ### External
 

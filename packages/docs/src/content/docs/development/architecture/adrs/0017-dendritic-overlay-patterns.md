@@ -396,8 +396,8 @@ nixpkgs.overlays = [ inputs.self.overlays.default ];
 ### Internal
 
 - [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/) (superseded)
-- [Module System Primitives](/notes/development/modulesystem/primitives/) - Option merging and list concatenation semantics
-- [Terminology Glossary](/notes/development/modulesystem/terminology-glossary/) - Module system terminology guide
+- [Module System Primitives](/concepts/module-system-primitives/) - Option merging and list concatenation semantics
+- [Terminology Glossary](/development/context/glossary/) - Module system terminology guide
 - test-clan validation: `~/projects/nix-workspace/test-clan/`
 - Drupol dendritic reference: `~/projects/nix-workspace/drupol-dendritic-infra/`
 - mirkolenz-nixos reference: `~/projects/nix-workspace/mirkolenz-nixos/`

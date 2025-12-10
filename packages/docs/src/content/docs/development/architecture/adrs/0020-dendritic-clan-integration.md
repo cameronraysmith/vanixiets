@@ -372,8 +372,8 @@ GCP nodes validated pattern at scale:
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 - [ADR-0011: SOPS secrets management](0011-sops-secrets-management/)
 - [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
-- [Module System Primitives](/notes/development/modulesystem/primitives/) - deferredModule and evalModules foundations
-- [Terminology Glossary](/notes/development/modulesystem/terminology-glossary/) - Module system terminology guide
+- [Module System Primitives](/concepts/module-system-primitives/) - deferredModule and evalModules foundations
+- [Terminology Glossary](/development/context/glossary/) - Module system terminology guide
 
 ### External
 

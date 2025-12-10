@@ -72,7 +72,7 @@ Every module in the infrastructure is a deferred module that delays evaluation u
 
 This foundation explains why the dendritic pattern works: deferred modules compose cleanly because they form a monoid under concatenation, and auto-discovery works because import-tree simply adds modules to the imports list without changing evaluation semantics.
 
-See [Module System Primitives](/notes/development/modulesystem/primitives.md) for detailed explanation of deferredModule and evalModules.
+See [Module System Primitives](/concepts/module-system-primitives/) for detailed explanation of deferredModule and evalModules.
 
 ### Layer 1: Flake-parts framework
 

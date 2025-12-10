@@ -55,8 +55,8 @@ The dendritic pattern adds organizational conventions to flake-parts:
 The key insight: dendritic is an organizational pattern for deferred modules, not a fundamentally different abstraction.
 The composition works because the module system provides deferredModule as a compositional primitive that forms a monoid under concatenation.
 
-For detailed explanation of module system primitives, see [Module System Primitives](/notes/development/modulesystem/primitives.md).
-For how flake-parts uses these primitives, see [Flake-parts as Module System Abstraction](/notes/development/modulesystem/flake-parts-abstraction.md).
+For detailed explanation of module system primitives, see [Module System Primitives](/concepts/module-system-primitives/).
+For how flake-parts uses these primitives, see [Flake-parts as Module System Abstraction](/concepts/flake-parts-module-system/).
 
 ### Traditional vs dendritic organization
 
@@ -398,9 +398,9 @@ The host is now:
 
 Understanding the algebraic primitives that enable the dendritic pattern:
 
-- [Module System Primitives](/notes/development/modulesystem/primitives.md) - Detailed deferredModule and evalModules explanation with three-tier (intuitive/computational/formal) treatment
-- [Flake-parts as Module System Abstraction](/notes/development/modulesystem/flake-parts-abstraction.md) - What flake-parts adds to the module system (perSystem, namespace conventions, class-based organization)
-- [Terminology Glossary](/notes/development/modulesystem/terminology-glossary.md) - Quick reference for module system vs flake-parts vs dendritic terminology
+- [Module System Primitives](/concepts/module-system-primitives/) - Detailed deferredModule and evalModules explanation with three-tier (intuitive/computational/formal) treatment
+- [Flake-parts as Module System Abstraction](/concepts/flake-parts-module-system/) - What flake-parts adds to the module system (perSystem, namespace conventions, class-based organization)
+- [Terminology Glossary](/development/context/glossary/) - Quick reference for module system vs flake-parts vs dendritic terminology
 
 ## See also
 
