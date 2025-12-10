@@ -827,7 +827,7 @@ December 2024 overlay architecture enhancement following dendritic migration.
 Previous architecture (ADR-0003):
 
 The file inputs.nix provided multi-channel access.
-The file infra/hotfixes.nix provided platform fixes.
+The file infra/stable-fallbacks.nix provided platform fixes.
 The directory packages/ contained custom derivations.
 All nested in overlays/ directory.
 
