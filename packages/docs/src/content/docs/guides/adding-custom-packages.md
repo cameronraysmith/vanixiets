@@ -216,7 +216,7 @@ This means:
 - Non-nix files and empty directories are ignored
 - The `callPackage` mechanism handles dependency injection automatically
 
-The resulting package set is merged into the overlay composition as Layer 3 (after channels and hotfixes, before overrides), making your packages available throughout your system configuration.
+The resulting package set is merged into the overlay composition as Layer 3 (after channels and stable fallbacks, before overrides), making your packages available throughout your system configuration.
 
 ## Common build functions
 
@@ -237,7 +237,7 @@ Check the [nixpkgs manual](https://nixos.org/manual/nixpkgs/stable/) for details
 Once you're comfortable adding packages, you might want to:
 
 - Override existing nixpkgs packages with custom build options (see `modules/nixpkgs/overlays/overrides.nix`)
-- Use stable channel fallbacks for broken packages (see `modules/nixpkgs/overlays/hotfixes.nix`)
+- Use stable channel fallbacks for broken packages (see `modules/nixpkgs/overlays/stable-fallbacks.nix`)
 - Apply upstream patches to nixpkgs packages (see [handling broken packages](/guides/handling-broken-packages))
 
 For deeper understanding of the overlay architecture, see [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns).
