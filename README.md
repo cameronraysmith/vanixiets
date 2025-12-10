@@ -50,7 +50,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ⊕ **Dendritic module organization** - import-tree auto-discovers Nix files organized by feature category (aspect) rather than host, with the intent that each file qualifies as a flake-parts module that exports to semantically meaningful namespaces (`flake.modules.darwin.*`, `flake.modules.home.*`, `flake.modules.nixos.*`)
 
-⋈ **Per-package nixpkgs channel selection** - Multi-channel overlay architecture enables unstable default with selective stable fallbacks via `modules/nixpkgs/overlays/hotfixes.nix` without holding back rolling upgrades for the entire package set.
+⋈ **Per-package nixpkgs channel selection** - Multi-channel overlay architecture enables unstable default with selective stable fallbacks via `modules/nixpkgs/overlays/stable-fallbacks.nix` without holding back rolling upgrades for the entire package set.
 
 ⊛ **Cross-platform deployment targets** - NixOS, nix-darwin, or home-manager configurations
 
@@ -58,7 +58,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ⊢ **Declarative secrets management** - sops-nix integration with age encryption for managing encrypted secrets and integration with clan vars.
 
-⊠ **Composable package overlays** - layered overlay composition (multi-channel access → hotfixes → custom packages → build overrides → flake input overlays) for package customization and dependency management
+⊠ **Composable package overlays** - layered overlay composition (multi-channel access → stable fallbacks → custom packages → build overrides → flake input overlays) for package customization and dependency management
 
 ↯ **Reproducible development environments** - Standard nix development shell(s) with direnv auto-activation and just task runner recipe for each CI job to support reproducible local 
 development testing
