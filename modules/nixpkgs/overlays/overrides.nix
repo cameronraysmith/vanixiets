@@ -12,7 +12,7 @@
 # vanixiets has auto-import infrastructure but no actual overrides yet.
 # This is a placeholder for future package build modifications.
 #
-# See vanixiets overlays README.md for when to use overrides vs hotfixes vs patches
+# See vanixiets overlays README.md for when to use overrides vs stable-fallbacks vs patches
 #
 { ... }:
 {
