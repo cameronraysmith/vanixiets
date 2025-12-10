@@ -4,17 +4,17 @@ sidebar:
   order: 7
 ---
 
-Systematic approach to fixing broken packages from nixpkgs unstable using the hotfixes infrastructure.
+Systematic approach to fixing broken packages from nixpkgs unstable using the stable fallbacks infrastructure.
 
 ## Quick reference
 
 | Scenario | Strategy | File | Recovery time |
 |----------|----------|------|---------------|
-| Single package broken | Stable fallback | modules/nixpkgs/overlays/hotfixes.nix | 5 minutes |
+| Single package broken | Stable fallback | modules/nixpkgs/overlays/stable-fallbacks.nix | 5 minutes |
 | Tests fail only | Build modification | modules/nixpkgs/overlays/overrides.nix | 5 minutes |
 | Fix exists in PR | Upstream patch | modules/nixpkgs/overlays/channels.nix (patches list) | 10 minutes |
 | Multiple packages broken | Flake.lock rollback | flake.lock | 2 minutes |
-| Darwin-specific issue | Platform hotfix | modules/nixpkgs/overlays/hotfixes.nix (darwin section) | 5 minutes |
+| Darwin-specific issue | Platform-specific stable fallback | modules/nixpkgs/overlays/stable-fallbacks.nix (darwin section) | 5 minutes |
 
 ## Incident workflow
 
@@ -58,11 +58,11 @@ Check hydra status:
 
 Questions to answer:
 1. How many packages are affected?
-   - Single package → Use hotfix
+   - Single package → Use stable fallback
    - Multiple (5+) → Consider rollback
 
 2. Is it platform-specific?
-   - Darwin only → Use platform-specific hotfix section
+   - Darwin only → Use platform-specific stable fallback section
    - All platforms → Use cross-platform section
 
 3. Is upstream fix available?
@@ -84,7 +84,7 @@ When to use:
 
 Steps:
 
-1. Edit modules/nixpkgs/overlays/hotfixes.nix:
+1. Edit modules/nixpkgs/overlays/stable-fallbacks.nix:
 
 ```nix
 // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
@@ -114,11 +114,11 @@ darwin-rebuild build --flake . --dry-run
 darwin-rebuild switch --flake .
 ```
 
-3. Commit the hotfix:
+3. Commit the stable fallback:
 
 ```bash
-git add modules/nixpkgs/overlays/hotfixes.nix
-git commit -m "fix(overlays): add packageName stable hotfix for llvm 21.x issue
+git add modules/nixpkgs/overlays/stable-fallbacks.nix
+git commit -m "fix(overlays): add packageName stable fallback for llvm 21.x issue
 
 - Package fails to compile with llvm 21.x in unstable
 - Using stable version (llvm 19.x) until upstream fixes land
@@ -233,7 +233,7 @@ nix build .#packages.aarch64-darwin.patched.hello 2>&1 | grep "got:"
 # Copy the hash and update channels.nix
 ```
 
-4. Use patched package in hotfixes.nix:
+4. Use patched package in stable-fallbacks.nix:
 
 ```nix
 {
@@ -253,7 +253,7 @@ nix flake check
 darwin-rebuild build --flake . --dry-run
 
 # Commit both files
-git add modules/nixpkgs/overlays/channels.nix modules/nixpkgs/overlays/hotfixes.nix
+git add modules/nixpkgs/overlays/channels.nix modules/nixpkgs/overlays/stable-fallbacks.nix
 git commit -m "fix(overlays): apply nixpkgs#123456 for packageName
 
 - Applies upstream fix from PR#123456
@@ -267,9 +267,9 @@ Time: 10 minutes total
 
 When to use:
 - Multiple packages broken (5+)
-- Hotfixes would be too numerous
+- Stable fallbacks would be too numerous
 - Need immediate system stability
-- Plan to apply selective hotfixes later
+- Plan to apply selective stable fallbacks later
 
 Steps:
 
@@ -322,8 +322,8 @@ After system is stable, update specific packages:
 # Update non-broken packages
 nix flake lock --update-input some-other-input
 
-# Add hotfixes for packages that need unstable features
-# Edit modules/nixpkgs/overlays/hotfixes.nix with unstable packages you need
+# Add stable fallbacks for packages that need unstable features
+# Edit modules/nixpkgs/overlays/stable-fallbacks.nix with unstable packages you need
 ```
 
 Time: 2 minutes for rollback, additional time for selective updates
@@ -372,7 +372,7 @@ Add notes to commit message or incident log:
 
 #### 4.1 Set removal reminder
 
-Create tracking TODO in the hotfix file:
+Create tracking TODO in the stable fallback file:
 
 ```nix
 inherit (final.stable)
@@ -388,9 +388,9 @@ inherit (final.stable)
 ```bash
 cd ~/projects/nix-workspace/infra
 
-# List active hotfixes
-echo "=== Active Hotfixes ==="
-grep -B2 -A2 "inherit.*stable" modules/nixpkgs/overlays/hotfixes.nix
+# List active stable fallbacks
+echo "=== Active Stable Fallbacks ==="
+grep -B2 -A2 "inherit.*stable" modules/nixpkgs/overlays/stable-fallbacks.nix
 
 # List active overrides
 echo "=== Active Overrides ==="
@@ -401,7 +401,7 @@ echo "=== Active Patches ==="
 grep -A5 "patches = \[" modules/nixpkgs/overlays/channels.nix
 ```
 
-For each hotfix/override/patch:
+For each stable fallback/override/patch:
 1. Check if still needed (hydra status)
 2. Test without it (comment out, run flake check)
 3. Remove if passing
@@ -412,7 +412,7 @@ For each hotfix/override/patch:
 ```bash
 cd ~/projects/nix-workspace/infra
 
-# For hotfixes: Remove inherit entry from modules/nixpkgs/overlays/hotfixes.nix
+# For stable fallbacks: Remove inherit entry from modules/nixpkgs/overlays/stable-fallbacks.nix
 
 # For overrides: Remove override entry from modules/nixpkgs/overlays/overrides.nix
 
@@ -424,7 +424,7 @@ darwin-rebuild build --flake . --dry-run
 
 # Commit
 git add modules/nixpkgs/overlays/
-git commit -m "fix(overlays): remove packageName hotfix after upstream fix
+git commit -m "fix(overlays): remove packageName stable fallback after upstream fix
 
 - Upstream fix merged in nixpkgs commit abc123
 - Package now builds successfully in unstable
@@ -494,7 +494,7 @@ When package A breaks because dependency B broke:
 
 ## Templates
 
-### Hotfix template (modules/nixpkgs/overlays/hotfixes.nix)
+### Stable fallback template (modules/nixpkgs/overlays/stable-fallbacks.nix)
 
 ```nix
 // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
@@ -607,13 +607,13 @@ git merge test-nixpkgs-update
 ### Regular maintenance
 
 Weekly:
-- Review active hotfixes (are they still needed?)
-- Check hydra status for hotfixed packages
-- Test removing old hotfixes
+- Review active stable fallbacks (are they still needed?)
+- Check hydra status for packages pinned to stable
+- Test removing old stable fallbacks
 
 Monthly:
 - Update nixpkgs and test
-- Clean up resolved hotfixes/overrides/patches
+- Clean up resolved stable fallbacks/overrides/patches
 - Document patterns for future incidents
 
 ### Incident log

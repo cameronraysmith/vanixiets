@@ -9,7 +9,7 @@ $ARGUMENTS
 
 | Scenario | Strategy | File |
 |----------|----------|------|
-| Single package broken | Stable fallback | modules/nixpkgs/overlays/hotfixes.nix |
+| Single package broken | Stable fallback | modules/nixpkgs/overlays/stable-fallbacks.nix |
 | Tests fail only | Build modification | modules/nixpkgs/overlays/overrides.nix |
 | Fix exists in PR | Upstream patch | modules/nixpkgs/overlays/channels.nix |
 | Multiple packages broken | Flake.lock rollback | flake.lock |
@@ -22,7 +22,7 @@ Documentation:
 @packages/docs/src/content/docs/guides/handling-broken-packages.md
 
 Current overlays (see existing patterns):
-@modules/nixpkgs/overlays/hotfixes.nix
+@modules/nixpkgs/overlays/stable-fallbacks.nix
 @modules/nixpkgs/overlays/channels.nix
 @modules/nixpkgs/overlays/overrides.nix
 
