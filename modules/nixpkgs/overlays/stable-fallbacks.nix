@@ -1,6 +1,6 @@
-# Platform-specific hotfixes for broken unstable packages
+# Platform-specific stable fallbacks for broken unstable packages
 #
-# flake-parts module exporting hotfix overlays via list concatenation
+# flake-parts module exporting stable fallback overlays via list concatenation
 #
 # Selectively inherits from final.stable when unstable packages break
 #
@@ -16,7 +16,7 @@
     (
       final: prev:
       {
-        # Cross-platform hotfixes (all systems)
+        # Cross-platform stable fallbacks (all systems)
         inherit (final.stable)
           # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.aarch64-darwin
           # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.x86_64-linux
@@ -34,20 +34,20 @@
           ;
       }
       // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
-        # Darwin-wide hotfixes (both aarch64 and x86_64)
-        # (Add Darwin-specific hotfixes here as needed)
+        # Darwin-wide stable fallbacks (both aarch64 and x86_64)
+        # (Add Darwin-specific stable fallbacks here as needed)
       })
       // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "x86_64-darwin") {
-        # x86_64-darwin specific hotfixes
+        # x86_64-darwin specific stable fallbacks
         # Example:
         # ncdu = final.empty or (prev.runCommand "empty-ncdu" {} "mkdir -p $out");
       })
       // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "aarch64-darwin") {
-        # aarch64-darwin specific hotfixes
+        # aarch64-darwin specific stable fallbacks
         # (Add as needed)
       })
       // (prev.lib.optionalAttrs prev.stdenv.isLinux {
-        # Linux-wide hotfixes
+        # Linux-wide stable fallbacks
         inherit (final.stable)
           # https://hydra.nixos.org/job/nixpkgs/trunk/google-cloud-sdk.x86_64-linux
           # Error: auto-patchelf missing pyelftools on rosetta-builder
