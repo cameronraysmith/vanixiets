@@ -54,7 +54,7 @@ This infrastructure combines four complementary technologies:
 1. **Flake-parts** provides the foundation, organizing everything as composable modules
 2. **Dendritic pattern** organizes modules by aspect (what they do) rather than by host (where they run)
 3. **Clan-core** coordinates multi-machine deployments with inventory-based service assignment
-4. **Overlays** provide resilience through multi-channel nixpkgs access and hotfixes
+4. **Overlays** provide resilience through multi-channel nixpkgs access and stable fallbacks
 
 You don't need to understand all of this deeply right now.
 The key insight is that your machine configuration is just one piece of a larger, well-organized system.
