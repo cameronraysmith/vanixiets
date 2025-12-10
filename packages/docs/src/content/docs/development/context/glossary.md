@@ -110,7 +110,7 @@ Synonym: none.
 Related: just, task automation.
 
 **multi-channel fallback**: Pattern using multiple nixpkgs inputs to handle broken packages without system-wide rollback.
-Synonym: nixpkgs hotfixes pattern.
+Synonym: nixpkgs stable fallbacks pattern.
 Related: nixpkgs, overlay, stable fallback.
 
 **nix develop**: Command to enter development shell defined by flake.
