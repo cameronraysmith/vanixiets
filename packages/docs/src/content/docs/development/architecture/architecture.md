@@ -57,6 +57,44 @@ This enables stable fallbacks for broken packages without rolling back the entir
 ## Component Model
 
 The infrastructure composes four major subsystems that integrate through well-defined interfaces.
+These subsystems build on a three-layer foundation.
+
+### Layer 0: Module system foundation
+
+The nixpkgs module system provides the foundational primitives for configuration composition.
+Every module in the infrastructure is a deferred module that delays evaluation until the final configuration is computed.
+
+**Core primitives:**
+
+- **lib.evalModules**: Fixpoint computation that resolves module definitions into final configuration
+- **deferredModule type**: Delayed evaluation enabling modules to reference the final merged result
+- **Option merging**: Type-specific merge functions with priority handling
+
+This foundation explains why the dendritic pattern works: deferred modules compose cleanly because they form a monoid under concatenation, and auto-discovery works because import-tree simply adds modules to the imports list without changing evaluation semantics.
+
+See [Module System Primitives](/notes/development/modulesystem/primitives.md) for detailed explanation of deferredModule and evalModules.
+
+### Layer 1: Flake-parts framework
+
+Flake-parts wraps nixpkgs' evalModules for flake composition, providing ergonomic access to the module system in the flake context.
+
+**What it provides:**
+
+- Wraps evalModules for flake outputs (class "flake")
+- Defines flake.modules.* namespace convention (deferredModule type)
+- Provides perSystem abstraction (per-system evaluation with class "perSystem")
+
+Flake-parts is NOT a module system primitive—it is a framework that makes the module system convenient for flake outputs.
+
+### Layer 2: Dendritic organization
+
+The dendritic pattern organizes deferred modules by aspect rather than by host.
+
+**What it provides:**
+
+- Auto-discovery via import-tree (automatic imports list population)
+- Directory-based namespace merging (deferredModule monoid composition)
+- Aspect-oriented structure (modules organized by feature, not host)
 
 ### Dendritic flake-parts subsystem
 
