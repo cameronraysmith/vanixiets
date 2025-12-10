@@ -51,7 +51,7 @@ infra/
 │   │   ├── per-system.nix   # Per-system nixpkgs configuration
 │   │   └── overlays/    # Overlay modules (auto-discovered, appended to list)
 │   │       ├── channels.nix  # Multi-channel nixpkgs access
-│   │       ├── hotfixes.nix  # Platform-specific stable fallbacks
+│   │       ├── stable-fallbacks.nix  # Platform-specific stable fallbacks
 │   │       ├── overrides.nix  # Per-package build modifications
 │   │       ├── nvim-treesitter.nix  # nvim-treesitter-main external overlay
 │   │       ├── fish-stable-darwin.nix  # Darwin-specific stable fallback
@@ -192,7 +192,7 @@ All overlays are collected into `flake.nixpkgsOverlays` via dendritic list conca
 # modules/nixpkgs/compose.nix - composed via lib.composeManyExtensions
 [
   channels.nix              # Multi-channel nixpkgs access (stable, unstable, patched)
-  hotfixes.nix              # Platform-specific stable fallbacks
+  stable-fallbacks.nix      # Platform-specific stable fallbacks
   overrides.nix             # Per-package build modifications
   nvim-treesitter.nix       # External overlay: nvim-treesitter-main
   nuenv.nix                 # External overlay: nushell utilities
