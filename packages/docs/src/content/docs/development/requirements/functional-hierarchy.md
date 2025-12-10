@@ -189,7 +189,7 @@ See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adr
 - Package from stable instead of unstable
 - Platform-conditional application
 
-**Invocation**: Via hotfixes.nix overlay
+**Invocation**: Via stable-fallbacks.nix overlay
 
 **Related use cases**: UC-005 (Handle broken packages)
 
