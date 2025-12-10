@@ -146,7 +146,7 @@ Layer 1 - Multi-channel access (modules/nixpkgs/overlays/channels.nix):
 
 The first layer provides pkgs.stable (OS-specific stable nixpkgs), pkgs.unstable (explicit unstable), pkgs.patched (unstable with upstream patches applied), and pkgs.nixpkgs (main unstable).
 
-Layer 2 - Platform-specific hotfixes (modules/nixpkgs/overlays/hotfixes.nix):
+Layer 2 - Platform-specific stable fallbacks (modules/nixpkgs/overlays/stable-fallbacks.nix):
 
 The second layer selectively uses stable versions for completely broken unstable packages.
 Platform conditionals isolate fixes to affected systems (isDarwin, isLinux, specific architecture).
@@ -167,7 +167,7 @@ Each wrapper module (nuenv.nix, nvim-treesitter.nix) appends external overlays t
 
 Composition order:
 
-All overlays (internal and external) compose via lib.composeManyExtensions on the flake.nixpkgsOverlays list: channels → hotfixes → overrides → external (nuenv, nvim-treesitter) → custom packages.
+All overlays (internal and external) compose via lib.composeManyExtensions on the flake.nixpkgsOverlays list: channels → stable-fallbacks → overrides → external (nuenv, nvim-treesitter) → custom packages.
 Later layers can reference packages from earlier layers.
 
 ## Function Model
@@ -247,7 +247,7 @@ Terraform state persisted and encrypted for infrastructure tracking.
 Stable fallback:
 
 Broken unstable packages use stable versions without rolling back entire nixpkgs.
-Layer 2 hotfixes enable per-package channel selection.
+Layer 2 stable fallbacks enable per-package channel selection.
 
 Upstream patch application:
 
@@ -336,14 +336,14 @@ Decision tree:
 
 When package breaks after nixpkgs update:
 
-1. Multiple packages affected → Consider flake.lock rollback, then selective hotfixes
+1. Multiple packages affected → Consider flake.lock rollback, then selective stable fallbacks
 2. Upstream fix exists in PR → Use Layer 1 patches (infra/patches.nix)
-3. Package completely broken → Use Layer 2 hotfixes (stable fallback)
+3. Package completely broken → Use Layer 2 stable fallbacks (stable fallback)
 4. Package builds but has issues → Use Layer 4 overrides (build modifications)
 
 Stable fallback (Layer 2):
 
-1. Edit modules/nixpkgs/overlays/hotfixes.nix
+1. Edit modules/nixpkgs/overlays/stable-fallbacks.nix
 2. Add package to appropriate platform conditional (isDarwin, isLinux)
 3. Document with hydra link and removal condition
 4. Test with nix eval .#legacyPackages.\<system\>.\<package\>.name
@@ -355,7 +355,7 @@ Upstream patch (Layer 1):
 1. Identify upstream PR with fix
 2. Add patch URL to modules/nixpkgs/overlays/channels.nix patches list
 3. Get hash from nix build failure output
-4. Reference patched package in hotfixes: inherit (final.patched) packageX;
+4. Reference patched package in stable-fallbacks: inherit (final.patched) packageX;
 5. Test with nix build
 6. Commit change
 7. Remove when PR merges and reaches channel
@@ -573,7 +573,7 @@ inputs (flake inputs)
   ↓
 overlays/*.nix wrapper modules append to flake.nixpkgsOverlays list:
   ├─ channels.nix (Layer 1): Export stable/unstable/patched nixpkgs
-  ├─ hotfixes.nix (Layer 2): Selective stable fallbacks
+  ├─ stable-fallbacks.nix (Layer 2): Selective stable fallbacks
   ├─ overrides.nix (Layer 4): Package build modifications
   ├─ nuenv.nix (Layer 5): External nuenv overlay
   └─ nvim-treesitter.nix (Layer 5): External nvim-treesitter overlay
@@ -738,7 +738,7 @@ Terraform output: perSystem.packages.terraform generates terraform JSON.
 
 Layer 1 channels: modules/nixpkgs/overlays/channels.nix exports stable/unstable/patched.
 
-Layer 2 hotfixes: modules/nixpkgs/overlays/hotfixes.nix with platform conditionals.
+Layer 2 stable fallbacks: modules/nixpkgs/overlays/stable-fallbacks.nix with platform conditionals.
 
 Layer 3 custom packages: pkgs/by-name/ with pkgs-by-name-for-flake-parts integration.
 
