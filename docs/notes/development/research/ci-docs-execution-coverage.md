@@ -53,7 +53,7 @@ Coverage levels used:
 | 5 | 33 | tutorials/nixos-deployment.md |
 | 6 | 32 | guides/handling-broken-packages.md |
 | 7 | 27 | development/architecture/adrs/0002-use-generic-just-recipes.md |
-| 8 | 27 | development/architecture/nixpkgs-hotfixes.md |
+| 8 | 27 | development/architecture/nixpkgs-stable-fallbacks.md |
 | 9 | 26 | tutorials/darwin-deployment.md |
 | 10 | 25 | about/contributing/container-runtime-setup.md |
 
