@@ -77,6 +77,13 @@ clan.machines = {
 };
 ```
 
+**Module system integration**:
+The clan machine registry imports deferred modules from the `flake.modules.*` namespaces.
+These are deferredModule type (nixpkgs `lib/types.nix` primitive) that delay evaluation until the configuration is computed.
+When clan calls nixosSystem or darwinSystem for a machine, it triggers evalModules with the imported modules from the machine's imports list.
+The deferred evaluation resolves at that point with system-specific arguments—the final configuration, pkgs, lib, and other module arguments become available.
+This explains the seamless integration: dendritic exports deferred modules to namespaces, clan imports those modules into machine configurations, and the module system's fixpoint computation handles evaluation with the appropriate context for each platform.
+
 Inventory system via `clan.inventory.*`:
 
 ```nix
@@ -302,6 +309,8 @@ Result: 8-machine fleet fully operational under clan orchestration.
 - [ADR-0011: SOPS secrets management](0011-sops-secrets-management/)
 - [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
 - [ADR-0020: Dendritic + Clan integration](0020-dendritic-clan-integration/)
+- [Module System Primitives](/notes/development/modulesystem/primitives/) - deferredModule and evalModules foundations
+- [Terminology Glossary](/notes/development/modulesystem/terminology-glossary/) - Module system terminology guide
 
 ### External
 
