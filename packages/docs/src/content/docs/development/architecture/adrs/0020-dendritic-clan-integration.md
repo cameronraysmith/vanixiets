@@ -19,6 +19,13 @@ Neither was designed with the other in mind.
 - Clan expects configurations via `clan.machines.*`
 - Need pattern for dendritic modules consumed by clan registry
 
+**Module system integration**:
+This integration works because both dendritic and clan use the same module system foundation from nixpkgs.
+Dendritic modules are deferredModule type (nixpkgs `lib/types.nix` primitive) that delay evaluation until the final configuration is computed.
+The `flake.modules.*` option has type `lazyAttrsOf deferredModule`, creating a namespace of deferred modules that can be imported into any evaluation context.
+When clan machines import these deferred modules via their imports list, the modules are added to evalModules and evaluated with clan's module arguments (the final system configuration).
+This explains why the integration is seamless: both systems use the same underlying module system primitives (deferredModule, evalModules, fixpoint computation), just with different evaluation contexts—flake-parts evaluates with class "flake" to build the namespace, while clan evaluates with nixosSystem or darwinSystem to build machine configurations.
+
 **Module discovery vs machine registry**:
 - import-tree auto-discovers all `*.nix` files as flake-parts modules
 - Clan maintains explicit machine registry
@@ -365,6 +372,8 @@ GCP nodes validated pattern at scale:
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 - [ADR-0011: SOPS secrets management](0011-sops-secrets-management/)
 - [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
+- [Module System Primitives](/notes/development/modulesystem/primitives/) - deferredModule and evalModules foundations
+- [Terminology Glossary](/notes/development/modulesystem/terminology-glossary/) - Module system terminology guide
 
 ### External
 
