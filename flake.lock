@@ -106,18 +106,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1765349790,
-        "narHash": "sha256-vO+DPWbqBUd5+OrRMlLxTg8Z8FLG6cbzh/DL4ztZs2Y=",
-        "owner": "cameronraysmith",
-        "repo": "clan-core",
-        "rev": "378c457a49e482cf65624d62dea8813a5fac45aa",
-        "type": "github"
+        "lastModified": 1765378202,
+        "narHash": "sha256-7mQrr5vU2zDfzNlt1fjwP3Az6h2pZi4fjQt4nlwg1fg=",
+        "rev": "c5099003a9c473414f085d8b58237888fe7c3070",
+        "type": "tarball",
+        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/c5099003a9c473414f085d8b58237888fe7c3070.tar.gz"
       },
       "original": {
-        "owner": "cameronraysmith",
-        "ref": "fix-install-secret-upload-path",
-        "repo": "clan-core",
-        "type": "github"
+        "type": "tarball",
+        "url": "https://git.clan.lol/clan/clan-core/archive/fix-install-secret-upload-path.tar.gz"
       }
     },
     "darwin": {
