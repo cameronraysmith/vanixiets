@@ -46,10 +46,33 @@ No standardized pattern for shared modules.
 
 Adopt the **dendritic flake-parts pattern** where every Nix file is a flake-parts module organized by aspect (feature) rather than host.
 
+### Module system foundation
+
+The dendritic pattern builds on nixpkgs module system primitives, which explains why composition works reliably:
+
+**deferredModule type**: A module that delays evaluation until the final configuration is computed.
+The type signature is `Config → Module`, meaning modules are functions from configurations to option declarations and definitions.
+This enables modules to reference the final merged configuration without creating circular dependencies.
+
+**evalModules fixpoint**: The function that evaluates a list of modules by computing a least fixpoint.
+It collects all option declarations, collects all configuration definitions, computes a fixpoint where the `config` argument equals the merged result, merges definitions according to type-specific merge functions, and validates that definitions match declared options.
+
+**Flake-parts integration**: Flake-parts wraps evalModules for flake outputs, defining:
+- Class-based module organization (darwin, nixos, homeManager via module classes)
+- `flake.modules.*` namespace (type: `lazyAttrsOf (lazyAttrsOf deferredModule)`)
+- `perSystem` abstraction (per-architecture evaluation with nested evalModules call)
+
+**Why this matters**: The pattern's compositional properties (namespace merging, auto-discovery, cross-cutting concerns) emerge from module system semantics, not from dendritic-specific logic.
+Deferred modules form a monoid under concatenation, which is why multiple files can export to the same namespace and merge correctly.
+Fixpoint computation is why modules can reference each other's configuration decisions without evaluation order mattering.
+
+For detailed treatment, see [Module System Primitives](/notes/development/modulesystem/primitives.md).
+
 ### Pattern overview
 
-Every `.nix` file in the `modules/` directory is a flake-parts module.
-Files export to namespaces under `flake.modules.*` and are auto-discovered by import-tree.
+Every `.nix` file in the `modules/` directory is a deferred module (type: `Config → Module`).
+Files export to namespaces under `flake.modules.*` (type: `lazyAttrsOf deferredModule`) and are auto-discovered by import-tree, which populates the module system's imports list.
+Flake-parts evaluates these modules with class "flake", providing access to the final flake output configuration.
 
 Organizational principle:
 ```
@@ -87,7 +110,8 @@ Result: Minimal flake.nix (23 lines) with 83+ auto-discovered modules.
 
 ### Module namespace exports
 
-Modules export to `flake.modules.*` namespaces for consumption:
+Modules export to `flake.modules.*` namespaces for consumption.
+These namespaces have type `lazyAttrsOf deferredModule`, meaning they are attribute sets of deferred modules that delay evaluation until imported by a consumer.
 
 ```nix
 # modules/home/ai/claude-code.nix
@@ -103,6 +127,12 @@ Modules export to `flake.modules.*` namespaces for consumption:
 Multiple files in the same directory export to the same namespace, auto-merging into aggregates:
 - `modules/home/ai/claude-code.nix` + `modules/home/ai/mcp-servers.nix` merge into `flake.modules.homeManager.ai`
 - Directory structure creates the namespace boundaries
+
+**Module system semantics**: The deferredModule type's merge function collects modules into imports lists rather than evaluating them immediately.
+When multiple files export to the same namespace (`flake.modules.homeManager.ai`), the module system merges them via monoid composition (concatenation of imports lists).
+Later, when a machine configuration imports `flake.modules.homeManager.ai`, it triggers evalModules with all collected modules, resolving the fixpoint with that machine's configuration context.
+
+This deferred evaluation is what enables the pattern's composability: modules don't need to know who will import them or in what order they'll be evaluated.
 
 ### Directory organization
 
@@ -169,6 +199,8 @@ in
 | Configuration passing | specialArgs (implicit) | Namespace exports (explicit) |
 | Organization | By host | By aspect/feature |
 | Module registration | Required specific paths | Any path under modules/ |
+| Module type | Immediate attribute sets | Deferred modules (Config → Module) |
+| Composition mechanism | Directory autowiring rules | deferredModule monoid + fixpoint |
 | flake.nix size | 50-100+ lines | 23 lines |
 | Adding features | Edit multiple host files | Create single aspect file |
 
@@ -181,6 +213,9 @@ Adding AI tooling meant editing 8 separate host configuration files, each time r
 The specialArgs mechanism became a debugging nightmare - when a module failed, tracing the failure required understanding which implicit dependencies were injected and in what order.
 More critically, nixos-unified provided no inventory abstraction for clan integration, which this fleet requires for zerotier VPN coordination across darwin laptops and nixos servers.
 The path-based autowiring rules were convenient for the initial setup but became a liability when restructuring was needed - renaming a directory meant understanding the implicit mapping from filesystem paths to flake outputs.
+More fundamentally, nixos-unified doesn't use deferred modules - it evaluates configuration immediately based on file paths.
+This prevents the kind of cross-module references that dendritic enables, where modules can reference the final merged configuration via fixpoint computation.
+The lack of deferredModule type meant cross-cutting concerns (features that span multiple hosts) had to be duplicated rather than composed from shared modules.
 
 ### Raw flake-parts without dendritic pattern
 
@@ -189,6 +224,10 @@ At 83 modules (and growing), this fleet would require maintaining a massive impo
 The dendritic pattern's import-tree mechanism eliminates this registration burden entirely - creating a new file under `modules/` automatically includes it.
 More importantly, raw flake-parts provides no organizational convention, meaning each implementation develops its own directory structure and namespace patterns.
 The dendritic pattern brings a proven structure that works across multiple production implementations, reducing cognitive load when switching contexts.
+
+More importantly, both use identical module system primitives (deferredModule type, evalModules fixpoint, option merging).
+The difference is purely organizational: raw flake-parts requires manual imports list maintenance, while dendritic automates discovery via import-tree and establishes namespace conventions.
+The underlying composition mechanism (module system) is identical, so both have the same compositional properties - dendritic just reduces registration burden.
 
 ### Snowfall lib
 
@@ -203,13 +242,22 @@ The existence of multiple high-quality production implementations (drupol, might
 The traditional NixOS module system provides powerful composition capabilities, but this fleet includes 4 darwin laptops alongside 4 nixos servers.
 Darwin uses nix-darwin's module system, which is similar to but separate from NixOS modules, and coordinating shared configuration between the two without a unifying abstraction would mean duplicating every cross-platform feature.
 Flake-parts provides the perSystem abstraction that enables defining packages and configurations in a platform-agnostic way, then specializing only where necessary.
-Additionally, the standard NixOS module approach lacks the namespace export pattern that dendritic uses to create composable aggregates - machine configurations would need to import every individual module rather than importing high-level aggregates like `flakeModulesHome.ai` that bundle related functionality.
+Additionally, the standard NixOS module approach lacks the namespace export conventions that flake-parts provides.
+While NixOS modules use the same underlying primitives (deferredModule, evalModules), they don't have flake-parts' `flake.modules.*` namespace or perSystem abstraction.
+Without these namespace conventions, creating composable aggregates requires manually maintaining imports lists, and cross-platform modules require duplication for darwin vs nixos contexts.
+Flake-parts provides the namespace organization and evaluation strategy that makes dendritic's aspect-based aggregation practical.
 
 ## Consequences
 
 ### Positive
 
-The dendritic pattern's feature-based organization eliminates the duplication problem that plagued the nixos-unified architecture.
+**Compositional semantics**: The pattern's benefits derive from module system algebraic structure, not organizational convention alone.
+Deferred modules form a monoid under concatenation, which guarantees composition is associative and has identity.
+This means module evaluation order doesn't matter (associativity), and empty modules don't affect results (identity).
+The fixpoint computation ensures cross-module references resolve consistently regardless of import order.
+These algebraic properties make the pattern's composition reliable at scale.
+
+**Feature-based organization**: The dendritic pattern's aspect-based organization eliminates the duplication problem that plagued the nixos-unified architecture.
 When we define AI tooling once in `modules/home/ai/`, every machine configuration can import that aggregate and receive the entire suite of tools consistently.
 This changes the operational model from "edit 8 machine files to add a feature" to "create one feature file and import it where needed."
 The impact becomes clear when considering that changes propagate automatically - updating the AI tooling aggregate updates all machines simultaneously, eliminating version drift across the fleet.
@@ -310,6 +358,12 @@ Result: 8-machine fleet fully operational under dendritic architecture.
 - [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 - [ADR-0020: Dendritic + Clan integration](0020-dendritic-clan-integration/)
+
+#### Module system foundations
+
+- [Module System Primitives](/notes/development/modulesystem/primitives.md) - deferredModule and evalModules with three-tier explanations
+- [Flake-parts as Module System Abstraction](/notes/development/modulesystem/flake-parts-abstraction.md) - What flake-parts adds to module system
+- [Terminology Glossary](/notes/development/modulesystem/terminology-glossary.md) - Module system vs flake-parts vs dendritic terminology
 
 ### External
 
