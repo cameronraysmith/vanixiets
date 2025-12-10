@@ -285,7 +285,7 @@ inventory.machines = {
 
 **Preconditions**:
 - Multi-channel nixpkgs inputs configured (unstable, stable, patched)
-- Overlays infrastructure operational (`modules/nixpkgs/overlays/hotfixes.nix`, `modules/nixpkgs/overlays/channels.nix`)
+- Overlays infrastructure operational (`modules/nixpkgs/overlays/stable-fallbacks.nix`, `modules/nixpkgs/overlays/channels.nix`)
 - Package broken in nixpkgs-unstable
 - Understanding of overlay composition layers
 
@@ -294,7 +294,7 @@ inventory.machines = {
 2. System builds fail due to broken package in unstable
 3. Developer investigates issue (compilation failure, test failure, etc.)
 4. Developer determines appropriate fix strategy (stable fallback, upstream patch, or build modification)
-5. Developer edits appropriate overlay file (`hotfixes.nix`, `patches.nix`, or `overrides/<package>.nix`)
+5. Developer edits appropriate overlay file (`stable-fallbacks.nix`, `patches.nix`, or `overrides/<package>.nix`)
 6. Developer tests fix: `nix build .#legacyPackages.<system>.<package>`
 7. System builds successfully using fixed package
 8. Developer commits fix with tracking comment (hydra link, TODO condition)
@@ -317,12 +317,12 @@ inventory.machines = {
 **References**:
 - [Context: Goals](../context/goals-and-objectives/) - G-U05: Surgical package fixes, G-S08: Multi-channel resilience
 - [Handling broken packages](/guides/handling-broken-packages) - Complete implementation guide
-- modules/nixpkgs/overlays/hotfixes.nix - Platform-specific stable fallbacks
+- modules/nixpkgs/overlays/stable-fallbacks.nix - Platform-specific stable fallbacks
 - modules/nixpkgs/overlays/channels.nix - Upstream patch list
 
 **Example**:
 ```nix
-# modules/nixpkgs/overlays/hotfixes.nix
+# modules/nixpkgs/overlays/stable-fallbacks.nix
 // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
   inherit (final.stable)
     # https://hydra.nixos.org/job/nixpkgs/trunk/buf.aarch64-darwin
