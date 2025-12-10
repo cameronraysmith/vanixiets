@@ -1,6 +1,7 @@
 import cloudflare from "@astrojs/cloudflare";
 import starlight from "@astrojs/starlight";
 import starlightLinksValidator from "starlight-links-validator";
+import { starlightKatex } from "starlight-katex";
 import { defineConfig } from "astro/config";
 import justGrammar from "./src/grammars/just.tmLanguage.json";
 // ROLLDOWN INTEGRATION (DISABLED) - Uncomment when re-enabling (see ROLLDOWN.md)
@@ -18,8 +19,9 @@ export default defineConfig({
             starlightLinksValidator({
               errorOnRelativeLinks: false,
             }),
+            starlightKatex(),
           ]
-        : [],
+        : [starlightKatex()],
       customCss: [
         './src/fonts/font-face.css',
         './src/styles/custom.css',

@@ -1,3 +1,8 @@
 :root {
   --sl-font: 'CMU Sans Serif', ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
+
+/* Fix KaTeX SVG rendering in Starlight (github.com/withastro/starlight/issues/2511) */
+.katex-html svg {
+  height: inherit;
+}
