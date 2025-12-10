@@ -7,28 +7,41 @@ This infrastructure combines three complementary architectural patterns to creat
 
 ## Architecture overview
 
+### Layer 0: Module system foundation (nixpkgs)
+
+Uses nixpkgs' module system primitives for configuration composition.
+Flake-parts wraps `lib.evalModules` for flake composition.
+
+**What it provides:**
+- **lib.evalModules**: Fixpoint computation resolving modules into final configuration
+- **deferredModule type**: Delayed evaluation enabling modules to reference final merged result
+- **Option merging**: Type-specific merge functions with priority handling
+
 ### Layer 1: Base framework (flake-parts)
 
 Uses [flake-parts](https://flake.parts) as the foundation for modular flake composition.
-This enables perSystem configurations and composable flake modules, providing the structural foundation for organizing nix code.
+Flake-parts wraps nixpkgs' evalModules for flake outputs, adding flake-specific conventions and ergonomics.
 
 **What it provides:**
-- Modular flake composition
-- PerSystem configuration helpers
+- Modular flake composition via evalModules wrapper
+- PerSystem configuration helpers (per-system evaluation)
+- flake.modules.* namespace convention (deferredModule type)
 - Clean separation of concerns across system types
 
-### Layer 2: Module organization (dendritic pattern)
+### Layer 2: Deferred module composition (dendritic pattern)
 
-Uses the [dendritic flake-parts pattern](/concepts/dendritic-architecture/) for module organization.
-Every Nix file is a flake-parts module, organized by *aspect* (feature) rather than by *host*.
+Uses deferred modules (nixpkgs module system primitive) for configuration composition.
+Every Nix file is a deferred module that delays evaluation until the final configuration is computed, enabling cross-cutting concerns to reference the merged result.
+
+The [dendritic pattern](/concepts/dendritic-architecture/) organizes these modules by *aspect* (feature) rather than by *host*, with flake-parts providing the evaluation context and namespace conventions.
 
 **Key principle**: Configuration is organized by what it does, not which machine it runs on.
 
 **What it provides:**
 - Aspect-based organization (features, not hosts)
-- Automatic module discovery via import-tree
+- Automatic module discovery via import-tree (adds to evalModules imports list)
 - Cross-cutting configuration spanning NixOS, nix-darwin, and home-manager
-- Aggregate modules for composing related features
+- Aggregate modules for composing related features (deferredModule monoid composition)
 
 See [Dendritic Architecture](/concepts/dendritic-architecture/) for detailed explanation.
 
