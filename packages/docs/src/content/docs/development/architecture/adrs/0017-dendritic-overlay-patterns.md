@@ -25,6 +25,12 @@ The migration from nixos-unified to dendritic flake-parts + clan architecture (N
 - From single `overlays/default.nix` composition to dendritic `compose.nix`
 - From implicit module discovery to explicit `flake.nixpkgsOverlays` list
 
+**Module system foundation**:
+Overlay composition in this architecture uses the module system's list merge semantics.
+Multiple dendritic modules defining the same `flake.nixpkgsOverlays` option automatically merge via list concatenation because the option type is `listOf types.unspecified`.
+This is how the module system handles list-typed options: when multiple modules provide definitions, the merge function concatenates them in order (the join operation in the list semilattice).
+This explains why dendritic's pattern of multiple files exporting to the same namespace works without explicit composition code—the module system's evalModules handles the merging during fixpoint computation.
+
 ## Decision
 
 Adopt five-layer overlay architecture using dendritic flake-parts list concatenation pattern.
@@ -390,6 +396,8 @@ nixpkgs.overlays = [ inputs.self.overlays.default ];
 ### Internal
 
 - [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/) (superseded)
+- [Module System Primitives](/notes/development/modulesystem/primitives/) - Option merging and list concatenation semantics
+- [Terminology Glossary](/notes/development/modulesystem/terminology-glossary/) - Module system terminology guide
 - test-clan validation: `~/projects/nix-workspace/test-clan/`
 - Drupol dendritic reference: `~/projects/nix-workspace/drupol-dendritic-infra/`
 - mirkolenz-nixos reference: `~/projects/nix-workspace/mirkolenz-nixos/`
