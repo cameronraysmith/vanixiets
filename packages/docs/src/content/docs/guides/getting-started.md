@@ -183,7 +183,7 @@ infra/
 │   │   ├── darwin/   # Darwin hosts (stibnite, blackphos, rosegold, argentum)
 │   │   └── nixos/    # NixOS hosts (cinnabar, electrum, galena, scheelite)
 │   ├── nixos/        # NixOS modules (all nixos hosts)
-│   └── nixpkgs/      # Overlay composition (channels, hotfixes, overrides)
+│   └── nixpkgs/      # Overlay composition (channels, stable fallbacks, overrides)
 ├── pkgs/             # Custom packages (pkgs-by-name pattern)
 ├── secrets/          # Encrypted secrets (sops-nix)
 └── vars/             # Clan-generated secrets (Tier 1)
