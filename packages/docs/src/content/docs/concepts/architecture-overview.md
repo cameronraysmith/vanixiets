@@ -51,7 +51,7 @@ Adopts proven resilience patterns from [mirkolenz/nixos](https://github.com/mirk
 
 **Key components:**
 - **Multi-channel inputs**: Stable, unstable, and patched nixpkgs variants
-- **Hotfixes infrastructure**: Platform-specific stable fallbacks
+- **Stable fallbacks infrastructure**: Platform-specific stable fallbacks
 - **Five-layer overlay composition**: Structured package and overlay merging
 
 See [Handling Broken Packages](/guides/handling-broken-packages) for operational details.
@@ -94,7 +94,7 @@ The overlay system provides resilience against nixpkgs breakage through internal
 # Overlay composition order (via lib.composeManyExtensions)
 lib.composeManyExtensions [
   channels       # Multi-channel nixpkgs access (stable, unstable, patched)
-  hotfixes       # Platform-specific stable fallbacks
+  stable-fallbacks       # Platform-specific stable fallbacks
   overrides      # Build modifications
   nvim-treesitter # External overlay: nvim-treesitter from flake input
   nuenv          # External overlay: nushell utilities from flake input
@@ -115,10 +115,10 @@ final: prev: {
 
 All channels available throughout the configuration for selective package sourcing.
 
-### Hotfixes pattern
+### Stable fallbacks pattern
 
 ```nix
-# modules/nixpkgs/overlays/hotfixes.nix
+# modules/nixpkgs/overlays/stable-fallbacks.nix
 final: prev: {
   # Platform-conditional stable fallbacks
   inherit (final.stable) packageName;  # Use stable version
