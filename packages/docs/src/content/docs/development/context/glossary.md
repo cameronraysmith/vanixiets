@@ -37,7 +37,7 @@ Related: flake, follows.
 
 **module system**: Nix's configuration composition system (nixpkgs `lib.evalModules`) with options, types, and validation.
 Core primitives: deferredModule (delays evaluation for fixpoint resolution), evalModules (computes configuration fixpoint), option merging (type-specific merge functions).
-See [Module System Primitives](/notes/development/modulesystem/primitives.md).
+See [Module System Primitives](/concepts/module-system-primitives/).
 Synonym: none.
 Related: options, types, configuration, deferredModule, evalModules.
 

@@ -309,8 +309,8 @@ Result: 8-machine fleet fully operational under clan orchestration.
 - [ADR-0011: SOPS secrets management](0011-sops-secrets-management/)
 - [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
 - [ADR-0020: Dendritic + Clan integration](0020-dendritic-clan-integration/)
-- [Module System Primitives](/notes/development/modulesystem/primitives/) - deferredModule and evalModules foundations
-- [Terminology Glossary](/notes/development/modulesystem/terminology-glossary/) - Module system terminology guide
+- [Module System Primitives](/concepts/module-system-primitives/) - deferredModule and evalModules foundations
+- [Terminology Glossary](/development/context/glossary/) - Module system terminology guide
 
 ### External
 

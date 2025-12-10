@@ -168,7 +168,7 @@ See the full command reference by running `just help` after activating the dev s
 ## Understanding the structure
 
 **Architecture note**: This infrastructure uses [deferred module composition](/concepts/dendritic-architecture/) (the dendritic pattern) built on nixpkgs' module system.
-For deeper understanding of why patterns work, see [Module System Primitives](/notes/development/modulesystem/primitives/).
+For deeper understanding of why patterns work, see [Module System Primitives](/concepts/module-system-primitives/).
 
 This configuration uses the [dendritic flake-parts pattern](/concepts/dendritic-architecture) where every Nix file is a flake-parts module organized by *aspect* (feature) rather than by *host*:
 
