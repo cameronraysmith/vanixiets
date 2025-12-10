@@ -72,9 +72,9 @@ Adopt five-layer overlay architecture using dendritic flake-parts list concatena
 }
 ```
 
-### Layer 2: Platform-Specific Hotfixes
+### Layer 2: Platform-Specific Stable Fallbacks
 
-**Location**: `modules/nixpkgs/overlays/hotfixes.nix`
+**Location**: `modules/nixpkgs/overlays/stable-fallbacks.nix`
 
 **Purpose**: Selectively use stable versions when unstable packages break, avoiding flake.lock rollbacks that affect all packages.
 
@@ -84,7 +84,7 @@ Adopt five-layer overlay architecture using dendritic flake-parts list concatena
 {
   flake.nixpkgsOverlays = [
     (final: prev: {
-      # Cross-platform hotfixes
+      # Cross-platform stable fallbacks
       inherit (final.stable)
         # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.aarch64-darwin
         micromamba  # fmt library compatibility issue
@@ -99,7 +99,7 @@ Adopt five-layer overlay architecture using dendritic flake-parts list concatena
 
 **Key properties**:
 - Uses `final.stable.packageName` for stable fallback
-- Documents each hotfix with hydra link
+- Documents each stable fallback with hydra link
 - Platform conditionals: `isDarwin`, `isLinux`, specific system checks
 - Remove when upstream fixes land in unstable
 
@@ -229,7 +229,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 
 **Clear separation of concerns**:
 - Layer 1 (channels): Multi-channel access
-- Layer 2 (hotfixes): Platform-specific fixes
+- Layer 2 (stable-fallbacks): Platform-specific fixes
 - Layer 3 (pkgs-by-name): Custom packages
 - Layer 4 (overrides): Build modifications
 - Layer 5 (external): Flake input overlays
@@ -247,7 +247,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 
 **Surgical package fixes remain functional**:
 - Layer 1-2 enable stable fallbacks without flake.lock rollback
-- Hydra links document why each hotfix exists
+- Hydra links document why each stable fallback exists
 - Platform-specific conditionals isolate fixes to affected systems
 
 **Custom packages organized predictably**:
@@ -287,7 +287,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 - Same underlying concepts
 
 **Multi-channel resilience preserved**:
-- ADR principles from nixpkgs-hotfixes still apply
+- ADR principles from nixpkgs stable fallbacks still apply
 - Stable fallback mechanism unchanged
 - Platform-specific fixes still functional
 
@@ -306,7 +306,7 @@ modules/nixpkgs/
 ├── compose.nix          # Composes overlays into flake.overlays.default
 └── overlays/
     ├── channels.nix         # Layer 1: Multi-channel access
-    ├── hotfixes.nix         # Layer 2: Platform fixes
+    ├── stable-fallbacks.nix         # Layer 2: Platform fixes
     ├── overrides.nix        # Layer 4: Build modifications
     ├── nuenv.nix            # Layer 5: External overlay (nushell packaging)
     ├── nvim-treesitter.nix  # Layer 5: External overlay (treesitter grammars)
@@ -346,7 +346,7 @@ overlays/
 ├── inputs.nix           # Multi-channel access
 ├── infra/              # Hidden from autowiring
 │   ├── patches.nix
-│   └── hotfixes.nix
+│   └── stable-fallbacks.nix
 ├── packages/           # Custom derivations
 │   ├── starship-jj.nix
 │   └── atuin-format/
@@ -371,7 +371,7 @@ modules/nixpkgs/
 ├── compose.nix          # Dendritic composition
 └── overlays/
     ├── channels.nix     # Multi-channel access
-    ├── hotfixes.nix     # Platform fixes
+    ├── stable-fallbacks.nix     # Platform fixes
     └── overrides.nix    # Build modifications
 
 pkgs/by-name/           # Custom packages
