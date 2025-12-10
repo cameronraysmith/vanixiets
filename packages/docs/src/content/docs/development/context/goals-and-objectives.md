@@ -490,7 +490,7 @@ System Goals
 ### Goals preserved through migration
 
 Successfully maintained:
-- ● G-S08: Multi-channel resilience (nixpkgs hotfixes pattern preserved)
+- ● G-S08: Multi-channel resilience (nixpkgs stable fallbacks pattern preserved)
 - ● G-U05: Surgical package fixes (overlay composition maintained)
 - ● G-U01: Efficient workflows (all functionality preserved)
 - ● G-B01: Reliable infrastructure (stability maintained)
