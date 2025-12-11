@@ -367,10 +367,17 @@ Result: 8-machine fleet fully operational under dendritic architecture.
 
 ### External
 
-- [dendritic pattern](https://github.com/mightyiam/dendritic) by Shahar "Dawn" Or
-- [import-tree](https://github.com/vic/import-tree) by Victor Borja
-- [dendrix documentation](https://vic.github.io/dendrix/Dendritic.html)
-- [flake.parts](https://flake.parts) - Foundation framework
-- [drupol-dendritic-infra](https://github.com/drupol/nixos-config) - Reference implementation
-- [mightyiam-dendritic-infra](https://github.com/mightyiam/nix-config) - Pattern creator's config
-- [gaetanlepage-dendritic-nix-config](https://github.com/GaetanLepage/nix-config) - Reference implementation
+#### Dependencies
+
+- [flake.parts](https://flake.parts) - Modular flake framework enabling deferred module composition
+- [import-tree](https://github.com/vic/import-tree) by Victor Borja - Automatic module discovery
+
+#### Reference documentation
+
+- [dendrix documentation](https://vic.github.io/dendrix/Dendritic.html) - Community ecosystem and documentation
+- [dendritic](https://github.com/mightyiam/dendritic) by Shahar "Dawn" Or - "Awesome" dendritic flake-parts
+
+#### Example projects
+
+- [drupol/infra](https://github.com/drupol/infra) - Aspect-based factorization of dependencies
+- [GaetanLepage/nix-config](https://github.com/GaetanLepage/nix-config) - Dendritic pattern at scale
