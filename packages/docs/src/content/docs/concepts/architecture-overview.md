@@ -9,30 +9,6 @@ This infrastructure combines three complementary architectural patterns to creat
 
 ## Architecture overview
 
-```mermaid
-flowchart TB
-    subgraph L4["Layer 4: Overlay Composition"]
-        OV[Multi-channel Fallbacks]
-    end
-    subgraph L3["Layer 3: Clan Orchestration"]
-        CL[Machine Registry & Deployment]
-    end
-    subgraph L2["Layer 2: Deferred Modules"]
-        DM[Aspect-based Configuration]
-    end
-    subgraph L1["Layer 1: Flake-parts"]
-        FP[Modular Flake Composition]
-    end
-    subgraph L0["Layer 0: Nixpkgs"]
-        NP[lib.evalModules]
-    end
-
-    L4 --> L3
-    L3 --> L2
-    L2 --> L1
-    L1 --> L0
-```
-
 ### Layer 0: Module system foundation (nixpkgs)
 
 Uses nixpkgs' module system primitives for configuration composition.
