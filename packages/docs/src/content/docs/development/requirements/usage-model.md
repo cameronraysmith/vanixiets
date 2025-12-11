@@ -315,7 +315,7 @@ inventory.machines = {
 - Fix removed when upstream resolves issue
 
 **References**:
-- [Context: Goals](../context/goals-and-objectives/) - G-U05: Surgical package fixes, G-S08: Multi-channel resilience
+- [Context: Goals](../context/goals-and-objectives/) - G-U05: Surgical package fixes, G-S08: Stable fallbacks
 - [Handling broken packages](/guides/handling-broken-packages) - Complete implementation guide
 - modules/nixpkgs/overlays/stable-fallbacks.nix - Platform-specific stable fallbacks
 - modules/nixpkgs/overlays/channels.nix - Upstream patch list
@@ -623,7 +623,7 @@ The usage model supports the following quality attributes from [quality requirem
 - [Goals and objectives](../context/goals-and-objectives/) - Strategic goals driving use cases
 
 **Architecture**:
-- [Handling broken packages](/guides/handling-broken-packages) - Multi-channel resilience implementation
+- [Handling broken packages](/guides/handling-broken-packages) - Multi-channel stable fallback implementation
 - ADR-0014: Design principles - Framework independence, type safety
 
 **Migration planning** (internal, not published):
