@@ -12,6 +12,7 @@
         stash-staged = "Save staged changes to stash while keeping them staged";
         github-email = "Get GitHub noreply email address for a user";
         check-github-token-scopes = "Check GitHub personal access token scopes";
+        rerun-pr-checks = "Re-run GitHub Actions workflow checks for a PR";
       };
     }
     {
