@@ -6,7 +6,7 @@ sidebar:
 ---
 
 This tutorial guides you through deploying NixOS servers to cloud providers.
-You'll understand infrastructure provisioning with terranix, deployment orchestration with clan, and how the two tiers of secrets work together on NixOS.
+You'll understand infrastructure provisioning with terranix, deployment orchestration with clan, and how secrets management works on NixOS with clan vars.
 
 ## What you will learn
 
@@ -16,7 +16,7 @@ By the end of this tutorial, you will understand:
 - The multi-cloud strategy for Hetzner and GCP deployments
 - How clan inventory coordinates service assignment across machines
 - The complete deployment flow from infrastructure provisioning to system activation
-- Both tiers of secrets architecture in practice
+- Secrets management with clan vars on NixOS
 
 ## Prerequisites
 
@@ -240,7 +240,7 @@ ls modules/machines/nixos/
 
 These configurations import dendritic modules just like darwin, but include NixOS-specific elements like systemd services and disko disk layouts.
 
-## Step 4: Generate secrets (Tier 1)
+## Step 4: Generate secrets
 
 Before deploying, generate machine-specific secrets.
 
@@ -251,7 +251,7 @@ Clan vars creates:
 - Zerotier identity secrets
 - Any other service-specific credentials
 
-These are Tier 1 secrets, managed automatically by clan.
+These secrets are managed automatically by clan.
 
 ### Generate vars
 
@@ -380,26 +380,26 @@ sudo zerotier-cli listnetworks
 # Look for "CONTROLLER" in the output
 ```
 
-## Step 7: Configure user secrets (Tier 2)
+## Step 7: Configure user secrets (legacy sops-nix)
 
-NixOS machines also support Tier 2 secrets for user-specific credentials.
+NixOS machines can also use legacy sops-nix for user-specific credentials during the migration.
 
-### Understanding the two tiers on NixOS
+### Understanding secrets on NixOS
 
-**Tier 1 (clan vars)** provides system secrets:
+**Clan vars (target)** provides all secrets:
 - Generated automatically
 - Machine-scoped
 - Deployed to `/run/secrets/`
 
-**Tier 2 (sops-nix)** provides user secrets:
+**sops-nix (legacy)** provides user secrets during migration:
 - Created manually
 - User-scoped
 - Deployed to `~/.config/sops-nix/secrets/`
 
-Both tiers work on NixOS.
-Darwin only supports Tier 2.
+Darwin machines use legacy sops-nix patterns.
+NixOS is migrating toward clan vars for all secrets.
 
-### Setting up Tier 2 on NixOS
+### Setting up legacy sops-nix on NixOS
 
 The process mirrors darwin.
 On the NixOS machine:
@@ -418,13 +418,13 @@ chmod 600 ~/.config/sops/age/keys.txt
 
 After setting up the key, your user's sops secrets will decrypt during home-manager activation.
 
-### Verify both tiers
+### Verify secrets
 
 ```bash
-# Tier 1: System secrets
+# Clan vars: System secrets
 ls /run/secrets/
 
-# Tier 2: User secrets (after home-manager activation)
+# Legacy sops-nix: User secrets (after home-manager activation)
 ls ~/.config/sops-nix/secrets/
 ```
 
@@ -502,7 +502,7 @@ Along the way, you learned:
 
 - **Terranix** translates Nix to Terraform for infrastructure provisioning
 - **Clan** orchestrates NixOS deployment with inventory-based service assignment
-- **Two-tier secrets** on NixOS: Tier 1 (clan vars) for system, Tier 2 (sops-nix) for users
+- **Secrets** on NixOS: clan vars for system secrets, legacy sops-nix for user secrets during migration
 - **Multi-cloud** patterns for Hetzner (cost-effective) and GCP (burst/GPU)
 - **Toggle patterns** manage costs by enabling/disabling resources
 
@@ -586,7 +586,7 @@ Common issues:
 - Firewall blocking UDP 9993
 - Controller not authorizing the peer
 
-### Tier 1 secrets not appearing
+### Clan vars secrets not appearing
 
 Ensure vars were generated:
 
