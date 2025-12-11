@@ -62,7 +62,7 @@ See [Clan Integration](/concepts/clan-integration/) for detailed explanation.
 
 ### Layer 4: Overlay composition (multi-channel fallback)
 
-Adopts proven resilience patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos) for handling nixpkgs unstable breakage.
+Adopts proven patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos) for handling nixpkgs unstable breakage with stable fallbacks.
 
 **Key components:**
 - **Multi-channel inputs**: Stable, unstable, and patched nixpkgs variants
@@ -103,7 +103,7 @@ pkgs/
 
 ## Multi-channel overlay architecture
 
-The overlay system provides resilience against nixpkgs breakage through internal and external overlays composed in a single pass:
+The overlay system provides stable fallbacks for nixpkgs breakage through internal and external overlays composed in a single pass:
 
 ```nix
 # Overlay composition order (via lib.composeManyExtensions)
@@ -200,7 +200,7 @@ The combination provides:
 
 - **Scalable organization** - Dendritic pattern handles growing complexity
 - **Multi-machine coordination** - Clan orchestrates heterogeneous fleet
-- **Robust nixpkgs handling** - Overlay patterns provide resilience
+- **Robust nixpkgs handling** - Overlay patterns provide stable fallbacks
 - **Clean separation** - Each layer has clear responsibilities
 
 ## References
@@ -208,7 +208,7 @@ The combination provides:
 - [flake-parts](https://flake.parts) - Modular flake composition
 - [dendritic pattern](https://vic.github.io/dendrix/Dendritic.html) - Module organization
 - [clan](https://clan.lol/) - Multi-machine coordination
-- [mirkolenz/nixos](https://github.com/mirkolenz/nixos) - Multi-channel resilience patterns
+- [mirkolenz/nixos](https://github.com/mirkolenz/nixos) - Multi-channel stable fallback patterns
 
 ## See also
 
