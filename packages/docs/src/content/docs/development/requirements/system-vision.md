@@ -38,7 +38,7 @@ Infra operates within the Nix ecosystem providing declarative, reproducible infr
 - **Declarative secrets**: Clan vars system with automatic generation and deployment
 - **Overlay networking**: Zerotier VPN providing secure communication between all 8 hosts
 - **Cross-platform composition**: Single modules targeting multiple platforms (darwin + nixos + home-manager)
-- **Multi-channel nixpkgs resilience**: Surgical package fixes without system rollback
+- **Multi-channel nixpkgs stable fallbacks**: Surgical package fixes without system rollback
 - **VPS infrastructure**: Always-on NixOS servers (cinnabar, electrum, galena, scheelite)
 - **Development environment**: Automatic activation via direnv + just task runner
 - **CI/CD pipeline**: Automated testing with binary caching
@@ -54,7 +54,7 @@ Infra operates within the Nix ecosystem providing declarative, reproducible infr
 - **Overlay networking**: Zerotier VPN providing secure 8-machine mesh network ✓
 - **Cross-platform composition**: Single modules targeting multiple platforms (darwin + nixos + home-manager) ✓
 - **Systematic service deployment**: Service instances with roles spanning multiple machines ✓
-- **Multi-channel nixpkgs resilience**: Surgical package fixes without system rollback ✓
+- **Multi-channel nixpkgs stable fallbacks**: Surgical package fixes without system rollback ✓
 - **Development environment**: Workflow automation with direnv and just ✓
 - **CI/CD integration**: Automated testing with binary caching ✓
 
@@ -186,7 +186,7 @@ Secrets Flow:
 
 **User benefit**: Reproducible systems, easy rollback, configuration as documentation.
 
-### F-002: Multi-channel package resilience
+### F-002: Multi-channel stable fallbacks
 
 **Description**: Use multiple nixpkgs channels to fix individual packages without system-wide rollback.
 
@@ -372,7 +372,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 ### Current state preservation (ACHIEVED)
 
 - ✓ All existing functionality maintained
-- ✓ Multi-channel resilience preserved (F-002)
+- ✓ Multi-channel stable fallbacks preserved (F-002)
 - ✓ Development environment functional (F-004)
 - ✓ No regressions in daily workflows
 
