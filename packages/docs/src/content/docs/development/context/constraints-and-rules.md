@@ -46,7 +46,7 @@ Constraints are non-negotiable restrictions arising from business context, laws,
 - Private keys must never be committed to repository
 - Reason: Security requirements
 
-**Multi-channel resilience** (current architecture):
+**Multi-channel stable fallbacks** (current architecture):
 - Must maintain ability to use stable channel for individual packages while staying on unstable
 - Cannot require system-wide channel rollback for single package issues
 - Reason: Operational stability without sacrificing access to latest packages
@@ -169,7 +169,7 @@ Rules are conditional standard procedures that guide implementation but can be a
 
 **Dependency management**:
 - Pin all flake inputs with `follows` where appropriate
-- Use multi-channel pattern for package resilience
+- Use multi-channel pattern for stable fallbacks
 - Prefer stable packages when possible, unstable when needed
 - Document reasons for unstable channel usage
 - Condition: Can use unpinned for rapid testing, must pin before commit
