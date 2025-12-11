@@ -525,7 +525,7 @@ Aggregates are defined in `modules/home/_aggregates.nix`.
 
 ## Secrets setup
 
-All users use [Tier 2 (sops-nix)](/concepts/clan-integration#two-tier-secrets-architecture) for personal secrets.
+All users use [sops-nix](/concepts/clan-integration#secrets-management) for personal secrets.
 
 ### Generate age key
 
@@ -680,4 +680,4 @@ Key points:
 
 - [Host Onboarding](/guides/host-onboarding/) - Initial machine setup
 - [Deferred Module Composition](/concepts/deferred-module-composition) - Module organization
-- [Clan Integration](/concepts/clan-integration) - Two-tier secrets architecture
+- [Clan Integration](/concepts/clan-integration) - Secrets management
