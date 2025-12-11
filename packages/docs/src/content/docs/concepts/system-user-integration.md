@@ -1,6 +1,8 @@
 ---
 title: System-user integration
 description: Understanding admin users with integrated home-manager vs non-admin standalone users
+sidebar:
+  order: 7
 ---
 
 This infrastructure supports multiple user patterns optimized for different access levels and use cases.
