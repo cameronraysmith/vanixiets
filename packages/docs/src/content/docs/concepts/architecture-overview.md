@@ -55,7 +55,7 @@ Clan orchestrates deployments across the machine fleet but doesn't replace under
 **What it provides:**
 - Machine registry and deployment targets
 - Inventory system for service orchestration
-- System-level secrets generation (clan vars)
+- Secrets management with encryption (clan vars)
 - Unified deployment tooling
 
 See [Clan Integration](/concepts/clan-integration/) for detailed explanation.
@@ -146,17 +146,12 @@ When nixpkgs unstable breaks, apply surgical fixes (stable fallback for one pack
 
 ## Secrets architecture
 
-Two-tier secrets model:
+Clan vars provides unified secrets management with sops encryption.
+All secrets (SSH keys, zerotier identities, API tokens, passphrases) are managed through clan vars for consistent deployment and access control.
 
-| Tier | System | Purpose | Management |
-|------|--------|---------|------------|
-| **Tier 1** | Clan vars | System-level generated secrets | `clan vars generate` |
-| **Tier 2** | sops-nix | User-level manual secrets | `sops secrets/...` |
+Migration in progress: some secrets still use legacy direct sops-nix patterns during transition to clan vars.
 
-- **Tier 1 examples**: SSH host keys, zerotier identities, LUKS passphrases
-- **Tier 2 examples**: GitHub tokens, API keys, signing keys
-
-See [Clan Integration](/concepts/clan-integration/) for details on two-tier secrets.
+See [Clan Integration](/concepts/clan-integration/) for detailed secrets architecture and migration status.
 
 ## Integration points
 
