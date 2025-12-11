@@ -38,9 +38,9 @@ import { Card, CardGrid } from "@astrojs/starlight/components";
     Deploy to nixos, nix-darwin, or home-manager configurations.
     Consistent architecture across linux and macos systems with platform-specific modules.
   </Card>
-  <Card title="Two-tier secrets management" icon="lock">
-    Clan vars manage system-level generated secrets (SSH keys, zerotier identities).
-    sops-nix can be used directly for user-level manual secrets (API tokens, personal credentials).
+  <Card title="Declarative secrets management" icon="lock">
+    Clan vars manages encrypted secrets (SSH keys, zerotier identities, API tokens).
+    Uses sops encryption internally with automatic generation and deployment.
   </Card>
   <Card title="Composable package overlays" icon="puzzle">
     Multi-layer overlay composition: simultaneously use multiple upstream nixpkgs channels, apply stable fallbacks, and define custom packages and overrides.
