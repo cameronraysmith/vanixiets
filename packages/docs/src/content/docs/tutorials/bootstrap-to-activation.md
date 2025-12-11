@@ -312,7 +312,7 @@ Along the way, you learned:
 Now that your machine is activated, you should:
 
 1. **Set up secrets** if you haven't already.
-   The [Secrets Setup Tutorial](/tutorials/secrets-setup) walks you through the two-tier secrets architecture.
+   The [Secrets Setup Tutorial](/tutorials/secrets-setup) walks you through secrets management with clan vars and legacy sops-nix.
 
 2. **Understand your user configuration** by reading through your user module in `modules/home/users/`.
 
