@@ -79,7 +79,7 @@ Goals issued by stakeholders organized by business, usage, and system categories
 - G-S05: Comprehensive development environment (achieved)
 - G-S06: Clan-core integration (achieved)
 - G-S07: Secrets with clan vars and legacy sops-nix migration (achieved)
-- G-S08: Multi-channel resilience (preserved)
+- G-S08: Stable fallbacks (preserved)
 
 ### [Domain model](/development/context/domain-model/)
 
@@ -161,7 +161,7 @@ This provides the foundation for the requirements layer, which specifies what th
 
 **Architecture**:
 - ADRs: `packages/docs/src/content/docs/development/architecture/adrs/`
-- [Handling broken packages](/guides/handling-broken-packages): Multi-channel resilience guide
+- [Handling broken packages](/guides/handling-broken-packages): Multi-channel stable fallbacks guide
 
 **External**:
 - AMDiRE framework: Research paper on artefact-based requirements engineering
