@@ -33,9 +33,7 @@
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.10",
     "@astrojs/starlight": "^0.37.0",
-    "astro": "^5.15.1",
-    "sharp": "^0.34.2",
-    "starlight-katex": "^0.0.4"
+    "astro": "^5.15.1"
   },
   "devDependencies": {
     "@beoe/rehype-mermaid": "^0.4.2",
@@ -51,6 +49,8 @@
     "semantic-release": "^25.0.1",
     "semantic-release-major-tag": "^0.3.2",
     "semantic-release-monorepo": "^8.0.2",
+    "sharp": "^0.34.5",
+    "starlight-katex": "^0.0.4",
     "starlight-links-validator": "^0.19.0",
     "svgo": "^4.0.0",
     "vitest": "^4.0.3",
