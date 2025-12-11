@@ -324,6 +324,6 @@ Examples:
 
 ## See also
 
-- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization pattern
+- [Deferred Module Composition](/concepts/deferred-module-composition) - Module organization pattern
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination
 - [Architecture overview](/concepts/architecture-overview) - Overall architecture

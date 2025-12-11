@@ -36,7 +36,7 @@ Users in this infrastructure are configured in one of two ways:
 
 ### User module locations
 
-User configurations follow the [dendritic pattern](/concepts/dendritic-architecture):
+User configurations follow the [deferred module composition pattern](/concepts/deferred-module-composition):
 
 ```
 modules/
@@ -679,5 +679,5 @@ Key points:
 ## See also
 
 - [Host Onboarding](/guides/host-onboarding/) - Initial machine setup
-- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization
+- [Deferred Module Composition](/concepts/deferred-module-composition) - Module organization
 - [Clan Integration](/concepts/clan-integration) - Two-tier secrets architecture

@@ -30,12 +30,12 @@ Flake-parts wraps nixpkgs' evalModules for flake outputs, adding flake-specific 
 - flake.modules.* namespace convention (deferredModule type)
 - Clean separation of concerns across system types
 
-### Layer 2: Deferred module composition (dendritic pattern)
+### Layer 2: Deferred module composition (aspect-based pattern)
 
 Uses deferred modules (nixpkgs module system primitive) for configuration composition.
 Every Nix file is a deferred module that delays evaluation until the final configuration is computed, enabling cross-cutting concerns to reference the merged result.
 
-The [dendritic pattern](/concepts/dendritic-architecture/) organizes these modules by *aspect* (feature) rather than by *host*, with flake-parts providing the evaluation context and namespace conventions.
+The [aspect-based deferred module composition pattern](/concepts/deferred-module-composition/) organizes these modules by *aspect* (feature) rather than by *host*, with flake-parts providing the evaluation context and namespace conventions.
 
 **Key principle**: Configuration is organized by what it does, not which machine it runs on.
 
@@ -45,7 +45,7 @@ The [dendritic pattern](/concepts/dendritic-architecture/) organizes these modul
 - Cross-cutting configuration spanning NixOS, nix-darwin, and home-manager
 - Aggregate modules for composing related features (deferredModule monoid composition)
 
-See [Dendritic Architecture](/concepts/dendritic-architecture/) for detailed explanation.
+See [Deferred Module Composition](/concepts/deferred-module-composition/) for detailed explanation.
 
 ### Layer 3: Multi-machine coordination (clan)
 
@@ -217,6 +217,6 @@ The combination provides:
 
 ## See also
 
-- [Dendritic flake-parts Architecture](/concepts/dendritic-architecture/) - Module organization pattern details
+- [Deferred Module Composition](/concepts/deferred-module-composition/) - Module organization pattern details
 - [Clan Integration](/concepts/clan-integration/) - Multi-machine coordination details
 - [Repository Structure](/reference/repository-structure) - Complete directory layout

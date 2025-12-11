@@ -520,7 +520,7 @@ Now that you've deployed NixOS:
 
 4. **Understand the architecture** more deeply:
    - [Clan Integration](/concepts/clan-integration) for the full coordination model
-   - [Dendritic Architecture](/concepts/dendritic-architecture) for module organization
+   - [Deferred Module Composition](/concepts/deferred-module-composition) for module organization
 
 ## Troubleshooting
 

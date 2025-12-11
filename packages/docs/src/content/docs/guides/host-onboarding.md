@@ -20,7 +20,7 @@ NixOS hosts are managed by [clan](/concepts/clan-integration) which handles depl
 ## Architecture references
 
 Before proceeding, understand the configuration patterns:
-- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization (aspect-based, not host-based)
+- [Deferred Module Composition](/concepts/deferred-module-composition) - Module organization (aspect-based, not host-based)
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and two-tier secrets
 
 Configuration files live in `modules/machines/darwin/` and `modules/machines/nixos/`, not `configurations/`.
@@ -614,9 +614,9 @@ sops secrets/users/<username>.sops.yaml
 
 ---
 
-## Dendritic module structure
+## Deferred module structure
 
-Host configurations follow the [dendritic pattern](/concepts/dendritic-architecture):
+Host configurations follow the [deferred module composition pattern](/concepts/deferred-module-composition):
 
 ```
 modules/
@@ -768,7 +768,7 @@ A successful NixOS onboarding:
 
 ## See also
 
-- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization pattern
+- [Deferred Module Composition](/concepts/deferred-module-composition) - Module organization pattern
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination
 - [Getting Started](/guides/getting-started/) - Initial repository setup
 - [User Onboarding](/guides/home-manager-onboarding/) - Standalone home-manager for non-admin users

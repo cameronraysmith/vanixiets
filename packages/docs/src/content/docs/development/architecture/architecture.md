@@ -916,7 +916,7 @@ Future: Unified secrets interface abstracting tier selection, automated secret r
 
 ### Internal documentation
 
-- [Dendritic Architecture concept documentation](/concepts/dendritic-architecture)
+- [Deferred Module Composition concept documentation](/concepts/deferred-module-composition)
 - [Clan Integration concept documentation](/concepts/clan-integration)
 - [Architecture Decision Records](/development/architecture/adrs/)
 - [Handling Broken Packages guide](/guides/handling-broken-packages)

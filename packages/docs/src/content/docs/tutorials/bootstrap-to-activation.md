@@ -56,9 +56,9 @@ This infrastructure combines four complementary technologies:
 3. **Clan-core** coordinates multi-machine deployments with inventory-based service assignment
 4. **Overlays** provide resilience through multi-channel nixpkgs access and stable fallbacks
 
-**Module system foundation**: The dendritic pattern uses deferred modules that delay evaluation until fixpoint computation.
+**Module system foundation**: The deferred module composition pattern uses deferred modules that delay evaluation until fixpoint computation.
 This enables the cross-cutting configuration patterns you'll see below.
-See [Dendritic Architecture](/concepts/dendritic-architecture/) for conceptual explanation.
+See [Deferred Module Composition](/concepts/deferred-module-composition/) for conceptual explanation.
 
 You don't need to understand all of this deeply right now.
 The key insight is that your machine configuration is just one piece of a larger, well-organized system.
@@ -87,7 +87,7 @@ modules/
 Each feature (git configuration, shell setup, development tools) lives in its own module.
 Machines compose these modules to build their complete configuration.
 
-For the full explanation, see [Dendritic Architecture](/concepts/dendritic-architecture).
+For the full explanation, see [Deferred Module Composition](/concepts/deferred-module-composition).
 
 ## Step 1: Clone the repository
 
@@ -321,7 +321,7 @@ Now that your machine is activated, you should:
    - [Host Onboarding Guide](/guides/host-onboarding) for adding new machines
 
 4. **Deepen your understanding** with the concepts documentation:
-   - [Dendritic Architecture](/concepts/dendritic-architecture) for module organization
+   - [Deferred Module Composition](/concepts/deferred-module-composition) for module organization
    - [Clan Integration](/concepts/clan-integration) for multi-machine coordination
 
 ## Troubleshooting

@@ -354,7 +354,7 @@ Result: 8-machine fleet fully operational under dendritic architecture.
 
 ### Internal
 
-- [Dendritic Architecture concept documentation](/concepts/dendritic-architecture)
+- [Deferred Module Composition concept documentation](/concepts/deferred-module-composition)
 - [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 - [ADR-0020: Dendritic + Clan integration](0020-dendritic-clan-integration/)
