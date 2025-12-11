@@ -1,6 +1,8 @@
 ---
 title: Module system primitives
 description: Understanding deferredModule, evalModules, and fixpoint computation - the foundations that enable Nix configuration composition
+sidebar:
+  order: 10
 ---
 
 The Nix module system implements a sophisticated configuration composition mechanism that can be understood through its core algebraic primitives.
