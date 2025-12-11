@@ -563,7 +563,7 @@ UC-007 (Migration)
 **Skills required**:
 - Nix language proficiency
 - Module system and overlay composition
-- Multi-channel nixpkgs resilience patterns
+- Multi-channel nixpkgs stable fallback patterns
 - Cross-platform development (darwin, NixOS)
 - Testing and validation workflows
 

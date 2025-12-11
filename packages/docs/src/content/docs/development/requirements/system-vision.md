@@ -285,7 +285,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 - Multi-host coordination and networking
 - Secrets management
 - Development environment
-- Package management and resilience patterns
+- Package management and stable fallback patterns
 - CI/CD automation
 - VPS infrastructure provisioning
 
