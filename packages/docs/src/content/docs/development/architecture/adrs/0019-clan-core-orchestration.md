@@ -117,20 +117,20 @@ Deployment tooling:
 |------------|------------|---------------------|
 | Cloud infrastructure provisioning | **Terranix/Terraform** | Clan deploys TO infrastructure that terranix creates |
 | User environment configuration | **Home-Manager** | Deployed WITH clan, not BY clan |
-| User-level secrets | **sops-nix** | Tier 2 secrets, parallel to clan vars |
+| User-level secrets | **sops-nix (legacy)** | User secrets during migration to clan vars |
 | NixOS/darwin system configuration | **NixOS modules** | Clan imports and deploys configs, doesn't define them |
 | Nixpkgs overlays and config | **Flake-level** | Outside clan scope entirely |
 
-### Two-tier secrets architecture
+### Secrets management with clan vars
 
-This infrastructure uses a two-tier secrets system that divides responsibilities based on the lifecycle and purpose of secrets.
-Tier 1 handles machine-level secrets that are generated automatically by clan and tied to specific machines - these are the foundational identities like SSH host keys and zerotier network membership tokens that a machine needs to participate in the fleet.
+This infrastructure uses clan vars for all secrets with legacy sops-nix during migration.
+Clan vars handles machine-level secrets that are generated automatically and tied to specific machines - these are the foundational identities like SSH host keys and zerotier network membership tokens that a machine needs to participate in the fleet.
 When you run `clan vars generate`, clan's generator system creates these secrets deterministically based on templates, then encrypts them using age keys and stores them in the `vars/` directory.
 This automation eliminates the manual key management burden for foundational secrets that would be tedious and error-prone to create by hand across 8 machines.
 
-Tier 2 handles user-level secrets that are manually created via sops and represent human-controlled credentials like GitHub personal access tokens, API keys, and signing keys.
+Legacy sops-nix handles user-level secrets that are manually created via sops and represent human-controlled credentials like GitHub personal access tokens, API keys, and signing keys.
 These secrets live in the `secrets/` directory and are managed through the standard sops workflow - you edit `secrets/users/username.sops.yaml` with the sops CLI, which handles encryption using the same age keys.
-The separation between tiers prevents lifecycle conflicts (clan won't regenerate your API keys, and sops won't try to template-generate machine identities) and keeps concerns separated (machine infrastructure versus user identity).
+The separation between clan vars and sops-nix prevents lifecycle conflicts (clan won't regenerate your API keys, and sops won't try to template-generate machine identities) and keeps concerns separated (machine infrastructure versus user identity).
 
 See [ADR-0011](0011-sops-secrets-management/) for sops-nix implementation details.
 
@@ -211,9 +211,9 @@ The operational simplification becomes particularly valuable during incident res
 The generated secrets system eliminates the manual key management burden that plagued the pre-clan architecture.
 When adding a new machine to the fleet, `clan vars generate` creates the SSH host keys, zerotier network identity, and other foundational secrets automatically based on templates defined in the clan configuration.
 This automation prevents the common mistake of forgetting to generate a required secret until deployment fails, and ensures secrets follow a consistent format across all machines.
-The two-tier secrets architecture complements this automation by keeping machine-generated secrets (Tier 1) clearly separated from human-managed credentials (Tier 2).
+The secrets architecture complements this automation by keeping machine-generated secrets clearly separated from human-managed credentials during the migration from legacy sops-nix.
 Clan vars handles the machine identity lifecycle while sops-nix handles user credentials, and this separation prevents lifecycle conflicts - clan won't regenerate your API keys, and sops won't try to auto-generate machine identities.
-Each tier is optimized for its use case, and there's no ambiguity about which system manages which secrets.
+Each system is optimized for its use case, and there's no ambiguity about which system manages which secrets.
 
 Service inventory provides the abstraction layer this fleet needs for multi-machine coordination.
 The zerotier VPN configuration demonstrates the pattern clearly - the inventory declaratively defines "cinnabar is the controller, these 7 machines are peers," and the clan zerotier module consumes that declaration to generate the appropriate configuration for each machine.
@@ -233,13 +233,13 @@ This workaround functions reliably in practice - all darwin machines maintain st
 More problematically, the workaround requires maintenance when clan updates its zerotier abstractions, and contributors working on darwin configurations must understand both the standard clan patterns and the darwin-specific deviations.
 
 The clan abstractions (inventory, vars, generators) impose a learning curve that compounds the flake-parts learning investment required by the dendritic pattern.
-Contributors must understand how the inventory system maps services to machines (`roles.controller.machines."cinnabar"`), how vars generators create secrets from templates, and how the two-tier secrets architecture divides responsibilities between clan vars (machine identities) and sops-nix (user credentials).
+Contributors must understand how the inventory system maps services to machines (`roles.controller.machines."cinnabar"`), how vars generators create secrets from templates, and how the secrets architecture divides responsibilities between clan vars (machine identities) and sops-nix (user credentials during migration).
 While clan documentation has improved substantially during 2024, it remains less comprehensive than NixOS module documentation - many patterns are documented primarily through example configurations rather than thorough conceptual guides.
 This means new contributors face a steeper ramp-up period before they can confidently modify clan configurations or add new machines to the inventory.
 
 Vars encryption ties secret lifecycle to age key management, which introduces operational risk if keys are lost or compromised.
 The vars system encrypts all generated secrets using age keys that are stored in `vars/` and must be carefully backed up.
-These are the same age keys used by sops-nix for user-level secrets, which provides consistency but also means a single key management failure affects both tiers of the secrets architecture.
+These are the same age keys used by sops-nix for user-level secrets, which provides consistency but also means a single key management failure affects both the clan vars and legacy sops-nix systems.
 If age keys are lost, all vars-managed secrets must be regenerated, which for this fleet means recreating SSH host keys (breaking known_hosts), regenerating zerotier network identities (breaking VPN connectivity), and potentially recreating LUKS/ZFS passphrases (preventing disk access).
 The vars system provides no key recovery mechanism - the encryption is designed to be unbreakable, which is exactly what makes key loss catastrophic.
 
