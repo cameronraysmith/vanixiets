@@ -124,10 +124,10 @@ After deployment:
 - Home-manager configurations applied
 - Shell and environment configured
 
-### Step 6: Set up secrets (Tier 2 - sops-nix)
+### Step 6: Set up secrets (legacy sops-nix)
 
-Darwin hosts use Tier 2 (sops-nix) secrets for user-level credentials.
-Tier 1 (clan vars) is not available on darwin.
+Darwin hosts currently use legacy sops-nix for secrets.
+Clan vars is the target for all secrets on all platforms, with darwin support planned.
 
 #### Generate age key
 
@@ -242,7 +242,7 @@ Use this for NixOS servers: cinnabar, electrum, galena, scheelite.
 
 NixOS hosts are managed by [clan](/concepts/clan-integration), which provides:
 - Unified deployment commands
-- Automatic secrets generation (Tier 1)
+- Automatic secrets generation (clan vars)
 - Multi-machine service coordination
 - Zerotier mesh networking
 
@@ -250,7 +250,7 @@ NixOS hosts are managed by [clan](/concepts/clan-integration), which provides:
 
 Before starting, ensure you have:
 - SSH access to deploy machine (or physical access for initial install)
-- Age key at `~/.config/sops/age/keys.txt` for Tier 2 secrets
+- Age key at `~/.config/sops/age/keys.txt` for legacy sops-nix secrets
 - Cloud provider credentials (for new VMs):
   - Hetzner: API token
   - GCP: Service account JSON
@@ -293,7 +293,7 @@ ls modules/machines/nixos/<hostname>.nix
 Machine configurations live in `modules/machines/nixos/`.
 Clan machine registry is in `modules/clan/machines.nix`.
 
-### Step 3: Generate secrets (Tier 1 - clan vars)
+### Step 3: Generate secrets (clan vars)
 
 Clan vars handles system-level secrets automatically:
 
@@ -355,7 +355,7 @@ clan machines install galena --target-host root@34.82.xxx.xxx
 This:
 - Partitions disks (if using disko)
 - Installs NixOS with your configuration
-- Deploys Tier 1 secrets to `/run/secrets/`
+- Deploys clan vars secrets to `/run/secrets/`
 - Configures zerotier automatically
 
 ### Step 5: Update existing machines
@@ -376,9 +376,9 @@ This:
 - Updates secrets if changed
 - Restarts affected services
 
-### Step 6: Set up Tier 2 secrets (sops-nix)
+### Step 6: Set up legacy sops-nix secrets
 
-For user-level secrets (API keys, tokens), configure sops-nix:
+For user-level secrets (API keys, tokens), configure legacy sops-nix:
 
 ```bash
 # Generate age key (if not already done)
@@ -389,7 +389,7 @@ age-keygen -y ~/.config/sops/age/keys.txt
 ```
 
 Add the public key to `.sops.yaml` and create encrypted secrets files.
-See [Tier 2 secrets](#tier-2-sops-nix-user-level) below for details.
+See [Legacy sops-nix secrets](#sops-nix-legacy-user-secrets) below for details.
 
 ### Step 7: Verify zerotier mesh
 
@@ -430,7 +430,7 @@ echo $HOME_MANAGER_GENERATION
 
 Your NixOS host is now:
 - Running clan-managed NixOS configuration
-- Using Tier 1 secrets (clan vars) for system secrets
+- Using clan vars for system secrets
 - Connected to the zerotier mesh network
 
 For updates, run:
@@ -572,7 +572,7 @@ clan vars generate <machine>
 
 **Location on target**: `/run/secrets/`
 
-**Platforms**: NixOS only (not available on darwin)
+**Platforms**: NixOS (darwin support planned)
 
 ### sops-nix (legacy user secrets)
 
@@ -606,7 +606,7 @@ sops secrets/users/<username>.sops.yaml
 
 | Aspect | Darwin | NixOS |
 |--------|--------|-------|
-| Clan vars | Not available | `clan vars generate`, `/run/secrets/` |
+| Clan vars | Available (future) | `clan vars generate`, `/run/secrets/` |
 | sops-nix (legacy) | Age key + home-manager | Age key + home-manager |
 | SSH host keys | Manual or existing | Clan vars generated |
 | Zerotier identity | Homebrew installation generates | Clan vars generated |
@@ -760,7 +760,7 @@ A successful darwin onboarding:
 
 A successful NixOS onboarding:
 - [ ] `clan machines install` completes without errors
-- [ ] Tier 1 secrets at `/run/secrets/`
+- [ ] Clan vars secrets at `/run/secrets/`
 - [ ] Zerotier mesh connected
 - [ ] SSH access via `.zt` hostname
 
