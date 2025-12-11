@@ -1,26 +1,31 @@
 ---
-title: Dendritic architecture
+title: Deferred module composition
 description: Understanding deferred module composition where every Nix file is a module organized by aspect
 sidebar:
   order: 5
 ---
 
-This infrastructure uses **deferred module composition** (the dendritic pattern), where every Nix file is a deferred module evaluated via flake-parts, and configuration is organized by *aspect* (feature) rather than by *host*.
+This infrastructure uses **deferred module composition** (a popular approach referred to as the dendritic flake-parts pattern), where every Nix file is a deferred module evaluated via flake-parts, and configuration is organized by *aspect* (feature) rather than by *host*.
 The pattern leverages the Nix module system's fixpoint semantics to enable compositional configuration across platforms.
 
 ## Credits and attribution
 
 The dendritic flake-parts pattern was created and documented by Shahar "Dawn" Or (@mightyiam), establishing a configuration approach where every Nix file is a flake-parts module organized by feature rather than host.
 
-### Foundational projects
+### Dependencies
 
-- **[flake-parts](https://flake.parts)** by Robert Hensing (@roberth) and Hercules CI - The modular flake framework that enables the dendritic pattern
+- **[flake-parts](https://flake.parts)** by Robert Hensing (@roberth) and Hercules CI (@hercules-ci) - The modular flake framework that enables defining and integrating deferred modules to configure multiple systems
+- **[import-tree](https://github.com/vic/import-tree)** by Victor Borja (@vic) - Automatic module discovery mechanism from a given directory subtree
 
-- **[dendritic](https://github.com/mightyiam/dendritic)** by Shahar "Dawn" Or - Pattern definition, documentation, and reference implementation
+### Example projects
 
-- **[import-tree](https://github.com/vic/import-tree)** by Victor Borja (@vic) - Automatic module discovery mechanism that makes dendritic practical at scale
+- **[drupol/infra](https://github.com/drupol/infra)** by Pol Dellaiera (@drupol) - Uses flake-parts based deferred modules and illustrates the "aspect"-based factorization of dependencies.
+- **[GaetanLepage/nix-config](https://github.com/GaetanLepage/nix-config)** by Gaétan Lepage (@GaetanLepage) - Uses flake-parts based deferred modules and illustrates configuration of a host posessing a GPU.
 
-- **[dendrix](https://vic.github.io/dendrix/Dendritic.html)** by Victor Borja - Community ecosystem, comprehensive documentation, and dendritic module distribution
+### Reference documentation
+
+- **[dendrix](https://vic.github.io/dendrix/Dendritic.html)** by Victor Borja (@vic) - Community ecosystem, documentation, and dendritic module "distribution"
+- **[dendritic](https://github.com/mightyiam/dendritic)** by Shahar "Dawn" Or (@mightyiam) - "Awesome" dendritic flake-parts
 
 ## Core principle
 
