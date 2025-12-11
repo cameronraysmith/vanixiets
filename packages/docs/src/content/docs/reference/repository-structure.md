@@ -226,7 +226,7 @@ Note: ccstatusline was previously a custom package but is now sourced from the l
 
 ## Secrets structure
 
-### Tier 1: Clan vars (system-level)
+### Clan vars (system secrets)
 
 ```
 vars/
@@ -240,7 +240,7 @@ vars/
 
 Generated via `clan vars generate`, encrypted with machine age keys.
 
-### Tier 2: sops-nix (user-level)
+### sops-nix (legacy user secrets)
 
 ```
 secrets/
