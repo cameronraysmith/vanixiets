@@ -7,17 +7,20 @@ This infrastructure configuration builds on work from the Nix community.
 
 ## Primary frameworks
 
-### Dendritic flake-parts pattern
+### Flake-parts
 
-The dendritic pattern provides aspect-based module organization where every Nix file is a flake-parts module.
+- **[flake-parts](https://flake.parts)** by Robert Hensing (@roberth) and Hercules CI (@hercules-ci) - The modular flake framework that enables defining and integrating deferred modules to configure multiple systems
 
-- **[dendritic](https://github.com/mightyiam/dendritic)** by Shahar "Dawn" Or (@mightyiam) - Pattern definition and reference implementation
-- **[dendrix](https://vic.github.io/dendrix/Dendritic.html)** by Victor Borja (@vic) - Community ecosystem and comprehensive documentation
-- **[import-tree](https://github.com/vic/import-tree)** by Victor Borja (@vic) - Automatic module discovery mechanism
+### Import-tree
 
-### Flake-parts ecosystem
+- **[import-tree](https://github.com/vic/import-tree)** by Victor Borja (@vic) - Automatic module discovery mechanism from a given directory subtree
 
-- **[hercules-ci/flake-parts](https://flake.parts)** by Robert Hensing and Hercules CI - Modular flake composition framework
+### Dendritic pattern documentation
+
+The "dendritic" pattern is a community convention for aspect-based module organization using flake-parts and import-tree.
+
+- **[dendrix](https://vic.github.io/dendrix/Dendritic.html)** by Victor Borja (@vic) - Community ecosystem, documentation, and dendritic module "distribution"
+- **[dendritic](https://github.com/mightyiam/dendritic)** by Shahar "Dawn" Or (@mightyiam) - "Awesome" dendritic flake-parts
 
 ### Clan
 
@@ -31,11 +34,10 @@ The dendritic pattern provides aspect-based module organization where every Nix 
 
 These implementations informed the architectural patterns:
 
-### Dendritic pattern references
+### Dendritic pattern examples
 
-- **[drupol/infra](https://github.com/drupol/infra)** by Pol Dellaiera (@drupol) - Comprehensive dendritic implementation
-- **[mightyiam/infra](https://github.com/mightyiam/infra)** by Shahar "Dawn" Or - Original dendritic reference
-- **[gaetanlepage/nix-config](https://github.com/gaetanlepage/nix-config)** by Gaétan Lepage - Dendritic pattern at scale
+- **[drupol/infra](https://github.com/drupol/infra)** by Pol Dellaiera (@drupol) - Uses flake-parts based deferred modules and illustrates the "aspect"-based factorization of dependencies
+- **[GaetanLepage/nix-config](https://github.com/GaetanLepage/nix-config)** by Gaétan Lepage (@GaetanLepage) - Uses flake-parts based deferred modules and illustrates configuration of a host possessing a GPU
 
 ### Clan references
 
