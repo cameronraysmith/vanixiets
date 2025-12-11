@@ -153,7 +153,8 @@ Related: flake-parts, autowiring, specialArgs, dendritic flake-parts pattern.
 Synonym: none (clan-core is the repository name, not an alternative term).
 Related: inventory, vars, zerotier, clan vars, service instance.
 
-**clan vars**: Two-tier secrets system in clan with centralized generators creating machine-specific outputs.
+**clan vars**: Secrets system in clan with centralized generators creating machine-specific outputs.
+Target for all secrets with ongoing migration from legacy sops-nix.
 Synonym: vars system.
 Related: clan, vars generator, secrets, sops.
 
