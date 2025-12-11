@@ -115,9 +115,9 @@ Add the user to the machine configuration:
 }
 ```
 
-### Step 3: Create user secrets (Tier 2)
+### Step 3: Create user secrets (legacy sops-nix)
 
-User secrets are managed via sops-nix.
+User secrets are managed via legacy sops-nix.
 
 Create the secrets file:
 
@@ -287,7 +287,7 @@ Use clan inventory user instances when:
 - Deploying users to NixOS machines via clan
 - You need declarative system user creation with encrypted password management
 - Managing users across multiple machines with shared credentials
-- Integrating with clan's vars-based secrets infrastructure (Tier 1)
+- Integrating with clan's vars-based secrets infrastructure (clan vars)
 
 This pattern is NixOS-specific.
 For darwin machines, continue using the integrated user setup described above.
@@ -351,7 +351,7 @@ The `roles.default.settings` block controls system user creation:
 
 **`share = true`**: Share password across machines (optional)
 - When `true`, all machines with this user instance use the same encrypted password
-- Password stored in clan vars (Tier 1 secrets)
+- Password stored in clan vars
 - When `false`, each machine has unique password
 
 **`prompt = false`**: Password generation method (optional)
