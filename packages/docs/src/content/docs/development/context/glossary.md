@@ -149,6 +149,12 @@ Related: flake-parts, autowiring, specialArgs, dendritic flake-parts pattern.
 
 ## Target architecture terms
 
+**aspect**: Cross-cutting concern or feature spanning multiple configuration classes (NixOS, nix-darwin, home-manager).
+Terminology from [Aspect-Oriented Programming (AOP)](https://en.wikipedia.org/wiki/Aspect-oriented_programming) where aspects are program functionalities cutting across multiple modules.
+In deferred module composition: the organizational dimension where each file configures one capability across all relevant platforms.
+Synonym: feature, cross-cutting concern.
+See [Understanding "aspect"](/concepts/deferred-module-composition/#understanding-aspect).
+
 **clan**: Framework for multi-host NixOS/nix-darwin management providing coordination, inventory system, vars, and service instances. Repository name: clan-core.
 Synonym: none (clan-core is the repository name, not an alternative term).
 Related: inventory, vars, zerotier, clan vars, service instance.
