@@ -1,9 +1,9 @@
 ---
 title: vanixiets
-description: Multi-machine nix infrastructure using dendritic flake-parts and clan
+description: Multi-machine nix infrastructure using aspect-based deferred module composition and clan
 template: splash
 hero:
-  tagline: "Multi-machine nix infrastructure for nixos, nix-darwin, and home-manager using dendritic flake-parts module architecture and clan fleet coordination."
+  tagline: "Multi-machine nix infrastructure for nixos, nix-darwin, and home-manager using aspect-based deferred module composition and clan fleet coordination."
   image:
     file: ../../assets/nix-snowflake-colours.svg
   actions:
@@ -22,8 +22,8 @@ import { Card, CardGrid } from "@astrojs/starlight/components";
 ## Features
 
 <CardGrid stagger>
-  <Card title="Dendritic module organization" icon="puzzle">
-    Every nix file is a flake-parts module organized by feature category rather than by host.
+  <Card title="Aspect-based module organization" icon="puzzle">
+    Every nix file is a deferred flake-parts module organized by feature category rather than by host.
     Cross-cutting configuration via unified modules spans nixos, nix-darwin, and home-manager.
   </Card>
   <Card title="Clan deployment" icon="rocket">
@@ -75,10 +75,10 @@ See [Getting started guide](/guides/getting-started/) for complete setup instruc
 
 Multi-layer architecture combining complementary patterns:
 
-1. **flake-parts** - Modular flake composition framework
-2. **dendritic pattern** - Aspect-based module organization with import-tree auto-discovery
+1. **flake-parts** - Modular flake composition framework enabling deferred module integration
+2. **Aspect-based organization** - Feature-oriented module structure with import-tree auto-discovery
 3. **clan** - Multi-machine coordination and deployment
-4. **simultaneously use multi multiple nixpkgs channels** - Per-package nixpkgs channel selection for resilience
+4. **Multi-channel nixpkgs** - Per-package nixpkgs channel selection for resilience
 
 Learn more in [Architecture overview](/concepts/architecture-overview/).
 
@@ -93,12 +93,12 @@ Learn more in [Architecture overview](/concepts/architecture-overview/).
 
 <CardGrid>
   <Card title="Understand the architecture" icon="open-book">
-    Dendritic flake-parts + clan architecture for multi-machine deployments.
+    Deferred module composition + clan architecture for multi-machine deployments.
     [Architecture overview →](/concepts/architecture-overview/)
   </Card>
-  <Card title="See the dendritic flake-parts pattern in action" icon="puzzle">
-    Feature-based flake-parts module organization.
-    [Dendritic flake-parts architecture →](/concepts/dendritic-architecture/)
+  <Card title="See aspect-based module composition" icon="puzzle">
+    Feature-based deferred module organization using flake-parts.
+    [Dendritic architecture →](/concepts/dendritic-architecture/)
   </Card>
   <Card title="Understand clan integration" icon="rocket">
     Multi-machine coordination, deployment, and service orchestration.
