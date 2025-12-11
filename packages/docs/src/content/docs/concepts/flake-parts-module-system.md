@@ -1,6 +1,8 @@
 ---
 title: Flake-parts and the module system
 description: How flake-parts wraps nixpkgs evalModules to provide flake composition, perSystem evaluation, and namespace conventions
+sidebar:
+  order: 11
 ---
 
 Flake-parts provides ergonomic access to the Nix module system for creating flakes.
