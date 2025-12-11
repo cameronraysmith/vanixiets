@@ -27,6 +27,25 @@ This deferred module composition pattern correpsonds to a configuration approach
 - **[dendrix](https://vic.github.io/dendrix/Dendritic.html)** by Victor Borja (@vic) - Community ecosystem, documentation, and dendritic module "distribution"
 - **[dendritic](https://github.com/mightyiam/dendritic)** by Shahar "Dawn" Or (@mightyiam) - "Awesome" dendritic flake-parts
 
+## Understanding "aspect"
+
+The term "aspect" in this context refers to a cross-cutting concern or feature that spans multiple configuration classes (NixOS, nix-darwin, home-manager).
+This terminology draws from [Aspect-Oriented Programming (AOP)](https://en.wikipedia.org/wiki/Aspect-oriented_programming), where "aspects" are program functionalities that cut across multiple modules without clean encapsulation in any single component.
+We use "aspect" rather than simply "feature" to emphasize this cross-cutting nature: an aspect isn't confined to a single host or platform, it's a concern that applies broadly across your infrastructure.
+
+In the dendritic pattern, an aspect is a unified capability defined once and applied across relevant platforms.
+Rather than defining SSH configuration separately for each host, the "SSH aspect" configures SSH across NixOS (server setup), nix-darwin (builtin ssh client), and home-manager (client config) from a single location.
+This aspect-oriented organization eliminates duplication and makes features composable.
+
+**Key characteristics of an aspect:**
+
+- Defined once in a dedicated module (e.g., `modules/home/shell/zsh.nix` for the zsh aspect)
+- Spans multiple configuration classes where relevant (may configure NixOS, darwin, and home-manager from the same file)
+- Automatically available to all hosts that import it (no per-host duplication)
+- Can have platform-specific implementations while maintaining unified intent (e.g., a scrolling-desktop aspect using niri on Linux, different tooling on macOS)
+
+This aspect-based organization is the key difference from traditional host-centric configuration, where all settings for a host live together regardless of their purpose.
+
 ## Core principle
 
 Every Nix file in the repository is a deferred module exported via the flake-parts framework.
