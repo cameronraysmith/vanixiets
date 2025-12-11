@@ -10,7 +10,7 @@ The pattern leverages the Nix module system's fixpoint semantics to enable compo
 
 ## Credits and attribution
 
-This deferred module composition pattern was created and documented by Shahar "Dawn" Or (@mightyiam), establishing a configuration approach where every Nix file is a flake-parts module organized by feature rather than host.
+This deferred module composition pattern correpsonds to a configuration approach where every Nix file is a flake-parts module organized by feature rather than host.
 
 ### Dependencies
 
