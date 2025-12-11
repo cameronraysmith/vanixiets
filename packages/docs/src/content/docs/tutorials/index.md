@@ -35,6 +35,21 @@ Tutorials build the understanding that makes guides useful.
 
 If you're new to this infrastructure, follow this sequence:
 
+```mermaid
+flowchart TB
+    bootstrap["Bootstrap to Activation"]
+    secrets["Secrets Setup"]
+    darwin["Darwin Deployment"]
+    nixos["NixOS Deployment"]
+
+    bootstrap --> secrets
+    secrets --> darwin
+    secrets --> nixos
+
+    darwin --> next["Guides & Concepts"]
+    nixos --> next
+```
+
 ### 1. Bootstrap to Activation
 
 **[Bootstrap to Activation](/tutorials/bootstrap-to-activation)** — Start here.
