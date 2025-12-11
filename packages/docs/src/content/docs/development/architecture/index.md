@@ -29,4 +29,4 @@ Secrets management uses clan vars for all secrets with legacy sops-nix during mi
 
 ## Reference Documentation
 
-- [Handling Broken Packages](/guides/handling-broken-packages) - Operational guide for multi-channel nixpkgs resilience
+- [Handling Broken Packages](/guides/handling-broken-packages) - Operational guide for multi-channel nixpkgs stable fallbacks
