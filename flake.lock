@@ -106,15 +106,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1765378202,
-        "narHash": "sha256-7mQrr5vU2zDfzNlt1fjwP3Az6h2pZi4fjQt4nlwg1fg=",
-        "rev": "c5099003a9c473414f085d8b58237888fe7c3070",
+        "lastModified": 1765426137,
+        "narHash": "sha256-7z47H1awsQLa+tahtiRa9rB4pEBEhrQAEAIQyogvoZY=",
+        "rev": "8d6a7114fa253ce172dd2c05623656b02e27f4bf",
         "type": "tarball",
-        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/c5099003a9c473414f085d8b58237888fe7c3070.tar.gz"
+        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/8d6a7114fa253ce172dd2c05623656b02e27f4bf.tar.gz"
       },
       "original": {
         "type": "tarball",
-        "url": "https://git.clan.lol/clan/clan-core/archive/fix-install-secret-upload-path.tar.gz"
+        "url": "https://git.clan.lol/clan/clan-core/archive/main.tar.gz"
       }
     },
     "darwin": {
