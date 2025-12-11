@@ -6,3 +6,13 @@
 .katex-html svg {
   height: inherit;
 }
+
+/* Mermaid diagram dark mode support via @beoe/rehype-mermaid */
+/* darkScheme: "class" outputs .beoe-light and .beoe-dark variants */
+html[data-theme="light"] .beoe-dark {
+  display: none;
+}
+
+html[data-theme="dark"] .beoe-light {
+  display: none;
+}
