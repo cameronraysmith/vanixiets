@@ -707,6 +707,6 @@ The mathematics isn't just theoretical—it's the reason NixOS configurations co
 
 ## Further reading
 
-- [nix.dev module system tutorial](https://nix.dev/tutorials/module-system/module-system.html)
+- [nix.dev module system tutorial](https://nix.dev/tutorials/module-system/index.html)
 - [nixpkgs lib/modules.nix source](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/modules.nix)
 - [nixpkgs lib/types.nix source](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/types.nix)
