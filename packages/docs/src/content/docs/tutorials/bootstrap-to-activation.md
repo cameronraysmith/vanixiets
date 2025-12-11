@@ -54,7 +54,7 @@ This infrastructure combines four complementary technologies:
 1. **Flake-parts** provides the foundation, organizing everything as composable modules
 2. **Dendritic pattern** organizes modules by aspect (what they do) rather than by host (where they run)
 3. **Clan-core** coordinates multi-machine deployments with inventory-based service assignment
-4. **Overlays** provide resilience through multi-channel nixpkgs access and stable fallbacks
+4. **Overlays** provide stable fallbacks through multi-channel nixpkgs access
 
 **Module system foundation**: The deferred module composition pattern uses deferred modules that delay evaluation until fixpoint computation.
 This enables the cross-cutting configuration patterns you'll see below.
