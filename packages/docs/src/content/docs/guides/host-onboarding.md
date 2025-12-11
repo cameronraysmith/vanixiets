@@ -11,8 +11,8 @@ The workflow differs significantly between darwin (macOS) and NixOS platforms.
 
 | Platform | Hosts | Deployment command | Secrets |
 |----------|-------|-------------------|---------|
-| Darwin (nix-darwin) | stibnite, blackphos, rosegold, argentum | `darwin-rebuild switch` | Tier 2 only (sops-nix) |
-| NixOS (clan-managed) | cinnabar, electrum, galena, scheelite | `clan machines update` | Tier 1 + Tier 2 |
+| Darwin (nix-darwin) | stibnite, blackphos, rosegold, argentum | `darwin-rebuild switch` | Legacy sops-nix |
+| NixOS (clan-managed) | cinnabar, electrum, galena, scheelite | `clan machines update` | Clan vars + legacy sops-nix |
 
 Darwin hosts use nix-darwin with standalone builds.
 NixOS hosts are managed by [clan](/concepts/clan-integration) which handles deployment, secrets generation, and multi-machine coordination.
@@ -21,7 +21,7 @@ NixOS hosts are managed by [clan](/concepts/clan-integration) which handles depl
 
 Before proceeding, understand the configuration patterns:
 - [Deferred Module Composition](/concepts/deferred-module-composition) - Module organization (aspect-based, not host-based)
-- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and two-tier secrets
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and secrets management
 
 Configuration files live in `modules/machines/darwin/` and `modules/machines/nixos/`, not `configurations/`.
 
@@ -548,12 +548,12 @@ After the SSH daemon restarts with the new key, SSH connections will work normal
 
 ---
 
-## Two-tier secrets architecture
+## Secrets management
 
-This infrastructure uses a two-tier secrets model.
-See [Clan Integration](/concepts/clan-integration#two-tier-secrets-architecture) for the complete explanation.
+This infrastructure uses clan vars for all secrets with legacy sops-nix during migration.
+See [Clan Integration](/concepts/clan-integration#secrets-management) for the complete explanation.
 
-### Tier 1: Clan vars (system-level)
+### Clan vars (system secrets)
 
 **Purpose**: Machine-specific, auto-generated secrets
 
@@ -574,7 +574,7 @@ clan vars generate <machine>
 
 **Platforms**: NixOS only (not available on darwin)
 
-### Tier 2: sops-nix (user-level)
+### sops-nix (legacy user secrets)
 
 **Purpose**: User-specific, manually-created secrets
 
@@ -606,11 +606,11 @@ sops secrets/users/<username>.sops.yaml
 
 | Aspect | Darwin | NixOS |
 |--------|--------|-------|
-| Tier 1 (clan vars) | Not available | `clan vars generate`, `/run/secrets/` |
-| Tier 2 (sops-nix) | Age key + home-manager | Age key + home-manager |
+| Clan vars | Not available | `clan vars generate`, `/run/secrets/` |
+| sops-nix (legacy) | Age key + home-manager | Age key + home-manager |
 | SSH host keys | Manual or existing | Clan vars generated |
 | Zerotier identity | Homebrew installation generates | Clan vars generated |
-| User API keys | sops-nix | sops-nix |
+| User API keys | sops-nix (legacy) | sops-nix (legacy) |
 
 ---
 
