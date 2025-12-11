@@ -38,6 +38,7 @@
     "starlight-katex": "^0.0.4"
   },
   "devDependencies": {
+    "@beoe/rehype-mermaid": "^0.4.2",
     "@biomejs/biome": "^2.3.0",
     "@playwright/test": "^1.57.0",
     "@semantic-release/changelog": "^6.0.3",
@@ -46,6 +47,7 @@
     "@types/node": "^24.9.1",
     "@vitest/coverage-v8": "^4.0.3",
     "conventional-changelog-conventionalcommits": "^9.1.0",
+    "playwright": "^1.57.0",
     "semantic-release": "^25.0.1",
     "semantic-release-major-tag": "^0.3.2",
     "semantic-release-monorepo": "^8.0.2",
