@@ -98,7 +98,7 @@ inventory.instances.zerotier = {
 };
 ```
 
-Vars and generators (Tier 1 secrets):
+Vars and generators (clan vars):
 - SSH host keys
 - Zerotier network identities
 - LUKS/ZFS encryption passphrases
