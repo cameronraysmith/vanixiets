@@ -123,7 +123,7 @@ Maintainability directly impacts long-term viability and aligns with G-S03: Redu
 ### Current state
 
 **Achieved**:
-- Multi-channel resilience enables surgical fixes (preserves maintainability)
+- Multi-channel stable fallbacks enable surgical fixes (preserves maintainability)
 - ADRs document architectural decisions with rationale
 - Clear separation: overlays vs modules vs hosts
 - Atomic commits per file reduce review complexity
@@ -514,5 +514,5 @@ fd -e yaml sops/ -x file {} | rg "ASCII text"
 
 **Architecture**:
 - [ADR-0014: Design principles](../../architecture/adrs/0014-design-principles/) - Framework independence, type safety, template duality, bias toward removal
-- [Handling broken packages](/guides/handling-broken-packages) - Multi-channel resilience implementation
+- [Handling broken packages](/guides/handling-broken-packages) - Multi-channel stable fallback implementation
 - [CI philosophy](../../traceability/ci-philosophy/) - Continuous integration approach
