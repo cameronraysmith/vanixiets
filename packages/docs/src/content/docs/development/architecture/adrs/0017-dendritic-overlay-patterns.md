@@ -292,7 +292,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 - Different composition mechanism (dendritic vs flocken)
 - Same underlying concepts
 
-**Multi-channel resilience preserved**:
+**Multi-channel stable fallbacks preserved**:
 - ADR principles from nixpkgs stable fallbacks still apply
 - Stable fallback mechanism unchanged
 - Platform-specific fixes still functional
