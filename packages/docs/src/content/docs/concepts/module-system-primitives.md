@@ -11,7 +11,7 @@ The algebraic foundations are not merely theoretical—they are the reason NixOS
 
 ## deferredModule
 
-**Source reference**: `nixpkgs/lib/types.nix:1138-1180`
+**Source reference**: [nixpkgs lib/types.nix:1138-1180](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/types.nix#L1138-L1180)
 
 ### Intuitive explanation
 
@@ -91,7 +91,7 @@ The category-theoretic insight: deferred modules transform the module system fro
 
 ## evalModules
 
-**Source reference**: `nixpkgs/lib/modules.nix:84-367`
+**Source reference**: [nixpkgs lib/modules.nix:84-367](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/modules.nix#L84-L367)
 
 ### Intuitive explanation
 
@@ -202,8 +202,8 @@ The equation `config = F(config)` is precisely the trace operation that connects
 ## Option merging primitives
 
 **Source references**:
-- `nixpkgs/lib/modules.nix:1469-1509` (mkIf, mkMerge, mkOverride)
-- `nixpkgs/lib/modules.nix:1155-1257` (mergeDefinitions)
+- [nixpkgs lib/modules.nix:1469-1509](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/modules.nix#L1469-L1509) (mkIf, mkMerge, mkOverride)
+- [nixpkgs lib/modules.nix:1155-1257](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/modules.nix#L1155-L1257) (mergeDefinitions)
 
 ### Intuitive explanation
 
@@ -363,7 +363,7 @@ The join-semilattice structure is the key to modular reasoning: you can understa
 
 ## Type system and constraints
 
-**Source reference**: `nixpkgs/lib/types.nix` (entire file, especially type definitions)
+**Source reference**: [nixpkgs lib/types.nix](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/types.nix) (entire file, especially type definitions)
 
 ### Intuitive explanation
 
@@ -708,5 +708,5 @@ The mathematics isn't just theoretical—it's the reason NixOS configurations co
 ## Further reading
 
 - [nix.dev module system tutorial](https://nix.dev/tutorials/module-system/module-system.html)
-- [nixpkgs lib/modules.nix source](https://github.com/NixOS/nixpkgs/blob/master/lib/modules.nix)
-- [nixpkgs lib/types.nix source](https://github.com/NixOS/nixpkgs/blob/master/lib/types.nix)
+- [nixpkgs lib/modules.nix source](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/modules.nix)
+- [nixpkgs lib/types.nix source](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/types.nix)
