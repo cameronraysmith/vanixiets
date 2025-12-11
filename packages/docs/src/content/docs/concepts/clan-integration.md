@@ -55,14 +55,15 @@ inventory.instances.zerotier = {
 This pattern coordinates multi-machine services.
 Cinnabar runs as zerotier controller; other machines join as peers.
 
-### Vars and generators (Tier 1 secrets)
+### Vars and generators
 
-Clan generates and manages system-level secrets via the vars system:
+Clan generates and manages secrets via the vars system using sops encryption under the hood:
 
 - SSH host keys
 - Zerotier network identities
 - LUKS/ZFS encryption passphrases
 - Service-specific credentials
+- User secrets (migration in progress)
 
 Generated via `clan vars generate`, stored encrypted in `vars/` directory.
 
@@ -97,7 +98,7 @@ Each service instance can have multiple roles (controller, peer, default, etc.) 
 |------------|------------|---------------------|
 | Cloud infrastructure provisioning | **Terranix/Terraform** | Clan deploys TO infrastructure that terranix creates |
 | User environment configuration | **Home-Manager** | Deployed WITH clan, not BY clan |
-| User-level secrets | **sops-nix** | Tier 2 secrets, parallel to clan vars |
+| User-level secrets (legacy) | **sops-nix** | Some secrets still in direct sops-nix pending migration to clan vars |
 | NixOS/darwin system configuration | **NixOS modules** | Clan imports and deploys configs, doesn't define them |
 | Nixpkgs overlays and config | **Flake-level** | Outside clan scope entirely |
 
@@ -142,9 +143,9 @@ Home-manager configuration is defined OUTSIDE clan, in dendritic modules.
 When you run `clan machines update`, home-manager activates as part of system activation.
 Clan doesn't know about home-manager specifically.
 
-### User secrets (sops-nix)
+### User secrets (legacy sops-nix)
 
-User-level secrets are managed by sops-nix, not clan vars.
+Some user-level secrets are still managed via direct sops-nix configuration pending migration to clan vars.
 
 ```nix
 # modules/home/core/git.nix
@@ -153,50 +154,52 @@ sops.secrets."users/crs58/github-signing-key" = {
 };
 ```
 
-This is Tier 2 secrets, separate from clan vars (Tier 1).
+These will migrate to clan vars as part of the ongoing secrets consolidation.
 
-## Two-tier secrets architecture
+## Secrets management
 
-The infrastructure uses a two-tier secrets model:
+Clan vars is the target secrets management system for all secrets (system and user).
+Clan vars uses sops encryption internally and provides unified secret generation, distribution, and management.
 
-### Tier 1: Clan vars (system-level)
+### Current state
+
+The infrastructure is in migration from legacy direct sops-nix to clan vars:
+
+**Clan vars (target for all secrets)**
 
 - **Generated** by clan vars system
-- **Machine-specific** secrets
-- **Examples**: SSH host keys, zerotier identities, LUKS passphrases
+- **Machine-specific and user-specific** secrets
+- **Examples**: SSH host keys, zerotier identities, LUKS passphrases, user credentials
 - **Managed via**: `clan vars generate`
-- **Storage**: `vars/` directory, encrypted
+- **Storage**: `vars/` directory, encrypted with sops
 
 ```nix
 # Vars are generated automatically
 # machines/nixos/cinnabar/vars/zerotier/...
+# machines/darwin/stibnite/vars/user-secrets/...
 ```
 
-### Tier 2: sops-nix (user-level)
+**Legacy sops-nix (pending migration)**
 
 - **Manually created** via sops CLI
-- **User-specific** secrets
-- **Examples**: GitHub tokens, API keys, signing keys, personal credentials
+- **User-specific** secrets not yet migrated
+- **Examples**: Some GitHub tokens, API keys, signing keys, personal credentials
 - **Managed via**: `sops secrets/users/username.sops.yaml`
 - **Storage**: `secrets/` directory, encrypted with age
 
 ```nix
-# Secrets manually created and encrypted
+# Secrets manually created and encrypted (legacy)
 sops.secrets."users/crs58/github-token" = {
   sopsFile = ./secrets/users/crs58.sops.yaml;
 };
 ```
 
-### Why two tiers?
+### Migration strategy
 
-**Clan vars** excel at generated, machine-specific secrets.
-The vars generator creates SSH keys, zerotier IDs, and other secrets that machines need automatically.
-
-**sops-nix** excels at user-specific, manually-entered secrets.
-API tokens, personal credentials, and signing keys must be created by humans, not generated.
-
-The tiers are complementary, not competing.
-Clan vars for system infrastructure, sops-nix for user credentials.
+Clan vars handles both generated secrets (SSH keys, service credentials) and manually-created secrets (API tokens, personal credentials).
+The distinction is not about secret type but about creation method.
+As secrets are rotated or new machines are added, they migrate to clan vars.
+Legacy sops-nix configuration remains for backward compatibility during transition.
 
 ## Integration patterns
 
@@ -225,15 +228,16 @@ Home-manager modules defined in dendritic structure, deployed via clan.
 ### Clan + sops-nix
 
 ```
-Tier 1 (Clan vars)              Tier 2 (sops-nix)
-─────────────────               ─────────────────
-SSH host keys                   GitHub tokens
-Zerotier identities             API keys
-LUKS passphrases                Personal credentials
+Clan vars (target)              Legacy sops-nix (migration)
+──────────────────              ───────────────────────────
+SSH host keys                   Some GitHub tokens
+Zerotier identities             Some API keys
+LUKS passphrases                Some personal credentials
+User credentials (new)          (being migrated to clan vars)
 ```
 
-Both tiers coexist.
-Machine uses clan vars for infrastructure secrets, sops-nix for user secrets.
+Both systems coexist during migration.
+New secrets use clan vars; legacy secrets remain in sops-nix until rotated.
 
 ## Machine fleet
 
@@ -264,11 +268,11 @@ Clan installs NixOS and deploys configurations to those resources.
 Home-manager configurations are defined outside clan in dendritic modules.
 Clan's `machines update` deploys the full machine config including home-manager.
 
-### "Clan secrets replace sops-nix"
+### "Clan vars can't handle user secrets"
 
-**Reality**: Clan vars are system-level generated secrets.
-sops-nix handles user-level manually-created secrets.
-They're complementary: Tier 1 (clan vars) + Tier 2 (sops-nix).
+**Reality**: Clan vars is the target for all secrets (system and user).
+The current mix of clan vars and sops-nix reflects migration state, not architectural limitation.
+Clan vars uses sops encryption internally and can manage both generated and manually-created secrets.
 
 ### "Clan provides NixOS services"
 
