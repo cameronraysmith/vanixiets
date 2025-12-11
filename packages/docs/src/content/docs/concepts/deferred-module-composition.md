@@ -10,7 +10,7 @@ The pattern leverages the Nix module system's fixpoint semantics to enable compo
 
 ## Credits and attribution
 
-The dendritic flake-parts pattern was created and documented by Shahar "Dawn" Or (@mightyiam), establishing a configuration approach where every Nix file is a flake-parts module organized by feature rather than host.
+This deferred module composition pattern was created and documented by Shahar "Dawn" Or (@mightyiam), establishing a configuration approach where every Nix file is a flake-parts module organized by feature rather than host.
 
 ### Dependencies
 
@@ -52,20 +52,20 @@ Flake-parts wraps `evalModules` for flake outputs, providing:
 - The `perSystem` abstraction for per-architecture evaluation
 - Integration with flake schema (packages, apps, devShells, etc.)
 
-**Layer 2: Dendritic organization**
+**Layer 2: Aspect-based organization**
 
-The dendritic pattern adds organizational conventions to flake-parts:
+This deferred module composition pattern adds organizational conventions to flake-parts:
 - Auto-discovery via import-tree (automatically populate evalModules imports list from directory tree)
 - Directory-based namespace merging (multiple files → single aggregate via deferredModule composition)
 - Aspect-oriented structure (organize by feature, not by host)
 
-The key insight: dendritic is an organizational pattern for deferred modules, not a fundamentally different abstraction.
+The key insight: this is an organizational pattern for deferred modules, not a fundamentally different abstraction.
 The composition works because the module system provides deferredModule as a compositional primitive that forms a monoid under concatenation.
 
 For detailed explanation of module system primitives, see [Module System Primitives](/concepts/module-system-primitives/).
 For how flake-parts uses these primitives, see [Flake-parts as Module System Abstraction](/concepts/flake-parts-module-system/).
 
-### Traditional vs dendritic organization
+### Traditional vs aspect-based organization
 
 **Traditional (host-based)**:
 ```
@@ -77,7 +77,7 @@ configurations/
 
 Problems: Duplication across hosts, hard to share features, changes require editing multiple files.
 
-**Dendritic (aspect-based)**:
+**Aspect-based**:
 ```
 modules/
 ├── darwin/
@@ -100,7 +100,7 @@ Machine-specific configs contain only truly unique settings.
 
 The module system's deferredModule type enables namespace merging: multiple files can export to the same namespace, and the module system automatically composes them via its merge semantics.
 
-### Dendritic module pattern with namespace merging
+### Deferred module pattern with namespace merging
 
 Every file exports to a namespace under `flake.modules.*`, and files within the same directory automatically merge into a shared namespace:
 
@@ -276,7 +276,7 @@ nixos-unified used directory-based "autowiring" where file paths mapped to flake
 - Host-centric organization
 - Required specific directory names
 
-Dendritic uses deferred module composition with aspect-based organization:
+This deferred module composition pattern uses aspect-based organization:
 - Any file can export deferred modules to any namespace (flake-parts convention)
 - Feature-centric organization enabled by module system's compositional semantics
 - Directory names are semantic, not required (import-tree discovers based on file existence)
@@ -285,24 +285,24 @@ Dendritic uses deferred module composition with aspect-based organization:
 ### vs pure flake-parts
 
 Pure flake-parts requires manual imports in `flake.nix` to populate the module system's imports list.
-Dendritic adds import-tree for automatic discovery of modules, making it practical for large configurations.
+This deferred module composition pattern adds import-tree for automatic discovery of modules, making it practical for large configurations.
 
 Both use the same underlying module system primitives (deferredModule type, evalModules fixpoint).
-Dendritic adds organizational conventions (directory-based namespace merging, auto-discovery) on top of flake-parts' module system integration.
+This pattern adds organizational conventions (directory-based namespace merging, auto-discovery) on top of flake-parts' module system integration.
 
 ### vs monolithic configurations
 
 Monolithic approaches put all configuration in a few large files.
-Dendritic enables fine-grained modules that can be composed, reused, and tested independently.
+This deferred module composition pattern enables fine-grained modules that can be composed, reused, and tested independently.
 
 ## Integration with clan
 
-Clan coordinates multi-machine deployments while dendritic organizes the modules being deployed.
+Clan coordinates multi-machine deployments while this deferred module composition pattern organizes the modules being deployed.
 The integration works because both use the same module system foundation: clan calls nixosSystem or darwinSystem (which call evalModules), importing deferred modules from `flake.modules.*` namespaces.
 
-Dendritic exports deferred modules → clan imports them → evalModules resolves fixpoint with clan's arguments (system, config, pkgs, etc.).
+This pattern exports deferred modules → clan imports them → evalModules resolves fixpoint with clan's arguments (system, config, pkgs, etc.).
 
-See [Clan Integration](/concepts/clan-integration/) for how clan orchestrates deployments of dendritic-organized configurations.
+See [Clan Integration](/concepts/clan-integration/) for how clan orchestrates deployments of configurations organized with this pattern.
 
 ## Practical examples
 
@@ -403,7 +403,7 @@ The host is now:
 
 ## Module system foundations
 
-Understanding the algebraic primitives that enable the dendritic pattern:
+Understanding the algebraic primitives that enable this deferred module composition pattern:
 
 - [Module System Primitives](/concepts/module-system-primitives/) - Detailed deferredModule and evalModules explanation with three-tier (intuitive/computational/formal) treatment
 - [Flake-parts as Module System Abstraction](/concepts/flake-parts-module-system/) - What flake-parts adds to the module system (perSystem, namespace conventions, class-based organization)
