@@ -16,6 +16,12 @@ const mermaidConfig = {
   strategy: "file" as const,
   fsPath: "public/beoe",
   webPath: "/beoe",
+  mermaidConfig: {
+    theme: "base",
+    themeVariables: {
+      fontSize: "14px",
+    },
+  },
 };
 
 // https://astro.build/config
