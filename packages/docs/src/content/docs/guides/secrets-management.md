@@ -12,7 +12,7 @@ Clan vars is the target for all secrets, with legacy sops-nix secrets pending mi
 
 The infrastructure is migrating to clan vars for all secrets management.
 Currently some secrets remain in legacy sops-nix format pending migration.
-See [Clan Integration](/concepts/clan-integration#secrets-implementation) for the complete architectural explanation.
+See [Clan Integration](/concepts/clan-integration#secrets-management) for the complete architectural explanation.
 
 For a learning-oriented walkthrough of setting up secrets from scratch, see the [Secrets Setup Tutorial](/tutorials/secrets-setup/).
 
