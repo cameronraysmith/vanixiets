@@ -61,8 +61,8 @@ The infrastructure includes four darwin machines and four NixOS machines:
 | Aspect | Darwin | NixOS |
 |--------|--------|-------|
 | Deployment | `darwin-rebuild switch` | `clan machines update` |
-| Secrets Tier 1 | Not available | clan vars |
-| Secrets Tier 2 | sops-nix | sops-nix |
+| Secrets (clan vars) | Available (future) | clan vars |
+| Secrets (legacy sops-nix) | sops-nix | sops-nix |
 | Zerotier | Homebrew cask | Nix package |
 | Service management | launchd | systemd |
 | Disk management | macOS manages | disko via clan |
@@ -331,7 +331,8 @@ ping 10.144.x.y   # Or use the IP directly
 
 ## Step 6: Configure secrets for darwin
 
-Darwin machines use Tier 2 secrets (sops-nix) since Tier 1 (clan vars) requires NixOS.
+Darwin machines currently use legacy sops-nix for secrets.
+Clan vars is the target for all secrets on all platforms, with darwin support planned.
 
 ### Ensure your age key exists
 
@@ -419,7 +420,7 @@ Along the way, you learned:
 - **nix-darwin** provides declarative macOS configuration alongside (not replacing) macOS
 - **Homebrew integration** handles what Nix can't (system extensions, notarized installers)
 - **Zerotier mesh** connects darwin machines to the broader infrastructure
-- **Tier 2 secrets** work identically on darwin and NixOS via sops-nix
+- **Legacy sops-nix secrets** work identically on darwin and NixOS via sops-nix
 - **Generations** provide rollback safety for darwin configurations
 
 ## Next steps
