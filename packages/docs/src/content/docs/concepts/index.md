@@ -6,12 +6,17 @@ sidebar:
 
 Conceptual documentation to help you understand the architecture and design patterns used in this infrastructure.
 
-## Architecture
+## Overview
 
-- [Architecture overview](/concepts/architecture-overview/) - Four-layer architecture combining flake-parts, dendritic pattern, clan, and multi-channel overlays
-- [Dendritic Architecture](/concepts/dendritic-architecture/) - Aspect-based module organization where every file is a flake-parts module
-- [Clan Integration](/concepts/clan-integration/) - Multi-machine coordination, deployment, and service orchestration
+- [Architecture overview](/concepts/architecture-overview/) - Understanding the architecture combining dendritic flake-parts, clan, and multi-channel overlay composition
 
-## Patterns
+## Module system foundations
 
-- [System-user Integration](/concepts/system-user-integration/) - Admin users with integrated home-manager vs standalone users
+- [Module system primitives](/concepts/module-system-primitives/) - Understanding deferredModule, evalModules, and fixpoint computation - the foundations that enable Nix configuration composition
+- [Flake-parts and the module system](/concepts/flake-parts-module-system/) - How flake-parts wraps nixpkgs evalModules to provide flake composition, perSystem evaluation, and namespace conventions
+
+## Configuration patterns
+
+- [Dendritic architecture](/concepts/dendritic-architecture/) - Understanding deferred module composition where every Nix file is a module organized by aspect
+- [Clan Integration](/concepts/clan-integration/) - Multi-machine coordination with clan and clear boundaries with other tools
+- [System-user integration](/concepts/system-user-integration/) - Understanding admin users with integrated home-manager vs non-admin standalone users
