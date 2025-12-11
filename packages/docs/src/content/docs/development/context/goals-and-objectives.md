@@ -125,7 +125,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-B02 (sustainable maintenance)
 
-**Status**: Achieved (two-tier secrets: sops-nix for home-manager + clan vars for system, November 2024)
+**Status**: Achieved (clan vars for secrets with legacy sops-nix for home-manager during migration, November 2024)
 
 ### G-U04: Cross-platform module composition
 
@@ -345,7 +345,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-U03 (declarative secrets)
 
-**Status**: Achieved (two-tier architecture: clan vars for system secrets, sops-nix preserved for home-manager, November 2024)
+**Status**: Achieved (clan vars for secrets with legacy sops-nix preserved for home-manager during migration, November 2024)
 
 ### G-S08: Multi-channel nixpkgs resilience preservation
 
@@ -445,11 +445,11 @@ System Goals
 
 **Conflict (resolved)**: G-U03 (declarative secrets) vs. manual sops-nix
 
-**Resolution (completed November 2024)**: Two-tier architecture implemented
-- ● sops-nix preserved for home-manager secrets (user-level)
-- ● clan vars deployed for system secrets (declarative generation)
-- ● Hybrid approach operational across 8-machine fleet
-- ● Both systems coexist successfully
+**Resolution (completed November 2024)**: Migration architecture implemented
+- ● sops-nix preserved for home-manager secrets (legacy user-level)
+- ● clan vars deployed for secrets (declarative generation, target for all)
+- ● Migration approach operational across 8-machine fleet
+- ● Both systems coexist successfully during migration
 
 **Conflict (resolved)**: G-U02 (multi-host coordination) vs. per-host management
 
@@ -468,11 +468,11 @@ System Goals
 - ● G-S04: Dendritic flake-parts pattern adoption (November 2024)
 - ● G-S05: Comprehensive development environment (ADR-0009)
 - ● G-S06: Clan-core integration (inventory, vars, services, November 2024)
-- ● G-S07: Clan vars system adoption (two-tier with sops-nix, November 2024)
+- ● G-S07: Clan vars system adoption (with legacy sops-nix migration, November 2024)
 - ● G-S08: Multi-channel resilience (multi-channel overlay pattern)
 - ● G-U01: Efficient development workflows (preserved through migration)
 - ● G-U02: Multi-host coordination (8-machine fleet, November 2024)
-- ● G-U03: Declarative secrets management (two-tier architecture, November 2024)
+- ● G-U03: Declarative secrets management (clan vars with legacy sops-nix migration, November 2024)
 - ● G-U04: Cross-platform module composition (dendritic pattern, November 2024)
 - ● G-U05: Surgical package fixes (via G-S08)
 - ● G-U06: Secure overlay networking (zerotier mesh, November 2024)
@@ -501,9 +501,9 @@ Enabled through dendritic + clan architecture:
 - ● G-S03: Maximum type safety (dendritic maximizes module system)
 - ● G-S04: Dendritic pattern adoption (all configurations migrated)
 - ● G-S06: Clan-core integration (inventory, vars, services operational)
-- ● G-S07: Clan vars system (two-tier architecture with sops-nix)
+- ● G-S07: Clan vars system (with legacy sops-nix migration)
 - ● G-U02: Multi-host coordination (8-machine fleet operational)
-- ● G-U03: Declarative secrets (two-tier: clan vars + sops-nix)
+- ● G-U03: Declarative secrets (clan vars with legacy sops-nix migration)
 - ● G-U04: Cross-platform composition (dendritic cross-cutting modules)
 - ● G-U06: Overlay networking (zerotier mesh: cinnabar + 7 peers)
 
