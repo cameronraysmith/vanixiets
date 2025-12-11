@@ -340,9 +340,9 @@ Ongoing updates:
 
 ### Secret distribution workflow
 
-Managing secrets across two-tier architecture separating system and user secrets.
+Managing secrets with clan vars (target) and legacy sops-nix (migration).
 
-Tier 1 - System secrets (clan vars):
+Clan vars (system secrets):
 
 1. Define secret generators in clan vars configuration
 2. Run clan vars generate to create/update secrets
@@ -351,7 +351,7 @@ Tier 1 - System secrets (clan vars):
 5. Clan deployment decrypts and installs secrets on target machine
 6. Services access secrets through standard nixos/darwin secret paths
 
-Tier 2 - User secrets (sops-nix):
+sops-nix (legacy user secrets):
 
 1. Create secrets/users/\<username\>.sops.yaml file
 2. Edit with sops secrets/users/\<username\>.sops.yaml
@@ -360,9 +360,9 @@ Tier 2 - User secrets (sops-nix):
 5. Reference secrets in home-manager modules via sops.secrets
 6. Deployment decrypts secrets to home directory
 
-Age key reuse:
+Age key management:
 
-Both tiers use same age key infrastructure.
+Both systems use age key infrastructure.
 Machine keys derived from SSH host keys.
 User keys stored in standard age location.
 
@@ -908,9 +908,9 @@ Future: Auto-generated module documentation from namespace exports, dependency g
 
 ### Secrets management evolution
 
-Two-tier architecture functional but could integrate more tightly.
+Migration from legacy sops-nix to clan vars ongoing.
 
-Future: Unified secrets interface abstracting tier selection, automated secret rotation, secrets validation in CI, emergency access patterns for disaster recovery.
+Future: Complete clan vars migration, automated secret rotation, secrets validation in CI, emergency access patterns for disaster recovery.
 
 ## References
 
