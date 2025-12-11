@@ -65,7 +65,7 @@ Goals issued by stakeholders organized by business, usage, and system categories
 **Usage goals**:
 - G-U01: Efficient development workflows
 - G-U02: Multi-host coordination (achieved via clan)
-- G-U03: Declarative secrets management (achieved via two-tier)
+- G-U03: Declarative secrets management (achieved with clan vars, migrating from legacy sops-nix)
 - G-U04: Cross-platform module composition (achieved via dendritic)
 - G-U05: Surgical package fixes (preserved via multi-channel)
 - G-U06: Secure overlay networking (achieved via zerotier)
@@ -78,7 +78,7 @@ Goals issued by stakeholders organized by business, usage, and system categories
 - G-S04: Dendritic flake-parts pattern (adopted)
 - G-S05: Comprehensive development environment (achieved)
 - G-S06: Clan-core integration (achieved)
-- G-S07: Two-tier secrets (clan vars + sops-nix) (achieved)
+- G-S07: Secrets with clan vars and legacy sops-nix migration (achieved)
 - G-S08: Multi-channel resilience (preserved)
 
 ### [Domain model](/development/context/domain-model/)
