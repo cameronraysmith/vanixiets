@@ -111,7 +111,7 @@ Application values use `config.flake.*` namespace.
 - **Import pattern**: Modules imported via import-tree auto-discovery, composed through module system.
 - **specialArgs usage**: Minimal - only framework values (inputs, self). Application values via `config.flake.*`.
 
-### Multi-channel resilience pattern
+### Multi-channel stable fallback pattern
 
 - **Problem**: Single channel can have broken packages.
 - **Solution**: Multiple nixpkgs inputs with overlay-based selection.
@@ -474,7 +474,7 @@ See `glossary.md` for comprehensive term definitions.
 - terranix: <https://terranix.org/>
 - disko: <https://github.com/nix-community/disko>
 - srvos: <https://github.com/nix-community/srvos>
-- Multi-channel resilience: [Handling broken packages](/guides/handling-broken-packages)
+- Multi-channel stable fallbacks: [Handling broken packages](/guides/handling-broken-packages)
 
 ### Nix ecosystem
 
