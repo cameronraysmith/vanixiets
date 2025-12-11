@@ -352,7 +352,7 @@ Production migration:
 - 8 machines registered via pattern
 - All machines use namespace export → clan import
 - Home-manager aggregates shared across all users
-- Secrets working across both tiers
+- Secrets working with clan vars and legacy sops-nix
 
 ### GCP infrastructure (December 2024)
 
