@@ -165,8 +165,8 @@ Related: zerotier, peer, overlay network.
 Foundation: nixpkgs module system (deferredModule type, evalModules fixpoint).
 Implementation: flake-parts evaluation + import-tree auto-discovery.
 Convention: directory-based namespace merging via flake.modules.*.
-See [Dendritic Architecture](/concepts/dendritic-architecture/).
-Synonym: dendritic pattern, every-file-is-module.
+See [Deferred Module Composition](/concepts/deferred-module-composition/).
+Synonym: dendritic pattern, deferred module composition, aspect-based pattern, every-file-is-module.
 Related: flake-parts, import-tree, flake.modules, deferredModule, evalModules.
 
 **disko**: Tool for declarative disk partitioning and formatting.

@@ -436,7 +436,7 @@ Now that your darwin machine is deployed:
    - [Secrets Management Guide](/guides/secrets-management) for secret rotation and sharing
 
 4. **Understand the architecture** more deeply:
-   - [Dendritic Architecture](/concepts/dendritic-architecture) for module organization
+   - [Deferred Module Composition](/concepts/deferred-module-composition) for module organization
    - [System-user Integration](/concepts/system-user-integration) for user configuration approaches
 
 ## Troubleshooting

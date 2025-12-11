@@ -167,10 +167,10 @@ See the full command reference by running `just help` after activating the dev s
 
 ## Understanding the structure
 
-**Architecture note**: This infrastructure uses [deferred module composition](/concepts/dendritic-architecture/) (the dendritic pattern) built on nixpkgs' module system.
+**Architecture note**: This infrastructure uses [deferred module composition](/concepts/deferred-module-composition/) (the aspect-based pattern) built on nixpkgs' module system.
 For deeper understanding of why patterns work, see [Module System Primitives](/concepts/module-system-primitives/).
 
-This configuration uses the [dendritic flake-parts pattern](/concepts/dendritic-architecture) where every Nix file is a flake-parts module organized by *aspect* (feature) rather than by *host*:
+This configuration uses the [deferred module composition pattern](/concepts/deferred-module-composition) where every Nix file is a flake-parts module organized by *aspect* (feature) rather than by *host*:
 
 ```
 infra/
@@ -203,7 +203,7 @@ See [Repository Structure](/reference/repository-structure) for complete directo
 
 ### Learn the architecture
 
-- [Dendritic Architecture](/concepts/dendritic-architecture) - Core pattern where every file is a flake-parts module
+- [Deferred Module Composition](/concepts/deferred-module-composition) - Core pattern where every file is a flake-parts module
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and two-tier secrets
 - [System-user Integration](/concepts/system-user-integration) - Admin vs non-admin users
 

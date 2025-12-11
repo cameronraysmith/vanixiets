@@ -147,7 +147,7 @@ The [Guides](/guides/) section provides task-oriented procedures:
 ### Deepen your understanding
 
 The [Concepts](/concepts/) section explains the architecture:
-- [Dendritic flake-parts Architecture](/concepts/dendritic-architecture) — Module organization pattern
+- [Deferred Module Composition](/concepts/deferred-module-composition) — Module organization pattern
 - [Clan Machine Management](/concepts/clan-integration) — Multi-machine coordination
 - [System-user Integration](/concepts/system-user-integration) — User configuration approaches
 

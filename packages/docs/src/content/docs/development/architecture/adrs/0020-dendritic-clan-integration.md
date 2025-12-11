@@ -366,7 +366,7 @@ GCP nodes validated pattern at scale:
 
 ### Internal
 
-- [Dendritic Architecture concept documentation](/concepts/dendritic-architecture)
+- [Deferred Module Composition concept documentation](/concepts/deferred-module-composition)
 - [Clan Integration concept documentation](/concepts/clan-integration)
 - [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)

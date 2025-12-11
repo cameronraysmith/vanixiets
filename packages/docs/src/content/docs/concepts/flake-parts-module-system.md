@@ -189,11 +189,11 @@ Key additions in dendritic architectures:
 - **Namespace sharding** - Organizes modules by concern (configurations, modules, packages, systems)
 - **Hierarchical composition** - Modules at each level contribute to merged outputs
 
-These are organizational patterns specific to dendritic architectures, not features of flake-parts itself.
-The dendritic pattern fundamentally relies on deferred modules (a module system primitive), uses flake-parts for ergonomic flake integration, and adds its own conventions for module discovery and composition.
+These are organizational patterns specific to aspect-based deferred module composition architectures, not features of flake-parts itself.
+The deferred module composition pattern fundamentally relies on deferred modules (a module system primitive), uses flake-parts for ergonomic flake integration, and adds its own conventions for module discovery and composition.
 
 For details on the underlying module system primitives, see [Module system primitives](/concepts/module-system-primitives/).
-For details on dendritic architecture patterns, see [Dendritic architecture](/concepts/dendritic-architecture/).
+For details on the deferred module composition pattern, see [Deferred module composition](/concepts/deferred-module-composition/).
 
 ## External references
 
