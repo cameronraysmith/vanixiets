@@ -1,6 +1,8 @@
 ---
 title: Architecture overview
 description: Understanding the architecture combining dendritic flake-parts, clan, and multi-channel overlay composition
+sidebar:
+  order: 2
 ---
 
 This infrastructure combines three complementary architectural patterns to create a maintainable, multi-machine configuration that works across macOS and NixOS systems.

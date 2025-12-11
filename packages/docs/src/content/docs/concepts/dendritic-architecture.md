@@ -1,6 +1,8 @@
 ---
 title: Dendritic architecture
 description: Understanding deferred module composition where every Nix file is a module organized by aspect
+sidebar:
+  order: 5
 ---
 
 This infrastructure uses **deferred module composition** (the dendritic pattern), where every Nix file is a deferred module evaluated via flake-parts, and configuration is organized by *aspect* (feature) rather than by *host*.

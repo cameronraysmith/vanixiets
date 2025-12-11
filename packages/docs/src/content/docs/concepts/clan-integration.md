@@ -1,6 +1,8 @@
 ---
 title: Clan Integration
 description: Multi-machine coordination with clan and clear boundaries with other tools
+sidebar:
+  order: 6
 ---
 
 [Clan](https://clan.lol/) is our multi-machine coordination and deployment framework.
