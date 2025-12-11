@@ -129,7 +129,7 @@ Cloud infrastructure and NixOS server deployment.
 - Infrastructure provisioning with terranix
 - Clan-based deployment orchestration
 - Multi-cloud patterns (Hetzner, GCP)
-- Both tiers of secrets on NixOS
+- Clan vars and legacy sops-nix on NixOS
 
 **Prerequisites:** Completed Bootstrap and Secrets tutorials, cloud provider access
 
