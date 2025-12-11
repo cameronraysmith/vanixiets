@@ -316,7 +316,7 @@ Related: design principles, ADR-0014.
 **requirements layer**: AMDiRE layer specifying requirements from black-box perspective (system vision, usage model, quality requirements).
 Related: AMDiRE, context layer.
 
-**stable fallback**: Multi-channel resilience pattern using stable channel version when unstable broken.
+**stable fallback**: Multi-channel pattern using stable channel version when unstable broken.
 Related: multi-channel fallback, nixpkgs.
 
 **template duality**: Design principle where repository serves as both working deployment and forkable template.
