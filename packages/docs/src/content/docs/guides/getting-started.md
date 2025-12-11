@@ -204,7 +204,7 @@ See [Repository Structure](/reference/repository-structure) for complete directo
 ### Learn the architecture
 
 - [Deferred Module Composition](/concepts/deferred-module-composition) - Core pattern where every file is a flake-parts module
-- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and two-tier secrets
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and secrets management
 - [System-user Integration](/concepts/system-user-integration) - Admin vs non-admin users
 
 ### Set up a new machine
@@ -222,7 +222,7 @@ See [Repository Structure](/reference/repository-structure) for complete directo
 For in-depth learning-oriented walkthroughs, see:
 
 - [Bootstrap to Activation](/tutorials/bootstrap-to-activation/) - Step-by-step initial setup and activation
-- [Secrets Setup](/tutorials/secrets-setup/) - Two-tier secrets architecture configuration
+- [Secrets Setup](/tutorials/secrets-setup/) - Secrets management with clan vars and legacy sops-nix
 - [Darwin Deployment](/tutorials/darwin-deployment/) - Complete macOS deployment workflow
 - [NixOS Deployment](/tutorials/nixos-deployment/) - Cloud server provisioning and deployment
 
