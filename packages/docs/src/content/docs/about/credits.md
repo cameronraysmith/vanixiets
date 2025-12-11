@@ -26,7 +26,7 @@ The "dendritic" pattern is a community convention for aspect-based module organi
 
 - **[clan](https://clan.lol/)** - Multi-machine coordination and deployment framework
 
-### Multi-channel resilience
+### Stable fallbacks
 
 - **[mirkolenz/nixos](https://github.com/mirkolenz/nixos)** by Mirko Lenz - Multi-channel nixpkgs patterns and overlay composition strategies
 
