@@ -347,7 +347,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Status**: Achieved (clan vars for secrets with legacy sops-nix preserved for home-manager during migration, November 2024)
 
-### G-S08: Multi-channel nixpkgs resilience preservation
+### G-S08: Stable fallback preservation
 
 **Description**: Maintain ability to use multiple nixpkgs channels for package-specific fixes.
 
@@ -428,7 +428,7 @@ System Goals
 ├── G-S07: Clan vars system
 │   ├── Supports: G-U03
 │   └── Dependencies: G-S06
-└── G-S08: Multi-channel resilience
+└── G-S08: Stable fallbacks
     ├── Supports: G-U05, G-B01
     └── Dependencies: None (achieved)
 ```
@@ -469,7 +469,7 @@ System Goals
 - ● G-S05: Comprehensive development environment (ADR-0009)
 - ● G-S06: Clan-core integration (inventory, vars, services, November 2024)
 - ● G-S07: Clan vars system adoption (with legacy sops-nix migration, November 2024)
-- ● G-S08: Multi-channel resilience (multi-channel overlay pattern)
+- ● G-S08: Stable fallbacks (multi-channel overlay pattern)
 - ● G-U01: Efficient development workflows (preserved through migration)
 - ● G-U02: Multi-host coordination (8-machine fleet, November 2024)
 - ● G-U03: Declarative secrets management (clan vars with legacy sops-nix migration, November 2024)
@@ -490,7 +490,7 @@ System Goals
 ### Goals preserved through migration
 
 Successfully maintained:
-- ● G-S08: Multi-channel resilience (nixpkgs stable fallbacks pattern preserved)
+- ● G-S08: Stable fallbacks (nixpkgs stable fallbacks pattern preserved)
 - ● G-U05: Surgical package fixes (overlay composition maintained)
 - ● G-U01: Efficient workflows (all functionality preserved)
 - ● G-B01: Reliable infrastructure (stability maintained)
@@ -520,7 +520,7 @@ All hosts migrated successfully:
 
 - ADR-0009: Nix development environment
 - ADR-0014: Design principles
-- [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns): Multi-channel resilience pattern
+- [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns): Multi-channel stable fallback pattern
 - [Handling broken packages](/guides/handling-broken-packages): Operational guide
 - Migration plan: Phased dendritic + clan adoption
 - dendritic pattern: Type safety through module system maximization
