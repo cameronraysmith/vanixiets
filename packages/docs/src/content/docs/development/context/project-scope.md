@@ -16,7 +16,7 @@ Migration from flake-parts + nixos-unified architecture to dendritic flake-parts
 Current infrastructure achieves maximum type safety through "every file is a flake-parts module" organizational pattern, eliminating specialArgs anti-pattern.
 Systematic multi-host management operational through clan's inventory system, service instances, and overlay networking (zerotier).
 Declarative secrets management deployed through clan vars system with automatic generation and deployment.
-Multi-channel nixpkgs resilience patterns preserved (surgical fixes without system-wide rollback).
+Multi-channel nixpkgs stable fallback patterns preserved (surgical fixes without system-wide rollback).
 All original functionality maintained while gaining enhanced modularity, type safety, and multi-host coordination capabilities.
 
 ## Current state architecture
@@ -66,7 +66,7 @@ NixOS VPS hosts (x86_64-linux):
 
 **Key capabilities**:
 - Platform support: macOS (nix-darwin), NixOS, standalone home-manager
-- Multi-channel resilience: surgical package fixes without holding back entire channel
+- Multi-channel stable fallbacks: surgical package fixes without holding back entire channel
 - Secrets management: clan vars with declarative generation and deployment
 - Development environment: direnv integration, just task runner
 - CI/CD: GitHub Actions with cachix, automated testing
@@ -166,4 +166,4 @@ Infrastructure now operational with:
 - Zerotier overlay networking connecting all machines
 - Declarative secrets management via clan vars
 - Coordinated service deployment via clan inventory system
-- Multi-channel nixpkgs resilience preserved from nixos-unified architecture
+- Multi-channel nixpkgs stable fallbacks preserved from nixos-unified architecture
