@@ -17,7 +17,7 @@ Dendritic flake-parts provides feature-based module organization with auto-disco
 Clan orchestrates deployment across darwin and nixos machines through a unified command interface.
 Terranix provisions cloud infrastructure on Hetzner and GCP with toggle mechanisms for cost control.
 Five-layer overlay composition enables surgical package fixes without system-wide rollbacks when nixpkgs packages break.
-A two-tier secrets architecture separates system-level generated secrets from user credentials using age encryption.
+Secrets management uses clan vars for all secrets with legacy sops-nix during migration, all using age encryption.
 
 ## System Specification
 
