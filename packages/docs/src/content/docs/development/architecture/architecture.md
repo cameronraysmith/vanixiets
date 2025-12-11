@@ -879,7 +879,7 @@ Explicit Layer 5 external overlay composition.
 
 Preservation:
 
-Multi-channel resilience patterns preserved.
+Multi-channel stable fallback patterns preserved.
 Stable fallback mechanism unchanged.
 Hydra documentation patterns maintained.
 
