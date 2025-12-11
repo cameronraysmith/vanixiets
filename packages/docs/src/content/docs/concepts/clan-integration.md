@@ -296,6 +296,6 @@ Dendritic provides auto-discovery for ALL modules, not just clan.
 
 - [Deferred Module Composition](/concepts/deferred-module-composition/) - Module organization pattern
 - [Repository Structure](/reference/repository-structure) - Directory layout
-- [Secrets Management](/guides/secrets-management/) - Operational procedures for both tiers
+- [Secrets Management](/guides/secrets-management/) - Operational procedures for clan vars and legacy sops-nix
 - [ADR-0019: Clan-Core Orchestration](/development/architecture/adrs/0019-clan-core-orchestration/) - Architectural decision record
 - [ADR-0020: Dendritic + Clan Integration](/development/architecture/adrs/0020-dendritic-clan-integration/) - Integration patterns ADR
