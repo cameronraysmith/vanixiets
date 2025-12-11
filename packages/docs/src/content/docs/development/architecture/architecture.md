@@ -144,7 +144,7 @@ Service instances defined with roles assigned to specific machines.
 Zerotier instance has controller role (cinnabar) and peer roles (all other machines).
 User instances assign user accounts to relevant machines.
 
-Vars and generators:
+Vars and generators (clan vars):
 
 System-level generated secrets including SSH host keys, zerotier network identities, LUKS/ZFS encryption passphrases, and service credentials.
 Generated via clan vars generate, stored encrypted in vars/ directory with age encryption.
@@ -630,7 +630,7 @@ Custom packages merge last using attribute set merge (//).
 
 ### Secrets data flow
 
-Clan vars (Tier 1):
+Clan vars:
 
 ```
 Generator specification (nix)
@@ -652,7 +652,7 @@ Secret installation (/run/secrets/*)
 Service access (via paths)
 ```
 
-sops-nix (Tier 2):
+Legacy sops-nix:
 
 ```
 Manual secret creation (sops editor)
@@ -702,7 +702,7 @@ Summary of major architectural decisions with links to detailed ADRs.
 
 | Decision | ADR | Status | Impact |
 |----------|-----|--------|--------|
-| SOPS secrets management | [ADR-0011](/development/architecture/adrs/0011-sops-secrets-management/) | Accepted | User-level secrets (Tier 2) |
+| SOPS secrets management | [ADR-0011](/development/architecture/adrs/0011-sops-secrets-management/) | Accepted | User-level secrets (legacy) |
 
 ### Testing
 
