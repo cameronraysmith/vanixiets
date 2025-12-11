@@ -684,10 +684,10 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 
 **Outputs**:
 - Generated secrets via clan vars
-- External secrets remain in sops-nix
-- Two-tier hybrid architecture operational
+- Legacy user secrets remain in sops-nix during migration
+- Migration architecture operational
 
-**Status**: COMPLETE - Clan vars generators operational for generated secrets, sops-nix retained for external secrets
+**Status**: COMPLETE - Clan vars generators operational for secrets, sops-nix retained for legacy user secrets during migration
 
 **Related use cases**: UC-007 (Migration), UC-003 (Secrets)
 
