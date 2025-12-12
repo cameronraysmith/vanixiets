@@ -25,7 +25,9 @@
           pkgs.sops
           # Tools required by TypeScript packages CI
           pkgs.bun
-          pkgs.nodejs_24 # Required for semantic-release v25 (>= 24.10.0)
+          pkgs.nodejs_24 # semantic-release >= 24.10.0
+          pkgs.fuc # (rm/cp)z
+          pkgs.rip2
           # Language detection
           pkgs.github-linguist
         ];
