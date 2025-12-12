@@ -31,6 +31,7 @@ flowchart TB
     end
 
     context --> requirements
+    context --> solution
     requirements --> solution
 ```
 
