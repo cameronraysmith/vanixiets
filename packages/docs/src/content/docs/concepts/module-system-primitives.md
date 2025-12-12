@@ -146,6 +146,11 @@ This seemingly circular reference works because it combines both structures: the
 The module doesn't immediately evaluate `config.paths.base`—it constructs a function from `config` to definitions.
 When `evalModules` computes the fixpoint via demand-driven lazy evaluation, it ties the knot: the final `config` becomes the argument to all module functions, resolving `config.paths.processed` without explicit threading.
 
+Note that while this demonstrates the fixpoint mechanism, `paths.base` must still be defined by another module or have a default value.
+The module system resolves the reference to the final merged value, but doesn't create values from nothing.
+If `paths.base` is undefined, evaluation will fail with "The option `paths.base' was accessed but has no value defined. Try setting the option."
+This is not a limitation of the fixpoint—it's the correct behavior: the module declares it *needs* a base path but doesn't *provide* one.
+
 ## evalModules
 
 **Source reference**: [nixpkgs lib/modules.nix:84-367](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/modules.nix#L84-L367)
