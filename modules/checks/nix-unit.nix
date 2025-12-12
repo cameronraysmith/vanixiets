@@ -139,11 +139,14 @@
         };
 
         # TC-010: Namespace Exports
-        # Validates modules export to correct namespaces
+        # Validates modules export to correct namespaces as valid module definitions
+        # NixOS module system accepts both attrsets and functions as modules
         testFeatureNamespaceExports = {
           expr =
-            (builtins.typeOf self.modules.nixos.base) == "set"
-            && (builtins.typeOf self.modules.terranix.base) == "set";
+            let
+              isValidModule = m: builtins.isFunction m || builtins.isAttrs m;
+            in
+            isValidModule self.modules.nixos.base && isValidModule self.modules.terranix.base;
           expected = true;
         };
 
