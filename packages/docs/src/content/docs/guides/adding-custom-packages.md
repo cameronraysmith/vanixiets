@@ -2,7 +2,7 @@
 title: Adding custom packages
 description: How to add your own package derivations to this configuration
 sidebar:
-  order: 5
+  order: 6
 ---
 
 This guide shows you how to add custom package derivations to your configuration.

@@ -1,7 +1,7 @@
 ---
 title: User Onboarding
 sidebar:
-  order: 4
+  order: 5
 ---
 
 This guide covers onboarding users to machines where nix-darwin or NixOS is already configured by an admin.

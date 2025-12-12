@@ -1,7 +1,7 @@
 ---
 title: Host Onboarding
 sidebar:
-  order: 3
+  order: 4
 ---
 
 This guide covers onboarding a new host to this infrastructure.

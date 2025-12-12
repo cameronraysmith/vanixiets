@@ -1,7 +1,7 @@
 ---
 title: Handling broken packages
 sidebar:
-  order: 7
+  order: 8
 ---
 
 Systematic approach to fixing broken packages from nixpkgs unstable using the stable fallbacks infrastructure.
