@@ -431,11 +431,11 @@ diagrams-build:
     typst compile --format svg "$typ" "../public/diagrams/$name.svg"
   done
   echo "Optimizing SVGs with svgo..."
-  cd ../public/diagrams
-  for svg in *.svg; do
+  cd ..
+  for svg in public/diagrams/*.svg; do
     [ -f "$svg" ] || continue
-    echo "  Optimizing $svg"
-    svgo --quiet "$svg" -o "$svg"
+    echo "  Optimizing $(basename "$svg")"
+    bunx svgo --quiet "$svg" -o "$svg"
   done
   echo "Done. Diagrams in packages/docs/public/diagrams/"
 
