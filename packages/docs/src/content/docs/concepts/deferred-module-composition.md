@@ -27,7 +27,7 @@ This deferred module composition pattern correpsonds to a configuration approach
 - **[dendrix](https://vic.github.io/dendrix/Dendritic.html)** by Victor Borja (@vic) - Community ecosystem, documentation, and dendritic module "distribution"
 - **[dendritic](https://github.com/mightyiam/dendritic)** by Shahar "Dawn" Or (@mightyiam) - "Awesome" dendritic flake-parts
 
-## Understanding "aspect"
+## Why "aspect"
 
 The term "aspect" in this context refers to a cross-cutting concern or feature that spans multiple configuration classes (NixOS, nix-darwin, home-manager).
 This terminology draws from [Aspect-Oriented Programming (AOP)](https://en.wikipedia.org/wiki/Aspect-oriented_programming), where "aspects" are program functionalities that cut across multiple modules without clean encapsulation in any single component.
@@ -67,6 +67,7 @@ The module system computes this fixpoint via lazy evaluation, resolving cross-mo
 **Layer 1: Flake-parts framework**
 
 Flake-parts wraps `evalModules` for flake outputs, providing:
+
 - The `flake.modules.*` namespace convention for organizing deferred modules by class (darwin, nixos, homeManager)
 - The `perSystem` abstraction for per-architecture evaluation
 - Integration with flake schema (packages, apps, devShells, etc.)
@@ -74,6 +75,7 @@ Flake-parts wraps `evalModules` for flake outputs, providing:
 **Layer 2: Aspect-based organization**
 
 This deferred module composition pattern adds organizational conventions to flake-parts:
+
 - Auto-discovery via import-tree (automatically populate evalModules imports list from directory tree)
 - Directory-based namespace merging (multiple files → single aggregate via deferredModule composition)
 - Aspect-oriented structure (organize by feature, not by host)
@@ -87,6 +89,7 @@ For how flake-parts uses these primitives, see [Flake-parts as Module System Abs
 ### Traditional vs aspect-based organization
 
 **Traditional (host-based)**:
+
 ```
 configurations/
 ├── stibnite.nix      # Everything for stibnite
@@ -97,6 +100,7 @@ configurations/
 Problems: Duplication across hosts, hard to share features, changes require editing multiple files.
 
 **Aspect-based**:
+
 ```
 modules/
 ├── darwin/
@@ -148,6 +152,7 @@ Every file exports to a namespace under `flake.modules.*`, and files within the 
 ```
 
 The key insight:
+
 - Both files live in `modules/home/tools/`
 - Both export to the same namespace: `flake.modules.homeManager.tools`
 - The module system's deferredModule type merges them into a single aggregate (deferredModule forms a monoid under concatenation)
@@ -187,6 +192,7 @@ Each directory becomes an aggregate through import-tree's auto-discovery and nam
 ```
 
 How it works:
+
 - Each directory import (e.g., `./ai`) triggers import-tree to discover all `*.nix` files inside
 - Files in `ai/` that export to `flake.modules.homeManager.ai` auto-merge into a single aggregate
 - No explicit aggregate definition needed - the directory IS the aggregate boundary
@@ -240,10 +246,12 @@ This scans `modules/` recursively and imports every `.nix` file as a flake-parts
 **Module system integration**:
 
 What import-tree does:
+
 1. Recursively scans `./modules` for all `.nix` files
 2. Adds them to a top-level `imports` list passed to evalModules
 
 What the module system does:
+
 1. Processes the imports list via `collectModules` (recursive expansion, disabledModules filtering)
 2. Merges modules via `mergeModules` (option declarations + definitions)
 3. Computes fixpoint where `config` refers to final merged result
@@ -291,11 +299,13 @@ modules/
 ### vs nixos-unified (deprecated)
 
 nixos-unified used directory-based "autowiring" where file paths mapped to flake outputs:
+
 - `configurations/darwin/stibnite.nix` → `darwinConfigurations.stibnite`
 - Host-centric organization
 - Required specific directory names
 
 This deferred module composition pattern uses aspect-based organization:
+
 - Any file can export deferred modules to any namespace (flake-parts convention)
 - Feature-centric organization enabled by module system's compositional semantics
 - Directory names are semantic, not required (import-tree discovers based on file existence)
@@ -409,6 +419,7 @@ in
 ```
 
 The host is now:
+
 - Available as `clan.machines.newhost` for clan orchestration
 - Composed from auto-merged directory aggregates
 - Ready for deployment with `clan machines update newhost`
