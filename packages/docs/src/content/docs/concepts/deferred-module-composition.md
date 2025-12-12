@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-This infrastructure uses **deferred module composition** (a popular approach referred to as the dendritic flake-parts pattern), where every Nix file is a deferred module evaluated via flake-parts, and configuration is organized by *aspect* (feature) rather than by *host*.
+This infrastructure uses **deferred module composition** (a popular approach referred to as the dendritic flake-parts pattern), where every Nix file is a deferred module (in this documentation, evaluated via flake-parts, though deferred modules are a nixpkgs primitive usable directly with `lib.evalModules`), and configuration is organized by *aspect* (feature) rather than by *host*.
 The pattern leverages the Nix module system's fixpoint semantics to enable compositional configuration across platforms.
 
 ## Credits and attribution
@@ -81,7 +81,7 @@ This deferred module composition pattern adds organizational conventions to flak
 - Aspect-oriented structure (organize by feature, not by host)
 
 The key insight: this is an organizational pattern for deferred modules, not a fundamentally different abstraction.
-The composition works because the module system provides deferredModule as a compositional primitive that forms a monoid under concatenation.
+The composition works because the module system orchestrates two complementary algebraic structures: at the type level, deferredModule values form a monoid under imports list concatenation (enabling order-independent module collection), while at the semantic level, merged configuration values form a join-semilattice after fixpoint computation (enabling declarative configuration merging with priority overrides).
 
 For detailed explanation of module system primitives, see [Module System Primitives](/concepts/module-system-primitives/).
 For how flake-parts uses these primitives, see [Flake-parts as Module System Abstraction](/concepts/flake-parts-module-system/).
