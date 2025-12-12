@@ -4,7 +4,7 @@ sidebar:
   order: 2
 ---
 
-This page provides curated reading paths through the documentation based on your current goals.
+This page provides curated reading paths through the documentation organized by goal.
 Each path sequences documents to build understanding progressively, ensuring prerequisites appear before advanced material.
 Use these paths when you want a structured approach rather than browsing individual pages.
 
