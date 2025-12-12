@@ -415,6 +415,40 @@ docs-check:
 docs-linkcheck:
   cd packages/docs && bun run linkcheck
 
+## diagrams
+
+# Compile all typst diagrams to SVG and optimize for web
+[group('diagrams')]
+diagrams-build:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  echo "Compiling typst diagrams to SVG..."
+  cd packages/docs/diagrams
+  for typ in *.typ; do
+    [ -f "$typ" ] || continue
+    name="${typ%.typ}"
+    echo "  $typ -> $name.svg"
+    typst compile --format svg "$typ" "../public/diagrams/$name.svg"
+  done
+  echo "Optimizing SVGs with svgo..."
+  cd ../public/diagrams
+  for svg in *.svg; do
+    [ -f "$svg" ] || continue
+    echo "  Optimizing $svg"
+    svgo --quiet "$svg" -o "$svg"
+  done
+  echo "Done. Diagrams in packages/docs/public/diagrams/"
+
+# Compile a single typst diagram (without optimization)
+[group('diagrams')]
+diagrams-compile name:
+  cd packages/docs/diagrams && typst compile --format svg "{{name}}.typ" "../public/diagrams/{{name}}.svg"
+
+# Watch typst diagrams for changes and recompile
+[group('diagrams')]
+diagrams-watch:
+  cd packages/docs/diagrams && typst watch --format svg reading-paths.typ ../public/diagrams/reading-paths.svg
+
 # Run all documentation tests
 [group('docs')]
 docs-test:
