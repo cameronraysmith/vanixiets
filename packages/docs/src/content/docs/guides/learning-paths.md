@@ -15,49 +15,62 @@ Then follow the numbered document list in order, skipping items you already unde
 ## Path overview
 
 The following diagram shows how the 15 learning paths relate to each other.
-Foundation paths (1-3) support operational paths (4-8), which in turn enable platform-specific paths (9-10).
-Meta paths (11-15) can be entered at any point depending on your needs.
+Two entry points lead to distinct tracks: Bootstrap for operational tasks, Module System for conceptual understanding.
+These tracks converge at Fleet coordination and Architecture respectively, then branch to deployment targets and deeper topics.
 
 ```mermaid
 flowchart TB
-    subgraph foundation["Foundation"]
+    subgraph foundations["Foundations"]
         p1["1. Bootstrap"]
         p2["2. Module System"]
+    end
+
+    subgraph understanding["Understanding"]
         p3["3. Architecture"]
+        p12["12. AMDiRE"]
+        p13["13. Decisions"]
     end
 
     subgraph operations["Operations"]
         p4["4. Host Onboarding"]
-        p5["5. User Environment"]
+        p5["5. User Setup"]
         p6["6. Secrets"]
         p7["7. Packages"]
-        p8["8. Fleet Coordination"]
+        p8["8. Fleet"]
+        p15["15. Troubleshooting"]
     end
 
-    subgraph platforms["Platform-specific"]
+    subgraph deployment["Platform deployment"]
         p9["9. Cloud/NixOS"]
         p10["10. Darwin"]
     end
 
-    subgraph meta["Meta"]
+    subgraph support["Support"]
         p11["11. Contributing"]
-        p12["12. AMDiRE"]
-        p13["13. Decision Archaeology"]
         p14["14. Reference"]
-        p15["15. Troubleshooting"]
     end
 
+    %% Conceptual track
+    p2 --> p3
+    p3 --> p12
+    p12 --> p13
+
+    %% Operational track
     p1 --> p4
     p1 --> p5
-    p2 --> p3
-    p3 --> p8
     p4 --> p6
     p5 --> p6
     p6 --> p8
+
+    %% To deployment
     p8 --> p9
     p8 --> p10
-    p3 --> p12
-    p12 --> p13
+
+    %% Cross-domain connections
+    p3 --> p8
+    p3 --> p7
+    p3 --> p11
+    p7 --> p15
 ```
 
 ## Path 1: First-time bootstrap
