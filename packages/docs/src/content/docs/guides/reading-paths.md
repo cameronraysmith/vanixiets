@@ -18,7 +18,7 @@ The 15 reading paths are organized into five groups: Foundations (Bootstrap, Mod
 Two entry points lead to distinct tracks: Bootstrap for operational tasks, Module System for conceptual understanding.
 These tracks converge at Fleet coordination and Architecture respectively, then branch to deployment targets and deeper topics.
 
-<!-- Mermaid diagram temporarily removed for CI debugging - see git history to restore -->
+![Reading paths overview diagram showing 15 paths organized into 5 groups with dependency arrows](/diagrams/reading-paths.svg)
 
 ## Path 1: First-time bootstrap
 
