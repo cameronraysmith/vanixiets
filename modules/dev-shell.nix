@@ -30,6 +30,8 @@
           pkgs.rip2
           # Language detection
           pkgs.github-linguist
+          # Document typesetting
+          pkgs.typstWithPackages
         ];
 
         passthru.meta.description = "Development environment with clan CLI and build tools";
