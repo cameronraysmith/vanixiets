@@ -8,7 +8,7 @@ sidebar:
 This guide walks through bootstrapping a new machine with this configuration.
 
 :::tip[Looking for a structured review?]
-See [Learning paths](/guides/learning-paths/) for recommended sequences of pages organized by topic of interest.
+See [Reading paths](/guides/reading-paths/) for recommended sequences of pages organized by topic of interest.
 :::
 
 :::note
