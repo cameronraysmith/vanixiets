@@ -11,6 +11,14 @@ This document provides three-tier explanations (intuitive, computational, and fo
 Understanding these primitives is essential for working with Nix at scale because they explain why the module system supports complex patterns like conditional imports, priority overrides, and recursive submodules while maintaining predictable semantics.
 The algebraic foundations are not merely theoretical—they are the reason NixOS configurations compose reliably.
 
+### Where this fits
+
+This document provides the foundational understanding of Nix module system primitives.
+After mastering these concepts, see:
+
+- [Flake-parts and the module system](/concepts/flake-parts-module-system/) — How flake-parts wraps these primitives for flake integration
+- [Deferred module composition](/concepts/deferred-module-composition/) — Organizational patterns built on these primitives
+
 ## deferredModule
 
 **Source reference**: [nixpkgs lib/types.nix:1138-1180](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/types.nix#L1138-L1180)
@@ -745,6 +753,13 @@ The mathematics isn't just theoretical—it's the reason NixOS configurations co
 
 ## Further reading
 
-- [nix.dev module system tutorial](https://nix.dev/tutorials/module-system/index.html)
-- [nixpkgs lib/modules.nix source](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/modules.nix)
-- [nixpkgs lib/types.nix source](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/types.nix)
+### Related documentation
+
+- [Flake-parts and the module system](/concepts/flake-parts-module-system/) — How flake-parts wraps evalModules for flake composition
+- [Deferred module composition](/concepts/deferred-module-composition/) — Aspect-based organizational patterns using these primitives
+
+### External resources
+
+- [nix.dev module system tutorial](https://nix.dev/tutorials/module-system/index.html) — Official introduction to module system concepts
+- [nixpkgs lib/modules.nix](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/modules.nix) — evalModules implementation
+- [nixpkgs lib/types.nix](https://github.com/NixOS/nixpkgs/blob/nixos-25.11/lib/types.nix) — Type system implementation including deferredModule
