@@ -2,10 +2,14 @@
 title: Getting started
 description: Quick start guide for bootstrapping and using this configuration
 sidebar:
-  order: 2
+  order: 3
 ---
 
 This guide walks through bootstrapping a new machine with this configuration.
+
+:::tip[Looking for a structured approach?]
+See [Learning paths](/guides/learning-paths/) for curated reading sequences based on your goals, including the recommended first-time bootstrap path.
+:::
 
 :::note
 This repository pertains to a particular set of users and machines and is not directly structured as a template, but could relatively easily be treated as such via renaming.
