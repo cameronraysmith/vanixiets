@@ -37,9 +37,9 @@
     "test-release": "semantic-release --dry-run --no-ci"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^12.6.10",
-    "@astrojs/starlight": "^0.37.0",
-    "astro": "^5.15.1"
+    "@astrojs/cloudflare": "12.6.12",
+    "@astrojs/starlight": "0.37.1",
+    "astro": "5.16.5"
   },
   "devDependencies": {
     "@beoe/rehype-mermaid": "^0.4.2",
