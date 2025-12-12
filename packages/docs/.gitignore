@@ -1,2 +1,3 @@
-# Generated mermaid diagram SVGs (build-time artifacts)
+# Generated diagram SVGs (build-time artifacts)
 public/beoe/*.svg
+public/diagrams/*.svg
