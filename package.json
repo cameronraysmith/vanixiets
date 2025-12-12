@@ -13,7 +13,7 @@
   ],
   "packageManager": "bun@1.3.4",
   "scripts": {
-    "reinstall": "rm -rf node_modules packages/*/node_modules && bun install",
+    "reinstall": "rmz -f node_modules && rmz -f packages/docs/node_modules && bun install",
     "test-release": "semantic-release --dry-run --no-ci",
     "preview-version": "./scripts/preview-version.sh"
   },
