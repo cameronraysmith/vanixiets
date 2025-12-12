@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-This infrastructure uses **deferred module composition** (a popular approach referred to as the dendritic flake-parts pattern), where every Nix file is a deferred module (in this documentation, evaluated via flake-parts, though deferred modules are a nixpkgs primitive usable directly with `lib.evalModules`), and configuration is organized by *aspect*—a cross-cutting concern that spans multiple configuration classes (NixOS, nix-darwin, home-manager) rather than being confined to a single host.
+This infrastructure uses **deferred module composition** (a popular approach referred to as the dendritic flake-parts pattern), where every Nix file is a flake-parts module that exports deferredModule values (configuration fragments stored for later evaluation by consumers like NixOS, nix-darwin, or home-manager), and configuration is organized by *aspect*—a cross-cutting concern that spans multiple configuration classes (NixOS, nix-darwin, home-manager) rather than being confined to a single host.
 The pattern leverages the Nix module system's fixpoint semantics to enable compositional configuration across platforms.
 See [Why "aspect"](#why-aspect) below for the full rationale behind this terminology.
 
@@ -49,11 +49,38 @@ This aspect-based organization is the key difference from traditional host-centr
 
 ## Core principle
 
-Every Nix file in the repository is a deferred module exported via the flake-parts framework.
+Every Nix file in the repository is a flake-parts module (evaluated at the top level with class "flake") that exports deferredModule values (evaluated later when consumers import them).
 This means modules delay evaluation until the final configuration is computed, enabling them to reference merged results without circular dependencies.
 
 Files are organized by **aspect** (feature) rather than by **host**, enabling cross-cutting configuration that spans NixOS, nix-darwin, and home-manager from a single location.
 The module system's fixpoint computation resolves these cross-cutting references into a coherent configuration.
+
+### The two-layer architecture
+
+In the dendritic pattern, every file participates in two distinct evaluation contexts:
+
+**Outer layer (the file itself)**: A flake-parts module evaluated with `class = "flake"`.
+The file's top-level function is called immediately during the collection phase of the top-level `evalModules`.
+
+**Inner layer (stored values)**: deferredModule values assigned to `flake.modules.<class>.<name>`.
+These values are NOT evaluated by the top-level evalModules—they're collected into an imports list via the deferredModule type's merge function and only evaluated when a consumer (NixOS, nix-darwin, home-manager) imports them into their own `evalModules` call.
+
+Example file `modules/home/tools/bat.nix`:
+
+```nix
+# OUTER: This entire file IS a flake-parts module (evaluated immediately)
+{ ... }:
+{
+  # INNER: This VALUE is a deferredModule (evaluated later by home-manager)
+  flake.modules.homeManager.tools = { ... }: {
+    programs.bat.enable = true;
+  };
+}
+```
+
+The outer module function executes during flake evaluation.
+The inner value (`{ ... }: { programs.bat.enable = true; }`) is stored without evaluation.
+When a home-manager configuration imports `flakeModulesHome.tools`, *then* that inner module is evaluated with home-manager's `config`, `pkgs`, etc.
 
 ### Understanding the mechanism
 
@@ -61,7 +88,8 @@ The dendritic pattern works because of three compositional layers:
 
 **Layer 0: Module system foundation** (nixpkgs `lib.evalModules`)
 
-Deferred modules are functions from configuration to module content, suspended until the fixpoint is computed.
+Module functions are called immediately during the collection phase, receiving a `config` argument that is a lazy reference to the final fixpoint result.
+The "deferral" is in the lazy evaluation of config values, not in suspending function calls.
 When you write `{ config, ... }: { ... }`, the `config` argument refers to the final merged configuration after all modules have been evaluated together.
 The module system computes this fixpoint via lazy evaluation, resolving cross-module dependencies without infinite recursion as long as there are no strict cycles.
 
@@ -258,7 +286,7 @@ What the module system does:
 3. Computes fixpoint where `config` refers to final merged result
 4. Returns configuration with all modules composed
 
-The composition is lazy: modules are only evaluated when their values are demanded, enabling circular-looking references (module A references config set by module B, which references config set by module A) to resolve via fixpoint as long as there are no strict cycles.
+The composition is lazy: module functions execute immediately during collection, but the config values they reference are evaluated on demand, enabling circular-looking references (module A references config set by module B, which references config set by module A) to resolve via fixpoint as long as there are no strict cycles.
 
 ### Benefits over manual registration
 
