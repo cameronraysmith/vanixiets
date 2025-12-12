@@ -2,27 +2,10 @@ import cloudflare from "@astrojs/cloudflare";
 import starlight from "@astrojs/starlight";
 import starlightLinksValidator from "starlight-links-validator";
 import { starlightKatex } from "starlight-katex";
-import { rehypeMermaid } from "@beoe/rehype-mermaid";
 import { defineConfig } from "astro/config";
 import justGrammar from "./src/grammars/just.tmLanguage.json";
 // ROLLDOWN INTEGRATION (DISABLED) - Uncomment when re-enabling (see ROLLDOWN.md)
 // import * as vite from "vite";
-
-// Mermaid diagram configuration for build-time SVG rendering
-// Uses darkScheme: "class" for Starlight theme compatibility
-// Strategy "file" writes SVGs to public/beoe for optimal caching
-const mermaidConfig = {
-  darkScheme: "class" as const,
-  strategy: "file" as const,
-  fsPath: "public/beoe",
-  webPath: "/beoe",
-  mermaidConfig: {
-    theme: "base",
-    themeVariables: {
-      fontSize: "14px",
-    },
-  },
-};
 
 // https://astro.build/config
 export default defineConfig({
@@ -141,11 +124,9 @@ export default defineConfig({
   markdown: {
     syntaxHighlight: {
       type: "shiki",
-      // Exclude mermaid from syntax highlighting so rehypeMermaid can process it
-      // math is excluded by default for KaTeX compatibility
-      excludeLangs: ["mermaid", "math"],
+      // math is excluded for KaTeX compatibility
+      excludeLangs: ["math"],
     },
-    rehypePlugins: [[rehypeMermaid, mermaidConfig]],
   },
 
   /* ROLLDOWN INTEGRATION (DISABLED - Cloudflare Workers Incompatibility)
