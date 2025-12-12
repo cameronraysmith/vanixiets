@@ -153,7 +153,7 @@ Related: flake-parts, autowiring, specialArgs, dendritic flake-parts pattern.
 Terminology from [Aspect-Oriented Programming (AOP)](https://en.wikipedia.org/wiki/Aspect-oriented_programming) where aspects are program functionalities cutting across multiple modules.
 In deferred module composition: the organizational dimension where each file configures one capability across all relevant platforms.
 Synonym: feature, cross-cutting concern.
-See [Understanding "aspect"](/concepts/deferred-module-composition/#understanding-aspect).
+See [Why "aspect"](/concepts/deferred-module-composition/#why-aspect).
 
 **clan**: Framework for multi-host NixOS/nix-darwin management providing coordination, inventory system, vars, and service instances. Repository name: clan-core.
 Synonym: none (clan-core is the repository name, not an alternative term).
@@ -384,6 +384,7 @@ Related: overlay, multi-channel fallback.
 ## Glossary maintenance
 
 This glossary should be updated when:
+
 - New architectural terms introduced during migration
 - Upstream projects add significant new concepts
 - Terminology evolves or requires clarification
