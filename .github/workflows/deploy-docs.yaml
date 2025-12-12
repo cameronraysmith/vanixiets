@@ -143,7 +143,7 @@ jobs:
 
       - name: Save job result to cache
         if: success() && steps.cache.outputs.should-run == 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5
         with:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
