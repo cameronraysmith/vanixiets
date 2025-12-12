@@ -42,12 +42,14 @@ When you write a module as a function:
 }
 ```
 
-This function is NOT called immediately.
-Instead, the module system:
+This function IS called immediately during the collection phase.
+The module system:
 
-1. Collects all modules (both immediate attribute sets and deferred functions)
-2. Computes a fixpoint where `config` becomes the result of evaluating all modules with that same `config` value
-3. Only then calls deferred module functions with the fixpoint `config`
+1. Collects all modules by calling their functions with args including a lazy `config` reference
+2. Normalizes returned attrsets to canonical form `{ _file, key, imports, options, config }`
+3. Computes a fixpoint where the lazy `config` reference resolves to the merged result
+
+The "deferral" is in the lazy evaluation of `config` values within the returned attrsets, not in suspending function calls.
 
 The type implementation shows this clearly:
 
@@ -66,6 +68,22 @@ deferredModuleWith = { staticModules ? [] }: mkOptionType {
 
 The `merge` function doesn't evaluate the modules—it just collects them into an `imports` list.
 The actual evaluation happens later in `evalModules` via the fixpoint computation.
+
+### What "deferred" means (and doesn't mean)
+
+The term "deferred" in module system context is frequently misunderstood:
+
+**NOT deferred (happens immediately during collection)**:
+- Module function calls — `applyModuleArgs` invokes functions eagerly
+- Import resolution — paths are imported and processed during collection
+- Structural normalization — modules converted to canonical form
+
+**IS deferred (resolved later)**:
+- Config value evaluation — thunks referencing `config` resolve on demand during fixpoint computation
+- deferredModule-typed option consumption — values stored in options like `flake.modules.*` are only evaluated when a consumer imports them into their own `evalModules` call
+
+The circularity in `{ config, ... }: { foo = config.bar; }` works NOT because the function call is deferred, but because `config` is a lazy reference to the fixpoint result.
+The function executes immediately and returns an attrset containing an unevaluated thunk (`config.bar`).
 
 ### Formal characterization
 
@@ -673,6 +691,10 @@ As long as the chain of demands terminates before cycling back, lazy evaluation 
 
 ### Formal characterization
 
+**Terminology note**: When describing the computational mechanism, we use "fixpoint" or "lazy fixpoint" to emphasize self-referential binding with demand-driven evaluation.
+"Least fixpoint" is appropriate only in formal domain-theoretic contexts (like this section) where we characterize the mathematical object.
+Nix does not compute via Kleene iteration `⊥, f(⊥), f²(⊥), ...`—it uses `let x = f x in x` with lazy thunk resolution.
+
 The fixpoint computation implements a **domain-theoretic least fixpoint** via Nix's lazy evaluation strategy.
 
 **Scott domains**: Nix values form a Scott domain—a partially ordered set where:
@@ -700,11 +722,11 @@ $$
 \mu F = \bigsqcup_{n \geq 0} F^n(\bot)
 $$
 
-Nix's lazy evaluation implements this via **demand-driven fixpoint iteration**:
-- Start with all values as $\bot$ (thunks)
-- When a value is demanded, compute one iteration step $F(\text{current})$
-- If that demands another thunk, recursively evaluate it
-- Update the configuration with newly computed values
+Nix's lazy evaluation implements this via **demand-driven thunk resolution** (not iteration):
+- All values start as thunks (unevaluated expressions)
+- When a value is demanded, its thunk is forced, which may demand other thunks
+- Memoization caches evaluated thunks to avoid recomputation
+- No explicit iteration sequence $F^0, F^1, F^2, \ldots$ is constructed
 
 **Well-founded recursion**: The domain has finite height in the demanded slice (the portion of the configuration actually needed).
 This ensures:
