@@ -69,6 +69,8 @@ deferredModuleWith = { staticModules ? [] }: mkOptionType {
 The `merge` function doesn't evaluate the modules—it just collects them into an `imports` list.
 The actual evaluation happens later in `evalModules` via the fixpoint computation.
 
+**Type vs value**: `deferredModule` is an option *type* (specifically `types.deferredModuleWith`), not a value. When you write `flake.modules.homeManager.foo = { ... }: { ... }`, you're assigning a *value* of type deferredModule to an option. The type's merge function defines how multiple such values compose.
+
 ### What "deferred" means (and doesn't mean)
 
 The term "deferred" in module system context is frequently misunderstood:
@@ -99,7 +101,7 @@ More precisely, modules form a category $\mathbf{Mod}$ where:
 - Objects are module interfaces (sets of option declarations)
 - Morphisms are module implementations (functions from configurations to definitions)
 
-The deferred module type embeds the Kleisli category $\mathbf{Kl}(T)$ for the reader monad $T = (-) \times \text{Config}$ into $\mathbf{Mod}$.
+The deferred module type embeds the Kleisli category $\mathbf{Kl}(T)$ for the reader monad $T(A) = \text{Config} \to A$ into $\mathbf{Mod}$.
 
 A module expression of the form:
 
@@ -107,7 +109,11 @@ $$
 m : \text{Config} \to \{ \text{options} : \text{Options}, \text{config} : \text{Definitions} \}
 $$
 
-is suspended until the fixpoint operator provides the actual configuration value:
+awaits the fixpoint-resolved configuration as its function argument:
+
+:::note[Terminology]
+"Least fixpoint" is domain-theoretic (mathematical object). "Fixpoint" or "lazy fixpoint" describes the computational mechanism. Nix does not compute via Kleene iteration—it uses demand-driven thunk evaluation.
+:::
 
 $$
 \text{config}_{\text{final}} = \mu c.\, \bigsqcup_{i} m_i(c)
@@ -337,11 +343,11 @@ highestPrio = foldl' (prio: def: min (getPrio def) prio) 9999 defs;
 values = filter (def: getPrio def == highestPrio) defs;
 ```
 
-Default priorities:
-- `mkOptionDefault`: 1500 (option's own default)
-- `mkDefault`: 1000 (module default)
-- No modifier: 100 (user value)
+Priority values (lower number = higher priority, "wins" in merge):
 - `mkForce`: 50 (force override)
+- No modifier: 100 (user value)
+- `mkDefault`: 1000 (module default)
+- `mkOptionDefault`: 1500 (option's own default)
 
 **Stage 3: Sort by order**
 ```nix
@@ -382,6 +388,8 @@ $$
 xs \sqcup ys = xs \mathbin{+\!\!+} ys
 $$
 (list concatenation, associative with identity $[]$).
+
+**Note**: List concatenation is technically a **monoid** operation, not a true join-semilattice operation (it is not commutative or idempotent). The $\sqcup$ notation here emphasizes the merge semantics rather than strict lattice-theoretic structure.
 
 **Attribute sets**: $\mathcal{L}_{\text{attrsOf}\, \alpha} = \text{Name} \to \mathcal{L}_\alpha$ with pointwise join:
 $$
@@ -736,12 +744,7 @@ $$
 
 meaning iteration converges in finitely many steps.
 
-**Thunk semantics**: A thunk represents a morphism in the Kleisli category for the partiality monad:
-$$
-\text{Thunk}(A) = \mu X.\, (A + X)
-$$
-
-The fixpoint equation $X = A + X$ means a thunk either evaluates to a value ($A$) or to another thunk ($X$), enabling the recursive structure.
+**Thunk semantics**: A thunk is a suspended computation—an unevaluated expression in the domain $\mathcal{D}$. Thunks represent the bottom element $\bot$ before evaluation; forcing a thunk either produces a value or another thunk (in case of lazy chains). The partiality aspect comes from non-termination: a thunk that loops forever never produces a value.
 
 **Infinite recursion as non-termination**: A strict cycle creates a non-continuous function where:
 $$
