@@ -107,14 +107,29 @@ Deferred modules enable a traced monoidal category structure where the trace ope
 
 ### Connecting formalism to implementation
 
-The Kleisli category characterization directly corresponds to everyday Nix module syntax:
+The Kleisli category characterization directly corresponds to everyday Nix module syntax for the reader-like operations:
 
-| Kleisli Operation | Module System Primitive | Nix Manifestation |
-|-------------------|-------------------------|-------------------|
+| Reader Operation | Module System Primitive | Nix Manifestation |
+|------------------|-------------------------|-------------------|
 | `ask` | Config access | `{ config, ... }: config.foo.bar` |
 | `fmap` | Option transformation | Defining values in terms of other options |
-| `>>=` (bind) | Chained references | Module A reads config set by Module B |
-| `trace` | Fixpoint tying | `config = F(config)` recursive binding |
+
+The reader monad captures deferred access to configuration: modules are functions awaiting the final `config` value.
+However, the fixpoint computation that *provides* that `config` value requires a different categorical framework.
+
+**Fixpoint as trace**: The equation `config = F(config)` is a *trace* operation in a traced monoidal category, not a Kleisli operation.
+In categorical terms, trace "ties the knot" on an internal state:
+
+$$
+\text{Tr}_C : (A \otimes C \to B \otimes C) \to (A \to B)
+$$
+
+For modules: $A$ is external input (pkgs, lib), $B$ is output configuration, and $C$ is the configuration being computed.
+The trace feeds $C$ back into itself, implementing the recursive `config = F(config)` binding.
+
+These two frameworks work together:
+- **Reader monad** (Kleisli): explains why modules can reference `config` without explicit threading
+- **Traced monoidal category**: explains why the self-referential fixpoint is well-defined
 
 Concretely:
 
@@ -127,7 +142,7 @@ Concretely:
 }
 ```
 
-This seemingly circular reference works because it's a suspended reader computation.
+This seemingly circular reference works because it combines both structures: the module is a reader computation (accessing `config`), and `evalModules` applies the trace operation to resolve the fixpoint.
 The module doesn't immediately evaluate `config.paths.base`—it constructs a function from `config` to definitions.
 When `evalModules` computes the fixpoint via demand-driven lazy evaluation, it ties the knot: the final `config` becomes the argument to all module functions, resolving `config.paths.processed` without explicit threading.
 
