@@ -236,8 +236,8 @@ let
   result = lib.evalModules {
     modules = [
       ./services/database.nix
-      { config.database.enabled = true; }
-      { config.database.port = 3306; }
+      { database.enabled = true; }
+      { database.port = 3306; }
     ];
   };
 in
