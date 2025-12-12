@@ -1,3 +1,2 @@
-# Generated diagram SVGs (build-time artifacts)
-public/beoe/*.svg
+# Generated diagram SVGs (build-time artifacts from typst)
 public/diagrams/*.svg

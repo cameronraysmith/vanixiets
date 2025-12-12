@@ -14,7 +14,7 @@
     "clean": "bun run clean:dist && bun run clean:public && bun run clean:cache",
     "clean:cache": "astro sync --force",
     "clean:dist": "rmz -f dist",
-    "clean:public": "rip -f public/beoe/*.svg || true",
+    "clean:public": "rip -f public/diagrams/*.svg || true",
     "dev": "astro dev",
     "dev:clean": "bun run clean:cache && bun run dev",
     "start": "astro dev",
@@ -42,7 +42,6 @@
     "astro": "5.16.5"
   },
   "devDependencies": {
-    "@beoe/rehype-mermaid": "^0.4.2",
     "@biomejs/biome": "^2.3.0",
     "@playwright/test": "^1.57.0",
     "@semantic-release/changelog": "^6.0.3",
