@@ -378,7 +378,7 @@ clan-metadata:
 # Install workspace dependencies
 [group('docs')]
 install:
-  bun install
+  bun install {{ if env("CI", "") != "" { "--frozen-lockfile" } else { "" } }}
 
 # Start documentation development server
 [group('docs')]
