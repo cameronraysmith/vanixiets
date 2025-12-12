@@ -8,7 +8,7 @@ Task-oriented guides for common operations and workflows with this infrastructur
 
 ## Orientation
 
-- [Learning paths](/guides/learning-paths/) - Curated reading sequences through the documentation based on your goals
+- [Reading paths](/guides/reading-paths/) - Curated reading sequences through the documentation based on your goals
 
 ## Setup and Onboarding
 

@@ -1,5 +1,5 @@
 ---
-title: Learning paths
+title: Reading paths
 sidebar:
   order: 2
 ---
@@ -14,7 +14,7 @@ Then follow the numbered document list in order, skipping items you already unde
 
 ## Path overview
 
-The following diagram shows how the 15 learning paths relate to each other.
+The following diagram shows how the 15 reading paths relate to each other.
 Two entry points lead to distinct tracks: Bootstrap for operational tasks, Module System for conceptual understanding.
 These tracks converge at Fleet coordination and Architecture respectively, then branch to deployment targets and deeper topics.
 
