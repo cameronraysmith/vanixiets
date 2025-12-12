@@ -89,7 +89,39 @@ $$
 
 where $\mu$ denotes the least fixpoint and $\sqcup$ is the join operation in the configuration lattice.
 
-The category-theoretic insight: deferred modules transform the module system from a simple monoid (concatenation of attribute sets) into a traced monoidal category, where the trace operation implements the fixpoint computation.
+The module system orchestrates two complementary algebraic structures:
+
+1. **Type-level monoid** (module collection): deferredModule values form a monoid under concatenation of imports lists—identity is the empty list `[]`, operation is list concatenation `++`, and composition happens before fixpoint computation
+2. **Semantic-level join-semilattice** (configuration merging): merged configuration values form a join-semilattice with type-specific merge operations, computed after the fixpoint resolves cross-module references
+
+The transition from monoid (module collection) to semilattice (configuration merging) happens via `evalModules` fixpoint computation.
+Deferred modules enable a traced monoidal category structure where the trace operation implements the fixpoint that ties the configuration back to itself.
+
+### Connecting formalism to implementation
+
+The Kleisli category characterization directly corresponds to everyday Nix module syntax:
+
+| Kleisli Operation | Module System Primitive | Nix Manifestation |
+|-------------------|-------------------------|-------------------|
+| `ask` | Config access | `{ config, ... }: config.foo.bar` |
+| `fmap` | Option transformation | Defining values in terms of other options |
+| `>>=` (bind) | Chained references | Module A reads config set by Module B |
+| `trace` | Fixpoint tying | `config = F(config)` recursive binding |
+
+Concretely:
+
+```nix
+{ config, lib, ... }: {
+  options.paths.base = lib.mkOption { type = lib.types.str; };
+  options.paths.processed = lib.mkOption { type = lib.types.str; };
+
+  config.paths.processed = "${config.paths.base}/processed";
+}
+```
+
+This seemingly circular reference works because it's a suspended reader computation.
+The module doesn't immediately evaluate `config.paths.base`—it constructs a function from `config` to definitions.
+When `evalModules` computes the fixpoint via demand-driven lazy evaluation, it ties the knot: the final `config` becomes the argument to all module functions, resolving `config.paths.processed` without explicit threading.
 
 ## evalModules
 
@@ -149,7 +181,7 @@ This shows `config` is a self-referential binding that relies on lazy evaluation
 
 ### Formal characterization
 
-`evalModules` computes the least fixpoint of a module configuration functor in a domain-theoretic framework.
+`evalModules` computes the least fixpoint of a module configuration functor in a domain-theoretic framework via demand-driven lazy evaluation, not classical Kleene iteration.
 
 Let $\mathcal{M}$ be the set of all modules, and define the configuration space $\mathcal{C}$ as a complete lattice of partial configurations ordered by information content (the Smyth order: $c_1 \sqsubseteq c_2$ iff $c_2$ extends $c_1$).
 
@@ -168,13 +200,13 @@ $$
 
 where $\sqcup$ is the join operation in the configuration lattice (merging definitions according to type-specific merge functions and priority ordering).
 
-By the Knaster-Tarski theorem, since $F$ is monotone on the complete lattice $\mathcal{C}$, it has a least fixpoint:
+By the Knaster-Tarski theorem, since $F$ is monotone on the complete lattice $\mathcal{C}$, it has a unique least fixpoint:
 
 $$
-\text{evalModules}(m_1, \ldots, m_n) = \mu F = \text{lfp}(F) = \bigsqcup_{k \geq 0} F^k(\bot)
+\text{evalModules}(m_1, \ldots, m_n) = \mu F = \text{lfp}(F)
 $$
 
-where $\bot$ is the minimal configuration (no definitions) and $F^k$ denotes $k$ applications of $F$.
+The classical Kleene characterization $\text{lfp}(F) = \bigsqcup_{k \geq 0} F^k(\bot)$ describes the mathematical object (where $\bot$ is the minimal configuration and $F^k$ denotes $k$ applications of $F$), but Nix does not compute this series directly—it uses demand-driven thunk evaluation instead, computing only the portions of the fixpoint actually demanded.
 
 **Lattice structure**: The configuration lattice is product of per-option lattices:
 
@@ -188,10 +220,14 @@ where each option's lattice $\mathcal{L}_o$ is determined by:
 - `mkOverride`: imposes priority ordering (values with priority $p$ dominate those with priority $p' > p$)
 - `submodule`: recursive fixpoint on nested configuration lattice
 
-**Convergence**: The iteration $F^k(\bot)$ converges because:
-1. Nix's lazy evaluation ensures we only compute the parts of the lattice actually demanded
-2. Each iteration adds more defined options (monotonicity)
-3. The lattice has finite height in the demand-driven slice (no infinite ascending chains in practice)
+**Convergence**: Nix reaches the fixpoint without exhaustive iteration because:
+1. Lazy evaluation computes only demanded portions of the configuration space
+2. Each demand resolves more thunks, monotonically increasing defined values
+3. The demanded slice has finite height (no infinite ascending chains in practice)
+4. Stabilization happens per-demanded-value, not globally across the entire lattice
+
+Unlike classical Kleene iteration (which computes $F^0(\bot), F^1(\bot), F^2(\bot), \ldots$ until global stabilization), Nix evaluates thunks on demand.
+The mathematical result is identical (the least fixpoint), but the computational path is fundamentally different.
 
 **Category theory perspective**: The fixpoint computation implements a trace operation in a traced monoidal category.
 The module system forms a compact closed category where:
@@ -283,9 +319,9 @@ Each type defines its own merge function:
 - Integers: must all be equal (or use `mergeEqualOption`)
 - Submodules: recursive `evalModules`
 
-### Formal characterization
+### Formal characterization (semantic-level join-semilattice)
 
-Option merging forms a join-semilattice with priority stratification.
+Option merging forms a join-semilattice with priority stratification—this is the semantic-level algebraic structure that operates after fixpoint computation resolves cross-module references.
 
 **Join-semilattice structure**: For each option of type $\tau$, the set of possible merged values $M_\tau$ forms a join-semilattice $(\mathcal{L}_\tau, \sqcup)$ where:
 
@@ -692,11 +728,11 @@ The domain-theoretic foundation ensures the module system's declarative semantic
 
 The Nix module system's algebraic primitives form a coherent mathematical structure:
 
-1. **Deferred modules** embed Kleisli category morphisms, enabling computation to reference fixpoint results
-2. **evalModules** computes least fixpoints in domain-theoretic configuration lattices
-3. **Merging primitives** implement join-semilattice operations with priority stratification
+1. **Deferred modules** embed Kleisli category morphisms, enabling computation to reference fixpoint results; at the type level, they form a monoid under imports list concatenation
+2. **evalModules** computes the unique least fixpoint in domain-theoretic configuration lattices via demand-driven lazy evaluation, not classical Kleene iteration
+3. **Merging primitives** implement semantic-level join-semilattice operations with priority stratification (after fixpoint resolves references)
 4. **Types** define graded monads constraining merge algebras and enabling compositional reasoning
-5. **Lazy evaluation** realizes domain-theoretic fixpoints via demand-driven iteration
+5. **Lazy evaluation** realizes domain-theoretic fixpoints via demand-driven thunk evaluation, computing only demanded portions of the configuration
 
 Together, these primitives transform attribute set merging into a powerful typed functional language for declarative configuration, where:
 - Composition is order-independent (associative, commutative)
