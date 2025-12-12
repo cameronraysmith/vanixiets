@@ -14,64 +14,11 @@ Then follow the numbered document list in order, skipping items you already unde
 
 ## Path overview
 
-The following diagram shows how the 15 reading paths relate to each other.
+The 15 reading paths are organized into five groups: Foundations (Bootstrap, Module System), Understanding (Architecture, AMDiRE, Decisions), Operations (Host Onboarding, User Setup, Secrets, Packages, Fleet, Troubleshooting), Platform deployment (Cloud/NixOS, Darwin), and Support (Contributing, Reference).
 Two entry points lead to distinct tracks: Bootstrap for operational tasks, Module System for conceptual understanding.
 These tracks converge at Fleet coordination and Architecture respectively, then branch to deployment targets and deeper topics.
 
-```mermaid
-flowchart TB
-    subgraph foundations["Foundations"]
-        p1["1. Bootstrap"]
-        p2["2. Module System"]
-    end
-
-    subgraph understanding["Understanding"]
-        p3["3. Architecture"]
-        p12["12. AMDiRE"]
-        p13["13. Decisions"]
-    end
-
-    subgraph operations["Operations"]
-        p4["4. Host Onboarding"]
-        p5["5. User Setup"]
-        p6["6. Secrets"]
-        p7["7. Packages"]
-        p8["8. Fleet"]
-        p15["15. Troubleshooting"]
-    end
-
-    subgraph deployment["Platform deployment"]
-        p9["9. Cloud/NixOS"]
-        p10["10. Darwin"]
-    end
-
-    subgraph support["Support"]
-        p11["11. Contributing"]
-        p14["14. Reference"]
-    end
-
-    %% Conceptual track
-    p2 --> p3
-    p3 --> p12
-    p12 --> p13
-
-    %% Operational track
-    p1 --> p4
-    p1 --> p5
-    p4 --> p6
-    p5 --> p6
-    p6 --> p8
-
-    %% To deployment
-    p8 --> p9
-    p8 --> p10
-
-    %% Cross-domain connections
-    p3 --> p8
-    p3 --> p7
-    p3 --> p11
-    p7 --> p15
-```
+<!-- Mermaid diagram temporarily removed for CI debugging - see git history to restore -->
 
 ## Path 1: First-time bootstrap
 
