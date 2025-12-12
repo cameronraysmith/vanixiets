@@ -9,7 +9,7 @@ This infrastructure combines three complementary architectural patterns to creat
 
 ## Architecture overview
 
-### Layer 0: Module system foundation (nixpkgs)
+### Foundation: Module system primitives (nixpkgs)
 
 Uses nixpkgs' module system primitives for configuration composition.
 Flake-parts wraps `lib.evalModules` for flake composition.
@@ -19,7 +19,7 @@ Flake-parts wraps `lib.evalModules` for flake composition.
 - **deferredModule type**: Option type for storing module values that are evaluated later by consumers
 - **Option merging**: Type-specific merge functions with priority handling
 
-### Layer 1: Base framework (flake-parts)
+### Framework: Flake composition (flake-parts)
 
 Uses [flake-parts](https://flake.parts) as the foundation for modular flake composition.
 Flake-parts wraps nixpkgs' evalModules for flake outputs, adding flake-specific conventions and ergonomics.
@@ -30,7 +30,7 @@ Flake-parts wraps nixpkgs' evalModules for flake outputs, adding flake-specific 
 - flake.modules.* namespace convention (deferredModule type)
 - Clean separation of concerns across system types
 
-### Layer 2: Deferred module composition (aspect-based pattern)
+### Organization: Deferred module composition (aspect-based pattern)
 
 Uses the deferredModule type (nixpkgs module system primitive) for storing configuration fragments.
 Every Nix file is a flake-parts module (evaluated at the top level) that exports deferredModule values (evaluated later when consumers import them), enabling cross-cutting concerns to reference the merged result.
@@ -47,7 +47,7 @@ The [aspect-based deferred module composition pattern](/concepts/deferred-module
 
 See [Deferred Module Composition](/concepts/deferred-module-composition/) for detailed explanation.
 
-### Layer 3: Multi-machine coordination (clan)
+### Orchestration: Multi-machine coordination (clan)
 
 Uses [clan](https://clan.lol/) for multi-machine coordination and deployment.
 Clan orchestrates deployments across the machine fleet but doesn't replace underlying NixOS/nix-darwin configuration.
@@ -60,7 +60,7 @@ Clan orchestrates deployments across the machine fleet but doesn't replace under
 
 See [Clan Integration](/concepts/clan-integration/) for detailed explanation.
 
-### Layer 4: Overlay composition (multi-channel fallback)
+### Packages: Overlay composition (multi-channel fallback)
 
 Adopts proven patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos) for handling nixpkgs unstable breakage with stable fallbacks.
 
