@@ -8,32 +8,7 @@ Development documentation organized using AMDiRE (Architecture, Monitoring, Deve
 
 The documentation follows AMDiRE's three-layer structure:
 
-```mermaid
-flowchart TB
-    subgraph context["Context Layer"]
-        scope["Project Scope"]
-        stakeholders["Stakeholders"]
-        goals["Goals"]
-        constraints["Constraints"]
-    end
-
-    subgraph requirements["Requirements Layer"]
-        vision["System Vision"]
-        usage["Usage Model"]
-        functional["Functions"]
-        quality["Quality"]
-    end
-
-    subgraph solution["Solution Layer"]
-        archspec["Architecture"]
-        adrs["ADRs"]
-        traceability["Traceability"]
-    end
-
-    context --> requirements
-    context --> solution
-    requirements --> solution
-```
+![AMDiRE three-layer documentation structure: Context flows to Requirements and Solution, Requirements flows to Solution](/diagrams/development-amdire.svg)
 
 ## Context layer
 
