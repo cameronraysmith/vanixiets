@@ -6,6 +6,10 @@ sidebar:
 
 Task-oriented guides for common operations and workflows with this infrastructure.
 
+## Orientation
+
+- [Learning paths](/guides/learning-paths/) - Curated reading sequences through the documentation based on your goals
+
 ## Setup and Onboarding
 
 - [Getting started](/guides/getting-started/) - Bootstrap Nix and activate your first configuration
