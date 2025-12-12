@@ -10,24 +10,6 @@ Conceptual documentation to help you understand the architecture and design patt
 
 - [Architecture overview](/concepts/architecture-overview/) - Understanding the architecture combining dendritic flake-parts, clan, and multi-channel overlay composition
 
-These concepts build on each other in the following order:
-
-```mermaid
-flowchart TB
-    arch["Architecture Overview"]
-    primitives["Module System Primitives"]
-    flakeparts["Flake-parts Module System"]
-    deferred["Deferred Module Composition"]
-    clan["Clan Integration"]
-    sysuser["System-User Integration"]
-
-    arch --> primitives
-    primitives --> flakeparts
-    flakeparts --> deferred
-    deferred --> clan
-    clan --> sysuser
-```
-
 ## Module system foundations
 
 - [Module system primitives](/concepts/module-system-primitives/) - Understanding deferredModule, evalModules, and fixpoint computation - the foundations that enable Nix configuration composition
