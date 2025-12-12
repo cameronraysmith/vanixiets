@@ -387,7 +387,7 @@ docs-dev:
 
 # Build the documentation site
 [group('docs')]
-docs-build:
+docs-build: diagrams-build
   cd packages/docs && bun run build
 
 # Preview the built documentation site
@@ -412,7 +412,7 @@ docs-check:
 
 # Validate internal and external links in documentation
 [group('docs')]
-docs-linkcheck:
+docs-linkcheck: diagrams-build
   cd packages/docs && bun run linkcheck
 
 ## diagrams
@@ -471,7 +471,7 @@ docs-test-coverage:
 
 # Deploy documentation to Cloudflare Workers (preview)
 [group('docs')]
-docs-deploy-preview branch=`git branch --show-current`:
+docs-deploy-preview branch=`git branch --show-current`: diagrams-build
   #!/usr/bin/env bash
   set -euo pipefail
   cd packages/docs
@@ -526,7 +526,7 @@ docs-deploy-preview branch=`git branch --show-current`:
 
 # Deploy documentation to Cloudflare Workers (production)
 [group('docs')]
-docs-deploy-production:
+docs-deploy-production: diagrams-build
     @./scripts/docs/deploy-production.sh
 
 # List recent Cloudflare deployments
