@@ -89,31 +89,6 @@ This path takes you from initial installation through understanding the reposito
 For users wanting to understand the algebraic and category-theoretic foundations enabling Nix configuration composition.
 This path covers how the module system enables declarative composition through fixpoint computation and deferred evaluation.
 
-The following diagram shows the structure of this path, including optional prerequisites and the core reading sequence.
-
-```mermaid
-flowchart TB
-    subgraph prereq["Prerequisites"]
-        ext["nix.dev tutorial"]
-        gloss["Glossary"]
-    end
-
-    subgraph core["Core path"]
-        primitives["Module Primitives"]
-        flakeparts["Flake-parts"]
-        deferred["Deferred Composition"]
-        adr["ADR-0018"]
-        domain["Domain Model"]
-    end
-
-    ext --> gloss
-    gloss --> primitives
-    primitives --> flakeparts
-    flakeparts --> deferred
-    deferred --> adr
-    adr --> domain
-```
-
 ### Prerequisites
 
 Skip this section if you are already comfortable writing basic Nix modules with `mkOption`, `mkEnableOption`, and the `{ config, lib, ... }:` pattern.
