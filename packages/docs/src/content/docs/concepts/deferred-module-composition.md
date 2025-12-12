@@ -5,8 +5,9 @@ sidebar:
   order: 5
 ---
 
-This infrastructure uses **deferred module composition** (a popular approach referred to as the dendritic flake-parts pattern), where every Nix file is a deferred module (in this documentation, evaluated via flake-parts, though deferred modules are a nixpkgs primitive usable directly with `lib.evalModules`), and configuration is organized by *aspect* (feature) rather than by *host*.
+This infrastructure uses **deferred module composition** (a popular approach referred to as the dendritic flake-parts pattern), where every Nix file is a deferred module (in this documentation, evaluated via flake-parts, though deferred modules are a nixpkgs primitive usable directly with `lib.evalModules`), and configuration is organized by *aspect*—a cross-cutting concern that spans multiple configuration classes (NixOS, nix-darwin, home-manager) rather than being confined to a single host.
 The pattern leverages the Nix module system's fixpoint semantics to enable compositional configuration across platforms.
+See [Why "aspect"](#why-aspect) below for the full rationale behind this terminology.
 
 ## Credits and attribution
 
