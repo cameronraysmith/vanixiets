@@ -100,7 +100,7 @@ jobs:
         run: nix develop --accept-flake-config -c just install
 
       - name: Setup tmate debug session
-        if: steps.cache.outputs.should-run == 'true'
+        if: inputs.debug_enabled == 'true' && steps.cache.outputs.should-run == 'true'
         uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
 
       - name: Validate documentation links
