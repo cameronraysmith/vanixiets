@@ -34,6 +34,13 @@
           pkgs.typstWithPackages
         ];
 
+        # Make fonts available to typst for consistent rendering across environments
+        TYPST_FONT_PATHS = pkgs.lib.concatStringsSep ":" [
+          "${pkgs.inter}/share/fonts/truetype"
+          "${pkgs.lmodern}/share/fonts"
+          "${pkgs.newcomputermodern}/share/fonts"
+        ];
+
         passthru.meta.description = "Development environment with clan CLI and build tools";
       };
     };
