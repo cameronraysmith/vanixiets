@@ -2,7 +2,7 @@
 title: Secrets Management
 description: Managing secrets using clan vars and legacy sops-nix during migration
 sidebar:
-  order: 6
+  order: 7
 ---
 
 This guide documents secrets management in the infrastructure.
