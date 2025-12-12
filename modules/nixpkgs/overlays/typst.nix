@@ -3,13 +3,18 @@
   flake.nixpkgsOverlays = [
     (final: prev: {
       # Typst with pre-fetched packages for reproducible builds.
-      # Fletcher depends on CeTZ which depends on oxifmt, so we include all
-      # transitive dependencies explicitly to avoid runtime downloads.
+      # Note: typst.withPackages does NOT auto-resolve typstDeps from
+      # nixpkgs' typst-packages-from-universe.toml, so transitive deps
+      # must be listed explicitly.
       typstWithPackages = prev.typst.withPackages (
         ps: with ps; [
-          oxifmt # transitive dep of cetz
-          cetz
-          fletcher
+          # Transitive dependencies (must be explicit)
+          oxifmt_0_2_1 # required by cetz 0.3.4
+
+          # Top-level packages
+          fletcher # diagrams with nodes and arrows (pulls cetz)
+          chronos # sequence diagrams
+          polylux # presentations
         ]
       );
     })
