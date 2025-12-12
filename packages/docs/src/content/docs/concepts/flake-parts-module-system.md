@@ -195,6 +195,93 @@ The deferred module composition pattern fundamentally relies on deferred modules
 For details on the underlying module system primitives, see [Module system primitives](/concepts/module-system-primitives/).
 For details on the deferred module composition pattern, see [Deferred module composition](/concepts/deferred-module-composition/).
 
+## Flake-parts is optional
+
+The dendritic organizational pattern does not require flake-parts.
+Deferred modules are a nixpkgs primitive available through `lib.evalModules`, and you can evaluate them directly without any flake framework.
+Flake-parts provides convenient abstractions for flake integration, but the underlying module composition mechanisms work independently.
+
+### Direct evalModules usage
+
+A minimal example demonstrating direct evaluation without flake-parts:
+
+```nix
+# services/database.nix - A deferred module
+{ config, lib, ... }:
+{
+  options.database = {
+    enabled = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Enable database service";
+    };
+    port = lib.mkOption {
+      type = lib.types.port;
+      default = 5432;
+      description = "Database port";
+    };
+  };
+
+  config = lib.mkIf config.database.enabled {
+    # Service configuration would go here
+  };
+}
+
+# evaluation.nix - Direct evalModules call
+let
+  pkgs = import <nixpkgs> { };
+  lib = pkgs.lib;
+
+  # Evaluate modules directly
+  result = lib.evalModules {
+    modules = [
+      ./services/database.nix
+      { config.database.enabled = true; }
+      { config.database.port = 3306; }
+    ];
+  };
+in
+{
+  inherit (result) config options;
+  # result.config.database.enabled => true
+  # result.config.database.port => 3306
+}
+```
+
+This demonstrates the core composition mechanism: `evalModules` accepts a list of deferred modules, merges their option declarations and config definitions, computes the fixpoint where `config` refers to the final merged state, and returns the evaluated configuration.
+
+### What flake-parts adds
+
+Flake-parts builds on this foundation with flake-specific abstractions:
+
+- **perSystem evaluation** - Automatically evaluates modules for each system in `systems` list, eliminating manual per-architecture iteration
+- **Namespace conventions** - `flake.modules.<class>.<name>` provides conventional publishing structure for reusable modules
+- **Transposition** - Merges per-system configurations into flat flake output schema (`packages.<system>.name`)
+- **Two-layer evaluation** - Separates flake-level concerns (class `"flake"`) from per-system concerns (class `"perSystem"`)
+- **Type safety** - Module classes via `_class` attribute prevent mixing incompatible module contexts
+
+### When to use each approach
+
+**Use raw evalModules when:**
+- You need maximum control over evaluation parameters
+- Your use case doesn't fit the two-layer (flake + perSystem) model
+- You're learning module system fundamentals
+- You're building custom evaluation contexts (not flake outputs)
+
+**Use flake-parts when:**
+- You're producing flake outputs with per-system variants
+- You want to publish reusable modules with namespace conventions
+- You need the perSystem abstraction to avoid boilerplate
+- You're integrating with the broader flake-parts ecosystem
+
+**Use dendritic pattern when:**
+- You have complex multi-machine configurations
+- You want aspect-based organization with auto-discovery
+- You need hierarchical module composition across platforms
+- You're managing fleets with shared cross-cutting concerns
+
+The choice depends on your organizational needs and whether flake-parts' opinionated structure matches your use case.
+
 ## External references
 
 - [Flake-parts documentation](https://flake.parts) - Official flake-parts reference
