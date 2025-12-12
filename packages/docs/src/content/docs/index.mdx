@@ -71,31 +71,6 @@ just activate
 
 See [Getting started guide](/guides/getting-started/) for complete setup instructions.
 
-The documentation is organized into complementary sections:
-
-```mermaid
-flowchart LR
-    subgraph user["User Documentation"]
-        tutorials["Tutorials"]
-        guides["Guides"]
-        concepts["Concepts"]
-        reference["Reference"]
-    end
-
-    subgraph dev["Development"]
-        context["Context"]
-        requirements["Requirements"]
-        architecture["Architecture"]
-    end
-
-    start(["Start here"]) --> tutorials
-    start --> guides
-    tutorials --> concepts
-    guides --> concepts
-    concepts --> reference
-    concepts --> architecture
-```
-
 ## Architecture
 
 Multi-layer architecture combining complementary patterns:
