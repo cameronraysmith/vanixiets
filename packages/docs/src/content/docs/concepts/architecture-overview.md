@@ -16,7 +16,7 @@ Flake-parts wraps `lib.evalModules` for flake composition.
 
 **What it provides:**
 - **lib.evalModules**: Fixpoint computation resolving modules into final configuration
-- **deferredModule type**: Delayed evaluation enabling modules to reference final merged result
+- **deferredModule type**: Option type for storing module values that are evaluated later by consumers
 - **Option merging**: Type-specific merge functions with priority handling
 
 ### Layer 1: Base framework (flake-parts)
@@ -32,8 +32,8 @@ Flake-parts wraps nixpkgs' evalModules for flake outputs, adding flake-specific 
 
 ### Layer 2: Deferred module composition (aspect-based pattern)
 
-Uses deferred modules (nixpkgs module system primitive) for configuration composition.
-Every Nix file is a deferred module that delays evaluation until the final configuration is computed, enabling cross-cutting concerns to reference the merged result.
+Uses the deferredModule type (nixpkgs module system primitive) for storing configuration fragments.
+Every Nix file is a flake-parts module (evaluated at the top level) that exports deferredModule values (evaluated later when consumers import them), enabling cross-cutting concerns to reference the merged result.
 
 The [aspect-based deferred module composition pattern](/concepts/deferred-module-composition/) organizes these modules by *aspect* (feature) rather than by *host*, with flake-parts providing the evaluation context and namespace conventions.
 
