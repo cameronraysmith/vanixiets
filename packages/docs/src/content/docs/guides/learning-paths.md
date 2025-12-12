@@ -1,7 +1,7 @@
 ---
 title: Learning paths
 sidebar:
-  order: 9
+  order: 2
 ---
 
 This page provides curated reading paths through the documentation based on your current goals.
