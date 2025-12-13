@@ -80,13 +80,12 @@ Aligns with G-S02: Type safety via module system and ADR-0014 principle 3 (Type 
 - Module system type checking operational
 - Options defined with types (bool, str, int, attrs, etc.)
 - Invalid option values rejected at evaluation time
-- Deferred module composition eliminates specialArgs in new modules
+- Deferred module composition eliminates specialArgs in all modules
 - Cross-module references via config.flake.modules.* namespace
 
 **Limitations**:
-- Legacy nixos-unified patterns still use specialArgs (being migrated)
 - Some older modules accept untyped attrsets
-- Submodule coverage incomplete in legacy code
+- Submodule coverage incomplete in some modules
 
 ### Target state
 
@@ -129,14 +128,12 @@ Maintainability directly impacts long-term viability and aligns with G-S03: Redu
 - Atomic commits per file reduce review complexity
 
 **Limitations**:
-- Two architectures in parallel during migration (being resolved)
-- Legacy nixos-unified patterns documented but marked for migration
-- Legacy modules being incrementally refactored to deferred module composition
+- Some modules being incrementally improved for better maintainability
 
 ### Target state
 
 **Goals**:
-- Single architecture (deferred module composition + clan) after migration
+- Continue maintaining single architecture (deferred module composition + clan)
 - Every pattern documented with examples
 - AMDiRE documentation complete (Context, Requirements, Traceability)
 - Clear migration path preserved in documentation even after completion
@@ -369,7 +366,7 @@ Supports ADR-0014 principle 2 (Template duality): forces us to use what we build
 - Notes/ directory for deployment-specific content (excluded from build)
 
 **Limitations**:
-- Migration in progress (template aspect not polished yet)
+- Template polish in progress (architecture complete, documentation ongoing)
 - Some host-specific assumptions in current configuration
 - Template documentation incomplete
 
