@@ -323,7 +323,7 @@ Validation metrics:
 ### Internal
 
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
-- [ADR-0020: Dendritic + Clan Integration](0020-dendritic-clan-integration/) - How terranix integrates with the dendritic+clan architecture
+- [ADR-0020: Deferred module composition + Clan Integration](0020-deferred-module-composition-clan-integration/) - How terranix integrates with the deferred module composition + clan architecture
 - Terranix modules: `modules/terranix/`
 
 ### External
