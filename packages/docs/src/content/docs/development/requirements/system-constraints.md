@@ -313,7 +313,7 @@ flake.modules.darwin.shell-fish = { ... };
 flake.modules.homeManager.shell-fish = { ... };
 flake.modules.nixos.shell-fish = { ... };
 
-# Host imports via:
+# Host imports via (deferred module composition pattern):
 imports = [ config.flake.modules.darwin.shell-fish ];
 ```
 
