@@ -106,18 +106,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1765349790,
-        "narHash": "sha256-vO+DPWbqBUd5+OrRMlLxTg8Z8FLG6cbzh/DL4ztZs2Y=",
-        "owner": "cameronraysmith",
-        "repo": "clan-core",
-        "rev": "378c457a49e482cf65624d62dea8813a5fac45aa",
-        "type": "github"
+        "lastModified": 1765498125,
+        "narHash": "sha256-/B5IClRLqm02U07vxdvqVqid7M6W9rd8zA5169GohiU=",
+        "rev": "5b161dbe4d6583a573802877a82dba7a5865d56d",
+        "type": "tarball",
+        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/5b161dbe4d6583a573802877a82dba7a5865d56d.tar.gz"
       },
       "original": {
-        "owner": "cameronraysmith",
-        "ref": "fix-install-secret-upload-path",
-        "repo": "clan-core",
-        "type": "github"
+        "type": "tarball",
+        "url": "https://git.clan.lol/clan/clan-core/archive/main.tar.gz"
       }
     },
     "darwin": {
@@ -639,11 +636,11 @@
     },
     "nixos-facter-modules": {
       "locked": {
-        "lastModified": 1764252389,
-        "narHash": "sha256-3bbuneTKZBkYXlm0bE36kUjiDsasoIC1GWBw/UEJ9T4=",
+        "lastModified": 1765442039,
+        "narHash": "sha256-k3lYQ+A1F7aTz8HnlU++bd9t/x/NP2A4v9+x6opcVg0=",
         "owner": "nix-community",
         "repo": "nixos-facter-modules",
-        "rev": "5ea68886d95218646d11d3551a476d458df00778",
+        "rev": "9dd775ee92de63f14edd021d59416e18ac2c00f1",
         "type": "github"
       },
       "original": {

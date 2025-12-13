@@ -1,0 +1,2 @@
+# Generated diagram SVGs (build-time artifacts from typst)
+public/diagrams/*.svg

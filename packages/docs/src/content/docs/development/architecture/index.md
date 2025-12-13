@@ -5,7 +5,7 @@ title: Architecture
 Architecture documentation for the vanixiets multi-machine infrastructure configuration.
 
 This repository manages a heterogeneous fleet of 6 permanent machines plus ephemeral cloud instances across 2 platforms using declarative Nix configuration.
-The infrastructure coordinates 4 nix-darwin laptops and permanent nixos servers (cinnabar plus ephemeral instances like electrum) through dendritic flake-parts module organization, clan multi-machine orchestration, and terranix cloud provisioning.
+The infrastructure coordinates 4 nix-darwin laptops and permanent nixos servers (cinnabar plus ephemeral instances like electrum) through deferred module composition, clan multi-machine orchestration, and terranix cloud provisioning.
 
 ## Overview
 
@@ -13,11 +13,11 @@ The architecture follows a feature-based organizational pattern where capabiliti
 Infrastructure provisioning, system deployment, and secrets management are separated into distinct layers with clear boundaries.
 
 The system integrates four major architectural components.
-Dendritic flake-parts provides feature-based module organization with auto-discovery mechanisms that eliminate manual registration.
+Deferred module composition provides feature-based module organization with auto-discovery mechanisms that eliminate manual registration.
 Clan orchestrates deployment across darwin and nixos machines through a unified command interface.
 Terranix provisions cloud infrastructure on Hetzner and GCP with toggle mechanisms for cost control.
 Five-layer overlay composition enables surgical package fixes without system-wide rollbacks when nixpkgs packages break.
-A two-tier secrets architecture separates system-level generated secrets from user credentials using age encryption.
+Secrets management uses clan vars for all secrets with legacy sops-nix during migration, all using age encryption.
 
 ## System Specification
 
@@ -29,4 +29,4 @@ A two-tier secrets architecture separates system-level generated secrets from us
 
 ## Reference Documentation
 
-- [Handling Broken Packages](/guides/handling-broken-packages) - Operational guide for multi-channel nixpkgs resilience
+- [Handling Broken Packages](/guides/handling-broken-packages) - Operational guide for multi-channel nixpkgs stable fallbacks

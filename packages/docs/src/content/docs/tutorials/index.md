@@ -35,12 +35,14 @@ Tutorials build the understanding that makes guides useful.
 
 If you're new to this infrastructure, follow this sequence:
 
+![Tutorial progression: Bootstrap to Activation leads to Secrets Setup, which branches to Darwin and NixOS Deployment, both converging to Guides and Concepts](/diagrams/tutorials-flow.svg)
+
 ### 1. Bootstrap to Activation
 
 **[Bootstrap to Activation](/tutorials/bootstrap-to-activation)** — Start here.
 
 Learn how to set up a machine from scratch.
-You'll understand Nix flakes, the dendritic module pattern, direnv integration, and the activation process.
+You'll understand Nix flakes, the deferred module composition pattern, direnv integration, and the activation process.
 
 - **Prerequisites**: macOS or NixOS machine with admin access
 - **Teaches**: Nix fundamentals, repository structure, first activation
@@ -51,7 +53,7 @@ You'll understand Nix flakes, the dendritic module pattern, direnv integration, 
 **[Secrets Setup](/tutorials/secrets-setup)** — Essential for any real use.
 
 Learn how secrets management works.
-You'll understand the two-tier architecture, derive age keys from SSH keys, and set up encrypted secrets that deploy with your configuration.
+You'll understand secrets management with clan vars and legacy sops-nix, derive age keys from SSH keys, and set up encrypted secrets that deploy with your configuration.
 
 - **Prerequisites**: Completed Bootstrap to Activation
 - **Teaches**: Age encryption, sops-nix, Bitwarden integration
@@ -91,7 +93,7 @@ Your entry point into this infrastructure.
 
 **What you'll learn:**
 - How Nix flakes provide reproducible configuration
-- The dendritic pattern for module organization
+- The deferred module composition pattern for module organization
 - Development shell activation with direnv
 - Building and activating your first configuration
 
@@ -102,7 +104,7 @@ Your entry point into this infrastructure.
 Secure credential management from first principles.
 
 **What you'll learn:**
-- Two-tier secrets architecture (clan vars vs sops-nix)
+- Secrets management with clan vars and legacy sops-nix migration
 - Age key derivation from SSH keys
 - Creating and managing encrypted secrets
 - Platform differences (darwin vs NixOS)
@@ -129,7 +131,7 @@ Cloud infrastructure and NixOS server deployment.
 - Infrastructure provisioning with terranix
 - Clan-based deployment orchestration
 - Multi-cloud patterns (Hetzner, GCP)
-- Both tiers of secrets on NixOS
+- Clan vars and legacy sops-nix on NixOS
 
 **Prerequisites:** Completed Bootstrap and Secrets tutorials, cloud provider access
 
@@ -147,7 +149,7 @@ The [Guides](/guides/) section provides task-oriented procedures:
 ### Deepen your understanding
 
 The [Concepts](/concepts/) section explains the architecture:
-- [Dendritic flake-parts Architecture](/concepts/dendritic-architecture) — Module organization pattern
+- [Deferred Module Composition](/concepts/deferred-module-composition) — Module organization pattern
 - [Clan Machine Management](/concepts/clan-integration) — Multi-machine coordination
 - [System-user Integration](/concepts/system-user-integration) — User configuration approaches
 

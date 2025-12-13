@@ -1,5 +1,5 @@
 {
-  description = "vanixiets: cameronraysmith-managed local and cloud infrastructure";
+  description = "vanixiets: infrastructure from nix with flake-parts and clan";
 
   outputs =
     inputs@{ flake-parts, ... }:
@@ -26,9 +26,7 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
-    # TODO: switch back to upstream after resolving cross-platform vars/secrets/builds/installs
-    # clan-core.url = "https://git.clan.lol/clan/clan-core/archive/main.tar.gz";
-    clan-core.url = "github:cameronraysmith/clan-core/fix-install-secret-upload-path";
+    clan-core.url = "https://git.clan.lol/clan/clan-core/archive/main.tar.gz";
     clan-core.inputs.nixpkgs.follows = "nixpkgs";
     clan-core.inputs.sops-nix.follows = "sops-nix";
     clan-core.inputs.disko.follows = "disko";

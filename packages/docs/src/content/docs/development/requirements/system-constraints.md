@@ -137,7 +137,7 @@ Constraints are organized by category and include rationale, implications, and m
 - Error messages may not clearly indicate cycle
 
 **Mitigation**:
-- Dendritic pattern: every file is flake-parts module (no imports between modules)
+- Deferred module composition: flake-parts modules with deferred evaluation (no imports between modules)
 - Shared configuration via config.flake.modules.* namespace
 - Clear module organization by category
 
@@ -271,7 +271,7 @@ Constraints are organized by category and include rationale, implications, and m
 - Some packages linux-only (e.g., systemd-specific)
 - Cross-platform packages may have different dependencies
 
-## SC-005: Dendritic pattern constraints
+## SC-005: Deferred module composition constraints
 
 ### Every file is a module
 
@@ -319,11 +319,11 @@ imports = [ config.flake.modules.darwin.shell-fish ];
 
 ### No specialArgs
 
-**Constraint**: Dendritic pattern eliminates specialArgs for type safety
+**Constraint**: Deferred module composition eliminates specialArgs for type safety
 
 **Legacy architecture (nixos-unified, deprecated)**: Used specialArgs to pass custom arguments
 
-**Current architecture (dendritic)**: All arguments via module system
+**Current architecture (deferred module composition)**: All arguments via module system
 
 **Implications**:
 - Module signatures: { config, pkgs, lib, ... }
@@ -583,7 +583,7 @@ nix-store --query --tree $(nix eval --raw .#darwinConfigurations.<hostname>.conf
 
 ### Current architecture (post-migration)
 
-**Architecture**: Dendritic flake-parts + clan is the active framework
+**Architecture**: Deferred module composition + clan is the active framework
 
 **Deprecated**: nixos-unified removed from active use (November 2024)
 
@@ -592,7 +592,7 @@ nix-store --query --tree $(nix eval --raw .#darwinConfigurations.<hostname>.conf
 - NixOS hosts (4): cinnabar (permanent VPS), electrum, galena, scheelite (ephemeral VPS)
 
 **Module organization**:
-- All modules follow dendritic pattern (every file is flake-parts module)
+- All modules follow deferred module composition (flake-parts modules with deferred evaluation)
 - Clan inventory manages multi-machine coordination
 - No architectural coexistence - single unified system
 

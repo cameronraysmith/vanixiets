@@ -25,9 +25,20 @@
           pkgs.sops
           # Tools required by TypeScript packages CI
           pkgs.bun
-          pkgs.nodejs_24 # Required for semantic-release v25 (>= 24.10.0)
+          pkgs.nodejs_24 # semantic-release >= 24.10.0
+          pkgs.fuc # (rm/cp)z
+          pkgs.rip2
           # Language detection
           pkgs.github-linguist
+          # Document typesetting
+          pkgs.typstWithPackages
+        ];
+
+        # Make fonts available to typst for consistent rendering across environments
+        TYPST_FONT_PATHS = pkgs.lib.concatStringsSep ":" [
+          "${pkgs.inter}/share/fonts/truetype"
+          "${pkgs.lmodern}/share/fonts"
+          "${pkgs.newcomputermodern}/share/fonts"
         ];
 
         passthru.meta.description = "Development environment with clan CLI and build tools";

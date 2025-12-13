@@ -46,7 +46,7 @@ Constraints are non-negotiable restrictions arising from business context, laws,
 - Private keys must never be committed to repository
 - Reason: Security requirements
 
-**Multi-channel resilience** (current architecture):
+**Multi-channel stable fallbacks** (current architecture):
 - Must maintain ability to use stable channel for individual packages while staying on unstable
 - Cannot require system-wide channel rollback for single package issues
 - Reason: Operational stability without sacrificing access to latest packages
@@ -162,14 +162,14 @@ Rules are conditional standard procedures that guide implementation but can be a
 
 **Module organization** (current → target):
 - Current: Directory-based autowire (`modules/{darwin,home,nixos}/`)
-- Target: Dendritic flat categories (`modules/{base,shell,dev,hosts}/`)
+- Target: Deferred module composition flat categories (`modules/{base,shell,dev,hosts}/`)
 - Feature-based organization, not platform-based
 - Cross-cutting concerns enabled (one module, multiple targets)
 - Condition: Migration in progress, both patterns temporarily coexist
 
 **Dependency management**:
 - Pin all flake inputs with `follows` where appropriate
-- Use multi-channel pattern for package resilience
+- Use multi-channel pattern for stable fallbacks
 - Prefer stable packages when possible, unstable when needed
 - Document reasons for unstable channel usage
 - Condition: Can use unpinned for rapid testing, must pin before commit
@@ -195,9 +195,9 @@ Rules are conditional standard procedures that guide implementation but can be a
 - Disk usage: use `diskus` instead of `du -sh`
 - Condition: Can use standard tools in contexts where Nix tools unavailable
 
-### Historical: Migration rules (completed November 2024)
+### Historical: Migration rules
 
-These rules governed the nixos-unified → clan+dendritic migration (Phases 0-6) completed in November 2024.
+These rules governed the nixos-unified → deferred module composition + clan migration (Phases 0-6).
 They remain documented for historical context and potential future migrations.
 
 **Progressive migration order** (completed):
@@ -213,10 +213,10 @@ They remain documented for historical context and potential future migrations.
 
 **Priority hierarchy for pattern conflicts** (remains current):
 1. Clan functionality (non-negotiable)
-2. Dendritic flake-parts pattern (best-effort)
+2. Deferred module composition (best-effort)
 3. Pattern purity (flexible)
-- Rule: When conflicts arise, preserve clan functionality, optimize with dendritic where possible
-- Condition: Can deviate from pure dendritic if necessary for clan compatibility
+- Rule: When conflicts arise, preserve clan functionality, optimize with deferred module composition where possible
+- Condition: Can deviate from pure deferred module composition if necessary for clan compatibility
 
 ### Documentation rules
 
@@ -254,9 +254,9 @@ When rules must be broken, document:
 # Reason: Clan flakeModules integration requires minimal specialArgs
 # Justification: This is framework-level passing (inputs, self),
 #                not extensive application value passing
-# Alternative considered: Pure dendritic (not compatible with clan)
+# Alternative considered: Pure deferred module composition (not compatible with clan)
 # Status: Permanent acceptable exception
-# References: dendritic pattern anti-pattern discussion
+# References: deferred module composition anti-pattern discussion
 ```
 
 ## Constraints and rules review

@@ -17,6 +17,7 @@
   # - bat.nix (better cat)
   # - agents-md.nix (agent documentation)
   # - texlive.nix (TeX/LaTeX distribution)
+  # - typst.nix (Typst typesetting with CeTZ/Fletcher)
   # - claude-code-wrappers.nix (GLM wrapper)
   # - commands/ (custom shell commands)
   flake.modules.homeManager.tools = { ... }: { };

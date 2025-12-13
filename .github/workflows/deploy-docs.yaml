@@ -95,17 +95,17 @@ jobs:
           installer: quick
           system: x86_64-linux
 
+      - name: Install dependencies
+        if: steps.cache.outputs.should-run == 'true'
+        run: nix develop --accept-flake-config -c just install
+
       - name: Setup tmate debug session
         if: inputs.debug_enabled == 'true' && steps.cache.outputs.should-run == 'true'
         uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
 
-      - name: Install dependencies
-        if: steps.cache.outputs.should-run == 'true'
-        run: nix develop -c just install
-
       - name: Validate documentation links
         if: steps.cache.outputs.should-run == 'true'
-        run: nix develop -c just docs-linkcheck
+        run: nix develop --accept-flake-config -c just docs-linkcheck
 
       - name: Deploy to Cloudflare Workers
         if: steps.cache.outputs.should-run == 'true'
@@ -118,10 +118,10 @@ jobs:
         run: |
           if [ "${{ inputs.environment }}" = "preview" ]; then
             echo "Deploying preview for branch: ${{ inputs.branch }}"
-            nix develop -c just docs-deploy-preview ${{ inputs.branch }}
+            nix develop --accept-flake-config -c just docs-deploy-preview ${{ inputs.branch }}
           else
             echo "Deploying to production (promoting existing version if available)"
-            nix develop -c just docs-deploy-production
+            nix develop --accept-flake-config -c just docs-deploy-production
           fi
 
       - name: Create job result marker

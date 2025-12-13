@@ -378,7 +378,7 @@ clan-metadata:
 # Install workspace dependencies
 [group('docs')]
 install:
-  bun install
+  bun install {{ if env("CI", "") != "" { "--frozen-lockfile" } else { "" } }}
 
 # Start documentation development server
 [group('docs')]
@@ -387,7 +387,7 @@ docs-dev:
 
 # Build the documentation site
 [group('docs')]
-docs-build:
+docs-build: diagrams-build
   cd packages/docs && bun run build
 
 # Preview the built documentation site
@@ -412,8 +412,42 @@ docs-check:
 
 # Validate internal and external links in documentation
 [group('docs')]
-docs-linkcheck:
+docs-linkcheck: diagrams-build
   cd packages/docs && bun run linkcheck
+
+## diagrams
+
+# Compile all typst diagrams to SVG and optimize for web
+[group('diagrams')]
+diagrams-build:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  echo "Compiling typst diagrams to SVG..."
+  cd packages/docs/diagrams
+  for typ in *.typ; do
+    [ -f "$typ" ] || continue
+    name="${typ%.typ}"
+    echo "  $typ -> $name.svg"
+    typst compile --format svg "$typ" "../public/diagrams/$name.svg"
+  done
+  echo "Optimizing SVGs with svgo..."
+  cd ..
+  for svg in public/diagrams/*.svg; do
+    [ -f "$svg" ] || continue
+    echo "  Optimizing $(basename "$svg")"
+    bunx svgo --quiet "$svg" -o "$svg"
+  done
+  echo "Done. Diagrams in packages/docs/public/diagrams/"
+
+# Compile a single typst diagram (without optimization)
+[group('diagrams')]
+diagrams-compile name:
+  cd packages/docs/diagrams && typst compile --format svg "{{name}}.typ" "../public/diagrams/{{name}}.svg"
+
+# Watch typst diagrams for changes and recompile
+[group('diagrams')]
+diagrams-watch:
+  cd packages/docs/diagrams && typst watch --format svg reading-paths.typ ../public/diagrams/reading-paths.svg
 
 # Run all documentation tests
 [group('docs')]
@@ -437,7 +471,7 @@ docs-test-coverage:
 
 # Deploy documentation to Cloudflare Workers (preview)
 [group('docs')]
-docs-deploy-preview branch=`git branch --show-current`:
+docs-deploy-preview branch=`git branch --show-current`: diagrams-build
   #!/usr/bin/env bash
   set -euo pipefail
   cd packages/docs
@@ -492,7 +526,7 @@ docs-deploy-preview branch=`git branch --show-current`:
 
 # Deploy documentation to Cloudflare Workers (production)
 [group('docs')]
-docs-deploy-production:
+docs-deploy-production: diagrams-build
     @./scripts/docs/deploy-production.sh
 
 # List recent Cloudflare deployments

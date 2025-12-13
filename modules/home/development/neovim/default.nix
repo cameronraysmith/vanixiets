@@ -48,7 +48,12 @@
               nix.enable = true;
               python.enable = true;
               tailwind.enable = true;
+              tex.enable = true;
               typescript.enable = true;
+              typst = {
+                enable = true;
+                installDependencies = true;
+              };
             };
             test.core.enable = true;
             util.dot.enable = true;
@@ -57,6 +62,9 @@
           extraPackages = with pkgs; [
             vimPlugins.blink-copilot
             markdown-toc
+            pplatex
+            texliveWithPackages
+            typstWithPackages
           ];
 
           plugins = {

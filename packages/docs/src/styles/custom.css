@@ -1,3 +1,19 @@
 :root {
   --sl-font: 'CMU Sans Serif', ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
+
+/* Fix KaTeX SVG rendering in Starlight (github.com/withastro/starlight/issues/2511) */
+.katex-html svg {
+  height: inherit;
+}
+
+/* Center standalone images (markdown images on their own line become <p><img></p>)
+ * This applies to typst-generated diagram SVGs and other block-level images.
+ * Uses the Starlight content container class for specificity.
+ */
+.sl-markdown-content > p > img {
+  display: block;
+  margin: 1.5rem auto;
+  max-width: 100%;
+  height: auto;
+}

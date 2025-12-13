@@ -6,17 +6,17 @@ sidebar:
 ---
 
 This tutorial teaches you how secrets management works in this infrastructure.
-You'll understand the two-tier architecture, derive your age encryption key from your SSH key, and set up secrets that deploy automatically with your configuration.
+You'll understand the secrets architecture and migration state, derive your age encryption key from your SSH key, and set up secrets that deploy automatically with your configuration.
 
 ## What you will learn
 
 By the end of this tutorial, you will understand:
 
-- Why we use two tiers of secrets and when to use each
+- The clan vars target architecture and current migration state
 - How age encryption provides the foundation for secrets management
 - The Bitwarden bootstrap workflow for key derivation
 - How sops-nix integrates secrets into your home-manager configuration
-- Platform differences between darwin and NixOS secrets
+- The migration path from legacy sops-nix to clan vars
 
 ## Prerequisites
 
@@ -34,61 +34,60 @@ Adding new secrets takes 5-10 minutes once you understand the workflow.
 
 ## Understanding secrets architecture
 
-Before handling any secrets, let's understand why the architecture exists and how it serves different purposes.
+Before handling any secrets, let's understand the target architecture and current migration state.
 
-### Why two tiers?
+### Target: clan vars for all secrets
 
-This infrastructure separates secrets into two tiers because system-level and user-level secrets have fundamentally different lifecycles and access patterns.
+The long-term architecture uses **clan vars** for all secrets management across all platforms.
+Clan vars uses sops encryption internally and provides:
 
-**Tier 1: Clan vars (system-level)**
+**Unified management**: All secrets (system and user) managed through the clan inventory.
 
-System secrets are machine-specific credentials that the system needs to function.
-These include SSH host keys, zerotier network identities, and service credentials.
+**Automatic generation**: System secrets like SSH host keys and zerotier identities are generated automatically by clan during deployment.
 
-Characteristics:
-- Generated automatically by clan during deployment
-- Machine-scoped (each machine has its own)
-- Managed declaratively through the clan inventory
+**Declarative configuration**: Secrets are defined declaratively and deployed to appropriate locations (`/run/secrets/` for system, `~/.config/sops-nix/secrets/` for user).
+
+**Cross-platform support**: Works on both NixOS and darwin (nix-darwin).
+
+### Current state: migration in progress
+
+You'll currently encounter two approaches in this infrastructure:
+
+**Clan vars (target approach)**:
+- System secrets on NixOS machines (SSH host keys, zerotier identities, service credentials)
+- Managed automatically by clan
 - Deployed to `/run/secrets/` at system activation
-- **Only available on NixOS** (clan vars require the NixOS module system)
+- Available on both darwin and NixOS platforms
 
-**Tier 2: sops-nix (user-level)**
-
-User secrets are personal credentials you manage manually.
-These include GitHub tokens, API keys, and SSH signing keys.
-
-Characteristics:
-- Created manually by you
-- User-scoped (each user has their own secrets file)
-- Encrypted with age keys derived from your SSH key
+**Legacy sops-nix (being migrated away from)**:
+- User secrets currently managed manually
+- Created and encrypted by you
 - Deployed to `~/.config/sops-nix/secrets/` at home-manager activation
-- **Available on all platforms** (darwin and NixOS)
+- Will eventually be migrated to clan vars
 
-### Why this separation matters
+### Why the migration matters
 
-The two-tier approach provides:
+The migration from legacy sops-nix to clan vars provides:
 
-**Defense in depth**: Compromising a user's secrets doesn't expose system credentials, and vice versa.
+**Unified tooling**: One set of commands and patterns for all secrets instead of separate workflows.
 
-**Appropriate automation**: System secrets can be generated automatically because they follow predictable patterns (SSH host keys always use ed25519, zerotier identities have a standard format).
-User secrets require human judgment about what to store and how to use it.
+**Better automation**: Clan can generate and rotate secrets automatically while maintaining proper encryption.
 
-**Platform flexibility**: Darwin machines can't use clan vars (no NixOS module system), but they can use sops-nix for user secrets.
-The user experience is consistent across platforms.
+**Consistent experience**: Same approach works across darwin laptops and NixOS servers.
 
-For the complete architecture reference, see [Clan Integration: Two-Tier Secrets](/concepts/clan-integration#two-tier-secrets-architecture).
+For the complete architecture reference, see [Clan Integration: Secrets Management](/concepts/clan-integration#secrets-management).
 
-### Platform comparison
+### Current implementation status
 
 | Aspect | Darwin (macOS) | NixOS |
 |--------|----------------|-------|
-| Tier 1 (clan vars) | Not available | Automatic |
-| Tier 2 (sops-nix) | Available | Available |
-| System secrets | Manual or skipped | Generated by clan |
-| User secrets | sops-nix | sops-nix |
+| Clan vars | Supported but minimal usage | Active for system secrets |
+| Legacy sops-nix | Active for user secrets | Active for user secrets |
+| System secrets | Manual or via clan vars | Generated by clan vars |
+| User secrets | Legacy sops-nix (migrating) | Legacy sops-nix (migrating) |
 
-Darwin machines use Tier 2 only.
-NixOS machines use both tiers, with Tier 1 for system operations and Tier 2 for user customization.
+Both platforms support clan vars.
+The current implementation uses clan vars primarily for NixOS system secrets, with user secrets still on legacy sops-nix pending migration.
 
 ## Step 1: Understand age encryption
 
@@ -367,11 +366,11 @@ cat ~/.config/sops-nix/secrets/github-token
 You've now set up secrets management from scratch.
 Along the way, you learned:
 
-- **Two-tier architecture** separates system secrets (clan vars) from user secrets (sops-nix)
+- **Target architecture** uses clan vars for all secrets across all platforms
+- **Current migration state** still uses legacy sops-nix for user secrets
 - **Age encryption** provides the cryptographic foundation using simple key pairs
 - **SSH key derivation** via ssh-to-age reduces key management overhead
 - **sops integration** encrypts secrets at rest and decrypts them during activation
-- **Platform differences** mean darwin uses Tier 2 only, while NixOS uses both tiers
 
 ## Next steps
 
@@ -380,8 +379,8 @@ Now that you understand secrets:
 1. **Add more secrets** as needed.
    Use templates for complex formats; see the [Secrets Management Guide](/guides/secrets-management#home-manager-integration).
 
-2. **Understand Tier 1** if you manage NixOS machines.
-   Clan vars are generated automatically, but understanding them helps with troubleshooting.
+2. **Understand clan vars** for the target architecture.
+   Clan vars are generated automatically, and understanding them helps with migration planning.
 
 3. **Continue to platform-specific tutorials**:
    - [Darwin Deployment Tutorial](/tutorials/darwin-deployment) for macOS specifics

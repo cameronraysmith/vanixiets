@@ -1,42 +1,42 @@
 ---
-title: Secrets Management
-description: Managing secrets with the two-tier architecture using clan vars and sops-nix
+title: Secrets management
+description: Managing secrets using clan vars and legacy sops-nix
 sidebar:
-  order: 6
+  order: 7
 ---
 
-This guide documents secrets management in the infrastructure using the two-tier architecture.
-System-level secrets use clan vars (Tier 1), user-level secrets use sops-nix (Tier 2).
+This guide documents secrets management in the infrastructure.
+Clan vars is the primary secrets system, with legacy sops-nix for supplementary user secrets.
 
 ## Secrets architecture overview
 
-The infrastructure uses a two-tier secrets model.
-See [Clan Integration](/concepts/clan-integration#two-tier-secrets-architecture) for the complete architectural explanation.
+The infrastructure uses clan vars as the primary secrets system, with some legacy sops-nix patterns remaining.
+See [Clan Integration](/concepts/clan-integration#secrets-management) for the complete architectural explanation.
 
 For a learning-oriented walkthrough of setting up secrets from scratch, see the [Secrets Setup Tutorial](/tutorials/secrets-setup/).
 
-| Tier | Tool | Purpose | Platforms | Generation |
-|------|------|---------|-----------|------------|
-| Tier 1 | Clan vars | System-level, machine-specific | NixOS only | Automatic (`clan vars generate`) |
-| Tier 2 | sops-nix | User-level, personal | All (darwin + NixOS) | Manual (age key derivation) |
+| Status | Tool | Purpose | Platforms | Generation |
+|--------|------|---------|-----------|------------|
+| Primary | Clan vars | System and user secrets | NixOS (darwin support planned) | Automatic (`clan vars generate`) |
+| Supplementary | sops-nix | User secrets (legacy format) | All (darwin + NixOS) | Manual (age key derivation) |
 
-### Why two tiers?
+### Current usage patterns
 
-**Clan vars** excel at generated, machine-specific secrets.
+Secrets are split between two systems:
+
+**Clan vars** handles auto-generated, machine-specific secrets on NixOS hosts.
 The vars generator creates SSH keys, zerotier IDs, and other secrets that machines need automatically.
 
-**sops-nix** excels at user-specific, manually-entered secrets.
-API tokens, personal credentials, and signing keys must be created by humans, not generated.
+**sops-nix** handles manually-entered user secrets on all platforms.
+API tokens, personal credentials, and signing keys are created by humans using age encryption.
+New user secrets can use clan vars; legacy patterns remain functional.
 
-The tiers are complementary, not competing.
-Clan vars for system infrastructure, sops-nix for user credentials.
+## Clan vars (primary)
 
-## Tier 1: Clan vars (system-level)
+Clan vars is the primary secrets management system.
+Deployed on NixOS hosts (cinnabar, electrum, galena, scheelite) for system secrets.
 
-Clan vars handles system-level secrets that can be auto-generated.
-This tier is only available on NixOS hosts (cinnabar, electrum, galena, scheelite).
-
-### What belongs in Tier 1
+### Current clan vars usage
 
 - **SSH host keys** - Machine identity for SSH
 - **Zerotier identities** - Network identity for mesh VPN
@@ -84,7 +84,7 @@ ls /run/secrets/
 
 ### Rotation procedure
 
-To rotate Tier 1 secrets:
+To rotate clan vars secrets:
 
 ```bash
 # Regenerate secrets for a machine
@@ -96,12 +96,12 @@ clan machines update cinnabar
 
 Service restart may be required after rotation depending on which secrets changed.
 
-## Tier 2: sops-nix (user-level)
+## Legacy sops-nix (supplementary)
 
 sops-nix handles user-level secrets that require manual creation.
-This tier is available on all platforms (darwin and NixOS).
+Available on all platforms (darwin and NixOS).
 
-### What belongs in Tier 2
+### Current sops-nix usage
 
 - **GitHub tokens** - Personal access tokens, signing keys
 - **API keys** - Anthropic, OpenAI, and other service credentials
@@ -296,7 +296,7 @@ After generating your age public key, add it to `.sops.yaml`:
 
 ```yaml
 keys:
-  # User keys (Tier 2)
+  # User keys (legacy sops-nix)
   - &crs58-stibnite age1abc...xyz
   - &raquel-blackphos age1def...uvw
 
@@ -383,7 +383,7 @@ readlink -f ~/.config/sops-nix/secrets/users-crs58-github-token
 
 ### Rotation procedure
 
-To rotate Tier 2 secrets:
+To rotate sops-nix secrets:
 
 ```bash
 # 1. Edit the encrypted secrets file
@@ -417,8 +417,8 @@ sops updatekeys secrets/users/crs58.sops.yaml
 
 ### Darwin (stibnite, blackphos, rosegold, argentum)
 
-Darwin hosts use **Tier 2 only** (sops-nix).
-Clan vars (Tier 1) is not available on darwin.
+Darwin hosts currently use **legacy sops-nix only**.
+Clan vars support for darwin is planned but not yet implemented.
 
 **Secrets workflow:**
 
@@ -435,9 +435,9 @@ Clan vars (Tier 1) is not available on darwin.
 
 ### NixOS (cinnabar, electrum, galena, scheelite)
 
-NixOS hosts use **both tiers**.
+NixOS hosts use clan vars for system secrets and legacy sops-nix for user secrets.
 
-**Tier 1 workflow (system secrets):**
+**Clan vars workflow (system secrets):**
 
 ```bash
 # Generate machine secrets
@@ -447,31 +447,31 @@ clan vars generate cinnabar
 clan machines update cinnabar
 ```
 
-**Tier 2 workflow (user secrets):**
+**Legacy sops-nix workflow (user secrets):**
 
 Same as darwin - bootstrap age key, create sops secrets, configure home-manager.
 
 **Secrets deployment:**
 
-- Tier 1: `/run/secrets/` (system activation)
-- Tier 2: `~/.config/sops-nix/secrets/` (home-manager activation)
+- Clan vars: `/run/secrets/` (system activation)
+- sops-nix: `~/.config/sops-nix/secrets/` (home-manager activation)
 
 ### Platform comparison
 
 | Aspect | Darwin | NixOS |
 |--------|--------|-------|
-| Tier 1 (clan vars) | Not available | `clan vars generate`, `/run/secrets/` |
-| Tier 2 (sops-nix) | Age key + home-manager | Age key + home-manager |
+| Clan vars | Not yet implemented | `clan vars generate`, `/run/secrets/` |
+| Legacy sops-nix | Age key + home-manager | Age key + home-manager |
 | SSH host keys | Manual or existing | Clan vars generated |
 | Zerotier identity | Homebrew generates | Clan vars generated |
-| User API keys | sops-nix | sops-nix |
+| User API keys | sops-nix (legacy) | sops-nix (legacy) |
 | Deployment | `darwin-rebuild switch` | `clan machines update` |
 
 ## Working with secrets
 
 ### Creating new secrets
 
-**For user-level secrets (Tier 2):**
+**For user-level secrets (legacy sops-nix):**
 
 ```bash
 # 1. Edit or create secrets file
@@ -487,7 +487,7 @@ sops secrets/users/<username>.sops.yaml
 darwin-rebuild switch --flake .#<hostname>
 ```
 
-**For system-level secrets (Tier 1 - NixOS only):**
+**For system-level secrets (clan vars - NixOS only):**
 
 System secrets are typically auto-generated by clan vars.
 For custom system secrets, use clan vars generators or add to the machine's vars configuration.
@@ -523,7 +523,7 @@ head secrets/users/crs58.sops.yaml
 
 ## Troubleshooting
 
-### Tier 1 issues (clan vars - NixOS)
+### Clan vars issues (NixOS)
 
 **Vars not generating:**
 
@@ -561,7 +561,7 @@ ls -la /run/secrets/<secret-name>
 groups $(whoami)
 ```
 
-### Tier 2 issues (sops-nix - all platforms)
+### Legacy sops-nix issues (all platforms)
 
 **Cannot decrypt sops file:**
 
@@ -626,7 +626,7 @@ ls ~/.config/sops-nix/secrets/
 
 ## See also
 
-- [Clan Integration](/concepts/clan-integration) - Two-tier architecture overview
+- [Clan Integration](/concepts/clan-integration) - Secrets implementation architecture
 - [Host Onboarding](/guides/host-onboarding) - Platform-specific setup steps
 - [Home-Manager Onboarding](/guides/home-manager-onboarding) - User module patterns
 

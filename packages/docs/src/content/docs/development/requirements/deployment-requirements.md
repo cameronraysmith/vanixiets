@@ -9,7 +9,7 @@ This document specifies requirements for deploying configurations to target syst
 ## Overview
 
 Deployment requirements define how configurations are built, activated, validated, and rolled back on darwin (macOS) and NixOS systems.
-Requirements reflect the dendritic + clan architecture currently used across the infrastructure.
+Requirements reflect the deferred module composition + clan architecture currently used across the infrastructure.
 
 ## DR-001: Darwin deployment
 

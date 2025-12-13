@@ -6,6 +6,10 @@ sidebar:
 
 Task-oriented guides for common operations and workflows with this infrastructure.
 
+## Orientation
+
+- [Reading paths](/guides/reading-paths/) - Curated reading sequences through the documentation based on your goals
+
 ## Setup and Onboarding
 
 - [Getting started](/guides/getting-started/) - Bootstrap Nix and activate your first configuration
@@ -18,12 +22,12 @@ Task-oriented guides for common operations and workflows with this infrastructur
 
 ## Operations and Maintenance
 
-- [Secrets management](/guides/secrets-management/) - Manage encrypted secrets with the two-tier model (clan vars + sops-nix)
+- [Secrets management](/guides/secrets-management/) - Manage encrypted secrets with clan vars and legacy sops-nix
 - [Handling broken packages](/guides/handling-broken-packages/) - Fix broken packages from nixpkgs unstable with surgical stable fallbacks
 - [MCP servers usage](/guides/mcp-server-usage/) - Configure and use Model Context Protocol servers
 
 ## Architecture References
 
 For understanding the underlying patterns:
-- [Dendritic flake-parts Architecture](/concepts/dendritic-architecture) - Module organization pattern
+- [Deferred Module Composition](/concepts/deferred-module-composition) - Module organization pattern
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and secrets

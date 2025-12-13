@@ -2,10 +2,14 @@
 title: Getting started
 description: Quick start guide for bootstrapping and using this configuration
 sidebar:
-  order: 2
+  order: 3
 ---
 
 This guide walks through bootstrapping a new machine with this configuration.
+
+:::tip[Looking for a structured review?]
+See [Reading paths](/guides/reading-paths/) for recommended sequences of pages organized by topic of interest.
+:::
 
 :::note
 This repository pertains to a particular set of users and machines and is not directly structured as a template, but could relatively easily be treated as such via renaming.
@@ -14,6 +18,7 @@ This repository pertains to a particular set of users and machines and is not di
 ## Prerequisites
 
 Before you begin, ensure you have:
+
 - Physical access or SSH access to the target machine
 - macOS (for nix-darwin) or NixOS system
 - Internet connection for downloading Nix and packages
@@ -34,6 +39,7 @@ make bootstrap && exec $SHELL
 ```
 
 **What this does:**
+
 - Installs Nix using the [NixOS fork](https://github.com/NixOS/experimental-nix-installer) of the [Determinate Systems nix installer](https://github.com/DeterminateSystems/nix-installer)
 - Configures Nix with comprehensive settings for optimal performance:
   - Enables flakes and nix-command experimental features
@@ -52,6 +58,7 @@ direnv reload
 ```
 
 **What this does:**
+
 - Automatically loads the Nix development shell
 - Makes `just` and other dev tools available
 - Activates the project environment
@@ -63,6 +70,7 @@ make verify
 ```
 
 **This checks:**
+
 - Nix installation
 - Flakes support
 - Flake validity
@@ -74,6 +82,7 @@ make setup-user
 ```
 
 **What this does:**
+
 - Generates age key at `~/.config/sops/age/keys.txt` for secrets encryption
 - Skip this if you're just exploring the configuration
 
@@ -93,6 +102,7 @@ just activate --ask
 It would be best to first understand the more verbose ways of accomplishing similar tasks described below and then revert to using various relevant variations of the above command as the output is much more informative and easier to understand thanks to use of nix flake apps that call relevant subcommands of the [nh cli](https://github.com/nix-community/nh) and thus utilize the [nix-output-monitor](https://github.com/maralorn/nix-output-monitor) and [dix diff](https://github.com/faukah/dix).
 
 **For NixOS hosts** (local access):
+
 ```bash
 nixos-rebuild switch --flake .#cinnabar
 nixos-rebuild switch --flake .#electrum
@@ -104,6 +114,7 @@ If you are activating a configuration on a remote machine that has the same syst
 as your local machine, the default behavior is to build on the local machine and transfer the build outputs
 to the remote machine over ssh.
 :::
+
 ```bash
 clan machines update <hostname>
 
@@ -113,6 +124,7 @@ clan machines update electrum
 ```
 
 **For darwin hosts** (macOS):
+
 ```bash
 darwin-rebuild switch --flake .#<hostname>
 
@@ -120,7 +132,6 @@ darwin-rebuild switch --flake .#<hostname>
 darwin-rebuild switch --flake .#stibnite
 darwin-rebuild switch --flake .#blackphos
 ```
-
 
 ## Essential commands
 
@@ -137,6 +148,7 @@ just
 ### Common tasks
 
 **System management:**
+
 ```bash
 just activate          # Activate configuration for current user/host
 just update            # Update nix flake inputs
@@ -144,6 +156,7 @@ just verify            # Verify system builds without activating
 ```
 
 **Development:**
+
 ```bash
 just dev               # Enter development shell manually
 just lint              # Lint nix files
@@ -151,6 +164,7 @@ just clean             # Remove build output links
 ```
 
 **Secrets:**
+
 ```bash
 just check-secrets     # Verify secrets access
 just edit-secret FILE  # Edit encrypted secret
@@ -158,6 +172,7 @@ just validate-secrets  # Validate all secrets decrypt correctly
 ```
 
 **Troubleshooting:**
+
 ```bash
 just bisect-nixpkgs    # Find breaking nixpkgs commits
 just verify            # Test if configuration builds
@@ -167,7 +182,10 @@ See the full command reference by running `just help` after activating the dev s
 
 ## Understanding the structure
 
-This configuration uses the [dendritic flake-parts pattern](/concepts/dendritic-architecture) where every Nix file is a flake-parts module organized by *aspect* (feature) rather than by *host*:
+**Architecture note**: This infrastructure uses [deferred module composition](/concepts/deferred-module-composition/) (the aspect-based pattern) built on nixpkgs' module system.
+For deeper understanding of why patterns work, see [Module System Primitives](/concepts/module-system-primitives/).
+
+This configuration uses the [deferred module composition pattern](/concepts/deferred-module-composition) where every Nix file is a flake-parts module organized by *aspect* (feature) rather than by *host*:
 
 ```
 infra/
@@ -185,11 +203,12 @@ infra/
 │   ├── nixos/        # NixOS modules (all nixos hosts)
 │   └── nixpkgs/      # Overlay composition (channels, stable fallbacks, overrides)
 ├── pkgs/             # Custom packages (pkgs-by-name pattern)
-├── secrets/          # Encrypted secrets (sops-nix)
-└── vars/             # Clan-generated secrets (Tier 1)
+├── secrets/          # Encrypted secrets (legacy sops-nix)
+└── vars/             # Clan-generated secrets (clan vars)
 ```
 
 Key concepts:
+
 - **Aspect-based organization**: Features (git, shell, AI tools) defined once, shared across hosts
 - **Machine-specific configs**: Only truly unique settings in `modules/machines/`
 - **Auto-discovery**: [import-tree](https://github.com/vic/import-tree) automatically imports all modules
@@ -200,8 +219,8 @@ See [Repository Structure](/reference/repository-structure) for complete directo
 
 ### Learn the architecture
 
-- [Dendritic Architecture](/concepts/dendritic-architecture) - Core pattern where every file is a flake-parts module
-- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and two-tier secrets
+- [Deferred Module Composition](/concepts/deferred-module-composition) - Core pattern where every file is a flake-parts module
+- [Clan Integration](/concepts/clan-integration) - Multi-machine coordination and secrets management
 - [System-user Integration](/concepts/system-user-integration) - Admin vs non-admin users
 
 ### Set up a new machine
@@ -219,7 +238,7 @@ See [Repository Structure](/reference/repository-structure) for complete directo
 For in-depth learning-oriented walkthroughs, see:
 
 - [Bootstrap to Activation](/tutorials/bootstrap-to-activation/) - Step-by-step initial setup and activation
-- [Secrets Setup](/tutorials/secrets-setup/) - Two-tier secrets architecture configuration
+- [Secrets Setup](/tutorials/secrets-setup/) - Secrets management with clan vars and legacy sops-nix
 - [Darwin Deployment](/tutorials/darwin-deployment/) - Complete macOS deployment workflow
 - [NixOS Deployment](/tutorials/nixos-deployment/) - Cloud server provisioning and deployment
 
@@ -228,6 +247,7 @@ For in-depth learning-oriented walkthroughs, see:
 ### Nix not found after bootstrap
 
 **Solution:** Restart your shell or source the nix profile:
+
 ```bash
 exec $SHELL
 # or
@@ -238,6 +258,7 @@ source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 
 **Solution:** Ensure direnv is installed and hooked into your shell.
 Check `~/.bashrc` or `~/.zshrc` for:
+
 ```bash
 eval "$(direnv hook bash)"  # or zsh
 ```
@@ -245,6 +266,7 @@ eval "$(direnv hook bash)"  # or zsh
 ### Build failures
 
 **Solution:** Check if nixpkgs unstable has breaking changes:
+
 ```bash
 just verify  # Test build without activating
 ```
@@ -254,6 +276,7 @@ If build fails, see [Handling broken packages](/guides/handling-broken-packages)
 ### Secrets not decrypting
 
 **Solution:** Ensure your age key is properly set up:
+
 ```bash
 make setup-user                    # Generate age key
 just check-secrets                 # Verify access
@@ -285,6 +308,7 @@ See [Secrets Management](/guides/secrets-management) for detailed troubleshootin
 ## What's next?
 
 Now that you're set up, you can:
+
 - Explore the configuration files to understand the setup
 - Customize the configuration for your needs
 - Add new hosts or users following the onboarding guides

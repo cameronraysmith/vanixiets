@@ -1,38 +1,53 @@
 ---
 title: Architecture overview
-description: Understanding the architecture combining dendritic flake-parts, clan, and multi-channel overlay composition
+description: Understanding the architecture combining deferred module composition, clan, and multi-channel overlay composition
+sidebar:
+  order: 2
 ---
 
 This infrastructure combines three complementary architectural patterns to create a maintainable, multi-machine configuration that works across macOS and NixOS systems.
 
 ## Architecture overview
 
-### Layer 1: Base framework (flake-parts)
+### Foundation: Module system primitives (nixpkgs)
 
-Uses [flake-parts](https://flake.parts) as the foundation for modular flake composition.
-This enables perSystem configurations and composable flake modules, providing the structural foundation for organizing nix code.
+Uses nixpkgs' module system primitives for configuration composition.
+Flake-parts wraps `lib.evalModules` for flake composition.
 
 **What it provides:**
-- Modular flake composition
-- PerSystem configuration helpers
+- **lib.evalModules**: Fixpoint computation resolving modules into final configuration
+- **deferredModule type**: Option type for storing module values that are evaluated later by consumers
+- **Option merging**: Type-specific merge functions with priority handling
+
+### Framework: Flake composition (flake-parts)
+
+Uses [flake-parts](https://flake.parts) as the foundation for modular flake composition.
+Flake-parts wraps nixpkgs' evalModules for flake outputs, adding flake-specific conventions and ergonomics.
+
+**What it provides:**
+- Modular flake composition via evalModules wrapper
+- PerSystem configuration helpers (per-system evaluation)
+- flake.modules.* namespace convention (deferredModule type)
 - Clean separation of concerns across system types
 
-### Layer 2: Module organization (dendritic pattern)
+### Organization: Deferred module composition (aspect-based pattern)
 
-Uses the [dendritic flake-parts pattern](/concepts/dendritic-architecture/) for module organization.
-Every Nix file is a flake-parts module, organized by *aspect* (feature) rather than by *host*.
+Uses the deferredModule type (nixpkgs module system primitive) for storing configuration fragments.
+Every Nix file is a flake-parts module (evaluated at the top level) that exports deferredModule values (evaluated later when consumers import them), enabling cross-cutting concerns to reference the merged result.
+
+The [aspect-based deferred module composition pattern](/concepts/deferred-module-composition/) organizes these modules by *aspect* (feature) rather than by *host*, with flake-parts providing the evaluation context and namespace conventions.
 
 **Key principle**: Configuration is organized by what it does, not which machine it runs on.
 
 **What it provides:**
 - Aspect-based organization (features, not hosts)
-- Automatic module discovery via import-tree
+- Automatic module discovery via import-tree (adds to evalModules imports list)
 - Cross-cutting configuration spanning NixOS, nix-darwin, and home-manager
-- Aggregate modules for composing related features
+- Aggregate modules for composing related features (deferredModule monoid composition)
 
-See [Dendritic Architecture](/concepts/dendritic-architecture/) for detailed explanation.
+See [Deferred Module Composition](/concepts/deferred-module-composition/) for detailed explanation.
 
-### Layer 3: Multi-machine coordination (clan)
+### Orchestration: Multi-machine coordination (clan)
 
 Uses [clan](https://clan.lol/) for multi-machine coordination and deployment.
 Clan orchestrates deployments across the machine fleet but doesn't replace underlying NixOS/nix-darwin configuration.
@@ -40,14 +55,14 @@ Clan orchestrates deployments across the machine fleet but doesn't replace under
 **What it provides:**
 - Machine registry and deployment targets
 - Inventory system for service orchestration
-- System-level secrets generation (clan vars)
+- Secrets management with encryption (clan vars)
 - Unified deployment tooling
 
 See [Clan Integration](/concepts/clan-integration/) for detailed explanation.
 
-### Layer 4: Overlay composition (multi-channel fallback)
+### Packages: Overlay composition (multi-channel fallback)
 
-Adopts proven resilience patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos) for handling nixpkgs unstable breakage.
+Adopts proven patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos) for handling nixpkgs unstable breakage with stable fallbacks.
 
 **Key components:**
 - **Multi-channel inputs**: Stable, unstable, and patched nixpkgs variants
@@ -88,7 +103,7 @@ pkgs/
 
 ## Multi-channel overlay architecture
 
-The overlay system provides resilience against nixpkgs breakage through internal and external overlays composed in a single pass:
+The overlay system provides stable fallbacks for nixpkgs breakage through internal and external overlays composed in a single pass:
 
 ```nix
 # Overlay composition order (via lib.composeManyExtensions)
@@ -131,17 +146,12 @@ When nixpkgs unstable breaks, apply surgical fixes (stable fallback for one pack
 
 ## Secrets architecture
 
-Two-tier secrets model:
+Clan vars provides unified secrets management with sops encryption.
+All secrets (SSH keys, zerotier identities, API tokens, passphrases) are managed through clan vars for consistent deployment and access control.
 
-| Tier | System | Purpose | Management |
-|------|--------|---------|------------|
-| **Tier 1** | Clan vars | System-level generated secrets | `clan vars generate` |
-| **Tier 2** | sops-nix | User-level manual secrets | `sops secrets/...` |
+Some secrets use legacy direct sops-nix patterns alongside clan vars.
 
-- **Tier 1 examples**: SSH host keys, zerotier identities, LUKS passphrases
-- **Tier 2 examples**: GitHub tokens, API keys, signing keys
-
-See [Clan Integration](/concepts/clan-integration/) for details on two-tier secrets.
+See [Clan Integration](/concepts/clan-integration/) for detailed secrets architecture and migration status.
 
 ## Integration points
 
@@ -154,18 +164,18 @@ Clan deploys NixOS configurations to those resources.
 Terranix creates VMs → Clan installs NixOS → Clan deploys config
 ```
 
-### Dendritic + Clan
+### Deferred module composition + Clan
 
-Dendritic modules define configurations.
+Deferred modules define configurations.
 Clan machines import and deploy those configurations.
 
 ```
-Dendritic modules (aspect-based) → Clan machines (host-based) → Deployment
+Deferred modules (aspect-based) → Clan machines (host-based) → Deployment
 ```
 
 ### Home-Manager + Clan
 
-Home-manager modules defined in dendritic structure.
+Home-manager modules defined using deferred module composition.
 Machine configurations import home-manager modules.
 Clan deploys full machine config including home-manager.
 
@@ -190,7 +200,7 @@ The combination provides:
 
 - **Scalable organization** - Dendritic pattern handles growing complexity
 - **Multi-machine coordination** - Clan orchestrates heterogeneous fleet
-- **Robust nixpkgs handling** - Overlay patterns provide resilience
+- **Robust nixpkgs handling** - Overlay patterns provide stable fallbacks
 - **Clean separation** - Each layer has clear responsibilities
 
 ## References
@@ -198,10 +208,10 @@ The combination provides:
 - [flake-parts](https://flake.parts) - Modular flake composition
 - [dendritic pattern](https://vic.github.io/dendrix/Dendritic.html) - Module organization
 - [clan](https://clan.lol/) - Multi-machine coordination
-- [mirkolenz/nixos](https://github.com/mirkolenz/nixos) - Multi-channel resilience patterns
+- [mirkolenz/nixos](https://github.com/mirkolenz/nixos) - Multi-channel stable fallback patterns
 
 ## See also
 
-- [Dendritic flake-parts Architecture](/concepts/dendritic-architecture/) - Module organization pattern details
+- [Deferred Module Composition](/concepts/deferred-module-composition/) - Module organization pattern details
 - [Clan Integration](/concepts/clan-integration/) - Multi-machine coordination details
 - [Repository Structure](/reference/repository-structure) - Complete directory layout

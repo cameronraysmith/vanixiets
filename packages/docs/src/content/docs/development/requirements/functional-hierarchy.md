@@ -12,7 +12,7 @@ Functions describe what the system does from a black-box perspective without spe
 The functional hierarchy captures user-visible functions accessible through commands, configuration options, and flake outputs.
 Functions are organized by purpose rather than technical implementation, reflecting the artefact-based requirements engineering approach.
 
-This hierarchy documents the current dendritic flake-parts + clan architecture. Historical migration functions (MF-001 to MF-004) are preserved for reference, marked as completed.
+This hierarchy documents the current deferred module composition + clan architecture. Historical migration functions (MF-001 to MF-004) are preserved for reference, marked as completed.
 
 ## Configuration management functions
 
@@ -22,7 +22,7 @@ This hierarchy documents the current dendritic flake-parts + clan architecture. 
 
 **Inputs**:
 - flake.nix with imports
-- Module files (dendritic pattern via import-tree)
+- Module files (deferred module composition via import-tree)
 - Input dependencies (locked in flake.lock)
 
 **Outputs**:
@@ -59,7 +59,7 @@ See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adr
 
 **Inputs**:
 - Host definitions in modules/hosts/<hostname>/
-- Dendritic base modules
+- Deferred modules
 - Clan inventory (target)
 
 **Outputs**:
@@ -650,30 +650,30 @@ See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adr
 
 **Related use cases**: Build performance optimization
 
-## Migration functions (HISTORICAL - COMPLETED)
+## Migration functions
 
-These functions describe the migration from nixos-unified to dendritic + clan architecture.
+These functions describe the migration from nixos-unified to deferred module composition + clan architecture.
 Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, rosegold, argentum; 4 nixos VPS: cinnabar, electrum, galena, scheelite).
 
-### MF-001: Convert modules to dendritic pattern [COMPLETE]
+### MF-001: Convert modules to deferred module composition
 
-**Purpose**: Transform nixos-unified modules to dendritic
+**Purpose**: Transform nixos-unified modules to deferred module composition
 
 **Inputs**:
 - Existing module in modules/{darwin,home,nixos}/
-- Dendritic pattern knowledge
+- Deferred module composition pattern knowledge
 - flake.modules.* namespace
 
 **Outputs**:
-- Module in dendritic structure
+- Module in deferred module composition structure
 - Cross-platform capability
 - Type-safe imports via config.flake.modules.*
 
-**Status**: COMPLETE - All modules converted to dendritic pattern with auto-discovery via import-tree
+**Status**: COMPLETE - All modules converted to deferred module composition with auto-discovery via import-tree
 
 **Related use cases**: UC-007 (Migration)
 
-### MF-002: Migrate secrets to clan vars [COMPLETE]
+### MF-002: Migrate secrets to clan vars
 
 **Purpose**: Convert sops-nix secrets to clan vars generators
 
@@ -684,14 +684,14 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 
 **Outputs**:
 - Generated secrets via clan vars
-- External secrets remain in sops-nix
-- Two-tier hybrid architecture operational
+- Legacy user secrets remain in sops-nix during migration
+- Migration architecture operational
 
-**Status**: COMPLETE - Clan vars generators operational for generated secrets, sops-nix retained for external secrets
+**Status**: COMPLETE - Clan vars generators operational for secrets, sops-nix retained for legacy user secrets during migration
 
 **Related use cases**: UC-007 (Migration), UC-003 (Secrets)
 
-### MF-003: Validate migration readiness [COMPLETE]
+### MF-003: Validate migration readiness
 
 **Purpose**: Ensure host ready for migration
 
@@ -709,7 +709,7 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 
 **Related use cases**: UC-007 (Migration)
 
-### MF-004: Monitor post-migration stability [COMPLETE]
+### MF-004: Monitor post-migration stability
 
 **Purpose**: Track system stability after migration
 
@@ -718,7 +718,7 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 - Functionality validation tests
 - Stability time window (1-2 weeks)
 
-**Status**: COMPLETE - Fleet stable on dendritic + clan architecture
+**Status**: COMPLETE - Fleet stable on deferred module composition + clan architecture
 
 **Related use cases**: UC-007 (Migration)
 
@@ -896,7 +896,7 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 - **UC-004 (Multi-host services)**: MC-001, MC-002, MC-003, MC-004, DF-007, OF-001, OF-002, OF-004
 - **UC-005 (Handle broken packages)**: PM-001, PM-002, PM-003, PM-004
 - **UC-006 (Overlay network)**: ON-001, ON-002, ON-003, ON-004, MC-002, DF-007, OF-002
-- **UC-007 (Migration - HISTORICAL)**: MF-001, MF-002, MF-003, MF-004, DF-001, DF-002, DF-005, DF-006
+- **UC-007 (Migration)**: MF-001, MF-002, MF-003, MF-004, DF-001, DF-002, DF-005, DF-006
 
 ### By operational category
 
@@ -970,11 +970,11 @@ CI/CD (CI)
 ├── CI-003: Run static analysis
 └── CI-004: Cache build outputs
 
-Migration (MF) [HISTORICAL - COMPLETED]
-├── MF-001: Convert modules to dendritic pattern [COMPLETE]
-├── MF-002: Migrate secrets to clan vars [COMPLETE]
-├── MF-003: Validate migration readiness [COMPLETE]
-└── MF-004: Monitor post-migration stability [COMPLETE]
+Migration (MF)
+├── MF-001: Convert modules to deferred module composition
+├── MF-002: Migrate secrets to clan vars
+├── MF-003: Validate migration readiness
+└── MF-004: Monitor post-migration stability
 
 Infrastructure Provisioning (IF)
 ├── IF-001: Provision Hetzner VPS instances

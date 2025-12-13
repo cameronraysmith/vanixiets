@@ -2,7 +2,7 @@
 title: Domain model
 ---
 
-This document describes the domain in which the system operates, including the Nix ecosystem and current architecture components based on dendritic flake-parts + clan.
+This document describes the domain in which the system operates, including the Nix ecosystem and current architecture components based on deferred module composition + clan.
 
 ## Nix ecosystem overview
 
@@ -27,7 +27,7 @@ This document describes the domain in which the system operates, including the N
 
 ## Current architecture domain model
 
-### Dendritic flake-parts pattern
+### Deferred module composition
 
 - **Core principle**: Every file is a flake-parts module.
 - **Namespace**: Modules contribute to `flake.modules.<type>.*` where type is `nixos`, `darwin`, or `homeManager`.
@@ -111,7 +111,7 @@ Application values use `config.flake.*` namespace.
 - **Import pattern**: Modules imported via import-tree auto-discovery, composed through module system.
 - **specialArgs usage**: Minimal - only framework values (inputs, self). Application values via `config.flake.*`.
 
-### Multi-channel resilience pattern
+### Multi-channel stable fallback pattern
 
 - **Problem**: Single channel can have broken packages.
 - **Solution**: Multiple nixpkgs inputs with overlay-based selection.
@@ -395,16 +395,16 @@ final: prev: {
 
 ### Historical note: migration from nixos-unified
 
-The infrastructure completed migration from nixos-unified to dendritic flake-parts + clan in November 2024.
+The infrastructure completed migration from nixos-unified to deferred module composition + clan.
 
 **Migration was progressive host-by-host**:
-1. **Initial validation**: Validated dendritic + clan in test-clan repository
+1. **Initial validation**: Validated deferred module composition + clan in test-clan repository
 2. **VPS foundation**: Deployed cinnabar VPS using validated patterns
 3. **Darwin migrations**: Migrated darwin hosts incrementally (blackphos → rosegold → argentum → stibnite)
 4. **Architecture cleanup**: Removed nixos-unified, completed cleanup
 
 **Per-host migration steps**:
-1. Created `modules/hosts/<hostname>/default.nix` using dendritic pattern
+1. Created `modules/hosts/<hostname>/default.nix` using deferred module composition
 2. Defined in clan inventory
 3. Generated clan vars
 4. Tested build: `nix build .#darwinConfigurations.<hostname>.system`
@@ -468,13 +468,13 @@ See `glossary.md` for comprehensive term definitions.
 ### Architecture components
 
 - flake-parts: <https://flake.parts/>
-- Dendritic pattern: <https://github.com/mightyiam/dendritic>
+- Deferred module composition pattern: <https://github.com/mightyiam/dendritic>
 - import-tree: <https://github.com/vic/import-tree>
 - clan: <https://docs.clan.lol/>
 - terranix: <https://terranix.org/>
 - disko: <https://github.com/nix-community/disko>
 - srvos: <https://github.com/nix-community/srvos>
-- Multi-channel resilience: [Handling broken packages](/guides/handling-broken-packages)
+- Multi-channel stable fallbacks: [Handling broken packages](/guides/handling-broken-packages)
 
 ### Nix ecosystem
 
@@ -485,5 +485,5 @@ See `glossary.md` for comprehensive term definitions.
 
 ### Historical/deprecated
 
-- nixos-unified: <https://github.com/srid/nixos-unified> (deprecated November 2024, replaced by dendritic + clan)
+- nixos-unified: <https://github.com/srid/nixos-unified> (deprecated, replaced by deferred module composition + clan)
 - sops-nix: <https://github.com/Mic92/sops-nix> (replaced by clan vars system)

@@ -1,17 +1,17 @@
 ---
 title: Repository Structure
-description: Directory layout for dendritic flake-parts + clan architecture
+description: Directory layout for deferred module composition + clan architecture
 sidebar:
   order: 2
 ---
 
-Complete reference for the repository structure using dendritic flake-parts organization with clan integration.
+Complete reference for the repository structure using deferred module composition organization with clan integration.
 
 ## Directory tree
 
 ```
 infra/
-├── modules/             # Dendritic flake-parts modules (auto-discovered)
+├── modules/             # Deferred module composition modules (auto-discovered)
 │   ├── clan/            # Clan integration
 │   │   ├── core.nix     # Clan flakeModule import
 │   │   ├── machines.nix # Machine registry
@@ -106,7 +106,7 @@ infra/
 
 ## Module organization
 
-### Dendritic modules (auto-discovered)
+### Deferred module composition modules (auto-discovered)
 
 Every file in `modules/` is a flake-parts module, auto-discovered via import-tree.
 File path determines module organization, not flake output names.
@@ -186,7 +186,7 @@ inventory.instances.zerotier = {
 
 ### Overlay composition
 
-All overlays are collected into `flake.nixpkgsOverlays` via dendritic list concatenation, then composed in order using `lib.composeManyExtensions`, followed by merging custom packages:
+All overlays are collected into `flake.nixpkgsOverlays` via deferred module composition list concatenation, then composed in order using `lib.composeManyExtensions`, followed by merging custom packages:
 
 ```nix
 # modules/nixpkgs/compose.nix - composed via lib.composeManyExtensions
@@ -226,7 +226,7 @@ Note: ccstatusline was previously a custom package but is now sourced from the l
 
 ## Secrets structure
 
-### Tier 1: Clan vars (system-level)
+### Clan vars (system secrets)
 
 ```
 vars/
@@ -240,7 +240,7 @@ vars/
 
 Generated via `clan vars generate`, encrypted with machine age keys.
 
-### Tier 2: sops-nix (user-level)
+### sops-nix (legacy user secrets)
 
 ```
 secrets/
@@ -324,6 +324,6 @@ Examples:
 
 ## See also
 
-- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization pattern
+- [Deferred Module Composition](/concepts/deferred-module-composition) - Module organization pattern
 - [Clan Integration](/concepts/clan-integration) - Multi-machine coordination
 - [Architecture overview](/concepts/architecture-overview) - Overall architecture

@@ -1,43 +1,14 @@
+# TeX Live distribution for LaTeX document processing
+#
+# Uses pkgs.texliveWithPackages from the texlive overlay which includes
+# scheme-small plus packages for academic writing and algorithms.
 { ... }:
 {
   flake.modules.homeManager.tools =
     { pkgs, ... }:
-    let
-      tex = pkgs.texlive.combine {
-        inherit (pkgs.texlive)
-          scheme-small
-          algorithm2e
-          algorithmicx
-          algorithms
-          algpseudocodex
-          apacite
-          appendix
-          caption
-          cm-super
-          dvipng
-          framed
-          git-latexdiff
-          latexdiff
-          latexmk
-          latexpand
-          multirow
-          ncctools
-          pdfcrop
-          pdfjam
-          placeins
-          rsfs
-          sttools
-          threeparttable
-          type1cm
-          vruler
-          wrapfig
-          xurl
-          ;
-      };
-    in
     {
       home.packages = [
-        tex
+        pkgs.texliveWithPackages
       ];
     };
 }

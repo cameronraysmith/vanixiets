@@ -1,7 +1,7 @@
 ---
 title: User Onboarding
 sidebar:
-  order: 4
+  order: 5
 ---
 
 This guide covers onboarding users to machines where nix-darwin or NixOS is already configured by an admin.
@@ -36,7 +36,7 @@ Users in this infrastructure are configured in one of two ways:
 
 ### User module locations
 
-User configurations follow the [dendritic pattern](/concepts/dendritic-architecture):
+User configurations follow the [deferred module composition pattern](/concepts/deferred-module-composition):
 
 ```
 modules/
@@ -115,9 +115,9 @@ Add the user to the machine configuration:
 }
 ```
 
-### Step 3: Create user secrets (Tier 2)
+### Step 3: Create user secrets (legacy sops-nix)
 
-User secrets are managed via sops-nix.
+User secrets are managed via legacy sops-nix.
 
 Create the secrets file:
 
@@ -287,7 +287,7 @@ Use clan inventory user instances when:
 - Deploying users to NixOS machines via clan
 - You need declarative system user creation with encrypted password management
 - Managing users across multiple machines with shared credentials
-- Integrating with clan's vars-based secrets infrastructure (Tier 1)
+- Integrating with clan's vars-based secrets infrastructure (clan vars)
 
 This pattern is NixOS-specific.
 For darwin machines, continue using the integrated user setup described above.
@@ -351,7 +351,7 @@ The `roles.default.settings` block controls system user creation:
 
 **`share = true`**: Share password across machines (optional)
 - When `true`, all machines with this user instance use the same encrypted password
-- Password stored in clan vars (Tier 1 secrets)
+- Password stored in clan vars
 - When `false`, each machine has unique password
 
 **`prompt = false`**: Password generation method (optional)
@@ -525,7 +525,7 @@ Aggregates are defined in `modules/home/_aggregates.nix`.
 
 ## Secrets setup
 
-All users use [Tier 2 (sops-nix)](/concepts/clan-integration#two-tier-secrets-architecture) for personal secrets.
+All users use [sops-nix](/concepts/clan-integration#secrets-management) for personal secrets.
 
 ### Generate age key
 
@@ -679,5 +679,5 @@ Key points:
 ## See also
 
 - [Host Onboarding](/guides/host-onboarding/) - Initial machine setup
-- [Dendritic Architecture](/concepts/dendritic-architecture) - Module organization
-- [Clan Integration](/concepts/clan-integration) - Two-tier secrets architecture
+- [Deferred Module Composition](/concepts/deferred-module-composition) - Module organization
+- [Clan Integration](/concepts/clan-integration) - Secrets management

@@ -105,7 +105,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-B01 (reliable infrastructure), G-U06 (overlay networking)
 
-**Status**: Achieved (8-machine fleet operational, November 2024)
+**Status**: Achieved (8-machine fleet operational)
 
 ### G-U03: Declarative secrets management
 
@@ -125,7 +125,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-B02 (sustainable maintenance)
 
-**Status**: Achieved (two-tier secrets: sops-nix for home-manager + clan vars for system, November 2024)
+**Status**: Achieved (clan vars for secrets with legacy sops-nix for home-manager)
 
 ### G-U04: Cross-platform module composition
 
@@ -139,11 +139,11 @@ These goals focus on how the system is intended to be used.
 - No code duplication for cross-cutting concerns
 - Module composition explicit and type-safe
 
-**Dependencies**: G-S03 (dendritic flake-parts pattern)
+**Dependencies**: G-S03 (deferred module composition)
 
 **Supports**: G-B02 (sustainable maintenance), G-S01 (maintainable structure)
 
-**Status**: Achieved (dendritic pattern enables cross-platform module composition, November 2024)
+**Status**: Achieved (deferred module composition enables cross-platform module composition)
 
 ### G-U05: Surgical package fixes without system rollback
 
@@ -163,7 +163,7 @@ These goals focus on how the system is intended to be used.
 
 **Status**: Achieved in current state (multi-channel fallback), must be preserved during migration
 
-**Reference**: [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
+**Reference**: [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
 
 ### G-U06: Secure overlay networking
 
@@ -181,7 +181,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-U02 (multi-host coordination)
 
-**Status**: Achieved (zerotier mesh operational: cinnabar controller + 7 peers, November 2024)
+**Status**: Achieved (zerotier mesh operational: cinnabar controller + 7 peers)
 
 ### G-U07: Fast, cached builds
 
@@ -221,7 +221,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-B02 (sustainable maintenance), G-B03 (template value)
 
-**Status**: Achieved (dendritic pattern provides improved organization, November 2024)
+**Status**: Achieved (deferred module composition provides improved organization)
 
 ### G-S02: Clear, idiomatic patterns
 
@@ -250,7 +250,7 @@ These goals focus on system architecture, design, and technical properties.
 **Rationale**:
 - Nix language provides no native compile-time type checking
 - Module system provides type checking at evaluation time
-- dendritic pattern maximizes module system usage by making every file a module
+- deferred module composition maximizes module system usage by making every file a module
 
 **Success criteria**:
 - Configuration errors caught at evaluation, not runtime
@@ -258,15 +258,15 @@ These goals focus on system architecture, design, and technical properties.
 - Invalid configurations rejected early
 - Clear error messages guide fixes
 
-**Dependencies**: G-S04 (dendritic pattern adoption)
+**Dependencies**: G-S04 (deferred module composition adoption)
 
 **Supports**: G-B01 (reliable infrastructure), G-S01 (maintainable structure)
 
-**Status**: Achieved (dendritic pattern maximizes module system usage for type safety, November 2024)
+**Status**: Achieved (deferred module composition maximizes module system usage for type safety)
 
 **Reference**: Strategic rationale in migration plan (type safety through module system maximization)
 
-### G-S04: Dendritic flake-parts pattern adoption
+### G-S04: Deferred module composition adoption
 
 **Description**: Adopt "every file is a flake-parts module" organizational pattern.
 
@@ -284,9 +284,9 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-S03 (maximum type safety), G-S01 (maintainable structure), G-U04 (cross-platform composition)
 
-**Status**: Achieved (dendritic flake-parts pattern adopted across all configurations, November 2024)
+**Status**: Achieved (deferred module composition adopted across all configurations)
 
-**Reference**: dendritic-flake-parts README, pattern documentation
+**Reference**: deferred module composition README, pattern documentation
 
 ### G-S05: Comprehensive development environment
 
@@ -325,7 +325,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-U02 (multi-host coordination), G-U03 (declarative secrets), G-U06 (overlay networking)
 
-**Status**: Achieved (clan integrated with inventory, vars, and services, November 2024)
+**Status**: Achieved (clan integrated with inventory, vars, and services)
 
 ### G-S07: Clan vars system adoption
 
@@ -345,9 +345,9 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-U03 (declarative secrets)
 
-**Status**: Achieved (two-tier architecture: clan vars for system secrets, sops-nix preserved for home-manager, November 2024)
+**Status**: Achieved (clan vars for secrets with legacy sops-nix preserved for home-manager during migration)
 
-### G-S08: Multi-channel nixpkgs resilience preservation
+### G-S08: Stable fallback preservation
 
 **Description**: Maintain ability to use multiple nixpkgs channels for package-specific fixes.
 
@@ -365,7 +365,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Status**: Achieved, must be preserved during migration
 
-**Reference**: [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
+**Reference**: [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
 
 ## Goal hierarchy and relationships
 
@@ -428,28 +428,28 @@ System Goals
 ├── G-S07: Clan vars system
 │   ├── Supports: G-U03
 │   └── Dependencies: G-S06
-└── G-S08: Multi-channel resilience
+└── G-S08: Stable fallbacks
     ├── Supports: G-U05, G-B01
     └── Dependencies: None (achieved)
 ```
 
 ### Historical conflicts and resolutions
 
-**Conflict (resolved)**: G-S04 (dendritic) + G-S06 (clan) vs. nixos-unified architecture
+**Conflict (resolved)**: G-S04 (deferred module composition) + G-S06 (clan) vs. nixos-unified architecture
 
-**Resolution (completed November 2024)**: Migrated to dendritic + clan, abandoned nixos-unified
-- ● Dendritic and clan both eliminate specialArgs antipattern
+**Resolution (completed November 2024)**: Migrated to deferred module composition + clan, abandoned nixos-unified
+- ● Deferred module composition and clan both eliminate specialArgs antipattern
 - ● Both use flake-parts as foundation
 - ● nixos-unified replaced completely
 - ● Progressive migration completed successfully
 
 **Conflict (resolved)**: G-U03 (declarative secrets) vs. manual sops-nix
 
-**Resolution (completed November 2024)**: Two-tier architecture implemented
-- ● sops-nix preserved for home-manager secrets (user-level)
-- ● clan vars deployed for system secrets (declarative generation)
-- ● Hybrid approach operational across 8-machine fleet
-- ● Both systems coexist successfully
+**Resolution (completed November 2024)**: Migration architecture implemented
+- ● sops-nix preserved for home-manager secrets (legacy user-level)
+- ● clan vars deployed for secrets (declarative generation, target for all)
+- ● Migration approach operational across 8-machine fleet
+- ● Both systems coexist successfully during migration
 
 **Conflict (resolved)**: G-U02 (multi-host coordination) vs. per-host management
 
@@ -463,19 +463,19 @@ System Goals
 
 ### Achieved goals
 
-- ● G-S01: Maintainable codebase structure (dendritic pattern, November 2024)
-- ● G-S03: Maximum type safety (dendritic maximizes module system, November 2024)
-- ● G-S04: Dendritic flake-parts pattern adoption (November 2024)
+- ● G-S01: Maintainable codebase structure (deferred module composition)
+- ● G-S03: Maximum type safety (deferred module composition maximizes module system)
+- ● G-S04: Deferred module composition adoption (November 2024)
 - ● G-S05: Comprehensive development environment (ADR-0009)
-- ● G-S06: Clan-core integration (inventory, vars, services, November 2024)
-- ● G-S07: Clan vars system adoption (two-tier with sops-nix, November 2024)
-- ● G-S08: Multi-channel resilience (multi-channel overlay pattern)
+- ● G-S06: Clan-core integration (inventory, vars, services)
+- ● G-S07: Clan vars system adoption (with legacy sops-nix migration)
+- ● G-S08: Stable fallbacks (multi-channel overlay pattern)
 - ● G-U01: Efficient development workflows (preserved through migration)
-- ● G-U02: Multi-host coordination (8-machine fleet, November 2024)
-- ● G-U03: Declarative secrets management (two-tier architecture, November 2024)
-- ● G-U04: Cross-platform module composition (dendritic pattern, November 2024)
+- ● G-U02: Multi-host coordination (8-machine fleet)
+- ● G-U03: Declarative secrets management (clan vars with legacy sops-nix migration)
+- ● G-U04: Cross-platform module composition (deferred module composition)
 - ● G-U05: Surgical package fixes (via G-S08)
-- ● G-U06: Secure overlay networking (zerotier mesh, November 2024)
+- ● G-U06: Secure overlay networking (zerotier mesh)
 - ● G-U07: Fast, cached builds (cachix integration)
 - ● G-B01: Reliable infrastructure (stable through migration)
 
@@ -490,21 +490,21 @@ System Goals
 ### Goals preserved through migration
 
 Successfully maintained:
-- ● G-S08: Multi-channel resilience (nixpkgs stable fallbacks pattern preserved)
+- ● G-S08: Stable fallbacks (nixpkgs stable fallbacks pattern preserved)
 - ● G-U05: Surgical package fixes (overlay composition maintained)
 - ● G-U01: Efficient workflows (all functionality preserved)
 - ● G-B01: Reliable infrastructure (stability maintained)
 
 ### Goals achieved by migration
 
-Enabled through dendritic + clan architecture:
-- ● G-S03: Maximum type safety (dendritic maximizes module system)
-- ● G-S04: Dendritic pattern adoption (all configurations migrated)
+Enabled through deferred module composition + clan architecture:
+- ● G-S03: Maximum type safety (deferred module composition maximizes module system)
+- ● G-S04: Deferred module composition adoption (all configurations migrated)
 - ● G-S06: Clan-core integration (inventory, vars, services operational)
-- ● G-S07: Clan vars system (two-tier architecture with sops-nix)
+- ● G-S07: Clan vars system (with legacy sops-nix migration)
 - ● G-U02: Multi-host coordination (8-machine fleet operational)
-- ● G-U03: Declarative secrets (two-tier: clan vars + sops-nix)
-- ● G-U04: Cross-platform composition (dendritic cross-cutting modules)
+- ● G-U03: Declarative secrets (clan vars with legacy sops-nix migration)
+- ● G-U04: Cross-platform composition (deferred module composition cross-cutting modules)
 - ● G-U06: Overlay networking (zerotier mesh: cinnabar + 7 peers)
 
 ### Migration validation results
@@ -520,8 +520,8 @@ All hosts migrated successfully:
 
 - ADR-0009: Nix development environment
 - ADR-0014: Design principles
-- [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns): Multi-channel resilience pattern
+- [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns): Multi-channel stable fallback pattern
 - [Handling broken packages](/guides/handling-broken-packages): Operational guide
-- Migration plan: Phased dendritic + clan adoption
-- dendritic pattern: Type safety through module system maximization
+- Migration plan: Phased deferred module composition + clan adoption
+- deferred module composition: Type safety through module system maximization
 - clan: Multi-host coordination capabilities
