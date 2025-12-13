@@ -30,7 +30,7 @@ Infra operates within the Nix ecosystem providing declarative, reproducible infr
 
 ### Current state vision
 
-**Foundation**: Dendritic flake-parts pattern + clan integration providing maximum type safety and multi-host coordination.
+**Foundation**: Deferred module composition + clan integration providing maximum type safety and multi-host coordination.
 
 **Key capabilities**:
 - **Type-safe configuration**: Every file is a flake-parts module, eliminating specialArgs antipattern
@@ -45,10 +45,10 @@ Infra operates within the Nix ecosystem providing declarative, reproducible infr
 
 ### Achieved architecture features
 
-**Foundation**: Dendritic flake-parts pattern + clan integration (OPERATIONAL).
+**Foundation**: Deferred module composition + clan integration (OPERATIONAL).
 
 **Achieved capabilities**:
-- **Maximum type safety**: Every file is a flake-parts module, specialArgs antipattern eliminated ✓
+- **Maximum type safety**: Deferred module evaluation, specialArgs antipattern eliminated ✓
 - **Multi-host coordination**: Clan inventory system managing 8 machines, services, and relationships ✓
 - **Declarative secrets**: Clan vars system with automatic generation and deployment ✓
 - **Overlay networking**: Zerotier VPN providing secure 8-machine mesh network ✓
@@ -62,14 +62,14 @@ Infra operates within the Nix ecosystem providing declarative, reproducible infr
 - **4 NixOS VPS machines**: cinnabar (Hetzner zerotier controller), electrum (Hetzner), galena (GCP CPU), scheelite (GCP GPU) ✓
 - **4 Darwin workstations**: stibnite, blackphos, rosegold, argentum (all aarch64-darwin) ✓
 - **8-machine overlay network**: Zerotier mesh with cinnabar as controller, all others as peers ✓
-- **Migration complete**: All hosts migrated from nixos-unified to dendritic+clan architecture ✓
+- **Migration complete**: All hosts migrated from nixos-unified to deferred module composition + clan architecture ✓
 
 ## Rich picture: Current architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                         Nix-Config System                              │
-│                    (Dendritic + Clan Architecture)                     │
+│          (Deferred Module Composition + Clan Architecture)             │
 └──────────────────────────────────────────────────────────────────────┘
 
 External Dependencies                System Boundary
@@ -164,8 +164,8 @@ External Dependencies                System Boundary
 Configuration Flow:
   Developer ──► Edit modules/ ──► Git commit ──► CI checks ──► Deploy
                    │                                              │
-                   └──► Dendritic pattern ◄──────────────────────┘
-                        (every file is module)
+                   └──► Deferred composition ◄───────────────────┘
+                        (deferred evaluation)
 
 Secrets Flow:
   Developer ──► Define generators ──► Clan vars generate
@@ -182,7 +182,7 @@ Secrets Flow:
 
 **Description**: Define entire system configuration in version-controlled Nix files.
 
-**Status**: OPERATIONAL - Implemented via dendritic flake-parts pattern.
+**Status**: OPERATIONAL - Implemented via deferred module composition.
 
 **User benefit**: Reproducible systems, easy rollback, configuration as documentation.
 
@@ -232,7 +232,7 @@ Secrets Flow:
 
 **Description**: Share modules across darwin, nixos, and home-manager.
 
-**Status**: OPERATIONAL - Dendritic pattern enables single module targeting multiple platforms.
+**Status**: OPERATIONAL - Deferred module composition enables single module targeting multiple platforms.
 
 **User benefit**: Reduced duplication, clear separation of platform-specific vs shared code.
 
@@ -240,7 +240,7 @@ Secrets Flow:
 
 **Description**: Catch configuration errors at evaluation time through module system.
 
-**Status**: OPERATIONAL - Maximized via dendritic pattern (every file is module, specialArgs eliminated).
+**Status**: OPERATIONAL - Maximized via deferred module composition (specialArgs eliminated).
 
 **User benefit**: Earlier error detection, better error messages, safer refactoring.
 
@@ -321,7 +321,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 
 ### Initial validation (COMPLETE)
 
-**Objective**: Prove dendritic + clan integration works in test environment.
+**Objective**: Prove deferred module composition + clan integration works in test environment.
 
 **Outcome**: Validated patterns ready for production deployment via test-clan repository.
 
@@ -334,7 +334,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 **Key features enabled**:
 - F-009: VPS infrastructure (4 machines: cinnabar, electrum, galena, scheelite)
 - F-006: Overlay networking (controller role on cinnabar)
-- F-008: Type-safe configuration (dendritic on NixOS)
+- F-008: Type-safe configuration (deferred module composition on NixOS)
 
 **Status**: Complete.
 
@@ -344,7 +344,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 
 **Key features enabled**:
 - F-007: Cross-platform module composition
-- F-008: Type-safe configuration (dendritic on darwin)
+- F-008: Type-safe configuration (deferred module composition on darwin)
 - F-005: Multi-host coordination (8-machine inventory)
 - F-006: Overlay networking (peer role on all darwin hosts)
 - F-003: Declarative secrets (clan vars)
@@ -353,9 +353,9 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 
 ### Architecture cleanup (COMPLETE)
 
-**Objective**: Remove nixos-unified, complete migration to dendritic+clan.
+**Objective**: Remove nixos-unified, complete migration to deferred module composition + clan.
 
-**Outcome**: Full dendritic + clan architecture operational across all 8 machines.
+**Outcome**: Full deferred module composition + clan architecture operational across all 8 machines.
 
 **Status**: Complete.
 
@@ -370,7 +370,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 
 ### Architecture achievement (COMPLETE)
 
-- ✓ Dendritic pattern adopted (every file is module) - OPERATIONAL
+- ✓ Deferred module composition adopted - OPERATIONAL
 - ✓ Clan integration functional (inventory, vars, services) - OPERATIONAL
 - ✓ Type safety maximized through module system (F-008) - OPERATIONAL
 - ✓ Multi-host coordination operational (F-005) - 8 machines managed
@@ -385,7 +385,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 - ✓ Stability demonstrated (all hosts stable in production)
 - ✓ Rollback capability preserved throughout migration
 - ✓ Primary workstation (stibnite) migrated last after all others proven
-- ✓ nixos-unified removed, dendritic+clan architecture fully operational
+- ✓ nixos-unified removed, deferred module composition + clan architecture fully operational
 
 ## References
 

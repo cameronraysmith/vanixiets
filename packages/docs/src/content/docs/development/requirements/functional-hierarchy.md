@@ -12,7 +12,7 @@ Functions describe what the system does from a black-box perspective without spe
 The functional hierarchy captures user-visible functions accessible through commands, configuration options, and flake outputs.
 Functions are organized by purpose rather than technical implementation, reflecting the artefact-based requirements engineering approach.
 
-This hierarchy documents the current dendritic flake-parts + clan architecture. Historical migration functions (MF-001 to MF-004) are preserved for reference, marked as completed.
+This hierarchy documents the current deferred module composition + clan architecture. Historical migration functions (MF-001 to MF-004) are preserved for reference, marked as completed.
 
 ## Configuration management functions
 
@@ -22,7 +22,7 @@ This hierarchy documents the current dendritic flake-parts + clan architecture. 
 
 **Inputs**:
 - flake.nix with imports
-- Module files (dendritic pattern via import-tree)
+- Module files (deferred module composition via import-tree)
 - Input dependencies (locked in flake.lock)
 
 **Outputs**:
@@ -59,7 +59,7 @@ See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adr
 
 **Inputs**:
 - Host definitions in modules/hosts/<hostname>/
-- Dendritic base modules
+- Deferred modules
 - Clan inventory (target)
 
 **Outputs**:
@@ -655,21 +655,21 @@ See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adr
 These functions describe the migration from nixos-unified to dendritic + clan architecture.
 Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, rosegold, argentum; 4 nixos VPS: cinnabar, electrum, galena, scheelite).
 
-### MF-001: Convert modules to dendritic pattern
+### MF-001: Convert modules to deferred module composition
 
-**Purpose**: Transform nixos-unified modules to dendritic
+**Purpose**: Transform nixos-unified modules to deferred module composition
 
 **Inputs**:
 - Existing module in modules/{darwin,home,nixos}/
-- Dendritic pattern knowledge
+- Deferred module composition pattern knowledge
 - flake.modules.* namespace
 
 **Outputs**:
-- Module in dendritic structure
+- Module in deferred module composition structure
 - Cross-platform capability
 - Type-safe imports via config.flake.modules.*
 
-**Status**: COMPLETE - All modules converted to dendritic pattern with auto-discovery via import-tree
+**Status**: COMPLETE - All modules converted to deferred module composition with auto-discovery via import-tree
 
 **Related use cases**: UC-007 (Migration)
 
@@ -718,7 +718,7 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 - Functionality validation tests
 - Stability time window (1-2 weeks)
 
-**Status**: COMPLETE - Fleet stable on dendritic + clan architecture
+**Status**: COMPLETE - Fleet stable on deferred module composition + clan architecture
 
 **Related use cases**: UC-007 (Migration)
 

@@ -11,7 +11,7 @@ This document details the use cases from the system vision with complete scenari
 The usage model specifies how the system is intended to be used from a black-box perspective.
 Each use case describes user-visible interactions without constraining internal implementation.
 
-Use cases describe the operational dendritic flake-parts + clan architecture managing an 8-machine fleet (4 darwin laptops, 4 NixOS VPS) with terranix-provisioned cloud infrastructure.
+Use cases describe the operational deferred module composition + clan architecture managing an 8-machine fleet (4 darwin laptops, 4 NixOS VPS) with terranix-provisioned cloud infrastructure.
 
 ## Use case catalog
 
@@ -28,7 +28,7 @@ Use cases describe the operational dendritic flake-parts + clan architecture man
 
 **Main flow**:
 1. Administrator creates host configuration in `modules/hosts/<hostname>/default.nix`
-2. System imports dendritic base modules (`config.flake.modules.{darwin,nixos}.base`)
+2. System imports deferred modules (`config.flake.modules.{darwin,nixos}.base`)
 3. Administrator adds host to clan inventory with appropriate tags and machineClass
 4. Administrator generates clan vars for the host: `clan vars generate <hostname>`
 5. System generates required secrets (SSH keys, service credentials)
@@ -50,7 +50,7 @@ Use cases describe the operational dendritic flake-parts + clan architecture man
 - Host ready for feature module additions
 
 **References**:
-- [Context: Domain model](../context/domain-model/) - Dendritic pattern, clan inventory
+- [Context: Domain model](../context/domain-model/) - Deferred module composition, clan inventory
 - [Context: Project scope](../context/project-scope/) - Bootstrap rationale
 - Migration plan: docs/notes/clan/integration-plan.md - Bootstrap patterns
 
@@ -77,9 +77,9 @@ Use cases describe the operational dendritic flake-parts + clan architecture man
 **Actor**: Developer/Maintainer (crs58)
 
 **Preconditions**:
-- Dendritic + clan architecture operational
+- Deferred module composition + clan architecture operational
 - Repository structure in place (`modules/{base,shell,dev,hosts}`)
-- Understanding of dendritic cross-cutting concern pattern
+- Understanding of cross-cutting concern pattern
 - Target platforms identified (darwin, nixos, home-manager)
 
 **Main flow**:
@@ -108,9 +108,8 @@ Use cases describe the operational dendritic flake-parts + clan architecture man
 - Module composable with other features
 
 **References**:
-- [Context: Domain model](../context/domain-model/) - Dendritic cross-cutting concerns
+- [Context: Domain model](../context/domain-model/) - Cross-cutting concerns
 - [Context: Goals](../context/goals-and-objectives/) - G-U04: Cross-platform module composition
-- dendritic-flake-parts/README.md - Pattern documentation
 
 **Example**:
 ```nix
@@ -398,15 +397,15 @@ inventory.instances.zerotier-local = {
 # - Network member authorization
 ```
 
-### UC-007: Migrate host to dendritic + clan architecture
+### UC-007: Migrate host to deferred module composition + clan architecture
 
-**Status**: COMPLETE (November 2024) - This use case describes the historical migration workflow from nixos-unified to dendritic + clan architecture. All machines have been migrated. Preserved as reference for understanding the migration patterns used.
+**Status**: COMPLETE (November 2024) - This use case describes the historical migration workflow from nixos-unified to deferred module composition + clan architecture. All machines have been migrated. Preserved as reference for understanding the migration patterns used.
 
 **Actor**: System Administrator (crs58)
 
 **Preconditions**:
 - Target host currently on nixos-unified architecture
-- Dendritic + clan patterns validated (Phase 0)
+- Deferred module composition + clan patterns validated (Phase 0)
 - VPS infrastructure operational (Phase 1) if darwin migration
 - Previous host migrations successful and stable (if not first migration)
 - Target host fully backed up
@@ -414,8 +413,8 @@ inventory.instances.zerotier-local = {
 
 **Main flow**:
 1. Administrator creates feature branch for migration: `git checkout -b migrate-<hostname>`
-2. Administrator creates dendritic host configuration in `modules/hosts/<hostname>/default.nix`
-3. Administrator converts relevant modules from `modules/{darwin,home,nixos}/` to dendritic pattern
+2. Administrator creates deferred module composition host configuration in `modules/hosts/<hostname>/default.nix`
+3. Administrator converts relevant modules from `modules/{darwin,home,nixos}/` to deferred module composition pattern
 4. Administrator imports converted modules in host config via `config.flake.modules.*`
 5. Administrator adds host to clan inventory with appropriate tags
 6. Administrator generates clan vars for host: `clan vars generate <hostname>`
@@ -425,11 +424,11 @@ inventory.instances.zerotier-local = {
 10. Administrator performs dry-run: `darwin-rebuild switch --flake .#<hostname> --dry-run`
 11. Administrator backs up current generation: `darwin-rebuild --list-generations`
 12. Administrator deploys new configuration: `darwin-rebuild switch --flake .#<hostname>`
-13. System activates dendritic + clan configuration, deploys secrets
+13. System activates deferred module composition + clan configuration, deploys secrets
 14. Administrator validates functionality: development tools, services, networking
 15. Administrator connects to zerotier network: verifies overlay network connectivity
 16. Administrator monitors stability for 1-2 weeks before next host migration
-17. Host successfully migrated to dendritic + clan architecture
+17. Host successfully migrated to deferred module composition + clan architecture
 
 **Alternate flows**:
 - **A1**: If build fails, administrator debugs errors, fixes module issues, retries build
@@ -441,7 +440,7 @@ inventory.instances.zerotier-local = {
 - **A7**: If stability issues emerge, administrator keeps host on nixos-unified, investigates root cause before retrying
 
 **Postconditions**:
-- Host operational on dendritic + clan architecture
+- Host operational on deferred module composition + clan architecture
 - All functionality from nixos-unified preserved
 - Clan vars deployed and functional
 - Zerotier network connectivity established
@@ -464,7 +463,7 @@ inventory.instances.zerotier-local = {
 - Phase 5: stibnite (darwin) - COMPLETE - primary workstation migrated
 - Phase 6: Cleanup - COMPLETE - nixos-unified removed
 
-**Example dendritic conversion**:
+**Example deferred module composition conversion**:
 ```nix
 # Current (nixos-unified): configurations/darwin/blackphos.nix
 { inputs, config, pkgs, ... }:
@@ -476,7 +475,7 @@ inventory.instances.zerotier-local = {
   networking.hostName = "blackphos";
 }
 
-# Target (dendritic): modules/hosts/blackphos/default.nix
+# Target (deferred module composition): modules/hosts/blackphos/default.nix
 { config, ... }:
 {
   flake.modules.darwin."hosts/blackphos" = {
@@ -536,7 +535,7 @@ UC-007 (Migration)
 
 **Skills required**:
 - Nix language and module system proficiency
-- Understanding of dendritic flake-parts pattern
+- Understanding of deferred module composition
 - Familiarity with clan architecture
 - System administration (darwin and NixOS)
 - Network configuration (zerotier, SSH)
