@@ -85,7 +85,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-B01 (reliable infrastructure)
 
-**Status**: Achieved in current state, must be preserved during migration
+**Status**: Achieved
 
 ### G-U02: Multi-host coordination
 
@@ -161,7 +161,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-B01 (reliable infrastructure)
 
-**Status**: Achieved in current state (multi-channel fallback), must be preserved during migration
+**Status**: Achieved (multi-channel fallback)
 
 **Reference**: [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
 
@@ -363,7 +363,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-U05 (surgical package fixes), G-B01 (reliable infrastructure)
 
-**Status**: Achieved, must be preserved during migration
+**Status**: Achieved
 
 **Reference**: [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
 
@@ -416,7 +416,7 @@ System Goals
 ├── G-S03: Maximum type safety
 │   ├── Supports: G-B01, G-S01
 │   └── Dependencies: G-S04
-├── G-S04: Dendritic pattern adoption
+├── G-S04: Deferred module composition adoption
 │   ├── Supports: G-S03, G-S01, G-U04
 │   └── Conflicts: nixos-unified
 ├── G-S05: Comprehensive dev environment
@@ -451,7 +451,7 @@ System Goals
 - ● G-U05: Surgical package fixes (via G-S08)
 - ● G-U06: Secure overlay networking (zerotier mesh)
 - ● G-U07: Fast, cached builds (cachix integration)
-- ● G-B01: Reliable infrastructure (stable through migration)
+- ● G-B01: Reliable infrastructure
 
 ### Ongoing goals
 
