@@ -147,7 +147,7 @@ Related: NixOS, activation.
 Abbreviation: none.
 Related: flake-parts, autowiring, specialArgs, dendritic flake-parts pattern.
 
-## Target architecture terms
+## Architecture terms
 
 **aspect**: Cross-cutting concern or feature spanning multiple configuration classes (NixOS, nix-darwin, home-manager).
 Terminology from [Aspect-Oriented Programming (AOP)](https://en.wikipedia.org/wiki/Aspect-oriented_programming) where aspects are program functionalities cutting across multiple modules.
