@@ -5,7 +5,7 @@ title: "ADR-0017: Deferred Module Composition Overlay Patterns"
 - **Status**: Accepted
 - **Date**: 2024-12-02
 - **Scope**: Nix configuration
-- **Supersedes**: [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/)
+- **Supersedes**: ADR-0003 (deleted, nixos-unified overlay patterns)
 
 ## Context
 
@@ -395,7 +395,7 @@ nixpkgs.overlays = [ inputs.self.overlays.default ];
 
 ### Internal
 
-- [ADR-0003: Overlay composition patterns](0003-overlay-composition-patterns/) (superseded)
+- ADR-0003: Overlay composition patterns (deleted, superseded by this ADR)
 - [Module System Primitives](/concepts/module-system-primitives/) - Option merging and list concatenation semantics
 - [Terminology Glossary](/development/context/glossary/) - Module system terminology guide
 - test-clan validation: `~/projects/nix-workspace/test-clan/`
