@@ -5,8 +5,14 @@ sidebar:
   order: 5
 ---
 
-This infrastructure uses **deferred module composition** (a popular approach referred to as the dendritic flake-parts pattern), where every Nix file is a flake-parts module that exports deferredModule values (configuration fragments stored for later evaluation by consumers like NixOS, nix-darwin, or home-manager), and configuration is organized by *aspect*—a cross-cutting concern that spans multiple configuration classes (NixOS, nix-darwin, home-manager) rather than being confined to a single host.
-The pattern leverages the Nix module system's fixpoint semantics to enable compositional configuration across platforms.
+This infrastructure uses **deferred module composition** (an approach sometimes referred to as the "dendritic" flake-parts pattern), a form of **traced Kleisli module composition**: flake-parts module functions defined in a directory tree of Nix files assign `types.deferredModule` values to `flake.modules.<class>.<name>` namespaces.
+Those values are later resolved by consumer `lib.evalModules` calls, which compute:
+
+$$\text{config}^* = f(\text{config}^*) \quad \text{where} \quad f = \text{merge}(m_1(-), \ldots, m_n(-))$$
+
+is the merged effect of all imported modules, and $\text{config}^*$ is the unique [fixed point](https://en.wikipedia.org/wiki/Least_fixed_point) guaranteed given [Scott-continuous](https://en.wikipedia.org/wiki/Scott_continuity) module functions.
+
+Configuration is organized by *aspect*—a cross-cutting concern that spans multiple configuration classes (NixOS, nix-darwin, home-manager) rather than being confined to a single host.
 See [Why "aspect"](#why-aspect) below for the full rationale behind this terminology.
 
 ## Credits and attribution
