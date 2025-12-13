@@ -40,7 +40,7 @@ The term "aspect" in this context refers to a cross-cutting concern or feature t
 This terminology draws from [Aspect-Oriented Programming (AOP)](https://en.wikipedia.org/wiki/Aspect-oriented_programming), where "aspects" are program functionalities that cut across multiple modules without clean encapsulation in any single component.
 We use "aspect" rather than simply "feature" to emphasize this cross-cutting nature: an aspect isn't confined to a single host or platform, it's a concern that applies broadly across your infrastructure.
 
-In the dendritic pattern, an aspect is a unified capability defined once and applied across relevant platforms.
+In deferred module composition, an aspect is a unified capability defined once and applied across relevant platforms.
 Rather than defining SSH configuration separately for each host, the "SSH aspect" configures SSH across NixOS (server setup), nix-darwin (builtin ssh client), and home-manager (client config) from a single location.
 This aspect-oriented organization eliminates duplication and makes features composable.
 
@@ -63,7 +63,7 @@ The module system's fixpoint computation resolves these cross-cutting references
 
 ### The two-layer architecture
 
-In the dendritic pattern, every file participates in two distinct evaluation contexts:
+In deferred module composition, every file participates in two distinct evaluation contexts:
 
 **Outer layer (the file itself)**: A flake-parts module evaluated with `class = "flake"`.
 The file's top-level function is called immediately during the collection phase of the top-level `evalModules`.
@@ -90,7 +90,7 @@ When a home-manager configuration imports `flakeModulesHome.tools`, *then* that 
 
 ### Understanding the mechanism
 
-The dendritic pattern works because of three compositional layers:
+Deferred module composition works because of three compositional layers:
 
 **Layer 0: Module system foundation** (nixpkgs `lib.evalModules`)
 
@@ -361,7 +361,7 @@ This deferred module composition pattern enables fine-grained modules that can b
 
 ## Integration with clan
 
-Clan coordinates multi-machine deployments while this deferred module composition pattern organizes the modules being deployed.
+Clan coordinates multi-machine deployments while deferred module composition organizes the modules being deployed.
 The integration works because both use the same module system foundation: clan calls nixosSystem or darwinSystem (which call evalModules), importing deferred modules from `flake.modules.*` namespaces.
 
 This pattern exports deferred modules → clan imports them → evalModules resolves fixpoint with clan's arguments (system, config, pkgs, etc.).
