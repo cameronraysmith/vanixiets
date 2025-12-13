@@ -1,6 +1,6 @@
 ---
 title: Architecture overview
-description: Understanding the architecture combining dendritic flake-parts, clan, and multi-channel overlay composition
+description: Understanding the architecture combining deferred module composition, clan, and multi-channel overlay composition
 sidebar:
   order: 2
 ---
@@ -164,18 +164,18 @@ Clan deploys NixOS configurations to those resources.
 Terranix creates VMs → Clan installs NixOS → Clan deploys config
 ```
 
-### Dendritic + Clan
+### Deferred module composition + Clan
 
-Dendritic modules define configurations.
+Deferred modules define configurations.
 Clan machines import and deploy those configurations.
 
 ```
-Dendritic modules (aspect-based) → Clan machines (host-based) → Deployment
+Deferred modules (aspect-based) → Clan machines (host-based) → Deployment
 ```
 
 ### Home-Manager + Clan
 
-Home-manager modules defined in dendritic structure.
+Home-manager modules defined using deferred module composition.
 Machine configurations import home-manager modules.
 Clan deploys full machine config including home-manager.
 
