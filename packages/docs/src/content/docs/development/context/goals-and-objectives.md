@@ -459,37 +459,6 @@ System Goals
 - ⏳ G-B03: Template value (continuous improvement)
 - ⏳ G-S02: Clear patterns (continuous refinement)
 
-## Migration outcomes (November 2024)
-
-### Goals preserved through migration
-
-Successfully maintained:
-- ● G-S08: Stable fallbacks (nixpkgs stable fallbacks pattern preserved)
-- ● G-U05: Surgical package fixes (overlay composition maintained)
-- ● G-U01: Efficient workflows (all functionality preserved)
-- ● G-B01: Reliable infrastructure (stability maintained)
-
-### Goals achieved by migration
-
-Enabled through deferred module composition + clan architecture:
-- ● G-S03: Maximum type safety (deferred module composition maximizes module system)
-- ● G-S04: Deferred module composition adoption (all configurations migrated)
-- ● G-S06: Clan-core integration (inventory, vars, services operational)
-- ● G-S07: Clan vars system (with legacy sops-nix migration)
-- ● G-U02: Multi-host coordination (8-machine fleet operational)
-- ● G-U03: Declarative secrets (clan vars with legacy sops-nix migration)
-- ● G-U04: Cross-platform composition (deferred module composition cross-cutting modules)
-- ● G-U06: Overlay networking (zerotier mesh: cinnabar + 7 peers)
-
-### Migration validation results
-
-All hosts migrated successfully:
-- **Initial validation**: ● Validated G-S04 + G-S06 compatibility in test-clan
-- **VPS foundation**: ● Validated G-U06 (zerotier), G-S07 (vars) on cinnabar
-- **Darwin migrations**: ● Validated G-U04 (cross-platform), G-S03 (type safety) on stibnite; validated G-U02 (multi-host) with blackphos; validated with rosegold and argentum
-- **Additional VPS hosts**: ● Validated with electrum, galena, scheelite
-- **Architecture cleanup**: ● Confirmed all goals achieved, G-B02 sustainable
-
 ## References
 
 - ADR-0009: Nix development environment
