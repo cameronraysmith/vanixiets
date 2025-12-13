@@ -15,8 +15,6 @@ This documentation captures the architecture and operational context for the def
 
 **Current state**: Deferred module composition with clan integration managing 8 hosts (4 darwin, 4 nixos) with multi-machine coordination, declarative secrets, and overlay networking.
 
-**Architecture migration complete**: The migration from nixos-unified to deferred module composition + clan completed. All documentation reflects current state.
-
 ## Context documents
 
 ### [Project scope](/development/context/project-scope/)

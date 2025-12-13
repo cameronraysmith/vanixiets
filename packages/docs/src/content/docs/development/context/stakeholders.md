@@ -23,7 +23,7 @@ title: Stakeholders
 - Efficient development environment
 - Learning and adopting modern Nix patterns
 
-**Domain knowledge**: Deep understanding of Nix ecosystem, flake-parts, nixos-unified, sops-nix, darwin/NixOS configuration
+**Domain knowledge**: Deep understanding of Nix ecosystem, flake-parts, clan-core, sops-nix, darwin/NixOS configuration
 
 **Decision authority**: Final authority on all technical and architectural decisions
 
