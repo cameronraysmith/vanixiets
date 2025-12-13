@@ -461,6 +461,9 @@ The host is now:
 
 ## External resources
 
+Note: External repositories use "dendritic" in their names and documentation.
+This infrastructure uses "deferred module composition" as the preferred terminology for the pattern, emphasizing the underlying module system semantics rather than the metaphorical name.
+
 - [Dendritic pattern documentation](https://vic.github.io/dendrix/Dendritic.html) - Comprehensive explanation by Victor Borja
 - [mightyiam/dendritic](https://github.com/mightyiam/dendritic) - Original pattern definition
 - [flake.parts](https://flake.parts) - Foundation framework documentation
