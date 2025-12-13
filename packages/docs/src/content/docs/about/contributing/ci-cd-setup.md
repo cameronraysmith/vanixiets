@@ -248,7 +248,7 @@ The workflow executes these jobs with intelligent per-job caching (jobs skip if 
 **Validation jobs (run based on file changes):**
 5. ● **bootstrap-verification**: Validate Makefile bootstrap workflow
 6. ● **config-validation**: Test config.nix user definitions
-7. ● **autowiring-validation**: Verify nixos-unified autowiring
+7. ● **autowiring-validation**: Verify legacy autowiring patterns (deprecated, may be removed)
 8. ● **secrets-workflow**: Test sops-nix mechanics
 9. ● **justfile-activation**: Validate justfile recipes
 
