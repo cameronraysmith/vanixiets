@@ -139,7 +139,7 @@ home-manager.users.crs58 = {
 };
 ```
 
-Home-manager configuration is defined OUTSIDE clan, in dendritic modules.
+Home-manager configuration is defined OUTSIDE clan, using deferred module composition.
 When you run `clan machines update`, home-manager activates as part of system activation.
 Clan doesn't know about home-manager specifically.
 
@@ -216,13 +216,13 @@ Terranix creates resources, calls clan to deploy NixOS.
 ### Clan + Home-Manager
 
 ```
-Dendritic modules (define) →  Clan machines (deploy) →  Home-Manager (activates)
+Deferred modules (define) →  Clan machines (deploy) →  Home-Manager (activates)
 ───────────────────────────────────────────────────────────────────────────────
 modules/home/ai/*.nix      →  clan machines update    →  home-manager switch
 modules/home/shell/*.nix   →  (part of system config) →  (part of activation)
 ```
 
-Home-manager modules defined in dendritic structure, deployed via clan.
+Home-manager modules defined using deferred module composition, deployed via clan.
 
 ### Clan + sops-nix
 
@@ -264,7 +264,7 @@ Clan installs NixOS and deploys configurations to those resources.
 ### "Clan replaces home-manager"
 
 **Reality**: Clan coordinates machine deployments which may include home-manager.
-Home-manager configurations are defined outside clan in dendritic modules.
+Home-manager configurations are defined outside clan using deferred module composition.
 Clan's `machines update` deploys the full machine config including home-manager.
 
 ### "Clan vars can't handle user secrets"
