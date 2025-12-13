@@ -165,6 +165,14 @@ Rules are conditional standard procedures that guide implementation but can be a
 - Cross-cutting concerns enabled (one module, multiple targets)
 - Condition: Can use platform-specific modules when truly platform-specific functionality required
 
+**Priority hierarchy for architecture conflicts**:
+When deferred module composition patterns and clan requirements conflict, apply this priority:
+1. Clan functionality (non-negotiable - clan features must work)
+2. Deferred module composition patterns (best-effort - follow when possible)
+3. Pattern purity (flexible - can deviate when necessary)
+- Rule: Preserve clan functionality first, optimize with deferred module composition where feasible
+- Condition: Can deviate from pure deferred module composition if required for clan compatibility
+
 **Dependency management**:
 - Pin all flake inputs with `follows` where appropriate
 - Use multi-channel pattern for stable fallbacks
