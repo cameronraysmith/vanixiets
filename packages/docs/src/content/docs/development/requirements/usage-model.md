@@ -398,7 +398,7 @@ inventory.instances.zerotier-local = {
 # - Network member authorization
 ```
 
-### UC-007: Migrate host to dendritic + clan architecture (Historical - completed November 2024)
+### UC-007: Migrate host to dendritic + clan architecture
 
 **Status**: COMPLETE (November 2024) - This use case describes the historical migration workflow from nixos-unified to dendritic + clan architecture. All machines have been migrated. Preserved as reference for understanding the migration patterns used.
 

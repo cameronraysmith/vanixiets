@@ -650,12 +650,12 @@ See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adr
 
 **Related use cases**: Build performance optimization
 
-## Migration functions (HISTORICAL - COMPLETED)
+## Migration functions
 
 These functions describe the migration from nixos-unified to dendritic + clan architecture.
 Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, rosegold, argentum; 4 nixos VPS: cinnabar, electrum, galena, scheelite).
 
-### MF-001: Convert modules to dendritic pattern [COMPLETE]
+### MF-001: Convert modules to dendritic pattern
 
 **Purpose**: Transform nixos-unified modules to dendritic
 
@@ -673,7 +673,7 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 
 **Related use cases**: UC-007 (Migration)
 
-### MF-002: Migrate secrets to clan vars [COMPLETE]
+### MF-002: Migrate secrets to clan vars
 
 **Purpose**: Convert sops-nix secrets to clan vars generators
 
@@ -691,7 +691,7 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 
 **Related use cases**: UC-007 (Migration), UC-003 (Secrets)
 
-### MF-003: Validate migration readiness [COMPLETE]
+### MF-003: Validate migration readiness
 
 **Purpose**: Ensure host ready for migration
 
@@ -709,7 +709,7 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 
 **Related use cases**: UC-007 (Migration)
 
-### MF-004: Monitor post-migration stability [COMPLETE]
+### MF-004: Monitor post-migration stability
 
 **Purpose**: Track system stability after migration
 
@@ -896,7 +896,7 @@ Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, roseg
 - **UC-004 (Multi-host services)**: MC-001, MC-002, MC-003, MC-004, DF-007, OF-001, OF-002, OF-004
 - **UC-005 (Handle broken packages)**: PM-001, PM-002, PM-003, PM-004
 - **UC-006 (Overlay network)**: ON-001, ON-002, ON-003, ON-004, MC-002, DF-007, OF-002
-- **UC-007 (Migration - HISTORICAL)**: MF-001, MF-002, MF-003, MF-004, DF-001, DF-002, DF-005, DF-006
+- **UC-007 (Migration)**: MF-001, MF-002, MF-003, MF-004, DF-001, DF-002, DF-005, DF-006
 
 ### By operational category
 
@@ -970,11 +970,11 @@ CI/CD (CI)
 ├── CI-003: Run static analysis
 └── CI-004: Cache build outputs
 
-Migration (MF) [HISTORICAL - COMPLETED]
-├── MF-001: Convert modules to dendritic pattern [COMPLETE]
-├── MF-002: Migrate secrets to clan vars [COMPLETE]
-├── MF-003: Validate migration readiness [COMPLETE]
-└── MF-004: Monitor post-migration stability [COMPLETE]
+Migration (MF)
+├── MF-001: Convert modules to dendritic pattern
+├── MF-002: Migrate secrets to clan vars
+├── MF-003: Validate migration readiness
+└── MF-004: Monitor post-migration stability
 
 Infrastructure Provisioning (IF)
 ├── IF-001: Provision Hetzner VPS instances
