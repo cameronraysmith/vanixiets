@@ -127,7 +127,7 @@ Application values use `config.flake.*` namespace.
 - **Upstream patch**: Apply patch from upstream PR to current version
 - **Build override**: Custom build parameters or dependencies
 
-**Reference**: [Handling broken packages](/guides/handling-broken-packages), [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns)
+**Reference**: [Handling broken packages](/guides/handling-broken-packages), [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns)
 
 ### Secrets management
 
