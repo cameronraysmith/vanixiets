@@ -42,7 +42,7 @@ If you're new to this infrastructure, follow this sequence:
 **[Bootstrap to Activation](/tutorials/bootstrap-to-activation)** — Start here.
 
 Learn how to set up a machine from scratch.
-You'll understand Nix flakes, the dendritic module pattern, direnv integration, and the activation process.
+You'll understand Nix flakes, the deferred module composition pattern, direnv integration, and the activation process.
 
 - **Prerequisites**: macOS or NixOS machine with admin access
 - **Teaches**: Nix fundamentals, repository structure, first activation
@@ -93,7 +93,7 @@ Your entry point into this infrastructure.
 
 **What you'll learn:**
 - How Nix flakes provide reproducible configuration
-- The dendritic pattern for module organization
+- The deferred module composition pattern for module organization
 - Development shell activation with direnv
 - Building and activating your first configuration
 

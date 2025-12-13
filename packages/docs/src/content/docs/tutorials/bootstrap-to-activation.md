@@ -12,7 +12,7 @@ This tutorial guides you through setting up a new machine with this infrastructu
 By the end of this tutorial, you will understand:
 
 - How Nix flakes provide reproducible, declarative system configuration
-- What the dendritic pattern is and why we organize modules by aspect rather than by host
+- What the deferred module composition pattern is and why we organize modules by aspect rather than by host
 - How direnv automatically activates your development environment
 - What happens during system activation and how to verify success
 - How to explore your machine's configuration and make sense of the module structure
@@ -52,7 +52,7 @@ This means:
 This infrastructure combines four complementary technologies:
 
 1. **Flake-parts** provides the foundation, organizing everything as composable modules
-2. **Dendritic pattern** organizes modules by aspect (what they do) rather than by host (where they run)
+2. **Deferred module composition** organizes modules by aspect (what they do) rather than by host (where they run)
 3. **Clan-core** coordinates multi-machine deployments with inventory-based service assignment
 4. **Overlays** provide stable fallbacks through multi-channel nixpkgs access
 
@@ -65,12 +65,12 @@ The key insight is that your machine configuration is just one piece of a larger
 
 For deeper understanding, see [Architecture overview](/concepts/architecture-overview).
 
-### Dendritic organization
+### Deferred module composition organization
 
 Traditional nix configs often organize by host: all of `stibnite`'s configuration in one place, all of `blackphos`'s in another.
 This leads to duplication when multiple machines need similar features.
 
-The dendritic pattern instead organizes by aspect:
+The deferred module composition pattern instead organizes by aspect:
 
 ```
 modules/
@@ -107,13 +107,13 @@ ls -la
 
 You'll see:
 - `flake.nix` - The entry point defining all outputs
-- `modules/` - The dendritic module hierarchy
+- `modules/` - The deferred module composition hierarchy
 - `secrets/` - Encrypted secrets (we'll cover this in the secrets tutorial)
 - `justfile` - Task runner with common operations
 - `Makefile` - Bootstrap automation
 
 The `flake.nix` file is intentionally minimal because most logic lives in the auto-discovered modules.
-This is the dendritic pattern at work.
+This is the deferred module composition pattern at work.
 
 ## Step 2: Bootstrap Nix and direnv
 
@@ -197,7 +197,7 @@ cat modules/machines/darwin/stibnite/default.nix
 ```
 
 You'll see imports of various modules.
-These imports follow the dendritic pattern, pulling in features from across the module hierarchy rather than defining everything inline.
+These imports follow the deferred module composition pattern, pulling in features from across the module hierarchy rather than defining everything inline.
 
 Notice how the file is relatively short.
 Most configuration comes from:
@@ -302,7 +302,7 @@ You've now completed your first bootstrap-to-activation cycle.
 Along the way, you learned:
 
 - **Nix flakes** provide reproducible, declarative system configuration
-- **Dendritic organization** groups modules by aspect, reducing duplication
+- **Deferred module composition** groups modules by aspect, reducing duplication
 - **direnv** automatically activates your development environment
 - **Validation before activation** catches errors before they affect your system
 - **Generations** provide rollback safety for every change

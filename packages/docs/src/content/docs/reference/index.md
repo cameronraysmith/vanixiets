@@ -9,7 +9,7 @@ This section provides comprehensive reference documentation for the infra reposi
 
 ## Repository structure
 
-- [Repository Structure](/reference/repository-structure/) - Directory layout for dendritic flake-parts + clan architecture
+- [Repository Structure](/reference/repository-structure/) - Directory layout for deferred module composition + clan architecture
 
 ## CLI tooling
 

@@ -238,7 +238,7 @@ Each NixOS machine has a configuration in `modules/machines/nixos/`:
 ls modules/machines/nixos/
 ```
 
-These configurations import dendritic modules just like darwin, but include NixOS-specific elements like systemd services and disko disk layouts.
+These configurations import deferred module composition modules just like darwin, but include NixOS-specific elements like systemd services and disko disk layouts.
 
 ## Step 4: Generate secrets
 

@@ -94,8 +94,8 @@ nix-unit tests validate flake structure and configuration invariants without bui
 | TC-010 | testFeatureNamespaceExports | feature | Modules export to correct namespaces |
 | TC-011 | testTypeSafetySpecialargsPropagation | type-safety | inputs available via specialArgs |
 | TC-012 | testTypeSafetyNixosConfigStructure | type-safety | All configs have config attribute |
-| TC-013 | testInvariantNamespaceMerging | invariant | Dendritic namespace auto-merging works |
-| TC-014 | testInvariantClanDendriticIntegration | invariant | Clan machines have dendritic module exports |
+| TC-013 | testInvariantNamespaceMerging | invariant | Module namespace auto-merging works |
+| TC-014 | testInvariantClanDendriticIntegration | invariant | Clan machines have module exports |
 | TC-015 | testFeatureImportTreeCompleteness | feature | import-tree discovers all namespace modules |
 | TC-016 | testInvariantCrossplatformHomeModules | invariant | Home modules available for darwin and linux |
 
@@ -105,7 +105,7 @@ Validation checks run shell commands to verify configuration correctness.
 
 | TC-ID | Check Name | Description |
 |-------|------------|-------------|
-| TC-020 | home-module-exports | Home modules exported to dendritic namespace |
+| TC-020 | home-module-exports | Home modules exported to flake namespace |
 | TC-021 | home-configurations-exposed | Nested homeConfigurations exposed for nh CLI |
 | TC-022 | naming-conventions | Machine names follow kebab-case |
 | TC-023 | terraform-validate | Terraform configuration syntactically valid |
