@@ -97,7 +97,8 @@ Related: flake-parts, deferredModule, system.
 Abbreviation: SOPS (Secrets OPerationS).
 Related: age, sops-nix, secrets.
 
-**sops-nix**: Legacy secrets management tool integrating SOPS with NixOS and nix-darwin; replaced by clan vars in current architecture.
+**sops-nix**: Secrets management tool integrating SOPS with NixOS and nix-darwin for user-level secrets.
+Current architecture uses sops-nix for user secrets and clan vars for machine secrets.
 Synonym: none.
 Related: SOPS, age, secrets, clan vars.
 
