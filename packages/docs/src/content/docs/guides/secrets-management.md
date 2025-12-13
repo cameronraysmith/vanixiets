@@ -1,42 +1,40 @@
 ---
-title: Secrets Management
-description: Managing secrets using clan vars and legacy sops-nix during migration
+title: Secrets management
+description: Managing secrets using clan vars and legacy sops-nix
 sidebar:
   order: 7
 ---
 
 This guide documents secrets management in the infrastructure.
-Clan vars is the target for all secrets, with legacy sops-nix secrets pending migration.
+Clan vars is the primary secrets system, with legacy sops-nix for supplementary user secrets.
 
 ## Secrets architecture overview
 
-The infrastructure is migrating to clan vars for all secrets management.
-Currently some secrets remain in legacy sops-nix format pending migration.
+The infrastructure uses clan vars as the primary secrets system, with some legacy sops-nix patterns remaining.
 See [Clan Integration](/concepts/clan-integration#secrets-management) for the complete architectural explanation.
 
 For a learning-oriented walkthrough of setting up secrets from scratch, see the [Secrets Setup Tutorial](/tutorials/secrets-setup/).
 
 | Status | Tool | Purpose | Platforms | Generation |
 |--------|------|---------|-----------|------------|
-| Target | Clan vars | All secrets (system and user) | NixOS (darwin support planned) | Automatic (`clan vars generate`) |
-| Legacy | sops-nix | User secrets pending migration | All (darwin + NixOS) | Manual (age key derivation) |
+| Primary | Clan vars | System and user secrets | NixOS (darwin support planned) | Automatic (`clan vars generate`) |
+| Supplementary | sops-nix | User secrets (legacy format) | All (darwin + NixOS) | Manual (age key derivation) |
 
 ### Current usage patterns
 
-During migration, secrets are split between two systems:
+Secrets are split between two systems:
 
-**Clan vars** currently handles auto-generated, machine-specific secrets on NixOS hosts.
+**Clan vars** handles auto-generated, machine-specific secrets on NixOS hosts.
 The vars generator creates SSH keys, zerotier IDs, and other secrets that machines need automatically.
-This is the target state for all secrets once migration is complete.
 
-**sops-nix** currently handles manually-entered user secrets on all platforms.
+**sops-nix** handles manually-entered user secrets on all platforms.
 API tokens, personal credentials, and signing keys are created by humans using age encryption.
-These will migrate to clan vars when user-level vars support is implemented.
+New user secrets can use clan vars; legacy patterns remain functional.
 
-## Clan vars (target state)
+## Clan vars (primary)
 
-Clan vars is the target for all secrets management.
-Currently deployed on NixOS hosts (cinnabar, electrum, galena, scheelite) for system secrets.
+Clan vars is the primary secrets management system.
+Deployed on NixOS hosts (cinnabar, electrum, galena, scheelite) for system secrets.
 
 ### Current clan vars usage
 
@@ -98,10 +96,10 @@ clan machines update cinnabar
 
 Service restart may be required after rotation depending on which secrets changed.
 
-## Legacy sops-nix (migration pending)
+## Legacy sops-nix (supplementary)
 
-sops-nix currently handles user-level secrets that require manual creation.
-Available on all platforms (darwin and NixOS) pending migration to clan vars.
+sops-nix handles user-level secrets that require manual creation.
+Available on all platforms (darwin and NixOS).
 
 ### Current sops-nix usage
 
