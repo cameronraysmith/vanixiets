@@ -195,7 +195,7 @@ Rules are conditional standard procedures that guide implementation but can be a
 - Disk usage: use `diskus` instead of `du -sh`
 - Condition: Can use standard tools in contexts where Nix tools unavailable
 
-### Historical: Migration rules (completed November 2024)
+### Historical: Migration rules
 
 These rules governed the nixos-unified → clan+dendritic migration (Phases 0-6) completed in November 2024.
 They remain documented for historical context and potential future migrations.
