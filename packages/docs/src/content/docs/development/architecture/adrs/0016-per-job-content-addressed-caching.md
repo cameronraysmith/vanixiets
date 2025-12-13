@@ -6,7 +6,7 @@ title: "ADR-0016: Per-Job Content-Addressed Caching"
 
 **Implemented** (2025-10-31)
 
-Supersedes [ADR-0015](/development/architecture/adrs/0015-ci-caching-optimization/)
+Supersedes ADR-0015 (deleted, centralized helper job approach)
 
 ### Implementation Timeline
 - **Phase 1 (2025-10-30)**: Initial per-job caching with GitHub Checks API
@@ -1001,6 +1001,6 @@ Phase 1.10 successfully implemented this approach by hashing job-specific input 
   - `8ab1409`: Phase 1.3 enhanced content hashing
 - **GitHub Checks API:** https://docs.github.com/en/rest/checks/runs
 - **tj-actions/changed-files:** https://github.com/tj-actions/changed-files
-- **Previous approach:** [ADR-0015](/development/architecture/adrs/0015-ci-caching-optimization/)
+- **Previous approach:** ADR-0015 (deleted, centralized helper job approach)
 - **Content-addressed builds:** Nix manual, Bazel documentation
 - **Composite actions:** https://docs.github.com/en/actions/creating-actions/creating-a-composite-action
