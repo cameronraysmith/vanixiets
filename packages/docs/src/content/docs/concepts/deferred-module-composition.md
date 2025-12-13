@@ -483,5 +483,5 @@ Understanding the algebraic primitives that enable this deferred module composit
 - [Repository Structure](/reference/repository-structure) - Complete directory layout
 - [Adding Custom Packages](/guides/adding-custom-packages/) - Practical guide to package customization
 - [Handling Broken Packages](/guides/handling-broken-packages/) - Fixing broken packages from nixpkgs
-- [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adrs/0018-dendritic-flake-parts-architecture/) - Architectural decision record
-- [ADR-0020: Dendritic + Clan Integration](/development/architecture/adrs/0020-dendritic-clan-integration/) - Integration patterns ADR
+- [ADR-0018: Deferred Module Composition Architecture](/development/architecture/adrs/0018-deferred-module-composition-architecture/) - Architectural decision record
+- [ADR-0020: Deferred module composition + Clan Integration](/development/architecture/adrs/0020-deferred-module-composition-clan-integration/) - Integration patterns ADR
