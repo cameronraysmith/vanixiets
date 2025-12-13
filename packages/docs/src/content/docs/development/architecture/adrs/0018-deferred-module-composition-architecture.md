@@ -1,5 +1,5 @@
 ---
-title: "ADR-0018: Dendritic Flake-Parts Architecture"
+title: "ADR-0018: Deferred Module Composition Architecture"
 ---
 
 - **Status**: Accepted
