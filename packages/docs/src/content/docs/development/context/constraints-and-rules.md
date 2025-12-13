@@ -201,29 +201,6 @@ When deferred module composition patterns and clan requirements conflict, apply 
 - Disk usage: use `diskus` instead of `du -sh`
 - Condition: Can use standard tools in contexts where Nix tools unavailable
 
-### Historical: Migration rules
-
-These rules governed the nixos-unified → deferred module composition + clan migration (Phases 0-6).
-They remain documented for historical context and potential future migrations.
-
-**Progressive migration order** (completed):
-- Phase 0: Validated in test-clan (required before infrastructure commitment)
-- Phase 1: Deployed VPS infrastructure (cinnabar)
-- Phases 2-5: Migrated darwin hosts (blackphos → rosegold → argentum → stibnite)
-- Phase 6: Cleanup (removed nixos-unified)
-
-**Stability gates** (applied during migration):
-- Each host was stable for 1-2 weeks before proceeding to next
-- Primary workstation (stibnite) migrated last
-- Rollback capability maintained until migration complete
-
-**Priority hierarchy for pattern conflicts** (remains current):
-1. Clan functionality (non-negotiable)
-2. Deferred module composition (best-effort)
-3. Pattern purity (flexible)
-- Rule: When conflicts arise, preserve clan functionality, optimize with deferred module composition where possible
-- Condition: Can deviate from pure deferred module composition if necessary for clan compatibility
-
 ### Documentation rules
 
 **Architecture Decision Records**:
