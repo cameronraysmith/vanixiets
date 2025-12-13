@@ -26,7 +26,7 @@ An overlay is a function that takes two arguments (`final` and `prev`) and retur
 
 **This repository automates the overlay boilerplate.**
 Instead of writing overlay functions directly, you write standard package derivations.
-The dendritic flake-parts pattern uses `lib.packagesFromDirectoryRecursive` in `modules/nixpkgs/per-system.nix` to automatically discover your package files, call them with the necessary dependencies, and merge them into an overlay layer.
+The deferred module composition pattern uses `lib.packagesFromDirectoryRecursive` in `modules/nixpkgs/per-system.nix` to automatically discover your package files, call them with the necessary dependencies, and merge them into an overlay layer.
 
 **What packagesFromDirectoryRecursive does.**
 This nixpkgs library function scans the `pkgs/by-name/` directory and transforms it into an attribute set of packages.
@@ -200,7 +200,7 @@ For npm packages, you also need `npmDepsHash` which works the same way.
 
 ## How packages are discovered
 
-The discovery process happens in `modules/nixpkgs/per-system.nix` using the dendritic flake-parts pattern:
+The discovery process happens in `modules/nixpkgs/per-system.nix` using the deferred module composition pattern:
 
 ```nix
 pkgsDirectory = ../../../pkgs/by-name;
