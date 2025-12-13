@@ -12,7 +12,7 @@ Infrastructure coordination leverages clan's inventory system with tags, roles, 
 
 ## Statement of intent
 
-Migration from flake-parts + nixos-unified architecture to dendritic flake-parts pattern with clan integration is complete (November 2024).
+Migration from flake-parts + nixos-unified architecture to dendritic flake-parts pattern with clan integration is complete.
 Current infrastructure achieves maximum type safety through "every file is a flake-parts module" organizational pattern, eliminating specialArgs anti-pattern.
 Systematic multi-host management operational through clan's inventory system, service instances, and overlay networking (zerotier).
 Declarative secrets management deployed through clan vars system with automatic generation and deployment.
@@ -83,7 +83,7 @@ NixOS VPS hosts (x86_64-linux):
 
 **Foundation**: flake-parts (modular composition) + nixos-unified (directory-based autowiring)
 
-**Deprecation**: nixos-unified architecture deprecated November 2024, removed during migration.
+**Deprecation**: nixos-unified architecture deprecated, removed during migration.
 
 **Historical repository structure**:
 - `flake.nix` used `flake-parts.lib.mkFlake` with auto-wired imports from `./modules/flake-parts/`
@@ -133,7 +133,7 @@ NixOS VPS hosts (x86_64-linux):
 2. **Secondary**: Dendritic flake-parts pattern (best-effort) - apply where feasible without compromising clan
 3. **Tertiary**: Pattern purity (flexible) - some specialArgs acceptable if clan requires, pragmatism over orthodoxy
 
-**Validated in production**: 8-machine fleet operational since November 2024
+**Validated in production**: 8-machine fleet operational
 
 ## Risk mitigation strategy (historical)
 
@@ -155,7 +155,7 @@ Outcome: proven patterns successfully deployed to cinnabar and all 8 machines.
 
 ## Conclusion
 
-Migration from flake-parts + nixos-unified to dendritic + clan architecture completed successfully (November 2024).
+Migration from flake-parts + nixos-unified to dendritic + clan architecture completed successfully.
 Current architecture maximizes type safety through deeper module system integration and enables systematic multi-host management across 8-machine fleet.
 Validation-first approach with progressive host-by-host deployment minimized risk to primary workstation.
 Success achieved through careful validation at each host, stability monitoring between hosts (1-2 weeks per host), and proven rollback capabilities.

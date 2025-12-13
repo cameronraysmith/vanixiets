@@ -395,7 +395,7 @@ final: prev: {
 
 ### Historical note: migration from nixos-unified
 
-The infrastructure completed migration from nixos-unified to dendritic flake-parts + clan in November 2024.
+The infrastructure completed migration from nixos-unified to dendritic flake-parts + clan.
 
 **Migration was progressive host-by-host**:
 1. **Initial validation**: Validated dendritic + clan in test-clan repository
@@ -485,5 +485,5 @@ See `glossary.md` for comprehensive term definitions.
 
 ### Historical/deprecated
 
-- nixos-unified: <https://github.com/srid/nixos-unified> (deprecated November 2024, replaced by dendritic + clan)
+- nixos-unified: <https://github.com/srid/nixos-unified> (deprecated, replaced by dendritic + clan)
 - sops-nix: <https://github.com/Mic92/sops-nix> (replaced by clan vars system)
