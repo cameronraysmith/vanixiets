@@ -159,12 +159,11 @@ Rules are conditional standard procedures that guide implementation but can be a
 - **Bias toward removal**: Remove content when no longer valuable, git preserves history
 - Condition: Pragmatic exceptions when benefits clear
 
-**Module organization** (current → target):
-- Current: Directory-based autowire (`modules/{darwin,home,nixos}/`)
-- Target: Deferred module composition flat categories (`modules/{base,shell,dev,hosts}/`)
+**Module organization**:
+- Uses deferred module composition with flat categories (`modules/{base,shell,dev,hosts}/`)
 - Feature-based organization, not platform-based
 - Cross-cutting concerns enabled (one module, multiple targets)
-- Condition: Migration in progress, both patterns temporarily coexist
+- Condition: Can use platform-specific modules when truly platform-specific functionality required
 
 **Dependency management**:
 - Pin all flake inputs with `follows` where appropriate
