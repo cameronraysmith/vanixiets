@@ -419,7 +419,7 @@ inventory.instances.zerotier-local = {
 5. Administrator adds host to clan inventory with appropriate tags
 6. Administrator generates clan vars for host: `clan vars generate <hostname>`
 7. Administrator builds new configuration: `nix build .#darwinConfigurations.<hostname>.system`
-8. System evaluates dendritic + clan configuration, type-checks modules
+8. System evaluates deferred module composition + clan configuration, type-checks modules
 9. Administrator reviews build output, compares with current system
 10. Administrator performs dry-run: `darwin-rebuild switch --flake .#<hostname> --dry-run`
 11. Administrator backs up current generation: `darwin-rebuild --list-generations`
