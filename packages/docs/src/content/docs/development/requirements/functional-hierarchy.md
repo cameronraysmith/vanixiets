@@ -51,7 +51,7 @@ This hierarchy documents the current deferred module composition + clan architec
 
 **Related use cases**: UC-002 (Add feature module)
 
-See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adrs/0018-dendritic-flake-parts-architecture/) for module auto-discovery patterns.
+See [ADR-0018: Deferred Module Composition Architecture](/development/architecture/adrs/0018-dendritic-flake-parts-architecture/) for module auto-discovery patterns.
 
 ### CM-003: Host configuration generation
 
