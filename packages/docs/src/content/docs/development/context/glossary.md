@@ -97,9 +97,9 @@ Related: flake-parts, deferredModule, system.
 Abbreviation: SOPS (Secrets OPerationS).
 Related: age, sops-nix, secrets.
 
-**sops-nix**: Integration of SOPS with NixOS and nix-darwin for secrets management.
+**sops-nix**: Legacy secrets management tool integrating SOPS with NixOS and nix-darwin; replaced by clan vars in current architecture.
 Synonym: none.
-Related: SOPS, age, secrets.
+Related: SOPS, age, secrets, clan vars.
 
 **specialArgs**: Module system mechanism to pass values into module evaluations.
 Synonym: none.
@@ -152,9 +152,8 @@ Synonym: none (clan-core is the repository name, not an alternative term).
 Related: inventory, vars, zerotier, clan vars, service instance.
 
 **clan vars**: Secrets system in clan with centralized generators creating machine-specific outputs.
-Target for all secrets with ongoing migration from legacy sops-nix.
 Synonym: vars system.
-Related: clan, vars generator, secrets, sops.
+Related: clan, vars generator, secrets.
 
 **controller**: Zerotier role managing network and authorizing peers.
 Synonym: zerotier controller.
@@ -165,7 +164,7 @@ Foundation: nixpkgs module system (deferredModule type, evalModules fixpoint).
 Implementation: flake-parts evaluation + import-tree auto-discovery.
 Convention: directory-based namespace merging via flake.modules.*.
 See [Deferred Module Composition](/concepts/deferred-module-composition/).
-Synonym: aspect-based pattern, every-file-is-module, dendritic pattern (after [mightyiam/dendritic](https://github.com/mightyiam/dendritic)).
+Synonym: aspect-based pattern, every-file-is-module.
 Related: flake-parts, import-tree, flake.modules, deferredModule, evalModules.
 
 **disko**: Tool for declarative disk partitioning and formatting.
@@ -316,17 +315,6 @@ Related: design principles, ADR-0014.
 
 **type safety**: Property of having configuration errors caught through module system type checking.
 Related: module system, deferred module composition.
-
-## Migration terms
-
-**progressive migration**: Strategy of migrating hosts one at a time with validation between each.
-Related: stability gate, risk mitigation.
-
-**stability gate**: Requirement for each migrated host to remain stable for 1-2 weeks before proceeding to next.
-Related: progressive migration, risk mitigation.
-
-**test-clan**: Experimental repository for validating deferred module composition + clan integration before production deployment.
-Related: validation.
 
 ## Workflow terms
 
