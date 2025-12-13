@@ -1,5 +1,5 @@
 ---
-title: "ADR-0017: Dendritic Overlay Patterns"
+title: "ADR-0017: Deferred Module Composition Overlay Patterns"
 ---
 
 - **Status**: Accepted
