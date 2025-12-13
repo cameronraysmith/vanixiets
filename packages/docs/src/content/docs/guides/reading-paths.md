@@ -48,7 +48,7 @@ Skip this section if you are already comfortable writing basic Nix modules with 
 3. [Module System Primitives](/concepts/module-system-primitives/) - deferredModule, evalModules, fixpoint computation
 4. [Flake-parts and the Module System](/concepts/flake-parts-module-system/) - How flake-parts wraps evalModules
 5. [Deferred Module Composition](/concepts/deferred-module-composition/) - Aspect-based organization pattern
-6. [ADR-0018: Dendritic flake-parts architecture](/development/architecture/adrs/0018-dendritic-flake-parts-architecture/) - Decision rationale
+6. [ADR-0018: Deferred module composition architecture](/development/architecture/adrs/0018-deferred-module-composition-architecture/) - Decision rationale
 7. [Domain Model](/development/context/domain-model/) - Nix ecosystem conceptual model
 
 ## Path 3: Architecture understanding
@@ -105,7 +105,7 @@ This path explains the overlay system and multi-channel architecture that enable
 2. [Adding Custom Packages](/guides/adding-custom-packages/) - pkgs-by-name pattern
 3. [Architecture Overview](/concepts/architecture-overview/) - Multi-channel overlay section
 4. [ADR-0003: Overlay composition patterns](/development/architecture/adrs/0003-overlay-composition-patterns/) - Original overlay design
-5. [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns/) - Current overlay architecture
+5. [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns/) - Current overlay architecture
 
 ## Path 8: Multi-machine fleet coordination
 
@@ -115,7 +115,7 @@ This path covers the clan-based coordination system and its integration with the
 1. [Clan Integration](/concepts/clan-integration/) - Core coordination concepts
 2. [Architecture Overview](/concepts/architecture-overview/) - Fleet overview and integration points
 3. [ADR-0019: Clan-core orchestration](/development/architecture/adrs/0019-clan-core-orchestration/) - Orchestration decision
-4. [ADR-0020: Dendritic + Clan integration](/development/architecture/adrs/0020-dendritic-clan-integration/) - Pattern integration
+4. [ADR-0020: Deferred module composition + Clan integration](/development/architecture/adrs/0020-deferred-module-composition-clan-integration/) - Pattern integration
 5. [Usage Model](/development/requirements/usage-model/) - UC-004: Coordinated service deployment
 6. [Functional Hierarchy](/development/requirements/functional-hierarchy/) - MC-* multi-host coordination functions
 
