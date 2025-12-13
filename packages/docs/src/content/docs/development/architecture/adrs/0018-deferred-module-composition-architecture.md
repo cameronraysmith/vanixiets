@@ -5,7 +5,7 @@ title: "ADR-0018: Deferred Module Composition Architecture"
 - **Status**: Accepted
 - **Date**: 2024-11-20
 - **Scope**: Nix configuration architecture
-- **Related**: [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
+- **Related**: [ADR-0017: Deferred module composition overlay patterns](0017-deferred-module-composition-overlay-patterns/)
 
 ## Context
 
@@ -355,9 +355,9 @@ Result: 8-machine fleet fully operational under dendritic architecture.
 ### Internal
 
 - [Deferred Module Composition concept documentation](/concepts/deferred-module-composition)
-- [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
+- [ADR-0017: Deferred module composition overlay patterns](0017-deferred-module-composition-overlay-patterns/)
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
-- [ADR-0020: Dendritic + Clan integration](0020-dendritic-clan-integration/)
+- [ADR-0020: Deferred module composition + Clan integration](0020-deferred-module-composition-clan-integration/)
 
 #### Module system foundations
 
