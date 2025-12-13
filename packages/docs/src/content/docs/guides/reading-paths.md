@@ -110,7 +110,7 @@ This path explains the overlay system and multi-channel architecture that enable
 ## Path 8: Multi-machine fleet coordination
 
 For users managing deployments across multiple hosts.
-This path covers the clan-based coordination system and its integration with the dendritic architecture.
+This path covers the clan-based coordination system and its integration with the deferred module composition architecture.
 
 1. [Clan Integration](/concepts/clan-integration/) - Core coordination concepts
 2. [Architecture Overview](/concepts/architecture-overview/) - Fleet overview and integration points

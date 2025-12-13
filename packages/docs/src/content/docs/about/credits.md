@@ -15,7 +15,7 @@ This infrastructure configuration builds on work from the Nix community.
 
 - **[import-tree](https://github.com/vic/import-tree)** by Victor Borja (@vic) - Automatic module discovery mechanism from a given directory subtree
 
-### Dendritic pattern documentation
+### Deferred module composition pattern documentation
 
 The "dendritic" pattern is a community convention for aspect-based module organization using flake-parts and import-tree.
 
@@ -34,7 +34,7 @@ The "dendritic" pattern is a community convention for aspect-based module organi
 
 These implementations informed the architectural patterns:
 
-### Dendritic pattern examples
+### Deferred module composition pattern examples
 
 - **[drupol/infra](https://github.com/drupol/infra)** by Pol Dellaiera (@drupol) - Uses flake-parts based deferred modules and illustrates the "aspect"-based factorization of dependencies
 - **[GaetanLepage/nix-config](https://github.com/GaetanLepage/nix-config)** by Gaétan Lepage (@GaetanLepage) - Uses flake-parts based deferred modules and illustrates configuration of a host possessing a GPU
