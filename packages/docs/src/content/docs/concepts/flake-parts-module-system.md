@@ -7,7 +7,7 @@ sidebar:
 
 Flake-parts provides ergonomic access to the Nix module system for creating flakes.
 It wraps `lib.evalModules` to evaluate modules with specialized abstractions for flake outputs, per-system evaluation, and module publication.
-Understanding what flake-parts adds on top of the base module system is critical for working with dendritic architectures.
+Understanding what flake-parts adds on top of the base module system is critical for working with deferred module composition architectures.
 
 ## What flake-parts provides
 
@@ -179,11 +179,11 @@ nixpkgs.lib.nixosSystem {
 
 This pattern enables module composition across flake boundaries without premature evaluation.
 
-## How dendritic builds on flake-parts
+## How deferred module composition builds on flake-parts
 
-The dendritic pattern uses flake-parts as its integration layer for producing flake outputs, but extends it with auto-discovery and structured module organization.
+Deferred module composition uses flake-parts as its integration layer for producing flake outputs, but extends it with auto-discovery and structured module organization.
 
-Key additions in dendritic architectures:
+Key additions in deferred module composition architectures:
 
 - **import-tree for auto-discovery** - Automatically discovers and imports modules from directory structures
 - **Namespace sharding** - Organizes modules by concern (configurations, modules, packages, systems)
@@ -197,7 +197,7 @@ For details on the deferred module composition pattern, see [Deferred module com
 
 ## Flake-parts is optional
 
-The dendritic organizational pattern does not require flake-parts.
+The deferred module composition organizational pattern does not require flake-parts.
 Deferred modules are a nixpkgs primitive available through `lib.evalModules`, and you can evaluate them directly without any flake framework.
 Flake-parts provides convenient abstractions for flake integration, but the underlying module composition mechanisms work independently.
 
@@ -274,7 +274,7 @@ Flake-parts builds on this foundation with flake-specific abstractions:
 - You need the perSystem abstraction to avoid boilerplate
 - You're integrating with the broader flake-parts ecosystem
 
-**Use dendritic pattern when:**
+**Use deferred module composition when:**
 - You have complex multi-machine configurations
 - You want aspect-based organization with auto-discovery
 - You need hierarchical module composition across platforms
