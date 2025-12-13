@@ -433,32 +433,6 @@ System Goals
     └── Dependencies: None (achieved)
 ```
 
-### Historical conflicts and resolutions
-
-**Conflict (resolved)**: G-S04 (deferred module composition) + G-S06 (clan) vs. nixos-unified architecture
-
-**Resolution (completed November 2024)**: Migrated to deferred module composition + clan, abandoned nixos-unified
-- ● Deferred module composition and clan both eliminate specialArgs antipattern
-- ● Both use flake-parts as foundation
-- ● nixos-unified replaced completely
-- ● Progressive migration completed successfully
-
-**Conflict (resolved)**: G-U03 (declarative secrets) vs. manual sops-nix
-
-**Resolution (completed November 2024)**: Migration architecture implemented
-- ● sops-nix preserved for home-manager secrets (legacy user-level)
-- ● clan vars deployed for secrets (declarative generation, target for all)
-- ● Migration approach operational across 8-machine fleet
-- ● Both systems coexist successfully during migration
-
-**Conflict (resolved)**: G-U02 (multi-host coordination) vs. per-host management
-
-**Resolution (completed November 2024)**: VPS infrastructure deployed, fleet operational
-- ● cinnabar deployed as zerotier controller
-- ● 7 peers connected (4 darwin + 3 nixos VPS)
-- ● Single source of truth in clan inventory
-- ● All hosts migrated successfully
-
 ## Goals tracking and validation
 
 ### Achieved goals
