@@ -89,7 +89,7 @@ These projects provide the foundation and influence architectural decisions:
 - Defines inventory system, vars system, service instances
 - Influences: Architecture, multi-host patterns, secrets management
 
-**dendritic flake-parts pattern** (mightyiam/dendritic):
+**deferred module composition pattern** (mightyiam/dendritic):
 - Defines "every file is a flake-parts module" organizational pattern
 - Eliminates specialArgs antipattern
 - Influences: Directory structure, module composition patterns

@@ -162,7 +162,7 @@ Rules are conditional standard procedures that guide implementation but can be a
 
 **Module organization** (current → target):
 - Current: Directory-based autowire (`modules/{darwin,home,nixos}/`)
-- Target: Dendritic flat categories (`modules/{base,shell,dev,hosts}/`)
+- Target: Deferred module composition flat categories (`modules/{base,shell,dev,hosts}/`)
 - Feature-based organization, not platform-based
 - Cross-cutting concerns enabled (one module, multiple targets)
 - Condition: Migration in progress, both patterns temporarily coexist
@@ -213,10 +213,10 @@ They remain documented for historical context and potential future migrations.
 
 **Priority hierarchy for pattern conflicts** (remains current):
 1. Clan functionality (non-negotiable)
-2. Dendritic flake-parts pattern (best-effort)
+2. Deferred module composition (best-effort)
 3. Pattern purity (flexible)
-- Rule: When conflicts arise, preserve clan functionality, optimize with dendritic where possible
-- Condition: Can deviate from pure dendritic if necessary for clan compatibility
+- Rule: When conflicts arise, preserve clan functionality, optimize with deferred module composition where possible
+- Condition: Can deviate from pure deferred module composition if necessary for clan compatibility
 
 ### Documentation rules
 
@@ -254,9 +254,9 @@ When rules must be broken, document:
 # Reason: Clan flakeModules integration requires minimal specialArgs
 # Justification: This is framework-level passing (inputs, self),
 #                not extensive application value passing
-# Alternative considered: Pure dendritic (not compatible with clan)
+# Alternative considered: Pure deferred module composition (not compatible with clan)
 # Status: Permanent acceptable exception
-# References: dendritic pattern anti-pattern discussion
+# References: deferred module composition anti-pattern discussion
 ```
 
 ## Constraints and rules review

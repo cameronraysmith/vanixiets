@@ -5,14 +5,14 @@ title: Project scope
 ## Problem description
 
 Managing personal infrastructure across multiple platforms (macOS, NixOS) with reproducible, type-safe configurations presents inherent complexity.
-Current architecture uses dendritic flake-parts pattern with clan integration, providing systematic multi-host management with maximized type safety through deep module system integration.
+Current architecture uses deferred module composition with clan integration, providing systematic multi-host management with maximized type safety through deep module system integration.
 The system manages 8 machines across darwin and NixOS platforms with declarative secrets via clan vars, zerotier overlay networking, and coordinated service deployment.
 This architecture eliminates specialArgs anti-patterns, enabling cross-platform module composition (darwin + nixos + home-manager) with full module system type checking.
 Infrastructure coordination leverages clan's inventory system with tags, roles, and service instances for multi-machine orchestration.
 
 ## Statement of intent
 
-Migration from flake-parts + nixos-unified architecture to dendritic flake-parts pattern with clan integration is complete.
+Migration from flake-parts + nixos-unified architecture to deferred module composition with clan integration is complete.
 Current infrastructure achieves maximum type safety through "every file is a flake-parts module" organizational pattern, eliminating specialArgs anti-pattern.
 Systematic multi-host management operational through clan's inventory system, service instances, and overlay networking (zerotier).
 Declarative secrets management deployed through clan vars system with automatic generation and deployment.
@@ -21,9 +21,9 @@ All original functionality maintained while gaining enhanced modularity, type sa
 
 ## Current state architecture
 
-**Foundation**: dendritic flake-parts pattern + clan integration
+**Foundation**: deferred module composition + clan integration
 
-**Dendritic flake-parts pattern**:
+**Deferred module composition**:
 - Every Nix file is a flake-parts module contributing to `flake.modules.*` namespace
 - Eliminates specialArgs pass-through in favor of `config.flake.*` access
 - import-tree auto-discovery replaces manual directory scanning
@@ -39,7 +39,7 @@ All original functionality maintained while gaining enhanced modularity, type sa
 
 **Repository structure**:
 - `flake.nix` uses `flake-parts.lib.mkFlake` with import-tree auto-discovery
-- `modules/{darwin,nixos,home}/` modular configurations (dendritic pattern)
+- `modules/{darwin,nixos,home}/` modular configurations (deferred module composition)
 - `machines/` clan inventory system with host configurations
 - `secrets/` clan vars with declarative secret generation
 - `overlays/`, `packages/` custom package definitions and multi-channel fallback
@@ -101,7 +101,7 @@ NixOS VPS hosts (x86_64-linux):
 
 **Why nixos-unified was abandoned**:
 - nixos-unified uses specialArgs + directory-based autowire
-- Dendritic eliminates specialArgs in favor of `config.flake.*` namespace
+- Deferred module composition eliminates specialArgs in favor of `config.flake.*` namespace
 - These approaches are mutually exclusive (cannot coexist cleanly)
 - clan-infra production infrastructure uses clan + flake-parts with manual imports, not nixos-unified
 
@@ -112,34 +112,34 @@ NixOS VPS hosts (x86_64-linux):
 - **Architecture cleanup**: COMPLETE - removed nixos-unified, completed migration
 
 **Migration rationale**:
-- **Type safety**: Nix lacks native type system; module system provides type checking at evaluation time; dendritic maximizes module system usage
+- **Type safety**: Nix lacks native type system; module system provides type checking at evaluation time; deferred module composition maximizes module system usage
 - **Multi-host management**: nixos-unified architecture handled each host independently; clan provides coordinated multi-machine management
 - **Secrets management**: Moved from manual sops-nix to declarative clan vars with generation and deployment automation
-- **Modularity**: Dendritic pattern enables clearer feature isolation and cross-platform module composition
-- **Proven patterns**: Both dendritic and clan have production deployments (drupol-dendritic-infra, clan-infra)
+- **Modularity**: Deferred module composition enables clearer feature isolation and cross-platform module composition
+- **Proven patterns**: Both deferred module composition and clan have production deployments (drupol-dendritic-infra, clan-infra)
 
 ## Architectural compatibility analysis
 
-**Dendritic + clan compatibility validated**:
+**Deferred module composition + clan compatibility validated**:
 - Both use flake-parts as foundational architecture
 - Both eliminate specialArgs antipattern (clan uses minimal `{ inherit inputs; }` for framework integration)
-- Dendritic's `flake.modules.*` namespace pairs naturally with clan's inventory system
+- Deferred module composition's `flake.modules.*` namespace pairs naturally with clan's inventory system
 - Both support SOPS secrets (clan uses sops-nix internally)
 - Both emphasize modular, type-safe configurations
 - import-tree auto-discovery works seamlessly with clan modules
 
 **Priority hierarchy applied during migration**:
 1. **Primary**: Clan functionality (non-negotiable) - all clan features must work correctly
-2. **Secondary**: Dendritic flake-parts pattern (best-effort) - apply where feasible without compromising clan
+2. **Secondary**: Deferred module composition (best-effort) - apply where feasible without compromising clan
 3. **Tertiary**: Pattern purity (flexible) - some specialArgs acceptable if clan requires, pragmatism over orthodoxy
 
 **Validated in production**: 8-machine fleet operational
 
 ## Risk mitigation strategy (historical)
 
-**Validation completed**: No production examples existed combining dendritic + clan patterns.
+**Validation completed**: No production examples existed combining deferred module composition + clan patterns.
 test-clan/ repository validated integration in minimal environment before infrastructure commitment.
-Reduced compound debugging complexity across 8 simultaneous layers (dendritic, clan, terraform, hetzner, disko, LUKS, zerotier, NixOS).
+Reduced compound debugging complexity across 8 simultaneous layers (deferred module composition, clan, terraform, hetzner, disko, LUKS, zerotier, NixOS).
 Outcome: proven patterns successfully deployed to cinnabar and all 8 machines.
 
 **Progressive migration completed**:
@@ -155,7 +155,7 @@ Outcome: proven patterns successfully deployed to cinnabar and all 8 machines.
 
 ## Conclusion
 
-Migration from flake-parts + nixos-unified to dendritic + clan architecture completed successfully.
+Migration from flake-parts + nixos-unified to deferred module composition + clan architecture completed successfully.
 Current architecture maximizes type safety through deeper module system integration and enables systematic multi-host management across 8-machine fleet.
 Validation-first approach with progressive host-by-host deployment minimized risk to primary workstation.
 Success achieved through careful validation at each host, stability monitoring between hosts (1-2 weeks per host), and proven rollback capabilities.

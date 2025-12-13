@@ -11,11 +11,11 @@ The context layer considers the context of the system under consideration, inclu
 
 ## Overview
 
-This documentation captures the architecture and operational context for the dendritic flake-parts + clan infrastructure.
+This documentation captures the architecture and operational context for the deferred module composition + clan infrastructure.
 
-**Current state**: Dendritic flake-parts pattern with clan integration managing 8 hosts (4 darwin, 4 nixos) with multi-machine coordination, declarative secrets, and overlay networking.
+**Current state**: Deferred module composition with clan integration managing 8 hosts (4 darwin, 4 nixos) with multi-machine coordination, declarative secrets, and overlay networking.
 
-**Architecture migration complete**: The migration from nixos-unified to dendritic + clan completed. All documentation reflects current state.
+**Architecture migration complete**: The migration from nixos-unified to deferred module composition + clan completed. All documentation reflects current state.
 
 ## Context documents
 
@@ -24,7 +24,7 @@ This documentation captures the architecture and operational context for the den
 Description of the infrastructure scope and capabilities.
 
 **Key topics**:
-- Current architecture (dendritic flake-parts, clan, multi-channel overlays)
+- Current architecture (deferred module composition, clan, multi-channel overlays)
 - Multi-machine coordination capabilities
 - Cross-platform deployment (darwin + nixos)
 - Future expansion areas
@@ -36,7 +36,7 @@ Individuals, groups, and institutions with interest in the project.
 **Key stakeholders**:
 - Primary: User/maintainer (crs58/cameron) - all roles
 - Secondary: Family users (raquel, janettesmith, christophersmith)
-- Reference: Upstream projects (flake-parts, clan, dendritic pattern, home-manager, nix-darwin)
+- Reference: Upstream projects (flake-parts, clan, deferred module composition pattern, home-manager, nix-darwin)
 
 ### [Constraints and rules](/development/context/constraints-and-rules/)
 
@@ -51,7 +51,7 @@ Restrictions influencing the system, distinguishing non-negotiable constraints f
 **Rules** (conditional procedures):
 - Git workflow (atomic commits, conventional messages)
 - Code style (markdown formatting, naming conventions)
-- Architecture principles (dendritic organization, type safety)
+- Architecture principles (deferred module composition organization, type safety)
 
 ### [Goals and objectives](/development/context/goals-and-objectives/)
 
@@ -66,7 +66,7 @@ Goals issued by stakeholders organized by business, usage, and system categories
 - G-U01: Efficient development workflows
 - G-U02: Multi-host coordination (achieved via clan)
 - G-U03: Declarative secrets management (achieved with clan vars, migrating from legacy sops-nix)
-- G-U04: Cross-platform module composition (achieved via dendritic)
+- G-U04: Cross-platform module composition (achieved via deferred module composition)
 - G-U05: Surgical package fixes (preserved via multi-channel)
 - G-U06: Secure overlay networking (achieved via zerotier)
 - G-U07: Fast, cached builds
@@ -75,7 +75,7 @@ Goals issued by stakeholders organized by business, usage, and system categories
 - G-S01: Maintainable codebase structure
 - G-S02: Clear, idiomatic patterns
 - G-S03: Maximum type safety through module system (achieved)
-- G-S04: Dendritic flake-parts pattern (adopted)
+- G-S04: Deferred module composition (adopted)
 - G-S05: Comprehensive development environment (achieved)
 - G-S06: Clan-core integration (achieved)
 - G-S07: Secrets with clan vars and legacy sops-nix migration (achieved)
@@ -87,7 +87,7 @@ Description of the Nix ecosystem domain and current architecture components.
 
 **Key domains**:
 - Nix ecosystem overview (core concepts, package channels)
-- Current architecture (dendritic flake-parts, clan, multi-channel fallback, sops-nix)
+- Current architecture (deferred module composition, clan, multi-channel fallback, sops-nix)
 - Domain processes (workflows for configuration, secrets, multi-host coordination)
 
 ### [Glossary](/development/context/glossary/)
@@ -96,7 +96,7 @@ Important terms, abbreviations, synonyms, and descriptions.
 
 **Term categories**:
 - Nix ecosystem terms (flake, derivation, module system, nixpkgs)
-- Architecture terms (dendritic, clan, inventory, vars, zerotier)
+- Architecture terms (deferred module composition, clan, inventory, vars, zerotier)
 - Host names (stibnite, blackphos, rosegold, argentum, cinnabar, electrum, galena, scheelite)
 
 ## Navigation
@@ -165,6 +165,6 @@ This provides the foundation for the requirements layer, which specifies what th
 
 **External**:
 - AMDiRE framework: Research paper on artefact-based requirements engineering
-- dendritic pattern: <https://github.com/mightyiam/dendritic>
+- deferred module composition pattern: <https://github.com/mightyiam/dendritic>
 - clan: <https://clan.lol/>
 - flake-parts: <https://flake.parts/>
