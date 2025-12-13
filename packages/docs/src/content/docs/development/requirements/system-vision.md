@@ -325,9 +325,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 
 **Outcome**: Validated patterns ready for production deployment via test-clan repository.
 
-**Status**: COMPLETE.
-
-**Completion**: November 2024.
+**Status**: Complete.
 
 ### Foundation infrastructure (COMPLETE)
 
@@ -338,9 +336,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 - F-006: Overlay networking (controller role on cinnabar)
 - F-008: Type-safe configuration (dendritic on NixOS)
 
-**Status**: COMPLETE.
-
-**Completion**: November 2024.
+**Status**: Complete.
 
 ### Darwin migration (COMPLETE)
 
@@ -353,9 +349,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 - F-006: Overlay networking (peer role on all darwin hosts)
 - F-003: Declarative secrets (clan vars)
 
-**Status**: COMPLETE.
-
-**Completion**: November 2024.
+**Status**: Complete.
 
 ### Architecture cleanup (COMPLETE)
 
@@ -363,9 +357,7 @@ Detailed use cases are documented in [usage-model](/development/requirements/usa
 
 **Outcome**: Full dendritic + clan architecture operational across all 8 machines.
 
-**Status**: COMPLETE.
-
-**Completion**: November 2024.
+**Status**: Complete.
 
 ## Success criteria (ACHIEVED)
 

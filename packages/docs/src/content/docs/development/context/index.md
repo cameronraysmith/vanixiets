@@ -15,7 +15,7 @@ This documentation captures the architecture and operational context for the den
 
 **Current state**: Dendritic flake-parts pattern with clan integration managing 8 hosts (4 darwin, 4 nixos) with multi-machine coordination, declarative secrets, and overlay networking.
 
-**Architecture migration complete**: The migration from nixos-unified to dendritic + clan completed November 2024. All documentation reflects current state.
+**Architecture migration complete**: The migration from nixos-unified to dendritic + clan completed. All documentation reflects current state.
 
 ## Context documents
 
