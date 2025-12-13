@@ -163,7 +163,7 @@ These goals focus on how the system is intended to be used.
 
 **Status**: Achieved (multi-channel fallback)
 
-**Reference**: [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
+**Reference**: [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
 
 ### G-U06: Secure overlay networking
 
@@ -365,7 +365,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Status**: Achieved
 
-**Reference**: [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
+**Reference**: [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns), [Handling broken packages](/guides/handling-broken-packages)
 
 ## Goal hierarchy and relationships
 
@@ -463,7 +463,7 @@ System Goals
 
 - ADR-0009: Nix development environment
 - ADR-0014: Design principles
-- [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns): Multi-channel stable fallback pattern
+- [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns): Multi-channel stable fallback pattern
 - [Handling broken packages](/guides/handling-broken-packages): Operational guide
 - Migration plan: Phased deferred module composition + clan adoption
 - deferred module composition: Type safety through module system maximization
