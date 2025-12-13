@@ -80,7 +80,7 @@ Aligns with G-S02: Type safety via module system and ADR-0014 principle 3 (Type 
 - Module system type checking operational
 - Options defined with types (bool, str, int, attrs, etc.)
 - Invalid option values rejected at evaluation time
-- Dendritic pattern eliminates specialArgs in new modules
+- Deferred module composition eliminates specialArgs in new modules
 - Cross-module references via config.flake.modules.* namespace
 
 **Limitations**:
@@ -91,8 +91,8 @@ Aligns with G-S02: Type safety via module system and ADR-0014 principle 3 (Type 
 ### Target state
 
 **Goals**:
-- Eliminate specialArgs entirely (dendritic pattern enforces this)
-- Every file is a module: type-checked via flake-parts
+- Eliminate specialArgs entirely (deferred module composition enforces this)
+- Type-checked module evaluation via flake-parts
 - Cross-module references via config.flake.modules.* (type-safe)
 - Increased use of submodules for structured configuration
 
@@ -131,12 +131,12 @@ Maintainability directly impacts long-term viability and aligns with G-S03: Redu
 **Limitations**:
 - Two architectures in parallel during migration (being resolved)
 - Legacy nixos-unified patterns documented but marked for migration
-- Legacy modules being incrementally refactored to dendritic pattern
+- Legacy modules being incrementally refactored to deferred module composition
 
 ### Target state
 
 **Goals**:
-- Single architecture (dendritic + clan) after migration
+- Single architecture (deferred module composition + clan) after migration
 - Every pattern documented with examples
 - AMDiRE documentation complete (Context, Requirements, Traceability)
 - Clear migration path preserved in documentation even after completion
@@ -173,7 +173,7 @@ Aligns with G-S04: Modular architecture for scalability and ADR-0014 principle 1
 - Module system provides composition mechanism
 - Platform-specific modules organized separately
 - Cross-platform sharing via home-manager
-- Dendritic pattern enables single-file cross-cutting concerns
+- Deferred module composition enables single-file cross-cutting concerns
 - Explicit module boundaries via flake.modules.* namespace
 - Clan service instances enable multi-host feature coordination
 
@@ -184,7 +184,7 @@ Aligns with G-S04: Modular architecture for scalability and ADR-0014 principle 1
 ### Target state
 
 **Goals**:
-- Eliminate all specialArgs (complete migration to dendritic pattern)
+- Eliminate all specialArgs (complete migration to deferred module composition)
 - Every module composed via typed flake.modules.* imports
 - Features composable without inheritance patterns
 - Clan services fully integrated across 8-machine fleet

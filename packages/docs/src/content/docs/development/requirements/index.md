@@ -12,7 +12,7 @@ This section contains the Requirements layer of the AMDiRE (Artefact Model for D
 The Requirements layer specifies what the system should do from a black-box perspective - the user-visible functionality and quality attributes without constraining internal implementation.
 This layer bridges the Context layer (problem space) and the System layer (solution space, when implemented).
 
-All requirements support the dendritic flake-parts + clan architecture, which is now the current operational architecture.
+All requirements support the deferred module composition + clan architecture, which is now the current operational architecture.
 This documentation reflects the complete migration from nixos-unified, with all eight machines in the fleet operating under the new architecture.
 
 ## AMDiRE Requirements layer purpose
@@ -57,7 +57,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 - UC-004: Deploy coordinated service across hosts
 - UC-005: Handle broken package with multi-channel fallback
 - UC-006: Establish secure overlay network
-- UC-007: Migrate host to dendritic + clan architecture
+- UC-007: Migrate host to deferred module composition + clan architecture
 
 **For each use case**:
 - Actors and their roles
@@ -326,7 +326,7 @@ Each layer provides different views appropriate for different stakeholders and p
 
 ## Summary
 
-The Requirements layer provides a complete black-box specification of infra under the dendritic + clan architecture that is now operational across an eight-machine fleet.
+The Requirements layer provides a complete black-box specification of infra under the deferred module composition + clan architecture that is now operational across an eight-machine fleet.
 
 **Key takeaways**:
 - Seven core use cases capture all major workflows

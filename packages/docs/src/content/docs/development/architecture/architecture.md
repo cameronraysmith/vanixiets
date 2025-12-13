@@ -70,7 +70,7 @@ Every module in the infrastructure is a deferred module that delays evaluation u
 - **deferredModule type**: Delayed evaluation enabling modules to reference the final merged result
 - **Option merging**: Type-specific merge functions with priority handling
 
-This foundation explains why the dendritic pattern works: deferred modules compose cleanly because they form a monoid under concatenation, and auto-discovery works because import-tree simply adds modules to the imports list without changing evaluation semantics.
+This foundation explains why the deferred module composition works: deferred modules compose cleanly because they form a monoid under concatenation, and auto-discovery works because import-tree simply adds modules to the imports list without changing evaluation semantics.
 
 See [Module System Primitives](/concepts/module-system-primitives/) for detailed explanation of deferredModule and evalModules.
 
@@ -86,9 +86,9 @@ Flake-parts wraps nixpkgs' evalModules for flake composition, providing ergonomi
 
 Flake-parts is NOT a module system primitive—it is a framework that makes the module system convenient for flake outputs.
 
-### Layer 2: Dendritic organization
+### Layer 2: Deferred module composition organization
 
-The dendritic pattern organizes deferred modules by aspect rather than by host.
+The deferred module composition organizes deferred modules by aspect rather than by host.
 
 **What it provides:**
 
@@ -96,9 +96,9 @@ The dendritic pattern organizes deferred modules by aspect rather than by host.
 - Directory-based namespace merging (deferredModule monoid composition)
 - Aspect-oriented structure (modules organized by feature, not host)
 
-### Dendritic flake-parts subsystem
+### Deferred module composition subsystem
 
-The dendritic subsystem provides module organization and auto-discovery through the dendritic pattern.
+The module organization subsystem provides module organization and auto-discovery through deferred module composition.
 Every nix file under modules/ is a flake-parts module that exports to flake.modules.* namespaces.
 The import-tree mechanism by Victor Borja auto-discovers modules without manual registration.
 
@@ -182,7 +182,7 @@ Later layers can reference packages from earlier layers.
 
 Each subsystem provides distinct capabilities that compose to deliver the complete infrastructure.
 
-### Dendritic flake-parts functions
+### Deferred module composition functions
 
 **Module auto-discovery**: The import-tree mechanism scans modules/ recursively and imports every .nix file as flake-parts module.
 Adding new module requires only creating file, no flake.nix updates.
@@ -256,7 +256,7 @@ Initial machine installation from bare metal or cloud VM to fully configured sys
 
 **Clan installation (all machines)**:
 
-1. Machine registered in modules/clan/machines.nix importing configuration from dendritic namespace
+1. Machine registered in modules/clan/machines.nix importing configuration from namespace
 2. Run clan machines install \<machine\> --target-host root@\<ip\>
 3. Clan builds system configuration for target platform
 4. Clan partitions disks and installs NixOS/nix-darwin
@@ -389,19 +389,19 @@ Adding new machines to the fleet.
 
 Integration points where subsystems exchange data and coordinate behavior.
 
-### Dendritic to clan interface
+### Deferred module composition to clan interface
 
 **Namespace export → clan import pattern**: Machine modules export to flake.modules.\{darwin,nixos\}.* namespaces.
 Clan registry (modules/clan/machines.nix) imports from these namespaces.
 
 Integration point: config.flake.modules.\{darwin,nixos\}."machines/\{darwin,nixos\}/\<hostname\>"
 
-This two-step registration enables dendritic auto-discovery while maintaining explicit clan registry control.
+This two-step registration enables auto-discovery while maintaining explicit clan registry control.
 
-**ClanModules importing dendritic modules**: Clan inventory instances can import shared configuration from dendritic namespaces.
+**ClanModules importing modules**: Clan inventory instances can import shared configuration from namespaces.
 Service modules reference config.flake.modules.common.* for cross-machine shared configuration.
 
-Integration point: clan.inventory.instances.\<service\>.module imports from dendritic namespaces.
+Integration point: clan.inventory.instances.\<service\>.module imports from namespaces.
 
 ### Terranix to clan interface
 
@@ -458,7 +458,7 @@ Configuration flow from Nix expressions through evaluation to deployed system st
 Version controlled, human-editable, declarative specifications.
 
 **Evaluation layer (nix evaluation)**: Nix expressions evaluated to attribute sets.
-Dendritic auto-discovery imports modules.
+Auto-discovery imports modules.
 Flake-parts composition merges configurations.
 Overlays compose packages.
 
@@ -481,7 +481,7 @@ Each layer transforms data: Source (text) → Evaluation (attribute sets) → Bu
 
 ### Namespace data structure
 
-**Dendritic modules export to structured namespaces**:
+**Modules export to structured namespaces**:
 
 ```nix
 flake.modules = {
@@ -646,7 +646,7 @@ Summary of major architectural decisions with links to detailed ADRs.
 
 Links to implementation artifacts demonstrating how architectural decisions manifest in code.
 
-### Dendritic implementation
+### Module organization implementation
 
 Module auto-discovery: flake.nix imports inputs.import-tree.flakeModule and configures flake.autoImport.
 
@@ -658,7 +658,7 @@ Home aggregates: modules/home/ organized by aspect with auto-merging exports.
 
 ### Clan implementation
 
-Machine registry: modules/clan/machines.nix defines clan.machines.* with imports from dendritic namespaces.
+Machine registry: modules/clan/machines.nix defines clan.machines.* with imports from namespaces.
 
 Inventory instances: modules/clan/inventory/services/ defines service coordination.
 
@@ -706,7 +706,7 @@ Architectural patterns validated through phased implementation effort.
 
 Pattern validation in test-clan repository before production migration.
 
-Established dendritic structure, clan integration, and testing infrastructure.
+Established module organization structure, clan integration, and testing infrastructure.
 Validated cross-platform modules, secrets, and physical deployment.
 
 Metrics: 83 auto-discovered modules, 23-line minimal flake.nix, 270 packages preserved across migration, all 7 patterns rated HIGH confidence in validation decision.
@@ -715,7 +715,7 @@ Metrics: 83 auto-discovered modules, 23-line minimal flake.nix, 270 packages pre
 
 Production migration to infra repository.
 
-Migrated all machines to dendritic + clan architecture.
+Migrated all machines to deferred module composition + clan architecture.
 Darwin workstations (stibnite, blackphos) and NixOS VPS (cinnabar, electrum) operational.
 New machines (rosegold, argentum) created using established patterns.
 
@@ -737,7 +737,7 @@ Per-job content-addressed caching optimizes CI without sacrificing validation.
 
 ## Migration History
 
-### From nixos-unified to dendritic + clan
+### From nixos-unified to deferred module composition + clan
 
 November 2024 architectural migration addressing scalability limitations.
 
@@ -756,16 +756,16 @@ Cross-platform consistency across darwin and nixos.
 
 ### From three-layer to five-layer overlays
 
-December 2024 overlay architecture enhancement following dendritic migration.
+December 2024 overlay architecture enhancement following module organization migration.
 
 **Previous architecture (ADR-0003)**: The file inputs.nix provided multi-channel access.
 The file infra/stable-fallbacks.nix provided platform fixes.
 The directory packages/ contained custom derivations.
 All nested in overlays/ directory.
 
-**Migration to dendritic (ADR-0017)**: Moved overlays/ to modules/nixpkgs/overlays/.
+**Migration to deferred module composition (ADR-0017)**: Moved overlays/ to modules/nixpkgs/overlays/.
 Adopted pkgs-by-name pattern for custom packages.
-Introduced dendritic list concatenation.
+Introduced list concatenation pattern.
 Added Layer 4 overrides.
 Explicit Layer 5 external overlay composition.
 
