@@ -1,5 +1,5 @@
 ---
-title: "ADR-0020: Dendritic + Clan Integration"
+title: "ADR-0020: Deferred Module Composition + Clan Integration"
 ---
 
 - **Status**: Accepted
