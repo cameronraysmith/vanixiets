@@ -28,7 +28,7 @@ This means specifying requirements from a user's perspective without constrainin
 - **Deployment procedures**: How configurations reach target systems
 - **Grey-box constraints**: Known architectural restrictions without full implementation details
 
-The Requirements layer serves as the contract between stakeholders (Context layer) and the implementation (System layer, future work).
+The Requirements layer serves as the contract between stakeholders (Context layer) and the implementation (System layer).
 
 ## Requirements documents
 
@@ -298,7 +298,7 @@ The AMDiRE approach distinguishes three levels of abstraction:
 
 1. **Context layer** (completed): Domain, stakeholders, constraints, goals
 2. **Requirements layer** (this section): Black-box system specification
-3. **System layer** (future work): Glass-box internal architecture
+3. **System layer**: Glass-box internal architecture
 
 Each layer provides different views appropriate for different stakeholders and purposes.
 
