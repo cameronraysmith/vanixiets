@@ -5,7 +5,7 @@ title: "ADR-0019: Clan-Core Orchestration"
 - **Status**: Accepted
 - **Date**: 2024-11-20
 - **Scope**: Multi-machine coordination and deployment
-- **Related**: [ADR-0011: SOPS secrets management](0011-sops-secrets-management/), [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
+- **Related**: [ADR-0011: SOPS secrets management](0011-sops-secrets-management/), [ADR-0018: Deferred module composition architecture](0018-deferred-module-composition-architecture/)
 
 ## Context
 
@@ -307,8 +307,8 @@ Result: 8-machine fleet fully operational under clan orchestration.
 
 - [Clan Integration concept documentation](/concepts/clan-integration)
 - [ADR-0011: SOPS secrets management](0011-sops-secrets-management/)
-- [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
-- [ADR-0020: Dendritic + Clan integration](0020-dendritic-clan-integration/)
+- [ADR-0018: Deferred module composition architecture](0018-deferred-module-composition-architecture/)
+- [ADR-0020: Deferred module composition + Clan integration](0020-deferred-module-composition-clan-integration/)
 - [Module System Primitives](/concepts/module-system-primitives/) - deferredModule and evalModules foundations
 - [Terminology Glossary](/development/context/glossary/) - Module system terminology guide
 
