@@ -106,7 +106,7 @@ NixOS VPS hosts (x86_64-linux):
 - clan-infra production infrastructure uses clan + flake-parts with manual imports, not nixos-unified
 
 **Migration completed**: Validation-first, then VPS infrastructure, then progressive darwin host migration
-- **Initial validation**: COMPLETE - validated dendritic + clan integration in test-clan/ repository (isolated testing)
+- **Initial validation**: COMPLETE - validated deferred module composition + clan integration in test-clan/ repository (isolated testing)
 - **VPS foundation**: COMPLETE - deployed cinnabar VPS using validated patterns (foundation infrastructure)
 - **Darwin migrations**: COMPLETE - migrated darwin hosts progressively (blackphos → rosegold → argentum → stibnite, primary workstation last after all others proven stable)
 - **Architecture cleanup**: COMPLETE - removed nixos-unified, completed migration

@@ -221,7 +221,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-B02 (sustainable maintenance), G-B03 (template value)
 
-**Status**: Achieved (dendritic pattern provides improved organization)
+**Status**: Achieved (deferred module composition provides improved organization)
 
 ### G-S02: Clear, idiomatic patterns
 
@@ -258,7 +258,7 @@ These goals focus on system architecture, design, and technical properties.
 - Invalid configurations rejected early
 - Clear error messages guide fixes
 
-**Dependencies**: G-S04 (dendritic pattern adoption)
+**Dependencies**: G-S04 (deferred module composition adoption)
 
 **Supports**: G-B01 (reliable infrastructure), G-S01 (maintainable structure)
 

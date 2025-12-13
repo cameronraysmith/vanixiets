@@ -197,7 +197,7 @@ Rules are conditional standard procedures that guide implementation but can be a
 
 ### Historical: Migration rules
 
-These rules governed the nixos-unified → clan+dendritic migration (Phases 0-6) completed in November 2024.
+These rules governed the nixos-unified → deferred module composition + clan migration (Phases 0-6).
 They remain documented for historical context and potential future migrations.
 
 **Progressive migration order** (completed):
