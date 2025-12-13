@@ -652,7 +652,7 @@ See [ADR-0018: Dendritic Flake-Parts Architecture](/development/architecture/adr
 
 ## Migration functions
 
-These functions describe the migration from nixos-unified to dendritic + clan architecture.
+These functions describe the migration from nixos-unified to deferred module composition + clan architecture.
 Migration completed across 8-machine fleet (4 darwin: stibnite, blackphos, rosegold, argentum; 4 nixos VPS: cinnabar, electrum, galena, scheelite).
 
 ### MF-001: Convert modules to deferred module composition
@@ -971,7 +971,7 @@ CI/CD (CI)
 └── CI-004: Cache build outputs
 
 Migration (MF)
-├── MF-001: Convert modules to dendritic pattern
+├── MF-001: Convert modules to deferred module composition
 ├── MF-002: Migrate secrets to clan vars
 ├── MF-003: Validate migration readiness
 └── MF-004: Monitor post-migration stability

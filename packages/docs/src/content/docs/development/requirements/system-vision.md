@@ -76,7 +76,7 @@ External Dependencies                System Boundary
 ┌─────────────────┐                  ┌────────────────────────────────┐
 │ GitHub          │◄─────────────────┤  Source Repository             │
 │  - Git hosting  │                  │   - flake.nix                  │
-│  - CI/CD        │                  │   - modules/ (dendritic)       │
+│  - CI/CD        │                  │   - modules/ (deferred)        │
 │  - Issues       │                  │   - sops/ (clan vars)          │
 └─────────────────┘                  └────────────────────────────────┘
                                                     │
