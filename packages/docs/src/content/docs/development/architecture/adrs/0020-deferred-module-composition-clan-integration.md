@@ -5,11 +5,11 @@ title: "ADR-0020: Deferred Module Composition + Clan Integration"
 - **Status**: Accepted
 - **Date**: 2024-11-20
 - **Scope**: Architecture integration
-- **Synthesizes**: [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/), [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
+- **Synthesizes**: [ADR-0018: Deferred module composition architecture](0018-deferred-module-composition-architecture/), [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 
 ## Context
 
-Adopting both dendritic flake-parts ([ADR-0018](0018-dendritic-flake-parts-architecture/)) and clan ([ADR-0019](0019-clan-core-orchestration/)) required solving integration challenges.
+Adopting both deferred module composition ([ADR-0018](0018-deferred-module-composition-architecture/)) and clan ([ADR-0019](0019-clan-core-orchestration/)) required solving integration challenges.
 Neither was designed with the other in mind.
 
 ### Integration challenges
@@ -368,10 +368,10 @@ GCP nodes validated pattern at scale:
 
 - [Deferred Module Composition concept documentation](/concepts/deferred-module-composition)
 - [Clan Integration concept documentation](/concepts/clan-integration)
-- [ADR-0018: Dendritic flake-parts architecture](0018-dendritic-flake-parts-architecture/)
+- [ADR-0018: Deferred module composition architecture](0018-deferred-module-composition-architecture/)
 - [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
 - [ADR-0011: SOPS secrets management](0011-sops-secrets-management/)
-- [ADR-0017: Dendritic overlay patterns](0017-dendritic-overlay-patterns/)
+- [ADR-0017: Deferred module composition overlay patterns](0017-deferred-module-composition-overlay-patterns/)
 - [Module System Primitives](/concepts/module-system-primitives/) - deferredModule and evalModules foundations
 - [Terminology Glossary](/development/context/glossary/) - Module system terminology guide
 
