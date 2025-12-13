@@ -105,7 +105,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-B01 (reliable infrastructure), G-U06 (overlay networking)
 
-**Status**: Achieved (8-machine fleet operational, November 2024)
+**Status**: Achieved (8-machine fleet operational)
 
 ### G-U03: Declarative secrets management
 
@@ -125,7 +125,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-B02 (sustainable maintenance)
 
-**Status**: Achieved (clan vars for secrets with legacy sops-nix for home-manager during migration, November 2024)
+**Status**: Achieved (clan vars for secrets with legacy sops-nix for home-manager)
 
 ### G-U04: Cross-platform module composition
 
@@ -143,7 +143,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-B02 (sustainable maintenance), G-S01 (maintainable structure)
 
-**Status**: Achieved (dendritic pattern enables cross-platform module composition, November 2024)
+**Status**: Achieved (dendritic pattern enables cross-platform module composition)
 
 ### G-U05: Surgical package fixes without system rollback
 
@@ -181,7 +181,7 @@ These goals focus on how the system is intended to be used.
 
 **Supports**: G-U02 (multi-host coordination)
 
-**Status**: Achieved (zerotier mesh operational: cinnabar controller + 7 peers, November 2024)
+**Status**: Achieved (zerotier mesh operational: cinnabar controller + 7 peers)
 
 ### G-U07: Fast, cached builds
 
@@ -221,7 +221,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-B02 (sustainable maintenance), G-B03 (template value)
 
-**Status**: Achieved (dendritic pattern provides improved organization, November 2024)
+**Status**: Achieved (dendritic pattern provides improved organization)
 
 ### G-S02: Clear, idiomatic patterns
 
@@ -262,7 +262,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-B01 (reliable infrastructure), G-S01 (maintainable structure)
 
-**Status**: Achieved (dendritic pattern maximizes module system usage for type safety, November 2024)
+**Status**: Achieved (dendritic pattern maximizes module system usage for type safety)
 
 **Reference**: Strategic rationale in migration plan (type safety through module system maximization)
 
@@ -284,7 +284,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-S03 (maximum type safety), G-S01 (maintainable structure), G-U04 (cross-platform composition)
 
-**Status**: Achieved (dendritic flake-parts pattern adopted across all configurations, November 2024)
+**Status**: Achieved (dendritic flake-parts pattern adopted across all configurations)
 
 **Reference**: dendritic-flake-parts README, pattern documentation
 
@@ -325,7 +325,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-U02 (multi-host coordination), G-U03 (declarative secrets), G-U06 (overlay networking)
 
-**Status**: Achieved (clan integrated with inventory, vars, and services, November 2024)
+**Status**: Achieved (clan integrated with inventory, vars, and services)
 
 ### G-S07: Clan vars system adoption
 
@@ -345,7 +345,7 @@ These goals focus on system architecture, design, and technical properties.
 
 **Supports**: G-U03 (declarative secrets)
 
-**Status**: Achieved (clan vars for secrets with legacy sops-nix preserved for home-manager during migration, November 2024)
+**Status**: Achieved (clan vars for secrets with legacy sops-nix preserved for home-manager during migration)
 
 ### G-S08: Stable fallback preservation
 
@@ -463,19 +463,19 @@ System Goals
 
 ### Achieved goals
 
-- ● G-S01: Maintainable codebase structure (dendritic pattern, November 2024)
-- ● G-S03: Maximum type safety (dendritic maximizes module system, November 2024)
+- ● G-S01: Maintainable codebase structure (dendritic pattern)
+- ● G-S03: Maximum type safety (dendritic maximizes module system)
 - ● G-S04: Dendritic flake-parts pattern adoption (November 2024)
 - ● G-S05: Comprehensive development environment (ADR-0009)
-- ● G-S06: Clan-core integration (inventory, vars, services, November 2024)
-- ● G-S07: Clan vars system adoption (with legacy sops-nix migration, November 2024)
+- ● G-S06: Clan-core integration (inventory, vars, services)
+- ● G-S07: Clan vars system adoption (with legacy sops-nix migration)
 - ● G-S08: Stable fallbacks (multi-channel overlay pattern)
 - ● G-U01: Efficient development workflows (preserved through migration)
-- ● G-U02: Multi-host coordination (8-machine fleet, November 2024)
-- ● G-U03: Declarative secrets management (clan vars with legacy sops-nix migration, November 2024)
-- ● G-U04: Cross-platform module composition (dendritic pattern, November 2024)
+- ● G-U02: Multi-host coordination (8-machine fleet)
+- ● G-U03: Declarative secrets management (clan vars with legacy sops-nix migration)
+- ● G-U04: Cross-platform module composition (dendritic pattern)
 - ● G-U05: Surgical package fixes (via G-S08)
-- ● G-U06: Secure overlay networking (zerotier mesh, November 2024)
+- ● G-U06: Secure overlay networking (zerotier mesh)
 - ● G-U07: Fast, cached builds (cachix integration)
 - ● G-B01: Reliable infrastructure (stable through migration)
 
