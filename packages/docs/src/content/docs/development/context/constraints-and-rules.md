@@ -92,7 +92,6 @@ Constraints are non-negotiable restrictions arising from business context, laws,
 **Breaking changes**:
 - Cannot break existing host functionality during configuration changes
 - Must maintain rollback capability for all configuration deployments
-- Historical note: nixos-unified configurations were preserved until migration completed in November 2024
 - Reason: Operational continuity and risk management
 
 **Upstream compatibility**:
