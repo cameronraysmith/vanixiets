@@ -325,7 +325,7 @@ modules/
 
 ## Comparison with other patterns
 
-### vs nixos-unified (deprecated)
+### vs nixos-unified
 
 nixos-unified used directory-based "autowiring" where file paths mapped to flake outputs:
 
