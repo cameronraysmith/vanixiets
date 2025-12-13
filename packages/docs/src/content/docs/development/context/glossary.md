@@ -109,11 +109,7 @@ Related: module system, extraSpecialArgs.
 
 **autowiring**: Automatic discovery and configuration of hosts from directory structure.
 Synonym: auto-wiring, directory-based discovery.
-Related: nixos-unified, configurations directory.
-
-**configurations directory**: OBSOLETE (November 2024). Legacy directory structure replaced by `modules/{darwin,nixos,home}/` in dendritic migration.
-Synonym: configs directory.
-Related: nixos-unified, modules directory.
+Related: dendritic pattern, import-tree.
 
 **darwin-rebuild**: Command-line tool for activating nix-darwin configurations.
 Synonym: none.
@@ -142,10 +138,6 @@ Related: flake, devShell, development environment.
 **nixos-rebuild**: Command-line tool for activating NixOS configurations.
 Synonym: none.
 Related: NixOS, activation.
-
-**nixos-unified**: DEPRECATED (November 2024). Framework that provided directory-based autowiring for multi-platform Nix configurations, replaced by dendritic flake-parts + clan architecture.
-Abbreviation: none.
-Related: flake-parts, autowiring, specialArgs, dendritic flake-parts pattern.
 
 ## Architecture terms
 
