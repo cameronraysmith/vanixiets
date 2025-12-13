@@ -588,16 +588,16 @@ Summary of major architectural decisions with links to detailed ADRs.
 
 | Decision | ADR | Status | Impact |
 |----------|-----|--------|--------|
-| Dendritic overlay patterns | [ADR-0017](/development/architecture/adrs/0017-dendritic-overlay-patterns/) | Accepted | Five-layer overlay composition |
+| Deferred module composition overlay patterns | [ADR-0017](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns/) | Accepted | Five-layer overlay composition |
 | Overlay composition patterns | [ADR-0003](/development/architecture/adrs/0003-overlay-composition-patterns/) | Superseded | Replaced by ADR-0017 |
 
 ### Fleet architecture
 
 | Decision | ADR | Status | Impact |
 |----------|-----|--------|--------|
-| Dendritic flake-parts | [ADR-0018](/development/architecture/adrs/0018-dendritic-flake-parts-architecture/) | Accepted | Feature-based module organization |
+| Deferred module composition architecture | [ADR-0018](/development/architecture/adrs/0018-deferred-module-composition-architecture/) | Accepted | Feature-based module organization |
 | Clan-core orchestration | [ADR-0019](/development/architecture/adrs/0019-clan-core-orchestration/) | Accepted | Multi-machine deployment |
-| Dendritic + Clan integration | [ADR-0020](/development/architecture/adrs/0020-dendritic-clan-integration/) | Accepted | Namespace export → clan import pattern |
+| Deferred module composition + Clan integration | [ADR-0020](/development/architecture/adrs/0020-deferred-module-composition-clan-integration/) | Accepted | Namespace export → clan import pattern |
 | Terranix provisioning | [ADR-0021](/development/architecture/adrs/0021-terranix-infrastructure-provisioning/) | Accepted | Cloud infrastructure in Nix |
 
 ### Security
