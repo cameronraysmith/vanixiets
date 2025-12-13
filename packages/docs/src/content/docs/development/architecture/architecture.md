@@ -589,7 +589,6 @@ Summary of major architectural decisions with links to detailed ADRs.
 | Decision | ADR | Status | Impact |
 |----------|-----|--------|--------|
 | Deferred module composition overlay patterns | [ADR-0017](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns/) | Accepted | Five-layer overlay composition |
-| Overlay composition patterns | [ADR-0003](/development/architecture/adrs/0003-overlay-composition-patterns/) | Superseded | Replaced by ADR-0017 |
 
 ### Fleet architecture
 
@@ -618,7 +617,6 @@ Summary of major architectural decisions with links to detailed ADRs.
 |----------|-----|--------|--------|
 | GitHub Actions pipeline | [ADR-0012](/development/architecture/adrs/0012-github-actions-pipeline/) | Accepted | Continuous integration |
 | Per-job content-addressed caching | [ADR-0016](/development/architecture/adrs/0016-per-job-content-addressed-caching/) | Accepted | CI optimization |
-| CI caching optimization | [ADR-0015](/development/architecture/adrs/0015-ci-caching-optimization/) | Superseded | Replaced by ADR-0016 |
 
 ### Monorepo
 
