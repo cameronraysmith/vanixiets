@@ -393,26 +393,6 @@ final: prev: {
 }
 ```
 
-### Historical note: migration from nixos-unified
-
-The infrastructure completed migration from nixos-unified to deferred module composition + clan.
-
-**Migration was progressive host-by-host**:
-1. **Initial validation**: Validated deferred module composition + clan in test-clan repository
-2. **VPS foundation**: Deployed cinnabar VPS using validated patterns
-3. **Darwin migrations**: Migrated darwin hosts incrementally (blackphos → rosegold → argentum → stibnite)
-4. **Architecture cleanup**: Removed nixos-unified, completed cleanup
-
-**Per-host migration steps**:
-1. Created `modules/hosts/<hostname>/default.nix` using deferred module composition
-2. Defined in clan inventory
-3. Generated clan vars
-4. Tested build: `nix build .#darwinConfigurations.<hostname>.system`
-5. Deployed: `darwin-rebuild switch --flake .#<hostname>`
-6. Validated functionality
-7. Monitored stability for 1-2 weeks
-8. Proceeded to next host
-
 ## Domain constraints
 
 **Nix evaluation constraints**:
