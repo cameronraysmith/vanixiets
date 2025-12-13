@@ -30,7 +30,7 @@ All machines managed through single configuration repository with cross-platform
 ### User management
 
 The infrastructure manages 5 users across the fleet.
-The crs58 user serves as global admin on legacy machines stibnite and blackphos.
+The crs58 user serves as global admin on machines stibnite and blackphos.
 The cameron user operates as an admin alias on new machines.
 The raquel user is the primary user on blackphos.
 The christophersmith user is the primary user on argentum.
@@ -274,9 +274,9 @@ Initial machine installation from bare metal or cloud VM to fully configured sys
 
 ### Secret distribution workflow
 
-Managing secrets with clan vars (target) and legacy sops-nix (migration).
+Managing secrets with clan vars for machine-level secrets and sops-nix for user-level secrets.
 
-**Clan vars (system secrets)**:
+**Clan vars (machine secrets)**:
 
 1. Define secret generators in clan vars configuration
 2. Run clan vars generate to create/update secrets
@@ -285,7 +285,7 @@ Managing secrets with clan vars (target) and legacy sops-nix (migration).
 5. Clan deployment decrypts and installs secrets on target machine
 6. Services access secrets through standard nixos/darwin secret paths
 
-**sops-nix (legacy user secrets)**:
+**sops-nix (user secrets)**:
 
 1. Create secrets/users/\<username\>.sops.yaml file
 2. Edit with sops secrets/users/\<username\>.sops.yaml
@@ -698,80 +698,79 @@ Age keys: .sops.yaml defines machine and user age keys.
 
 Home-manager secrets: modules/home/ modules reference sops.secrets.
 
-## Validation Evidence
+## Architectural Foundation
 
-Architectural patterns validated through phased implementation effort.
+The architecture rests on patterns validated through phased implementation.
 
-### Initial validation (November 2024)
+### Pattern validation (November 2024)
 
-Pattern validation in test-clan repository before production migration.
+Pattern validation in test-clan repository established viability before production adoption.
 
-Established module organization structure, clan integration, and testing infrastructure.
-Validated cross-platform modules, secrets, and physical deployment.
+Validated module organization structure, clan integration, cross-platform modules, secrets distribution, and physical deployment.
 
 Metrics: 83 auto-discovered modules, 23-line minimal flake.nix, 270 packages preserved across migration, all 7 patterns rated HIGH confidence in validation decision.
 
-### Production migration (November 2024)
+### Production adoption (November 2024)
 
-Production migration to infra repository.
+Production infrastructure implemented using validated patterns.
 
-Migrated all machines to deferred module composition + clan architecture.
+All machines deployed with deferred module composition + clan architecture.
 Darwin workstations (stibnite, blackphos) and NixOS VPS (cinnabar, electrum) operational.
 New machines (rosegold, argentum) created using established patterns.
 
-Result: 6-machine permanent fleet fully operational under new architecture (note that galena and scheelite were added December 2024, not November 2024).
+Result: 6-machine permanent fleet operational under unified architecture (galena and scheelite added December 2024).
 
 ### GCP infrastructure expansion (December 2024)
 
-GCP infrastructure integration.
+GCP infrastructure integration extended the architecture.
 
-Added terranix GCP support, deployed CPU (galena) and GPU (scheelite) instances.
+Terranix GCP support deployed CPU (galena) and GPU (scheelite) instances.
 Toggle mechanism validated with expensive GPU resources.
 
 Metrics: 172-line GCP terranix module, GPU instance operational, 10 patterns established for GCP integration.
 
 ### Continuous validation
 
-CI/CD pipeline runs on every commit validating nix flake check, builds, and tests.
+CI/CD pipeline validates nix flake check, builds, and tests on every commit.
 Per-job content-addressed caching optimizes CI without sacrificing validation.
 
-## Migration History
+## Architecture Evolution
 
 ### From nixos-unified to deferred module composition + clan
 
-November 2024 architectural migration addressing scalability limitations.
+November 2024 architectural evolution addressing scalability and composability.
 
-**nixos-unified limitations**: The specialArgs anti-pattern created implicit dependencies.
+**Previous limitations**: specialArgs anti-pattern created implicit dependencies.
 Host-centric organization led to duplication across machines.
 Limited module composition for cross-cutting concerns.
 
-**Migration approach**: Patterns validated in test-clan repository.
-Production infrastructure migrated November 2024.
-Zero downtime for critical services (zerotier, VPN).
-
-**Migration outcomes**: Feature-based organization eliminates duplication.
+**Current architecture**: Feature-based organization eliminates duplication.
 Explicit imports make dependencies visible.
 Auto-discovery scales gracefully to 100+ modules.
 Cross-platform consistency across darwin and nixos.
 
+**Transition approach**: Patterns validated in test-clan repository.
+Production infrastructure adopted patterns November 2024.
+Zero downtime for critical services (zerotier, VPN).
+
 ### From three-layer to five-layer overlays
 
-December 2024 overlay architecture enhancement following module organization migration.
+December 2024 overlay architecture enhancement for improved composability.
 
 **Previous architecture (ADR-0003)**: The file inputs.nix provided multi-channel access.
 The file infra/stable-fallbacks.nix provided platform fixes.
 The directory packages/ contained custom derivations.
 All nested in overlays/ directory.
 
-**Migration to deferred module composition (ADR-0017)**: Moved overlays/ to modules/nixpkgs/overlays/.
-Adopted pkgs-by-name pattern for custom packages.
-Introduced list concatenation pattern.
-Added Layer 4 overrides.
+**Current architecture (ADR-0017)**: Overlays organized in modules/nixpkgs/overlays/.
+pkgs-by-name pattern for custom packages.
+List concatenation pattern for external overlays.
+Layer 4 overrides for build modifications.
 Explicit Layer 5 external overlay composition.
 
-**Preservation**: Multi-channel stable fallback patterns preserved.
-Stable fallback mechanism unchanged.
-Hydra documentation patterns maintained.
+**Preserved patterns**: Multi-channel stable fallback mechanism.
+Hydra documentation conventions.
+Platform-specific conditionals.
 
 ## Future Directions
 
@@ -798,9 +797,9 @@ Future: Auto-generated module documentation from namespace exports, dependency g
 
 ### Secrets management evolution
 
-Migration from legacy sops-nix to clan vars ongoing.
+Current architecture uses clan vars for machine secrets and sops-nix for user secrets.
 
-Future: Complete clan vars migration, automated secret rotation, secrets validation in CI, emergency access patterns for disaster recovery.
+Future: Automated secret rotation, secrets validation in CI, emergency access patterns for disaster recovery.
 
 ## References
 
