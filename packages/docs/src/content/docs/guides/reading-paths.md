@@ -104,8 +104,7 @@ This path explains the overlay system and multi-channel architecture that enable
 1. [Handling Broken Packages](/guides/handling-broken-packages/) - Stable fallback procedures
 2. [Adding Custom Packages](/guides/adding-custom-packages/) - pkgs-by-name pattern
 3. [Architecture Overview](/concepts/architecture-overview/) - Multi-channel overlay section
-4. [ADR-0003: Overlay composition patterns](/development/architecture/adrs/0003-overlay-composition-patterns/) - Original overlay design
-5. [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns/) - Current overlay architecture
+4. [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns/) - Current overlay architecture
 
 ## Path 8: Multi-machine fleet coordination
 
