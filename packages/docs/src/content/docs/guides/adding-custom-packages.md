@@ -240,4 +240,4 @@ Once you're comfortable adding packages, you might want to:
 - Use stable channel fallbacks for broken packages (see `modules/nixpkgs/overlays/stable-fallbacks.nix`)
 - Apply upstream patches to nixpkgs packages (see [handling broken packages](/guides/handling-broken-packages))
 
-For deeper understanding of the overlay architecture, see [ADR-0017: Dendritic overlay patterns](/development/architecture/adrs/0017-dendritic-overlay-patterns).
+For deeper understanding of the overlay architecture, see [ADR-0017: Deferred module composition overlay patterns](/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns).
