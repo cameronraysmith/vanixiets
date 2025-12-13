@@ -43,7 +43,7 @@ Related: options, types, configuration, deferredModule, evalModules.
 
 **deferredModule**: Module system type that delays evaluation until configuration is computed.
 Enables modules to reference final merged configuration via fixpoint resolution.
-Foundation of dendritic pattern and flake-parts module composition.
+Foundation of deferred module composition and flake-parts module composition.
 Synonym: none.
 Related: evalModules, module system, flake-parts.
 
@@ -109,7 +109,7 @@ Related: module system, extraSpecialArgs.
 
 **autowiring**: Automatic discovery and configuration of hosts from directory structure.
 Synonym: auto-wiring, directory-based discovery.
-Related: dendritic pattern, import-tree.
+Related: deferred module composition, import-tree.
 
 **darwin-rebuild**: Command-line tool for activating nix-darwin configurations.
 Synonym: none.
@@ -160,12 +160,12 @@ Related: clan, vars generator, secrets, sops.
 Synonym: zerotier controller.
 Related: zerotier, peer, overlay network.
 
-**dendritic flake-parts pattern**: Organizational pattern where every file is a deferred module.
+**deferred module composition**: Organizational pattern where every file is a flake-parts module.
 Foundation: nixpkgs module system (deferredModule type, evalModules fixpoint).
 Implementation: flake-parts evaluation + import-tree auto-discovery.
 Convention: directory-based namespace merging via flake.modules.*.
 See [Deferred Module Composition](/concepts/deferred-module-composition/).
-Synonym: dendritic pattern, deferred module composition, aspect-based pattern, every-file-is-module.
+Synonym: aspect-based pattern, every-file-is-module, dendritic pattern (after [mightyiam/dendritic](https://github.com/mightyiam/dendritic)).
 Related: flake-parts, import-tree, flake.modules, deferredModule, evalModules.
 
 **disko**: Tool for declarative disk partitioning and formatting.
@@ -176,11 +176,11 @@ Related: partitioning, LUKS, installation.
 Type: `lazyAttrsOf (lazyAttrsOf deferredModule)` - attribute sets of deferred modules organized by class (nixos, darwin, homeManager).
 Delays evaluation until consumer imports the module into their evalModules call.
 Synonym: modules namespace.
-Related: deferredModule, dendritic pattern, flake-parts.
+Related: deferredModule, deferred module composition, flake-parts.
 
 **import-tree**: Auto-discovery mechanism recursively importing all `.nix` files from a directory.
 Synonym: none.
-Related: dendritic pattern, auto-discovery.
+Related: deferred module composition, auto-discovery.
 
 **instance**: Clan service instance, potentially spanning multiple machines with different roles.
 Synonym: service instance.
@@ -300,7 +300,7 @@ Related: AMDiRE, requirements layer.
 Related: git workflow, semantic versioning.
 
 **cross-cutting concern**: Feature spanning multiple configuration classes (darwin + nixos + home-manager).
-Related: dendritic pattern, module composition.
+Related: deferred module composition, module composition.
 
 **framework independence**: Design principle avoiding framework-specific naming in core identifiers.
 Related: design principles, ADR-0014.
@@ -315,7 +315,7 @@ Related: multi-channel fallback, nixpkgs.
 Related: design principles, ADR-0014.
 
 **type safety**: Property of having configuration errors caught through module system type checking.
-Related: module system, dendritic pattern.
+Related: module system, deferred module composition.
 
 ## Migration terms
 
@@ -325,7 +325,7 @@ Related: stability gate, risk mitigation.
 **stability gate**: Requirement for each migrated host to remain stable for 1-2 weeks before proceeding to next.
 Related: progressive migration, risk mitigation.
 
-**test-clan**: Experimental repository for validating dendritic + clan integration before production deployment.
+**test-clan**: Experimental repository for validating deferred module composition + clan integration before production deployment.
 Related: validation.
 
 ## Workflow terms
@@ -343,7 +343,7 @@ Related: activation, validation.
 Related: activation, recovery.
 
 **specialArgs antipattern**: Extensive use of specialArgs for passing application values, bypassing module system type checking.
-Related: specialArgs, dendritic pattern.
+Related: specialArgs, deferred module composition.
 
 ## Provider and service terms
 
@@ -365,7 +365,7 @@ Related: flake-parts, modules.
 Related: sops-nix, clan vars, encryption.
 
 **modules directory**: Current `modules/{darwin,home,nixos}/` or target `modules/{base,shell,dev,hosts}/`.
-Related: module organization, dendritic pattern.
+Related: module organization, deferred module composition.
 
 **packages directory**: `packages/` containing custom package definitions.
 Related: derivation, overlay.
