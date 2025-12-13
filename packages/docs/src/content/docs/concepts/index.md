@@ -8,7 +8,7 @@ Conceptual documentation to help you understand the architecture and design patt
 
 ## Overview
 
-- [Architecture overview](/concepts/architecture-overview/) - Understanding the architecture combining dendritic flake-parts, clan, and multi-channel overlay composition
+- [Architecture overview](/concepts/architecture-overview/) - Understanding the architecture combining deferred module composition, clan, and multi-channel overlay composition
 
 ## Module system foundations
 
