@@ -633,7 +633,7 @@ The usage model supports the following quality attributes from [quality requirem
 - docs/notes/clan/migration-assessment.md - Per-host validation criteria
 
 **External**:
-- Dendritic pattern: https://github.com/mightyiam/dendritic
+- Deferred module composition pattern: https://github.com/mightyiam/dendritic
 - Clan docs: https://docs.clan.lol/
 - Clan inventory guide: clan-core/docs/site/guides/inventory/
 - Clan vars guide: clan-core/docs/site/guides/vars/
