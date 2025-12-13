@@ -84,20 +84,15 @@ These projects provide the foundation and influence architectural decisions:
 - Defines module system extensions for flakes
 - Influences: Configuration structure, module organization patterns
 
-**nixos-unified** (srid/nixos-unified) [deprecated November 2024]:
-- Provides directory-based autowiring
-- Enables multi-platform support (darwin, nixos, home-manager)
-- Influences: Current configuration structure (configurations/ directory)
-
-**clan** (clan.lol/clan/clan-core) [migration target]:
+**clan** (clan.lol/clan/clan-core):
 - Provides multi-host coordination
 - Defines inventory system, vars system, service instances
-- Influences: Target architecture, multi-host patterns, secrets management
+- Influences: Architecture, multi-host patterns, secrets management
 
-**dendritic flake-parts pattern** (mightyiam/dendritic) [migration target]:
+**dendritic flake-parts pattern** (mightyiam/dendritic):
 - Defines "every file is a flake-parts module" organizational pattern
 - Eliminates specialArgs antipattern
-- Influences: Target directory structure, module composition patterns
+- Influences: Directory structure, module composition patterns
 
 **home-manager** (nix-community/home-manager):
 - Provides user environment management
