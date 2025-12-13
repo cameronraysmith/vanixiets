@@ -63,7 +63,7 @@ Clan generates and manages secrets via the vars system using sops encryption und
 - Zerotier network identities
 - LUKS/ZFS encryption passphrases
 - Service-specific credentials
-- User secrets (migration in progress)
+- User secrets
 
 Generated via `clan vars generate`, stored encrypted in `vars/` directory.
 
@@ -145,7 +145,7 @@ Clan doesn't know about home-manager specifically.
 
 ### User secrets (legacy sops-nix)
 
-Some user-level secrets are still managed via direct sops-nix configuration pending migration to clan vars.
+Some user-level secrets use direct sops-nix configuration alongside clan vars.
 
 ```nix
 # modules/home/core/git.nix
@@ -154,18 +154,18 @@ sops.secrets."users/crs58/github-signing-key" = {
 };
 ```
 
-These will migrate to clan vars as part of the ongoing secrets consolidation.
+New user secrets use clan vars.
 
 ## Secrets management
 
-Clan vars is the target secrets management system for all secrets (system and user).
+Clan vars is the primary secrets management system for all secrets (system and user).
 Clan vars uses sops encryption internally and provides unified secret generation, distribution, and management.
 
-### Current state
+### Secrets architecture
 
-The infrastructure is in migration from legacy direct sops-nix to clan vars:
+The infrastructure uses clan vars as the primary secrets system, with some legacy sops-nix patterns remaining:
 
-**Clan vars (target for all secrets)**
+**Clan vars (primary)**
 
 - **Generated** by clan vars system
 - **Machine-specific and user-specific** secrets
@@ -179,10 +179,10 @@ The infrastructure is in migration from legacy direct sops-nix to clan vars:
 # machines/darwin/stibnite/vars/user-secrets/...
 ```
 
-**Legacy sops-nix (pending migration)**
+**Legacy sops-nix (supplementary)**
 
 - **Manually created** via sops CLI
-- **User-specific** secrets not yet migrated
+- **User-specific** secrets in legacy format
 - **Examples**: Some GitHub tokens, API keys, signing keys, personal credentials
 - **Managed via**: `sops secrets/users/username.sops.yaml`
 - **Storage**: `secrets/` directory, encrypted with age
@@ -194,12 +194,11 @@ sops.secrets."users/crs58/github-token" = {
 };
 ```
 
-### Migration strategy
+### Secrets lifecycle
 
 Clan vars handles both generated secrets (SSH keys, service credentials) and manually-created secrets (API tokens, personal credentials).
 The distinction is not about secret type but about creation method.
-As secrets are rotated or new machines are added, they migrate to clan vars.
-Legacy sops-nix configuration remains for backward compatibility during transition.
+New secrets use clan vars; legacy sops-nix patterns remain functional for existing configurations.
 
 ## Integration patterns
 
@@ -228,16 +227,16 @@ Home-manager modules defined in dendritic structure, deployed via clan.
 ### Clan + sops-nix
 
 ```
-Clan vars (target)              Legacy sops-nix (migration)
-──────────────────              ───────────────────────────
+Clan vars (primary)             Legacy sops-nix (supplementary)
+───────────────────             ───────────────────────────────
 SSH host keys                   Some GitHub tokens
 Zerotier identities             Some API keys
 LUKS passphrases                Some personal credentials
-User credentials (new)          (being migrated to clan vars)
+User credentials (new)          User credentials (legacy)
 ```
 
-Both systems coexist during migration.
-New secrets use clan vars; legacy secrets remain in sops-nix until rotated.
+Both systems coexist.
+New secrets use clan vars; legacy sops-nix patterns remain functional.
 
 ## Machine fleet
 
@@ -270,8 +269,8 @@ Clan's `machines update` deploys the full machine config including home-manager.
 
 ### "Clan vars can't handle user secrets"
 
-**Reality**: Clan vars is the target for all secrets (system and user).
-The current mix of clan vars and sops-nix reflects migration state, not architectural limitation.
+**Reality**: Clan vars handles all secrets (system and user).
+The current mix of clan vars and sops-nix reflects historical patterns, not architectural limitation.
 Clan vars uses sops encryption internally and can manage both generated and manually-created secrets.
 
 ### "Clan provides NixOS services"
