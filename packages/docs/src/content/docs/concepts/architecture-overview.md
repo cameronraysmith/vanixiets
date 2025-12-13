@@ -149,7 +149,7 @@ When nixpkgs unstable breaks, apply surgical fixes (stable fallback for one pack
 Clan vars provides unified secrets management with sops encryption.
 All secrets (SSH keys, zerotier identities, API tokens, passphrases) are managed through clan vars for consistent deployment and access control.
 
-Migration in progress: some secrets still use legacy direct sops-nix patterns during transition to clan vars.
+Some secrets use legacy direct sops-nix patterns alongside clan vars.
 
 See [Clan Integration](/concepts/clan-integration/) for detailed secrets architecture and migration status.
 
