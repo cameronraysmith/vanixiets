@@ -34,6 +34,12 @@ cd vanixiets
 
 ### Step 2: Bootstrap Nix and essential tools
 
+:::note[make vs just]
+This repository uses two task runners: `make` for initial bootstrap (before the devshell exists) and `just` for daily operations (after the devshell is available).
+The Makefile provides `bootstrap`, `verify`, and `setup-user` targets that work without Nix.
+Once you enter the devshell via `direnv allow` or `nix develop`, use `just` commands for all other tasks.
+:::
+
 ```bash
 make bootstrap && exec $SHELL
 ```
