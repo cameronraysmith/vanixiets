@@ -1,6 +1,6 @@
 ---
 title: Contents
-descripton: "AMDiRE requirements layer"
+description: "AMDiRE requirements layer"
 sidebar:
   order: 1
 ---
