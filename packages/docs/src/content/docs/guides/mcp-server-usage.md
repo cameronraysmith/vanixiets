@@ -86,12 +86,12 @@ This server uses a local workspace project, not an npm package.
 
 **Build requirement**:
 ```bash
-cd ~/projects/planning-workspace/mcp-prompts-server
+cd /path/to/mcp-prompts-server  # Your local clone
 npm run build
 ```
 
 **Update when changed**:
-The nix config references `${home}/projects/planning-workspace/mcp-prompts-server/dist/server.js`.
+The nix config references `${home}/path/to/mcp-prompts-server/dist/server.js`.
 When you update the project, rebuild it with `npm run build` - no nix rebuild needed.
 
 ## Secret rotation
@@ -126,8 +126,8 @@ claude --mcp-config ~/.mcp/firecrawl.json --help
 - Check module syntax: `nix-instantiate --parse modules/home/all/tools/claude-code/mcp-servers.nix`
 
 **mcp-prompt-server not working**:
-- Ensure project is built: `ls ~/projects/planning-workspace/mcp-prompts-server/dist/server.js`
-- Rebuild if needed: `cd ~/projects/planning-workspace/mcp-prompts-server && npm run build`
+- Ensure project is built: `ls /path/to/mcp-prompts-server/dist/server.js`
+- Rebuild if needed: `cd /path/to/mcp-prompts-server && npm run build`
 
 **terraform server fails to start**:
 - Check Docker daemon: `docker info`
@@ -153,13 +153,13 @@ mv ~/.mcp-nix-managed ~/.mcp
 
 **Disable nix management**:
 ```bash
-cd ~/projects/nix-workspace/infra
+cd /path/to/infra  # Your local clone of this repository
 
 # Comment out import in claude-code/default.nix
 # Remove line: ./mcp-servers.nix
 
 # Rebuild
-darwin-rebuild switch --flake .#stibnite
+darwin-rebuild switch --flake .#<hostname>
 
 # Manually manage ~/.mcp/ files
 ```
