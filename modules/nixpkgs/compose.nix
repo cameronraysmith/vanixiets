@@ -1,4 +1,4 @@
-# Overlay composition using dendritic list concatenation
+# Overlay composition using list concatenation
 #
 # This module composes all overlays from the auto-discovered flake.nixpkgsOverlays list
 # into a single flake.overlays.default for use in machine configurations.

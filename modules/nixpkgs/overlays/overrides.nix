@@ -1,8 +1,8 @@
 # Per-package build modifications
 #
-# Dendritic flake-parts module exporting override overlays via list concatenation
+# Flake-parts module exporting override overlays via list concatenation
 #
-# Adapted from _overlays/overrides.nix using dendritic list composition pattern
+# Adapted from _overlays/overrides.nix
 #
 # This file contains per-package overrideAttrs customizations:
 # - Test disabling
