@@ -309,7 +309,7 @@ terraform-destroy *ARGS:
   nix run .#terraform.destroy -- {{ARGS}}
 
 ## clan
-# Commands for clan-based machine management (dendritic+clan architecture)
+# Commands for clan-based machine management (deferred module composition+clan architecture)
 
 # Run all tests (nix flake check)
 [group('clan')]
