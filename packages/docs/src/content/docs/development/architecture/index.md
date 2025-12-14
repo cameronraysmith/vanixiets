@@ -4,8 +4,8 @@ title: Architecture
 
 Architecture documentation for the vanixiets multi-machine infrastructure configuration.
 
-This repository manages a heterogeneous fleet of 6 permanent machines plus ephemeral cloud instances across 2 platforms using declarative Nix configuration.
-The infrastructure coordinates 4 nix-darwin laptops and permanent nixos servers (cinnabar plus ephemeral instances like electrum) through deferred module composition, clan multi-machine orchestration, and terranix cloud provisioning.
+This repository manages a heterogeneous fleet of 8 machines across 2 platforms using declarative Nix configuration.
+The infrastructure coordinates 4 nix-darwin laptops (argentum, blackphos, rosegold, stibnite) and 4 nixos servers (cinnabar, electrum, galena, scheelite) through deferred module composition, clan multi-machine orchestration, and terranix cloud provisioning.
 
 ## Overview
 
