@@ -239,7 +239,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cache.outputs.should-run == 'true'
-        run: nix develop -c bun install
+        run: nix develop --accept-flake-config -c bun install
 
       - name: Setup tmate debug session
         if: steps.cache.outputs.should-run == 'true' && needs.set-variables.outputs.debug == 'true'
@@ -249,7 +249,7 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         run: |
           echo "::group::Preview semantic-release version"
-          OUTPUT=$(nix develop -c just preview-version main ${{ matrix.package.path }} 2>&1 | tee /dev/stderr)
+          OUTPUT=$(nix develop --accept-flake-config -c just preview-version main ${{ matrix.package.path }} 2>&1 | tee /dev/stderr)
           echo "::endgroup::"
 
           # Extract and annotate the next version (grep returns 1 on no match, so suppress with || true)
@@ -433,8 +433,8 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         run: |
           mkdir -p test-secrets
-          nix develop --command age-keygen -o test-secrets/test-key.txt
-          TEST_AGE_PUBLIC=$(nix develop --command age-keygen -y test-secrets/test-key.txt)
+          nix develop --accept-flake-config --command age-keygen -o test-secrets/test-key.txt
+          TEST_AGE_PUBLIC=$(nix develop --accept-flake-config --command age-keygen -y test-secrets/test-key.txt)
           echo "generated test age key"
           echo "public key: $TEST_AGE_PUBLIC"
           echo "TEST_AGE_PUBLIC=$TEST_AGE_PUBLIC" >> $GITHUB_ENV
@@ -456,7 +456,7 @@ jobs:
         run: |
           cd test-secrets
           echo "test_secret: test-value-12345" > test.yaml
-          nix develop --command sops -e -i test.yaml
+          nix develop --accept-flake-config --command sops -e -i test.yaml
           echo "encrypted test secret"
 
       - name: verify decryption
@@ -464,7 +464,7 @@ jobs:
         run: |
           cd test-secrets
           SOPS_AGE_KEY_FILE=test-key.txt \
-            nix develop --command sops -d test.yaml | grep -q "test_secret: test-value-12345"
+            nix develop --accept-flake-config --command sops -d test.yaml | grep -q "test_secret: test-value-12345"
           echo "● test secret decryption successful"
 
       - name: validate sops structure
@@ -472,7 +472,7 @@ jobs:
         run: |
           if [ -f .sops.yaml ]; then
             echo "● .sops.yaml exists in repository"
-            nix develop --command sops --version
+            nix develop --accept-flake-config --command sops --version
           else
             echo "⚠️  .sops.yaml not found (may need creation)"
           fi
@@ -543,7 +543,7 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         run: |
           # Use --summary instead of --list to avoid broken pipe with large output
-          JUST_RECIPES=$(nix develop --command just --summary)
+          JUST_RECIPES=$(nix develop --accept-flake-config --command just --summary)
           echo "Available recipes (summary):"
           echo "$JUST_RECIPES" | tr ' ' '\n' | head -20
           echo "... (and more)"
@@ -565,7 +565,7 @@ jobs:
         run: |
           # Run full nix flake check including VM integration tests
           # Use `just check-fast` locally for quicker iteration (~1-2 min vs ~7 min)
-          nix develop --command just check
+          nix develop --accept-flake-config --command just check
 
       - name: Create job result marker
         if: success() && steps.cache.outputs.should-run == 'true'
@@ -636,7 +636,7 @@ jobs:
       - name: cache overlay packages
         if: steps.cache.outputs.should-run == 'true'
         run: |
-          nix develop --command just cache-overlay-packages ${{ matrix.system }}
+          nix develop --accept-flake-config --command just cache-overlay-packages ${{ matrix.system }}
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
@@ -737,7 +737,7 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         run: |
           echo "building ${{ matrix.category }}${{ matrix.config && format(' {0}', matrix.config) || '' }} for ${{ matrix.system }}"
-          nix develop --command just ci-build-category "${{ matrix.system }}" "${{ matrix.category }}" "${{ matrix.config }}"
+          nix develop --accept-flake-config --command just ci-build-category "${{ matrix.system }}" "${{ matrix.category }}" "${{ matrix.config }}"
 
       - name: report disk usage
         if: always()
