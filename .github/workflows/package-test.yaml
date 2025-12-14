@@ -88,15 +88,15 @@ jobs:
 
       - name: install dependencies
         if: steps.cache.outputs.should-run == 'true'
-        run: nix develop --accept-flake-config --command bun install
+        run: nix develop --accept-flake-config -c bun install
 
       - name: run unit tests with coverage
         if: steps.cache.outputs.should-run == 'true'
-        run: nix develop --accept-flake-config --command just ${{ inputs.package-name }}-test-coverage
+        run: nix develop --accept-flake-config -c just ${{ inputs.package-name }}-test-coverage
 
       - name: build for e2e tests
         if: steps.cache.outputs.should-run == 'true'
-        run: nix develop --accept-flake-config --command just ${{ inputs.package-name }}-build
+        run: nix develop --accept-flake-config -c just ${{ inputs.package-name }}-build
 
       # Uncomment for interactive debugging of e2e test failures
       # - name: Setup tmate session for debugging
@@ -107,7 +107,7 @@ jobs:
 
       - name: run e2e tests
         if: steps.cache.outputs.should-run == 'true'
-        run: nix develop --accept-flake-config --command just ${{ inputs.package-name }}-test-e2e
+        run: nix develop --accept-flake-config -c just ${{ inputs.package-name }}-test-e2e
 
       - name: Create job result marker
         if: success() && steps.cache.outputs.should-run == 'true'
