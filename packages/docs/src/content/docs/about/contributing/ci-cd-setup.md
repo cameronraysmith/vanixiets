@@ -235,36 +235,62 @@ gh run view --web
 
 ### 3.3 Verify Each Job
 
-The workflow executes these jobs with intelligent per-job caching (jobs skip if already succeeded for this commit):
+The workflow executes these jobs with intelligent per-job caching (jobs skip if already succeeded for this commit).
+See [Caching Architecture](#caching-architecture) for details on the content-addressed caching mechanism.
 
 **Core jobs (always run on PR/push):**
-1. ● **secrets-scan**: Gitleaks secret scanning (security critical, no caching)
-2. ● **set-variables**: Configure workflow variables (produces outputs, always runs)
+
+1. **secrets-scan** — Gitleaks secret scanning (security critical, no caching)
+2. **set-variables** — Configure workflow variables and discover packages
 
 **Preview jobs (PR only, fast feedback):**
-3. ● **preview-release-version**: Show what version would be released
-4. ● **preview-docs-deploy**: Deploy docs to branch-specific preview URL
+
+3. **preview-release-version** — Show what version would be released (per package matrix)
+4. **preview-docs-deploy** — Deploy docs to branch-specific preview URL
 
 **Validation jobs (run based on file changes):**
-5. ● **bootstrap-verification**: Validate Makefile bootstrap workflow
-6. ● **config-validation**: Test config.nix user definitions
-7. ● **autowiring-validation**: Verify legacy autowiring patterns (deprecated, may be removed)
-8. ● **secrets-workflow**: Test sops-nix mechanics
-9. ● **justfile-activation**: Validate justfile recipes
+
+5. **bootstrap-verification** — Validate Makefile bootstrap workflow
+6. **secrets-workflow** — Test sops-nix mechanics with ephemeral keys
+7. **flake-validation** — Validate flake structure and justfile recipes
 
 **Build jobs (run based on file changes, with matrix):**
-10. ● **cache-overlay-packages**: Pre-cache overlay packages (per system)
-11. ● **nix**: Build all flake outputs (per category/system)
-12. ● **typescript**: Test TypeScript packages (per package)
+
+8. **cache-overlay-packages** — Pre-cache resource-intensive overlay packages (x86_64-linux, aarch64-linux)
+9. **nix** — Build flake outputs by category (packages, checks-devshells, home, nixos) per system
+10. **typescript** — Test TypeScript packages (per package matrix)
 
 **Production jobs (main/beta only):**
-13. ● **production-release-packages**: Release packages to production
-14. ● **production-docs-deploy**: Deploy documentation to production
 
-Jobs use path-based filtering to skip when irrelevant files change (e.g., nix jobs skip on markdown-only changes).
-Each job queries GitHub Checks API to skip if it already succeeded for the current commit SHA.
+11. **production-release-packages** — Release packages via semantic-release
+12. **production-docs-deploy** — Deploy documentation to production
 
-### 3.4 Check Deployment
+Jobs use `paths-ignore` filtering to skip on markdown-only changes.
+Each job uses content-addressed caching to skip if source files haven't changed since last success.
+
+### 3.4 Reusable Workflows
+
+The CI system includes several reusable workflows that can be called from other workflows or used as building blocks for custom pipelines.
+
+**`package-test.yaml`** — TypeScript package testing workflow.
+Runs Vitest tests for all packages in the `packages/` directory.
+Called by `ci.yaml` via the `typescript` job.
+Can be called independently for focused package testing.
+
+**`package-release.yaml`** — Semantic release workflow for package publishing.
+Integrates with semantic-release to version, tag, and publish packages based on conventional commits.
+Called by `ci.yaml` via the `production-release-packages` job on main/beta branches.
+Requires `NPM_TOKEN` or similar registry credentials.
+
+**`deploy-docs.yaml`** — Cloudflare Workers deployment workflow.
+Deploys documentation site to Cloudflare Workers using Wrangler.
+Called by `ci.yaml` for both preview deployments (PR branches) and production (main branch).
+Supports branch-specific URLs for preview deployments.
+
+All reusable workflows accept `workflow_call` trigger and expose inputs for customization.
+See individual workflow files in `.github/workflows/` for input schemas and usage examples.
+
+### 3.5 Check Deployment
 
 If deployment succeeded, verify at:
 - Cloudflare Dashboard: https://dash.cloudflare.com/
@@ -293,18 +319,166 @@ The workflow will automatically:
 
 The CI/CD workflow runs on:
 
-1. **Manual dispatch** (`workflow_dispatch`)
-   - `debug_enabled`: Enable tmate debugging session
-   - `deploy_enabled`: Force deployment even on non-main branch
-   - `force_run`: Force all jobs to run, ignoring per-job caching
+1. **Manual dispatch** (`workflow_dispatch`) — supports interactive control via GitHub UI or `gh workflow run ci.yaml`
+   - `job`: Run a specific job only (e.g., `flake-validation`, `nix`)
+   - `debug_enabled`: Enable tmate debugging session for troubleshooting
+   - `deploy_enabled`: Force deployment even on non-main branch (use cautiously)
+   - `force_run`: Force all jobs to run, ignoring content-addressed caching
 
-2. **Pull requests** (`pull_request`)
+2. **Workflow call** (`workflow_call`) — allows reuse as a callable workflow from other workflows
+   - Accepts same inputs as `workflow_dispatch`
+   - Enables composition of CI workflows across repositories
+
+3. **Pull requests** (`pull_request`) — runs on all PR events except those matching `paths-ignore`
    - Runs CI checks only (no deployment)
-   - Jobs use intelligent caching (skip if already succeeded for this commit)
+   - Skips on markdown-only changes via `paths-ignore: ['**/*.md', 'docs/**']`
+   - Jobs use content-addressed caching to skip if source files unchanged
+   - Preview jobs deploy to branch-specific URLs
 
-3. **Push to main** (`push` to `main` branch)
-   - Runs full CI with intelligent caching
-   - Automatically deploys to production
+4. **Push to main** (`push` to `main` branch) — production deployment trigger
+   - Runs full CI with content-addressed caching
+   - Automatically deploys to production environment
+   - Runs semantic-release for package publishing
+
+5. **Force-run override** — bypass caching for specific workflow runs
+   - Add `force-ci` label to PR to force all jobs to run
+   - Use `workflow_dispatch` with `force_run: true` for manual runs
+   - Useful when cache corruption suspected or after dependency updates
+
+## Caching Architecture
+
+The CI system implements a three-tier caching strategy to minimize redundant work and reduce workflow execution time from hours to minutes.
+
+### Content-Addressed Job Caching
+
+Jobs use the `cached-ci-job` composite action (`.github/actions/cached-ci-job/action.yaml`) to implement content-addressed caching at the job level.
+This is the first tier of caching and determines whether a job needs to run at all.
+
+The mechanism works by computing a cache key from source files that affect the job's output, then checking GitHub's cache for a previous successful run with the same key.
+If found, the job is skipped entirely.
+If not found or if the job previously failed, it runs and caches the success state upon completion.
+
+Each job declares its *hash sources* — glob patterns identifying files that affect its output.
+For example, the `flake-validation` job uses:
+
+```yaml
+hash_sources: |
+  flake.nix
+  flake.lock
+  justfile
+  .envrc
+  .github/workflows/ci.yaml
+```
+
+When any of these files change, the cache key changes, forcing the job to re-run.
+When none have changed since the last successful run, the job skips immediately.
+
+The cache key format is: `ci-job-<job-name>-<runner-os>-<hash-of-sources>-<run-attempt>`.
+This ensures cache isolation per job, per platform, per source state, and per retry attempt.
+
+### Nix Store Cache
+
+The second tier caches the Nix store itself across workflow runs.
+The `setup-nix` composite action (`.github/actions/setup-nix/action.yaml`) manages this through two installer strategies:
+
+**Full installer mode** (default) — uses `DeterminateSystems/nix-installer-action` with automatic GC root registration and store path caching.
+This mode is slower to initialize but provides robust cache persistence for the entire store.
+
+**Quick installer mode** (`quick: true`) — uses `cachix/install-nix-action` for faster initialization.
+Sacrifices some cache robustness for speed, useful for jobs with minimal Nix dependencies.
+
+Both modes integrate with GitHub's cache action to persist `/nix/store` paths between runs.
+The cache key includes `runner.os`, Nix version, and a hash of `flake.lock` to ensure cache invalidation when dependencies update.
+
+### Binary Cache (Cachix)
+
+The third tier uses Cachix as a remote binary cache for pre-built derivations.
+This cache is shared across all developers and CI runs, not scoped to a single repository or workflow.
+
+The `cache-overlay-packages` job pre-builds resource-intensive overlay packages (like LLVM, GCC, Rust toolchains) and pushes them to Cachix.
+Subsequent jobs pull from Cachix instead of rebuilding from source, reducing build times from hours to minutes.
+
+Cachix configuration is managed via `secrets/shared.yaml`:
+- `CACHIX_CACHE_NAME` — the cache to push/pull from
+- `CACHIX_AUTH_TOKEN` — authentication for write access (read access is public)
+
+### Cache Invalidation
+
+Caches invalidate when their key inputs change:
+
+- **Job cache** — invalidates when hash sources change (per-job source patterns)
+- **Nix store cache** — invalidates when `flake.lock` changes or Nix version updates
+- **Cachix** — never invalidates (content-addressed), but may evict old entries per cache policy
+
+Force-run overrides (`force_run` input or `force-ci` label) bypass only the job cache.
+Nix store cache and Cachix remain active to accelerate builds even when forcing job re-execution.
+
+## Local Development
+
+### Running CI Locally
+
+The repository maintains parity between CI and local environments through the `nix develop -c just [recipe]` pattern.
+Every CI job has a corresponding justfile recipe that runs the same commands the workflow executes, using the same Nix flake environment.
+
+This enables fast iteration: reproduce CI failures locally without waiting for GitHub Actions, validate fixes immediately, and push with confidence.
+
+### CI Job to Local Command Mapping
+
+| CI Job | Local Equivalent | Purpose |
+|--------|------------------|---------|
+| `flake-validation` | `just check-fast` | Fast flake validation (~1-2 min vs ~7 min full check) |
+| `nix` (packages) | `just ci-build-category x86_64-linux packages` | Build all packages for a specific system |
+| `nix` (checks) | `just ci-build-category x86_64-linux checks-devshells` | Run all checks and build devShells |
+| `typescript` | `just test-typescript-packages` | Test all TypeScript packages via Vitest |
+| `bootstrap-verification` | `just verify-bootstrap` | Validate Makefile bootstrap workflow |
+| `secrets-workflow` | `just verify-secrets-workflow` | Test sops-nix mechanics |
+| All jobs | `just ci-run-watch` | Trigger full CI and watch progress |
+
+### Key Justfile Recipes
+
+**`ci-run-watch`** — triggers the CI workflow via `gh workflow run` and watches execution in real-time.
+Useful for validating changes before merging.
+
+**`ci-status`** — shows current CI run status and summary.
+Quickly check if CI is passing without opening GitHub.
+
+**`ci-logs`** — downloads and displays CI logs, optionally filtering to failed jobs only via `ci-logs-failed`.
+Faster than navigating GitHub UI for debugging.
+
+**`ci-build-category <system> <category>`** — builds a specific category of flake outputs for a specific system.
+Example: `just ci-build-category x86_64-linux packages` builds all packages.
+Categories: `packages`, `checks-devshells`, `home`, `nixos`.
+
+**`check-fast`** — runs fast flake validation (1-2 minutes) vs `nix flake check` (7+ minutes).
+Validates flake structure, evaluates outputs, checks formatting without building everything.
+
+### Debugging CI Failures
+
+When a CI job fails:
+
+1. **Identify the failing job** — use `just ci-status` or check GitHub Actions UI
+2. **Run locally** — use the corresponding justfile recipe from the table above
+3. **Reproduce the failure** — the local environment should match CI exactly
+4. **Fix and validate** — iterate locally until the recipe succeeds
+5. **Force re-run** — if needed, add `force-ci` label to PR or use `just ci-run-watch`
+
+For Nix-specific failures, enter the development shell explicitly:
+```bash
+nix develop
+# Then run the failing command manually
+```
+
+For failures in specific packages, use targeted builds:
+```bash
+# Build a specific package
+nix build .#packages.x86_64-linux.some-package
+
+# Build a specific check
+nix build .#checks.x86_64-linux.some-check
+```
+
+If the failure is environment-specific (e.g., macOS vs Linux), use remote builders or platform-specific machines.
+The justfile recipes respect the local platform but can be overridden via Nix's `--system` flag.
 
 ## Troubleshooting
 
@@ -376,6 +550,8 @@ After successful setup:
 
 ## Useful Commands
 
+### GitHub CLI Workflow Commands
+
 ```bash
 # List workflows
 gh workflow list
@@ -386,14 +562,76 @@ gh run list --workflow=ci.yaml
 # Trigger manual deployment
 gh workflow run ci.yaml -f deploy_enabled=true
 
+# Force all jobs to run (ignore caching)
+gh workflow run ci.yaml -f force_run=true
+
+# Run a specific job only
+gh workflow run ci.yaml -f job=flake-validation
+
 # View latest run
 gh run view
+
+# View latest run in browser
+gh run view --web
 
 # Download workflow artifacts
 gh run download
 
 # Re-run failed workflow
 gh run rerun <run-id>
+```
+
+### Justfile CI Commands
+
+```bash
+# Trigger CI and watch progress in real-time
+just ci-run-watch
+
+# View current CI status
+just ci-status
+
+# View all CI logs
+just ci-logs
+
+# View only failed job logs
+just ci-logs-failed
+
+# Build specific category locally (matches CI nix job)
+just ci-build-category x86_64-linux packages
+just ci-build-category x86_64-linux checks-devshells
+just ci-build-category aarch64-darwin home
+
+# Fast flake validation (~1-2 min vs ~7 min nix flake check)
+just check-fast
+
+# Test TypeScript packages (matches CI typescript job)
+just test-typescript-packages
+
+# Verify bootstrap workflow (matches CI bootstrap-verification job)
+just verify-bootstrap
+
+# Verify secrets workflow (matches CI secrets-workflow job)
+just verify-secrets-workflow
+```
+
+### Local Development Parity
+
+```bash
+# Enter development environment (same as CI uses)
+nix develop
+
+# Run any justfile recipe in dev environment
+nix develop -c just <recipe>
+
+# Build specific flake output
+nix build .#packages.x86_64-linux.some-package
+nix build .#checks.x86_64-linux.some-check
+
+# Evaluate flake outputs without building
+nix eval .#packages.x86_64-linux --apply builtins.attrNames
+
+# Show flake structure
+nix flake show
 ```
 
 ## References
