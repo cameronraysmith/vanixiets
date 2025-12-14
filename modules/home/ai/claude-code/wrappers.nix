@@ -14,11 +14,6 @@
         home = config.home.homeDirectory;
       in
       {
-        # GLM wrapper using sops-nix for API key
-        # Pattern A + sops-nix enables secrets via config.sops.secrets
-        # crs58/cameron only (raquel doesn't have ai aggregate)
-
-        # GLM wrapper script - ENABLED via sops-nix
         home.packages = [
           (pkgs.writeShellApplication {
             name = "claude-glm";
