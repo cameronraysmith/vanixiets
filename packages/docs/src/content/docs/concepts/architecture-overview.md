@@ -211,7 +211,7 @@ The combination provides:
 ## References
 
 - [flake-parts](https://flake.parts) - Modular flake composition
-- [dendritic pattern](https://vic.github.io/dendrix/Dendritic.html) - Module organization
+- [deferred module composition pattern](https://vic.github.io/dendrix/Dendritic.html) - Module organization
 - [clan](https://clan.lol/) - Multi-machine coordination
 - [mirkolenz/nixos](https://github.com/mirkolenz/nixos) - Multi-channel stable fallback patterns
 
