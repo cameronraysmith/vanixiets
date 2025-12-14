@@ -56,7 +56,7 @@ Infrastructure tests validate the nix flake structure, machine configurations, a
 | nix-unit | `modules/checks/nix-unit.nix` | 16 | Unit tests for flake structure and invariants |
 | validation | `modules/checks/validation.nix` | 10 | Configuration validation and naming conventions |
 | integration | `modules/checks/integration.nix` | 2 | VM boot tests for NixOS machines |
-| performance | `modules/checks/performance.nix` | 4 | Performance benchmarks and optimization (planned) |
+| performance | `modules/checks/performance.nix` | 0 (planned: 4) | Performance benchmarks and optimization (planned) |
 | treefmt | (flake-parts) | 1 | Code formatting validation |
 | pre-commit | (flake-parts) | 1 | Pre-commit hook validation |
 
