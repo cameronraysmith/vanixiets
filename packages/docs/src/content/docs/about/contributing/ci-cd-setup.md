@@ -376,14 +376,14 @@ This ensures cache isolation per job and per source state, enabling independent 
 The second tier caches the Nix store itself across workflow runs.
 The `setup-nix` composite action (`.github/actions/setup-nix/action.yml`) manages this through two installer strategies:
 
-**Full mode** (default) — includes disk space reclamation via `nothing-but-nix` on Linux (or manual cleanup on macOS) and enables `nix-community/cache-nix-action` for store path persistence.
+**Full mode** (default) — includes disk space reclamation via `nothing-but-nix` on Linux (or manual cleanup on macOS) and enables `DeterminateSystems/magic-nix-cache-action` for store path persistence.
 This mode reclaims 40-60GB of disk space on GitHub runners and maintains a cached Nix store across runs.
 
 **Quick mode** (`installer: quick`) — skips space reclamation and store caching for faster initialization.
 Both modes use `cachix/install-nix-action` for Nix installation but quick mode omits the caching overhead, useful for simple validation jobs.
 
-In full mode, the `cache-nix-action` persists `/nix/store` paths between runs with automatic garbage collection when the store exceeds `gc-max-store-size` (default 5GB).
-The cache key includes `runner.os` and a hash of all `.nix` files plus `flake.lock` to ensure invalidation when dependencies change.
+In full mode, the `magic-nix-cache-action` transparently caches `/nix/store` paths between runs using GitHub Actions cache.
+FlakeHub is disabled in favor of Cachix for binary caching.
 
 ### Binary Cache (Cachix)
 
