@@ -1,5 +1,4 @@
 # Disko disk configuration for cinnabar (Hetzner CX43 BIOS boot)
-# Merged into machines/nixos/cinnabar via dendritic flake-parts pattern
 { ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" = {

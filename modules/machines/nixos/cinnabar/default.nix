@@ -8,7 +8,7 @@ let
   flakeModules = config.flake.modules.nixos;
 in
 {
-  # Export host module to flake namespace (dendritic pattern)
+  # Export host module to flake namespace
   flake.modules.nixos."machines/nixos/cinnabar" =
     {
       config,
@@ -45,7 +45,7 @@ in
       boot.zfs.devNodes = "/dev/disk/by-path";
 
       # Disko disk configuration extracted to disko.nix
-      # Auto-merged via dendritic flake-parts pattern
+      # Auto-merged via import-tree
 
       # Bootloader: GRUB BIOS mode (CX43 has legacy BIOS only, not UEFI)
       # srvos hardware-hetzner-cloud handles GRUB BIOS configuration
