@@ -1,9 +1,9 @@
 { ... }:
 {
-  # TODO: Requires flake.config user lookup pattern from nixos-unified
-  # This module references flake.config.${config.home.username} which is
-  # nixos-unified-specific and needs adaptation for dendritic pattern.
-  # Temporarily disabled until user configuration pattern is migrated.
+  # TODO: Previously used flake.config user lookup pattern from nixos-unified
+  # This module references flake.config.${config.home.username} which is a pattern
+  # that was in place when this config was based on nixos-unified and needs adaptation
+  # for deferred module composition pattern. Temporarily disabled.
   /*
     flake.modules.homeManager.tools =
       {
