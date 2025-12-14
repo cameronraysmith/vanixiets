@@ -121,29 +121,43 @@ just test-container fd
 
 **3. Manifest workflow (CI/CD registry distribution)**
 
-The `fdManifest` and `rgManifest` definitions use flocken to create multi-arch manifests for pushing to container registries. These require registry configuration (see `modules/flake-parts/containers.nix`).
+The `fdManifest` and `rgManifest` definitions use flocken v2 to create multi-arch manifests for pushing to container registries.
+See `modules/containers/default.nix` for the implementation.
 
 For local multi-arch testing, use workflow #2 above instead.
 
-Example manifest definition:
+Example manifest definition (flocken v2 API):
 ```nix
 fdManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
-  version = "latest";
+  version = "1.0.0";  # Semantic version, not "latest"
+  branch = "main";
   imageFiles = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
-  registries = {
-    "ghcr.io" = {
-      username = "your-username";
-      repo = "your-repo";
-    };
+  registries."ghcr.io" = {
+    repo = "your-org/your-image";
+    username = "your-username";
+    password = "$GITHUB_TOKEN";  # Env var reference, not literal value
   };
-  tags = [ "latest" ];
 };
 ```
 
-Once configured:
+For CI/CD integration with environment variables:
+```nix
+fdManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
+  version = getEnvOr "VERSION" "1.0.0";
+  branch = getEnvOr "GITHUB_REF_NAME" "main";
+  imageFiles = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
+  registries."ghcr.io" = {
+    repo = "cameronraysmith/fd";
+    username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
+    password = "$GITHUB_TOKEN";
+  };
+};
+```
+
+Once configured, run in CI:
 ```bash
-nix run --impure .#fdManifest  # Builds + pushes to configured registries
-nix run --impure .#rgManifest
+VERSION=1.0.0 nix run --impure .#fdManifest  # Builds + pushes to configured registries
+VERSION=1.0.0 nix run --impure .#rgManifest
 ```
 
 ### Architecture auto-detection
@@ -182,54 +196,63 @@ The nix-rosetta-builder VM is configured with:
 
 ## Adding new containers
 
-To add a new tool container, edit `modules/flake-parts/containers.nix`:
+To add a new tool container, edit `modules/containers/default.nix`:
 
 **1. Add the container package:**
 
+Add to the `lib.mkMerge` list inside the `packages` definition:
+
 ```nix
-packages = lib.optionalAttrs isLinux {
-  fdContainer = mkToolContainer {
-    name = "fd";
-    package = pkgs.fd;
-  };
+packages = lib.mkMerge [
+  # Container images - Linux only
+  (lib.optionalAttrs isLinux {
+    fdContainer = mkToolContainer {
+      name = "fd";
+      package = pkgs.fd;
+    };
 
-  rgContainer = mkToolContainer {
-    name = "rg";
-    package = pkgs.ripgrep;  # Note: package name != binary name
-  };
+    rgContainer = mkToolContainer {
+      name = "rg";
+      package = pkgs.ripgrep;  # Note: package name != binary name
+    };
 
-  myToolContainer = mkToolContainer {
-    name = "mytool";
-    package = pkgs.mytool;
-  };
-};
+    myToolContainer = mkToolContainer {
+      name = "mytool";
+      package = pkgs.mytool;
+    };
+  })
+
+  # Manifests section (see step 2)
+];
 ```
 
 **2. Add the manifest (optional, for multi-arch registry distribution):**
 
+Add to the same `lib.mkMerge` list. Manifests are available on all systems since they coordinate cross-system builds:
+
 ```nix
-legacyPackages = {
-  fdManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
-    version = "latest";
-    imageFiles = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
-    registries = { };
-    tags = [ "latest" ];
-  };
+packages = lib.mkMerge [
+  # Container images (see step 1)
 
-  rgManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
-    version = "latest";
-    imageFiles = map (sys: inputs.self.packages.${sys}.rgContainer) imageSystems;
-    registries = { };
-    tags = [ "latest" ];
-  };
-
-  myToolManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
-    version = "latest";
-    imageFiles = map (sys: inputs.self.packages.${sys}.myToolContainer) imageSystems;
-    registries = { };
-    tags = [ "latest" ];
-  };
-};
+  # Multi-arch manifests - available on all systems
+  (
+    let
+      getEnvOr = var: default: let val = builtins.getEnv var; in if val == "" then default else val;
+    in
+    {
+      myToolManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
+        version = getEnvOr "VERSION" "1.0.0";
+        branch = getEnvOr "GITHUB_REF_NAME" "main";
+        imageFiles = map (sys: inputs.self.packages.${sys}.myToolContainer) imageSystems;
+        registries."ghcr.io" = {
+          repo = "your-org/mytool";
+          username = getEnvOr "GITHUB_ACTOR" "your-username";
+          password = "$GITHUB_TOKEN";
+        };
+      };
+    }
+  )
+];
 ```
 
 **3. Use the justfile workflows:**
@@ -242,9 +265,12 @@ just container-all myToolContainer mytool
 just container-all-multiarch myToolContainer mytool
 ```
 
-**4. (Optional) Configure manifest for CI/CD registry push:**
+**4. (Optional) Run manifest in CI/CD for registry push:**
 
-Add registry configuration to the manifest definition and use in CI/CD pipelines.
+In GitHub Actions, the environment variables are automatically available:
+```bash
+VERSION=${{ github.ref_name }} nix run --impure .#myToolManifest
+```
 
 ## Container management with Colima
 
