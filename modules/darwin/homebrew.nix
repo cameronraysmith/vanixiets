@@ -1,6 +1,5 @@
 # Homebrew package management for darwin systems
 # Defines custom.homebrew options and base GUI application fleet
-# Merged into darwin.base via dendritic auto-discovery
 { ... }:
 {
   flake.modules = {

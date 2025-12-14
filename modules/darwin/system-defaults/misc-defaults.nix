@@ -4,7 +4,6 @@
 # - loginwindow → loginwindow.nix
 # - screencapture → screencapture.nix
 # - WindowManager → window-manager.nix
-# Merged into darwin.base via dendritic auto-discovery
 { ... }:
 {
   flake.modules.darwin.base =
