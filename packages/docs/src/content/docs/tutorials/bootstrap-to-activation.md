@@ -43,6 +43,7 @@ Traditional system configuration involves installing packages manually, editing 
 Nix takes a different approach: your entire system configuration lives in version-controlled files, and the system state is derived from those files deterministically.
 
 This means:
+
 - **Reproducibility**: The same configuration produces the same system, every time
 - **Rollback**: Every change creates a new generation you can roll back to
 - **Declarative**: You describe what you want, not how to get there
@@ -95,7 +96,7 @@ Let's start by getting the configuration onto your machine.
 
 ```bash
 cd ~/projects  # Or wherever you keep your code
-git clone git@github.com:cameronraysmith/vanixiets.git
+git clone https://github.com/cameronraysmith/vanixiets.git
 cd vanixiets
 ```
 
@@ -106,6 +107,7 @@ ls -la
 ```
 
 You'll see:
+
 - `flake.nix` - The entry point defining all outputs
 - `modules/` - The deferred module composition hierarchy
 - `secrets/` - Encrypted secrets (we'll cover this in the secrets tutorial)
@@ -124,6 +126,7 @@ make bootstrap
 ```
 
 This command:
+
 1. Checks if Nix is installed, installs it via the Determinate Systems installer if not
 2. Installs direnv for automatic development shell activation
 3. Configures your shell to use direnv
@@ -181,6 +184,7 @@ ls modules/machines/nixos/
 ```
 
 The current fleet includes:
+
 - **Darwin**: stibnite, blackphos, rosegold, argentum
 - **NixOS**: cinnabar, electrum, galena, scheelite
 
@@ -201,6 +205,7 @@ These imports follow the deferred module composition pattern, pulling in feature
 
 Notice how the file is relatively short.
 Most configuration comes from:
+
 - Aggregate modules that bundle related features
 - User modules that define personal environments
 - Shared modules that all machines inherit
@@ -265,6 +270,7 @@ clan machines update cinnabar
 ### What happens during activation?
 
 The activation process:
+
 1. **Builds** the complete system configuration from your flake
 2. **Creates** a new system generation in `/nix/store`
 3. **Switches** symlinks to point to the new generation
