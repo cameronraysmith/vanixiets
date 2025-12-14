@@ -1,8 +1,8 @@
 # Multi-channel nixpkgs access layer
 #
-# Dendritic flake-parts module exporting channel overlays via list concatenation
+# Flake-parts module exporting channel overlays via list concatenation
 #
-# Adapted from _overlays/inputs.nix using dendritic list composition pattern
+# Adapted from _overlays/inputs.nix
 #
 # Exports to flake.nixpkgsOverlays list:
 #   - inputs: Raw flake inputs reference
