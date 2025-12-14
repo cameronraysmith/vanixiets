@@ -440,10 +440,10 @@
       for pr in "''${prs_to_approve[@]}"; do
         echo "Approving PR #$pr..."
         if gh pr review "$pr" --approve; then
-          ((approved++))
+          ((++approved))
         else
           echo "Warning: Failed to approve PR #$pr" >&2
-          ((failed++))
+          ((++failed))
         fi
       done
 
