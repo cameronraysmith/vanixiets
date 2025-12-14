@@ -38,7 +38,7 @@ This explains why the integration is seamless: both systems use the same underly
 
 **Cross-platform consistency**:
 - Clan inventory coordinates machines
-- Dendritic home-manager modules should work across darwin and nixos
+- Deferred module composition home-manager modules should work across darwin and nixos
 - Service instances span both platforms
 
 ### What needed to work together
@@ -377,6 +377,6 @@ GCP nodes validated pattern at scale:
 
 ### External
 
-- [dendritic pattern](https://github.com/mightyiam/dendritic) - Original deferred module composition pattern
+- [deferred module composition pattern](https://github.com/mightyiam/dendritic) - Original pattern definition
 - [clan](https://github.com/clan-lol/clan-core)
 - [nixpkgs.molybdenum.software-dendritic-clan](https://github.com/nixpkgs-community/nixpkgs.molybdenum.software) - Deferred module composition + clan combination reference
