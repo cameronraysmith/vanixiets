@@ -297,7 +297,7 @@ These documents provide partial traceability that this audit extends and validat
 | TC-004 | testInvariantNixosConfigurationsExist | NixOS configs present |
 | TC-005 | testInvariantDarwinConfigurationsExist | Darwin configs present |
 | TC-006 | testInvariantHomeConfigurationsExist | Home configs present |
-| TC-008 | testFeatureDendriticModuleDiscovery | NixOS module discovery |
+| TC-008 | testFeatureModuleDiscovery | NixOS module discovery |
 | TC-009 | testFeatureDarwinModuleDiscovery | Darwin module discovery |
 | TC-010 | testFeatureNamespaceExports | Namespace exports |
 | TC-013 | testTypeSafetyModuleEvaluationIsolation | Module structure |
