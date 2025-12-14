@@ -22,7 +22,7 @@
 
 ## What This Provides
 
-Nix flake-based system configurations for NixOS, nix-darwin, and home-manager using the dendritic flake-parts architecture and clan.
+Nix flake-based system configurations for NixOS, nix-darwin, and home-manager using deferred module composition and clan.
 
 ## Quick Start
 
@@ -48,7 +48,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ## Features
 
-⊕ **Dendritic module organization** - import-tree auto-discovers Nix files organized by feature category (aspect) rather than host, with the intent that each file qualifies as a flake-parts module that exports to semantically meaningful namespaces (`flake.modules.darwin.*`, `flake.modules.home.*`, `flake.modules.nixos.*`)
+⊕ **Deferred module composition** - import-tree auto-discovers Nix files organized by feature category (aspect) rather than host, where each file is a flake-parts module that assigns deferredModule values to class-organized namespaces (`flake.modules.darwin.*`, `flake.modules.homeManager.*`, `flake.modules.nixos.*`)
 
 ⋈ **Per-package nixpkgs channel selection** - Multi-channel overlay architecture enables unstable default with selective stable fallbacks via `modules/nixpkgs/overlays/stable-fallbacks.nix` without holding back rolling upgrades for the entire package set.
 
@@ -60,7 +60,7 @@ See the [Getting Started guide](https://infra.cameronraysmith.net/guides/getting
 
 ⊠ **Composable package overlays** - layered overlay composition (multi-channel access → stable fallbacks → custom packages → build overrides → flake input overlays) for package customization and dependency management
 
-↯ **Reproducible development environments** - Standard nix development shell(s) with direnv auto-activation and just task runner recipe for each CI job to support reproducible local 
+↯ **Reproducible development environments** - Standard nix development shell(s) with direnv auto-activation and just task runner recipe for each CI job to support reproducible local
 development testing
 
 ## Documentation
