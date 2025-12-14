@@ -29,7 +29,7 @@ Use Nix flakes for reproducible development environments with direnv integration
 
 **Key components:**
 - `flake.nix` - Flake configuration and inputs
-- `nix/modules/` - Modular Nix configuration
+- `modules/` - Modular Nix configuration (including `modules/dev-shell.nix`)
 - `.envrc` - direnv integration for automatic shell activation
 
 **Provided tools:**
