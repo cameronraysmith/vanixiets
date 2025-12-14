@@ -1,5 +1,4 @@
 # Disko disk configuration for galena (GCP e2-standard UEFI boot)
-# Merged into machines/nixos/galena via dendritic flake-parts pattern
 { ... }:
 {
   flake.modules.nixos."machines/nixos/galena" = {

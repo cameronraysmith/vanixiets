@@ -1,5 +1,4 @@
 # Disko disk configuration for electrum (Hetzner CCX23 UEFI boot)
-# Merged into machines/nixos/electrum via dendritic flake-parts pattern
 { ... }:
 {
   flake.modules.nixos."machines/nixos/electrum" = {

@@ -1,5 +1,4 @@
 # Disko disk configuration for scheelite (GCP g2-standard UEFI boot)
-# Merged into machines/nixos/scheelite via dendritic flake-parts pattern
 { ... }:
 {
   flake.modules.nixos."machines/nixos/scheelite" = {
