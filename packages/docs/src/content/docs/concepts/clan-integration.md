@@ -253,7 +253,7 @@ Current machines managed by clan:
 | galena | NixOS GCP | x86_64-linux | CPU compute | `clan machines update` |
 | scheelite | NixOS GCP | x86_64-linux | GPU compute | `clan machines update` |
 
-## Common misconceptions
+## Potential misconceptions to avoid
 
 ### "Clan manages infrastructure provisioning"
 
@@ -278,12 +278,6 @@ Clan vars uses sops encryption internally and can manage both generated and manu
 **Reality**: Clan orchestrates deployment of NixOS services across machines.
 Clan inventory assigns machines to service roles.
 NixOS modules define the actual service configuration.
-
-### "Dendritic flake-parts is a clan feature"
-
-**Reality**: Dendritic is a flake-parts pattern, independent of clan.
-Clan is ONE flake-parts module imported alongside others.
-Dendritic provides auto-discovery for ALL modules, not just clan.
 
 ## External resources
 
