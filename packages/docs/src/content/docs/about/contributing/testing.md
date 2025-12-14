@@ -89,13 +89,13 @@ nix-unit tests validate flake structure and configuration invariants without bui
 | TC-005 | testInvariantNixosConfigurationsExist | invariant | Expected NixOS configs present |
 | TC-006 | testInvariantDarwinConfigurationsExist | invariant | Expected Darwin configs present |
 | TC-007 | testInvariantHomeConfigurationsExist | invariant | Expected home configs present |
-| TC-008 | testFeatureDendriticModuleDiscovery | feature | import-tree discovers nixos modules |
+| TC-008 | testFeatureModuleDiscovery | feature | import-tree discovers nixos modules |
 | TC-009 | testFeatureDarwinModuleDiscovery | feature | import-tree discovers darwin modules |
 | TC-010 | testFeatureNamespaceExports | feature | Modules export to correct namespaces |
 | TC-011 | testTypeSafetySpecialargsPropagation | type-safety | inputs available via specialArgs |
 | TC-012 | testTypeSafetyNixosConfigStructure | type-safety | All configs have config attribute |
 | TC-013 | testInvariantNamespaceMerging | invariant | Module namespace auto-merging works |
-| TC-014 | testInvariantClanDendriticIntegration | invariant | Clan machines have module exports |
+| TC-014 | testInvariantClanModuleIntegration | invariant | Clan machines have module exports |
 | TC-015 | testFeatureImportTreeCompleteness | feature | import-tree discovers all namespace modules |
 | TC-016 | testInvariantCrossplatformHomeModules | invariant | Home modules available for darwin and linux |
 
