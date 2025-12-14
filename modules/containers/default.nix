@@ -11,6 +11,7 @@
     { pkgs, system, ... }:
     let
       isLinux = lib.hasSuffix "-linux" system;
+      isDarwin = lib.hasSuffix "-darwin" system;
 
       # Build a minimal container image with a package
       # Makes it work like: docker run <name>:latest --version
@@ -64,13 +65,14 @@
         })
 
         # Multi-arch manifests for CI/CD registry distribution
+        # Darwin-only: requires nix-rosetta-builder to build both Linux architectures
         # Usage: nix run --impure .#fdManifest
         # Requires: GITHUB_TOKEN environment variable in CI
-        # Available on all systems (coordinates cross-system builds)
         #
-        # Note: github.enable requires API calls; we configure manually for pure evaluation.
-        # In GitHub Actions, set VERSION and GITHUB_TOKEN env vars.
-        (
+        # Note: Manifests are Darwin-only because they depend on both x86_64-linux
+        # and aarch64-linux container images. Darwin hosts with nix-rosetta-builder
+        # can build both, but single-arch Linux CI runners cannot.
+        (lib.optionalAttrs isDarwin (
           let
             # Helper to get env var with fallback (requires --impure for actual env var reading)
             getEnvOr =
@@ -103,7 +105,7 @@
               };
             };
           }
-        )
+        ))
       ];
     };
 }
