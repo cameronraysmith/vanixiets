@@ -64,6 +64,7 @@ infra/
 ├── pkgs/                # Custom package derivations
 │   └── by-name/         # pkgs-by-name pattern
 │       ├── atuin-format/
+│       ├── beads-viewer/
 │       ├── markdown-tree-parser/
 │       └── starship-jj/
 ├── vars/                # Clan vars (generated secrets)
@@ -219,6 +220,7 @@ Packages defined using pkgs-by-name pattern:
 | Package | Location | Description |
 |---------|----------|-------------|
 | atuin-format | `pkgs/by-name/atuin-format/` | Atuin history formatter |
+| beads-viewer | `pkgs/by-name/beads-viewer/` | TUI for Beads issue tracker |
 | markdown-tree-parser | `pkgs/by-name/markdown-tree-parser/` | Markdown tree parser |
 | starship-jj | `pkgs/by-name/starship-jj/` | Starship jj plugin |
 
