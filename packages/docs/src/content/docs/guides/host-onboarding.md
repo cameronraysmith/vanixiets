@@ -62,7 +62,7 @@ nix --version
 ### Step 2: Clone and enter repository
 
 ```bash
-cd ~/projects
+cd ~/projects  # Or your preferred directory for repositories
 git clone https://github.com/cameronraysmith/vanixiets
 cd vanixiets
 
