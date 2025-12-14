@@ -228,14 +228,14 @@ packages = lib.mkMerge [
 
 **2. Add the manifest (optional, for multi-arch registry distribution):**
 
-Add to the same `lib.mkMerge` list. Manifests are available on all systems since they coordinate cross-system builds:
+Add to the same `lib.mkMerge` list. Manifests are Darwin-only because they depend on both x86_64-linux and aarch64-linux container images, which requires nix-rosetta-builder:
 
 ```nix
 packages = lib.mkMerge [
   # Container images (see step 1)
 
-  # Multi-arch manifests - available on all systems
-  (
+  # Multi-arch manifests - Darwin only (requires nix-rosetta-builder)
+  (lib.optionalAttrs isDarwin (
     let
       getEnvOr = var: default: let val = builtins.getEnv var; in if val == "" then default else val;
     in
@@ -251,7 +251,7 @@ packages = lib.mkMerge [
         };
       };
     }
-  )
+  ))
 ];
 ```
 
