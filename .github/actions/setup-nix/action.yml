@@ -1,11 +1,11 @@
 name: setup-nix
-description: setup nix using nothing-but-nix pattern with space reclamation and github actions cache
+description: setup nix using nothing-but-nix pattern with space reclamation and magic-nix-cache
 
 inputs:
   installer:
     description: |
       nix installation strategy:
-      - 'full' (default): space reclamation + cache + cachix for builds
+      - 'full' (default): space reclamation + magic-nix-cache + cachix for builds
       - 'quick': minimal install for simple tasks (no space reclamation, no caching overhead)
     type: string
     required: false
@@ -18,19 +18,6 @@ inputs:
     description: enable nix sandbox builds
     type: string
     default: "true"
-  cache-key:
-    description: primary cache key (auto-generated from nix files if not provided)
-    type: string
-    required: false
-    default: ""
-  gc-max-store-size-linux:
-    description: max nix store size on linux before garbage collection (e.g., 5G, 10G)
-    type: string
-    default: "5G"
-  gc-max-store-size-macos:
-    description: max nix store size on macos before garbage collection (e.g., 5G, 10G)
-    type: string
-    default: "5G"
   enable-cachix:
     description: enable cachix binary cache
     type: boolean
@@ -52,14 +39,6 @@ inputs:
     type: string
     required: false
     default: "2.32.4"
-
-outputs:
-  cache-hit:
-    description: whether the primary cache key was hit
-    value: ${{ steps.cache.outputs.hit-primary-key }}
-  cache-key:
-    description: the cache key that was used
-    value: ${{ steps.cache.outputs.primary-key }}
 
 runs:
   using: composite
@@ -120,20 +99,14 @@ runs:
       shell: bash
       run: sudo mkdir -p /nix/build
 
-    - name: setup cache
-      if: runner.os == 'Linux' && inputs.installer == 'full'
-      id: cache
-      uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a # v6
+    - name: setup magic-nix-cache
+      if: inputs.installer == 'full'
+      uses: DeterminateSystems/magic-nix-cache-action@b8276522d77f21bf19d3574e5bc99186a6c7aa6c # main
       with:
-        primary-key: ${{ inputs.cache-key != '' && inputs.cache-key || format('nix-{0}-{1}', inputs.system, hashFiles('**/*.nix', '**/flake.lock')) }}
-        restore-prefixes-first-match: ${{ format('nix-{0}-', inputs.system) }}
-        gc-max-store-size-linux: ${{ inputs.gc-max-store-size-linux }}
-        gc-max-store-size-macos: ${{ inputs.gc-max-store-size-macos }}
-        purge: true
-        purge-prefixes: ${{ format('nix-{0}-', inputs.system) }}
-        purge-created: 0
-        purge-last-accessed: 0
-        purge-primary-key: never
+        # Disable FlakeHub cache (we use Cachix instead)
+        use-flakehub: false
+        # Disable telemetry
+        diagnostic-endpoint: ""
 
     - name: setup cachix
       if: inputs.enable-cachix == 'true'
