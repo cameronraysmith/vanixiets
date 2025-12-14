@@ -157,7 +157,7 @@ The Requirements layer serves as the contract between stakeholders (Context laye
 - SC-002: Module system constraints
 - SC-003: Flake constraints
 - SC-004: Platform-specific constraints (darwin, NixOS)
-- SC-005: Dendritic pattern constraints
+- SC-005: Deferred module composition pattern constraints
 - SC-006: Clan-core constraints
 - SC-007: Build system constraints
 - SC-008: Secrets management constraints
