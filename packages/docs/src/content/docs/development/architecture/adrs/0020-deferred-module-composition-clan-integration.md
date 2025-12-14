@@ -15,13 +15,13 @@ Neither was designed with the other in mind.
 ### Integration challenges
 
 **Namespace boundaries**:
-- Dendritic exports to `flake.modules.*` namespaces
+- Deferred module composition exports to `flake.modules.*` namespaces
 - Clan expects configurations via `clan.machines.*`
-- Need pattern for dendritic modules consumed by clan registry
+- Need pattern for deferred module composition modules consumed by clan registry
 
 **Module system integration**:
-This integration works because both dendritic and clan use the same module system foundation from nixpkgs.
-Dendritic modules are deferredModule type (nixpkgs `lib/types.nix` primitive) that delay evaluation until the final configuration is computed.
+This integration works because both deferred module composition and clan use the same module system foundation from nixpkgs.
+Deferred modules are deferredModule type (nixpkgs `lib/types.nix` primitive) that delay evaluation until the final configuration is computed.
 The `flake.modules.*` option has type `lazyAttrsOf deferredModule`, creating a namespace of deferred modules that can be imported into any evaluation context.
 When clan machines import these deferred modules via their imports list, the modules are added to evalModules and evaluated with clan's module arguments (the final system configuration).
 This explains why the integration is seamless: both systems use the same underlying module system primitives (deferredModule, evalModules, fixpoint computation), just with different evaluation contexts—flake-parts evaluates with class "flake" to build the namespace, while clan evaluates with nixosSystem or darwinSystem to build machine configurations.
@@ -50,7 +50,7 @@ This explains why the integration is seamless: both systems use the same underly
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                    modules/ (dendritic)                      │
+│         modules/ (deferred module composition)               │
 │  ├── clan/machines.nix    → clan.machines registry          │
 │  ├── home/ai/             → flake.modules.homeManager.ai    │
 │  ├── machines/darwin/     → flake.modules.darwin.*          │
@@ -65,7 +65,7 @@ This explains why the integration is seamless: both systems use the same underly
 
 ## Decision
 
-Integrate dendritic and clan via **namespace export → clan import** pattern where machine modules export to dendritic namespaces and clan registry imports from those namespaces.
+Integrate deferred module composition and clan via **namespace export → clan import** pattern where machine modules export to deferred module composition namespaces and clan registry imports from those namespaces.
 
 ### Pattern 1: Machine configuration export
 
@@ -79,7 +79,7 @@ let
   flakeModulesHome = config.flake.modules.homeManager;
 in
 {
-  # Export machine config to dendritic namespace
+  # Export machine config to namespace
   flake.modules.darwin."machines/darwin/stibnite" =
     { pkgs, lib, inputs, ... }:
     {
@@ -90,7 +90,7 @@ in
 
       networking.hostName = "stibnite";
 
-      # Home-manager imports from dendritic aggregates
+      # Home-manager imports from aggregates
       home-manager.users.crs58.imports = [
         flakeModulesHome."users/crs58"
         flakeModulesHome.ai
@@ -105,7 +105,7 @@ File at `modules/machines/darwin/stibnite/` exports to `flake.modules.darwin."ma
 
 ### Pattern 2: Clan registry imports
 
-Clan machine registry imports from dendritic namespaces:
+Clan machine registry imports from deferred module composition namespaces:
 
 ```nix
 # modules/clan/machines.nix
@@ -114,7 +114,7 @@ Clan machine registry imports from dendritic namespaces:
   clan.machines = {
     stibnite = {
       nixpkgs.hostPlatform = "aarch64-darwin";
-      # Import from dendritic namespace
+      # Import from namespace
       imports = [ config.flake.modules.darwin."machines/darwin/stibnite" ];
     };
     cinnabar = {
@@ -131,13 +131,13 @@ Two-step registration:
 2. Clan registry imports that exported module
 
 This indirection enables:
-- Dendritic auto-discovery of machine modules
+- Auto-discovery of machine modules
 - Explicit clan registry control
 - Namespace consistency across the codebase
 
-### Pattern 3: clanModules from dendritic namespaces
+### Pattern 3: clanModules from deferred module composition namespaces
 
-Clan service modules (clanModules) can import shared configuration from dendritic namespaces:
+Clan service modules (clanModules) can import shared configuration from deferred module composition namespaces:
 
 ```nix
 # modules/clan/inventory/services/ssh-known-hosts.nix
@@ -145,7 +145,7 @@ Clan service modules (clanModules) can import shared configuration from dendriti
 {
   clan.inventory.instances.ssh-known-hosts = {
     module = { ... }: {
-      # Import shared SSH config from dendritic namespace
+      # Import shared SSH config from namespace
       imports = [ config.flake.modules.common.ssh-known-hosts ];
     };
     roles.default.machines = {
@@ -157,7 +157,7 @@ Clan service modules (clanModules) can import shared configuration from dendriti
 }
 ```
 
-Service configuration defined once in dendritic module, reused across clan inventory.
+Service configuration defined once in shared module, reused across clan inventory.
 
 ### Pattern 4: Secrets integration
 
@@ -189,7 +189,7 @@ User keys stored in `~/.config/sops/age/keys.txt`.
 
 ### Pattern 5: Cross-platform module reuse
 
-Home-manager modules work across darwin and nixos via dendritic aggregates:
+Home-manager modules work across darwin and nixos via aggregates:
 
 ```nix
 # modules/home/ai/claude-code.nix - works on any platform
@@ -249,22 +249,22 @@ File auto-discovered by import-tree, manually registered in clan.
 2. Export to namespace: `flake.modules.homeManager.<aspect>`
 3. Import in machine configs: `flakeModulesHome.<aspect>`
 
-No clan changes needed - features flow through dendritic aggregates.
+No clan changes needed - features flow through aggregates.
 
 ### Adding a new service
 
 1. Create inventory file at `modules/clan/inventory/services/<service>.nix`
 2. Define roles and machine assignments
-3. Optionally import shared config from dendritic namespace
+3. Optionally import shared config from namespace
 
-Service coordination via clan, shared config via dendritic.
+Service coordination via clan, shared config via deferred module composition.
 
 ## Consequences
 
 ### Positive
 
 **Clear separation of concerns**:
-- Dendritic: Module organization and auto-discovery
+- Deferred module composition: Module organization and auto-discovery
 - Clan: Machine registry and deployment orchestration
 - Each system does what it's designed for
 
@@ -274,7 +274,7 @@ Machine configs, home modules, darwin modules all follow same pattern.
 Predictable structure across entire codebase.
 
 **Explicit integration points**:
-`modules/clan/machines.nix` is THE integration point between dendritic and clan.
+`modules/clan/machines.nix` is THE integration point between deferred module composition and clan.
 Easy to audit, easy to understand.
 No hidden wiring.
 
@@ -298,7 +298,7 @@ Intentional trade-off for explicit control.
 
 **Conceptual overhead**:
 Understanding integration requires grasping both patterns.
-Contributors need to know: dendritic namespaces AND clan registry.
+Contributors need to know: deferred module composition namespaces AND clan registry.
 Documentation critical.
 
 **Namespace string conventions**:
@@ -314,17 +314,17 @@ Related files in different directories.
 ### Neutral
 
 **Clan remains optional**:
-Dendritic pattern works without clan (as proven in reference implementations).
-Clan adds orchestration ON TOP of dendritic organization.
-Could theoretically remove clan, keep dendritic structure.
+Deferred module composition pattern works without clan (as proven in reference implementations).
+Clan adds orchestration ON TOP of deferred module composition organization.
+Could theoretically remove clan, keep deferred module composition structure.
 
 **Home-manager unchanged**:
 home-manager modules are standard NixOS home-manager modules.
-Dendritic organization doesn't change how modules work internally.
+Deferred module composition organization doesn't change how modules work internally.
 Skills transfer from standard home-manager development.
 
 **Flake-parts foundation**:
-Both dendritic and clan are flake-parts modules.
+Both deferred module composition and clan are flake-parts modules.
 Integration happens within flake-parts composition.
 Standard flake-parts patterns apply.
 
@@ -335,14 +335,14 @@ Standard flake-parts patterns apply.
 Integration validated in test-clan:
 
 - blackphos migration proved darwin namespace export pattern
-- Portable home modules extracted to dendritic aggregates
+- Portable home modules extracted to aggregates
 - Complete migration validated two-step machine registration
 - Secrets architecture established with clan vars and legacy sops-nix
 - Physical deployment validated end-to-end integration
 
 Validation metrics:
 - 3 machines integrated (darwin + nixos)
-- 17 home-manager modules in dendritic aggregates
+- 17 home-manager modules in aggregates
 - Secrets operational with clan vars and legacy sops-nix
 
 ### Production migration (November 2024)
@@ -377,6 +377,6 @@ GCP nodes validated pattern at scale:
 
 ### External
 
-- [dendritic pattern](https://github.com/mightyiam/dendritic)
+- [dendritic pattern](https://github.com/mightyiam/dendritic) - Original deferred module composition pattern
 - [clan](https://github.com/clan-lol/clan-core)
-- [nixpkgs.molybdenum.software-dendritic-clan](https://github.com/nixpkgs-community/nixpkgs.molybdenum.software) - Dendritic + clan combination reference
+- [nixpkgs.molybdenum.software-dendritic-clan](https://github.com/nixpkgs-community/nixpkgs.molybdenum.software) - Deferred module composition + clan combination reference
