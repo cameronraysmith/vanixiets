@@ -825,11 +825,11 @@ Future: Automated secret rotation, secrets validation in CI, emergency access pa
 
 ### Reference implementations
 
-- [drupol-dendritic-infra](https://github.com/drupol/nixos-config) - Dendritic reference
-- [mightyiam-dendritic-infra](https://github.com/mightyiam/nix-config) - Pattern creator config
-- [gaetanlepage-dendritic-nix-config](https://github.com/GaetanLepage/nix-config) - Reference implementation
-- [clan-infra](https://git.clan.lol/clan/clan-infra) - Production clan reference
-- [nixpkgs.molybdenum.software-dendritic-clan](https://github.com/nixpkgs-community/nixpkgs.molybdenum.software) - Dendritic + clan combination
+- [drupol/infra](https://github.com/drupol/infra)
+- [GaetanLepage/nix-config](https://github.com/GaetanLepage/nix-config)
+- [mightyiam-dendritic-infra](https://github.com/mightyiam/nix-config)
+- [clan-infra](https://git.clan.lol/clan/clan-infra) - production clan usage reference
+- [nixpkgs.molybdenum.software](https://github.com/molybdenumsoftware/nixpkgs.molybdenum.software) - "dendritic" flake-parts + clan integration
 
 ### Related specifications
 
