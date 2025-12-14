@@ -35,29 +35,47 @@ This document describes the domain in which the system operates, including the N
 **File organization**:
 ```
 modules/
-├── base/              # Foundation modules (cross-platform)
-│   ├── nix.nix        # Core nix settings
-│   └── system.nix     # State versions
-├── shell/             # Shell tools
-│   ├── fish.nix
-│   └── starship.nix
-├── dev/               # Development tools
-│   └── git/
-├── hosts/             # Machine-specific configurations
-│   ├── blackphos/
-│   ├── rosegold/
-│   ├── argentum/
-│   ├── stibnite/
-│   ├── cinnabar/
-│   ├── electrum/
-│   ├── galena/
-│   └── scheelite/
-├── flake-parts/       # Flake-level configuration
-│   ├── nixpkgs.nix
-│   ├── clan.nix
-│   └── *-machines.nix
-└── users/             # User configurations
-    └── crs58/
+├── checks/             # Nix evaluation checks
+├── clan/               # Clan integration
+│   └── inventory/      # Service instances and machine inventory
+├── containers/         # OCI container build definitions
+├── darwin/             # Darwin-specific system modules
+│   └── system-defaults/
+├── home/               # Home-manager modules
+│   ├── ai/             # AI tooling (claude-code, mcp)
+│   ├── base/           # Foundation (xdg, fonts)
+│   ├── core/           # Core tools (ssh, gpg)
+│   ├── development/    # Dev tools (git, editors)
+│   ├── modules/        # Reusable option definitions
+│   ├── packages/       # Package sets
+│   ├── shell/          # Shell config (zsh, fish, starship)
+│   ├── terminal/       # Terminal emulators
+│   ├── tools/          # Utility programs
+│   └── users/          # User-specific modules
+│       ├── crs58/
+│       ├── raquel/
+│       └── ...
+├── lib/                # Shared library functions
+├── machines/           # Machine-specific configurations
+│   ├── darwin/         # Darwin hosts
+│   │   ├── argentum/
+│   │   ├── blackphos/
+│   │   ├── rosegold/
+│   │   └── stibnite/
+│   └── nixos/          # NixOS hosts
+│       ├── cinnabar/
+│       ├── electrum/
+│       ├── galena/
+│       └── scheelite/
+├── nixos/              # NixOS-specific system modules
+├── nixpkgs/            # Nixpkgs configuration
+│   └── overlays/       # Package overlays
+├── system/             # Cross-platform system modules
+├── terranix/           # Terraform/cloud provisioning
+├── dev-shell.nix       # Development shell
+├── flake-parts.nix     # Flake-level configuration
+├── formatting.nix      # Code formatting
+└── systems.nix         # Supported system platforms
 ```
 
 **import-tree**: Auto-discovery mechanism replacing manual imports.
@@ -101,12 +119,13 @@ Application values use `config.flake.*` namespace.
 
 ### Module organization
 
-- **modules/flake-parts/**: Flake-level configuration modules.
 - **modules/darwin/**: Darwin-specific system modules.
 - **modules/nixos/**: NixOS-specific system modules.
 - **modules/home/**: Home-manager modules (user environment).
-- **modules/hosts/**: Per-host configuration directories.
+- **modules/machines/**: Per-host configuration directories (darwin/ and nixos/ subdirectories).
 - **modules/nixpkgs/overlays/**: Package overlays and modifications.
+- **modules/clan/**: Clan integration and inventory configuration.
+- **modules/terranix/**: Cloud infrastructure provisioning.
 
 - **Import pattern**: Modules imported via import-tree auto-discovery, composed through module system.
 - **specialArgs usage**: Minimal - only framework values (inputs, self). Application values via `config.flake.*`.
@@ -223,9 +242,9 @@ nixos-rebuild switch --flake .#cinnabar
 - `galena`: GCP CPU compute instance
 - `scheelite`: GCP GPU compute instance
 
-**Configuration location**: `modules/hosts/<hostname>/default.nix`
+**Configuration location**: `modules/machines/darwin/<hostname>/default.nix` or `modules/machines/nixos/<hostname>/default.nix`
 
-**Inventory definition**: `modules/flake-parts/clan.nix` (clan inventory with tags and service instances)
+**Inventory definition**: `modules/clan/inventory/` (clan inventory with tags and service instances)
 
 ### Clan-core architecture
 
