@@ -125,12 +125,12 @@ runs:
       id: cache
       uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a # v6
       with:
-        primary-key: ${{ inputs.cache-key != '' && inputs.cache-key || format('nix-{0}-{1}', runner.os, hashFiles('**/*.nix', '**/flake.lock')) }}
-        restore-prefixes-first-match: ${{ format('nix-{0}-', runner.os) }}
+        primary-key: ${{ inputs.cache-key != '' && inputs.cache-key || format('nix-{0}-{1}', inputs.system, hashFiles('**/*.nix', '**/flake.lock')) }}
+        restore-prefixes-first-match: ${{ format('nix-{0}-', inputs.system) }}
         gc-max-store-size-linux: ${{ inputs.gc-max-store-size-linux }}
         gc-max-store-size-macos: ${{ inputs.gc-max-store-size-macos }}
         purge: true
-        purge-prefixes: ${{ format('nix-{0}-', runner.os) }}
+        purge-prefixes: ${{ format('nix-{0}-', inputs.system) }}
         purge-created: 0
         purge-last-accessed: 0
         purge-primary-key: never
