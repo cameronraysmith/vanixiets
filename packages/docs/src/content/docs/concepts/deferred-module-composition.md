@@ -17,7 +17,7 @@ See [Why "aspect"](#why-aspect) below for the full rationale behind this termino
 
 ## Credits and attribution
 
-This deferred module composition pattern correpsonds to a configuration approach where every Nix file is a flake-parts module organized by feature rather than host.
+This deferred module composition pattern corresponds to a configuration approach where every Nix file is a flake-parts module organized by feature rather than host.
 
 ### Dependencies
 
