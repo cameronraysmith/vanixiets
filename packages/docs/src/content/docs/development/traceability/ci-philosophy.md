@@ -13,15 +13,15 @@ Our CI validates the **user experience** described in the README, not just that 
 3. **Fail fast and clearly** - Errors should point to the exact problem
 4. **Scale efficiently** - Tests should remain fast as the project grows
 
-## Job: justfile-activation
+## Job: flake-validation
 
-**Purpose**: Validates that users can discover and use justfile recipes to manage configurations.
+**Purpose**: Validates flake structure and developer tooling.
 
 ### What It Tests
 
 #### 1. Justfile Recipe Discovery
 ```bash
-just --list  # Shows all available recipes
+just --summary  # Shows all available recipes
 ```
 
 **Validates**:
@@ -40,66 +40,14 @@ just check  # Runs nix flake check
 - Flake syntax is correct
 - All outputs are properly defined
 - No circular dependencies
+- All nix checks pass (see Nix Checks section below)
 
 **Why**: Users run `just check` before making changes. Must pass consistently.
 
-#### 3. Home Configuration Discovery
-```bash
-find configurations/home -name "*.nix"  # Dynamic discovery
-```
-
-**Validates**:
-- All home configs in filesystem are discoverable
-- Configs follow naming convention (user@host.nix)
-- No orphaned/broken config files
-
-**Why**: Users should be able to see all available home configs without reading code.
-
-#### 4. Activation Dry-Run
-```bash
-just -n activate <config>  # Test each discovered config
-```
-
-**Validates**:
-- Each home config can be activated (dry-run)
-- Activation logic works for all configs
-- No hardcoded assumptions about config names
-
-**Why**: Users will run `just activate user@host` - must work for ALL configs.
-
-#### 5. Configuration Output Mapping
-```bash
-nix flake show --json | jq '...'  # Get flake outputs
-```
-
-**Validates**:
-- All darwin configs in `modules/machines/darwin/` → `darwinConfigurations.*`
-- All nixos configs in `modules/machines/nixos/` → `nixosConfigurations.*`
-- Deferred module composition via import-tree is working correctly
-- No configs exist in filesystem but not in outputs
-
-**Why**: Users expect file-based discovery to work. If `modules/machines/darwin/foo/` exists, `darwin-rebuild switch --flake .#foo` should work.
-
-### What It Doesn't Test
-
-- **Full builds** - tested in separate `nix` job (expensive)
-- **Actual activation** - requires system-specific environment (sudo, /etc, etc)
-- **Home config outputs** - legacyPackages structure harder to validate, deferred
-- **Cross-platform behavior** - darwin-specific code can't run on ubuntu runners
-
 ### Expected Runtime
 
-- **Duration**: 1-2 minutes
-- **Bottleneck**: `nix develop` to build devshell (~30s first time, cached after)
-
-### Failure Modes and Debugging
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| "⊘ activate recipe not found" | Justfile missing `activate` recipe | Check justfile:25 exists |
-| "⊘ $config dry-run failed" | Config syntax error or missing dependency | Run locally: `just -n activate $config` |
-| "⊘ darwin:foo missing from flake outputs" | Config file exists but not in flake | Check auto-discovery or namespace exports |
-| "⚠️  no home configurations found" | Empty configurations/home/ directory | Expected on fresh clone |
+- **Duration**: 5-7 minutes (includes VM tests on Linux)
+- **Fast local alternative**: `just check-fast` (~1-2 min, skips VM tests)
 
 ## Job: nix
 
@@ -107,20 +55,21 @@ nix flake show --json | jq '...'  # Get flake outputs
 
 ### What It Tests
 
-Builds all outputs for all systems:
-- `nixosConfigurations.*`
-- `darwinConfigurations.*`
-- `packages.*`
-- `devShells.*`
-- `checks.*`
+Builds all outputs by category for each system:
+- **packages**: overlay packages for x86_64-linux and aarch64-linux
+- **checks-devshells**: all checks and development shells
+- **home**: homeConfigurations for Linux systems
+- **nixos**: individual nixosConfigurations (cinnabar, electrum)
 
-### Why Separate from justfile-activation
+### Build Matrix Strategy
 
-- **Different goals**: justfile-activation tests UX, nix tests builds
-- **Different performance**: dry-run (fast) vs full build (slow)
-- **Matrix strategy**: nix runs on native platforms (aarch64-darwin on macOS, etc)
+The nix job uses a matrix strategy to distribute builds across multiple runners and avoid disk space exhaustion:
+- x86_64-linux: packages, checks-devshells, home, nixos (cinnabar), nixos (electrum)
+- aarch64-linux: packages, checks-devshells, home
 
-## Job: sops
+Darwin configurations are not built in CI due to lack of macOS runners.
+
+## Job: secrets-workflow
 
 **Purpose**: Validates secrets management infrastructure.
 
@@ -133,38 +82,59 @@ Builds all outputs for all systems:
 
 **Why**: Secrets are critical infrastructure. Test that sops-nix integration works.
 
-## Job: docs-test
+## Job: typescript
 
-**Purpose**: Validates documentation site.
+**Purpose**: Validates TypeScript packages in the packages/ directory.
 
 ### What It Tests
 
 - Dependency installation (bun)
 - Build process
 - Unit tests with coverage
-- Docs site generation
+- E2E tests where applicable
 
-**Why**: Documentation is part of the user experience. Must build and pass tests.
+**Why**: TypeScript packages (like docs) are part of the user experience. Must build and pass tests.
+
+## Nix Checks
+
+The flake defines checks in `modules/checks/` that run during `nix flake check`:
+
+**Validation checks** (all platforms):
+- `home-module-exports` — validates home modules exported to flake.modules.homeManager namespace
+- `home-configurations-exposed` — validates nested homeConfigurations exposed for nh CLI
+- `naming-conventions` — validates consistent kebab-case naming across machines
+- `terraform-validate` — validates generated terraform is syntactically correct
+- `deployment-safety` — verifies terraform configuration safety patterns
+- `vars-user-password-validation` — validates clan vars system for user password management
+- `secrets-tier-separation` — validates secrets tier separation (vars vs secrets)
+- `clan-inventory-consistency` — validates clan inventory references valid machines
+- `secrets-encryption-integrity` — validates all secrets are SOPS-encrypted
+- `machine-registry-completeness` — validates all machine modules are registered in clan
+
+**Integration checks** (Linux only):
+- `vm-test-framework` — VM test framework smoke test
+- `vm-boot-all-machines` — VM boot validation for NixOS machines
+
+**Other checks**:
+- `nix-unit` — unit tests for flake structure and module exports
+- `treefmt` — formatting validation
+- `pre-commit` — pre-commit hook validation
 
 ## Adding New Tests
 
-### When to Add to justfile-activation
+### When to Add a Nix Check
 
-Add tests when:
-- Users will interact with it via justfile
-- It affects configuration discovery
-- It validates a workflow described in README
+Add a check in `modules/checks/` when:
+- Validating flake structure or module exports
+- Testing infrastructure configuration (terraform, secrets)
+- Verifying cross-cutting concerns (naming conventions, registry completeness)
 
-Example: If you add `just deploy` recipe, test it exists and works.
-
-### When to Create New Job
+### When to Create New CI Job
 
 Create new job when:
-- Test requires different environment (e.g., docker, cloud resources)
+- Test requires different environment (e.g., specific runner type)
 - Test has very different performance characteristics
-- Test validates completely separate concern
-
-Example: Terraform validation would be separate job.
+- Test validates completely separate concern (e.g., TypeScript vs Nix)
 
 ### Dynamic vs Static Tests
 
@@ -180,28 +150,15 @@ Example: Terraform validation would be separate job.
 
 ## Test Maintenance
 
-### Updating Tests
-
-When you add a configuration:
-- **No action needed** - justfile-activation discovers it automatically
-
-When you add a justfile recipe:
-- **Consider** - Should it be in core recipes list?
-- **Example**: If you add `just backup`, decide if CI should verify it exists
-
-When you change directory structure:
-- **Update** - Discovery logic in justfile-activation
-- **Example**: If configs move from `configurations/` to `hosts/`, update `find` commands
-
 ### Monitoring Test Performance
 
 Track in CI:
-- `justfile-activation` should stay under 2min
-- If it grows beyond 3min, consider splitting
+- `flake-validation` should stay under 10min (includes VM tests)
+- If individual checks become slow, consider optimization
 
 Track locally:
-- `just check` should stay under 30s
-- If it grows beyond 1min, investigate what's being evaluated
+- `just check-fast` should stay under 2min
+- If it grows beyond 3min, investigate what's being evaluated
 
 ## Job Execution Caching
 
