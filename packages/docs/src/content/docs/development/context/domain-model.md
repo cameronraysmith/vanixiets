@@ -108,7 +108,7 @@ Example module structure:
 **specialArgs minimization**: Only framework values (inputs, self) passed via specialArgs.
 Application values use `config.flake.*` namespace.
 
-**Reference**: [dendritic flake-parts pattern](https://github.com/mightyiam/dendritic)
+**Reference**: [deferred module composition pattern](https://github.com/mightyiam/dendritic)
 
 ### Flake-parts integration
 
