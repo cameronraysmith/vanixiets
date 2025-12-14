@@ -58,6 +58,7 @@ This enables modules to reference the final merged configuration without creatin
 It collects all option declarations, collects all configuration definitions, computes a fixpoint where the `config` argument equals the merged result, merges definitions according to type-specific merge functions, and validates that definitions match declared options.
 
 **Flake-parts integration**: Flake-parts wraps evalModules for flake outputs, defining:
+
 - Class-based module organization (darwin, nixos, homeManager via module classes)
 - `flake.modules.*` namespace (type: `lazyAttrsOf (lazyAttrsOf deferredModule)`)
 - `perSystem` abstraction (per-architecture evaluation with nested evalModules call)
@@ -75,6 +76,7 @@ Files export to namespaces under `flake.modules.*` (type: `lazyAttrsOf deferredM
 Flake-parts evaluates these modules with class "flake", providing access to the final flake output configuration.
 
 Organizational principle:
+
 ```
 modules/
 ├── home/ai/           # AI tools for ALL users
@@ -92,6 +94,7 @@ Machine-specific files contain only truly unique settings.
 The [import-tree](https://github.com/vic/import-tree) mechanism by Victor Borja enables automatic module discovery without manual registration.
 
 Configuration in flake.nix:
+
 ```nix
 {
   imports = [ inputs.import-tree.flakeModule ];
@@ -125,6 +128,7 @@ These namespaces have type `lazyAttrsOf deferredModule`, meaning they are attrib
 ```
 
 Multiple files in the same directory export to the same namespace, auto-merging into aggregates:
+
 - `modules/home/ai/claude-code.nix` + `modules/home/ai/mcp-servers.nix` merge into `flake.modules.homeManager.ai`
 - Directory structure creates the namespace boundaries
 
@@ -335,6 +339,7 @@ Pattern validated in test-clan repository before production migration:
 - Physical deployment successful (blackphos darwin laptop)
 
 Validation metrics:
+
 - 83 auto-discovered modules
 - 23-line minimal flake.nix
 - 270 packages preserved across migration (zero regression)
@@ -380,4 +385,4 @@ Result: 8-machine fleet fully operational under deferred module composition arch
 #### Example projects
 
 - [drupol/infra](https://github.com/drupol/infra) - Aspect-based factorization of dependencies
-- [GaetanLepage/nix-config](https://github.com/GaetanLepage/nix-config) - Dendritic pattern at scale
+- [GaetanLepage/nix-config](https://github.com/GaetanLepage/nix-config) - well-designed configuration that includes GPU usage
