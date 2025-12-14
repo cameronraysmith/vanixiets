@@ -358,37 +358,32 @@ The mechanism works by computing a cache key from source files that affect the j
 If found, the job is skipped entirely.
 If not found or if the job previously failed, it runs and caches the success state upon completion.
 
-Each job declares its *hash sources* — glob patterns identifying files that affect its output.
+Each job declares its *hash-sources* — glob patterns identifying files that affect its output.
 For example, the `flake-validation` job uses:
 
 ```yaml
-hash_sources: |
-  flake.nix
-  flake.lock
-  justfile
-  .envrc
-  .github/workflows/ci.yaml
+hash-sources: 'justfile flake.nix flake.lock .github/actions/setup-nix/action.yml'
 ```
 
 When any of these files change, the cache key changes, forcing the job to re-run.
 When none have changed since the last successful run, the job skips immediately.
 
-The cache key format is: `ci-job-<job-name>-<runner-os>-<hash-of-sources>-<run-attempt>`.
-This ensures cache isolation per job, per platform, per source state, and per retry attempt.
+The cache key format is: `job-result-{sanitized-job-name}-{12-char-content-hash}`.
+This ensures cache isolation per job and per source state, enabling independent caching for matrix job variants.
 
 ### Nix Store Cache
 
 The second tier caches the Nix store itself across workflow runs.
-The `setup-nix` composite action (`.github/actions/setup-nix/action.yaml`) manages this through two installer strategies:
+The `setup-nix` composite action (`.github/actions/setup-nix/action.yml`) manages this through two installer strategies:
 
-**Full installer mode** (default) — uses `DeterminateSystems/nix-installer-action` with automatic GC root registration and store path caching.
-This mode is slower to initialize but provides robust cache persistence for the entire store.
+**Full mode** (default) — includes disk space reclamation via `nothing-but-nix` on Linux (or manual cleanup on macOS) and enables `nix-community/cache-nix-action` for store path persistence.
+This mode reclaims 40-60GB of disk space on GitHub runners and maintains a cached Nix store across runs.
 
-**Quick installer mode** (`quick: true`) — uses `cachix/install-nix-action` for faster initialization.
-Sacrifices some cache robustness for speed, useful for jobs with minimal Nix dependencies.
+**Quick mode** (`installer: quick`) — skips space reclamation and store caching for faster initialization.
+Both modes use `cachix/install-nix-action` for Nix installation but quick mode omits the caching overhead, useful for simple validation jobs.
 
-Both modes integrate with GitHub's cache action to persist `/nix/store` paths between runs.
-The cache key includes `runner.os`, Nix version, and a hash of `flake.lock` to ensure cache invalidation when dependencies update.
+In full mode, the `cache-nix-action` persists `/nix/store` paths between runs with automatic garbage collection when the store exceeds `gc-max-store-size` (default 5GB).
+The cache key includes `runner.os` and a hash of all `.nix` files plus `flake.lock` to ensure invalidation when dependencies change.
 
 ### Binary Cache (Cachix)
 
@@ -426,12 +421,12 @@ This enables fast iteration: reproduce CI failures locally without waiting for G
 
 | CI Job | Local Equivalent | Purpose |
 |--------|------------------|---------|
-| `flake-validation` | `just check-fast` | Fast flake validation (~1-2 min vs ~7 min full check) |
+| `flake-validation` | `just check` or `just check-fast` | Flake validation (full ~7 min, fast ~1-2 min) |
 | `nix` (packages) | `just ci-build-category x86_64-linux packages` | Build all packages for a specific system |
 | `nix` (checks) | `just ci-build-category x86_64-linux checks-devshells` | Run all checks and build devShells |
-| `typescript` | `just test-typescript-packages` | Test all TypeScript packages via Vitest |
-| `bootstrap-verification` | `just verify-bootstrap` | Validate Makefile bootstrap workflow |
-| `secrets-workflow` | `just verify-secrets-workflow` | Test sops-nix mechanics |
+| `typescript` | `just test-package <name>` | Test a specific TypeScript package |
+| `bootstrap-verification` | `make bootstrap && make verify` | Validate Makefile bootstrap workflow |
+| `secrets-workflow` | `nix develop -c sops -d secrets/test.yaml` | Test sops-nix decryption |
 | All jobs | `just ci-run-watch` | Trigger full CI and watch progress |
 
 ### Key Justfile Recipes
@@ -604,14 +599,17 @@ just ci-build-category aarch64-darwin home
 # Fast flake validation (~1-2 min vs ~7 min nix flake check)
 just check-fast
 
-# Test TypeScript packages (matches CI typescript job)
-just test-typescript-packages
+# Full flake validation (includes VM tests, ~7 min)
+just check
 
-# Verify bootstrap workflow (matches CI bootstrap-verification job)
-just verify-bootstrap
+# Test a specific TypeScript package (matches CI typescript job)
+just test-package docs
 
-# Verify secrets workflow (matches CI secrets-workflow job)
-just verify-secrets-workflow
+# Bootstrap verification (matches CI bootstrap-verification job)
+make bootstrap && make verify
+
+# Secrets workflow test (matches CI secrets-workflow job)
+nix develop -c sops -d secrets/test.yaml
 ```
 
 ### Local Development Parity
