@@ -813,7 +813,7 @@ Future: Automated secret rotation, secrets validation in CI, emergency access pa
 
 ### External references
 
-- [dendritic pattern](https://github.com/mightyiam/dendritic) - Organizational pattern
+- [deferred module composition pattern](https://github.com/mightyiam/dendritic) - Organizational pattern
 - [import-tree](https://github.com/vic/import-tree) - Auto-discovery mechanism
 - [dendrix documentation](https://vic.github.io/dendrix/Dendritic.html) - Pattern documentation
 - [flake.parts](https://flake.parts) - Foundation framework

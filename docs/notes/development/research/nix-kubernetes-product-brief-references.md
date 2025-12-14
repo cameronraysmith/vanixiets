@@ -10,7 +10,7 @@ It serves as the foundation for planning an experimental development cluster con
 | hetzcube | `~/projects/sciops-workspace/hetzkube/` | Hetzner CAPI + NixOS node images |
 | nixidy | `~/projects/sciops-workspace/nixidy/` | GitOps manifest generation |
 | terranix | `~/projects/sciops-workspace/terranix/` | Nix-to-Terraform bridge |
-| infra | `~/projects/nix-workspace/infra/` | Target repo with dendritic patterns |
+| infra | `~/projects/nix-workspace/infra/` | Target repo with deferred module composition patterns |
 
 ---
 
@@ -361,7 +361,7 @@ terraform init && terraform apply
 
 ---
 
-## Infra Repository Dendritic Patterns
+## Infra Repository Deferred Module Composition Patterns
 
 ### Directory Structure
 
@@ -413,7 +413,7 @@ terraform init && terraform apply
 │
 └── docs/
     └── architecture/
-        ├── dendritic-pattern.md
+        ├── deferred-module-composition.md
         ├── secrets-and-vars-architecture.md
         └── evaluation-flow-diagram.md
 ```
@@ -426,7 +426,7 @@ outputs = inputs@{ flake-parts, ... }:
   flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
 ```
 
-Dendritic auto-merge pattern (multiple files → same namespace):
+Deferred module composition auto-merge pattern (multiple files → same namespace):
 ```nix
 # modules/system/nix-settings.nix
 { ... }: {
@@ -698,7 +698,7 @@ Two-tier secrets architecture:
 - Tier 1 (Clan vars): Cluster-level secrets (API tokens, TLS keys)
 - Tier 2 (sops-nix): User credentials for cluster access
 
-### Dendritic composition throughout
+### Deferred module composition throughout
 
 All new modules follow the import-tree auto-discovery pattern.
 No manual module registration required.
