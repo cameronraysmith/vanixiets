@@ -209,12 +209,3 @@ This path collects troubleshooting resources and operational documentation.
 3. [CI Jobs](/reference/ci-jobs/) - Job reference with troubleshooting
 4. [Test Harness](/development/traceability/test-harness/) - Testing infrastructure
 5. [System Constraints](/development/requirements/system-constraints/) - Known limitations
-
-## Path relationships
-
-The paths in this guide form a coherent whole organized around the architecture's four layers.
-Foundation paths establish the conceptual groundwork that operational paths build upon.
-Platform-specific paths specialize the operational knowledge for particular deployment targets.
-Meta paths provide cross-cutting concerns like contribution guidelines and decision rationale that support work at any level.
-
-Return to the path overview diagram at the top of this page to visualize these relationships and plan your reading accordingly.
