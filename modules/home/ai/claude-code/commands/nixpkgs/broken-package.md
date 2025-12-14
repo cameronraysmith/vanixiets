@@ -1,6 +1,7 @@
 Triage a broken nixpkg after flake update.
 
 Error from: [nix flake check / darwin-rebuild switch / nix build ...]
+
 ```
 $ARGUMENTS
 ```
@@ -27,13 +28,13 @@ Current overlays (see existing patterns):
 @modules/nixpkgs/overlays/overrides.nix
 
 Architecture (if needed):
-@packages/docs/src/content/docs/development/architecture/adrs/0017-dendritic-overlay-patterns.md
+@packages/docs/src/content/docs/development/architecture/adrs/0017-deferred-module-composition-overlay-patterns.md
 
 ## Workflow
 
 1. Identify broken package(s) from error output
 2. Check upstream status:
-   - Hydra: https://hydra.nixos.org/job/nixpkgs/trunk/PACKAGE.SYSTEM
+   - Hydra: <https://hydra.nixos.org/job/nixpkgs/trunk/PACKAGE.SYSTEM>
    - GitHub: search nixpkgs issues/PRs for this package
 3. Assess scope (single package? multiple? platform-specific?)
 4. Match scenario to strategy using quick reference above
@@ -42,6 +43,7 @@ Architecture (if needed):
 ## Output format
 
 Present findings:
+
 - **Package(s)**: name and system(s) affected
 - **Root cause**: why it's broken (compiler issue, test failure, dependency)
 - **Upstream status**: links to hydra/issues/PRs

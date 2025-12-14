@@ -1,5 +1,4 @@
 # Nix configuration for darwin systems
-# Merged into darwin.base via dendritic auto-discovery
 # Note: overlays handled separately in modules/nixpkgs/
 { ... }:
 {

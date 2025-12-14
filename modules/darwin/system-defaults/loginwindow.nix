@@ -1,5 +1,4 @@
 # macOS login window settings
-# Merged into darwin.base via dendritic auto-discovery
 { ... }:
 {
   flake.modules.darwin.base =

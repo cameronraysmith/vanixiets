@@ -1,5 +1,4 @@
 # macOS Window Manager (Stage Manager) settings
-# Merged into darwin.base via dendritic auto-discovery
 { ... }:
 {
   flake.modules.darwin.base =

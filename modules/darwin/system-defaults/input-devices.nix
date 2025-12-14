@@ -1,5 +1,4 @@
 # macOS input device settings (trackpad and magic mouse)
-# Merged into darwin.base via dendritic auto-discovery
 { ... }:
 {
   flake.modules.darwin.base =

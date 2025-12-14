@@ -1,5 +1,4 @@
 # Binary cache configuration for darwin systems
-# Merged into darwin.base via dendritic auto-discovery
 # DRYed with lib/caches.nix (shared with flake.nix and system/caches.nix)
 let
   # Shared cache configuration

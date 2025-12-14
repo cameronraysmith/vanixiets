@@ -1,6 +1,5 @@
 # System-level profile options for darwin systems
 # Defines options that can be set in system configurations
-# Merged into darwin.base via dendritic auto-discovery
 { ... }:
 {
   flake.modules = {

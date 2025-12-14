@@ -1,5 +1,4 @@
 # macOS custom user preferences for specific applications
-# Merged into darwin.base via dendritic auto-discovery
 { ... }:
 {
   flake.modules.darwin.base =
