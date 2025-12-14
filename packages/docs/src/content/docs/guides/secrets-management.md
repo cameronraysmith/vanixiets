@@ -58,18 +58,22 @@ clan machines update cinnabar
 
 ### Directory structure
 
-Generated secrets are stored encrypted in the vars directory:
+Generated secrets are stored encrypted in the vars directory at the repository root:
 
 ```
-machines/
-└── nixos/
-    └── cinnabar/
-        └── vars/
-            ├── ssh.id_ed25519/
-            │   ├── secret   # Private key (encrypted)
-            │   └── public   # Public key
-            └── zerotier/
-                └── identity.secret
+vars/
+├── per-machine/
+│   └── cinnabar/
+│       ├── openssh/
+│       │   ├── ssh.id_ed25519/
+│       │   │   └── secret   # Private key (encrypted)
+│       │   └── ssh.id_ed25519.pub/
+│       │       └── value    # Public key
+│       └── zerotier/
+│           └── zerotier-identity-secret/
+│               └── secret
+└── shared/
+    └── ...  # Shared secrets across machines
 ```
 
 ### Secrets location on target
@@ -417,7 +421,7 @@ sops updatekeys secrets/users/crs58.sops.yaml
 
 ### Darwin (stibnite, blackphos, rosegold, argentum)
 
-Darwin hosts currently use **legacy sops-nix only**.
+Darwin hosts use **sops-nix for user-level secrets**.
 Clan vars support for darwin is planned but not yet implemented.
 
 **Secrets workflow:**
@@ -435,7 +439,7 @@ Clan vars support for darwin is planned but not yet implemented.
 
 ### NixOS (cinnabar, electrum, galena, scheelite)
 
-NixOS hosts use clan vars for system secrets and legacy sops-nix for user secrets.
+NixOS hosts use clan vars for system secrets and sops-nix for user secrets.
 
 **Clan vars workflow (system secrets):**
 
@@ -447,9 +451,9 @@ clan vars generate cinnabar
 clan machines update cinnabar
 ```
 
-**Legacy sops-nix workflow (user secrets):**
+**sops-nix workflow (user secrets):**
 
-Same as darwin - bootstrap age key, create sops secrets, configure home-manager.
+Same as darwin: bootstrap age key, create sops secrets, configure home-manager.
 
 **Secrets deployment:**
 
@@ -460,11 +464,11 @@ Same as darwin - bootstrap age key, create sops secrets, configure home-manager.
 
 | Aspect | Darwin | NixOS |
 |--------|--------|-------|
-| Clan vars | Not yet implemented | `clan vars generate`, `/run/secrets/` |
-| Legacy sops-nix | Age key + home-manager | Age key + home-manager |
+| Clan vars | Planned (not yet implemented) | `clan vars generate`, `/run/secrets/` |
+| sops-nix | Age key + home-manager | Age key + home-manager |
 | SSH host keys | Manual or existing | Clan vars generated |
 | Zerotier identity | Homebrew generates | Clan vars generated |
-| User API keys | sops-nix (legacy) | sops-nix (legacy) |
+| User API keys | sops-nix | sops-nix |
 | Deployment | `darwin-rebuild switch` | `clan machines update` |
 
 ## Working with secrets
