@@ -73,12 +73,12 @@ nix flake show --json | jq '...'  # Get flake outputs
 ```
 
 **Validates**:
-- All darwin configs in `configurations/darwin/` → `darwinConfigurations.*`
-- All nixos configs in `configurations/nixos/` → `nixosConfigurations.*`
-- Nixos-unified autowiring is working correctly
+- All darwin configs in `modules/machines/darwin/` → `darwinConfigurations.*`
+- All nixos configs in `modules/machines/nixos/` → `nixosConfigurations.*`
+- Deferred module composition via import-tree is working correctly
 - No configs exist in filesystem but not in outputs
 
-**Why**: Users expect file-based discovery to work. If `configurations/darwin/foo.nix` exists, `darwin-rebuild switch --flake .#foo` should work.
+**Why**: Users expect file-based discovery to work. If `modules/machines/darwin/foo/` exists, `darwin-rebuild switch --flake .#foo` should work.
 
 ### What It Doesn't Test
 
