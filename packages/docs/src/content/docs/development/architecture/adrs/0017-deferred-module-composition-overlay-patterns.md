@@ -9,31 +9,31 @@ title: "ADR-0017: Deferred Module Composition Overlay Patterns"
 
 ## Context
 
-The migration from nixos-unified to dendritic flake-parts + clan architecture (November 2024) required restructuring overlay organization to align with dendritic module patterns and eliminate nixos-unified-specific conventions.
+The migration from nixos-unified to deferred module composition + clan architecture (November 2024) required restructuring overlay organization to align with deferred module composition patterns and eliminate nixos-unified-specific conventions.
 
 ### Key architectural changes
 
 **Framework transition**:
 - nixos-unified's `autoWire` mechanism eliminated (no specialArgs pattern)
-- Dendritic flake-parts list concatenation pattern adopted
+- Deferred module composition list concatenation pattern adopted
 - Overlay location moved from `overlays/` to `modules/nixpkgs/overlays/`
 - pkgs-by-name pattern adopted for custom packages (following nixpkgs RFC 140)
 
 **Organizational shift**:
 - From file-based autowiring to explicit list concatenation
 - From hidden `overlays/infra/` subdirectory to structured `modules/nixpkgs/overlays/`
-- From single `overlays/default.nix` composition to dendritic `compose.nix`
+- From single `overlays/default.nix` composition to `compose.nix`
 - From implicit module discovery to explicit `flake.nixpkgsOverlays` list
 
 **Module system foundation**:
 Overlay composition in this architecture uses the module system's list merge semantics.
-Multiple dendritic modules defining the same `flake.nixpkgsOverlays` option automatically merge via list concatenation because the option type is `listOf types.unspecified`.
+Multiple modules defining the same `flake.nixpkgsOverlays` option automatically merge via list concatenation because the option type is `listOf types.unspecified`.
 This is how the module system handles list-typed options: when multiple modules provide definitions, the merge function concatenates them in order (the join operation in the list semilattice).
-This explains why dendritic's pattern of multiple files exporting to the same namespace works without explicit composition code—the module system's evalModules handles the merging during fixpoint computation.
+This explains why the pattern of multiple files exporting to the same namespace works without explicit composition code—the module system's evalModules handles the merging during fixpoint computation.
 
 ## Decision
 
-Adopt five-layer overlay architecture using dendritic flake-parts list concatenation pattern.
+Adopt five-layer overlay architecture using deferred module composition list concatenation pattern.
 
 ### Layer 1: Multi-Channel Nixpkgs Access (channels overlay)
 
@@ -161,7 +161,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 
 **Location**: `modules/nixpkgs/overlays/*.nix` (wrapper modules)
 
-**Purpose**: Integrate overlays from external flake inputs using the same dendritic pattern as internal overlays.
+**Purpose**: Integrate overlays from external flake inputs using the same deferred module composition pattern as internal overlays.
 
 **Pattern**: Each external overlay gets a wrapper module that appends to `flake.nixpkgsOverlays`:
 ```nix
@@ -182,7 +182,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 - Same list concatenation pattern as internal overlays
 - Unified composition via `lib.composeManyExtensions`
 
-### Dendritic List Concatenation Pattern
+### List Concatenation Pattern
 
 **Option declaration** (`modules/nixpkgs/overlays-option.nix`):
 ```nix
@@ -245,7 +245,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 - Overlay composition uses standard `lib.composeManyExtensions`
 - Platform conditionals use nixpkgs stdlib (`stdenv.isDarwin`, etc.)
 
-**Dendritic architecture benefits**:
+**Deferred module composition benefits**:
 - List concatenation enables module composition
 - No hidden `overlays/infra/` subdirectory (explicit structure)
 - Each overlay in `modules/nixpkgs/overlays/*.nix` appends to list
@@ -262,7 +262,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 - Supports both single-file and multi-file packages
 
 **External overlays cleanly integrated**:
-- Same dendritic wrapper module pattern as internal overlays
+- Same wrapper module pattern as internal overlays
 - Unified composition via `lib.composeManyExtensions`
 - Easy to add/remove external dependencies (just add/remove wrapper module)
 - No special-casing in `compose.nix`
@@ -275,7 +275,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 - Old: `overlays/packages/` → New: `pkgs/by-name/`
 - Requires updating documentation and references
 
-**Dendritic conventions add complexity**:
+**Module conventions add complexity**:
 - Underscore prefix for non-module directories (e.g., `_overlays/` if needed)
 - Explicit `flake.nixpkgsOverlays` list management
 - List concatenation pattern not immediately obvious
@@ -289,7 +289,7 @@ customPackages = withSystem prev.stdenv.hostPlatform.system (
 
 **mirkolenz-nixos reference patterns remain valid**:
 - Layer 3-4 patterns similar (custom packages, overrides)
-- Different composition mechanism (dendritic vs flocken)
+- Different composition mechanism (deferred module composition vs flocken)
 - Same underlying concepts
 
 **Multi-channel stable fallbacks preserved**:
@@ -368,13 +368,13 @@ perSystem = { lib, ... }: {
 };
 ```
 
-### After (dendritic flake-parts with ADR-0017)
+### After (deferred module composition with ADR-0017)
 
 ```
 modules/nixpkgs/
 ├── default.nix          # Integration (imports submodules)
 ├── overlays-option.nix  # List option declaration
-├── compose.nix          # Dendritic composition
+├── compose.nix          # Overlay composition
 └── overlays/
     ├── channels.nix     # Multi-channel access
     ├── stable-fallbacks.nix     # Platform fixes
@@ -407,6 +407,6 @@ nixpkgs.overlays = [ inputs.self.overlays.default ];
 
 ### Migration Evidence
 
-- November 2024 migration: nixos-unified → dendritic + clan
+- November 2024 migration: nixos-unified → deferred module composition + clan
 - test-clan validation: Architecture validated
 - Current implementation: `modules/nixpkgs/` in infra repository

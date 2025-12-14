@@ -15,6 +15,7 @@ Uses nixpkgs' module system primitives for configuration composition.
 Flake-parts wraps `lib.evalModules` for flake composition.
 
 **What it provides:**
+
 - **lib.evalModules**: Fixpoint computation resolving modules into final configuration
 - **deferredModule type**: Option type for storing module values that are evaluated later by consumers
 - **Option merging**: Type-specific merge functions with priority handling
@@ -25,6 +26,7 @@ Uses [flake-parts](https://flake.parts) as the foundation for modular flake comp
 Flake-parts wraps nixpkgs' evalModules for flake outputs, adding flake-specific conventions and ergonomics.
 
 **What it provides:**
+
 - Modular flake composition via evalModules wrapper
 - PerSystem configuration helpers (per-system evaluation)
 - flake.modules.* namespace convention (deferredModule type)
@@ -40,6 +42,7 @@ The [aspect-based deferred module composition pattern](/concepts/deferred-module
 **Key principle**: Configuration is organized by what it does, not which machine it runs on.
 
 **What it provides:**
+
 - Aspect-based organization (features, not hosts)
 - Automatic module discovery via import-tree (adds to evalModules imports list)
 - Cross-cutting configuration spanning NixOS, nix-darwin, and home-manager
@@ -53,6 +56,7 @@ Uses [clan](https://clan.lol/) for multi-machine coordination and deployment.
 Clan orchestrates deployments across the machine fleet but doesn't replace underlying NixOS/nix-darwin configuration.
 
 **What it provides:**
+
 - Machine registry and deployment targets
 - Inventory system for service orchestration
 - Secrets management with encryption (clan vars)
@@ -65,6 +69,7 @@ See [Clan Integration](/concepts/clan-integration/) for detailed explanation.
 Adopts proven patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos) for handling nixpkgs unstable breakage with stable fallbacks.
 
 **Key components:**
+
 - **Multi-channel inputs**: Stable, unstable, and patched nixpkgs variants
 - **Stable fallbacks infrastructure**: Platform-specific stable fallbacks
 - **Five-layer overlay composition**: Structured package and overlay merging
@@ -198,9 +203,9 @@ All machines managed via `clan machines update <hostname>`.
 
 The combination provides:
 
-- **Scalable organization** - Dendritic pattern handles growing complexity
+- **Scalable organization** - The deferred module composition pattern retains interpretability of large configurations
 - **Multi-machine coordination** - Clan orchestrates heterogeneous fleet
-- **Robust nixpkgs handling** - Overlay patterns provide stable fallbacks
+- **Reliable nixpkgs handling** - Overlay patterns provide stable fallbacks
 - **Clean separation** - Each layer has clear responsibilities
 
 ## References
