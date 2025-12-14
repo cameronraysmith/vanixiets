@@ -24,7 +24,7 @@
     {
       checks = {
         # TC-020: Home Module Exports
-        # Purpose: Validate portable home modules exported to dendritic namespace
+        # Purpose: Validate portable home modules exported to flake module namespace
         home-module-exports =
           pkgs.runCommand "home-module-exports"
             {
