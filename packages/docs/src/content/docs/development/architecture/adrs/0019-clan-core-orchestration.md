@@ -82,7 +82,7 @@ The clan machine registry imports deferred modules from the `flake.modules.*` na
 These are deferredModule type (nixpkgs `lib/types.nix` primitive) that delay evaluation until the configuration is computed.
 When clan calls nixosSystem or darwinSystem for a machine, it triggers evalModules with the imported modules from the machine's imports list.
 The deferred evaluation resolves at that point with system-specific arguments—the final configuration, pkgs, lib, and other module arguments become available.
-This explains the seamless integration: dendritic exports deferred modules to namespaces, clan imports those modules into machine configurations, and the module system's fixpoint computation handles evaluation with the appropriate context for each platform.
+This explains the seamless integration: deferred module composition exports deferred modules to namespaces, clan imports those modules into machine configurations, and the module system's fixpoint computation handles evaluation with the appropriate context for each platform.
 
 Inventory system via `clan.inventory.*`:
 
@@ -180,7 +180,7 @@ While deploy-rs is simpler than clan in some ways, that simplicity comes from no
 
 Morph was eliminated primarily due to its lack of darwin support - with 4 darwin laptops in the fleet, requiring a separate deployment mechanism for half the machines would fragment the operational model.
 Beyond the cross-platform issue, morph doesn't provide the inventory abstraction that this fleet needs for service coordination.
-The project also sees less active development compared to clan, and while that doesn't automatically disqualify a tool, it matters when you need ecosystem support for integration with newer tools like dendritic flake-parts patterns.
+The project also sees less active development compared to clan, and while that doesn't automatically disqualify a tool, it matters when you need ecosystem support for integration with newer tools like deferred module composition patterns.
 Unlike the clan ecosystem with documented production deployments (clan-infra coordinating multiple Hetzner VPS, qubasa's dotfiles managing personal infrastructure, mic92's multi-machine research environment, pinpox's homelab setup), morph lacks examples of darwin + nixos fleet coordination that this infrastructure requires.
 The clan examples demonstrate proven patterns for exactly this use case - heterogeneous fleets with cross-platform coordination - while morph examples focus primarily on homogeneous NixOS deployments.
 
@@ -222,8 +222,8 @@ This declarative coordination scales naturally - the complexity of adding machin
 
 The architecture benefits from clan's active development by Chaos Computer Club members and the growing ecosystem of clan modules.
 Regular releases provide new features and bug fixes, and the responsive issue handling means blockers can be resolved quickly.
-More importantly, clan is built as a flake-parts module, which means it integrates naturally with the dendritic pattern this infrastructure uses.
-The clan machine registry consumes the same namespace exports (`flake.modules.darwin.*`, `flake.modules.nixos.*`) that the dendritic organization produces, creating seamless architectural coherence without impedance mismatch between layers.
+More importantly, clan is built as a flake-parts module, which means it integrates naturally with the deferred module composition pattern this infrastructure uses.
+The clan machine registry consumes the same namespace exports (`flake.modules.darwin.*`, `flake.modules.nixos.*`) that the deferred module composition organization produces, creating seamless architectural coherence without impedance mismatch between layers.
 
 ### Negative
 
@@ -232,7 +232,7 @@ The 4 darwin laptops in this fleet (stibnite, blackphos, rosegold, argentum) can
 This workaround functions reliably in practice - all darwin machines maintain stable zerotier connections - but it represents platform-specific complexity that wouldn't exist if clan provided darwin-native modules.
 More problematically, the workaround requires maintenance when clan updates its zerotier abstractions, and contributors working on darwin configurations must understand both the standard clan patterns and the darwin-specific deviations.
 
-The clan abstractions (inventory, vars, generators) impose a learning curve that compounds the flake-parts learning investment required by the dendritic pattern.
+The clan abstractions (inventory, vars, generators) impose a learning curve that compounds the flake-parts learning investment required by the deferred module composition pattern.
 Contributors must understand how the inventory system maps services to machines (`roles.controller.machines."cinnabar"`), how vars generators create secrets from templates, and how the secrets architecture divides responsibilities between clan vars (machine identities) and sops-nix (user credentials during migration).
 While clan documentation has improved substantially during 2024, it remains less comprehensive than NixOS module documentation - many patterns are documented primarily through example configurations rather than thorough conceptual guides.
 This means new contributors face a steeper ramp-up period before they can confidently modify clan configurations or add new machines to the inventory.
@@ -257,14 +257,14 @@ This separation of concerns is architecturally clean - terranix answers "what in
 The boundary is well-defined and creates no impedance mismatch - terranix creates machines and outputs their SSH connection details, clan consumes those details to deploy configurations.
 However, this does mean contributors need to understand both systems and their interaction, as adding a new machine requires terranix changes (create the infrastructure) followed by clan changes (add to inventory and deploy configuration).
 
-Home-manager configurations remain unchanged in their definition and authoring - they're still standard home-manager modules defined in the dendritic module structure.
+Home-manager configurations remain unchanged in their definition and authoring - they're still standard home-manager modules defined in the deferred module composition structure.
 Clan's role is purely deployment - it imports and deploys the full system configuration including home-manager, but provides no home-manager-specific abstractions or integration beyond that.
 User environment configuration continues to be written using standard home-manager patterns, and clan simply ensures those configurations are activated on the appropriate machines.
-This means home-manager expertise remains directly applicable - contributors don't need to learn clan-specific approaches to home-manager configuration, they just write normal home-manager modules in the dendritic structure and clan handles the deployment mechanics.
+This means home-manager expertise remains directly applicable - contributors don't need to learn clan-specific approaches to home-manager configuration, they just write normal home-manager modules in the deferred module composition structure and clan handles the deployment mechanics.
 
 NixOS modules similarly remain standard NixOS modules in their implementation, with clan providing deployment orchestration rather than configuration abstraction.
 System configuration continues to use the NixOS module system with its familiar option declarations, configuration merging, and module composition patterns.
-Clan imports these modules (via the dendritic namespace exports) and deploys the resulting configurations, but the modules themselves are written using pure NixOS module patterns.
+Clan imports these modules (via the deferred module composition namespace exports) and deploys the resulting configurations, but the modules themselves are written using pure NixOS module patterns.
 This architectural separation means NixOS module authoring skills transfer directly - a contributor who understands NixOS modules can immediately work on this infrastructure's system configurations without learning clan-specific configuration patterns.
 Clan's contribution is the inventory abstraction for coordinating which machines receive which modules, not in how those modules are written.
 
