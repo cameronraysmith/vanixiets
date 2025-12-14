@@ -1,6 +1,5 @@
-# Main nixpkgs integration + overlay export
+# nixpkgs integration + overlay export
 #
-# Dendritic subdirectory pattern separating concerns:
 # - Integration (this file) imports submodules
 # - Configuration (per-system.nix) configures perSystem pkgs
 # - Overlays (overlays/*.nix) append to flake.nixpkgsOverlays list
