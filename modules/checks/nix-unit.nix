@@ -119,9 +119,9 @@
 
         # Feature Tests
 
-        # TC-008: Dendritic Module Discovery
+        # TC-008: Module Discovery
         # Validates import-tree discovers nixos modules
-        testFeatureDendriticModuleDiscovery = {
+        testFeatureModuleDiscovery = {
           expr =
             (builtins.hasAttr "base" self.modules.nixos)
             && (builtins.hasAttr "machines/nixos/electrum" self.modules.nixos);
@@ -172,7 +172,7 @@
         # Architectural Invariant Tests
 
         # TC-013: Namespace Merging
-        # Validates files in same dendritic directory auto-merge into single namespace
+        # Validates files in same module directory auto-merge into single namespace
         testInvariantNamespaceMerging = {
           expr =
             (builtins.hasAttr "ai" self.modules.homeManager)
@@ -181,9 +181,9 @@
           expected = true;
         };
 
-        # TC-014: Clan-Dendritic Integration
-        # Validates clan machines have corresponding dendritic module exports
-        testInvariantClanDendriticIntegration = {
+        # TC-014: Clan Module Integration
+        # Validates clan machines have corresponding flake module exports
+        testInvariantClanModuleIntegration = {
           expr =
             let
               darwinMachines = [
