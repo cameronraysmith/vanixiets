@@ -62,7 +62,7 @@ It collects all option declarations, collects all configuration definitions, com
 - `flake.modules.*` namespace (type: `lazyAttrsOf (lazyAttrsOf deferredModule)`)
 - `perSystem` abstraction (per-architecture evaluation with nested evalModules call)
 
-**Why this matters**: The pattern's compositional properties (namespace merging, auto-discovery, cross-cutting concerns) emerge from module system semantics, not from dendritic-specific logic.
+**Why this matters**: The pattern's compositional properties (namespace merging, auto-discovery, cross-cutting concerns) emerge from module system semantics, not from pattern-specific logic.
 Deferred modules form a monoid under concatenation, which is why multiple files can export to the same namespace and merge correctly.
 Fixpoint computation is why modules can reference each other's configuration decisions without evaluation order mattering.
 

@@ -10,7 +10,7 @@ title: "ADR-0021: Terranix Infrastructure Provisioning"
 ## Context
 
 This infrastructure requires cloud VM provisioning across multiple providers (Hetzner, GCP) with togglable resources for cost control.
-The provisioning approach needed to integrate with the dendritic flake-parts + clan-core architecture while maintaining infrastructure-as-code principles.
+The provisioning approach needed to integrate with the deferred module composition + clan-core architecture while maintaining infrastructure-as-code principles.
 
 ### Requirements
 
@@ -26,7 +26,7 @@ The provisioning approach needed to integrate with the dendritic flake-parts + c
 
 **Nix integration**:
 - Configuration in Nix expressions, not HCL
-- Leverage flake inputs and dendritic patterns
+- Leverage flake inputs and deferred module composition patterns
 - Type checking and composition from Nix ecosystem
 
 **Clan deployment integration**:
