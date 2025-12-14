@@ -55,12 +55,12 @@ This model enables:
 The infrastructure includes four NixOS machines across two cloud providers:
 
 **Hetzner Cloud:**
-- **cinnabar** - Zerotier controller, always-on coordinator
-- **electrum** - Zerotier peer, general-purpose VPS
+- **cinnabar** - Zerotier controller, always-on coordinator (enabled by default)
+- **electrum** - Zerotier peer, secondary test VM (disabled by default in terranix)
 
 **Google Cloud Platform:**
-- **galena** - CPU-only compute node (e2-standard-8)
-- **scheelite** - GPU compute node (n1-standard-8 with Tesla T4)
+- **galena** - CPU-only compute node (e2-standard-8, toggle-controlled)
+- **scheelite** - GPU compute node (n1-standard-8 with Tesla T4, toggle-controlled)
 
 Each cloud serves different purposes: Hetzner for cost-effective always-on infrastructure, GCP for burst compute and GPU workloads.
 
@@ -72,7 +72,7 @@ The infrastructure uses toggle patterns to enable/disable machines:
 ```nix
 # In modules/terranix/hetzner.nix or gcp.nix
 cinnabar.enabled = true;   # Always on - zerotier controller
-electrum.enabled = true;   # Usually on
+electrum.enabled = false;  # Disabled by default - enable when needed
 galena.enabled = false;    # Enable when needed
 scheelite.enabled = false; # Enable when GPU needed
 ```
