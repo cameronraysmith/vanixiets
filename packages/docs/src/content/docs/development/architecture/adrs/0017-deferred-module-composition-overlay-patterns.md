@@ -398,9 +398,6 @@ nixpkgs.overlays = [ inputs.self.overlays.default ];
 - ADR-0003: Overlay composition patterns (deleted, superseded by this ADR)
 - [Module System Primitives](/concepts/module-system-primitives/) - Option merging and list concatenation semantics
 - [Terminology Glossary](/development/context/glossary/) - Module system terminology guide
-- test-clan validation: `~/projects/nix-workspace/test-clan/`
-- Drupol dendritic reference: `~/projects/nix-workspace/drupol-dendritic-infra/`
-- mirkolenz-nixos reference: `~/projects/nix-workspace/mirkolenz-nixos/`
 
 ### External
 
