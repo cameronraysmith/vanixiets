@@ -44,11 +44,11 @@ No standardized pattern for shared modules.
 
 ## Decision
 
-Adopt the **dendritic flake-parts pattern** where every Nix file is a flake-parts module organized by aspect (feature) rather than host.
+Adopt the **deferred module composition pattern** where every Nix file is a flake-parts module organized by aspect (feature) rather than host.
 
 ### Module system foundation
 
-The dendritic pattern builds on nixpkgs module system primitives, which explains why composition works reliably:
+The deferred module composition pattern builds on nixpkgs module system primitives, which explains why composition works reliably:
 
 **deferredModule type**: A module that delays evaluation until the final configuration is computed.
 The type signature is `Config → Module`, meaning modules are functions from configurations to option declarations and definitions.
@@ -193,7 +193,7 @@ in
 
 ### Comparison with nixos-unified
 
-| Aspect | nixos-unified | Dendritic flake-parts |
+| Aspect | nixos-unified | Deferred module composition |
 |--------|---------------|----------------------|
 | Module discovery | Path-based autowiring | import-tree auto-discovery |
 | Configuration passing | specialArgs (implicit) | Namespace exports (explicit) |
@@ -214,28 +214,28 @@ The specialArgs mechanism became a debugging nightmare - when a module failed, t
 More critically, nixos-unified provided no inventory abstraction for clan integration, which this fleet requires for zerotier VPN coordination across darwin laptops and nixos servers.
 The path-based autowiring rules were convenient for the initial setup but became a liability when restructuring was needed - renaming a directory meant understanding the implicit mapping from filesystem paths to flake outputs.
 More fundamentally, nixos-unified doesn't use deferred modules - it evaluates configuration immediately based on file paths.
-This prevents the kind of cross-module references that dendritic enables, where modules can reference the final merged configuration via fixpoint computation.
+This prevents the kind of cross-module references that deferred module composition enables, where modules can reference the final merged configuration via fixpoint computation.
 The lack of deferredModule type meant cross-cutting concerns (features that span multiple hosts) had to be duplicated rather than composed from shared modules.
 
-### Raw flake-parts without dendritic pattern
+### Raw flake-parts without deferred module composition pattern
 
-Flake-parts provides the infrastructure for modular flake composition, but without the dendritic organizational pattern, it requires explicit module registration in flake.nix for every new file.
+Flake-parts provides the infrastructure for modular flake composition, but without the deferred module composition organizational pattern, it requires explicit module registration in flake.nix for every new file.
 At 83 modules (and growing), this fleet would require maintaining a massive imports list, and every new feature would mean editing the root flake.nix file.
-The dendritic pattern's import-tree mechanism eliminates this registration burden entirely - creating a new file under `modules/` automatically includes it.
+The deferred module composition pattern's import-tree mechanism eliminates this registration burden entirely - creating a new file under `modules/` automatically includes it.
 More importantly, raw flake-parts provides no organizational convention, meaning each implementation develops its own directory structure and namespace patterns.
-The dendritic pattern brings a proven structure that works across multiple production implementations, reducing cognitive load when switching contexts.
+The deferred module composition pattern brings a proven structure that works across multiple production implementations, reducing cognitive load when switching contexts.
 
 More importantly, both use identical module system primitives (deferredModule type, evalModules fixpoint, option merging).
-The difference is purely organizational: raw flake-parts requires manual imports list maintenance, while dendritic automates discovery via import-tree and establishes namespace conventions.
-The underlying composition mechanism (module system) is identical, so both have the same compositional properties - dendritic just reduces registration burden.
+The difference is purely organizational: raw flake-parts requires manual imports list maintenance, while deferred module composition automates discovery via import-tree and establishes namespace conventions.
+The underlying composition mechanism (module system) is identical, so both have the same compositional properties - deferred module composition just reduces registration burden.
 
 ### Snowfall lib
 
 Snowfall lib offers an alternative organizational framework with its own opinionated structure and conventions.
-We chose the dendritic pattern instead because it aligns more closely with the flake-parts ecosystem that clan is built on.
-Clan is itself a flake-parts module, and the dendritic namespace exports (`flake.modules.*`) integrate naturally with clan's inventory system.
+We chose the deferred module composition pattern instead because it aligns more closely with the flake-parts ecosystem that clan is built on.
+Clan is itself a flake-parts module, and the deferred module composition namespace exports (`flake.modules.*`) integrate naturally with clan's inventory system.
 Additionally, import-tree's discovery mechanism is simpler and more transparent than Snowfall's loader - it's easier to reason about "every .nix file under modules/ is imported" than to learn Snowfall's specific directory naming conventions.
-The existence of multiple high-quality production implementations (drupol, mightyiam, gaetanlepage) using the dendritic pattern provided confidence that the architecture scales and integrates well with common NixOS patterns.
+The existence of multiple high-quality production implementations (drupol, mightyiam, gaetanlepage) using the deferred module composition pattern provided confidence that the architecture scales and integrates well with common NixOS patterns.
 
 ### NixOS modules only (no flake-parts)
 
@@ -245,7 +245,7 @@ Flake-parts provides the perSystem abstraction that enables defining packages an
 Additionally, the standard NixOS module approach lacks the namespace export conventions that flake-parts provides.
 While NixOS modules use the same underlying primitives (deferredModule, evalModules), they don't have flake-parts' `flake.modules.*` namespace or perSystem abstraction.
 Without these namespace conventions, creating composable aggregates requires manually maintaining imports lists, and cross-platform modules require duplication for darwin vs nixos contexts.
-Flake-parts provides the namespace organization and evaluation strategy that makes dendritic's aspect-based aggregation practical.
+Flake-parts provides the namespace organization and evaluation strategy that makes the deferred module composition aspect-based aggregation practical.
 
 ## Consequences
 
@@ -257,7 +257,7 @@ This means module evaluation order doesn't matter (associativity), and empty mod
 The fixpoint computation ensures cross-module references resolve consistently regardless of import order.
 These algebraic properties make the pattern's composition reliable at scale.
 
-**Feature-based organization**: The dendritic pattern's aspect-based organization eliminates the duplication problem that plagued the nixos-unified architecture.
+**Feature-based organization**: The deferred module composition pattern's aspect-based organization eliminates the duplication problem that plagued the nixos-unified architecture.
 When we define AI tooling once in `modules/home/ai/`, every machine configuration can import that aggregate and receive the entire suite of tools consistently.
 This changes the operational model from "edit 8 machine files to add a feature" to "create one feature file and import it where needed."
 The impact becomes clear when considering that changes propagate automatically - updating the AI tooling aggregate updates all machines simultaneously, eliminating version drift across the fleet.
@@ -278,9 +278,9 @@ The same organizational patterns work identically for darwin modules, nixos modu
 Home-manager aggregates work on both darwin and nixos hosts without modification, and platform-specific concerns are isolated to the machine-specific configuration files under `modules/machines/darwin/` and `modules/machines/nixos/`.
 This unification is critical for this fleet's 4 darwin laptops and 4 nixos servers - shared tooling lives in cross-platform aggregates while platform-specific settings remain isolated.
 
-The dendritic pattern aligns architecturally with clan-core because both are built on flake-parts modules.
-Clan's machine registry consumes the same namespace exports (`flake.modules.darwin.*`, `flake.modules.nixos.*`) that dendritic produces, creating a natural integration point.
-Machine configurations export to namespaces that clan reads when building the fleet inventory, which enables clan's multi-machine orchestration to work seamlessly with the dendritic organization.
+The deferred module composition pattern aligns architecturally with clan-core because both are built on flake-parts modules.
+Clan's machine registry consumes the same namespace exports (`flake.modules.darwin.*`, `flake.modules.nixos.*`) that deferred module composition produces, creating a natural integration point.
+Machine configurations export to namespaces that clan reads when building the fleet inventory, which enables clan's multi-machine orchestration to work seamlessly with the deferred module composition organization.
 This architectural coherence eliminated what could have been a significant impedance mismatch between the configuration framework and the deployment orchestration layer.
 
 Finally, multiple production implementations validate that this pattern works at scale and integrates well with the broader NixOS ecosystem.
@@ -295,7 +295,7 @@ The trade-off is initial complexity for long-term maintainability, which becomes
 
 Converting from nixos-unified required restructuring all configurations, which consumed substantial engineering effort during the production migration (November 2024).
 The migration involved moving approximately 83 modules from host-centric organization to aspect-based organization, reorganizing imports to use namespace exports, and validating that every module continued to function correctly after the transition.
-This migration work was necessary because the two architectures organize configuration fundamentally differently - nixos-unified's implicit autowiring cannot be mechanically transformed into dendritic's explicit namespace exports.
+This migration work was necessary because the two architectures organize configuration fundamentally differently - nixos-unified's implicit autowiring cannot be mechanically transformed into deferred module composition's explicit namespace exports.
 The investment pays dividends in ongoing maintenance burden reduction, but it represents real upfront cost that delayed other development work.
 
 Namespace discipline failures create silent build failures that can be difficult to diagnose without understanding the auto-merging mechanism.
@@ -310,13 +310,13 @@ These conventions are documented in this ADR and the concepts documentation, but
 
 ### Neutral
 
-Dendritic modules remain NixOS/home-manager modules at their core, which means the pattern adds organizational structure rather than introducing fundamentally new abstractions.
-A contributor who understands NixOS module development already possesses most of the knowledge needed to work with dendritic modules - the same option declarations, the same configuration merging semantics, the same module system features all work identically.
-The dendritic pattern simply prescribes where modules should live in the filesystem and how they should export to namespaces for consumption by machine configurations.
+Deferred module composition modules remain NixOS/home-manager modules at their core, which means the pattern adds organizational structure rather than introducing fundamentally new abstractions.
+A contributor who understands NixOS module development already possesses most of the knowledge needed to work with deferred module composition - the same option declarations, the same configuration merging semantics, the same module system features all work identically.
+The deferred module composition pattern simply prescribes where modules should live in the filesystem and how they should export to namespaces for consumption by machine configurations.
 This conceptual alignment means skills transfer directly from standard NixOS module development, and existing documentation about NixOS module patterns remains applicable.
 The learning investment focuses narrowly on organizational conventions rather than requiring mastery of an entirely new configuration system.
 
-Documentation for the dendritic pattern exists but is scattered across multiple reference implementations rather than consolidated in a single authoritative source.
+Documentation for the deferred module composition pattern exists but is scattered across multiple reference implementations rather than consolidated in a single authoritative source.
 The dendrix documentation, mightyiam's configuration, and drupol's setup each demonstrate aspects of the pattern, but newcomers must synthesize understanding from these distributed examples.
 This fragmentation creates a steeper initial learning curve than a framework with comprehensive official documentation would provide.
 However, this ADR and the concepts documentation in this repository fill that gap for contributors to this specific infrastructure, providing a single reference that explains the pattern's application to this fleet's needs.
@@ -328,9 +328,9 @@ The scattered ecosystem documentation remains valuable for seeing how different 
 
 Pattern validated in test-clan repository before production migration:
 
-- Initial dendritic structure established
+- Initial deferred module composition structure established
 - Test harness with 18 tests validating auto-discovery
-- Pure dendritic pattern achieved with zero regressions
+- Pure deferred module composition pattern achieved with zero regressions
 - Cross-platform modules validated (darwin + nixos)
 - Physical deployment successful (blackphos darwin laptop)
 
@@ -348,7 +348,7 @@ Production migration to infra repository:
 - NixOS VPS (cinnabar, electrum) operational
 - New machines (rosegold, argentum) created using patterns
 
-Result: 8-machine fleet fully operational under dendritic architecture.
+Result: 8-machine fleet fully operational under deferred module composition architecture.
 
 ## References
 
