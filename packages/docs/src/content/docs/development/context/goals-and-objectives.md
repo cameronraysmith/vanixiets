@@ -9,9 +9,7 @@ Goals build a hierarchy and can influence each other through conflicts, constrai
 
 These goals focus on the overall value and sustainability of the infrastructure.
 
-###
-
- G-B01: Reliable personal infrastructure
+### G-B01: Reliable personal infrastructure
 
 **Description**: Maintain stable, dependable systems for daily personal and professional computing.
 
