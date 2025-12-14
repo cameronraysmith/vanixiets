@@ -6,7 +6,7 @@ Comprehensive architecture specification for the vanixiets multi-machine infrast
 
 ## Scope and Boundaries
 
-This infrastructure manages a heterogeneous fleet of 6 permanent machines plus ephemeral cloud instances across 2 platforms with 5 users through declarative Nix configuration.
+This infrastructure manages a heterogeneous fleet of 8 machines across 2 platforms with 5 users through declarative Nix configuration.
 The system provides unified deployment, configuration management, secrets distribution, and cloud infrastructure provisioning for both personal workstations and cloud servers.
 
 ### System boundary
@@ -18,13 +18,16 @@ These capabilities may run ON the infrastructure but are not managed BY the infr
 
 ### Machine fleet
 
-The infrastructure coordinates 6 permanent machines plus ephemeral cloud instances:
+The infrastructure coordinates 8 machines across two platforms:
 
 - 4 nix-darwin laptops: stibnite (crs58), blackphos (raquel), argentum (christophersmith), rosegold (janettesmith)
-- 1 permanent nixos server: cinnabar (Hetzner VPS, zerotier coordinator)
-- 1 ephemeral nixos server: electrum (Hetzner VPS, usually disabled in terranix)
+- 4 nixos servers:
+  - cinnabar (Hetzner VPS, zerotier controller, always enabled)
+  - electrum (Hetzner VPS, zerotier peer, disabled by default in terranix)
+  - galena (GCP CPU node e2-standard-8, zerotier peer, toggle-controlled)
+  - scheelite (GCP GPU node n1-standard-8 with T4, zerotier peer, toggle-controlled)
 
-Note that galena (GCP CPU) and scheelite (GCP GPU) were added as GCP infrastructure expansion, not part of the initial November 2024 validation.
+Cloud machines use toggle patterns in terranix for cost control.
 All machines managed through single configuration repository with cross-platform module sharing.
 
 ### User management
@@ -716,7 +719,7 @@ All machines deployed with deferred module composition + clan architecture.
 Darwin workstations (stibnite, blackphos) and NixOS VPS (cinnabar, electrum) operational.
 New machines (rosegold, argentum) created using established patterns.
 
-Result: 6-machine permanent fleet operational under unified architecture (galena and scheelite added December 2024).
+Result: 8-machine fleet operational under unified architecture.
 
 ### GCP infrastructure expansion (December 2024)
 
