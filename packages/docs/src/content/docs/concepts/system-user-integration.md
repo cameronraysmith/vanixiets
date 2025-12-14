@@ -51,22 +51,34 @@ nh home switch  # For standalone home-manager activation
 modules/
 ├── home/
 │   └── users/               # User-specific home-manager modules
-│       ├── crs58.nix        # Primary admin user module
-│       ├── cameron.nix      # admin alias
-│       ├── raquel.nix       # additional users...
-│       ├── janettesmith.nix
-│       └── christophersmith.nix
+│       ├── crs58/           # Primary admin user module
+│       │   └── default.nix
+│       ├── raquel/          # Additional users...
+│       │   └── default.nix
+│       ├── janettesmith/
+│       │   └── default.nix
+│       └── christophersmith/
+│           └── default.nix
 └── machines/
     ├── darwin/              # Darwin host configurations
-    │   ├── stibnite.nix     # Single-user (crs58)
-    │   ├── blackphos.nix    # Multi-user (raquel primary, crs58 admin)
-    │   ├── rosegold.nix     # Multi-user (janettesmith primary, cameron admin)
-    │   └── argentum.nix     # Multi-user (christophersmith primary, cameron admin)
+    │   ├── stibnite/        # Single-user (crs58)
+    │   │   └── default.nix
+    │   ├── blackphos/       # Multi-user (raquel primary, crs58 admin)
+    │   │   └── default.nix
+    │   ├── rosegold/        # Multi-user (janettesmith primary, cameron admin)
+    │   │   └── default.nix
+    │   └── argentum/        # Multi-user (christophersmith primary, cameron admin)
+    │       └── default.nix
     └── nixos/               # NixOS host configurations
-        ├── cinnabar.nix     # Server (cameron)
-        ├── electrum.nix     # Server (cameron)
-        ├── galena.nix       # Compute (cameron)
-        └── scheelite.nix    # GPU compute (cameron)
+        ├── cinnabar/        # Server (cameron)
+        │   ├── default.nix
+        │   └── disko.nix    # Disk layout
+        ├── electrum/
+        │   └── default.nix
+        ├── galena/
+        │   └── default.nix
+        └── scheelite/
+            └── default.nix
 ```
 
 ## Configuration patterns
@@ -76,30 +88,58 @@ modules/
 **Example**: stibnite (crs58's primary workstation)
 
 ```nix
-# modules/machines/darwin/stibnite.nix
-{ config, ... }:
+# modules/machines/darwin/stibnite/default.nix
 {
-  flake.darwinConfigurations.stibnite = config.lib.mkDarwinConfiguration {
-    system = "aarch64-darwin";
-    modules = [
-      config.flake.modules.darwin.core
-      config.flake.modules.darwin.apps
-    ];
-    home-manager.users.crs58 = {
-      imports = with config.flake.modules.homeManager; [
-        aggregate-core
-        aggregate-ai
-        aggregate-development
-        aggregate-shell
-      ];
+  config,
+  inputs,
+  ...
+}:
+let
+  flakeModules = config.flake.modules.darwin;
+  flakeModulesHome = config.flake.modules.homeManager;
+in
+{
+  flake.modules.darwin."machines/darwin/stibnite" =
+    { config, pkgs, lib, ... }:
+    {
+      imports = [
+        inputs.home-manager.darwinModules.home-manager
+      ]
+      ++ (with flakeModules; [
+        base
+        ssh-known-hosts
+      ]);
+
+      networking.hostName = "stibnite";
+      nixpkgs.hostPlatform = "aarch64-darwin";
+
+      # Single-user configuration
+      users.users.crs58 = {
+        uid = 501;
+        home = "/Users/crs58";
+        shell = pkgs.zsh;
+      };
+
+      # Home-Manager configuration
+      home-manager = {
+        useGlobalPkgs = true;
+        useUserPackages = true;
+        users.crs58.imports = [
+          flakeModulesHome."users/crs58"
+          flakeModulesHome.ai
+          flakeModulesHome.core
+          flakeModulesHome.development
+          flakeModulesHome.shell
+        ];
+      };
     };
-  };
 }
 ```
 
 **Key points:**
-- Single user defined in machine config
-- All home-manager aggregates for the user
+- Uses deferred module composition pattern with `flake.modules.darwin."machines/darwin/hostname"`
+- Imports darwin modules and home-manager modules via `config.flake.modules.*`
+- Single user defined in machine config with home-manager integration
 - System activation deploys both system and home config
 
 ### Multi-user darwin host
@@ -107,38 +147,69 @@ modules/
 **Example**: blackphos (raquel's workstation, crs58 as admin)
 
 ```nix
-# modules/machines/darwin/blackphos.nix
-{ config, ... }:
+# modules/machines/darwin/blackphos/default.nix
 {
-  flake.darwinConfigurations.blackphos = config.lib.mkDarwinConfiguration {
-    system = "aarch64-darwin";
-    modules = [
-      config.flake.modules.darwin.core
-      config.flake.modules.darwin.apps
-    ];
-    home-manager.users = {
-      raquel = {
-        imports = with config.flake.modules.homeManager; [
-          aggregate-core
-          aggregate-shell
-        ];
+  config,
+  inputs,
+  ...
+}:
+let
+  flakeModules = config.flake.modules.darwin;
+  flakeModulesHome = config.flake.modules.homeManager;
+in
+{
+  flake.modules.darwin."machines/darwin/blackphos" =
+    { config, pkgs, lib, ... }:
+    {
+      imports = [
+        inputs.home-manager.darwinModules.home-manager
+      ]
+      ++ (with flakeModules; [
+        base
+        ssh-known-hosts
+      ]);
+
+      networking.hostName = "blackphos";
+      nixpkgs.hostPlatform = "aarch64-darwin";
+
+      # Multi-user configuration
+      users.users = {
+        raquel = {
+          uid = 501;
+          home = "/Users/raquel";
+          shell = pkgs.zsh;
+        };
+        crs58 = {
+          uid = 502;
+          home = "/Users/crs58";
+          shell = pkgs.zsh;
+        };
       };
-      crs58 = {
-        imports = with config.flake.modules.homeManager; [
-          aggregate-core
-          aggregate-ai
-          aggregate-development
-          aggregate-shell
+
+      # Home-Manager configuration for multiple users
+      home-manager = {
+        useGlobalPkgs = true;
+        useUserPackages = true;
+        users.raquel.imports = [
+          flakeModulesHome."users/raquel"
+          flakeModulesHome.core
+          flakeModulesHome.shell
+        ];
+        users.crs58.imports = [
+          flakeModulesHome."users/crs58"
+          flakeModulesHome.ai
+          flakeModulesHome.core
+          flakeModulesHome.development
+          flakeModulesHome.shell
         ];
       };
     };
-  };
 }
 ```
 
 **Key points:**
-- Multiple users defined in machine config
-- Each user gets appropriate aggregates for their role
+- Uses deferred module composition pattern with `flake.modules.darwin."machines/darwin/hostname"`
+- Multiple users defined in machine config with separate home-manager imports
 - Primary user (raquel) has basic config
 - Admin user (crs58) has full development config
 
@@ -147,23 +218,36 @@ modules/
 **Example**: cinnabar (zerotier controller)
 
 ```nix
-# modules/machines/nixos/cinnabar.nix
-{ config, ... }:
+# modules/machines/nixos/cinnabar/default.nix
 {
-  flake.nixosConfigurations.cinnabar = config.lib.mkNixosConfiguration {
-    system = "x86_64-linux";
-    modules = [
-      config.flake.modules.nixos.core
-      config.flake.modules.nixos.services
-    ];
-    home-manager.users.cameron = {
-      imports = with config.flake.modules.homeManager; [
-        aggregate-core
-        aggregate-development
-        aggregate-shell
-      ];
+  config,
+  inputs,
+  ...
+}:
+let
+  flakeModules = config.flake.modules.nixos;
+in
+{
+  flake.modules.nixos."machines/nixos/cinnabar" =
+    { config, pkgs, lib, ... }:
+    {
+      imports = [
+        inputs.srvos.nixosModules.server
+        inputs.srvos.nixosModules.hardware-hetzner-cloud
+        inputs.home-manager.nixosModules.home-manager
+      ]
+      ++ (with flakeModules; [
+        base
+        ssh-known-hosts
+      ]);
+
+      networking.hostName = "cinnabar";
+      nixpkgs.hostPlatform = "x86_64-linux";
+      system.stateVersion = "25.05";
+
+      # User configuration managed via clan inventory users service
+      # See: modules/clan/inventory/services/users.nix
     };
-  };
 }
 ```
 
@@ -171,27 +255,39 @@ modules/
 
 ### User-specific configuration
 
-Each user has a module in `modules/home/users/`:
+Each user has a module directory in `modules/home/users/<username>/default.nix`:
 
 ```nix
-# modules/home/users/user.nix
-{ ... }:
+# modules/home/users/crs58/default.nix
 {
-  flake.modules.homeManager."users/user" = { config, pkgs, ... }: {
-    home.username = "user";
-    home.homeDirectory = "/Users/user";
+  lib,
+  ...
+}:
+{
+  flake.modules.homeManager."users/crs58" =
+    { config, pkgs, lib, flake, ... }:
+    {
+      home.stateVersion = "23.11";
+      home.username = lib.mkDefault "crs58";
+      home.homeDirectory = lib.mkDefault (
+        if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
+      );
 
-    # User-specific settings
-    programs.git = {
-      userName = "User Name";
-      userEmail = "user@example.com";
-    };
+      # User-specific settings
+      programs.git.settings = {
+        user.name = "Cameron Smith";
+        user.email = "cameron.ray.smith@gmail.com";
+      };
 
-    # sops-nix user secrets
-    sops.secrets."users/user/github-token" = {
-      sopsFile = ./../../secrets/users/user.sops.yaml;
+      # sops-nix user secrets
+      sops = {
+        defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
+        secrets = {
+          github-token = { };
+          ssh-signing-key = { mode = "0400"; };
+        };
+      };
     };
-  };
 }
 ```
 
