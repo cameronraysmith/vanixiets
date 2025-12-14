@@ -16,7 +16,7 @@ This section provides comprehensive reference documentation for the infra reposi
 Reference documentation for command-line tools and automation:
 
 - [Flake Apps](/reference/flake-apps/) - Reference for nix flake apps (`darwin`, `os`, `home`) that wrap configuration activation
-- [Justfile Recipes](/reference/justfile-recipes/) - Complete reference for all ~100 justfile recipes organized by functional group, with CI-tested indicators
+- [Justfile Recipes](/reference/justfile-recipes/) - Complete reference for all ~121 justfile recipes organized by functional group, with CI-tested indicators
 - [CI Jobs](/reference/ci-jobs/) - GitHub Actions CI job reference with local equivalents and troubleshooting
 
 ## Quick start

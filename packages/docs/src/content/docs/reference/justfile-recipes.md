@@ -13,13 +13,15 @@ Run `just --list` to see available recipes or `just help` for usage information.
 | Group | Count | Purpose |
 |-------|-------|---------|
 | [activation](#activation) | 4 | System/home configuration activation |
-| [nix](#nix) | 13 | Core nix operations |
+| [nix](#nix) | 15 | Core nix operations |
+| [terraform](#terraform) | 3 | Terraform/terranix infrastructure |
 | [clan](#clan) | 7 | Machine building and testing |
 | [docs](#docs) | 17 | Documentation site management |
+| [diagrams](#diagrams) | 3 | Typst diagram compilation |
 | [containers](#containers) | 7 | Container image building |
-| [secrets](#secrets) | 13 | SOPS secrets management |
+| [secrets](#secrets) | 14 | SOPS secrets management |
 | [sops](#sops) | 8 | SOPS key management |
-| [CI/CD](#cicd) | 27 | CI/CD operations and caching |
+| [CI/CD](#cicd) | 30 | CI/CD operations and caching |
 | [nix-home-manager](#nix-home-manager) | 4 | Home-manager bootstrap |
 | [nix-darwin](#nix-darwin) | 3 | Darwin bootstrap |
 | [nixos](#nixos) | 4 | NixOS operations |
@@ -76,6 +78,19 @@ Core nix operations for building, checking, and managing the flake.
 
 **CI-tested recipes:** `check` is called by the `flake-validation` CI job.
 
+## Terraform
+
+Terraform/terranix infrastructure management for cloud resources.
+Recipes manage Hetzner VPS infrastructure through terranix-generated configurations.
+
+| Recipe | Arguments | Description | CI-tested |
+|--------|-----------|-------------|-----------|
+| `terraform` | `*ARGS` | Run terraform apply (removes stale lockfile first) | No |
+| `terraform-plan` | `*ARGS` | Run terraform plan only | No |
+| `terraform-destroy` | `*ARGS` | Run terraform destroy | No |
+
+**Note:** These recipes stop the rosetta-manager service before running to avoid conflicts, and remove stale `.terraform.lock.hcl` files to sync with nix-provided providers.
+
 ## Clan
 
 Commands for clan-based machine management.
@@ -116,6 +131,18 @@ Documentation site management using Starlight and Cloudflare Workers.
 
 **CI-tested recipes:** `docs-test-*` recipes are called by the `typescript` CI job.
 `docs-deploy-*` recipes are called by `preview-docs-deploy` and `production-docs-deploy` jobs.
+
+## Diagrams
+
+Typst diagram compilation and optimization for documentation.
+
+| Recipe | Arguments | Description | CI-tested |
+|--------|-----------|-------------|-----------|
+| `diagrams-build` | - | Compile all typst diagrams to SVG and optimize for web | No |
+| `diagrams-compile` | `name` | Compile a single typst diagram (without optimization) | No |
+| `diagrams-watch` | - | Watch typst diagrams for changes and recompile | No |
+
+**Note:** `diagrams-build` is called as a dependency by `docs-build`, `docs-linkcheck`, `docs-deploy-preview`, and `docs-deploy-production`.
 
 ## Containers
 
