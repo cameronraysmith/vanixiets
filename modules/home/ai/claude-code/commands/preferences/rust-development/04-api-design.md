@@ -231,6 +231,272 @@ pub enum DatabaseImpl {
 
 This hierarchy supports FDM by preferring concrete types for domain logic (level 1), using enums for I/O boundaries (level 2), reserving generics for true abstraction needs (level 3), and avoiding trait objects unless necessary (level 4).
 
+## Serialization boundaries
+
+### Principle
+
+Domain types should remain ignorant of serialization concerns.
+This preserves persistence ignorance and keeps domain logic independent of infrastructure choices.
+For conceptual foundation, see `~/.claude/commands/preferences/architectural-patterns.md` (Onion/hexagonal architecture, infrastructure layer responsibilities).
+
+### DTO separation pattern
+
+Separate Data Transfer Objects (DTOs) from domain types to maintain clear boundaries:
+
+**Domain types**:
+- Enforce invariants via smart constructors
+- Provide getter methods for private fields
+- Never derive Serialize/Deserialize
+- Contain business logic
+
+**DTOs**:
+- Plain structs with public fields
+- Derive Serialize and Deserialize
+- No business logic or validation
+- Exist solely for serialization
+
+```rust
+// Domain type: smart constructor, private fields, no Serde
+pub struct Email {
+    value: String,
+}
+
+impl Email {
+    pub fn new(s: impl AsRef<str>) -> Result<Self, ValidationError> {
+        let value = s.as_ref();
+        if !value.contains('@') {
+            return Err(ValidationError::InvalidEmail(value.to_string()));
+        }
+        Ok(Self { value: value.to_string() })
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.value
+    }
+}
+
+// DTO: public fields, Serde derives, no validation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmailDto {
+    pub value: String,
+}
+```
+
+### Conversion patterns
+
+**Domain → DTO (infallible)**:
+
+Conversion from validated domain types to DTOs always succeeds because domain invariants are already enforced.
+Use `From<DomainType>` for infallible conversions.
+
+```rust
+impl From<Email> for EmailDto {
+    fn from(email: Email) -> Self {
+        EmailDto {
+            value: email.as_str().to_string(),
+        }
+    }
+}
+
+// More complex example with nested types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserDto {
+    pub email: String,
+    pub age: u32,
+}
+
+impl From<User> for UserDto {
+    fn from(user: User) -> Self {
+        UserDto {
+            email: user.email().as_str().to_string(),
+            age: user.age().into(),
+        }
+    }
+}
+```
+
+**DTO → Domain (fallible)**:
+
+Conversion from DTOs to domain types validates at the boundary.
+Use `TryFrom<DomainTypeDto>` for fallible conversions that enforce invariants.
+
+```rust
+impl TryFrom<EmailDto> for Email {
+    type Error = ValidationError;
+
+    fn try_from(dto: EmailDto) -> Result<Self, Self::Error> {
+        Email::new(dto.value)  // Re-validates via smart constructor
+    }
+}
+
+// More complex example with nested validation
+impl TryFrom<UserDto> for User {
+    type Error = ValidationError;
+
+    fn try_from(dto: UserDto) -> Result<Self, Self::Error> {
+        let email = Email::new(dto.email)?;
+        let age = Age::new(dto.age)?;
+        Ok(User::new(email, age))
+    }
+}
+```
+
+### Module organization
+
+Separate domain and DTO modules to enforce the boundary:
+
+```rust
+// src/domain/user.rs - domain types
+pub struct User {
+    email: Email,
+    age: Age,
+}
+
+impl User {
+    pub fn email(&self) -> &Email { &self.email }
+    pub fn age(&self) -> &Age { &self.age }
+}
+
+// src/dto/user.rs - DTOs with Serde
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserDto {
+    pub email: String,
+    pub age: u32,
+}
+
+// Conversions in either module or dedicated conversions module
+impl From<User> for UserDto { /* ... */ }
+impl TryFrom<UserDto> for User { /* ... */ }
+```
+
+This organization makes it clear:
+- `#[derive(Serialize, Deserialize)]` appears only in `dto/` modules
+- Domain types in `domain/` have no Serde dependencies
+- Conversion implementations explicitly document the boundary
+
+## Command and event struct patterns
+
+### Principle
+
+Workflows have typed inputs (commands) and outputs (events) that document intent and outcomes.
+Commands represent actions to perform; events represent facts about what occurred.
+For conceptual foundation, see `~/.claude/commands/preferences/architectural-patterns.md` (Commands and events as workflow boundaries).
+
+### Command conventions
+
+Commands represent intent to perform an action:
+
+**Naming**: Use imperative verb phrases
+- `ProcessObservations`, `TrainModel`, `ValidateInput`
+- NOT `ProcessObservationsCommand` (redundant suffix)
+
+**Structure**: Include operation data and metadata
+- Data needed to perform the operation
+- Timestamp, request ID, user context for tracing
+- Immutable (no `mut` methods)
+
+**Derives**: Typical derives for commands
+```rust
+#[derive(Debug, Clone)]
+pub struct ProcessObservationsCommand {
+    pub request_id: RequestId,
+    pub timestamp: DateTime<Utc>,
+    pub observations: Vec<RawObservation>,
+    pub user_id: UserId,
+}
+```
+
+Optionally derive `Serialize`/`Deserialize` if commands cross API boundaries (HTTP, message queue).
+For internal commands, `Debug` and `Clone` usually suffice.
+
+### Event conventions
+
+Events represent facts about what happened:
+
+**Naming**: Use past-tense verb phrases
+- `ObservationsProcessed`, `ModelTrained`, `ValidationCompleted`
+- NOT `ProcessingSuccessEvent` (awkward, redundant)
+
+**Structure**: Include result data
+- Data needed by downstream consumers
+- Timestamp, correlation IDs for tracing
+- Immutable
+
+**Multiple events**: Workflows may emit multiple events
+```rust
+#[derive(Debug, Clone)]
+pub enum ProcessingEvent {
+    ObservationsValidated {
+        count: usize,
+        quality_score: f64,
+        timestamp: DateTime<Utc>,
+    },
+    CalibrationCompleted {
+        model_version: String,
+        timestamp: DateTime<Utc>,
+    },
+    ProcessingFailed {
+        reason: String,
+        timestamp: DateTime<Utc>,
+    },
+}
+```
+
+### Complete example
+
+```rust
+use chrono::{DateTime, Utc};
+
+// Command: imperative naming, contains input data
+#[derive(Debug, Clone)]
+pub struct ProcessObservationsCommand {
+    pub request_id: RequestId,
+    pub timestamp: DateTime<Utc>,
+    pub observations: Vec<RawObservation>,
+    pub user_id: UserId,
+}
+
+// Events: past-tense naming, contain result data
+#[derive(Debug, Clone)]
+pub enum ProcessingEvent {
+    ObservationsValidated {
+        count: usize,
+        quality_score: f64,
+    },
+    CalibrationCompleted {
+        model_version: String,
+    },
+    ProcessingFailed {
+        reason: String,
+    },
+}
+
+// Workflow signature: Command → Result<Vec<Event>, Error>
+pub fn process_observations(
+    calibration_model: &CalibrationModel,
+    command: ProcessObservationsCommand,
+) -> Result<Vec<ProcessingEvent>, ProcessingError> {
+    let mut events = Vec::new();
+
+    // Validate observations
+    let validated = validate_observations(&command.observations)?;
+    events.push(ProcessingEvent::ObservationsValidated {
+        count: validated.len(),
+        quality_score: calculate_quality(&validated),
+    });
+
+    // Calibrate
+    let calibrated = calibration_model.calibrate(&validated)?;
+    events.push(ProcessingEvent::CalibrationCompleted {
+        model_version: calibration_model.version().to_string(),
+    });
+
+    Ok(events)
+}
+```
+
+This pattern supports FDM by making workflow boundaries explicit, documenting I/O contracts in types, and enabling event-driven architectures.
+
 ## Builder pattern
 
 Use builder pattern when types support 4 or more initialization parameters, especially when some are optional.
