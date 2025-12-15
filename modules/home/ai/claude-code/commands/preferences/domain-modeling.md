@@ -20,7 +20,7 @@ Model problem domains using types that:
 - **Implementation techniques**: See algebraic-data-types.md for sum/product types and railway-oriented-programming.md for error handling
 - **Application structure**: See architectural-patterns.md for how to organize domain logic in a larger system
 - **Theoretical foundations**: See theoretical-foundations.md for categorical and type-theoretic underpinnings
-- **Language-specific examples**: See python-development.md, typescript-nodejs-development.md, rust-development.md for concrete implementations
+- **Language-specific examples**: See python-development.md, typescript-nodejs-development.md, rust-development/00-index.md for concrete implementations
 
 ## Universal patterns
 
@@ -831,7 +831,7 @@ For concrete code examples in each language:
   - Discriminated unions with string literal types
   - Effect-TS for effect composition
 
-- **Rust**: See rust-development.md#functional-domain-modeling
+- **Rust**: See rust-development/01-functional-domain-modeling.md
   - Newtype pattern with tuple structs
   - Enums for sum types
   - Native Result and Option types
