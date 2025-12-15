@@ -2,22 +2,25 @@
 
 This guide integrates functional domain modeling (FDM) with pragmatic Rust practices from Microsoft engineers.
 
-**Primary lens:** Functional domain modeling - type-driven design that encodes business logic in the type system, making invariants explicit and violations compile-time errors.
+**Primary lens:** Functional domain modeling - type-driven design encoding business logic in the type system, making invariants explicit and violations compile-time errors.
 
 **Complementary guidance:** Microsoft Pragmatic Rust Guidelines - industry best practices for API design, testing, performance, and safety.
 
 **Philosophical reconciliations:**
 
-- *Panic semantics*: Panics for true programming bugs only (contract violations, impossible states). Domain errors and infrastructure errors use Result types. These approaches align - good type design reduces both panic surface and error handling complexity.
-
-- *Dependency injection*: Prefer concrete types for domain logic, enums for testable I/O (sans-io pattern), generics for algorithm parameters, dyn Trait only for true runtime polymorphism. This hierarchy complements FDM's emphasis on explicit, type-safe dependencies.
-
-- *Type-driven design*: Both FDM and Microsoft guidance emphasize making invalid states unrepresentable. Smart constructors, state machines, and strong types eliminate entire categories of bugs.
+- *Panic semantics*: Panics for true programming bugs only (contract violations, impossible states).
+Domain and infrastructure errors use Result types.
+Good type design reduces both panic surface and error handling complexity.
+- *Dependency injection*: Prefer concrete types for domain logic, enums for testable I/O (sans-io), generics for algorithm parameters, dyn Trait only for true runtime polymorphism.
+This hierarchy complements FDM's emphasis on explicit, type-safe dependencies.
+- *Type-driven design*: Both approaches emphasize making invalid states unrepresentable.
+Smart constructors, state machines, and strong types eliminate bug categories.
 
 **Role in multi-language architectures:** Rust often serves as the base IO/Result layer in multi-language monad transformer stacks, providing memory-safe, high-performance foundations for effect composition.
+
 ## Functional domain modeling in Rust
 
-This section demonstrates how to implement functional domain modeling patterns in Rust.
+This section demonstrates implementing FDM patterns in Rust.
 For pattern descriptions, see domain-modeling.md.
 For theoretical foundations, see theoretical-foundations.md.
 
@@ -166,24 +169,6 @@ pub enum DataState {
     Inferred(InferredResults),
     Validated(ValidatedModel),
 }
-
-// Pattern matching helper
-impl DataState {
-    pub fn description(&self) -> String {
-        match self {
-            DataState::Raw(raw) => format!("Raw: {} observations", raw.values.len()),
-            DataState::Calibrated(cal) => {
-                format!("Calibrated: {} measurements", cal.measurements.len())
-            }
-            DataState::Inferred(inf) => {
-                format!("Inferred: {} parameters", inf.parameters.len())
-            }
-            DataState::Validated(val) => {
-                format!("Validated: {} diagnostics", val.diagnostics.len())
-            }
-        }
-    }
-}
 ```
 
 **State transitions as functions**
@@ -277,7 +262,6 @@ pub fn validate_model(
         diagnostics.insert(name.clone(), metric_fn(&inferred.parameters));
     }
 
-    // Check all diagnostics pass threshold
     if !diagnostics.values().all(|&v| v > 0.9) {
         return Err(ValidationError::DiagnosticsFailed(diagnostics));
     }
@@ -352,64 +336,6 @@ where
 
     Ok(validated)
 }
-
-// Default implementations
-pub struct DefaultCalibrationModel;
-
-impl CalibrationModel for DefaultCalibrationModel {
-    fn calibrate(&self, raw: f64, _metadata: &HashMap<String, String>) -> (f64, f64, f64) {
-        let value = raw * 1.1;
-        let uncertainty = value.abs() * 0.05;
-        let quality = 0.95;
-        (value, uncertainty, quality)
-    }
-}
-
-pub struct DefaultInferenceAlgorithm;
-
-impl InferenceAlgorithm for DefaultInferenceAlgorithm {
-    fn infer(
-        &self,
-        measurements: &[Measurement],
-    ) -> (HashMap<String, f64>, f64, HashMap<String, bool>) {
-        let values: Vec<f64> = measurements.iter().map(|m| m.value()).collect();
-        let mean = values.iter().sum::<f64>() / values.len() as f64;
-
-        let mut parameters = HashMap::new();
-        parameters.insert("mean".to_string(), mean);
-
-        let mut convergence = HashMap::new();
-        convergence.insert("converged".to_string(), true);
-
-        (parameters, -10.0, convergence)
-    }
-}
-
-// Usage
-let raw = RawObservations {
-    values: vec![1.0, 2.0, 3.0],
-    metadata: [("source".to_string(), "sensor_1".to_string())]
-        .iter()
-        .cloned()
-        .collect(),
-};
-
-let calibration = DefaultCalibrationModel;
-let inference = DefaultInferenceAlgorithm;
-let metrics: HashMap<String, Box<dyn Fn(&HashMap<String, f64>) -> f64>> = [
-    ("metric1".to_string(), Box::new(|_| 0.95) as Box<_>)
-]
-.iter()
-.cloned()
-.collect();
-
-let result = process_observations(
-    &calibration,
-    0.8,
-    &inference,
-    &metrics,
-    raw,
-)?;
 ```
 
 **See also**:
@@ -519,34 +445,6 @@ impl Dataset {
         &self.statistics
     }
 }
-
-// Usage
-let obs1 = Observation {
-    timestamp: Utc::now(),
-    value: 10.0,
-    metadata: [("sensor".to_string(), "A".to_string())]
-        .iter()
-        .cloned()
-        .collect(),
-};
-
-let obs2 = Observation {
-    timestamp: Utc::now(),
-    value: 12.0,
-    metadata: [("sensor".to_string(), "A".to_string())]
-        .iter()
-        .cloned()
-        .collect(),
-};
-
-let dataset = Dataset::new(
-    DatasetId::new("dataset-001".to_string())?,
-    vec![obs1, obs2],
-    "protocol-001".to_string(),
-)?;
-
-println!("Dataset created with {} observations", dataset.statistics().count);
-println!("Mean: {}", dataset.statistics().mean);
 ```
 
 **See also**: domain-modeling.md#pattern-5-aggregates-as-consistency-boundaries
@@ -639,157 +537,6 @@ pub enum WorkflowError {
 
 ### Complete example: Temporal data processing
 
-```rust
-/**
- * Complete example: Temporal data processing pipeline
- *
- * Demonstrates:
- * - Smart constructors (newtypes)
- * - State machines (enums)
- * - Workflows (dependency injection)
- * - Aggregates (dataset with observations)
- * - Error handling (domain vs infrastructure)
- */
-
-use std::collections::HashMap;
-use chrono::{DateTime, Utc};
-
-// Dependencies encapsulated in struct
-pub struct ProcessingDependencies<C, I> {
-    calibration_model: C,
-    quality_threshold: f64,
-    inference_algorithm: I,
-    validation_metrics: HashMap<String, Box<dyn Fn(&HashMap<String, f64>) -> f64>>,
-}
-
-impl<C, I> ProcessingDependencies<C, I>
-where
-    C: CalibrationModel,
-    I: InferenceAlgorithm,
-{
-    pub fn new(
-        calibration_model: C,
-        quality_threshold: f64,
-        inference_algorithm: I,
-        validation_metrics: HashMap<String, Box<dyn Fn(&HashMap<String, f64>) -> f64>>,
-    ) -> Self {
-        Self {
-            calibration_model,
-            quality_threshold,
-            inference_algorithm,
-            validation_metrics,
-        }
-    }
-
-    pub fn process(&self, raw: RawObservations) -> Result<ValidatedModel, ProcessingError> {
-        process_observations(
-            &self.calibration_model,
-            self.quality_threshold,
-            &self.inference_algorithm,
-            &self.validation_metrics,
-            raw,
-        )
-    }
-}
-
-// Command pattern
-#[derive(Debug, Clone)]
-pub struct ProcessDataCommand {
-    raw_data: RawObservations,
-    timestamp: DateTime<Utc>,
-    user_id: String,
-    request_id: String,
-}
-
-// Event pattern
-#[derive(Debug, Clone)]
-pub enum ProcessingEvent {
-    DataProcessed {
-        model: ValidatedModel,
-        processing_time: std::time::Duration,
-        timestamp: DateTime<Utc>,
-    },
-    ProcessingFailed {
-        error: String,
-        timestamp: DateTime<Utc>,
-    },
-}
-
-// Handle command and emit events
-pub fn handle_process_data_command<C, I>(
-    deps: &ProcessingDependencies<C, I>,
-    command: ProcessDataCommand,
-) -> Vec<ProcessingEvent>
-where
-    C: CalibrationModel,
-    I: InferenceAlgorithm,
-{
-    let start = std::time::Instant::now();
-
-    match deps.process(command.raw_data) {
-        Ok(model) => vec![ProcessingEvent::DataProcessed {
-            model,
-            processing_time: start.elapsed(),
-            timestamp: Utc::now(),
-        }],
-        Err(error) => vec![ProcessingEvent::ProcessingFailed {
-            error: error.to_string(),
-            timestamp: Utc::now(),
-        }],
-    }
-}
-
-// Usage example
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let deps = ProcessingDependencies::new(
-        DefaultCalibrationModel,
-        0.8,
-        DefaultInferenceAlgorithm,
-        [("metric1".to_string(), Box::new(|_| 0.95) as Box<_>)]
-            .iter()
-            .cloned()
-            .collect(),
-    );
-
-    let command = ProcessDataCommand {
-        raw_data: RawObservations {
-            values: vec![1.0, 2.0, 3.0, 4.0, 5.0],
-            metadata: [
-                ("source".to_string(), "sensor_A".to_string()),
-                ("experiment".to_string(), "exp_001".to_string()),
-            ]
-            .iter()
-            .cloned()
-            .collect(),
-        },
-        timestamp: Utc::now(),
-        user_id: "user_123".to_string(),
-        request_id: "req_456".to_string(),
-    };
-
-    let events = handle_process_data_command(&deps, command);
-
-    for event in events {
-        match event {
-            ProcessingEvent::DataProcessed {
-                model,
-                processing_time,
-                ..
-            } => {
-                println!("Success! Processed in {:?}", processing_time);
-                println!("Parameters: {:?}", model.parameters);
-                println!("Diagnostics: {:?}", model.diagnostics);
-            }
-            ProcessingEvent::ProcessingFailed { error, .. } => {
-                println!("Failed: {}", error);
-            }
-        }
-    }
-
-    Ok(())
-}
-```
-
 **Key takeaways**:
 
 1. **Types enforce invariants**: Newtypes prevent mixing incompatible values
@@ -807,7 +554,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Error handling
 
 Rust error handling centers on `Result<T, E>` and the question mark operator `?` for composable, type-safe error propagation.
-This section describes how to design error types that are both ergonomic for callers and aligned with functional domain modeling principles.
+This section describes designing error types aligned with FDM principles.
 
 ### Result<T, E> and the ? operator
 
@@ -832,17 +579,16 @@ fn parse_config(path: &str) -> Result<Config, ConfigError> {
 }
 ```
 
-### Library error types: Canonical error structs (thiserror)
+### Library error types: thiserror
 
-Libraries should define situation-specific error structs following the canonical pattern described in Microsoft's M-ERRORS-CANONICAL-STRUCTS guideline.
-Use the `thiserror` crate to reduce boilerplate while maintaining full control over error design.
+Libraries should define situation-specific error structs using `thiserror` to reduce boilerplate.
 
-**Key principles for library errors**:
+**Key principles**:
 
-1. Create situation-specific structs, not generic ErrorKind enums exposed in public API
+1. Create situation-specific structs, not generic ErrorKind enums in public API
 2. Include `Backtrace` field for debugging (captured when `RUST_BACKTRACE=1`)
 3. Store upstream error cause via `#[source]` for error chains
-4. Expose `is_xxx()` helper methods for error classification, not raw ErrorKind
+4. Expose `is_xxx()` helper methods for classification, not raw ErrorKind
 5. Implement `Display` with context, `Error` trait, and `From` conversions
 
 **Pattern: Simple library error**
@@ -867,8 +613,8 @@ impl ConfigurationError {
 
 **Pattern: Library error with multiple failure modes**
 
-When your library has distinct failure scenarios, use an internal `ErrorKind` enum but do not expose it directly in the public API.
-Instead, provide `is_xxx()` methods for callers to classify errors.
+Use internal `ErrorKind` enum not exposed in public API.
+Provide `is_xxx()` methods for callers to classify errors.
 
 ```rust
 use std::backtrace::Backtrace;
@@ -903,12 +649,11 @@ impl ConfigError {
         matches!(self.kind, ErrorKind::Validation(_))
     }
 
-    // Public accessor for contextual information
     pub fn config_path(&self) -> &Path {
         &self.config_path
     }
 
-    // Internal constructor
+    // Internal constructors
     pub(crate) fn new_io(err: std::io::Error, path: PathBuf) -> Self {
         Self {
             kind: ErrorKind::Io(err),
@@ -950,16 +695,15 @@ impl std::error::Error for ConfigError {
 ```
 
 **Why this pattern**:
-- Callers can handle specific errors via `is_xxx()` methods without coupling to internal error representation
-- Library can add new error kinds without breaking API (new `is_xxx()` methods are additive)
-- Backtrace captured at error construction for debugging complex async code
+- Callers handle specific errors via `is_xxx()` without coupling to internal representation
+- Library can add error kinds without breaking API (new `is_xxx()` methods are additive)
+- Backtrace captured at error construction for debugging async code
 - Error chains preserved via `source()` for root cause analysis
 
 **Using thiserror to reduce boilerplate**:
 
 ```rust
 use std::backtrace::Backtrace;
-use std::path::PathBuf;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProcessingError {
@@ -998,197 +742,103 @@ fn load_and_process_config(path: &str) -> Result<ProcessedConfig> {
     let config = load_config(path)
         .context("failed to load configuration")?;
 
-    let processed = process_config(config)
-        .with_context(|| format!("failed to process config from {}", path))?;
+    let processed = process_config(&config)
+        .context("failed to process configuration")?;
 
     Ok(processed)
 }
-
-fn main() -> Result<()> {
-    // Application entry point returns anyhow::Result
-    let config = load_and_process_config("config.toml")?;
-    start_service(config)?;
-    Ok(())
-}
 ```
-
-**Key distinction**:
-- **Libraries**: Use `thiserror` to define specific error types with structured fields and helper methods
-- **Applications**: Use `anyhow` to handle errors generically with context strings
-- **Within repository**: Application-internal crates may use anyhow if never published
 
 ### Context propagation with .context()
 
-Both `anyhow` and many error libraries support `.context()` for adding human-readable context to errors as they propagate.
+Add context as errors propagate to explain what operation failed.
 
-**With anyhow**:
 ```rust
 use anyhow::{Context, Result};
 
-fn download_and_save(url: &str, dest: &Path) -> Result<()> {
-    let response = reqwest::blocking::get(url)
-        .context("failed to send HTTP request")?;
+fn process_pipeline(input_path: &str) -> Result<Summary> {
+    let raw_data = read_file(input_path)
+        .with_context(|| format!("failed to read input file: {}", input_path))?;
 
-    let bytes = response.bytes()
-        .context("failed to read response body")?;
+    let calibrated = calibrate(raw_data)
+        .context("calibration step failed")?;
 
-    fs::write(dest, bytes)
-        .with_context(|| format!("failed to write to {}", dest.display()))?;
+    let validated = validate(calibrated)
+        .context("validation step failed")?;
 
-    Ok(())
+    Ok(validated.summary())
 }
-```
-
-**With custom Result extension trait**:
-```rust
-pub trait ResultExt<T> {
-    fn context(self, msg: &str) -> Result<T, String>;
-    fn with_context<F: FnOnce() -> String>(self, f: F) -> Result<T, String>;
-}
-
-impl<T, E: std::fmt::Display> ResultExt<T> for Result<T, E> {
-    fn context(self, msg: &str) -> Result<T, String> {
-        self.map_err(|e| format!("{}: {}", msg, e))
-    }
-
-    fn with_context<F: FnOnce() -> String>(self, f: F) -> Result<T, String> {
-        self.map_err(|e| format!("{}: {}", f(), e))
-    }
-}
-```
-
-Context helps readers understand error chains:
-```
-Error: failed to start service
-Caused by:
-    0: failed to load configuration
-    1: failed to read config file
-    2: No such file or directory (os error 2)
 ```
 
 ### Error composition and transformation
 
-When workflows combine operations with different error types, unify them via enum or trait object.
-
-**Pattern 1: Unified workflow error enum**
+**Map errors with .map_err()**
 
 ```rust
-#[derive(Debug, thiserror::Error)]
+fn load_config(path: &str) -> Result<Config, AppError> {
+    let contents = std::fs::read_to_string(path)
+        .map_err(|e| AppError::IoFailed {
+            path: path.to_string(),
+            source: e,
+        })?;
+
+    serde_json::from_str(&contents)
+        .map_err(|e| AppError::ParseFailed {
+            path: path.to_string(),
+            source: e,
+        })
+}
+```
+
+**Compose with From trait for automatic conversion**
+
+```rust
+#[derive(Error, Debug)]
 pub enum WorkflowError {
+    #[error(transparent)]
+    Calibration(#[from] CalibrationError),
+    #[error(transparent)]
+    Inference(#[from] InferenceError),
     #[error(transparent)]
     Validation(#[from] ValidationError),
-
-    #[error(transparent)]
-    Processing(#[from] ProcessingError),
-
-    #[error(transparent)]
-    Database(#[from] DatabaseError),
 }
 
-fn process_order_workflow(order: UnvalidatedOrder) -> Result<OrderConfirmation, WorkflowError> {
-    // ? operator automatically converts each error type via From
-    let validated = validate_order(order)?; // ValidationError -> WorkflowError
-    let processed = process_payment(validated)?; // ProcessingError -> WorkflowError
-    let saved = save_to_database(processed)?; // DatabaseError -> WorkflowError
-    Ok(saved)
+// ? automatically converts via From
+fn workflow() -> Result<Output, WorkflowError> {
+    let cal = calibrate()?;  // CalibrationError -> WorkflowError
+    let inf = infer(cal)?;   // InferenceError -> WorkflowError
+    let val = validate(inf)?; // ValidationError -> WorkflowError
+    Ok(val)
 }
 ```
-
-**Pattern 2: Domain and infrastructure error distinction**
-
-Following functional domain modeling principles, distinguish domain errors (expected failures in business logic) from infrastructure errors (technical failures).
-
-```rust
-// Domain errors: Part of problem domain, modeled explicitly
-#[derive(Debug, thiserror::Error)]
-pub enum DomainError {
-    #[error("quality score {0} below threshold {1}")]
-    QualityBelowThreshold(f64, f64),
-
-    #[error("calibration failed: {0}")]
-    CalibrationFailed(String),
-
-    #[error("model failed to converge after {0} iterations")]
-    ConvergenceFailed(usize),
-}
-
-// Infrastructure errors: Technical concerns outside domain logic
-#[derive(Debug, thiserror::Error)]
-pub enum InfrastructureError {
-    #[error("database operation failed")]
-    Database(#[from] DatabaseError),
-
-    #[error("network request failed")]
-    Network(#[from] NetworkError),
-}
-
-// Unified workflow error
-#[derive(Debug, thiserror::Error)]
-pub enum WorkflowError {
-    #[error(transparent)]
-    Domain(#[from] DomainError),
-
-    #[error(transparent)]
-    Infrastructure(#[from] InfrastructureError),
-}
-```
-
-**Why this distinction matters**:
-- Domain errors appear in type signatures to document expected failure modes
-- Subject matter experts recognize domain errors as part of problem vocabulary
-- Infrastructure errors may be retried or logged differently than domain errors
-- Testing strategies differ: domain errors have business logic tests, infrastructure errors have resilience tests
-
-See `~/.claude/commands/preferences/domain-modeling.md#pattern-6-domain-errors-vs-infrastructure-errors` for detailed examples.
 
 ### Railway-oriented programming with Result
 
-Compose operations that return `Result` using monadic patterns for short-circuit error propagation.
-
-**Monadic composition with bind (flatMap)**:
+Use applicative patterns to collect multiple errors rather than failing on first error.
 
 ```rust
-// Explicit bind pattern
-fn bind<T, U, E, F>(result: Result<T, E>, f: F) -> Result<U, E>
-where
-    F: FnOnce(T) -> Result<U, E>,
-{
-    match result {
-        Ok(value) => f(value),
-        Err(e) => Err(e),
-    }
+// Sequential (fail-fast): stops at first error
+fn validate_user_sequential(
+    email: &str,
+    name: &str,
+    age: i32,
+) -> Result<ValidUser, ValidationError> {
+    let email = validate_email(email)?;  // Stops here if invalid
+    let name = validate_name(name)?;
+    let age = validate_age(age)?;
+    Ok(ValidUser { email, name, age })
 }
 
-// ? operator provides built-in bind
-fn process_pipeline(raw: RawData) -> Result<ProcessedData, ProcessingError> {
-    let validated = validate(raw)?; // Short-circuits on Err
-    let calibrated = calibrate(validated)?;
-    let inferred = infer(calibrated)?;
-    Ok(inferred)
-}
-```
+// Parallel (collect all errors): accumulates all validation errors
+fn validate_user_parallel(
+    email: &str,
+    name: &str,
+    age: i32,
+) -> Result<ValidUser, Vec<ValidationError>> {
+    let email_result = validate_email(email);
+    let name_result = validate_name(name);
+    let age_result = validate_age(age);
 
-**Functor mapping with .map()**:
-
-```rust
-// Transform success values without affecting errors
-fn parse_and_double(input: &str) -> Result<i32, ParseIntError> {
-    input.parse::<i32>()
-        .map(|n| n * 2) // Only applies if Ok
-}
-```
-
-**Applicative validation (collecting all errors)**:
-
-When validating independent fields, collect all errors instead of short-circuiting on first failure.
-
-```rust
-pub fn validate_user(raw: &UserInput) -> Result<ValidUser, Vec<ValidationError>> {
-    let email_result = validate_email(&raw.email);
-    let name_result = validate_name(&raw.name);
-    let age_result = validate_age(&raw.age);
-
-    // Collect all errors
     let mut errors = Vec::new();
 
     let email = match email_result {
@@ -1232,55 +882,30 @@ See `~/.claude/commands/preferences/railway-oriented-programming.md` for compreh
 1. **Use Result, not panic**: Reserve `panic!`, `unwrap()`, and `expect()` for programmer errors (bugs), not recoverable failures
 2. **Capture backtraces**: Include `Backtrace` in library error types for debugging async and complex call chains
 3. **Add context as errors propagate**: Use `.context()` or `.with_context()` to explain what operation failed
-4. **Design errors for callers**: Provide `is_xxx()` helpers and contextual accessors so callers can handle errors appropriately
+4. **Design errors for callers**: Provide `is_xxx()` helpers and contextual accessors
 5. **Distinguish error categories**: Separate domain errors (expected) from infrastructure errors (technical) from panics (bugs)
 6. **Compose errors via From**: Implement `From<UpstreamError>` to enable `?` operator automatic conversions
-7. **Document failure modes**: Include `# Errors` sections in doc comments listing when functions return Err
-
-### Integration with functional domain modeling
-
-Error types are part of your domain vocabulary.
-When modeling domain processes, make error types explicit in function signatures to communicate what can go wrong.
-
-```rust
-// State machine transition with typed error
-pub fn calibrate(
-    raw: RawObservations,
-    threshold: f64,
-) -> Result<CalibratedData, CalibrationError> {
-    // Domain logic with explicit failure mode
-}
-
-// Workflow with unified error type
-pub fn process_observations(
-    raw: RawObservations,
-) -> Result<ValidatedModel, ProcessingError> {
-    let calibrated = calibrate(raw, 0.8)?;
-    let inferred = infer(calibrated)?;
-    let validated = validate_model(inferred)?;
-    Ok(validated)
-}
-```
+7. **Document failure modes**: Include `# Errors` sections in doc comments
 
 Domain errors become part of state machine documentation, workflow specifications, and aggregate invariants.
+See Pattern 5 above for complete error classification examples.
 
-See `~/.claude/commands/preferences/rust-development.md#pattern-5-error-classification` for complete examples showing how error types integrate with smart constructors, state machines, and aggregates.
 ## Panic semantics
 
-Panics in Rust are not exceptions or a form of error communication.
-A panic means program termination, a request to stop execution immediately because the system has entered an invalid state from which it cannot meaningfully continue.
+Panics in Rust are not exceptions or error communication.
+A panic means program termination - stop execution immediately because the system entered an invalid state from which it cannot meaningfully continue.
 
 ### Core principle
 
 Following Microsoft guideline M-PANIC-IS-STOP: panics suggest immediate program termination.
 Although code must be panic-safe (survived panics may not lead to inconsistent state), invoking a panic means this program should stop now.
-It is never valid to use panics to communicate errors upstream or as a control flow mechanism.
+Never use panics to communicate errors upstream or as control flow.
 
 ### When panics are appropriate
 
 Panics are appropriate only when:
 
-**1. Detected programming errors (contract violations)** - Following M-PANIC-ON-BUG, when an unrecoverable programming error has been detected, code must panic to request program termination.
+**1. Detected programming errors (contract violations)** - When an unrecoverable programming error has been detected, code must panic to request program termination.
 No Error type should be introduced or returned, as such errors cannot be acted upon at runtime.
 
 ```rust
@@ -1328,7 +953,7 @@ impl QualityScore {
 }
 ```
 
-**4. Poison detection** - When encountering a poisoned lock, which signals another thread has already panicked.
+**4. Poison detection** - When encountering a poisoned lock, which signals another thread already panicked.
 
 ```rust
 let data = lock.lock()
@@ -1362,40 +987,11 @@ pub fn create_email(input: &str) -> Result<EmailAddress, ValidationError> {
 
 **2. I/O operations** - File operations, network requests, database queries should return Result.
 
-```rust
-// BAD: I/O can fail for non-programming reasons
-pub fn read_config() -> Config {
-    let contents = std::fs::read_to_string("config.toml")
-        .expect("config must exist");
-    toml::from_str(&contents).expect("config must be valid")
-}
-
-// GOOD: I/O failures are infrastructure errors
-pub fn read_config() -> Result<Config, ConfigError> {
-    let contents = std::fs::read_to_string("config.toml")
-        .map_err(|e| ConfigError::ReadFailed(e.to_string()))?;
-    toml::from_str(&contents)
-        .map_err(|e| ConfigError::ParseFailed(e.to_string()))
-}
-```
-
 **3. Parseable data** - Parsing structured data that might be malformed should return Result.
-
-```rust
-// BAD: Parsing is not a programming error
-pub fn parse_uri(s: &str) -> Uri {
-    Uri::from_str(s).unwrap()
-}
-
-// GOOD: Parsing can fail legitimately
-pub fn parse_uri(s: &str) -> Result<Uri, ParseError> {
-    Uri::from_str(s)
-}
-```
 
 ### Integration with FDM error classification
 
-Panic semantics align with the three-tier error classification from functional domain modeling:
+Panic semantics align with three-tier error classification:
 
 **Domain errors → Result** - Expected outcomes of domain operations that subject matter experts recognize.
 
@@ -1423,25 +1019,6 @@ pub fn calibrate(
 
 **Infrastructure errors → Result or propagate** - Technical failures in supporting systems.
 
-```rust
-#[derive(Error, Debug)]
-pub enum InfrastructureError {
-    #[error("database operation '{operation}' failed: {exception}")]
-    DatabaseFailed { operation: String, exception: String },
-}
-
-pub async fn save_to_database(
-    data: &Data,
-) -> Result<SavedData, InfrastructureError> {
-    db.execute(/* ... */)
-        .await
-        .map_err(|e| InfrastructureError::DatabaseFailed {
-            operation: "save".to_string(),
-            exception: e.to_string(),
-        })
-}
-```
-
 **Panics → true programming bugs only** - Broken invariants, impossible states reached.
 
 ```rust
@@ -1464,7 +1041,7 @@ impl Dataset {
 
     /// This method's precondition is guaranteed by smart constructor
     pub fn mean(&self) -> f64 {
-        // Panic is appropriate here: empty dataset violates invariant
+        // Panic is appropriate: empty dataset violates invariant
         assert!(!self.observations.is_empty(),
             "invariant broken: dataset cannot be empty");
         self.statistics.mean
@@ -1551,66 +1128,9 @@ When designing error handling, follow this decision process:
 - Yes → Infrastructure error, consider Result or propagate exception
 - No → Panic
 
-Examples applying this tree:
-
-```rust
-// 1. Caller can prevent: return Result
-pub fn create_user(email: &str, age: i32) -> Result<User, ValidationError> {
-    if age < 0 {
-        return Err(ValidationError::OutOfRange {
-            field: "age".to_string(),
-            message: "must be non-negative".to_string(),
-        });
-    }
-    // ...
-}
-
-// 2. Domain expert recognizes: return Result
-pub fn train_model(data: &TrainingData) -> Result<Model, TrainingError> {
-    if !converged {
-        return Err(TrainingError::FailedToConverge {
-            iterations,
-            final_loss,
-        });
-    }
-    // ...
-}
-
-// 3. Cannot continue (broken invariant): panic
-pub fn process_validated_batch(&self) -> Summary {
-    assert!(!self.items.is_empty(),
-        "invariant broken: batch must have items after validation");
-    // ...
-}
-```
-
-### What constitutes a violation is situational
-
-Following M-PANIC-ON-BUG, APIs are not expected to go out of their way to detect contract violations, as such checks can be impossible or expensive.
-
-Encountering `must_be_even == 3` during an already existing check clearly warrants a panic, while a function `parse(&str)` clearly must return a Result.
-
-The principle: if you would already be checking this condition for correctness, and it fails, that's a programming error.
-If you would need to add expensive validation solely to panic, return Result instead.
-
-```rust
-// Already checking index bounds for correctness
-pub fn get_cell(&self, row: usize, col: usize) -> f64 {
-    assert!(row < self.rows && col < self.cols,
-        "index out of bounds");
-    self.data[row * self.cols + col]
-}
-
-// Would be expensive to validate entire URI grammar just to panic
-pub fn parse_uri(s: &str) -> Result<Uri, ParseError> {
-    // Return Result instead of adding expensive checks + panic
-    // ...
-}
-```
-
 ### Make it correct by construction
 
-While panicking on a detected programming error is the least bad option, your panic might still ruin someone's day.
+While panicking on detected programming error is the least bad option, your panic might still ruin someone's day.
 For any user input or calling sequence that would otherwise panic, explore using the type system to avoid panicking code paths altogether.
 
 ```rust
@@ -1640,122 +1160,40 @@ pub fn process_data(input: ValidatedInput) -> Summary {
 }
 ```
 
-### Integration with testing
+**See also**:
+- domain-modeling.md Pattern 6 for error classification framework
+- railway-oriented-programming.md for Result composition patterns
+- architectural-patterns.md for effect isolation at boundaries
+- Microsoft Rust Guidelines M-PANIC-IS-STOP and M-PANIC-ON-BUG
 
-Use should_panic tests for operations that document panic conditions:
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[should_panic(expected = "denominator must be non-zero")]
-    fn test_divide_zero_panics() {
-        divide_non_zero(10, 0);
-    }
-
-    #[test]
-    fn test_divide_non_zero_succeeds() {
-        assert_eq!(divide_non_zero(10, 2), 5);
-    }
-}
-```
-
-### Further reading
-
-See domain-modeling.md Pattern 6 for error classification framework.
-See railway-oriented-programming.md for Result composition patterns.
-See architectural-patterns.md for effect isolation at boundaries.
-See Microsoft Rust Guidelines M-PANIC-IS-STOP and M-PANIC-ON-BUG for authoritative guidance.
 ## API design
 
-This section integrates Microsoft's pragmatic Rust guidelines with functional domain modeling principles to create APIs that are discoverable, testable, and type-safe.
+This section integrates Microsoft's pragmatic Rust guidelines with FDM principles to create APIs that are discoverable, testable, and type-safe.
 
 ### Naming conventions
 
 Symbol names should be free of weasel words that don't meaningfully add information.
 Common offenders include `Service`, `Manager`, and `Factory`.
 
-**Bad: Weasel words obscure intent**
-
 ```rust
-pub struct BookingService {
-    client: HttpClient,
-    db: Database,
-}
+// Bad: Weasel words obscure intent
+pub struct BookingService { }
+pub struct CacheManager { }
+pub struct ConnectionFactory { }
 
-pub struct CacheManager {
-    entries: HashMap<String, String>,
-}
-
-pub struct ConnectionFactory {
-    config: Config,
-}
+// Good: Domain vocabulary reveals purpose
+pub struct Booking { }
+pub struct Cache { }
+pub struct ConnectionBuilder { }
 ```
 
-**Good: Domain vocabulary reveals purpose**
-
-```rust
-// Use domain vocabulary instead of "Service"
-pub struct Booking {
-    client: HttpClient,
-    db: Database,
-}
-
-// Use specific action instead of "Manager"
-pub struct Cache {
-    entries: HashMap<String, String>,
-}
-
-// Use builder pattern instead of "Factory"
-pub struct ConnectionBuilder {
-    config: Config,
-}
-```
-
-The same principle applies to functions:
-
-```rust
-// Bad: generic verb + weasel word
-impl Database {
-    pub fn manage_connection(&self) { ... }
-    pub fn process_service(&self) { ... }
-}
-
-// Good: specific domain action
-impl Database {
-    pub fn connect(&self) { ... }
-    pub fn execute_query(&self, query: Query) { ... }
-}
-```
-
-**Integration with FDM**: Domain-specific names make smart constructors and state machines self-documenting.
+Domain-specific names make smart constructors and state machines self-documenting.
 A type named `CalibrationResult` is clearer than `CalibrationService` or `CalibrationManager`.
 
 ### Function organization
 
 Essential functionality should be implemented as inherent methods on types, not just as trait implementations.
 Traits should forward to inherent functions.
-
-**Bad: Core functionality hidden in trait**
-
-```rust
-pub struct Dataset { /* ... */ }
-
-// User must know to import DatasetOps to use add_observation
-pub trait DatasetOps {
-    fn add_observation(&mut self, obs: Observation) -> Result<(), Error>;
-}
-
-impl DatasetOps for Dataset {
-    fn add_observation(&mut self, obs: Observation) -> Result<(), Error> {
-        // Implementation here
-    }
-}
-```
-
-**Good: Essential methods inherent, trait forwards**
 
 ```rust
 pub struct Dataset { /* ... */ }
@@ -1784,13 +1222,6 @@ impl DatasetOps for Dataset {
 Associated functions should primarily be used for instance creation (constructors, builders).
 
 ```rust
-// Bad: associated function for computation
-impl Measurement {
-    pub fn calculate_uncertainty(value: f64, baseline: f64) -> f64 {
-        (value - baseline).abs()
-    }
-}
-
 // Good: regular function for computation
 pub fn calculate_uncertainty(value: f64, baseline: f64) -> f64 {
     (value - baseline).abs()
@@ -1804,7 +1235,7 @@ impl Measurement {
 }
 ```
 
-**Integration with FDM**: Inherent methods make smart constructors and aggregate methods immediately discoverable.
+Inherent methods make smart constructors and aggregate methods immediately discoverable.
 Users don't need to know which trait to import to access core domain operations.
 
 ### Dependency injection hierarchy
@@ -1859,14 +1290,6 @@ impl FileSystem {
             Self::Mock(mock) => mock.read_file(path),
         }
     }
-
-    pub fn write_file(&self, path: &Path, data: &[u8]) -> std::io::Result<()> {
-        match self {
-            Self::Real => std::fs::write(path, data),
-            #[cfg(feature = "test-util")]
-            Self::Mock(mock) => mock.write_file(path, data),
-        }
-    }
 }
 
 #[cfg(feature = "test-util")]
@@ -1894,13 +1317,6 @@ pub mod mock {
                 ))
         }
 
-        pub fn write_file(&self, path: &Path, data: &[u8]) -> std::io::Result<()> {
-            self.inner.files.lock().unwrap()
-                .insert(path.to_path_buf(), data.to_vec());
-            Ok(())
-        }
-
-        // Test helper methods
         pub fn add_file(&self, path: PathBuf, contents: Vec<u8>) {
             self.inner.files.lock().unwrap().insert(path, contents);
         }
@@ -1950,10 +1366,6 @@ where
     }
     Ok(results)
 }
-
-// Usage with different calibration algorithms
-let linear_result = calibrate(|v| (v * 1.1, 0.95), 0.8, &data)?;
-let nonlinear_result = calibrate(|v| (v.powi(2), 0.90), 0.8, &data)?;
 ```
 
 **Level 4: dyn Trait (last resort)**
@@ -1985,8 +1397,7 @@ pub enum DatabaseImpl {
 }
 ```
 
-**Integration with FDM**: This hierarchy supports functional domain modeling by preferring concrete types for domain logic (level 1), using enums for I/O boundaries (level 2), reserving generics for true abstraction needs (level 3), and avoiding trait objects unless necessary (level 4).
-The result is APIs that are testable, composable, and don't pay runtime costs for unused flexibility.
+This hierarchy supports FDM by preferring concrete types for domain logic (level 1), using enums for I/O boundaries (level 2), reserving generics for true abstraction needs (level 3), and avoiding trait objects unless necessary (level 4).
 
 ### Builder pattern
 
@@ -1998,420 +1409,21 @@ Use builder pattern when types support 4 or more initialization parameters, espe
 - Complex initialization with validation steps
 - Need to provide incremental construction
 
-**Builder naming**: `FooBuilder` for type `Foo`.
+**Pattern: Builder with validation**
 
 ```rust
-// Complex type with many parameters
-pub struct ModelConfig {
-    architecture: Architecture,
-    learning_rate: f64,
-    batch_size: usize,
-    epochs: usize,
-    optimizer: Optimizer,
-    regularization: Option<Regularization>,
-    checkpoint_dir: Option<PathBuf>,
-    early_stopping: Option<EarlyStopping>,
-}
-
-// Builder with chainable methods
-pub struct ModelConfigBuilder {
-    architecture: Option<Architecture>,
-    learning_rate: Option<f64>,
-    batch_size: Option<usize>,
-    epochs: Option<usize>,
-    optimizer: Option<Optimizer>,
-    regularization: Option<Regularization>,
-    checkpoint_dir: Option<PathBuf>,
-    early_stopping: Option<EarlyStopping>,
-}
-
-impl ModelConfigBuilder {
-    pub fn new() -> Self {
-        Self {
-            architecture: None,
-            learning_rate: None,
-            batch_size: None,
-            epochs: None,
-            optimizer: None,
-            regularization: None,
-            checkpoint_dir: None,
-            early_stopping: None,
-        }
-    }
-
-    // Chainable setters
-    pub fn architecture(mut self, arch: Architecture) -> Self {
-        self.architecture = Some(arch);
-        self
-    }
-
-    pub fn learning_rate(mut self, lr: f64) -> Self {
-        self.learning_rate = Some(lr);
-        self
-    }
-
-    pub fn batch_size(mut self, size: usize) -> Self {
-        self.batch_size = Some(size);
-        self
-    }
-
-    pub fn epochs(mut self, epochs: usize) -> Self {
-        self.epochs = Some(epochs);
-        self
-    }
-
-    pub fn optimizer(mut self, opt: Optimizer) -> Self {
-        self.optimizer = Some(opt);
-        self
-    }
-
-    // Optional parameters
-    pub fn regularization(mut self, reg: Regularization) -> Self {
-        self.regularization = Some(reg);
-        self
-    }
-
-    pub fn checkpoint_dir(mut self, dir: PathBuf) -> Self {
-        self.checkpoint_dir = Some(dir);
-        self
-    }
-
-    pub fn early_stopping(mut self, es: EarlyStopping) -> Self {
-        self.early_stopping = Some(es);
-        self
-    }
-
-    // Build with validation (smart constructor)
-    pub fn build(self) -> Result<ModelConfig, ValidationError> {
-        let architecture = self.architecture
-            .ok_or(ValidationError::MissingField("architecture"))?;
-        let learning_rate = self.learning_rate
-            .ok_or(ValidationError::MissingField("learning_rate"))?;
-        let batch_size = self.batch_size
-            .ok_or(ValidationError::MissingField("batch_size"))?;
-        let epochs = self.epochs
-            .ok_or(ValidationError::MissingField("epochs"))?;
-        let optimizer = self.optimizer
-            .unwrap_or(Optimizer::Adam); // Default for optional
-
-        // Validation
-        if learning_rate <= 0.0 || learning_rate >= 1.0 {
-            return Err(ValidationError::InvalidLearningRate(learning_rate));
-        }
-
-        if batch_size == 0 {
-            return Err(ValidationError::InvalidBatchSize(batch_size));
-        }
-
-        Ok(ModelConfig {
-            architecture,
-            learning_rate,
-            batch_size,
-            epochs,
-            optimizer,
-            regularization: self.regularization,
-            checkpoint_dir: self.checkpoint_dir,
-            early_stopping: self.early_stopping,
-        })
-    }
-}
-
-// Usage
-let config = ModelConfigBuilder::new()
-    .architecture(Architecture::ResNet50)
-    .learning_rate(0.001)
-    .batch_size(32)
-    .epochs(100)
-    .optimizer(Optimizer::Adam)
-    .regularization(Regularization::L2 { lambda: 0.01 })
-    .build()?;
-```
-
-**Integration with FDM**: Builders work naturally with smart constructors.
-The `build()` method acts as the smart constructor, validating invariants before creating the type.
-This is especially useful for aggregates and complex value objects with many fields.
-
-### Input flexibility
-
-Make APIs flexible by accepting trait bounds instead of concrete types for common conversions.
-
-**Accept `impl AsRef<T>` for borrowed data**
-
-```rust
-// Bad: forces caller to provide exact type
-pub fn load_config(path: &Path) -> Result<Config, Error> { ... }
-
-// Good: accepts &Path, &PathBuf, &&Path, etc.
-pub fn load_config(path: impl AsRef<Path>) -> Result<Config, Error> {
-    let path = path.as_ref();
-    // Use path...
-}
-
-// Usage flexibility
-load_config(&path_buf)?;           // &PathBuf
-load_config(path)?;                // &Path
-load_config("config.toml")?;       // &str (via AsRef<Path>)
-```
-
-**Accept `impl RangeBounds<T>` for ranges**
-
-```rust
-use std::ops::RangeBounds;
-
-// Bad: forces specific range type
-pub fn select_range(data: &[f64], range: Range<usize>) -> &[f64] {
-    &data[range]
-}
-
-// Good: accepts any range type
-pub fn select_range<R>(data: &[f64], range: R) -> &[f64]
-where
-    R: RangeBounds<usize>,
-{
-    use std::ops::Bound;
-
-    let start = match range.start_bound() {
-        Bound::Included(&n) => n,
-        Bound::Excluded(&n) => n + 1,
-        Bound::Unbounded => 0,
-    };
-
-    let end = match range.end_bound() {
-        Bound::Included(&n) => n + 1,
-        Bound::Excluded(&n) => n,
-        Bound::Unbounded => data.len(),
-    };
-
-    &data[start..end]
-}
-
-// Usage flexibility
-select_range(data, 0..10);      // Range
-select_range(data, 0..=9);      // RangeInclusive
-select_range(data, 5..);        // RangeFrom
-select_range(data, ..10);       // RangeTo
-select_range(data, ..);         // RangeFull
-```
-
-**Accept `impl Read`/`impl Write` for I/O (sans-io pattern)**
-
-Functions that perform I/O should accept trait objects to decouple business logic from I/O source.
-
-```rust
-use std::io::{Read, Write};
-
-// Bad: forces caller to use File
-pub fn parse_data(file: File) -> Result<Data, Error> { ... }
-
-// Good: accepts any Read implementation
-pub fn parse_data(mut reader: impl Read) -> Result<Data, Error> {
-    let mut buffer = String::new();
-    reader.read_to_string(&mut buffer)?;
-    // Parse buffer...
-}
-
-// Usage flexibility
-parse_data(File::open("data.txt")?)?;           // File
-parse_data(std::io::stdin())?;                  // Stdin
-parse_data(data_bytes.as_slice())?;             // &[u8]
-parse_data(TcpStream::connect("server:8080")?)?; // Network
-```
-
-**Integration with FDM**: Input flexibility complements smart constructors by making them easier to call.
-A smart constructor for `FilePath` that accepts `impl AsRef<Path>` is more ergonomic than one requiring `&Path`.
-
-### Avoiding visible complexity
-
-Hide implementation details that don't add value for users.
-
-**Hide smart pointers in APIs**
-
-Don't expose `Arc`, `Rc`, `Box` in public APIs unless the ownership semantics are essential.
-
-```rust
-// Bad: exposes Arc in API
-pub struct Database {
-    connection: Arc<Connection>,
-}
-
-pub fn query_database(db: Arc<Database>, query: &str) -> Result<Data, Error> {
-    // ...
-}
-
-// Good: hides Arc internally, presents simple interface
-pub struct Database {
-    connection: Arc<Connection>, // Internal detail
-}
-
-impl Database {
-    pub fn query(&self, query: &str) -> Result<Data, Error> {
-        // Use self.connection internally
-    }
-}
-
-// Clone Database cheaply (Arc internally)
-impl Clone for Database {
-    fn clone(&self) -> Self {
-        Self {
-            connection: Arc::clone(&self.connection),
-        }
-    }
-}
-
-// Usage: simple, no Arc visible
-let db1 = Database::connect("localhost")?;
-let db2 = db1.clone(); // Cheap clone via internal Arc
-let result = db1.query("SELECT * FROM users")?;
-```
-
-**Services are Clone** (M-SERVICES-CLONE pattern): Heavyweight service types should implement `Clone` with shared ownership semantics internally.
-
-```rust
-// Service with internal Arc for cheap cloning
-pub struct MetricsCollector {
-    inner: Arc<MetricsInner>,
-}
-
-struct MetricsInner {
-    storage: Mutex<HashMap<String, f64>>,
-}
-
-impl Clone for MetricsCollector {
-    fn clone(&self) -> Self {
-        Self {
-            inner: Arc::clone(&self.inner),
-        }
-    }
-}
-
-impl MetricsCollector {
-    pub fn new() -> Self {
-        Self {
-            inner: Arc::new(MetricsInner {
-                storage: Mutex::new(HashMap::new()),
-            }),
-        }
-    }
-
-    pub fn record(&self, name: String, value: f64) {
-        self.inner.storage.lock().unwrap().insert(name, value);
-    }
-}
-
-// Usage: can clone and share service cheaply
-fn spawn_worker(metrics: MetricsCollector) {
-    std::thread::spawn(move || {
-        metrics.record("worker_started".to_string(), 1.0);
-    });
-}
-
-let metrics = MetricsCollector::new();
-spawn_worker(metrics.clone());
-spawn_worker(metrics.clone());
-```
-
-**Minimize nested type parameters**
-
-Don't expose complex nested generics in primary API surface.
-
-```rust
-// Bad: complex nested types visible to user
-pub fn process<T, E, F>(
-    data: Vec<Result<Option<T>, E>>,
-    transform: F,
-) -> Result<Vec<T>, ProcessingError<E>>
-where
-    F: Fn(T) -> Result<T, E>,
-{ ... }
-
-// Good: hide complexity with type aliases and simpler interface
-pub type ProcessingResult<T> = Result<Vec<T>, ProcessingError>;
-
-pub fn process<T>(
-    data: Vec<T>,
-    transform: impl Fn(T) -> Result<T, ValidationError>,
-) -> ProcessingResult<T>
-{ ... }
-```
-
-**Integration with FDM**: Hiding complexity makes domain types easier to use.
-A smart constructor should present a simple interface even if it uses complex validation internally.
-An aggregate should expose clean methods even if it uses locks or other synchronization primitives internally.
-
-### How these principles support FDM
-
-API design principles work synergistically with functional domain modeling:
-
-1. **Domain vocabulary (naming)** makes types and functions self-documenting
-   - `CalibrationResult` instead of `CalibrationService`
-   - `calibrate()` instead of `manage_calibration()`
-   - Types speak the problem domain language
-
-2. **Inherent methods (organization)** make smart constructors discoverable
-   - `Measurement::new()` available without trait imports
-   - Core domain operations immediately visible
-   - Traits extend, don't replace, inherent functionality
-
-3. **Dependency hierarchy** preserves domain purity
-   - Domain logic uses concrete types (level 1)
-   - I/O abstracted with enums (level 2)
-   - Generics for true algorithm flexibility (level 3)
-   - Trait objects only when necessary (level 4)
-
-4. **Builders** enable complex smart constructors
-   - Aggregates with many fields use builders
-   - Validation in `build()` method enforces invariants
-   - Chainable API improves ergonomics
-
-5. **Input flexibility** makes APIs more composable
-   - `impl AsRef<Path>` works with domain types
-   - `impl RangeBounds<T>` accepts rich range vocabulary
-   - Sans-io pattern decouples domain logic from I/O
-
-6. **Hidden complexity** focuses users on domain concepts
-   - Internal `Arc` enables cheap cloning without exposing ownership
-   - Type aliases hide complex effect stacks
-   - Users work with domain types, not infrastructure primitives
-
-**Complete example: FDM + API design**
-
-```rust
-use std::path::Path;
-use std::io::Read;
-
-// Domain type with smart constructor
-#[derive(Debug, Clone)]
-pub struct QualityScore(f64);
-
-impl QualityScore {
-    // Smart constructor (inherent method)
-    pub fn new(value: f64) -> Result<Self, ValidationError> {
-        if !(0.0..=1.0).contains(&value) {
-            return Err(ValidationError::OutOfRange {
-                field: "quality_score".to_string(),
-                value,
-                range: (0.0, 1.0),
-            });
-        }
-        Ok(Self(value))
-    }
-
-    pub fn value(&self) -> f64 {
-        self.0
-    }
-}
-
-// Complex domain type uses builder
 pub struct CalibrationConfig {
     baseline: f64,
     threshold: QualityScore,
     model_path: PathBuf,
+    max_iterations: Option<usize>,
 }
 
 pub struct CalibrationConfigBuilder {
     baseline: Option<f64>,
     threshold: Option<QualityScore>,
     model_path: Option<PathBuf>,
+    max_iterations: Option<usize>,
 }
 
 impl CalibrationConfigBuilder {
@@ -2420,6 +1432,7 @@ impl CalibrationConfigBuilder {
             baseline: None,
             threshold: None,
             model_path: None,
+            max_iterations: None,
         }
     }
 
@@ -2433,97 +1446,80 @@ impl CalibrationConfigBuilder {
         self
     }
 
-    // Flexible input: accepts any AsRef<Path>
     pub fn model_path(mut self, path: impl AsRef<Path>) -> Self {
         self.model_path = Some(path.as_ref().to_path_buf());
         self
     }
 
-    // Smart constructor in build()
-    pub fn build(self) -> Result<CalibrationConfig, ValidationError> {
+    pub fn max_iterations(mut self, max: usize) -> Self {
+        self.max_iterations = Some(max);
+        self
+    }
+
+    pub fn build(self) -> Result<CalibrationConfig, String> {
+        let baseline = self.baseline.ok_or("baseline is required")?;
+        let threshold = self.threshold.ok_or("threshold is required")?;
+        let model_path = self.model_path.ok_or("model_path is required")?;
+
         Ok(CalibrationConfig {
-            baseline: self.baseline
-                .ok_or(ValidationError::MissingRequired {
-                    field: "baseline".to_string(),
-                })?,
-            threshold: self.threshold
-                .ok_or(ValidationError::MissingRequired {
-                    field: "threshold".to_string(),
-                })?,
-            model_path: self.model_path
-                .ok_or(ValidationError::MissingRequired {
-                    field: "model_path".to_string(),
-                })?,
+            baseline,
+            threshold,
+            model_path,
+            max_iterations: self.max_iterations,
         })
     }
 }
+```
 
-// Service uses enum for I/O abstraction
-pub enum Calibrator {
-    Real { config: CalibrationConfig },
-    #[cfg(feature = "test-util")]
-    Mock(mock::MockCalibratorCtrl),
+### Input flexibility
+
+Accept `impl AsRef<T>` for path and string-like parameters to provide flexibility without cost.
+
+```rust
+// Accepts &str, String, &Path, PathBuf, and more
+pub fn load_model(path: impl AsRef<Path>) -> Result<Model, IoError> {
+    let path = path.as_ref();
+    // ...
 }
 
-impl Calibrator {
-    // Constructor for production
-    pub fn new(config: CalibrationConfig) -> Self {
-        Self::Real { config }
-    }
-
-    // Constructor for testing returns mock controller
-    #[cfg(feature = "test-util")]
-    pub fn new_mocked(config: CalibrationConfig) -> (Self, mock::MockCalibratorCtrl) {
-        let ctrl = mock::MockCalibratorCtrl::new();
-        (Self::Mock(ctrl.clone()), ctrl)
-    }
-
-    // Sans-io: accepts any Read implementation
-    pub fn calibrate(
-        &self,
-        data: impl Read,
-    ) -> Result<CalibratedData, CalibrationError> {
-        match self {
-            Self::Real { config } => {
-                // Real implementation reads from data
-            }
-            #[cfg(feature = "test-util")]
-            Self::Mock(mock) => mock.calibrate(data),
-        }
-    }
-}
-
-// Usage combining all principles
-fn example() -> Result<(), Box<dyn std::error::Error>> {
-    // Build config with flexible inputs
-    let config = CalibrationConfigBuilder::new()
-        .baseline(1.0)
-        .threshold(QualityScore::new(0.95)?)
-        .model_path("models/calibration.bin")  // &str via AsRef<Path>
-        .build()?;
-
-    // Create calibrator
-    let calibrator = Calibrator::new(config);
-
-    // Use with flexible I/O
-    let result = calibrator.calibrate(File::open("data.csv")?)?;
-
-    Ok(())
+// Accepts File, TcpStream, &[u8], and many more
+pub fn parse_data(data: impl std::io::Read) -> Result<Data, ParseError> {
+    // ...
 }
 ```
 
-This example demonstrates:
-- Domain vocabulary: `QualityScore`, `Calibrator` (not `CalibrationService`)
-- Smart constructors: `QualityScore::new()` validates range
-- Builder pattern: `CalibrationConfigBuilder` for complex construction
-- Enum for I/O: `Calibrator` enum enables testing without trait objects
-- Input flexibility: `impl AsRef<Path>`, `impl Read`
-- Hidden complexity: No `Arc` in public API even if used internally
+### Avoiding visible complexity
 
-**See also**:
-- domain-modeling.md for pattern descriptions
-- architectural-patterns.md for dependency injection
-- rust-development.md for implementation examples
+Hide implementation complexity behind simple public APIs.
+
+```rust
+// Bad: Exposes Arc in public API
+pub struct Database {
+    pub connection: Arc<Mutex<Connection>>,
+}
+
+// Good: Hides Arc, provides clean API
+pub struct Database {
+    connection: Arc<Mutex<Connection>>,
+}
+
+impl Database {
+    pub fn query(&self, sql: &str) -> Result<QueryResult, DbError> {
+        // Internal complexity hidden
+    }
+}
+```
+
+### API design principles summary
+
+These principles support FDM by:
+- Making domain vocabulary explicit in type names
+- Keeping core operations discoverable without trait imports
+- Providing testability through enums rather than trait objects
+- Hiding complexity behind simple, type-safe interfaces
+- Using builders for complex construction with validation
+- Accepting flexible input types without performance cost
+
 ## Testing
 
 ### Unit tests and test organization
@@ -2556,28 +1552,16 @@ mod tests {
 }
 ```
 
-Create integration tests in the `tests/` directory.
-These tests verify your public API works correctly without access to private implementation details.
-
-```rust
-// tests/integration_test.rs
-use my_crate::PublicApi;
-
-#[test]
-fn test_public_workflow() {
-    let api = PublicApi::new();
-    let result = api.process();
-    assert!(result.is_ok());
-}
-```
+Create integration tests in `tests/` directory.
+These verify public API works correctly without access to private implementation details.
 
 ### Mockable I/O pattern (sans-io)
 
 Any user-facing type doing I/O or system calls with side effects should be mockable to these effects.
-This includes file and network access, clocks, entropy sources, and similar.
+This includes file and network access, clocks, entropy sources.
 More generally, any operation that is non-deterministic, reliant on external state, depending on hardware or environment, or otherwise fragile should be mockable.
 
-Libraries supporting inherent mocking should implement it using a runtime abstraction via enum with `Native` and `Mock` variants.
+Libraries supporting inherent mocking should implement it using runtime abstraction via enum with `Native` and `Mock` variants.
 
 **Pattern: Library returns (Lib, MockHandle) tuple**
 
@@ -2607,7 +1591,7 @@ impl Library {
     }
 }
 
-// Dispatches calls either to the operating system or to a mocking controller
+// Dispatches calls either to operating system or mocking controller
 enum LibraryCore {
     Native,
 
@@ -2659,40 +1643,17 @@ struct MockCtrlInner {
 }
 ```
 
-**Why tuple return `(Lib, MockHandle)` instead of accepting MockHandle**
+**Why tuple return `(Lib, MockHandle)` instead of accepting MockHandle**: Prevents state ambiguity if multiple instances shared a single controller.
 
-Return the mock controller via parameter tuple rather than accepting it.
-This prevents state ambiguity if multiple instances shared a single controller.
+**When to use traits vs enums for abstraction**:
 
-```rust
-// Good: Each library instance gets its own mock controller
-pub fn new_mocked() -> (Self, MockCtrl) { ... }
+1. **Enum with Native/Mock variants (preferred for testing)**: If the other implementation is only concerned with providing sans-io implementation for testing, implement your type as an enum.
+2. **Traits (for extensibility)**: If users are expected to provide custom implementations beyond just testing, introduce narrow traits.
+3. **Dynamic dispatch (last resort)**: Only when generics become a nesting problem, consider `dyn Trait`.
 
-// Bad: Multiple instances could share same controller causing confusion
-pub fn new_mocked(ctrl: &mut MockCtrl) -> Self { ... }
-```
-
-**When to use traits vs enums for abstraction**
-
-Follow this design escalation ladder:
-
-1. **Enum with Native/Mock variants (preferred for testing)**: If the other implementation is only concerned with providing a sans-io implementation for testing, implement your type as an enum.
-This avoids trait object overhead and keeps the API concrete.
-
-2. **Traits (for extensibility)**: If users are expected to provide custom implementations beyond just testing, introduce narrow traits and implement them for your concrete types.
-
-3. **Dynamic dispatch (last resort)**: Only when generics become a nesting problem, consider `dyn Trait` wrapped in a custom type.
-
-**Sans-io for one-shot I/O**
-
-Functions and types that only need to perform one-shot I/O during initialization should accept `impl Read` or `impl Write` rather than concrete file types.
+**Sans-io for one-shot I/O**: Functions that only need one-shot I/O during initialization should accept `impl Read` or `impl Write` rather than concrete file types.
 
 ```rust
-// Bad: Forces caller to use File even if data comes from network
-fn parse_data(file: std::fs::File) -> Result<Data, ParseError> {
-    // ...
-}
-
 // Good: Accepts File, TcpStream, &[u8], and many more
 fn parse_data(data: impl std::io::Read) -> Result<Data, ParseError> {
     // ...
@@ -2705,7 +1666,7 @@ For async functions targeting multiple runtimes, use `futures::io::AsyncRead` an
 
 Testing functionality must be guarded behind a feature flag to prevent production builds from accidentally bypassing safety checks.
 
-**Use a single feature flag named `test-util`**
+**Use single feature flag named `test-util`**
 
 ```toml
 # Cargo.toml
@@ -2713,8 +1674,7 @@ Testing functionality must be guarded behind a feature flag to prevent productio
 test-util = []
 ```
 
-**What to gate behind `test-util`**
-
+**What to gate behind `test-util`**:
 - Mocking functionality (mock controllers, mock variants)
 - Ability to inspect sensitive data
 - Safety check overrides
@@ -2732,37 +1692,13 @@ impl HttpClient {
     }
 }
 
-impl Database {
-    #[cfg(feature = "test-util")]
-    pub fn inspect_query_cache(&self) -> &HashMap<String, CachedResult> {
-        &self.query_cache
-    }
-}
-
 #[cfg(feature = "test-util")]
 pub fn generate_fake_user(seed: u64) -> User {
     // Deterministic fake data generation for tests
 }
 ```
 
-**Runtime abstraction with test-util**
-
-If your library already uses runtime abstraction, extend the runtime enum with a Mock variant:
-
-```rust
-enum Runtime {
-    #[cfg(feature = "tokio")]
-    Tokio(tokio::Runtime),
-
-    #[cfg(feature = "smol")]
-    Smol(smol::Executor),
-
-    #[cfg(feature = "test-util")]
-    Mock(mock::MockCtrl),
-}
-```
-
-### Testing domain models from functional domain modeling patterns
+### Testing domain models from FDM patterns
 
 #### Testing smart constructor validation
 
@@ -2784,12 +1720,6 @@ mod tests {
     #[test]
     fn quality_score_rejects_above_one() {
         let score = QualityScore::new(1.5);
-        assert!(score.is_err());
-    }
-
-    #[test]
-    fn quality_score_rejects_below_zero() {
-        let score = QualityScore::new(-0.1);
         assert!(score.is_err());
     }
 
@@ -2849,26 +1779,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn complete_workflow_valid_transitions() {
-        let raw = create_test_raw_observations();
-        let calibration = DefaultCalibrationModel;
-        let inference = DefaultInferenceAlgorithm;
-        let metrics = create_test_validation_metrics();
-
-        let result = process_observations(
-            &calibration,
-            0.8,
-            &inference,
-            &metrics,
-            raw,
-        );
-
-        assert!(result.is_ok());
-        let validated = result.unwrap();
-        assert!(validated.diagnostics.values().all(|&v| v > 0.9));
-    }
-
     // Note: Invalid transitions like "deploy unvalidated model" are
     // prevented by the type system and won't compile, so no test needed
 }
@@ -2886,12 +1796,6 @@ proptest! {
     fn quality_score_always_in_range(value in 0.0f64..=1.0) {
         let score = QualityScore::new(value).unwrap();
         prop_assert!(score.value() >= 0.0 && score.value() <= 1.0);
-    }
-
-    #[test]
-    fn uncertainty_always_positive(value in 0.01f64..100.0) {
-        let uncertainty = Uncertainty::new(value).unwrap();
-        prop_assert!(uncertainty.value() > 0.0);
     }
 
     #[test]
@@ -2954,23 +1858,6 @@ mod tests {
     }
 
     #[test]
-    fn domain_error_model_convergence() {
-        let calibrated = create_test_calibrated_data();
-        let divergent_algorithm = create_divergent_algorithm();
-
-        let result = infer(divergent_algorithm, calibrated);
-        assert!(result.is_err());
-
-        match result.unwrap_err() {
-            InferenceError::Failed(msg) => {
-                assert!(msg.contains("converge") || msg.contains("diverge"));
-            }
-        }
-    }
-
-    // Infrastructure errors might be tested differently
-    // depending on whether they use Result or exceptions
-    #[test]
     #[cfg(feature = "test-util")]
     fn infrastructure_error_database_unavailable() {
         let (mut repo, mock) = Repository::new_mocked();
@@ -2978,7 +1865,6 @@ mod tests {
 
         let result = repo.save_model(test_model());
 
-        // If using Result for infrastructure errors
         assert!(matches!(
             result,
             Err(InfrastructureError::Database(_))
@@ -2991,21 +1877,13 @@ mod tests {
 
 Use `cargo test` to run all tests before committing.
 
-```bash
-cargo test
-```
-
-Consider using `cargo nextest` for faster test execution with better output:
+Consider `cargo nextest` for faster test execution with better output:
 
 ```bash
 cargo nextest run
 ```
 
-Benefits of nextest:
-- Runs tests in parallel more efficiently
-- Cleaner, more informative output
-- Better failure reporting
-- JUnit output for CI integration
+Benefits: runs tests in parallel more efficiently, cleaner output, better failure reporting, JUnit output for CI.
 
 ### Doc tests
 
@@ -3017,7 +1895,7 @@ Write doc tests to ensure documentation examples stay current and compile.
 /// # Examples
 ///
 /// ```
-/// use my_crate::{RawObservations, calibrate, DefaultCalibrationModel};
+/// use my_crate::{RawObservations, calibrate};
 ///
 /// let raw = RawObservations {
 ///     values: vec![1.0, 2.0, 3.0],
@@ -3043,7 +1921,7 @@ where
 }
 ```
 
-Doc tests are automatically run with `cargo test` and serve dual purpose as both documentation and verification.
+Doc tests automatically run with `cargo test` and serve dual purpose as documentation and verification.
 
 ### Test coverage
 
@@ -3064,16 +1942,8 @@ cargo tarpaulin --out Html
 cargo llvm-cov --html
 ```
 
-Focus coverage efforts on:
-- Domain logic (highest value, most likely to have bugs)
-- Public API surface (contract with users)
-- Error paths (often undertested)
-- Boundary conditions (edge cases)
-
-Less critical to cover:
-- Simple getters/setters
-- Trivial type conversions
-- Generated code
+Focus coverage efforts on domain logic, public API surface, error paths, and boundary conditions.
+Less critical: simple getters/setters, trivial type conversions, generated code.
 
 ### Testing patterns summary
 
@@ -3083,10 +1953,11 @@ Less critical to cover:
 - **Sans-io**: Accept `impl Read`/`impl Write` for composability
 - **Smart constructors**: Test valid construction and validation failures
 - **State machines**: Test valid transitions, rely on type system to prevent invalid ones
-- **Property-based**: Use proptest/quickcheck to verify invariants across many examples
+- **Property-based**: Use proptest/quickcheck to verify invariants
 - **Domain errors**: Test expected failure scenarios return appropriate error variants
 - **Doc tests**: Ensure examples compile and demonstrate correct usage
 - **Coverage**: Focus on domain logic, public APIs, and error paths
+
 ## Documentation
 
 Write comprehensive documentation using Rust's canonical doc comment structure.
@@ -3095,17 +1966,17 @@ Documentation is part of the API contract and serves both human readers and AI c
 ### Canonical doc comment sections
 
 Public library items must include canonical doc sections.
-The summary sentence is always required.
-Extended documentation and examples are strongly encouraged.
-Other sections must be present when applicable.
+Summary sentence always required.
+Extended documentation and examples strongly encouraged.
+Other sections present when applicable.
 
 ```rust
 /// Summary sentence of less than 15 words.
 ///
 /// Extended documentation in free form providing context, background,
-/// and usage guidance. Explain what the function does and why callers
-/// would use it. Reference related functions and types using markdown
-/// links like [`OtherType`] and [`other_function`].
+/// and usage guidance.
+/// Explain what the function does and why callers would use it.
+/// Reference related functions and types using markdown links like [`OtherType`].
 ///
 /// # Examples
 ///
@@ -3128,8 +1999,8 @@ Other sections must be present when applicable.
 /// # Safety
 ///
 /// (For unsafe functions) Callers must ensure that the pointer is
-/// valid and properly aligned. The referenced memory must remain
-/// valid for the lifetime of the returned reference.
+/// valid and properly aligned.
+/// The referenced memory must remain valid for the lifetime of the returned reference.
 pub fn example_function() -> Result<(), Error> {
     Ok(())
 }
@@ -3138,21 +2009,21 @@ pub fn example_function() -> Result<(), Error> {
 **Section ordering**: Summary, extended docs, Examples, Errors, Panics, Safety, Abort.
 
 **Summary line requirements**:
-- Must be descriptive and complete, not just repeat the function name
-- Should be under 15 words for readability in listings
+- Descriptive and complete, not just repeat function name
+- Under 15 words for readability in listings
 - Avoid implementation details; focus on what, not how
 - Does not end with a period (by convention)
 
 **Examples section**:
 - Include runnable code demonstrating common use cases
 - Examples run as doc tests with `cargo test`
-- Use `#` prefix to hide setup code that clutters the rendered example
+- Use `#` prefix to hide setup code that clutters rendered example
 - Show both success and error cases when relevant
 
 **Errors section**:
 - Document all error conditions that can be returned
 - Explain when and why each error variant occurs
-- Link to error type documentation using markdown links
+- Link to error type documentation
 
 **Panics section**:
 - Document all conditions that can cause panic
@@ -3180,23 +2051,23 @@ fn copy(src: File, dst: File) {}
 // Good: Natural prose
 /// Copies a file from `src` to `dst`.
 ///
-/// If `dst` already exists, it will be overwritten. The source file
-/// is not modified or removed. Metadata like permissions are copied
-/// when possible.
+/// If `dst` already exists, it will be overwritten.
+/// The source file is not modified or removed.
+/// Metadata like permissions are copied when possible.
 fn copy(src: File, dst: File) {}
 ```
 
 ### Module-level documentation
 
 Every public module must have `//!` module documentation.
-The first sentence must follow the same 15-word guideline as item docs.
+First sentence must follow same 15-word guideline as item docs.
 
 ```rust
 //! Contains FFI abstractions for external library integration.
 //!
 //! This module provides safe wrappers around unsafe FFI calls to the
-//! external C library. All functions validate invariants and convert
-//! C errors to Rust Result types.
+//! external C library.
+//! All functions validate invariants and convert C errors to Rust Result types.
 //!
 //! # Examples
 //!
@@ -3214,7 +2085,7 @@ pub mod ffi {
 
 ### Re-exported items
 
-Use `#[doc(inline)]` for items re-exported via `pub use` to integrate them into your module's documentation instead of showing them in an opaque re-export block.
+Use `#[doc(inline)]` for items re-exported via `pub use` to integrate them into your module's documentation.
 
 ```rust
 // Re-export items from internal module
@@ -3226,12 +2097,10 @@ pub use internal::important_function;
 ```
 
 Do not use `#[doc(inline)]` for `std` or third-party types.
-These should remain as plain re-exports to make their external origin clear.
 
 ### Doc tests as executable examples
 
 Doc tests run with `cargo test` and verify examples stay current.
-Use them liberally to demonstrate API usage.
 
 ```rust
 /// Validates and creates a new quality score.
@@ -3267,7 +2136,7 @@ pub fn new(value: f64) -> Result<QualityScore, String> {
 
 #### Smart constructor validation rules
 
-Document all validation rules in the constructor's Errors section.
+Document all validation rules in constructor's Errors section.
 List each constraint explicitly.
 
 ```rust
@@ -3299,35 +2168,27 @@ pub fn new(
 
 #### State machine transitions
 
-Document preconditions, postconditions, and error conditions for each transition.
+Document valid transitions and their preconditions.
 
 ```rust
 /// Transitions raw observations to calibrated data.
 ///
-/// Applies the calibration model to each raw value and validates
-/// that all resulting measurements meet the quality threshold.
+/// This transition applies the calibration model to each raw value and
+/// validates that resulting quality scores meet the threshold.
 ///
 /// # Examples
 ///
 /// ```
-/// # use crate::{calibrate, RawObservations};
-/// let raw = RawObservations::new(vec![1.0, 2.0, 3.0]);
-/// let calibrated = calibrate(
-///     |v, _| (v * 1.1, v * 0.05, 0.95),
-///     0.9,
-///     raw
-/// )?;
+/// # use crate::{RawObservations, calibrate};
+/// let raw = RawObservations { values: vec![1.0, 2.0], metadata: Default::default() };
+/// let calibrated = calibrate(|v, _| (v * 1.1, v * 0.05, 0.95), 0.8, raw)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
 /// # Errors
 ///
-/// Returns [`CalibrationError::QualityBelowThreshold`] if any
-/// measurement's quality score falls below `quality_threshold`.
-///
-/// Returns [`CalibrationError::Failed`] if the calibration model
-/// produces invalid measurements (negative uncertainty, out of
-/// range quality score).
+/// Returns [`CalibrationError::QualityBelowThreshold`] if any measurement's
+/// quality score falls below `quality_threshold`.
 pub fn calibrate<F>(
     calibration_model: F,
     quality_threshold: f64,
@@ -3336,56 +2197,45 @@ pub fn calibrate<F>(
 where
     F: Fn(f64, &HashMap<String, String>) -> (f64, f64, f64),
 {
-    // Transition implementation
+    // Implementation
 }
 ```
 
 #### Workflow preconditions and postconditions
 
-Document the full workflow contract including dependency requirements and guarantees.
+Document dependencies, ordering requirements, and guarantees.
 
 ```rust
-/// Processes observations through calibration, inference, and validation.
+/// Processes raw observations through complete validation workflow.
 ///
-/// This workflow composes three steps:
-/// 1. Calibrate raw observations using the provided model
-/// 2. Run inference algorithm on calibrated measurements
-/// 3. Validate inferred results against diagnostic metrics
+/// The workflow executes three stages:
+/// 1. Calibration: applies model and validates quality
+/// 2. Inference: estimates parameters from calibrated data
+/// 3. Validation: checks model diagnostics meet thresholds
 ///
 /// # Examples
 ///
 /// ```
-/// # use crate::{process_observations, DefaultCalibrationModel,
-/// #            DefaultInferenceAlgorithm, RawObservations};
-/// # use std::collections::HashMap;
-/// let calibration = DefaultCalibrationModel;
-/// let inference = DefaultInferenceAlgorithm;
-/// let metrics: HashMap<String, Box<dyn Fn(_) -> f64>> =
-///     [("metric1".into(), Box::new(|_| 0.95) as Box<_>)]
-///         .iter().cloned().collect();
+/// # use crate::{process_observations, RawObservations};
+/// let raw = RawObservations { values: vec![1.0, 2.0, 3.0], metadata: Default::default() };
+/// let model = DefaultCalibrationModel;
+/// let algorithm = DefaultInferenceAlgorithm;
+/// let metrics = create_validation_metrics();
 ///
-/// let raw = RawObservations::new(vec![1.0, 2.0, 3.0]);
-/// let result = process_observations(
-///     &calibration,
-///     0.8,
-///     &inference,
-///     &metrics,
-///     raw
-/// )?;
+/// let result = process_observations(&model, 0.8, &algorithm, &metrics, raw)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
 /// # Errors
 ///
-/// Returns error if any workflow step fails:
-/// - [`ProcessingError::Calibration`] if calibration fails validation
-/// - [`ProcessingError::Inference`] if inference doesn't converge
-/// - [`ProcessingError::Validation`] if diagnostics fail thresholds
+/// Returns [`ProcessingError::Calibration`] if calibration fails quality checks.
+/// Returns [`ProcessingError::Inference`] if inference algorithm fails to converge.
+/// Returns [`ProcessingError::Validation`] if model diagnostics fail validation.
 ///
 /// # Type Parameters
 ///
-/// - `C`: Calibration model implementing [`CalibrationModel`] trait
-/// - `I`: Inference algorithm implementing [`InferenceAlgorithm`] trait
+/// - `C`: Calibration model implementation
+/// - `I`: Inference algorithm implementation
 pub fn process_observations<C, I>(
     calibration_model: &C,
     quality_threshold: f64,
@@ -3397,409 +2247,296 @@ where
     C: CalibrationModel,
     I: InferenceAlgorithm,
 {
-    // Workflow implementation
+    // Implementation
 }
 ```
 
-### Additional guidelines
-
-- Use markdown links for cross-references: `[`Type`]`, `[`function`]`, `[`module::item`]`
-- Link to related items in extended documentation to guide readers
-- Prefer prose explanations over bullet lists when describing behavior
-- Document type parameters in a dedicated section for complex generics
-- Use code blocks with proper syntax highlighting: `rust`, `no_run`, `ignore`
-- Keep summary lines focused on what, not how or why (save that for extended docs)
-- Review generated docs with `cargo doc --open` to verify formatting and links
 ## Performance
 
 ### Hot path identification and profiling discipline
 
-Identify early in the development process whether your crate is performance or COGS relevant.
-For performance-sensitive code, establish a regular profiling discipline from the start rather than treating optimization as an afterthought.
+Identify hot paths through profiling before optimizing.
 
-**Early identification checklist:**
+Use profiling tools:
+- `cargo flamegraph` - generates flame graphs showing where time is spent
+- `perf` (Linux) - detailed CPU profiling
+- `Instruments` (macOS) - Apple's profiling tools
+- `cargo bench` with criterion - statistical benchmarking
 
-- Identify hot paths during design phase and create benchmarks around them
-- Document performance-sensitive areas in code comments and module documentation
-- Set measurable performance targets (latency bounds, throughput goals, memory budgets)
-- Regularly run profilers collecting CPU and allocation insights
+```bash
+# Generate flame graph
+cargo flamegraph --bin my_app
 
-**Profiling tools and workflow:**
+# Run with perf
+perf record -g ./target/release/my_app
+perf report
+```
 
-- Use `cargo flamegraph` for visualizing CPU time spent in functions
-- Use `perf` for detailed CPU performance counter analysis on Linux
-- Profile both debug and release builds to understand optimization impact
-- Profile with realistic workloads that exercise hot paths under production-like conditions
-- Run benchmarks on CI to detect performance regressions
-
-**Common hot path performance issues:**
-
-Profiling frequently reveals these optimization opportunities:
-
-- Short-lived allocations that could use bump allocation or arena patterns
-- Memory copy overhead from cloning `String`s and collections unnecessarily
-- Repeated re-hashing of equal data structures (consider `FxHashMap` for non-cryptographic hashing)
-- Use of Rust's default hasher where collision resistance is not required
-- Missed opportunities for zero-cost abstractions (unnecessary trait objects, excessive generics monomorphization)
-
-Anecdotally, addressing only some `String` allocation problems can yield approximately 15% benchmark gains on hot paths, with highly optimized versions potentially achieving up to 50% improvements.
+Only optimize code proven to be performance-critical through profiling.
 
 ### Throughput optimization for batch processing
 
-Optimize for throughput using items-per-CPU-cycle as the primary metric for batch processing workloads.
-While latency matters and cannot be scaled horizontally the way throughput can, avoid paying for latency with empty cycles that come from single-item processing, contended locks, and frequent task switching.
+For batch operations processing many items:
 
-**Throughput optimization principles:**
+```rust
+// Good: Process batch in single operation
+pub fn process_batch(items: &[Item]) -> Vec<Result> {
+    items.par_iter()  // Parallel iteration with rayon
+        .map(|item| process_item(item))
+        .collect()
+}
 
-- Partition reasonable chunks of work upfront rather than discovering work incrementally
-- Let individual threads and tasks deal with their slice of work independently
-- Sleep or yield when no work is present rather than hot spinning
-- Design your own APIs for batched operations where single-item APIs would force inefficiency
-- Perform work via batched APIs where available from dependencies
-- Yield within long individual items or between chunks of batches (see async cooperative scheduling below)
-- Exploit CPU caches through temporal and spatial locality (access related data together, reuse recently accessed data)
+// Avoid: Individual operations with repeated overhead
+pub fn process_one(item: &Item) -> Result {
+    // Each call pays setup/teardown cost
+}
+```
 
-**Anti-patterns to avoid:**
-
-- Hot spinning to receive individual items faster (wastes CPU cycles, prevents other tasks from running)
-- Processing work on individual items when batching is possible (increases per-item overhead, loses vectorization opportunities)
-- Work stealing or similar strategies to balance individual items (introduces synchronization overhead for marginal gains)
-- Single-item channel processing in tight loops (context switch overhead dominates useful work)
-
-**Shared state considerations:**
-
-Only use shared state when the cost of sharing (synchronization, cache coherence, false sharing) is less than the cost of re-computation or re-fetching.
-Consider using thread-local copies, message passing, or immutable shared data to avoid synchronization overhead.
+Use `rayon` for data parallelism when operations are independent.
 
 ### Async cooperative scheduling and yield points
 
-Long-running tasks must cooperatively yield to prevent starving other tasks of CPU time.
-Futures executed in runtimes that cannot work around blocking or long-running tasks cause runtime overhead and degrade system responsiveness.
-
-**Automatic yielding through I/O:**
-
-Tasks performing I/O regularly utilize await points to preempt themselves automatically:
+Async functions must yield regularly to prevent blocking the executor.
 
 ```rust
-async fn process_items(items: &[Item]) {
-    // Keep processing items, the runtime will preempt you automatically
-    for item in items {
-        read_item(item).await; // I/O operation provides natural yield point
-    }
-}
-```
+use tokio::task::yield_now;
 
-**Explicit yielding for CPU-bound work:**
+pub async fn process_large_dataset(data: &[Item]) -> Result<Summary, Error> {
+    let mut results = Vec::new();
 
-Tasks performing long-running CPU operations without intermixed I/O should cooperatively yield at regular intervals:
+    for (i, item) in data.iter().enumerate() {
+        results.push(process_item(item).await?);
 
-```rust
-async fn process_items(zip_file: File) {
-    let items = zip_file.read().await;
-    for item in items {
-        decompress(item); // CPU-bound work
-        tokio::task::yield_now().await; // Explicit yield point
-    }
-}
-```
-
-**Yield point frequency guideline:**
-
-In thread-per-core runtime models, balance task switching overhead against systemic effects of starving unrelated tasks.
-Assuming runtime task switching takes hundreds of nanoseconds plus CPU cache overhead, continuous execution between yields should be long enough that switching cost becomes negligible (less than 1% overhead).
-
-**Recommended yield interval:** Perform 10-100 microseconds of CPU-bound work between yield points.
-
-**Dynamic yielding with runtime budget:**
-
-For operations with unpredictable number and duration, query the hosting runtime using APIs like `has_budget_remaining()`:
-
-```rust
-async fn process_variable_workload(items: Vec<Item>) {
-    for item in items {
-        process_item(item);
-
-        // Yield only when runtime budget is exhausted
-        if !tokio::task::coop::has_budget_remaining() {
-            tokio::task::yield_now().await;
+        // Yield every 100 iterations to allow other tasks to run
+        if i % 100 == 0 {
+            yield_now().await;
         }
     }
+
+    Ok(compute_summary(&results))
 }
 ```
+
+Without yield points, long-running async functions starve other tasks.
 
 ### Memory efficiency and allocation strategies
 
-**Prefer borrowing over ownership:**
-
-- Use `&str` over `String` when ownership is not needed
-- Consider `Cow<str>` for conditional ownership (borrows when possible, clones when necessary)
-- Pass slices `&[T]` instead of `Vec<T>` when function does not need ownership
-- Use `AsRef<T>` and `Borrow<T>` traits to accept both owned and borrowed forms
-
-**Pre-allocate when size is known:**
-
-- Use `Vec::with_capacity(n)` when final size is known or estimable
-- Use `HashMap::with_capacity(n)` and `HashSet::with_capacity(n)` to avoid rehashing during growth
-- Consider `String::with_capacity(n)` for string building in loops
-
-**Avoid unnecessary allocations:**
-
-- Reuse buffers across loop iterations instead of allocating per iteration
-- Use `clear()` to reset collections while preserving allocated capacity
-- Consider arena allocators or bump allocation for short-lived allocations in hot paths
-- Profile allocations using `cargo flamegraph` with allocation profiling or tools like `heaptrack`
-
-**Zero-cost abstractions:**
-
-- Prefer iterator chains over explicit loops (compiler optimizes them equivalently)
-- Use generics and monomorphization for performance-critical code (generates specialized code)
-- Leverage const generics and const evaluation to move computation to compile time where applicable
-- Avoid trait objects (`dyn Trait`) in hot paths when static dispatch (generics) is possible
-
-### Allocator considerations
-
-**Use mimalloc for applications:**
-
-Applications should set [mimalloc](https://crates.io/crates/mimalloc) as their global allocator for significant performance gains without code changes.
-This frequently results in notable performance increases along allocating hot paths, with benchmark improvements up to 25% observed.
-
-**Setting mimalloc as global allocator:**
-
-Add mimalloc to `Cargo.toml`:
-
-```toml
-[dependencies]
-mimalloc = "0.1"
-```
-
-Configure global allocator in application entry point (typically `main.rs`):
+**Reuse allocations**:
 
 ```rust
-use mimalloc::MiMalloc;
+// Good: Reuse buffer across iterations
+let mut buffer = Vec::with_capacity(1024);
+for item in items {
+    buffer.clear();
+    process_into_buffer(item, &mut buffer);
+    use_buffer(&buffer);
+}
 
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
-fn main() {
-    // Application code runs with mimalloc
+// Avoid: Allocate on each iteration
+for item in items {
+    let buffer = Vec::new();  // New allocation every loop
+    process_into_buffer(item, &mut buffer);
 }
 ```
 
-**When to consider custom allocators:**
+**Pre-allocate when size known**:
 
-- Libraries should not set global allocators (leave choice to applications)
-- Consider custom allocators for specialized workload patterns (arena allocation for tree structures, bump allocation for temporary allocations, pool allocation for fixed-size objects)
-- Profile allocation patterns before implementing custom allocators to ensure complexity is justified
-- Document allocator assumptions in crate documentation if allocation behavior is performance-critical
+```rust
+// Good: Pre-allocate with known capacity
+let mut results = Vec::with_capacity(items.len());
+for item in items {
+    results.push(process(item));
+}
+
+// Avoid: Repeated reallocations as vector grows
+let mut results = Vec::new();
+for item in items {
+    results.push(process(item));  // May reallocate multiple times
+}
+```
+
+### Allocator considerations
+
+Consider alternative allocators for specific workloads:
+
+```rust
+// Use jemalloc for multi-threaded applications with frequent allocations
+#[global_allocator]
+static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
+// Or mimalloc for high-performance scenarios
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+```
+
+Profile before switching allocators - gains vary by workload.
 
 ### Benchmarking and measurement
 
-**Establish benchmark suite:**
-
-- Use `criterion` crate for statistically rigorous benchmarks with regression detection
-- Use `divan` crate for faster compile times and simpler benchmark definitions
-- Benchmark hot paths identified during profiling and design phases
-- Include both microbenchmarks (isolated functions) and macrobenchmarks (end-to-end workflows)
-
-**Criterion benchmark example:**
+Use `criterion` for statistical benchmarking:
 
 ```rust
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-fn fibonacci(n: u64) -> u64 {
-    match n {
-        0 => 1,
-        1 => 1,
-        n => fibonacci(n-1) + fibonacci(n-2),
-    }
+fn bench_process_data(c: &mut Criterion) {
+    let data = create_test_data();
+
+    c.bench_function("process_data", |b| {
+        b.iter(|| {
+            process_data(black_box(&data))
+        })
+    });
 }
 
-fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
-}
-
-criterion_group!(benches, criterion_benchmark);
+criterion_group!(benches, bench_process_data);
 criterion_main!(benches);
 ```
 
-**Divan benchmark example:**
+Run benchmarks:
 
-```rust
-use divan::Bencher;
-
-#[divan::bench]
-fn parse_date(bencher: Bencher) {
-    bencher.bench_local(|| {
-        parse_date_impl("2024-01-15")
-    });
-}
+```bash
+cargo bench
 ```
 
-**Benchmark best practices:**
-
-- Use `black_box()` to prevent compiler from optimizing away benchmarked code
-- Run benchmarks on dedicated hardware or in controlled environments (disable CPU frequency scaling, close background applications)
-- Measure allocations, not just wall-clock time, to understand memory overhead
-- Compare against baseline implementations to quantify optimization impact
-- Add benchmarks to CI to detect regressions automatically
+Criterion provides statistical analysis, outlier detection, and comparison across runs.
 
 ### Performance documentation
 
-**Document performance characteristics:**
-
-- Add performance notes to public API documentation explaining expected complexity (O(n), O(log n), etc.)
-- Document allocation behavior (whether functions allocate, how much, under what conditions)
-- Explain trade-offs made between performance and other concerns (correctness, maintainability, API ergonomics)
-- Provide guidance on performance-sensitive usage patterns
-
-**Example performance documentation:**
+Document performance characteristics in function docs when relevant:
 
 ```rust
-/// Processes items in batches for optimal throughput.
+/// Processes observations in parallel using all available CPU cores.
 ///
 /// # Performance
 ///
-/// - Time complexity: O(n) where n is the number of items
-/// - Memory: Allocates a single buffer of size `batch_size` reused across batches
-/// - Throughput: Optimized for batches of 100-1000 items
-/// - Yields every 50μs to prevent starving other async tasks
+/// - Time complexity: O(n) where n is the number of observations
+/// - Space complexity: O(n) for result storage
+/// - Parallelism: Uses rayon thread pool, scales with core count
+/// - Allocation: Pre-allocates result vector, no per-item allocation
 ///
-/// For latency-sensitive workloads, consider using `process_items_streaming`
-/// which processes items individually with lower batching overhead.
-pub async fn process_items_batched(items: &[Item], batch_size: usize) -> Result<Vec<Output>> {
+/// For small datasets (< 100 items), use [`process_sequential`] to avoid
+/// threading overhead.
+pub fn process_parallel(observations: &[Observation]) -> Vec<Result> {
     // Implementation
 }
 ```
-## Structured logging
 
-Use the `tracing` crate for structured logging with message templates and named properties.
-Structured logging provides better filtering, aggregation, and analysis compared to string-based logs.
+## Structured logging
 
 ### Message templates over string formatting
 
-Avoid string formatting in log messages as it allocates memory at runtime.
-Use message templates with named properties instead, which defer formatting until viewing time.
+Use message templates with named fields rather than string formatting.
 
 ```rust
 use tracing::{event, Level};
 
-// Bad: String formatting causes allocations
-tracing::info!("file opened: {}", path);
-tracing::info!(format!("file opened: {}", path));
-
-// Good: Message templates with named properties
+// Good: Message template with structured fields
 event!(
-    name: "file.open.success",
+    name: "calibration.completed",
     Level::INFO,
-    file.path = %path.display(),
-    "file opened: {{file.path}}",
+    observation.count = measurements.len(),
+    quality.threshold = threshold,
+    processing.duration_ms = duration.as_millis(),
+    "completed calibration of {{observation.count}} observations with quality threshold {{quality.threshold}} in {{processing.duration_ms}}ms"
+);
+
+// Avoid: String formatting loses structured data
+event!(
+    Level::INFO,
+    "completed calibration of {} observations with quality threshold {} in {}ms",
+    measurements.len(), threshold, duration.as_millis()
 );
 ```
 
-The `{{property}}` syntax in message templates preserves literal text while escaping Rust's format syntax.
+Message templates enable log aggregation, filtering, and analysis tools to extract structured data.
 
 ### Event naming conventions
 
-Name events using hierarchical dot notation: `<component>.<operation>.<state>`.
+Use hierarchical dot-separated names: `component.operation.outcome`
 
 ```rust
-// Bad: Unnamed events
-event!(
-    Level::INFO,
-    file.path = file_path,
-    "file {{file.path}} processed successfully",
-);
+// Component.operation.outcome pattern
+event!(name: "calibration.process.started", Level::INFO, "starting calibration");
+event!(name: "calibration.process.completed", Level::INFO, "calibration succeeded");
+event!(name: "calibration.process.failed", Level::WARN, "calibration failed");
 
-// Good: Named events enable grouping and filtering
-event!(
-    name: "file.processing.success",
-    Level::INFO,
-    file.path = file_path,
-    "file {{file.path}} processed successfully",
-);
+event!(name: "database.query.started", Level::DEBUG, "executing query");
+event!(name: "database.query.completed", Level::INFO, "query succeeded");
+event!(name: "database.connection.failed", Level::ERROR, "connection failed");
 ```
 
-Examples of good event names:
-- `database.query.started`
-- `http.request.completed`
-- `calibration.validation.failed`
-- `model.training.converged`
+This enables hierarchical filtering: `calibration.*`, `*.failed`, etc.
 
 ### Spans for operation context
 
-Use spans to track operation duration and provide context for nested events.
+Use spans to group related log events:
 
 ```rust
-use tracing::{info_span, instrument};
+use tracing::{instrument, event, Level};
 
-// Manual span creation
-async fn process_file(path: &Path) -> Result<(), Error> {
-    let _span = info_span!(
-        "file.processing",
-        file.path = %path.display(),
-        file.size = tracing::field::Empty  // Filled later
-    )
-    .entered();
-
-    // Events within this span automatically inherit file.path
+#[instrument(
+    name = "calibration.workflow",
+    skip(raw_data),
+    fields(data.count = raw_data.len())
+)]
+async fn calibrate_workflow(
+    model: &CalibrationModel,
+    threshold: f64,
+    raw_data: Vec<RawMeasurement>
+) -> Result<Vec<ValidatedMeasurement>, WorkflowError> {
     event!(
-        name: "file.validation.started",
+        name: "calibration.started",
         Level::INFO,
-        "validating file"
+        quality.threshold = threshold,
+        "starting calibration workflow"
     );
 
-    // ... processing ...
+    let measurements = raw_data
+        .into_iter()
+        .map(|raw| model.calibrate(raw))
+        .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(())
-}
+    event!(
+        name: "calibration.completed",
+        Level::INFO,
+        result.count = measurements.len(),
+        "calibration workflow completed successfully"
+    );
 
-// Instrument macro for automatic spans
-#[instrument(
-    name = "calibration.process",
-    skip(data),  // Skip large data from logs
-    fields(
-        data.size = data.len(),
-        quality.threshold = threshold
-    )
-)]
-async fn calibrate_data(
-    threshold: f64,
-    data: &[f64]
-) -> Result<CalibratedData, CalibrationError> {
-    // Span automatically created with function name and arguments
-    info!("starting calibration");
-    // ... implementation ...
+    Ok(measurements)
 }
 ```
 
+Spans automatically propagate context to all events within the span.
+
 ### OpenTelemetry semantic conventions
 
-Follow OpenTelemetry semantic conventions for standard attributes to enable interoperability.
+Use OpenTelemetry semantic conventions for standard attributes:
 
 ```rust
 event!(
     name: "http.request.completed",
     Level::INFO,
-    http.request.method = "POST",
+    http.request.method = "GET",
     http.response.status_code = 200,
-    url.path = "/api/process",
-    server.address = "localhost:8080",
-    duration.ms = elapsed.as_millis(),
-    "request completed: {{http.request.method}} {{url.path}} → {{http.response.status_code}}"
+    url.scheme = "https",
+    url.path = "/api/data",
+    server.address = "api.example.com",
+    "HTTP request completed"
 );
 
 event!(
-    name: "db.query.executed",
-    Level::DEBUG,
+    name: "db.query.completed",
+    Level::INFO,
     db.system = "postgresql",
     db.namespace = "experiments",
     db.operation.name = "SELECT",
-    db.query.text = redact_query(query),
-    "executed query on {{db.system}}.{{db.namespace}}"
+    db.query.text = query,
+    "database query completed"
 );
 ```
 
-Common OpenTelemetry conventions:
+Common conventions:
 - **HTTP**: `http.request.method`, `http.response.status_code`, `url.scheme`, `url.path`, `server.address`
 - **File**: `file.path`, `file.directory`, `file.name`, `file.extension`, `file.size`
 - **Database**: `db.system`, `db.namespace`, `db.operation.name`, `db.query.text`
@@ -3813,16 +2550,6 @@ Redact or hash sensitive information before logging.
 ```rust
 use data_privacy::redact_email;
 
-// Bad: Logs potentially sensitive data
-event!(
-    name: "user.operation.started",
-    Level::INFO,
-    user.email = user.email,  // Exposed
-    user.password = password,  // Critical exposure
-    auth.token = token,       // Critical exposure
-    "processing request for user {{user.email}}"
-);
-
 // Good: Redact sensitive parts
 event!(
     name: "user.operation.started",
@@ -3833,36 +2560,17 @@ event!(
 );
 ```
 
-**Never log these types of sensitive data**:
-- Passwords, API keys, auth tokens, session IDs
-- Email addresses (redact or hash)
-- File paths revealing user identity
-- File contents containing PII
-- Credit card numbers, SSNs, other personal identifiers
-- Database connection strings with credentials
-- Cryptographic keys or secrets
-
-Consider using the `data_privacy` crate for consistent redaction patterns.
+**Never log**: Passwords, API keys, auth tokens, session IDs, email addresses (redact or hash), file paths revealing user identity, file contents containing PII, credit card numbers, SSNs, database connection strings with credentials, cryptographic keys or secrets.
 
 ### Logging as an effect at boundaries
 
-In functional domain modeling, logging is an effect that should be isolated at architectural boundaries (see architectural-patterns.md).
+In FDM, logging is an effect isolated at architectural boundaries (see architectural-patterns.md).
 
-**Domain layer** (pure logic):
-- No logging - pure functions return values
-- Pass logged events as return values if needed
+**Domain layer** (pure logic): No logging - pure functions return values.
 
-**Application layer** (workflows):
-- Log workflow entry/exit with spans
-- Log state transitions
-- Log validation failures
-- Emit structured events as workflow progresses
+**Application layer** (workflows): Log workflow entry/exit with spans, state transitions, validation failures.
 
-**Infrastructure layer** (I/O):
-- Log external service calls
-- Log database operations
-- Log network requests
-- Log file system operations
+**Infrastructure layer** (I/O): Log external service calls, database operations, network requests, file system operations.
 
 ```rust
 // Domain layer: Pure function, no logging
@@ -3960,19 +2668,19 @@ async fn save_results(
 
 This layered approach ensures:
 - Domain logic remains pure and testable without logging infrastructure
-- Logging effects are explicit in function signatures (async, Result)
+- Logging effects explicit in function signatures (async, Result)
 - Tracing context propagates automatically through spans
-- Infrastructure operations are observable at their boundaries
+- Infrastructure operations observable at boundaries
 
 **See also**:
 - architectural-patterns.md#effect-composition-and-signatures for effect isolation
 - Message Templates Specification: https://messagetemplates.org/
 - OpenTelemetry Semantic Conventions: https://opentelemetry.io/docs/specs/semconv/
-- OWASP Logging Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+
 ## Unsafe code
 
 Rust's safety guarantees make it ideal for implementing the type-safe foundations described in domain-modeling.md.
-However, `unsafe` code deliberately lowers the compiler's guardrails, transferring correctness responsibilities to the programmer.
+However, `unsafe` code deliberately lowers compiler guardrails, transferring correctness responsibilities to the programmer.
 This section defines when unsafe is permissible and the validation requirements that apply.
 
 ### Fundamental principle: unsafe implies undefined behavior risk
@@ -3992,7 +2700,6 @@ unsafe fn delete_database() {
 }
 ```
 
-Use clear, descriptive names and documentation to communicate danger that does not involve undefined behavior.
 Reserve `unsafe` exclusively for its technical meaning in Rust's memory safety model.
 
 ### Valid reasons for unsafe code
@@ -4056,16 +2763,7 @@ fn status_from_int_good(x: u8) -> Option<Status> {
 }
 ```
 
-**Bypass lifetime requirements** - Lifetimes encode essential relationships:
-```rust
-// NEVER: Extending lifetimes via transmute
-fn extend_lifetime_bad<'a, 'b, T>(x: &'a T) -> &'b T {
-    // Creates dangling references
-    unsafe { std::mem::transmute(x) }
-}
-
-// ALWAYS: Respect lifetime bounds or redesign API
-```
+**Bypass lifetime requirements** - Lifetimes encode essential relationships.
 
 Ad-hoc unsafe is never acceptable.
 If you need these capabilities, design a proper abstraction with sound encapsulation.
@@ -4073,60 +2771,22 @@ If you need these capabilities, design a proper abstraction with sound encapsula
 ### Relationship to functional domain modeling
 
 Good type design reduces the need for unsafe code.
-The patterns in domain-modeling.md show how to make invalid states unrepresentable using safe Rust:
-
-**Smart constructors eliminate unsafe validation shortcuts**:
-```rust
-// Instead of bypassing validation with transmute
-pub struct QualityScore(f64); // Could use unsafe to skip checks
-
-// Use smart constructor pattern (safe)
-impl QualityScore {
-    pub fn new(value: f64) -> Result<Self, String> {
-        if !(0.0..=1.0).contains(&value) {
-            return Err(format!("quality score must be in [0,1], got {}", value));
-        }
-        Ok(QualityScore(value))
-    }
-}
-```
-
-**State machines prevent unsafe state manipulation**:
-```rust
-// Instead of unsafely setting state flags
-struct Model {
-    state: u8, // 0=training, 1=validated, would need unsafe casts
-}
-
-// Use enum state machine (safe)
-enum ModelState {
-    Training(TrainingData),
-    Validated(ValidationResult),
-}
-```
-
-**Type-level invariants reduce unchecked operations**:
-```rust
-// Instead of get_unchecked assuming non-empty
-fn first_element<T>(vec: &Vec<T>) -> &T {
-    unsafe { vec.get_unchecked(0) } // UB if empty
-}
-
-// Use NonEmpty type with guaranteed length (safe)
-pub struct NonEmpty<T> {
-    head: T,
-    tail: Vec<T>,
-}
-
-impl<T> NonEmpty<T> {
-    pub fn first(&self) -> &T {
-        &self.head // Always safe, no bounds check needed
-    }
-}
-```
+The patterns in domain-modeling.md show how to make invalid states unrepresentable using safe Rust.
 
 Before reaching for unsafe, ask: "Can I encode this invariant in the type system?"
 Good domain modeling eliminates entire classes of unsafe operations.
+
+**Smart constructors eliminate unsafe validation shortcuts**:
+
+Instead of bypassing validation with transmute, use smart constructor pattern (safe).
+
+**State machines prevent unsafe state manipulation**:
+
+Instead of unsafely setting state flags, use enum state machine (safe).
+
+**Type-level invariants reduce unchecked operations**:
+
+Instead of `get_unchecked` assuming non-empty, use `NonEmpty` type with guaranteed length (safe).
 
 ### Novel abstractions: validation requirements
 
@@ -4139,16 +2799,10 @@ Prefer proven libraries over custom implementations.
 
 **2. Design must be minimal and testable**
 
-Extract the unsafe core into the smallest possible module.
+Extract unsafe core into smallest possible module.
 Provide safe wrappers for all public APIs.
 
 ```rust
-// Bad: Large unsafe module with mixed concerns
-mod database {
-    pub unsafe fn raw_query(sql: *const u8, len: usize) -> QueryResult { }
-    pub unsafe fn raw_insert(data: *const u8) -> bool { }
-}
-
 // Good: Minimal unsafe core with safe wrapper
 mod ffi {
     // Private unsafe core
@@ -4174,45 +2828,7 @@ Your unsafe code must remain sound even when:
 - `Clone` implementations produce invalid copies
 - `Drop` implementations panic or access global state
 
-Test with intentionally misbehaving implementations:
-
-```rust
-#[cfg(test)]
-mod adversarial_tests {
-    struct PanicOnSecondDeref {
-        count: Cell<usize>,
-        value: String,
-    }
-
-    impl Deref for PanicOnSecondDeref {
-        type Target = String;
-        fn deref(&self) -> &String {
-            let count = self.count.get();
-            self.count.set(count + 1);
-            if count > 0 {
-                panic!("adversarial deref");
-            }
-            &self.value
-        }
-    }
-
-    #[test]
-    fn custom_type_handles_panicking_deref() {
-        let adversarial = PanicOnSecondDeref {
-            count: Cell::new(0),
-            value: "test".to_string(),
-        };
-
-        // Your unsafe abstraction must not cause UB here
-        let result = std::panic::catch_unwind(|| {
-            your_unsafe_abstraction(&adversarial)
-        });
-
-        // Either succeeds or panics, but never UB
-        assert!(result.is_ok() || result.is_err());
-    }
-}
-```
+Test with intentionally misbehaving implementations.
 
 If a closure panics, your abstraction must become invalid (e.g., poisoned like `Mutex`), but must never cause undefined behavior.
 
@@ -4238,11 +2854,6 @@ pub fn process_measurements(data: &[f64]) -> f64 {
 }
 ```
 
-Insufficient documentation:
-```rust
-unsafe { data.get_unchecked(0) } // SAFETY: should be fine
-```
-
 The reasoning must be detailed enough for reviewers to verify correctness.
 
 **5. Pass Miri including adversarial tests**
@@ -4254,16 +2865,13 @@ All unsafe code must pass Miri without warnings:
 cargo +nightly miri test
 ```
 
-Run Miri on:
-- Normal test cases
-- Edge cases (empty collections, zero values, maximum sizes)
-- Adversarial tests (panicking traits, misbehaving implementations)
-
+Run Miri on normal test cases, edge cases, and adversarial tests.
 Miri failures indicate undefined behavior that must be fixed before merging.
 
 **6. Follow official unsafe code guidelines**
 
 Study and follow the [Rust Unsafe Code Guidelines](https://rust-lang.github.io/unsafe-code-guidelines/).
+
 Key resources:
 - [The Rustonomicon](https://doc.rust-lang.org/nightly/nomicon/)
 - [Unsafe Code Guidelines Reference](https://rust-lang.github.io/unsafe-code-guidelines/)
@@ -4271,40 +2879,15 @@ Key resources:
 
 ### Performance: validation requirements
 
-Using unsafe for performance requires the same rigor as novel abstractions plus benchmark evidence:
+Using unsafe for performance requires same rigor as novel abstractions plus benchmark evidence:
 
 **1. Benchmark first**
 
-Prove the unsafe optimization provides meaningful benefit:
-
-```rust
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-
-fn bench_safe_version(c: &mut Criterion) {
-    let data: Vec<f64> = (0..1000).map(|x| x as f64).collect();
-    c.bench_function("safe_get", |b| {
-        b.iter(|| {
-            black_box(&data)[black_box(500)]
-        })
-    });
-}
-
-fn bench_unsafe_version(c: &mut Criterion) {
-    let data: Vec<f64> = (0..1000).map(|x| x as f64).collect();
-    c.bench_function("unsafe_get", |b| {
-        b.iter(|| {
-            unsafe { black_box(&data).get_unchecked(black_box(500)) }
-        })
-    });
-}
-
-criterion_group!(benches, bench_safe_version, bench_unsafe_version);
-criterion_main!(benches);
-```
+Prove unsafe optimization provides meaningful benefit.
 
 Only proceed if:
-- The unsafe version shows significant improvement (>20% faster)
-- The operation is in a verified hot path (profiling data)
+- Unsafe version shows significant improvement (>20% faster)
+- Operation is in a verified hot path (profiling data)
 - Safe alternatives have been exhausted
 
 **2. Document safety reasoning**
@@ -4314,7 +2897,6 @@ Same requirements as novel abstractions: plain-text explanation of invariants.
 **3. Pass Miri**
 
 Performance-related unsafe must pass Miri.
-Use Miri to verify the optimization is sound across all inputs.
 
 **4. Consider safe alternatives first**
 
@@ -4329,7 +2911,7 @@ Many "necessary" unsafe optimizations become unnecessary with proper profiling a
 
 ### FFI: validation requirements
 
-When calling foreign functions, follow these requirements:
+When calling foreign functions:
 
 **1. Prefer established interop libraries**
 
@@ -4369,7 +2951,7 @@ pub fn process(data: &mut MyStruct) -> Result<(), ExternalError> {
 
 **3. Follow unsafe code guidelines**
 
-FFI code must follow the same safety requirements as novel abstractions.
+FFI code must follow same safety requirements as novel abstractions.
 
 ### Zero-tolerance policy for unsound code
 
@@ -4384,47 +2966,9 @@ A function is unsound if:
 This applies even if causing UB requires "weird code" or "remote theoretical possibility."
 The standard is strict: if UB is possible from safe code, the abstraction is unsound.
 
-**Examples of unsound code**:
-
-```rust
-// Unsound: safe signature, but causes UB if T is smaller than u128
-fn unsound_ref<T>(x: &T) -> &u128 {
-    unsafe { std::mem::transmute(x) }
-}
-
-// Unsound: safe signature, but violates Send contract
-struct AlwaysSend<T>(T);
-unsafe impl<T> Send for AlwaysSend<T> {}
-// If T is !Send (e.g., contains Rc), this creates data races
-
-// Unsound: safe signature, but assumes Vec is non-empty
-pub fn first_element<T>(vec: &Vec<T>) -> &T {
-    unsafe { vec.get_unchecked(0) }
-    // UB when called with empty Vec
-}
-```
-
 **How to fix unsound code**:
 
-If you cannot safely encapsulate something, expose an `unsafe` function and document proper usage:
-
-```rust
-// Sound: unsafe signature documents requirements
-pub unsafe fn first_element_unchecked<T>(vec: &Vec<T>) -> &T {
-    // SAFETY: Caller must ensure vec.len() > 0
-    vec.get_unchecked(0)
-}
-
-// Or better: use safe wrapper with Result
-pub fn first_element<T>(vec: &Vec<T>) -> Option<&T> {
-    vec.first()
-}
-
-// Or best: use NonEmpty type to encode requirement
-pub fn first_element<T>(vec: &NonEmpty<T>) -> &T {
-    vec.first() // Always safe
-}
-```
+If you cannot safely encapsulate something, expose an `unsafe` function and document proper usage, or better: use safe wrapper with Result, or best: use type to encode requirement.
 
 **No exceptions**:
 
@@ -4436,7 +2980,7 @@ If you discover unsound code:
 2. Mark affected code `unsafe` if temporary fix is needed
 3. Redesign the abstraction to be sound or remove it
 
-The zero-tolerance policy exists because unsound abstractions create undefined behavior without warning, making debugging nearly impossible and creating severe security vulnerabilities.
+Zero-tolerance policy exists because unsound abstractions create undefined behavior without warning, making debugging nearly impossible and creating severe security vulnerabilities.
 
 ### Summary: unsafe checklist
 
@@ -4453,41 +2997,12 @@ Before using `unsafe`, verify:
 - [ ] The abstraction is sound (cannot cause UB from safe code)
 
 If any item is unchecked, do not proceed with unsafe.
-The burden of proof is on the author to demonstrate safety.
+Burden of proof is on the author to demonstrate safety.
 
-### Relationship to other type-safety patterns
-
-The type-safety principles in domain-modeling.md and rust-development.md work together:
-
-1. **Smart constructors** (domain-modeling.md): Encode validation in types to avoid runtime checks that might tempt unsafe shortcuts
-2. **State machines** (domain-modeling.md): Make invalid states unrepresentable, eliminating need to unsafely manipulate state
-3. **Result types** (rust-development.md): Explicit error handling prevents bypassing safety with unwrap/expect in unsafe contexts
-4. **Ownership and borrowing** (rust-development.md): Core safety guarantees that unsafe code must preserve
-
-Good type design makes unsafe code unnecessary in most domains.
-When unsafe is genuinely required, these patterns help isolate it in minimal, well-tested modules with safe public interfaces.
-
-### Further reading
-
-**Official Rust resources**:
-- [The Rustonomicon](https://doc.rust-lang.org/nightly/nomicon/) - The dark arts of unsafe Rust
-- [Unsafe Code Guidelines](https://rust-lang.github.io/unsafe-code-guidelines/) - Official reference
-- [Miri documentation](https://github.com/rust-lang/miri) - UB detection tool
-
-**Safety concepts**:
-- [Unsafe, Unsound, Undefined](https://cheats.rs/#unsafe-unsound-undefined) - Terminology reference
-- [Adversarial Code Patterns](https://cheats.rs/#adversarial-code) - Testing malicious inputs
-
-**Related documentation**:
+**See also**:
 - domain-modeling.md - Type-safe domain modeling patterns
 - architectural-patterns.md - Isolating effects and unsafe code at boundaries
 - theoretical-foundations.md - Category-theoretic foundations for safety reasoning
-- Address all `clippy` warnings before committing - run `cargo clippy --all-targets --all-features`
-- Use `cargo fmt` to format code according to Rust style guidelines
-- Enable additional clippy lint groups: `#![warn(clippy::all, clippy::pedantic)]`
-- Consider stricter lints for critical code: `clippy::unwrap_used`, `clippy::expect_used`
-- Run `cargo check` frequently during development for fast feedback
-
 
 ## Code quality and linting
 
@@ -4519,4 +3034,3 @@ This document integrates guidance from:
 
 - theoretical-foundations.md - category-theoretic underpinnings
 - algebraic-data-types.md - sum/product type patterns
-- python-development.md, typescript-nodejs-development.md - FDM in other languages
