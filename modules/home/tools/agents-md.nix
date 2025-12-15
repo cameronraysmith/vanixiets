@@ -43,7 +43,7 @@
           - secrets management: ${prefsPath}/secrets.md
           - nix development: ${prefsPath}/nix-development.md
           - python development: ${prefsPath}/python-development.md
-          - rust development: ${prefsPath}/rust-development.md
+          - rust development: ${prefsPath}/rust-development/00-index.md
           - haskell development: ${prefsPath}/haskell-development.md
           - typescript/node.js development: ${prefsPath}/typescript-nodejs-development.md
           - react/ui development: ${prefsPath}/react-tanstack-ui-development.md
