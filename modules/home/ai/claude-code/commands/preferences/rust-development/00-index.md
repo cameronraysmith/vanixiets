@@ -24,10 +24,10 @@ This guide is organized into focused topic files for easy navigation and AI agen
 
 | File | Description |
 |------|-------------|
-| [01-functional-domain-modeling.md](./01-functional-domain-modeling.md) | Core FDM patterns: smart constructors, state machines, workflows, aggregates, error classification |
-| [02-error-handling.md](./02-error-handling.md) | Canonical error structs, thiserror/anyhow, Result composition, railway-oriented programming |
+| [01-functional-domain-modeling.md](./01-functional-domain-modeling.md) | Core FDM patterns: smart constructors, state machines, workflows, aggregates, error classification; advanced patterns: phantom types, const generics, NonEmpty collections |
+| [02-error-handling.md](./02-error-handling.md) | Canonical error structs, thiserror/anyhow, Result composition, railway-oriented programming, applicative validation, #[must_use] enforcement |
 | [03-panic-semantics.md](./03-panic-semantics.md) | When to panic vs return Result, programming bugs vs domain errors |
-| [04-api-design.md](./04-api-design.md) | Naming, dependency injection hierarchy, builders, sans-io pattern |
+| [04-api-design.md](./04-api-design.md) | Naming, dependency injection hierarchy, builders, sans-io pattern, serialization boundaries, command/event struct patterns |
 | [05-testing.md](./05-testing.md) | Mockable I/O, property-based testing, feature-gated test utilities |
 | [06-documentation.md](./06-documentation.md) | Canonical doc sections, module docs, doc tests |
 | [07-performance.md](./07-performance.md) | Hot paths, throughput optimization, async yield points, allocators |
@@ -41,11 +41,11 @@ This guide is organized into focused topic files for easy navigation and AI agen
 
 This document integrates guidance from:
 
-- **Functional domain modeling**: See domain-modeling.md for universal patterns, architectural-patterns.md for application structure, railway-oriented-programming.md for error composition
+- **Functional domain modeling**: See `~/.claude/commands/preferences/domain-modeling.md` for universal patterns, `~/.claude/commands/preferences/architectural-patterns.md` for application structure, `~/.claude/commands/preferences/railway-oriented-programming.md` for error composition
 - **Microsoft Pragmatic Rust Guidelines**: https://microsoft.github.io/rust-guidelines/agents/all.txt - comprehensive production Rust guidance from Microsoft engineers
 - **Rust API Guidelines**: https://rust-lang.github.io/api-guidelines/ - official Rust API design checklist
 
 ### Related documents
 
-- theoretical-foundations.md - category-theoretic underpinnings
-- algebraic-data-types.md - sum/product type patterns
+- `~/.claude/commands/preferences/theoretical-foundations.md` - category-theoretic underpinnings
+- `~/.claude/commands/preferences/algebraic-data-types.md` - sum/product type patterns
