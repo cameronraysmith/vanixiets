@@ -102,6 +102,106 @@ let measurement = Measurement::new(10.0, 0.5, 0.95)?;
 
 **See also**: domain-modeling.md#pattern-2-smart-constructors-for-invariants
 
+## Pattern 1a: Const generics for compile-time constraints
+
+Use const generics (Rust 1.51+) to enforce numeric bounds and collection sizes at compile time when values are known statically.
+
+**When to use const generics vs runtime validation**:
+
+- **Const generics**: Bounds known at compile time, zero runtime cost, no runtime errors possible
+- **Smart constructors**: Bounds from configuration/runtime data, need Result for error handling
+
+**Example: Bounded numeric types**
+
+```rust
+use std::fmt;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoundedU32<const MIN: u32, const MAX: u32>(u32);
+
+#[derive(Debug)]
+pub struct BoundsError {
+    value: u32,
+    min: u32,
+    max: u32,
+}
+
+impl fmt::Display for BoundsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "value {} out of range [{}, {}]",
+            self.value, self.min, self.max
+        )
+    }
+}
+
+impl<const MIN: u32, const MAX: u32> BoundedU32<MIN, MAX> {
+    pub fn new(value: u32) -> Result<Self, BoundsError> {
+        if value < MIN || value > MAX {
+            Err(BoundsError {
+                value,
+                min: MIN,
+                max: MAX,
+            })
+        } else {
+            Ok(Self(value))
+        }
+    }
+
+    pub fn value(&self) -> u32 {
+        self.0
+    }
+}
+
+// Domain-specific type aliases
+type Percentage = BoundedU32<0, 100>;
+type DayOfMonth = BoundedU32<1, 31>;
+type HttpPort = BoundedU32<1, 65535>;
+
+// Usage
+let percentage = Percentage::new(95)?;
+let day = DayOfMonth::new(15)?;
+// DayOfMonth::new(0)?;  // Compile-time type documents valid range
+```
+
+**Example: Fixed-size validated collections**
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub struct FixedVec<T, const N: usize>([T; N]);
+
+impl<T, const N: usize> FixedVec<T, N> {
+    pub fn new(items: [T; N]) -> Self {
+        Self(items)
+    }
+
+    pub fn get(&self, index: usize) -> Option<&T> {
+        self.0.get(index)
+    }
+
+    pub fn len(&self) -> usize {
+        N
+    }
+}
+
+// Exactly 3 RGB components, enforced at compile time
+type RgbColor = FixedVec<u8, 3>;
+type Coordinate3D = FixedVec<f64, 3>;
+
+// Usage
+let color = RgbColor::new([255, 128, 0]);
+// let invalid = RgbColor::new([255, 128]); // Compile error: expected array of 3 elements
+```
+
+**Limitations and when to fall back to runtime validation**:
+
+1. **Runtime bounds**: When limits come from configuration or user input, use smart constructors
+2. **Complex constraints**: Const generics don't support all expressions yet (e.g., `MIN < MAX` assertion)
+3. **API compatibility**: When interfacing with APIs expecting primitive types, add conversion methods
+
+**See also**: domain-modeling.md#pattern-2-smart-constructors-for-invariants
+
 ## Pattern 2: State machines with enums
 
 Use enums with associated data to model entity lifecycles.
@@ -253,6 +353,172 @@ pub fn validate_model(
     })
 }
 ```
+
+**See also**: domain-modeling.md#pattern-3-state-machines-for-entity-lifecycles
+
+## Pattern 2a: Phantom types for zero-cost state tracking
+
+Use phantom types as an alternative to enum-based state machines when state is known at compile time and you want zero runtime overhead.
+
+**When to use phantom types vs enums**:
+
+- **Phantom types**: State known at compile time, no runtime branching needed, zero-cost abstraction, impossible to inspect state at runtime
+- **Enums**: Runtime state inspection needed, state not known until runtime, pattern matching required, enables dynamic behavior
+
+**Example: Typestate pattern for document workflow**
+
+```rust
+use std::marker::PhantomData;
+
+// State markers (zero-sized types)
+pub struct Unvalidated;
+pub struct Validated;
+pub struct Approved;
+
+// Document parameterized by state
+pub struct Document<State> {
+    content: String,
+    _state: PhantomData<State>,
+}
+
+// Operations available only on unvalidated documents
+impl Document<Unvalidated> {
+    pub fn new(content: String) -> Self {
+        Document {
+            content,
+            _state: PhantomData,
+        }
+    }
+
+    pub fn validate(self) -> Result<Document<Validated>, ValidationError> {
+        // Validation logic
+        if self.content.is_empty() {
+            return Err(ValidationError("content cannot be empty".to_string()));
+        }
+
+        Ok(Document {
+            content: self.content,
+            _state: PhantomData,
+        })
+    }
+}
+
+// Operations available only on validated documents
+impl Document<Validated> {
+    pub fn approve(self, approver: &User) -> Document<Approved> {
+        // In real code, record approver info
+        Document {
+            content: self.content,
+            _state: PhantomData,
+        }
+    }
+}
+
+// Operations available only on approved documents
+impl Document<Approved> {
+    pub fn publish(&self) -> PublishedDocument {
+        PublishedDocument {
+            content: self.content.clone(),
+            published_at: chrono::Utc::now(),
+        }
+    }
+}
+
+// Common operations available in all states
+impl<State> Document<State> {
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+}
+
+#[derive(Debug)]
+pub struct ValidationError(String);
+
+pub struct User {
+    name: String,
+}
+
+pub struct PublishedDocument {
+    content: String,
+    published_at: chrono::DateTime<chrono::Utc>,
+}
+
+// Usage - invalid transitions are compile errors
+fn example_workflow() -> Result<PublishedDocument, ValidationError> {
+    let doc = Document::<Unvalidated>::new("content".to_string());
+    let validated = doc.validate()?;
+    let approver = User { name: "admin".to_string() };
+    let approved = validated.approve(&approver);
+    Ok(approved.publish())
+
+    // doc.publish();  // Compile error: method not available on Unvalidated
+    // validated.publish();  // Compile error: method not available on Validated
+}
+```
+
+**Example: Units of measure for type-safe calculations**
+
+```rust
+use std::marker::PhantomData;
+
+pub struct Quantity<Unit>(f64, PhantomData<Unit>);
+
+// Unit markers
+pub struct Meters;
+pub struct Seconds;
+pub struct MetersPerSecond;
+pub struct MetersPerSecondSquared;
+
+impl<U> Quantity<U> {
+    pub fn new(value: f64) -> Self {
+        Quantity(value, PhantomData)
+    }
+
+    pub fn value(&self) -> f64 {
+        self.0
+    }
+}
+
+// Type-safe division: distance / time = velocity
+impl std::ops::Div<Quantity<Seconds>> for Quantity<Meters> {
+    type Output = Quantity<MetersPerSecond>;
+
+    fn div(self, rhs: Quantity<Seconds>) -> Self::Output {
+        Quantity::new(self.0 / rhs.0)
+    }
+}
+
+// Type-safe division: velocity / time = acceleration
+impl std::ops::Div<Quantity<Seconds>> for Quantity<MetersPerSecond> {
+    type Output = Quantity<MetersPerSecondSquared>;
+
+    fn div(self, rhs: Quantity<Seconds>) -> Self::Output {
+        Quantity::new(self.0 / rhs.0)
+    }
+}
+
+// Usage
+let distance = Quantity::<Meters>::new(100.0);
+let time = Quantity::<Seconds>::new(9.8);
+let velocity = distance / time;  // Type: Quantity<MetersPerSecond>
+let acceleration = velocity / time;  // Type: Quantity<MetersPerSecondSquared>
+
+// let invalid = distance + time;  // Compile error: no Add impl for different units
+```
+
+**Benefits of phantom types**:
+
+1. **Zero runtime cost**: PhantomData is zero-sized, no memory overhead
+2. **Compile-time safety**: Invalid state transitions impossible
+3. **Documentation**: Type signature shows exactly what state is required
+4. **Optimization**: Compiler can inline and eliminate all state tracking
+
+**Limitations**:
+
+1. **No runtime inspection**: Cannot check "what state am I in?" at runtime
+2. **State must be known**: All transitions must be deterministic at compile time
+3. **API ergonomics**: Generic parameters can complicate type signatures
+4. **Error handling complexity**: Harder to return different states based on runtime conditions
 
 **See also**: domain-modeling.md#pattern-3-state-machines-for-entity-lifecycles
 
@@ -426,6 +692,135 @@ impl Dataset {
     }
 }
 ```
+
+**See also**: domain-modeling.md#pattern-5-aggregates-as-consistency-boundaries
+
+## Pattern 4a: NonEmpty collections for aggregate invariants
+
+Use NonEmpty collections to encode "at least one" invariants in aggregate types, preventing empty states at the type level.
+
+**The problem**: Standard collections like Vec allow empty states, but many aggregates require at least one element (Order must have at least one line, Dataset must have at least one observation).
+
+**Example: Using nonempty crate**
+
+```rust
+use nonempty::NonEmpty;
+
+#[derive(Debug, Clone)]
+pub struct OrderLine {
+    product_id: String,
+    quantity: u32,
+    price: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct Order {
+    id: String,
+    lines: NonEmpty<OrderLine>,  // Guaranteed at least one
+}
+
+impl Order {
+    /// Smart constructor - requires at least one line
+    pub fn new(id: String, first_line: OrderLine) -> Self {
+        Order {
+            id,
+            lines: NonEmpty::new(first_line),
+        }
+    }
+
+    /// Add more lines
+    pub fn add_line(&mut self, line: OrderLine) {
+        self.lines.push(line);
+    }
+
+    /// Remove line - returns error if it would leave order empty
+    pub fn remove_line(&mut self, idx: usize) -> Result<OrderLine, RemoveError> {
+        if self.lines.len() <= 1 {
+            Err(RemoveError::WouldBeEmpty)
+        } else {
+            // Remove from tail (index adjusted by 1 since head is separate)
+            if idx == 0 {
+                // Swap head with first tail element
+                let old_head = std::mem::replace(&mut self.lines.head, self.lines.tail.remove(0));
+                Ok(old_head)
+            } else {
+                Ok(self.lines.tail.remove(idx - 1))
+            }
+        }
+    }
+
+    /// Total price calculation always valid - guaranteed to have items
+    pub fn total_price(&self) -> f64 {
+        self.lines.iter().map(|line| line.price * line.quantity as f64).sum()
+    }
+}
+
+#[derive(Debug)]
+pub enum RemoveError {
+    WouldBeEmpty,
+    IndexOutOfBounds,
+}
+```
+
+**Example: Custom NonEmpty implementation**
+
+If not using the nonempty crate, implement your own:
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub struct NonEmpty<T> {
+    head: T,
+    tail: Vec<T>,
+}
+
+impl<T> NonEmpty<T> {
+    pub fn new(head: T) -> Self {
+        NonEmpty { head, tail: Vec::new() }
+    }
+
+    pub fn from_vec(mut vec: Vec<T>) -> Option<Self> {
+        if vec.is_empty() {
+            None
+        } else {
+            let head = vec.remove(0);
+            Some(NonEmpty { head, tail: vec })
+        }
+    }
+
+    pub fn push(&mut self, item: T) {
+        self.tail.push(item);
+    }
+
+    pub fn head(&self) -> &T {
+        &self.head
+    }
+
+    pub fn tail(&self) -> &[T] {
+        &self.tail
+    }
+
+    pub fn len(&self) -> usize {
+        1 + self.tail.len()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        std::iter::once(&self.head).chain(self.tail.iter())
+    }
+}
+```
+
+**Benefits of NonEmpty**:
+
+1. **Type-level guarantee**: Impossible to create empty aggregate
+2. **Simpler logic**: No need to check for empty in aggregate methods
+3. **Self-documenting**: Type signature communicates invariant
+4. **Compiler enforcement**: Refactoring maintains invariant automatically
+
+**When to use NonEmpty**:
+
+- Aggregate root must always contain members (Order with OrderLines)
+- Computation requires at least one value (mean, max, etc.)
+- Business rule explicitly forbids empty state
 
 **See also**: domain-modeling.md#pattern-5-aggregates-as-consistency-boundaries
 
