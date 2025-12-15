@@ -176,10 +176,35 @@ pub enum ProcessingError {
 }
 ```
 
-## Application error types: anyhow
+## Application error types: anyhow and miette
 
 Applications (binaries, not libraries) should use `anyhow` for simplified error handling.
 The `anyhow::Result<T>` type automatically converts any error implementing `std::error::Error`.
+
+For CLI tools and developer-facing applications that benefit from rich diagnostic output, consider `miette` instead.
+It provides pretty-printed error reports with source code snippets, help text, and related errors.
+
+```rust
+use miette::{Diagnostic, SourceSpan};
+use thiserror::Error;
+
+#[derive(Error, Diagnostic, Debug)]
+#[error("invalid configuration")]
+#[diagnostic(
+    code(config::invalid),
+    help("check that all required fields are present")
+)]
+pub struct ConfigError {
+    #[source_code]
+    pub src: String,
+    #[label("this field is invalid")]
+    pub span: SourceSpan,
+}
+```
+
+**When to use each**:
+- **anyhow**: General applications, quick prototyping, when you just need error context chains
+- **miette**: CLI tools, compilers, linters, any tool where users benefit from seeing error locations in source
 
 ```rust
 use anyhow::{Context, Result};
