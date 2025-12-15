@@ -261,68 +261,212 @@ fn workflow() -> Result<Output, WorkflowError> {
 
 ## Railway-oriented programming with Result
 
-Use applicative patterns to collect multiple errors rather than failing on first error.
+Railway-oriented programming treats error handling as a two-track railway: success track and failure track.
+The `?` operator provides monadic composition (bind) for fail-fast behavior.
+This section focuses on applicative composition for error accumulation.
+
+See `~/.claude/commands/preferences/railway-oriented-programming.md` for comprehensive patterns including bind vs apply, effect signatures, and the two-track model.
+
+### Fail-fast vs error accumulation
+
+Choose your composition strategy based on whether operations are independent:
+
+**When to fail-fast (monadic bind with `?`)**:
+- Steps depend on previous results
+- Operations are expensive (database writes, API calls)
+- Want to short-circuit and avoid wasted work
+- Example: validate input → reserve inventory → charge payment → create shipment
+
+**When to accumulate (applicative validation)**:
+- Validations are independent
+- Want all errors at once for better UX
+- Operations are cheap (field validation)
+- Example: validate all form fields, show user every problem
+
+### Manual error accumulation pattern
+
+Validate all fields independently and collect errors:
 
 ```rust
-// Sequential (fail-fast): stops at first error
-fn validate_user_sequential(
-    email: &str,
-    name: &str,
-    age: i32,
-) -> Result<ValidUser, ValidationError> {
-    let email = validate_email(email)?;  // Stops here if invalid
-    let name = validate_name(name)?;
-    let age = validate_age(age)?;
-    Ok(ValidUser { email, name, age })
-}
-
-// Parallel (collect all errors): accumulates all validation errors
-fn validate_user_parallel(
-    email: &str,
-    name: &str,
-    age: i32,
-) -> Result<ValidUser, Vec<ValidationError>> {
-    let email_result = validate_email(email);
-    let name_result = validate_name(name);
-    let age_result = validate_age(age);
-
+fn validate_user(input: &UserInput) -> Result<ValidUser, Vec<ValidationError>> {
     let mut errors = Vec::new();
 
-    let email = match email_result {
-        Ok(e) => e,
-        Err(e) => {
-            errors.push(e);
-            return Err(errors);
-        }
+    let email = match Email::new(&input.email) {
+        Ok(e) => Some(e),
+        Err(e) => { errors.push(e.into()); None }
     };
 
-    let name = match name_result {
-        Ok(n) => n,
-        Err(e) => {
-            errors.push(e);
-            return Err(errors);
-        }
+    let age = match Age::new(input.age) {
+        Ok(a) => Some(a),
+        Err(e) => { errors.push(e.into()); None }
     };
 
-    let age = match age_result {
-        Ok(a) => a,
-        Err(e) => {
-            errors.push(e);
-            return Err(errors);
-        }
+    let name = match Name::new(&input.name) {
+        Ok(n) => Some(n),
+        Err(e) => { errors.push(e.into()); None }
     };
 
-    if !errors.is_empty() {
-        return Err(errors);
+    if errors.is_empty() {
+        Ok(ValidUser {
+            email: email.unwrap(),
+            age: age.unwrap(),
+            name: name.unwrap(),
+        })
+    } else {
+        Err(errors)
     }
-
-    Ok(ValidUser { email, name, age })
 }
 ```
 
-For more sophisticated applicative patterns, consider libraries like `validation` or `garde`.
+**Why this pattern**:
+- All validations run even if some fail
+- User sees all problems at once
+- Each validation is independent (no data dependencies)
+- Pattern is explicit and easy to understand
 
-See `~/.claude/commands/preferences/railway-oriented-programming.md` for comprehensive patterns including bind, apply, and effect signatures.
+### Generic validation collection helper
+
+Extract the accumulation pattern into a reusable helper:
+
+```rust
+fn collect_validations<T, E>(
+    results: Vec<Result<T, E>>
+) -> Result<Vec<T>, Vec<E>> {
+    let (oks, errs): (Vec<_>, Vec<_>) = results
+        .into_iter()
+        .partition(Result::is_ok);
+
+    if errs.is_empty() {
+        Ok(oks.into_iter().map(Result::unwrap).collect())
+    } else {
+        Err(errs.into_iter().map(|r| r.unwrap_err()).collect())
+    }
+}
+
+// Usage: validate multiple items
+fn validate_batch(inputs: &[UserInput]) -> Result<Vec<ValidUser>, Vec<ValidationError>> {
+    let results: Vec<Result<ValidUser, ValidationError>> = inputs
+        .iter()
+        .map(|input| validate_user_single(input))
+        .collect();
+
+    collect_validations(results)
+        .map_err(|errs| errs.into_iter().flatten().collect())
+}
+```
+
+### Validation libraries
+
+For production code, consider validation crates:
+
+**`validator` crate** - derive-based validation:
+```rust
+use validator::{Validate, ValidationError};
+
+#[derive(Debug, Validate)]
+pub struct SignupForm {
+    #[validate(email)]
+    email: String,
+
+    #[validate(length(min = 3, max = 50))]
+    username: String,
+
+    #[validate(range(min = 18, max = 120))]
+    age: u8,
+}
+
+// Returns ValidationErrors with all field errors
+fn validate_signup(form: &SignupForm) -> Result<(), ValidationErrors> {
+    form.validate()
+}
+```
+
+**`garde` crate** - flexible validation with better errors:
+```rust
+use garde::Validate;
+
+#[derive(Debug, Validate)]
+pub struct User {
+    #[garde(email)]
+    email: String,
+
+    #[garde(length(min = 1, max = 100))]
+    name: String,
+
+    #[garde(custom(validate_age))]
+    age: i32,
+}
+
+fn validate_age(age: &i32, _ctx: &()) -> garde::Result {
+    if *age >= 18 && *age <= 120 {
+        Ok(())
+    } else {
+        Err(garde::Error::new("age must be between 18 and 120"))
+    }
+}
+```
+
+**Custom implementation**:
+For domain-specific validation that doesn't fit standard patterns, use manual accumulation.
+This gives full control over error types and validation logic.
+
+### Enforcing Result handling with #[must_use]
+
+Use `#[must_use]` to make the two-track model explicit in the type system.
+The compiler warns when Result values are ignored, enforcing railway-oriented discipline.
+
+```rust
+#[must_use = "validation result must be handled"]
+pub fn validate(input: &Input) -> Result<Validated, ValidationError> {
+    // Validation logic
+}
+
+// Compiler error if you forget to handle Result:
+validate(&input);  // warning: unused `Result` that must be used
+
+// Force explicit handling:
+let _ = validate(&input);  // warning: unused `Result` that must be used
+validate(&input)?;         // OK: propagates error
+match validate(&input) {   // OK: explicit handling
+    Ok(v) => process(v),
+    Err(e) => log_error(e),
+}
+```
+
+**Apply to custom Result wrappers**:
+
+```rust
+#[must_use]
+pub struct ValidationResult<T> {
+    inner: Result<T, ValidationError>,
+}
+
+impl<T> ValidationResult<T> {
+    pub fn new(result: Result<T, ValidationError>) -> Self {
+        Self { inner: result }
+    }
+
+    pub fn into_result(self) -> Result<T, ValidationError> {
+        self.inner
+    }
+}
+
+#[must_use = "calibration must be validated before use"]
+pub fn calibrate(data: &RawData) -> ValidationResult<CalibratedData> {
+    ValidationResult::new(calibrate_impl(data))
+}
+```
+
+**When to apply #[must_use]**:
+- Public Result-returning functions where ignoring the error would be a bug
+- Operations that combine computation with validation
+- Functions with important side effects encoded in the return value
+- Custom Result wrapper types that carry domain errors
+
+**Connection to ROP**:
+This attribute makes the two-track railway explicit in the type system.
+You cannot accidentally stay on the success track without handling potential failure.
+The compiler enforces that you acknowledge both tracks exist.
 
 ## Error handling best practices
 
