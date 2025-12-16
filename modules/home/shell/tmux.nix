@@ -254,6 +254,7 @@
             # Pane management
             bind z resize-pane -Z
             bind x swap-pane -D
+            bind @ choose-tree 'join-pane -h -t "%%"'
             bind c kill-pane
             bind * setw synchronize-panes
             bind P set pane-border-status
