@@ -77,6 +77,22 @@ dev:
 clean:
   rm -f ./result
 
+# Preview nix store garbage collection (dry run)
+[group('nix')]
+gc-dry keep="5" keep_since="7d":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  nh clean all -n -k {{keep}} -K {{keep_since}}
+  echo ""
+  echo "This was a dry run. To execute garbage collection:"
+  echo "  just gc {{keep}} {{keep_since}}"
+  echo "  nh clean all -k {{keep}} -K {{keep_since}}"
+
+# Execute nix store garbage collection
+[group('nix')]
+gc keep="5" keep_since="7d":
+  nh clean all -k {{keep}} -K {{keep_since}}
+
 # Build nix flake
 [group('nix')]
 build profile: lint check
