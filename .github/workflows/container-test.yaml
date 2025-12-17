@@ -1,0 +1,127 @@
+name: Container Build Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      system:
+        description: "Target system for container build"
+        required: true
+        type: choice
+        options:
+          - x86_64-linux
+          - aarch64-linux
+          - both
+        default: x86_64-linux
+      container:
+        description: "Container to build (e.g., fdContainer, rgContainer)"
+        required: true
+        type: string
+        default: fdContainer
+      test_load:
+        description: "Test loading to Docker daemon"
+        required: false
+        type: boolean
+        default: true
+      debug_enabled:
+        description: "Enable tmate debug session"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: container-test-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  CACHIX_BINARY_CACHE: cameronraysmith
+
+jobs:
+  build-container:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+            enabled: ${{ inputs.system == 'x86_64-linux' || inputs.system == 'both' }}
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+            enabled: ${{ inputs.system == 'aarch64-linux' || inputs.system == 'both' }}
+        exclude:
+          - enabled: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        with:
+          system: ${{ matrix.system }}
+          enable-cachix: true
+          cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Setup tmate debug session
+        if: inputs.debug_enabled
+        uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
+
+      - name: Build container image
+        id: build
+        run: |
+          echo "Building ${{ inputs.container }} for ${{ matrix.system }}"
+          nix build ".#packages.${{ matrix.system }}.${{ inputs.container }}" -o result-container
+
+          # Verify output is JSON manifest (nix2container) not tarball (dockerTools)
+          if file result-container | grep -q "JSON"; then
+            echo "output_type=json-manifest" >> $GITHUB_OUTPUT
+            echo "Container built with nix2container (JSON manifest)"
+            head -20 result-container
+          elif file result-container | grep -q "gzip"; then
+            echo "output_type=tarball" >> $GITHUB_OUTPUT
+            echo "Container built with dockerTools (tarball)"
+          else
+            echo "output_type=unknown" >> $GITHUB_OUTPUT
+            file result-container
+          fi
+
+      - name: Check passthru attributes
+        run: |
+          echo "Checking passthru attributes..."
+          PASSTHRU=$(nix eval ".#packages.${{ matrix.system }}.${{ inputs.container }}.passthru" --apply 'x: builtins.attrNames x' 2>&1) || true
+          echo "Available passthru: $PASSTHRU"
+
+          # Check for nix2container-specific attributes
+          if echo "$PASSTHRU" | grep -q "copyToDockerDaemon"; then
+            echo "nix2container passthru detected"
+          fi
+
+      - name: Test copyToDockerDaemon
+        if: inputs.test_load && steps.build.outputs.output_type == 'json-manifest'
+        run: |
+          echo "Attempting to load container to Docker daemon..."
+          # This may fail due to skopeo build issues - that's expected and informative
+          nix run ".#packages.${{ matrix.system }}.${{ inputs.container }}.copyToDockerDaemon" 2>&1 || {
+            echo "::warning::copyToDockerDaemon failed - this may be due to nix2container skopeo build issues"
+            echo "The container image itself built successfully (JSON manifest verified)"
+          }
+
+      - name: Test with native docker load (tarball fallback)
+        if: inputs.test_load && steps.build.outputs.output_type == 'tarball'
+        run: |
+          echo "Loading tarball to Docker..."
+          docker load < result-container
+          docker images | head -5
+
+      - name: Report disk usage
+        if: always()
+        run: df -h
