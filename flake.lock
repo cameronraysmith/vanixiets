@@ -652,15 +652,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1765614563,
-        "narHash": "sha256-YP867hf3ApYYHZ6ugNRq4HmTwtDXV1tmkkHg6FYOXDU=",
-        "owner": "nlewo",
+        "lastModified": 1765999785,
+        "narHash": "sha256-QBMel1kJOuKT+bnvAoOlL4nIrMbowiI6dmQWJXXOa2M=",
+        "owner": "cameronraysmith",
         "repo": "nix2container",
-        "rev": "954bfece93c6f1475be983820d860b2f9a39e7ce",
+        "rev": "0e9a2f5c361444a8edc64cca2eedcdfb473f7965",
         "type": "github"
       },
       "original": {
-        "owner": "nlewo",
+        "owner": "cameronraysmith",
+        "ref": "185-skopeo-fix",
         "repo": "nix2container",
         "type": "github"
       }
