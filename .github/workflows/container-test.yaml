@@ -44,20 +44,29 @@ env:
   CACHIX_BINARY_CACHE: cameronraysmith
 
 jobs:
+  # Dynamic matrix setup - generates matrix based on system input
+  # This avoids the GitHub Actions bug where matrix exclude with expressions fails
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          if [[ "${{ inputs.system }}" == "both" ]]; then
+            echo 'matrix={"include":[{"system":"x86_64-linux","runner":"ubuntu-latest"},{"system":"aarch64-linux","runner":"ubuntu-24.04-arm"}]}' >> $GITHUB_OUTPUT
+          elif [[ "${{ inputs.system }}" == "x86_64-linux" ]]; then
+            echo 'matrix={"include":[{"system":"x86_64-linux","runner":"ubuntu-latest"}]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"include":[{"system":"aarch64-linux","runner":"ubuntu-24.04-arm"}]}' >> $GITHUB_OUTPUT
+          fi
+
   build-container:
+    needs: setup-matrix
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - system: x86_64-linux
-            runner: ubuntu-latest
-            enabled: ${{ inputs.system == 'x86_64-linux' || inputs.system == 'both' }}
-          - system: aarch64-linux
-            runner: ubuntu-24.04-arm
-            enabled: ${{ inputs.system == 'aarch64-linux' || inputs.system == 'both' }}
-        exclude:
-          - enabled: false
+      matrix: ${{ fromJSON(needs.setup-matrix.outputs.matrix) }}
 
     steps:
       - name: Checkout repository
