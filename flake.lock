@@ -626,11 +626,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1765999785,
+        "lastModified": 1766000582,
         "narHash": "sha256-QBMel1kJOuKT+bnvAoOlL4nIrMbowiI6dmQWJXXOa2M=",
         "owner": "cameronraysmith",
         "repo": "nix2container",
-        "rev": "0e9a2f5c361444a8edc64cca2eedcdfb473f7965",
+        "rev": "6c5365c945af381435c77de7104ccf4f10b101e5",
         "type": "github"
       },
       "original": {
