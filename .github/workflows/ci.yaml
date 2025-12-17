@@ -38,6 +38,9 @@ on:
         type: string
   pull_request:
     types: [opened, reopened, synchronize]
+    # TEMP: exclude container refactor branch during iteration (revert before merge)
+    branches-ignore:
+      - refactor-container-builds
     paths-ignore:
       - "*.md"
   push:
