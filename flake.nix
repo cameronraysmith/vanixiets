@@ -85,7 +85,9 @@
     flocken.url = "github:mirkolenz/flocken/v2";
     flocken.inputs.nixpkgs.follows = "nixpkgs";
 
-    nix2container.url = "github:nlewo/nix2container";
+    # Using fork with skopeo fix for issue #185 (go mod vendor for skopeo >= 1.15)
+    # TODO: revert to upstream when https://github.com/nlewo/nix2container/issues/185 is fixed
+    nix2container.url = "github:cameronraysmith/nix2container/185-skopeo-fix";
     nix2container.inputs.nixpkgs.follows = "nixpkgs";
 
     nix-rosetta-builder.url = "github:cpick/nix-rosetta-builder";
