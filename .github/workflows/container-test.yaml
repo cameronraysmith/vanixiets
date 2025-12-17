@@ -91,16 +91,20 @@ jobs:
           nix build ".#packages.${{ matrix.system }}.${{ inputs.container }}" -o result-container
 
           # Verify output is JSON manifest (nix2container) not tarball (dockerTools)
-          if file result-container | grep -q "JSON"; then
+          # Use file -L to follow symlink and get actual file type
+          FILE_TYPE=$(file -L result-container)
+          echo "File type: $FILE_TYPE"
+
+          if echo "$FILE_TYPE" | grep -qi "json"; then
             echo "output_type=json-manifest" >> $GITHUB_OUTPUT
             echo "Container built with nix2container (JSON manifest)"
             head -20 result-container
-          elif file result-container | grep -q "gzip"; then
+          elif echo "$FILE_TYPE" | grep -qi "gzip"; then
             echo "output_type=tarball" >> $GITHUB_OUTPUT
             echo "Container built with dockerTools (tarball)"
           else
             echo "output_type=unknown" >> $GITHUB_OUTPUT
-            file result-container
+            echo "Unknown file type"
           fi
 
       - name: Check passthru attributes
