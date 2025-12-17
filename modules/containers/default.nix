@@ -1,8 +1,18 @@
-# Multi-architecture container builds using flocken and nix-rosetta-builder
+# Multi-architecture container builds using nix2container and flocken
 #
 # This module provides:
 # - Container packages (fdContainer, rgContainer) for Linux systems
 # - Multi-arch manifests (fdManifest, rgManifest) for CI/CD registry distribution
+#
+# Architecture:
+# - nix2container: Builds JSON manifests with pre-computed layer digests
+#   No tarballs written to Nix store; layers synthesized at push time by patched skopeo
+# - flocken: Creates multi-arch Docker manifests from nix2container streams
+#
+# Performance characteristics:
+# - Build time: O(manifest size) - JSON generation only, no tar creation
+# - Store space: O(manifest size) - no layer tarball duplication
+# - Push time: O(changed layers) - skopeo skips unchanged layers by digest
 #
 # See docs/about/contributing/multi-arch-containers.md for usage guide.
 { inputs, lib, ... }:
@@ -13,31 +23,61 @@
       isLinux = lib.hasSuffix "-linux" system;
       isDarwin = lib.hasSuffix "-darwin" system;
 
+      # Get nix2container for this system
+      nix2container = inputs.nix2container.packages.${system}.nix2container;
+
+      # Shared base layer: bash and coreutils
+      # This layer is reused across all tool containers, maximizing cache hits
+      baseLayer = nix2container.buildLayer {
+        deps = [
+          pkgs.bashInteractive
+          pkgs.coreutils
+        ];
+      };
+
       # Build a minimal container image with a package
       # Makes it work like: docker run <name>:latest --version
+      #
+      # Layer strategy:
+      # - Layer 0: baseLayer (bash, coreutils) - rarely changes, shared
+      # - Layer 1: tool package - changes independently per tool
+      #
+      # Development workflow:
+      # - Local test: nix run .#fdContainer.copyToDockerDaemon && docker run fd
+      # - Single push: nix run .#fdContainer.copyToRegistry
+      # - Multi-arch: nix run --impure .#fdManifest
       mkToolContainer =
         {
           name,
           package,
           tag ? "latest",
         }:
-        pkgs.dockerTools.buildLayeredImage {
+        nix2container.buildImage {
           inherit name tag;
-          contents = [
-            pkgs.bashInteractive
-            pkgs.coreutils
-            package
-          ];
+
+          # Explicit layers: base packages in shared layer
+          layers = [ baseLayer ];
+
+          # Tool package in main image layer (copyToRoot strips /nix/store prefix)
+          copyToRoot = pkgs.buildEnv {
+            name = "root";
+            paths = [ package ];
+            pathsToLink = [ "/bin" ];
+          };
+
           config = {
-            Entrypoint = [ "${package}/bin/${name}" ];
+            entrypoint = [ "${package}/bin/${name}" ];
             Env = [
               "PATH=${package}/bin:${pkgs.coreutils}/bin:${pkgs.bashInteractive}/bin"
             ];
             Labels = {
               "org.opencontainers.image.description" = "Minimal container with ${name}";
-              "org.opencontainers.image.source" = "https://github.com/cameronraysmith/infra";
+              "org.opencontainers.image.source" = "https://github.com/cameronraysmith/vanixiets";
             };
           };
+
+          # Further split customization layer by popularity if beneficial
+          maxLayers = 2;
         };
 
       # Systems to build images for (both architectures)
@@ -86,9 +126,10 @@
             fdManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
               version = getEnvOr "VERSION" "1.0.0";
               branch = getEnvOr "GITHUB_REF_NAME" "main";
-              imageFiles = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
+              # nix2container images produce streaming outputs for flocken
+              imageStreams = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
               registries."ghcr.io" = {
-                repo = "cameronraysmith/fd";
+                repo = "cameronraysmith/vanixiets/fd";
                 username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
                 password = "$GITHUB_TOKEN";
               };
@@ -97,9 +138,9 @@
             rgManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
               version = getEnvOr "VERSION" "1.0.0";
               branch = getEnvOr "GITHUB_REF_NAME" "main";
-              imageFiles = map (sys: inputs.self.packages.${sys}.rgContainer) imageSystems;
+              imageStreams = map (sys: inputs.self.packages.${sys}.rgContainer) imageSystems;
               registries."ghcr.io" = {
-                repo = "cameronraysmith/rg";
+                repo = "cameronraysmith/vanixiets/rg";
                 username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
                 password = "$GITHUB_TOKEN";
               };
