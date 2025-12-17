@@ -85,6 +85,9 @@
     flocken.url = "github:mirkolenz/flocken/v2";
     flocken.inputs.nixpkgs.follows = "nixpkgs";
 
+    nix2container.url = "github:nlewo/nix2container";
+    nix2container.inputs.nixpkgs.follows = "nixpkgs";
+
     nix-rosetta-builder.url = "github:cpick/nix-rosetta-builder";
     nix-rosetta-builder.inputs.nixpkgs.url = "github:nixos/nixpkgs/e9f00bd893984bc8ce46c895c3bf7cac95331127";
 
