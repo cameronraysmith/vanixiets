@@ -201,9 +201,8 @@ Beyond issue-by-issue evolution, periodically review the whole graph.
 ### Weekly or sprint-boundary review
 
 ```bash
-# Overall health
-bd stats
-bv --robot-insights
+# Unified health check — start here
+bv --robot-triage
 
 # Stale issues (not updated in 30+ days)
 bd stale
@@ -211,16 +210,21 @@ bd stale
 # Blocked issues — are blockers being worked?
 bd blocked
 
-# Cycle check — should always be zero
+# Cycle check — should always be zero (also in triage output)
 bd dep cycles
 
-# Priority misalignment
+# Priority misalignment (for targeted priority fixes)
 bv --robot-priority
 ```
 
 ### Graph structure review
 
+For deep structural analysis beyond what `--robot-triage` provides:
+
 ```bash
+# Full graph metrics (PageRank, betweenness, HITS, eigenvector, critical path)
+bv --robot-insights
+
 # Bottlenecks — are these being prioritized?
 bv --robot-insights | jq '.Bottlenecks[:10]'
 
