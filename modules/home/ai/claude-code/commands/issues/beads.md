@@ -9,6 +9,7 @@ Data lives in `.beads/` at the repository root, making it portable and version-c
 
 Related commands:
 - `/issues:beads-workflow` (`~/.claude/commands/issues/beads-workflow.md`) — operational workflows for AI agents
+- `/issues:beads-evolve` (`~/.claude/commands/issues/beads-evolve.md`) — adaptive issue graph evolution (XP-style refinement)
 - `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference for hooks
 
 ## Core concepts
