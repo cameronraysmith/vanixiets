@@ -51,6 +51,7 @@ If you encounter a file with multiple distinct logical changes already present:
 - Succinct conventional commit messages for semantic versioning
 - Test locally before committing when reasonable
 - Never use emojis or multiple authors in commit messages
+- Never @-mention usernames or reference issues/PRs (#NNN, URLs) in commit messages - causes unwanted notifications and immutable backlinks
 - Fixup commits: prefix with "fixup! " followed by exact subject from commit being revised (use only once, not repeated)
 - Stage one file per commit via `git add [file]` after verifying exactly one logical change
 - Never use `git add .`, `git add -A`, or interactive staging (`git add -p`, `git add -i`, `git add -e`) - interactive commands hang
