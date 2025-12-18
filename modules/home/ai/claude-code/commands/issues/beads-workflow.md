@@ -18,44 +18,51 @@ Related commands:
 Run these commands at session start or when asked about project status:
 
 ```bash
-# Quick stats overview
-bd stats
+# Unified triage — the single entry point for all project intelligence
+bv --robot-triage
 
-# Execution plan with parallel tracks and unblocks analysis
-bv --robot-plan
-
-# Epic progress summary
+# Epic progress summary (not included in triage)
 bd epic status
 ```
 
-The `bd stats` output shows total issues, open/closed/blocked/ready counts.
-The `bv --robot-plan` output provides actionable intelligence: parallel work tracks, what each item unblocks, and a `summary.highest_impact` field identifying the single best issue to work on next.
+The `bv --robot-triage` output provides everything in one call:
+- `quick_ref`: at-a-glance counts + top 3 picks
+- `recommendations`: ranked actionable items with scores, reasons, unblock info
+- `quick_wins`: low-effort high-impact items
+- `stale_alerts`: issues needing attention
+- `project_health`: status/type/priority distributions, graph metrics, cycles, bottlenecks
+- `commands`: copy-paste shell commands for next steps
 
-For deeper structural analysis (bottlenecks, critical path, cycles):
+For minimal context (token-constrained scenarios):
 
 ```bash
-bv --robot-insights
+bv --robot-next
 ```
 
-Key metrics in the insights output:
-- *Bottlenecks* (betweenness): issues on many shortest paths — completing them unblocks multiple streams
-- *Keystones* (critical path): issues that cannot be delayed without delaying the project
-- *Cycles*: circular dependencies that must be resolved (structural bugs in the issue graph)
+For specialized deep analysis when needed:
+
+```bash
+bv --robot-insights   # full graph metrics: PageRank, betweenness, critical path
+bv --robot-priority   # priority misalignment detection
+```
 
 ## Phase 2: Work selection
 
 To identify what to work on next:
 
 ```bash
-# Get the highest-impact ready issue
-PLAN=$(bv --robot-plan)
-HIGHEST=$(echo "$PLAN" | jq -r '.plan.summary.highest_impact')
+# Get top recommendation from triage
+TRIAGE=$(bv --robot-triage)
+TOP=$(echo "$TRIAGE" | jq -r '.recommendations[0].id')
+
+# Or use --robot-next for minimal output
+TOP=$(bv --robot-next | jq -r '.recommendation.id')
 
 # Full context: what blocks it AND what completing it unblocks
-bd dep tree "$HIGHEST" --direction both
+bd dep tree "$TOP" --direction both
 
 # Detailed description and metadata
-bd show "$HIGHEST"
+bd show "$TOP"
 ```
 
 The `--direction both` flag is essential: it shows upstream blockers (down) and downstream dependents (up), giving full impact context.
@@ -238,10 +245,10 @@ bd close <issue-id>
 
 | Phase | Command | Purpose |
 |-------|---------|---------|
-| Orient | `bd stats` | Quick counts |
-| Orient | `bv --robot-plan` | Actionable work with unblocks |
-| Orient | `bv --robot-insights` | Graph metrics and bottlenecks |
+| Orient | `bv --robot-triage` | Unified triage: counts, recommendations, health |
+| Orient | `bv --robot-next` | Minimal: just the top pick |
 | Orient | `bd epic status` | Epic progress |
+| Orient | `bv --robot-insights` | Deep graph metrics (when needed) |
 | Select | `bd dep tree <id> --direction both` | Full dependency context |
 | Select | `bd show <id>` | Issue details |
 | Start | `bd update <id> --status in_progress` | Mark as active |
