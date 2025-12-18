@@ -5,7 +5,7 @@ Slash command: `/issues:beads-prime`
 
 Minimal context for AI agents.
 Use in hooks (SessionStart, PreCompact) or when context is constrained.
-For full documentation: `/issues:beads` (concepts) and `/issues:beads-workflow` (operations).
+For full documentation: `/issues:beads` (concepts), `/issues:beads-workflow` (operations), `/issues:beads-evolve` (adaptive refinement).
 
 ## Orient
 
