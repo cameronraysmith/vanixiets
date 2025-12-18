@@ -1,10 +1,15 @@
 # Issue tracking with beads
 
+Symlink location: `~/.claude/commands/issues/beads.md`
+Slash command: `/issues:beads`
+
 Beads is a git-friendly issue tracker that stores data in SQLite with a JSONL file for synchronization.
 The `bd` CLI provides comprehensive issue, epic, and dependency management from the command line.
 Data lives in `.beads/` at the repository root, making it portable and version-controllable.
 
-For AI agent operational workflows (orientation, work selection, lifecycle management), see `/issues:beads-workflow`.
+Related commands:
+- `/issues:beads-workflow` (`~/.claude/commands/issues/beads-workflow.md`) — operational workflows for AI agents
+- `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference for hooks
 
 ## Core concepts
 
