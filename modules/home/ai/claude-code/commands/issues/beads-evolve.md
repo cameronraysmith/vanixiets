@@ -201,8 +201,8 @@ Beyond issue-by-issue evolution, periodically review the whole graph.
 ### Weekly or sprint-boundary review
 
 ```bash
-# Unified health check — start here
-bv --robot-triage
+# Quick human-readable health check
+bd status
 
 # Stale issues (not updated in 30+ days)
 bd stale
@@ -210,29 +210,40 @@ bd stale
 # Blocked issues — are blockers being worked?
 bd blocked
 
-# Cycle check — should always be zero (also in triage output)
+# Cycle check — should always be zero
 bd dep cycles
 
-# Priority misalignment (for targeted priority fixes)
-bv --robot-priority
+# For structured analysis (redirect to avoid context pollution)
+bv --robot-triage > /tmp/triage.json
+jq '.stale_alerts' /tmp/triage.json
+jq '.project_health' /tmp/triage.json
+rm /tmp/triage.json
+
+# Priority misalignment (redirect — can be large)
+bv --robot-priority > /tmp/priority.json
+jq '.recommendations[:5]' /tmp/priority.json
+rm /tmp/priority.json
 ```
 
 ### Graph structure review
 
-For deep structural analysis beyond what `--robot-triage` provides:
+For deep structural analysis (always redirect — 3000+ lines of JSON):
 
 ```bash
-# Full graph metrics (PageRank, betweenness, HITS, eigenvector, critical path)
-bv --robot-insights
+# Write to file to avoid context pollution
+bv --robot-insights > /tmp/insights.json
 
 # Bottlenecks — are these being prioritized?
-bv --robot-insights | jq '.Bottlenecks[:10]'
+jq '.Bottlenecks[:10]' /tmp/insights.json
 
 # Keystones on critical path — any surprises?
-bv --robot-insights | jq '.Keystones[:10]'
+jq '.Keystones[:10]' /tmp/insights.json
 
 # Overall density — is coupling increasing?
-bv --robot-insights | jq '.ClusterDensity'
+jq '.ClusterDensity' /tmp/insights.json
+
+# Clean up
+rm /tmp/insights.json
 ```
 
 If density is increasing over time, consider:
