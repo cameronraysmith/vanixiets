@@ -4,6 +4,8 @@ Beads is a git-friendly issue tracker that stores data in SQLite with a JSONL fi
 The `bd` CLI provides comprehensive issue, epic, and dependency management from the command line.
 Data lives in `.beads/` at the repository root, making it portable and version-controllable.
 
+For AI agent operational workflows (orientation, work selection, lifecycle management), see `/issues:beads-workflow`.
+
 ## Core concepts
 
 Issues are the fundamental unit of work, identified by short alphanumeric IDs like `bd-a3f8` or project-prefixed IDs like `ironstar-jzb`.
