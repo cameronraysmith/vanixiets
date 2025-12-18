@@ -3,10 +3,14 @@
 Symlink location: `~/.claude/commands/issues/beads-evolve.md`
 Slash command: `/issues:beads-evolve`
 
-Guidance for evolving the issue graph through development cycles.
+Reference document for adaptive issue graph evolution.
 Issues, epics, dependencies, and priorities are hypotheses refined through implementation feedback.
 
+For session lifecycle, use the action commands: `/issues:beads-orient` (start) and `/issues:beads-checkpoint` (wind-down).
+
 Related commands:
+- `/issues:beads-orient` (`~/.claude/commands/issues/beads-orient.md`) — action: session start
+- `/issues:beads-checkpoint` (`~/.claude/commands/issues/beads-checkpoint.md`) — action: session wind-down
 - `/issues:beads` (`~/.claude/commands/issues/beads.md`) — conceptual reference
 - `/issues:beads-workflow` (`~/.claude/commands/issues/beads-workflow.md`) — operational workflows
 - `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference
