@@ -21,16 +21,18 @@ bd epic status
 For structured data when needed (redirect to avoid context pollution):
 
 ```bash
-# Write to temp file — bv JSON outputs can be thousands of lines
-bv --robot-triage > /tmp/triage.json
+# Create repo-specific temp file — bv JSON outputs can be thousands of lines
+REPO=$(basename "$(git rev-parse --show-toplevel)")
+TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
+bv --robot-triage > "$TRIAGE"
 
 # Extract specific fields
-jq '.quick_ref' /tmp/triage.json              # summary counts and top picks
-jq '.recommendations[:3]' /tmp/triage.json    # top 3 recommendations
-jq '.project_health.graph_metrics.cycles' /tmp/triage.json  # circular deps
+jq '.quick_ref' "$TRIAGE"              # summary counts and top picks
+jq '.recommendations[:3]' "$TRIAGE"    # top 3 recommendations
+jq '.project_health.graph_metrics.cycles' "$TRIAGE"  # circular deps
 
 # Clean up when done
-rm /tmp/triage.json
+rm "$TRIAGE"
 ```
 
 For minimal structured output (safe for direct consumption):

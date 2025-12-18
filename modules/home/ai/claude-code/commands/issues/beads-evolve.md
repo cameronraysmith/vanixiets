@@ -214,15 +214,18 @@ bd blocked
 bd dep cycles
 
 # For structured analysis (redirect to avoid context pollution)
-bv --robot-triage > /tmp/triage.json
-jq '.stale_alerts' /tmp/triage.json
-jq '.project_health' /tmp/triage.json
-rm /tmp/triage.json
+REPO=$(basename "$(git rev-parse --show-toplevel)")
+TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
+bv --robot-triage > "$TRIAGE"
+jq '.stale_alerts' "$TRIAGE"
+jq '.project_health' "$TRIAGE"
+rm "$TRIAGE"
 
 # Priority misalignment (redirect — can be large)
-bv --robot-priority > /tmp/priority.json
-jq '.recommendations[:5]' /tmp/priority.json
-rm /tmp/priority.json
+PRIORITY=$(mktemp "/tmp/bv-${REPO}-priority.XXXXXX.json")
+bv --robot-priority > "$PRIORITY"
+jq '.recommendations[:5]' "$PRIORITY"
+rm "$PRIORITY"
 ```
 
 ### Graph structure review
@@ -230,20 +233,22 @@ rm /tmp/priority.json
 For deep structural analysis (always redirect — 3000+ lines of JSON):
 
 ```bash
-# Write to file to avoid context pollution
-bv --robot-insights > /tmp/insights.json
+# Create repo-specific temp file to avoid conflicts between concurrent agents
+REPO=$(basename "$(git rev-parse --show-toplevel)")
+INSIGHTS=$(mktemp "/tmp/bv-${REPO}-insights.XXXXXX.json")
+bv --robot-insights > "$INSIGHTS"
 
 # Bottlenecks — are these being prioritized?
-jq '.Bottlenecks[:10]' /tmp/insights.json
+jq '.Bottlenecks[:10]' "$INSIGHTS"
 
 # Keystones on critical path — any surprises?
-jq '.Keystones[:10]' /tmp/insights.json
+jq '.Keystones[:10]' "$INSIGHTS"
 
 # Overall density — is coupling increasing?
-jq '.ClusterDensity' /tmp/insights.json
+jq '.ClusterDensity' "$INSIGHTS"
 
 # Clean up
-rm /tmp/insights.json
+rm "$INSIGHTS"
 ```
 
 If density is increasing over time, consider:
