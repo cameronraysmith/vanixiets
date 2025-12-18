@@ -10,6 +10,7 @@ Data lives in `.beads/` at the repository root, making it portable and version-c
 Action commands (start here):
 - `/issues:beads-orient` (`~/.claude/commands/issues/beads-orient.md`) — session start: run commands, synthesize state, select work
 - `/issues:beads-checkpoint` (`~/.claude/commands/issues/beads-checkpoint.md`) — session wind-down: capture learnings, prepare handoff
+- `/issues:beads-review` (`~/.claude/commands/issues/beads-review.md`) — audit: review database against planning docs and repo state
 
 Reference commands:
 - `/issues:beads-workflow` (`~/.claude/commands/issues/beads-workflow.md`) — operational workflows
