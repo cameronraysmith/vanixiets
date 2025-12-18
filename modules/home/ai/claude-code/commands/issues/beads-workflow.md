@@ -1,0 +1,245 @@
+# Beads workflow for AI agents
+
+This workflow guides AI agents through project orientation, work selection, and issue lifecycle management using the `bd` CLI and `bv` TUI viewer.
+
+For conceptual background on beads (issue types, dependencies, epics), see `/issues:beads`.
+
+## Phase 1: Orientation
+
+Run these commands at session start or when asked about project status:
+
+```bash
+# Quick stats overview
+bd stats
+
+# Execution plan with parallel tracks and unblocks analysis
+bv --robot-plan
+
+# Epic progress summary
+bd epic status
+```
+
+The `bd stats` output shows total issues, open/closed/blocked/ready counts.
+The `bv --robot-plan` output provides actionable intelligence: parallel work tracks, what each item unblocks, and a `summary.highest_impact` field identifying the single best issue to work on next.
+
+For deeper structural analysis (bottlenecks, critical path, cycles):
+
+```bash
+bv --robot-insights
+```
+
+Key metrics in the insights output:
+- *Bottlenecks* (betweenness): issues on many shortest paths — completing them unblocks multiple streams
+- *Keystones* (critical path): issues that cannot be delayed without delaying the project
+- *Cycles*: circular dependencies that must be resolved (structural bugs in the issue graph)
+
+## Phase 2: Work selection
+
+To identify what to work on next:
+
+```bash
+# Get the highest-impact ready issue
+PLAN=$(bv --robot-plan)
+HIGHEST=$(echo "$PLAN" | jq -r '.plan.summary.highest_impact')
+
+# Full context: what blocks it AND what completing it unblocks
+bd dep tree "$HIGHEST" --direction both
+
+# Detailed description and metadata
+bd show "$HIGHEST"
+```
+
+The `--direction both` flag is essential: it shows upstream blockers (down) and downstream dependents (up), giving full impact context.
+
+For priority validation (when human-assigned priorities may be stale):
+
+```bash
+bv --robot-priority
+```
+
+This compares computed graph importance against assigned priorities and flags misalignments.
+
+## Phase 3: Lifecycle management
+
+### Before starting work
+
+Optionally mark the issue as in-progress (if the project uses this convention):
+
+```bash
+bd update <issue-id> --status in_progress
+```
+
+Add a comment noting work is starting:
+
+```bash
+bd comment <issue-id> "Starting implementation"
+```
+
+### During work
+
+When discovering related issues or blockers:
+
+```bash
+# Create a new issue discovered during this work
+bd create "Found: edge case in validation" -t bug -p 2
+
+# Link it to the current work
+bd dep add <new-issue-id> <current-issue-id> --type discovered-from
+```
+
+When encountering a blocker that should have been a dependency:
+
+```bash
+# Create the blocking issue
+bd create "Need to refactor X first" -t task -p 1
+
+# Wire the dependency
+bd dep add <blocker-id> <current-issue-id>
+```
+
+Update descriptions or priorities as understanding evolves:
+
+```bash
+bd update <issue-id> --description "Updated: also needs to handle Y"
+bd update <issue-id> --priority 0  # escalate if more critical than expected
+```
+
+### After completing work
+
+Close the issue with a comment referencing the implementation:
+
+```bash
+bd close <issue-id> --comment "Implemented in commit $(git rev-parse --short HEAD)"
+```
+
+Check what this unblocks:
+
+```bash
+bd dep tree <issue-id> --direction up
+```
+
+Check if any epics are now eligible for closure:
+
+```bash
+bd epic close-eligible --dry-run
+bd epic close-eligible  # if appropriate
+```
+
+### Abandoning or deferring work
+
+If work cannot be completed:
+
+```bash
+# Add context about why
+bd comment <issue-id> "Blocked by external dependency, deferring"
+
+# Reset status if it was in_progress
+bd update <issue-id> --status open
+
+# Optionally add a label
+bd update <issue-id> --labels "deferred"
+```
+
+## Phase 4: Maintenance operations
+
+### Refactoring the issue graph
+
+Split an issue that's too large:
+
+```bash
+# Create child tasks
+bd create "Part 1: data layer" -p 2 --parent <original-id>
+bd create "Part 2: API layer" -p 2 --parent <original-id>
+bd create "Part 3: UI layer" -p 2 --parent <original-id>
+
+# Wire dependencies if there's sequencing
+bd dep add <part1-id> <part2-id>
+bd dep add <part2-id> <part3-id>
+```
+
+Merge duplicate issues:
+
+```bash
+# Close the duplicate with reference
+bd close <duplicate-id> --comment "Duplicate of <primary-id>"
+```
+
+Fix incorrectly wired dependencies:
+
+```bash
+bd dep remove <wrong-from> <wrong-to>
+bd dep add <correct-from> <correct-to>
+```
+
+### Health checks
+
+```bash
+# Detect circular dependencies (must be zero for healthy graph)
+bd dep cycles
+
+# Check for orphaned dependency references
+bd repair-deps --dry-run
+
+# Validate database integrity
+bd validate
+```
+
+## Integration patterns
+
+### With atomic commits
+
+After each commit that progresses an issue:
+
+```bash
+bd comment <issue-id> "Progress: $(git log -1 --oneline)"
+```
+
+### With branch workflow
+
+When creating a feature branch:
+
+```bash
+# Branch name should reference issue
+git checkout -b <issue-id>-short-description
+```
+
+When merging:
+
+```bash
+bd close <issue-id> --comment "Merged in PR #N"
+```
+
+### With code review
+
+Before requesting review:
+
+```bash
+bd comment <issue-id> "Ready for review: PR #N"
+bd update <issue-id> --labels "needs-review"
+```
+
+After approval:
+
+```bash
+bd update <issue-id> --labels ""  # clear labels
+bd close <issue-id>
+```
+
+## Command quick reference
+
+| Phase | Command | Purpose |
+|-------|---------|---------|
+| Orient | `bd stats` | Quick counts |
+| Orient | `bv --robot-plan` | Actionable work with unblocks |
+| Orient | `bv --robot-insights` | Graph metrics and bottlenecks |
+| Orient | `bd epic status` | Epic progress |
+| Select | `bd dep tree <id> --direction both` | Full dependency context |
+| Select | `bd show <id>` | Issue details |
+| Start | `bd update <id> --status in_progress` | Mark as active |
+| Start | `bd comment <id> "Starting"` | Log start |
+| During | `bd create ... --parent <id>` | Create sub-issues |
+| During | `bd dep add <new> <current> --type discovered-from` | Link discoveries |
+| Finish | `bd close <id> --comment "..."` | Complete with context |
+| Finish | `bd epic close-eligible` | Auto-close completed epics |
+| Health | `bd dep cycles` | Detect circular deps |
+| Health | `bd validate` | Database integrity |
