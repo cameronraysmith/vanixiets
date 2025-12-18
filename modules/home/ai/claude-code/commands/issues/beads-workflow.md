@@ -174,6 +174,16 @@ bd update <issue-id> --status open
 bd update <issue-id> --labels "deferred"
 ```
 
+### Commit beads changes
+
+After any batch of `bd` modifications (creates, updates, closes, dependency changes), commit the database:
+
+```bash
+git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
+```
+
+Commit eagerly to avoid losing work and to keep the database in sync with the repository.
+
 ## Phase 4: Maintenance operations
 
 ### Refactoring the issue graph

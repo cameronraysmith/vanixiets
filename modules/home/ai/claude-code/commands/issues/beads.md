@@ -233,3 +233,19 @@ bd list --status open --priority 0 --priority 1
 | Add comment | `bd comment issue-id "text"` |
 | Manage labels | `bd label` |
 | Statistics | `bd stats` |
+
+## Version control integration
+
+The beads database lives in `.beads/issues.jsonl`, which must be committed to git after modifications.
+Changes made with `bd` commands (create, update, close, dep add/remove) are not automatically committed.
+
+```bash
+git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
+```
+
+Commit frequency:
+- **Eager**: Commit after each logical batch (e.g., creating an epic with children, wiring dependencies)
+- **Session boundary**: At minimum, commit before ending work via `/issues:beads-checkpoint`
+- **Descriptive when relevant**: For significant changes, use specific messages like `chore(beads): close auth epic after implementation`
+
+Failing to commit leaves the database out of sync with the repository, causing confusion for other agents or future sessions.

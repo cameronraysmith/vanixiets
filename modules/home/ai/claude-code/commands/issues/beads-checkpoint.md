@@ -105,10 +105,13 @@ EOF
 )"
 ```
 
-**Final sync:**
+**Final sync and commit:**
 ```bash
 # Ensure all changes are persisted
 bd sync
+
+# Commit the beads database (required after any bd modifications)
+git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
 ```
 
 ## Verify next work is discoverable

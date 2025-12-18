@@ -416,3 +416,8 @@ bd comment <feature-id> "Acceptance revealed missing Y — added as blocker"
 4. **Trust the history**: Git tracks all changes; don't fear refactoring the graph
 5. **Reflect after completing**: Use completion as a trigger to review downstream issues
 6. **Periodic whole-graph review**: Don't let the forest get lost in the trees
+7. **Commit the database**: After evolving the graph, commit `.beads/issues.jsonl` to preserve changes
+
+```bash
+git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
+```
