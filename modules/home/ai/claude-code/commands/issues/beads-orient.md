@@ -11,34 +11,36 @@ Run the commands below, synthesize results, and present project state to the use
 Execute these commands now:
 
 ```bash
-# Quick health check
-bd stats
+# Unified triage — the single entry point for project state
+bv --robot-triage
 
-# Execution plan with impact analysis
-bv --robot-plan
-
-# Epic progress
+# Epic progress (not included in triage output)
 bd epic status
 ```
 
-If `bd stats` shows blocked > 50% of open issues, also run:
+For minimal context when token-constrained:
 
 ```bash
-# Identify structural bottlenecks
-bv --robot-insights | jq '{bottlenecks: .Bottlenecks[:5], cycles: .Cycles, density: .ClusterDensity}'
+# Just the single top pick with claim command
+bv --robot-next
 ```
 
 ## Interpret results
 
-From `bd stats`:
-- Ready count = work that can start immediately
-- Blocked count = work waiting on dependencies
-- Healthy ratio: ready should be >10% of open
+From `bv --robot-triage`:
+- `quick_ref` = at-a-glance counts + top 3 picks
+- `recommendations` = ranked actionable items with scores, reasons, unblock info
+- `quick_wins` = low-effort high-impact items
+- `stale_alerts` = issues needing attention
+- `project_health` = status/type/priority distributions, graph metrics, cycles
+- `commands` = copy-paste shell commands for next steps
 
-From `bv --robot-plan`:
-- `tracks` = independent parallel work streams
-- `items[].unblocks` = what completing each item frees up
-- `summary.highest_impact` = single best item to work on for maximum downstream effect
+Key jq extractions:
+```bash
+bv --robot-triage | jq '.quick_ref'           # summary counts and top picks
+bv --robot-triage | jq '.recommendations[0]'  # top recommendation with full context
+bv --robot-triage | jq '.project_health.graph_metrics.cycles'  # circular deps (must be empty)
+```
 
 From `bd epic status`:
 - Progress percentages show which epics are advancing
@@ -48,10 +50,11 @@ From `bd epic status`:
 
 Provide the user a concise summary:
 
-1. **Health**: X open, Y ready, Z blocked (ratio assessment)
-2. **Highest-impact ready work**: Top 2-3 items from robot-plan with what they unblock
-3. **Epic progress**: Which epics are advancing vs stalled
-4. **Structural issues** (if any): Cycles, bottlenecks, density concerns
+1. **Health**: Use `quick_ref` counts — open/ready/blocked ratio assessment
+2. **Top recommendations**: First 2-3 from `recommendations` with scores and what they unblock
+3. **Quick wins**: Any items from `quick_wins` that could be knocked out rapidly
+4. **Epic progress**: Which epics are advancing vs stalled
+5. **Alerts** (if any): Stale issues, cycles, or health warnings from `project_health`
 
 ## Prompt work selection
 
