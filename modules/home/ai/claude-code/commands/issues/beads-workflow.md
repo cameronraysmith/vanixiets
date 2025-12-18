@@ -7,6 +7,7 @@ This workflow guides AI agents through project orientation, work selection, and 
 
 Related commands:
 - `/issues:beads` (`~/.claude/commands/issues/beads.md`) — conceptual reference (issue types, dependencies, epics)
+- `/issues:beads-evolve` (`~/.claude/commands/issues/beads-evolve.md`) — adaptive issue graph evolution (XP-style refinement)
 - `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference for hooks
 
 ## Phase 1: Orientation
