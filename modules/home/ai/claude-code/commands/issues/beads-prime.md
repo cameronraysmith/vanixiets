@@ -1,3 +1,7 @@
+---
+description: Minimal quick reference for beads commands when context is constrained
+---
+
 # Beads quick reference
 
 Symlink location: `~/.claude/commands/issues/beads-prime.md`

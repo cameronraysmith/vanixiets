@@ -1,3 +1,7 @@
+---
+description: Operational workflows reference for beads issue lifecycle management
+---
+
 # Beads workflow for AI agents
 
 Symlink location: `~/.claude/commands/issues/beads-workflow.md`

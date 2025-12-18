@@ -1,3 +1,7 @@
+---
+description: Session wind-down action - capture learnings into issue graph, prepare handoff
+---
+
 # Session checkpoint
 
 Symlink location: `~/.claude/commands/issues/beads-checkpoint.md`

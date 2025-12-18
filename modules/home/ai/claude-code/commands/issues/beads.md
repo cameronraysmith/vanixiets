@@ -1,3 +1,7 @@
+---
+description: Conceptual reference for beads issue tracking with bd CLI and bv viewer
+---
+
 # Issue tracking with beads
 
 Symlink location: `~/.claude/commands/issues/beads.md`
