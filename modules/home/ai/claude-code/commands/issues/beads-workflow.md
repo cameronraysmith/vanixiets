@@ -1,8 +1,13 @@
 # Beads workflow for AI agents
 
+Symlink location: `~/.claude/commands/issues/beads-workflow.md`
+Slash command: `/issues:beads-workflow`
+
 This workflow guides AI agents through project orientation, work selection, and issue lifecycle management using the `bd` CLI and `bv` TUI viewer.
 
-For conceptual background on beads (issue types, dependencies, epics), see `/issues:beads`.
+Related commands:
+- `/issues:beads` (`~/.claude/commands/issues/beads.md`) — conceptual reference (issue types, dependencies, epics)
+- `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference for hooks
 
 ## Phase 1: Orientation
 
