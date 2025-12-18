@@ -10,16 +10,16 @@ For deeper patterns: `/issues:beads` (concepts), `/issues:beads-workflow` (opera
 ## Orient
 
 ```bash
-bd stats                    # counts: total, open, blocked, ready
-bv --robot-plan             # execution plan with unblocks (JSON)
+bv --robot-triage           # unified triage: counts, recommendations, health (JSON)
+bv --robot-next             # minimal: just the single top pick
 bd epic status              # epic progress
 ```
 
 ## Select work
 
 ```bash
-# Highest-impact ready issue
-bv --robot-plan | jq -r '.plan.summary.highest_impact'
+# Top recommendation with full context
+bv --robot-triage | jq '.recommendations[0]'
 
 # Full dependency context (upstream + downstream)
 bd dep tree <id> --direction both
@@ -56,8 +56,8 @@ bd validate                 # database integrity
 
 ## Key patterns
 
-- `bd ready` shows ready work but lacks impact context
-- `bv --robot-plan` adds unblocks analysis — prefer this for selection
+- `bv --robot-triage` is the single entry point — unified counts, recommendations, health
+- `bv --robot-next` for minimal context — just top pick with claim command
 - `bd dep tree <id> --direction both` shows full context (blockers + what completing it unblocks)
 - Always close with `--comment` referencing the implementation
 - Use `--type discovered-from` when creating issues found during other work
