@@ -11,36 +11,48 @@ Run the commands below, synthesize results, and present project state to the use
 Execute these commands now:
 
 ```bash
-# Unified triage — the single entry point for project state
-bv --robot-triage
+# Quick human-readable summary (~20 lines)
+bd status
 
-# Epic progress (not included in triage output)
+# Epic progress
 bd epic status
 ```
 
-For minimal context when token-constrained:
+For structured data when needed (redirect to avoid context pollution):
 
 ```bash
-# Just the single top pick with claim command
+# Write to temp file — bv JSON outputs can be thousands of lines
+bv --robot-triage > /tmp/triage.json
+
+# Extract specific fields
+jq '.quick_ref' /tmp/triage.json              # summary counts and top picks
+jq '.recommendations[:3]' /tmp/triage.json    # top 3 recommendations
+jq '.project_health.graph_metrics.cycles' /tmp/triage.json  # circular deps
+
+# Clean up when done
+rm /tmp/triage.json
+```
+
+For minimal structured output (safe for direct consumption):
+
+```bash
+# Just the single top pick — small JSON output
 bv --robot-next
 ```
 
 ## Interpret results
 
-From `bv --robot-triage`:
+From `bd status`:
+- Total/Open/Blocked/Ready counts at a glance
+- Recent activity from git history
+- Human-readable, context-efficient
+
+From `bv --robot-triage` (via jq extraction):
 - `quick_ref` = at-a-glance counts + top 3 picks
 - `recommendations` = ranked actionable items with scores, reasons, unblock info
 - `quick_wins` = low-effort high-impact items
 - `stale_alerts` = issues needing attention
 - `project_health` = status/type/priority distributions, graph metrics, cycles
-- `commands` = copy-paste shell commands for next steps
-
-Key jq extractions:
-```bash
-bv --robot-triage | jq '.quick_ref'           # summary counts and top picks
-bv --robot-triage | jq '.recommendations[0]'  # top recommendation with full context
-bv --robot-triage | jq '.project_health.graph_metrics.cycles'  # circular deps (must be empty)
-```
 
 From `bd epic status`:
 - Progress percentages show which epics are advancing

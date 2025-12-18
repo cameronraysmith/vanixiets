@@ -18,32 +18,41 @@ Related commands:
 Run these commands at session start or when asked about project status:
 
 ```bash
-# Unified triage — the single entry point for all project intelligence
-bv --robot-triage
+# Quick human-readable summary (~20 lines, context-efficient)
+bd status
 
-# Epic progress summary (not included in triage)
+# Epic progress summary
 bd epic status
 ```
 
-The `bv --robot-triage` output provides everything in one call:
-- `quick_ref`: at-a-glance counts + top 3 picks
-- `recommendations`: ranked actionable items with scores, reasons, unblock info
-- `quick_wins`: low-effort high-impact items
-- `stale_alerts`: issues needing attention
-- `project_health`: status/type/priority distributions, graph metrics, cycles, bottlenecks
-- `commands`: copy-paste shell commands for next steps
-
-For minimal context (token-constrained scenarios):
+For structured data (redirect to file — bv outputs can be thousands of lines):
 
 ```bash
-bv --robot-next
+# Write to temp file to avoid context pollution
+bv --robot-triage > /tmp/triage.json
+
+# Extract specific fields as needed
+jq '.quick_ref' /tmp/triage.json              # summary + top 3 picks
+jq '.recommendations[:3]' /tmp/triage.json    # top recommendations
+jq '.quick_wins' /tmp/triage.json             # low-effort high-impact
+jq '.stale_alerts' /tmp/triage.json           # issues needing attention
+jq '.project_health.graph_metrics' /tmp/triage.json  # cycles, bottlenecks
+
+# Clean up
+rm /tmp/triage.json
 ```
 
-For specialized deep analysis when needed:
+For minimal structured output (safe for direct consumption):
 
 ```bash
-bv --robot-insights   # full graph metrics: PageRank, betweenness, critical path
-bv --robot-priority   # priority misalignment detection
+bv --robot-next   # just the single top pick — small JSON
+```
+
+For specialized deep analysis (always redirect — these are very large):
+
+```bash
+bv --robot-insights > /tmp/insights.json   # 3000+ lines: PageRank, betweenness, critical path
+bv --robot-priority > /tmp/priority.json   # priority misalignment detection
 ```
 
 ## Phase 2: Work selection
@@ -51,11 +60,7 @@ bv --robot-priority   # priority misalignment detection
 To identify what to work on next:
 
 ```bash
-# Get top recommendation from triage
-TRIAGE=$(bv --robot-triage)
-TOP=$(echo "$TRIAGE" | jq -r '.recommendations[0].id')
-
-# Or use --robot-next for minimal output
+# Get top pick (minimal output, safe for direct consumption)
 TOP=$(bv --robot-next | jq -r '.recommendation.id')
 
 # Full context: what blocks it AND what completing it unblocks
@@ -67,10 +72,12 @@ bd show "$TOP"
 
 The `--direction both` flag is essential: it shows upstream blockers (down) and downstream dependents (up), giving full impact context.
 
-For priority validation (when human-assigned priorities may be stale):
+For priority validation (redirect — output can be large):
 
 ```bash
-bv --robot-priority
+bv --robot-priority > /tmp/priority.json
+jq '.recommendations[:5]' /tmp/priority.json  # top misalignments
+rm /tmp/priority.json
 ```
 
 This compares computed graph importance against assigned priorities and flags misalignments.
@@ -245,10 +252,10 @@ bd close <issue-id>
 
 | Phase | Command | Purpose |
 |-------|---------|---------|
-| Orient | `bv --robot-triage` | Unified triage: counts, recommendations, health |
-| Orient | `bv --robot-next` | Minimal: just the top pick |
+| Orient | `bd status` | Quick human-readable summary (~20 lines) |
 | Orient | `bd epic status` | Epic progress |
-| Orient | `bv --robot-insights` | Deep graph metrics (when needed) |
+| Orient | `bv --robot-next` | Minimal JSON: just the top pick |
+| Orient | `bv --robot-triage > /tmp/t.json` | Full triage (redirect to avoid context pollution) |
 | Select | `bd dep tree <id> --direction both` | Full dependency context |
 | Select | `bd show <id>` | Issue details |
 | Start | `bd update <id> --status in_progress` | Mark as active |

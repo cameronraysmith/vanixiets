@@ -10,22 +10,30 @@ For deeper patterns: `/issues:beads` (concepts), `/issues:beads-workflow` (opera
 ## Orient
 
 ```bash
-bv --robot-triage           # unified triage: counts, recommendations, health (JSON)
-bv --robot-next             # minimal: just the single top pick
+bd status                   # quick human-readable summary (~20 lines)
 bd epic status              # epic progress
+bv --robot-next             # minimal JSON: just the single top pick
 ```
 
 ## Select work
 
 ```bash
-# Top recommendation with full context
-bv --robot-triage | jq '.recommendations[0]'
+# Top pick (small JSON, safe for direct consumption)
+bv --robot-next
 
 # Full dependency context (upstream + downstream)
 bd dep tree <id> --direction both
 
 # Issue details
 bd show <id>
+```
+
+For deeper analysis (redirect to file to avoid context pollution):
+
+```bash
+bv --robot-triage > /tmp/triage.json
+jq '.recommendations[:3]' /tmp/triage.json
+rm /tmp/triage.json
 ```
 
 ## During work
