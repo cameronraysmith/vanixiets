@@ -1,3 +1,7 @@
+---
+description: Adaptive refinement patterns for evolving the issue graph during implementation
+---
+
 # Adaptive issue evolution
 
 Symlink location: `~/.claude/commands/issues/beads-evolve.md`

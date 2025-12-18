@@ -1,3 +1,7 @@
+---
+description: Session start action - run diagnostics, synthesize project state, select work
+---
+
 # Session orientation
 
 Symlink location: `~/.claude/commands/issues/beads-orient.md`
