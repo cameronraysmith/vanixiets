@@ -3,9 +3,9 @@
 Symlink location: `~/.claude/commands/issues/beads-prime.md`
 Slash command: `/issues:beads-prime`
 
-Minimal context for AI agents.
-Use in hooks (SessionStart, PreCompact) or when context is constrained.
-For full documentation: `/issues:beads` (concepts), `/issues:beads-workflow` (operations), `/issues:beads-evolve` (adaptive refinement).
+Minimal quick reference when context is constrained.
+For session lifecycle, prefer action commands: `/issues:beads-orient` (start), `/issues:beads-checkpoint` (wind-down).
+For deeper patterns: `/issues:beads` (concepts), `/issues:beads-workflow` (operations), `/issues:beads-evolve` (refinement).
 
 ## Orient
 
