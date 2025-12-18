@@ -3,12 +3,15 @@
 Symlink location: `~/.claude/commands/issues/beads-workflow.md`
 Slash command: `/issues:beads-workflow`
 
-This workflow guides AI agents through project orientation, work selection, and issue lifecycle management using the `bd` CLI and `bv` TUI viewer.
+Reference document for operational workflows.
+For active session work, prefer the action commands: `/issues:beads-orient` (session start) and `/issues:beads-checkpoint` (session wind-down).
 
 Related commands:
-- `/issues:beads` (`~/.claude/commands/issues/beads.md`) — conceptual reference (issue types, dependencies, epics)
-- `/issues:beads-evolve` (`~/.claude/commands/issues/beads-evolve.md`) — adaptive issue graph evolution (XP-style refinement)
-- `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference for hooks
+- `/issues:beads-orient` (`~/.claude/commands/issues/beads-orient.md`) — action: session start
+- `/issues:beads-checkpoint` (`~/.claude/commands/issues/beads-checkpoint.md`) — action: session wind-down
+- `/issues:beads` (`~/.claude/commands/issues/beads.md`) — conceptual reference
+- `/issues:beads-evolve` (`~/.claude/commands/issues/beads-evolve.md`) — adaptive refinement patterns
+- `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference
 
 ## Phase 1: Orientation
 
