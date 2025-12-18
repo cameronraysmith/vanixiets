@@ -31,6 +31,7 @@
           - jj workflow (full): ${commandsPath}/jj/jj-workflow.md
           - documentation: ${prefsPath}/documentation.md
           - change management: ${prefsPath}/change-management.md
+          - issue tracking: ${commandsPath}/issues/beads.md
           - architectural patterns: ${prefsPath}/architectural-patterns.md
           - functional domain modeling (DDD, types, aggregates): ${prefsPath}/domain-modeling.md
           - theoretical foundations (category theory, type theory): ${prefsPath}/theoretical-foundations.md
