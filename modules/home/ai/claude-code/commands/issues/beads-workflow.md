@@ -28,18 +28,20 @@ bd epic status
 For structured data (redirect to file — bv outputs can be thousands of lines):
 
 ```bash
-# Write to temp file to avoid context pollution
-bv --robot-triage > /tmp/triage.json
+# Create repo-specific temp files to avoid conflicts between concurrent agents
+REPO=$(basename "$(git rev-parse --show-toplevel)")
+TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
+bv --robot-triage > "$TRIAGE"
 
 # Extract specific fields as needed
-jq '.quick_ref' /tmp/triage.json              # summary + top 3 picks
-jq '.recommendations[:3]' /tmp/triage.json    # top recommendations
-jq '.quick_wins' /tmp/triage.json             # low-effort high-impact
-jq '.stale_alerts' /tmp/triage.json           # issues needing attention
-jq '.project_health.graph_metrics' /tmp/triage.json  # cycles, bottlenecks
+jq '.quick_ref' "$TRIAGE"              # summary + top 3 picks
+jq '.recommendations[:3]' "$TRIAGE"    # top recommendations
+jq '.quick_wins' "$TRIAGE"             # low-effort high-impact
+jq '.stale_alerts' "$TRIAGE"           # issues needing attention
+jq '.project_health.graph_metrics' "$TRIAGE"  # cycles, bottlenecks
 
 # Clean up
-rm /tmp/triage.json
+rm "$TRIAGE"
 ```
 
 For minimal structured output (safe for direct consumption):
@@ -51,8 +53,11 @@ bv --robot-next   # just the single top pick — small JSON
 For specialized deep analysis (always redirect — these are very large):
 
 ```bash
-bv --robot-insights > /tmp/insights.json   # 3000+ lines: PageRank, betweenness, critical path
-bv --robot-priority > /tmp/priority.json   # priority misalignment detection
+REPO=$(basename "$(git rev-parse --show-toplevel)")
+INSIGHTS=$(mktemp "/tmp/bv-${REPO}-insights.XXXXXX.json")
+bv --robot-insights > "$INSIGHTS"   # 3000+ lines: PageRank, betweenness, critical path
+# ... extract fields with jq ...
+rm "$INSIGHTS"
 ```
 
 ## Phase 2: Work selection
@@ -75,9 +80,11 @@ The `--direction both` flag is essential: it shows upstream blockers (down) and 
 For priority validation (redirect — output can be large):
 
 ```bash
-bv --robot-priority > /tmp/priority.json
-jq '.recommendations[:5]' /tmp/priority.json  # top misalignments
-rm /tmp/priority.json
+REPO=$(basename "$(git rev-parse --show-toplevel)")
+PRIORITY=$(mktemp "/tmp/bv-${REPO}-priority.XXXXXX.json")
+bv --robot-priority > "$PRIORITY"
+jq '.recommendations[:5]' "$PRIORITY"  # top misalignments
+rm "$PRIORITY"
 ```
 
 This compares computed graph importance against assigned priorities and flags misalignments.
@@ -255,7 +262,7 @@ bd close <issue-id>
 | Orient | `bd status` | Quick human-readable summary (~20 lines) |
 | Orient | `bd epic status` | Epic progress |
 | Orient | `bv --robot-next` | Minimal JSON: just the top pick |
-| Orient | `bv --robot-triage > /tmp/t.json` | Full triage (redirect to avoid context pollution) |
+| Orient | `bv --robot-triage > $(mktemp)` | Full triage (redirect to avoid context pollution) |
 | Select | `bd dep tree <id> --direction both` | Full dependency context |
 | Select | `bd show <id>` | Issue details |
 | Start | `bd update <id> --status in_progress` | Mark as active |

@@ -31,9 +31,11 @@ bd show <id>
 For deeper analysis (redirect to file to avoid context pollution):
 
 ```bash
-bv --robot-triage > /tmp/triage.json
-jq '.recommendations[:3]' /tmp/triage.json
-rm /tmp/triage.json
+REPO=$(basename "$(git rev-parse --show-toplevel)")
+TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
+bv --robot-triage > "$TRIAGE"
+jq '.recommendations[:3]' "$TRIAGE"
+rm "$TRIAGE"
 ```
 
 ## During work
