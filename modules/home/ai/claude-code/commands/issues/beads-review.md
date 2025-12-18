@@ -19,8 +19,12 @@ $ARGUMENTS
 
 ## Phase 1: Document discovery
 
-If document paths were provided in arguments, use those.
-Otherwise, search for planning documents in conventional locations:
+If document paths were provided in arguments:
+1. Acknowledge the provided path(s)
+2. Read and internalize the document(s)
+3. Briefly summarize what the document covers before proceeding
+
+If no arguments provided, search for planning documents in conventional locations:
 
 ```bash
 # Common planning doc locations
@@ -52,8 +56,11 @@ bd status
 # Structural issues
 bd dep cycles
 
-# Database integrity
-bd validate
+# Database integrity (requires --no-daemon flag)
+bd --no-daemon validate
+
+# Test pollution detection (requires --no-daemon flag)
+bd --no-daemon detect-pollution
 ```
 
 For deeper structural analysis (redirect to avoid context pollution):
@@ -62,12 +69,14 @@ For deeper structural analysis (redirect to avoid context pollution):
 REPO=$(basename "$(git rev-parse --show-toplevel)")
 
 # Suggestions: duplicates, missing deps, label issues
+# Note: Field names may vary; check actual output structure if null
 SUGGEST=$(mktemp "/tmp/bv-${REPO}-suggest.XXXXXX.json")
 bv --robot-suggest > "$SUGGEST"
-jq '.duplicates[:10]' "$SUGGEST"
-jq '.missing_dependencies[:10]' "$SUGGEST"
-jq '.label_suggestions[:10]' "$SUGGEST"
-jq '.cycles' "$SUGGEST"
+jq '.' "$SUGGEST" | head -50  # Preview structure first if unfamiliar
+jq '.duplicates // empty | .[:10]' "$SUGGEST"
+jq '.dependencies // .missing_dependencies // empty | .[:10]' "$SUGGEST"
+jq '.labels // .label_suggestions // empty | .[:10]' "$SUGGEST"
+jq '.cycles // empty' "$SUGGEST"
 rm "$SUGGEST"
 
 # Priority misalignment
@@ -101,11 +110,15 @@ For each planning document, identify:
 # List all open beads with their descriptions
 bd list --status open --json | jq -r '.[] | "\(.id): \(.title)"'
 
-# List all epics
-bd list --type epic --json | jq -r '.[] | "\(.id): \(.title) [\(.status)]"'
+# List all epics (--type may not be supported; filter with jq if needed)
+bd list --type epic --json 2>/dev/null | jq -r '.[] | "\(.id): \(.title) [\(.status)]"' \
+  || bd list --json | jq -r '.[] | select(.type == "epic") | "\(.id): \(.title) [\(.status)]"'
 
 # Search for specific terms from requirements
 bd search "<requirement-keyword>"
+
+# View dependency tree for an epic (use bd dep tree, not bd deps)
+bd dep tree <epic-id>
 ```
 
 ### Identify gaps
@@ -138,19 +151,23 @@ git log --oneline --grep="bd-" -20 2>/dev/null || git log --oneline --grep="-[a-
 
 ```bash
 REPO=$(basename "$(git rev-parse --show-toplevel)")
+
+# History correlations (field names may vary; preview structure first)
 HISTORY=$(mktemp "/tmp/bv-${REPO}-history.XXXXXX.json")
 bv --robot-history > "$HISTORY"
-
-# Sample correlations
-jq '.correlations[:20]' "$HISTORY"
+jq 'keys' "$HISTORY"  # Preview top-level structure
+jq '.correlations // .history // . | if type == "array" then .[:20] else . end' "$HISTORY"
+rm "$HISTORY"
 
 # Orphan commits (should be linked but aren't)
 ORPHANS=$(mktemp "/tmp/bv-${REPO}-orphans.XXXXXX.json")
 bv --robot-orphans > "$ORPHANS"
-jq '.candidates[:15]' "$ORPHANS"
-
-rm "$HISTORY" "$ORPHANS"
+jq 'keys' "$ORPHANS"  # Preview top-level structure
+jq '.candidates // .orphans // . | if type == "array" then .[:15] else . end' "$ORPHANS"
+rm "$ORPHANS"
 ```
+
+Note: These commands require git history to be analyzed. If output is null or empty, the repository may lack sufficient commit-to-bead correlation data, or the bv index may need rebuilding.
 
 ### Deep analysis with pickaxe (skip if --shallow)
 
