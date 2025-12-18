@@ -75,3 +75,4 @@ bd validate                 # database integrity
 - `bd dep tree <id> --direction both` shows full context (blockers + what completing it unblocks)
 - Always close with `--comment` referencing the implementation
 - Use `--type discovered-from` when creating issues found during other work
+- After `bd` modifications: `git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"`

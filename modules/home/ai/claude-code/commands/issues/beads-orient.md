@@ -99,6 +99,11 @@ Review with user:
 - Is scope appropriate or should it be split first?
 
 Update the issue if anything is stale before beginning work.
+If updates were made, commit the database:
+
+```bash
+git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
+```
 
 ---
 

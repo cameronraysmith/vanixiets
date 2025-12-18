@@ -266,6 +266,11 @@ bd show <bead-id>
 bd update <bead-id> --labels "<corrected-labels>"
 ```
 
+**After applying remediation commands**, commit the database:
+```bash
+git add .beads/issues.jsonl && git commit -m "chore(beads): apply review remediation"
+```
+
 ## Summary template
 
 Provide final summary to user:
