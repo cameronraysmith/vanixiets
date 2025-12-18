@@ -112,16 +112,19 @@ bd sync
 Before ending the session, ensure the next agent can pick up cleanly via `/issues:beads-orient`.
 
 ```bash
-# Identify highest-impact ready item
-bv --robot-plan | jq '.plan.summary'
+# Quick check of top recommendation
+bv --robot-triage | jq '.quick_ref'
+
+# Or minimal: just the top pick
+bv --robot-next
 
 # Review its description
-bd show <highest-impact-id>
+bd show <top-recommendation-id>
 ```
 
 If the description is stale or incomplete based on what was learned this session:
 ```bash
-bd update <highest-impact-id> --description "Updated: <incorporate session learnings that affect this issue>"
+bd update <top-recommendation-id> --description "Updated: <incorporate session learnings that affect this issue>"
 ```
 
 This applies whether work was completed or interrupted:
