@@ -7,10 +7,14 @@ Beads is a git-friendly issue tracker that stores data in SQLite with a JSONL fi
 The `bd` CLI provides comprehensive issue, epic, and dependency management from the command line.
 Data lives in `.beads/` at the repository root, making it portable and version-controllable.
 
-Related commands:
-- `/issues:beads-workflow` (`~/.claude/commands/issues/beads-workflow.md`) — operational workflows for AI agents
-- `/issues:beads-evolve` (`~/.claude/commands/issues/beads-evolve.md`) — adaptive issue graph evolution (XP-style refinement)
-- `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference for hooks
+Action commands (start here):
+- `/issues:beads-orient` (`~/.claude/commands/issues/beads-orient.md`) — session start: run commands, synthesize state, select work
+- `/issues:beads-checkpoint` (`~/.claude/commands/issues/beads-checkpoint.md`) — session wind-down: capture learnings, prepare handoff
+
+Reference commands:
+- `/issues:beads-workflow` (`~/.claude/commands/issues/beads-workflow.md`) — operational workflows
+- `/issues:beads-evolve` (`~/.claude/commands/issues/beads-evolve.md`) — adaptive refinement patterns
+- `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference
 
 ## Core concepts
 
