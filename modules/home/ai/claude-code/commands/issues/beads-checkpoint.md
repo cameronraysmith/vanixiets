@@ -107,6 +107,30 @@ EOF
 bd sync
 ```
 
+## Verify next work is discoverable
+
+Before ending the session, ensure the next agent can pick up cleanly via `/issues:beads-orient`.
+
+```bash
+# Identify highest-impact ready item
+bv --robot-plan | jq '.plan.summary'
+
+# Review its description
+bd show <highest-impact-id>
+```
+
+If the description is stale or incomplete based on what was learned this session:
+```bash
+bd update <highest-impact-id> --description "Updated: <incorporate session learnings that affect this issue>"
+```
+
+This applies whether work was completed or interrupted:
+- **Completed milestone**: Next issue's description should reflect any context discovered during the completed work
+- **Interrupted work**: Current issue should have checkpoint comment, AND next logical issue should be accurate
+
+The issue graph becomes the handoff — no complex session notes needed.
+When descriptions are accurate, `/issues:beads-orient` in the next session will find actionable, up-to-date work.
+
 ## Summary for user
 
 Provide the user a brief summary of what was captured:
