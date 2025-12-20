@@ -4,6 +4,7 @@
       pkgs,
       inputs',
       config,
+      self',
       ...
     }:
     {
@@ -20,6 +21,7 @@
           pkgs.nh
           pkgs.nix-output-monitor
           pkgs.nix-update
+          self'.packages.beads-viewer
           # Tools required by Makefile verify target
           pkgs.age
           pkgs.ssh-to-age
