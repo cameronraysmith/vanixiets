@@ -41,6 +41,7 @@
           nix-info
           nix-output-monitor
           nix-prefetch-scripts
+          nix-update
           nixd
           nixfmt
           nixpkgs-reviewFull
