@@ -18,11 +18,7 @@
         home.file.".mcp/.keep".text = "";
 
         # MCP servers using sops-nix for API keys
-        # Pattern A + sops-nix enables secrets via config.sops.secrets
-        # Only 2 MCP servers use API keys: firecrawl, huggingface (NOT context7)
-        # crs58/cameron only (raquel doesn't have ai aggregate)
-
-        # --- Servers WITH secrets (2) - Using sops.templates ---
+        # 3 MCP servers use secrets: firecrawl, huggingface, agent-mail
 
         # Generate MCP server configuration files using sops templates
         # Each server gets its own JSON file for manual composition via --mcp-config
@@ -65,6 +61,25 @@
                     "--header"
                     "Authorization: Bearer ${config.sops.placeholder."huggingface-token"}"
                   ];
+                };
+              };
+            };
+          };
+
+          # Agent Mail: Git-backed agent coordination messaging
+          # Pattern: HTTP transport with Bearer token authentication
+          # Server must be running before client can connect
+          mcp-agent-mail = {
+            mode = "0400";
+            path = "${home}/.mcp/agent-mail.json";
+            content = builtins.toJSON {
+              mcpServers = {
+                "mcp-agent-mail" = {
+                  type = "http";
+                  url = "http://127.0.0.1:8765/mcp/";
+                  headers = {
+                    Authorization = "Bearer ${config.sops.placeholder."mcp-agent-mail-bearer-token"}";
+                  };
                 };
               };
             };
