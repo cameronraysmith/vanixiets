@@ -25,9 +25,7 @@
         enableZshIntegration = true;
         settings = {
           use_cache = true;
-          # Delay before spawning tmux pane for long builds
-          # Set low (2s) for testing visibility; tune to 4-12s for production
-          mux_delay = 2;
+          mux_delay = 5;
         };
       };
     };
