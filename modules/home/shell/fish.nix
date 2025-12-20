@@ -12,6 +12,8 @@
         ...
       }:
       {
+        programs.man.generateCaches = false; # (apropos)
+
         programs.fish = {
           enable = true;
 
