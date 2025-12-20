@@ -9,6 +9,7 @@
   lib,
   buildGoModule,
   fetchFromGitHub,
+  nix-update-script,
 }:
 
 buildGoModule rec {
@@ -28,6 +29,8 @@ buildGoModule rec {
 
   # Tests require beads fixtures and git history
   doCheck = false;
+
+  passthru.updateScript = nix-update-script { };
 
   meta = {
     description = "High-performance TUI for the Beads issue tracker with dependency graph analysis";
