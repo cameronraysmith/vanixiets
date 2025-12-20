@@ -18,7 +18,7 @@
       # No local imports needed - all 17 modules available via aggregate merging
 
       # sops-nix configuration for crs58/cameron user
-      # 8 secrets: development + ai + shell aggregates
+      # 9 secrets: development + ai + shell aggregates
       sops = {
         defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
         secrets = {
@@ -26,12 +26,13 @@
           ssh-signing-key = {
             mode = "0400";
           };
-          ssh-public-key = { }; # NEW: For allowed_signers generation
+          ssh-public-key = { }; # For allowed_signers generation
           glm-api-key = { };
           firecrawl-api-key = { };
           huggingface-token = { };
           bitwarden-email = { };
           atuin-key = { };
+          mcp-agent-mail-bearer-token = { };
         };
 
         # Generate allowed_signers file using sops.templates
