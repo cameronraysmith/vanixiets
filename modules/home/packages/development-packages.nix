@@ -51,6 +51,7 @@
           bazelisk
           bazel-buildtools
           buf
+          smithy-cli
           claude-monitor
           dvcWithOptionalRemotes
           gh
