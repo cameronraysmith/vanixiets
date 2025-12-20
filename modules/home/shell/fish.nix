@@ -22,6 +22,15 @@
             end
           '';
 
+          interactiveShellInit = ''
+            # Vi mode keybindings
+            fish_vi_key_bindings
+
+            # Edit command in $EDITOR (like zsh's `vv`)
+            # Alt+e in vi mode, or bind to `vv` in normal mode:
+            bind -M normal v edit_command_buffer
+          '';
+
           # nnn cd-on-quit function (no home-manager fish integration exists)
           # Mirrors the zsh function in modules/home/development/zsh.nix
           functions.n = ''
