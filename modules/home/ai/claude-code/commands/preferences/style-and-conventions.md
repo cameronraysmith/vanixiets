@@ -22,6 +22,23 @@
 
 - Never pollute the repository root or other working directory with markdown files. Always place these types of working notes in suitable paths like: `./docs/notes/[category]/[lower-kebab-case-filename.md]` where you may need to create the directory if it doesn't exist before creating the file. See "Working notes" in `~/.claude/commands/preferences/documentation.md` for lifecycle management and integration with formal documentation.
 
+### File length and modularization
+
+Files should remain comprehensible as cohesive units.
+As files grow, split along responsibility boundaries rather than at arbitrary line counts.
+
+Soft guidance thresholds:
+- Under 500 lines: generally appropriate
+- 500-800 lines: consider extracting distinct sections
+- Beyond 800 lines: likely needs splitting unless genuinely single-purpose
+
+For code, extract modules with clear interfaces using the language's import mechanism.
+For documentation, create index files linking to subpages or organize into subdirectories.
+
+Create subdirectories when extractions form natural hierarchies or exceed 4-5 related files; otherwise sibling files with cross-references suffice.
+
+Avoid splitting when it would fragment a genuinely cohesive unit or create excessive coupling through circular references.
+
 ## Development workflow and tooling
 
 - Always at least consider testing changes with the relevant framework like bash shell commands where you can validate output, `cargo test`, `pytest`, `vitest`, `nix eval` or `nix build`, a task runner like `just test` or `make test`, or `gh workflow run` before considering any work to be complete and correct.
