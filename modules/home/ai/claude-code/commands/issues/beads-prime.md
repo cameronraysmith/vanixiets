@@ -9,7 +9,7 @@ Slash command: `/issues:beads-prime`
 
 Minimal quick reference when context is constrained.
 For session lifecycle, prefer action commands: `/issues:beads-orient` (start), `/issues:beads-checkpoint` (wind-down).
-For deeper patterns: `/issues:beads` (concepts), `/issues:beads-workflow` (operations), `/issues:beads-evolve` (refinement).
+For comprehensive reference: `/issues:beads` (complete workflows, concepts, and operations).
 
 ## Command index
 

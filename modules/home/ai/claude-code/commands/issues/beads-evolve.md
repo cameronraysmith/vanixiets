@@ -15,8 +15,7 @@ For session lifecycle, use the action commands: `/issues:beads-orient` (start) a
 Related commands:
 - `/issues:beads-orient` (`~/.claude/commands/issues/beads-orient.md`) — action: session start
 - `/issues:beads-checkpoint` (`~/.claude/commands/issues/beads-checkpoint.md`) — action: session wind-down
-- `/issues:beads` (`~/.claude/commands/issues/beads.md`) — conceptual reference
-- `/issues:beads-workflow` (`~/.claude/commands/issues/beads-workflow.md`) — operational workflows
+- `/issues:beads` (`~/.claude/commands/issues/beads.md`) — comprehensive reference
 - `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference
 
 ## When to use this command
