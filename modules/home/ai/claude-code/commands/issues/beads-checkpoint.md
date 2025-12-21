@@ -164,4 +164,4 @@ The next session can run `/issues:beads-orient` to see the updated project state
 
 *Reference docs (read only if deeper patterns needed):*
 - `/issues:beads-evolve` — comprehensive adaptation patterns
-- `/issues:beads-workflow` — full operational workflows
+- `/issues:beads` — comprehensive reference for all beads workflows and commands

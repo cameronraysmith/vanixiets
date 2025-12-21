@@ -288,5 +288,5 @@ Run this script weekly or before major planning sessions to catch drift early.
 
 - `beads-review.md` - Synchronization with planning documents
 - `beads-evolve.md` - Adaptive refinement during implementation
-- `beads-workflow.md` - Operational lifecycle management
+- `beads.md` - Comprehensive reference for all beads workflows and commands
 - `beads-orient.md` - Session start diagnostics

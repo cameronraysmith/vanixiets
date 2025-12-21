@@ -115,5 +115,5 @@ git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
 ---
 
 *Reference docs (read only if deeper patterns needed):*
-- `/issues:beads-workflow` — full operational workflows
+- `/issues:beads` — comprehensive reference for all beads workflows and commands
 - `/issues:beads-evolve` — adaptive refinement patterns during work
