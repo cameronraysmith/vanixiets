@@ -10,6 +10,9 @@ Slash command: `/issues:beads-checkpoint`
 Action prompt for session wind-down.
 Capture learnings into the issue graph before context is lost.
 
+**Purpose**: End of session status updates and handoff preparation.
+If you need to refactor the issue graph structure during checkpoint (e.g., split epics, merge issues, restructure dependencies), use `/issues:beads-evolve` first, then complete the checkpoint workflow.
+
 ## Reflect
 
 Consider what was learned this session that the issue graph doesn't yet reflect:
@@ -105,14 +108,20 @@ EOF
 )"
 ```
 
-**Final sync and commit:**
+**Final commit:**
 ```bash
-# Ensure all changes are persisted
-bd sync
+# Validate beads database integrity before committing
+bd hooks run pre-commit
 
-# Commit the beads database (required after any bd modifications)
-git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
+# Commit with meaningful message describing what changed
+git commit -m "chore(issues): <describe what changed - closed issues, new discoveries, etc.>"
 ```
+
+The commit message should explain WHAT changed in the issue graph, not just generic sync messages.
+Examples:
+- "chore(issues): close bd-xyz auth implementation, discover bd-abc blocker"
+- "chore(issues): refactor epic dependencies after arch review"
+- "chore(issues): add checkpoint for bd-xyz incomplete auth work"
 
 ## Verify next work is discoverable
 
