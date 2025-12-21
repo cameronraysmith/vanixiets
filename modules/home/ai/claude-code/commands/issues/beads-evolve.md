@@ -30,7 +30,7 @@ When to use beads-evolve:
 - Finding new issues during implementation that affect the graph
 
 When NOT to use beads-evolve:
-- **Periodic health checks without implementation context**: use `/issues:beads-review` instead
+- **Periodic health checks without implementation context**: use `/issues:beads-audit` instead
 - **Initial creation from architecture docs**: use beads-seed or manual creation
 - **Session start diagnostics**: use `/issues:beads-orient`
 - **Session end capture**: use `/issues:beads-checkpoint`

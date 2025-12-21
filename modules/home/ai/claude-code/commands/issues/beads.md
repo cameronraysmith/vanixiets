@@ -16,7 +16,7 @@ Action commands:
 - `/issues:beads-orient` (`~/.claude/commands/issues/beads-orient.md`) — session start: run diagnostics, synthesize state, select work
 - `/issues:beads-evolve` (`~/.claude/commands/issues/beads-evolve.md`) — adaptive refinement: refactor graph structure and feed back to architecture
 - `/issues:beads-checkpoint` (`~/.claude/commands/issues/beads-checkpoint.md`) — session wind-down: update status, capture learnings, prepare handoff
-- `/issues:beads-review` (`~/.claude/commands/issues/beads-review.md`) — audit: review database against planning docs and repository state
+- `/issues:beads-audit` (`~/.claude/commands/issues/beads-audit.md`) — periodic graph health checks and maintenance
 - `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference for token-constrained contexts
 
 ## Development lifecycle overview
