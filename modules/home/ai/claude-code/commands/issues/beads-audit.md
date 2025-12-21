@@ -5,7 +5,7 @@ description: Periodic beads graph health checks and maintenance
 # Beads audit
 
 Periodic maintenance and health checks for the beads issue graph.
-This command focuses on structural integrity, not synchronization with external planning documents (see `beads-review.md` for that).
+This command focuses on structural integrity of the beads graph.
 
 ## When to use
 
@@ -286,7 +286,7 @@ Run this script weekly or before major planning sessions to catch drift early.
 
 ## Related commands
 
-- `beads-review.md` - Synchronization with planning documents
+- `beads-seed.md` - Architecture docs to beads issues transition
 - `beads-evolve.md` - Adaptive refinement during implementation
 - `beads.md` - Comprehensive reference for all beads workflows and commands
 - `beads-orient.md` - Session start diagnostics
