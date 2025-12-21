@@ -1,5 +1,5 @@
 ---
-description: Adaptive refinement patterns for evolving the issue graph during implementation
+description: Adaptive refinement patterns for evolving the issue graph during implementation with architecture feedback loop
 ---
 
 # Adaptive issue evolution
@@ -18,6 +18,23 @@ Related commands:
 - `/issues:beads` (`~/.claude/commands/issues/beads.md`) — conceptual reference
 - `/issues:beads-workflow` (`~/.claude/commands/issues/beads-workflow.md`) — operational workflows
 - `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference
+
+## When to use this command
+
+Use beads-evolve specifically for graph structure problems discovered during active implementation.
+
+When to use beads-evolve:
+- Implementing an issue and discovering it needs to be split
+- Finding unexpected blockers that change dependency structure
+- Realizing work can be done in parallel instead of sequentially
+- Discovering scope is larger or smaller than initially thought
+- Finding new issues during implementation that affect the graph
+
+When NOT to use beads-evolve:
+- **Periodic health checks without implementation context**: use `/issues:beads-review` instead
+- **Initial creation from architecture docs**: use beads-seed or manual creation
+- **Session start diagnostics**: use `/issues:beads-orient`
+- **Session end capture**: use `/issues:beads-checkpoint`
 
 ## Philosophy
 
@@ -408,6 +425,76 @@ bd dep add <gap-id> <feature-id>
 bd comment <feature-id> "Acceptance revealed missing Y — added as blocker"
 ```
 
+## Architecture feedback loop
+
+When implementation reveals architectural problems, update both the graph and flag documentation needs.
+
+### Identifying architectural discoveries
+
+Implementation discoveries that warrant architecture doc updates:
+- Component dependency assumptions were wrong
+- Integration patterns don't work as designed
+- Performance characteristics differ significantly from design
+- Security model has gaps
+- Data flow differs from architectural diagrams
+- Technology choices prove incompatible
+
+### Workflow for architectural changes
+
+When you discover an architectural issue during implementation:
+
+```bash
+# 1. Update the issue graph to reflect new reality
+bd create "Auth must precede API gateway setup" -t task -p 0
+bd dep add <new-auth-task> <api-gateway-task>
+
+# 2. Comment on the architectural implication
+bd comment <current-issue> "Implementation revealed architectural change: auth dependency exists that wasn't in design docs"
+
+# 3. Create documentation update issue
+bd create "Update architecture docs: add auth dependency to API gateway component" -t task -p 1
+bd dep add <arch-doc-update> <release-milestone> --type related
+
+# 4. Flag specific documentation that needs updating
+bd comment <arch-doc-update> "Files to update: docs/architecture/system-design.md (component diagram), docs/architecture/integration-patterns.md (auth flow)"
+```
+
+### Examples of architectural feedback
+
+**Component dependency changes:**
+```bash
+bd comment <issue> "Discovered that auth must happen before API gateway setup — this changes our component dependency model. Flagged for architecture doc update: docs/architecture/system-design.md"
+```
+
+**Integration pattern problems:**
+```bash
+bd comment <issue> "Event-driven pattern doesn't work for this use case due to latency requirements. Need synchronous RPC. Update docs/architecture/integration-patterns.md"
+```
+
+**Performance constraints:**
+```bash
+bd comment <issue> "Database query performance requires caching layer not in original design. Add caching tier to docs/architecture/data-architecture.md"
+```
+
+**Security gaps:**
+```bash
+bd comment <issue> "API exposes PII without authentication check. Security model in docs/architecture/security.md needs revision"
+```
+
+### When to update architecture docs immediately vs defer
+
+Update architecture docs immediately:
+- Critical path blocker that affects multiple teams
+- Security vulnerability or compliance gap
+- Fundamental design assumption invalidated
+
+Defer architecture doc updates:
+- Minor optimization or implementation detail
+- Change isolated to single component
+- Experimental approach not yet validated
+
+Always create a beads issue to track deferred doc updates so they don't get lost.
+
 ## Key principles
 
 1. **Evolve early, evolve often**: Update issues as soon as understanding changes, not in batches
@@ -416,8 +503,23 @@ bd comment <feature-id> "Acceptance revealed missing Y — added as blocker"
 4. **Trust the history**: Git tracks all changes; don't fear refactoring the graph
 5. **Reflect after completing**: Use completion as a trigger to review downstream issues
 6. **Periodic whole-graph review**: Don't let the forest get lost in the trees
-7. **Commit the database**: After evolving the graph, commit `.beads/issues.jsonl` to preserve changes
+7. **Close the architecture feedback loop**: When implementation reveals design problems, update both graph and documentation
+8. **Commit the database**: After evolving the graph, commit `.beads/issues.jsonl` to preserve changes
+
+## Manual sync workflow
+
+After evolving the graph, commit changes to preserve them:
 
 ```bash
-git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
+# Run pre-commit hooks to ensure database integrity
+bd hooks run pre-commit
+
+# Commit with descriptive message about what changed
+git commit -m "chore(issues): [describe graph changes]"
 ```
+
+Examples of commit messages:
+- `chore(issues): split auth task into subtasks due to scope expansion`
+- `chore(issues): add database migration blocker discovered during API work`
+- `chore(issues): resequence tasks after architectural feedback`
+- `chore(issues): create arch doc update issues for component dependency changes`
