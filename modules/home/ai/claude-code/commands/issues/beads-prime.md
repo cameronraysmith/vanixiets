@@ -11,6 +11,35 @@ Minimal quick reference when context is constrained.
 For session lifecycle, prefer action commands: `/issues:beads-orient` (start), `/issues:beads-checkpoint` (wind-down).
 For deeper patterns: `/issues:beads` (concepts), `/issues:beads-workflow` (operations), `/issues:beads-evolve` (refinement).
 
+## Command index
+
+- `beads-init` - Initial setup for beads issue tracking
+- `beads-seed` - Generate issues from architecture documentation
+- `beads-orient` - Session start diagnostics and work selection
+- `beads-evolve` - Issue graph refactoring patterns
+- `beads-checkpoint` - Session wind-down and handoff prep
+- `beads-audit` - Database health check and validation
+
+## Manual sync workflow
+
+After git operations that modify beads state (pull, checkout, merge, rebase):
+
+```bash
+# Import changes from git into beads database
+bd sync --import-only
+```
+
+Before committing beads changes:
+
+```bash
+# Run pre-commit validation
+bd hooks run pre-commit
+
+# Commit beads changes
+git add .beads/issues.jsonl
+git commit -m "chore(issues): ..."
+```
+
 ## Orient
 
 ```bash
