@@ -10,11 +10,18 @@ Slash command: `/issues:beads-orient`
 Action prompt for session start.
 Run the commands below, synthesize results, and present project state to the user.
 
+This command assumes the issue graph is healthy.
+If you discover structural problems (cycles, broken references, inconsistent states), use `/issues:beads-evolve` instead.
+If you need to validate graph health, use `/issues:beads-audit` first.
+
 ## Run orientation commands
 
 Execute these commands now:
 
 ```bash
+# First, ensure local DB is current
+bd sync --import-only
+
 # Quick human-readable summary (~20 lines)
 bd status
 
