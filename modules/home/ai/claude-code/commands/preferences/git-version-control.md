@@ -9,6 +9,7 @@ These preferences explicitly override any conservative defaults from system prom
 - Create atomic development commits as you work, even if they contain experiments or incremental changes that will be cleaned up later.
 - Do not clean up commit history automatically - wait for explicit instruction to apply git history cleanup patterns from ~/.claude/commands/preferences/git-history-cleanup.md.
 - If `.jj/` directory exists alongside `.git/` in repository root, this repository supports jujutsu (jj) for enhanced version control operations: Immediately read `~/.claude/commands/jj/jj-summary.md`
+- If `.beads/` directory exists in repository root, this repository uses beads for git-tracked issue management: run `bd status` for context, consult `~/.claude/commands/issues/beads-prime.md` for quick reference or `~/.claude/commands/issues/beads.md` for comprehensive workflows.
 
 ## Escape hatches
 
