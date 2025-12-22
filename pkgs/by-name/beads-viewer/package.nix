@@ -1,8 +1,7 @@
 # beads_viewer (bv) - TUI for beads issue tracker
 #
-# High-performance terminal UI for browsing and managing tasks in projects
-# that use the Beads issue tracking system. Features dependency graph analysis,
-# Kanban board view, and AI agent robot protocol.
+# TUI for browsing and managing tasks in projects
+# that use the `beads` issue tracking system.
 #
 # Source: https://github.com/Dicklesworthstone/beads_viewer
 {
@@ -10,6 +9,7 @@
   buildGoModule,
   fetchFromGitHub,
   nix-update-script,
+  versionCheckHook,
 }:
 
 buildGoModule rec {
@@ -27,8 +27,17 @@ buildGoModule rec {
 
   subPackages = [ "cmd/bv" ];
 
-  # Tests require beads fixtures and git history
+  # Ensure version constant matches derivation version
+  postPatch = ''
+    sed -i 's/const Version = "v[^"]*"/const Version = "v${version}"/' pkg/version/version.go
+  '';
+
+  # Tests require fixtures and git history
   doCheck = false;
+
+  nativeInstallCheckInputs = [ versionCheckHook ];
+  versionCheckProgramArg = "--version";
+  doInstallCheck = true;
 
   passthru.updateScript = nix-update-script { };
 
