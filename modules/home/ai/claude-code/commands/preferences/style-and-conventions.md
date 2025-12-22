@@ -18,6 +18,16 @@
 - Do not use uppercase words for emphasis or notification purposes like "IMPORTANT", "URGENT", "WARNING", etc except in relevant situations like error handling, logging, or quoting usage by other sources.
 - Do not name files with all uppercase letters. Use lowercase kebab-case specifically for markdown filenames or if there is no specific convention for the programming language or filetype (e.g. python uses snake_case).
 
+## Factual commentary
+
+Avoid presumptive, negatively judgmental, or editorializing language in code comments, documentation, and commit messages.
+State what code does, not speculative narratives about why.
+
+- Do not speculate about causes, motivations, or intent when you only observed an effect.
+- Do not attribute habits or patterns from single observations ("often", "always", "usually", "tends to").
+- Do not add evaluative judgment where factual description suffices.
+- Reference relevant sources like documentation rather than inventing explanations.
+
 ## File organization
 
 - Never pollute the repository root or other working directory with markdown files. Always place these types of working notes in suitable paths like: `./docs/notes/[category]/[lower-kebab-case-filename.md]` where you may need to create the directory if it doesn't exist before creating the file. See "Working notes" in `~/.claude/commands/preferences/documentation.md` for lifecycle management and integration with formal documentation.
