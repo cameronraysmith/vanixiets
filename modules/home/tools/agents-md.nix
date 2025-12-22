@@ -48,6 +48,7 @@
           - haskell development: ${prefsPath}/haskell-development.md
           - typescript/node.js development: ${prefsPath}/typescript-nodejs-development.md
           - react/ui development: ${prefsPath}/react-tanstack-ui-development.md
+          - hypermedia/server-driven UI development: ${prefsPath}/hypermedia-development/00-index.md
 
           Always remember to fallback to using practical features and architectural
           patterns that emphasize algebraic data types, type-safety, and functional
