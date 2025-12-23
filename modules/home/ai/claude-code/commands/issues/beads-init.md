@@ -22,14 +22,10 @@ We keep the default merge driver (no `--skip-merge-driver`) since it only activa
 After `bd init` completes, perform these required cleanup steps:
 
 ```bash
-# Discard auto-generated AGENTS.md changes
-git restore AGENTS.md
-
-# Prevent .beads/README.md from being tracked
+touch .beads/issues.jsonl            # bd init bug: without this, auto-flush uses interactions.jsonl
+git restore AGENTS.md                # discard auto-generated changes
 echo "README.md" >> .beads/.gitignore
 ```
-
-The `bd init` command creates `AGENTS.md` if it doesn't exist, but we manage this file separately and don't want beads to modify it.
 
 ## Manual sync workflow
 
