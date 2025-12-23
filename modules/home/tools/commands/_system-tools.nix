@@ -8,7 +8,7 @@
   # Manage nix-rosetta-builder VM (stop/start/restart/gc)
   rosetta-manage = {
     runtimeInputs = with pkgs; [
-      openssh
+      openssh # explicit dep for reproducibility; system SSH works for localhost
       nix
       procps # for pgrep
     ];
