@@ -180,11 +180,105 @@ git log --oneline --graph -n 10
 git diff <original-branch>..HEAD  # Should be empty for pure history changes
 ```
 
+## git revise (preferred for simple cases)
+
+git revise is faster than git rebase (in-memory, doesn't touch working directory) and well-suited for linear history cleanup.
+
+### key differences from git rebase
+
+- No `drop` command: all commits must be accounted for (use fixup to absorb unwanted commits)
+- Todo format: `<action> <hash> <message>` (simpler than rebase)
+- Single-commit reword: `git revise -m <target> -m "new message"` (no editor needed)
+- Undo with `git reset @{1}` (single reflog entry)
+
+### non-interactive patterns
+
+```bash
+# Reword a specific commit without interactive mode
+git revise --no-gpg-sign <target-hash> -m "new commit message"
+
+# Apply fixups using GIT_SEQUENCE_EDITOR (same as rebase)
+cat > /tmp/revise-editor.sh << 'SCRIPT'
+#!/bin/bash
+cat > "$1" << 'TODO'
+pick <hash1> first commit message
+fixup <hash2> fixup for first
+pick <hash3> second commit message
+fixup <hash4> fixup for second
+TODO
+SCRIPT
+chmod +x /tmp/revise-editor.sh
+GIT_SEQUENCE_EDITOR="/tmp/revise-editor.sh" git revise -i --no-gpg-sign <base>^
+```
+
+### multi-pass workflow (recommended)
+
+Complex rewrites are safer as separate operations:
+
+1. **Structure pass**: reorder and fixup/squash related commits
+2. **Message pass**: reword each commit with `git revise -m <hash> -m "message"`
+3. **Verify pass**: `git log --oneline`, `git show --stat <hash>` for each commit
+
+### gpg signing
+
+When commit.gpgSign is configured but key unavailable, use `--no-gpg-sign`:
+
+```bash
+git revise --no-gpg-sign -i <base>
+git revise --no-gpg-sign <hash> -m "message"
+```
+
+### fixup ordering
+
+Fixup commits must immediately follow their target:
+
+```bash
+# Correct: fixup follows its target
+pick abc123 feature implementation
+fixup def456 fix typo in feature
+
+# Wrong: fixup before target (will squash into wrong commit)
+fixup def456 fix typo in feature
+pick abc123 feature implementation
+```
+
+### absorbing removal + restoration commits
+
+When a commit removes something and a later commit restores it (net effect: just comments/modifications), squash them:
+
+```bash
+# Before: A removes X, B restores X with comment, C fixes comment
+# After: single commit with just the comment
+
+cat > /tmp/revise-editor.sh << 'SCRIPT'
+cat > "$1" << 'TODO'
+pick <hash-A> remove X
+fixup <hash-B> restore X with comment
+fixup <hash-C> fix comment
+TODO
+SCRIPT
+GIT_SEQUENCE_EDITOR="/tmp/revise-editor.sh" git revise -i --no-gpg-sign <hash-A>^
+
+# Then reword with correct message
+git revise --no-gpg-sign <new-hash> -m "add comment explaining X"
+```
+
+## when to use which tool
+
+| Scenario | Tool | Reason |
+|----------|------|--------|
+| Simple linear cleanup | git revise | Faster, in-memory |
+| Reword single commit | `git revise -m` | No editor needed |
+| Complex reordering | git rebase -i | More flexible |
+| Conflicts expected | git rebase -i | Better conflict UX |
+| exec/break needed | git rebase -i | revise lacks these |
+
 ## key reminders
 
 - Always work on a backup branch first
 - Use `-i.bak` with sed for safety (creates backup)
 - Test rebase scripts on throwaway branches
-- Check `git rebase --abort` is available if things go wrong
+- Check `git rebase --abort` or `git reset @{1}` is available if things go wrong
 - For AI agents: create temporary shell scripts rather than inline complex sed/awk
-- Never use bare `git rebase -i` without `GIT_SEQUENCE_EDITOR` set
+- Never use bare `git rebase -i` or `git revise -i` without `GIT_SEQUENCE_EDITOR` set
+- Use `--no-gpg-sign` when GPG key is unavailable
