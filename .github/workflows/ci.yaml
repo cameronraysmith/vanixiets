@@ -176,11 +176,14 @@ jobs:
             justfile
           sparse-checkout-cone-mode: false
 
+      - name: Install just
+        uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3.0.0
+        with:
+          just-version: 1.43.1
+
       - name: Discover packages
         id: discover-packages
         run: |
-          # Install just for package discovery
-          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
           PACKAGES=$(just list-packages-json)
           echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
           echo "Discovered packages: $PACKAGES"
