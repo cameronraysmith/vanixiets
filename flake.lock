@@ -106,11 +106,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1766535217,
-        "narHash": "sha256-jh0WyL5FYWoIn8s0bl1R5m4KECzEBIA6kH9XXke0azw=",
-        "rev": "20b495f31403985026c7e0204b5e6c2fd6daf8e6",
+        "lastModified": 1766588573,
+        "narHash": "sha256-JGmU+XgXNe+l/HWZSWDM6XSqwZXzYmX6D96PTWBZR08=",
+        "rev": "3d44baeaffa5f6478117fef8bb90ea40f992b202",
         "type": "tarball",
-        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/20b495f31403985026c7e0204b5e6c2fd6daf8e6.tar.gz"
+        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/3d44baeaffa5f6478117fef8bb90ea40f992b202.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -662,11 +662,11 @@
     },
     "nixos-facter-modules": {
       "locked": {
-        "lastModified": 1766499999,
-        "narHash": "sha256-p/Bwo4YjbYNvHjmgj71WgGN8qDyZTzUqNfJJouwQ/As=",
+        "lastModified": 1766558141,
+        "narHash": "sha256-Ud9v49ZPsoDBFuyJSQ2Mpw1ZgAH/aMwUwwzrVoetNus=",
         "owner": "nix-community",
         "repo": "nixos-facter-modules",
-        "rev": "feb4086d1462d8a5bb2adcedb5039fef10b69904",
+        "rev": "e796d536e3d83de74267069e179dc620a608ed7d",
         "type": "github"
       },
       "original": {
