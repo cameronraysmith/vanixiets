@@ -37,7 +37,7 @@
         };
 
         scheelite = {
-          enabled = true;
+          enabled = false;
           machineType = "n1-standard-8"; # 8 vCPU, 30GB RAM
           zone = "us-central1-f"; # Try: a -> b -> c -> f if RESOURCE_EXHAUSTED
           image = "debian-12";
