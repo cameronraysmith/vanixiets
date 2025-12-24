@@ -117,14 +117,14 @@
         target_tags = [ "terraform-managed" ];
       };
 
-      # Firewall rule: Allow ZeroTier (udp/51820) for mesh networking
+      # Firewall rule: Allow ZeroTier (udp/9993) for mesh networking
       resource.google_compute_firewall.allow_zerotier = {
         name = "allow-zerotier-terraform";
         network = "default";
         allow = [
           {
             protocol = "udp";
-            ports = [ "51820" ];
+            ports = [ "9993" ];
           }
         ];
         source_ranges = [ "0.0.0.0/0" ];
