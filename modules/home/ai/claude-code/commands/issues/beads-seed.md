@@ -163,7 +163,7 @@ bd create "CDN integration for serving processed content" \
 bd dep add bd-processing-worker bd-upload-api --type blocks
 
 # Verify structure
-bd list --tree
+bd list --pretty
 
 # Commit
 git add .beads/
@@ -200,7 +200,7 @@ Both are version controlled and evolve together but serve different purposes.
 
 **Seed incrementally**: For large systems, seed one epic at a time rather than attempting to create the entire structure upfront.
 
-**Validate dependencies**: After seeding, run `bd list --tree` and verify the dependency graph matches architectural understanding.
+**Validate dependencies**: After seeding, run `bd list --pretty` to review the structure, and `bd dep tree <epic-id>` for each epic to verify dependencies match architectural understanding.
 
 ## Common patterns
 
