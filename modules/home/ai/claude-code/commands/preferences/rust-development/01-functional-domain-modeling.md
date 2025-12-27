@@ -360,6 +360,11 @@ pub fn validate_model(
 
 Use phantom types as an alternative to enum-based state machines when state is known at compile time and you want zero runtime overhead.
 
+**Emergent typestate**: Rust's typestate capability is not a pattern added on top of the language—it emerges naturally from three core primitives: affine types (move semantics), nominal types (types distinct by name), and phantom type parameters (`PhantomData<S>`).
+As Graydon Hoare noted: "There was a typestate system that turns out to be redundant once you have affine types, nominal types and phantom type parameters."
+The explicit typestate feature was removed from early Rust because these primitives made it redundant.
+For concurrency applications of this insight, see ./11-concurrency.md.
+
 **When to use phantom types vs enums**:
 
 - **Phantom types**: State known at compile time, no runtime branching needed, zero-cost abstraction, impossible to inspect state at runtime
