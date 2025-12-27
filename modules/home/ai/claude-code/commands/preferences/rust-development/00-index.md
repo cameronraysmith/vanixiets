@@ -35,6 +35,7 @@ This guide is organized into focused topic files for easy navigation and AI agen
 | [09-unsafe-code.md](./09-unsafe-code.md) | Validation requirements, Miri testing, soundness guarantees |
 | [10-tooling.md](./10-tooling.md) | Code quality, linting, dependency management |
 | [11-concurrency.md](./11-concurrency.md) | Capability-secure concurrency: deny capabilities, actor patterns, channel primitives, structured concurrency |
+| [12-distributed-systems.md](./12-distributed-systems.md) | Distributed patterns: idempotency keys, saga orchestration, transactional outbox, event sourcing integration |
 
 ## References
 
@@ -48,5 +49,6 @@ This document integrates guidance from:
 
 ### Related documents
 
+- `~/.claude/commands/preferences/distributed-systems.md` - universal distributed systems decision framework
 - `~/.claude/commands/preferences/theoretical-foundations.md` - category-theoretic underpinnings
 - `~/.claude/commands/preferences/algebraic-data-types.md` - sum/product type patterns
