@@ -597,6 +597,11 @@ where
 
 Group related entities that must change together atomically.
 
+**Scope: Local consistency boundaries**: Aggregates define consistency boundaries within a single service or process.
+Cross-aggregate operations within the same service can use database transactions; cross-service operations cannot.
+For distributed consistency across services, see distributed-systems.md.
+Aggregates in different services communicate via events and accept eventual consistency as a fundamental constraint.
+
 **Example: Dataset aggregate with observations**
 
 ```rust
