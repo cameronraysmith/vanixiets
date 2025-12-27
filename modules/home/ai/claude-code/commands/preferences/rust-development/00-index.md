@@ -34,6 +34,7 @@ This guide is organized into focused topic files for easy navigation and AI agen
 | [08-structured-logging.md](./08-structured-logging.md) | Tracing, message templates, OpenTelemetry conventions |
 | [09-unsafe-code.md](./09-unsafe-code.md) | Validation requirements, Miri testing, soundness guarantees |
 | [10-tooling.md](./10-tooling.md) | Code quality, linting, dependency management |
+| [11-concurrency.md](./11-concurrency.md) | Capability-secure concurrency: deny capabilities, actor patterns, channel primitives, structured concurrency |
 
 ## References
 
