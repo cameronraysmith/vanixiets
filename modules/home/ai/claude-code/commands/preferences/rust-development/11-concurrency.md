@@ -6,6 +6,15 @@ The goal is not merely to avoid data races, but to reason about concurrency in t
 For pattern descriptions, see domain-modeling.md.
 For theoretical foundations, see theoretical-foundations.md.
 
+## Scope: Local concurrency
+
+This document covers concurrency within a single process boundary.
+For distributed systems (multiple processes, services, or machines), see ./12-distributed-systems.md and the universal distributed-systems.md.
+
+The actor patterns here assume co-located actors with reliable message delivery.
+Distributed actors introduce network partitions, at-least-once delivery, and consistency model choices not addressed here.
+The "deny capabilities" mental model applies to local references; distributed references require additional coordination primitives.
+
 ## Emergent typestate from Rust's primitives
 
 Rust's typestate capability is not a pattern added on top of the language—it emerges naturally from three core primitives working together:
