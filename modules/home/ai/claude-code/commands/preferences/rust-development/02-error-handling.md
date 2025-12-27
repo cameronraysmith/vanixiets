@@ -514,6 +514,7 @@ See ./01-functional-domain-modeling.md Pattern 5 for complete error classificati
 - ./05-testing.md - Testing patterns
 - ./06-documentation.md - Documentation best practices
 - ./08-structured-logging.md - Structured logging and logging as an effect
+- ./11-concurrency.md - Error handling in concurrent contexts (cancellation, task panics, channel errors)
 - domain-modeling.md - Universal domain modeling patterns
 - railway-oriented-programming.md - Result composition patterns
 - architectural-patterns.md - Effect isolation at boundaries
