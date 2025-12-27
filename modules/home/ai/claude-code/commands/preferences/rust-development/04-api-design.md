@@ -382,6 +382,16 @@ Workflows have typed inputs (commands) and outputs (events) that document intent
 Commands represent actions to perform; events represent facts about what occurred.
 For conceptual foundation, see `~/.claude/commands/preferences/architectural-patterns.md` (Commands and events as workflow boundaries).
 
+**Local vs. distributed semantics**: The command/event pattern here describes in-process workflow documentation.
+When commands or events cross service boundaries (HTTP, gRPC, message queues), additional concerns apply:
+
+- Idempotency keys for exactly-once semantics
+- Correlation IDs for distributed tracing
+- Schema evolution for event contracts
+- Delivery guarantees (at-least-once vs. exactly-once)
+
+See ./12-distributed-systems.md for distributed command/event patterns.
+
 ### Command conventions
 
 Commands represent intent to perform an action:
