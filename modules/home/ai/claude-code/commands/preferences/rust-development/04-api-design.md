@@ -608,6 +608,9 @@ impl Database {
 }
 ```
 
+**Concurrency consideration**: Before using `Arc<Mutex<T>>` or `Arc<RwLock<T>>`, consider whether an actor pattern with channels would better preserve capability-secure concurrency.
+See ./11-concurrency.md for the concurrency primitive hierarchy and when shared mutable state is genuinely necessary versus when it indicates a missing architectural abstraction.
+
 ## API design principles summary
 
 These principles support FDM by:
@@ -629,5 +632,6 @@ These principles support FDM by:
 - ./08-structured-logging.md (structured logging)
 - ./09-unsafe-code.md (unsafe code patterns)
 - ./10-tooling.md (code quality and dependencies)
+- ./11-concurrency.md (capability-secure concurrency patterns)
 - domain-modeling.md (universal domain modeling patterns)
 - architectural-patterns.md (application structure patterns)
