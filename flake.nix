@@ -6,7 +6,7 @@
     flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz";
 
     nixpkgs-darwin-stable.url = "github:NixOS/nixpkgs/nixpkgs-25.05-darwin";
     nixpkgs-linux-stable.url = "github:NixOS/nixpkgs/nixos-25.05";
