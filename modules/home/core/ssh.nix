@@ -82,6 +82,12 @@
             user = "cameron";
           };
 
+          "pixel7.zt" = {
+            hostname = "fddb:4344:343b:14b9:399:939f:c45d:577c";
+            port = 8022; # Termux sshd default
+            user = "termux"; # Termux accepts any username
+          };
+
           # Wildcard for all zerotier hosts
           "*.zt" = {
             # Enable compression for zerotier (encrypted tunnel over encrypted tunnel)
