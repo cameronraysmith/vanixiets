@@ -36,6 +36,7 @@ This guide is organized into focused topic files for easy navigation and AI agen
 | [10-tooling.md](./10-tooling.md) | Code quality, linting, dependency management |
 | [11-concurrency.md](./11-concurrency.md) | Capability-secure concurrency: deny capabilities, actor patterns, channel primitives, structured concurrency |
 | [12-distributed-systems.md](./12-distributed-systems.md) | Distributed patterns: idempotency keys, saga orchestration, transactional outbox, event sourcing integration |
+| [13-type-level-programming.md](./13-type-level-programming.md) | Strategic library extensions: typenum, frunk, nutype for type-level programming; compile-time assertions; anti-patterns to avoid |
 
 ## References
 
