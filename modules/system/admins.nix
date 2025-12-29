@@ -17,7 +17,6 @@
           isNormalUser = true;
           shell = pkgs.zsh;
           extraGroups = [ "wheel" ];
-          # SSH keys from shared identity module
           openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
         };
 
