@@ -952,6 +952,488 @@ Audit compliance: both indices preserved, enables reconstructing "what did we kn
 - domain-modeling.md#pattern-3-state-machines for state machines as event handlers
 - railway-oriented-programming.md for Result composition in command handlers
 
+## Reactive systems and comonads
+
+Reactive signal systems exhibit comonadic structure, the categorical dual of monads.
+While monads model effect production (building up context through sequenced computations), comonads model context consumption (extracting and transforming values from surrounding context).
+This duality is essential for understanding how dataflow reactive systems work and how they compose with the monadic event sourcing patterns described above.
+
+### Signals as comonads
+
+**Practical pattern**: Reactive signals that hold current values and support derived computations
+
+```haskell
+-- A signal is a container with a current value
+-- and the ability to create derived signals
+data Signal a = Signal
+  { current :: a
+  , neighbors :: [Signal a]  -- conceptual: related signal values
+  }
+```
+
+**Category-theoretic interpretation**:
+
+A comonad W is a functor with two natural transformations:
+
+```haskell
+class Functor w => Comonad w where
+  extract :: w a -> a                     -- get current value
+  extend :: (w a -> b) -> w a -> w b      -- create derived signal
+  -- or equivalently:
+  duplicate :: w a -> w (w a)             -- nest the context
+```
+
+For signals:
+- `extract` retrieves the current value from a signal
+- `extend f signal` creates a derived signal where each point computes `f` over the signal's context
+- `duplicate` creates a signal of signals (each point sees its neighborhood)
+
+**Comonad laws** (dual to monad laws):
+
+```haskell
+-- Left identity: extracting then extending is identity
+extend extract = id
+
+-- Right identity: extending then extracting gives the function result
+extract . extend f = f
+
+-- Associativity: extension composes
+extend f . extend g = extend (f . extend g)
+```
+
+**Practical consequence**:
+
+Derived signals compose correctly.
+If you derive signal B from signal A, and derive signal C from signal B, the result is equivalent to deriving C directly from A with the composed derivation function.
+This is why signal graphs can be built incrementally without worrying about evaluation order.
+
+**Code example: Signal derivation**
+
+```typescript
+// Datastar signal system (conceptual model)
+const price = signal(100);
+const quantity = signal(5);
+
+// Derived signal: extend over price and quantity context
+const total = computed(() => price.value * quantity.value);
+// extend: (context -> result) -> signal -> derived signal
+
+// Extracting from derived signal
+const currentTotal = total.value;  // extract: signal -> value
+```
+
+**Monad/comonad duality**:
+
+```
+Monad (effects):                    Comonad (context):
+  return :: a -> m a                  extract :: w a -> a
+  bind :: m a -> (a -> m b) -> m b    extend :: w a -> (w a -> b) -> w b
+
+  Effects flow inward (produced)      Values flow outward (consumed)
+  Kleisli composition: a -> m b       CoKleisli composition: w a -> b
+```
+
+In SSE-based hypermedia:
+- Server events arrive via monadic effect channel (SSE stream produces values)
+- Client signals consume those values via comonadic extraction (signals hold and derive)
+
+This explains the architectural split: server-side event sourcing is monadic (effect production), client-side reactivity is comonadic (context consumption).
+
+### Signal graphs as free categories
+
+**Practical pattern**: Directed acyclic graph of signal dependencies
+
+```typescript
+// Signal dependency graph
+const a = signal(1);
+const b = computed(() => a.value * 2);      // b depends on a
+const c = computed(() => a.value + 10);     // c depends on a
+const d = computed(() => b.value + c.value); // d depends on b and c
+```
+
+**Category-theoretic interpretation**:
+
+A signal graph forms a free category over the dependency DAG:
+- Objects: Signals (typed by their value type)
+- Morphisms: Derivation functions between signal types
+- Composition: Function composition of derivations
+- Identity: The identity derivation (signal depends on itself trivially)
+
+The DAG constraint (no cycles) ensures the category is well-founded, meaning every signal can be evaluated in topological order.
+
+**Code example: Category structure**
+
+```haskell
+-- Morphisms in the signal category
+type Derivation a b = Signal a -> b
+
+-- Identity morphism
+idDeriv :: Derivation a a
+idDeriv = extract
+
+-- Composition
+composeDeriv :: Derivation b c -> Derivation a b -> Derivation a c
+composeDeriv f g = f . extend g
+```
+
+**Practical consequence**:
+
+Signal frameworks can topologically sort the dependency graph and update signals in dependency order.
+The free category structure ensures this ordering exists and that incremental updates propagate correctly.
+Memoization at each signal node is sound because the category laws guarantee consistent evaluation.
+
+### Web components as coalgebras
+
+**Practical pattern**: Web components with state, rendering, and event handling
+
+```javascript
+class ChartWrapper extends HTMLElement {
+  // State
+  data = [];
+
+  // Output: render state to DOM
+  render() { /* state -> HTML */ }
+
+  // Transition: handle events/attributes to update state
+  attributeChangedCallback(name, old, new) { /* (state, input) -> state */ }
+}
+```
+
+**Category-theoretic interpretation**:
+
+A web component is a Moore machine (a type of coalgebra where output depends only on state, not on current input).
+
+For functor F S = Output × (Input → S):
+
+```haskell
+-- Moore machine coalgebra
+coalgebra :: S -> (Output, Input -> S)
+coalgebra state = (render state, \input -> transition state input)
+```
+
+Where:
+- S is the component's state type (reactive properties, internal state)
+- Output is the rendered DOM
+- Input is the union of events and attribute changes
+- `render` produces output from current state
+- `transition` computes next state from current state and input
+
+**Bisimulation as behavioral equivalence**:
+
+Two component states are behaviorally equivalent (bisimilar) if they:
+1. Produce the same rendered output
+2. Transition to bisimilar states on all inputs
+
+This is crucial for morphing algorithms: if two DOM states are bisimilar with respect to user interaction, morphing can safely replace one with the other without observable behavior change.
+
+**Code example: Coalgebra structure**
+
+```haskell
+-- Component as coalgebra
+data Component s = Component
+  { state :: s
+  , render :: s -> HTML
+  , transition :: s -> Event -> s
+  }
+
+-- Coalgebra morphism (natural transformation)
+observe :: Component s -> (HTML, Event -> Component s)
+observe (Component s r t) = (r s, \e -> Component (t s e) r t)
+```
+
+**Connection to hypermedia**:
+
+The thin wrapper pattern (05-web-components.md line 24) describes components as "morphisms between the hypermedia signal world and imperative library APIs."
+This is precisely the coalgebra structure: components observe signal state and produce library state as output.
+
+```
+Signals ──extract──▶ Component State ──render──▶ Library DOM
+                           │
+                           ◀──transition──
+                           │
+                      Event Input
+```
+
+### Composing reactive systems
+
+**Full reactive pipeline**:
+
+```
+Server Events ──(monad)──▶ Signal Updates ──(comonad)──▶ Component State ──(coalgebra)──▶ DOM
+      │                          │                              │
+      │                          │                              │
+      └──────────── Profunctor structure ───────────────────────┘
+```
+
+The complete system is a profunctor:
+- Contravariant in inputs (server events flow to signals)
+- Covariant in outputs (component state renders to DOM)
+
+**Code example: Pipeline composition**
+
+```haskell
+-- Server → Signal (monadic effect reception)
+receiveEvent :: SSE Event -> IO (Signal State)
+
+-- Signal → Component (comonadic extraction)
+bindComponent :: Signal State -> Component State
+bindComponent = extend (\sig -> ComponentState { ... })
+
+-- Component → DOM (coalgebraic observation)
+renderComponent :: Component State -> HTML
+renderComponent = fst . observe
+```
+
+**Practical consequence**:
+
+This decomposition clarifies responsibility boundaries:
+1. SSE layer handles effect reception (monadic)
+2. Signal layer handles state derivation (comonadic)
+3. Component layer handles DOM observation (coalgebraic)
+
+Each layer has its own laws and can be tested independently.
+The composition laws ensure end-to-end correctness.
+
+**See also**:
+- hypermedia-development/03-datastar.md for signal system patterns
+- hypermedia-development/05-web-components.md for component integration
+- hypermedia-development/07-event-architecture.md for SSE as projection channel
+
+## Materialized views as Galois connections
+
+Read models and materialized views in CQRS/event sourcing architectures form a Galois connection with the event log.
+This algebraic structure explains why projections are lossy, how query caching works, and how temporal versioning enables time travel.
+
+### The abstraction-concretion pair
+
+**Practical pattern**: Projecting event logs to queryable views
+
+```haskell
+-- Abstraction: project events to view (loses information)
+project :: EventLog -> ReadModel
+
+-- Concretion: what events could produce this view (gains uncertainty)
+reconstruct :: ReadModel -> Set EventLog
+```
+
+**Category-theoretic interpretation**:
+
+A Galois connection is a pair of functions between ordered sets:
+
+```haskell
+abstract :: EventLog -> ReadModel
+concrete :: ReadModel -> EventLog
+
+-- Galois condition: for all e, m
+abstract(e) ⊑ m  ⟺  e ⊑ concrete(m)
+```
+
+Where ⊑ is information ordering (refinement).
+
+For event sourcing:
+- `abstract` (projection): collapses event sequences into aggregated views
+- `concrete` (reconstruction): maps views back to minimal event sequences that produce them
+
+**Properties**:
+
+```haskell
+-- Projection is surjective onto its image
+abstract . concrete . abstract = abstract
+
+-- Reconstruction is injective on views
+concrete . abstract . concrete = concrete
+
+-- Projection loses information monotonically
+abstract(e1 ++ e2) ⊑ abstract(e1) <> abstract(e2)
+```
+
+**Practical consequence**:
+
+Multiple event sequences can produce the same view (abstract is many-to-one).
+Views can be rebuilt from events, but events cannot be recovered from views.
+This is why event logs are the source of truth—views are derived, disposable, and rebuildable.
+
+### Views as quotients of the event monoid
+
+**Practical pattern**: Equivalent event sequences producing the same view
+
+The event log is a free monoid (see "Event sourcing as algebraic duality" above).
+A materialized view is a quotient monoid—the free monoid modulo an equivalence relation that identifies event sequences producing the same view.
+
+**Code example: Quotient structure**
+
+```haskell
+-- Events that commute produce equivalent sequences
+-- [DepositA, DepositB] ≡ [DepositB, DepositA]  (same final balance)
+
+-- Events that are idempotent collapse
+-- [SetStatus "active", SetStatus "active"] ≡ [SetStatus "active"]
+
+-- The projection is a monoid homomorphism
+project :: [Event] -> View
+project [] = initialView                      -- preserves identity
+project (e1 ++ e2) = project e1 <> project e2 -- preserves composition
+```
+
+**Category-theoretic interpretation**:
+
+The quotient is the coequalizer of all equivalent event sequences:
+
+```
+EventLog ──π──▶ EventLog/≡ ≅ View
+```
+
+Where π is the projection to equivalence classes.
+
+**Practical consequence**:
+
+Different event sequences may be equivalent for querying purposes.
+This enables:
+- Log compaction (remove redundant events)
+- Snapshot optimization (store view state instead of replaying)
+- Parallel projection (events that commute can be processed concurrently)
+
+**When events commute**:
+
+Events commute when their order doesn't affect the final view:
+
+```haskell
+commute :: Event -> Event -> Bool
+commute (Deposit a1) (Deposit a2) = True   -- deposits commute
+commute (Deposit _) (Withdraw _) = False   -- these don't commute
+commute (SetField f1 _) (SetField f2 _) = f1 /= f2  -- different fields commute
+```
+
+Commutativity analysis enables parallel projection and relaxed consistency models.
+
+### Query caching as memoization
+
+**Practical pattern**: Caching query results for repeated access
+
+```haskell
+-- Uncached query
+query :: ReadModel -> QueryParams -> Result
+query model params = expensiveComputation model params
+
+-- Cached query
+cachedQuery :: Cache -> ReadModel -> QueryParams -> Result
+cachedQuery cache model params =
+  case lookup params cache of
+    Just result -> result
+    Nothing -> let result = query model params
+               in insert params result cache; result
+```
+
+**Category-theoretic interpretation**:
+
+Memoization is a form of profunctor memoization where:
+- Queries form a category (by refinement/composition)
+- Results form another category
+- The query function is a profunctor Q : Params^op × Model → Result
+- Caching adds morphism memoization to the profunctor
+
+**Cache invalidation as naturality**:
+
+A cached result is valid when the naturality square commutes:
+
+```
+Model_old ───query(p)───▶ Result_old
+    │                          │
+ update                     same?
+    │                          │
+    v                          v
+Model_new ───query(p)───▶ Result_new
+```
+
+If `update` changes data relevant to query `p`, the cache entry is invalid.
+This is why cache invalidation is "hard"—determining affected queries requires understanding the naturality conditions.
+
+**Practical strategies**:
+
+```haskell
+-- Time-based invalidation (eventual consistency)
+cachedWithTTL :: Duration -> Cache -> Query -> Result
+
+-- Event-based invalidation (strong consistency)
+invalidateOn :: [EventType] -> Cache -> Query -> Result
+
+-- Dependency tracking (precise invalidation)
+cachedWithDeps :: DependencyGraph -> Cache -> Query -> Result
+```
+
+**DuckDB connection**:
+
+DuckDB's query optimizer can be understood through this lens:
+- Predicate pushdown: restructuring the query profunctor
+- Partition pruning: memoization over partition boundaries
+- Statistics-based optimization: using cached metadata for query planning
+
+### Temporal versioning as indexed types
+
+**Practical pattern**: Time-travel queries in lakehouse architectures
+
+```sql
+-- DuckLake/Iceberg time travel
+SELECT * FROM orders VERSION AS OF '2025-01-01';
+SELECT * FROM orders VERSION AS OF 12345;  -- snapshot ID
+```
+
+**Type-level interpretation**:
+
+Tables are indexed by version/time:
+
+```haskell
+-- Table parameterized by version
+data Table (v :: Version) a
+
+-- Query parameterized by table version
+query :: Table v a -> Query -> Result
+
+-- Time travel: change version index
+asOf :: Table v a -> Version -> Table v' a
+```
+
+**Connection to indexed monads** (see lines 250-308):
+
+Just as indexed monads track effect state through computation, versioned tables track temporal state through queries.
+
+```haskell
+-- Indexed query composition
+data VersionedQuery v1 v2 a where
+  Query :: Table v1 a -> Query -> VersionedQuery v1 v1 Result
+  TimeTravel :: Version -> VersionedQuery v1 v2 a -> VersionedQuery v1 v2 a
+
+-- Bind tracks version changes
+ibind :: VersionedQuery v1 v2 a -> (a -> VersionedQuery v2 v3 b) -> VersionedQuery v1 v3 b
+```
+
+**Bitemporal connection** (see "Temporal semantics" in Event sourcing section):
+
+DuckLake versioning implements the processing-time axis of bitemporality:
+- Event time: when the business event occurred
+- Processing time (DuckLake version): when the data was recorded in the lake
+
+```haskell
+-- Full bitemporal query
+queryBitemporal :: Table ProcessingTime a -> EventTime -> ProcessingTime -> Query -> Result
+queryBitemporal table eventT procT q =
+  let snapshot = asOf table procT
+  in query (filterByEventTime eventT snapshot) q
+```
+
+**Practical consequence**:
+
+Temporal versioning enables:
+- Audit queries ("what did we know at time T?")
+- Debugging ("why did this query return X last week?")
+- Reproducibility ("run the same analysis on historical snapshot")
+- Schema evolution (new schema on new versions, old queries use old schema)
+
+**See also**:
+- data-modeling.md for DuckDB patterns
+- distributed-systems.md "Position 1: Event log as authority" for read model derivation
+- hypermedia-development/07-event-architecture.md for bitemporal event handling
+
 ## Cross-references to practical documents
 
 This theoretical foundation supports patterns described in:
@@ -990,6 +1472,22 @@ This theoretical foundation supports patterns described in:
 ### hypermedia-development/07-event-architecture.md
 - **SSE as projection channel** → Functors from event log to stream
 - **Temporal consistency** → Ordered monoid preserving causality
+
+### hypermedia-development/03-datastar.md
+- **Signal system** → Comonadic context consumption (reactive-systems-and-comonads)
+- **Computed signals** → CoKleisli composition for derived values
+- **PatchSignals** → Monadic effect delivery from server to client
+
+### hypermedia-development/05-web-components.md
+- **Thin wrapper pattern** → Web components as coalgebras/Moore machines
+- **Morphing boundaries** → Bisimulation for behavioral equivalence
+- **Signal-to-library bridge** → Comonad extraction feeding coalgebra observation
+
+### data-modeling.md
+- **Read models as derived views** → Galois connection with event log
+- **Query caching** → Memoization with naturality-based invalidation
+- **DuckLake time travel** → Temporal versioning as indexed types
+- **Views as quotients** → Equivalent event sequences under projection
 
 ## Further reading
 
