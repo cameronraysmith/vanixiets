@@ -84,7 +84,7 @@ stdenv.mkDerivation (finalAttrs: {
       };
       "aarch64-linux" = fetchzip {
         url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-linux-aarch64.zip";
-        hash = "sha256-iwt35AA7ERv2xN6+IMR7Io0X1VQl8N/dTX/lCZjGwNI=";
+        hash = "sha256-B3H2XuhZYBqNmgMl1R/fBlneGhBrfZvE8oESDE7NFvA=";
         stripRoot = false;
       };
       "x86_64-darwin" = fetchzip {
