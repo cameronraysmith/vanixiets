@@ -33,6 +33,10 @@
           bitwarden-email = { };
           atuin-key = { };
           mcp-agent-mail-bearer-token = { };
+          git-credentials = {
+            mode = "0600";
+            path = "${config.home.homeDirectory}/.git-credentials";
+          };
         };
 
         # Generate allowed_signers file using sops.templates
