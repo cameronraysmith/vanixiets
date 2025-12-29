@@ -52,12 +52,11 @@
             # User modules should override user.name and user.email
             core.editor = "nvim";
             # Clear system helpers, then: sops-managed store first, osxkeychain fallback (Darwin only)
-            credential.helper =
-              [
-                ""
-                "store --file ${config.home.homeDirectory}/.git-credentials"
-              ]
-              ++ lib.optionals pkgs.stdenv.isDarwin [ "osxkeychain" ];
+            credential.helper = [
+              ""
+              "store --file ${config.home.homeDirectory}/.git-credentials"
+            ]
+            ++ lib.optionals pkgs.stdenv.isDarwin [ "osxkeychain" ];
             github.user = "cameronraysmith";
             color.ui = true;
             diff.colorMoved = "zebra";
