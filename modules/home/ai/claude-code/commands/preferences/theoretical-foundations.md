@@ -753,7 +753,7 @@ data FileHandle :: FileState -> * where
 
 ## Event sourcing as algebraic duality
 
-Event sourcing occupies a privileged position in the taxonomy of architectural patterns: it explicitly represents both construction (F-algebras, lines 123-143) and observation (coalgebras, lines 397-432) perspectives.
+Event sourcing occupies a privileged position in the taxonomy of architectural patterns: it explicitly represents both construction (see [F-algebras and catamorphisms](#f-algebras-and-catamorphisms)) and observation (see [Coalgebras for endofunctors](#coalgebras-for-endofunctors)) perspectives.
 The event log is a free monoid over event types, a universal construction that preserves complete history while enabling arbitrary interpretations via monoid homomorphisms.
 State reconstruction proceeds via catamorphism, the unique fold guaranteed by initiality.
 This duality manifests concretely in CQRS: the command side (contravariant in commands) and query side (covariant in views) both factor through the event log as pivot point, forming a profunctor structure that preserves information while enabling independent scaling.
@@ -796,7 +796,7 @@ instance Monoid EventLog where
 
 The free monoid Free(S) over set S is the initial object in the comma category (S ↓ U) where U is the forgetful functor from monoids to sets.
 This is precisely the initial algebra construction: the free monoid is the initial algebra for the list functor ListF X = 1 + (S × X).
-Back-reference to F-algebras (lines 123-143): just as recursive data types are initial algebras, the event log as list of events is the initial algebra for the list functor.
+Just as recursive data types are initial algebras (see [F-algebras and catamorphisms](#f-algebras-and-catamorphisms)), the event log as list of events is the initial algebra for the list functor.
 
 **Universal property**:
 
@@ -984,9 +984,9 @@ ibind
 
 **Category-theoretic interpretation**:
 
-Bitemporal events form an indexed monad (lines 250-395) tracking temporal state transitions.
+Bitemporal events form an indexed monad (see [Indexed monads for effect tracking](#indexed-monads-for-effect-tracking)) tracking temporal state transitions.
 The indices i, j represent positions in bitemporal space: i is input temporal context, j is output temporal context.
-Connection to indexed monads: just as file handles track resource state (lines 281-292), bitemporal types track temporal state.
+Just as indexed monads can track file handle resource state transitions, bitemporal types track temporal state.
 
 **Practical consequence**:
 
@@ -1443,7 +1443,7 @@ query :: Table v a -> Query -> Result
 asOf :: Table v a -> Version -> Table v' a
 ```
 
-**Connection to indexed monads** (see lines 250-308):
+**Connection to indexed monads** (see [Indexed monads for effect tracking](#indexed-monads-for-effect-tracking)):
 
 Just as indexed monads track effect state through computation, versioned tables track temporal state through queries.
 
