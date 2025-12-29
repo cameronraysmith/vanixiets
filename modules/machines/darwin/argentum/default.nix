@@ -131,10 +131,8 @@ in
         home = "/Users/christophersmith";
         shell = pkgs.zsh;
         description = "christophersmith";
-        # SSH key for christophersmith
-        openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKPi1aUkaTAykqzTEQI1lr8qTpPMxXcyxZwilVECIzAM"
-        ];
+        # SSH keys from shared identity module
+        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.christophersmith.sshKeys;
       };
 
       users.users.cameron = {
@@ -142,10 +140,8 @@ in
         home = "/Users/cameron";
         shell = pkgs.zsh;
         description = "cameron";
-        # SSH key from crs58 identity (cameron is crs58 alias)
-        openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+"
-        ];
+        # SSH keys from shared identity module (cameron is crs58 alias)
+        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
       };
 
       # Darwin requires explicit knownUsers
