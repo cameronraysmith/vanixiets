@@ -35,8 +35,6 @@
         };
       in
       {
-        # Integrated catppuccin-nix module for tmux theme
-        # Pattern 6 (flake.inputs module import): catppuccin home-manager module
         imports = [ flake.inputs.catppuccin.homeModules.catppuccin ];
 
         catppuccin.tmux = {
