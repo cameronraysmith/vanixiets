@@ -59,8 +59,11 @@ This paradigm complements functional domain modeling by maintaining clear effect
 
 ## Related documents
 
+- `~/.claude/commands/preferences/theoretical-foundations.md` - algebraic foundations: signals as comonads, web components as coalgebras, event sourcing as free monoids
 - `~/.claude/commands/preferences/architectural-patterns.md` - onion/hexagonal architecture, effect boundaries
 - `~/.claude/commands/preferences/domain-modeling.md` - functional domain modeling, smart constructors
 - `~/.claude/commands/preferences/railway-oriented-programming.md` - Result-based error handling
+- `~/.claude/commands/preferences/distributed-systems.md` - event log authority, CQRS, idempotency patterns
+- `~/.claude/commands/preferences/data-modeling.md` - materialized views, DuckDB/DuckLake patterns
 - `~/.claude/commands/preferences/rust-development/` - Rust-specific patterns (integrates with Datastar-Rust/hypertext)
 - `~/.claude/commands/preferences/typescript-nodejs-development.md` - TypeScript patterns for Node.js backends
