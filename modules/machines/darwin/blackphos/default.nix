@@ -47,14 +47,12 @@ in
       programs.info.enable = lib.mkForce true;
       programs.man.enable = lib.mkForce true;
 
-      # Host identification
       networking.hostName = "blackphos";
       networking.computerName = "blackphos";
 
       # Remote deployment target (enables `clan machines update` from stibnite)
       clan.core.networking.targetHost = "crs58@blackphos.zt";
 
-      # Platform
       nixpkgs.hostPlatform = "aarch64-darwin";
 
       # Allow unfree packages (required for copilot-language-server, etc.)
@@ -72,12 +70,9 @@ in
       # Note: crs58 is the admin user on blackphos
       system.primaryUser = "crs58";
 
-      # Enable desktop profile for GUI applications
       custom.profile.isDesktop = true;
 
-      # Homebrew configuration
-      # Base casks (40 apps) from modules/darwin/homebrew.nix
-      # Machine-specific additions below
+      # Base casks from modules/darwin/homebrew.nix; machine-specific additions below
       custom.homebrew = {
         enable = true;
 
@@ -102,7 +97,6 @@ in
         # Fonts managed via base homebrew module (manageFonts defaults to true)
       };
 
-      # TouchID authentication for sudo
       security.pam.services.sudo_local.touchIdAuth = true;
 
       # SSH daemon configuration
@@ -113,9 +107,7 @@ in
         MaxAuthTries 20
       '';
 
-      # Multi-user configuration
-      # crs58: admin user (UID 502 - matches existing blackphos system)
-      # raquel: primary non-admin user (UID 506 - matches existing blackphos system)
+      # crs58: admin (UID 502), raquel: primary (UID 506) - matches existing system
       users.users.crs58 = {
         uid = 502;
         home = "/Users/crs58";
@@ -139,16 +131,13 @@ in
         "raquel"
       ];
 
-      # System packages
       environment.systemPackages = with pkgs; [
         vim
         git
       ];
 
-      # Enable zsh system-wide
       programs.zsh.enable = true;
 
-      # Home-Manager configuration
       home-manager = {
         useGlobalPkgs = true;
         useUserPackages = true;
