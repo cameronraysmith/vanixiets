@@ -16,6 +16,7 @@
   # Runtime dependencies for binary patching
   openssl,
   autoPatchelfHook,
+  zlib,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
@@ -33,7 +34,12 @@ stdenv.mkDerivation (finalAttrs: {
     autoPatchelfHook
   ];
 
-  buildInputs = [ openssl ];
+  buildInputs =
+    [ openssl ]
+    ++ lib.optionals stdenv.hostPlatform.isLinux [
+      stdenv.cc.cc.lib # libgcc_s.so.1
+      zlib # libz.so.1
+    ];
 
   installPhase = ''
     runHook preInstall
