@@ -15,6 +15,10 @@
         programs.zed-editor = {
           enable = true;
           package = null;
+          # When true (default), home-manager merges Nix settings with existing
+          # settings.json via activation script. When false, creates a read-only
+          # symlink to Nix store (pure but prevents Zed UI edits).
+          mutableUserSettings = true;
 
           # https://github.com/zed-industries/extensions/tree/main/extensions
           extensions = [
@@ -73,8 +77,13 @@
               dark = "Catppuccin Mocha";
             };
 
+            git_panel = {
+              dock = "right";
+              sort_by_path = false;
+            };
             agent = {
               dock = "right";
+              play_sound_when_agent_done = true;
             };
             outline_panel = {
               dock = "right";
