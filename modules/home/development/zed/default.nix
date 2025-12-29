@@ -73,7 +73,7 @@
               dark = "Catppuccin Mocha";
             };
 
-            agent_panel = {
+            agent = {
               dock = "right";
             };
             outline_panel = {
