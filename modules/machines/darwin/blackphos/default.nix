@@ -121,10 +121,8 @@ in
         home = "/Users/crs58";
         shell = pkgs.zsh;
         description = "crs58";
-        # SSH key from vanixiets config.nix
-        openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+"
-        ];
+        # SSH keys from shared identity module
+        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
       };
 
       users.users.raquel = {
@@ -132,10 +130,8 @@ in
         home = "/Users/raquel";
         shell = pkgs.zsh;
         description = "raquel";
-        # SSH key from vanixiets config.nix
-        openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAIBdSMsU0hZy7MPpnFmS+P7RlN/x6GwMPVp3g7BOUuf"
-        ];
+        # SSH keys from shared identity module
+        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.raquel.sshKeys;
       };
 
       # Darwin requires explicit knownUsers
