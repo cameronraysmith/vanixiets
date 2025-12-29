@@ -42,6 +42,10 @@ The web component is a functor between hypermedia signals and imperative library
 Pure in the functional sense: same attributes produce same library configuration.
 Side effects are isolated in lifecycle methods with explicit cleanup.
 
+**Theoretical foundation**: Web components are coalgebras (specifically Moore machines) where state determines output and input triggers transitions.
+This coalgebraic structure explains why morphing boundaries work: bisimilar states produce equivalent DOM output and transition behavior.
+See `theoretical-foundations.md` section "Web components as coalgebras" for the formal model and section "Composing reactive systems" for how comonadic signal extraction feeds into coalgebraic observation.
+
 ## Vanilla web component pattern
 
 Use vanilla web components (no framework) when the library wrapper is simple and state is owned by the library.
