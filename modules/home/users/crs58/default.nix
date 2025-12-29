@@ -34,7 +34,7 @@
           atuin-key = { };
           mcp-agent-mail-bearer-token = { };
           git-credentials = {
-            mode = "0600";
+            mode = "0400"; # Read-only: prevent git credential-store from modifying
             path = "${config.home.homeDirectory}/.git-credentials";
           };
         };
