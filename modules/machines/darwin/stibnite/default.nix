@@ -49,14 +49,12 @@ in
       programs.info.enable = lib.mkForce true;
       programs.man.enable = lib.mkForce true;
 
-      # Host identification
       networking.hostName = "stibnite";
       networking.computerName = "stibnite";
 
       # Remote deployment target (enables `clan machines update` from other machines)
       clan.core.networking.targetHost = "crs58@stibnite.zt";
 
-      # Platform
       nixpkgs.hostPlatform = "aarch64-darwin";
 
       # Allow unfree packages (required for copilot-language-server, etc.)
@@ -74,12 +72,9 @@ in
       # Note: crs58 is both admin and primary user on stibnite
       system.primaryUser = "crs58";
 
-      # Enable desktop profile for GUI applications
       custom.profile.isDesktop = true;
 
-      # Homebrew configuration
-      # Base casks (40 apps) from modules/darwin/homebrew.nix
-      # Machine-specific additions below
+      # Base casks from modules/darwin/homebrew.nix; machine-specific additions below
       custom.homebrew = {
         enable = true;
 
@@ -109,7 +104,6 @@ in
         # Fonts managed via base homebrew module (manageFonts defaults to true)
       };
 
-      # TouchID authentication for sudo
       security.pam.services.sudo_local.touchIdAuth = true;
 
       # SSH daemon configuration
@@ -146,13 +140,11 @@ in
         "crs58"
       ];
 
-      # System packages
       environment.systemPackages = with pkgs; [
         vim
         git
       ];
 
-      # Enable zsh system-wide
       programs.zsh.enable = true;
 
       # Disable native linux-builder (replaced by nix-rosetta-builder)
@@ -186,7 +178,6 @@ in
         extraPackages = [ ];
       };
 
-      # Home-Manager configuration
       home-manager = {
         useGlobalPkgs = true;
         useUserPackages = true;
