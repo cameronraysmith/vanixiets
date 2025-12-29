@@ -40,13 +40,25 @@
               args = "transfer";
               concurrent = true;
             };
+            # Submodule optimization: auto-recurse, parallel fetch, shared object store
+            submodule = {
+              recurse = true; # Auto-update submodules on checkout/pull/switch
+              fetchJobs = 8; # Parallel submodule fetching
+              alternateLocation = "superproject"; # Share objects with parent repo
+              alternateErrorStrategy = "info"; # Warn but continue if alternates fail
+            };
+            status.submoduleSummary = true; # Show submodule changes in git status
+            diff.submodule = "log"; # Show commit log in diffs, not just hashes
             # User modules should override user.name and user.email
             core.editor = "nvim";
             credential.helper = "store --file ~/.git-credentials";
             github.user = "cameronraysmith";
             color.ui = true;
             diff.colorMoved = "zebra";
-            fetch.prune = true;
+            fetch = {
+              prune = true;
+              recurseSubmodules = "on-demand"; # Fetch submodules when superproject ref changes
+            };
             format.signoff = true;
             init = {
               defaultBranch = "main";
@@ -56,6 +68,7 @@
             push = {
               autoSetupRemote = true;
               useForceIfIncludes = true;
+              recurseSubmodules = "check"; # Fail if submodule commits aren't pushed
             };
             rebase = {
               autoStash = true;
