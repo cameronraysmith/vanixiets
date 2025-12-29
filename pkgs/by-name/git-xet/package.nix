@@ -34,12 +34,13 @@ stdenv.mkDerivation (finalAttrs: {
     autoPatchelfHook
   ];
 
-  buildInputs =
-    [ openssl ]
-    ++ lib.optionals stdenv.hostPlatform.isLinux [
-      stdenv.cc.cc.lib # libgcc_s.so.1
-      zlib # libz.so.1
-    ];
+  buildInputs = [
+    openssl
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isLinux [
+    stdenv.cc.cc.lib # libgcc_s.so.1
+    zlib # libz.so.1
+  ];
 
   installPhase = ''
     runHook preInstall
