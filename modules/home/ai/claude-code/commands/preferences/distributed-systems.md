@@ -236,6 +236,8 @@ The log is the system of record.
 
 **Example**: Banking system where account balance is derived from transaction events.
 
+**See also**: theoretical-foundations.md for the algebraic foundation of event sourcing (free monoid of events, state as catamorphism).
+
 ### Position 2: Service as authority
 
 **Pattern**: Service owns state, events are notifications.
@@ -329,6 +331,9 @@ This matrix shows what you sacrifice and what you gain.
 | **Monolith** | Independent deployment, team autonomy | Low latency, ACID transactions, simpler deployment |
 | **Saga pattern** | ACID transactions, rollback simplicity | Distributed transactions, service autonomy |
 | **Two-phase commit** | Availability, performance | ACID across services (at high cost) |
+
+**Note**: The CQRS pattern separates read and write models using profunctor-like structure, where commands flow one direction (write) and queries another (read).
+See theoretical-foundations.md for the formal profunctor interpretation.
 
 ### Anti-patterns to avoid
 
@@ -498,6 +503,9 @@ Idempotency must be designed in, not added later.
 An operation is idempotent if executing it multiple times has the same effect as executing it once.
 
 **Mathematical definition**: `f(f(x)) = f(x)`
+
+This corresponds to monoid identity laws: applying an operation multiple times has the same effect as applying it once.
+See theoretical-foundations.md for the algebraic foundation of idempotency in distributed systems.
 
 **Examples**:
 - Idempotent: SET balance = 100 (same result regardless of repetition)
@@ -818,6 +826,9 @@ Use choreography for simple event-driven workflows.
 Deterministic replay rebuilds system state by re-executing operations from a log.
 Critical for durability, debugging, and compliance.
 
+**Theoretical foundation**: State reconstruction from event log is a catamorphism (fold) over the event sequence.
+See theoretical-foundations.md for the category-theoretic interpretation of event replay as structural recursion.
+
 ### When to design for it
 
 **Durability guarantees**:
@@ -1104,3 +1115,5 @@ Use this checklist before implementing distributed system features.
 - domain-modeling.md (aggregates as consistency boundaries)
 - architectural-patterns.md (effect isolation, onion architecture)
 - railway-oriented-programming.md (Result types for distributed error handling)
+- theoretical-foundations.md (algebraic foundations: event sourcing as free monoid, catamorphisms, profunctors)
+- hypermedia-development/07-event-architecture.md (SSE streaming as event projection, CQRS in hypermedia context)

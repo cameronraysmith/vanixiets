@@ -701,6 +701,257 @@ data FileHandle :: FileState -> * where
 - railway-oriented-programming.md for Result composition
 - domain-modeling.md#workflows-as-type-safe-pipelines
 
+## Event sourcing as algebraic duality
+
+Event sourcing occupies a privileged position in the taxonomy of architectural patterns: it explicitly represents both construction (F-algebras, lines 123-143) and observation (coalgebras, lines 397-432) perspectives.
+The event log is a free monoid over event types, a universal construction that preserves complete history while enabling arbitrary interpretations via monoid homomorphisms.
+State reconstruction proceeds via catamorphism, the unique fold guaranteed by initiality.
+This duality manifests concretely in CQRS: the command side (contravariant in commands) and query side (covariant in views) both factor through the event log as pivot point, forming a profunctor structure that preserves information while enabling independent scaling.
+
+**ASCII diagram: The duality triangle**
+
+```
+       Commands
+          │
+          │ contravariant
+          ↓
+      EventLog ─────────→ State/Queries
+       (pivot)   covariant
+    Free monoid    Functoriality
+```
+
+### Events as free monoid
+
+Event logs form a free monoid over event types, explaining why event sourcing preserves complete history while enabling arbitrary interpretations.
+
+**Code example: Free monoid structure**
+
+```haskell
+-- Event types are generators of the free monoid
+data Event
+  = UserRegistered UserId Email
+  | EmailVerified UserId
+  | OrderPlaced OrderId UserId
+  | OrderShipped OrderId
+
+-- Event log is free monoid over Event
+newtype EventLog = EventLog [Event]
+
+instance Monoid EventLog where
+  mempty = EventLog []
+  mappend (EventLog xs) (EventLog ys) = EventLog (xs ++ ys)
+```
+
+**Category-theoretic interpretation**:
+
+The free monoid Free(S) over set S is the initial object in the comma category (S ↓ U) where U is the forgetful functor from monoids to sets.
+This is precisely the initial algebra construction: the free monoid is the initial algebra for the list functor ListF X = 1 + (S × X).
+Back-reference to F-algebras (lines 123-143): just as recursive data types are initial algebras, the event log as list of events is the initial algebra for the list functor.
+
+**Universal property**:
+
+```haskell
+-- For any monoid homomorphism, there's a unique fold
+foldEvents :: Monoid m => (Event -> m) -> EventLog -> m
+foldEvents f (EventLog events) = foldMap f events
+```
+
+**Practical consequence**:
+
+Initiality guarantees arbitrarily many projections, each a monoid homomorphism from EventLog to some target monoid.
+The append-only structure is enforced by monoid axioms: associativity ensures event order is preserved, identity (empty log) provides a starting point.
+Log compaction (removing obsolete events) must be a monoid homomorphism to preserve semantics.
+
+### State reconstruction as catamorphism
+
+Reconstructing state from event log is precisely a catamorphism (fold), initiality guarantees uniqueness.
+
+**Code example: Catamorphic reconstruction**
+
+```haskell
+data State = State
+  { users :: Map UserId UserInfo
+  , orders :: Map OrderId OrderInfo
+  , emailVerified :: Set UserId
+  }
+
+initialState :: State
+initialState = State mempty mempty mempty
+
+-- Algebra structure: how to apply one event
+apply :: State -> Event -> State
+apply state (UserRegistered uid email) =
+  state { users = Map.insert uid (UserInfo email False) (users state) }
+apply state (EmailVerified uid) =
+  state { emailVerified = Set.insert uid (emailVerified state) }
+apply state event = -- ... other cases
+
+-- Catamorphism: unique fold from initial algebra
+reconstruct :: EventLog -> State
+reconstruct (EventLog events) = foldl' apply initialState events
+```
+
+**Category-theoretic interpretation**:
+
+The function apply :: State → Event → State defines an algebra structure (State, apply) for the list functor.
+The catamorphism reconstruct is the unique morphism from the initial algebra (EventLog, constructors) to this algebra.
+Initiality ensures there is exactly one way to interpret the event sequence as state transitions.
+
+**Practical consequence**:
+
+Uniqueness: given the algebra (apply), there is exactly one correct way to fold events into state.
+Deterministic replay: same event sequence always produces same state, crucial for debugging and audit.
+Snapshots are partial evaluations (memoization): snapshot at event N is reconstruct (take N events), then continue folding from that point.
+
+### CQRS as profunctor structure
+
+CQRS exhibits profunctor structure: command side contravariant in commands, query side covariant in views, event log as pivot.
+
+**Code example: Profunctor instance**
+
+```haskell
+-- Profunctor class
+class Profunctor p where
+  dimap :: (a' -> a) -> (b -> b') -> p a b -> p a' b'
+
+-- CQRS as profunctor
+data CQRS cmd view = CQRS
+  { handleCommand :: cmd -> EventLog         -- contravariant
+  , deriveView :: EventLog -> view           -- covariant
+  }
+
+instance Profunctor CQRS where
+  dimap f g (CQRS handle derive) = CQRS
+    (handle . f)    -- contravariant: precompose
+    (g . derive)    -- covariant: postcompose
+```
+
+**Category-theoretic interpretation**:
+
+A profunctor P : C^op × D → Set is contravariant in first argument, covariant in second.
+CQRS cmd view is a profunctor from commands to views, with event log as the "hom-set" mediating the relationship.
+Connection to Kleisli: command handlers are Kleisli arrows cmd → M EventLog where M captures effects (IO, validation errors).
+
+**Code example: Multiple views**
+
+```haskell
+-- Different views from same event stream (covariance)
+data UserView = UserView { userCount :: Int }
+data OrderView = OrderView { orderStats :: Stats }
+
+userProjection :: EventLog -> UserView
+orderProjection :: EventLog -> OrderView
+
+-- Both derive from same event log
+cqrsUser :: CQRS Command UserView
+cqrsOrder :: CQRS Command OrderView
+```
+
+**Practical consequence**:
+
+Independent scaling: profunctor factors through event log, allowing command processing and view derivation to scale independently.
+Multiple read models: covariance in views means we can derive arbitrarily many projections from same event stream without affecting command handling.
+Command versioning: contravariance in commands means we can adapt new command formats to old handlers via dimap.
+
+### Projections as functors
+
+Each projection is a functor from event streams to read models, natural transformations capture consistency.
+
+**Code example: Functor projections**
+
+```haskell
+-- Event stream is time-indexed
+newtype EventStream a = EventStream { events :: [(Timestamp, a)] }
+
+instance Functor EventStream where
+  fmap f (EventStream evs) = EventStream [(t, f e) | (t, e) <- evs]
+
+-- Projection is functor from EventStream to read model
+newtype Projection model = Projection
+  { runProjection :: EventStream Event -> model }
+
+-- Example projections
+userCountProjection :: Projection Int
+userCountProjection = Projection $ \stream ->
+  length . filter isUserEvent . map snd . events $ stream
+
+activeOrdersProjection :: Projection (Set OrderId)
+activeOrdersProjection = Projection $ \stream ->
+  foldl' updateOrders mempty (events stream)
+```
+
+**Category-theoretic interpretation**:
+
+Each projection is a functor F : EventStream → ReadModel preserving structure.
+Multiple projections form a diagram in the functor category [EventStream, ReadModel].
+A natural transformation η : F ⇒ G between projections is a consistency check: for all event streams e, ηₑ (F e) = G e.
+
+**Code example: Natural transformation as consistency**
+
+```haskell
+-- Natural transformation checks projection consistency
+type ConsistencyCheck m n = forall e. EventStream e -> m -> n -> Bool
+
+-- Example: user count should match cardinality of user set
+userCountConsistent :: ConsistencyCheck Int (Set UserId)
+userCountConsistent stream count userSet =
+  count == Set.size userSet
+```
+
+**Practical consequence**:
+
+Multiple projections = multiple functors from same source, enabling polyglot persistence.
+Projection independence: functors compose, so we can build complex views from simpler projections.
+Eventual consistency = failure of naturality: projection update lags behind event stream, natural transformation doesn't hold at all times.
+
+### Temporal semantics
+
+Event time vs processing time creates bitemporal structure modeled as indexed type.
+
+**Code example: Bitemporal indexing**
+
+```haskell
+-- Event time: when event occurred in domain
+newtype EventTime = EventTime UTCTime
+
+-- Processing time: when event was recorded in log
+newtype ProcessingTime = ProcessingTime UTCTime
+
+-- Bitemporal event indexed by both times
+data BitemporalEvent i j a where
+  BitemporalEvent
+    :: EventTime
+    -> ProcessingTime
+    -> a
+    -> BitemporalEvent EventTime ProcessingTime a
+
+-- Indexed monad bind tracks temporal provenance
+ibind
+  :: BitemporalEvent i j a
+  -> (a -> BitemporalEvent j k b)
+  -> BitemporalEvent i k b
+```
+
+**Category-theoretic interpretation**:
+
+Bitemporal events form an indexed monad (lines 250-395) tracking temporal state transitions.
+The indices i, j represent positions in bitemporal space: i is input temporal context, j is output temporal context.
+Connection to indexed monads: just as file handles track resource state (lines 281-292), bitemporal types track temporal state.
+
+**Practical consequence**:
+
+Time travel queries: query state as of event time (what we knew when event occurred) vs processing time (what we know now).
+Late-arriving events: event time in past, processing time is now, indexed type makes this explicit.
+Audit compliance: both indices preserved, enables reconstructing "what did we know at time T" for regulatory requirements.
+
+### See also
+
+**See also**:
+- distributed-systems.md for practical event sourcing patterns
+- rust-development/12-distributed-systems.md for Rust implementation of event-sourced systems
+- domain-modeling.md#pattern-3-state-machines for state machines as event handlers
+- railway-oriented-programming.md for Result composition in command handlers
+
 ## Cross-references to practical documents
 
 This theoretical foundation supports patterns described in:
@@ -729,6 +980,16 @@ This theoretical foundation supports patterns described in:
 - **Effect signatures** → Indexed monads (simplified)
 - **Dependency injection** → Reader monad / ReaderT transformer
 - **Monad transformer stacks** → Composition of effect transformers
+
+### distributed-systems.md
+- **Event log as authority** → Free monoid of events (event-sourcing-as-algebraic-duality)
+- **Deterministic replay** → State reconstruction as catamorphism
+- **CQRS pattern** → Profunctor structure separating read/write
+- **Idempotency** → Monoid identity laws for event application
+
+### hypermedia-development/07-event-architecture.md
+- **SSE as projection channel** → Functors from event log to stream
+- **Temporal consistency** → Ordered monoid preserving causality
 
 ## Further reading
 
