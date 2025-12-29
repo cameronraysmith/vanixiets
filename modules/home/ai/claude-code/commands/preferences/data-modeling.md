@@ -147,6 +147,12 @@ Build complex metrics from simpler, reusable components.
 
 ## DuckDB and DuckLake patterns
 
+**Theoretical foundation**: Read models and materialized views in analytics architectures form a Galois connection with the underlying event log or source data.
+The projection from events to views is information-lossy but composable; views are quotients of the source data under an equivalence relation.
+Query caching is memoization over the query profunctor, with cache invalidation governed by naturality conditions.
+DuckLake's time-travel capability implements temporal versioning as indexed types, connecting to the bitemporal semantics described in event sourcing.
+See `theoretical-foundations.md` section "Materialized views as Galois connections" for the formal algebraic model.
+
 ### Metadata management
 
 Store catalog metadata in SQL databases, not file-based catalogs.
