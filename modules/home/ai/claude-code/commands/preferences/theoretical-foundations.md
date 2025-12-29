@@ -329,16 +329,19 @@ Type parameters i, j, k track effect state:
 **Example: File handle tracking**
 
 ```haskell
-data FileHandle :: FileState -> * where
-  -- File starts Closed, becomes Opened, ends Closed
+data FileState = Closed | Opened
+data FileHandle :: FileState -> FileState -> * -> * where
+  -- Indexed monad tracking file state transitions
 
 openFile :: FilePath -> FileHandle Closed Opened Handle
 readFile :: FileHandle Opened Opened String
-closeFile :: FileHandle Opened Closed ()
+closeFile :: Handle -> FileHandle Opened Closed ()
+
+-- Indexed bind enables safe composition:
+-- ibind :: FileHandle i j a -> (a -> FileHandle j k b) -> FileHandle i k b
 
 -- Type system prevents:
-readFile ∘ closeFile  -- Can't read closed file
-closeFile ∘ closeFile -- Can't close twice
+readFile `ibind` (\_ -> closeFile) `ibind` (\_ -> readFile)  -- Can't read after close
 ```
 
 **Practical limitations**:
@@ -520,7 +523,7 @@ data Lens s a = Lens
 
 Lenses are morphisms in category of types with product × and function →.
 
-Lens composition is function composition (contravariant).
+Lens composition is covariant in the focus direction: composing `addressL :: Lens' Person Address` with `cityFieldL :: Lens' Address String` gives `cityL :: Lens' Person String`, moving deeper into the structure following the flow of data access.
 
 **Profunctor representation**:
 
@@ -934,7 +937,7 @@ activeOrdersProjection = Projection $ \stream ->
 
 Each projection is a functor F : EventStream → ReadModel preserving structure.
 Multiple projections form a diagram in the functor category [EventStream, ReadModel].
-A natural transformation η : F ⇒ G between projections is a consistency check: for all event streams e, ηₑ (F e) = G e.
+A natural transformation η : F ⇒ G between projections is a family of morphisms indexed by event streams: for all event streams e, ηₑ :: F e → G e, such that consistency is maintained across stream transformations (naturality square commutes).
 
 **Code example: Natural transformation as consistency**
 
@@ -1274,11 +1277,15 @@ A Galois connection is a pair of functions between ordered sets:
 abstract :: EventLog -> ReadModel
 concrete :: ReadModel -> EventLog
 
+-- Poset structures:
+-- EventLog ordered by prefix: e1 ⊑_E e2 iff e1 is prefix of e2
+-- ReadModel ordered by refinement: m1 ⊑_M m2 iff m1 refines/extends m2
+
 -- Galois condition: for all e, m
-abstract(e) ⊑ m  ⟺  e ⊑ concrete(m)
+abstract(e) ⊑_M m  ⟺  e ⊑_E concrete(m)
 ```
 
-Where ⊑ is information ordering (refinement).
+The abstraction-concretion pair preserves and reflects the ordering structure between event sequences and their derived views.
 
 For event sourcing:
 - `abstract` (projection): collapses event sequences into aggregated views
