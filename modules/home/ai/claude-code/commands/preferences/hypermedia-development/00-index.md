@@ -26,6 +26,7 @@ This paradigm complements functional domain modeling by maintaining clear effect
 | [04-css-architecture.md](./04-css-architecture.md) | Design tokens with Open Props, cascade layers, `light-dark()` theming, container queries, PostCSS configuration, Light DOM requirement |
 | [05-web-components.md](./05-web-components.md) | Thin wrapper pattern for third-party libraries (charts, editors, maps), vanilla vs Lit, morph exclusion, event design, memory cleanup |
 | [06-templating.md](./06-templating.md) | Type-safe server-side templating, lazy vs eager evaluation, ID strategy for morphing, security (escaping, sanitization), testing patterns |
+| [07-event-architecture.md](./07-event-architecture.md) | Event sourcing with SSE, CQRS pattern for hypermedia, event log as authority, real-time projections |
 
 ## When to use hypermedia architecture
 

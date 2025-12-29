@@ -20,6 +20,8 @@ Show loading state, wait for server response, then update UI with actual results
 CQRS pattern for network architecture: maintain a single long-lived SSE connection for reads (state updates from server), and use short-lived HTTP requests for writes (user actions).
 This separates the read model (passive updates) from the write model (intentional commands).
 
+**See also**: For event sourcing architectures where SSE streams project events from an authoritative event log, see `07-event-architecture.md`.
+
 ## Signal system
 
 Signals are reactive variables denoted with `$` prefix syntax: `$signalName`.

@@ -114,6 +114,8 @@ This boundary creates a natural separation:
 Hypermedia architecture makes this boundary explicit because HTML generation happens *after* domain logic completes and *before* infrastructure delivers the response.
 The rendering step transforms pure domain results into hypermedia representations without introducing additional effects.
 
+**See also**: For event sourcing patterns where the event log serves as authority and SSE streams project events to clients, see `07-event-architecture.md`.
+
 ## Hypermedia as the engine of application state (HATEOAS)
 
 HATEOAS is a constraint of REST architecture stating that clients interact with applications entirely through hypermedia provided dynamically by servers.
