@@ -73,17 +73,17 @@ stdenv.mkDerivation (finalAttrs: {
     sources = {
       "x86_64-linux" = fetchzip {
         url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-linux-x86_64.zip";
-        hash = "sha256-xN+jQpmMVLB2qnBY/pjljGrWUAdmLmjrlC6hv4uL8u4=";
+        hash = "sha256-8FxDWkx+s2+0VF9bAuaP0Aiz+6g6noGeN2x7RLMciqg=";
         stripRoot = false;
       };
       "aarch64-linux" = fetchzip {
         url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-linux-aarch64.zip";
-        hash = "sha256-zJUG1o8TxAp5AhNWfUDaXD7vG6vc1L5qCq3RThdl4NY=";
+        hash = "sha256-iwt35AA7ERv2xN6+IMR7Io0X1VQl8N/dTX/lCZjGwNI=";
         stripRoot = false;
       };
       "x86_64-darwin" = fetchzip {
         url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-macos-x86_64.zip";
-        hash = "sha256-JgPiY4RJ1pRJl/wLJHg0HVPkUJhN2p4NqrDTxh5CG+k=";
+        hash = "sha256-Zhhm1SQ1oypisG+ecaeI6StIzsJCFMXzHC4xmCFQm8k=";
         stripRoot = false;
       };
       "aarch64-darwin" = fetchzip {
