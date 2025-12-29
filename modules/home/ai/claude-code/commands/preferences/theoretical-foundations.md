@@ -228,7 +228,7 @@ For a monad M, the Kleisli category has:
 (>=>) :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
 f >=> g = \x -> f x >>= g
 
--- Identity law: return >=> f ≅ f ≅ f >=> return
+-- Identity law: return >=> f ≡ f ≡ f >=> return
 -- Associativity: (f >=> g) >=> h ≅ f >=> (g >=> h)
 ```
 
@@ -435,7 +435,7 @@ runFileSystem :: Eff '[FileSystem, Error] a -> IO (Either Error a)
 ```
 
 **Advantages**:
-- Effects commute (order doesn't matter)
+- Effects can be reordered more flexibly (handlers interpret effect sets, order matters less than with transformers)
 - No lift boilerplate
 - More modular effect handlers
 - Better type inference
@@ -558,6 +558,9 @@ data Prism s a = Prism
   , build :: a -> s            -- inject
   }
 
+-- Note: Using Either a s (match on Right) instead of conventional Either s a
+-- to emphasize successful extraction as the primary case
+
 -- Laws (dual to lens laws)
 -- MatchBuild: match (build a) = Right a
 -- BuildMatch: either build id (match s) = s
@@ -613,6 +616,9 @@ IO:       Functions that perform I/O
 **Monoidal structure**: Effects compose
 
 ```haskell
+-- Note: ⊗ denotes abstract effect composition; concrete realization
+-- depends on transformer stack ordering (ExceptT e (StateT s m) ≠ StateT s (ExceptT e m))
+
 -- Compose effects (monad transformers)
 Error e ⊗ State s ≅ StateT s (Either e)
 
@@ -1080,7 +1086,7 @@ const currentTotal = total.value;  // extract: signal -> value
 ```
 Monad (effects):                    Comonad (context):
   return :: a -> m a                  extract :: w a -> a
-  bind :: m a -> (a -> m b) -> m b    extend :: w a -> (w a -> b) -> w b
+  bind :: m a -> (a -> m b) -> m b    extend :: (w a -> b) -> w a -> w b
 
   Effects flow inward (produced)      Values flow outward (consumed)
   Kleisli composition: a -> m b       CoKleisli composition: w a -> b
