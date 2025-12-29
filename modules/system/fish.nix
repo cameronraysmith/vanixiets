@@ -10,7 +10,6 @@
         programs.fish.enable = true;
 
         # Disable auto-generated completions to prevent staleness
-        # Pattern from mic92-clan-dotfiles
         environment.etc."fish/generated_completions".source = lib.mkForce (
           pkgs.runCommand "fish-no-completions" { } "mkdir $out"
         );
