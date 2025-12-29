@@ -29,7 +29,6 @@ As Graydon Hoare noted in [a retrospective on Rust's design](https://graydon2.dr
 **Move semantics as linear types**: Rust's ownership system is not merely *similar* to linear types—it *is* a linear type system in practical effect.
 A moved value is consumed exactly once; the compiler enforces this statically.
 This is the Curry-Howard correspondence for linear logic realized in a systems programming language.
-The explicit typestate feature was removed from early Rust because these primitives made it redundant.
 
 ```rust
 use std::marker::PhantomData;
