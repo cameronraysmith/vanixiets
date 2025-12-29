@@ -51,7 +51,7 @@
             diff.submodule = "log"; # Show commit log in diffs, not just hashes
             # User modules should override user.name and user.email
             core.editor = "nvim";
-            credential.helper = "store --file ~/.git-credentials";
+            credential.helper = "store --file ${config.home.homeDirectory}/.git-credentials";
             github.user = "cameronraysmith";
             color.ui = true;
             diff.colorMoved = "zebra";
