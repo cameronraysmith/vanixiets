@@ -131,7 +131,6 @@ in
         home = "/Users/christophersmith";
         shell = pkgs.zsh;
         description = "christophersmith";
-        # SSH keys from shared identity module
         openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.christophersmith.sshKeys;
       };
 
@@ -140,7 +139,6 @@ in
         home = "/Users/cameron";
         shell = pkgs.zsh;
         description = "cameron";
-        # SSH keys from shared identity module (cameron is crs58 alias)
         openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
       };
 
