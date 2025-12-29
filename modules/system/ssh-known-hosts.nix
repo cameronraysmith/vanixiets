@@ -99,6 +99,20 @@ let
         # Verified 2025-11-29
         publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII6X063DuDUFScs6Za6nx3TnvG9dlJDrTthx7e2aX1XA";
       };
+
+      # ====================
+      # Mobile Devices (Termux on Android)
+      # ====================
+
+      "pixel7.zt" = {
+        hostNames = [
+          "[pixel7.zt]:8022"
+          "[fddb:4344:343b:14b9:399:939f:c45d:577c]:8022" # Zerotier IPv6 + Termux port
+        ];
+        # Static key from Termux openssh
+        # Verified 2025-12-29
+        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBRGpKclkLskRxF+Iu4DTVkkLnAk5cBipL0dDtrvROwJ";
+      };
     };
 in
 {
