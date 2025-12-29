@@ -11,11 +11,6 @@
         ...
       }:
       {
-        # Note: mcp-servers.nix, wrappers.nix, and ccstatusline-settings.nix are separate
-        # Pattern A modules that merge into homeManager.ai aggregate via import-tree
-
-        # Integrated llm-agents flake input for claude-code package
-        # Pattern A (flake context access): package override from external flake input
         programs.claude-code = {
           enable = true;
           package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
