@@ -47,7 +47,6 @@
           # Shell preference (works on both platforms)
           users.users.crs58.shell = pkgs.zsh;
 
-          # SSH keys from shared identity module
           users.users.crs58.openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
 
           # Enable zsh system-wide (works on both platforms)
