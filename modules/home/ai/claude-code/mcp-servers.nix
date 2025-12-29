@@ -23,8 +23,6 @@
         # Generate MCP server configuration files using sops templates
         # Each server gets its own JSON file for manual composition via --mcp-config
         sops.templates = {
-          # Firecrawl: Web scraping with API key
-          # Pattern: env block (secure - secrets not in argv)
           mcp-firecrawl = {
             mode = "0400";
             path = "${home}/.mcp/firecrawl.json";
@@ -45,9 +43,6 @@
             };
           };
 
-          # Hugging Face: AI model access with token
-          # Pattern: --header Authorization: Bearer <token>
-          # Note: mcp-remote requires full header value as single arg (exposes token in process args)
           mcp-huggingface = {
             mode = "0400";
             path = "${home}/.mcp/huggingface.json";
@@ -66,9 +61,6 @@
             };
           };
 
-          # Agent Mail: Git-backed agent coordination messaging
-          # Pattern: HTTP transport with Bearer token authentication
-          # Server must be running before client can connect
           mcp-agent-mail = {
             mode = "0400";
             path = "${home}/.mcp/agent-mail.json";
