@@ -5,8 +5,6 @@
 #
 # Without this declaration, flake-parts treats multiple assignments to
 # flake.nixpkgsOverlays as conflicts rather than mergeable list items.
-#
-# Pattern from flake-parts/modules/overlays.nix using mkSubmoduleOptions
 { lib, flake-parts-lib, ... }:
 let
   inherit (lib) mkOption types;
