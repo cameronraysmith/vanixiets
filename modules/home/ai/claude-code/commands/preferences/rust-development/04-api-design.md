@@ -231,6 +231,61 @@ pub enum DatabaseImpl {
 
 This hierarchy supports FDM by preferring concrete types for domain logic (level 1), using enums for I/O boundaries (level 2), reserving generics for true abstraction needs (level 3), and avoiding trait objects unless necessary (level 4).
 
+## Sealed trait pattern for closed type families
+
+Use sealed traits to create closed sets of types that external code cannot extend.
+This is valuable for state machines, protocol states, and any API where the set of valid implementations must be fixed.
+
+```rust
+// Private module prevents external implementations
+mod private {
+    pub trait Sealed {}
+}
+
+// Public trait requires Sealed, which outsiders cannot implement
+pub trait ConnectionState: private::Sealed {
+    fn description(&self) -> &'static str;
+}
+
+// Concrete states - exhaustive set known at compile time
+pub struct Disconnected;
+pub struct Connected;
+pub struct Authenticated;
+
+// Implement Sealed for each state (in same crate)
+impl private::Sealed for Disconnected {}
+impl private::Sealed for Connected {}
+impl private::Sealed for Authenticated {}
+
+// Implement the public trait
+impl ConnectionState for Disconnected {
+    fn description(&self) -> &'static str { "not connected" }
+}
+
+impl ConnectionState for Connected {
+    fn description(&self) -> &'static str { "connected, awaiting auth" }
+}
+
+impl ConnectionState for Authenticated {
+    fn description(&self) -> &'static str { "authenticated" }
+}
+```
+
+External code can use `ConnectionState` as a trait bound but cannot add new states.
+This combines with phantom types for compile-time state machine enforcement.
+
+**When to use sealed traits**:
+
+- State machines where adding states would break invariants
+- Protocol implementations with fixed message sets
+- Type-level flags or markers that must remain closed
+- APIs where exhaustive matching over implementors is required
+
+**Relationship to enum-based state machines**: Sealed traits provide the closed-world assumption of enums while allowing each state to have different associated data and methods.
+Prefer enums when states share structure; prefer sealed traits when states are structurally different or when you need trait-based polymorphism.
+
+See [01-functional-domain-modeling.md](./01-functional-domain-modeling.md#pattern-2a-phantom-types-for-zero-cost-state-tracking) for combining sealed traits with phantom types.
+
 ## Serialization boundaries
 
 ### Principle
