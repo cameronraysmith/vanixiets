@@ -5,7 +5,6 @@
   flake.modules.homeManager.core =
     { ... }:
     {
-      # Enable fontconfig for proper font rendering
       fonts.fontconfig.enable = true;
     };
 }
