@@ -31,6 +31,15 @@
           };
 
           settings = {
+            # git-xet: https://huggingface.co/docs/hub/xet/using-xet-storage
+            # The following settings are equivalent to running
+            # `git-xet install --concurrency 8`
+            lfs.concurrenttransfers = 8;
+            "lfs \"customtransfer.xet\"" = {
+              path = "git-xet";
+              args = "transfer";
+              concurrent = true;
+            };
             # User modules should override user.name and user.email
             core.editor = "nvim";
             credential.helper = "store --file ~/.git-credentials";
