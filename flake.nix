@@ -9,7 +9,7 @@
     nixpkgs.url = "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz";
 
     nixpkgs-darwin-stable.url = "https://channels.nixos.org/nixpkgs-25.05-darwin/nixexprs.tar.xz";
-    nixpkgs-linux-stable.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs-linux-stable.url = "https://channels.nixos.org/nixos-25.05/nixexprs.tar.xz";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
