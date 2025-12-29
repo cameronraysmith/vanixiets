@@ -47,14 +47,12 @@ in
       programs.info.enable = lib.mkForce true;
       programs.man.enable = lib.mkForce true;
 
-      # Host identification
       networking.hostName = "rosegold";
       networking.computerName = "rosegold";
 
       # Remote deployment target (enables `clan machines update` from stibnite)
       clan.core.networking.targetHost = "cameron@rosegold.zt";
 
-      # Platform
       nixpkgs.hostPlatform = "aarch64-darwin";
 
       # Allow unfree packages (required for copilot-language-server, etc.)
@@ -91,12 +89,9 @@ in
       # Note: cameron is the admin user on rosegold (manages homebrew)
       system.primaryUser = "cameron";
 
-      # Enable desktop profile for GUI applications
       custom.profile.isDesktop = true;
 
-      # Homebrew configuration
-      # Base casks (40 apps) from modules/darwin/homebrew.nix
-      # Machine-specific additions below - simplified for basic user machine
+      # Base casks from modules/darwin/homebrew.nix; machine-specific additions below
       custom.homebrew = {
         enable = true;
 
@@ -113,7 +108,6 @@ in
         # Fonts managed via base homebrew module (manageFonts defaults to true)
       };
 
-      # TouchID authentication for sudo
       security.pam.services.sudo_local.touchIdAuth = true;
 
       # SSH daemon configuration
@@ -124,7 +118,6 @@ in
         MaxAuthTries 20
       '';
 
-      # Multi-user configuration
       # UIDs verified against rosegold system state (2025-11-28)
       users.users.janettesmith = {
         uid = 501; # Primary user
@@ -149,16 +142,13 @@ in
         "cameron"
       ];
 
-      # System packages
       environment.systemPackages = with pkgs; [
         vim
         git
       ];
 
-      # Enable zsh system-wide
       programs.zsh.enable = true;
 
-      # Home-Manager configuration
       home-manager = {
         useGlobalPkgs = true;
         useUserPackages = true;
