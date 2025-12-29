@@ -59,6 +59,7 @@
           git-filter-repo
           git-machete
           git-revise
+          git-xet
           gitmux
           graphite-cli
           graphviz
