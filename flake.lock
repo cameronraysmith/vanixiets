@@ -739,18 +739,15 @@
     },
     "nixpkgs-darwin-stable": {
       "locked": {
-        "lastModified": 1766899694,
-        "narHash": "sha256-lN6zOvHa213omlQ/CsxfE/OHADe6UnXte/B9ZAFZteI=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "5c84a81d259b415b071a34efea61b0fae832e928",
-        "type": "github"
+        "lastModified": 1766963038,
+        "narHash": "sha256-y2hqh//0FukprTyS9oCeeSpfiNA9K3FTvAGAInLNkII=",
+        "rev": "2126b5b4845e8ee1e5045373df27387856eaedfd",
+        "type": "tarball",
+        "url": "https://releases.nixos.org/nixpkgs/25.05-darwin/nixpkgs-darwin-25.05pre813790.2126b5b4845e/nixexprs.tar.xz"
       },
       "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-25.05-darwin",
-        "repo": "nixpkgs",
-        "type": "github"
+        "type": "tarball",
+        "url": "https://channels.nixos.org/nixpkgs-25.05-darwin/nixexprs.tar.xz"
       }
     },
     "nixpkgs-lib": {
