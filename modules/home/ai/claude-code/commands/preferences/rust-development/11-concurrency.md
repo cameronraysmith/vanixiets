@@ -26,6 +26,11 @@ Rust's typestate capability is not a pattern added on top of the language—it e
 The original Rust language had an explicit typestate system, but it was removed because these primitives made it redundant.
 As Graydon Hoare noted in [a retrospective on Rust's design](https://graydon2.dreamwidth.org/307291.html): "There was a typestate system that turns out to be redundant once you have affine types, nominal types and phantom type parameters."
 
+**Move semantics as linear types**: Rust's ownership system is not merely *similar* to linear types—it *is* a linear type system in practical effect.
+A moved value is consumed exactly once; the compiler enforces this statically.
+This is the Curry-Howard correspondence for linear logic realized in a systems programming language.
+The explicit typestate feature was removed from early Rust because these primitives made it redundant.
+
 ```rust
 use std::marker::PhantomData;
 

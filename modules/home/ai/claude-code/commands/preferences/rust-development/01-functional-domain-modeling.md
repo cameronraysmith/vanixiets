@@ -102,6 +102,27 @@ let measurement = Measurement::new(10.0, 0.5, 0.95)?;
 
 **See also**: domain-modeling.md#pattern-2-smart-constructors-for-invariants
 
+**Alternative: Declarative refinement with nutype**
+
+For common validation patterns (range constraints, string validation, regex), the `nutype` crate provides equivalent safety guarantees with reduced boilerplate.
+The 15-line manual smart constructor becomes a 4-line derive declaration:
+
+```rust
+use nutype::nutype;
+
+#[nutype(
+    validate(greater_or_equal = 0.0, less_or_equal = 1.0),
+    derive(Debug, Clone, Copy, PartialEq)
+)]
+pub struct QualityScore(f64);
+
+// Generated: QualityScore::try_new(f64) -> Result<Self, QualityScoreError>
+// Generated: QualityScore::into_inner(self) -> f64
+```
+
+Use nutype for simple constraints; use manual smart constructors when you need cross-field validation or maximum control over error types.
+See [13-type-level-programming.md](./13-type-level-programming.md#nutype-refinement-types-via-derive) for comprehensive patterns.
+
 ## Pattern 1a: Const generics for compile-time constraints
 
 Use const generics (Rust 1.51+) to enforce numeric bounds and collection sizes at compile time when values are known statically.
