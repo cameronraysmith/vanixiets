@@ -51,7 +51,6 @@
           # Shell preference (works on both platforms)
           users.users.cameron.shell = pkgs.zsh;
 
-          # SSH keys from shared identity module
           users.users.cameron.openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
 
           # Enable zsh system-wide (works on both platforms)
