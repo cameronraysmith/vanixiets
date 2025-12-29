@@ -8,7 +8,7 @@
   inputs = {
     nixpkgs.url = "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz";
 
-    nixpkgs-darwin-stable.url = "github:NixOS/nixpkgs/nixpkgs-25.05-darwin";
+    nixpkgs-darwin-stable.url = "https://channels.nixos.org/nixpkgs-25.05-darwin/nixexprs.tar.xz";
     nixpkgs-linux-stable.url = "github:NixOS/nixpkgs/nixos-25.05";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
