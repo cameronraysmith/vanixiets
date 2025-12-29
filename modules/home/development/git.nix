@@ -51,12 +51,13 @@
             diff.submodule = "log"; # Show commit log in diffs, not just hashes
             # User modules should override user.name and user.email
             core.editor = "nvim";
-            # Clear system helpers, then: sops-managed store first, osxkeychain fallback
-            credential.helper = [
-              ""
-              "store --file ${config.home.homeDirectory}/.git-credentials"
-              "osxkeychain"
-            ];
+            # Clear system helpers, then: sops-managed store first, osxkeychain fallback (Darwin only)
+            credential.helper =
+              [
+                ""
+                "store --file ${config.home.homeDirectory}/.git-credentials"
+              ]
+              ++ lib.optionals pkgs.stdenv.isDarwin [ "osxkeychain" ];
             github.user = "cameronraysmith";
             color.ui = true;
             diff.colorMoved = "zebra";
