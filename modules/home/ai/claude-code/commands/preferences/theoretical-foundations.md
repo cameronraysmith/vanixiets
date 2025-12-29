@@ -184,11 +184,14 @@ data List a = Nil | Cons a (List a)
 data ListF a r = NilF | ConsF a r
 
 -- List a is the initial algebra for ListF a
--- Catamorphism is the unique fold:
+-- The initial algebra is (List a, in :: ListF a (List a) -> List a)
+-- where in NilF = Nil, in (ConsF x xs) = Cons x xs
+-- Catamorphism is the unique algebra morphism to any other algebra:
 cata :: (ListF a b -> b) -> List a -> b
 ```
 
 **Practical consequence**: Every recursive data type has a canonical "fold" operation that expresses all structural recursion.
+Initiality guarantees that cata is the unique homomorphism from the initial algebra to any other algebra structure.
 
 **See also**: domain-modeling.md pattern matching, algebraic-data-types.md for concrete examples
 
@@ -468,10 +471,15 @@ A coalgebra for functor F is:
 c :: S -> F S
 ```
 
-For state machines: F S = Output × S (produces output and next state)
+For Moore machines: F S = Output × S (output depends only on state).
+Note that Mealy machines use F S = Input → (Output × S) where output depends on both state and input.
 
 ```haskell
-coalgebra :: State -> (Output, State)
+-- Moore machine coalgebra
+mooreCoalg :: State -> (Output, State)
+
+-- Mealy machine coalgebra
+mealyCoalg :: State -> Input -> (Output, State)
 ```
 
 **Final coalgebra**:
@@ -848,6 +856,11 @@ apply state event = -- ... other cases
 -- Catamorphism: unique fold from initial algebra
 reconstruct :: EventLog -> State
 reconstruct (EventLog events) = foldl' apply initialState events
+-- Note: Using foldl' (strict left fold) instead of canonical foldr for:
+-- - Stack-safety with long event sequences
+-- - Strictness in state accumulation (avoids space leaks)
+-- - Natural left-to-right event processing order
+-- Valid because the algebra (State, apply) is associative
 ```
 
 **Category-theoretic interpretation**:
@@ -989,6 +1002,10 @@ ibind
   :: BitemporalEvent i j a
   -> (a -> BitemporalEvent j k b)
   -> BitemporalEvent i k b
+
+-- Note: This GADT always produces the same index types (EventTime, ProcessingTime)
+-- making this phantom typing rather than true indexed monad effect tracking.
+-- A proper indexed bitemporal monad would track temporal state transitions through i, j, k.
 ```
 
 **Category-theoretic interpretation**:
@@ -1112,7 +1129,8 @@ const d = computed(() => b.value + c.value); // d depends on b and c
 
 **Category-theoretic interpretation**:
 
-A signal graph forms a free category over the dependency DAG:
+The dependency DAG generates a free category (the DAG's vertices and edges freely generate objects and morphisms, with paths as compositions).
+Signals form a diagram (functor) from this free category to the category of types and derivation functions:
 - Objects: Signals (typed by their value type)
 - Morphisms: Derivation functions between signal types
 - Composition: Function composition of derivations
