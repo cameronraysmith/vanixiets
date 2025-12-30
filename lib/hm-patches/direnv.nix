@@ -1,3 +1,6 @@
+# Patched copy of home-manager modules/programs/direnv.nix
+# Source: github:nix-community/home-manager (commit e4e78a2c)
+# See git history for exact modifications
 {
   config,
   lib,
@@ -92,7 +95,7 @@ in
       }
       // {
         default = true;
-        readOnly = true;
+        # readOnly = true; # Removed: conflicts with direnv-instant mkForce
       };
 
     enableNushellIntegration = lib.hm.shell.mkNushellIntegrationOption { inherit config; };
