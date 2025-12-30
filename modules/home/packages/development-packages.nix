@@ -134,7 +134,7 @@
           # dependently typed / proof assistants
           idris2
           lean4
-          coq
+          rocq-core
         ]
         # backlog-md disabled: auto-patchelf fails on rosetta-builder (elftools issue)
         # ++ lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
