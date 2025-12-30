@@ -21,7 +21,8 @@
 
         nix = {
           # Enables use of `nix-shell -p ...` etc with pinned nixpkgs
-          nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
+          # Uses flake registry reference (survives GC) rather than store path (can be GC'd)
+          nixPath = [ "nixpkgs=flake:nixpkgs" ];
 
           # Make `nix shell` etc use pinned nixpkgs
           registry.nixpkgs.flake = inputs.nixpkgs;
