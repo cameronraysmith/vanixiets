@@ -121,6 +121,20 @@
           python
           ruff
           uv
+
+          # haskell
+          ghc
+          cabal-install
+
+          # ocaml
+          ocaml
+          dune_3
+          opam
+
+          # dependently typed / proof assistants
+          idris2
+          lean4
+          coq
         ]
         # backlog-md disabled: auto-patchelf fails on rosetta-builder (elftools issue)
         # ++ lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
