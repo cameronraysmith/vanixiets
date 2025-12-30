@@ -8,9 +8,16 @@
   flake.modules.homeManager.terminal =
     { flake, ... }:
     {
-      # Import direnv-instant home-manager module
-      # Provides programs.direnv-instant options and shell integration
-      imports = [ flake.inputs.direnv-instant.homeModules.direnv-instant ];
+      # Disable home-manager's direnv module: has readOnly on enableFishIntegration
+      # which conflicts with direnv-instant's mkForce for mutual exclusivity
+      disabledModules = [ "programs/direnv.nix" ];
+
+      imports = [
+        # Patched home-manager direnv module (readOnly removed)
+        ../../../lib/hm-patches/direnv.nix
+        # direnv-instant for async shell integration
+        flake.inputs.direnv-instant.homeModules.direnv-instant
+      ];
 
       programs.direnv = {
         enable = true;
