@@ -501,7 +501,9 @@ order = loadOrder(orderId)
 customer = loadCustomer(order.customer_id)
 ```
 
-**See also**: theoretical-foundations.md#aggregates-and-optics
+**See also**:
+- `theoretical-foundations.md#aggregates-and-optics`
+- `event-sourcing.md` for event-sourced aggregates where state is derived from event log
 
 ### Pattern 6: Domain errors vs infrastructure errors
 
