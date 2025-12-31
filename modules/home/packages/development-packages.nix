@@ -22,13 +22,11 @@
       };
       # from llm-agents
       beads = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.beads;
-      coderabbit-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
-      crush = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.crush;
+      # coderabbit-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
+      # crush = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.crush;
       # droid: disabled - auto-patchelf fails on rosetta-builder (missing pyelftools)
       # opencode: disabled - bun node_modules cleanup fails during build
-      # TODO: Re-enable when upstream llm-agents fixes these issues
-      # Disabled: 2025-11-26
-      gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
+      # gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
     in
     {
       home.packages =
@@ -71,10 +69,10 @@
           mkcert
           # from llm-agents
           beads
-          coderabbit-cli
-          crush
+          # coderabbit-cli # disabled: unused
+          # crush      # disabled: unused
           # droid      # disabled: auto-patchelf fails
-          gemini-cli
+          # gemini-cli # disabled: requires nodejs_22 pin
           # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
           beads-viewer
