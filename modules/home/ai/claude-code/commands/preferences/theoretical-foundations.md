@@ -1020,13 +1020,41 @@ Time travel queries: query state as of event time (what we knew when event occur
 Late-arriving events: event time in past, processing time is now, indexed type makes this explicit.
 Audit compliance: both indices preserved, enables reconstructing "what did we know at time T" for regulatory requirements.
 
+### Hoffman's laws as algebraic constraints
+
+Kevin Hoffman's "10 Laws of Event Sourcing" (from "Real World Event Sourcing") can be understood as constraints that preserve the algebraic structure described above.
+
+*Law 1: Events are immutable* corresponds to the monoid axiom that elements, once introduced, cannot be modified.
+The free monoid is append-only by construction.
+
+*Law 2: Event schemas are immutable* preserves the *closed universe* assumption required for exhaustive pattern matching in the algebra structure.
+A change to an event schema creates a new type, hence a new generator for the free monoid.
+
+*Law 3: All data for a projection must be on the events* ensures the catamorphism (fold) is *self-contained*.
+If projections could access external state, the homomorphism property would fail.
+
+*Law 4: All projections must stem from events* ensures projections are *derived artifacts* (catamorphism results), not independent sources of truth.
+This preserves the initiality of the event log.
+
+*Law 5: Different projectors cannot share projections* ensures projections form independent homomorphisms from the free monoid.
+Shared state would create implicit coupling that breaks composition.
+
+*Law 6: Applying a failure event returns previous state* corresponds to a *partial identity* in the algebra: failure events act as identity morphisms on state.
+This maintains the state machine interpretation where rejected commands produce no state transition.
+
+*Law 9: Process managers consume events and emit commands* establishes the coalgebra-algebra duality: aggregates are coalgebras (state observation yields events), process managers are algebras (event consumption yields commands).
+
+These laws are not arbitrary conventions but algebraic necessities.
+Violating them breaks the structural guarantees that make event sourcing mathematically tractable.
+
 ### See also
 
 **See also**:
-- distributed-systems.md for practical event sourcing patterns
-- rust-development/12-distributed-systems.md for Rust implementation of event-sourced systems
-- domain-modeling.md#pattern-3-state-machines for state machines as event handlers
-- railway-oriented-programming.md for Result composition in command handlers
+- `event-sourcing.md` for comprehensive event sourcing patterns synthesizing FDM and Hoffman's approach
+- `distributed-systems.md` for practical event sourcing patterns
+- `rust-development/12-distributed-systems.md` for Rust implementation of event-sourced systems
+- `domain-modeling.md#pattern-3-state-machines` for state machines as event handlers
+- `railway-oriented-programming.md` for Result composition in command handlers
 
 ## Reactive systems and comonads
 
