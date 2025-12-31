@@ -28,7 +28,9 @@
       # opencode: disabled - bun node_modules cleanup fails during build
       # TODO: Re-enable when upstream llm-agents fixes these issues
       # Disabled: 2025-11-26
-      gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
+      # gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
+      # gemini-cli: uses pkgs.gemini-cli from overlay (nodejs_22 pin)
+      # See: modules/nixpkgs/overlays/llm-agents-patches.nix
     in
     {
       home.packages =
@@ -74,7 +76,7 @@
           coderabbit-cli
           crush
           # droid      # disabled: auto-patchelf fails
-          gemini-cli
+          gemini-cli # from overlay: llm-agents-patches.nix (nodejs_22 pin)
           # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
           beads-viewer
