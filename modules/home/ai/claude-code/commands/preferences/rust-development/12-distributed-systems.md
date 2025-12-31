@@ -467,6 +467,9 @@ At-least-once with idempotent consumers is the practical solution.
 Event sourcing stores all state changes as an immutable event log.
 Current state is derived by replaying events from the beginning.
 
+For comprehensive event sourcing patterns, Hoffman's laws, and theoretical foundations, see `event-sourcing.md`.
+This section provides Rust-specific implementation guidance.
+
 ### When to use event sourcing in Rust
 
 Consider event sourcing when:
@@ -606,7 +609,58 @@ Brief overview of relevant crates for distributed systems in Rust.
 Rust event sourcing ecosystem is immature compared to JVM (Akka, Axon).
 Most production systems build custom event stores on top of Postgres or Kafka.
 
-Avoid recommending specific event sourcing crates—patterns are more stable than libraries.
+**Pattern references for study** (not recommended as dependencies):
+
+- **cqrs-es**: lightweight framework with Aggregate trait, command/event separation, optimistic concurrency.
+  Good reference for understanding the trait-based approach to aggregates.
+  Supported persistence: PostgreSQL, MySQL, DynamoDB.
+
+- **esrs** (event_sourcing.rs): pure sync aggregates without async runtime dependency.
+  Demonstrates upcaster patterns for event schema migration.
+  Useful for understanding how to version events in Rust's type system.
+
+- **sqlite-es**: SQLite-backed event store with simple schema.
+  Good reference for the minimal event store table structure.
+
+- **kameo_es**: actor-based event sourcing using kameo actors.
+  Demonstrates integration between actor supervision and event persistence.
+  Alpha quality but illustrates actor + ES composition.
+
+**Choosing framework vs custom implementation**:
+
+Prefer custom implementation when:
+- You need full control over event serialization and versioning
+- Your aggregate patterns don't fit the framework's Aggregate trait
+- You're using an event store not supported by existing crates
+- You need to integrate with existing persistence infrastructure
+
+Consider framework adoption when:
+- You're starting a greenfield project with standard patterns
+- Your team is new to event sourcing and needs structural guidance
+- The framework's supported persistence matches your infrastructure
+- You're building a prototype to validate ES for your domain
+
+**Minimal event store schema** (PostgreSQL example):
+
+```sql
+CREATE TABLE events (
+    id UUID PRIMARY KEY,
+    stream_id UUID NOT NULL,
+    version BIGINT NOT NULL,
+    event_type VARCHAR(255) NOT NULL,
+    payload JSONB NOT NULL,
+    metadata JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (stream_id, version)
+);
+
+CREATE INDEX idx_events_stream ON events (stream_id, version);
+```
+
+The `(stream_id, version)` unique constraint enforces optimistic concurrency.
+Append with `INSERT ... WHERE NOT EXISTS (SELECT 1 FROM events WHERE stream_id = $1 AND version >= $2)`.
+
+Cross-reference `event-sourcing.md` for event schema evolution patterns (upcasting, versioning).
 
 ## Testing distributed patterns
 
@@ -736,6 +790,7 @@ Keep integration tests focused on critical paths—unit tests cover edge cases.
 
 ## See also
 
+- `event-sourcing.md` (comprehensive event sourcing patterns, Hoffman's laws, CQRS)
 - `distributed-systems.md` (universal decision framework and theory)
 - `./11-concurrency.md` (local concurrency patterns, actors, workers)
 - `./01-functional-domain-modeling.md` (aggregates, state machines, domain events)
