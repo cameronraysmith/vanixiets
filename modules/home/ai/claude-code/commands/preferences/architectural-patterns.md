@@ -464,7 +464,9 @@ async def handle_command(command_json: dict) -> Response:
 4. **Testing**: Easy to create command instances for testing
 5. **Audit trail**: Commands + events provide complete history
 
-**See also**: domain-modeling.md#workflows-as-type-safe-pipelines
+**See also**:
+- `domain-modeling.md#workflows-as-type-safe-pipelines`
+- `event-sourcing.md` for full event sourcing patterns where events become the authoritative source of truth
 
 ## Effect composition and signatures
 
