@@ -236,7 +236,7 @@ The log is the system of record.
 
 **Example**: Banking system where account balance is derived from transaction events.
 
-**See also**: theoretical-foundations.md for the algebraic foundation of event sourcing (free monoid of events, state as catamorphism).
+**See also**: `event-sourcing.md` for comprehensive event sourcing patterns, `theoretical-foundations.md` for the algebraic foundation (free monoid of events, state as catamorphism).
 
 ### Position 2: Service as authority
 
@@ -1110,10 +1110,11 @@ Use this checklist before implementing distributed system features.
 
 ## See also
 
-- rust-development/11-concurrency.md (local concurrency primitives)
-- rust-development/12-distributed-systems.md (Rust-specific distributed implementations)
-- domain-modeling.md (aggregates as consistency boundaries)
-- architectural-patterns.md (effect isolation, onion architecture)
-- railway-oriented-programming.md (Result types for distributed error handling)
-- theoretical-foundations.md (algebraic foundations: event sourcing as free monoid, catamorphisms, profunctors)
-- hypermedia-development/07-event-architecture.md (SSE streaming as event projection, CQRS in hypermedia context)
+- `event-sourcing.md` (comprehensive event sourcing patterns, process managers, CQRS)
+- `rust-development/11-concurrency.md` (local concurrency primitives)
+- `rust-development/12-distributed-systems.md` (Rust-specific distributed implementations)
+- `domain-modeling.md` (aggregates as consistency boundaries)
+- `architectural-patterns.md` (effect isolation, onion architecture)
+- `railway-oriented-programming.md` (Result types for distributed error handling)
+- `theoretical-foundations.md` (algebraic foundations: event sourcing as free monoid, catamorphisms, profunctors)
+- `hypermedia-development/07-event-architecture.md` (SSE streaming as event projection, CQRS in hypermedia context)
