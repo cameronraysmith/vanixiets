@@ -20,6 +20,9 @@
         enableAzure = true;
         enableSSH = true;
       };
+      # scala - pin sbt to specific JDK
+      jdk = pkgs.temurin-bin-21;
+      sbtWithJdk = pkgs.sbt.override { jre = jdk; };
       # from llm-agents
       beads = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.beads;
       # coderabbit-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
@@ -107,6 +110,9 @@
 
           # go
           go
+
+          # scala
+          sbtWithJdk
 
           # python
           dotnet-sdk_8 # for fable transpiler
