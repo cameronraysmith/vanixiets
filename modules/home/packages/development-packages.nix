@@ -79,6 +79,7 @@
           # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
           beads-viewer
+          gastown
           #------
           plantuml-c4
           pre-commit
