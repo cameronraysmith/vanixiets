@@ -22,6 +22,7 @@
           pkgs.nix-output-monitor
           pkgs.nix-update
           self'.packages.beads-viewer
+          self'.packages.gastown
           # Tools required by Makefile verify target
           pkgs.age
           pkgs.ssh-to-age
