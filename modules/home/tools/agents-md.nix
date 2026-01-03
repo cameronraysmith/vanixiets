@@ -34,6 +34,8 @@
           - issue tracking: ${commandsPath}/issues/beads.md
           - architectural patterns: ${prefsPath}/architectural-patterns.md
           - functional domain modeling (DDD, types, aggregates): ${prefsPath}/domain-modeling.md
+          - discovery process: ${prefsPath}/discovery-process.md
+          - collaborative modeling (EventStorming, Domain Storytelling): ${prefsPath}/collaborative-modeling.md
           - theoretical foundations (category theory, type theory): ${prefsPath}/theoretical-foundations.md
           - algebraic laws (functor/monad laws, property-based testing): ${prefsPath}/algebraic-laws.md
           - smart constructors and validation patterns: see domain-modeling.md
