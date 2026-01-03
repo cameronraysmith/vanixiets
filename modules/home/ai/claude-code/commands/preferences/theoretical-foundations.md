@@ -57,11 +57,13 @@ For practical application, see:
   - [Signal graphs as free categories](#signal-graphs-as-free-categories)
   - [Web components as coalgebras](#web-components-as-coalgebras)
   - [Composing reactive systems](#composing-reactive-systems)
+  - [Backpressure as algebraic constraint](#backpressure-as-algebraic-constraint)
 - [Materialized views as Galois connections](#materialized-views-as-galois-connections)
   - [The abstraction-concretion pair](#the-abstraction-concretion-pair)
   - [Views as quotients of the event monoid](#views-as-quotients-of-the-event-monoid)
   - [Query caching as memoization](#query-caching-as-memoization)
   - [Temporal versioning as indexed types](#temporal-versioning-as-indexed-types)
+- [The ladder of pattern quality](#the-ladder-of-pattern-quality)
 - [Cross-references to practical documents](#cross-references-to-practical-documents)
 - [Further reading](#further-reading)
 
@@ -1304,6 +1306,16 @@ The composition laws ensure end-to-end correctness.
 - hypermedia-development/05-web-components.md for component integration
 - hypermedia-development/07-event-architecture.md for SSE as projection channel
 
+### Backpressure as algebraic constraint
+
+In reactive stream systems, backpressure represents a bidirectional flow constraint.
+Data flows from producer to consumer; demand signals flow in the opposite direction.
+
+This bidirectional flow can be modeled as a profunctor or as adjoint functors between producer and consumer categories.
+The backpressure mechanism ensures that the compositional properties of streams (ordering, exactly-once) are preserved under varying load.
+
+See distributed-systems.md#reactive-streams-for-distributed-messaging for practical reactive stream patterns.
+
 ## Materialized views as Galois connections
 
 Read models and materialized views in CQRS/event sourcing architectures form a Galois connection with the event log.
@@ -1542,6 +1554,25 @@ Temporal versioning enables:
 - data-modeling.md for DuckDB patterns
 - distributed-systems.md "Position 1: Event log as authority" for read model derivation
 - hypermedia-development/07-event-architecture.md for bitemporal event handling
+
+## The ladder of pattern quality
+
+Ghosh describes a hierarchy of pattern quality based on algebraic properties:
+
+1. **Pure functions**: Foundation enabling fearless composition and equational reasoning
+
+2. **Algebraic abstractions with static types**: Patterns with well-defined laws (monoids, functors, monads) that can be verified
+
+3. **Free theorems from parametricity**: Polymorphic functions where behavior is constrained by type signature alone
+
+Each level builds on the previous.
+Pure functions enable algebraic abstractions.
+Algebraic abstractions with parametric polymorphism yield free theorems.
+
+This hierarchy guides pattern selection: prefer patterns higher on the ladder when possible, as they provide stronger guarantees with less explicit verification.
+
+See algebraic-laws.md for laws that algebraic patterns must satisfy.
+See algebraic-laws.md#parametricity-and-free-theorems for how parametricity reduces testing burden.
 
 ## Cross-references to practical documents
 
