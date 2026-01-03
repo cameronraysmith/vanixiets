@@ -24,6 +24,9 @@ Core domain contexts receive more autonomy and isolation, while generic domain c
 The investment prioritization frameworks in this document inform all technical decisions downstream: from choosing programming languages and type systems to determining testing strategies and team composition.
 Strategic classification is not a one-time exercise but an ongoing reassessment as markets evolve and competitive landscapes shift.
 
+Collaborative modeling sessions documented in *collaborative-modeling.md* surface the domain structures and sub-domains through EventStorming and Domain Storytelling that strategic analysis then classifies as core, supporting, or generic.
+The domain events, aggregates, and linguistic patterns discovered during collaborative sessions provide the raw material for strategic classification decisions.
+
 ## Domain classification
 
 ### The strategic classification model
