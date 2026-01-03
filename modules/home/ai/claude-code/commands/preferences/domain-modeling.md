@@ -203,6 +203,68 @@ value :: DomainType -> InnerValue
 - Rust: Private struct fields, public associated function returning Result
 - F#: Private constructor, module with create function
 
+**Algebra of API design**:
+
+A module is a collection of functions operating on types while honoring invariants.
+These invariants are laws—verifiable properties that should hold for all valid uses of the API.
+This algebraic structure makes APIs predictable, composable, and testable through property-based testing.
+
+Smart constructors establish the initial algebra: they are the "generators" that produce valid values.
+The invariants they enforce are the laws of the algebra.
+All other module functions must preserve these laws—they are homomorphisms over the algebra structure.
+
+```rust
+// Example: NonEmptyList algebra
+// Law: length must always be >= 1
+
+// Smart constructor establishes the law
+impl<T> NonEmptyList<T> {
+    pub fn new(head: T, tail: Vec<T>) -> Self {
+        NonEmptyList { head, tail }
+        // Invariant: guaranteed non-empty by construction
+    }
+
+    // All operations preserve the law
+    pub fn push(&mut self, item: T) {
+        self.tail.push(item);
+        // Still non-empty: law preserved
+    }
+
+    pub fn map<U>(self, f: impl Fn(T) -> U) -> NonEmptyList<U> {
+        NonEmptyList {
+            head: f(self.head),
+            tail: self.tail.into_iter().map(f).collect(),
+        }
+        // Law preserved: non-empty maps to non-empty
+    }
+}
+
+// Property-based test verifying the law
+#[cfg(test)]
+mod tests {
+    use quickcheck::quickcheck;
+
+    quickcheck! {
+        fn non_empty_list_never_empty(head: i32, tail: Vec<i32>) -> bool {
+            let list = NonEmptyList::new(head, tail);
+            list.len() >= 1  // Law holds
+        }
+
+        fn map_preserves_non_empty(head: i32, tail: Vec<i32>) -> bool {
+            let list = NonEmptyList::new(head, tail);
+            let mapped = list.map(|x| x * 2);
+            mapped.len() >= 1  // Law preserved under map
+        }
+    }
+}
+```
+
+These laws form the algebra of the module.
+When all functions preserve the laws, users can reason algebraically about code: if input satisfies laws, output will too.
+This is why "making illegal states unrepresentable" works—the type system enforces the algebraic structure.
+
+**See also**: `theoretical-foundations.md#algebraic-laws` for formal treatment of algebraic laws and their categorical interpretation.
+
 **See also**: algebraic-data-types.md#constrained-values
 
 ### Pattern 3: State machines for entity lifecycles
@@ -561,11 +623,192 @@ order = loadOrder(orderId)
 customer = loadCustomer(order.customer_id)
 ```
 
+**Functional aggregate updates with lenses**:
+
+For complex aggregates with deeply nested structures, lenses provide compositional getters and setters that preserve immutability and compose elegantly.
+Rather than writing verbose nested record updates, lenses enable focused modifications that clearly express intent.
+
+```rust
+// Without lenses: verbose nested update
+fn update_city(dataset: Dataset, new_city: String) -> Dataset {
+    Dataset {
+        protocol: Protocol {
+            facility: Facility {
+                address: Address {
+                    city: new_city,
+                    ..dataset.protocol.facility.address
+                },
+                ..dataset.protocol.facility
+            },
+            ..dataset.protocol
+        },
+        ..dataset
+    }
+}
+
+// With lenses: compositional update
+let city_lens = dataset_lens.compose(protocol_lens)
+                             .compose(facility_lens)
+                             .compose(address_lens)
+                             .compose(city_field_lens);
+
+let updated = city_lens.set(dataset, new_city);
+```
+
+Lens laws ensure these operations are well-behaved: getting and then setting with the same value is identity (GetPut), setting and then getting returns the set value (PutGet), and setting twice uses the second value (PutPut).
+
+```haskell
+-- Lens laws
+-- GetPut: set (view lens s) s = s
+-- PutGet: view lens (set a s) = a
+-- PutPut: set a' (set a s) = set a' s
+```
+
+**See also**: `theoretical-foundations.md#lenses-for-nested-data-access` for categorical interpretation and formal lens laws.
+
 **See also**:
 - `theoretical-foundations.md#aggregates-and-optics`
 - `event-sourcing.md` for event-sourced aggregates where state is derived from event log
 
-### Pattern 6: Domain errors vs infrastructure errors
+### Pattern 6: Repositories as generic modules
+
+Group persistence operations as parameterized modules that abstract over storage mechanisms while maintaining type safety and composability.
+
+**Abstract definition**:
+
+A repository is a generic interface parameterized by aggregate type and identifier type.
+The repository signature defines abstract operations (query, store, delete) without committing to implementation details like database technology or serialization format.
+Different algebras implement this signature for different storage backends (in-memory, PostgreSQL, object storage), and interpreters execute operations in specific contexts (production database, test mocks).
+
+**Generic repository signature**:
+
+```rust
+trait Repository<A, Id> {
+    type Error;
+
+    fn query(&self, id: &Id) -> Result<Option<A>, Self::Error>;
+    fn store(&self, aggregate: &A) -> Result<A, Self::Error>;
+    fn delete(&self, id: &Id) -> Result<(), Self::Error>;
+    fn query_by(&self, predicate: impl Fn(&A) -> bool) -> Result<Vec<A>, Self::Error>;
+}
+
+// Concrete implementation for PostgreSQL
+struct PostgresRepository<A> {
+    pool: PgPool,
+    _phantom: PhantomData<A>,
+}
+
+impl<A> Repository<A, Uuid> for PostgresRepository<A>
+where
+    A: Serialize + DeserializeOwned + HasId<Uuid>,
+{
+    type Error = DatabaseError;
+
+    fn query(&self, id: &Uuid) -> Result<Option<A>, DatabaseError> {
+        // Implementation using sqlx
+    }
+
+    fn store(&self, aggregate: &A) -> Result<A, DatabaseError> {
+        // Implementation using sqlx
+    }
+
+    fn delete(&self, id: &Uuid) -> Result<(), DatabaseError> {
+        // Implementation using sqlx
+    }
+
+    fn query_by(&self, predicate: impl Fn(&A) -> bool) -> Result<Vec<A>, DatabaseError> {
+        // Load all and filter (or translate predicate to SQL)
+    }
+}
+
+// In-memory implementation for testing
+struct InMemoryRepository<A, Id> {
+    storage: Arc<RwLock<HashMap<Id, A>>>,
+}
+
+impl<A, Id> Repository<A, Id> for InMemoryRepository<A, Id>
+where
+    A: Clone,
+    Id: Eq + Hash + Clone,
+{
+    type Error = InMemoryError;
+
+    fn query(&self, id: &Id) -> Result<Option<A>, InMemoryError> {
+        Ok(self.storage.read().unwrap().get(id).cloned())
+    }
+
+    fn store(&self, aggregate: &A) -> Result<A, InMemoryError> {
+        let id = aggregate.id().clone();
+        self.storage.write().unwrap().insert(id, aggregate.clone());
+        Ok(aggregate.clone())
+    }
+
+    // ... other operations
+}
+```
+
+**Dependency injection via Reader pattern**:
+
+Rather than passing repositories as constructor parameters (which couples components to concrete implementations), use the Reader pattern to thread dependencies through computations.
+This defers injection to the call site, enabling testing with alternative implementations and making dependency requirements explicit in type signatures.
+
+```rust
+// Reader monad threads environment through computation
+struct Reader<R, A> {
+    run: Box<dyn Fn(&R) -> A>,
+}
+
+impl<R, A> Reader<R, A> {
+    fn new(f: impl Fn(&R) -> A + 'static) -> Self {
+        Reader { run: Box::new(f) }
+    }
+
+    fn run_reader(&self, env: &R) -> A {
+        (self.run)(env)
+    }
+
+    fn map<B>(self, f: impl Fn(A) -> B + 'static) -> Reader<R, B> {
+        Reader::new(move |env| f(self.run_reader(env)))
+    }
+
+    fn bind<B>(self, f: impl Fn(A) -> Reader<R, B> + 'static) -> Reader<R, B> {
+        Reader::new(move |env| f(self.run_reader(env)).run_reader(env))
+    }
+}
+
+// Usage: workflow that needs repository
+fn load_and_process_dataset(
+    dataset_id: DatasetId
+) -> Reader<impl Repository<Dataset, DatasetId>, Result<ProcessedData, Error>> {
+    Reader::new(move |repo| {
+        match repo.query(&dataset_id)? {
+            Some(dataset) => process_dataset(dataset),
+            None => Err(Error::NotFound(dataset_id)),
+        }
+    })
+}
+
+// At call site: inject dependencies
+fn main() {
+    let repo = PostgresRepository::new(db_pool);
+    let workflow = load_and_process_dataset(dataset_id);
+    let result = workflow.run_reader(&repo);
+}
+
+// In tests: inject mock
+#[test]
+fn test_load_and_process() {
+    let repo = InMemoryRepository::new();
+    repo.store(&test_dataset());
+    let workflow = load_and_process_dataset(test_dataset_id);
+    let result = workflow.run_reader(&repo);
+    assert!(result.is_ok());
+}
+```
+
+**See also**: `railway-oriented-programming.md` for Reader pattern details and effect composition, `theoretical-foundations.md` for Reader monad categorical interpretation.
+
+### Pattern 7: Domain errors vs infrastructure errors
 
 Classify errors by their role in the domain model to determine how to handle them.
 
@@ -727,6 +970,234 @@ combined input =
 ```
 
 **See also**: railway-oriented-programming.md#working-with-domain-errors
+
+## Module algebra for domain services
+
+Domain services are best understood as algebras consisting of three parts: signatures that define abstract operations, algebras that implement those operations, and interpreters that execute them in specific contexts.
+This organization pattern, central to Debasish Ghosh's approach in "Functional and Reactive Domain Modeling", separates interface from implementation and execution, enabling testability, composability, and multiple interpretations of the same domain logic.
+
+### Signatures
+
+A signature is a trait or interface defining abstract operations parameterized on types.
+The signature publishes the contract without committing to implementation.
+Type parameters remain abstract, allowing different implementations to choose concrete representations suited to their context.
+
+```rust
+// Account service signature
+trait AccountService {
+    type Account;
+    type Amount;
+    type Error;
+
+    fn open(&self, no: &str, name: &str, opening_date: Date)
+        -> Result<Self::Account, Self::Error>;
+
+    fn close(&self, account: &Self::Account, close_date: Date)
+        -> Result<Self::Account, Self::Error>;
+
+    fn debit(&self, account: &Self::Account, amount: Self::Amount)
+        -> Result<Self::Account, Self::Error>;
+
+    fn credit(&self, account: &Self::Account, amount: Self::Amount)
+        -> Result<Self::Account, Self::Error>;
+
+    fn balance(&self, account: &Self::Account) -> Self::Amount;
+}
+```
+
+The signature abstracts over Account, Amount, and Error types.
+Different implementations can provide different concrete types: Amount might be Decimal for production, or i64 for tests; Account might be a rich domain object or a minimal test stub.
+
+```haskell
+-- Haskell equivalent using type families
+class AccountService m where
+    type Account m
+    type Amount m
+    type Error m
+
+    open :: String -> String -> Date -> m (Either (Error m) (Account m))
+    close :: Account m -> Date -> m (Either (Error m) (Account m))
+    debit :: Account m -> Amount m -> m (Either (Error m) (Account m))
+    credit :: Account m -> Amount m -> m (Either (Error m) (Account m))
+    balance :: Account m -> m (Amount m)
+```
+
+### Algebras (implementations)
+
+An algebra is a concrete implementation of the signature.
+Multiple algebras can implement the same signature for different contexts: production database, in-memory testing, event sourcing, external API integration.
+
+```rust
+// Production algebra: PostgreSQL implementation
+struct PostgresAccountService {
+    pool: PgPool,
+}
+
+impl AccountService for PostgresAccountService {
+    type Account = Account;  // Rich domain type
+    type Amount = Decimal;
+    type Error = DatabaseError;
+
+    fn open(&self, no: &str, name: &str, opening_date: Date)
+        -> Result<Account, DatabaseError>
+    {
+        // Validate using smart constructor
+        let account = Account::open(no, name, opening_date)?;
+
+        // Persist to database
+        sqlx::query!(
+            "INSERT INTO accounts (number, name, opened_on, status) VALUES ($1, $2, $3, 'open')",
+            account.number(),
+            account.name(),
+            account.opened_on()
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(account)
+    }
+
+    fn debit(&self, account: &Account, amount: Decimal) -> Result<Account, DatabaseError> {
+        let updated = account.debit(amount)?;  // Domain logic
+
+        // Persist change
+        sqlx::query!(
+            "UPDATE accounts SET balance = $1 WHERE number = $2",
+            updated.balance(),
+            updated.number()
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(updated)
+    }
+
+    // ... other operations
+}
+
+// Test algebra: in-memory implementation
+struct InMemoryAccountService {
+    accounts: Arc<RwLock<HashMap<String, Account>>>,
+}
+
+impl AccountService for InMemoryAccountService {
+    type Account = Account;  // Same domain type
+    type Amount = Decimal;
+    type Error = TestError;
+
+    fn open(&self, no: &str, name: &str, opening_date: Date)
+        -> Result<Account, TestError>
+    {
+        let account = Account::open(no, name, opening_date)?;
+        self.accounts.write().unwrap().insert(no.to_string(), account.clone());
+        Ok(account)
+    }
+
+    fn debit(&self, account: &Account, amount: Decimal) -> Result<Account, TestError> {
+        let updated = account.debit(amount)?;
+        self.accounts.write().unwrap().insert(account.number().to_string(), updated.clone());
+        Ok(updated)
+    }
+
+    // ... other operations
+}
+```
+
+Different algebras for the same signature enable swapping implementations without changing client code.
+Tests use `InMemoryAccountService`, production uses `PostgresAccountService`, but both satisfy the `AccountService` contract.
+
+### Interpreters
+
+An interpreter transforms one algebra into another or executes the algebra in a specific context.
+This separation enables testing with mock interpreters while using database interpreters in production.
+
+```rust
+// Interpreter: execute account operations in IO context
+async fn run_account_workflow<S: AccountService>(
+    service: &S,
+    account_no: &str,
+    name: &str,
+    transactions: Vec<Transaction>,
+) -> Result<S::Account, S::Error> {
+    // Open account
+    let mut account = service.open(account_no, name, Date::today())?;
+
+    // Apply transactions
+    for transaction in transactions {
+        account = match transaction {
+            Transaction::Debit(amount) => service.debit(&account, amount)?,
+            Transaction::Credit(amount) => service.credit(&account, amount)?,
+        };
+    }
+
+    Ok(account)
+}
+
+// Use with different algebras
+#[tokio::main]
+async fn main() {
+    let service = PostgresAccountService::new(pool);
+    let account = run_account_workflow(&service, "ACC001", "Alice", transactions).await;
+}
+
+#[test]
+fn test_account_workflow() {
+    let service = InMemoryAccountService::new();
+    let account = block_on(run_account_workflow(&service, "ACC001", "Alice", test_transactions));
+    assert_eq!(service.balance(&account.unwrap()), Decimal::from(1000));
+}
+```
+
+The interpreter `run_account_workflow` is polymorphic over any `AccountService` implementation.
+It doesn't care whether operations hit a database or update in-memory state—it operates purely on the algebra interface.
+
+### Composition
+
+Modules compose via trait inheritance (Rust), mixins (Scala), or type class composition.
+Larger services are built by combining smaller service algebras.
+
+```rust
+// Compose account service with reporting service
+trait AccountReportingService: AccountService {
+    fn generate_statement(&self, account: &Self::Account, period: DateRange)
+        -> Result<Statement, Self::Error>;
+
+    fn tax_report(&self, accounts: Vec<Self::Account>, year: Year)
+        -> Result<TaxReport, Self::Error>;
+}
+
+// Implementation composes both algebras
+impl AccountReportingService for PostgresAccountService {
+    fn generate_statement(&self, account: &Account, period: DateRange)
+        -> Result<Statement, DatabaseError>
+    {
+        // Uses self.balance() from AccountService
+        let current_balance = self.balance(account);
+
+        // Fetch transactions from database
+        let transactions = self.fetch_transactions(account, period)?;
+
+        Ok(Statement::new(account.clone(), transactions, current_balance))
+    }
+
+    // ... other operations
+}
+```
+
+Composition preserves the algebra structure: composed services remain abstract over type parameters, enabling the same test/production separation at higher levels of abstraction.
+
+```haskell
+-- Haskell: compose services via constraint intersection
+class (AccountService m, ReportingService m) => AccountReportingService m where
+    generateStatement :: Account m -> DateRange -> m (Either (Error m) Statement)
+    taxReport :: [Account m] -> Year -> m (Either (Error m) TaxReport)
+```
+
+This compositional structure scales to complex domain models.
+Payment services compose with account services; portfolio management composes with both; risk analysis composes with all three.
+Each layer remains testable in isolation by substituting appropriate algebras.
+
+**See also**: `theoretical-foundations.md` for the categorical interpretation of module algebras as F-algebras, and `architectural-patterns.md` for organizing module algebras in application architecture.
 
 ## Anti-patterns to avoid
 
