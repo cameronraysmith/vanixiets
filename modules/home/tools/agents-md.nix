@@ -35,6 +35,7 @@
           - architectural patterns: ${prefsPath}/architectural-patterns.md
           - functional domain modeling (DDD, types, aggregates): ${prefsPath}/domain-modeling.md
           - theoretical foundations (category theory, type theory): ${prefsPath}/theoretical-foundations.md
+          - algebraic laws (functor/monad laws, property-based testing): ${prefsPath}/algebraic-laws.md
           - smart constructors and validation patterns: see domain-modeling.md
           - error handling with Result types: see railway-oriented-programming.md
           - data modeling (database schemas, normalization, ER diagrams): ${prefsPath}/data-modeling.md
