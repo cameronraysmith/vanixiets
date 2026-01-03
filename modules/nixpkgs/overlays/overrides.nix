@@ -12,32 +12,34 @@
 {
   flake.nixpkgsOverlays = [
     (final: prev: {
-      # Rename graphite-cli binary from `gt` to `grt`
+      # Rename graphite-cli binary from `gt` to `gph`
       #
       # Conflict: upstream graphite-cli uses `gt` which collides with gastown.
       # gastown (multi-agent orchestration framework) natively uses `gt` for its CLI.
-      # This rename frees `gt` for gastown while keeping graphite-cli accessible as `grt`.
+      # This rename frees `gt` for gastown while keeping graphite-cli accessible as `gph`.
+      #
+      # Note: `grt` was considered but conflicts with existing shell alias for git-root.
       #
       # Pattern: stackit-cli style postInstall rename with completion regeneration
       graphite-cli = prev.graphite-cli.overrideAttrs (oldAttrs: {
         postInstall = prev.lib.optionalString (prev.stdenv.buildPlatform.canExecute prev.stdenv.hostPlatform) ''
-          # Rename binary: gt -> grt
-          mv $out/bin/gt $out/bin/grt
+          # Rename binary: gt -> gph
+          mv $out/bin/gt $out/bin/gph
 
           # Regenerate shell completions for renamed binary
-          installShellCompletion --cmd grt \
-            --bash <($out/bin/grt completion) \
-            --fish <(GT_PAGER= $out/bin/grt fish) \
-            --zsh <(ZSH_NAME=zsh $out/bin/grt completion)
+          installShellCompletion --cmd gph \
+            --bash <($out/bin/gph completion) \
+            --fish <(GT_PAGER= $out/bin/gph fish) \
+            --zsh <(ZSH_NAME=zsh $out/bin/gph completion)
 
           # Fix zsh completion directive to reference renamed binary
           # Pattern: cobra-cli style completion metadata patching
-          substituteInPlace $out/share/zsh/site-functions/_grt \
-            --replace-fail '#compdef gt' '#compdef grt'
+          substituteInPlace $out/share/zsh/site-functions/_gph \
+            --replace-fail '#compdef gt' '#compdef gph'
         '';
 
         meta = oldAttrs.meta // {
-          mainProgram = "grt";
+          mainProgram = "gph";
         };
       });
     })
