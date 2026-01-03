@@ -80,6 +80,7 @@
           # from pkgs/by-name
           beads-viewer
           gastown
+          golem-cli
           #------
           plantuml-c4
           pre-commit
