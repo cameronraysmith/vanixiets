@@ -145,6 +145,56 @@ Infrastructure layer:
 - Product catalog
 ```
 
+## Algebraic view of architecture layers
+
+Each architecture layer can be understood as a module algebra with its own signature, implementation, and composition rules.
+This perspective formalizes the layer separation and clarifies composition.
+
+### Layers as signatures
+
+Each layer defines a signature (interface) hiding implementation details.
+Domain layer signatures use pure types; infrastructure signatures may include effects.
+
+```rust
+// Domain layer signature - pure
+trait AccountDomain {
+    fn validate_account(data: AccountData) -> Result<Account, DomainError>;
+    fn apply_interest(account: Account, rate: Rate) -> Account;
+}
+
+// Infrastructure layer signature - effectful
+trait AccountRepository {
+    fn find(&self, id: AccountId) -> impl Future<Output = Result<Account, DbError>>;
+    fn save(&self, account: &Account) -> impl Future<Output = Result<(), DbError>>;
+}
+```
+
+### Layers as algebras
+
+Each layer implements its signature, potentially using services from inner layers.
+The domain layer is pure; outer layers add effects.
+
+### Composition via functors
+
+Layer boundaries are crossed via natural transformations (functors mapping between algebras).
+The application layer composes domain and infrastructure through these transformations.
+
+```rust
+// Application layer composes domain + infrastructure
+async fn process_account(
+    id: AccountId,
+    repo: &impl AccountRepository,
+) -> Result<Account, AppError> {
+    let account = repo.find(id).await.map_err(AppError::from)?;
+    let validated = AccountDomain::validate_account(account.into())?;
+    let updated = AccountDomain::apply_interest(validated, current_rate());
+    repo.save(&updated).await.map_err(AppError::from)?;
+    Ok(updated)
+}
+```
+
+**See also**: domain-modeling.md#module-algebra-for-domain-services for the full signature/algebra/interpreter pattern.
+
 ## Workflow pipeline architecture
 
 ### Pattern
@@ -351,6 +401,44 @@ def process_observations_reader(
 
 **See also**: theoretical-foundations.md#monad-transformers
 
+### Dependency injection via Kleisli arrows
+
+Beyond simple function parameters, Kleisli arrows (`A -> M B`) compose effectful computations with embedded dependencies.
+The Reader monad is a Kleisli category over the function type.
+
+```rust
+// Kleisli-style service composition
+type ServiceOp<A> = impl Fn(&ServiceContext) -> Result<A, Error>;
+
+fn find_account(id: AccountId) -> ServiceOp<Account> {
+    move |ctx| ctx.account_repo.find(id)
+}
+
+fn validate_balance(account: Account, amount: Amount) -> ServiceOp<Account> {
+    move |_ctx| {
+        if account.balance >= amount {
+            Ok(account)
+        } else {
+            Err(Error::InsufficientBalance)
+        }
+    }
+}
+
+// Compose via Kleisli composition (>=>)
+fn withdraw(id: AccountId, amount: Amount) -> ServiceOp<Account> {
+    find_account(id)
+        .and_then(|a| validate_balance(a, amount))
+        .and_then(|a| debit(a, amount))
+}
+```
+
+This pattern:
+- Defers dependency injection to the execution site
+- Enables pure composition before execution
+- Simplifies testing with mock contexts
+
+**See also**: railway-oriented-programming.md#combining-result-with-other-effects for monad transformer patterns.
+
 ## Commands and events as workflow boundaries
 
 ### Commands as inputs
@@ -522,6 +610,31 @@ AsyncOption[T] = Async[Option[T]]
 # Result + Option (rare, usually use Result with error for "not found")
 ResultOption[T, E] = Result[Option[T], E]
 ```
+
+### Effect signatures as documentation
+
+Type aliases document the effects a computation requires.
+This makes effect requirements explicit in signatures.
+
+```rust
+// Effect signature documents: this operation needs DB access and may fail
+type DbOperation<A> = impl Future<Output = Result<A, DbError>>;
+
+// Effect signature documents: needs config and DB, may fail with app errors
+type AppOperation<A> = impl Fn(&Config) -> impl Future<Output = Result<A, AppError>>;
+
+// Pure domain operations have no effect signature
+fn calculate_interest(principal: Amount, rate: Rate, days: u32) -> Amount { ... }
+```
+
+Effect signatures serve as documentation:
+- Which effects does this operation perform?
+- What context does it need?
+- What can go wrong?
+
+This connects to the module algebra pattern where signatures declare capabilities.
+
+**See also**: domain-modeling.md#module-algebra-for-domain-services for signature/algebra/interpreter patterns.
 
 ### Effect composition guidelines
 
