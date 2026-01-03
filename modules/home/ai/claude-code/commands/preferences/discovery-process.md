@@ -117,11 +117,66 @@ Domain Storytelling produces annotated diagrams showing actors, actions, and wor
 Example Mapping generates rules with supporting examples and open questions requiring clarification.
 
 Algebraic interpretation views domain events as candidates for sum type variants in the event algebra.
-Each orange sticky note potentially becomes a case in an event ADT like `data OrderEvent = OrderPlaced | OrderShipped | OrderCancelled`.
-Commands become functions with the shape `Command -> Validation (List Event)`, where validation captures business rule enforcement.
-Policies become event handlers with shape `Event -> List Command`, enabling choreography-style coordination.
-Aggregates identify consistency boundaries that map to functors or monads encapsulating invariant preservation.
-The free monoid structure of events (append-only, associative) appears naturally in event storm outputs even when participants lack category theory background.
+Domain events discovered through EventStorming translate directly to sum type constructors, where each orange sticky becomes a variant in the event ADT.
+
+```haskell
+data OrderEvent
+  = OrderPlaced { orderId :: OrderId, items :: [Item], placedAt :: DateTime }
+  | OrderConfirmed { orderId :: OrderId, confirmedAt :: DateTime }
+  | OrderShipped { orderId :: OrderId, trackingNo :: TrackingNumber, shippedAt :: DateTime }
+  | OrderDelivered { orderId :: OrderId, deliveredAt :: DateTime, signature :: Signature }
+  | OrderCancelled { orderId :: OrderId, reason :: CancellationReason, cancelledAt :: DateTime }
+```
+
+Commands (blue stickies) become functions returning validated events or errors:
+
+```haskell
+placeOrder :: OrderData -> Validation (NonEmpty OrderError) OrderEvent
+placeOrder orderData =
+  validateItems orderData.items *>
+  validateCustomer orderData.customerId *>
+  pure (OrderPlaced (newOrderId ()) orderData.items (now ()))
+
+confirmOrder :: OrderId -> Validation (NonEmpty OrderError) OrderEvent
+confirmOrder orderId =
+  checkOrderExists orderId *>
+  checkPaymentReceived orderId *>
+  pure (OrderConfirmed orderId (now ()))
+```
+
+Policies (purple stickies) become event handlers producing downstream commands:
+
+```haskell
+onOrderPlaced :: OrderEvent -> [Command]
+onOrderPlaced (OrderPlaced orderId items _) =
+  [ SendConfirmationEmail orderId
+  , ReserveInventory items
+  , NotifyFulfillment orderId
+  ]
+onOrderPlaced _ = []
+```
+
+Aggregates (yellow stickies) identify consistency boundaries that enforce invariants through encapsulation:
+
+```rust
+// Order aggregate module signature
+pub mod order {
+    pub struct Order(OrderState); // private state
+
+    pub fn place_order(data: OrderData) -> Result<(Order, OrderEvent), OrderError> {
+        // smart constructor enforcing invariants
+    }
+
+    pub fn apply_event(order: Order, event: OrderEvent) -> Order {
+        // event fold function for state evolution
+    }
+}
+```
+
+The free monoid structure of events (append-only, associative) emerges naturally from EventStorming outputs even when participants lack category theory background.
+Event streams compose through concatenation, supporting both event sourcing persistence and choreography-style integration.
+
+See `event-sourcing.md#event-discovery` for complete guidance on translating EventStorming artifacts to event types and `domain-modeling.md#smart-constructors-and-validation` for command validation patterns.
 
 ### Step 3: Decompose into sub-domains
 
@@ -139,10 +194,83 @@ Outputs include a sub-domain map showing named sub-domains with their responsibi
 Teams often discover that initial aggregate boundaries were too coarse or too fine, requiring iteration.
 
 Algebraic interpretation treats sub-domains as module boundaries in the module algebra.
-Each sub-domain becomes a signature (trait/typeclass/interface) plus an algebra (implementation) plus interpreters for different contexts.
-Boundaries between sub-domains identify functor boundaries where types and operations change meaning.
-For example, an Order in the sales sub-domain may differ from an Order in fulfillment, requiring explicit mapping at the context boundary.
+Sub-domain boundaries become module signatures (interfaces) hiding implementation details, where each sub-domain exports a public API while maintaining freedom to evolve internal structure.
+
+```rust
+// Order sub-domain module signature
+pub trait OrderService {
+    fn place_order(&self, data: OrderData) -> Result<OrderId, OrderError>;
+    fn confirm_order(&self, id: OrderId) -> Result<(), OrderError>;
+    fn get_order(&self, id: OrderId) -> Result<Order, OrderError>;
+    fn cancel_order(&self, id: OrderId, reason: CancellationReason) -> Result<(), OrderError>;
+}
+
+// Fulfillment sub-domain module signature
+pub trait FulfillmentService {
+    fn ship_order(&self, id: OrderId) -> Result<ShipmentId, FulfillmentError>;
+    fn track_shipment(&self, id: ShipmentId) -> Result<TrackingInfo, FulfillmentError>;
+    fn confirm_delivery(&self, id: ShipmentId, signature: Signature) -> Result<(), FulfillmentError>;
+}
+
+// Payment sub-domain module signature
+pub trait PaymentService {
+    fn authorize_payment(&self, order: OrderId, amount: Money) -> Result<PaymentId, PaymentError>;
+    fn capture_payment(&self, payment: PaymentId) -> Result<(), PaymentError>;
+    fn refund_payment(&self, payment: PaymentId, amount: Money) -> Result<(), PaymentError>;
+}
+```
+
+Boundaries between sub-domains identify functor boundaries where types and operations change meaning:
+
+```haskell
+-- Sales context: Order is a sales agreement
+data SalesOrder = SalesOrder
+  { salesOrderId :: OrderId
+  , customer :: CustomerId
+  , items :: [LineItem]
+  , totalPrice :: Money
+  }
+
+-- Fulfillment context: Order is a picking list
+data FulfillmentOrder = FulfillmentOrder
+  { fulfillmentOrderId :: OrderId
+  , warehouseLocation :: WarehouseId
+  , pickingItems :: [PickingItem]
+  , shippingAddress :: Address
+  }
+
+-- Explicit functor mapping at boundary
+toFulfillmentOrder :: SalesOrder -> FulfillmentOrder
+toFulfillmentOrder salesOrder = FulfillmentOrder
+  { fulfillmentOrderId = salesOrder.salesOrderId
+  , warehouseLocation = assignWarehouse salesOrder.items
+  , pickingItems = map toPickingItem salesOrder.items
+  , shippingAddress = getCustomerAddress salesOrder.customer
+  }
+```
+
+The module algebra pattern (signature + algebra + interpreter) maps directly to sub-domain decomposition, where signatures define contracts, algebras provide implementations, and interpreters handle different execution contexts (testing, production, simulation).
+
+```haskell
+-- Signature: abstract interface
+class OrderService m where
+  placeOrder :: OrderData -> m (Either OrderError OrderId)
+  confirmOrder :: OrderId -> m (Either OrderError ())
+
+-- Algebra: concrete implementation
+data OrderServiceImpl = OrderServiceImpl
+  { orderRepo :: OrderRepository
+  , eventBus :: EventBus
+  }
+
+-- Interpreter: run in specific effect context
+runOrderService :: OrderServiceImpl -> OrderService m => m a -> IO a
+```
+
 The ability to compose modules through functorial relationships depends on discovering boundaries that respect natural domain structure rather than technical convenience.
+Sub-domains aligned with business capabilities compose cleanly, while technically-motivated boundaries create coupling.
+
+See `domain-modeling.md#module-algebra-for-domain-services` for detailed patterns on implementing module algebra and `architectural-patterns.md#hexagonal-architecture` for organizing sub-domain modules with ports and adapters.
 
 ### Step 4: Strategize domain investment
 
@@ -181,10 +309,118 @@ Outputs include message flow diagrams showing events flowing between sub-domains
 Teams identify integration patterns like Anti-Corruption Layer, Open Host Service, Published Language, or Shared Kernel.
 
 Algebraic interpretation views message flows as Kleisli composition chains.
-Each arrow in a message flow diagram represents a function `Event -> Effect (List Command)` where Effect captures concerns like asynchrony, failure, or transactionality.
-Composing these arrows requires monadic structure, typically a reader-writer-state or free monad encoding effects.
-Choreography-style flows compose through the monoid structure of event streams, while orchestration flows require explicit effect management.
-Anti-Corruption Layers become functor mappings between type systems, translating upstream types into downstream domain language while preserving semantics.
+Context relationships discovered through message flow modeling become functors mapping types and operations between bounded contexts, where the relationship pattern determines the functor's characteristics.
+
+For Partnership relationships, contexts share types bidirectionally through a shared kernel:
+
+```typescript
+// Shared kernel: common types used by both contexts
+type CustomerId = string & { readonly __brand: 'CustomerId' };
+type Money = { amount: number; currency: Currency };
+
+// Both Order and Billing contexts import and use these types
+import { CustomerId, Money } from '@shared/kernel';
+```
+
+For Customer-Supplier relationships, the upstream context publishes a stable interface (Open Host Service) that downstream contexts consume:
+
+```rust
+// Upstream Payment context publishes stable API
+pub mod payment_api {
+    pub struct PaymentRequest {
+        pub order_id: OrderId,
+        pub amount: Money,
+        pub method: PaymentMethod,
+    }
+
+    pub enum PaymentResult {
+        Authorized { payment_id: PaymentId, auth_code: String },
+        Declined { reason: DeclineReason },
+        Error { error: PaymentError },
+    }
+}
+
+// Downstream Order context consumes published API directly
+use payment_api::{PaymentRequest, PaymentResult};
+```
+
+For Anticorruption Layer relationships, the ACL module implements an explicit translation functor protecting the downstream context from upstream changes:
+
+```rust
+// External payment gateway types (upstream, outside our control)
+struct ExternalPaymentResponse {
+    status: String,  // "SUCCESS" | "FAILED" | "PENDING"
+    transaction_id: String,
+    error_code: Option<i32>,
+}
+
+// Domain payment types (downstream, our model)
+enum DomainPaymentResult {
+    Authorized { payment_id: PaymentId },
+    Declined { reason: DeclineReason },
+    Pending { tracking_id: TrackingId },
+}
+
+// ACL functor: external → domain translation
+impl From<ExternalPaymentResponse> for Result<DomainPaymentResult, PaymentError> {
+    fn from(external: ExternalPaymentResponse) -> Self {
+        match external.status.as_str() {
+            "SUCCESS" => Ok(DomainPaymentResult::Authorized {
+                payment_id: PaymentId::from(external.transaction_id)
+            }),
+            "FAILED" => Ok(DomainPaymentResult::Declined {
+                reason: map_error_code(external.error_code)
+            }),
+            "PENDING" => Ok(DomainPaymentResult::Pending {
+                tracking_id: TrackingId::from(external.transaction_id)
+            }),
+            unknown => Err(PaymentError::UnknownStatus(unknown.to_string()))
+        }
+    }
+}
+```
+
+Message flow choreography composes through Kleisli arrows in the effect monad:
+
+```haskell
+-- Each policy arrow: Event -> Effect [Command]
+onOrderPlaced :: OrderPlacedEvent -> IO [Command]
+onOrderPlaced event = do
+  emailCmd <- generateConfirmationEmail event.orderId
+  inventoryCmd <- reserveInventory event.items
+  pure [emailCmd, inventoryCmd]
+
+-- Kleisli composition: (>=>) composes effectful arrows
+processOrderFlow :: OrderPlacedEvent -> IO [FulfillmentEvent]
+processOrderFlow =
+  onOrderPlaced >=>
+  executeCommands >=>
+  onInventoryReserved >=>
+  triggerFulfillment
+
+-- Where (>=>) :: (a -> m b) -> (b -> m c) -> (a -> m c)
+```
+
+Orchestration flows require explicit effect management through reader-writer-state or free monads:
+
+```haskell
+-- Orchestrator maintains state through effect stack
+type OrderOrchestrator a = ReaderT Config (StateT OrderState (ExceptT OrchestratorError IO)) a
+
+orchestrateOrder :: OrderData -> OrderOrchestrator OrderCompleted
+orchestrateOrder orderData = do
+  orderId <- placeOrder orderData
+  paymentResult <- authorizePayment orderId
+  case paymentResult of
+    Authorized -> do
+      reserveInventory orderId
+      scheduleShipment orderId
+      pure (OrderCompleted orderId)
+    Declined reason ->
+      throwError (PaymentDeclined reason)
+```
+
+See `bounded-context-design.md#category-theoretic-view-of-context-relationships` for detailed analysis of how Context Map patterns map to categorical structures and `event-sourcing.md#choreography-vs-orchestration` for choosing between choreography and orchestration styles.
 
 ### Step 6: Organize teams and contexts
 
