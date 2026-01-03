@@ -638,6 +638,58 @@ Generate code:
 - TypeScript: type definitions
 - Rust: structs with serde
 
+## Strategic architecture
+
+Architectural decisions should align with the strategic importance of different domains rather than applying uniform approaches across the entire system.
+The Core/Supporting/Generic domain classification described in *strategic-domain-analysis.md* directly influences architectural choices about integration patterns, deployment topology, and team boundaries.
+
+### Domain classification shapes architecture
+
+Core domains warrant the most sophisticated architectural treatment because they represent competitive advantage.
+These contexts receive dedicated infrastructure, independent deployment pipelines, and careful isolation from other system components.
+The hexagonal architecture patterns described earlier in this document apply most rigorously to core domains, with explicit ports and adapters ensuring that domain logic remains insulated from infrastructure concerns.
+
+Supporting sub-domains receive solid but less elaborate architectural treatment.
+These contexts often share infrastructure with other supporting contexts, deploy together in service groups, and use standardized integration patterns.
+The workflow pipeline patterns remain appropriate, but the level of isolation and custom infrastructure investment is reduced compared to core domains.
+
+Generic sub-domains receive minimal custom architecture, favoring integration with third-party services or shared platform capabilities.
+These contexts are often thin adapter layers that translate between internal domain models and external service interfaces.
+The dependency injection patterns enable swapping providers without modifying domain logic, but the domain logic itself is minimal.
+
+### Context boundaries as architectural units
+
+Bounded contexts, detailed in *bounded-context-design.md*, serve as the fundamental architectural unit in domain-driven systems.
+Each context represents a deployment unit, an ownership boundary, and an integration interface.
+
+The context relationship patterns (Partnership, Customer-Supplier, Anti-Corruption Layer) directly influence architectural decisions about synchronous versus asynchronous communication, data replication versus service calls, and tight versus loose coupling.
+Anti-Corruption Layers manifest as adapter modules that translate between external types and internal domain types, implementing the functor mappings that preserve semantic relationships across context boundaries.
+
+When multiple contexts are owned by the same team, they may share deployment infrastructure while maintaining logical separation.
+When contexts are owned by different teams, deployment independence becomes more valuable, trading some efficiency for reduced coordination overhead.
+
+### Team topology alignment
+
+Architectural patterns should support the communication patterns implied by team structure.
+Conway's Law ensures that architecture and organization will eventually align, so deliberate design should anticipate this alignment rather than fighting it.
+
+Stream-aligned teams owning core domain contexts need architectural patterns that maximize autonomy and minimize dependencies on other teams.
+Platform teams providing generic capabilities need architectural patterns that emphasize stability, backward compatibility, and clear versioning.
+Enabling teams helping multiple teams adopt new patterns need architectural patterns that are portable and technology-agnostic.
+
+The Team Topologies interaction modes (Collaboration, X-as-a-Service, Facilitating) map to context relationship patterns.
+Collaboration implies Partnership or Shared Kernel relationships with tight coupling.
+X-as-a-Service implies Open Host Service with stable, versioned interfaces.
+Facilitating implies enabling teams help stream-aligned teams design their own context architectures.
+
+### See also
+
+*strategic-domain-analysis.md* for detailed Core/Supporting/Generic classification frameworks and investment prioritization.
+
+*bounded-context-design.md* for context relationship patterns and the Bounded Context Canvas.
+
+*discovery-process.md* for how strategic and organizational analysis fits into the broader discovery workflow.
+
 ## Theoretical ideal
 
 In the ideal case, all systems—regardless of language—would integrate as a coherent monad transformer stack in the category of functional effects.
