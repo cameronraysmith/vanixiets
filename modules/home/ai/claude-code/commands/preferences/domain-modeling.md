@@ -263,9 +263,9 @@ These laws form the algebra of the module.
 When all functions preserve the laws, users can reason algebraically about code: if input satisfies laws, output will too.
 This is why "making illegal states unrepresentable" works—the type system enforces the algebraic structure.
 
-**See also**: `theoretical-foundations.md#algebraic-laws` for formal treatment of algebraic laws and their categorical interpretation.
+**See also**: `algebraic-laws.md` for formal treatment of algebraic laws and their categorical interpretation.
 
-**See also**: algebraic-data-types.md#constrained-values
+**See also**: algebraic-data-types.md#newtype-pattern for constrained value types
 
 ### Pattern 3: State machines for entity lifecycles
 
@@ -367,7 +367,7 @@ handleEntity (State3 data) = processState3 data
 3. Forces thinking about edge cases (what if transition fails? what if already in target state?)
 4. Self-documenting: reading type definition shows complete lifecycle
 
-**See also**: algebraic-data-types.md#sum-types
+**See also**: algebraic-data-types.md#sum-types-discriminated-unions
 
 ### Pattern 4: Workflows as type-safe pipelines
 
