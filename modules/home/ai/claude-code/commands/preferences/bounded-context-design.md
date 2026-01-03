@@ -670,6 +670,74 @@ The solution is to default to separate models and only introduce shared kernels 
 This allows upstream assumptions to corrupt downstream models, making the downstream context fragile and difficult to evolve.
 The solution is to recognize when upstream models are unsuitable and introduce translation layers that preserve downstream model integrity.
 
+## Category-theoretic view of context relationships
+
+Context relationships can be formalized as functors between categories, providing precise semantics for integration patterns.
+This perspective clarifies what each relationship pattern preserves and what it may transform.
+
+### Contexts as categories
+
+Each bounded context forms a category where:
+- Objects are domain types (entities, value objects, aggregates)
+- Morphisms are domain operations (functions between types)
+- Composition is function composition
+- Identity is the identity function on each type
+
+The ubiquitous language defines the objects and morphisms within each context.
+
+### Context mappings as functors
+
+A mapping between contexts is a functor: a structure-preserving transformation.
+
+```
+F: ContextA → ContextB
+
+F maps:
+- Types in A to types in B
+- Operations in A to operations in B
+- Preserves composition: F(g ∘ f) = F(g) ∘ F(f)
+- Preserves identity: F(id_A) = id_{F(A)}
+```
+
+### Relationship patterns as functor types
+
+| Pattern | Functor Characteristics |
+|---------|------------------------|
+| Shared Kernel | Isomorphism (bidirectional, structure-preserving) |
+| Conformist | Faithful functor (downstream adopts upstream types exactly) |
+| Anticorruption Layer | Composition of functors (translate through intermediate category) |
+| Open Host Service | Functor from internal to published language |
+| Published Language | The target category of an Open Host Service functor |
+
+### Anticorruption layer as functor composition
+
+The ACL is a composition of two functors:
+1. Translation functor: External → ACL internal representation
+2. Adaptation functor: ACL internal → Domain types
+
+```
+External Context ──F──→ ACL Layer ──G──→ Domain Context
+
+Total mapping: G ∘ F
+```
+
+This composition isolates the domain from external changes.
+If the external context changes, only F needs updating; G remains stable.
+
+### Natural transformations for polymorphic mappings
+
+When multiple contexts share a common structure, natural transformations provide polymorphic mappings.
+
+```haskell
+-- Natural transformation between context functors
+type ContextMapping f g = forall a. f a -> g a
+```
+
+This ensures the mapping behaves uniformly across all types in the source context.
+
+See `theoretical-foundations.md` for the formal definitions of functors and natural transformations.
+See `domain-modeling.md#module-algebra-for-domain-services` for how modules implement these categorical structures.
+
 ## See also
 
 - `discovery-process.md`: Process for discovering and identifying bounded contexts through collaborative modeling
