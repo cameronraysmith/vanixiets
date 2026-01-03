@@ -799,7 +799,7 @@ Facilitating implies enabling teams help stream-aligned teams design their own c
 
 *strategic-domain-analysis.md* for detailed Core/Supporting/Generic classification frameworks and investment prioritization.
 
-*bounded-context-design.md* for context relationship patterns and the Bounded Context Canvas.
+*bounded-context-design.md* for context relationship patterns, the Bounded Context Canvas, and the algebraic interpretation of Anti-Corruption Layers as functors between type algebras.
 
 *discovery-process.md* for how strategic and organizational analysis fits into the broader discovery workflow.
 
