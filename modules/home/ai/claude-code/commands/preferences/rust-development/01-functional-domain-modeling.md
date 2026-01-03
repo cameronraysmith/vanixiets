@@ -939,7 +939,7 @@ pub enum WorkflowError {
 }
 ```
 
-**See also**: domain-modeling.md#pattern-6-domain-errors-vs-infrastructure-errors
+**See also**: domain-modeling.md#pattern-7-domain-errors-vs-infrastructure-errors
 
 ## Complete example: Temporal data processing
 

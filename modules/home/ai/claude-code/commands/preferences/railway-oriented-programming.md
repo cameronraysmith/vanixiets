@@ -1224,7 +1224,7 @@ def process_order_workflow(
 - Panics: panic!, assert
 
 **See also**:
-- domain-modeling.md#pattern-6-domain-errors-vs-infrastructure-errors for detailed examples
+- domain-modeling.md#pattern-7-domain-errors-vs-infrastructure-errors for detailed examples
 - Language-specific docs (python-development.md, typescript-nodejs-development.md, rust-development/02-error-handling.md) for error type hierarchies
 
 ## Integration with data pipelines
