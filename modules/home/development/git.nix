@@ -101,6 +101,7 @@
               fo = "fetch origin";
               fu = "fetch upstream";
               lease = "push --force-with-lease";
+              ll = "log --pretty=format:\"%C(yellow)%h%C(reset) %C(green)%ad%C(reset) %C(blue)%an%C(reset) %s%C(auto)%d%C(reset)\" --date=format:'%Y-%m-%d %H:%M'";
               lol = "log --graph --decorate --pretty=oneline --abbrev-commit";
               lola = "log --graph --decorate --pretty=oneline --abbrev-commit --all";
               pl = "pull";
