@@ -48,6 +48,76 @@ This structure directly parallels Wlaschin's Pattern 4 (workflows as pure functi
 The aggregate receives commands, validates them against current state, and emits events that capture domain facts.
 
 
+## Event discovery
+
+The domain events that form the foundation of event-sourced systems emerge through collaborative discovery rather than top-down design.
+EventStorming sessions, described in detail in *collaborative-modeling.md*, produce the raw material from which the event type algebra is constructed.
+The translation from orange sticky notes on a workshop wall to discriminated union variants in code represents a formalization process that preserves domain understanding while adding type-level precision.
+
+### From sticky notes to algebraic data types
+
+Each orange sticky note in an EventStorming session represents a candidate for a domain event type.
+The past-tense naming convention on sticky notes ("Order Placed", "Payment Received", "Shipment Dispatched") maps directly to variant names in a sum type.
+The temporal ordering of events on the workshop timeline reveals the chronological constraints that the append-only event log naturally enforces.
+
+An EventStorming board showing events "Order Placed", "Order Shipped", "Order Cancelled" translates to a discriminated union:
+
+```haskell
+data OrderEvent
+  = OrderPlaced { orderId :: OrderId, customerId :: CustomerId, items :: [OrderItem], timestamp :: Timestamp }
+  | OrderShipped { orderId :: OrderId, shipmentId :: ShipmentId, carrier :: Carrier, timestamp :: Timestamp }
+  | OrderCancelled { orderId :: OrderId, reason :: CancellationReason, timestamp :: Timestamp }
+```
+
+The metadata discussed around each sticky note (what triggered it, what information it carries, what subsequent events it enables) becomes the fields in each event record.
+Hotspots (pink sticky notes) that mark uncertainty about what data an event contains indicate areas requiring further domain expert conversation before finalizing the type definition.
+
+### Commands as event-producing functions
+
+Blue sticky notes representing commands in EventStorming sessions translate to functions that validate preconditions and produce events.
+The relationship between a command and the events it produces defines the aggregate's behavior.
+
+A command "Place Order" with business rules about inventory availability and customer credit translates to:
+
+```haskell
+placeOrder :: ValidatedOrderRequest -> AggregateState -> Either OrderError (NonEmpty OrderEvent)
+placeOrder request state =
+  validateInventory request.items
+    >>= \_ -> validateCustomerCredit request.customerId request.total
+    >>= \_ -> Right (singleton (OrderPlaced { ... }))
+```
+
+The validation logic encoded in the command handler reflects the business rules discussed during EventStorming.
+The `NonEmpty` return type ensures that successful commands always produce at least one event, maintaining the invariant that commands either fail with an error or advance the aggregate's state through events.
+
+### Policies as process managers
+
+Purple sticky notes representing policies ("Whenever X, then Y") translate to event handlers that emit commands in response to events.
+In event-sourced systems, these handlers often live in process managers or sagas that coordinate across aggregate boundaries.
+
+A policy "Whenever Order Placed, reserve inventory" becomes a handler subscribed to OrderPlaced events that emits ReserveInventory commands to the Inventory aggregate.
+The choreography visible in the EventStorming timeline becomes the event-driven control flow in the implementation.
+
+### Aggregate boundaries from event clustering
+
+Yellow sticky notes marking aggregates in EventStorming identify consistency boundaries for event streams.
+Each aggregate owns a single event stream and enforces invariants across all events in that stream.
+
+The clustering of events around aggregates during Design Level EventStorming reveals which events must be validated together.
+If "Order Line Added" and "Order Line Removed" events must maintain the invariant that orders have at least one line, they belong to the same aggregate and are validated in the same command handler.
+
+The insight from collaborative modeling is that aggregate boundaries are discovered through examining which invariants span which events, not imposed by technical convenience.
+EventStorming makes these relationships visible through physical proximity on the workshop board before they become module boundaries in code.
+
+### See also
+
+*collaborative-modeling.md* for detailed EventStorming facilitation patterns, artifact vocabulary, and session types (Big Picture, Process Modelling, Design Level).
+
+*discovery-process.md* for how event discovery fits into the broader domain discovery workflow.
+
+*domain-modeling.md* for Pattern 3 (state machines) and Pattern 5 (aggregates) that implement the structures discovered through EventStorming.
+
+
 ## Hoffman's ten laws with theoretical grounding
 
 Kevin Hoffman distills event sourcing principles into "laws" that constrain implementation.
