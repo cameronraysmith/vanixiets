@@ -22,6 +22,66 @@ Model problem domains using types that:
 - **Theoretical foundations**: See theoretical-foundations.md for categorical and type-theoretic underpinnings
 - **Language-specific examples**: See python-development.md, typescript-nodejs-development.md, rust-development/00-index.md for concrete implementations
 
+## Pre-implementation discovery
+
+The patterns in this document assume that domain discovery has occurred before implementation begins.
+Attempting to apply these patterns without prior discovery often results in domains modeled around technical convenience rather than business structure, missing essential domain concepts that domain experts would surface, and premature commitment to boundaries that require expensive refactoring.
+
+The discovery process described in *discovery-process.md* precedes the implementation patterns here.
+Discovery produces informal artifacts like event storm boards, domain stories, and context maps that this document's patterns formalize into type systems.
+
+### Discovery outputs as implementation inputs
+
+EventStorming sessions produce orange sticky notes representing domain events that become sum type variants in this document's Pattern 3 (state machines) and in event-sourcing.md.
+Blue command sticky notes become function signatures in Pattern 4 (workflows as pipelines).
+Yellow aggregate sticky notes become the consistency boundaries in Pattern 5 (aggregates).
+
+Domain Storytelling produces narratives that reveal workflow sequences directly applicable to Pattern 4.
+The actors, work objects, and activities in domain stories map to types, entities, and functions in the domain model.
+
+Example Mapping produces concrete examples of business rules that inform smart constructor validation in Pattern 2 and property-based test cases for Pattern invariants.
+
+### When to skip discovery
+
+Certain scenarios warrant abbreviated or skipped discovery.
+Bug fixes in well-understood domains do not require fresh EventStorming sessions.
+Small features extending existing bounded contexts can rely on prior discovery documentation.
+Maintenance work within stable domains operates on established understanding.
+
+Even in these cases, verify that prior discovery artifacts remain current.
+Domains evolve, and stale discovery documentation misleads more than no documentation.
+
+### Linking workflows to EventStorming
+
+Pattern 4 (workflows as type-safe pipelines) directly implements the command and event flows surfaced during EventStorming.
+Each blue command sticky note becomes a workflow function taking validated input and producing events or errors.
+The sequence of commands and events on the event storm board suggests pipeline composition order.
+
+For example, an EventStorming session might surface the sequence "Validate Order → Calculate Price → Apply Discounts → Confirm Order" as commands triggering events.
+This sequence becomes a composed pipeline:
+
+```
+validateOrder :: UnvalidatedOrder -> Validation ValidatedOrder
+calculatePrice :: ValidatedOrder -> PricedOrder
+applyDiscounts :: PricedOrder -> DiscountedOrder
+confirmOrder :: DiscountedOrder -> Validation (OrderConfirmed, List Event)
+
+processOrder = validateOrder
+  >=> (pure . calculatePrice)
+  >=> (pure . applyDiscounts)
+  >=> confirmOrder
+```
+
+The workflow directly traces to EventStorming artifacts, maintaining traceability from discovery through implementation.
+
+### See also
+
+*discovery-process.md* for the complete discovery workflow including EventStorming facilitation, context mapping, and strategic domain analysis.
+
+*collaborative-modeling.md* for detailed guidance on EventStorming, Domain Storytelling, and Example Mapping techniques.
+
+*strategic-domain-analysis.md* for Core/Supporting/Generic classification that determines the type sophistication applied to each domain.
+
 ## Universal patterns
 
 ### Pattern 1: Types as domain vocabulary
