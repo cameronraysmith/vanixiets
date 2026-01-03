@@ -30,83 +30,22 @@ set -euo pipefail
 #   Requires secrets/shared.yaml with CACHIX_CACHE_NAME variable
 # ============================================================================
 
-# ============================================================================
-# Argument Parsing
-# ============================================================================
+# Source shared infrastructure
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/ci-shared.sh"
 
-if [ $# -lt 2 ]; then
-    echo "usage: $0 <system> <category> [config]"
-    echo ""
-    echo "system: x86_64-linux, aarch64-linux, aarch64-darwin"
-    echo "category: packages, checks-devshells, home, nixos, darwin"
-    echo "config: required for nixos/darwin categories"
-    exit 1
-fi
-
-SYSTEM="$1"
-CATEGORY="$2"
-CONFIG="${3:-}"
-
-# ============================================================================
-# Validation
-# ============================================================================
-
-# Validate system
-case "$SYSTEM" in
-    x86_64-linux|aarch64-linux|aarch64-darwin)
-        ;;
-    *)
-        echo "error: unsupported system '$SYSTEM'"
-        echo "supported: x86_64-linux, aarch64-linux, aarch64-darwin"
-        exit 1
-        ;;
-esac
-
-# Validate category
-case "$CATEGORY" in
-    packages|checks-devshells|home|nixos|darwin)
-        ;;
-    *)
-        echo "error: unknown category '$CATEGORY'"
-        echo "valid: packages, checks-devshells, home, nixos, darwin"
-        exit 1
-        ;;
-esac
-
-# Validate config requirement
-if [ "$CATEGORY" = "nixos" ] || [ "$CATEGORY" = "darwin" ]; then
-    if [ -z "$CONFIG" ]; then
-        echo "error: category '$CATEGORY' requires config argument"
-        echo "example: $0 $SYSTEM $CATEGORY blackphos"
-        exit 1
-    fi
-fi
+# Parse and validate arguments
+parse_arguments "$@"
+validate_system
+validate_category
+validate_config_requirement
 
 # Get cachix cache name
 CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
 
 # ============================================================================
-# Helper Functions
+# Cache-Specific Helper Functions
 # ============================================================================
-
-print_header() {
-    local title="$1"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "$title"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-}
-
-print_step() {
-    local step="$1"
-    echo ""
-    echo "step: $step"
-}
-
-report_disk_usage() {
-    echo ""
-    echo "disk usage:"
-    df -h / | tail -1
-}
 
 push_to_cachix() {
     local store_paths="$1"
@@ -134,20 +73,8 @@ cache_packages() {
     print_header "caching packages for $system"
 
     print_step "discovering packages"
-    # Filter packages by meta.hydraPlatforms (nixpkgs convention for CI platform control)
-    # - hydraPlatforms unset: include package (default behavior)
-    # - hydraPlatforms = []: exclude from all CI builds
-    # - hydraPlatforms = ["x86_64-linux"]: include only for that system
     local packages
-    packages=$(nix eval ".#packages.$system" --apply '
-      pkgs: builtins.filter (name:
-        let
-          pkg = pkgs.${name};
-          hydraPlatforms = pkg.meta.hydraPlatforms or null;
-        in
-          hydraPlatforms == null || builtins.elem "'"$system"'" hydraPlatforms
-      ) (builtins.attrNames pkgs)
-    ' --json 2>/dev/null | jq -r '.[]' || echo "")
+    packages=$(discover_packages "$system")
 
     if [ -z "$packages" ]; then
         echo "no packages found for $system"
@@ -194,7 +121,7 @@ cache_checks_devshells() {
 
     print_step "discovering and building checks"
     local checks
-    checks=$(nix eval ".#checks.$system" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo "")
+    checks=$(discover_checks "$system")
 
     if [ -n "$checks" ]; then
         local check_targets=""
@@ -214,7 +141,7 @@ cache_checks_devshells() {
 
     print_step "discovering and building devshells"
     local devshells
-    devshells=$(nix eval ".#devShells.$system" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo "")
+    devshells=$(discover_devshells "$system")
 
     if [ -n "$devshells" ]; then
         local shell_targets=""
@@ -253,7 +180,7 @@ cache_home() {
 
     print_step "discovering home configurations"
     local homes
-    homes=$(nix eval ".#legacyPackages.$system.homeConfigurations" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo "")
+    homes=$(discover_homes "$system")
 
     if [ -z "$homes" ]; then
         echo "no home configurations found for $system"
@@ -363,15 +290,7 @@ cache_darwin() {
 # Main Execution
 # ============================================================================
 
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║              CI Category Cacher                               ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
-echo ""
-echo "system: $SYSTEM"
-echo "category: $CATEGORY"
-if [ -n "$CONFIG" ]; then
-    echo "config: $CONFIG"
-fi
+print_ci_header "Cacher"
 echo "cache: https://app.cachix.org/cache/$CACHE_NAME"
 echo ""
 
