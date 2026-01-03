@@ -48,6 +48,25 @@ This structure directly parallels Wlaschin's Pattern 4 (workflows as pure functi
 The aggregate receives commands, validates them against current state, and emits events that capture domain facts.
 
 
+## Contrasting with CRUD persistence
+
+Traditional CRUD persistence overwrites state in place, losing the history of changes.
+Event sourcing preserves the complete sequence of state transitions.
+
+| Aspect | CRUD | Event Sourcing |
+|--------|------|----------------|
+| History | Current snapshot only | Complete change log |
+| Audit | Requires separate audit tables | Built-in audit trail |
+| Temporal queries | Not possible | Query any point in time |
+| Schema alignment | Mutable state ≠ immutable domain | Append-only ≈ immutable model |
+| Scalability | Single point of contention | Append-only scales well |
+
+Event sourcing aligns naturally with functional domain modeling because both emphasize immutability.
+The event log is a persistent representation of the free monoid structure (events under concatenation).
+In CRUD systems, mutable state encourages imperative programming patterns that obscure the sequence of domain actions.
+In event-sourced systems, the append-only log makes the history of domain actions explicit and queryable.
+
+
 ## Event discovery
 
 The domain events that form the foundation of event-sourced systems emerge through collaborative discovery rather than top-down design.
@@ -472,6 +491,151 @@ The key constraint: projectors cannot communicate with each other.
 Each projection is independently derived from the event log.
 
 
+## Composable commands via free monads
+
+Commands can be implemented as a free monad over the event algebra.
+This separates command composition (pure) from command execution (effectful), enabling testable workflows and interpreter-based flexibility.
+
+### Commands as pure data
+
+Define commands as a functor representing possible operations.
+Lift into the free monad to enable monadic composition without executing effects.
+
+```haskell
+-- Command functor: possible operations
+data AccountCommand next
+  = Open AccountNo Name (Account -> next)
+  | Close AccountNo (() -> next)
+  | Debit AccountNo Amount (() -> next)
+  | Credit AccountNo Amount (() -> next)
+
+instance Functor AccountCommand where
+  fmap f (Open acc name k) = Open acc name (f . k)
+  fmap f (Close acc k) = Close acc (f . k)
+  fmap f (Debit acc amt k) = Debit acc amt (f . k)
+  fmap f (Credit acc amt k) = Credit acc amt (f . k)
+
+-- Free monad over AccountCommand
+type AccountProgram = Free AccountCommand
+
+-- Smart constructors
+open :: AccountNo -> Name -> AccountProgram Account
+open acc name = liftF (Open acc name id)
+
+close :: AccountNo -> AccountProgram ()
+close acc = liftF (Close acc id)
+
+debit :: AccountNo -> Amount -> AccountProgram ()
+debit acc amt = liftF (Debit acc amt id)
+
+credit :: AccountNo -> Amount -> AccountProgram ()
+credit acc amt = liftF (Credit acc amt id)
+```
+
+This design follows Debasish Ghosh's Chapter 8 pattern: commands become data structures that describe operations without performing them.
+The free monad provides monadic bind for sequencing without committing to an execution strategy.
+
+### Composing command sequences
+
+Commands compose monadically without executing side effects.
+The resulting program is a pure data structure describing the operations.
+
+```haskell
+-- Transfer as pure command composition
+transfer :: AccountNo -> AccountNo -> Amount -> AccountProgram ()
+transfer from to amount = do
+  debit from amount
+  credit to amount
+
+-- Complex workflow: open account and fund it
+openAndFund :: AccountNo -> Name -> Amount -> AccountProgram Account
+openAndFund accNo name initialDeposit = do
+  account <- open accNo name
+  credit accNo initialDeposit
+  return account
+```
+
+The `transfer` function constructs a free monad value representing the sequence of operations.
+No database calls, no event emissions, no validation yet occur.
+The program is just a tree structure encoding the desired computation.
+
+### Interpreters for execution
+
+An interpreter traverses the free monad structure, executing effects.
+Different interpreters enable different execution contexts (production, testing, simulation).
+
+```haskell
+-- Production interpreter: validates and persists to event store
+runProduction :: AccountProgram a -> IO (Either Error a)
+runProduction = foldFree interpret
+  where
+    interpret :: AccountCommand a -> IO (Either Error a)
+    interpret (Open accNo name k) = do
+      result <- validateAndOpen accNo name  -- validate business rules
+      case result of
+        Left err -> return (Left err)
+        Right account -> do
+          appendEvents accNo [AccountOpened accNo name]
+          return (Right (k account))
+    interpret (Debit accNo amt k) = do
+      result <- validateAndDebit accNo amt
+      case result of
+        Left err -> return (Left err)
+        Right () -> do
+          appendEvents accNo [MoneyDebited accNo amt]
+          return (Right (k ()))
+    -- ... other cases
+
+-- Test interpreter: uses in-memory state
+runTest :: AccountProgram a -> State (Map AccountNo Account) (Either Error a)
+runTest = foldFree interpret
+  where
+    interpret :: AccountCommand a -> State (Map AccountNo Account) (Either Error a)
+    interpret (Open accNo name k) = do
+      accounts <- get
+      if Map.member accNo accounts
+        then return (Left AccountAlreadyExists)
+        else do
+          let account = Account accNo name (Money 0)
+          put (Map.insert accNo account accounts)
+          return (Right (k account))
+    -- ... other cases
+```
+
+This separation enables:
+- Pure, testable command definitions (programs are data)
+- Swappable interpreters for different contexts (production vs test vs audit-only)
+- Composition before execution (build complex workflows from simple commands)
+- Effect tracking through type-level constraints (interpreters can target different monad stacks)
+
+The pattern unifies command handling with the general principle of effect isolation.
+See `domain-modeling.md` section on module algebras for the broader interpreter pattern across domain services.
+See `theoretical-foundations.md` section on free monads and F-algebras for the categorical foundations.
+
+### Connection to aggregate command handlers
+
+Free monads provide a compositional layer *above* traditional aggregate command handlers.
+The interpreter is where validation against aggregate invariants occurs:
+
+```haskell
+-- Aggregate command handler (traditional)
+handleCommand :: Command -> State -> Either Error [Event]
+
+-- Free monad interpreter calls command handler
+interpret :: AccountCommand a -> IO (Either Error a)
+interpret cmd = do
+  events <- loadEvents streamId
+  let state = reconstruct events
+  case handleCommand (toCommand cmd) state of
+    Left err -> return (Left err)
+    Right newEvents -> do
+      appendEvents streamId newEvents
+      return (Right (extractResult newEvents))
+```
+
+This layering preserves the aggregate pattern (commands → validation → events) while adding compositional workflow building.
+
+
 ## Process managers and sagas
 
 Long-running processes that span multiple aggregates require coordination.
@@ -643,6 +807,49 @@ reconstruct (Just snap) events =
 
 Snapshots are *derived artifacts*, not the source of truth.
 If the snapshot format changes or becomes corrupted, regenerate from events.
+
+#### Snapshot implementation details
+
+Snapshotting accelerates reconstruction by saving periodic aggregate state.
+Reconstruction then folds only events after the snapshot, avoiding replaying the entire history.
+
+```haskell
+-- Snapshot policy: every N events
+snapshotFrequency :: Int
+snapshotFrequency = 100
+
+-- Save snapshot after appending events
+appendEventsWithSnapshot :: StreamId -> [Event] -> IO ()
+appendEventsWithSnapshot streamId newEvents = do
+  currentVersion <- appendEvents streamId newEvents
+  when (currentVersion `mod` snapshotFrequency == 0) $ do
+    allEvents <- loadEvents streamId
+    let state = foldl' apply initialState allEvents
+    saveSnapshot streamId (Snapshot currentVersion state)
+
+-- Load with snapshot optimization
+loadAggregate :: StreamId -> IO State
+loadAggregate streamId = do
+  maybeSnapshot <- loadLatestSnapshot streamId
+  case maybeSnapshot of
+    Nothing -> do
+      events <- loadEvents streamId
+      return (foldl' apply initialState events)
+    Just snap -> do
+      events <- loadEventsSince streamId (snapshotVersion snap)
+      return (foldl' apply (snapshotState snap) events)
+```
+
+Key properties:
+- Snapshots are derived artifacts, not source of truth (events remain authoritative)
+- Snapshots can be regenerated from the event log if corrupted or schema changes
+- Snapshot frequency balances reconstruction speed vs storage cost
+- Version numbers ensure correct event filtering (only fold events after snapshot)
+- Snapshot failures must not prevent event appending (snapshots are optimization, not correctness requirement)
+
+Snapshot storage can be separate from event storage.
+Some systems store snapshots in fast key-value stores while events remain in durable append-only logs.
+This separation enables snapshot deletion without affecting event retention policies.
 
 ### Event ordering and causality
 
