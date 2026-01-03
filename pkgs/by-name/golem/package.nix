@@ -34,6 +34,14 @@ let
       .${stdenv.hostPlatform.system} or (throw "Unsupported platform for librusty_v8");
     meta.sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
   };
+
+  # Pre-fetch moonbit-wasm archive that moonbit-component-generator tries to download at build time
+  # Version must match ARCHIVE_URL in moonbit-component-generator build.rs
+  moonbitWasm = fetchurl {
+    name = "moonbit-wasm-0.6.32.tar.gz";
+    url = "https://github.com/moonbitlang/moonbit-compiler/releases/download/v0.6.32%2B6f48aae3f/moonbit-wasm.tar.gz";
+    hash = "sha256-1z8ALklgWwo/0Wh+N0D7inUbhA3C7nImKOIIEXcTgEs=";
+  };
 in
 rustPlatform.buildRustPackage rec {
   pname = "golem";
@@ -54,6 +62,13 @@ rustPlatform.buildRustPackage rec {
   # Ref: https://github.com/golemcloud/golem/blob/v1.4.3/Makefile.toml#L399
   postPatch = ''
     grep -rl --include 'Cargo.toml' '0\.0\.0' | xargs sed -i "s/0\.0\.0/${version}/g"
+
+    # Patch moonbit-component-generator build.rs to use pre-fetched archive
+    # instead of downloading from GitHub (blocked in Nix sandbox on Linux)
+    for dir in $cargoDepsCopy/moonbit-component-generator-*/; do
+      echo "Patching moonbit-component-generator in $dir for Nix sandbox..."
+      patch -d "$dir" -p1 < ${./moonbit-nix-sandbox.patch}
+    done
   '';
 
   nativeBuildInputs = [
@@ -73,6 +88,9 @@ rustPlatform.buildRustPackage rec {
   # Pre-downloaded V8 static library to avoid network access during build
   RUSTY_V8_ARCHIVE = librusty_v8;
 
+  # Pre-downloaded moonbit-wasm archive to avoid network access during build
+  MOONBIT_WASM_ARCHIVE = moonbitWasm;
+
   cargoHash = "sha256-WMeSVedrX1ADRcuv0vtGUvr/cHELgV8wy/onnM+JPUA=";
 
   # Tests are failing in the sandbox because of some redis integration tests
@@ -87,7 +105,7 @@ rustPlatform.buildRustPackage rec {
 
   passthru = {
     updateScript = nix-update-script { };
-    inherit librusty_v8;
+    inherit librusty_v8 moonbitWasm;
   };
 
   meta = {

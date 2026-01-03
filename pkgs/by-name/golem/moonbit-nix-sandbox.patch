@@ -1,0 +1,49 @@
+Patch moonbit-component-generator build.rs to check for MOONBIT_WASM_ARCHIVE
+environment variable. When set, reads from the local archive instead of
+downloading from GitHub, enabling builds in the Nix sandbox.
+
+--- a/build.rs
++++ b/build.rs
+@@ -25,19 +25,24 @@ fn main() -> Result<()> {
+     let bundled_core_path = manifest_path.join("bundled-core");
+
+     //  Download the file using reqwest (blocking)
+-    //  Using a blocking request is simpler in a build script
+-    println!("cargo:warning=Downloading moonc.wasm...");
+-    let response = reqwest::blocking::get(ARCHIVE_URL)
+-        .with_context(|| format!("Failed to download file from URL: {}", ARCHIVE_URL))?;
+-
+-    // Check the HTTP response status
+-    if !response.status().is_success() {
+-        anyhow::bail!(
+-            "Received an error status code while downloading the file: {}",
+-            response.status()
+-        );
+-    }
+-
+-    let content = response
+-        .bytes()
+-        .context("Failed to read response content")?;
++    //  Check for MOONBIT_WASM_ARCHIVE env var for Nix sandbox builds
++    let content: bytes::Bytes = if let Ok(archive_path) = env::var("MOONBIT_WASM_ARCHIVE") {
++        println!("cargo:warning=Using pre-fetched moonbit archive from: {}", archive_path);
++        std::fs::read(&archive_path)
++            .with_context(|| format!("Failed to read archive from: {}", archive_path))?
++            .into()
++    } else {
++        println!("cargo:warning=Downloading moonc.wasm...");
++        let response = reqwest::blocking::get(ARCHIVE_URL)
++            .with_context(|| format!("Failed to download file from URL: {}", ARCHIVE_URL))?;
++        if !response.status().is_success() {
++            anyhow::bail!(
++                "Received an error status code while downloading the file: {}",
++                response.status()
++            );
++        }
++        response
++            .bytes()
++            .context("Failed to read response content")?
++    };
+
+     // Decompress and extract the specific file from the archive in memory
+     let tar = GzDecoder::new(content.as_ref());
