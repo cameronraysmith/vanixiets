@@ -1,0 +1,145 @@
+The should_skip() function only returns true when GOLEM_BUILD_SKIP_SHADOW
+is set AND shadow.rs already exists. In a clean nix build, shadow.rs
+doesn't exist yet, so shadow-rs tries to run git commands which fail
+in the sandbox.
+
+This patch modifies should_skip() to generate a fallback shadow.rs with
+version info from CARGO_PKG_VERSION when the skip is requested but the
+file doesn't exist.
+
+--- a/golem-common/build.rs
++++ b/golem-common/build.rs
+@@ -45,8 +45,63 @@
+         return false;
+     }
+
+-    let out = Path::new(&std::env::var("OUT_DIR").unwrap()).join("shadow.rs");
+-    out.exists()
++    let out_dir = std::env::var("OUT_DIR").unwrap();
++    let out = Path::new(&out_dir).join("shadow.rs");
++
++    if out.exists() {
++        return true;
++    }
++
++    // Generate fallback shadow.rs for Nix sandbox builds where git is unavailable
++    let version = std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.0.0".to_string());
++    let parts: Vec<&str> = version.split('.').collect();
++    let target = std::env::var("TARGET").unwrap_or_default();
++    let name = std::env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "unknown".to_string());
++
++    let fallback = format!(
++        r#"pub const BRANCH: &str = "nix";
++pub const BUILD_OS: &str = "nix";
++pub const BUILD_TARGET: &str = "{target}";
++pub const BUILD_TIME: &str = "";
++pub const BUILD_TIME_2822: &str = "";
++pub const BUILD_TIME_3339: &str = "";
++pub const BUILD_RUST_CHANNEL: &str = "stable";
++pub const CARGO_MANIFEST_DIR: &str = "";
++pub const CARGO_TREE: &str = "";
++pub const CARGO_VERSION: &str = "";
++pub const COMMIT_AUTHOR: &str = "";
++pub const COMMIT_DATE: &str = "";
++pub const COMMIT_DATE_2822: &str = "";
++pub const COMMIT_DATE_3339: &str = "";
++pub const COMMIT_EMAIL: &str = "";
++pub const COMMIT_HASH: &str = "";
++pub const GIT_CLEAN: bool = true;
++pub const GIT_STATUS_FILE: &str = "";
++pub const LAST_TAG: &str = "v{version}";
++pub const PKG_DESCRIPTION: &str = "";
++pub const PKG_VERSION: &str = "{version}";
++pub const PKG_VERSION_MAJOR: &str = "{major}";
++pub const PKG_VERSION_MINOR: &str = "{minor}";
++pub const PKG_VERSION_PATCH: &str = "{patch}";
++pub const PKG_VERSION_PRE: &str = "";
++pub const PROJECT_NAME: &str = "{name}";
++pub const RUST_CHANNEL: &str = "stable";
++pub const RUST_VERSION: &str = "";
++pub const SHORT_COMMIT: &str = "";
++pub const TAG: &str = "v{version}";
++#[allow(clippy::all, clippy::pedantic, clippy::restriction, clippy::nursery)]
++pub const GIT_DESCRIBE_TAGS: &str = "{version}";"#,
++        target = target,
++        version = version,
++        major = parts.first().unwrap_or(&"0"),
++        minor = parts.get(1).unwrap_or(&"0"),
++        patch = parts.get(2).unwrap_or(&"0"),
++        name = name,
++    );
++
++    std::fs::write(&out, fallback).expect("Failed to write fallback shadow.rs");
++    println!("cargo::warning=Generated fallback shadow.rs for Nix build");
++    true
+ }
+
+ fn append_write_git_describe_tags_hook(file: &File) -> SdResult<()> {
+--- a/cli/golem-cli/build.rs
++++ b/cli/golem-cli/build.rs
+@@ -45,8 +45,63 @@
+         return false;
+     }
+
+-    let out = Path::new(&std::env::var("OUT_DIR").unwrap()).join("shadow.rs");
+-    out.exists()
++    let out_dir = std::env::var("OUT_DIR").unwrap();
++    let out = Path::new(&out_dir).join("shadow.rs");
++
++    if out.exists() {
++        return true;
++    }
++
++    // Generate fallback shadow.rs for Nix sandbox builds where git is unavailable
++    let version = std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.0.0".to_string());
++    let parts: Vec<&str> = version.split('.').collect();
++    let target = std::env::var("TARGET").unwrap_or_default();
++    let name = std::env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "unknown".to_string());
++
++    let fallback = format!(
++        r#"pub const BRANCH: &str = "nix";
++pub const BUILD_OS: &str = "nix";
++pub const BUILD_TARGET: &str = "{target}";
++pub const BUILD_TIME: &str = "";
++pub const BUILD_TIME_2822: &str = "";
++pub const BUILD_TIME_3339: &str = "";
++pub const BUILD_RUST_CHANNEL: &str = "stable";
++pub const CARGO_MANIFEST_DIR: &str = "";
++pub const CARGO_TREE: &str = "";
++pub const CARGO_VERSION: &str = "";
++pub const COMMIT_AUTHOR: &str = "";
++pub const COMMIT_DATE: &str = "";
++pub const COMMIT_DATE_2822: &str = "";
++pub const COMMIT_DATE_3339: &str = "";
++pub const COMMIT_EMAIL: &str = "";
++pub const COMMIT_HASH: &str = "";
++pub const GIT_CLEAN: bool = true;
++pub const GIT_STATUS_FILE: &str = "";
++pub const LAST_TAG: &str = "v{version}";
++pub const PKG_DESCRIPTION: &str = "";
++pub const PKG_VERSION: &str = "{version}";
++pub const PKG_VERSION_MAJOR: &str = "{major}";
++pub const PKG_VERSION_MINOR: &str = "{minor}";
++pub const PKG_VERSION_PATCH: &str = "{patch}";
++pub const PKG_VERSION_PRE: &str = "";
++pub const PROJECT_NAME: &str = "{name}";
++pub const RUST_CHANNEL: &str = "stable";
++pub const RUST_VERSION: &str = "";
++pub const SHORT_COMMIT: &str = "";
++pub const TAG: &str = "v{version}";
++#[allow(clippy::all, clippy::pedantic, clippy::restriction, clippy::nursery)]
++pub const GIT_DESCRIBE_TAGS: &str = "{version}";"#,
++        target = target,
++        version = version,
++        major = parts.first().unwrap_or(&"0"),
++        minor = parts.get(1).unwrap_or(&"0"),
++        patch = parts.get(2).unwrap_or(&"0"),
++        name = name,
++    );
++
++    std::fs::write(&out, fallback).expect("Failed to write fallback shadow.rs");
++    println!("cargo::warning=Generated fallback shadow.rs for Nix build");
++    true
+ }
+
+ fn append_write_git_describe_tags_hook(file: &File) -> SdResult<()> {
