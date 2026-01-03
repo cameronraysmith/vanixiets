@@ -104,5 +104,8 @@ rustPlatform.buildRustPackage rec {
       "x86_64-darwin"
       "aarch64-darwin"
     ];
+    # Skip CI builds - V8 compilation requires more disk/memory than CI runners provide
+    # Manual builds work fine: nix build .#golem
+    hydraPlatforms = [ ];
   };
 }
