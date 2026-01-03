@@ -7,6 +7,8 @@ This document provides a language-agnostic decision framework mapping theoretica
 
 Topics covered:
 - Consistency models and their tradeoffs
+- Algebraic foundations of CRDTs
+- Reactive streams for distributed messaging
 - The authority question (who owns truth?)
 - Pattern tensions and what you sacrifice
 - Dual-write avoidance strategies
@@ -197,6 +199,142 @@ Not causally related (concurrent):
 | Financial transactions | Required | Insufficient | Insufficient |
 | Collaborative editing | Overkill | Ideal | Possible (CRDTs) |
 | Content delivery | Overkill | Overkill | Ideal |
+
+## Algebraic foundations of CRDTs
+
+Conflict-free Replicated Data Types (CRDTs) achieve eventual consistency through algebraic properties.
+Understanding the underlying algebraic structures clarifies when and how to use each CRDT type.
+
+### CRDTs as semilattices
+
+State-based CRDTs (CvRDTs) form join-semilattices: partially ordered sets where any two elements have a least upper bound (join).
+
+Properties required:
+- Associativity: `join(join(a, b), c) = join(a, join(b, c))`
+- Commutativity: `join(a, b) = join(b, a)`
+- Idempotence: `join(a, a) = a`
+
+These properties ensure:
+- Message reordering does not affect final state
+- Duplicate messages are harmless
+- Convergence is guaranteed
+
+### Common CRDT algebraic structures
+
+| CRDT | Algebraic Structure | Operation |
+|------|---------------------|-----------|
+| G-Counter | Commutative monoid | Pointwise max of version vectors |
+| PN-Counter | Abelian group (over integers) | Increment/decrement pairs |
+| G-Set | Join-semilattice | Set union |
+| 2P-Set | Pair of G-Sets | Add-set ∪, Remove-set ∪ |
+| LWW-Register | Bounded join-semilattice | Max by timestamp |
+| OR-Set | Complex semilattice | Tagged elements with tombstones |
+
+### G-Counter as commutative monoid
+
+The G-Counter (grow-only counter) demonstrates the monoid pattern:
+
+```rust
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+struct GCounter {
+    counts: HashMap<NodeId, u64>,
+}
+
+type NodeId = String;
+
+impl GCounter {
+    // Monoid identity
+    fn zero() -> Self {
+        GCounter {
+            counts: HashMap::new()
+        }
+    }
+
+    // Monoid operation (commutative, associative, idempotent)
+    fn merge(&self, other: &GCounter) -> GCounter {
+        let mut result = self.counts.clone();
+        for (node, count) in &other.counts {
+            let entry = result.entry(node.clone()).or_insert(0);
+            *entry = (*entry).max(*count);
+        }
+        GCounter { counts: result }
+    }
+
+    fn value(&self) -> u64 {
+        self.counts.values().sum()
+    }
+}
+```
+
+### Operation-based CRDTs
+
+Op-based CRDTs (CmRDTs) require operations to be commutative.
+The algebraic requirement shifts from state merge to operation application.
+
+See `theoretical-foundations.md` for the foundational laws these structures must satisfy (monoid axioms, semilattice properties, and free algebraic constructions).
+
+## Reactive streams for distributed messaging
+
+Reactive streams provide backpressure-aware communication between distributed components.
+The stream abstraction composes algebraically while handling practical concerns like flow control.
+
+### Stream algebra
+
+Streams form a compositional algebra with three core components:
+- **Source**: Produces elements (no input)
+- **Flow/Pipe**: Transforms elements (input → output)
+- **Sink**: Consumes elements (no output)
+
+```
+Source[A] → Flow[A, B] → Flow[B, C] → Sink[C]
+```
+
+These compose via connection operators, building complex pipelines from simple stages.
+
+### Backpressure as first-class concern
+
+Backpressure prevents fast producers from overwhelming slow consumers.
+The algebraic model includes demand signaling flowing opposite to data.
+
+```
+Data:    Source ──────────────────→ Sink
+Demand:  Source ←────────────────── Sink
+```
+
+This bidirectional flow ensures:
+- Consumers process at their own pace
+- Producers throttle to match consumer capacity
+- No unbounded buffering or dropped messages
+
+### Domain event streams
+
+Event-driven bounded context communication maps naturally to streams:
+
+```rust
+use futures::StreamExt;
+
+// Domain events flow between bounded contexts
+async fn process_events(event_store: EventStore, context_id: ContextId) {
+    let events: impl Stream<Item = DomainEvent> =
+        event_store.subscribe(context_id);
+
+    let processed = events
+        .filter(|e| matches!(e, DomainEvent::OrderPlaced { .. }))
+        .map(|e| transform_to_downstream_context(e))
+        .ready_chunks(100); // Buffer with backpressure
+
+    downstream_context.consume(processed).await;
+}
+```
+
+### Stream composition preserves algebraic properties
+
+If individual stream stages preserve certain properties (e.g., ordering, exactly-once), composition preserves them.
+This enables reasoning about end-to-end guarantees from stage-level properties.
+
+See `event-sourcing.md` for how event streams integrate with event-sourced aggregates.
 
 ## The authority question
 
