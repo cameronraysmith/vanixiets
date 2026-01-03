@@ -111,8 +111,20 @@ build_packages() {
     print_header "building packages for $system"
 
     print_step "discovering packages"
+    # Filter packages by meta.hydraPlatforms (nixpkgs convention for CI platform control)
+    # - hydraPlatforms unset: include package (default behavior)
+    # - hydraPlatforms = []: exclude from all CI builds
+    # - hydraPlatforms = ["x86_64-linux"]: include only for that system
     local packages
-    packages=$(nix eval ".#packages.$system" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo "")
+    packages=$(nix eval ".#packages.$system" --apply '
+      pkgs: builtins.filter (name:
+        let
+          pkg = pkgs.${name};
+          hydraPlatforms = pkg.meta.hydraPlatforms or null;
+        in
+          hydraPlatforms == null || builtins.elem "'"$system"'" hydraPlatforms
+      ) (builtins.attrNames pkgs)
+    ' --json 2>/dev/null | jq -r '.[]' || echo "")
 
     if [ -z "$packages" ]; then
         echo "no packages found for $system"
