@@ -78,7 +78,7 @@ The workflow directly traces to EventStorming artifacts, maintaining traceabilit
 
 *discovery-process.md* for the complete discovery workflow including EventStorming facilitation, context mapping, and strategic domain analysis.
 
-*collaborative-modeling.md* for detailed guidance on EventStorming, Domain Storytelling, and Example Mapping techniques.
+*collaborative-modeling.md* for detailed guidance on EventStorming, Domain Storytelling, and Example Mapping techniques that produce the events, commands, aggregates, and policies this document's patterns implement as algebraic types, smart constructors, and workflows.
 
 *strategic-domain-analysis.md* for Core/Supporting/Generic classification that determines the type sophistication applied to each domain.
 
