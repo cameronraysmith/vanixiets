@@ -21,6 +21,7 @@
           pkgs.nh
           pkgs.nix-output-monitor
           pkgs.nix-update
+          pkgs.nix-prefetch-github
           self'.packages.beads-viewer
           self'.packages.gastown
           # Tools required by Makefile verify target
