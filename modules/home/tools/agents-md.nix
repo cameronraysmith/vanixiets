@@ -36,6 +36,8 @@
           - functional domain modeling (DDD, types, aggregates): ${prefsPath}/domain-modeling.md
           - discovery process: ${prefsPath}/discovery-process.md
           - collaborative modeling (EventStorming, Domain Storytelling): ${prefsPath}/collaborative-modeling.md
+          - strategic domain analysis (Core/Supporting/Generic classification): ${prefsPath}/strategic-domain-analysis.md
+          - bounded context design (context mapping, integration, ACL): ${prefsPath}/bounded-context-design.md
           - theoretical foundations (category theory, type theory): ${prefsPath}/theoretical-foundations.md
           - algebraic laws (functor/monad laws, property-based testing): ${prefsPath}/algebraic-laws.md
           - smart constructors and validation patterns: see domain-modeling.md
