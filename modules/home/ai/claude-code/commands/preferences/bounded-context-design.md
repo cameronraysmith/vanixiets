@@ -27,6 +27,9 @@ System-level architectural decisions about modularity, deployment, and integrati
 A bounded context may be deployed as a standalone service, compiled as a library module, or implemented as a package within a larger application.
 The logical boundary remains consistent regardless of deployment topology.
 
+EventStorming and Domain Storytelling sessions documented in *collaborative-modeling.md* reveal linguistic boundaries where the same term carries different meanings and model boundaries where different invariants apply.
+These collaborative modeling techniques produce the artifacts that context design formalizes into bounded context canvases and context maps.
+
 ## Bounded contexts
 
 ### Definition and purpose
