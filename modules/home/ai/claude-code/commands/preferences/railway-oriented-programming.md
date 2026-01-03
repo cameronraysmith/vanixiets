@@ -167,6 +167,79 @@ if result.IsOk() {
 }
 ```
 
+## The abstraction hierarchy
+
+Result types participate in a hierarchy of abstractions, each more powerful than the last.
+Understanding this hierarchy helps you choose the appropriate abstraction for each situation.
+
+### Functor: transforming success values
+
+The functor interface (`map`) transforms the success value without affecting the error track.
+Use when you have a pure function to apply to a successful result.
+
+```rust
+result.map(|account| account.balance)
+```
+
+This is the simplest and most widely applicable abstraction.
+Every Result is a functor, and functors compose freely.
+
+### Applicative: combining independent results
+
+The applicative interface (`apply`, `map2`, `mapN`) combines multiple independent results.
+All validations run regardless of individual failures, collecting all errors.
+
+Use when operations don't depend on each other's results.
+
+```rust
+// All three validations run; errors accumulate
+validate_name(name)
+    .and(validate_email(email))
+    .and(validate_age(age))
+    .map3(|n, e, a| User::new(n, e, a))
+```
+
+Applicative is more powerful than functor because it can combine multiple Results, but less powerful than monad because it cannot express sequential dependencies.
+
+### Monad: sequencing dependent operations
+
+The monad interface (`flatMap`, `and_then`, `>>=`) sequences operations where later steps depend on earlier results.
+Execution short-circuits on first failure.
+
+Use when each step needs the result of the previous step.
+
+```rust
+validate_account_no(no)
+    .and_then(|no| lookup_account(no))
+    .and_then(|account| validate_balance(account, amount))
+    .and_then(|account| debit(account, amount))
+```
+
+Monad is the most powerful abstraction in this hierarchy, but also the most specialized.
+Not all applicatives are monads.
+
+### The least powerful abstraction principle
+
+Prefer the simplest abstraction that solves your problem.
+Functors compose more freely than applicatives.
+Applicatives compose more freely than monads.
+Using a more powerful abstraction than necessary restricts composability.
+
+When in doubt, follow this decision tree:
+1. Can you just transform the success value? Use functor (`map`)
+2. Are the operations independent of each other? Use applicative (`apply`, `mapN`)
+3. Does each step depend on the previous result? Use monad (`bind`, `and_then`)
+
+### Selection guidance
+
+| Situation | Abstraction | Interface | Why |
+|-----------|-------------|-----------|-----|
+| Transform success value | Functor | `map` | Simplest, most reusable, composes freely |
+| Combine independent validations | Applicative | `apply`, `mapN` | Parallel execution, error accumulation |
+| Chain dependent operations | Monad | `bind`, `and_then` | Sequential dependency, fail-fast |
+
+See `~/.claude/commands/preferences/theoretical-foundations.md#functor-applicative-monad-hierarchy` for the mathematical laws each abstraction must satisfy.
+
 ## bind: Monadic composition
 
 Chain operations that can fail - short-circuit on first error.
@@ -411,6 +484,135 @@ function validateUser(raw: unknown): Result<User, ValidationError[]> {
 }
 ```
 
+### Error accumulation with semigroups
+
+For applicative validation to accumulate errors, the error type must form a semigroup (support associative combination).
+NonEmptyList or NonEmptyVec are common choices because they guarantee at least one error when in the Failure case.
+
+```rust
+use nonempty::NonEmpty;
+
+type ValidationResult<T> = Result<T, NonEmpty<ValidationError>>;
+
+#[derive(Debug, Clone)]
+enum ValidationError {
+    InvalidName(String),
+    InvalidEmail(String),
+    InvalidAge(String),
+}
+
+fn validate_name(name: &str) -> ValidationResult<String> {
+    if name.is_empty() {
+        Err(NonEmpty::new(ValidationError::InvalidName(
+            "name is required".into()
+        )))
+    } else {
+        Ok(name.to_string())
+    }
+}
+
+fn validate_email(email: &str) -> ValidationResult<String> {
+    if !email.contains('@') {
+        Err(NonEmpty::new(ValidationError::InvalidEmail(
+            "email must contain @".into()
+        )))
+    } else {
+        Ok(email.to_string())
+    }
+}
+
+fn validate_age(age: i32) -> ValidationResult<i32> {
+    if age < 0 {
+        Err(NonEmpty::new(ValidationError::InvalidAge(
+            "age must be positive".into()
+        )))
+    } else {
+        Ok(age)
+    }
+}
+
+fn validate_user(
+    name: &str,
+    email: &str,
+    age: i32
+) -> ValidationResult<User> {
+    // All three validations run even if some fail
+    // Errors are combined using semigroup append
+    validate_name(name)
+        .and(validate_email(email))
+        .and(validate_age(age))
+        .map(|(n, e, a)| User::new(n, e, a))
+}
+
+// Example: multiple validation failures
+let result = validate_user("", "invalid", -5);
+// Returns: Err(NonEmpty([InvalidName, InvalidEmail, InvalidAge]))
+```
+
+The semigroup requirement means errors can be combined associatively.
+NonEmptyVec satisfies this: `(e1 + e2) + e3 == e1 + (e2 + e3)`.
+This enables the applicative to collect errors from independent validations while maintaining type safety (at least one error when failed).
+
+### Pattern: Applicative with NonEmptyList in Python
+
+```python
+from typing import Generic, TypeVar
+from dataclasses import dataclass
+
+T = TypeVar('T')
+E = TypeVar('E')
+
+@dataclass
+class NonEmptyList(Generic[E]):
+    """List guaranteed to have at least one element."""
+    head: E
+    tail: list[E]
+
+    def append(self, other: 'NonEmptyList[E]') -> 'NonEmptyList[E]':
+        """Semigroup operation: combine two non-empty lists."""
+        return NonEmptyList(
+            head=self.head,
+            tail=self.tail + [other.head] + other.tail
+        )
+
+    def to_list(self) -> list[E]:
+        return [self.head] + self.tail
+
+ValidationResult = Result[T, NonEmptyList[E]]
+
+def validate_user_fields(
+    name: str,
+    email: str,
+    age: int
+) -> ValidationResult[User]:
+    """
+    Validate all fields independently.
+    Accumulates all errors using NonEmptyList semigroup.
+    """
+    name_result = validate_name(name)
+    email_result = validate_email(email)
+    age_result = validate_age(age)
+
+    # Applicative combination with error accumulation
+    return apply(
+        apply(
+            map(lambda n: lambda e: lambda a: User(n, e, a), name_result),
+            email_result
+        ),
+        age_result
+    )
+
+# All three validations execute
+result = validate_user_fields("", "bad-email", -1)
+# Returns: Failure(NonEmptyList(
+#   head=ValidationError("name required"),
+#   tail=[
+#       ValidationError("email must contain @"),
+#       ValidationError("age must be positive")
+#   ]
+# ))
+```
+
 ### When to use apply (applicative style)
 
 Use apply when:
@@ -423,6 +625,8 @@ Example scenarios:
 - User input validation: email, name, age all validated independently
 - Configuration validation: check all required fields before proceeding
 - Multi-field business rules: credit score AND income AND debt ratio
+
+The key difference from monadic bind: applicative runs all validations regardless of individual failures, while bind short-circuits on first error.
 
 ## Effect signatures
 
@@ -535,6 +739,167 @@ async function updateUser(
   }
 }
 ```
+
+## Combining Result with other effects
+
+When Result must be combined with other effects (async, reader, state), monad transformers stack the effects.
+
+### ResultT for async + error
+
+Most commonly, Result needs to be combined with async operations.
+The standard pattern is `Future<Result<T, E>>` or `Promise<Result<T, E>>`.
+
+```rust
+// Rust: AsyncResult pattern
+type AsyncResult<T, E> = impl Future<Output = Result<T, E>>;
+
+async fn fetch_and_validate(id: &str) -> Result<Account, Error> {
+    let data = fetch(id).await?;  // Async effect + error propagation
+    validate(data)?;              // Error effect
+    Ok(Account::from(data))
+}
+
+// Compose async Results with and_then
+async fn process_account(id: &str) -> Result<ProcessedAccount, Error> {
+    let account = fetch_and_validate(id).await?;
+    let verified = verify_account(account).await?;
+    let processed = process(verified).await?;
+    Ok(processed)
+}
+```
+
+```typescript
+// TypeScript: Promise<Result<T, E>> pattern
+type AsyncResult<T, E> = Promise<Result<T, E>>;
+
+async function fetchAndValidate(id: string): AsyncResult<Account, Error> {
+    const dataResult = await fetch(id);  // Returns Result<Data, Error>
+    if (!dataResult.ok) return dataResult;
+
+    const validResult = validate(dataResult.value);
+    if (!validResult.ok) return validResult;
+
+    return success(Account.from(validResult.value));
+}
+
+// Compose with async/await
+async function processAccount(id: string): AsyncResult<ProcessedAccount, Error> {
+    const accountResult = await fetchAndValidate(id);
+    if (!accountResult.ok) return accountResult;
+
+    const verifiedResult = await verifyAccount(accountResult.value);
+    if (!verifiedResult.ok) return verifiedResult;
+
+    const processedResult = await process(verifiedResult.value);
+    return processedResult;
+}
+```
+
+```python
+# Python: Awaitable[Result[T, E]] pattern
+from typing import Awaitable
+
+AsyncResult = Awaitable[Result[T, E]]
+
+async def fetch_and_validate(id: str) -> Result[Account, Error]:
+    """
+    Async operation that can fail.
+    Combines async effect (await) with error effect (Result).
+    """
+    data_result = await fetch(id)  # Returns Result[Data, Error]
+
+    match data_result:
+        case Success(data):
+            valid_result = validate(data)
+            match valid_result:
+                case Success(valid):
+                    return Success(Account.from_valid(valid))
+                case Failure(error):
+                    return Failure(error)
+        case Failure(error):
+            return Failure(error)
+
+# Compose async Results
+async def process_account(id: str) -> Result[ProcessedAccount, Error]:
+    account_result = await fetch_and_validate(id)
+
+    match account_result:
+        case Success(account):
+            verified_result = await verify_account(account)
+            match verified_result:
+                case Success(verified):
+                    return await process(verified)
+                case Failure(error):
+                    return Failure(error)
+        case Failure(error):
+            return Failure(error)
+```
+
+### Effect ordering matters
+
+The transformer stacking order determines behavior.
+`Future<Result<T, E>>` gives a Future that resolves to a Result - this is the standard pattern.
+`Result<Future<T>, E>` (less common) would give a Result containing a Future, which is rarely useful because you cannot meaningfully combine a successful Future with a failed computation.
+
+For most domain code, prefer `Future<Result<T, E>>` / `async fn() -> Result<T, E>`.
+This allows async operations to complete before error handling, matching the natural execution order.
+
+### Combining multiple effects with monad transformers
+
+When stacking more than two effects, libraries provide transformer types:
+
+```haskell
+-- Haskell: ReaderT + ExceptT + IO
+type AppM a = ReaderT Config (ExceptT AppError IO) a
+
+-- Unwrapped: Config -> IO (Either AppError a)
+-- Three effects: Reader (config access), Except (errors), IO (effects)
+
+runApp :: AppM a -> Config -> IO (Either AppError a)
+runApp app config = runExceptT (runReaderT app config)
+```
+
+```rust
+// Rust approximation with custom type
+struct AppM<T> {
+    run: Box<dyn Fn(Config) -> Pin<Box<dyn Future<Output = Result<T, AppError>>>>>
+}
+
+// Combines Reader effect (Config ->), async (Future), and error (Result)
+impl<T> AppM<T> {
+    fn run(self, config: Config) -> impl Future<Output = Result<T, AppError>> {
+        (self.run)(config)
+    }
+}
+```
+
+Most languages without native transformer support use a simpler pattern:
+
+```typescript
+// TypeScript: Manually stack effects in function signatures
+type AppM<T> = (config: Config) => Promise<Result<T, AppError>>;
+
+// Three effects: Reader (Config ->), async (Promise), error (Result)
+async function processOrder(config: Config): Promise<Result<Order, AppError>> {
+    // Config available via closure (Reader effect)
+    // await for async effect
+    // Result for error effect
+    const validResult = await validateOrder(config);
+    if (!validResult.ok) return validResult;
+
+    return success(validResult.value);
+}
+```
+
+### Guidelines for effect composition
+
+1. **Most common**: `async fn() -> Result<T, E>` / `Future<Result<T, E>>` for async + error
+2. **Keep transformers shallow**: Two or three effects maximum before complexity becomes unwieldy
+3. **Document effect order**: Make clear what each layer represents
+4. **Use language idioms**: async/await with Result is more idiomatic than custom transformers in most languages
+5. **Consider effect libraries**: fp-ts (TypeScript), cats-effect (Scala), polysemy (Haskell) when transformer stacks become complex
+
+See `~/.claude/commands/preferences/theoretical-foundations.md#monad-transformers` for the mathematical foundation and `~/.claude/commands/preferences/theoretical-foundations.md#indexed-monad-transformer-stacks-in-practice` for practical considerations when stacking effects.
 
 ## The two-track model
 
