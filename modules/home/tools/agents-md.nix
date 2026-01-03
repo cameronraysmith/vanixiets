@@ -34,6 +34,7 @@
           - issue tracking: ${commandsPath}/issues/beads.md
           - architectural patterns: ${prefsPath}/architectural-patterns.md
           - functional domain modeling (DDD, types, aggregates): ${prefsPath}/domain-modeling.md
+          - event sourcing (event replay, state reconstruction, CQRS): ${prefsPath}/event-sourcing.md
           - discovery process: ${prefsPath}/discovery-process.md
           - collaborative modeling (EventStorming, Domain Storytelling): ${prefsPath}/collaborative-modeling.md
           - strategic domain analysis (Core/Supporting/Generic classification): ${prefsPath}/strategic-domain-analysis.md
@@ -41,7 +42,7 @@
           - theoretical foundations (category theory, type theory): ${prefsPath}/theoretical-foundations.md
           - algebraic laws (functor/monad laws, property-based testing): ${prefsPath}/algebraic-laws.md
           - smart constructors and validation patterns: see domain-modeling.md
-          - error handling with Result types: see railway-oriented-programming.md
+          - error handling and workflow composition (Result types, railway-oriented): ${prefsPath}/railway-oriented-programming.md
           - data modeling (database schemas, normalization, ER diagrams): ${prefsPath}/data-modeling.md
           - schema versioning: ${prefsPath}/schema-versioning.md
           - web application deployment: ${prefsPath}/web-application-deployment.md
