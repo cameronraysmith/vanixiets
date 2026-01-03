@@ -310,6 +310,84 @@ class Coordinates(NamedTuple):
     y: int
 ```
 
+## Algebraic properties
+
+The name "algebraic data types" reflects that sum and product types satisfy algebraic laws analogous to arithmetic.
+Understanding these properties enables reasoning about type equivalences and refactoring.
+
+### Sum types as addition
+
+Sum types correspond to addition (coproduct in category theory).
+The number of inhabitants of `A | B` equals the sum of inhabitants of A and B.
+
+Laws:
+- Commutativity: `A | B ≅ B | A` (order doesn't matter)
+- Associativity: `(A | B) | C ≅ A | (B | C)` (grouping doesn't matter)
+- Identity: `A | Never ≅ A` (Never/Void is the zero element)
+
+### Product types as multiplication
+
+Product types correspond to multiplication (categorical product).
+The number of inhabitants of `(A, B)` equals the product of inhabitants of A and B.
+
+Laws:
+- Commutativity: `(A, B) ≅ (B, A)`
+- Associativity: `((A, B), C) ≅ (A, (B, C))`
+- Identity: `(A, ()) ≅ A` (unit type is the identity)
+
+### Distributivity
+
+Products distribute over sums, just like multiplication over addition.
+
+```
+A × (B + C) ≅ (A × B) + (A × C)
+```
+
+This equivalence enables refactoring between representations:
+
+```rust
+// Before: product containing sum
+struct Tagged<A, B> {
+    tag: String,
+    value: Either<A, B>,
+}
+
+// After: sum of products (often clearer)
+enum Tagged<A, B> {
+    Left { tag: String, value: A },
+    Right { tag: String, value: B },
+}
+```
+
+### Exponentials as functions
+
+Function types correspond to exponentiation.
+The type `A -> B` has `|B|^|A|` inhabitants.
+
+This completes the arithmetic correspondence:
+- `0` = Never/Void (uninhabited)
+- `1` = () / Unit (single inhabitant)
+- `+` = Sum types
+- `×` = Product types
+- `^` = Function types
+
+See `theoretical-foundations.md#algebraic-data-types-as-initial-algebras` for the categorical perspective.
+
+### Recursive types and initial algebras
+
+Recursive ADTs like lists and trees are initial algebras of their defining functor.
+The fold operation (catamorphism) is the unique homomorphism from this initial algebra.
+
+```haskell
+-- List as initial algebra of ListF
+data ListF a r = Nil | Cons a r
+
+-- Natural numbers as initial algebra of NatF
+data NatF r = Zero | Succ r
+```
+
+For the full categorical treatment of ADTs as initial algebras, including catamorphisms and anamorphisms, see `theoretical-foundations.md#f-algebras-and-catamorphisms`.
+
 ## Newtype pattern
 
 Wrap primitive types to prevent mixing semantically different values.
