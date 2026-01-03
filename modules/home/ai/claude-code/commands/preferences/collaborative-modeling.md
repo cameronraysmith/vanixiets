@@ -8,6 +8,12 @@ This document provides guidance on facilitating EventStorming, Domain Storytelli
 The techniques bridge the gap between informal domain knowledge held by subject matter experts and formal algebraic type specifications suitable for implementation.
 While domain experts articulate business processes in natural language, facilitators guide discovery toward artifacts that map systematically to sum types, functions, invariants, and workflows in the type system.
 
+Facilitators should maintain awareness that these artifacts have algebraic structure even during discovery.
+Events form a free monoid under concatenation, commands are functions producing validated events, policies are Kleisli arrows composing effectful transformations, and aggregates are functors maintaining state.
+This mental model, drawn from Debasish Ghosh's algebraic approach to functional domain modeling, shapes how facilitators push for precision and completeness.
+The discovered artifacts ultimately feed into formal specification in Idris2 or similar dependently-typed languages, followed by systematic translation to implementation languages like Rust, Haskell, or TypeScript.
+Keeping this destination in mind during facilitation ensures artifacts capture the precision needed for type-level encoding without burdening domain experts with algebraic terminology.
+
 ## Relationship to other documents
 
 This document provides detailed facilitation techniques for the collaborative modeling referenced in discovery-process.md step 2.
