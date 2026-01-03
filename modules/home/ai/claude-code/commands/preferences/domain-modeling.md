@@ -623,6 +623,70 @@ order = loadOrder(orderId)
 customer = loadCustomer(order.customer_id)
 ```
 
+**Algebraic interpretation**:
+
+Aggregates are functors maintaining private state that receive commands and emit events.
+The functor property means aggregates transform events into state while preserving the structure of event composition.
+This algebraic view connects aggregate design to event sourcing patterns and collaborative modeling artifacts.
+
+The core aggregate operation is state reconstruction via fold.
+Given an initial state and a sequence of events, the aggregate's `applyEvent` function reduces the event history to current state:
+
+```haskell
+applyEvent :: Event -> State -> State
+
+-- State reconstruction as catamorphism (fold)
+fold :: (State -> Event -> State) -> State -> [Event] -> State
+fold f initial events = foldl f initial events
+
+-- Equivalently
+reconstruct :: [Event] -> State
+reconstruct = fold applyEvent initialState
+```
+
+The fold function is a catamorphism—a universal way to consume structured data.
+Event histories form a free monoid (list concatenation), and `applyEvent` interprets that monoid into state transitions.
+This makes aggregates compositional: replaying events in sequence produces the same state as applying them incrementally.
+
+During EventStorming sessions, yellow sticky notes identify aggregates in the collaborative model.
+These yellow stickies translate directly to aggregate implementation structure:
+
+1. **Private AggregateState type**: The state maintained by the yellow sticky becomes a private type capturing the aggregate's data and computed invariants.
+
+2. **Smart constructors for creation**: Initial aggregate creation uses smart constructors (Pattern 2) that validate the aggregate can legally exist in the initial state.
+
+3. **Command functions returning events**: Blue command stickies attached to the yellow aggregate become functions with signatures:
+   ```haskell
+   handleCommand :: Command -> State -> Result (NonEmpty Event) Error
+   ```
+   Commands either succeed and emit one or more events, or fail with a domain error.
+
+4. **The fold/applyEvent function**: Orange event stickies become variants in the Event sum type, and the aggregate implements `applyEvent` to evolve state for each event variant.
+
+5. **Exported module signature**: The aggregate's public API (the module signature) exposes only command handlers and queries, keeping state private.
+
+Aggregate invariants become predicates used in two places:
+
+```haskell
+-- As refinement types in the aggregate state
+data OrderState = OrderState
+  { lines :: NonEmpty OrderLine  -- invariant: at least one line
+  , total :: Money                -- invariant: sum of line amounts
+  }
+
+-- As validation in command handlers
+addLine :: OrderLine -> OrderState -> Result OrderState OrderError
+addLine line state =
+  let newLines = line : state.lines
+      newTotal = sum (map lineAmount newLines)
+  in if newTotal > maxOrderAmount
+     then Error (OrderTooLarge newTotal)
+     else Ok (OrderState newLines newTotal)
+```
+
+Refinement types (like `NonEmpty`) enforce invariants at the type level.
+Validation predicates in command handlers enforce business rules that cannot be captured statically.
+
 **Functional aggregate updates with lenses**:
 
 For complex aggregates with deeply nested structures, lenses provide compositional getters and setters that preserve immutability and compose elegantly.
@@ -668,7 +732,8 @@ Lens laws ensure these operations are well-behaved: getting and then setting wit
 
 **See also**:
 - `theoretical-foundations.md#aggregates-and-optics`
-- `event-sourcing.md` for event-sourced aggregates where state is derived from event log
+- `event-sourcing.md` for full treatment of state reconstruction, event algebra, and the fold/applyEvent pattern
+- `collaborative-modeling.md` for EventStorming facilitation and how yellow stickies map to aggregate implementation structure
 
 ### Pattern 6: Repositories as generic modules
 
