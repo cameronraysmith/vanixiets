@@ -24,6 +24,7 @@
         ngc = "Nix garbage collection for system and user";
         flakeup = "Update Nix flake and commit lock file";
         dev = "Enter Nix development shell";
+        nix-bin-providers = "Find all nixpkgs packages that install a given binary";
       };
     }
     {
