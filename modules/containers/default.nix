@@ -162,6 +162,42 @@
               skopeo = skopeo-nix2container;
               podman = pkgs.podman;
             };
+
+            # Single-arch x86_64-linux variants (no manifest list)
+            # Usage: nix run --impure .#fdManifest-x86
+            fdManifest-x86 = mkMultiArchManifest {
+              name = "fd";
+              images = {
+                "x86_64-linux" = inputs.self.packages.x86_64-linux.fdContainer;
+              };
+              registry = {
+                name = "ghcr.io";
+                repo = "cameronraysmith/vanixiets/fd";
+                username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
+                password = "$GITHUB_TOKEN";
+              };
+              version = getEnvOr "VERSION" "1.0.0";
+              branch = getEnvOr "GITHUB_REF_NAME" "main";
+              skopeo = skopeo-nix2container;
+              podman = pkgs.podman;
+            };
+
+            rgManifest-x86 = mkMultiArchManifest {
+              name = "rg";
+              images = {
+                "x86_64-linux" = inputs.self.packages.x86_64-linux.rgContainer;
+              };
+              registry = {
+                name = "ghcr.io";
+                repo = "cameronraysmith/vanixiets/rg";
+                username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
+                password = "$GITHUB_TOKEN";
+              };
+              version = getEnvOr "VERSION" "1.0.0";
+              branch = getEnvOr "GITHUB_REF_NAME" "main";
+              skopeo = skopeo-nix2container;
+              podman = pkgs.podman;
+            };
           }
         ))
       ];
