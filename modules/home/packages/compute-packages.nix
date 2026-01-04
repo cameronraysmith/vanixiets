@@ -1,7 +1,12 @@
 { ... }:
 {
   flake.modules.homeManager.packages =
-    { pkgs, ... }:
+    { pkgs, flake, ... }:
+    let
+      # nix2container's patched skopeo with nix: transport for container manifest operations
+      skopeo-nix2container =
+        flake.inputs.nix2container.packages.${pkgs.stdenv.hostPlatform.system}.skopeo-nix2container;
+    in
     {
       home.packages = with pkgs; [
         # compute
@@ -28,7 +33,7 @@
         lazydocker
         lima
         ngrok
-        # skopeo: replaced by skopeo-nix2container in development-packages.nix
+        skopeo-nix2container
         step-cli
         tenv
         timoni
