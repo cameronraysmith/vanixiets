@@ -15,7 +15,11 @@
 # - Push time: O(changed layers) - skopeo skips unchanged layers by digest
 #
 # See docs/about/contributing/multi-arch-containers.md for usage guide.
-{ inputs, lib, ... }:
+{
+  inputs,
+  lib,
+  ...
+}@args:
 {
   perSystem =
     { pkgs, system, ... }:
@@ -30,7 +34,8 @@
       skopeo-nix2container = inputs.nix2container.packages.${system}.skopeo-nix2container;
 
       # Import the multi-arch manifest builder
-      mkMultiArchManifest = pkgs.callPackage ./mk-multi-arch-manifest.nix { };
+      # Note: Located in _lib/ to prevent import-tree auto-discovery (underscore-prefixed dirs are ignored)
+      mkMultiArchManifest = pkgs.callPackage ./_lib/mk-multi-arch-manifest.nix { };
 
       # Shared base layer: bash and coreutils
       # This layer is reused across all tool containers, maximizing cache hits
