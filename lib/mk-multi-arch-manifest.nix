@@ -31,6 +31,7 @@
   writeShellApplication,
   coreutils,
   git,
+  crane,
 }:
 {
   images,
@@ -72,6 +73,7 @@ let
 
   skopeoExe = lib.getExe skopeo;
   podmanExe = lib.getExe podman;
+  craneExe = lib.getExe crane;
 
 in
 assert lib.assertMsg (images != { }) "At least one image must be provided";
@@ -82,6 +84,7 @@ writeShellApplication {
   runtimeInputs = [
     skopeo
     podman
+    crane
     coreutils
     git
   ];
@@ -92,6 +95,7 @@ writeShellApplication {
 
       ${podmanExe} manifest rm "${manifestName}" || true
       ${podmanExe} logout "${registry.name}" || true
+      ${craneExe} auth logout "${registry.name}" || true
     }
     trap cleanup EXIT
 
@@ -155,13 +159,20 @@ writeShellApplication {
       "${manifestName}"
 
     # Tag additional tags if present (skip the first tag which was already pushed)
+    # crane tag is a registry-side metadata operation - no data transfer needed
+    ${lib.optionalString (lib.length parsedTags > 1) ''
+      # Login to crane for tagging operations
+      set +x
+      echo "crane login ${registry.name}"
+      ${craneExe} auth login "${registry.name}" \
+        --username "${registry.username}" \
+        --password "${registry.password}"
+      set -x
+    ''}
     ${lib.concatMapStringsSep "\n" (tag: ''
-      # Retag manifest list by copying from primary tag
-      # --all copies entire manifest list instead of selecting single platform
-      ${skopeoExe} copy --all \
-        --dest-creds "${registry.username}:${registry.password}" \
-        "docker://${registry.name}/${registry.repo}:${lib.head parsedTags}" \
-        "docker://${registry.name}/${registry.repo}:${tag}"
+      ${craneExe} tag \
+        "${registry.name}/${registry.repo}:${lib.head parsedTags}" \
+        "${tag}"
     '') (lib.tail parsedTags)}
 
     set +x
