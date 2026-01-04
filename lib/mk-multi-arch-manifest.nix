@@ -157,7 +157,8 @@ writeShellApplication {
     # Tag additional tags if present (skip the first tag which was already pushed)
     ${lib.concatMapStringsSep "\n" (tag: ''
       # Retag manifest list by copying from primary tag
-      ${skopeoExe} copy \
+      # --all copies entire manifest list instead of selecting single platform
+      ${skopeoExe} copy --all \
         --dest-creds "${registry.username}:${registry.password}" \
         "docker://${registry.name}/${registry.repo}:${lib.head parsedTags}" \
         "docker://${registry.name}/${registry.repo}:${tag}"
