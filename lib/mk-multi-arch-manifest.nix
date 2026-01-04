@@ -1,13 +1,11 @@
 # nix2container-native multi-arch manifest builder
 #
 # Creates and pushes multi-architecture Docker manifests using:
-# - skopeo with nix: transport (from nix2container) to push individual arch images
+# - skopeo with nix: transport to push individual arch images directly from JSON manifests
 # - podman to create and push the multi-arch manifest list
+# - crane for efficient registry-side tagging
 #
-# This replaces flocken's ~400 line implementation with ~110-130 lines by:
-# - Using nix2container's JSON manifests directly via skopeo nix: transport
-# - Eliminating docker-archive tarball streaming (flocken's approach)
-# - Pushing images to registry first, then creating manifest from digests
+# Single-arch builds auto-detected and use simplified direct push (no manifest list).
 #
 # Usage:
 #   mkMultiArchManifest {
