@@ -62,7 +62,7 @@ let
       arch = systemToArch.${system};
     in
     lib.nameValuePair arch {
-      inherit system image;
+      inherit system image arch;
       tag = "${version}-${arch}";
       uri = "${registry.name}/${registry.repo}:${version}-${arch}";
     }
