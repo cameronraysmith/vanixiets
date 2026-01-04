@@ -50,6 +50,9 @@ let
   ]
   ++ (if tags != [ ] then tags else (if branch == "main" then [ "latest" ] else [ ]));
 
+  # Detect single-arch vs multi-arch scenario
+  isSingleArch = lib.length (lib.attrNames images) == 1;
+
   # System to arch mapping for container platforms
   systemToArch = {
     "x86_64-linux" = "amd64";
@@ -57,15 +60,20 @@ let
   };
 
   # Generate per-arch image URIs for registry
+  # Single-arch: push directly to primary tag (no arch suffix)
+  # Multi-arch: push with arch suffix, then create manifest list
   archImages = lib.mapAttrs' (
     system: image:
     let
       arch = systemToArch.${system};
+      primaryTag = lib.head parsedTags;
     in
     lib.nameValuePair arch {
       inherit system image arch;
-      tag = "${version}-${arch}";
-      uri = "${registry.name}/${registry.repo}:${version}-${arch}";
+      tag = if isSingleArch then primaryTag else "${version}-${arch}";
+      uri = "${registry.name}/${registry.repo}:${
+        if isSingleArch then primaryTag else "${version}-${arch}"
+      }";
     }
   ) images;
 
@@ -127,36 +135,38 @@ writeShellApplication {
         "docker://${archImage.uri}"
     '') (lib.attrValues archImages)}
 
-    # Remove existing manifest if present
-    if ${podmanExe} manifest exists "${manifestName}"; then
-      ${podmanExe} manifest rm "${manifestName}"
-    fi
+    ${lib.optionalString (!isSingleArch) ''
+      # Remove existing manifest if present
+      if ${podmanExe} manifest exists "${manifestName}"; then
+        ${podmanExe} manifest rm "${manifestName}"
+      fi
 
-    # Create multi-arch manifest with OCI annotations
-    ${podmanExe} manifest create \
-      --annotation "org.opencontainers.image.created=$(${lib.getExe' coreutils "date"} --iso-8601=seconds)" \
-      --annotation "org.opencontainers.image.revision=$(${lib.getExe git} rev-parse HEAD)" \
-      --annotation "org.opencontainers.image.version=${version}" \
-      --annotation "org.opencontainers.image.source=https://github.com/cameronraysmith/vanixiets" \
-      "${manifestName}"
+      # Create multi-arch manifest with OCI annotations
+      ${podmanExe} manifest create \
+        --annotation "org.opencontainers.image.created=$(${lib.getExe' coreutils "date"} --iso-8601=seconds)" \
+        --annotation "org.opencontainers.image.revision=$(${lib.getExe git} rev-parse HEAD)" \
+        --annotation "org.opencontainers.image.version=${version}" \
+        --annotation "org.opencontainers.image.source=https://github.com/cameronraysmith/vanixiets" \
+        "${manifestName}"
 
-    # Add each arch-specific image to the manifest by digest
-    # Podman fetches the digest from registry and adds to manifest list
-    ${lib.concatMapStringsSep "\n" (archImage: ''
-      ${podmanExe} manifest add "${manifestName}" "docker://${archImage.uri}"
-    '') (lib.attrValues archImages)}
+      # Add each arch-specific image to the manifest by digest
+      # Podman fetches the digest from registry and adds to manifest list
+      ${lib.concatMapStringsSep "\n" (archImage: ''
+        ${podmanExe} manifest add "${manifestName}" "docker://${archImage.uri}"
+      '') (lib.attrValues archImages)}
 
-    set +x
-    echo "Manifest: ${manifestName}"
-    ${podmanExe} manifest inspect "${manifestName}"
-    echo "Tags: ${toString parsedTags}"
-    set -x
+      set +x
+      echo "Manifest: ${manifestName}"
+      ${podmanExe} manifest inspect "${manifestName}"
+      echo "Tags: ${toString parsedTags}"
+      set -x
 
-    # Push manifest to registry with primary tag
-    ${podmanExe} manifest push \
-      --all \
-      --format v2s2 \
-      "${manifestName}"
+      # Push manifest to registry with primary tag
+      ${podmanExe} manifest push \
+        --all \
+        --format v2s2 \
+        "${manifestName}"
+    ''}
 
     # Tag additional tags if present (skip the first tag which was already pushed)
     # crane tag is a registry-side metadata operation - no data transfer needed
@@ -176,7 +186,16 @@ writeShellApplication {
     '') (lib.tail parsedTags)}
 
     set +x
-    echo "Successfully pushed multi-arch manifest for ${name}"
+    ${
+      if isSingleArch then
+        ''
+          echo "Successfully pushed single-arch image for ${name}"
+        ''
+      else
+        ''
+          echo "Successfully pushed multi-arch manifest for ${name}"
+        ''
+    }
     echo "Available at: ${registry.name}/${registry.repo}:${lib.head parsedTags}"
     ${lib.concatMapStringsSep "\n" (tag: ''
       echo "  Also tagged: ${registry.name}/${registry.repo}:${tag}"
