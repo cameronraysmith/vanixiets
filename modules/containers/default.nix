@@ -33,9 +33,8 @@
       # Get nix2container's patched skopeo (required for nix: transport)
       skopeo-nix2container = inputs.nix2container.packages.${system}.skopeo-nix2container;
 
-      # Import the multi-arch manifest builder
-      # Note: Located in _lib/ to prevent import-tree auto-discovery (underscore-prefixed dirs are ignored)
-      mkMultiArchManifest = pkgs.callPackage ./_lib/mk-multi-arch-manifest.nix { };
+      # Import the multi-arch manifest builder from shared lib
+      mkMultiArchManifest = pkgs.callPackage ../../lib/mk-multi-arch-manifest.nix { };
 
       # Shared base layer: bash and coreutils
       # This layer is reused across all tool containers, maximizing cache hits
