@@ -82,9 +82,6 @@
     nix-index-database.url = "github:nix-community/nix-index-database";
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
 
-    flocken.url = "github:mirkolenz/flocken/v2";
-    flocken.inputs.nixpkgs.follows = "nixpkgs";
-
     nix2container.url = "github:nlewo/nix2container";
     nix2container.inputs.nixpkgs.follows = "nixpkgs";
 
