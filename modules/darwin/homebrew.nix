@@ -30,6 +30,7 @@
           "obs"
           "opcode"
           "orbstack"
+          "podman-desktop"
           "raindropio"
           "raycast"
           "skim"
