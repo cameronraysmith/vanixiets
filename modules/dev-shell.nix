@@ -17,6 +17,7 @@
 
         packages = [
           inputs'.clan-core.packages.default
+          inputs'.nix2container.packages.skopeo-nix2container
           pkgs.just
           pkgs.nh
           pkgs.nix-output-monitor
