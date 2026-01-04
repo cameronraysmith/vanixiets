@@ -28,7 +28,7 @@
         lazydocker
         lima
         ngrok
-        skopeo
+        # skopeo: replaced by skopeo-nix2container in development-packages.nix
         step-cli
         tenv
         timoni
