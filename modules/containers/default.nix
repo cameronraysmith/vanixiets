@@ -1,4 +1,4 @@
-# Multi-architecture container builds using nix2container and flocken
+# Multi-architecture container builds using nix2container
 #
 # This module provides:
 # - Container packages (fdContainer, rgContainer) for Linux systems
@@ -7,7 +7,7 @@
 # Architecture:
 # - nix2container: Builds JSON manifests with pre-computed layer digests
 #   No tarballs written to Nix store; layers synthesized at push time by patched skopeo
-# - flocken: Creates multi-arch Docker manifests from nix2container streams
+# - mkMultiArchManifest: Creates multi-arch Docker manifests using skopeo and podman
 #
 # Performance characteristics:
 # - Build time: O(manifest size) - JSON generation only, no tar creation
@@ -25,6 +25,12 @@
 
       # Get nix2container for this system
       nix2container = inputs.nix2container.packages.${system}.nix2container;
+
+      # Get nix2container's patched skopeo (required for nix: transport)
+      skopeo-nix2container = inputs.nix2container.packages.${system}.skopeo-nix2container;
+
+      # Import the multi-arch manifest builder
+      mkMultiArchManifest = pkgs.callPackage ./mk-multi-arch-manifest.nix { };
 
       # Shared base layer: bash and coreutils
       # This layer is reused across all tool containers, maximizing cache hits
@@ -123,27 +129,34 @@
               if val == "" then default else val;
           in
           {
-            fdManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
-              version = getEnvOr "VERSION" "1.0.0";
-              branch = getEnvOr "GITHUB_REF_NAME" "main";
-              # nix2container images produce streaming outputs for flocken
-              imageStreams = map (sys: inputs.self.packages.${sys}.fdContainer) imageSystems;
-              registries."ghcr.io" = {
+            fdManifest = mkMultiArchManifest {
+              name = "fd";
+              images = lib.genAttrs imageSystems (sys: inputs.self.packages.${sys}.fdContainer);
+              registry = {
+                name = "ghcr.io";
                 repo = "cameronraysmith/vanixiets/fd";
                 username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
                 password = "$GITHUB_TOKEN";
               };
-            };
-
-            rgManifest = inputs.flocken.legacyPackages.${system}.mkDockerManifest {
               version = getEnvOr "VERSION" "1.0.0";
               branch = getEnvOr "GITHUB_REF_NAME" "main";
-              imageStreams = map (sys: inputs.self.packages.${sys}.rgContainer) imageSystems;
-              registries."ghcr.io" = {
+              skopeo = skopeo-nix2container;
+              podman = pkgs.podman;
+            };
+
+            rgManifest = mkMultiArchManifest {
+              name = "rg";
+              images = lib.genAttrs imageSystems (sys: inputs.self.packages.${sys}.rgContainer);
+              registry = {
+                name = "ghcr.io";
                 repo = "cameronraysmith/vanixiets/rg";
                 username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
                 password = "$GITHUB_TOKEN";
               };
+              version = getEnvOr "VERSION" "1.0.0";
+              branch = getEnvOr "GITHUB_REF_NAME" "main";
+              skopeo = skopeo-nix2container;
+              podman = pkgs.podman;
             };
           }
         ))
