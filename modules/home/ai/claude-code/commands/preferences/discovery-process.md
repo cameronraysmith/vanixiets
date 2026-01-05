@@ -128,6 +128,8 @@ data OrderEvent
   | OrderCancelled { orderId :: OrderId, reason :: CancellationReason, cancelledAt :: DateTime }
 ```
 
+These events map to the `Event` type parameter in the Decider pattern: `Decider<Command, Event, State>`.
+
 Commands (blue stickies) become functions returning validated events or errors:
 
 ```haskell
@@ -143,6 +145,10 @@ confirmOrder orderId =
   checkPaymentReceived orderId *>
   pure (OrderConfirmed orderId (now ()))
 ```
+
+Commands discovered through EventStorming become inputs to the `decide` function in the Decider pattern: `decide: Command → State → List<Event>`.
+The validation logic shown above represents the command handling that occurs within `decide`.
+See domain-modeling.md#pattern-5 for translating command/event discoveries to Decider implementations.
 
 Policies (purple stickies) become event handlers producing downstream commands:
 
@@ -195,6 +201,7 @@ Teams often discover that initial aggregate boundaries were too coarse or too fi
 
 Algebraic interpretation treats sub-domains as module boundaries in the module algebra.
 Sub-domain boundaries become module signatures (interfaces) hiding implementation details, where each sub-domain exports a public API while maintaining freedom to evolve internal structure.
+Each bounded context or sub-domain may contain multiple Deciders, with the module signature exposing command-handling and query functions while hiding the internal Decider implementations.
 
 ```rust
 // Order sub-domain module signature
