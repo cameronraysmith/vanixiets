@@ -18,7 +18,7 @@
         home.file.".mcp/.keep".text = "";
 
         # MCP servers using sops-nix for API keys
-        # 3 MCP servers use secrets: firecrawl, huggingface, agent-mail
+        # 4 MCP servers use secrets: firecrawl, huggingface, agent-mail, context7
 
         # Generate MCP server configuration files using sops templates
         # Each server gets its own JSON file for manual composition via --mcp-config
@@ -71,6 +71,28 @@
                   url = "http://127.0.0.1:8765/mcp/";
                   headers = {
                     Authorization = "Bearer ${config.sops.placeholder."mcp-agent-mail-bearer-token"}";
+                  };
+                };
+              };
+            };
+          };
+
+          # Context7: Up-to-date code documentation for LLMs
+          # Pattern: env block (secure - API key not in argv)
+          mcp-context7 = {
+            mode = "0400";
+            path = "${home}/.mcp/context7.json";
+            content = builtins.toJSON {
+              mcpServers = {
+                context7 = {
+                  type = "stdio";
+                  command = "npx";
+                  args = [
+                    "-y"
+                    "@upstash/context7-mcp"
+                  ];
+                  env = {
+                    CONTEXT7_API_KEY = config.sops.placeholder."context7-api-key";
                   };
                 };
               };
