@@ -1,7 +1,7 @@
 # Multi-architecture container builds using nix2container with unified pkgsCross
 #
 # This module provides:
-# - Container packages for both x86_64-linux and aarch64-linux targets
+# - Container packages for configurable target architectures
 # - Multi-arch manifests for CI/CD registry distribution
 #
 # Architecture:
@@ -42,10 +42,13 @@
       # Import the multi-arch manifest builder from shared lib
       mkMultiArchManifest = pkgs.callPackage ../../lib/mk-multi-arch-manifest.nix { };
 
-      # Unified target definitions using pkgsCross
-      # When host == target, pkgsCross auto-optimizes to return native pkgs
-      # (verified: same derivation paths, zero overhead)
-      targets = {
+      # ============================================================================
+      # Target Architecture Configuration
+      # ============================================================================
+
+      # All available target architectures
+      # Each target defines: system name, pkgsCross instance, OCI arch label
+      allTargets = {
         x86_64 = {
           system = "x86_64-linux";
           crossPkgs = pkgs.pkgsCross.gnu64;
@@ -58,6 +61,19 @@
         };
       };
 
+      # Default targets for multi-arch builds (can be overridden per-container)
+      defaultTargetNames = [
+        "x86_64"
+        "aarch64"
+      ];
+
+      # Helper to filter targets by name list
+      selectTargets = targetNames: lib.filterAttrs (n: _: lib.elem n targetNames) allTargets;
+
+      # ============================================================================
+      # Container Image Building
+      # ============================================================================
+
       # Build base layer for a specific target architecture
       # Uses cross-compiled bash and coreutils for the target
       mkBaseLayerForTarget =
@@ -69,22 +85,34 @@
           ];
         };
 
-      # Build a minimal container image for a specific target architecture
-      # Makes it work like: docker run <name>:latest --version
+      # Build a container image for a specific target architecture
+      #
+      # Arguments:
+      #   name: Container/image name (e.g., "fd")
+      #   packages: List of package attribute names to include (e.g., ["fd"] or ["fd" "ripgrep"])
+      #   entrypoint: Binary name for entrypoint (defaults to name)
+      #   target: Target architecture definition from allTargets
+      #   tag: Image tag (defaults to "latest")
       #
       # Layer strategy:
       # - Layer 0: baseLayer (bash, coreutils) - rarely changes, shared per arch
-      # - Layer 1: tool package - changes independently per tool
-      mkToolContainerForTarget =
+      # - Layer 1: application packages - changes independently per container
+      mkContainerForTarget =
         {
           name,
-          pkgName ? name,
+          packages,
+          entrypoint ? name,
           target,
           tag ? "latest",
         }:
         let
-          package = target.crossPkgs.${pkgName};
+          # Resolve package names to actual packages from crossPkgs
+          resolvedPackages = map (pkgName: target.crossPkgs.${pkgName}) packages;
+          entrypointPackage = target.crossPkgs.${builtins.head packages};
           baseLayer = mkBaseLayerForTarget target;
+
+          # Build PATH from all included packages
+          packagePaths = lib.concatMapStringsSep ":" (pkg: "${pkg}/bin") resolvedPackages;
         in
         nix2container.buildImage {
           inherit name tag;
@@ -95,20 +123,21 @@
           # Explicit layers: base packages in shared layer
           layers = [ baseLayer ];
 
-          # Tool package in main image layer (copyToRoot strips /nix/store prefix)
+          # All packages in main image layer (copyToRoot strips /nix/store prefix)
           copyToRoot = target.crossPkgs.buildEnv {
             name = "root";
-            paths = [ package ];
+            paths = resolvedPackages;
             pathsToLink = [ "/bin" ];
           };
 
           config = {
-            entrypoint = [ "${package}/bin/${name}" ];
+            entrypoint = [ "${entrypointPackage}/bin/${entrypoint}" ];
             Env = [
-              "PATH=${package}/bin:${target.crossPkgs.coreutils}/bin:${target.crossPkgs.bashInteractive}/bin"
+              "PATH=${packagePaths}:${target.crossPkgs.coreutils}/bin:${target.crossPkgs.bashInteractive}/bin"
             ];
             Labels = {
-              "org.opencontainers.image.description" = "Minimal container with ${name} (${target.arch})";
+              "org.opencontainers.image.description" =
+                "Container with ${lib.concatStringsSep ", " packages} (${target.arch})";
               "org.opencontainers.image.source" = "https://github.com/cameronraysmith/vanixiets";
             };
           };
@@ -117,28 +146,45 @@
           maxLayers = 2;
         };
 
-      # Container definitions
+      # ============================================================================
+      # Container Definitions
+      # ============================================================================
+
+      # Define containers with their package lists
+      # Each container can include one or more packages
       containerDefs = {
         fd = {
           name = "fd";
-          pkgName = "fd";
+          packages = [ "fd" ];
+          entrypoint = "fd";
         };
         rg = {
           name = "rg";
-          pkgName = "ripgrep";
+          packages = [ "ripgrep" ];
+          entrypoint = "rg";
         };
+        # Example of future multi-package container:
+        # devtools = {
+        #   name = "devtools";
+        #   packages = [ "fd" "ripgrep" "jq" "yq-go" ];
+        #   entrypoint = "bash";
+        # };
       };
 
-      # Generate container packages for all targets
-      # Creates: fdContainer-x86_64, fdContainer-aarch64, rgContainer-x86_64, rgContainer-aarch64
+      # ============================================================================
+      # Package Generation
+      # ============================================================================
+
+      # Generate container packages for all containers and all targets
+      # Creates: fdContainer-x86_64, fdContainer-aarch64, rgContainer-x86_64, etc.
       containerPackages = lib.listToAttrs (
         lib.flatten (
           lib.mapAttrsToList (
             containerName: def:
             lib.mapAttrsToList (targetName: target: {
               name = "${containerName}Container-${targetName}";
-              value = mkToolContainerForTarget (def // { inherit target; });
-            }) targets
+              value = mkContainerForTarget (def // { inherit target; });
+            }) allTargets
           ) containerDefs
         )
       );
@@ -151,16 +197,31 @@
         in
         if val == "" then default else val;
 
-      # Generate multi-arch manifest for a container
-      # Works on any platform: Linux uses pkgsCross, Darwin uses rosetta-builder
-      mkManifestForContainer =
-        containerName:
+      # ============================================================================
+      # Manifest Generation (Unified)
+      # ============================================================================
+
+      # Generate a manifest for a container with specified target architectures
+      # When targetNames has one element, creates single-arch manifest (no manifest list)
+      # When targetNames has multiple elements, creates multi-arch manifest list
+      #
+      # Arguments:
+      #   containerName: Name of the container (key in containerDefs)
+      #   targetNames: List of target names to include (defaults to all)
+      mkManifest =
+        {
+          containerName,
+          targetNames ? defaultTargetNames,
+        }:
+        let
+          selectedTargets = selectTargets targetNames;
+        in
         mkMultiArchManifest {
           name = containerName;
           images = lib.mapAttrs' (
             targetName: target:
             lib.nameValuePair target.system containerPackages."${containerName}Container-${targetName}"
-          ) targets;
+          ) selectedTargets;
           registry = {
             name = "ghcr.io";
             repo = "cameronraysmith/vanixiets/${containerName}";
@@ -173,41 +234,31 @@
           podman = pkgs.podman;
         };
 
-      # Generate single-arch manifest (no manifest list, direct push)
-      mkSingleArchManifest =
-        containerName: targetName:
-        let
-          target = targets.${targetName};
-        in
-        mkMultiArchManifest {
-          name = containerName;
-          images = {
-            ${target.system} = containerPackages."${containerName}Container-${targetName}";
-          };
-          registry = {
-            name = "ghcr.io";
-            repo = "cameronraysmith/vanixiets/${containerName}";
-            username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
-            password = "$GITHUB_TOKEN";
-          };
-          version = getEnvOr "VERSION" "1.0.0";
-          branch = getEnvOr "GITHUB_REF_NAME" "main";
-          skopeo = skopeo-nix2container;
-          podman = pkgs.podman;
-        };
-
-      # Manifest packages
-      manifestPackages = {
-        # Multi-arch manifests (both architectures)
-        fdManifest = mkManifestForContainer "fd";
-        rgManifest = mkManifestForContainer "rg";
-
-        # Single-arch variants (for testing or single-platform deployments)
-        fdManifest-x86 = mkSingleArchManifest "fd" "x86_64";
-        fdManifest-arm = mkSingleArchManifest "fd" "aarch64";
-        rgManifest-x86 = mkSingleArchManifest "rg" "x86_64";
-        rgManifest-arm = mkSingleArchManifest "rg" "aarch64";
-      };
+      # Generate all manifest variants for all containers
+      # For each container: one multi-arch manifest + one single-arch manifest per target
+      manifestPackages = lib.listToAttrs (
+        lib.flatten (
+          lib.mapAttrsToList (
+            containerName: _:
+            [
+              # Multi-arch manifest (all targets)
+              {
+                name = "${containerName}Manifest";
+                value = mkManifest { inherit containerName; };
+              }
+            ]
+            ++
+              # Single-arch manifests (one per target)
+              lib.mapAttrsToList (targetName: _: {
+                name = "${containerName}Manifest-${targetName}";
+                value = mkManifest {
+                  inherit containerName;
+                  targetNames = [ targetName ];
+                };
+              }) allTargets
+          ) containerDefs
+        )
+      );
 
     in
     {
@@ -218,7 +269,7 @@
         # Available on both Linux and Darwin (Darwin builds via rosetta-builder)
         (lib.optionalAttrs (isLinux || isDarwin) containerPackages)
 
-        # Multi-arch manifests for CI/CD registry distribution
+        # Manifests for CI/CD registry distribution
         # Now works on Linux (via pkgsCross) and Darwin (via rosetta-builder)
         # Usage: VERSION=1.0.0 nix run --impure .#fdManifest
         (lib.optionalAttrs (isLinux || isDarwin) manifestPackages)
