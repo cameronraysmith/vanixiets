@@ -109,7 +109,7 @@ jobs:
 
       - name: Setup tmate debug session
         if: inputs.debug_enabled
-        uses: mxschmitt/action-tmate@v3
+        uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
 
       - name: Build ${{ matrix.container }} for ${{ matrix.target }}
         run: |
