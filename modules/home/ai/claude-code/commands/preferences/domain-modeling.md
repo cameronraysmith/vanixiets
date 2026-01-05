@@ -629,11 +629,107 @@ Aggregates are functors maintaining private state that receive commands and emit
 The functor property means aggregates transform events into state while preserving the structure of event composition.
 This algebraic view connects aggregate design to event sourcing patterns and collaborative modeling artifacts.
 
-The core aggregate operation is state reconstruction via fold.
-Given an initial state and a sequence of events, the aggregate's `applyEvent` function reduces the event history to current state:
+**The Decider abstraction**:
+
+The Decider pattern formalizes the aggregate's decision-making and state evolution functions as a pure algebraic structure.
+A Decider separates command validation from state evolution, making both functions independently testable and composable.
+
+```rust
+pub struct Decider<'a, C, S, E> {
+    pub decide: Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error> + 'a>,
+    pub evolve: Box<dyn Fn(&S, &E) -> S + 'a>,
+    pub initial_state: Box<dyn Fn() -> S + 'a>,
+}
+```
+
+The Decider has three components:
+
+1. **decide: Command → State → Result<NonEmpty<Event>, Error>**: Pure function that validates commands against current state and produces events.
+Commands that violate domain rules produce failure events (not exceptions), allowing the domain to explicitly model what went wrong.
+The same command applied to the same state always produces the same events—no hidden state, no I/O, no side effects.
+
+2. **evolve: State → Event → State**: Pure, total function that applies events to state.
+This function cannot fail because events represent historical facts that already occurred.
+Failure events (like `OrderNotCreated`) are handled explicitly: they typically preserve the current state unchanged.
+
+3. **initial_state: () → State**: Deterministic initial state, often modeled as `Option<T>` or `None` to represent non-existent aggregates.
+
+**Decider laws**:
 
 ```haskell
-applyEvent :: Event -> State -> State
+-- Law 1: State reconstruction is deterministic
+reconstruct :: [Event] -> State
+reconstruct events = foldl evolve initial_state events
+
+-- Law 2: Decide is pure (same input → same output)
+decide(cmd, state) == decide(cmd, state)  -- always
+
+-- Law 3: Evolve cannot fail (events are facts)
+evolve :: State -> Event -> State  -- no Result wrapper
+
+-- Law 4: Failure events preserve state
+evolve(state, FailureEvent) == state  -- typically
+```
+
+**Failure events vs exceptions**:
+
+Rather than returning errors from the decide function, domain-driven event sourcing models failures as explicit events.
+When a command cannot be executed, the Decider produces a failure event describing why:
+
+```rust
+pub type OrderDecider<'a> = Decider<'a, OrderCommand, Option<Order>, OrderEvent>;
+
+fn order_decider<'a>() -> OrderDecider<'a> {
+    Decider {
+        decide: Box::new(|command, state| match command {
+            OrderCommand::Create(cmd) => {
+                if state.is_some() {
+                    // Failure: already exists
+                    Ok(vec![OrderEvent::NotCreated(OrderNotCreated {
+                        identifier: cmd.identifier,
+                        reason: Reason("Order already exists"),
+                    })])
+                } else {
+                    // Success: create order
+                    Ok(vec![OrderEvent::Created(OrderCreated {
+                        identifier: cmd.identifier,
+                        status: OrderStatus::Created,
+                        line_items: cmd.line_items,
+                    })])
+                }
+            }
+        }),
+        evolve: Box::new(|state, event| match event {
+            OrderEvent::Created(evt) => Some(Order {
+                identifier: evt.identifier,
+                status: evt.status,
+                line_items: evt.line_items,
+            }),
+            // Failure events don't change state
+            OrderEvent::NotCreated(_) => state.clone(),
+        }),
+        initial_state: Box::new(|| None),
+    }
+}
+```
+
+Notice the `decide` function returns `Result<Vec<E>, Error>`, but the inner vector contains events representing both success and failure.
+The outer `Result` captures infrastructure errors (database failure, network timeout), while failure events model domain errors (business rule violations).
+This separation makes the domain model explicit: failure events appear in event stores and can trigger compensating workflows.
+
+**Option<State> pattern**:
+
+Modeling aggregate state as `Option<T>` elegantly handles non-existent aggregates.
+Initial state is `None`, creation events produce `Some(Aggregate)`, and failure events preserve `None`.
+This prevents the need for separate "empty" or "uninitialized" state variants.
+
+**State reconstruction via fold**:
+
+The core aggregate operation is state reconstruction via fold.
+Given an initial state and a sequence of events, the aggregate's `evolve` function reduces the event history to current state:
+
+```haskell
+evolve :: State -> Event -> State
 
 -- State reconstruction as catamorphism (fold)
 fold :: (State -> Event -> State) -> State -> [Event] -> State
@@ -641,12 +737,23 @@ fold f initial events = foldl f initial events
 
 -- Equivalently
 reconstruct :: [Event] -> State
-reconstruct = fold applyEvent initialState
+reconstruct = fold evolve initial_state
 ```
 
 The fold function is a catamorphism—a universal way to consume structured data.
-Event histories form a free monoid (list concatenation), and `applyEvent` interprets that monoid into state transitions.
+Event histories form a free monoid (list concatenation), and `evolve` interprets that monoid into state transitions.
 This makes aggregates compositional: replaying events in sequence produces the same state as applying them incrementally.
+
+**Decider as Ghosh's Signature → Algebra → Interpreter**:
+
+The Decider structure instantiates Debasish Ghosh's three-layer pattern from "Functional and Reactive Domain Modeling":
+
+- **Signature**: The type-level specification `Decider<C, S, E>` defines the shape of decision-making (commands, state, events) without implementation.
+- **Algebra**: The concrete Decider instance (like `order_decider()`) implements the signature's operations (`decide`, `evolve`, `initial_state`).
+- **Interpreter**: `EventSourcedAggregate` (from the application layer) executes the Decider by fetching events, reconstructing state via fold, applying commands, and persisting new events.
+
+This separation enables testing Deciders in isolation (pure functions), swapping different interpreters (in-memory vs PostgreSQL), and composing Deciders without coupling to persistence.
+See Pattern 6 (Repositories) and the Module Algebra section for how interpreters inject dependencies.
 
 During EventStorming sessions, yellow sticky notes identify aggregates in the collaborative model.
 These yellow stickies translate directly to aggregate implementation structure:
