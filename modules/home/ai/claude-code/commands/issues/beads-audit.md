@@ -57,19 +57,23 @@ bd audit record --prompt "..." --response "..."
 
 ### Orphaned issues
 
-**Symptoms**: Issues with no epic parent, broken dependencies pointing to deleted issues, or issues that should be part of an epic but aren't.
+**Symptoms**: Issues with no epic parent, broken dependencies pointing to deleted issues, issues that should be part of an epic but aren't, or issues referenced in commits but still open.
 
 **Detection**:
 ```bash
-bd list | grep -v "epic:"    # Issues without epic parent
-bd validate                   # Reports broken references
+bd orphans                         # Identifies issues referenced in commits but still open
+bd list --parent <epic-id>        # List children of specific epic
+bd doctor                          # Comprehensive health check (includes broken references)
+bd doctor --deep                   # Deep graph integrity validation
 ```
 
 **Remediation**:
 ```bash
-bd update <id> --epic <epic-id>    # Assign to epic
+bd update <id> --parent <epic-id>  # Assign to epic (use --parent flag)
 bd dep remove <id> <bad-dep-id>    # Remove broken dependency
 bd delete <id>                      # Delete truly orphaned issue
+bd orphans --fix                    # Close orphaned issues with confirmation
+bd repair                           # Clean orphaned dependencies, labels, comments, events
 ```
 
 ### Dependency cycles
@@ -118,7 +122,8 @@ bd stale
 ```bash
 bd update <id> --status open         # Reset to open
 bd update <id> --status blocked      # Mark blocked if waiting
-bd update <id> --status done         # Close if actually complete
+bd close <id>                         # Close if actually complete (prefer bd close over --status done)
+bd blocked                            # Show all blocked issues for review
 ```
 
 ### Missing dependencies
@@ -128,7 +133,7 @@ bd update <id> --status done         # Close if actually complete
 **Detection**:
 ```bash
 bd ready                        # Review what's marked ready
-bd list --epic <epic-id>        # Review epic structure
+bd list --parent <epic-id>      # Review epic structure (use --parent flag)
 ```
 
 **Remediation**:
@@ -142,14 +147,14 @@ bd dep add <dependent-id> <blocker-id>
 
 **Detection**:
 ```bash
-bd detect-pollution
-bd list | grep -i "test\|experiment\|tmp"
+bd doctor --check=pollution                  # Detect test/garbage issues
+bd list | grep -i "test\|experiment\|tmp"    # Manual search for test patterns
 ```
 
 **Remediation**:
 ```bash
-bd delete <id>                  # Remove test issues
-bd archive <id>                 # Archive if history is valuable
+bd doctor --check=pollution --clean          # Delete test issues (with confirmation)
+bd delete <id>                                # Manually remove test issues
 ```
 
 ## Graph visualization
@@ -163,8 +168,8 @@ bv
 # Machine-readable health data
 bv --robot-triage
 
-# Focus on specific epic
-bv --epic <epic-id>
+# Check for drift from baseline
+bv --check-drift
 ```
 
 Use visualization to:
@@ -181,18 +186,18 @@ When epic structure doesn't match implementation reality:
 
 ```bash
 # List current structure
-bd list --epic <epic-id>
+bd list --parent <epic-id>
 
 # Move issues to different epic
-bd update <id> --epic <new-epic-id>
+bd update <id> --parent <new-epic-id>
 
 # Split epic (create new epic, reassign issues)
 bd create --type epic --title "Epic: New Focus Area"
-bd update <story-id> --epic <new-epic-id>
+bd update <story-id> --parent <new-epic-id>
 
 # Merge epics (reassign all issues, delete empty epic)
-bd list --epic <old-epic-id> | while read id; do
-  bd update "$id" --epic <target-epic-id>
+bd list --parent <old-epic-id> | while read id; do
+  bd update "$id" --parent <target-epic-id>
 done
 bd delete <old-epic-id>
 ```
@@ -202,11 +207,14 @@ bd delete <old-epic-id>
 After epic completion:
 
 ```bash
-# Mark epic and all stories done
-bd update <epic-id> --status done
-bd list --epic <epic-id> | while read id; do
-  bd update "$id" --status done
+# Close epic and all stories
+bd close <epic-id>
+bd list --parent <epic-id> | while read id; do
+  bd close "$id"
 done
+
+# Check for epics ready to close automatically
+bd epic close-eligible
 
 # Or delete if no historical value
 bd delete --cascade <epic-id>
@@ -233,18 +241,22 @@ bd ready
 Run through this checklist during periodic maintenance:
 
 1. **Structural integrity**:
-   - `bd validate` passes with no errors
+   - `bd doctor` passes with no errors
+   - `bd doctor --deep` validates full graph integrity
    - `bd dep cycles` reports no cycles
 
 2. **Status accuracy**:
    - `bd ready` shows only truly unblocked work
+   - `bd blocked` shows expected blocked work
    - `bd list --status in_progress` contains only active work
    - `bd stale` shows minimal results
 
 3. **Graph cleanliness**:
-   - `bd detect-pollution` finds no test issues
+   - `bd doctor --check=pollution` finds no test issues
+   - `bd orphans` finds no issues referenced in commits but still open
    - All issues have epic parents (unless they are epics)
    - No orphaned or disconnected subgraphs
+   - `bd lint` passes for all issues
 
 4. **Logical coherence**:
    - Epic decomposition matches current understanding
@@ -267,12 +279,20 @@ Consider scripting common audit tasks:
 echo "=== Beads Health Check ==="
 echo
 
-echo "## Validation"
-bd validate || echo "FAILED: Graph has validation errors"
+echo "## Installation Health"
+bd doctor || echo "FAILED: Doctor found issues"
 echo
 
 echo "## Dependency Cycles"
 bd dep cycles && echo "OK: No cycles" || echo "FAILED: Cycles detected"
+echo
+
+echo "## Orphaned Issues"
+orphan_count=$(bd orphans --json | jq length)
+echo "Orphaned issues (in commits but still open): $orphan_count"
+if [ "$orphan_count" -gt 0 ]; then
+  echo "WARNING: Found orphaned issues"
+fi
 echo
 
 echo "## Stale Issues"
@@ -287,8 +307,16 @@ echo "## Ready Work"
 bd ready
 echo
 
+echo "## Blocked Work"
+bd blocked
+echo
+
 echo "## In Progress (should be actively worked)"
 bd list --status in_progress
+echo
+
+echo "## Template Compliance"
+bd lint
 ```
 
 Run this script weekly or before major planning sessions to catch drift early.
