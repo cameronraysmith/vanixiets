@@ -145,6 +145,12 @@ Signals represent cross-cutting state derived from events—data like authentica
 
 In event-sourced systems, signals are projections just like elements, but they project to data rather than HTML.
 
+This pattern mirrors the Decider pattern across the client-server boundary: server-side `decide` functions produce domain events that are projected to SSE streams, while client-side state management applies `evolve` logic as events arrive.
+The server maintains the authoritative event log and computes state via event folding, then projects that state into signals and elements for transmission.
+Clients receive these projections and update their local DOM representation, effectively running a read-only version of the `evolve` function.
+
+See `event-sourcing.md#the-decider-pattern` for the foundational pattern that governs this server-side command handling and event application.
+
 ```rust
 fn project_signal(event: &DomainEvent) -> Option<SignalPatch> {
     match event {
