@@ -25,8 +25,11 @@ Run these commands to assess graph health:
 # Overall graph status
 bd status
 
-# Comprehensive validation
-bd validate
+# Check and fix installation health (primary diagnostic tool)
+bd doctor
+
+# Check issues for missing template sections
+bd lint
 
 # Detect circular dependencies
 bd dep cycles
@@ -34,14 +37,20 @@ bd dep cycles
 # Find stale issues (not updated recently)
 bd stale
 
-# Detect test/garbage issues
-bd detect-pollution
+# Identify orphaned issues (referenced in commits but still open)
+bd orphans
 
 # Show what's actually ready to work on
 bd ready
 
+# Show blocked issues
+bd blocked
+
 # List all issues (for manual inspection)
 bd list
+
+# Record and label agent interactions
+bd audit record --prompt "..." --response "..."
 ```
 
 ## Common problems
