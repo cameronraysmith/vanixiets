@@ -321,6 +321,43 @@ bd lint
 
 Run this script weekly or before major planning sessions to catch drift early.
 
+## Programmatic usage
+
+Most beads commands support global flags for scripting and automation:
+
+```bash
+# JSON output for machine parsing
+bd status --json
+bd ready --json
+bd orphans --json
+bd blocked --json
+
+# Quiet mode (errors only)
+bd doctor --quiet
+bd lint --quiet
+
+# Verbose/debug output
+bd doctor --verbose
+bd repair --verbose
+```
+
+Common scripting patterns:
+
+```bash
+# Check if any issues are ready
+if [ "$(bd ready --json | jq length)" -gt 0 ]; then
+  echo "Work available"
+fi
+
+# Export all open issues
+bd list --status open --json > open-issues.json
+
+# Batch operations with JSON parsing
+bd list --json | jq -r '.[] | select(.priority == 0) | .id' | while read id; do
+  bd update "$id" --assignee alice
+done
+```
+
 ## Related commands
 
 - `beads-seed.md` - Architecture docs to beads issues transition
