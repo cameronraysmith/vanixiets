@@ -624,6 +624,44 @@ container-verify CONTAINER="fd" TARGET="aarch64":
   echo "Architecture: $(jq -r '.arch' "$RESULT")"
   echo "Layers: $(jq '.layers | length' "$RESULT")"
 
+# Defined containers (update when adding new containers to containerDefs)
+_containers := "fd rg"
+
+# Build all defined containers for all architectures
+[group('containers')]
+container-build-all-defs:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  for container in {{_containers}}; do
+    echo "=== Building $container for all architectures ==="
+    just container-build-all "$container"
+  done
+  echo "✓ All containers built successfully"
+
+# Push all defined container manifests to registry
+[group('containers')]
+container-push-all VERSION="1.0.0":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  for container in {{_containers}}; do
+    echo "=== Pushing $container manifest (version {{VERSION}}) ==="
+    just container-push "$container" "{{VERSION}}"
+  done
+  echo "✓ All manifests pushed successfully"
+
+# Complete workflow: build and push all containers
+[group('containers')]
+container-release VERSION="1.0.0":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  echo "=== Building all containers ==="
+  just container-build-all-defs
+  echo ""
+  echo "=== Pushing all manifests ==="
+  just container-push-all "{{VERSION}}"
+  echo ""
+  echo "✓ Release complete: version {{VERSION}}"
+
 ## secrets
 
 # Scan repository for hardcoded secrets (full history)
