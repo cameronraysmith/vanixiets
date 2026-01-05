@@ -138,12 +138,21 @@ writeShellApplication {
 
         # Push each architecture image using skopeo nix: transport
         # This reads nix2container's JSON manifest and pushes layers directly
+        # Capture digest from each push to ensure manifest list references exact images pushed
+        declare -A PUSHED_DIGESTS
         ${lib.concatMapStringsSep "\n" (archImage: ''
           echo "Pushing ${archImage.arch} image to ${archImage.uri}"
+          # skopeo copy outputs "Copying blob..." lines then "Writing manifest to image destination"
+          # Use --digestfile to reliably capture the pushed manifest digest
+          DIGESTFILE=$(mktemp)
           ${skopeoExe} copy \
+            --digestfile "$DIGESTFILE" \
             --dest-creds "${registry.username}:${registry.password}" \
             "nix:${archImage.image}" \
             "docker://${archImage.uri}"
+          PUSHED_DIGESTS["${archImage.arch}"]=$(cat "$DIGESTFILE")
+          rm "$DIGESTFILE"
+          echo "Pushed ${archImage.arch} with digest: ''${PUSHED_DIGESTS["${archImage.arch}"]}"
         '') (lib.attrValues archImages)}
 
         ${lib.optionalString (!isSingleArch) ''
@@ -160,10 +169,13 @@ writeShellApplication {
             --annotation "org.opencontainers.image.source=https://github.com/cameronraysmith/vanixiets" \
             "${manifestName}"
 
-          # Add each arch-specific image to the manifest by digest
-          # Podman fetches the digest from registry and adds to manifest list
+          # Add each arch-specific image to the manifest BY DIGEST (not by tag)
+          # This ensures manifest list references exactly what was just pushed,
+          # avoiding race conditions or registry caching issues with tag lookups
           ${lib.concatMapStringsSep "\n" (archImage: ''
-            ${podmanExe} manifest add "${manifestName}" "docker://${archImage.uri}"
+            echo "Adding ${archImage.arch} to manifest by digest: ''${PUSHED_DIGESTS["${archImage.arch}"]}"
+            ${podmanExe} manifest add "${manifestName}" \
+              "docker://${registry.name}/${registry.repo}@''${PUSHED_DIGESTS["${archImage.arch}"]}"
           '') (lib.attrValues archImages)}
 
           set +x
