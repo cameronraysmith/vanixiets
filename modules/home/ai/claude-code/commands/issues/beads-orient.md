@@ -25,6 +25,12 @@ bd sync --import-only
 # Quick human-readable summary (~20 lines)
 bd status
 
+# Recent activity (last 100 events)
+bd activity
+
+# Stale issues that may need attention
+bd stale
+
 # Epic progress
 bd epic status
 ```
@@ -51,6 +57,17 @@ For minimal structured output (safe for direct consumption):
 ```bash
 # Just the single top pick — small JSON output
 bv --robot-next
+
+# Additional diagnostic tools
+bv --robot-alerts           # drift + proactive alerts
+bv --robot-drift            # detect configuration drift
+```
+
+For drift detection with exit codes (useful for automation):
+
+```bash
+# Exit codes: 0=OK, 1=critical drift, 2=warning
+bv --check-drift
 ```
 
 ## Interpret results
@@ -59,6 +76,16 @@ From `bd status`:
 - Total/Open/Blocked/Ready counts at a glance
 - Recent activity from git history
 - Human-readable, context-efficient
+
+From `bd activity`:
+- Real-time feed of issue mutations (create, update, delete)
+- Event symbols: + (created), → (in_progress), ✓ (completed), ✗ (failed), ⊘ (deleted)
+- Shows workflow progress and recent changes
+
+From `bd stale`:
+- Issues not updated in last 30 days (configurable with --days)
+- Identifies potentially abandoned in_progress items
+- Highlights forgotten or outdated issues
 
 From `bv --robot-triage` (via jq extraction):
 - `quick_ref` = at-a-glance counts + top 3 picks
@@ -96,8 +123,11 @@ Once an issue is selected, before starting implementation:
 # Full dependency context
 bd dep tree <selected-id> --direction both
 
-# Detailed description
-bd show <selected-id>
+# Detailed description (choose format based on needs)
+bd show <selected-id>              # detailed view
+bd show <selected-id> --refs       # show issues that reference this issue
+bd show <selected-id> --short      # compact one-line output
+bd show <selected-id> --thread     # show full conversation thread
 ```
 
 Review with user:
