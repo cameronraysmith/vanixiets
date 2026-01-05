@@ -320,7 +320,116 @@ Keep middleware focused on coordination—delegate business logic to handlers.
 Sagas coordinate multi-step workflows with compensating transactions for rollback.
 Use when you need centralized visibility into workflow state.
 
-### State machine for saga coordinator
+### Saga as coalgebra: pure event reaction
+
+A Saga is the dual of a Decider: where Decider consumes commands and produces events, Saga consumes events and produces commands.
+In categorical terms, Saga is a coalgebra that unfolds events into command streams.
+
+```rust
+pub struct Saga<AR, A> {
+    pub react: Box<dyn Fn(&AR) -> Vec<A> + Send + Sync>,
+    _phantom: PhantomData<AR>,
+}
+
+// Pure reaction: Event → Commands
+impl Saga<RestaurantEvent, RestaurantCommand> {
+    pub fn order_saga() -> Self {
+        Self {
+            react: Box::new(|event| match event {
+                RestaurantEvent::OrderPlaced(e) => vec![
+                    RestaurantCommand::PrepareFood(PrepareFoodCommand {
+                        order_id: e.order_id,
+                        items: e.items.clone(),
+                    }),
+                ],
+                RestaurantEvent::FoodPrepared(e) => vec![
+                    RestaurantCommand::DeliverOrder(DeliverOrderCommand {
+                        order_id: e.order_id,
+                        delivery_address: e.delivery_address.clone(),
+                    }),
+                ],
+                RestaurantEvent::OrderDelivered(_) => vec![],
+                _ => vec![],
+            }),
+            _phantom: PhantomData,
+        }
+    }
+}
+```
+
+The `react` function is pure: given an event, it produces commands without I/O or state mutation.
+This enables testing saga logic without infrastructure and composing multiple sagas.
+
+### EventSourcedOrchestratingAggregate: recursive command processing
+
+For multi-aggregate workflows, an orchestrating aggregate combines Decider and Saga to recursively process commands until quiescence:
+
+```rust
+pub struct EventSourcedOrchestratingAggregate<C, S, E, Repository, Decider, Saga, Version, Error> {
+    repository: Repository,
+    decider: Decider,
+    saga: Saga,
+    _phantom: PhantomData<(C, S, E, Version, Error)>,
+}
+
+impl<C, S, E, Repository, Version, Error>
+    EventSourcedOrchestratingAggregate<
+        C,
+        S,
+        E,
+        Repository,
+        Decider<C, S, E, Error>,
+        Saga<E, C>,
+        Version,
+        Error,
+    >
+where
+    Repository: EventRepository<E, Version, Error>,
+    S: Clone,
+{
+    pub async fn handle(&self, command: &C) -> Result<Vec<(E, Version)>, Error> {
+        let mut all_events = Vec::new();
+        let mut commands_to_process = vec![command.clone()];
+
+        while let Some(cmd) = commands_to_process.pop() {
+            // 1. Fetch events and reconstruct state
+            let events = self.repository.fetch_events().await?;
+            let state = events.iter().fold((self.decider.initial_state)(), |s, e| {
+                (self.decider.evolve)(s, e)
+            });
+
+            // 2. Decide new events from command
+            let new_events = (self.decider.decide)(&cmd, &state)?;
+
+            // 3. Save events
+            let versions = self.repository.save(&new_events).await?;
+            all_events.extend(new_events.iter().cloned().zip(versions));
+
+            // 4. React to events with saga to produce new commands
+            for event in &new_events {
+                let reaction_commands = (self.saga.react)(event);
+                commands_to_process.extend(reaction_commands);
+            }
+        }
+
+        Ok(all_events)
+    }
+}
+```
+
+This pattern enables:
+- Pure domain logic (Decider and Saga are both effect-free)
+- Recursive workflow coordination (saga reactions spawn new commands)
+- Testability (mock repository, test command → event → command chains)
+- Composability (combine multiple sagas by merging their reactions)
+
+The orchestrating aggregate processes commands until the saga produces no new reactions, achieving workflow quiescence.
+See `event-sourcing.md` for the theoretical foundations of sagas as process managers.
+
+### State machine for saga coordinator (stateful alternative)
+
+The pure Saga pattern above is stateless.
+For workflows requiring state tracking across steps (compensation data, step history), use a stateful coordinator:
 
 ```rust
 #[derive(Debug, Clone)]
@@ -377,6 +486,9 @@ impl<C> SagaCoordinator<C> {
     }
 }
 ```
+
+This stateful coordinator maintains compensation history but loses the purity of the Saga pattern.
+Prefer the pure Saga when compensation doesn't require step-specific data.
 
 ### Command and compensation types
 
