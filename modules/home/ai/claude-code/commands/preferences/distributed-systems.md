@@ -342,6 +342,23 @@ Every distributed system must answer: **Who owns the current state?**
 
 Three architectural positions with different tradeoffs.
 
+### Authority and the Decider pattern
+
+The Decider pattern separates write authority from read authority through its algebraic structure.
+
+The `decide` function is **write authority**: it validates commands against current state and produces events representing state changes.
+This function embodies the business rules that determine what transitions are valid.
+
+The `evolve` function is **read authority**: it reconstructs state from the event log by applying events sequentially.
+This function represents the definitive interpretation of what each event means for the current state.
+
+The **event log is the system of record** in Decider-based architectures.
+State is always derivable by folding `evolve` over the event sequence: `fold(evolve, initialState, events)`.
+This separation enables distributed replay: any node can reconstruct state by consuming the event log, making the system resilient to failures and enabling temporal queries.
+
+The functional purity of `decide` and `evolve` enables better testing (pure functions with no side effects) and deployment flexibility (deterministic replay on any node).
+See rust-development/12-distributed-systems.md for Rust implementation patterns combining Decider with distributed event logs.
+
 ### Position 1: Event log as authority
 
 **Pattern**: Event sourcing with derived state.
