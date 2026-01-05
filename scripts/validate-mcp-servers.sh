@@ -16,14 +16,17 @@ NC='\033[0m' # No Color
 # Track errors
 ERRORS=0
 
-# 1. Check all 11 files were created
-echo "1. Checking all 11 MCP server JSON files exist..."
+# 1. Check all 14 files were created
+echo "1. Checking all 14 MCP server JSON files exist..."
 EXPECTED_FILES=(
+  "agent-mail.json"
   "chrome.json"
   "cloudflare.json"
   "context7.json"
   "duckdb.json"
   "firecrawl.json"
+  "gcloud.json"
+  "gcs.json"
   "historian.json"
   "huggingface.json"
   "mcp-prompt-server.json"
@@ -97,11 +100,11 @@ else
   ((ERRORS++))
 fi
 
-# Context7 (--api-key arg)
-if jq -e '.mcpServers.context7.args' ~/.mcp/context7.json >/dev/null 2>&1; then
-  KEY=$(jq -r '.mcpServers.context7.args[-1]' ~/.mcp/context7.json)
+# Context7 (env block)
+if jq -e '.mcpServers.context7.env.CONTEXT7_API_KEY' ~/.mcp/context7.json >/dev/null 2>&1; then
+  KEY=$(jq -r '.mcpServers.context7.env.CONTEXT7_API_KEY' ~/.mcp/context7.json)
   if [[ "$KEY" == ctx7sk-* ]]; then
-    echo -e "  ${GREEN}✓${NC} context7: API key injected (--api-key arg)"
+    echo -e "  ${GREEN}✓${NC} context7: API key injected (env block)"
   else
     echo -e "  ${RED}✗${NC} context7: Invalid API key format"
     ((ERRORS++))
@@ -122,6 +125,20 @@ if jq -e '.mcpServers."hf-mcp-server".args' ~/.mcp/huggingface.json >/dev/null 2
   fi
 else
   echo -e "  ${RED}✗${NC} huggingface: Token missing"
+  ((ERRORS++))
+fi
+
+# Agent-mail (HTTP transport with Bearer token)
+if jq -e '.mcpServers."mcp-agent-mail".headers.Authorization' ~/.mcp/agent-mail.json >/dev/null 2>&1; then
+  AUTH=$(jq -r '.mcpServers."mcp-agent-mail".headers.Authorization' ~/.mcp/agent-mail.json)
+  if [[ "$AUTH" == "Bearer "* ]] && [[ ${#AUTH} -gt 20 ]]; then
+    echo -e "  ${GREEN}✓${NC} agent-mail: Bearer token injected (HTTP headers)"
+  else
+    echo -e "  ${RED}✗${NC} agent-mail: Invalid Authorization header format"
+    ((ERRORS++))
+  fi
+else
+  echo -e "  ${RED}✗${NC} agent-mail: Authorization header missing"
   ((ERRORS++))
 fi
 echo ""
@@ -182,7 +199,7 @@ else
   echo ""
   echo "Troubleshooting:"
   echo "  - Check home-manager activation: /nix/var/nix/profiles/per-user/\$USER/home-manager/activate"
-  echo "  - Verify SOPS can decrypt: sops -d secrets/users/crs58/mcp-api-keys.yaml"
+  echo "  - Verify SOPS can decrypt: sops -d secrets/home-manager/users/crs58/secrets.yaml"
   echo "  - Check age key: ls ~/.config/sops/age/keys.txt"
   exit 1
 fi
