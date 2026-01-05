@@ -2,10 +2,14 @@
 #
 # Creates and pushes multi-architecture Docker manifests using:
 # - skopeo with nix: transport to push individual arch images directly from JSON manifests
-# - podman to create and push the multi-arch manifest list
-# - crane for efficient registry-side tagging
+# - crane to create manifest lists and perform registry-side tagging
 #
 # Single-arch builds auto-detected and use simplified direct push (no manifest list).
+#
+# Note: We use skopeo for image push because it has the nix: transport that reads
+# nix2container's JSON manifests. We use crane for manifest list creation because
+# it's lightweight (pure Go, no container runtime) and works on GitHub Actions
+# without storage driver workarounds that podman requires.
 #
 # Usage:
 #   mkMultiArchManifest {
@@ -22,7 +26,7 @@
 #     };
 #     version = "1.0.0";
 #     branch = "main";
-#     inherit skopeo podman;
+#     inherit skopeo;
 #   }
 {
   lib,
@@ -30,6 +34,7 @@
   coreutils,
   git,
   crane,
+  jq,
 }:
 {
   images,
@@ -39,7 +44,6 @@
   tags ? [ ],
   branch ? "main",
   skopeo,
-  podman,
 }:
 let
   # Compute final tags: always include version, add "latest" if on main branch
@@ -76,10 +80,11 @@ let
   ) images;
 
   manifestName = "${registry.name}/${registry.repo}:${lib.head parsedTags}";
+  repoBase = "${registry.name}/${registry.repo}";
 
   skopeoExe = lib.getExe skopeo;
-  podmanExe = lib.getExe podman;
   craneExe = lib.getExe crane;
+  jqExe = lib.getExe jq;
 
 in
 assert lib.assertMsg (images != { }) "At least one image must be provided";
@@ -89,139 +94,107 @@ writeShellApplication {
   name = "multi-arch-manifest-${name}";
   runtimeInputs = [
     skopeo
-    podman
     crane
+    jq
     coreutils
     git
   ];
 
   text = ''
-        # Configure podman to use VFS storage driver (no user namespace requirement)
-        # Required for GitHub Actions runners which restrict unprivileged user namespaces
-        mkdir -p "$HOME/.config/containers"
-        if [[ ! -f "$HOME/.config/containers/storage.conf" ]]; then
-          cat > "$HOME/.config/containers/storage.conf" << 'STORAGECONF'
-    [storage]
-    driver = "vfs"
-    runroot = "/tmp/containers-run"
-    graphroot = "/tmp/containers-storage"
-    STORAGECONF
-        fi
+    function cleanup {
+      set -x
+      ${skopeoExe} logout "${registry.name}" || true
+      ${craneExe} auth logout "${registry.name}" || true
+    }
+    trap cleanup EXIT
 
-        function cleanup {
-          set -x
+    set -x
 
-          ${podmanExe} manifest rm "${manifestName}" || true
-          ${skopeoExe} logout "${registry.name}" || true
-          ${craneExe} auth logout "${registry.name}" || true
-        }
-        trap cleanup EXIT
+    # skopeo requires a policy.json file for container operations
+    if [[ ! -f "/etc/containers/policy.json" && ! -f "$HOME/.config/containers/policy.json" ]]; then
+      echo "No policy found, using skopeo's default instead."
+      mkdir -p "$HOME/.config/containers"
+      install -Dm444 "${skopeo.policy}/default-policy.json" "$HOME/.config/containers/policy.json"
+    fi
 
-        set -x
+    # Login to registries
+    # skopeo for image push, crane for manifest list and tagging
+    set +x
+    echo "Logging in to ${registry.name}"
+    ${skopeoExe} login \
+      --username "${registry.username}" \
+      --password "${registry.password}" \
+      "${registry.name}"
+    ${craneExe} auth login "${registry.name}" \
+      --username "${registry.username}" \
+      --password "${registry.password}"
+    set -x
 
-        # Starting with Podman 5.x, a policy.json file is required.
-        # If none exists, use skopeo's default permissive policy.
-        if [[ ! -f "/etc/containers/policy.json" && ! -f "$HOME/.config/containers/policy.json" ]]; then
-          echo "No policy found, using skopeo's default instead."
-          install -Dm444 "${skopeo.policy}/default-policy.json" "$HOME/.config/containers/policy.json"
-        fi
+    # Push each architecture image using skopeo nix: transport
+    # This reads nix2container's JSON manifest and pushes layers directly
+    # Capture digest from each push to ensure manifest list references exact images pushed
+    declare -A PUSHED_DIGESTS
+    ${lib.concatMapStringsSep "\n" (archImage: ''
+      echo "Pushing ${archImage.arch} image to ${archImage.uri}"
+      # skopeo copy outputs "Copying blob..." lines then "Writing manifest to image destination"
+      # Use --digestfile to reliably capture the pushed manifest digest
+      DIGESTFILE=$(mktemp)
+      ${skopeoExe} copy \
+        --digestfile "$DIGESTFILE" \
+        --dest-creds "${registry.username}:${registry.password}" \
+        "nix:${archImage.image}" \
+        "docker://${archImage.uri}"
+      PUSHED_DIGESTS["${archImage.arch}"]=$(cat "$DIGESTFILE")
+      rm "$DIGESTFILE"
+      echo "Pushed ${archImage.arch} with digest: ''${PUSHED_DIGESTS["${archImage.arch}"]}"
+    '') (lib.attrValues archImages)}
 
-        # Login to registry once for all operations
-        # Use skopeo for login to avoid podman rootless namespace issues on GitHub Actions
-        set +x
-        echo "Logging in to ${registry.name}"
-        ${skopeoExe} login \
-          --username "${registry.username}" \
-          --password "${registry.password}" \
-          "${registry.name}"
-        set -x
-
-        # Push each architecture image using skopeo nix: transport
-        # This reads nix2container's JSON manifest and pushes layers directly
-        # Capture digest from each push to ensure manifest list references exact images pushed
-        declare -A PUSHED_DIGESTS
-        ${lib.concatMapStringsSep "\n" (archImage: ''
-          echo "Pushing ${archImage.arch} image to ${archImage.uri}"
-          # skopeo copy outputs "Copying blob..." lines then "Writing manifest to image destination"
-          # Use --digestfile to reliably capture the pushed manifest digest
-          DIGESTFILE=$(mktemp)
-          ${skopeoExe} copy \
-            --digestfile "$DIGESTFILE" \
-            --dest-creds "${registry.username}:${registry.password}" \
-            "nix:${archImage.image}" \
-            "docker://${archImage.uri}"
-          PUSHED_DIGESTS["${archImage.arch}"]=$(cat "$DIGESTFILE")
-          rm "$DIGESTFILE"
-          echo "Pushed ${archImage.arch} with digest: ''${PUSHED_DIGESTS["${archImage.arch}"]}"
-        '') (lib.attrValues archImages)}
-
-        ${lib.optionalString (!isSingleArch) ''
-          # Remove existing manifest if present
-          if ${podmanExe} manifest exists "${manifestName}"; then
-            ${podmanExe} manifest rm "${manifestName}"
-          fi
-
-          # Create multi-arch manifest with OCI annotations
-          ${podmanExe} manifest create \
-            --annotation "org.opencontainers.image.created=$(${lib.getExe' coreutils "date"} --iso-8601=seconds)" \
-            --annotation "org.opencontainers.image.revision=$(${lib.getExe git} rev-parse HEAD)" \
-            --annotation "org.opencontainers.image.version=${version}" \
-            --annotation "org.opencontainers.image.source=https://github.com/cameronraysmith/vanixiets" \
-            "${manifestName}"
-
-          # Add each arch-specific image to the manifest BY DIGEST (not by tag)
-          # This ensures manifest list references exactly what was just pushed,
-          # avoiding race conditions or registry caching issues with tag lookups
-          ${lib.concatMapStringsSep "\n" (archImage: ''
-            echo "Adding ${archImage.arch} to manifest by digest: ''${PUSHED_DIGESTS["${archImage.arch}"]}"
-            ${podmanExe} manifest add "${manifestName}" \
-              "docker://${registry.name}/${registry.repo}@''${PUSHED_DIGESTS["${archImage.arch}"]}"
-          '') (lib.attrValues archImages)}
-
-          set +x
-          echo "Manifest: ${manifestName}"
-          ${podmanExe} manifest inspect "${manifestName}"
-          echo "Tags: ${toString parsedTags}"
-          set -x
-
-          # Push manifest to registry with primary tag
-          ${podmanExe} manifest push \
-            --all \
-            --format v2s2 \
-            "${manifestName}"
-        ''}
-
-        # Tag additional tags if present (skip the first tag which was already pushed)
-        # crane tag is a registry-side metadata operation - no data transfer needed
-        ${lib.optionalString (lib.length parsedTags > 1) ''
-          # Login to crane for tagging operations
-          set +x
-          echo "crane login ${registry.name}"
-          ${craneExe} auth login "${registry.name}" \
-            --username "${registry.username}" \
-            --password "${registry.password}"
-          set -x
-        ''}
-        ${lib.concatMapStringsSep "\n" (tag: ''
-          ${craneExe} tag \
-            "${registry.name}/${registry.repo}:${lib.head parsedTags}" \
-            "${tag}"
-        '') (lib.tail parsedTags)}
-
-        set +x
+    ${lib.optionalString (!isSingleArch) ''
+      # Create and push multi-arch manifest list using crane
+      # crane index append creates a fresh index with the specified manifests
+      # and pushes it in a single operation - no local storage needed
+      echo "Creating multi-arch manifest list: ${manifestName}"
+      ${craneExe} index append \
         ${
-          if isSingleArch then
-            ''
-              echo "Successfully pushed single-arch image for ${name}"
-            ''
-          else
-            ''
-              echo "Successfully pushed multi-arch manifest for ${name}"
-            ''
-        }
-        echo "Available at: ${registry.name}/${registry.repo}:${lib.head parsedTags}"
-        ${lib.concatMapStringsSep "\n" (tag: ''
-          echo "  Also tagged: ${registry.name}/${registry.repo}:${tag}"
-        '') (lib.tail parsedTags)}
+          lib.concatMapStringsSep " \\\n            " (
+            archImage: ''-m "${repoBase}@''${PUSHED_DIGESTS["${archImage.arch}"]}"''
+          ) (lib.attrValues archImages)
+        } \
+        --annotation "org.opencontainers.image.created=$(${lib.getExe' coreutils "date"} --iso-8601=seconds)" \
+        --annotation "org.opencontainers.image.revision=$(${lib.getExe git} rev-parse HEAD)" \
+        --annotation "org.opencontainers.image.version=${version}" \
+        --annotation "org.opencontainers.image.source=https://github.com/cameronraysmith/vanixiets" \
+        -t "${manifestName}"
+
+      set +x
+      echo "Manifest: ${manifestName}"
+      ${craneExe} manifest "${manifestName}" | ${jqExe} .
+      echo "Tags: ${toString parsedTags}"
+      set -x
+    ''}
+
+    # Tag additional tags if present (skip the first tag which was already pushed)
+    # crane tag is a registry-side metadata operation - no data transfer needed
+    ${lib.concatMapStringsSep "\n" (tag: ''
+      ${craneExe} tag \
+        "${registry.name}/${registry.repo}:${lib.head parsedTags}" \
+        "${tag}"
+    '') (lib.tail parsedTags)}
+
+    set +x
+    ${
+      if isSingleArch then
+        ''
+          echo "Successfully pushed single-arch image for ${name}"
+        ''
+      else
+        ''
+          echo "Successfully pushed multi-arch manifest for ${name}"
+        ''
+    }
+    echo "Available at: ${registry.name}/${registry.repo}:${lib.head parsedTags}"
+    ${lib.concatMapStringsSep "\n" (tag: ''
+      echo "  Also tagged: ${registry.name}/${registry.repo}:${tag}"
+    '') (lib.tail parsedTags)}
   '';
 }
