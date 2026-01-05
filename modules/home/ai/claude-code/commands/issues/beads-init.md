@@ -17,6 +17,8 @@ Replace `<prefix>` with the project-specific issue prefix (e.g., `INFRA`, `TS`, 
 The `--skip-hooks` flag prevents installation of git hooks that would automatically stage `.beads/*.jsonl` files on every commit.
 We keep the default merge driver (no `--skip-merge-driver`) since it only activates during merge conflicts and doesn't auto-stage.
 
+For completely invisible beads usage without affecting repository collaborators, consider `--stealth` mode instead (see below).
+
 ## Post-init cleanup
 
 After `bd init` completes, perform these required cleanup steps:
