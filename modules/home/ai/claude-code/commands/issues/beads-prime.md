@@ -69,7 +69,7 @@ bd ready
 bd blocked
 
 # Full dependency context (upstream + downstream)
-bd dep tree <id> --direction=both
+bd dep tree <id> --direction both
 
 # Issue details
 bd show <id>
@@ -100,7 +100,7 @@ bd dep add <blocker-id> <current-id>
 ## Complete work
 
 ```bash
-bd close <id> --comment "Implemented in commit $(git rev-parse --short HEAD)"
+bd close <id> --reason "Implemented in commit $(git rev-parse --short HEAD)"
 bd epic close-eligible --dry-run
 ```
 
@@ -117,8 +117,8 @@ bd lint                     # check issues for missing template sections
 - `bv --robot-triage` is the single entry point — unified counts, recommendations, health
 - `bv --robot-next` for minimal context — just top pick with claim command
 - `bd ready` / `bd blocked` for quick work selection without JSON parsing
-- `bd dep tree <id> --direction=both` shows full context (blockers + what completing it unblocks)
-- Always close with `--comment` referencing the implementation
+- `bd dep tree <id> --direction both` shows full context (blockers + what completing it unblocks)
+- Always close with `--reason` referencing the implementation
 - Use `--type discovered-from` when creating issues found during other work
 - After `bd` modifications: `git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"`
 
