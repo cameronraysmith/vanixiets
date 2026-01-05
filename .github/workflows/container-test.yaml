@@ -4,10 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version tag for container images"
+        description: "Primary version tag (e.g., 1.0.0)"
         required: false
         type: string
         default: "latest"
+      tags:
+        description: "Additional tags, comma-separated (applied via crane, no re-upload)"
+        required: false
+        type: string
+        default: ""
       push:
         description: "Push images to registry"
         required: false
@@ -21,9 +26,14 @@ on:
   workflow_call:
     inputs:
       version:
-        description: "Version tag for container images"
+        description: "Primary version tag"
         required: true
         type: string
+      tags:
+        description: "Additional tags, comma-separated"
+        required: false
+        type: string
+        default: ""
       push:
         description: "Push images to registry"
         required: false
@@ -151,6 +161,10 @@ jobs:
       - name: Push ${{ matrix.container }} manifest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          TAGS: ${{ inputs.tags }}
         run: |
           echo "Pushing multi-arch manifest for ${{ matrix.container }}"
-          VERSION=${{ inputs.version }} nix run --impure ".#${{ matrix.container }}Manifest"
+          echo "Version: $VERSION"
+          echo "Additional tags: ${TAGS:-none}"
+          nix run --impure ".#${{ matrix.container }}Manifest"

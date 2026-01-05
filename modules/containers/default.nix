@@ -220,6 +220,14 @@ in
         in
         if val == "" then default else val;
 
+      # Parse comma-separated env var into list (empty string → empty list)
+      getEnvList =
+        var:
+        let
+          val = builtins.getEnv var;
+        in
+        if val == "" then [ ] else lib.splitString "," val;
+
       # ============================================================================
       # Manifest Generation (Unified)
       # ============================================================================
@@ -227,6 +235,11 @@ in
       # Generate a manifest for a container with specified target architectures
       # When targetNames has one element, creates single-arch manifest (no manifest list)
       # When targetNames has multiple elements, creates multi-arch manifest list
+      #
+      # Environment variables:
+      #   VERSION: Primary version tag (default: "1.0.0")
+      #   TAGS: Comma-separated additional tags, applied via crane (default: "latest" on main)
+      #   GITHUB_REF_NAME: Branch name for auto-tagging logic (default: "main")
       #
       # Arguments:
       #   containerName: Name of the container (key in containerDefs)
@@ -255,6 +268,7 @@ in
             password = "$GITHUB_TOKEN";
           };
           version = getEnvOr "VERSION" "1.0.0";
+          tags = getEnvList "TAGS"; # Additional tags via crane (e.g., "latest,stable")
           branch = getEnvOr "GITHUB_REF_NAME" "main";
           skopeo = skopeo-nix2container;
           podman = pkgs.podman;

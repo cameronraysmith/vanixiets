@@ -580,19 +580,20 @@ container-build-all CONTAINER="fd":
   @echo "✓ Both architectures built successfully"
 
 # Push multi-arch manifest to registry (requires GITHUB_TOKEN)
+# TAGS: comma-separated additional tags applied via crane (no re-upload)
 [group('containers')]
-container-push CONTAINER="fd" VERSION="1.0.0":
-  VERSION={{VERSION}} nix run --impure '.#{{CONTAINER}}Manifest'
+container-push CONTAINER="fd" VERSION="1.0.0" TAGS="":
+  VERSION={{VERSION}} TAGS={{TAGS}} nix run --impure '.#{{CONTAINER}}Manifest'
 
 # Push single-arch manifest (x86_64 only)
 [group('containers')]
-container-push-x86 CONTAINER="fd" VERSION="1.0.0":
-  VERSION={{VERSION}} nix run --impure '.#{{CONTAINER}}Manifest-x86'
+container-push-x86 CONTAINER="fd" VERSION="1.0.0" TAGS="":
+  VERSION={{VERSION}} TAGS={{TAGS}} nix run --impure '.#{{CONTAINER}}Manifest-x86_64'
 
 # Push single-arch manifest (aarch64 only)
 [group('containers')]
-container-push-arm CONTAINER="fd" VERSION="1.0.0":
-  VERSION={{VERSION}} nix run --impure '.#{{CONTAINER}}Manifest-arm'
+container-push-arm CONTAINER="fd" VERSION="1.0.0" TAGS="":
+  VERSION={{VERSION}} TAGS={{TAGS}} nix run --impure '.#{{CONTAINER}}Manifest-aarch64'
 
 # Load container image to Docker daemon via nix2container
 [group('containers')]
@@ -647,27 +648,30 @@ container-build-all-defs:
 
 # Push all defined container manifests to registry
 [group('containers')]
-container-push-all VERSION="1.0.0":
+container-push-all VERSION="1.0.0" TAGS="":
   #!/usr/bin/env bash
   set -euo pipefail
   for container in {{_containers}}; do
-    echo "=== Pushing $container manifest (version {{VERSION}}) ==="
-    just container-push "$container" "{{VERSION}}"
+    echo "=== Pushing $container manifest (version {{VERSION}}, tags: ${TAGS:-auto}) ==="
+    just container-push "$container" "{{VERSION}}" "{{TAGS}}"
   done
   echo "✓ All manifests pushed successfully"
 
 # Complete workflow: build and push all containers
 [group('containers')]
-container-release VERSION="1.0.0":
+container-release VERSION="1.0.0" TAGS="":
   #!/usr/bin/env bash
   set -euo pipefail
   echo "=== Building all containers ==="
   just container-build-all-defs
   echo ""
   echo "=== Pushing all manifests ==="
-  just container-push-all "{{VERSION}}"
+  just container-push-all "{{VERSION}}" "{{TAGS}}"
   echo ""
   echo "✓ Release complete: version {{VERSION}}"
+  if [[ -n "{{TAGS}}" ]]; then
+    echo "  Additional tags: {{TAGS}}"
+  fi
 
 ## secrets
 
