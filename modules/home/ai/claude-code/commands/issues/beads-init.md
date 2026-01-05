@@ -21,11 +21,15 @@ For completely invisible beads usage without affecting repository collaborators,
 
 ## Post-init cleanup
 
-After `bd init` completes, perform these required cleanup steps:
+After `bd init` completes, perform these cleanup steps:
 
 ```bash
-touch .beads/issues.jsonl            # bd init bug: without this, auto-flush uses interactions.jsonl
-git restore AGENTS.md                # discard auto-generated changes
+# Review AGENTS.md - the new auto-generated version is minimal and useful:
+# - Points to 'bd onboard' for getting started
+# - Contains brief quick reference commands
+# - Includes session completion protocol
+# Customize if needed, or keep the generated version.
+
 echo "README.md" >> .beads/.gitignore
 ```
 
