@@ -1103,6 +1103,35 @@ def test_all_order_statuses_handled():
         assert result is not None  # Ensure no case is missed
 ```
 
+## ADTs in event-sourced systems
+
+In event-sourced architectures, algebraic data types form the foundation of the Decider pattern—the canonical structure for command handling and event application.
+
+Commands are typically sum types (enums) representing possible operations: `PlaceOrder | CancelOrder | UpdateQuantity`.
+Each variant carries the data necessary to execute that specific command.
+
+Events are also sum types representing facts that occurred: `OrderPlaced | OrderCancelled | QuantityUpdated`.
+Event variants include all data necessary to apply the state change, including failure events like `PaymentFailed` or `InsufficientInventory`.
+
+State is typically a product type (struct) containing all aggregate fields together: `Order { id, customer, items, status, total }`.
+State fields are often monoidal (can be combined associatively), enabling efficient event replay and incremental updates.
+
+The Decider pattern composes these ADTs into a cohesive structure:
+
+```rust
+struct Decider<Command, Event, State> {
+    decide: fn(&Command, &State) -> Vec<Event>,
+    evolve: fn(&State, &Event) -> State,
+    initial_state: State,
+}
+```
+
+The `decide` function validates commands against current state and produces events (possibly including rejection events).
+The `evolve` function applies events to state, producing new state.
+Together they form an algebra where commands flow through validation to produce facts, and facts accumulate into state.
+
+See `event-sourcing.md#the-decider-pattern` for operational patterns and `theoretical-foundations.md#coalgebra-algebra-duality` for the categorical foundation.
+
 ## Integration with schema versioning
 
 See `~/.claude/commands/preferences/schema-versioning.md` for:
