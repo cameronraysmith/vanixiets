@@ -91,6 +91,133 @@ where
 }
 ```
 
+### Authority and the Decider pattern
+
+The Decider pattern separates pure domain logic from infrastructure concerns by extracting three functions:
+- `decide: (Command, State) → Result<Vec<Event>, Error>` - the write authority that validates commands and produces events
+- `evolve: (State, Event) → State` - the read authority that reconstructs state from events
+- `initial_state: () → State` - provides the starting state
+
+This separation enables testing pure logic without I/O and deploying the same logic to different infrastructure contexts.
+
+```rust
+pub struct Decider<C, S, E, Error> {
+    pub decide: Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error> + Send + Sync>,
+    pub evolve: Box<dyn Fn(S, &E) -> S + Send + Sync>,
+    pub initial_state: Box<dyn Fn() -> S + Send + Sync>,
+    _phantom: PhantomData<(C, E)>,
+}
+
+// Pure domain logic - no IO, no async
+impl Decider<OrderCommand, OrderState, OrderEvent, OrderError> {
+    pub fn order_decider() -> Self {
+        Self {
+            decide: Box::new(|cmd, state| match cmd {
+                OrderCommand::PlaceOrder { items, total } => {
+                    if state.status != OrderStatus::Empty {
+                        return Err(OrderError::OrderAlreadyPlaced);
+                    }
+                    if items.is_empty() {
+                        return Err(OrderError::EmptyOrder);
+                    }
+                    Ok(vec![OrderEvent::OrderPlaced {
+                        items: items.clone(),
+                        total: *total,
+                    }])
+                }
+                OrderCommand::ShipOrder { shipment_id } => {
+                    if state.status != OrderStatus::Placed {
+                        return Err(OrderError::CannotShip);
+                    }
+                    Ok(vec![OrderEvent::OrderShipped {
+                        shipment_id: *shipment_id,
+                    }])
+                }
+            }),
+            evolve: Box::new(|mut state, event| match event {
+                OrderEvent::OrderPlaced { items, total } => {
+                    state.items = items.clone();
+                    state.total = *total;
+                    state.status = OrderStatus::Placed;
+                    state
+                }
+                OrderEvent::OrderShipped { shipment_id } => {
+                    state.shipment_id = Some(*shipment_id);
+                    state.status = OrderStatus::Shipped;
+                    state
+                }
+            }),
+            initial_state: Box::new(|| OrderState {
+                items: vec![],
+                total: Money::zero(),
+                status: OrderStatus::Empty,
+                shipment_id: None,
+            }),
+            _phantom: PhantomData,
+        }
+    }
+}
+```
+
+The `decide` function is the write authority: it determines which events can be produced from a command against current state.
+The `evolve` function is the read authority: any replica with the same events will derive the same state.
+The event log is the pivot between them - the system of record that enables distributed consensus.
+
+### EventSourcedAggregate: connecting pure logic to infrastructure
+
+An `EventSourcedAggregate` wraps a `Decider` and connects it to an event repository, handling the async I/O boundary:
+
+```rust
+pub struct EventSourcedAggregate<C, S, E, Repository, Decider, Version, Error> {
+    repository: Repository,
+    decider: Decider,
+    _phantom: PhantomData<(C, S, E, Version, Error)>,
+}
+
+impl<C, S, E, Repository, Version, Error> EventSourcedAggregate<C, S, E, Repository, Decider<C, S, E, Error>, Version, Error>
+where
+    Repository: EventRepository<E, Version, Error>,
+    S: Clone,
+{
+    pub fn new(repository: Repository, decider: Decider<C, S, E, Error>) -> Self {
+        Self {
+            repository,
+            decider,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub async fn handle(&self, command: &C) -> Result<Vec<(E, Version)>, Error> {
+        // 1. Fetch events (IO)
+        let events = self.repository.fetch_events().await?;
+
+        // 2. Reconstruct state (pure)
+        let state = events
+            .iter()
+            .fold((self.decider.initial_state)(), |s, e| {
+                (self.decider.evolve)(s, e)
+            });
+
+        // 3. Decide new events (pure)
+        let new_events = (self.decider.decide)(command, &state)?;
+
+        // 4. Save events (IO)
+        let versions = self.repository.save(&new_events).await?;
+
+        Ok(new_events.into_iter().zip(versions).collect())
+    }
+}
+```
+
+This architecture provides:
+- Pure business logic testable without infrastructure
+- Same `Decider` can be used with different repositories (SQL, EventStoreDB, Kafka)
+- Clear separation between domain (decide/evolve) and effects (fetch/save)
+- Composability: deciders can be combined before wrapping in aggregate
+
+For distributed Rust systems using event sourcing, the fmodel-rust library provides this Decider pattern with proper async/effect separation via `EventSourcedAggregate`.
+See `event-sourcing.md` for the theoretical foundations of the Decider pattern and its relationship to algebras and coalgebras.
+
 Reference `./01-functional-domain-modeling.md` for aggregate design within a single consistency boundary.
 
 ## Idempotency key pattern
