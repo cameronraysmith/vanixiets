@@ -84,3 +84,23 @@ Manual sync workflow provides explicit control over when issue tracking state en
 - Avoid automatic staging during experimental work
 
 The merge driver remains enabled to handle merge conflicts in JSONL files during collaborative workflows, but it doesn't auto-stage changes during normal operations.
+
+## Configuring no-git-ops mode
+
+To suppress git commands in AI agent session protocols:
+
+```bash
+bd config set no-git-ops true
+```
+
+This configures `bd prime` to output stealth mode instructions, ensuring agents only flush to JSONL without attempting git operations.
+Useful when you want manual control over when commits happen.
+
+## See also
+
+Additional commands for working with beads:
+
+- `bd onboard` - Display integration snippet for AGENTS.md
+- `bd prime` - Show AI-optimized workflow context
+- `bd quickstart` - View quick start guide
+- `bd setup` - Install AI editor integrations
