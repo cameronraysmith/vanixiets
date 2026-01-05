@@ -96,107 +96,120 @@ writeShellApplication {
   ];
 
   text = ''
-    function cleanup {
-      set -x
+        # Configure podman to use VFS storage driver (no user namespace requirement)
+        # Required for GitHub Actions runners which restrict unprivileged user namespaces
+        mkdir -p "$HOME/.config/containers"
+        if [[ ! -f "$HOME/.config/containers/storage.conf" ]]; then
+          cat > "$HOME/.config/containers/storage.conf" << 'STORAGECONF'
+    [storage]
+    driver = "vfs"
+    runroot = "/tmp/containers-run"
+    graphroot = "/tmp/containers-storage"
+    STORAGECONF
+        fi
 
-      ${podmanExe} manifest rm "${manifestName}" || true
-      ${podmanExe} logout "${registry.name}" || true
-      ${craneExe} auth logout "${registry.name}" || true
-    }
-    trap cleanup EXIT
+        function cleanup {
+          set -x
 
-    set -x
+          ${podmanExe} manifest rm "${manifestName}" || true
+          ${skopeoExe} logout "${registry.name}" || true
+          ${craneExe} auth logout "${registry.name}" || true
+        }
+        trap cleanup EXIT
 
-    # Starting with Podman 5.x, a policy.json file is required.
-    # If none exists, use skopeo's default permissive policy.
-    if [[ ! -f "/etc/containers/policy.json" && ! -f "$HOME/.config/containers/policy.json" ]]; then
-      echo "No policy found, using skopeo's default instead."
-      install -Dm444 "${skopeo.policy}/default-policy.json" "$HOME/.config/containers/policy.json"
-    fi
+        set -x
 
-    # Login to registry once for all operations
-    set +x
-    echo "Logging in to ${registry.name}"
-    ${podmanExe} login \
-      --username "${registry.username}" \
-      --password "${registry.password}" \
-      "${registry.name}"
-    set -x
+        # Starting with Podman 5.x, a policy.json file is required.
+        # If none exists, use skopeo's default permissive policy.
+        if [[ ! -f "/etc/containers/policy.json" && ! -f "$HOME/.config/containers/policy.json" ]]; then
+          echo "No policy found, using skopeo's default instead."
+          install -Dm444 "${skopeo.policy}/default-policy.json" "$HOME/.config/containers/policy.json"
+        fi
 
-    # Push each architecture image using skopeo nix: transport
-    # This reads nix2container's JSON manifest and pushes layers directly
-    ${lib.concatMapStringsSep "\n" (archImage: ''
-      echo "Pushing ${archImage.arch} image to ${archImage.uri}"
-      ${skopeoExe} copy \
-        --dest-creds "${registry.username}:${registry.password}" \
-        "nix:${archImage.image}" \
-        "docker://${archImage.uri}"
-    '') (lib.attrValues archImages)}
+        # Login to registry once for all operations
+        # Use skopeo for login to avoid podman rootless namespace issues on GitHub Actions
+        set +x
+        echo "Logging in to ${registry.name}"
+        ${skopeoExe} login \
+          --username "${registry.username}" \
+          --password "${registry.password}" \
+          "${registry.name}"
+        set -x
 
-    ${lib.optionalString (!isSingleArch) ''
-      # Remove existing manifest if present
-      if ${podmanExe} manifest exists "${manifestName}"; then
-        ${podmanExe} manifest rm "${manifestName}"
-      fi
+        # Push each architecture image using skopeo nix: transport
+        # This reads nix2container's JSON manifest and pushes layers directly
+        ${lib.concatMapStringsSep "\n" (archImage: ''
+          echo "Pushing ${archImage.arch} image to ${archImage.uri}"
+          ${skopeoExe} copy \
+            --dest-creds "${registry.username}:${registry.password}" \
+            "nix:${archImage.image}" \
+            "docker://${archImage.uri}"
+        '') (lib.attrValues archImages)}
 
-      # Create multi-arch manifest with OCI annotations
-      ${podmanExe} manifest create \
-        --annotation "org.opencontainers.image.created=$(${lib.getExe' coreutils "date"} --iso-8601=seconds)" \
-        --annotation "org.opencontainers.image.revision=$(${lib.getExe git} rev-parse HEAD)" \
-        --annotation "org.opencontainers.image.version=${version}" \
-        --annotation "org.opencontainers.image.source=https://github.com/cameronraysmith/vanixiets" \
-        "${manifestName}"
+        ${lib.optionalString (!isSingleArch) ''
+          # Remove existing manifest if present
+          if ${podmanExe} manifest exists "${manifestName}"; then
+            ${podmanExe} manifest rm "${manifestName}"
+          fi
 
-      # Add each arch-specific image to the manifest by digest
-      # Podman fetches the digest from registry and adds to manifest list
-      ${lib.concatMapStringsSep "\n" (archImage: ''
-        ${podmanExe} manifest add "${manifestName}" "docker://${archImage.uri}"
-      '') (lib.attrValues archImages)}
+          # Create multi-arch manifest with OCI annotations
+          ${podmanExe} manifest create \
+            --annotation "org.opencontainers.image.created=$(${lib.getExe' coreutils "date"} --iso-8601=seconds)" \
+            --annotation "org.opencontainers.image.revision=$(${lib.getExe git} rev-parse HEAD)" \
+            --annotation "org.opencontainers.image.version=${version}" \
+            --annotation "org.opencontainers.image.source=https://github.com/cameronraysmith/vanixiets" \
+            "${manifestName}"
 
-      set +x
-      echo "Manifest: ${manifestName}"
-      ${podmanExe} manifest inspect "${manifestName}"
-      echo "Tags: ${toString parsedTags}"
-      set -x
+          # Add each arch-specific image to the manifest by digest
+          # Podman fetches the digest from registry and adds to manifest list
+          ${lib.concatMapStringsSep "\n" (archImage: ''
+            ${podmanExe} manifest add "${manifestName}" "docker://${archImage.uri}"
+          '') (lib.attrValues archImages)}
 
-      # Push manifest to registry with primary tag
-      ${podmanExe} manifest push \
-        --all \
-        --format v2s2 \
-        "${manifestName}"
-    ''}
+          set +x
+          echo "Manifest: ${manifestName}"
+          ${podmanExe} manifest inspect "${manifestName}"
+          echo "Tags: ${toString parsedTags}"
+          set -x
 
-    # Tag additional tags if present (skip the first tag which was already pushed)
-    # crane tag is a registry-side metadata operation - no data transfer needed
-    ${lib.optionalString (lib.length parsedTags > 1) ''
-      # Login to crane for tagging operations
-      set +x
-      echo "crane login ${registry.name}"
-      ${craneExe} auth login "${registry.name}" \
-        --username "${registry.username}" \
-        --password "${registry.password}"
-      set -x
-    ''}
-    ${lib.concatMapStringsSep "\n" (tag: ''
-      ${craneExe} tag \
-        "${registry.name}/${registry.repo}:${lib.head parsedTags}" \
-        "${tag}"
-    '') (lib.tail parsedTags)}
+          # Push manifest to registry with primary tag
+          ${podmanExe} manifest push \
+            --all \
+            --format v2s2 \
+            "${manifestName}"
+        ''}
 
-    set +x
-    ${
-      if isSingleArch then
-        ''
-          echo "Successfully pushed single-arch image for ${name}"
-        ''
-      else
-        ''
-          echo "Successfully pushed multi-arch manifest for ${name}"
-        ''
-    }
-    echo "Available at: ${registry.name}/${registry.repo}:${lib.head parsedTags}"
-    ${lib.concatMapStringsSep "\n" (tag: ''
-      echo "  Also tagged: ${registry.name}/${registry.repo}:${tag}"
-    '') (lib.tail parsedTags)}
+        # Tag additional tags if present (skip the first tag which was already pushed)
+        # crane tag is a registry-side metadata operation - no data transfer needed
+        ${lib.optionalString (lib.length parsedTags > 1) ''
+          # Login to crane for tagging operations
+          set +x
+          echo "crane login ${registry.name}"
+          ${craneExe} auth login "${registry.name}" \
+            --username "${registry.username}" \
+            --password "${registry.password}"
+          set -x
+        ''}
+        ${lib.concatMapStringsSep "\n" (tag: ''
+          ${craneExe} tag \
+            "${registry.name}/${registry.repo}:${lib.head parsedTags}" \
+            "${tag}"
+        '') (lib.tail parsedTags)}
+
+        set +x
+        ${
+          if isSingleArch then
+            ''
+              echo "Successfully pushed single-arch image for ${name}"
+            ''
+          else
+            ''
+              echo "Successfully pushed multi-arch manifest for ${name}"
+            ''
+        }
+        echo "Available at: ${registry.name}/${registry.repo}:${lib.head parsedTags}"
+        ${lib.concatMapStringsSep "\n" (tag: ''
+          echo "  Also tagged: ${registry.name}/${registry.repo}:${tag}"
+        '') (lib.tail parsedTags)}
   '';
 }
