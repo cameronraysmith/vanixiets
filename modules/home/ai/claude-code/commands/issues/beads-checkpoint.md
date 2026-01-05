@@ -63,12 +63,20 @@ bd dep add <actual-blocker> <issue-id>
 
 **Progress state** (if work incomplete):
 ```bash
-bd comment <issue-id> "Checkpoint: <summary of state>"
+bd comments add <issue-id> "Checkpoint: <summary of state>"
 ```
 
 **Completed work:**
 ```bash
-bd close <issue-id> --comment "Implemented in commit $(git rev-parse --short HEAD). <any notable learnings>"
+# Option A: Close with reason
+bd close <issue-id> --reason "Implemented in commit $(git rev-parse --short HEAD). <any notable learnings>"
+
+# Option B: Close and see what was unblocked
+bd close <issue-id> --reason "Implemented in..." --suggest-next
+
+# Option C: Separate close and comment
+bd close <issue-id>
+bd comments add <issue-id> "Implemented in commit $(git rev-parse --short HEAD). <learnings>"
 ```
 
 ## Handoff
@@ -77,7 +85,10 @@ Prepare for the next session to pick up cleanly.
 
 **If work is complete:**
 ```bash
-# Check what was unblocked
+# Option A: Close and immediately see what was unblocked
+bd close <issue-id> --reason "Implemented in..." --suggest-next
+
+# Option B: Manual review of dependencies
 bd dep tree <completed-id> --direction up
 
 # Check if any epics can close
@@ -90,7 +101,7 @@ Review unblocked issues — do their descriptions need updating given what was l
 
 Leave a checkpoint comment on the in-progress issue:
 ```bash
-bd comment <issue-id> "$(cat <<'EOF'
+bd comments add <issue-id> "$(cat <<'EOF'
 Checkpoint: <date/session identifier>
 
 Done:
@@ -107,6 +118,8 @@ Suggested next steps:
 EOF
 )"
 ```
+
+Note: Use `bd update <id> --claim` to atomically claim an issue when resuming work (sets assignee + status to in_progress, fails if already claimed).
 
 **Final commit:**
 ```bash
