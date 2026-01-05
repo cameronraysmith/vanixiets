@@ -126,7 +126,10 @@
             "claude-historian" = {
               type = "stdio";
               command = "npx";
-              args = [ "claude-historian" ];
+              args = [
+                "-y"
+                "claude-historian-mcp@latest"
+              ];
               env = { };
             };
           };
