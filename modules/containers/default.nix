@@ -1,17 +1,23 @@
-# Multi-architecture container builds using nix2container
+# Multi-architecture container builds using nix2container with unified pkgsCross
 #
 # This module provides:
-# - Container packages (fdContainer, rgContainer) for Linux systems
-# - Multi-arch manifests (fdManifest, rgManifest) for CI/CD registry distribution
+# - Container packages for both x86_64-linux and aarch64-linux targets
+# - Multi-arch manifests for CI/CD registry distribution
 #
 # Architecture:
+# - Uses pkgsCross for cross-compilation (auto-optimizes to native when host == target)
 # - nix2container: Builds JSON manifests with pre-computed layer digests
-#   No tarballs written to Nix store; layers synthesized at push time by patched skopeo
 # - mkMultiArchManifest: Creates multi-arch Docker manifests using skopeo and podman
 #
-# Performance characteristics:
-# - Build time: O(manifest size) - JSON generation only, no tar creation
-# - Store space: O(manifest size) - no layer tarball duplication
+# Platform behavior:
+# - x86_64-linux host: x86_64 containers native, aarch64 containers cross-compiled
+# - aarch64-linux host: aarch64 containers native, x86_64 containers cross-compiled
+# - aarch64-darwin host: both via rosetta-builder (native execution in Linux VM)
+#
+# Performance:
+# - pkgsCross auto-optimizes: when target == host, returns native pkgs (zero overhead)
+# - Cross-compilation runs at native speed (no emulation during build)
+# - Build time: O(manifest size) - JSON generation only
 # - Push time: O(changed layers) - skopeo skips unchanged layers by digest
 #
 # See docs/about/contributing/multi-arch-containers.md for usage guide.
@@ -19,7 +25,7 @@
   inputs,
   lib,
   ...
-}@args:
+}:
 {
   perSystem =
     { pkgs, system, ... }:
@@ -36,40 +42,61 @@
       # Import the multi-arch manifest builder from shared lib
       mkMultiArchManifest = pkgs.callPackage ../../lib/mk-multi-arch-manifest.nix { };
 
-      # Shared base layer: bash and coreutils
-      # This layer is reused across all tool containers, maximizing cache hits
-      baseLayer = nix2container.buildLayer {
-        deps = [
-          pkgs.bashInteractive
-          pkgs.coreutils
-        ];
+      # Unified target definitions using pkgsCross
+      # When host == target, pkgsCross auto-optimizes to return native pkgs
+      # (verified: same derivation paths, zero overhead)
+      targets = {
+        x86_64 = {
+          system = "x86_64-linux";
+          crossPkgs = pkgs.pkgsCross.gnu64;
+          arch = "amd64";
+        };
+        aarch64 = {
+          system = "aarch64-linux";
+          crossPkgs = pkgs.pkgsCross.aarch64-multiplatform;
+          arch = "arm64";
+        };
       };
 
-      # Build a minimal container image with a package
+      # Build base layer for a specific target architecture
+      # Uses cross-compiled bash and coreutils for the target
+      mkBaseLayerForTarget =
+        target:
+        nix2container.buildLayer {
+          deps = [
+            target.crossPkgs.bashInteractive
+            target.crossPkgs.coreutils
+          ];
+        };
+
+      # Build a minimal container image for a specific target architecture
       # Makes it work like: docker run <name>:latest --version
       #
       # Layer strategy:
-      # - Layer 0: baseLayer (bash, coreutils) - rarely changes, shared
+      # - Layer 0: baseLayer (bash, coreutils) - rarely changes, shared per arch
       # - Layer 1: tool package - changes independently per tool
-      #
-      # Development workflow:
-      # - Local test: nix run .#fdContainer.copyToDockerDaemon && docker run fd
-      # - Single push: nix run .#fdContainer.copyToRegistry
-      # - Multi-arch: nix run --impure .#fdManifest
-      mkToolContainer =
+      mkToolContainerForTarget =
         {
           name,
-          package,
+          pkgName ? name,
+          target,
           tag ? "latest",
         }:
+        let
+          package = target.crossPkgs.${pkgName};
+          baseLayer = mkBaseLayerForTarget target;
+        in
         nix2container.buildImage {
           inherit name tag;
+
+          # Explicit architecture for OCI manifest
+          arch = target.arch;
 
           # Explicit layers: base packages in shared layer
           layers = [ baseLayer ];
 
           # Tool package in main image layer (copyToRoot strips /nix/store prefix)
-          copyToRoot = pkgs.buildEnv {
+          copyToRoot = target.crossPkgs.buildEnv {
             name = "root";
             paths = [ package ];
             pathsToLink = [ "/bin" ];
@@ -78,10 +105,10 @@
           config = {
             entrypoint = [ "${package}/bin/${name}" ];
             Env = [
-              "PATH=${package}/bin:${pkgs.coreutils}/bin:${pkgs.bashInteractive}/bin"
+              "PATH=${package}/bin:${target.crossPkgs.coreutils}/bin:${target.crossPkgs.bashInteractive}/bin"
             ];
             Labels = {
-              "org.opencontainers.image.description" = "Minimal container with ${name}";
+              "org.opencontainers.image.description" = "Minimal container with ${name} (${target.arch})";
               "org.opencontainers.image.source" = "https://github.com/cameronraysmith/vanixiets";
             };
           };
@@ -90,116 +117,111 @@
           maxLayers = 2;
         };
 
-      # Systems to build images for (both architectures)
-      imageSystems = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
+      # Container definitions
+      containerDefs = {
+        fd = {
+          name = "fd";
+          pkgName = "fd";
+        };
+        rg = {
+          name = "rg";
+          pkgName = "ripgrep";
+        };
+      };
+
+      # Generate container packages for all targets
+      # Creates: fdContainer-x86_64, fdContainer-aarch64, rgContainer-x86_64, rgContainer-aarch64
+      containerPackages = lib.listToAttrs (
+        lib.flatten (
+          lib.mapAttrsToList (
+            containerName: def:
+            lib.mapAttrsToList (targetName: target: {
+              name = "${containerName}Container-${targetName}";
+              value = mkToolContainerForTarget (def // { inherit target; });
+            }) targets
+          ) containerDefs
+        )
+      );
+
+      # Helper to get env var with fallback (requires --impure for actual env var reading)
+      getEnvOr =
+        var: default:
+        let
+          val = builtins.getEnv var;
+        in
+        if val == "" then default else val;
+
+      # Generate multi-arch manifest for a container
+      # Works on any platform: Linux uses pkgsCross, Darwin uses rosetta-builder
+      mkManifestForContainer =
+        containerName:
+        mkMultiArchManifest {
+          name = containerName;
+          images = lib.mapAttrs' (
+            targetName: target:
+            lib.nameValuePair target.system containerPackages."${containerName}Container-${targetName}"
+          ) targets;
+          registry = {
+            name = "ghcr.io";
+            repo = "cameronraysmith/vanixiets/${containerName}";
+            username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
+            password = "$GITHUB_TOKEN";
+          };
+          version = getEnvOr "VERSION" "1.0.0";
+          branch = getEnvOr "GITHUB_REF_NAME" "main";
+          skopeo = skopeo-nix2container;
+          podman = pkgs.podman;
+        };
+
+      # Generate single-arch manifest (no manifest list, direct push)
+      mkSingleArchManifest =
+        containerName: targetName:
+        let
+          target = targets.${targetName};
+        in
+        mkMultiArchManifest {
+          name = containerName;
+          images = {
+            ${target.system} = containerPackages."${containerName}Container-${targetName}";
+          };
+          registry = {
+            name = "ghcr.io";
+            repo = "cameronraysmith/vanixiets/${containerName}";
+            username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
+            password = "$GITHUB_TOKEN";
+          };
+          version = getEnvOr "VERSION" "1.0.0";
+          branch = getEnvOr "GITHUB_REF_NAME" "main";
+          skopeo = skopeo-nix2container;
+          podman = pkgs.podman;
+        };
+
+      # Manifest packages
+      manifestPackages = {
+        # Multi-arch manifests (both architectures)
+        fdManifest = mkManifestForContainer "fd";
+        rgManifest = mkManifestForContainer "rg";
+
+        # Single-arch variants (for testing or single-platform deployments)
+        fdManifest-x86 = mkSingleArchManifest "fd" "x86_64";
+        fdManifest-arm = mkSingleArchManifest "fd" "aarch64";
+        rgManifest-x86 = mkSingleArchManifest "rg" "x86_64";
+        rgManifest-arm = mkSingleArchManifest "rg" "aarch64";
+      };
+
     in
     {
-      # Container packages - Linux only (built via nix-rosetta-builder on Darwin)
-      # Manifests available on all systems for CI/CD coordination
+      # All container and manifest packages available on Linux and Darwin
       # Use lib.mkMerge to properly merge with pkgs-by-name packages
       packages = lib.mkMerge [
-        # Container images - Linux only
-        (lib.optionalAttrs isLinux {
-          fdContainer = mkToolContainer {
-            name = "fd";
-            package = pkgs.fd;
-          };
-
-          rgContainer = mkToolContainer {
-            name = "rg";
-            package = pkgs.ripgrep;
-          };
-        })
+        # Container images for all target architectures
+        # Available on both Linux and Darwin (Darwin builds via rosetta-builder)
+        (lib.optionalAttrs (isLinux || isDarwin) containerPackages)
 
         # Multi-arch manifests for CI/CD registry distribution
-        # Darwin-only: requires nix-rosetta-builder to build both Linux architectures
-        # Usage: nix run --impure .#fdManifest
-        # Requires: GITHUB_TOKEN environment variable in CI
-        #
-        # Note: Manifests are Darwin-only because they depend on both x86_64-linux
-        # and aarch64-linux container images. Darwin hosts with nix-rosetta-builder
-        # can build both, but single-arch Linux CI runners cannot.
-        (lib.optionalAttrs isDarwin (
-          let
-            # Helper to get env var with fallback (requires --impure for actual env var reading)
-            getEnvOr =
-              var: default:
-              let
-                val = builtins.getEnv var;
-              in
-              if val == "" then default else val;
-          in
-          {
-            fdManifest = mkMultiArchManifest {
-              name = "fd";
-              images = lib.genAttrs imageSystems (sys: inputs.self.packages.${sys}.fdContainer);
-              registry = {
-                name = "ghcr.io";
-                repo = "cameronraysmith/vanixiets/fd";
-                username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
-                password = "$GITHUB_TOKEN";
-              };
-              version = getEnvOr "VERSION" "1.0.0";
-              branch = getEnvOr "GITHUB_REF_NAME" "main";
-              skopeo = skopeo-nix2container;
-              podman = pkgs.podman;
-            };
-
-            rgManifest = mkMultiArchManifest {
-              name = "rg";
-              images = lib.genAttrs imageSystems (sys: inputs.self.packages.${sys}.rgContainer);
-              registry = {
-                name = "ghcr.io";
-                repo = "cameronraysmith/vanixiets/rg";
-                username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
-                password = "$GITHUB_TOKEN";
-              };
-              version = getEnvOr "VERSION" "1.0.0";
-              branch = getEnvOr "GITHUB_REF_NAME" "main";
-              skopeo = skopeo-nix2container;
-              podman = pkgs.podman;
-            };
-
-            # Single-arch x86_64-linux variants (no manifest list)
-            # Usage: nix run --impure .#fdManifest-x86
-            fdManifest-x86 = mkMultiArchManifest {
-              name = "fd";
-              images = {
-                "x86_64-linux" = inputs.self.packages.x86_64-linux.fdContainer;
-              };
-              registry = {
-                name = "ghcr.io";
-                repo = "cameronraysmith/vanixiets/fd";
-                username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
-                password = "$GITHUB_TOKEN";
-              };
-              version = getEnvOr "VERSION" "1.0.0";
-              branch = getEnvOr "GITHUB_REF_NAME" "main";
-              skopeo = skopeo-nix2container;
-              podman = pkgs.podman;
-            };
-
-            rgManifest-x86 = mkMultiArchManifest {
-              name = "rg";
-              images = {
-                "x86_64-linux" = inputs.self.packages.x86_64-linux.rgContainer;
-              };
-              registry = {
-                name = "ghcr.io";
-                repo = "cameronraysmith/vanixiets/rg";
-                username = getEnvOr "GITHUB_ACTOR" "cameronraysmith";
-                password = "$GITHUB_TOKEN";
-              };
-              version = getEnvOr "VERSION" "1.0.0";
-              branch = getEnvOr "GITHUB_REF_NAME" "main";
-              skopeo = skopeo-nix2container;
-              podman = pkgs.podman;
-            };
-          }
-        ))
+        # Now works on Linux (via pkgsCross) and Darwin (via rosetta-builder)
+        # Usage: VERSION=1.0.0 nix run --impure .#fdManifest
+        (lib.optionalAttrs (isLinux || isDarwin) manifestPackages)
       ];
     };
 }
