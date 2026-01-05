@@ -561,53 +561,68 @@ docs-versions limit="10":
   cd packages/docs && sops exec-env ../../secrets/shared.yaml "bunx wrangler versions list --limit {{limit}}"
 
 ## containers
+# Unified container builds using pkgsCross
+# Works identically on x86_64-linux, aarch64-linux, and aarch64-darwin
+# pkgsCross auto-optimizes: native when host == target, cross-compile otherwise
 
-# Architecture auto-detection: map host arch to target Linux arch
-_current_arch := arch()
-_native_linux_arch := if _current_arch == "aarch64" { "aarch64-linux" } else { "x86_64-linux" }
-
-# Build a container image for the specified architecture (auto-detects native by default)
+# Build a container for target architecture (x86_64 or aarch64)
 [group('containers')]
-build-container container arch=_native_linux_arch:
-  nix build '.#packages.{{arch}}.{{container}}'
+container-build CONTAINER="fd" TARGET="aarch64":
+  nix build '.#{{CONTAINER}}Container-{{TARGET}}'
 
-# Build container for both aarch64-linux and x86_64-linux
+# Build containers for both architectures
 [group('containers')]
-build-multiarch container:
-  @echo "Building aarch64-linux..."
-  nix build '.#packages.aarch64-linux.{{container}}' -o result-aarch64-linux
+container-build-all CONTAINER="fd":
   @echo "Building x86_64-linux..."
-  nix build '.#packages.x86_64-linux.{{container}}' -o result-x86_64-linux
+  nix build '.#{{CONTAINER}}Container-x86_64' -o result-x86_64
+  @echo "Building aarch64-linux..."
+  nix build '.#{{CONTAINER}}Container-aarch64' -o result-aarch64
   @echo "✓ Both architectures built successfully"
 
-# Load the container image from result into docker
+# Push multi-arch manifest to registry (requires GITHUB_TOKEN)
 [group('containers')]
-load-container:
-  docker load < result
+container-push CONTAINER="fd" VERSION="1.0.0":
+  VERSION={{VERSION}} nix run --impure '.#{{CONTAINER}}Manifest'
 
-# Load the native architecture from a multi-arch build
+# Push single-arch manifest (x86_64 only)
 [group('containers')]
-load-native:
-  docker load < result-{{_native_linux_arch}}
+container-push-x86 CONTAINER="fd" VERSION="1.0.0":
+  VERSION={{VERSION}} nix run --impure '.#{{CONTAINER}}Manifest-x86'
 
-# Test a container by running the binary with --help
+# Push single-arch manifest (aarch64 only)
 [group('containers')]
-test-container binary:
-  docker run --rm {{binary}}:latest --help
+container-push-arm CONTAINER="fd" VERSION="1.0.0":
+  VERSION={{VERSION}} nix run --impure '.#{{CONTAINER}}Manifest-arm'
 
-# Complete workflow: build, load, and test a container (single-arch)
+# Load container image to Docker daemon via nix2container
 [group('containers')]
-container-all container binary arch=_native_linux_arch:
-  just build-container {{container}} {{arch}}
-  just load-container
-  just test-container {{binary}}
+container-load CONTAINER="fd" TARGET="aarch64":
+  nix run '.#{{CONTAINER}}Container-{{TARGET}}.copyToDockerDaemon'
 
-# Complete workflow: build both architectures, load native, and test
+# Test container by running with --help
 [group('containers')]
-container-all-multiarch container binary:
-  just build-multiarch {{container}}
-  just load-native
-  just test-container {{binary}}
+container-test BINARY="fd":
+  docker run --rm {{BINARY}}:latest --help
+
+# Complete workflow: build, load, and test a container
+[group('containers')]
+container-all CONTAINER="fd" BINARY="" TARGET="aarch64":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  BINARY="${BINARY:-$CONTAINER}"
+  just container-build {{CONTAINER}} {{TARGET}}
+  just container-load {{CONTAINER}} {{TARGET}}
+  just container-test "$BINARY"
+
+# Verify container architecture metadata
+[group('containers')]
+container-verify CONTAINER="fd" TARGET="aarch64":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  RESULT=$(nix build '.#{{CONTAINER}}Container-{{TARGET}}' --no-link --print-out-paths)
+  echo "Container: $RESULT"
+  echo "Architecture: $(jq -r '.arch' "$RESULT")"
+  echo "Layers: $(jq '.layers | length' "$RESULT")"
 
 ## secrets
 
