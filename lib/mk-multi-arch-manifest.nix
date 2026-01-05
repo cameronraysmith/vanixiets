@@ -32,7 +32,6 @@
   lib,
   writeShellApplication,
   coreutils,
-  git,
   crane,
   jq,
 }:
@@ -97,7 +96,6 @@ writeShellApplication {
     crane
     jq
     coreutils
-    git
   ];
 
   text = ''
@@ -153,6 +151,10 @@ writeShellApplication {
       # Create and push multi-arch manifest list using crane
       # crane index append creates a fresh index with the specified manifests
       # and pushes it in a single operation - no local storage needed
+      #
+      # Note: crane index append doesn't support --annotation flag.
+      # Manifest list annotations are optional metadata; individual images
+      # have labels set via nix2container's config.Labels if needed.
       echo "Creating multi-arch manifest list: ${manifestName}"
       ${craneExe} index append \
         ${
@@ -160,10 +162,6 @@ writeShellApplication {
             archImage: ''-m "${repoBase}@''${PUSHED_DIGESTS["${archImage.arch}"]}"''
           ) (lib.attrValues archImages)
         } \
-        --annotation "org.opencontainers.image.created=$(${lib.getExe' coreutils "date"} --iso-8601=seconds)" \
-        --annotation "org.opencontainers.image.revision=$(${lib.getExe git} rev-parse HEAD)" \
-        --annotation "org.opencontainers.image.version=${version}" \
-        --annotation "org.opencontainers.image.source=https://github.com/cameronraysmith/vanixiets" \
         -t "${manifestName}"
 
       set +x
