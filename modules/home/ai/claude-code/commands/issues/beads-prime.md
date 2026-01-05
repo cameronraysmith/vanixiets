@@ -40,6 +40,14 @@ git add .beads/issues.jsonl
 git commit -m "chore(issues): ..."
 ```
 
+Additional sync flags:
+
+```bash
+bd sync --flush-only    # Only export to JSONL (useful for pre-commit)
+bd sync --check         # Pre-sync integrity check
+bd sync --dry-run       # Preview sync without changes
+```
+
 ## Orient
 
 ```bash
@@ -54,8 +62,14 @@ bv --robot-next             # minimal JSON: just the single top pick
 # Top pick (small JSON, safe for direct consumption)
 bv --robot-next
 
+# Show ready-to-work issues (no blockers, open or in_progress)
+bd ready
+
+# Show blocked issues
+bd blocked
+
 # Full dependency context (upstream + downstream)
-bd dep tree <id> --direction both
+bd dep tree <id> --direction=both
 
 # Issue details
 bd show <id>
@@ -74,7 +88,7 @@ rm "$TRIAGE"
 ## During work
 
 ```bash
-# Create discovered issue
+# Create discovered issue (priority: 0=highest, 4=lowest, default=2)
 bd create "Found: ..." -t bug -p 2
 bd dep add <new-id> <current-id> --type discovered-from
 
@@ -94,14 +108,20 @@ bd epic close-eligible --dry-run
 
 ```bash
 bd dep cycles               # must be zero
-bd validate                 # database integrity
+bd doctor                   # check and fix installation health
+bd lint                     # check issues for missing template sections
 ```
 
 ## Key patterns
 
 - `bv --robot-triage` is the single entry point — unified counts, recommendations, health
 - `bv --robot-next` for minimal context — just top pick with claim command
-- `bd dep tree <id> --direction both` shows full context (blockers + what completing it unblocks)
+- `bd ready` / `bd blocked` for quick work selection without JSON parsing
+- `bd dep tree <id> --direction=both` shows full context (blockers + what completing it unblocks)
 - Always close with `--comment` referencing the implementation
 - Use `--type discovered-from` when creating issues found during other work
 - After `bd` modifications: `git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"`
+
+Other useful robot flags:
+- `bv --robot-plan` - Dependency-respecting execution plan
+- `bv --robot-insights` - Graph analysis
