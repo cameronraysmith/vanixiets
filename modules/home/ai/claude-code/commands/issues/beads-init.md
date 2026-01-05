@@ -19,6 +19,21 @@ We keep the default merge driver (no `--skip-merge-driver`) since it only activa
 
 For completely invisible beads usage without affecting repository collaborators, consider `--stealth` mode instead (see below).
 
+## Alternative: Stealth mode (invisible beads)
+
+For personal use without affecting repository collaborators:
+
+```bash
+bd init --stealth -p <prefix> -q
+```
+
+Stealth mode configures beads to be completely invisible to git:
+- Adds `.beads/` to `.git/info/exclude` (local gitignore, not committed)
+- Sets up Claude Code integration automatically
+- Perfect for personal issue tracking without team coordination
+
+With stealth mode, beads changes remain local and never enter git history.
+
 ## Post-init cleanup
 
 After `bd init` completes, perform these cleanup steps:
