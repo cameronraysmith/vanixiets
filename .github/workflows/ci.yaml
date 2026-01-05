@@ -36,11 +36,10 @@ on:
         description: comma-separated list of jobs to run
         required: false
         type: string
-  # TEMP: PR trigger disabled during container refactor iteration (revert before merge)
-  # pull_request:
-  #   types: [opened, reopened, synchronize]
-  #   paths-ignore:
-  #     - "*.md"
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths-ignore:
+      - "*.md"
   push:
     branches:
       - "main"
