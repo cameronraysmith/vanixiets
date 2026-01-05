@@ -7,7 +7,7 @@
 # Architecture:
 # - Uses pkgsCross for cross-compilation (auto-optimizes to native when host == target)
 # - nix2container: Builds JSON manifests with pre-computed layer digests
-# - mkMultiArchManifest: Creates multi-arch Docker manifests using skopeo and podman
+# - mkMultiArchManifest: Creates multi-arch Docker manifests using skopeo and crane
 #
 # Platform behavior:
 # - x86_64-linux host: x86_64 containers native, aarch64 containers cross-compiled
@@ -271,7 +271,6 @@ in
           tags = getEnvList "TAGS"; # Additional tags via crane (e.g., "latest,stable")
           branch = getEnvOr "GITHUB_REF_NAME" "main";
           skopeo = skopeo-nix2container;
-          podman = pkgs.podman;
         };
 
       # Generate all manifest variants for all containers
