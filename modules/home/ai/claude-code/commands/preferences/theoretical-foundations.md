@@ -46,6 +46,13 @@ For practical application, see:
   - [Practical challenges](#practical-challenges)
   - [Pragmatic approach](#pragmatic-approach)
   - [Best practices for effect composition](#best-practices-for-effect-composition)
+- [The Decider pattern: minimal algebraic interface](#the-decider-pattern-minimal-algebraic-interface)
+  - [Formal definition](#formal-definition)
+  - [Coalgebra-algebra adjoint pair](#coalgebra-algebra-adjoint-pair)
+  - [Signature-Algebra-Interpreter correspondence](#signature-algebra-interpreter-correspondence)
+  - [State reconstruction as catamorphism](#state-reconstruction-as-catamorphism-decider)
+  - [Monoidal composition of Deciders](#monoidal-composition-of-deciders)
+  - [Product monoid for aggregate state](#product-monoid-for-aggregate-state)
 - [Event sourcing as algebraic duality](#event-sourcing-as-algebraic-duality)
   - [Events as free monoid](#events-as-free-monoid)
   - [State reconstruction as catamorphism](#state-reconstruction-as-catamorphism)
@@ -770,12 +777,541 @@ data FileHandle :: FileState -> * where
 - railway-oriented-programming.md for Result composition
 - domain-modeling.md#workflows-as-type-safe-pipelines
 
+## The Decider pattern: minimal algebraic interface
+
+The Decider pattern, formalized by Jérémie Chassaing, provides the minimal algebraic interface for event-sourced aggregates.
+It unifies command handling and state reconstruction into a single coherent structure that is both coalgebra (commands unfold into events) and algebra (events fold into state).
+This pattern is the concrete realization of Ghosh's Signature → Algebra → Interpreter framework applied to event sourcing.
+
+### Formal definition
+
+A Decider is a triple of operations with an initial state:
+
+```haskell
+data Decider cmd state event = Decider
+  { decide       :: cmd -> state -> [event]
+  , evolve       :: state -> event -> state
+  , initialState :: state
+  , isTerminal   :: state -> Bool  -- optional: detect terminal states
+  }
+```
+
+**Type signatures**:
+- `decide: Command → State → List<Event>` produces events based on current state and command
+- `evolve: State → Event → State` applies a single event to state
+- `initialState: State` provides the starting state
+- `isTerminal: State → Bool` (optional) determines if aggregate reached terminal state
+
+**Minimal complete definition**: decide, evolve, initialState form the essential triple.
+
+The decider is pure: both decide and evolve are referentially transparent functions with no side effects.
+Effects (persistence, event publishing, external queries) are handled by the interpreter layer, not the decider itself.
+
+**Code example: Bank account decider**
+
+```haskell
+data AccountCommand
+  = OpenAccount CustomerId InitialBalance
+  | Deposit Amount
+  | Withdraw Amount
+  | CloseAccount
+
+data AccountEvent
+  = AccountOpened CustomerId InitialBalance
+  | Deposited Amount
+  | Withdrawn Amount
+  | AccountClosed
+  | WithdrawalRejected Reason
+
+data AccountState
+  = NotOpened
+  | Active { balance :: Amount }
+  | Closed
+
+accountDecider :: Decider AccountCommand AccountState AccountEvent
+accountDecider = Decider
+  { decide = \cmd state -> case (cmd, state) of
+      (OpenAccount cid bal, NotOpened) -> [AccountOpened cid bal]
+      (Deposit amt, Active bal) -> [Deposited amt]
+      (Withdraw amt, Active bal)
+        | amt <= bal -> [Withdrawn amt]
+        | otherwise -> [WithdrawalRejected InsufficientFunds]
+      (CloseAccount, Active _) -> [AccountClosed]
+      _ -> []  -- invalid command for current state
+
+  , evolve = \state event -> case (state, event) of
+      (NotOpened, AccountOpened _ bal) -> Active bal
+      (Active bal, Deposited amt) -> Active (bal + amt)
+      (Active bal, Withdrawn amt) -> Active (bal - amt)
+      (Active _, AccountClosed) -> Closed
+      _ -> state  -- failure events or invalid transitions preserve state
+
+  , initialState = NotOpened
+
+  , isTerminal = \state -> case state of
+      Closed -> True
+      _ -> False
+  }
+```
+
+**Practical consequence**:
+The entire aggregate logic is captured in one pure value.
+Testing requires no mocking or infrastructure: given command and state, verify events.
+Given events and initial state, verify final state.
+
+### Coalgebra-algebra adjoint pair
+
+The Decider exhibits coalgebra-algebra duality through its two core operations.
+
+**decide as coalgebra** (command unfolding):
+
+```haskell
+decide :: cmd -> state -> [event]
+-- equivalently: decide :: (cmd, state) -> F event
+-- where F event = [event] is the list functor
+```
+
+This is a coalgebra for the functor F X = Command × State → List X:
+- Given current aggregate state and a command
+- Unfold structure into a list of events
+- Events represent the "transition trace" from current state
+
+The coalgebra perspective emphasizes observation: decide observes the command-state pair and produces events as observable outputs.
+
+**evolve as algebra** (event folding):
+
+```haskell
+evolve :: state -> event -> state
+-- equivalently: evolve :: (state, event) -> state
+```
+
+This is an algebra for the list functor List Event → State:
+- Given a sequence of events (the free monoid over events)
+- Fold them into a single state value
+- State is the "collapsed history" of all events
+
+The algebra perspective emphasizes construction: evolve constructs state from event sequences.
+
+**ASCII diagram: The adjoint pair**
+
+```
+         decide (coalgebra)
+Command ──────────────────────▶ List<Event>
+   │                                 │
+   │ (contravariant)         (covariant)
+   │                                 │
+   └──────── State ◀─────────────────┘
+                 evolve (algebra)
+```
+
+**Category-theoretic interpretation**:
+
+The pair (decide, evolve) forms an adjunction between the command category (contravariant in commands) and the event category (covariant in events), with state as the pivot.
+
+- Left adjoint (decide): Free construction from commands to events via state
+- Right adjoint (evolve): Forgetful functor from event sequences to state
+
+The adjunction satisfies the unit-counit equations:
+- Unit: evolve ∘ decide gives a state transition endomorphism
+- Counit: decide ∘ evolve gives an event sequence endomorphism (modulo state projection)
+
+This duality is analogous to CQRS profunctor structure (see [CQRS as profunctor structure](#cqrs-as-profunctor-structure)), but at the aggregate level rather than system level.
+
+**Practical consequence**:
+The coalgebra-algebra duality ensures consistency between command handling (decide) and state reconstruction (evolve).
+If decide produces events e1, e2, e3, then folding those events via evolve must yield a state consistent with the command's intent.
+This bidirectional coherence is guaranteed by the adjunction, not by programmer discipline.
+
+### Signature-Algebra-Interpreter correspondence
+
+The Decider pattern instantiates Ghosh's three-level architecture (from "Functional and Reactive Domain Modeling"):
+
+**Level 1: Signature** (types and operation names)
+
+```haskell
+-- Signature defines the interface
+signature EventSourcingSignature = {
+  types: Command, Event, State
+  operations:
+    decide: Command → State → List<Event>
+    evolve: State → Event → State
+    initial: State
+}
+```
+
+The signature specifies what operations exist, but not their implementation.
+This is the "module signature" in ML terminology.
+
+**Level 2: Algebra** (implementation of signature)
+
+```haskell
+-- Algebra provides concrete implementation
+algebra AccountAlgebra : EventSourcingSignature = {
+  Command = AccountCommand
+  Event = AccountEvent
+  State = AccountState
+
+  decide = \cmd state -> ... -- business logic here
+  evolve = \state event -> ... -- state transition here
+  initial = NotOpened
+}
+```
+
+The Decider IS the algebra: it provides concrete implementations of decide, evolve, and initialState for specific types.
+
+Multiple algebras can exist for the same signature (different aggregates: Account, Order, Inventory).
+
+**Level 3: Interpreter** (effects and persistence)
+
+```haskell
+-- Interpreter runs the pure algebra against effectful infrastructure
+data EventSourcingInterpreter m = Interpreter
+  { loadEvents :: AggregateId -> m [Event]
+  , saveEvents :: AggregateId -> [Event] -> m ()
+  , snapshot   :: AggregateId -> State -> m ()  -- optional optimization
+  }
+
+runDecider
+  :: Monad m
+  => EventSourcingInterpreter m
+  -> Decider cmd state event
+  -> AggregateId
+  -> cmd
+  -> m [event]
+runDecider interp decider aggId cmd = do
+  events <- loadEvents interp aggId
+  let currentState = foldl' (evolve decider) (initialState decider) events
+  let newEvents = decide decider cmd currentState
+  saveEvents interp aggId newEvents
+  return newEvents
+```
+
+The interpreter handles all effects:
+- Loading events from event store (IO, database queries)
+- Saving new events (IO, transactions)
+- Snapshot management (performance optimization)
+- Concurrency control (optimistic locking)
+
+**Separation of concerns**:
+
+```
+Signature (interface)
+    ↓
+Algebra (pure logic) ← Decider lives here
+    ↓
+Interpreter (effects) ← fmodel, infrastructure code lives here
+```
+
+**Practical consequence**:
+The three-level separation enables:
+- Testing the algebra (Decider) in isolation without effects
+- Multiple interpreters: production (Postgres), test (in-memory), simulation
+- Swapping persistence mechanisms without changing business logic
+- Formal verification of the algebra (pure functions are amenable to proof)
+
+**Connection to fmodel-rust**:
+
+The fmodel library implements exactly this pattern:
+- Decider is the algebra (pure)
+- EventSourcingAggregate is the interpreter (effectful)
+- User code implements decide and evolve
+- Library handles persistence, optimization, error recovery
+
+### State reconstruction as catamorphism {#state-reconstruction-as-catamorphism-decider}
+
+State reconstruction via evolve is precisely a catamorphism (fold) over the event list.
+
+**Formal statement**:
+
+Given an event log `events = [e₁, e₂, ..., eₙ]` and the algebra `(State, evolve)`, the current state is:
+
+```haskell
+currentState = foldl' evolve initialState events
+```
+
+This is the unique catamorphism from the initial algebra (event list, cons) to the algebra (State, evolve).
+
+**Category-theoretic interpretation**:
+
+Event lists form the initial algebra for the list functor F X = 1 + (Event × X):
+- Constructors: Nil :: 1 → List Event, Cons :: Event × List Event → List Event
+- Initial algebra: (List Event, [Nil, Cons])
+
+The evolve function defines an algebra structure on State:
+- Algebra carrier: State
+- Algebra morphism: evolve :: State → Event → State
+
+Initiality guarantees there exists a unique homomorphism from (List Event, constructors) to (State, evolve).
+That unique homomorphism is `fold evolve initialState`.
+
+**ASCII diagram: Catamorphic reconstruction**
+
+```
+EventLog (initial algebra)
+    │
+    │ unique catamorphism (fold)
+    │
+    ▼
+  State (target algebra)
+```
+
+**Practical consequence**:
+
+Uniqueness means: given the algebra (evolve, initialState), there is exactly one way to interpret the event sequence.
+This guarantees deterministic replay: same events always produce same state, regardless of when or where events are replayed.
+
+**Connection to snapshots**:
+
+Snapshots are partial evaluations of the catamorphism:
+- Snapshot at event N: `snapshotₙ = foldl' evolve initialState (take N events)`
+- Resume from snapshot: `currentState = foldl' evolve snapshotₙ (drop N events)`
+
+Memoization is valid because fold is deterministic and associative (assuming evolve is total and deterministic).
+
+**Law: evolve must be total and deterministic**:
+
+```haskell
+-- Totality: evolve must handle all event cases
+evolve state event  -- always terminates, no exceptions
+
+-- Determinism: same state + event always gives same next state
+evolve s e == evolve s e  -- referential transparency
+
+-- Associativity (for folding): grouping doesn't matter
+foldl' evolve s [e1, e2, e3] == foldl' evolve (foldl' evolve s [e1, e2]) [e3]
+```
+
+If evolve violates these laws, state reconstruction becomes non-deterministic, breaking the catamorphism property.
+
+**See also**:
+- [F-algebras and catamorphisms](#f-algebras-and-catamorphisms) for general catamorphism theory
+- [Events as free monoid](#events-as-free-monoid) for the monoid structure of event logs
+- [State reconstruction as catamorphism](#state-reconstruction-as-catamorphism) in the event sourcing section for broader context
+
+### Monoidal composition of Deciders
+
+Deciders compose monoidally: two deciders can be combined into a single decider with product state and sum command/event types.
+
+**Formal construction**:
+
+Given:
+- `Decider<C₁, S₁, E₁>` (first decider)
+- `Decider<C₂, S₂, E₂>` (second decider)
+
+Construct:
+- `Decider<C₁ + C₂, S₁ × S₂, E₁ + E₂>` (combined decider)
+
+```haskell
+-- Sum type for commands
+data SumCmd c1 c2 = Left1 c1 | Right1 c2
+
+-- Sum type for events
+data SumEvent e1 e2 = Left2 e1 | Right2 e2
+
+-- Product type for state
+type ProductState s1 s2 = (s1, s2)
+
+-- Monoidal composition operator
+combine
+  :: Decider c1 s1 e1
+  -> Decider c2 s2 e2
+  -> Decider (SumCmd c1 c2) (ProductState s1 s2) (SumEvent e1 e2)
+combine d1 d2 = Decider
+  { decide = \cmd (s1, s2) -> case cmd of
+      Left1 c1 -> map Left2 (decide d1 c1 s1)
+      Right1 c2 -> map Right2 (decide d2 c2 s2)
+
+  , evolve = \(s1, s2) event -> case event of
+      Left2 e1 -> (evolve d1 s1 e1, s2)
+      Right2 e2 -> (s1, evolve d2 s2 e2)
+
+  , initialState = (initialState d1, initialState d2)
+
+  , isTerminal = \(s1, s2) -> isTerminal d1 s1 && isTerminal d2 s2
+  }
+```
+
+**Monoidal laws**:
+
+This composition satisfies monoidal axioms:
+
+```haskell
+-- Associativity (up to isomorphism)
+combine (combine d1 d2) d3 ≅ combine d1 (combine d2 d3)
+
+-- Identity (unit decider)
+data Unit = Unit
+unitDecider = Decider
+  { decide = \_ _ -> []
+  , evolve = \_ _ -> ()
+  , initialState = ()
+  , isTerminal = \_ -> False
+  }
+
+combine d unitDecider ≅ d
+combine unitDecider d ≅ d
+```
+
+**Category-theoretic interpretation**:
+
+Deciders form a monoidal category:
+- Objects: Type triples (Command, State, Event)
+- Morphisms: Decider implementations
+- Monoidal product: ⊗ defined by combine
+- Unit object: (Unit, (), Void) with trivial decider
+
+The monoidal product distributes command sums over state products:
+```
+(C₁ + C₂) × (S₁ × S₂) → List(E₁ + E₂)
+```
+
+**Practical use case: Aggregate composition**
+
+```haskell
+-- Account aggregate
+accountDecider :: Decider AccountCmd AccountState AccountEvent
+
+-- Audit log aggregate
+auditDecider :: Decider AuditCmd AuditState AuditEvent
+
+-- Combined aggregate: account with audit trail
+type CombinedCmd = SumCmd AccountCmd AuditCmd
+type CombinedState = (AccountState, AuditState)
+type CombinedEvent = SumEvent AccountEvent AuditEvent
+
+combinedDecider :: Decider CombinedCmd CombinedState CombinedEvent
+combinedDecider = combine accountDecider auditDecider
+```
+
+**Practical consequence**:
+
+Monoidal composition enables:
+- Building complex aggregates from simpler deciders (composition)
+- Testing each sub-decider independently (modularity)
+- Reusing deciders across different aggregate contexts (e.g., audit decider used with account, order, inventory)
+- Incremental aggregate design (start with one decider, compose in additional concerns)
+
+**Connection to fmodel**:
+
+The fmodel library provides `combine()` method implementing exactly this monoidal composition.
+Users can compose multiple deciders without writing boilerplate sum/product types.
+
+### Product monoid for aggregate state
+
+When aggregate state is a product of monoidal fields, the state itself forms a monoid, simplifying evolve implementation.
+
+**Practical pattern**: Aggregates with independent fields
+
+```haskell
+-- Aggregate state as product of monoidal components
+data OrderState = OrderState
+  { items :: Map ProductId Quantity  -- monoidal: Map with (Max Quantity) values
+  , totalPrice :: Sum Money          -- monoidal: Sum monoid
+  , status :: Last OrderStatus       -- monoidal: Last (most recent wins)
+  , appliedDiscounts :: Set DiscountCode  -- monoidal: Set union
+  }
+```
+
+**Monoidal structure**:
+
+Each field is a monoid:
+- `Map k v` is monoid when `v` is monoid (pointwise merge)
+- `Sum a` is monoid with addition
+- `Last a` is monoid taking the most recent value
+- `Set a` is monoid with union
+
+**Product monoid law**:
+
+If S₁, S₂, ..., Sₙ are monoids, their product S₁ × S₂ × ... × Sₙ is a monoid with:
+- Identity: (mempty₁, mempty₂, ..., memptyₙ)
+- Operation: (s₁, s₂, ..., sₙ) <> (s₁', s₂', ..., sₙ') = (s₁ <> s₁', s₂ <> s₂', ..., sₙ <> sₙ')
+
+**Code example: Monoidal evolve**
+
+```haskell
+instance Monoid OrderState where
+  mempty = OrderState
+    { items = mempty            -- empty map
+    , totalPrice = Sum 0        -- zero
+    , status = Last Nothing     -- no status yet
+    , appliedDiscounts = mempty -- empty set
+    }
+
+  mappend s1 s2 = OrderState
+    { items = items s1 <> items s2
+    , totalPrice = totalPrice s1 <> totalPrice s2
+    , status = status s1 <> status s2  -- Last monoid: s2 wins
+    , appliedDiscounts = appliedDiscounts s1 <> appliedDiscounts s2
+    }
+
+-- evolve becomes simple monoid append
+evolve :: OrderState -> OrderEvent -> OrderState
+evolve state event = state <> eventToState event
+  where
+    eventToState :: OrderEvent -> OrderState
+    eventToState (ItemAdded prodId qty price) = mempty
+      { items = Map.singleton prodId qty
+      , totalPrice = Sum price
+      }
+    eventToState (StatusChanged status) = mempty
+      { status = Last (Just status)
+      }
+    eventToState (DiscountApplied code discount) = mempty
+      { appliedDiscounts = Set.singleton code
+      , totalPrice = Sum (negate discount)
+      }
+```
+
+**Practical consequence**:
+
+Monoidal state simplifies evolve to: "convert event to partial state, then monoidally append."
+This pattern eliminates complex case analysis in evolve, reducing bugs and cognitive load.
+
+**When monoidal state works**:
+- Fields are independent (no cross-field constraints)
+- Append semantics match domain (e.g., items accumulate, status updates)
+- Conflicts resolve monoidally (Last, Max, Set union)
+
+**When monoidal state doesn't work**:
+- Complex invariants across fields (e.g., "total price must equal sum of item prices")
+- Non-commutative updates (order matters beyond what monoid captures)
+- State transitions require examining multiple fields (decision tree logic)
+
+**Connection to CRDTs**:
+
+Monoidal aggregate state is structurally similar to CRDTs (Conflict-Free Replicated Data Types).
+If all fields are commutative monoids, the aggregate state is a CRDT, enabling eventual consistency in distributed scenarios.
+
+**See also**:
+- algebraic-laws.md#monoid-laws for monoid axioms and testing
+- domain-modeling.md#pattern-5-deciders-for-event-sourced-aggregates for practical implementation guidance
+- event-sourcing.md for operational event sourcing patterns
+
+### See also
+
+**Practical implementation**:
+- domain-modeling.md#pattern-5-deciders-for-event-sourced-aggregates for implementation guidance and examples
+- event-sourcing.md for comprehensive operational patterns (aggregate design, snapshots, process managers)
+- rust-development/12-distributed-systems.md for Rust-specific decider implementation with fmodel
+
+**Theoretical foundations**:
+- [F-algebras and catamorphisms](#f-algebras-and-catamorphisms) for catamorphism theory underlying state reconstruction
+- [Coalgebras for endofunctors](#coalgebras-for-endofunctors) for coalgebra theory underlying command handling
+- [Event sourcing as algebraic duality](#event-sourcing-as-algebraic-duality) (next section) for system-level algebraic structure
+
+**Algebraic laws**:
+- algebraic-laws.md#monoid-laws for testing monoidal state composition
+- algebraic-laws.md#functor-laws for ensuring evolve preserves structure
+
 ## Event sourcing as algebraic duality
 
 Event sourcing occupies a privileged position in the taxonomy of architectural patterns: it explicitly represents both construction (see [F-algebras and catamorphisms](#f-algebras-and-catamorphisms)) and observation (see [Coalgebras for endofunctors](#coalgebras-for-endofunctors)) perspectives.
 The event log is a free monoid over event types, a universal construction that preserves complete history while enabling arbitrary interpretations via monoid homomorphisms.
 State reconstruction proceeds via catamorphism, the unique fold guaranteed by initiality.
 This duality manifests concretely in CQRS: the command side (contravariant in commands) and query side (covariant in views) both factor through the event log as pivot point, forming a profunctor structure that preserves information while enabling independent scaling.
+
+The [Decider pattern](#the-decider-pattern-minimal-algebraic-interface) (previous section) provides the minimal algebraic interface that makes this duality concrete at the aggregate level, unifying command handling (coalgebra) and state reconstruction (algebra) into a single coherent structure.
+This section examines the broader system-level algebraic properties that emerge when event sourcing is applied across multiple aggregates and projections.
 
 **ASCII diagram: The duality triangle**
 
