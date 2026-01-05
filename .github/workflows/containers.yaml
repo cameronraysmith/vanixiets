@@ -1,4 +1,4 @@
-name: Container Build Test
+name: Container Images
 
 on:
   workflow_dispatch:
