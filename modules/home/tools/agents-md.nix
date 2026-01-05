@@ -37,6 +37,7 @@
           - event sourcing (event replay, state reconstruction, CQRS): ${prefsPath}/event-sourcing.md
           - event catalog tooling (EventCatalog, schema documentation): ${prefsPath}/event-catalog-tooling.md
           - qlerify to eventcatalog (transformation workflow): ${prefsPath}/event-catalog-qlerify.md
+          - event modeling (Event Modeling, Qlerify, 7-step methodology): ${prefsPath}/event-modeling.md
           - discovery process: ${prefsPath}/discovery-process.md
           - collaborative modeling (EventStorming, Domain Storytelling): ${prefsPath}/collaborative-modeling.md
           - strategic domain analysis (Core/Supporting/Generic classification): ${prefsPath}/strategic-domain-analysis.md
