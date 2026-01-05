@@ -226,6 +226,8 @@ data AccountEvent
 ```
 Each constructor represents one sticky note event, with associated data capturing the information written on or around the sticky.
 The chronological sequence of events maps to the temporal ordering of elements in an event stream, which forms a free monoid under concatenation.
+Events discovered through EventStorming directly map to the `Event` type parameter in the Decider pattern.
+See event-sourcing.md#the-decider-pattern for how EventStorming artifacts translate to Decider components.
 
 Blue command sticky notes become functions that validate business rules and produce events or validation errors.
 A command "Open Account" with business rules about minimum deposit and account holder validation becomes:
@@ -234,6 +236,7 @@ openAccount :: ValidatedAccountRequest -> Validation (NonEmpty AccountEvent)
 ```
 The function signature documents that commands take validated input (enforcing smart constructors), return validation results (errors are explicit), and produce at least one event on success (NonEmpty ensures commands are effectful).
 Business rules written in natural language on or near command stickies become predicates in the validation logic or refinement types constraining the input type.
+Commands map to the input to the `decide` function in the Decider pattern: `Command → State → List<Event>`.
 
 Purple policy sticky notes become event handlers that produce commands in response to events.
 A policy "Whenever Deposit Made, Update Balance Projection" becomes:
@@ -252,6 +255,7 @@ An aggregate "Account" identified during EventStorming becomes a module containi
 - Exported types and functions constitute the public API
 
 The aggregate's responsibility for enforcing invariants like "balance cannot go negative" becomes predicates in command validation functions or constraints in the state type.
+Aggregates map directly to the `State` type and `evolve` function in the Decider pattern, where `evolve: State → Event → State` represents the state transition logic captured on yellow stickies.
 
 Pink hotspot sticky notes become open questions in specification documents or property-based test scenarios exploring edge cases.
 A hotspot "What happens if withdrawal is requested while deposit is processing?" indicates that the model needs to handle concurrent commands, suggesting either:
