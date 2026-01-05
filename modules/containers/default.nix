@@ -26,6 +26,52 @@
   lib,
   ...
 }:
+let
+  # ============================================================================
+  # Shared Container Definitions (system-independent)
+  # ============================================================================
+
+  # Default targets for multi-arch builds (can be overridden per-container)
+  defaultTargetNames = [
+    "x86_64"
+    "aarch64"
+  ];
+
+  # Define containers with their package lists and optional target architectures
+  #
+  # Schema:
+  #   name: Container/image name (e.g., "fd")
+  #   packages: List of package attribute names (e.g., ["fd"] or ["fd" "ripgrep"])
+  #   entrypoint: Binary name for entrypoint (defaults to name)
+  #   targets: Optional list of target names (defaults to defaultTargetNames)
+  #            Valid values: [ "x86_64" "aarch64" ] or subset
+  #
+  # CI Integration:
+  #   The containerMatrix output (see below) provides GitHub Actions with:
+  #   - build: flat list of {container, target} pairs for parallel build jobs
+  #   - manifest: list of container names for manifest push jobs
+  containerDefs = {
+    fd = {
+      name = "fd";
+      packages = [ "fd" ];
+      entrypoint = "fd";
+      # targets not specified - uses defaultTargetNames (both x86_64 and aarch64)
+    };
+    rg = {
+      name = "rg";
+      packages = [ "ripgrep" ];
+      entrypoint = "rg";
+      # targets not specified - uses defaultTargetNames (both x86_64 and aarch64)
+    };
+    # Example of future multi-package container:
+    # devtools = {
+    #   name = "devtools";
+    #   packages = [ "fd" "ripgrep" "jq" "yq-go" ];
+    #   entrypoint = "bash";
+    #   targets = [ "x86_64" ]; # Optional: only build for x86_64
+    # };
+  };
+in
 {
   perSystem =
     { pkgs, system, ... }:
@@ -60,12 +106,6 @@
           arch = "arm64";
         };
       };
-
-      # Default targets for multi-arch builds (can be overridden per-container)
-      defaultTargetNames = [
-        "x86_64"
-        "aarch64"
-      ];
 
       # Helper to filter targets by name list
       selectTargets = targetNames: lib.filterAttrs (n: _: lib.elem n targetNames) allTargets;
@@ -146,45 +186,28 @@
           maxLayers = 2;
         };
 
-      # ============================================================================
-      # Container Definitions
-      # ============================================================================
-
-      # Define containers with their package lists
-      # Each container can include one or more packages
-      containerDefs = {
-        fd = {
-          name = "fd";
-          packages = [ "fd" ];
-          entrypoint = "fd";
-        };
-        rg = {
-          name = "rg";
-          packages = [ "ripgrep" ];
-          entrypoint = "rg";
-        };
-        # Example of future multi-package container:
-        # devtools = {
-        #   name = "devtools";
-        #   packages = [ "fd" "ripgrep" "jq" "yq-go" ];
-        #   entrypoint = "bash";
-        # };
-      };
+      # Helper to get targets for a container (uses default if not specified)
+      getContainerTargets = def: def.targets or defaultTargetNames;
 
       # ============================================================================
       # Package Generation
       # ============================================================================
 
-      # Generate container packages for all containers and all targets
+      # Generate container packages respecting per-container target specifications
+      # Only generates containers for each container's specified targets (or defaults)
       # Creates: fdContainer-x86_64, fdContainer-aarch64, rgContainer-x86_64, etc.
       containerPackages = lib.listToAttrs (
         lib.flatten (
           lib.mapAttrsToList (
             containerName: def:
+            let
+              containerTargets = getContainerTargets def;
+              selectedTargets = selectTargets containerTargets;
+            in
             lib.mapAttrsToList (targetName: target: {
               name = "${containerName}Container-${targetName}";
               value = mkContainerForTarget (def // { inherit target; });
-            }) allTargets
+            }) selectedTargets
           ) containerDefs
         )
       );
@@ -207,14 +230,17 @@
       #
       # Arguments:
       #   containerName: Name of the container (key in containerDefs)
-      #   targetNames: List of target names to include (defaults to all)
+      #   targetNames: List of target names to include (defaults to container's targets)
       mkManifest =
         {
           containerName,
-          targetNames ? defaultTargetNames,
+          targetNames ? null,
         }:
         let
-          selectedTargets = selectTargets targetNames;
+          # Use provided targetNames, or fall back to container's targets
+          actualTargetNames =
+            if targetNames != null then targetNames else getContainerTargets containerDefs.${containerName};
+          selectedTargets = selectTargets actualTargetNames;
         in
         mkMultiArchManifest {
           name = containerName;
@@ -236,26 +262,31 @@
 
       # Generate all manifest variants for all containers
       # For each container: one multi-arch manifest + one single-arch manifest per target
+      # Respects per-container target specifications
       manifestPackages = lib.listToAttrs (
         lib.flatten (
           lib.mapAttrsToList (
-            containerName: _:
+            containerName: def:
+            let
+              containerTargets = getContainerTargets def;
+              selectedTargets = selectTargets containerTargets;
+            in
             [
-              # Multi-arch manifest (all targets)
+              # Multi-arch manifest (container's targets)
               {
                 name = "${containerName}Manifest";
                 value = mkManifest { inherit containerName; };
               }
             ]
             ++
-              # Single-arch manifests (one per target)
+              # Single-arch manifests (one per container's target)
               lib.mapAttrsToList (targetName: _: {
                 name = "${containerName}Manifest-${targetName}";
                 value = mkManifest {
                   inherit containerName;
                   targetNames = [ targetName ];
                 };
-              }) allTargets
+              }) selectedTargets
           ) containerDefs
         )
       );
@@ -275,4 +306,29 @@
         (lib.optionalAttrs (isLinux || isDarwin) manifestPackages)
       ];
     };
+
+  # Flake-level outputs
+  # Expose containerMatrix (system-independent data for CI)
+  # Pure evaluation (no --impure needed)
+  # Usage: nix eval .#containerMatrix.build --json
+  flake.containerMatrix = {
+    # Flat list of {container, target} pairs for parallel build jobs
+    # Each entry represents one container image to build for one architecture
+    build = lib.flatten (
+      lib.mapAttrsToList (
+        containerName: def:
+        let
+          containerTargets = def.targets or defaultTargetNames;
+        in
+        map (targetName: {
+          container = containerName;
+          target = targetName;
+        }) containerTargets
+      ) containerDefs
+    );
+
+    # List of container names for manifest push jobs
+    # One manifest job per container (handles all architectures for that container)
+    manifest = lib.attrNames containerDefs;
+  };
 }
