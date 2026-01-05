@@ -48,6 +48,302 @@ This structure directly parallels Wlaschin's Pattern 4 (workflows as pure functi
 The aggregate receives commands, validates them against current state, and emits events that capture domain facts.
 
 
+## The Decider pattern
+
+The Decider pattern, formalized by Jérémie Chassaing and implemented in libraries like fmodel-rust, provides a pure functional structure for aggregates that emphasizes the duality between command processing and state evolution.
+A decider is defined by three pure functions and an initial state:
+
+```haskell
+-- Decider type signature
+data Decider cmd event state = Decider
+  { decide :: cmd -> state -> Either Error [event]
+  , evolve :: state -> event -> state
+  , initialState :: state
+  , isTerminal :: state -> Bool  -- optional
+  }
+```
+
+The separation between `decide` (command validation) and `evolve` (state application) is fundamental.
+`decide` can fail because commands may be invalid given current state; `evolve` cannot fail because events represent facts that have already occurred.
+This asymmetry enforces the principle that validation happens before persistence, never during state reconstruction.
+
+### Pure decide and pure evolve
+
+Both `decide` and `evolve` are pure functions with no side effects.
+`decide` examines the current state and either rejects the command with an error or produces events describing what happened.
+`evolve` takes state and an event, returning a new state that reflects the event's occurrence.
+
+```rust
+// fmodel-rust decider structure
+pub struct Decider<C, S, E, Error = ()> {
+    pub decide: Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error> + Send + Sync>,
+    pub evolve: Box<dyn Fn(&S, &E) -> S + Send + Sync>,
+    pub initial_state: Box<dyn Fn() -> S + Send + Sync>,
+}
+```
+
+The purity of `evolve` is particularly important for state reconstruction.
+Given a sequence of events, folding `evolve` over them must always produce the same final state:
+
+```haskell
+-- State reconstruction as left fold
+reconstruct :: [Event] -> State
+reconstruct events = foldl evolve initialState events
+
+-- Reconstruction is deterministic
+reconstruct events == reconstruct events  -- always holds
+```
+
+If `evolve` could fail or perform I/O, this guarantee would break.
+State reconstruction would become non-deterministic, violating the fundamental event sourcing invariant.
+
+### Why evolve cannot fail
+
+Events represent facts that occurred in the domain.
+The event `OrderPlaced` means an order was placed; the event `PaymentReceived` means payment was received.
+These are historical facts, not proposals.
+
+The `evolve` function updates the aggregate's view of current state to reflect that a fact occurred.
+It cannot reject a fact; facts are not subject to validation.
+Validation happens in `decide`, before events are emitted and persisted.
+
+```haskell
+-- Decide validates; may fail
+decide :: PlaceOrder -> OrderState -> Either OrderError [OrderEvent]
+decide cmd state =
+  case state of
+    Nothing -> Right [OrderPlaced { ... }]
+    Just _ -> Left OrderAlreadyExists
+
+-- Evolve applies; cannot fail
+evolve :: OrderState -> OrderEvent -> OrderState
+evolve Nothing (OrderPlaced details) = Just (Order details)
+evolve state (OrderCancelled reason) = fmap (\o -> o { cancelled = True }) state
+evolve state _ = state  -- unknown events preserve state
+```
+
+If `evolve` could return `Either Error State`, we would face an impossible situation: what do we do when reconstructing state from the event log if `evolve` fails on event 47 out of 1000?
+We cannot reject historical events.
+The solution is to ensure `evolve` is total: it handles all event cases, and failure events (if needed) explicitly preserve state.
+
+### State reconstruction formula
+
+State reconstruction is defined as a left fold of `evolve` over the event sequence, starting from `initialState`.
+
+```haskell
+reconstruct :: Decider cmd event state -> [event] -> state
+reconstruct decider events = foldl (evolve decider) (initialState decider) events
+```
+
+This formula has several critical properties:
+
+1. **Determinism**: Given the same events, reconstruction always produces the same state
+2. **Associativity**: Folding subsets then combining yields the same result as folding the entire sequence (when state forms a monoid)
+3. **Composability**: Multiple deciders can be combined to produce a composite decider over product states
+
+The fold-based reconstruction enables several implementation optimizations:
+- Snapshotting: save state at event N, fold only events after N
+- Parallel fold: when state forms a monoid, events can be folded in parallel then combined
+- Incremental updates: maintain materialized state, fold only new events since last update
+
+### Contrast with mutable aggregate patterns
+
+Traditional object-oriented aggregate patterns use mutable `apply` methods:
+
+```rust
+// Traditional mutable aggregate (AVOID)
+impl Aggregate for Order {
+    fn apply(&mut self, event: OrderEvent) {
+        match event {
+            OrderEvent::OrderPlaced { items, total } => {
+                self.items = items;
+                self.total = total;
+                self.status = OrderStatus::Placed;
+            }
+            OrderEvent::OrderShipped { shipment_id } => {
+                self.status = OrderStatus::Shipped(shipment_id);
+            }
+        }
+    }
+}
+```
+
+The mutable approach has several drawbacks:
+- State reconstruction requires initializing a mutable aggregate then calling `apply` in a loop
+- Testing requires managing mutable state and ensuring proper reset between tests
+- Concurrency requires locks or other synchronization primitives
+- Composition is difficult because combining two mutable aggregates produces complex ownership semantics
+
+The Decider pattern uses pure `evolve`:
+
+```rust
+// Decider with pure evolve (PREFERRED)
+let order_decider = Decider {
+    decide: Box::new(|cmd, state| {
+        match (cmd, state) {
+            (PlaceOrder { items }, None) => Ok(vec![OrderPlaced { items }]),
+            (PlaceOrder { .. }, Some(_)) => Err(OrderAlreadyExists),
+            (ShipOrder { shipment_id }, Some(order)) if order.status == OrderStatus::Placed => {
+                Ok(vec![OrderShipped { shipment_id }])
+            }
+            _ => Err(InvalidCommand),
+        }
+    }),
+    evolve: Box::new(|state, event| {
+        match event {
+            OrderPlaced { items } => Some(Order { items, status: OrderStatus::Placed }),
+            OrderShipped { shipment_id } => state.map(|o| Order { status: OrderStatus::Shipped(shipment_id), ..o }),
+            _ => state,
+        }
+    }),
+    initial_state: Box::new(|| None),
+};
+```
+
+The pure approach enables:
+- State reconstruction as a simple fold with no mutable state
+- Trivial testing: `evolve(state, event)` is a pure function
+- Concurrency without locks: `evolve` can be called from any thread
+- Composition via `combine()`: two deciders yield a decider over `(S1, S2)`
+
+### fmodel-rust as reference implementation
+
+The fmodel-rust library (https://github.com/fraktalio/fmodel-rust) provides the canonical Rust implementation of the Decider pattern.
+It is preferred over libraries like cqrs-es or esrs because it enforces pure `evolve` rather than mutable `apply`.
+
+Key fmodel-rust idioms:
+
+1. **State as `Option<T>`**: `None` means the aggregate does not exist, `Some(T)` means it exists with state `T`
+2. **Failure events for domain rejection**: Events like `OrderNotCreated` or `PaymentNotProcessed` represent domain-level rejection, not errors
+3. **Error events preserve state**: When `evolve` handles a failure event, it returns `state.clone()` to preserve the previous state
+4. **Algebraic composition via `combine()`**: Two deciders `Decider<C1, E1, S1>` and `Decider<C2, E2, S2>` combine into `Decider<Sum<C1, C2>, Sum<E1, E2>, (S1, S2)>`
+
+```rust
+// Example: composing Order and Inventory deciders
+let combined = order_decider.combine(inventory_decider);
+
+// Combined decider has product state
+type CombinedState = (Option<Order>, Option<Inventory>);
+
+// Commands are sum type
+enum CombinedCommand {
+    OrderCommand(OrderCommand),
+    InventoryCommand(InventoryCommand),
+}
+
+// Events are sum type
+enum CombinedEvent {
+    OrderEvent(OrderEvent),
+    InventoryEvent(InventoryEvent),
+}
+```
+
+The composition enables building complex aggregates from simpler deciders, preserving the purity and testability of individual components.
+
+### Monoidal event composition
+
+Chassaing's key insight is that when aggregate state forms a monoid, `evolve` can be decomposed into two operations:
+
+```haskell
+-- Traditional evolve
+evolve :: State -> Event -> State
+
+-- Decomposed into convert and combine
+convert :: Event -> State        -- event as state delta
+combine :: State -> State -> State  -- monoidal operation
+
+-- Relationship: evolve state event = combine state (convert event)
+evolve state event = state `combine` convert event
+```
+
+This decomposition is possible when `State` forms a monoid with `combine` as the associative operation and `initialState` as the identity.
+The `convert` function interprets each event as a state delta (change), and `combine` merges that delta into the current state.
+
+### When State forms a monoid
+
+Not all aggregate states form monoids, but many do.
+Common examples:
+
+1. **Sets**: `combine = union`, `initialState = emptySet`, `convert event = singleton(event.item)`
+2. **Maps**: `combine = merge (last-write-wins or custom merge)`, `initialState = emptyMap`, `convert event = singletonMap(event.key, event.value)`
+3. **Counters**: `combine = (+)`, `initialState = 0`, `convert event = event.delta`
+4. **Append-only logs**: `combine = (++)`, `initialState = []`, `convert event = [event]`
+
+When state forms a monoid, the `evolve` function can be rewritten using `convert` and `combine`:
+
+```haskell
+-- Account balance (monoid: (Money, +, 0))
+data AccountState = AccountState { balance :: Money }
+
+-- combine is addition
+combine :: AccountState -> AccountState -> AccountState
+combine s1 s2 = AccountState { balance = s1.balance + s2.balance }
+
+-- initialState is zero
+initialState :: AccountState
+initialState = AccountState { balance = Money 0 }
+
+-- convert interprets events as deltas
+convert :: AccountEvent -> AccountState
+convert (Deposited amount) = AccountState { balance = amount }
+convert (Withdrawn amount) = AccountState { balance = negate amount }
+
+-- evolve is combine after convert
+evolve :: AccountState -> AccountEvent -> AccountState
+evolve state event = combine state (convert event)
+```
+
+### Parallel fold implications
+
+When state forms a monoid and `evolve` decomposes into `convert` and `combine`, state reconstruction becomes a map-reduce operation:
+
+```haskell
+-- Sequential fold (traditional)
+reconstruct :: [Event] -> State
+reconstruct = foldl evolve initialState
+
+-- Parallel fold (monoidal state)
+reconstructParallel :: [Event] -> State
+reconstructParallel events =
+  let deltas = parMap convert events  -- parallel map
+  in fold combine initialState deltas  -- parallel fold
+```
+
+The parallel fold is possible because monoid operations are associative: `(a + b) + c == a + (b + c)`.
+We can partition events, compute partial states in parallel, then combine the partials.
+
+This optimization is particularly valuable for long event streams where reconstruction latency is a bottleneck.
+Systems like Kafka with compacted logs or EventStoreDB with projections can leverage parallel fold for near-real-time materialization.
+
+### Product monoid for aggregate state
+
+When multiple deciders are composed, their states form a product.
+If each component state is a monoid, the product is also a monoid with pointwise operations:
+
+```haskell
+-- Two monoids
+(S1, combine1, initial1)
+(S2, combine2, initial2)
+
+-- Product is a monoid
+type ProductState = (S1, S2)
+combineProduct :: ProductState -> ProductState -> ProductState
+combineProduct (s1a, s2a) (s1b, s2b) = (combine1 s1a s1b, combine2 s2a s2b)
+
+initialProduct :: ProductState
+initialProduct = (initial1, initial2)
+```
+
+This structure enables composing deciders while preserving the monoidal optimization.
+Each component can be folded in parallel, and the final product state is constructed from the component results.
+
+See `theoretical-foundations.md` for the coalgebra-algebra interpretation of `decide` (coalgebra: state → commands → events) and `evolve` (algebra: events → state → state).
+
+See `domain-modeling.md` Pattern 5 for aggregate design principles that complement the Decider pattern.
+
+See `algebraic-laws.md` for the monoid laws and fold laws that underpin monoidal event composition.
+
+
 ## Contrasting with CRUD persistence
 
 Traditional CRUD persistence overwrites state in place, losing the history of changes.
@@ -443,6 +739,27 @@ The original stream remains the authoritative source; migrated streams are deriv
 
 CQRS separates the write model (commands, aggregates, events) from the read model (projections, queries).
 Event sourcing naturally leads to CQRS because the write model (event log) and read models (projections) have different optimization requirements.
+
+In Decider pattern terms, the write model is the full decider (decide + evolve + initialState), while read models are views (evolve + initialState, without decide).
+A view is just a specialized decider that only projects events into a read-optimized representation; it never processes commands.
+
+```haskell
+-- Write model: full decider
+type WriteModel cmd event state = Decider
+  { decide :: cmd -> state -> Either Error [event]
+  , evolve :: state -> event -> state
+  , initialState :: state
+  }
+
+-- Read model: view pattern (no decide)
+type View event projection =
+  { evolve :: projection -> event -> projection
+  , initialState :: projection
+  }
+```
+
+Process managers and sagas follow the inverse pattern: they react to events by emitting commands.
+In categorical terms, this is a saga pattern: `react :: event -> [cmd]`.
 
 ### Write model optimization
 
