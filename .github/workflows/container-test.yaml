@@ -3,44 +3,35 @@ name: Container Build Test
 on:
   workflow_dispatch:
     inputs:
-      container:
-        description: "Container name (fd or rg)"
-        required: true
-        type: choice
-        options:
-          - fd
-          - rg
-        default: fd
-      target:
-        description: "Target architecture"
-        required: true
-        type: choice
-        options:
-          - x86_64
-          - aarch64
-          - both
-        default: both
-      build_mode:
-        description: "Build mode"
-        required: true
-        type: choice
-        options:
-          - single-runner-cross
-          - native-runners
-        default: single-runner-cross
-      test_load:
-        description: "Test loading to Docker daemon"
+      version:
+        description: "Version tag for container images"
+        required: false
+        type: string
+        default: "latest"
+      push:
+        description: "Push images to registry"
         required: false
         type: boolean
-        default: true
+        default: false
       debug_enabled:
         description: "Enable tmate debug session"
         required: false
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      version:
+        description: "Version tag for container images"
+        required: true
+        type: string
+      push:
+        description: "Push images to registry"
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
-  group: container-test-${{ github.ref }}
+  group: container-${{ github.ref }}
   cancel-in-progress: true
 
 defaults:
@@ -55,15 +46,48 @@ env:
   CACHIX_BINARY_CACHE: cameronraysmith
 
 jobs:
-  # Single runner mode: builds both architectures using pkgsCross
-  # x86_64 is native, aarch64 is cross-compiled (both at native speed)
-  build-cross:
-    if: inputs.build_mode == 'single-runner-cross'
+  # Job 1: Discover containers and targets from Nix
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      build-matrix: ${{ steps.matrix.outputs.build }}
+      manifest-matrix: ${{ steps.matrix.outputs.manifest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        with:
+          system: x86_64-linux
+          enable-cachix: true
+          cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Discover container matrix from Nix
+        id: matrix
+        run: |
+          echo "Evaluating containerMatrix from flake..."
+          BUILD=$(nix eval .#containerMatrix.build --json)
+          MANIFEST=$(nix eval .#containerMatrix.manifest --json)
+          echo "Build matrix: $BUILD"
+          echo "Manifest list: $MANIFEST"
+          echo "build=$BUILD" >> $GITHUB_OUTPUT
+          echo "manifest=$MANIFEST" >> $GITHUB_OUTPUT
+
+  # Job 2: Build containers (parallel matrix over container × target)
+  # Uses single ubuntu-latest runner with pkgsCross for all architectures
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.discover.outputs.build-matrix) }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@v4
 
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
@@ -77,125 +101,56 @@ jobs:
         if: inputs.debug_enabled
         uses: mxschmitt/action-tmate@v3
 
-      - name: Build x86_64 container (native)
-        if: inputs.target == 'x86_64' || inputs.target == 'both'
+      - name: Build ${{ matrix.container }} for ${{ matrix.target }}
         run: |
-          echo "Building ${{ inputs.container }}Container-x86_64 (native on x86_64-linux)"
-          nix build ".#${{ inputs.container }}Container-x86_64" -o result-x86_64
-
-          echo "=== Container metadata ==="
-          jq '.arch' result-x86_64
-          jq '.layers | length' result-x86_64
-
-      - name: Build aarch64 container (cross-compiled)
-        if: inputs.target == 'aarch64' || inputs.target == 'both'
-        run: |
-          echo "Building ${{ inputs.container }}Container-aarch64 (cross-compiled via pkgsCross)"
-          nix build ".#${{ inputs.container }}Container-aarch64" -o result-aarch64
-
-          echo "=== Container metadata ==="
-          jq '.arch' result-aarch64
-          jq '.layers | length' result-aarch64
+          echo "Building ${{ matrix.container }}Container-${{ matrix.target }}"
+          echo "Using pkgsCross (x86_64 native, aarch64 cross-compiled)"
+          nix build ".#${{ matrix.container }}Container-${{ matrix.target }}" -L
 
       - name: Verify architecture metadata
         run: |
-          echo "=== Architecture Verification ==="
-          if [[ -f result-x86_64 ]]; then
-            ARCH=$(jq -r '.arch' result-x86_64)
-            echo "x86_64 container arch: $ARCH"
-            [[ "$ARCH" == "amd64" ]] || { echo "ERROR: Expected amd64"; exit 1; }
+          RESULT=$(nix build ".#${{ matrix.container }}Container-${{ matrix.target }}" --no-link --print-out-paths)
+          ARCH=$(jq -r '.arch' "$RESULT")
+          echo "Container: ${{ matrix.container }}"
+          echo "Target: ${{ matrix.target }}"
+          echo "OCI arch: $ARCH"
+
+          # Verify correct architecture
+          if [[ "${{ matrix.target }}" == "x86_64" && "$ARCH" != "amd64" ]]; then
+            echo "ERROR: Expected amd64, got $ARCH"
+            exit 1
+          elif [[ "${{ matrix.target }}" == "aarch64" && "$ARCH" != "arm64" ]]; then
+            echo "ERROR: Expected arm64, got $ARCH"
+            exit 1
           fi
-          if [[ -f result-aarch64 ]]; then
-            ARCH=$(jq -r '.arch' result-aarch64)
-            echo "aarch64 container arch: $ARCH"
-            [[ "$ARCH" == "arm64" ]] || { echo "ERROR: Expected arm64"; exit 1; }
-          fi
-          echo "All architecture checks passed"
+          echo "Architecture verified"
 
-      - name: Test manifest evaluation
-        if: inputs.target == 'both'
-        run: |
-          echo "Evaluating multi-arch manifest..."
-          nix eval ".#${{ inputs.container }}Manifest" --apply 'x: x.name' 2>&1 || true
-          echo "Manifest evaluation complete"
-
-      - name: Test copyToDockerDaemon (x86_64 only - native arch)
-        if: inputs.test_load && (inputs.target == 'x86_64' || inputs.target == 'both')
-        run: |
-          echo "Loading x86_64 container to Docker daemon..."
-          nix run ".#${{ inputs.container }}Container-x86_64.copyToDockerDaemon" 2>&1 || {
-            echo "::warning::copyToDockerDaemon failed - container image built successfully"
-          }
-
-      - name: Report disk usage
-        if: always()
-        run: df -h
-
-  # Native runner mode: uses separate runners per architecture
-  setup-matrix:
-    if: inputs.build_mode == 'native-runners'
+  # Job 3: Push manifests (parallel matrix over containers)
+  # Only runs if push input is true
+  manifest:
+    needs: [discover, build]
+    if: inputs.push
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          if [[ "${{ inputs.target }}" == "both" ]]; then
-            echo 'matrix={"include":[{"target":"x86_64","runner":"ubuntu-latest"},{"target":"aarch64","runner":"ubuntu-24.04-arm"}]}' >> $GITHUB_OUTPUT
-          elif [[ "${{ inputs.target }}" == "x86_64" ]]; then
-            echo 'matrix={"include":[{"target":"x86_64","runner":"ubuntu-latest"}]}' >> $GITHUB_OUTPUT
-          else
-            echo 'matrix={"include":[{"target":"aarch64","runner":"ubuntu-24.04-arm"}]}' >> $GITHUB_OUTPUT
-          fi
-
-  build-native:
-    if: inputs.build_mode == 'native-runners'
-    needs: setup-matrix
-    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.setup-matrix.outputs.matrix) }}
+      matrix:
+        container: ${{ fromJSON(needs.discover.outputs.manifest-matrix) }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@v4
 
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
         with:
-          system: ${{ matrix.target == 'x86_64' && 'x86_64-linux' || 'aarch64-linux' }}
+          system: x86_64-linux
           enable-cachix: true
           cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Setup tmate debug session
-        if: inputs.debug_enabled
-        uses: mxschmitt/action-tmate@v3
-
-      - name: Build container (native)
+      - name: Push ${{ matrix.container }} manifest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Building ${{ inputs.container }}Container-${{ matrix.target }} (native on ${{ matrix.runner }})"
-          nix build ".#${{ inputs.container }}Container-${{ matrix.target }}" -o result-container
-
-          echo "=== Container metadata ==="
-          jq '.arch' result-container
-          jq '.layers | length' result-container
-
-      - name: Verify architecture
-        run: |
-          EXPECTED_ARCH="${{ matrix.target == 'x86_64' && 'amd64' || 'arm64' }}"
-          ACTUAL_ARCH=$(jq -r '.arch' result-container)
-          echo "Expected: $EXPECTED_ARCH, Actual: $ACTUAL_ARCH"
-          [[ "$ACTUAL_ARCH" == "$EXPECTED_ARCH" ]] || { echo "ERROR: Architecture mismatch"; exit 1; }
-
-      - name: Test copyToDockerDaemon
-        if: inputs.test_load
-        run: |
-          echo "Loading container to Docker daemon..."
-          nix run ".#${{ inputs.container }}Container-${{ matrix.target }}.copyToDockerDaemon" 2>&1 || {
-            echo "::warning::copyToDockerDaemon failed - container image built successfully"
-          }
-
-      - name: Report disk usage
-        if: always()
-        run: df -h
+          echo "Pushing multi-arch manifest for ${{ matrix.container }}"
+          VERSION=${{ inputs.version }} nix run --impure ".#${{ matrix.container }}Manifest"
