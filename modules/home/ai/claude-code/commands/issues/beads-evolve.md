@@ -86,6 +86,9 @@ bd dep remove <not-actually-blocking> <issue-id>
 
 # Add dependency we now recognize
 bd dep add <actual-blocker> <issue-id>
+
+# Atomically claim the issue (sets assignee to you, status to in_progress)
+bd update <issue-id> --claim
 ```
 
 ## In-flight adaptation
@@ -122,7 +125,7 @@ bd create "Need to refactor auth module first" -t task -p 1
 bd dep add <new-blocker-id> <current-issue-id>
 
 # Comment on why this emerged
-bd comment <current-issue-id> "Discovered blocker: auth module coupling prevents clean implementation"
+bd comments add <current-issue-id> "Discovered blocker: auth module coupling prevents clean implementation"
 ```
 
 ### Parallel work opportunities discovered
@@ -134,7 +137,7 @@ When you realize parts can be done independently:
 bd dep remove <issue-a> <issue-b>
 
 # Add comment explaining the decoupling
-bd comment <issue-b> "Can proceed independently of <issue-a> — only shared dependency is X"
+bd comments add <issue-b> "Can proceed independently of <issue-a> — only shared dependency is X"
 ```
 
 ### Scope reduction
@@ -146,7 +149,10 @@ When an issue is simpler than expected, or part is no longer needed:
 bd update <issue-id> --description "Simplified: Y approach eliminates need for Z"
 
 # If sub-tasks become unnecessary, close them
-bd close <unnecessary-subtask> --comment "No longer needed — parent issue simplified"
+bd close <unnecessary-subtask> --reason "No longer needed — parent issue simplified"
+
+# Or defer instead of closing if work might be needed later
+bd update <unnecessary-subtask> --defer "2026-06-01" --description "Postponed: not needed for current release"
 ```
 
 ### New issues discovered
@@ -165,9 +171,14 @@ bd dep add <debt-id> <current-issue-id> --type discovered-from
 # Future enhancement recognized
 bd create "Enhancement: could also support Z" -t feature -p 3
 bd dep add <enhancement-id> <current-issue-id> --type related
+
+# Soft bidirectional relationship (e.g., related refactorings)
+bd create "Refactor: simplify similar pattern in component X" -t task -p 3
+bd dep relate <refactor-id> <current-issue-id>  # creates bidirectional relates-to link
 ```
 
 The `discovered-from` dependency type is crucial — it maintains traceability without creating false blockers.
+The `relates-to` type (via `bd dep relate`) creates soft bidirectional relationships useful for related but independent work.
 
 ## Post-completion reflection
 
@@ -176,7 +187,10 @@ After closing an issue, briefly reflect on what was learned:
 ### Update related issues
 
 ```bash
-# Check what this unblocked
+# Close and automatically see what's newly unblocked
+bd close <issue-id> --suggest-next
+
+# Check what this unblocked (manual approach)
 bd dep tree <completed-id> --direction up
 
 # Review those issues — are their descriptions still accurate given what we learned?
@@ -280,14 +294,14 @@ If density is increasing over time, consider:
 
 ```bash
 # Find and fix orphaned dependency references
-bd repair-deps --dry-run
-bd repair-deps
+bd repair --dry-run
+bd repair
 
 # Find potential duplicates
 bd duplicates
 
 # Validate database integrity
-bd validate
+bd doctor
 ```
 
 ## Common refactoring patterns
@@ -314,7 +328,7 @@ bd dep add <old-blocker> <subtask-that-actually-needs-it>
 ```bash
 # Pick the primary (better description, more context)
 # Close the duplicate with reference
-bd close <duplicate-id> --comment "Merged into <primary-id>"
+bd close <duplicate-id> --reason "Merged into <primary-id>"
 
 # Migrate any unique dependencies from duplicate
 bd dep add <unique-blocker-from-duplicate> <primary-id>
@@ -328,11 +342,11 @@ bd update <primary-id> --description "Merged: also includes X from <duplicate-id
 When organizational structure changes:
 
 ```bash
-# Remove old parent-child relationship
-bd dep remove <issue-id> <old-parent-id> --type parent-child
+# Re-parent the issue to a new parent
+bd update <issue-id> --parent <new-parent-id>
 
-# Add new parent-child relationship
-bd dep add <issue-id> <new-parent-id> --type parent-child
+# To remove parent (orphan the issue)
+bd update <issue-id> --parent ""
 ```
 
 ### Resequence a dependency chain
@@ -347,7 +361,7 @@ bd dep remove <was-first> <was-second>
 bd dep add <actually-first> <actually-second>
 
 # Comment explaining the resequencing
-bd comment <actually-second> "Resequenced: discovered that <actually-first> must complete first because X"
+bd comments add <actually-second> "Resequenced: discovered that <actually-first> must complete first because X"
 ```
 
 ### Promote a task to epic
@@ -364,8 +378,8 @@ When an epic turns out to be simpler than anticipated:
 
 ```bash
 # Close unnecessary children
-bd close <child-1> --comment "Absorbed into parent — simpler than expected"
-bd close <child-2> --comment "Absorbed into parent — simpler than expected"
+bd close <child-1> --reason "Absorbed into parent — simpler than expected"
+bd close <child-2> --reason "Absorbed into parent — simpler than expected"
 
 # Demote the epic
 bd update <epic-id> --type task --description "Demoted: originally expected complex, turned out straightforward"
@@ -384,7 +398,7 @@ bd create "Implement X using Y approach (from spike)" -t task -p 2 --parent <epi
 bd dep add <spike-id> <implementation-id> --type discovered-from
 
 # Close spike with summary
-bd close <spike-id> --comment "Findings: Y approach viable, estimate N days, see implementation issue"
+bd close <spike-id> --reason "Findings: Y approach viable, estimate N days, see implementation issue"
 ```
 
 ### During implementation
@@ -421,7 +435,7 @@ bd create "Acceptance gap: missing Y behavior" -t bug -p 1
 bd dep add <gap-id> <feature-id>
 
 # Update original feature with learnings
-bd comment <feature-id> "Acceptance revealed missing Y — added as blocker"
+bd comments add <feature-id> "Acceptance revealed missing Y — added as blocker"
 ```
 
 ## Architecture feedback loop
@@ -448,36 +462,36 @@ bd create "Auth must precede API gateway setup" -t task -p 0
 bd dep add <new-auth-task> <api-gateway-task>
 
 # 2. Comment on the architectural implication
-bd comment <current-issue> "Implementation revealed architectural change: auth dependency exists that wasn't in design docs"
+bd comments add <current-issue> "Implementation revealed architectural change: auth dependency exists that wasn't in design docs"
 
 # 3. Create documentation update issue
 bd create "Update architecture docs: add auth dependency to API gateway component" -t task -p 1
 bd dep add <arch-doc-update> <release-milestone> --type related
 
 # 4. Flag specific documentation that needs updating
-bd comment <arch-doc-update> "Files to update: docs/architecture/system-design.md (component diagram), docs/architecture/integration-patterns.md (auth flow)"
+bd comments add <arch-doc-update> "Files to update: docs/architecture/system-design.md (component diagram), docs/architecture/integration-patterns.md (auth flow)"
 ```
 
 ### Examples of architectural feedback
 
 **Component dependency changes:**
 ```bash
-bd comment <issue> "Discovered that auth must happen before API gateway setup — this changes our component dependency model. Flagged for architecture doc update: docs/architecture/system-design.md"
+bd comments add <issue> "Discovered that auth must happen before API gateway setup — this changes our component dependency model. Flagged for architecture doc update: docs/architecture/system-design.md"
 ```
 
 **Integration pattern problems:**
 ```bash
-bd comment <issue> "Event-driven pattern doesn't work for this use case due to latency requirements. Need synchronous RPC. Update docs/architecture/integration-patterns.md"
+bd comments add <issue> "Event-driven pattern doesn't work for this use case due to latency requirements. Need synchronous RPC. Update docs/architecture/integration-patterns.md"
 ```
 
 **Performance constraints:**
 ```bash
-bd comment <issue> "Database query performance requires caching layer not in original design. Add caching tier to docs/architecture/data-architecture.md"
+bd comments add <issue> "Database query performance requires caching layer not in original design. Add caching tier to docs/architecture/data-architecture.md"
 ```
 
 **Security gaps:**
 ```bash
-bd comment <issue> "API exposes PII without authentication check. Security model in docs/architecture/security.md needs revision"
+bd comments add <issue> "API exposes PII without authentication check. Security model in docs/architecture/security.md needs revision"
 ```
 
 ### When to update architecture docs immediately vs defer
