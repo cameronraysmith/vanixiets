@@ -24,7 +24,7 @@ This guide is organized into focused topic files for easy navigation and AI agen
 
 | File | Description |
 |------|-------------|
-| [01-functional-domain-modeling.md](./01-functional-domain-modeling.md) | Core FDM patterns: smart constructors, state machines, workflows, aggregates, error classification; advanced patterns: phantom types, const generics, NonEmpty collections |
+| [01-functional-domain-modeling.md](./01-functional-domain-modeling.md) | Core FDM patterns: smart constructors, state machines, workflows, aggregates, error classification; advanced patterns: phantom types, const generics, NonEmpty collections; Pattern 6: The Decider pattern (fmodel-rust) for event-sourced command handling |
 | [02-error-handling.md](./02-error-handling.md) | Canonical error structs, thiserror/anyhow/miette, Result composition, railway-oriented programming, applicative validation, #[must_use] enforcement |
 | [03-panic-semantics.md](./03-panic-semantics.md) | When to panic vs return Result, programming bugs vs domain errors |
 | [04-api-design.md](./04-api-design.md) | Naming, dependency injection hierarchy, builders, sans-io pattern, serialization boundaries, command/event struct patterns |
