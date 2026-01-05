@@ -941,6 +941,361 @@ pub enum WorkflowError {
 
 **See also**: domain-modeling.md#pattern-7-domain-errors-vs-infrastructure-errors
 
+## Pattern 6: The Decider pattern (fmodel-rust)
+
+The Decider pattern provides a pure functional approach to aggregates that separates decision-making (`decide`) from state evolution (`evolve`), enabling algebraic composition and property-based testing.
+Unlike imperative aggregate frameworks (cqrs-es, esrs) that mutate state via `apply(&mut self, event)`, fmodel-rust implements Jérémie Chassaing's Decider pattern as pure functions, which faithfully realizes Debasish Ghosh's module algebra for event sourcing.
+
+**Core structure**:
+
+```rust
+pub struct Decider<'a, C, S, E, Error = ()> {
+    pub decide: Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error> + Send + Sync>,
+    pub evolve: Box<dyn Fn(&S, &E) -> S + Send + Sync>,
+    pub initial_state: Box<dyn Fn() -> S + Send + Sync>,
+}
+```
+
+**Type alias pattern for domain-specific deciders**:
+
+```rust
+use fmodel_rust::decider::Decider;
+
+pub type OrderDecider<'a> = Decider<'a, OrderCommand, Option<Order>, OrderEvent>;
+
+// Usage shows intent: commands → events given current state
+fn create_order_handler() -> OrderDecider<'static> {
+    order_decider()
+}
+```
+
+**State as Option\<T\> idiom**:
+
+Model aggregate existence explicitly using Option:
+- `None` represents non-existent aggregate (before creation or after deletion)
+- `Some(T)` represents existing aggregate with state T
+
+```rust
+pub fn order_decider<'a>() -> OrderDecider<'a> {
+    Decider {
+        initial_state: Box::new(|| None),
+
+        decide: Box::new(|command, state| match command {
+            OrderCommand::Create(cmd) => {
+                if state.is_some() {
+                    // Aggregate already exists - return failure event
+                    Ok(vec![OrderEvent::NotCreated(OrderNotCreated {
+                        identifier: cmd.identifier.clone(),
+                        reason: Reason("Order already exists".to_string()),
+                    })])
+                } else {
+                    // Valid creation
+                    Ok(vec![OrderEvent::Created(OrderCreated {
+                        identifier: cmd.identifier.clone(),
+                        restaurant_id: cmd.restaurant_id.clone(),
+                        line_items: cmd.line_items.clone(),
+                    })])
+                }
+            }
+            OrderCommand::Confirm(cmd) => {
+                match state {
+                    Some(order) if order.status == OrderStatus::Placed => {
+                        Ok(vec![OrderEvent::Confirmed(OrderConfirmed {
+                            identifier: cmd.identifier.clone(),
+                        })])
+                    }
+                    Some(_) => {
+                        // Wrong state - cannot confirm
+                        Ok(vec![OrderEvent::NotConfirmed(OrderNotConfirmed {
+                            identifier: cmd.identifier.clone(),
+                            reason: Reason("Order not in Placed status".to_string()),
+                        })])
+                    }
+                    None => {
+                        // Aggregate doesn't exist
+                        Ok(vec![OrderEvent::NotConfirmed(OrderNotConfirmed {
+                            identifier: cmd.identifier.clone(),
+                            reason: Reason("Order does not exist".to_string()),
+                        })])
+                    }
+                }
+            }
+        }),
+
+        evolve: Box::new(|state, event| match event {
+            OrderEvent::Created(e) => Some(Order {
+                identifier: e.identifier.clone(),
+                restaurant_id: e.restaurant_id.clone(),
+                line_items: e.line_items.clone(),
+                status: OrderStatus::Placed,
+            }),
+            OrderEvent::Confirmed(e) => state.as_ref().map(|order| Order {
+                status: OrderStatus::Confirmed,
+                ..order.clone()
+            }),
+            // Error events preserve state unchanged
+            OrderEvent::NotCreated(_) => state.clone(),
+            OrderEvent::NotConfirmed(_) => state.clone(),
+        }),
+    }
+}
+```
+
+**Failure events vs exceptions**:
+
+Domain rejections are modeled as events (e.g., `OrderNotCreated`, `OrderNotConfirmed`), not as `Err` returns from `decide`.
+This preserves the event log's completeness: every command attempt is recorded, whether successful or rejected.
+
+```rust
+// Anti-pattern: Using Result::Err for domain rejections
+decide: Box::new(|command, state| match command {
+    OrderCommand::Create(cmd) => {
+        if state.is_some() {
+            Err(DomainError::OrderAlreadyExists)  // ❌ Lost from event log
+        } else {
+            Ok(vec![OrderEvent::Created(...)])
+        }
+    }
+}),
+
+// Correct: Domain rejections as events
+decide: Box::new(|command, state| match command {
+    OrderCommand::Create(cmd) => {
+        if state.is_some() {
+            Ok(vec![OrderEvent::NotCreated(...)])  // ✓ Preserved in event log
+        } else {
+            Ok(vec![OrderEvent::Created(...)])
+        }
+    }
+}),
+```
+
+Reserve `Result::Err` for infrastructure failures (database unavailable, network timeout) that prevent decision-making entirely.
+
+**Error events preserve state**:
+
+Events representing failures should not modify aggregate state.
+`evolve` returns the state unchanged when processing error events:
+
+```rust
+evolve: Box::new(|state, event| match event {
+    // Success events modify state
+    OrderEvent::Created(e) => Some(Order { ... }),
+    OrderEvent::Confirmed(e) => state.as_ref().map(|order| Order {
+        status: OrderStatus::Confirmed,
+        ..order.clone()
+    }),
+
+    // Error events preserve state
+    OrderEvent::NotCreated(_) => state.clone(),
+    OrderEvent::NotConfirmed(_) => state.clone(),
+    OrderEvent::NotPrepared(_) => state.clone(),
+}),
+```
+
+### Decider composition
+
+Deciders form a monoid under `combine()`, enabling compositional aggregate design.
+
+**Combining multiple aggregates**:
+
+```rust
+use fmodel_rust::Sum;
+
+// Combine order and restaurant deciders into unified handler
+let combined = order_decider()
+    .combine(restaurant_decider())
+    .map_command(command_from_sum, sum_from_command)
+    .map_event(event_from_sum, sum_to_event);
+
+// Helper to route commands to appropriate decider
+fn sum_from_command(c: &Command) -> Sum<OrderCommand, RestaurantCommand> {
+    match c {
+        Command::Order(cmd) => Sum::First(cmd.clone()),
+        Command::Restaurant(cmd) => Sum::Second(cmd.clone()),
+    }
+}
+
+// Helper to unify events from both deciders
+fn command_from_sum(s: Sum<OrderCommand, RestaurantCommand>) -> Command {
+    match s {
+        Sum::First(c) => Command::Order(c),
+        Sum::Second(c) => Command::Restaurant(c),
+    }
+}
+```
+
+**State composition**:
+
+When combining deciders, state becomes a product `(S1, S2)`:
+
+```rust
+// Individual decider states
+type OrderState = Option<Order>;
+type RestaurantState = Option<Restaurant>;
+
+// Combined state is product
+type CombinedState = (OrderState, RestaurantState);
+
+// evolve operates on product state
+let combined_evolve = |state: &(OrderState, RestaurantState), event: &Event| {
+    match event {
+        Event::Order(e) => (order_decider.evolve(&state.0, e), state.1.clone()),
+        Event::Restaurant(e) => (state.0.clone(), restaurant_decider.evolve(&state.1, e)),
+    }
+};
+```
+
+**Map transformations**:
+
+Use `map_command` and `map_event` to adapt deciders to different type contexts:
+
+```rust
+// Adapt decider to work with wrapper types
+let adapted = order_decider()
+    .map_command(
+        |external_cmd: &ExternalCommand| &external_cmd.inner,
+        |internal_cmd: OrderCommand| ExternalCommand { inner: internal_cmd },
+    )
+    .map_event(
+        |external_evt: &ExternalEvent| &external_evt.inner,
+        |internal_evt: OrderEvent| ExternalEvent { inner: internal_evt },
+    );
+```
+
+### Testing with DeciderTestSpecification
+
+fmodel-rust provides property-based testing support through `DeciderTestSpecification`:
+
+**Given-when-then pattern**:
+
+```rust
+use fmodel_rust::decider_test::DeciderTestSpecification;
+
+#[test]
+fn test_create_order() {
+    DeciderTestSpecification::default()
+        .for_decider(order_decider())
+        .given(vec![])  // No prior events (empty history)
+        .when(OrderCommand::Create(CreateOrderCommand {
+            identifier: OrderId("order-1".to_string()),
+            restaurant_id: RestaurantId("restaurant-1".to_string()),
+            line_items: vec![OrderLineItem {
+                menu_item_id: "item-1".to_string(),
+                quantity: 2,
+            }],
+        }))
+        .then(vec![OrderEvent::Created(OrderCreated {
+            identifier: OrderId("order-1".to_string()),
+            restaurant_id: RestaurantId("restaurant-1".to_string()),
+            line_items: vec![OrderLineItem {
+                menu_item_id: "item-1".to_string(),
+                quantity: 2,
+            }],
+        })]);
+}
+```
+
+**Event-sourced flavor (given events)**:
+
+Test behavior by replaying event history to build state, then applying command:
+
+```rust
+#[test]
+fn test_confirm_existing_order() {
+    DeciderTestSpecification::default()
+        .for_decider(order_decider())
+        .given(vec![
+            OrderEvent::Created(OrderCreated {
+                identifier: OrderId("order-1".to_string()),
+                restaurant_id: RestaurantId("restaurant-1".to_string()),
+                line_items: vec![],
+            }),
+        ])
+        .when(OrderCommand::Confirm(ConfirmOrderCommand {
+            identifier: OrderId("order-1".to_string()),
+        }))
+        .then(vec![OrderEvent::Confirmed(OrderConfirmed {
+            identifier: OrderId("order-1".to_string()),
+        })]);
+}
+```
+
+**State-stored flavor (given state)**:
+
+When using state-stored persistence, test by providing state directly:
+
+```rust
+#[test]
+fn test_with_explicit_state() {
+    let existing_order = Some(Order {
+        identifier: OrderId("order-1".to_string()),
+        restaurant_id: RestaurantId("restaurant-1".to_string()),
+        line_items: vec![],
+        status: OrderStatus::Placed,
+    });
+
+    DeciderTestSpecification::default()
+        .for_decider(order_decider())
+        .given_state(existing_order)
+        .when(OrderCommand::Confirm(ConfirmOrderCommand {
+            identifier: OrderId("order-1".to_string()),
+        }))
+        .then(vec![OrderEvent::Confirmed(OrderConfirmed {
+            identifier: OrderId("order-1".to_string()),
+        })]);
+}
+```
+
+**Testing failure scenarios**:
+
+```rust
+#[test]
+fn test_create_duplicate_order() {
+    DeciderTestSpecification::default()
+        .for_decider(order_decider())
+        .given(vec![
+            OrderEvent::Created(OrderCreated {
+                identifier: OrderId("order-1".to_string()),
+                restaurant_id: RestaurantId("restaurant-1".to_string()),
+                line_items: vec![],
+            }),
+        ])
+        .when(OrderCommand::Create(CreateOrderCommand {
+            identifier: OrderId("order-1".to_string()),
+            restaurant_id: RestaurantId("restaurant-1".to_string()),
+            line_items: vec![],
+        }))
+        .then(vec![OrderEvent::NotCreated(OrderNotCreated {
+            identifier: OrderId("order-1".to_string()),
+            reason: Reason("Order already exists".to_string()),
+        })]);
+}
+```
+
+### Why fmodel-rust over cqrs-es/esrs
+
+Prefer fmodel-rust over cqrs-es/esrs for codebases following algebraic functional domain modeling patterns, because fmodel-rust provides mathematical correctness guarantees through pure functions and compositional structure.
+
+| Aspect | cqrs-es/esrs | fmodel-rust |
+|--------|--------------|-------------|
+| **State mutation** | `apply(&mut self, event)` mutates state in-place | `evolve(&state, &event) → state` returns new state |
+| **Purity** | Impure (side effects allowed in apply) | Pure (no side effects, referential transparency) |
+| **Composition** | No compositional operators | `combine()` forms monoid, enabling aggregate composition |
+| **Testability** | Requires aggregate setup and mocking | Pure functions testable with simple assertions |
+| **Algebraic laws** | None explicit | Monoid laws on composition, coalgebra-algebra duality |
+| **Type safety** | Generic over aggregate traits | Generic over command/state/event with explicit error types |
+| **Event log semantics** | Exceptions can bypass event log | Failure events preserve complete audit trail |
+
+fmodel-rust faithfully implements Jérémie Chassaing's Decider pattern, which is the algebraic realization of Debasish Ghosh's module algebra for event sourcing.
+The `decide` function corresponds to the algebra's signature, `evolve` to the algebra's interpretation, and `combine` to the monoid structure that makes aggregates compositional.
+
+**See also**:
+- event-sourcing.md for event sourcing patterns and the Decider's role in CQRS/ES architectures
+- theoretical-foundations.md for coalgebra-algebra interpretation and categorical foundations
+- ./12-distributed-systems.md for distributed aggregate coordination and saga patterns
+- domain-modeling.md#pattern-5-aggregates-as-consistency-boundaries for general aggregate design
+
 ## Complete example: Temporal data processing
 
 **Key takeaways**:
