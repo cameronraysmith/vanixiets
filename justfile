@@ -624,8 +624,15 @@ container-verify CONTAINER="fd" TARGET="aarch64":
   echo "Architecture: $(jq -r '.arch' "$RESULT")"
   echo "Layers: $(jq '.layers | length' "$RESULT")"
 
-# Defined containers (update when adding new containers to containerDefs)
+# Defined containers - keep in sync with containerDefs in modules/containers/default.nix
+# CI uses `nix eval .#containerMatrix` for discovery; this is for local convenience
 _containers := "fd rg"
+
+# Show container matrix from Nix (same data CI uses)
+[group('containers')]
+container-matrix:
+  @echo "=== Container Matrix (from Nix) ==="
+  @nix eval .#containerMatrix --json | jq .
 
 # Build all defined containers for all architectures
 [group('containers')]
