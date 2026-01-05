@@ -1,75 +1,43 @@
-# Multi-architecture container builds using nix2container with unified pkgsCross
-#
-# This module provides:
-# - Container packages for configurable target architectures
-# - Multi-arch manifests for CI/CD registry distribution
+# Multi-architecture container builds using nix2container with pkgsCross
 #
 # Architecture:
-# - Uses pkgsCross for cross-compilation (auto-optimizes to native when host == target)
-# - nix2container: Builds JSON manifests with pre-computed layer digests
-# - mkMultiArchManifest: Creates multi-arch Docker manifests using skopeo and crane
+# - pkgsCross for cross-compilation (auto-optimizes to native when host == target)
+# - nix2container builds JSON manifests with pre-computed layer digests
+# - skopeo pushes via nix: transport, crane creates manifest lists
 #
 # Platform behavior:
-# - x86_64-linux host: x86_64 containers native, aarch64 containers cross-compiled
-# - aarch64-linux host: aarch64 containers native, x86_64 containers cross-compiled
-# - aarch64-darwin host: both via rosetta-builder (native execution in Linux VM)
+# - x86_64-linux host: x86_64 native, aarch64 cross-compiled
+# - aarch64-linux host: aarch64 native, x86_64 cross-compiled
+# - aarch64-darwin host: both via rosetta-builder
 #
-# Performance:
-# - pkgsCross auto-optimizes: when target == host, returns native pkgs (zero overhead)
-# - Cross-compilation runs at native speed (no emulation during build)
-# - Build time: O(manifest size) - JSON generation only
-# - Push time: O(changed layers) - skopeo skips unchanged layers by digest
-#
-# See docs/about/contributing/multi-arch-containers.md for usage guide.
+# Performance: cross-compilation at native speed (no QEMU), push skips unchanged layers
 {
   inputs,
   lib,
   ...
 }:
 let
-  # ============================================================================
-  # Shared Container Definitions (system-independent)
-  # ============================================================================
-
-  # Default targets for multi-arch builds (can be overridden per-container)
   defaultTargetNames = [
     "x86_64"
     "aarch64"
   ];
 
-  # Define containers with their package lists and optional target architectures
-  #
-  # Schema:
-  #   name: Container/image name (e.g., "fd")
-  #   packages: List of package attribute names (e.g., ["fd"] or ["fd" "ripgrep"])
+  # Container definitions schema:
+  #   name: Container/image name
+  #   packages: List of package attribute names from nixpkgs
   #   entrypoint: Binary name for entrypoint (defaults to name)
-  #   targets: Optional list of target names (defaults to defaultTargetNames)
-  #            Valid values: [ "x86_64" "aarch64" ] or subset
-  #
-  # CI Integration:
-  #   The containerMatrix output (see below) provides GitHub Actions with:
-  #   - build: flat list of {container, target} pairs for parallel build jobs
-  #   - manifest: list of container names for manifest push jobs
+  #   targets: Optional target list (defaults to defaultTargetNames)
   containerDefs = {
     fd = {
       name = "fd";
       packages = [ "fd" ];
       entrypoint = "fd";
-      # targets not specified - uses defaultTargetNames (both x86_64 and aarch64)
     };
     rg = {
       name = "rg";
       packages = [ "ripgrep" ];
       entrypoint = "rg";
-      # targets not specified - uses defaultTargetNames (both x86_64 and aarch64)
     };
-    # Example of future multi-package container:
-    # devtools = {
-    #   name = "devtools";
-    #   packages = [ "fd" "ripgrep" "jq" "yq-go" ];
-    #   entrypoint = "bash";
-    #   targets = [ "x86_64" ]; # Optional: only build for x86_64
-    # };
   };
 in
 {
@@ -79,21 +47,11 @@ in
       isLinux = lib.hasSuffix "-linux" system;
       isDarwin = lib.hasSuffix "-darwin" system;
 
-      # Get nix2container for this system
       nix2container = inputs.nix2container.packages.${system}.nix2container;
-
-      # Get nix2container's patched skopeo (required for nix: transport)
-      skopeo-nix2container = inputs.nix2container.packages.${system}.skopeo-nix2container;
-
-      # Import the multi-arch manifest builder from shared lib
+      skopeo-nix2container = inputs.nix2container.packages.${system}.skopeo-nix2container; # has nix: transport
       mkMultiArchManifest = pkgs.callPackage ../../lib/mk-multi-arch-manifest.nix { };
 
-      # ============================================================================
-      # Target Architecture Configuration
-      # ============================================================================
-
-      # All available target architectures
-      # Each target defines: system name, pkgsCross instance, OCI arch label
+      # Target architectures: system name, pkgsCross instance, OCI arch label
       allTargets = {
         x86_64 = {
           system = "x86_64-linux";
@@ -107,15 +65,8 @@ in
         };
       };
 
-      # Helper to filter targets by name list
       selectTargets = targetNames: lib.filterAttrs (n: _: lib.elem n targetNames) allTargets;
 
-      # ============================================================================
-      # Container Image Building
-      # ============================================================================
-
-      # Build base layer for a specific target architecture
-      # Uses cross-compiled bash and coreutils for the target
       mkBaseLayerForTarget =
         target:
         nix2container.buildLayer {
@@ -125,18 +76,7 @@ in
           ];
         };
 
-      # Build a container image for a specific target architecture
-      #
-      # Arguments:
-      #   name: Container/image name (e.g., "fd")
-      #   packages: List of package attribute names to include (e.g., ["fd"] or ["fd" "ripgrep"])
-      #   entrypoint: Binary name for entrypoint (defaults to name)
-      #   target: Target architecture definition from allTargets
-      #   tag: Image tag (defaults to "latest")
-      #
-      # Layer strategy:
-      # - Layer 0: baseLayer (bash, coreutils) - rarely changes, shared per arch
-      # - Layer 1: application packages - changes independently per container
+      # Layer strategy: base (bash, coreutils) rarely changes; app layer changes per container
       mkContainerForTarget =
         {
           name,
@@ -146,25 +86,17 @@ in
           tag ? "latest",
         }:
         let
-          # Resolve package names to actual packages from crossPkgs
           resolvedPackages = map (pkgName: target.crossPkgs.${pkgName}) packages;
           entrypointPackage = target.crossPkgs.${builtins.head packages};
           baseLayer = mkBaseLayerForTarget target;
-
-          # Build PATH from all included packages
           packagePaths = lib.concatMapStringsSep ":" (pkg: "${pkg}/bin") resolvedPackages;
         in
         nix2container.buildImage {
           inherit name tag;
-
-          # Explicit architecture for OCI manifest
           arch = target.arch;
-
-          # Explicit layers: base packages in shared layer
           layers = [ baseLayer ];
-
-          # All packages in main image layer (copyToRoot strips /nix/store prefix)
           copyToRoot = target.crossPkgs.buildEnv {
+            # strips /nix/store prefix
             name = "root";
             paths = resolvedPackages;
             pathsToLink = [ "/bin" ];
@@ -181,21 +113,12 @@ in
               "org.opencontainers.image.source" = "https://github.com/cameronraysmith/vanixiets";
             };
           };
-
-          # Further split customization layer by popularity if beneficial
           maxLayers = 2;
         };
 
-      # Helper to get targets for a container (uses default if not specified)
       getContainerTargets = def: def.targets or defaultTargetNames;
 
-      # ============================================================================
-      # Package Generation
-      # ============================================================================
-
-      # Generate container packages respecting per-container target specifications
-      # Only generates containers for each container's specified targets (or defaults)
-      # Creates: fdContainer-x86_64, fdContainer-aarch64, rgContainer-x86_64, etc.
+      # Generates: fdContainer-x86_64, fdContainer-aarch64, rgContainer-x86_64, etc.
       containerPackages = lib.listToAttrs (
         lib.flatten (
           lib.mapAttrsToList (
@@ -212,15 +135,13 @@ in
         )
       );
 
-      # Helper to get env var with fallback (requires --impure for actual env var reading)
+      # Env var helpers (require --impure)
       getEnvOr =
         var: default:
         let
           val = builtins.getEnv var;
         in
         if val == "" then default else val;
-
-      # Parse comma-separated env var into list (empty string → empty list)
       getEnvList =
         var:
         let
@@ -228,29 +149,13 @@ in
         in
         if val == "" then [ ] else lib.splitString "," val;
 
-      # ============================================================================
-      # Manifest Generation (Unified)
-      # ============================================================================
-
-      # Generate a manifest for a container with specified target architectures
-      # When targetNames has one element, creates single-arch manifest (no manifest list)
-      # When targetNames has multiple elements, creates multi-arch manifest list
-      #
-      # Environment variables:
-      #   VERSION: Primary version tag (default: "1.0.0")
-      #   TAGS: Comma-separated additional tags, applied via crane (default: "latest" on main)
-      #   GITHUB_REF_NAME: Branch name for auto-tagging logic (default: "main")
-      #
-      # Arguments:
-      #   containerName: Name of the container (key in containerDefs)
-      #   targetNames: List of target names to include (defaults to container's targets)
+      # Manifest generation. Env vars: VERSION, TAGS (comma-separated), GITHUB_REF_NAME
       mkManifest =
         {
           containerName,
           targetNames ? null,
         }:
         let
-          # Use provided targetNames, or fall back to container's targets
           actualTargetNames =
             if targetNames != null then targetNames else getContainerTargets containerDefs.${containerName};
           selectedTargets = selectTargets actualTargetNames;
@@ -268,14 +173,11 @@ in
             password = "$GITHUB_TOKEN";
           };
           version = getEnvOr "VERSION" "1.0.0";
-          tags = getEnvList "TAGS"; # Additional tags via crane (e.g., "latest,stable")
+          tags = getEnvList "TAGS";
           branch = getEnvOr "GITHUB_REF_NAME" "main";
           skopeo = skopeo-nix2container;
         };
 
-      # Generate all manifest variants for all containers
-      # For each container: one multi-arch manifest + one single-arch manifest per target
-      # Respects per-container target specifications
       manifestPackages = lib.listToAttrs (
         lib.flatten (
           lib.mapAttrsToList (
@@ -285,63 +187,42 @@ in
               selectedTargets = selectTargets containerTargets;
             in
             [
-              # Multi-arch manifest (container's targets)
               {
                 name = "${containerName}Manifest";
                 value = mkManifest { inherit containerName; };
               }
             ]
-            ++
-              # Single-arch manifests (one per container's target)
-              lib.mapAttrsToList (targetName: _: {
-                name = "${containerName}Manifest-${targetName}";
-                value = mkManifest {
-                  inherit containerName;
-                  targetNames = [ targetName ];
-                };
-              }) selectedTargets
+            ++ lib.mapAttrsToList (targetName: _: {
+              name = "${containerName}Manifest-${targetName}";
+              value = mkManifest {
+                inherit containerName;
+                targetNames = [ targetName ];
+              };
+            }) selectedTargets
           ) containerDefs
         )
       );
 
     in
     {
-      # All container and manifest packages available on Linux and Darwin
-      # Use lib.mkMerge to properly merge with pkgs-by-name packages
+      # Usage: VERSION=1.0.0 nix run --impure .#fdManifest
       packages = lib.mkMerge [
-        # Container images for all target architectures
-        # Available on both Linux and Darwin (Darwin builds via rosetta-builder)
         (lib.optionalAttrs (isLinux || isDarwin) containerPackages)
-
-        # Manifests for CI/CD registry distribution
-        # Now works on Linux (via pkgsCross) and Darwin (via rosetta-builder)
-        # Usage: VERSION=1.0.0 nix run --impure .#fdManifest
         (lib.optionalAttrs (isLinux || isDarwin) manifestPackages)
       ];
     };
 
-  # Flake-level outputs
-  # Expose containerMatrix (system-independent data for CI)
-  # Pure evaluation (no --impure needed)
-  # Usage: nix eval .#containerMatrix.build --json
+  # CI matrix data (pure evaluation): nix eval .#containerMatrix --json
   flake.containerMatrix = {
-    # Flat list of {container, target} pairs for parallel build jobs
-    # Each entry represents one container image to build for one architecture
     build = lib.flatten (
       lib.mapAttrsToList (
         containerName: def:
-        let
-          containerTargets = def.targets or defaultTargetNames;
-        in
         map (targetName: {
           container = containerName;
           target = targetName;
-        }) containerTargets
+        }) (def.targets or defaultTargetNames)
       ) containerDefs
     );
-
-    # List of container names for manifest push jobs
-    # One manifest job per container (handles all architectures for that container)
     manifest = lib.attrNames containerDefs;
   };
 }
