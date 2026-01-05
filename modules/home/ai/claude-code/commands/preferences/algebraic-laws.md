@@ -170,6 +170,73 @@ fc.assert(
 );
 ```
 
+### Fold and reconstruction laws for event sourcing
+
+Event-sourced systems reconstruct state by folding the `evolve` function over event sequences.
+This fold operation must satisfy algebraic laws ensuring deterministic reconstruction.
+
+The fold laws for state reconstruction:
+
+```haskell
+-- Identity: folding over empty events yields initial state
+fold(evolve, s₀, []) ≡ s₀
+
+-- Single element: folding over one event is equivalent to applying evolve once
+fold(evolve, s₀, [e]) ≡ evolve(s₀, e)
+
+-- Associativity: folding over concatenated event lists can be done in stages
+fold(evolve, s₀, es₁ ++ es₂) ≡ fold(evolve, fold(evolve, s₀, es₁), es₂)
+```
+
+The associativity law is critical for distributed systems: it enables incremental state reconstruction and checkpointing.
+You can fold events up to time T, snapshot the state, then fold remaining events from that snapshot rather than replaying from the beginning.
+
+When `State` itself has monoidal structure (e.g., balance as Sum monoid, analytics as product of counters), the fold inherits that structure:
+
+```haskell
+-- If State is a monoid and evolve preserves monoidal structure:
+fold(evolve, mempty, events) <> fold(evolve, mempty, moreEvents)
+  ≡ fold(evolve, mempty, events ++ moreEvents)
+```
+
+Property-based tests for fold laws ensure state reconstruction is deterministic:
+
+```rust
+proptest! {
+    #[test]
+    fn fold_identity(initial: AccountState) {
+        let events: Vec<AccountEvent> = vec![];
+        let result = events.iter().fold(initial.clone(), Account::evolve);
+        prop_assert_eq!(result, initial);
+    }
+
+    #[test]
+    fn fold_single_element(initial: AccountState, event: AccountEvent) {
+        let result1 = vec![event.clone()].iter().fold(initial.clone(), Account::evolve);
+        let result2 = Account::evolve(initial, &event);
+        prop_assert_eq!(result1, result2);
+    }
+
+    #[test]
+    fn fold_associativity(
+        initial: AccountState,
+        events1: Vec<AccountEvent>,
+        events2: Vec<AccountEvent>
+    ) {
+        let intermediate = events1.iter().fold(initial.clone(), Account::evolve);
+        let left = events2.iter().fold(intermediate, Account::evolve);
+
+        let all_events: Vec<_> = events1.iter().chain(events2.iter()).collect();
+        let right = all_events.iter().fold(initial, Account::evolve);
+
+        prop_assert_eq!(left, right);
+    }
+}
+```
+
+These laws connect to the monoidal structure of events (see monoid laws above) and enable correctness guarantees for event-sourced state machines.
+See event-sourcing.md#state-reconstruction for domain context and patterns, and theoretical-foundations.md#the-decider-pattern for the categorical interpretation of `evolve` as an F-algebra and state reconstruction as catamorphism.
+
 ## Functor laws
 
 ### The laws
