@@ -36,6 +36,7 @@
           - functional domain modeling (DDD, types, aggregates): ${prefsPath}/domain-modeling.md
           - event sourcing (event replay, state reconstruction, CQRS): ${prefsPath}/event-sourcing.md
           - event catalog tooling (EventCatalog, schema documentation): ${prefsPath}/event-catalog-tooling.md
+          - qlerify to eventcatalog (transformation workflow): ${prefsPath}/event-catalog-qlerify.md
           - discovery process: ${prefsPath}/discovery-process.md
           - collaborative modeling (EventStorming, Domain Storytelling): ${prefsPath}/collaborative-modeling.md
           - strategic domain analysis (Core/Supporting/Generic classification): ${prefsPath}/strategic-domain-analysis.md
