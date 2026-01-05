@@ -45,6 +45,7 @@
           - smart constructors and validation patterns: see domain-modeling.md
           - error handling and workflow composition (Result types, railway-oriented): ${prefsPath}/railway-oriented-programming.md
           - data modeling (database schemas, normalization, ER diagrams): ${prefsPath}/data-modeling.md
+          - json querying (duckdb, jaq): ${prefsPath}/json-querying.md
           - schema versioning: ${prefsPath}/schema-versioning.md
           - web application deployment: ${prefsPath}/web-application-deployment.md
           - cloudflare wrangler configuration: ${prefsPath}/cloudflare-wrangler-reference.md
