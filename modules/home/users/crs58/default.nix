@@ -18,7 +18,7 @@
       # No local imports needed - all 17 modules available via aggregate merging
 
       # sops-nix configuration for crs58/cameron user
-      # 9 secrets: development + ai + shell aggregates
+      # 10 secrets: development + ai + shell aggregates
       sops = {
         defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
         secrets = {
@@ -30,6 +30,7 @@
           glm-api-key = { };
           firecrawl-api-key = { };
           huggingface-token = { };
+          context7-api-key = { };
           bitwarden-email = { };
           atuin-key = { };
           mcp-agent-mail-bearer-token = { };
