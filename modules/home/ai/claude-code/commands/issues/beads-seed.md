@@ -76,7 +76,15 @@ Map architectural dependencies to beads dependencies:
 - Integration story requires both components ready → two dependencies
 
 Use `bd dep add <blocked-issue> <blocking-issue> --type blocks` syntax.
+The first argument is the issue that depends on (is blocked by) the second argument.
 The blocking issue must be resolved before the blocked issue can proceed.
+
+**Note**: The `--type` defaults to `blocks` and can be omitted for blocking dependencies.
+These are equivalent:
+```bash
+bd dep add bd-auth-integration-id bd-data-schema-id --type blocks
+bd dep add bd-auth-integration-id bd-data-schema-id  # --type blocks is default
+```
 
 ### 5. Create beads structure
 
@@ -103,9 +111,15 @@ bd create "Integrate auth with database for session storage" \
   --parent bd-auth-epic-id \
   --description "Persist sessions in PostgreSQL"
 
-# Wire dependencies
-bd dep add bd-auth-integration-id bd-data-schema-id --type blocks
-bd dep add bd-auth-integration-id bd-jwt-impl-id --type blocks
+# Wire dependencies (--type blocks is default, can be omitted)
+bd dep add bd-auth-integration-id bd-data-schema-id
+bd dep add bd-auth-integration-id bd-jwt-impl-id
+
+# Alternative: wire dependencies during creation
+bd create "Integrate auth with database for session storage" \
+  --parent bd-auth-epic-id \
+  --description "Persist sessions in PostgreSQL" \
+  --deps "bd-data-schema-id,bd-jwt-impl-id"
 ```
 
 ### 6. Commit the seeded structure
@@ -160,10 +174,13 @@ bd create "CDN integration for serving processed content" \
   --parent bd-content-epic
 
 # Wire dependencies (processing worker needs upload API first)
-bd dep add bd-processing-worker bd-upload-api --type blocks
+bd dep add bd-processing-worker bd-upload-api
 
 # Verify structure
-bd list --pretty
+bd status                                      # Quick health check
+bd list --pretty                               # Tree view with status symbols
+bd dep tree bd-user-mgmt-epic --direction both # Full dependency graph for epic
+bd dep tree bd-content-epic --direction both   # Full dependency graph for epic
 
 # Commit
 git add .beads/
@@ -200,7 +217,61 @@ Both are version controlled and evolve together but serve different purposes.
 
 **Seed incrementally**: For large systems, seed one epic at a time rather than attempting to create the entire structure upfront.
 
-**Validate dependencies**: After seeding, run `bd list --pretty` to review the structure, and `bd dep tree <epic-id>` for each epic to verify dependencies match architectural understanding.
+**Validate dependencies**: After seeding, run `bd list --pretty` to review the structure, and `bd dep tree <epic-id> --direction both` for each epic to verify dependencies match architectural understanding.
+
+**Note**: Use `--direction both` with `bd dep tree` to see the full graph in both directions (what blocks this issue and what this issue blocks).
+Use `--format mermaid` to generate Mermaid.js diagrams for visualization.
+
+## Scriptable seeding
+
+For automated seeding from scripts, use the `--silent` flag to capture issue IDs:
+
+```bash
+#!/usr/bin/env bash
+# Create epics and capture IDs
+AUTH_EPIC=$(bd create --type epic "Authentication System" \
+  --description "JWT-based auth with RBAC" --silent)
+
+DATA_EPIC=$(bd create --type epic "Data Storage Layer" \
+  --description "PostgreSQL schema with migration framework" --silent)
+
+# Create stories under epics with captured parent IDs
+JWT_STORY=$(bd create "JWT token generation" \
+  --parent "$AUTH_EPIC" \
+  --description "Core token operations with expiry and refresh" --silent)
+
+SCHEMA_STORY=$(bd create "Database schema initial migration" \
+  --parent "$DATA_EPIC" \
+  --description "Version 1 schema with user and session tables" --silent)
+
+# Create integration story with inline dependencies
+SESSION_STORY=$(bd create "Session storage" \
+  --parent "$AUTH_EPIC" \
+  --description "Persist sessions in PostgreSQL" \
+  --deps "$SCHEMA_STORY,$JWT_STORY" --silent)
+
+echo "Created epics: $AUTH_EPIC, $DATA_EPIC"
+echo "Created stories: $JWT_STORY, $SCHEMA_STORY, $SESSION_STORY"
+```
+
+The `--silent` flag outputs only the issue ID, making it suitable for scripting and automation.
+
+## Available dependency types
+
+When wiring dependencies with `bd dep add`, the following types are available:
+
+- `blocks` (default) - blocking dependency
+- `tracks` - tracking relationship
+- `related` - related issues
+- `parent-child` - hierarchical relationship
+- `discovered-from` - found during implementation
+- `until` - temporal dependency
+- `caused-by` - causal relationship
+- `validates` - validation relationship
+- `relates-to` - general relation
+- `supersedes` - replacement relationship
+
+The `blocks` type is the default and can be omitted.
 
 ## Common patterns
 
