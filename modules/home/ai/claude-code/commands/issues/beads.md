@@ -93,12 +93,18 @@ An epic is eligible for closure when all its child issues are closed.
 
 ### Dependencies
 
-Dependencies encode relationships between issues using four types:
+Dependencies encode relationships between issues using typed edges in the dependency graph.
+The primary dependency types are:
 
 - **blocks**: Hard blockers that affect the ready queue; the first issue must complete before the second can start
 - **parent-child**: Epic/subtask relationships establishing hierarchical structure
-- **related**: Soft associations indicating thematic connection without execution constraints
+- **tracks**: Soft associations for related work items that don't block execution
+- **related** / **relates-to**: Bidirectional soft relationships indicating thematic connection without execution constraints
 - **discovered-from**: Tracking issues found during other work, useful for tracing root causes
+- **until**: Temporal dependencies for scheduled or time-bound work
+- **caused-by**: Root cause tracking for bugs and issues
+- **validates**: Testing or validation relationships
+- **supersedes**: Replacement tracking for deprecated or obsoleted issues
 
 The dependency graph is a directed acyclic graph (DAG).
 Circular dependencies are prohibited and detected by `bd dep cycles`.
@@ -171,7 +177,12 @@ Create a standalone issue with type and priority:
 
 ```bash
 bd create "Implement authentication" -t feature -p 1
+bd create "Fix login bug" -t bug -p 0 --deps "blocks:auth-epic,discovered-from:ui-task"
+bd create "Add tests" -t task -p 2 --silent  # outputs only issue ID for scripting
 ```
+
+The `--deps` flag allows inline dependency creation with syntax: `--deps "type:id,type:id,..."`.
+The `--silent` flag suppresses all output except the issue ID, useful for shell scripts.
 
 Create an epic to group related work:
 
@@ -219,18 +230,30 @@ bd dep add task-789 epic-001 --type parent-child
 Visualize the dependency tree for an issue:
 
 ```bash
-bd dep tree bd-a3f8              # show what blocks this issue (downstream)
-bd dep tree bd-a3f8 --reverse    # show what this issue blocks (upstream)
-bd dep tree bd-a3f8 --direction both  # full context: blockers AND dependents
-bd dep tree bd-a3f8 --format mermaid  # output as mermaid diagram
+bd dep tree bd-a3f8                      # show what blocks this issue (downstream)
+bd dep tree bd-a3f8 --direction up       # show what this issue blocks (upstream)
+bd dep tree bd-a3f8 --direction both     # full context: blockers AND dependents
+bd dep tree bd-a3f8 --format mermaid     # output as mermaid diagram
+bd dep tree bd-a3f8 --max-depth 3        # limit tree depth
+bd dep tree bd-a3f8 --status open        # filter by status
+bd dep tree bd-a3f8 --type blocks        # filter by dependency type
+bd dep tree bd-a3f8 --show-all-paths     # show all paths in diamond dependencies
 ```
 
 The `--direction both` flag is essential for understanding full impact: it shows upstream blockers and downstream dependents in a single view.
+Use `--show-all-paths` when diamond dependencies exist to see all possible traversal routes.
 
 Detect circular dependencies that would create deadlocks:
 
 ```bash
 bd dep cycles
+```
+
+Create soft bidirectional relationships (for cross-cutting concerns):
+
+```bash
+bd dep relate bd-a3f8 bd-xyz     # create bidirectional relationship
+bd dep unrelate bd-a3f8 bd-xyz   # remove bidirectional relationship
 ```
 
 Remove dependencies when requirements change:
@@ -253,6 +276,24 @@ View blocked issues (waiting on unresolved dependencies):
 ```bash
 bd blocked
 bd blocked --json  # machine-readable output
+```
+
+Identify orphaned issues (referenced in commits but still open):
+
+```bash
+bd orphans
+```
+
+Check for stale issues (not updated recently):
+
+```bash
+bd stale
+```
+
+Monitor real-time issue state changes:
+
+```bash
+bd activity  # shows live feed of molecule state updates
 ```
 
 View epic progress across all children:
@@ -282,7 +323,7 @@ Repository statistics and status:
 
 ```bash
 bd status  # quick human-readable summary (~20 lines, context-efficient)
-bd stats   # detailed statistics
+bd stats   # alias for bd status, same output
 ```
 
 ### Issue lifecycle
@@ -290,7 +331,15 @@ bd stats   # detailed statistics
 Close an issue with context:
 
 ```bash
-bd close <issue-id> --comment "Implemented in commit $(git rev-parse --short HEAD)"
+bd close <issue-id> --reason "Implemented in commit $(git rev-parse --short HEAD)"
+bd close <issue-id> --suggest-next  # show newly unblocked issues after closing
+```
+
+Add comments separately when closing:
+
+```bash
+bd comments add <issue-id> "Implementation notes or context"
+bd close <issue-id>
 ```
 
 Reopen if needed:
@@ -302,9 +351,16 @@ bd reopen <issue-id>
 Add comments to track progress or reasoning:
 
 ```bash
-bd comment <issue-id> "Starting implementation"
-bd comment <issue-id> "Progress: $(git log -1 --oneline)"
-bd comment <issue-id> "Blocked by external dependency, deferring"
+bd comments add <issue-id> "Starting implementation"
+bd comments add <issue-id> "Progress: $(git log -1 --oneline)"
+bd comments add <issue-id> "Blocked by external dependency, deferring"
+```
+
+Defer issues for later work:
+
+```bash
+bd defer <issue-id>    # mark as deferred
+bd undefer <issue-id>  # remove deferred status
 ```
 
 Delete an issue (use sparingly, prefer closing):
@@ -412,7 +468,7 @@ Mark issue as in-progress (optional):
 
 ```bash
 bd update <issue-id> --status in_progress
-bd comment <issue-id> "Starting implementation"
+bd comments add <issue-id> "Starting implementation"
 ```
 
 When discovering related issues or blockers:
@@ -447,7 +503,14 @@ bd update <issue-id> --priority 0  # escalate if more critical than expected
 Close the issue with context:
 
 ```bash
-bd close <issue-id> --comment "Implemented in commit $(git rev-parse --short HEAD)"
+bd comments add <issue-id> "Implemented in commit $(git rev-parse --short HEAD)"
+bd close <issue-id> --suggest-next  # shows newly unblocked issues
+```
+
+Or use the `--reason` flag for closure context:
+
+```bash
+bd close <issue-id> --reason "Implemented in commit $(git rev-parse --short HEAD)"
 ```
 
 Check what this unblocks:
@@ -496,7 +559,7 @@ Merge duplicate issues:
 
 ```bash
 # Close the duplicate with reference
-bd close <duplicate-id> --comment "Duplicate of <primary-id>"
+bd close <duplicate-id> --reason "Duplicate of <primary-id>"
 ```
 
 Fix incorrectly wired dependencies:
@@ -517,14 +580,20 @@ bd dep cycles
 Check for orphaned dependency references:
 
 ```bash
-bd repair-deps --dry-run
-bd repair-deps  # if repairs are needed
+bd repair --dry-run
+bd repair  # if repairs are needed
 ```
 
-Validate database integrity:
+Check installation health and fix issues:
 
 ```bash
-bd validate
+bd doctor  # comprehensive health check with auto-repair suggestions
+```
+
+Validate issue templates and content:
+
+```bash
+bd lint  # check issues for missing template sections
 ```
 
 ## Integration patterns
@@ -534,13 +603,13 @@ bd validate
 After each commit that progresses an issue:
 
 ```bash
-bd comment <issue-id> "Progress: $(git log -1 --oneline)"
+bd comments add <issue-id> "Progress: $(git log -1 --oneline)"
 ```
 
 Before committing, update the relevant issue:
 
 ```bash
-bd comment <issue-id> "Implemented in commit $(git rev-parse --short HEAD)"
+bd comments add <issue-id> "Implemented in commit $(git rev-parse --short HEAD)"
 bd close <issue-id>
 ```
 
@@ -557,7 +626,8 @@ git checkout -b <issue-id>-short-description
 When merging:
 
 ```bash
-bd close <issue-id> --comment "Merged in PR #N"
+bd comments add <issue-id> "Merged in PR #N"
+bd close <issue-id>
 ```
 
 ### With code review
@@ -565,7 +635,7 @@ bd close <issue-id> --comment "Merged in PR #N"
 Before requesting review:
 
 ```bash
-bd comment <issue-id> "Ready for review: PR #N"
+bd comments add <issue-id> "Ready for review: PR #N"
 bd update <issue-id> --labels "needs-review"
 ```
 
@@ -629,6 +699,8 @@ When architectural assumptions change during implementation, use `/issues:beads-
 |-----------|---------|
 | **Creation** | |
 | Create issue | `bd create "title" -t type -p priority` |
+| Create with deps | `bd create "title" --deps "blocks:id1,discovered-from:id2"` |
+| Create silent | `bd create "title" --silent` (outputs only ID) |
 | Create epic | `bd create "title" -t epic -p priority` |
 | Create child | `bd create "title" --parent epic-id` |
 | **Inspection** | |
@@ -636,26 +708,38 @@ When architectural assumptions change during implementation, use `/issues:beads-
 | List issues | `bd list [filters]` |
 | Search | `bd search "query"` |
 | Status summary | `bd status` |
-| Statistics | `bd stats` |
+| Statistics | `bd stats` (alias for status) |
 | **Modification** | |
 | Update issue | `bd update issue-id --field value` |
-| Add comment | `bd comment issue-id "text"` |
-| Close issue | `bd close issue-id [--comment "..."]` |
+| Add comment | `bd comments add issue-id "text"` |
+| Close issue | `bd close issue-id [--reason "..."]` |
+| Close with suggestions | `bd close issue-id --suggest-next` |
 | Reopen issue | `bd reopen issue-id` |
 | Delete issue | `bd delete issue-id` |
+| Defer issue | `bd defer issue-id` |
+| Undefer issue | `bd undefer issue-id` |
 | **Dependencies** | |
 | Add dependency | `bd dep add from-id to-id [--type type]` |
 | Remove dependency | `bd dep remove from-id to-id` |
-| View dep tree | `bd dep tree issue-id [--direction both]` |
+| Relate (bidirectional) | `bd dep relate id1 id2` |
+| Unrelate | `bd dep unrelate id1 id2` |
+| View dep tree | `bd dep tree issue-id [--direction up\|down\|both]` |
+| Tree with depth | `bd dep tree issue-id --max-depth N` |
+| Tree with filters | `bd dep tree issue-id --status open --type blocks` |
+| Show all paths | `bd dep tree issue-id --show-all-paths` |
 | Find cycles | `bd dep cycles` |
-| Repair orphans | `bd repair-deps [--dry-run]` |
 | **Workflow** | |
 | Ready queue | `bd ready [filters]` |
 | Blocked issues | `bd blocked [--json]` |
+| Orphaned issues | `bd orphans` |
+| Stale issues | `bd stale` |
+| Activity feed | `bd activity` |
 | Epic status | `bd epic status [--eligible-only]` |
 | Auto-close epics | `bd epic close-eligible [--dry-run]` |
 | **Maintenance** | |
-| Validate database | `bd validate` |
+| Health check | `bd doctor` |
+| Lint issues | `bd lint` |
+| Repair database | `bd repair [--dry-run]` |
 | Run hooks | `bd hooks run pre-commit` |
 | Sync from JSONL | `bd sync --import-only` |
 | **Labels** | |
