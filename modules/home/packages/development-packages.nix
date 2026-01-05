@@ -92,6 +92,7 @@
           tea
           tmate
           tree-sitter
+          jaq
           yq
 
           # Note: for quick experiments with different versions
