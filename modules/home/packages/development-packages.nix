@@ -139,6 +139,10 @@
           dune_3
           opam
 
+          # elixir
+          elixir
+          elixir-ls
+
           # dependently typed / proof assistants
           idris2
           lean4
