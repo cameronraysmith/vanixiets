@@ -57,6 +57,39 @@ EventStorming produces hundreds of events in hours through parallel contribution
 Event Modeling systematically processes each event through seven steps, defining command schemas, read models, GWT scenarios, and bounded context assignments.
 The investment produces implementation-ready artifacts rather than exploration artifacts, appropriate when moving from understanding to building.
 
+## EventStorming to Event Modeling artifact transformation
+
+EventStorming artifacts transform systematically into Event Modeling specifications.
+Understanding which artifacts are reused, transformed, or require new information guides efficient transition between techniques.
+
+Orange event sticky notes are reused as Event Modeling events with field schemas added.
+The event name transfers directly while field-level details emerge through storyboarding and domain expert interviews.
+Questions to elicit fields include "when this event happens, what facts are worth recording?" and "what information would someone need to understand what occurred?"
+
+Blue command sticky notes are reused as Event Modeling commands with field schemas and validation rules added.
+The command name transfers while form fields emerge through the storyboard step.
+Questions to elicit fields include "when the actor performs this action, what information must they provide?" and "what validation rules determine whether the command succeeds?"
+
+Purple policy sticky notes transform into automation patterns or translation patterns depending on trigger type.
+Policies triggered by scheduled processes or queries become automation patterns with read models as eligibility queries.
+Policies triggered by external events become translation patterns with read models as external event payloads.
+The "whenever X then Y" structure becomes Given-When-Then scenarios capturing the conditional logic.
+
+Yellow aggregate sticky notes are reused for bounded context assignment in Step 6.
+Aggregates identified during EventStorming become aggregate roots in the Event Model, grouped into bounded contexts based on team ownership and deployment boundaries.
+
+Pink hotspot sticky notes transform into Given-When-Then scenarios that test edge cases and resolve uncertainty.
+Each hotspot represents a question or disagreement that becomes a behavioral specification documenting expected behavior.
+Converting hotspots to GWT scenarios forces explicit resolution of ambiguity before implementation.
+
+Green read model sticky notes are reused directly if present or added during Step 5 if missing.
+EventStorming read models transfer as starting points while Event Modeling adds field-level query definitions.
+
+Lilac external system sticky notes transform into translation pattern read models representing external event payloads.
+The external system boundary becomes an integration point where incoming data is interpreted and conditionally triggers domain events.
+
+New information required during Event Modeling that does not exist in EventStorming includes typed field schemas for all commands and events, UI form designs via command field ordering, query definitions for read models, Given-When-Then behavioral scenarios, and bounded context assignments mapping aggregates to team ownership.
+
 ## The 7-step Event Modeling methodology
 
 ### Step 1: Brainstorming
