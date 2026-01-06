@@ -20,8 +20,8 @@
         };
 
         nix = {
-          # Enables use of `nix-shell -p ...` etc with pinned nixpkgs
-          # Uses flake registry reference (survives GC) rather than store path (can be GC'd)
+          # Enable `nix-shell -p ...` etc with pinned nixpkgs via NIX_PATH env var
+          # Note: settings.nix-path below also needed for daemon/non-shell contexts
           nixPath = [ "nixpkgs=flake:nixpkgs" ];
 
           # Make `nix shell` etc use pinned nixpkgs
@@ -43,8 +43,9 @@
           optimise.automatic = true;
 
           settings = {
-            # Override default nix-path to prevent reading stale root channels
-            # This survives GC because flake: references use the registry
+            # Write nix-path to nix.conf for daemon and non-shell contexts
+            # Complements nixPath (env var) above; both needed for full coverage
+            # Overrides default behavior of reading /nix/var/nix/profiles/per-user/root/channels
             nix-path = [ "nixpkgs=flake:nixpkgs" ];
 
             accept-flake-config = true;
@@ -60,7 +61,8 @@
             # Enable Rosetta builds on Apple Silicon
             extra-platforms = "aarch64-darwin x86_64-darwin";
 
-            # Empty flake registry (use pinned inputs only)
+            # Disable mutable global flake registry (fetched from GitHub by default)
+            # Resolution still works via system registry populated by registry.nixpkgs above
             flake-registry = builtins.toFile "empty-flake-registry.json" ''{"flakes":[],"version":2}'';
 
             max-jobs = "auto";
