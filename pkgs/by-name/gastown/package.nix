@@ -18,23 +18,18 @@
 
 buildGoModule (finalAttrs: {
   pname = "gastown";
-  version = "0.2.1";
+  # To switch back to tagged release: version = "0.2.1"; and use tag instead of rev
+  version = "unstable-2026-01-05";
 
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "gastown";
-    tag = "v${finalAttrs.version}";
-    hash = "sha256-x2jDi69D02cyvcTH0ZnRX9hj+olgY+A0nOQTcUHvR1o=";
+    rev = "6e4f2bea299521b0b32a7ad642117d3d6b96ca3c";
+    # tag = "v${finalAttrs.version}";
+    hash = "sha256-Cy6B/pWf7SjhlrWgH3nMZMKButiXSna01VZZkOWwkzA=";
   };
 
-  # Upstream v0.2.1 has incomplete go.mod: internal/web/browser_e2e_test.go
-  # imports github.com/go-rod/rod which isn't declared as a dependency.
-  # Remove the test file to allow vendoring to succeed.
-  postPatch = ''
-    rm -f internal/web/browser_e2e_test.go
-  '';
-
-  vendorHash = "sha256-adI6n2Iyj072uqkcVbTRolN3z85Ovf0dO/VG7F8ZH08=";
+  vendorHash = "sha256-L+Hj2pCsqKX/6MXNq5P33RPOAbxvrLgsbNDIRdNTvvw=";
 
   subPackages = [ "cmd/gt" ];
 
@@ -48,10 +43,11 @@ buildGoModule (finalAttrs: {
   # Tests require git worktrees, tmux, and other runtime dependencies
   doCheck = false;
 
-  nativeInstallCheckInputs = [ versionCheckHook ];
-  versionCheckProgram = "${placeholder "out"}/bin/gt";
-  versionCheckProgramArg = "version";
-  doInstallCheck = true;
+  # Version check disabled for unstable builds; re-enable for tagged releases
+  # nativeInstallCheckInputs = [ versionCheckHook ];
+  # versionCheckProgram = "${placeholder "out"}/bin/gt";
+  # versionCheckProgramArg = "version";
+  # doInstallCheck = true;
 
   passthru.updateScript = nix-update-script { };
 
