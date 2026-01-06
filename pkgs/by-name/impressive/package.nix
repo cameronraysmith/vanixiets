@@ -6,6 +6,7 @@
 # Source: https://impressive.sourceforge.net/
 {
   lib,
+  stdenv,
   python3Packages,
   fetchurl,
   makeWrapper,
@@ -13,6 +14,7 @@
   poppler-utils,
   ghostscript,
   ffmpeg,
+  SDL2,
 }:
 
 python3Packages.buildPythonApplication rec {
@@ -66,17 +68,22 @@ python3Packages.buildPythonApplication rec {
 
   nativeBuildInputs = [ makeWrapper ];
 
-  postInstall = ''
-    wrapProgram $out/bin/impressive \
-      --prefix PATH : ${
-        lib.makeBinPath [
-          mupdf
-          poppler-utils
-          ghostscript
-          ffmpeg
-        ]
-      }
-  '';
+  postInstall =
+    let
+      libraryPathVar = if stdenv.hostPlatform.isDarwin then "DYLD_LIBRARY_PATH" else "LD_LIBRARY_PATH";
+    in
+    ''
+      wrapProgram $out/bin/impressive \
+        --prefix PATH : ${
+          lib.makeBinPath [
+            mupdf
+            poppler-utils
+            ghostscript
+            ffmpeg
+          ]
+        } \
+        --prefix ${libraryPathVar} : ${lib.makeLibraryPath [ SDL2 ]}
+    '';
 
   doCheck = false;
   pythonImportsCheck = [ "impressive_pkg" ];
