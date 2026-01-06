@@ -323,6 +323,21 @@ See `02-sse-patterns.md` for PatchElements event construction and SSE transport 
 
 See `03-morphing.md` for idiomorph configuration and how stable IDs enable efficient DOM updates.
 
+See `04-css-architecture.md` for composition primitives (Stack, Cluster, Sidebar, etc.) that provide semantic layout classes for use in templates:
+
+```html
+<!-- Prefer composition classes for layout structure -->
+<div class="center">
+  <article class="stack">
+    <h1>{title}</h1>
+    <div class="cluster">
+      {tags.map(tag => <span class="tag">{tag}</span>)}
+    </div>
+    <p>{content}</p>
+  </article>
+</div>
+```
+
 See `04-progressive-enhancement.md` for data attributes and event handling without hydration.
 
 See `05-state-management.md` for session state and how it flows into template rendering.
