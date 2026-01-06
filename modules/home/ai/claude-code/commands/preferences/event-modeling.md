@@ -11,11 +11,13 @@ EventStorming reveals what events exist and how they relate, while Event Modelin
 
 ## Relationship to other documents
 
-Event Modeling complements rather than replaces EventStorming, appearing at different phases of the discovery and design process.
+Event Modeling and EventStorming serve different purposes and can be used independently.
+EventStorming excels at rapid collaborative discovery when domain structure is unclear or contested, producing informal artifacts like sticky notes suitable for team alignment.
+Event Modeling produces implementation-ready specifications with field-level schemas through its own brainstorming phase (Step 1) plus six subsequent refinement steps.
 
-*collaborative-modeling.md* describes EventStorming as a discovery technique suitable for exploring unknown domains, identifying bounded contexts, and surfacing domain events through rapid collaborative sessions.
-Use EventStorming first to understand domain structure, then apply Event Modeling to specify implementation details for priority workflows.
-EventStorming answers "what events happen and why?" while Event Modeling answers "what data do commands carry and what information do actors need?"
+*collaborative-modeling.md* describes EventStorming as a pure discovery technique.
+Teams may use EventStorming for exploration without proceeding to Event Modeling, or start Event Modeling directly without prior EventStorming.
+If both techniques have been used, EventStorming artifacts can optionally enrich Event Modeling's brainstorming phase as supplementary input.
 
 *event-catalog-qlerify.md* provides the transformation workflow from Qlerify Event Modeling JSON exports to EventCatalog MDX artifacts with JSON Schema.
 Event Modeling sessions produce the source artifacts that this transformation consumes, generating discoverable documentation from implementation specifications.
@@ -33,34 +35,28 @@ Commands discovered through Event Modeling become inputs to the `decide` functio
 
 ## When to use Event Modeling versus EventStorming
 
-Choose the appropriate technique based on current understanding and desired outputs.
+Event Modeling and EventStorming address different needs and can be used independently.
 
-Use EventStorming when domain structure is unclear or contested.
-Multiple stakeholders with different perspectives benefit from the chaotic exploration phase where everyone contributes events simultaneously without predetermined structure.
-EventStorming surfaces assumptions, disagreements, and hotspots that indicate where understanding is shallow.
-The visual, temporal flow reveals causality and business processes without requiring participants to articulate formal specifications.
-EventStorming works well for greenfield domain exploration, brownfield discovery of legacy systems, and cross-team alignment where integration points must be identified.
+Use EventStorming when domain structure is unclear or contested and you need rapid collaborative discovery.
+Multiple stakeholders with different perspectives benefit from chaotic exploration where everyone contributes events simultaneously.
+EventStorming surfaces assumptions, disagreements, and hotspots without requiring commitment to implementation details.
+The output is informal artifacts like sticky notes suitable for team alignment, context mapping, and sub-domain identification.
 
-Use Event Modeling when domain events are known but implementation details need specification.
-After EventStorming identifies major workflows and bounded contexts, Event Modeling documents exactly what commands trigger events, what read models actors consult, and what validation rules commands must enforce.
-Event Modeling produces field-level schemas suitable for UI mockups, code generation, and EventCatalog documentation.
-The structured 7-step process ensures completeness by systematically addressing commands, read models, automation patterns, translation patterns, bounded contexts, and behavioral scenarios for each event.
+Use Event Modeling when you need implementation-ready specifications with field-level schemas.
+Event Modeling's 7-step process includes its own discovery phase (Step 1: Brainstorming) that generates events through AI-assisted prompts or collaborative input.
+The methodology produces typed command schemas, read model definitions, Given-When-Then scenarios, and bounded context assignments suitable for code generation.
+Teams can start Event Modeling from scratch using natural language workflow descriptions without prior discovery work.
 
-Use both techniques in sequence for comprehensive coverage.
-Start with Big Picture EventStorming to map the entire domain landscape, identifying major sub-domains and context boundaries.
-Follow with Process Level EventStorming for priority areas, exploring detailed event flows with business rules and policies.
-Then apply Event Modeling to critical workflows requiring implementation, generating specifications from which teams can build.
-This progression provides breadth through EventStorming's rapid exploration and depth through Event Modeling's systematic specification.
+Optionally combine both techniques when you want collaborative discovery to inform specification.
+If you have run EventStorming sessions, those artifacts can enrich Event Modeling's brainstorming phase.
+This is optional enrichment, not a prerequisite.
+Event Modeling's brainstorming step is self-sufficient for teams starting fresh.
 
-Recognize that Event Modeling requires more time per event than EventStorming.
-EventStorming produces hundreds of events in hours through parallel contribution and minimal structure.
-Event Modeling systematically processes each event through seven steps, defining command schemas, read models, GWT scenarios, and bounded context assignments.
-The investment produces implementation-ready artifacts rather than exploration artifacts, appropriate when moving from understanding to building.
+## Optional: Enriching brainstorming with EventStorming artifacts
 
-## EventStorming to Event Modeling artifact transformation
-
-EventStorming artifacts transform systematically into Event Modeling specifications.
-Understanding which artifacts are reused, transformed, or require new information guides efficient transition between techniques.
+If you have previously run EventStorming sessions, those artifacts can optionally enrich Event Modeling's Step 1 brainstorming phase.
+This integration pattern is supplementary, not required.
+Event Modeling's AI-assisted brainstorming or collaborative input provides complete discovery for teams starting fresh.
 
 Orange event sticky notes are reused as Event Modeling events with field schemas added.
 The event name transfers directly while field-level details emerge through storyboarding and domain expert interviews.
@@ -89,6 +85,9 @@ Lilac external system sticky notes transform into translation pattern read model
 The external system boundary becomes an integration point where incoming data is interpreted and conditionally triggers domain events.
 
 New information required during Event Modeling that does not exist in EventStorming includes typed field schemas for all commands and events, UI form designs via command field ordering, query definitions for read models, Given-When-Then behavioral scenarios, and bounded context assignments mapping aggregates to team ownership.
+
+Event Modeling Step 1 (Brainstorming) generates events, commands, aggregates, and read models through AI-assisted prompts or collaborative manual entry.
+EventStorming artifacts provide optional supplementary input when available, not prerequisite material.
 
 ## The 7-step Event Modeling methodology
 
