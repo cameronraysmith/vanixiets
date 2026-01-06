@@ -23,7 +23,7 @@ This paradigm complements functional domain modeling by maintaining clear effect
 | [01-architecture.md](./01-architecture.md) | Server-first philosophy, effect boundaries, HATEOAS principles, anti-patterns (client-side reactivity duplication, WASM SPAs, optimistic updates) |
 | [02-sse-patterns.md](./02-sse-patterns.md) | SSE protocol fundamentals, event types (PatchElements, PatchSignals), connection lifecycle, reconnection resilience, lag handling, resource cleanup |
 | [03-datastar.md](./03-datastar.md) | Datastar framework patterns: signal system, data attributes, backend actions, SDK event types, ReadSignals pattern, real-time updates |
-| [04-css-architecture.md](./04-css-architecture.md) | Design tokens with Open Props, cascade layers, `light-dark()` theming, container queries, PostCSS configuration, Light DOM requirement |
+| [04-css-architecture.md](./04-css-architecture.md) | CUBE CSS methodology, composition primitives (Every Layout), design tokens with Open Props, cascade layers, `light-dark()` theming, container queries, PostCSS configuration, Light DOM requirement |
 | [05-web-components.md](./05-web-components.md) | Thin wrapper pattern for third-party libraries (charts, editors, maps), vanilla vs Lit, morph exclusion, event design, memory cleanup |
 | [06-templating.md](./06-templating.md) | Type-safe server-side templating, lazy vs eager evaluation, ID strategy for morphing, security (escaping, sanitization), testing patterns |
 | [07-event-architecture.md](./07-event-architecture.md) | Event sourcing with SSE, CQRS pattern for hypermedia, event log as authority, real-time projections |
