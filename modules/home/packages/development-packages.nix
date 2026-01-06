@@ -63,6 +63,7 @@
           git-xet
           gitmux
           graphite-cli
+          d2
           graphviz
           jc
           jqp
