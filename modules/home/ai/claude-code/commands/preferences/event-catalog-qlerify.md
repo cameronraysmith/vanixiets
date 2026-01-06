@@ -99,6 +99,101 @@ Lanes define service boundaries:
 
 Parent-child relationships in the `parents[]` array establish temporal flow, enabling sequential ordering of events into flow steps.
 
+## D2 diagrams as complementary input
+
+D2 diagrams provide visual structure that complements Qlerify JSON data.
+When Event Modeling sessions produce both Qlerify JSON exports and D2 diagrams, the two artifacts inform EventCatalog transformation from different perspectives: Qlerify provides detailed schemas and relationships, while D2 provides visual organization and service boundaries.
+
+D2 can be generated from Qlerify JSON using automated transformation scripts, or created alongside Qlerify exports during Event Modeling sessions.
+In either case, D2 swimlanes map directly to EventCatalog service or domain organization, and D2 visual layout informs EventCatalog navigation structure.
+
+### D2 to EventCatalog mapping
+
+D2 structural elements map to EventCatalog artifacts:
+
+| D2 Element | EventCatalog Target | Notes |
+|------------|---------------------|-------|
+| Container (actor/system) | Domain or Service directory | Swimlanes become service boundaries |
+| Event node | Event MDX file | Past tense event name |
+| Command node | Command MDX file | Imperative command name |
+| Read Model node | Query documentation | Projection of event-sourced state |
+| Cross-container arrows | Producer/consumer relationships | Service sends/receives cross-references |
+| Node ordering (left-to-right) | Flow step sequence | Temporal ordering |
+| Container grouping | Domain boundaries | Multiple containers may belong to one domain |
+
+D2 swimlanes (containers) represent service boundaries in Event Modeling diagrams.
+Each swimlane maps to a service in EventCatalog, with the swimlane name converted to PascalCase for the service ID.
+When D2 diagrams group multiple swimlanes under a parent container, that parent becomes a domain grouping multiple services.
+
+D2 event nodes within a swimlane map to events owned by the corresponding EventCatalog service.
+D2 command nodes map to commands consumed by the service containing them.
+D2 read model nodes map to queries produced by the owning service.
+
+Cross-container arrows in D2 indicate inter-service communication.
+An arrow from a command in Service A to an event in Service B means Service B produces that event in response to the command.
+An arrow from an event in Service B to a command in Service C means Service C consumes that event and may trigger the command as a consequence.
+These arrows directly populate the `sends` and `receives` arrays in EventCatalog service frontmatter.
+
+Node ordering in D2 diagrams (left-to-right flow) corresponds to temporal event sequences.
+This ordering complements the parent-child relationships in Qlerify JSON, providing visual confirmation of flow steps.
+When D2 and Qlerify agree on ordering, transformation confidence is high.
+When they differ, the Qlerify parent-child relationships take precedence as they encode explicit temporal dependencies.
+
+### Workflow integration with D2
+
+When both Qlerify JSON and D2 diagrams are available, integrate them during transformation:
+
+```
+Event Modeling Session
+    ↓
+    ├─→ Qlerify JSON Export (detailed schemas, relationships)
+    └─→ D2 Diagram(s) (visual structure, service boundaries)
+    ↓
+Discovery Phase: Cross-validate structure
+    ├─→ Map D2 swimlanes to Qlerify lanes
+    ├─→ Verify event ordering matches across artifacts
+    └─→ Identify discrepancies (pause for manual resolution)
+    ↓
+Transformation to EventCatalog MDX
+```
+
+The discovery phase queries (see "Discovery queries" section) should be augmented with D2 validation queries:
+- Extract swimlane names from D2 and compare with Qlerify lane names
+- Verify event nodes in D2 match domainEvents in Qlerify JSON (by name or description)
+- Map D2 arrows to Qlerify parent-child relationships and flag inconsistencies
+
+D2 diagrams are particularly valuable for:
+- Clarifying ambiguous service boundaries when Qlerify lanes are unclearly named
+- Visualizing cross-service dependencies that may be implicit in Qlerify JSON
+- Confirming intended temporal ordering when parent-child relationships are complex (multiple parents, branching)
+- Providing initial service grouping into domains before bounded context analysis
+
+### D2 structural queries
+
+When D2 diagrams are available as `.d2` files, extract structure using text processing:
+
+```bash
+# Extract container (swimlane) names
+rg '^([a-zA-Z0-9_-]+):\s*\{' event-model.d2 -o -r '$1' | sort -u
+
+# Extract event nodes (past tense patterns, capitalized)
+rg '([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s*:' event-model.d2 -o -r '$1' |
+  grep -E '(Created|Updated|Deleted|Reserved|Confirmed|Cancelled|Sent|Received)$'
+
+# Extract command nodes (imperative patterns, often "Create", "Update", etc.)
+rg '([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*:' event-model.d2 -o -r '$1' |
+  grep -E '^(Create|Update|Delete|Reserve|Confirm|Cancel|Send|Receive)\s'
+
+# Extract cross-container arrows (service dependencies)
+rg '([a-zA-Z0-9_-]+)\.\S+\s*->\s*([a-zA-Z0-9_-]+)\.\S+' event-model.d2 -o -r '$1 -> $2' |
+  sort -u
+```
+
+These patterns extract D2 structure for comparison with Qlerify JSON during discovery.
+Exact regex patterns depend on D2 diagram conventions used during Event Modeling sessions.
+
+D2 diagrams should be stored alongside Qlerify JSON exports in the source directory, referenced in transformation logs, and archived as input artifacts for traceability.
+
 ## Discovery queries
 
 Use these queries to understand the structure of an unknown Qlerify export before beginning transformation.
@@ -357,7 +452,13 @@ Run discovery queries from the "Discovery queries" section to understand:
 - Fields requiring type inference
 - Orphaned schemas or missing relationships
 
-Generate a summary report showing counts, warnings, and structural observations before proceeding to extraction.
+If D2 diagrams are available, run D2 structural queries from "D2 diagrams as complementary input" section and cross-validate:
+- Compare D2 swimlane names with Qlerify lane names (should align)
+- Verify D2 event node names match Qlerify domainEvent descriptions
+- Map D2 cross-container arrows to Qlerify parent-child relationships
+- Flag discrepancies for manual review before proceeding
+
+Generate a summary report showing counts, warnings, structural observations, and D2 validation results before proceeding to extraction.
 
 ### Phase 2: Extract domain
 
