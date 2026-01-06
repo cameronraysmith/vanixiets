@@ -43,6 +43,10 @@
           optimise.automatic = true;
 
           settings = {
+            # Override default nix-path to prevent reading stale root channels
+            # This survives GC because flake: references use the registry
+            nix-path = [ "nixpkgs=flake:nixpkgs" ];
+
             accept-flake-config = true;
             build-users-group = lib.mkDefault "nixbld";
 
