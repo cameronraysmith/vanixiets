@@ -35,8 +35,12 @@ python3Packages.buildPythonApplication rec {
     _parent = Path(__file__).parent.parent
     if str(_parent) not in sys.path:
         sys.path.insert(0, str(_parent))
-    from impressive import main, __version__, __title__
+    from impressive import ParseOptions, run_main, __version__, __title__
     __all__ = ["main", "__version__", "__title__"]
+
+    def main():
+        ParseOptions(sys.argv[1:])
+        run_main()
     EOF
 
     cat > pyproject.toml << EOF
