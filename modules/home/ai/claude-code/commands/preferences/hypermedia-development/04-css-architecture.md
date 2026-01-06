@@ -18,6 +18,71 @@ CSS custom properties cascade through the DOM, making them ideal for design toke
 
 Contrast with utility-first approaches (Tailwind) where design values are embedded in class names, requiring build-time processing and lacking runtime flexibility.
 
+## CUBE CSS methodology
+
+CUBE CSS is a methodology developed by Andy Bell that works *with* the cascade rather than against it.
+The acronym stands for **Composition**, **Utility**, **Block**, **Exception**—representing four conceptual layers organized by cascade priority.
+Unlike methodologies like BEM that fight CSS's grain, CUBE extends CSS's natural capabilities.
+
+For authoritative reference, see [cube.fyi](https://cube.fyi) and [Andy Bell's original article](https://piccalil.li/blog/cube-css/).
+
+### Core philosophy
+
+CUBE CSS embraces two fundamental principles.
+
+*Work with the cascade*: Style as much as possible at a high level using cascade and inheritance.
+By the time you reach the Block layer, blocks become small because previous layers have done most of the work.
+Pages should render acceptably with only global styles loaded—blocks refine rather than define.
+
+*Progressive enhancement*: Create a minimum viable experience that works in older browsers, then enhance with modern features like flexbox and grid.
+CSS's forgiving nature allows extending functionality without polyfills or hacks, resulting in significantly less CSS code.
+
+### The four layers
+
+**Composition** provides high-level, flexible layouts that determine how elements interact spatially.
+Composition creates consistent flow and rhythm, accommodating any content type without visual treatment (colors, shadows).
+This layer is the macro view—even when applied in component-level contexts.
+
+**Utility** classes do one job well.
+Each utility applies a single CSS property or small group of related properties.
+Utilities extend design tokens as reusable helpers, abstracting repeatability to HTML rather than CSS.
+Open Props tokens integrate naturally here—utility classes generated from token values.
+
+**Block** styles apply specific rules for component contexts.
+Blocks arrive late in the cascade; most work is done by global styles, composition, and utilities.
+This makes blocks tiny compared to BEM-style component CSS.
+Block internals should employ composition patterns for flexible content support.
+
+**Exception** handles deviations from block rules, typically state changes.
+Exceptions use data attributes rather than CSS classes:
+
+```html
+<article class="card" data-state="reversed"></article>
+```
+
+```css
+.card[data-state='reversed'] {
+  flex-direction: column-reverse;
+}
+```
+
+Data attributes provide dual hooks for CSS and JavaScript, aligning with finite state machine concepts.
+Exceptions should be concise variations—if a variation is extreme enough to be unrecognizable, create a new block instead.
+
+### Class grouping convention
+
+CUBE recommends grouping classes for readability:
+
+```html
+<article
+  class="[ card ] [ section box ] [ bg-base color-primary ]"
+  data-state="reversed"
+>
+```
+
+Groups separate: primary block class, additional blocks/compositions, utility classes.
+Square brackets or pipes (`|`) work as delimiters—consistency matters more than specific syntax.
+
 ## Open Props integration
 
 Open Props is a design token library delivered as CSS custom properties, not utility classes.
@@ -120,16 +185,19 @@ Layers eliminate specificity wars and `!important` hacks by defining a global or
 Recommended layer order for hypermedia applications:
 
 ```css
-@layer openprops, normalize, theme, components, utilities, app;
+@layer openprops, normalize, theme, compositions, components, utilities, app;
 ```
 
 Layer semantics:
 - `openprops`: Design token definitions (lowest precedence)
 - `normalize`: Reset/normalization styles (overrides browser defaults)
 - `theme`: Semantic token mappings and theme-specific overrides
-- `components`: Reusable component styles
+- `compositions`: Layout primitives for spatial relationships (see "Composition primitives" section)
+- `components`: Reusable component styles (CUBE "blocks")
 - `utilities`: Single-purpose utility classes
 - `app`: Application-specific overrides (highest precedence)
+
+The `compositions` layer sits between theme (design decisions) and components (styled blocks) because compositions use theme tokens but don't define them, and components may contain compositions but compositions remain layout-agnostic.
 
 Layer declarations must occur before any layered styles.
 
@@ -137,7 +205,7 @@ Example layered architecture:
 
 ```css
 /* Layer definition */
-@layer openprops, normalize, theme, components, utilities, app;
+@layer openprops, normalize, theme, compositions, components, utilities, app;
 
 /* Open Props tokens */
 @layer openprops {
@@ -162,6 +230,19 @@ Example layered architecture:
     --primary-hover: var(--blue-8);
     --surface-default: light-dark(var(--gray-0), var(--gray-9));
     --text-primary: light-dark(var(--gray-9), var(--gray-1));
+  }
+}
+
+/* Compositions layer - layout primitives */
+@layer compositions {
+  .stack > * + * {
+    margin-block-start: var(--stack-space, var(--size-3));
+  }
+
+  .cluster {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cluster-space, var(--size-3));
   }
 }
 
@@ -372,6 +453,327 @@ Browser compatibility:
 
 For older browsers, provide viewport media query fallback or accept single-column layout.
 
+## Composition primitives
+
+Composition primitives are reusable layout patterns that respond to their content and container rather than viewport breakpoints.
+This approach is called *intrinsic design*—layouts that figure themselves out algorithmically without media query intervention.
+
+For authoritative reference, see [Every Layout](https://every-layout.dev) by Heydon Pickering and Andy Bell.
+
+### Design principles
+
+Composition primitives embody three key principles.
+
+*Singular responsibility*: Each primitive does one layout job.
+Stack handles vertical spacing; Cluster handles horizontal wrapping; Sidebar handles two-element main/sidebar relationships.
+Complex layouts emerge from composition of simple primitives.
+
+*Intrinsic responsiveness*: Primitives reconfigure based on available space, not viewport width.
+A Switcher switches from row to column when its container becomes too narrow—no media query needed.
+This produces context-independent components usable anywhere.
+
+*Composability*: Primitives nest within each other.
+A Stack inside a Sidebar inside a Center all compose correctly.
+This compositional property resembles algebraic closure—layout operations preserve the layout type.
+
+### The eight primitives
+
+Each primitive exposes custom properties for configuration, using Open Props tokens as defaults.
+
+#### Stack
+
+Manages vertical spacing between siblings via the "owl selector" pattern:
+
+```css
+.stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.stack > * + * {
+  margin-block-start: var(--stack-space, var(--size-3));
+}
+```
+
+The `> * + *` selector applies margin only where an element is preceded by another, avoiding extra margin on first/last elements.
+Configure spacing via custom property:
+
+```html
+<div class="stack" style="--stack-space: var(--size-5)">
+  <h1>Title</h1>
+  <p>First paragraph</p>
+  <p>Second paragraph</p>
+</div>
+```
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `--stack-space` | `var(--size-3)` | Vertical gap between siblings |
+
+#### Box
+
+A padded container with optional border and background inheritance:
+
+```css
+.box {
+  padding: var(--box-padding, var(--size-3));
+  border: var(--box-border, 0) solid;
+  background-color: inherit;
+}
+```
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `--box-padding` | `var(--size-3)` | Internal padding |
+| `--box-border` | `0` | Border width |
+
+#### Center
+
+Horizontally centers content within a maximum width:
+
+```css
+.center {
+  box-sizing: content-box;
+  max-inline-size: var(--center-max, var(--size-content-3));
+  margin-inline: auto;
+  padding-inline: var(--center-gutters, var(--size-3));
+}
+```
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `--center-max` | `var(--size-content-3)` | Maximum width |
+| `--center-gutters` | `var(--size-3)` | Horizontal padding |
+
+#### Cluster
+
+A wrapping horizontal group with consistent gap spacing:
+
+```css
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cluster-space, var(--size-3));
+  justify-content: var(--cluster-justify, flex-start);
+  align-items: var(--cluster-align, center);
+}
+```
+
+Ideal for tag collections, button groups, or icon sets that should flow horizontally and wrap naturally:
+
+```html
+<div class="cluster">
+  <button>Save</button>
+  <button>Cancel</button>
+  <button>Delete</button>
+</div>
+```
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `--cluster-space` | `var(--size-3)` | Gap between items |
+| `--cluster-justify` | `flex-start` | Horizontal alignment |
+| `--cluster-align` | `center` | Vertical alignment |
+
+#### Sidebar
+
+Two elements where one maintains fixed width while the other fills remaining space:
+
+```css
+.sidebar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sidebar-gap, var(--size-3));
+}
+
+.sidebar > :first-child {
+  flex-basis: var(--sidebar-width, 20rem);
+  flex-grow: 1;
+}
+
+.sidebar > :last-child {
+  flex-basis: 0;
+  flex-grow: 999;
+  min-inline-size: var(--sidebar-content-min, 50%);
+}
+```
+
+The `min-inline-size: 50%` triggers wrapping when content area would become too narrow.
+No media query—behavior emerges from flex properties:
+
+```html
+<div class="sidebar">
+  <nav>Sidebar content</nav>
+  <main>Main content expands to fill space</main>
+</div>
+```
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `--sidebar-width` | `20rem` | Sidebar target width |
+| `--sidebar-gap` | `var(--size-3)` | Gap between elements |
+| `--sidebar-content-min` | `50%` | Min width before wrapping |
+
+#### Switcher
+
+Switches between horizontal and vertical layout based on container width threshold:
+
+```css
+.switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--switcher-gap, var(--size-3));
+}
+
+.switcher > * {
+  flex-grow: 1;
+  flex-basis: calc((var(--switcher-threshold, 30rem) - 100%) * 999);
+}
+```
+
+The calculation produces either a large positive (forces 100% width, vertical stacking) or negative (horizontal distribution) value based on container width.
+All children get equal width—no awkward intermediate states:
+
+```html
+<div class="switcher">
+  <div>Equal width</div>
+  <div>Equal width</div>
+  <div>Equal width</div>
+</div>
+```
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `--switcher-threshold` | `30rem` | Width at which layout switches |
+| `--switcher-gap` | `var(--size-3)` | Gap between items |
+
+#### Cover
+
+Full-height container with centered principal element:
+
+```css
+.cover {
+  display: flex;
+  flex-direction: column;
+  min-block-size: var(--cover-min-height, 100vh);
+  padding: var(--cover-padding, var(--size-3));
+}
+
+.cover > * {
+  margin-block: var(--cover-space, var(--size-3));
+}
+
+.cover > :first-child:not(.cover-centered) {
+  margin-block-start: 0;
+}
+
+.cover > :last-child:not(.cover-centered) {
+  margin-block-end: 0;
+}
+
+.cover > .cover-centered {
+  margin-block: auto;
+}
+```
+
+Ideal for hero sections where a heading should be vertically centered with header/footer content at edges:
+
+```html
+<div class="cover">
+  <header>Top</header>
+  <h1 class="cover-centered">Vertically centered hero</h1>
+  <footer>Bottom</footer>
+</div>
+```
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `--cover-min-height` | `100vh` | Minimum container height |
+| `--cover-padding` | `var(--size-3)` | Internal padding |
+| `--cover-space` | `var(--size-3)` | Margin around children |
+
+#### Grid
+
+Responsive auto-filling grid that adapts column count to available space:
+
+```css
+.grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(var(--grid-min, 250px), 100%), 1fr)
+  );
+  gap: var(--grid-gap, var(--size-3));
+}
+```
+
+Items never become narrower than `--grid-min`, and columns are added/removed automatically:
+
+```html
+<div class="grid" style="--grid-min: 300px">
+  <div>Card 1</div>
+  <div>Card 2</div>
+  <div>Card 3</div>
+  <div>Card 4</div>
+</div>
+```
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `--grid-min` | `250px` | Minimum item width |
+| `--grid-gap` | `var(--size-3)` | Gap between items |
+
+### Composition examples
+
+Complex layouts emerge from combining primitives:
+
+```html
+<!-- Dialog: Center > Box > Stack > Cluster -->
+<div class="center">
+  <div class="box">
+    <div class="stack">
+      <h2>Confirm Action</h2>
+      <p>Are you sure you want to proceed?</p>
+      <div class="cluster" style="--cluster-justify: flex-end">
+        <button>Cancel</button>
+        <button>Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Article layout: Center > Stack > Sidebar -->
+<article class="center">
+  <div class="stack" style="--stack-space: var(--size-5)">
+    <h1>Article Title</h1>
+    <div class="sidebar">
+      <aside>Table of contents</aside>
+      <div class="stack">
+        <p>Main content...</p>
+        <p>More content...</p>
+      </div>
+    </div>
+  </div>
+</article>
+```
+
+### Algebraic properties
+
+Composition primitives exhibit properties analogous to algebraic structures.
+
+*Closure*: Composing primitives yields valid layouts.
+A Stack containing a Grid containing Clusters remains well-formed.
+
+*Local reasoning*: A Stack behaves identically regardless of parent context.
+Like pure functions that produce the same output for the same input, primitives produce consistent layout behavior regardless of where they're used.
+
+*Identity*: An empty composition (a div with no layout class) acts as identity—it doesn't transform the layout of its children.
+
+These properties emerge from the CSS techniques used (flexbox/grid intrinsic sizing) rather than being explicitly enforced, but they're reliable enough to treat compositions as a layout algebra.
+
+See `theoretical-foundations.md` for formal algebraic foundations including signals as comonads and web components as coalgebras.
+
 ## PostCSS configuration
 
 PostCSS transpiles modern CSS features for broader browser support.
@@ -464,11 +866,20 @@ styles/
     theme.css              # Semantic token mappings
   layers/
     normalize.css          # Reset styles
-    components/
+    compositions/          # Layout primitives
+      stack.css
+      box.css
+      center.css
+      cluster.css
+      sidebar.css
+      switcher.css
+      cover.css
+      grid.css
+    components/            # CUBE "blocks"
       card.css
       button.css
       dialog.css
-    utilities.css          # Utility classes
+    utilities.css          # Single-purpose utilities
   app.css                  # App-specific overrides
   main.css                 # Entry point, layer definitions
 ```
@@ -477,11 +888,19 @@ Entry point imports in layer order:
 
 ```css
 /* main.css */
-@layer openprops, normalize, theme, components, utilities, app;
+@layer openprops, normalize, theme, compositions, components, utilities, app;
 
 @import "./tokens/openprops.css" layer(openprops);
 @import "./layers/normalize.css" layer(normalize);
 @import "./tokens/theme.css" layer(theme);
+@import "./layers/compositions/stack.css" layer(compositions);
+@import "./layers/compositions/box.css" layer(compositions);
+@import "./layers/compositions/center.css" layer(compositions);
+@import "./layers/compositions/cluster.css" layer(compositions);
+@import "./layers/compositions/sidebar.css" layer(compositions);
+@import "./layers/compositions/switcher.css" layer(compositions);
+@import "./layers/compositions/cover.css" layer(compositions);
+@import "./layers/compositions/grid.css" layer(compositions);
 @import "./layers/components/card.css" layer(components);
 @import "./layers/components/button.css" layer(components);
 @import "./layers/utilities.css" layer(utilities);
