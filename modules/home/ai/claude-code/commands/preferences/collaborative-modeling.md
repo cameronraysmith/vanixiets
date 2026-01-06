@@ -405,6 +405,27 @@ cancelSuspended :: Suspended -> Cancelled
 
 The state machine makes illegal transitions impossible by construction, preventing bugs where cancelled subscriptions get billed.
 
+### Transitioning from EventStorming to Event Modeling
+
+EventStorming produces discovery artifacts while Event Modeling produces specification artifacts.
+The transition occurs when domain structure is understood but implementation details need precision.
+
+EventStorming is ready for Event Modeling transition when the timeline shows end-to-end workflow with clear start and completion, major aggregates are identified and named, hotspots are documented with context, sub-domain boundaries are drawn for Big Picture sessions, priority workflows are selected for implementation, and domain experts validate the narrative tells a coherent story.
+
+For each priority workflow cluster of 10-20 related events, the transition workflow proceeds as follows.
+First photograph and document the EventStorming timeline, aggregate groupings, and hotspots.
+Then identify participants by bringing forward domain experts from EventStorming plus developers for Event Modeling.
+Select the event scope by choosing a workflow slice such as "Order Placement Flow" rather than the entire domain.
+If using Qlerify, prepare a prompt listing events chronologically from the EventStorming timeline.
+Generate the initial Event Model through AI brainstorming or manual entry.
+Validate the output against the EventStorming board for consistency, checking for added events, missed events, or incorrect ordering.
+Finally apply the 7-step Event Modeling process to refine through steps 2-7.
+
+The key distinction is that EventStorming answers "what events happen and why?" while Event Modeling answers "what data do commands carry and what information do actors need?"
+EventStorming produces event names on sticky notes; Event Modeling produces typed field schemas suitable for code generation.
+
+See *event-modeling.md* for the complete 7-step methodology and Qlerify tooling guidance.
+
 ## Domain Storytelling
 
 Domain Storytelling captures realistic domain scenarios by having domain experts narrate actual work processes while facilitators diagram them using a simple pictographic language.
