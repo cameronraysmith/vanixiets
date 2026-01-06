@@ -449,6 +449,65 @@ Each team owns a module (signature plus algebra) and exports a public API (the s
 Context Map patterns become type system relationships: Shared Kernel means shared types, Anti-Corruption Layer means explicit functor translations, Open Host Service means published type definitions, Conformist means accepting upstream type definitions.
 Team Topologies map to dependency directions in the type system: stream-aligned teams own domain types, platform teams own effect types (IO, logging, metrics), enabling teams provide generic abstractions (lenses, traversals).
 
+### Step 7: Formalize specifications with Event Modeling
+
+Purpose is to transform priority EventStorming workflows into implementation-ready specifications with field-level schemas, UI mockups, and behavioral scenarios.
+This step bridges collaborative discovery (Step 2) and formal implementation (Step 8) by systematically specifying what data commands carry, what information actors need before decisions, and what scenarios must be tested.
+
+Event Modeling applies Adam Dymitruk's 7-step methodology to workflows identified through EventStorming, producing artifacts suitable for code generation and EventCatalog transformation.
+Where EventStorming explores domain structure through collaborative brainstorming, Event Modeling systematically documents commands, read models, and behavioral scenarios with field-level schemas.
+EventStorming reveals what events exist and how they relate, while Event Modeling specifies exactly what data each command requires, what information actors need before making decisions, and what scenarios must be tested.
+
+Apply Event Modeling when field-level detail and Given-When-Then scenarios are needed for implementation.
+Priority workflows from EventStorming become inputs, Qlerify JSON exports with typed schemas become outputs.
+The methodology spans brainstorming, plot organization, storyboarding, input identification, output identification, bounded context assignment, and scenario elaboration.
+
+The Event Modeling workflow starts with brainstorming to generate initial events through AI-assisted prompts or manual entry, establishing the temporal backbone of the system specification.
+Plot organization arranges events into actor-based swimlanes, strictly separating who performs actions from which systems own aggregates.
+Storyboarding creates UI mockups via command data fields, making abstract events tangible by designing the forms actors use to trigger events.
+Input identification names the commands that trigger events when forms are submitted, establishing domain language for imperative actions.
+Output identification defines read models representing data needed before commands execute, documenting what information actors consult when making decisions.
+Bounded context assignment applies Conway's Law by grouping aggregate roots into contexts that align with team ownership.
+Scenario elaboration writes Given-When-Then specifications, prioritizes scenarios into releases, and visualizes end-to-end flow per release through filtering.
+
+The process recognizes four common patterns beyond simple command-event flows.
+Regular input forms represent human actors manually filling forms with no special processing logic.
+External events represent triggers outside system boundaries by external systems, devices, or third parties, requiring only the event to be documented while deleting command and read model artifacts.
+Translation patterns handle events triggered by processing external event data through interpretation logic that conditionally produces domain events, using read models to represent incoming payloads and commands to represent domain actions if interpretation succeeds.
+Automation patterns handle events triggered by background processes querying for eligible items and processing each matching result, using read models as queries with filter fields and commands operating on each eligible item.
+
+Tools include Qlerify for Event Modeling sessions with AI-assisted generation, field-level schema definition, actor swimlane organization, and Given-When-Then scenario management.
+Card Type Settings configure what AI generates, Domain Model diagrams show aggregates and bounded contexts, User Story Maps align scenarios with release planning, and JSON export produces transformation inputs for EventCatalog.
+
+Participants typically include architects to guide bounded context decisions, developers to validate implementability of commands and read models, domain experts to review GWT scenarios and translation logic, and product managers to prioritize scenarios into releases.
+Event Modeling requires more time per event than EventStorming, systematically processing each event through seven steps rather than rapid parallel contribution.
+
+Outputs include events with typed field schemas suitable for code generation, commands with form designs and validation rules derived from GWT scenarios, read models with query definitions showing decision context, GWT scenarios for property-based tests, bounded context assignments for team ownership, User Story Maps connecting scenarios to release planning, and Qlerify JSON exports ready for EventCatalog transformation.
+
+Algebraic interpretation treats Event Modeling artifacts as formal specifications of the structures discovered informally through EventStorming.
+Events become constructors in sum types encoding the event algebra, forming free monoids under concatenation.
+Commands become functions `ValidatedInput -> Validation (NonEmpty Event)` that validate business rules and produce events or errors.
+Read models become query interfaces `QueryParams -> EventStore -> [ResultType]` derived from event streams or reference data.
+Aggregate roots become Decider modules implementing `decide: Command → State → List<Event>` for command handling and `evolve: State → Event → State` for state transitions.
+Translation patterns become conditional event handlers `ExternalEvent → Option<DomainEvent>` returning optional events based on interpretation criteria.
+Automation patterns become background jobs querying repositories, filtering by eligibility predicates, and looping over matches to invoke commands.
+GWT scenarios translate to property-based tests verifying that implementations maintain discovered invariants.
+
+Inputs from EventStorming include event timeline with temporal ordering showing chronological flow discovered collaboratively, commands triggering events identified as blue sticky notes, aggregates as consistency boundaries marked as yellow sticky notes, hotspots marking uncertainty or conflict that Event Modeling must resolve, and policies indicating automation candidates that become automation pattern events.
+
+Outputs to implementation include events as sum type variants with field-level data constructors, commands as validated functions with smart constructors enforcing GWT rules, read models as projections or queries with explicit schemas, aggregate roots as Decider modules with private state and public APIs, bounded contexts as module boundaries mapping to team ownership, and GWT scenarios as example-based and property-based test suites.
+
+The transition from EventStorming to Event Modeling represents a shift from exploration to specification, from informal sticky notes to formal typed schemas, from collaborative discovery to systematic documentation.
+EventStorming produces hundreds of events through hours of parallel brainstorming, revealing domain structure and surfacing disagreements.
+Event Modeling produces implementation-ready artifacts through systematic processing of each event, requiring more time but generating specifications from which teams can build directly.
+
+Teams typically run Big Picture EventStorming first to map the entire domain landscape, follow with Process Level EventStorming for priority areas to explore detailed event flows, then apply Event Modeling to critical workflows requiring implementation within the current roadmap.
+This progression provides breadth through EventStorming's rapid exploration and depth through Event Modeling's systematic specification, balancing discovery speed with implementation readiness.
+
+See *event-modeling.md* for the complete 7-step methodology, Qlerify tooling patterns, AI-assisted generation workflows, pattern details for translation and automation, and algebraic type mappings from Event Modeling artifacts to formal specifications.
+
+See *event-catalog-qlerify.md* for transforming Event Modeling outputs to EventCatalog documentation, consuming Qlerify JSON exports and generating MDX artifacts with JSON Schema that preserve algebraic structure.
+
 ## Adaptation patterns
 
 The canonical eight-step sequence represents an ideal that teams adapt to context, constraints, and maturity.
