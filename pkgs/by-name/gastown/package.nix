@@ -18,16 +18,23 @@
 
 buildGoModule (finalAttrs: {
   pname = "gastown";
-  version = "0.1.1";
+  version = "0.2.1";
 
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "gastown";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-yLulJPr7XBGydMWcHPEnyMBiH07FARoY0DDZ+MCxz3k=";
+    hash = "sha256-x2jDi69D02cyvcTH0ZnRX9hj+olgY+A0nOQTcUHvR1o=";
   };
 
-  vendorHash = "sha256-r+RZME3vxGirXHhDaDvVezPAaIiTEkkcIiM9Q5qn6OM=";
+  # Upstream v0.2.1 has incomplete go.mod: internal/web/browser_e2e_test.go
+  # imports github.com/go-rod/rod which isn't declared as a dependency.
+  # Remove the test file to allow vendoring to succeed.
+  postPatch = ''
+    rm -f internal/web/browser_e2e_test.go
+  '';
+
+  vendorHash = "sha256-adI6n2Iyj072uqkcVbTRolN3z85Ovf0dO/VG7F8ZH08=";
 
   subPackages = [ "cmd/gt" ];
 
