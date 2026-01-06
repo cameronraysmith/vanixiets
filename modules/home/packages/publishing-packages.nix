@@ -10,6 +10,7 @@
         exiftool
         ghostscript
         imagemagick
+        impressive # pkgs/by-name - PDF presentations with OpenGL transitions
         markdown-tree-parser # pkgs/by-name
         poppler-utils
         qpdf
