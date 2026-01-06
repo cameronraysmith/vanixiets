@@ -620,6 +620,145 @@ Translation handles integration boundaries, while automation handles scheduled p
 
 Both patterns require GWT scenarios to capture business logic that simple command-event relationships miss, ensuring that conditional triggering and eligibility criteria are explicit in specifications.
 
+## D2 diagram artifacts
+
+D2 diagrams should be generated alongside or as part of Event Modeling sessions, providing text-based, version-controllable representations of visual models.
+D2 output complements Qlerify JSON exports during EventCatalog transformation, allowing diagram-as-code workflows that integrate with documentation pipelines and git-based change tracking.
+
+### Color conventions for Event Modeling elements
+
+D2 diagrams follow Event Modeling color conventions to maintain visual consistency with Qlerify UI and traditional sticky note colors:
+
+```d2
+# Event Modeling color conventions in D2
+Commands: {
+  style.fill: "#3498db"  # blue
+}
+Events: {
+  style.fill: "#e67e22"  # orange
+}
+Read Models: {
+  style.fill: "#2ecc71"  # green
+}
+Aggregates: {
+  style.fill: "#f1c40f"  # yellow
+}
+External Systems: {
+  style.fill: "#9b59b6"  # purple
+}
+Hotspots: {
+  style.fill: "#e74c3c"  # red
+}
+```
+
+These colors map directly to Qlerify card types and traditional Event Modeling sticky notes, ensuring diagrams generated from JSON exports or created directly by LLMs maintain visual alignment with collaborative session artifacts.
+
+### Swimlane pattern for actor lanes
+
+D2 containers represent actor swimlanes following the actor-exclusive convention from Step 2:
+
+```d2
+direction: right
+
+guest: "Guest" {
+  style.fill: "#f5f5f5"
+
+  view_rooms: "View Available Rooms" {
+    style.fill: "#2ecc71"  # read model
+  }
+
+  book_room: "Book Room" {
+    style.fill: "#3498db"  # command
+  }
+
+  room_booked: "Room Booked" {
+    style.fill: "#e67e22"  # event
+  }
+
+  view_rooms -> book_room: "user input"
+  book_room -> room_booked: "triggers"
+}
+
+manager: "Manager" {
+  style.fill: "#f5f5f5"
+
+  view_catalog: "View Room Catalog" {
+    style.fill: "#2ecc71"
+  }
+
+  add_room: "Add Room" {
+    style.fill: "#3498db"
+  }
+
+  room_added: "Room Added" {
+    style.fill: "#e67e22"
+  }
+
+  view_catalog -> add_room
+  add_room -> room_added
+}
+
+automation: "Automation" {
+  style.fill: "#f0f0f0"
+
+  query_overdue: "Query Overdue Bookings" {
+    style.fill: "#2ecc71"
+  }
+
+  check_out: "Check Out" {
+    style.fill: "#3498db"
+  }
+
+  checked_out: "Guest Checked Out" {
+    style.fill: "#e67e22"
+  }
+
+  query_overdue -> check_out: "per result"
+  check_out -> checked_out
+}
+```
+
+Containers group artifacts by actor rather than by system or bounded context, deferring system boundaries to bounded context diagrams.
+The `direction: right` layout matches temporal left-to-right flow convention in Event Modeling timelines.
+
+### Per-step diagram output
+
+Each Event Modeling step produces specific D2 artifacts or refinements:
+
+Step 1 (Brainstorming) generates initial event timeline in D2 with temporal ordering arrows.
+AI-generated events appear as orange boxes arranged left-to-right with optional temporal connections showing narrative flow.
+Commands, read models, and aggregate roots may be generated simultaneously depending on AI capabilities.
+
+Step 2 (The Plot) organizes events into actor swimlanes using D2 containers.
+System-based lanes are reorganized into actor-based containers (Guest, Manager, Automation) with events moved to appropriate containers and temporal arrows adjusted to reflect actor perspective.
+
+Step 3 (The Storyboard) adds or refines command field schemas in D2 node labels or separate field tables.
+Commands gain field lists representing form structure, allowing UX mockup generation from D2 source.
+
+Step 4 (Identify Inputs) validates command names in D2 node labels.
+Command nodes are renamed to match domain language using imperative mood.
+
+Step 5 (Identify Outputs) adds read model nodes and field schemas to D2 diagrams.
+Read models appear as green boxes connected to commands via "informs decision" or similar labeled edges.
+
+Step 6 (Apply Conway's Law) produces separate bounded context diagrams showing aggregate groupings.
+A second D2 diagram shows aggregate roots (yellow boxes) grouped into bounded context containers with context boundaries clearly marked.
+
+Step 7 (Elaborate Scenarios) adds GWT annotations to event nodes or produces separate scenario diagrams.
+GWT scenarios appear as purple boxes connected to events or as structured text annotations on event nodes.
+
+### Integration with Qlerify and EventCatalog workflow
+
+D2 diagrams integrate with Qlerify and EventCatalog transformation workflows:
+
+D2 diagrams can be generated from Qlerify JSON exports through transformation scripts that map Qlerify card types to D2 color conventions, swimlanes to D2 containers, and timeline arrows to D2 edges.
+
+LLMs can create D2 diagrams directly during facilitation sessions when Qlerify is unavailable or when diagram-as-code workflow is preferred, generating actor swimlanes and artifact nodes from natural language descriptions.
+
+D2 diagrams serve as input for EventCatalog MDX generation alongside Qlerify JSON, allowing visual documentation to be generated from version-controlled diagram source rather than requiring screenshot exports.
+
+D2 source enables diff-based review of Event Model changes through git commits, making architectural evolution visible through text diffs rather than requiring visual comparison tools.
+
 ## Process workflow for Claude Code guidance
 
 ### Pre-session setup
@@ -627,6 +766,8 @@ Both patterns require GWT scenarios to capture business logic that simple comman
 Verify environment by confirming user is logged into Qlerify app, opening blank workflow, validating Card Type Settings have Use AI enabled for Command, Aggregate Root, Read Model, and Given-When-Then, validating Domain Model Role mappings are correct, and optionally selecting preferred LLM model in AI tab.
 
 Gather context by asking user to describe business scenario or workflow, identifying key actors and roles involved, confirming scope (single bounded context versus multi-context flow), and referencing existing documentation or examples if available.
+
+When diagram-as-code workflow is preferred, prepare D2 diagram generation by confirming actor swimlanes are understood, establishing color conventions for Event Modeling elements, and optionally initializing git repository for version-controlled diagram evolution.
 
 ### Guided Step 1: Brainstorming
 
