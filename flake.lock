@@ -448,11 +448,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1766770998,
-        "narHash": "sha256-yYNrwVcyY7adaRrRXZ2IVz6UbeAkIkrUoQO3BlyWS/4=",
+        "lastModified": 1767723471,
+        "narHash": "sha256-3rYPeWlQseBP6xuGS4+HzkyjB1uS4l+xsaSslU7nUdk=",
         "owner": "pfassina",
         "repo": "lazyvim-nix",
-        "rev": "af7dcd12829726e6ea7860ceb23a0c447dd9ecd6",
+        "rev": "b635476dfffca1530edb9c926cbd3026079d0d12",
         "type": "github"
       },
       "original": {
