@@ -45,9 +45,11 @@
             set -g @catppuccin_window_number_position 'right'
             set -g @catppuccin_window_flags 'icon'
 
-            # Use basename of current path for window names
-            set -g @catppuccin_window_text ' #{b:pane_current_path}'
-            set -g @catppuccin_window_current_text ' #{b:pane_current_path}'
+            # Window naming: show manual name if set, otherwise basename of current path
+            # When rename-window is used, tmux sets automatic-rename off for that window
+            # The conditional checks: if automatic-rename is on, show path; otherwise show window name
+            set -g @catppuccin_window_text ' #{?automatic-rename,#{b:pane_current_path},#W}'
+            set -g @catppuccin_window_current_text ' #{?automatic-rename,#{b:pane_current_path},#W}'
 
             # Status bar separators
             set -g @catppuccin_status_left_separator ""
@@ -288,6 +290,7 @@
             set -g renumber-windows on
             set -g set-clipboard on
             set -g status-position top
+            set -g automatic-rename on
 
             # Visual styling
             set -g pane-active-border-style 'fg=magenta,bg=default'
