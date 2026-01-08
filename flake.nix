@@ -92,7 +92,6 @@
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.home-manager.follows = "home-manager";
 
-    # TODO: enable in nixos configurations
     landrun-nix.url = "github:srid/landrun-nix";
 
     playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.57.0";
