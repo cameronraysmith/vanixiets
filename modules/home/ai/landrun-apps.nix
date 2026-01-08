@@ -40,7 +40,7 @@ in
 
       # Wrapper script that invokes claude with --dangerously-skip-permissions
       # This is needed because landrun's extraArgs are landrun arguments, not program arguments
-      claudeDangerousWrapper = pkgs.writeShellScript "claude-dangerous" ''
+      ccdsSandboxedWrapper = pkgs.writeShellScript "ccds-sandboxed-inner" ''
         exec ${claudePkg}/bin/claude --dangerously-skip-permissions "$@"
       '';
 
@@ -99,7 +99,7 @@ in
         # Internal prompts bypassed, but landrun enforces workspace boundaries
         # Uses wrapper script since extraArgs are landrun arguments, not program arguments
         ccds-sandboxed = claudeSandboxBase // {
-          program = "${claudeDangerousWrapper}";
+          program = "${ccdsSandboxedWrapper}";
         };
       };
     };
