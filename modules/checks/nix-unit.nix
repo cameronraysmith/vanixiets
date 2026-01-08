@@ -27,6 +27,7 @@
           nuenv
           llm-agents
           catppuccin
+          landrun-nix
           ;
         inherit self;
       };
