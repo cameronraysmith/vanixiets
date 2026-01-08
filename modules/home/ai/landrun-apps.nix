@@ -38,6 +38,12 @@ in
       isLinux = system == "x86_64-linux";
       claudePkg = inputs.llm-agents.packages.${system}.claude-code;
 
+      # Wrapper script that invokes claude with --dangerously-skip-permissions
+      # This is needed because landrun's extraArgs are landrun arguments, not program arguments
+      claudeDangerousWrapper = pkgs.writeShellScript "claude-dangerous" ''
+        exec ${claudePkg}/bin/claude --dangerously-skip-permissions "$@"
+      '';
+
       # Shared sandbox configuration for Claude Code
       # Allows full access within workspace directories while restricting everything else
       claudeSandboxBase = {
@@ -63,9 +69,9 @@ in
 
           # Read-write-execute for workspace directories
           # These are the meta-workspace boundaries within which Claude operates freely
+          # Note: landrun requires rwx paths to exist at runtime (unlike rox/ro which are conditional)
           rwx = [
             "$HOME/projects" # Primary workspace: all project repositories
-            "$HOME/agents" # Agent workspace directories
           ];
 
           # Environment variables to pass through
@@ -87,14 +93,9 @@ in
 
         # Sandboxed Claude with --dangerously-skip-permissions
         # Internal prompts bypassed, but landrun enforces workspace boundaries
+        # Uses wrapper script since extraArgs are landrun arguments, not program arguments
         ccds-sandboxed = claudeSandboxBase // {
-          program = "${claudePkg}/bin/claude";
-          cli = claudeSandboxBase.cli // {
-            extraArgs = [
-              "--"
-              "--dangerously-skip-permissions"
-            ];
-          };
+          program = "${claudeDangerousWrapper}";
         };
       };
     };
