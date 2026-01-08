@@ -33,7 +33,9 @@ in
       ...
     }:
     let
-      isLinux = lib.hasSuffix "-linux" system;
+      # Restrict to x86_64-linux only: landrun tests fail on aarch64-linux
+      # due to Landlock test failures (permission denied in --add-exec --ldd test)
+      isLinux = system == "x86_64-linux";
       claudePkg = inputs.llm-agents.packages.${system}.claude-code;
 
       # Shared sandbox configuration for Claude Code
