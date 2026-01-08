@@ -25,6 +25,35 @@ in
 {
   imports = [ landrun-nix.flakeModule ];
 
+  # Home-manager module to ensure landrun rw paths exist
+  # landrun-nix wrapper.nix adds rw/rwx paths unconditionally (no existence check),
+  # so these directories must exist at runtime or landrun fails with ENOENT
+  flake.modules.homeManager.ai =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
+    lib.mkIf pkgs.stdenv.isLinux {
+      home.activation.ensureLandrunPaths = {
+        after = [ "writeBoundary" ];
+        before = [ ];
+        data = ''
+          # Ensure directories exist for landrun rw paths
+          # These are created empty if missing; claude/gcloud will populate as needed
+          mkdir -p "$HOME/.claude"
+          mkdir -p "$HOME/.config/gcloud"
+          mkdir -p "$HOME/.cache/claude-cli-nodejs"
+          mkdir -p "$HOME/projects"
+
+          # Note: $HOME/.claude.json is a file, not a directory
+          # claude creates it on first run; landrun handles file creation fine
+          # (the error is about non-existent parent directories, not files)
+        '';
+      };
+    };
+
   perSystem =
     {
       pkgs,
@@ -64,16 +93,17 @@ in
 
         cli = {
           # Read-write paths for Claude state and credentials
+          # Note: landrun requires rw/rwx paths to exist at runtime (unlike ro/rox which are conditional)
+          # The ensureLandrunPaths activation script creates these directories if missing
           rw = [
             "$HOME/.claude" # Claude state directory
-            "$HOME/.claude.json" # Claude config file
+            "$HOME/.claude.json" # Claude config file (created by claude on first run)
             "$HOME/.config/gcloud" # Google Cloud auth (for Vertex AI)
             "$HOME/.cache/claude-cli-nodejs" # Node.js cache
           ];
 
           # Read-write-execute for workspace directories
           # These are the meta-workspace boundaries within which Claude operates freely
-          # Note: landrun requires rwx paths to exist at runtime (unlike rox/ro which are conditional)
           rwx = [
             "$HOME/projects" # Primary workspace: all project repositories
           ];
