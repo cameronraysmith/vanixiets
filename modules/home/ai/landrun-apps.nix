@@ -78,7 +78,12 @@ in
       claudeSandboxBase = {
         imports = [
           landrun-nix.landrunModules.gh # GitHub CLI with D-Bus keyring support
-          landrun-nix.landrunModules.git # Git with TTY and repository access
+          # Note: landrunModules.git is NOT imported because it adds $PWD/.git to rw paths,
+          # which are unconditional (no existence check). This causes landrun to fail when
+          # run from a directory without .git. Instead, we manually add git paths:
+          # - .gitconfig paths go to ro (conditional existence check)
+          # - .git access is covered by rwx = ["$HOME/projects"] for repos within workspace
+          # - TTY is already enabled in features below
         ];
 
         features = {
@@ -92,6 +97,13 @@ in
         };
 
         cli = {
+          # Read-only paths with conditional existence checks (ro paths only added if they exist)
+          # Git config files - replaces landrunModules.git which used unconditional rw for $PWD/.git
+          ro = [
+            "$HOME/.gitconfig"
+            "$HOME/.config/git/config"
+          ];
+
           # Read-write paths for Claude state and credentials
           # Note: landrun requires rw/rwx paths to exist at runtime (unlike ro/rox which are conditional)
           # The ensureLandrunPaths activation script creates these directories if missing
@@ -104,6 +116,7 @@ in
 
           # Read-write-execute for workspace directories
           # These are the meta-workspace boundaries within which Claude operates freely
+          # Git repositories within these paths have full .git access (no need for separate $PWD/.git)
           rwx = [
             "$HOME/projects" # Primary workspace: all project repositories
           ];
