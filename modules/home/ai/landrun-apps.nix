@@ -56,6 +56,10 @@ in
           tty = true; # Terminal support for interactive usage
           nix = true; # Nix store access (read) and daemon socket
           network = true; # Outbound network for API calls
+          # Disable dbus feature inherited from landrunModules.gh
+          # The gh module enables dbus for keyring/Secret Service API access,
+          # but $HOME/.local/share/keyrings may not exist on all systems
+          dbus = lib.mkForce false;
         };
 
         cli = {
