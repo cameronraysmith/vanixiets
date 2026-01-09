@@ -21,6 +21,7 @@
         (google-cloud-sdk.withExtraComponents [
           google-cloud-sdk.components.gke-gcloud-auth-plugin
         ])
+        s5cmd
         hcloud
         holos # from nixpkgs (custom version available at .#debug.holos)
         # kcl
