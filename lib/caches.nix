@@ -10,7 +10,6 @@
     "https://cuda-maintainers.cachix.org"
     "https://nvim-treesitter-main.cachix.org"
     "https://cameronraysmith.cachix.org"
-    "https://cache.thalheim.io"
   ];
 
   publicKeys = [
@@ -23,6 +22,5 @@
     "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
     "nvim-treesitter-main.cachix.org-1:cbwE6blfW5+BkXXyeAXoVSu1gliqPLHo2m98E4hWfZQ="
     "cameronraysmith.cachix.org-1:aC8ZcRCVcQql77Qn//Q1jrKkiDGir+pIUjhUunN6aio="
-    "cache.thalheim.io-1:R7msbosLEZKrxk/lKxf9BTjOOH7Ax3H0Qj0/6wiHOgc="
   ];
 }
