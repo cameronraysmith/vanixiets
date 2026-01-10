@@ -11,7 +11,7 @@
 
         pinentry.package = pkgs.pinentry-tty;
 
-        extraConfig = '''';
+        extraConfig = "";
       };
 
       programs.gpg = {
