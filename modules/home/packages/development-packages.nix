@@ -63,6 +63,7 @@
           git-xet
           gitmux
           graphite-cli
+          lumen
           d2
           graphviz
           jc
