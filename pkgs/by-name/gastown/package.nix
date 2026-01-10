@@ -18,15 +18,13 @@
 
 buildGoModule (finalAttrs: {
   pname = "gastown";
-  # To switch back to tagged release: version = "0.2.1"; and use tag instead of rev
-  version = "unstable-2026-01-05";
+  version = "0.2.3";
 
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "gastown";
-    rev = "6e4f2bea299521b0b32a7ad642117d3d6b96ca3c";
-    # tag = "v${finalAttrs.version}";
-    hash = "sha256-Cy6B/pWf7SjhlrWgH3nMZMKButiXSna01VZZkOWwkzA=";
+    tag = "v${finalAttrs.version}";
+    hash = "";
   };
 
   vendorHash = "sha256-L+Hj2pCsqKX/6MXNq5P33RPOAbxvrLgsbNDIRdNTvvw=";
@@ -43,11 +41,10 @@ buildGoModule (finalAttrs: {
   # Tests require git worktrees, tmux, and other runtime dependencies
   doCheck = false;
 
-  # Version check disabled for unstable builds; re-enable for tagged releases
-  # nativeInstallCheckInputs = [ versionCheckHook ];
-  # versionCheckProgram = "${placeholder "out"}/bin/gt";
-  # versionCheckProgramArg = "version";
-  # doInstallCheck = true;
+  nativeInstallCheckInputs = [ versionCheckHook ];
+  versionCheckProgram = "${placeholder "out"}/bin/gt";
+  versionCheckProgramArg = "version";
+  doInstallCheck = true;
 
   passthru.updateScript = nix-update-script { };
 
