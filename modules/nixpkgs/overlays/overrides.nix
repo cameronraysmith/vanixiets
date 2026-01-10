@@ -12,6 +12,15 @@
 {
   flake.nixpkgsOverlays = [
     (final: prev: {
+      # mactop: Test fails in Nix sandbox environment
+      # Issue: TestHeadlessIntegration tries to mkdir /homeless-shelter (sandbox $HOME)
+      # Symptom: mkdir /homeless-shelter: read-only file system
+      # Reference: https://github.com/metaspartan/mactop/issues (upstream test issue)
+      # TODO: Remove when upstream fixes test to use temp directory
+      # Date added: 2026-01-10
+      mactop = prev.mactop.overrideAttrs (old: {
+        doCheck = false;
+      });
       # Rename graphite-cli binary from `gt` to `gph`
       #
       # Conflict: upstream graphite-cli uses `gt` which collides with gastown.
