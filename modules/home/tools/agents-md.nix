@@ -84,11 +84,12 @@
 
           If you are a subagent Task (stated in your prompt), execute directly without
           nested dispatch. If you identify significant ambiguity, undefined terms, or
-          missing context, return with questions rather than resolving through interpretation.
+          missing context — whether in the original prompt or discovered during execution —
+          return with questions rather than resolving through interpretation.
 
           When dispatching Tasks, include: "You are a subagent Task; execute without
-          nested dispatch. Return with questions for any ambiguous requirements rather
-          than interpreting them."
+          nested dispatch. Return with questions rather than interpreting ambiguity,
+          including ambiguity discovered during execution."
         '';
       };
     };
