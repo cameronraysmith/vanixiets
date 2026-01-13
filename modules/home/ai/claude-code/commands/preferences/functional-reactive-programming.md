@@ -360,6 +360,27 @@ When two behaviors are combined pointwise, their discretizations should combine 
 This perspective clarifies what signals are: not the fundamental reality, but approximations to an underlying continuous semantics.
 The approximation is necessary for implementation but should be invisible in the programming model.
 
+### True FRP versus practical approximations
+
+Conal Elliott, who originated FRP with Paul Hudak, has argued that many systems marketed as "FRP" (notably RxJS, ReactiveX, and most "reactive" JavaScript libraries) are more accurately described as asynchronous dataflow.
+They lack the continuous-time denotational semantics that define FRP proper.
+
+True FRP in Elliott's sense requires:
+- Behaviors as functions `Time → a`, not sampled sequences or streams of discrete updates
+- Denotational semantics independent of evaluation strategy—the meaning of a behavior is the mathematical function, not how it happens to be computed
+- Continuous time as the semantic domain, with discretization as an implementation detail
+
+Most practical frameworks sacrifice continuous-time semantics for implementation tractability.
+Signals hold discrete values and update at discrete moments; there is no underlying continuous function being approximated.
+This is a meaningful trade-off, not merely an implementation detail.
+
+Understanding what is sacrificed clarifies what properties may be lost.
+True FRP guarantees that behaviors compose mathematically; discrete approximations may exhibit artifacts (aliasing, timing dependencies, evaluation-order sensitivity) that the continuous semantics would forbid.
+When debugging unexpected behavior in reactive systems, asking "would this occur in true FRP?" can identify whether the issue is fundamental or an artifact of the approximation.
+
+The patterns in this document apply to both true FRP and its practical approximations, but the categorical semantics are cleanest in the continuous case.
+Practical frameworks implement the structures with varying degrees of fidelity.
+
 ## The core insight: privileging change over state
 
 ### Positions versus velocities
