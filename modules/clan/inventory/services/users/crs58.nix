@@ -1,19 +1,10 @@
+# Admin user for legacy machines (forced username)
+# Clan users service settings apply to NixOS only; extraModules work cross-platform
 {
   inputs,
   ...
 }:
 {
-  # Admin user on legacy machines (crs58 username forced by existing setup)
-  # Deployed to: blackphos (darwin, ready now)
-  # Future: stibnite (darwin, when machine is configured)
-  # User identity: SAME crs58 home module (same SSH keys, git config, packages)
-  # Username: crs58 (forced on legacy machines)
-  #
-  # Note: Clan users service is currently NixOS-only. On darwin machines:
-  #   - settings.* (user, groups, share, prompt) are ignored
-  #   - extraModules provide all user configuration (works cross-platform)
-  #   - vars-based password management unavailable (NixOS feature)
-  # This pattern is forward-compatible with future darwin support.
   clan.inventory.instances.user-crs58 = {
     module = {
       name = "users";
