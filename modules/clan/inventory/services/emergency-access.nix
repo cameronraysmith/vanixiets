@@ -1,3 +1,4 @@
+# Emergency access via root SSH keys for recovery scenarios
 {
   clan.inventory.instances.emergency-access = {
     module = {
