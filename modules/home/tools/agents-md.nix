@@ -42,6 +42,7 @@
           - collaborative modeling (EventStorming, Domain Storytelling): ${prefsPath}/collaborative-modeling.md
           - strategic domain analysis (Core/Supporting/Generic classification): ${prefsPath}/strategic-domain-analysis.md
           - bounded context design (context mapping, integration, ACL): ${prefsPath}/bounded-context-design.md
+          - functional reactive programming (FRP foundations, arrows, presheaves): ${prefsPath}/functional-reactive-programming.md
           - theoretical foundations (category theory, type theory): ${prefsPath}/theoretical-foundations.md
           - algebraic laws (functor/monad laws, property-based testing): ${prefsPath}/algebraic-laws.md
           - smart constructors and validation patterns: see domain-modeling.md
