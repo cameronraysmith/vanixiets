@@ -1,3 +1,4 @@
+# Zerotier VPN with cinnabar as controller, NixOS peers, and external darwin members
 {
   clan.inventory.instances.zerotier = {
     module = {
