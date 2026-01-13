@@ -381,6 +381,39 @@ When debugging unexpected behavior in reactive systems, asking "would this occur
 The patterns in this document apply to both true FRP and its practical approximations, but the categorical semantics are cleanest in the continuous case.
 Practical frameworks implement the structures with varying degrees of fidelity.
 
+### Self-adjusting computation and incremental updates
+
+The practical question for any reactive system is: given `y = f(x)`, how do we efficiently compute `y' = f(x')` when `x` changes?
+Recomputing `f` from scratch is correct but potentially expensive.
+Self-adjusting computation (Acar et al.) provides the theoretical foundation for efficient incremental updates.
+
+The key insight is that a computation can be instrumented to track dependencies, then replayed with minimal recomputation when inputs change.
+Only the parts of the computation that actually depend on changed inputs need to re-execute.
+This is precisely what signal frameworks implement: dependency graphs that propagate changes incrementally.
+
+Categorically, incremental computation involves computing *Kan extensions*—the "best approximation" of one functor along another.
+When an input functor changes, the Kan extension describes how to adjust the output with minimal work.
+This connects to derivatives of functors: just as calculus derivatives describe how functions change, functor derivatives describe how type constructors change.
+
+```haskell
+-- Derivative of a functor (conceptual)
+-- ∂F describes "F with one hole"
+type family Deriv (f :: * -> *) :: * -> *
+
+-- For concrete types:
+-- ∂(Const a) = Const Void        -- constants have zero derivative
+-- ∂Identity = Const ()            -- identity has unit derivative
+-- ∂(F × G) = (∂F × G) + (F × ∂G)  -- product rule
+-- ∂(F + G) = ∂F + ∂G              -- sum rule
+```
+
+Signal frameworks implement approximate self-adjusting computation.
+Dependency tracking ensures only affected signals recompute; memoization caches intermediate results; topological ordering guarantees correct propagation.
+The theoretical foundation justifies why these optimizations preserve semantics: they are approximations to Kan extensions that respect the underlying categorical structure.
+
+Understanding this connection clarifies what signal frameworks are doing and why certain optimizations are sound.
+It also suggests directions for improvement: better approximations to the theoretical ideal yield more efficient reactive systems.
+
 ## The core insight: privileging change over state
 
 ### Positions versus velocities
