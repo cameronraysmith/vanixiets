@@ -416,6 +416,33 @@ derivePosition :: VelocityLog -> State
 derivePosition = foldl evolve initialState
 ```
 
+### The connection to dynamical systems
+
+The velocity/position duality is not merely a helpful metaphor—it is the same mathematics that underlies dynamical systems theory and numerical analysis.
+Recognizing this connection transfers centuries of insight from those fields to reactive system design.
+
+In dynamical systems, a differential equation `dy/dt = f(y, t)` specifies the velocity (rate of change) as a function of position and time.
+Solving the equation means integrating velocities to recover positions: `y(t) = y₀ + ∫f(y, τ) dτ`.
+This is precisely what event sourcing does: `state = foldl evolve initial events` is the discrete analogue of integration.
+
+The correspondences are structural:
+
+- *Event streams* are discrete approximations to continuous flows. Each event is a delta; the stream is a sampled derivative.
+- *Folding events into state* is numerical integration. The `evolve` function is the integrator; the fold accumulates the integral.
+- *Snapshotting* corresponds to adaptive step-size control. Just as numerical integrators take larger steps when the solution is smooth, event-sourced systems snapshot when the event rate is manageable.
+- *Signal dependencies* form computational stencils. A signal that depends on neighbors in a grid is computing a discrete differential operator.
+- *The comonadic `extend` operation* generalizes convolution. Applying a kernel to a signal's neighborhood is exactly what `extend` does: compute a derived value from the local context.
+
+This connection has practical implications.
+Numerical analysts have studied stability, convergence, and error accumulation for centuries; their insights apply directly to reactive systems.
+Projection lag in CQRS is analogous to phase error in integration schemes.
+CRDTs resemble symplectic integrators that preserve algebraic structure under composition, which is why they converge despite processing events in different orders.
+Eventual consistency has the character of convergence analysis: does the discrete approximation approach the continuous limit?
+
+For developers with backgrounds in numerical computing, physics simulation, or signal processing, this bridge provides immediate traction.
+The abstractions are familiar; only the application domain is new.
+For those without such backgrounds, the bridge remains available as a source of intuition when reactive systems exhibit unexpected behavior—asking "what would this mean in a dynamical systems context?" can suggest diagnostic approaches.
+
 ### The derivation generates all patterns
 
 This single insight—privileging change over state—generates the entire constellation of reactive patterns:
