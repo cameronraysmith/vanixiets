@@ -14,6 +14,7 @@ For practical application, see:
 - domain-modeling.md for patterns
 - algebraic-data-types.md for implementation techniques
 - railway-oriented-programming.md for error handling composition
+- functional-reactive-programming.md for the foundational paradigm connecting category theory to interactive system design
 
 ## Contents
 
@@ -1595,6 +1596,9 @@ Violating them breaks the structural guarantees that make event sourcing mathema
 - `railway-oriented-programming.md` for Result composition in command handlers
 
 ## Reactive systems and comonads
+
+This section applies concepts from functional reactive programming to practical signal systems.
+See `functional-reactive-programming.md` for the foundational treatment of why signals are comonadic, why event sourcing is monadic, and how the Decider pattern emerges from this duality.
 
 Reactive signal systems exhibit comonadic structure, the categorical dual of monads.
 While monads model effect production (building up context through sequenced computations), comonads model context consumption (extracting and transforming values from surrounding context).
