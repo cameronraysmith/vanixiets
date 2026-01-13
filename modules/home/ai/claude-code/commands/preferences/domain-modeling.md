@@ -633,6 +633,8 @@ This algebraic view connects aggregate design to event sourcing patterns and col
 
 The Decider pattern formalizes the aggregate's decision-making and state evolution functions as a pure algebraic structure.
 A Decider separates command validation from state evolution, making both functions independently testable and composable.
+This separation is not merely a design preference but is mathematically forced by the algebra-coalgebra duality in functional reactive systems.
+See `functional-reactive-programming.md#the-decider-as-forced-structure` for the categorical derivation.
 
 ```rust
 pub struct Decider<'a, C, S, E> {
