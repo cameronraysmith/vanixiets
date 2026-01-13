@@ -1,3 +1,4 @@
+# Public IP assignments for VPS machines
 {
   clan.inventory.instances.internet = {
     roles.default.machines.cinnabar.settings.host = "49.13.68.78";
