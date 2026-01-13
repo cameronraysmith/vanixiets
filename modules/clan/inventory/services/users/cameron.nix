@@ -1,19 +1,10 @@
+# Admin user for modern machines (preferred username)
+# Clan users service settings apply to NixOS only; extraModules work cross-platform
 {
   inputs,
   ...
 }:
 {
-  # Admin user on modern machines (cameron username preference)
-  # Deployed to: cinnabar, electrum (nixos, ready now)
-  # Future: argentum, rosegold (darwin, when machines are configured)
-  # User identity: crs58 home module (SSH keys, git config, packages)
-  # Username: cameron (preferred for new machines per CLAUDE.md)
-  #
-  # Note: Clan users service is currently NixOS-only. On darwin machines:
-  #   - settings.* (user, groups, share, prompt) are ignored
-  #   - extraModules provide all user configuration (works cross-platform)
-  #   - vars-based password management unavailable (NixOS feature)
-  # This pattern is forward-compatible with future darwin support.
   clan.inventory.instances.user-cameron = {
     module = {
       name = "users";
