@@ -90,6 +90,10 @@
           When dispatching Tasks, include: "You are a subagent Task; execute without
           nested dispatch. Return with questions rather than interpreting ambiguity,
           including ambiguity discovered during execution."
+
+          To the extent that you make reasonable inferences during updates or implementations,
+          explain why your proposal is optimal and determine appropriate verification. Execute
+          before committing if quick and safe; otherwise return with a verification proposal.
         '';
       };
     };
