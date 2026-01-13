@@ -71,6 +71,15 @@
           an indexed monad transformer stack in the category of effects. Succinctly,
           side effects should be explicit in type signatures and isolated at
           boundaries to preserve compositionality.
+
+          Do not hesitate to pause and ask questions to resolve any potentially significant
+          ambiguity rather than proceeding arbitrarily without clarity.
+
+          When instructed to operate in "orchestrator mode": strike a balance between
+          optimally priming your own context as orchestrator and dispatching context-intensive
+          work to subagent tasks to preserve your context for coordination. Ultrathink to
+          design the workflow DAG of subagent tasks for whom you can write optimal prompts
+          and dispatch them to work through the required tasks.
         '';
       };
     };
