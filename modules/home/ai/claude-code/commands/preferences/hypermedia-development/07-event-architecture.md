@@ -5,6 +5,8 @@ This document bridges the theoretical foundations of event sourcing (see `theore
 
 The Tao of Datastar emphasizes that the server is the source of truth, and event sourcing makes this principle explicit: the event log is the canonical state, and all views—including the DOM—are derived projections.
 SSE streams become functors mapping domain events to presentation updates (PatchElements and PatchSignals), maintaining causal consistency between server state and browser representation.
+This functor structure arises from functional reactive programming foundations where signals (browser state) and events (server state) form a comonad-monad duality.
+See `functional-reactive-programming.md` for the categorical framework explaining why this architecture is natural.
 
 This approach extends the patterns in `01-architecture.md` and `02-sse-patterns.md` by grounding hypermedia interactions in an immutable event log rather than mutable database state.
 While not every hypermedia application requires event sourcing, understanding the architectural alignment reveals design principles applicable even in traditional CRUD contexts.
