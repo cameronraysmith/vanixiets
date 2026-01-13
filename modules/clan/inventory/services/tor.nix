@@ -1,3 +1,4 @@
+# Tor relay service for NixOS machines
 {
   clan.inventory.instances.tor = {
     module = {
