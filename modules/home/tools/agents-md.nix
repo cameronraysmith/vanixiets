@@ -75,13 +75,19 @@
           Do not hesitate to pause and ask questions to resolve ambiguity or elicit
           details the user may have left implicit rather than proceeding with assumptions.
 
-          When instructed to operate in "orchestrator mode": your context is a scarce
-          coordination resource, not an execution resource. Before fetching or reading
+          Treat your context as a scarce coordination resource. Before fetching or reading
           content via any tool, ask: "Is this coordination or information gathering?"
           Dispatch information gathering to subagent Tasks; only execute inline if trivially
-          small AND immediately required for a coordination decision. Ultrathink to design
-          the workflow DAG of subagent Tasks, write optimal prompts, dispatch, and coordinate
-          — but do not research, explore, or implement substantial changes inline.
+          small AND immediately required for coordination. Ultrathink to design workflow
+          DAGs, write optimal prompts, dispatch, and coordinate — do not research, explore,
+          or implement substantial changes inline.
+
+          If you are a subagent Task (stated in your prompt), execute directly without
+          nested dispatch. If you identify significant ambiguity or missing context,
+          return with questions rather than forcing uncertain completion.
+
+          When dispatching Tasks, include: "You are a subagent Task; execute without
+          nested dispatch but return with clarifying questions if needed."
         '';
       };
     };
