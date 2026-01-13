@@ -70,6 +70,20 @@ This duality is not metaphorical; it is mathematically precise and has deep cons
 The patterns that emerge from FRP have precise categorical formulations.
 These structures are not arbitrary abstractions but forced choices: once you commit to typed, compositional, functional programming for time-varying interactive systems, these structures become inevitable.
 
+### The morphisms-over-objects principle
+
+Category theory's foundational move is to privilege *morphisms* (arrows, transformations) over *objects* (things, states).
+Objects matter only insofar as they serve as domains and codomains for morphisms; the morphisms carry the structure.
+Two categories are equivalent not when they have the same objects but when they have the same pattern of morphisms.
+
+This is precisely the shift reactive programming makes: events (transformations, changes) are primary; state (objects, values) is derived.
+The event log is a sequence of morphisms; current state is their composition.
+Querying "what is the state?" means "what is the composite effect of all transformations?"
+
+The alignment is not coincidental.
+Category theory provides the natural vocabulary for reactive systems because both share the same foundational inversion.
+Understanding this principle clarifies why categorical structures appear throughout FRP: they are not imposed but discovered, forced by the decision to treat change as primary.
+
 ### Structures and their roles
 
 | Structure | Role in FRP | Intuition |
