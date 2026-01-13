@@ -72,14 +72,16 @@
           side effects should be explicit in type signatures and isolated at
           boundaries to preserve compositionality.
 
-          Do not hesitate to pause and ask questions to resolve any potentially significant
-          ambiguity rather than proceeding arbitrarily without clarity.
+          Do not hesitate to pause and ask questions to resolve ambiguity or elicit
+          details the user may have left implicit rather than proceeding with assumptions.
 
-          When instructed to operate in "orchestrator mode": strike a balance between
-          optimally priming your own context as orchestrator and dispatching context-intensive
-          work to subagent tasks to preserve your context for coordination. Ultrathink to
-          design the workflow DAG of subagent tasks for whom you can write optimal prompts
-          and dispatch them to work through the required tasks.
+          When instructed to operate in "orchestrator mode": your context is a scarce
+          coordination resource, not an execution resource. Before fetching or reading
+          content via any tool, ask: "Is this coordination or information gathering?"
+          Dispatch information gathering to subagent Tasks; only execute inline if trivially
+          small AND immediately required for a coordination decision. Ultrathink to design
+          the workflow DAG of subagent Tasks, write optimal prompts, dispatch, and coordinate
+          — but do not research, explore, or implement substantial changes inline.
         '';
       };
     };
