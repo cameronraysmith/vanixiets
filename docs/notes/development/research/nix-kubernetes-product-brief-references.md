@@ -10,7 +10,7 @@ It serves as the foundation for planning an experimental development cluster con
 | hetzcube | `~/projects/sciops-workspace/hetzkube/` | Hetzner CAPI + NixOS node images |
 | nixidy | `~/projects/sciops-workspace/nixidy/` | GitOps manifest generation |
 | terranix | `~/projects/sciops-workspace/terranix/` | Nix-to-Terraform bridge |
-| infra | `~/projects/nix-workspace/infra/` | Target repo with deferred module composition patterns |
+| vanixiets | `~/projects/nix-workspace/vanixiets/` | Target repo with deferred module composition patterns |
 
 ---
 
@@ -361,12 +361,12 @@ terraform init && terraform apply
 
 ---
 
-## Infra Repository Deferred Module Composition Patterns
+## Vanixiets Repository Deferred Module Composition Patterns
 
 ### Directory Structure
 
 ```
-~/projects/nix-workspace/infra/
+~/projects/nix-workspace/vanixiets/
 ├── flake.nix                      # import-tree ./modules entry
 ├── lib/
 │   └── caches.nix                 # DRY shared configuration
@@ -574,10 +574,10 @@ Connection: `clan secrets get <name> → provider tokens, TLS certs, etc.`
 
 ---
 
-## Proposed Module Structure for Infra Repository
+## Proposed Module Structure for Vanixiets Repository
 
 ```
-~/projects/nix-workspace/infra/modules/
+~/projects/nix-workspace/vanixiets/modules/
 ├── k8s/                           # New: Kubernetes cluster configuration
 │   ├── core.nix                   # Flake module imports (nixidy, etc.)
 │   │
@@ -737,7 +737,7 @@ No manual module registration required.
 - Hetzcube README: `~/projects/sciops-workspace/hetzkube/README.md`
 - Nixidy user guide: `~/projects/sciops-workspace/nixidy/docs/user_guide/`
 - Terranix documentation: `~/projects/sciops-workspace/terranix/doc/`
-- Infra architecture docs: `~/projects/nix-workspace/infra/docs/architecture/`
+- Vanixiets architecture docs: `~/projects/nix-workspace/vanixiets/docs/architecture/`
 
 ### Key External Resources
 

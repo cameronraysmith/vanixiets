@@ -185,7 +185,7 @@ This shows the build matrix (container × target combinations) and manifest list
 
 ## Adding new containers
 
-Container definitions live in `/Users/crs58/projects/nix-workspace/infra-refactor-container-builds/modules/containers/default.nix` within the `containerDefs` attrset.
+Container definitions live in `~/projects/nix-workspace/vanixiets/modules/containers/default.nix` within the `containerDefs` attrset.
 
 Add a new container by extending the containerDefs attrset:
 
@@ -288,7 +288,7 @@ The nix-rosetta-builder VM image is automatically fetched from the cameronraysmi
 On a fresh macOS machine:
 
 ```bash
-cd /Users/crs58/projects/nix-workspace/infra-refactor-container-builds
+cd ~/projects/nix-workspace/vanixiets
 just activate --ask
 ```
 
