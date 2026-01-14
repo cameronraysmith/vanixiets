@@ -10,7 +10,7 @@ Complete reference for the repository structure using deferred module compositio
 ## Directory tree
 
 ```
-infra/
+vanixiets/
 ├── modules/             # Deferred module composition modules (auto-discovered)
 │   ├── clan/            # Clan integration
 │   │   ├── core.nix     # Clan flakeModule import
