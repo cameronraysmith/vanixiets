@@ -511,8 +511,8 @@ Adjust KubeadmControlPlane replicas and ensure odd numbers for etcd quorum.
 
 ## Related components
 
-- Colima profile setup: See `docs/notes/development/kubernetes/components/colima-profiles.md`
-- NixOS k3s module: See `docs/notes/development/kubernetes/components/nixos-k3s-server.md`
+- Colima profile setup: See [01-environment-setup.md](./01-environment-setup.md) for k3s-capi profile creation
+- NixOS k3s module: See [nixos-k3s-server.md](../components/nixos-k3s-server.md)
 - Cilium CNI deployment: Deploy after ClusterAPI bootstrap via easykubenix full stage
 - External-dns: Takes over DNS management after initial bootstrap
 
