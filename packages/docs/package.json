@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@astrojs/cloudflare": "12.6.12",
-    "@astrojs/starlight": "0.37.2",
+    "@astrojs/starlight": "0.37.3",
     "astro": "5.16.9"
   },
   "devDependencies": {
