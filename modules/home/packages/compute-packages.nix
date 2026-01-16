@@ -26,8 +26,10 @@
         holos # from nixpkgs (custom version available at .#debug.holos)
         # kcl
         kind
+        kluctl
         krew
         kubectl
+        clusterctl
         kubectx
         kubernetes-helm
         kustomize
