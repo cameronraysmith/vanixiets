@@ -70,6 +70,28 @@ For drift detection with exit codes (useful for automation):
 bv --check-drift
 ```
 
+## Run execution planning commands
+
+Extract three complementary perspectives on work prioritization:
+
+```bash
+# Parallel entry points (independent roots with no blockers)
+bv --robot-plan | jq '[.plan.tracks[] | select(.reason == "Independent work stream") | .items[]] | map({id, title, unblocks})'
+
+# Critical path (serialization bottleneck)
+bv --robot-capacity | jq '{critical_path, critical_path_length}'
+
+# Top 3 high-impact items (PageRank-based)
+bv --robot-triage | jq '.triage.recommendations[:3] | map({id, title, score, action})'
+```
+
+For additional topological context:
+
+```bash
+# Full execution order respecting dependencies
+bv --robot-insights | jq '.Stats.TopologicalOrder'
+```
+
 ## Interpret results
 
 From `bd status`:
@@ -98,15 +120,51 @@ From `bd epic status`:
 - Progress percentages show which epics are advancing
 - Stalled epics (0%) may indicate blocked critical paths
 
+From execution planning commands:
+
+**Parallel entry points** (from `--robot-plan` Track-B items):
+- Issues with no blockers that can start immediately
+- Multiple entry points can be worked in parallel by different sessions or agents
+- The `unblocks` field shows downstream impact of completing each
+
+**Critical path** (from `--robot-capacity`):
+- The longest chain of dependent issues in the graph
+- Completing critical path items reduces total project duration
+- Items not on critical path have slack — delays there do not extend the project
+
+**High-impact items** (from `--robot-triage` recommendations):
+- PageRank-based scoring identifies issues that unlock the most downstream work
+- Score reflects influence in the dependency graph, not urgency or effort
+- Optimizes for "maximum downstream unlock" rather than "what to do first"
+
+These three perspectives answer different questions:
+- *"What can I start now?"* → Parallel entry points
+- *"What reduces total duration?"* → Critical path
+- *"What has the most influence?"* → High-impact items
+
 ## Present synthesis
 
-Provide the user a concise summary:
+Provide the user a concise summary with three prioritization perspectives:
 
-1. **Health**: Use `quick_ref` counts — open/ready/blocked ratio assessment
-2. **Top recommendations**: First 2-3 from `recommendations` with scores and what they unblock
-3. **Quick wins**: Any items from `quick_wins` that could be knocked out rapidly
-4. **Epic progress**: Which epics are advancing vs stalled
-5. **Alerts** (if any): Stale issues, cycles, or health warnings from `project_health`
+**Health overview**:
+- Use `quick_ref` counts — open/ready/blocked ratio assessment
+- Epic progress — which epics are advancing vs stalled
+- Alerts (if any) — stale issues, cycles, or health warnings from `project_health`
+
+**Start here** (parallel entry points):
+- List N issues that have no blockers and can be worked in parallel
+- Show what each unblocks downstream
+- Example: "These 3 issues are independent roots: nix-50f.2, nix-50f.5, nix-l2a.1"
+
+**Critical path** (serialization bottleneck):
+- Show the chain that determines minimum project duration
+- Highlight which items on the path are ready vs blocked
+- Example: "6-issue critical path: nix-50f → nix-50f.5 → ... → nix-50f.12"
+
+**High impact** (PageRank recommendations):
+- First 2-3 from `recommendations` with scores and what they unblock
+- Quick wins from `quick_wins` that could be knocked out rapidly
+- Note overlap or divergence with critical path items
 
 ## Prompt work selection
 
