@@ -152,8 +152,8 @@ GCP, AWS, and other providers are future considerations, not current scope.
 *General-purpose Kubernetes distribution*: This is not a Kubernetes distribution.
 It is a specific architecture for the vanixiets project using k3s.
 
-*Zero-touch GitOps*: The current architecture uses kluctl for explicit deployments.
-ArgoCD integration for continuous reconciliation is a documented future path, not current implementation.
+*Zero-touch GitOps during infrastructure bootstrap*: The current prototype implements Phases 1-3 using kluctl for explicit infrastructure deployments.
+ArgoCD is installed by easykubenix (Phase 3); application management via nixidy/ArgoCD (Phase 4) is part of the committed four-phase architecture.
 
 *Managed Kubernetes compatibility*: The architecture uses k3s with ClusterAPI.
 GKE, EKS, and AKS patterns differ significantly.
@@ -327,7 +327,7 @@ Cilium provides networking, cert-manager handles TLS, sops-secrets-operator decr
 +-------------------+
 ```
 
-### Layer 5: Applications (future: nixidy/ArgoCD)
+### Layer 5: Applications (nixidy/ArgoCD)
 
 nixidy generates ArgoCD Application resources from Nix modules for application workloads.
 
@@ -339,8 +339,8 @@ nixidy generates ArgoCD Application resources from Nix modules for application w
 
 *Persistence*: GitOps-managed resources with continuous reconciliation.
 
-This layer is planned for future implementation.
-Currently, application workloads deploy through the same easykubenix/kluctl workflow as infrastructure.
+Phase 4 takes effect after easykubenix installs ArgoCD in Phase 3.
+The current prototype demonstrates Phases 1-3; Phase 4 application examples follow the same nixidy patterns documented in the nixidy-cluster reference (`~/projects/sciops-workspace/nixidy-cluster`).
 
 ```text
 +-------------------+
@@ -608,13 +608,13 @@ Manage infrastructure state via terraform state files.
 
 *Handoff*: Provides decrypted Secrets for application consumption.
 
-### Future: nixidy/ArgoCD
+### Phase 4: nixidy/ArgoCD
 
-*Will do*: Generate ArgoCD Applications, enable continuous reconciliation, provide drift detection.
+*Does*: Generate ArgoCD Applications, enable continuous reconciliation, provide drift detection.
 
-*Will not*: Replace easykubenix for infrastructure, manage ClusterAPI resources.
+*Does not*: Replace easykubenix for infrastructure, manage ClusterAPI resources.
 
-*Handoff boundary*: easykubenix manages infrastructure; nixidy manages applications.
+*Handoff boundary*: easykubenix manages infrastructure up to and including ArgoCD installation (Phases 1-3); nixidy manages applications after ArgoCD exists (Phase 4).
 
 ## Code reuse strategy
 
@@ -723,7 +723,7 @@ Completed components:
 The sciops workspace will migrate to this architecture, replacing:
 
 - `test-cluster`: GKE bootstrap via terraform (replaced by terranix + ClusterAPI + Hetzner)
-- `test-cluster-ops`: argocd-autopilot GitOps (replaced by easykubenix + kluctl, later nixidy + ArgoCD)
+- `test-cluster-ops`: argocd-autopilot GitOps (replaced by easykubenix + kluctl for infrastructure, nixidy + ArgoCD for applications)
 
 ### Transition steps
 
@@ -733,26 +733,26 @@ The sciops workspace will migrate to this architecture, replacing:
 4. Migrate application definitions to easykubenix modules
 5. Deploy sciops workloads to Hetzner cluster
 6. Deprecate GKE infrastructure
-7. Evaluate nixidy/ArgoCD integration for application layer
+7. Implement Phase 4 nixidy/ArgoCD for application layer
 
 ## Future considerations
 
-### nixidy/ArgoCD integration
+### Phase 4 implementation notes
 
-The current architecture uses kluctl for all deployments.
-A future evolution separates infrastructure (easykubenix/kluctl) from applications (nixidy/ArgoCD).
+The four-phase architecture separates infrastructure (Phases 1-3 via easykubenix/kluctl) from applications (Phase 4 via nixidy/ArgoCD).
+The current prototype implements Phases 1-3; Phase 4 patterns are documented here for implementation reference.
 
-ArgoCD benefits:
+ArgoCD benefits for application management:
 
 - Continuous reconciliation (self-healing)
 - Drift detection UI
 - Sync policies and approval gates
 - Multi-cluster ApplicationSets
 
-Proposed boundary:
+Tool boundary:
 
-- easykubenix/kluctl: ClusterAPI, CNI, CSI, core addons, ArgoCD itself
-- nixidy/ArgoCD: Application workloads, application secrets, ingress configuration
+- easykubenix/kluctl: ClusterAPI, CNI, CSI, core addons, ArgoCD itself (infrastructure)
+- nixidy/ArgoCD: Application workloads, application secrets, ingress configuration (applications)
 
 ### Multi-node local clusters
 
