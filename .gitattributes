@@ -7,3 +7,6 @@ scripts/** linguist-detectable=false
 justfile linguist-detectable=false
 Makefile linguist-detectable=false
 *.nix text eol=lf
+
+# Use bd merge for beads JSONL files
+.beads/issues.jsonl merge=beads
