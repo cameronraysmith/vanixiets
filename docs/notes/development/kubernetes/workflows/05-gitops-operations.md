@@ -833,10 +833,10 @@ kubectl exec -it postgres-0 -n database -- pg_restore -d app /backups/latest.dum
 Persistent volume recreation depends on whether original volumes are accessible.
 If using Hetzner volume snapshots, create volumes from snapshots via Hetzner API or terranix before cluster deployment.
 
-## Future: nixidy/ArgoCD integration
+## Phase 4: nixidy/ArgoCD integration
 
-The current architecture uses easykubenix + kluctl for the complete deployment lifecycle.
-A future evolution separates concerns between infrastructure and application layers.
+The four-phase architecture uses easykubenix + kluctl for infrastructure (Phases 1-3) and nixidy + ArgoCD for applications (Phase 4).
+The current prototype implements Phases 1-3; this section documents the Phase 4 patterns for application management.
 
 ### When to transition from kluctl to ArgoCD
 
@@ -900,7 +900,7 @@ tree result/
 
 ### Handoff boundary: easykubenix (infra) to nixidy (apps)
 
-The proposed architecture separates deployment concerns.
+The architecture separates deployment concerns at the Phase 3/Phase 4 boundary.
 
 *easykubenix + kluctl* manages.
 - ClusterAPI resources (Cluster, MachineDeployment, etc.)
