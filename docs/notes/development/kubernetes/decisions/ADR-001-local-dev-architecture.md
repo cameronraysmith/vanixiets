@@ -98,16 +98,19 @@ This maintains production parity with hetzkube which uses Cilium.
 - k3s default flannel is simpler but lacks advanced features like Gateway API and eBPF observability.
 - Calico provides similar features but is more complex to configure with k3s.
 
-### Decision 7: easykubenix with kluctl for Infrastructure, nixidy/ArgoCD for Applications
+### Decision 7: easykubenix/kluctl for Infrastructure, nixidy/ArgoCD for Applications
 
 **Context**: GitOps deployment requires a mechanism to render and apply Kubernetes manifests from Nix expressions.
+The architecture must cleanly separate infrastructure concerns from application workload management.
 
-**Decision**: Use easykubenix for manifest generation with kluctl for infrastructure deployment initially.
-Add nixidy with ArgoCD later for application-level GitOps.
+**Decision**: Use easykubenix for manifest generation with kluctl for infrastructure deployment (Phases 1-3).
+Use nixidy with ArgoCD for application-level GitOps (Phase 4).
+easykubenix installs ArgoCD as cluster infrastructure; nixidy generates Application resources for ArgoCD to manage.
 
 **Rationale**: kluctl provides simpler deployment semantics for infrastructure components where the reconciliation loop of ArgoCD adds complexity without benefit.
 ArgoCD becomes valuable for applications where self-healing, automatic sync, and the application catalog provide operational benefits.
-This staged approach allows validating infrastructure before adding GitOps complexity.
+The boundary is infrastructure versus applications, not now versus later.
+easykubenix handles everything up to and including ArgoCD installation; nixidy handles everything after ArgoCD exists.
 
 **Alternatives Considered**:
 - ArgoCD for everything would complicate the bootstrap sequence and add overhead for infrastructure components.
@@ -142,9 +145,8 @@ Full VM isolation provides stronger security boundaries than container-based app
 - Development performance reduced by Rosetta emulation overhead
 - External dependency on sslip.io for DNS (acceptable for development)
 - Two-VM resource overhead for ClusterAPI bootstrap operations
-- Staged GitOps adoption requires managing two deployment mechanisms temporarily
+- Two deployment mechanisms reflect the infrastructure/application boundary (easykubenix/kluctl for infrastructure, nixidy/ArgoCD for applications)
 
 ## Related Decisions
 
-- See `reference-architecture.md` for the complete local development environment specification.
-- Future ADRs will document production Hetzner deployment decisions and nixidy/ArgoCD integration patterns.
+- See `reference-architecture.md` for the complete local development environment specification and the four-phase architecture including nixidy/ArgoCD patterns.
