@@ -170,6 +170,136 @@ Completing the foundation chain unblocks verification for all infrastructure-dep
 
 ## Present synthesis
 
+Determine presentation depth based on graph scale, then provide the user a concise summary with three prioritization perspectives.
+
+### Scale-aware presentation
+
+Tailor output verbosity to issue count to avoid overwhelming users with large graphs while providing complete information for small ones.
+
+**Small graphs (< 30 open issues)**:
+- Enumerate all parallel entry points with full details
+- Show complete critical path with all nodes
+- Full detail on all ready issues including descriptions
+- Show complete dependency chains for recommendations
+
+**Medium graphs (30-100 open issues)**:
+- Show top 10 parallel entry points sorted by unblock count descending
+- Show critical path with length and key milestones
+- Group ready issues by epic with counts
+- Summarize recommendations with links to full details
+
+**Large graphs (> 100 open issues)**:
+- Show top 5 parallel entry points by unblock count descending
+- Show critical path length and first/last 3 nodes only
+- Epic-level aggregation mandatory (see below)
+- Per-epic top picks: best ready issue per major epic
+- Partially-complete epic analysis for epics with progress > 0%
+
+Determine scale tier at session start:
+
+```bash
+# Extract open count to determine tier
+bd status | grep "Open:"
+```
+
+### Selection criteria
+
+When showing a subset of issues at medium/large scale, apply these selection criteria:
+
+**Parallel entry points**: sorted by unblock count (descending), then by PageRank score as tiebreaker. This prioritizes issues that unlock the most downstream work.
+
+```bash
+# Extract parallel entry points sorted by unblock count
+bv --robot-plan | jq '[.plan.tracks[] | select(.reason == "Independent work stream") | .items[]] | sort_by(-.unblocks | length) | .[:10]'
+```
+
+**High-impact items**: sorted by PageRank score from `--robot-triage` recommendations. Score reflects influence in the dependency graph.
+
+**Critical path**: computed by `bv --robot-capacity`, representing the longest dependency chain. Items on this path determine minimum project duration.
+
+### Epic-level aggregation
+
+For medium and large graphs, aggregate ready issues by epic to help users select a workstream:
+
+```
+Ready issues by epic:
+- Domain layer (ironstar-abc): 12 ready, 8 blocked
+- Frontend pipeline (ironstar-xyz): 5 ready, 15 blocked
+- Event sourcing (ironstar-def): 3 ready, 10 blocked
+```
+
+Extract epic-level counts:
+
+```bash
+# Epic progress with ready/blocked breakdown
+bd epic status
+
+# Ready issues with hierarchy (shows parent epic)
+bd list --ready --pretty
+```
+
+For large graphs, this aggregation is mandatory — show epic-level summaries before individual issue recommendations.
+
+### Per-epic top picks
+
+For large graphs, identify the best entry point for each major epic rather than only global recommendations:
+
+```
+Top pick per epic:
+- Domain: ironstar-abc.5 (unblocks 4, verification-ready)
+- Frontend: ironstar-xyz.1 (on critical path, unblocks 3)
+- Event sourcing: ironstar-def.2 (unblocks 2, starts foundation chain)
+```
+
+This provides entry points into each workstream. Users can then focus on a specific epic without reviewing all 72+ ready issues.
+
+Selection within each epic uses the same criteria: unblock count descending, PageRank as tiebreaker.
+
+### Partially-complete epic analysis
+
+For large graphs with epics showing progress > 0%, provide completion context:
+
+```
+Domain layer (42% complete):
+- 12 issues closed, 8 ready, 12 blocked
+- Next milestone: Complete aggregate implementations
+- Blocking: ironstar-abc.7 (waiting on infrastructure)
+```
+
+This answers "why is X at Y%?" and "what's next for this epic?" without requiring users to drill into individual issues.
+
+Extract progress data:
+
+```bash
+# Epic completion percentages
+bd epic status
+
+# Blocked issues within an epic
+bd list --blocked | grep "ironstar-abc"
+```
+
+### Parallel track expansion
+
+For parallel work recommendations at medium/large scale, show 2-3 issues per track rather than just the first:
+
+```
+Parallel tracks:
+- Track 1 (foundation): A → B → C (creates environment)
+- Track 2 (domain): D → E → F (core business logic)
+- Track 3 (frontend): G → H (UI components)
+```
+
+This shows the next few issues in sequence, helping users understand what follows their immediate work item.
+
+Extract track sequences:
+
+```bash
+# Full track sequences from robot-plan
+bv --robot-plan | jq '.plan.tracks[] | {reason, items: [.items[] | {id, title}]}'
+```
+
+### Prioritization perspectives
+
 Provide the user a concise summary with three prioritization perspectives:
 
 **Health overview**:
