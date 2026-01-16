@@ -283,7 +283,7 @@ jobs:
 
       - name: Save job result to cache
         if: success() && steps.cache.outputs.should-run == 'true' && steps.cache.outputs.cache-source == 'none'
-        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
@@ -392,7 +392,7 @@ jobs:
 
       - name: Save job result to cache
         if: success() && steps.cache.outputs.should-run == 'true'
-        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
@@ -503,7 +503,7 @@ jobs:
 
       - name: Save job result to cache
         if: success() && steps.cache.outputs.should-run == 'true'
-        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
@@ -587,7 +587,7 @@ jobs:
 
       - name: Save job result to cache
         if: success() && steps.cache.outputs.should-run == 'true'
-        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
@@ -663,7 +663,7 @@ jobs:
 
       - name: Save job result to cache
         if: success() && steps.cache.outputs.should-run == 'true'
-        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
@@ -768,7 +768,7 @@ jobs:
 
       - name: Save job result to cache
         if: success() && steps.cache.outputs.should-run == 'true'
-        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
