@@ -13,9 +13,116 @@ Capture learnings into the issue graph before context is lost.
 **Purpose**: End of session status updates and handoff preparation.
 If you need to refactor the issue graph structure during checkpoint (e.g., split epics, merge issues, restructure dependencies), use `/issues:beads-evolve` first, then complete the checkpoint workflow.
 
+## Run wind-down diagnostics
+
+Execute these commands now:
+
+```bash
+# Current state (compare to session start)
+bd status
+
+# What changed this session
+bd activity
+
+# Epic progress change
+bd epic status
+
+# Health check before commit
+bd dep cycles
+```
+
+The activity feed shows what happened this session.
+Epic status shows progress advancement.
+Cycle check prevents committing a corrupted graph.
+
+For structured session summary:
+
+```bash
+# Create repo-specific temp file
+REPO=$(basename "$(git rev-parse --show-toplevel)")
+SUMMARY=$(mktemp "/tmp/bd-${REPO}-checkpoint.XXXXXX.json")
+bv --robot-triage > "$SUMMARY"
+
+# Session-relevant extractions
+jq '.quick_ref' "$SUMMARY"                    # current counts
+jq '.project_health.graph_metrics' "$SUMMARY" # health metrics
+jq '.stale_alerts' "$SUMMARY"                 # attention needed
+
+# Clean up when done
+rm "$SUMMARY"
+```
+
+## Scale-aware session summary
+
+Determine session scope by counting issues touched:
+
+```bash
+# Count issues modified this session (from activity feed)
+bd activity | grep -E "^[→✓✗⊘+]" | wc -l
+```
+
+Tailor summary depth to session scope:
+
+**Small sessions (1-3 issues touched)**:
+- Full detail on each change with complete before/after state
+- Include full descriptions for modified issues
+- Show complete dependency changes with rationale
+
+**Medium sessions (4-10 issues touched)**:
+- Summary table of changes by category:
+  - Closed: list with brief completion notes
+  - Updated: list with what changed
+  - Created: list with traceability
+  - Dependencies: count of additions/removals
+- Highlight key closures and discoveries
+
+**Large sessions (10+ issues touched)**:
+- Epic-level aggregation of changes
+- Statistics only: "8 closed, 3 created, 12 dependencies modified"
+- Only highlight critical changes:
+  - Blockers discovered during work
+  - Scope corrections that affect downstream
+  - Priority changes based on new understanding
+- Per-epic progress deltas: "Domain layer: 42% → 58% (+5 closed)"
+
+Determine scope tier:
+
+```bash
+# Rough session scope from recent activity
+bd activity --limit 50 | head -20
+```
+
+## Graph health verification
+
+Before committing, verify graph integrity:
+
+```bash
+# Must be zero — cycles corrupt the graph
+bd dep cycles
+
+# Check for structural issues
+bd lint
+
+# Confirm ready queue makes sense
+bd ready | head -5
+```
+
+If cycles are detected:
+
+```bash
+# Identify the cycle
+bd dep cycles --verbose
+
+# Break the cycle by removing the inappropriate dependency
+bd dep remove <upstream> <downstream>
+```
+
+If lint issues are found, resolve before committing.
+This prevents corrupting the graph during wind-down.
+
 ## Reflect
 
-Consider what was learned this session that the issue graph doesn't yet reflect:
+Consider what was learned this session that the issue graph does not yet reflect.
 
 **Scope changes**
 - Was the work larger or smaller than the issue described?
@@ -34,11 +141,32 @@ Consider what was learned this session that the issue graph doesn't yet reflect:
 
 **Priority shifts**
 - Did this work reveal that other issues are more/less critical than assigned?
-- Should any priorities be adjusted based on new understanding?
+- Were any P3 items actually critical blockers?
+- Were any P1 items actually low-impact?
+
+## Priority recalibration
+
+If reflection revealed priority mismatches, update before committing:
+
+```bash
+# Issue proved more critical than marked
+bd update <id> --priority 1
+
+# Issue proved less critical than marked
+bd update <id> --priority 3
+
+# Add context for the change
+bd comments add <id> "Priority adjusted: discovered this blocks X during implementation"
+```
+
+Common recalibration patterns:
+- Infrastructure issues often prove higher priority once downstream work begins
+- Optional enhancements sometimes prove necessary for core functionality
+- Assumed blockers sometimes prove to have workarounds
 
 ## Capture
 
-For each learning identified above, execute the appropriate update:
+For each learning identified above, execute the appropriate update.
 
 **Scope/understanding changes:**
 ```bash
@@ -78,6 +206,62 @@ bd close <issue-id> --reason "Implemented in..." --suggest-next
 bd close <issue-id>
 bd comments add <issue-id> "Implemented in commit $(git rev-parse --short HEAD). <learnings>"
 ```
+
+## Unblock chain visibility
+
+When closing issues, show the cascade effect:
+
+```bash
+# See what completing this unblocked
+bd close <id> --reason "..." --suggest-next
+
+# Show full unblock chain
+bd dep tree <closed-id> --direction up
+```
+
+Extract structured unblock data:
+
+```bash
+# Count direct and transitive unblocks
+bd dep tree <closed-id> --direction up --json | jq '{
+  direct: [.children[] | .id],
+  direct_count: [.children[]] | length,
+  total_downstream: [.. | .id? // empty] | unique | length
+}'
+```
+
+Present the cascade:
+- "Closing nix-50f.2 unblocked 3 issues (nix-50f.1, nix-l2a.2, nix-l2a.5)"
+- "These 3 issues unblock 7 more downstream"
+- "Total downstream impact: 10 issues now closer to ready"
+
+This demonstrates session impact and helps users understand graph flow.
+
+## Epic impact aggregation
+
+For medium and large sessions, show epic-level progress change:
+
+```bash
+# Epic progress overview
+bd epic status
+```
+
+Present as progress deltas:
+- "Domain layer: 42% → 58% (closed 5 issues)"
+- "Infrastructure: 20% → 35% (closed 3 issues, created 2)"
+- "Frontend: unchanged (0 issues touched)"
+
+For large sessions, aggregate by epic rather than listing individual issues:
+
+```bash
+# Extract issues by epic from activity
+bd activity | grep "✓" | while read line; do
+  id=$(echo "$line" | awk '{print $2}')
+  bd show "$id" --short
+done
+```
+
+This provides high-level progress visibility without overwhelming detail.
 
 ## Handoff
 
@@ -121,20 +305,62 @@ EOF
 
 Note: Use `bd update <id> --claim` to atomically claim an issue when resuming work (sets assignee + status to in_progress, fails if already claimed).
 
-**Final commit:**
+## Narrative handoff synthesis
+
+Produce a prose summary for the next session:
+
+```
+Session Summary:
+
+Completed:
+- <issue-id>: <brief description of what was implemented>
+- <issue-id>: <brief description>
+
+Discovered:
+- <issue-id>: <why this was created, what triggered discovery>
+
+Learned:
+- <key insight that changed understanding>
+- <assumption that proved incorrect>
+
+Next:
+- Recommended starting point: <issue-id> (<why this is the logical next step>)
+- Alternative entry points: <issue-id>, <issue-id>
+
+Warnings:
+- <blockers discovered but not resolved>
+- <scope risks identified>
+- <concerns that may affect future work>
+```
+
+This mirrors beads-orient's synthesis section but for session end.
+The next session can use this summary plus `/issues:beads-orient` to quickly resume.
+
+## Final commit
+
+Execute the commit sequence:
+
 ```bash
-# Validate beads database integrity before committing
+# Validate beads database integrity
 bd hooks run pre-commit
 
-# Commit with meaningful message describing what changed
-git commit -m "chore(issues): <describe what changed - closed issues, new discoveries, etc.>"
+# Ensure DB file is staged
+git add .beads/issues.jsonl
+
+# Commit with meaningful message
+git commit -m "chore(issues): <describe what changed>"
 ```
 
 The commit message should explain WHAT changed in the issue graph, not just generic sync messages.
-Examples:
+
+**Small sessions**: Name specific issues
 - "chore(issues): close bd-xyz auth implementation, discover bd-abc blocker"
-- "chore(issues): refactor epic dependencies after arch review"
-- "chore(issues): add checkpoint for bd-xyz incomplete auth work"
+
+**Medium sessions**: Summarize by category
+- "chore(issues): close 5 domain issues, update infrastructure dependencies"
+
+**Large sessions**: Epic-level summary
+- "chore(issues): advance domain epic to 58%, infrastructure sprint complete"
 
 ## Verify next work is discoverable
 
@@ -165,11 +391,28 @@ When descriptions are accurate, `/issues:beads-orient` in the next session will 
 
 ## Summary for user
 
-Provide the user a brief summary of what was captured:
-- Issues updated: X
-- New issues created: Y
-- Dependencies modified: Z
-- Work completed/checkpointed: <issue-id(s)>
+Provide the user a summary scaled to session scope.
+
+**Small sessions**: Full detail
+- Issues closed: <list with completion notes>
+- Issues updated: <list with what changed>
+- Issues created: <list with traceability>
+- Dependencies modified: <list with rationale>
+- Unblock cascade: <what is now ready>
+
+**Medium sessions**: Category summary
+- Closed: X issues (<key ones named>)
+- Updated: Y issues
+- Created: Z issues
+- Dependencies: N additions, M removals
+- Epic progress: <deltas for affected epics>
+- Next session: <top recommendation>
+
+**Large sessions**: Executive summary
+- Statistics: "8 closed, 3 created, 12 dependencies modified"
+- Epic progress: <deltas>
+- Key changes: <only critical items>
+- Next session: <top recommendation with rationale>
 
 The next session can run `/issues:beads-orient` to see the updated project state.
 
