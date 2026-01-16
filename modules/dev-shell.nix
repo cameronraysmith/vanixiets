@@ -29,6 +29,9 @@
           pkgs.age
           pkgs.ssh-to-age
           pkgs.sops
+          # Kubernetes cluster management
+          pkgs.clusterctl
+          pkgs.kluctl
           # Tools required by TypeScript packages CI
           pkgs.bun
           pkgs.nodejs_24 # semantic-release >= 24.10.0
