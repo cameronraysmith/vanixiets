@@ -142,6 +142,32 @@ These three perspectives answer different questions:
 - *"What reduces total duration?"* → Critical path
 - *"What has the most influence?"* → High-impact items
 
+### Implementation vs verification readiness
+
+The dependency graph models *code/logical dependencies*, not *environment prerequisites*.
+All graph roots (parallel entry points) are **implementation-ready** — you can write code now.
+A subset of these are also **verification-ready** — you can test and validate immediately.
+
+Distinguishing heuristics:
+
+**Pure code modules** — usually verification-ready:
+- Nix modules verifiable with `nix eval`, `nix build --dry-run`, or `nix-unit`
+- Library code verifiable with type checking, unit tests, or static analysis
+- These can be implemented AND verified in any order
+
+**Infrastructure-creating issues** — verification-ready once dependencies complete:
+- VM images, cluster provisioning, environment setup
+- Once created, they establish the environment for downstream verification
+- Example: k3s NixOS module → VM image → Colima profile → cluster exists
+
+**Infrastructure-deploying issues** — verification-blocked until target exists:
+- Kubernetes manifests, CNI plugins, certificates, operators
+- Implementation-ready (can write the code) but verification requires the target environment
+- Example: Cilium CNI module can be written now, but only verified after cluster exists
+
+The **foundation chain** is the sequence of infrastructure-creating issues that establishes verification environments.
+Completing the foundation chain unblocks verification for all infrastructure-deploying issues.
+
 ## Present synthesis
 
 Provide the user a concise summary with three prioritization perspectives:
@@ -154,7 +180,9 @@ Provide the user a concise summary with three prioritization perspectives:
 **Start here** (parallel entry points):
 - List N issues that have no blockers and can be worked in parallel
 - Show what each unblocks downstream
-- Example: "These 3 issues are independent roots: nix-50f.2, nix-50f.5, nix-l2a.1"
+- Classify each as *verification-ready* (pure code, can test now) or *verification-blocked* (needs environment first)
+- Identify the foundation chain if infrastructure-creating issues exist among roots
+- Example: "These 3 issues are independent roots: nix-50f.2 (verification-ready), nix-50f.5 (needs cluster), nix-l2a.1 (needs credentials)"
 
 **Critical path** (serialization bottleneck):
 - Show the chain that determines minimum project duration
@@ -166,12 +194,42 @@ Provide the user a concise summary with three prioritization perspectives:
 - Quick wins from `quick_wins` that could be knocked out rapidly
 - Note overlap or divergence with critical path items
 
+### Example interpretation
+
+Given parallel entry points `[A, B, C]` where:
+- A creates an environment (k3s module, VM image)
+- B deploys to that environment (CNI, operators)
+- C is pure code (library, Nix module testable with `nix eval`)
+
+The foundation chain might be: `A → D → E → ENVIRONMENT_EXISTS`
+
+**Solo recommendation**:
+1. Start with A (verification-ready) — implement and verify
+2. Complete D and E (each verification-ready after predecessor) — verify environment exists
+3. Now B and C can both be implemented AND verified
+4. C could have been done earlier but verification order doesn't matter for pure code
+
+**Parallel recommendation**:
+- Track 1: A → D → E (foundation chain — creates environment)
+- Track 2: B (implement now, verify after Track 1 completes)
+- Track 3: C (implement and verify immediately — no environment dependency)
+
+The key insight: all three roots (A, B, C) are *implementation-ready*, but only A and C are *verification-ready* at session start.
+
 ## Prompt work selection
 
 Ask the user:
+- Are you working solo (optimize for verification sequence) or parallel (maximize implementation throughput)?
 - Which area would you like to focus on?
 - Should we drill into a specific issue? (offer to run `bd dep tree <id> --direction both` and `bd show <id>`)
 - Any context about priorities or constraints for this session?
+
+**For solo work**: Recommend the foundation chain first — the sequence of infrastructure-creating issues that establishes environments.
+Complete and verify each step before moving to the next, then branch to parallel implementation of deployment modules.
+
+**For parallel work**: Recommend distributing across all implementation-ready roots.
+Assign foundation chain to one track and pure code / deployment modules to others.
+Verification will happen in waves as environments come online.
 
 ## Pre-work validation
 
