@@ -2,8 +2,11 @@
 #
 # Builds a qcow-efi format image for Colima x86_64-linux VMs with:
 # - k3s server (Cilium CNI integration via k3s-server module)
-# - Rosetta for x86_64 emulation on Apple Silicon
 # - SSH access with authorized keys
+#
+# The VM runs x86_64-linux. On Apple Silicon hosts, Colima uses
+# Virtualization.framework with Rosetta for x86_64 translation at the
+# hypervisor level — no guest-side Rosetta configuration needed.
 #
 # Usage: nix build .#k3s-local-image
 {
@@ -20,7 +23,8 @@ in
     { system, ... }:
     {
       packages.k3s-local-image = inputs.nixos-generators.nixosGenerate {
-        # Target x86_64-linux for Colima VM (Rosetta handles emulation on aarch64-darwin)
+        # Target x86_64-linux for production parity with Hetzner
+        # On Apple Silicon, Colima uses Virtualization.framework + Rosetta
         system = "x86_64-linux";
 
         # UEFI boot for modern VM compatibility
@@ -49,13 +53,6 @@ in
               k3s-server = {
                 enable = true;
                 clusterInit = true;
-              };
-
-              # Rosetta for x86_64 emulation on Apple Silicon hosts
-              # Colima mounts the Rosetta binary via Virtualization.framework
-              virtualisation.rosetta = {
-                enable = true;
-                mountTag = "vz-rosetta";
               };
 
               # SSH access for VM management
