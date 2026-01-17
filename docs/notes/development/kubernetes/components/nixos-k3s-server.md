@@ -1,10 +1,10 @@
 ---
-title: NixOS k3s server module
+title: NixOS k3s server configuration
 ---
 
-# NixOS k3s server module
+# NixOS k3s server configuration
 
-This document describes the NixOS module configuration for running k3s as a Kubernetes server node.
+This document describes configuring the nixpkgs `services.k3s` module and accompanying system settings for running k3s as a Kubernetes server node.
 The configuration targets x86_64-linux VMs running via Rosetta on aarch64-darwin hosts using Colima's vz backend.
 Production parity with Hetzner deployment is maintained through consistent module configuration.
 
