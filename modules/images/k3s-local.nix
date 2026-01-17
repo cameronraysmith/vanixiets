@@ -1,12 +1,12 @@
 # k3s local development VM image using nixos-generators
 #
-# Builds a qcow-efi format image for Colima x86_64-linux VMs with:
+# Builds an aarch64-linux qcow-efi image for local ClusterAPI bootstrap:
 # - k3s server (Cilium CNI integration via k3s-server module)
 # - SSH access with authorized keys
 #
-# The VM runs x86_64-linux. On Apple Silicon hosts, Colima uses
-# Virtualization.framework with Rosetta for x86_64 translation at the
-# hypervisor level — no guest-side Rosetta configuration needed.
+# Runs natively on Apple Silicon via Colima/incus without emulation.
+# Used to provision and manage x86_64-linux Hetzner production clusters.
+# Architecture independence documented in ADR-002.
 #
 # Usage: nix build .#k3s-local-image
 {
@@ -23,9 +23,9 @@ in
     { system, ... }:
     {
       packages.k3s-local-image = inputs.nixos-generators.nixosGenerate {
-        # Target x86_64-linux for production parity with Hetzner
-        # On Apple Silicon, Colima uses Virtualization.framework + Rosetta
-        system = "x86_64-linux";
+        # Native aarch64-linux for Apple Silicon (no emulation overhead)
+        # ClusterAPI provisions x86_64-linux Hetzner clusters from this image
+        system = "aarch64-linux";
 
         # UEFI boot for modern VM compatibility
         format = "qcow-efi";
