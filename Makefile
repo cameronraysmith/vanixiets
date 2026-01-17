@@ -93,11 +93,11 @@ bootstrap: install-nix install-direnv
 # This bypasses both the Fastly CDN (HTTP 618 errors) and the shell wrapper
 # (which has template placeholders that aren't filled in for raw source files).
 # To update version, change NIX_INSTALLER_VERSION below.
-# Note: versioning jumped from 0.27.0 to 3.11.3 when experimental-nix-installer
-# aligned with previous upstream determinate nix-installer versioning.
-# https://github.com/DeterminateSystems/nix-installer/releases/tag/v3.11.3
+# Note: versioning jumped from 0.27.0 to 3.11.3, then back to 2.33.0 when
+# experimental-nix-installer removed the 3.x tags.
+# https://github.com/NixOS/experimental-nix-installer/releases
 #
-# The experimental-nix-installer 3.11.3 defaults include settings equivalent to:
+# The experimental-nix-installer 2.33.0 defaults include settings equivalent to:
 #   --extra-conf "experimental-features = nix-command flakes"
 #   --extra-conf "auto-optimise-store = true"
 #   --extra-conf "always-allow-substitutes = true"
@@ -111,7 +111,7 @@ bootstrap: install-nix install-direnv
 #
 # If using the upstream nix installer (https://nixos.org/download/) which lacks
 # these defaults, add the --extra-conf flags above to the install command.
-NIX_INSTALLER_VERSION := 3.11.3
+NIX_INSTALLER_VERSION := 2.33.0
 install-nix: ## Install Nix using the NixOS community installer
 	@echo "Installing Nix..."
 	@if command -v nix >/dev/null 2>&1; then \
