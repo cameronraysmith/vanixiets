@@ -79,8 +79,8 @@ in
               # Console access for debugging
               boot.kernelParams = [ "console=tty0" ];
 
-              # 60 GB disk for k3s workloads (images, volumes, logs)
-              virtualisation.diskSize = 60 * 1024;
+              # 20 GB disk for development (expand at runtime if needed)
+              virtualisation.diskSize = 20 * 1024;
 
               system.stateVersion = "24.11";
             }
