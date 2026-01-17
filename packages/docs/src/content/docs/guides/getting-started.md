@@ -46,7 +46,7 @@ make bootstrap && exec $SHELL
 
 **What this does:**
 
-- Installs Nix using the [NixOS fork](https://github.com/NixOS/experimental-nix-installer) of the [Determinate Systems nix installer](https://github.com/DeterminateSystems/nix-installer)
+- Installs Nix using the [NixOS nix-installer](https://github.com/NixOS/nix-installer) (fork of the [Determinate Systems nix-installer](https://github.com/DeterminateSystems/nix-installer))
 - Configures Nix with comprehensive settings for optimal performance:
   - Enables flakes and nix-command experimental features
   - Disables store optimization (auto-optimise-store=false) to prevent corruption on Darwin
