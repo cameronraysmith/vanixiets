@@ -17,6 +17,18 @@ This architecture uses Cilium as the CNI, requiring k3s bundled components (flan
 The nixpkgs module lives at `/nixos/modules/services/cluster/rancher/default.nix` with k3s-specific options in `k3s.nix`.
 Reference implementations exist in the sini-dendritic-k8s-nix-config and hetzkube repositories.
 
+## Architecture layers
+
+This configuration operates at the NixOS system layer, providing the foundation for Kubernetes components deployed via easykubenix.
+
+The NixOS layer (this document) configures kernel modules, sysctl settings, firewall rules, containerd runtime with systemd cgroups, and k3s with disabled bundled components.
+The CNI plugin directory at `/opt/cni/bin` is prepared here; Cilium installs its binary there after k3s initialization.
+
+The Kubernetes manifest layer (easykubenix) deploys Cilium CNI, ArgoCD, cert-manager, storage provisioners, and application workloads after k3s is running.
+Correct NixOS configuration is prerequisite for Cilium stability and cluster networking.
+
+Settings in this document must align with easykubenix module configuration, particularly CIDR ranges and disabled components.
+
 ## Kernel requirements
 
 Kubernetes networking requires specific kernel modules for bridge filtering, connection tracking, and overlay filesystems.
@@ -195,6 +207,19 @@ services.k3s = {
 };
 ```
 
+## etcd storage optimization
+
+For HA clusters using embedded etcd (`clusterInit = true`), disable copy-on-write on the etcd data directory to avoid I/O fragmentation.
+
+```nix
+# Btrfs: disable CoW for etcd directory
+fileSystems."/var/lib/rancher/k3s/server/db" = {
+  options = [ "nodatacow" ];
+};
+```
+
+This optimization applies only to multi-node HA configurations, not single-node local development.
+
 ### Graceful shutdown
 
 Enable graceful node shutdown to allow pods to terminate cleanly.
@@ -263,6 +288,10 @@ extraFlags = [
   "--etcd-expose-metrics"
 ];
 ```
+
+The `cluster-cidr` and `service-cidr` values must match easykubenix Cilium IPAM configuration.
+Default values (10.42.0.0/16 for pods, 10.43.0.0/16 for services) align with easykubenix expectations.
+Misalignment causes pod networking failures when Cilium deploys.
 
 ## Complete example configuration
 
