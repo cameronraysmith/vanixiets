@@ -61,14 +61,15 @@ It synthesizes all component and workflow documentation into an authoritative re
 |             |                              |  +----------+----------+  |          |
 |             v                              |             |             |          |
 |  +----------+-----------+                  |             v             |          |
-|  | Cluster Stack        |                  |  +----------+----------+  |          |
-|  | - Cilium CNI         |                  |  | Cluster Stack       |  |          |
+|  | Cluster Stack (3b)   |                  |  +----------+----------+  |          |
+|  | - Cilium CNI         |                  |  | Cluster Stack (3b)  |  |          |
 |  | - step-ca (TLS)      |                  |  | - Cilium CNI        |  |          |
 |  | - cert-manager       |                  |  | - Let's Encrypt     |  |          |
 |  | - sops-secrets-op    |                  |  | - cert-manager      |  |          |
 |  | - nix-csi            |                  |  | - sops-secrets-op   |  |          |
-|  +----------------------+                  |  | - nix-csi           |  |          |
-|                                            |  | - external-dns      |  |          |
+|  | - ArgoCD             |                  |  | - nix-csi           |  |          |
+|  +----------------------+                  |  | - external-dns      |  |          |
+|                                            |  | - ArgoCD            |  |          |
 |                                            |  +---------------------+  |          |
 |  +----------------------+                  +---------------------------+          |
 |  | k3s-capi (ephemeral) |                                                         |
@@ -152,15 +153,16 @@ GCP, AWS, and other providers are future considerations, not current scope.
 *General-purpose Kubernetes distribution*: This is not a Kubernetes distribution.
 It is a specific architecture for the vanixiets project using k3s.
 
-*Zero-touch GitOps during infrastructure bootstrap*: The current prototype implements Phases 1-3 using kluctl for explicit infrastructure deployments.
-ArgoCD is installed by easykubenix (Phase 3); application management via nixidy/ArgoCD (Phase 4) is part of the committed four-phase architecture.
+*Zero-touch GitOps during infrastructure bootstrap*: The current prototype implements Phases 1-3b using kluctl for explicit infrastructure deployments.
+ArgoCD is installed by easykubenix (Phase 3b); application management via nixidy/ArgoCD (Phase 4) is part of the committed four-phase architecture.
 
 *Managed Kubernetes compatibility*: The architecture uses k3s with ClusterAPI.
 GKE, EKS, and AKS patterns differ significantly.
 
 ## Architecture layers
 
-The platform consists of five distinct layers, each with clear responsibilities and boundaries.
+The platform consists of four distinct phases, each with clear responsibilities and boundaries.
+Phase 3 subdivides into 3a (ClusterAPI) and 3b (cluster infrastructure via easykubenix), reflecting the dependency between cluster lifecycle and infrastructure deployment.
 
 ### Layer 1: Base infrastructure (terranix/opentofu)
 
@@ -239,7 +241,7 @@ It prepares machines for Kubernetes by configuring kernel modules, sysctl settin
 +-------------------+
 ```
 
-### Layer 3: Cluster lifecycle (ClusterAPI)
+### Layer 3a: Cluster lifecycle (ClusterAPI)
 
 ClusterAPI manages Kubernetes cluster infrastructure through declarative resources.
 
@@ -282,11 +284,12 @@ After initial bootstrap from a temporary management cluster, the production clus
 +-------------------+
 ```
 
-### Layer 4: Cluster infrastructure (easykubenix/kluctl)
+### Layer 3b: Cluster infrastructure (easykubenix/kluctl)
 
 easykubenix generates Kubernetes manifests from Nix modules; kluctl deploys them with discriminator-based tracking.
+This phase installs ArgoCD as cluster infrastructure, enabling Phase 4.
 
-*Scope*: CNI (Cilium), certificate management, secrets operator, storage provisioner, core addons.
+*Scope*: CNI (Cilium), certificate management, secrets operator, storage provisioner, ArgoCD, core addons.
 
 *Input*: Kubernetes modules in `modules/k8s/`.
 
@@ -294,8 +297,8 @@ easykubenix generates Kubernetes manifests from Nix modules; kluctl deploys them
 
 *Persistence*: Kubernetes resources with discriminator labels.
 
-This layer deploys everything needed to run workloads on the cluster.
-Cilium provides networking, cert-manager handles TLS, sops-secrets-operator decrypts secrets.
+This layer deploys everything needed to run workloads on the cluster, including ArgoCD itself.
+Cilium provides networking, cert-manager handles TLS, sops-secrets-operator decrypts secrets, and ArgoCD enables GitOps for Phase 4 applications.
 
 ```text
 +-------------------+
@@ -327,9 +330,10 @@ Cilium provides networking, cert-manager handles TLS, sops-secrets-operator decr
 +-------------------+
 ```
 
-### Layer 5: Applications (nixidy/ArgoCD)
+### Layer 4: Applications (nixidy/ArgoCD)
 
 nixidy generates ArgoCD Application resources from Nix modules for application workloads.
+This phase depends on ArgoCD being installed by Phase 3b; nixidy does not install ArgoCD.
 
 *Scope*: Application Deployments, Services, Ingresses, ConfigMaps, application-specific secrets.
 
@@ -339,8 +343,8 @@ nixidy generates ArgoCD Application resources from Nix modules for application w
 
 *Persistence*: GitOps-managed resources with continuous reconciliation.
 
-Phase 4 takes effect after easykubenix installs ArgoCD in Phase 3.
-The current prototype demonstrates Phases 1-3; Phase 4 application examples follow the same nixidy patterns documented in the nixidy-cluster reference (`~/projects/sciops-workspace/nixidy-cluster`).
+Phase 4 can only begin after easykubenix deploys ArgoCD in Phase 3b.
+The current prototype demonstrates Phases 1-3b; Phase 4 application examples follow the same nixidy patterns documented in the nixidy-cluster reference (`~/projects/sciops-workspace/nixidy-cluster`).
 
 ```text
 +-------------------+
@@ -368,6 +372,40 @@ The current prototype demonstrates Phases 1-3; Phase 4 application examples foll
 | Application pods  |
 +-------------------+
 ```
+
+### Phase 3b to Phase 4 handoff
+
+The transition from infrastructure deployment (Phase 3b) to application management (Phase 4) requires ArgoCD to be operational.
+
+Phase 3b (easykubenix/kluctl) deploys:
+- Cilium CNI (networking foundation)
+- cert-manager and ClusterIssuers
+- sops-secrets-operator with age key
+- local-path-provisioner and nix-csi
+- ArgoCD itself (required for Phase 4)
+- metrics-server and external-dns
+
+Phase 4 (nixidy/ArgoCD) takes over after ArgoCD exists:
+- nixidy generates ArgoCD Application CRs from Nix modules
+- Application CRs reference git repositories containing rendered manifests
+- ArgoCD continuously reconciles application state
+
+After initial bootstrap, ArgoCD can manage its own configuration through nixidy (self-updating pattern).
+Infrastructure changes still flow through easykubenix/kluctl to maintain separation of concerns.
+
+### ClusterAPI transfer point
+
+The optimal timing for `clusterctl move` (pivoting ClusterAPI resources to the workload cluster) remains experimental.
+The likely sequence:
+
+1. Phase 3b infrastructure deployment completes on workload cluster
+2. Verify ArgoCD operational and cluster stable
+3. Execute `clusterctl move --to-kubeconfig ./workload.kubeconfig`
+4. Delete local k3s-capi bootstrap cluster
+5. Phase 4 application deployment begins via nixidy
+
+After pivot, the production cluster is fully self-managed: ClusterAPI handles node lifecycle, ArgoCD handles applications, and nixidy generates all Application CRs.
+Local development validates this entire sequence before production deployment.
 
 ## Local development environment
 
@@ -614,7 +652,7 @@ Manage infrastructure state via terraform state files.
 
 *Does not*: Replace easykubenix for infrastructure, manage ClusterAPI resources.
 
-*Handoff boundary*: easykubenix manages infrastructure up to and including ArgoCD installation (Phases 1-3); nixidy manages applications after ArgoCD exists (Phase 4).
+*Handoff boundary*: easykubenix manages infrastructure up to and including ArgoCD installation (Phases 1-3b); nixidy manages applications after ArgoCD exists (Phase 4).
 
 ## Code reuse strategy
 
@@ -739,8 +777,8 @@ The sciops workspace will migrate to this architecture, replacing:
 
 ### Phase 4 implementation notes
 
-The four-phase architecture separates infrastructure (Phases 1-3 via easykubenix/kluctl) from applications (Phase 4 via nixidy/ArgoCD).
-The current prototype implements Phases 1-3; Phase 4 patterns are documented here for implementation reference.
+The four-phase architecture separates infrastructure (Phases 1-3b via easykubenix/kluctl) from applications (Phase 4 via nixidy/ArgoCD).
+The current prototype implements Phases 1-3b; Phase 4 patterns are documented here for implementation reference.
 
 ArgoCD benefits for application management:
 
@@ -874,6 +912,11 @@ Problem: Secrets not created
 ```
 
 ## Related documentation
+
+### Architectural decisions
+
+- [ADR-001: Local development architecture](../decisions/ADR-001-local-dev-architecture.md)
+- [ADR-002: ArgoCD and nixidy responsibilities](../decisions/ADR-002-argocd-nixidy-responsibilities.md)
 
 ### Component documentation
 
