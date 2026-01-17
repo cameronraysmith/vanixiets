@@ -94,10 +94,10 @@ bootstrap: install-nix install-direnv
 # (which has template placeholders that aren't filled in for raw source files).
 # To update version, change NIX_INSTALLER_VERSION below.
 # Note: versioning jumped from 0.27.0 to 3.11.3, then back to 2.33.0 when
-# experimental-nix-installer removed the 3.x tags.
-# https://github.com/NixOS/experimental-nix-installer/releases
+# NixOS/nix-installer removed the 3.x tags (repo renamed from experimental-nix-installer).
+# https://github.com/NixOS/nix-installer/releases
 #
-# The experimental-nix-installer 2.33.0 defaults include settings equivalent to:
+# The nix-installer 2.33.0 defaults include settings equivalent to:
 #   --extra-conf "experimental-features = nix-command flakes"
 #   --extra-conf "auto-optimise-store = true"
 #   --extra-conf "always-allow-substitutes = true"
@@ -124,7 +124,7 @@ install-nix: ## Install Nix using the NixOS community installer
 			Darwin-arm64)  PLATFORM="aarch64-darwin" ;; \
 			*) echo "Unsupported platform: $$(uname -s)-$$(uname -m)"; exit 1 ;; \
 		esac; \
-		INSTALLER_URL="https://github.com/NixOS/experimental-nix-installer/releases/download/$(NIX_INSTALLER_VERSION)/nix-installer-$$PLATFORM"; \
+		INSTALLER_URL="https://github.com/NixOS/nix-installer/releases/download/$(NIX_INSTALLER_VERSION)/nix-installer-$$PLATFORM"; \
 		echo "Platform: $$PLATFORM"; \
 		echo "Downloading from: $$INSTALLER_URL"; \
 		max_attempts=3; \
