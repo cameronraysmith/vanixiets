@@ -13,9 +13,9 @@
     }:
     {
       imports = [
-        ./kernel.nix
-        ./networking.nix
-        ./packages.nix
+        ./_kernel.nix
+        ./_networking.nix
+        ./_packages.nix
       ];
 
       options.k3s-server = {
