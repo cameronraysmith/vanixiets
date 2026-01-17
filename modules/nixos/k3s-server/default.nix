@@ -1,8 +1,20 @@
 # k3s server module for NixOS
 #
+# Flake-parts module contributing flake.modules.nixos.k3s-server
+# Composes sub-modules via deferred module composition pattern.
+#
 # Configures k3s with Cilium CNI integration via disabled bundled components.
-# Imports sub-modules for kernel, networking, and packages configuration.
 # See docs/notes/development/kubernetes/components/nixos-k3s-server.md for details.
+{ config, ... }:
+let
+  # Import sub-modules from flake.modules.nixos namespace
+  # These are defined in sibling files and discovered by import-tree
+  inherit (config.flake.modules.nixos)
+    k3s-server-kernel
+    k3s-server-networking
+    k3s-server-packages
+    ;
+in
 {
   flake.modules.nixos.k3s-server =
     {
@@ -13,9 +25,9 @@
     }:
     {
       imports = [
-        ./_kernel.nix
-        ./_networking.nix
-        ./_packages.nix
+        k3s-server-kernel
+        k3s-server-networking
+        k3s-server-packages
       ];
 
       options.k3s-server = {
