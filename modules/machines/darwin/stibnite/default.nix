@@ -174,6 +174,7 @@ in
         arch = "aarch64";
         vmType = "vz"; # macOS Virtualization.framework
         rosetta = true; # Rosetta 2 for x86_64 emulation
+        nestedVirtualization = true; # Required for incus VMs (KVM), needs M3/M4 + macOS 15+
         mountType = "virtiofs"; # High-performance mount driver
         extraPackages = [ ];
 
