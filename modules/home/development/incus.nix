@@ -70,7 +70,7 @@
                     addresses:
                       - ${profileCfg.ip}/24
                     routes:
-                      - to: default
+                      - to: 0.0.0.0/0
                         via: ${profileCfg.gateway}
             user.meta-data: |
               #cloud-config
