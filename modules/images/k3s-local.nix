@@ -1,14 +1,25 @@
-# k3s local development VM image using nixos-generators
+# k3s local development VM image for incus
 #
-# Builds an aarch64-linux qcow-efi image for local ClusterAPI bootstrap:
+# Builds an aarch64-linux VM image for local ClusterAPI bootstrap:
 # - k3s server (Cilium CNI integration via k3s-server module)
 # - SSH access with authorized keys
 #
-# Runs natively on Apple Silicon via Colima/incus without emulation.
+# Runs natively on Apple Silicon via incus without emulation.
 # Used to provision and manage x86_64-linux Hetzner production clusters.
 # Architecture independence documented in ADR-002.
 #
-# Usage: nix build .#k3s-local-image
+# Outputs:
+#   k3s-local-image - Unified incus tarball (metadata + qcow2)
+#   k3s-local-qcow  - Raw qcow2 for Hetzner, QEMU, other hypervisors
+#
+# Usage (incus):
+#   nix build .#k3s-local-image
+#   incus image import ./result/k3s-local.tar.gz --alias k3s-local
+#   incus launch k3s-local k3s-dev --vm
+#
+# Usage (raw qcow2):
+#   nix build .#k3s-local-qcow
+#   # Upload ./result/nixos.qcow2 to Hetzner or use with QEMU
 {
   inputs,
   config,
@@ -17,15 +28,19 @@
 let
   # Capture flake-level modules for use in nixosGenerate
   flakeModules = config.flake.modules.nixos;
+
+  # Target architecture for local development
+  targetSystem = "aarch64-linux";
 in
 {
   perSystem =
-    { system, ... }:
-    {
-      packages.k3s-local-image = inputs.nixos-generators.nixosGenerate {
+    { pkgs, ... }:
+    let
+      # Base qcow2 image from nixos-generators
+      qcowImage = inputs.nixos-generators.nixosGenerate {
         # Native aarch64-linux for Apple Silicon (no emulation overhead)
         # ClusterAPI provisions x86_64-linux Hetzner clusters from this image
-        system = "aarch64-linux";
+        system = targetSystem;
 
         # UEFI boot for modern VM compatibility
         format = "qcow-efi";
@@ -86,6 +101,43 @@ in
             }
           )
         ];
+      };
+
+      # incus architecture naming convention
+      incusArch =
+        if targetSystem == "aarch64-linux" then
+          "aarch64"
+        else if targetSystem == "x86_64-linux" then
+          "x86_64"
+        else
+          throw "Unsupported system: ${targetSystem}";
+    in
+    {
+      packages = {
+        # Raw qcow2 for Hetzner VPS, QEMU, and other hypervisors
+        k3s-local-qcow = qcowImage;
+
+        # Unified incus image (metadata + qcow2 in tarball)
+        k3s-local-image = pkgs.runCommand "k3s-local-incus-image" { } ''
+          mkdir -p $out
+
+          # Generate incus metadata
+          cat > metadata.yaml <<EOF
+          architecture: ${incusArch}
+          creation_date: $(date +%s)
+          properties:
+            os: nixos
+            release: unstable
+            variant: k3s-local
+            description: NixOS k3s local development VM (${targetSystem})
+          EOF
+
+          # Create unified incus image tarball
+          # incus expects: metadata.yaml + rootfs.img (qcow2 renamed)
+          # Use symlink + dereference (-h) to avoid copying 3GB+ file
+          ln -s ${qcowImage}/nixos.qcow2 rootfs.img
+          tar -czhvf $out/k3s-local.tar.gz metadata.yaml rootfs.img
+        '';
       };
     };
 }
