@@ -142,6 +142,7 @@
           vmType = cfg.vmType;
           mountType = cfg.mountType;
           rosetta = cfg.rosetta && cfg.arch == "aarch64";
+          nestedVirtualization = cfg.nestedVirtualization;
         }
         // lib.optionalAttrs (cfg.portForwards != { }) {
           portForwards = limaPortForwards;
@@ -300,6 +301,16 @@
           type = lib.types.bool;
           default = true;
           description = "Enable Rosetta 2 for x86_64 emulation (macOS 13+, aarch64 only)";
+        };
+
+        nestedVirtualization = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = ''
+            Enable nested virtualization for running VMs inside the Colima VM.
+            Requires macOS 15+ (Sequoia) and Apple M3/M4 chip.
+            Required for incus VMs (KVM support).
+          '';
         };
 
         mountType = lib.mkOption {
