@@ -84,6 +84,31 @@ in
               # Root user SSH access via centralized identity
               users.users.root.openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
 
+              # Cloud-init for runtime configuration injection
+              # Incus provides NoCloud datasource via user.network-config and user.meta-data
+              services.cloud-init = {
+                enable = true;
+                network.enable = true;
+              };
+
+              # Use systemd-networkd for network management (required by cloud-init.network)
+              networking.useNetworkd = true;
+
+              # Delegate hostname to cloud-init meta-data
+              # Priority 1337 is lower than mkDefault (1000) but higher than mkForce (50)
+              networking.hostName = lib.mkOverride 1337 "";
+
+              # DHCP fallback when no cloud-init network-config is provided
+              # Cloud-init network-config v2 will override this when present
+              systemd.network.networks."10-dhcp-fallback" = {
+                matchConfig.Name = "en*";
+                networkConfig = {
+                  DHCP = "yes";
+                  IPv6AcceptRA = true;
+                };
+                dhcpV4Config.UseDomains = true;
+              };
+
               # Nix configuration for flake-based workflows
               nix.settings = {
                 experimental-features = [
