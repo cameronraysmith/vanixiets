@@ -176,6 +176,17 @@ in
         rosetta = true; # Rosetta 2 for x86_64 emulation
         mountType = "virtiofs"; # High-performance mount driver
         extraPackages = [ ];
+
+        # Port forwards for k3s clusters (see ADR-004)
+        portForwards = {
+          k3s-dev = {
+            ip = "192.100.0.10";
+            apiPort = 6443;
+            httpPort = 8080;
+            httpsPort = 8443;
+            sshPort = 2210;
+          };
+        };
       };
 
       home-manager = {
@@ -192,28 +203,38 @@ in
         };
 
         # crs58 (admin + primary): Import portable home modules + base-sops
-        users.crs58.imports = [
-          flakeModulesHome."users/crs58"
-          flakeModulesHome.base-sops
-          # Import aggregate modules for crs58
-          # All aggregates via auto-merge
-          flakeModulesHome.ai
-          flakeModulesHome.core
-          flakeModulesHome.development
-          flakeModulesHome.packages
-          flakeModulesHome.shell
-          flakeModulesHome.terminal
-          flakeModulesHome.tools
-          # LazyVim home-manager module
-          inputs.lazyvim-nix.homeManagerModules.default
-          # nix-index-database for comma command-not-found
-          inputs.nix-index-database.homeModules.nix-index
-          # agents-md option module (requires flake arg from extraSpecialArgs)
-          ../../../home/modules/_agents-md.nix
-          # Mac app integration (Spotlight, Launchpad)
-          # Disabled: mac-app-util requires SBCL which has nixpkgs cache compatibility issues
-          # inputs.mac-app-util.homeManagerModules.default
-        ];
+        users.crs58 = {
+          imports = [
+            flakeModulesHome."users/crs58"
+            flakeModulesHome.base-sops
+            # Import aggregate modules for crs58
+            # All aggregates via auto-merge
+            flakeModulesHome.ai
+            flakeModulesHome.core
+            flakeModulesHome.development
+            flakeModulesHome.packages
+            flakeModulesHome.shell
+            flakeModulesHome.terminal
+            flakeModulesHome.tools
+            # LazyVim home-manager module
+            inputs.lazyvim-nix.homeManagerModules.default
+            # nix-index-database for comma command-not-found
+            inputs.nix-index-database.homeModules.nix-index
+            # agents-md option module (requires flake arg from extraSpecialArgs)
+            ../../../home/modules/_agents-md.nix
+            # Mac app integration (Spotlight, Launchpad)
+            # Disabled: mac-app-util requires SBCL which has nixpkgs cache compatibility issues
+            # inputs.mac-app-util.homeManagerModules.default
+          ];
+
+          # Incus k3s profiles (see ADR-004)
+          # Provides instance profiles for k3s clusters in Colima
+          incus.k3sProfiles = {
+            k3s-dev = {
+              ip = "192.100.0.10";
+            };
+          };
+        };
       };
     };
 }
