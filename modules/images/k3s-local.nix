@@ -45,9 +45,10 @@ in
         # UEFI boot for modern VM compatibility
         format = "qcow-efi";
 
-        # Pass flake modules via specialArgs for import access
+        # Pass flake modules and inputs via specialArgs for import access
         specialArgs = {
           inherit flakeModules;
+          inherit inputs;
         };
 
         modules = [
@@ -57,6 +58,7 @@ in
               lib,
               pkgs,
               flakeModules,
+              inputs,
               ...
             }:
             {
@@ -70,17 +72,17 @@ in
                 clusterInit = true;
               };
 
+              # Incus agent for incus exec support
+              virtualisation.incus.agent.enable = true;
+
               # SSH access for VM management
               services.openssh = {
                 enable = true;
                 settings.PasswordAuthentication = false;
               };
 
-              # Root user SSH access (configure with your keys)
-              # TODO: integrate with sops-nix or clan vars for key management
-              users.users.root.openssh.authorizedKeys.keys = [
-                # Add authorized keys here or via specialArgs
-              ];
+              # Root user SSH access via centralized identity
+              users.users.root.openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
 
               # Nix configuration for flake-based workflows
               nix.settings = {
@@ -91,8 +93,11 @@ in
                 trusted-users = [ "@wheel" ];
               };
 
-              # Console access for debugging
-              boot.kernelParams = [ "console=tty0" ];
+              # Console access for debugging (ttyAMA0 for ARM64 serial, tty0 for VGA)
+              boot.kernelParams = [
+                "console=ttyAMA0"
+                "console=tty0"
+              ];
 
               # 20 GB disk for development (expand at runtime if needed)
               virtualisation.diskSize = 20 * 1024;
