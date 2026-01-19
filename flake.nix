@@ -105,6 +105,9 @@
 
     cilium-src.url = "github:cilium/cilium/v1.16.5";
     cilium-src.flake = false;
+
+    step-ca-src.url = "github:smallstep/helm-charts/master";
+    step-ca-src.flake = false;
   };
 
   # sync with lib/caches.nix for machine modules
