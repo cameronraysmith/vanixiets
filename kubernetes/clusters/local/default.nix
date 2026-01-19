@@ -15,6 +15,13 @@
   # Enable Cilium CNI
   cilium.enable = true;
   cilium.version = "1.18.6";
+  # WORKAROUND: Disable TCX attachment mode (nix-2hd investigation)
+  # TCX on ARM64 + kernel 6.12 breaks pod-to-host packet delivery.
+  # Packets enter BPF "stack" but never reach kernel (see GitHub #39892).
+  # Falling back to traditional TC (clsact) attachment.
+  cilium.helmValues = {
+    bpf.enableTCX = false;
+  };
 
   # Enable step-ca ACME server for local TLS
   step-ca.enable = true;
