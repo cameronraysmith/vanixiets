@@ -102,6 +102,9 @@
 
     easykubenix.url = "github:Lillecarl/easykubenix";
     easykubenix.flake = false;
+
+    cilium-src.url = "github:cilium/cilium/v1.16.5";
+    cilium-src.flake = false;
   };
 
   # sync with lib/caches.nix for machine modules

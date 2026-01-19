@@ -65,6 +65,23 @@
         "type": "github"
       }
     },
+    "cilium-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1734041114,
+        "narHash": "sha256-LNO22MFB6b6clfBXsAyU+PzKiP8I/AcERcx2gIDPZ24=",
+        "owner": "cilium",
+        "repo": "cilium",
+        "rev": "ad6882773c5f89feda9c295276707f01de269296",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cilium",
+        "ref": "v1.16.5",
+        "repo": "cilium",
+        "type": "github"
+      }
+    },
     "cl-nix-lite": {
       "inputs": {
         "flake-parts": "flake-parts_2",
@@ -214,6 +231,22 @@
       "original": {
         "owner": "nix-community",
         "repo": "disko",
+        "type": "github"
+      }
+    },
+    "easykubenix": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1768239091,
+        "narHash": "sha256-QgzimppP/r47OCS35ubyP8xgrQUEpuktUCh2d1ObFmc=",
+        "owner": "Lillecarl",
+        "repo": "easykubenix",
+        "rev": "d8a0ef321c044b16c728eff9a606e23d7ae8f989",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Lillecarl",
+        "repo": "easykubenix",
         "type": "github"
       }
     },
@@ -973,9 +1006,11 @@
       "inputs": {
         "agenix": "agenix",
         "catppuccin": "catppuccin",
+        "cilium-src": "cilium-src",
         "clan-core": "clan-core",
         "direnv-instant": "direnv-instant",
         "disko": "disko",
+        "easykubenix": "easykubenix",
         "flake-parts": "flake-parts",
         "git-hooks": "git-hooks",
         "home-manager": "home-manager",
