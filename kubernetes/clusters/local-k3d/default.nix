@@ -30,4 +30,7 @@
     rootCert = ../local/pki/root_ca.crt;
     intermediateCert = ../local/pki/intermediate_ca.crt;
   };
+
+  # Enable sops-secrets-operator for secret management
+  sops-secrets-operator.enable = true;
 }
