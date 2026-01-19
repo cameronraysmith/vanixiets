@@ -1,5 +1,5 @@
 # ctlptl cluster configuration for local k3d development cluster
-# This configuration creates a single-node k3d cluster with:
+# This configuration creates a single-node k3d cluster (k3s v1.31) with:
 # - Disabled Flannel (for Cilium CNI)
 # - Disabled kube-proxy (for Cilium kube-proxy replacement)
 # - Disabled Traefik and ServiceLB (using custom ingress setup)
@@ -12,6 +12,7 @@ product: k3d
 k3d:
   v1alpha5Simple:
     servers: 1
+    image: rancher/k3s:v1.31.4-k3s1
     env:
       - envVar: K3D_FIX_MOUNTS=1
         nodeFilters:
