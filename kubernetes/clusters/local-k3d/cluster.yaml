@@ -4,41 +4,38 @@
 # - Disabled kube-proxy (for Cilium kube-proxy replacement)
 # - Disabled Traefik and ServiceLB (using custom ingress setup)
 # - Port 30080 exposed for ArgoCD access via NodePort
+# - K3D_FIX_MOUNTS=1 environment variable for OrbStack compatibility
 apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
-metadata:
-  name: k3d-dev
+name: k3d-dev
 product: k3d
-kindV1Alpha4Cluster:
-  nodes:
-  - role: server
-k3dV1Alpha5Simple:
-  servers: 1
-  options:
-    k3s:
-      extraArgs:
-      - arg: --flannel-backend=none
-        nodeFilters:
-        - server:*
-      - arg: --disable-network-policy
-        nodeFilters:
-        - server:*
-      - arg: --disable-kube-proxy
-        nodeFilters:
-        - server:*
-      - arg: --disable=traefik
-        nodeFilters:
-        - server:*
-      - arg: --disable=servicelb
-        nodeFilters:
-        - server:*
-    runtime:
-      env:
+k3d:
+  v1alpha5Simple:
+    servers: 1
+    env:
       - envVar: K3D_FIX_MOUNTS=1
         nodeFilters:
-        - server:*
-        - agent:*
-  ports:
-  - port: 30080:30080
-    nodeFilters:
-    - loadbalancer
+          - server:*
+          - agent:*
+    ports:
+      - port: 30080:30080
+        nodeFilters:
+          - loadbalancer
+    options:
+      k3s:
+        extraArgs:
+          - arg: --flannel-backend=none
+            nodeFilters:
+              - server:*
+          - arg: --disable-network-policy
+            nodeFilters:
+              - server:*
+          - arg: --disable-kube-proxy
+            nodeFilters:
+              - server:*
+          - arg: --disable=traefik
+            nodeFilters:
+              - server:*
+          - arg: --disable=servicelb
+            nodeFilters:
+              - server:*
