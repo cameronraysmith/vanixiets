@@ -30,7 +30,7 @@ in
 
     version = lib.mkOption {
       type = lib.types.str;
-      default = "0.17.3";
+      default = "0.16.0";
       description = "sops-secrets-operator version to deploy (compatible with k8s 1.34.x)";
     };
 
