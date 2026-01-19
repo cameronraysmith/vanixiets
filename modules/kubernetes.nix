@@ -24,6 +24,7 @@
           # Pass flake inputs to easykubenix modules via specialArgs
           specialArgs = {
             cilium-src = inputs.cilium-src;
+            step-ca-src = inputs.step-ca-src;
           };
         };
 
