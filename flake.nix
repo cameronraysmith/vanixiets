@@ -103,7 +103,7 @@
     easykubenix.url = "github:Lillecarl/easykubenix";
     easykubenix.flake = false;
 
-    cilium-src.url = "github:cilium/cilium/v1.16.5";
+    cilium-src.url = "github:cilium/cilium/v1.18.6";
     cilium-src.flake = false;
 
     step-ca-src.url = "github:smallstep/helm-charts/master";

@@ -14,7 +14,7 @@
 
   # Enable Cilium CNI
   cilium.enable = true;
-  cilium.version = "1.16.5";
+  cilium.version = "1.18.6";
 
   # Enable step-ca ACME server for local TLS
   step-ca.enable = true;

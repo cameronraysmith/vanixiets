@@ -22,7 +22,7 @@ in
 
     version = lib.mkOption {
       type = lib.types.str;
-      default = "1.16.5";
+      default = "1.18.6";
       description = "Cilium version to deploy (must match cilium-src flake input)";
     };
 
