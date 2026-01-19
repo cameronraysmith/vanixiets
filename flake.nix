@@ -108,6 +108,9 @@
 
     step-ca-src.url = "github:smallstep/helm-charts/master";
     step-ca-src.flake = false;
+
+    sops-secrets-operator-src.url = "github:isindir/sops-secrets-operator/v0.17.3";
+    sops-secrets-operator-src.flake = false;
   };
 
   # sync with lib/caches.nix for machine modules
