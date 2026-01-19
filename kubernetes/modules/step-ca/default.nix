@@ -81,14 +81,9 @@ in
       intermediateCert = builtins.readFile cfg.caCerts.intermediateCert;
     in
     lib.mkIf cfg.enable {
-      # Create namespace
-      kubernetes.objects = [
-        {
-          apiVersion = "v1";
-          kind = "Namespace";
-          metadata.name = cfg.namespace;
-        }
-      ];
+      # Create namespace using kubernetes.resources (easykubenix pattern)
+      # "none" namespace means cluster-scoped resource
+      kubernetes.resources.none.Namespace.${cfg.namespace} = { };
 
       helm.releases.${moduleName} = {
         namespace = cfg.namespace;
