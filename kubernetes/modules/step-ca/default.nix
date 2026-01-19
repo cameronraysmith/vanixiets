@@ -3,23 +3,24 @@
 # Deploys smallstep step-certificates as local ACME server for cert-manager.
 # Uses pre-generated CA from sops-encrypted secrets.
 #
-# This module integrates with sops-secrets-operator for secret management:
+# This module uses existingSecrets mode for clean GitOps integration:
 # - CA certificates are provided via caCerts options (public, in git)
-# - Private keys are provided via sopsSecretFile (encrypted SopsSecret CR)
-# - SopsSecret creates Kubernetes Secrets that override helm-created placeholders
+# - Certificates ConfigMap created by this module via kubernetes.resources
+# - Config ConfigMap (ca.json, defaults.json) created by this module
+# - Private keys provided via sopsSecretFile (encrypted SopsSecret CR)
+# - SopsSecret creates Kubernetes Secrets BEFORE helm deployment
+# - Helm chart mounts pre-existing resources, creates nothing
 #
 # The SopsSecret must create two secrets:
 # - step-ca-step-certificates-ca-password (key: password)
 # - step-ca-step-certificates-secrets (keys: root_ca_key, intermediate_ca_key)
 #
-# KNOWN ISSUE: On fresh cluster deployments, helm and SopsSecret both create
-# secrets with the same names. The SopsSecret operator reports ownership conflicts.
-# Workaround after first deploy:
-#   kubectl delete secret -n step-ca step-ca-step-certificates-ca-password step-ca-step-certificates-secrets
-#   kubectl annotate sopssecret -n step-ca step-ca-secrets reconcile=$(date +%s)
-#   kubectl delete pod -n step-ca step-ca-step-certificates-0
-#
-# On subsequent deploys, SopsSecret owns the secrets and no manual intervention needed.
+# Resource creation order (via kluctl phases):
+# 1. Namespace (default phase)
+# 2. SopsSecret CR (prio-15, after CRDs)
+# 3. sops-secrets-operator creates Kubernetes Secrets
+# 4. ConfigMaps created by this module
+# 5. Helm release mounts all pre-existing resources
 #
 # Receives step-ca-src from flake inputs via specialArgs to avoid
 # impure fetchTree calls during pure evaluation.
@@ -107,6 +108,57 @@ in
       rootCert = builtins.readFile cfg.caCerts.rootCert;
       intermediateCert = builtins.readFile cfg.caCerts.intermediateCert;
 
+      # Helm release name determines secret/configmap name prefix
+      # "step-ca" release -> "step-ca-step-certificates-*" resources
+      fullname = "step-ca-step-certificates";
+
+      # ca.json configuration for step-ca server
+      caJson = builtins.toJSON {
+        root = "/home/step/certs/root_ca.crt";
+        federateRoots = [ ];
+        crt = "/home/step/certs/intermediate_ca.crt";
+        key = "/home/step/secrets/intermediate_ca_key";
+        address = ":9000";
+        insecureAddress = "";
+        dnsNames = cfg.dnsNames;
+        logger.format = "json";
+        db = {
+          type = "badgerv2";
+          dataSource = "/home/step/db";
+        };
+        authority = {
+          enableAdmin = false;
+          provisioners = [
+            {
+              type = "ACME";
+              name = cfg.acme.provisioner;
+              forceCN = true;
+              claims = {
+                maxTLSCertDuration = "2160h";
+                defaultTLSCertDuration = "720h";
+              };
+            }
+          ];
+        };
+        tls = {
+          cipherSuites = [
+            "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"
+            "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+          ];
+          minVersion = 1.2;
+          maxVersion = 1.3;
+          renegotiation = false;
+        };
+      };
+
+      # defaults.json for step CLI
+      defaultsJson = builtins.toJSON {
+        ca-url = "https://step-ca.${cfg.namespace}.svc.cluster.local";
+        ca-config = "/home/step/config/ca.json";
+        fingerprint = "";
+        root = "/home/step/certs/root_ca.crt";
+      };
+
       # Create derivation for SopsSecret file (importyaml requires derivation, not path)
       sopsSecretDrv = lib.mkIf (cfg.sopsSecretFile != null) (
         pkgs.runCommand "step-ca-sopssecret" { } ''
@@ -125,93 +177,33 @@ in
         src = sopsSecretDrv;
       };
 
+      # Create ConfigMaps for certificates and config
+      kubernetes.resources.${cfg.namespace}.ConfigMap = {
+        # Certificates ConfigMap (public certs, not sensitive)
+        "${fullname}-certs".data = {
+          "root_ca.crt" = rootCert;
+          "intermediate_ca.crt" = intermediateCert;
+        };
+        # Config ConfigMap (ca.json and defaults.json)
+        "${fullname}-config".data = {
+          "ca.json" = caJson;
+          "defaults.json" = defaultsJson;
+        };
+      };
+
       helm.releases.${moduleName} = {
         namespace = cfg.namespace;
         chart = chartPath;
 
         values = lib.recursiveUpdate {
-          # Inject pre-generated CA certificates
-          inject = {
+          # Disable bootstrap and inject modes
+          bootstrap.enabled = false;
+          inject.enabled = false;
+
+          # Use existingSecrets mode - helm creates nothing, mounts pre-existing resources
+          existingSecrets = {
             enabled = true;
-
-            certificates = {
-              root_ca = rootCert;
-              intermediate_ca = intermediateCert;
-            };
-
-            secrets = {
-              # Password for CA key encryption (empty = unencrypted keys)
-              # Note: Empty string causes helm to skip creating the ca-password secret.
-              # SopsSecret operator creates it instead with the correct `password` key.
-              # On fresh deploys, may need `kubectl annotate sopssecret -n step-ca step-ca-secrets reconcile=$(date +%s)`
-              # to trigger re-reconciliation after helm-created secrets are cleaned up.
-              ca_password = "";
-
-              x509 = {
-                enabled = true;
-                # Placeholder values - SopsSecret operator will overwrite these
-                # secrets with the actual encrypted private keys from the SopsSecret CR.
-                # The helm chart creates the secret structure, SopsSecret provides content.
-                root_ca_key = "PLACEHOLDER_OVERWRITTEN_BY_SOPSSECRET";
-                intermediate_ca_key = "PLACEHOLDER_OVERWRITTEN_BY_SOPSSECRET";
-              };
-
-              ssh.enabled = false;
-            };
-
-            config = {
-              files = {
-                "ca.json" = {
-                  root = "/home/step/certs/root_ca.crt";
-                  federateRoots = [ ];
-                  crt = "/home/step/certs/intermediate_ca.crt";
-                  key = "/home/step/secrets/intermediate_ca_key";
-                  address = ":9000";
-                  insecureAddress = "";
-                  dnsNames = cfg.dnsNames;
-
-                  logger.format = "json";
-
-                  db = {
-                    type = "badgerv2";
-                    dataSource = "/home/step/db";
-                  };
-
-                  authority = {
-                    enableAdmin = false;
-                    provisioners = [
-                      {
-                        type = "ACME";
-                        name = cfg.acme.provisioner;
-                        forceCN = true;
-                        claims = {
-                          # Default certificate validity
-                          maxTLSCertDuration = "2160h"; # 90 days
-                          defaultTLSCertDuration = "720h"; # 30 days
-                        };
-                      }
-                    ];
-                  };
-
-                  tls = {
-                    cipherSuites = [
-                      "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"
-                      "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
-                    ];
-                    minVersion = 1.2;
-                    maxVersion = 1.3;
-                    renegotiation = false;
-                  };
-                };
-
-                "defaults.json" = {
-                  ca-url = "https://step-ca.${cfg.namespace}.svc.cluster.local";
-                  ca-config = "/home/step/config/ca.json";
-                  fingerprint = "";
-                  root = "/home/step/certs/root_ca.crt";
-                };
-              };
-            };
+            ca = true; # Mount ca-password secret for --password-file flag
           };
 
           # Service configuration
