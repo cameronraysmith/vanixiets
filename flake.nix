@@ -99,6 +99,9 @@
 
     playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.57.0";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
+
+    easykubenix.url = "github:Lillecarl/easykubenix";
+    easykubenix.flake = false;
   };
 
   # sync with lib/caches.nix for machine modules
