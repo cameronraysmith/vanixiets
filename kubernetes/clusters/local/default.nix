@@ -1,6 +1,6 @@
 # Local development cluster configuration
 #
-# Minimal Cilium-only configuration for k3s-dev cluster.
+# Cilium CNI and step-ca ACME server for k3s-dev cluster.
 # Cluster runs in Colima VM at 192.100.0.10.
 { ... }:
 {
@@ -15,4 +15,11 @@
   # Enable Cilium CNI
   cilium.enable = true;
   cilium.version = "1.16.5";
+
+  # Enable step-ca ACME server for local TLS
+  step-ca.enable = true;
+  step-ca.caCerts = {
+    rootCert = ./pki/root_ca.crt;
+    intermediateCert = ./pki/intermediate_ca.crt;
+  };
 }
