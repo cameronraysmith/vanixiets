@@ -6,6 +6,12 @@
 # Receives sops-secrets-operator-src from flake inputs via specialArgs to avoid
 # impure fetchTree calls during pure evaluation.
 #
+# This module demonstrates the canonical easykubenix pattern for operators with CRDs:
+# 1. importyaml for CRD deployment (helm includeCRDs=false by default)
+# 2. apiMappings to register custom resource types with API group/version
+# 3. namespacedMappings to declare scope (namespaced vs cluster-scoped)
+# 4. overrideNamespace to fix charts that don't template metadata.namespace
+#
 # Prerequisites - create age key secret before deploying:
 #   kubectl create namespace sops-secrets-operator
 #   kubectl create secret generic sops-age-key \
@@ -58,9 +64,26 @@ in
     # "none" namespace means cluster-scoped resource
     kubernetes.resources.none.Namespace.${cfg.namespace} = { };
 
+    # Import CRD via importyaml (helm includeCRDs=false by default)
+    # This ensures the SopsSecret CRD is deployed before operator starts
+    importyaml."${moduleName}-crd" = {
+      src = "${sops-secrets-operator-src}/config/crd/bases/isindir.github.com_sopssecrets.yaml";
+    };
+
+    # Register SopsSecret custom resource type with easykubenix
+    # Required for overrideNamespace and proper resource handling
+    kubernetes.apiMappings.SopsSecret = "isindir.github.com/v1alpha3";
+    kubernetes.namespacedMappings.SopsSecret = true;
+
     helm.releases.${moduleName} = {
       namespace = cfg.namespace;
       chart = "${sops-secrets-operator-src}/chart/helm3/sops-secrets-operator";
+
+      # Fix namespace for resources - the upstream Helm chart doesn't template
+      # metadata.namespace in Deployment/ServiceAccount, causing them to render
+      # without namespace and fall into "none" (cluster-scoped) in easykubenix.
+      # overrideNamespace applies metadata.namespace to all namespaced resources.
+      overrideNamespace = cfg.namespace;
 
       values = lib.recursiveUpdate {
         # Single replica for simplicity
