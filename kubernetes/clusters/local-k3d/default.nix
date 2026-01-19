@@ -30,6 +30,8 @@
     rootCert = ../local/pki/root_ca.crt;
     intermediateCert = ../local/pki/intermediate_ca.crt;
   };
+  # SopsSecret for CA private keys (processed by sops-secrets-operator)
+  step-ca.sopsSecretFile = ../../../secrets/clusters/local/step-ca-sopssecret.enc.yaml;
 
   # Enable sops-secrets-operator for secret management
   sops-secrets-operator.enable = true;
