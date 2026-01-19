@@ -2,7 +2,10 @@
 
 ## Status
 
-Proposed (pending review)
+Accepted (2026-01-19)
+
+Supersedes ADR-001 Decision 8 (NixOS VM via nixos-generators) for local development.
+ADR-001 remains valid for Hetzner production deployments.
 
 ## Context
 
@@ -67,11 +70,15 @@ k3d wraps k3s in Docker containers, providing lighter weight than kind.
 - 80% faster startup than kind
 - Lower memory footprint (423-502 MiB vs kind's higher usage)
 - Same eBPF limitations as kind (container runtime constraints)
-- Better for resource-constrained development
+- Native ARM64 support without emulation
 - Team configuration sharing via config files
+- Cilium support via `K3D_FIX_MOUNTS=1` (fixes `/sys/fs/bpf` mount propagation)
+- Multi-node clusters supported (`servers: N, agents: M`)
+- OrbStack as container runtime provides additional performance benefits
 
-**Verdict:** Viable alternative to kind.
-Choose k3d if production uses k3s (exact parity); choose kind for upstream Kubernetes parity.
+**Verdict:** Recommended approach.
+k3d uses k3s which matches Hetzner production exactly.
+Combined with OrbStack container runtime, provides optimal local development experience.
 
 ### Option D: Native aarch64 without Cilium
 
@@ -97,18 +104,19 @@ Combine kind with x86_64 node images running under Rosetta userspace translation
 - Cilium x86_64 images avoid ARM64-specific issues
 - Still subject to container runtime eBPF constraints
 
-**Verdict:** Recommended approach.
+**Verdict:** Viable alternative.
 Combines architecture parity with container-based simplicity.
 Avoids nested virtualization issues entirely.
+However, k3d is preferred for k3s distribution parity with production.
 
 ## Production Parity Analysis
 
-| Aspect | Current (Incus VM) | kind x86_64 Rosetta | Production |
+| Aspect | Current (Incus VM) | k3d native aarch64 | Production |
 |--------|-------------------|---------------------|------------|
-| Architecture | aarch64-linux | x86_64-linux | x86_64-linux |
-| Kubernetes | k3s | kind (upstream) | k3s |
+| Architecture | aarch64-linux | aarch64-linux | x86_64-linux |
+| Kubernetes | k3s | k3s | k3s |
 | CNI | Cilium (broken) | Cilium | Cilium |
-| Container runtime | containerd | containerd | containerd |
+| Container runtime | containerd | containerd (OrbStack) | containerd |
 | Networking | Overlay VM | Docker bridge | Overlay |
 | eBPF support | Broken | Limited | Full |
 | Node isolation | Full VM | Container | Full VM |
@@ -117,19 +125,30 @@ Key insight: No local approach provides full eBPF parity with production VMs.
 The choice is between broken eBPF (current) and limited eBPF (container-based).
 Limited eBPF is functional; broken eBPF is not.
 
+k3d provides **Kubernetes distribution parity** (k3s) which is more valuable than architecture parity (x86_64) for most development workflows.
+Architecture-specific issues are rare and better caught in CI on actual x86_64 infrastructure.
+
 ## Recommendation
 
-Adopt Option E: x86_64 kind with Rosetta translation as the primary local development approach.
+Adopt Option C: k3d with native aarch64 as the primary local development approach.
+
+**Rationale for k3d over kind:**
+- k3d uses k3s, matching Hetzner production exactly
+- Native aarch64 avoids Rosetta overhead (20% performance cost)
+- OrbStack container runtime provides 10x faster startup than Docker Desktop
+- Container images for k3s ecosystem are consistently multi-arch
 
 **Implementation path:**
 
-1. Create kind cluster configuration with:
-   - `disableDefaultCNI: true` for Cilium
-   - x86_64 node images via multi-arch manifests or explicit platform selection
+1. Create k3d cluster configuration with:
+   - `K3D_FIX_MOUNTS=1` environment variable for Cilium BPF mount propagation
+   - `--flannel-backend=none` to disable default CNI
+   - `--disable-network-policy`, `--disable-kube-proxy` for Cilium replacement
+   - `--disable=traefik`, `--disable=servicelb` for custom ingress
    - Port mappings for API server, ingress, and services
 
 2. Integrate ctlptl for declarative cluster lifecycle:
-   - YAML-based cluster definitions
+   - YAML-based cluster definitions (following Kargo patterns)
    - Version-controlled configuration
    - Team-shareable development environments
 
@@ -138,53 +157,78 @@ Adopt Option E: x86_64 kind with Rosetta translation as the primary local develo
    - Accept limited eBPF (container constraints)
    - Test full eBPF stack in CI on x86_64 infrastructure
 
-4. Optionally integrate nix2container for custom node images:
-   - Existing patterns in `modules/containers/`
-   - Multi-arch build capability already implemented
-   - Could create custom kindest/node images with Nix tooling pre-installed
+4. Preserve VM-based approach for specific scenarios:
+   - Full eBPF testing when required
+   - ClusterAPI development with nested VMs
+   - Architecture-specific debugging
+
+**Custom node images assessment:**
+nix2container is not practical for k3d node images because:
+- k3d overrides container entrypoints with its own orchestration scripts
+- Node images require full k3s distribution, not application containers
+- Default `rancher/k3s` images are well-maintained and sufficient
+- nix2container remains valuable for application containers only
 
 **Trade-offs accepted:**
 
-- Local development uses kind (upstream k8s) while production uses k3s
-- eBPF features are limited in container runtime
+- Architecture difference: local aarch64 vs production x86_64
+- eBPF features limited by container runtime
 - Full eBPF validation requires CI/CD on actual VMs
 - Docker bridge networking differs from production overlay
 
 **Trade-offs avoided (vs current approach):**
 
 - Nested virtualization eBPF failures (eliminated)
-- ARM64-specific BPF issues (eliminated via x86_64 architecture)
 - Total Cilium non-functionality (resolved)
+- Rosetta emulation overhead (eliminated)
 
 ## Migration Path
 
 1. **Preserve current incus infrastructure** for non-Cilium workloads or future testing
-2. **Add kind + ctlptl as parallel option** in development workflow
+2. **Add k3d + ctlptl as primary option** in development workflow
 3. **Update ADR-001/ADR-002** to document the evolution
-4. **Create `02b-local-development-kind.md`** workflow documentation
-5. **Evaluate after usage** whether to deprecate incus path entirely
+4. **Create `02b-local-development-k3d.md`** workflow documentation
+5. **Update all kubernetes documentation** to reflect k3d as primary approach
+6. **Evaluate after usage** whether to deprecate incus path entirely
 
 ## Consequences
 
 ### Enabled
 
 - Functional Cilium networking for local development
-- Architecture parity with production (x86_64-linux)
-- Faster iteration cycles (kind startup 2-10 seconds)
+- Kubernetes distribution parity with production (k3s)
+- Fast iteration cycles (k3d startup under 10 seconds with OrbStack)
 - Simpler tooling (no nested virtualization debugging)
 - Team-shareable cluster configurations via ctlptl
+- Multi-node cluster testing capability
 
 ### Constrained
 
 - eBPF features limited by container runtime
 - Node isolation weaker than VM-based approach
-- Kubernetes distribution difference (kind vs k3s)
-- Docker/Podman dependency for container runtime
+- Architecture difference (aarch64 local vs x86_64 production)
+- OrbStack/Docker dependency for container runtime
 
 ## Related Decisions
 
-- ADR-001: Local Development Architecture (partial supersession of Colima VM approach)
+- ADR-001: Local Development Architecture (partially superseded for local development)
 - ADR-002: Bootstrap Architecture Independence (validates aarch64 for ClusterAPI control plane)
-- ADR-004: Local Cluster Networking (port forwarding patterns may need revision for kind)
+- ADR-004: Local Cluster Networking (port forwarding patterns simplified with Docker bridge)
 - nix-2hd: Cilium pod-to-host networking investigation (motivating issue)
 - nix-50f: Local Development Cluster epic (scope expansion)
+- nix-tv8: k3d + ctlptl implementation issue
+
+## Decision Trail
+
+This ADR evolved through systematic investigation:
+
+1. **nix-2hd investigation** (2026-01-18/19): Identified Cilium eBPF failure in Incus/Colima nested virtualization
+2. **Root cause analysis**: macOS Hypervisor.framework lacks nested virtualization support
+3. **Alternative evaluation**: OrbStack (no CNI), kind (viable), k3d (recommended), native without Cilium (fallback)
+4. **k3d selection rationale**: Production k3s parity outweighs x86_64 architecture parity
+5. **OrbStack integration**: Existing user setup provides optimal container runtime performance
+
+Investigation artifacts:
+- Kernel tests: 6.12 LTS and 6.18 latest (both failed)
+- Cilium configuration tests: TCX, Tunnel, Native routing (all failed in nested virt)
+- Community research: GitHub issues #39930 (OrbStack), #742 (OrbStack CNI), CVE-2025-37959
