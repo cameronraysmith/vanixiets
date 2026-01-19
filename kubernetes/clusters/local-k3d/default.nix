@@ -4,12 +4,9 @@
 # Cluster runs in k3d containers via OrbStack container runtime.
 { ... }:
 {
-  # Deploy SopsSecret CRs in prio-15 phase (after CRDs at prio-10, before helm at default)
-  # This ensures:
-  # 1. SopsSecret CRD is registered first (prio-10)
-  # 2. SopsSecret CRs are applied (prio-15)
-  # 3. sops-secrets-operator creates Kubernetes Secrets
-  # 4. Helm charts deploy (default phase) - secrets already exist
+  # Deploy SopsSecret CRs after CRD registration.
+  # CRDs deploy at prio-10 (easykubenix default), SopsSecret CRs at prio-15.
+  # This guarantees the SopsSecret CRD exists before any SopsSecret CRs are applied.
   kluctl.resourcePriority.SopsSecret = 15;
 
   # Cluster identification
