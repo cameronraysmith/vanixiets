@@ -100,7 +100,7 @@
     playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.57.0";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
 
-    easykubenix.url = "github:Lillecarl/easykubenix";
+    easykubenix.url = "github:cameronraysmith/easykubenix/dev";
     easykubenix.flake = false;
 
     cilium-src.url = "github:cilium/cilium/v1.18.6";
