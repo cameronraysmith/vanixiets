@@ -103,6 +103,14 @@ creation_rules:
         - *admin-user
         - *orb-nixos
 
+  # Kubernetes cluster secrets (local dev cluster - admin access only)
+  - path_regex: secrets/clusters/local/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *admin-user
+
   # Shared secrets (everyone can access)
   - path_regex: (secrets/services/.*\.yaml$|secrets/shared\.yaml$|secrets/test\.yaml$)
     key_groups:
