@@ -30,6 +30,9 @@
 
       # Local development cluster
       localCluster = evalCluster ../kubernetes/clusters/local;
+
+      # Local k3d cluster
+      localK3dCluster = evalCluster ../kubernetes/clusters/local-k3d;
     in
     {
       packages = {
@@ -38,12 +41,23 @@
 
         # JSON manifest file (alternative format)
         k8s-manifests-local-json = localCluster.manifestJSONFile;
+
+        # YAML manifest file for local k3d cluster
+        k8s-manifests-local-k3d = localK3dCluster.manifestYAMLFile;
+
+        # JSON manifest file for local k3d cluster
+        k8s-manifests-local-k3d-json = localK3dCluster.manifestJSONFile;
       };
 
       # Deployment scripts (kluctl-based)
       apps.k8s-deploy-local = {
         type = "app";
         program = "${localCluster.deploymentScript}/bin/kubenixDeploy";
+      };
+
+      apps.k8s-deploy-local-k3d = {
+        type = "app";
+        program = "${localK3dCluster.deploymentScript}/bin/kubenixDeploy";
       };
     };
 }
