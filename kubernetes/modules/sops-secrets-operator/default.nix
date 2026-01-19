@@ -29,6 +29,15 @@
 let
   moduleName = "sops-secrets-operator";
   cfg = config.${moduleName};
+
+  # CRD source path from flake input
+  crdPath = "${sops-secrets-operator-src}/config/crd/bases/isindir.github.com_sopssecrets.yaml";
+
+  # Create derivation for CRD file (required for importyaml)
+  # importyaml expects either a derivation or URL, not a store path string
+  crdDrv = pkgs.runCommand "sops-secrets-operator-crd" { } ''
+    cp ${crdPath} $out
+  '';
 in
 {
   options.${moduleName} = {
@@ -67,7 +76,7 @@ in
     # Import CRD via importyaml (helm includeCRDs=false by default)
     # This ensures the SopsSecret CRD is deployed before operator starts
     importyaml."${moduleName}-crd" = {
-      src = "${sops-secrets-operator-src}/config/crd/bases/isindir.github.com_sopssecrets.yaml";
+      src = crdDrv;
     };
 
     # Register SopsSecret custom resource type with easykubenix
