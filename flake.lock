@@ -1034,6 +1034,7 @@
         "pkgs-by-name-for-flake-parts": "pkgs-by-name-for-flake-parts",
         "playwright-web-flake": "playwright-web-flake",
         "sops-nix": "sops-nix",
+        "sops-secrets-operator-src": "sops-secrets-operator-src",
         "srvos": "srvos",
         "step-ca-src": "step-ca-src",
         "terranix": "terranix",
@@ -1079,6 +1080,23 @@
       "original": {
         "owner": "Mic92",
         "repo": "sops-nix",
+        "type": "github"
+      }
+    },
+    "sops-secrets-operator-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1747307926,
+        "narHash": "sha256-WiL0vWIdxaflZzdhXIt+26xPhn5EH8UtZP6nEpfUiP4=",
+        "owner": "isindir",
+        "repo": "sops-secrets-operator",
+        "rev": "147febf336f14bb2546eec020680ce1b2a2e96f1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "isindir",
+        "ref": "0.16.0",
+        "repo": "sops-secrets-operator",
         "type": "github"
       }
     },
