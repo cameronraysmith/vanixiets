@@ -75,7 +75,8 @@ in
         # Mount age key secret as file
         secretsAsFiles = [
           {
-            name = cfg.ageKeySecret;
+            name = "sops-age-key-file";
+            secretName = cfg.ageKeySecret;
             mountPath = "/etc/sops-age";
           }
         ];
