@@ -3,6 +3,15 @@
 # Deploys smallstep step-certificates as local ACME server for cert-manager.
 # Uses pre-generated CA from sops-encrypted secrets.
 #
+# This module integrates with sops-secrets-operator for secret management:
+# - CA certificates are provided via caCerts options (public, in git)
+# - Private keys are provided via sopsSecretFile (encrypted SopsSecret CR)
+# - SopsSecret creates Kubernetes Secrets that the helm chart mounts
+#
+# The SopsSecret must create two secrets:
+# - step-ca-step-certificates-ca-password (key: password)
+# - step-ca-step-certificates-secrets (keys: root_ca_key, intermediate_ca_key)
+#
 # Receives step-ca-src from flake inputs via specialArgs to avoid
 # impure fetchTree calls during pure evaluation.
 {
@@ -50,8 +59,7 @@ in
       };
     };
 
-    # CA certificates are read from cluster-local paths
-    # Private keys must be provided at deployment time via sops
+    # CA certificates are read from cluster-local paths (public, committed to git)
     caCerts = {
       rootCert = lib.mkOption {
         type = lib.types.path;
@@ -61,6 +69,16 @@ in
         type = lib.types.path;
         description = "Path to intermediate CA certificate (PEM)";
       };
+    };
+
+    # SopsSecret file containing encrypted private keys
+    # The SopsSecret must create secrets matching helm chart expectations:
+    # - step-ca-step-certificates-ca-password with 'password' key
+    # - step-ca-step-certificates-secrets with 'root_ca_key', 'intermediate_ca_key' keys
+    sopsSecretFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "Path to encrypted SopsSecret YAML file for CA private keys";
     };
 
     helmValues = lib.mkOption {
@@ -79,11 +97,24 @@ in
       # Read certificates from provided paths
       rootCert = builtins.readFile cfg.caCerts.rootCert;
       intermediateCert = builtins.readFile cfg.caCerts.intermediateCert;
+
+      # Create derivation for SopsSecret file (importyaml requires derivation, not path)
+      sopsSecretDrv = lib.mkIf (cfg.sopsSecretFile != null) (
+        pkgs.runCommand "step-ca-sopssecret" { } ''
+          cp ${cfg.sopsSecretFile} $out
+        ''
+      );
     in
     lib.mkIf cfg.enable {
       # Create namespace using kubernetes.resources (easykubenix pattern)
       # "none" namespace means cluster-scoped resource
       kubernetes.resources.none.Namespace.${cfg.namespace} = { };
+
+      # Deploy SopsSecret CR for private keys (processed by sops-secrets-operator)
+      # This creates the Kubernetes Secrets that the helm chart expects
+      importyaml."${moduleName}-secrets" = lib.mkIf (cfg.sopsSecretFile != null) {
+        src = sopsSecretDrv;
+      };
 
       helm.releases.${moduleName} = {
         namespace = cfg.namespace;
@@ -100,16 +131,18 @@ in
             };
 
             secrets = {
-              # Empty password for local dev (keys are unencrypted)
+              # Password for CA key encryption (empty = unencrypted keys)
+              # Note: Helm creates secrets but SopsSecret operator overwrites them
+              # with correct values from the encrypted SopsSecret CR
               ca_password = "";
 
               x509 = {
                 enabled = true;
-                # These will be populated from sops secret at deployment time
-                # The helm chart expects the raw PEM content here
-                # For now, use placeholder that will be overridden
-                root_ca_key = "PLACEHOLDER_ROOT_KEY";
-                intermediate_ca_key = "PLACEHOLDER_INTERMEDIATE_KEY";
+                # Placeholder values - SopsSecret operator will overwrite these
+                # secrets with the actual encrypted private keys from the SopsSecret CR.
+                # The helm chart creates the secret structure, SopsSecret provides content.
+                root_ca_key = "PLACEHOLDER_OVERWRITTEN_BY_SOPSSECRET";
+                intermediate_ca_key = "PLACEHOLDER_OVERWRITTEN_BY_SOPSSECRET";
               };
 
               ssh.enabled = false;
