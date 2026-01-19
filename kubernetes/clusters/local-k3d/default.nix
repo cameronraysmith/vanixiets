@@ -4,6 +4,11 @@
 # Cluster runs in k3d containers via OrbStack container runtime.
 { ... }:
 {
+  # Deploy SopsSecret CRs in prio-10 phase (before helm releases in default phase)
+  # This ensures sops-secrets-operator can create Kubernetes Secrets before
+  # helm charts try to create conflicting secrets with the same names
+  kluctl.resourcePriority.SopsSecret = 10;
+
   # Cluster identification
   clusterName = "k3d-dev";
   clusterHost = "127.0.0.1"; # k3d API server listens on loopback
