@@ -676,10 +676,20 @@ container-release VERSION="1.0.0" TAGS="":
 
 ## k3d
 
-# Create local k3d cluster with OrbStack
+# Create local k3d cluster with OrbStack and bootstrap secrets
 [group('k3d')]
 k3d-up:
   K3D_FIX_MOUNTS=1 ctlptl apply -f kubernetes/clusters/local-k3d/cluster.yaml
+  @just k3d-bootstrap-secrets
+
+# Bootstrap secrets required before first deployment (idempotent)
+[group('k3d')]
+k3d-bootstrap-secrets:
+  kubectl create namespace sops-secrets-operator --dry-run=client -o yaml | kubectl apply -f -
+  kubectl create secret generic sops-age-key \
+    --namespace=sops-secrets-operator \
+    --from-file=age.key=${HOME}/.config/sops/age/keys.txt \
+    --dry-run=client -o yaml | kubectl apply -f -
 
 # Delete local k3d cluster
 [group('k3d')]
