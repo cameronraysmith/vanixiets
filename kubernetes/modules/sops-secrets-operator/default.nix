@@ -3,6 +3,9 @@
 # Deploys sops-secrets-operator for Kubernetes-native secret management.
 # Decrypts SopsSecret CRs into native Kubernetes Secrets using age encryption.
 #
+# Receives sops-secrets-operator-src from flake inputs via specialArgs to avoid
+# impure fetchTree calls during pure evaluation.
+#
 # Prerequisites - create age key secret before deploying:
 #   kubectl create namespace sops-secrets-operator
 #   kubectl create secret generic sops-age-key \
@@ -14,6 +17,7 @@
   config,
   lib,
   pkgs,
+  sops-secrets-operator-src,
   ...
 }:
 let
@@ -56,11 +60,7 @@ in
 
     helm.releases.${moduleName} = {
       namespace = cfg.namespace;
-      chart = {
-        repository = "https://isindir.github.io/sops-secrets-operator";
-        name = "sops-secrets-operator";
-        version = cfg.version;
-      };
+      chart = "${sops-secrets-operator-src}/chart/helm3/sops-secrets-operator";
 
       values = lib.recursiveUpdate {
         # Single replica for simplicity
