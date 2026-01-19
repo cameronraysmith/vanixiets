@@ -15,9 +15,14 @@
   # Enable Cilium CNI
   cilium.enable = true;
   cilium.version = "1.18.6";
-  # Disable kube-proxy replacement - use k3s native kube-proxy instead
-  # OrbStack container runtime limits eBPF capabilities for full replacement
-  cilium.helmValues.kubeProxyReplacement = false;
+  # k3d/OrbStack eBPF accommodations:
+  # - Disable kube-proxy replacement (use k3s native kube-proxy)
+  # - Disable BPF masquerade (use iptables masquerade instead)
+  cilium.helmValues = {
+    kubeProxyReplacement = false;
+    bpf.masquerade = false;
+    enableIPv4Masquerade = true;
+  };
 
   # Enable step-ca ACME server for local TLS
   step-ca.enable = true;
