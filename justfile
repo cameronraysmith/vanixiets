@@ -4,6 +4,7 @@
 
 ## nix
 ## clan
+## k3d
 ## secrets
 ## sops
 ## CI/CD
@@ -672,6 +673,23 @@ container-release VERSION="1.0.0" TAGS="":
   if [[ -n "{{TAGS}}" ]]; then
     echo "  Additional tags: {{TAGS}}"
   fi
+
+## k3d
+
+# Create local k3d cluster with OrbStack
+[group('k3d')]
+k3d-up:
+  K3D_FIX_MOUNTS=1 ctlptl apply -f kubernetes/clusters/local-k3d/cluster.yaml
+
+# Delete local k3d cluster
+[group('k3d')]
+k3d-down:
+  ctlptl delete -f kubernetes/clusters/local-k3d/cluster.yaml
+
+# Show k3d cluster status
+[group('k3d')]
+k3d-status:
+  k3d cluster list
 
 ## secrets
 
