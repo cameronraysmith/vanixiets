@@ -1,7 +1,7 @@
 # ctlptl cluster configuration for local k3d development cluster
 # This configuration creates a single-node k3d cluster (k3s v1.31) with:
-# - Disabled Flannel (for Cilium CNI)
-# - Disabled kube-proxy (for Cilium kube-proxy replacement)
+# - Disabled Flannel (for Cilium CNI - pod networking)
+# - k3s kube-proxy enabled (Cilium kube-proxy replacement has eBPF issues in k3d)
 # - Disabled Traefik and ServiceLB (using custom ingress setup)
 # - Port 30080 exposed for ArgoCD access via NodePort
 # - K3D_FIX_MOUNTS=1 environment variable for OrbStack compatibility
