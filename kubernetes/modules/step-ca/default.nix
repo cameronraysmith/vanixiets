@@ -16,11 +16,11 @@
 # - step-ca-step-certificates-secrets (keys: root_ca_key, intermediate_ca_key)
 #
 # Resource creation order (via kluctl phases):
-# 1. Namespace (default phase)
-# 2. SopsSecret CR (prio-15, after CRDs)
-# 3. sops-secrets-operator creates Kubernetes Secrets
-# 4. ConfigMaps created by this module
-# 5. Helm release mounts all pre-existing resources
+# 1. SopsSecret CRD registered (prio-10, easykubenix default)
+# 2. SopsSecret CR applied (prio-15, cluster config)
+# 3. Default phase: namespace, configmaps, helm release
+# 4. sops-secrets-operator reconciles SopsSecret -> Kubernetes Secrets
+# 5. step-ca pod starts with pre-existing secrets mounted
 #
 # Receives step-ca-src from flake inputs via specialArgs to avoid
 # impure fetchTree calls during pure evaluation.
