@@ -4,9 +4,15 @@
 # Imported by k3s-server main module via deferred module composition.
 {
   flake.modules.nixos.k3s-server-kernel =
-    { config, lib, ... }:
+    { config, lib, pkgs, ... }:
     {
       config = lib.mkIf config.k3s-server.enable {
+        # Use latest kernel to test ARM64 BPF stack delivery fix (nix-2hd)
+        # Default 6.12 LTS has issue where packets sent to BPF "stack" never
+        # reach kernel (ifindex 0, flow 0x0 in cilium monitor). Testing if
+        # 6.18.x resolves this. Remove once root cause confirmed.
+        boot.kernelPackages = pkgs.linuxPackages_latest;
+
         # Kernel modules for container networking and CNI operation
         boot.kernelModules = [
           "br_netfilter" # Bridge netfilter support for iptables rules on bridged traffic
