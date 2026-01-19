@@ -6,11 +6,20 @@
 # This module integrates with sops-secrets-operator for secret management:
 # - CA certificates are provided via caCerts options (public, in git)
 # - Private keys are provided via sopsSecretFile (encrypted SopsSecret CR)
-# - SopsSecret creates Kubernetes Secrets that the helm chart mounts
+# - SopsSecret creates Kubernetes Secrets that override helm-created placeholders
 #
 # The SopsSecret must create two secrets:
 # - step-ca-step-certificates-ca-password (key: password)
 # - step-ca-step-certificates-secrets (keys: root_ca_key, intermediate_ca_key)
+#
+# KNOWN ISSUE: On fresh cluster deployments, helm and SopsSecret both create
+# secrets with the same names. The SopsSecret operator reports ownership conflicts.
+# Workaround after first deploy:
+#   kubectl delete secret -n step-ca step-ca-step-certificates-ca-password step-ca-step-certificates-secrets
+#   kubectl annotate sopssecret -n step-ca step-ca-secrets reconcile=$(date +%s)
+#   kubectl delete pod -n step-ca step-ca-step-certificates-0
+#
+# On subsequent deploys, SopsSecret owns the secrets and no manual intervention needed.
 #
 # Receives step-ca-src from flake inputs via specialArgs to avoid
 # impure fetchTree calls during pure evaluation.
