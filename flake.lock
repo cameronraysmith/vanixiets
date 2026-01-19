@@ -1034,6 +1034,7 @@
         "playwright-web-flake": "playwright-web-flake",
         "sops-nix": "sops-nix",
         "srvos": "srvos",
+        "step-ca-src": "step-ca-src",
         "terranix": "terranix",
         "treefmt-nix": "treefmt-nix_4"
       }
@@ -1097,6 +1098,23 @@
       "original": {
         "owner": "nix-community",
         "repo": "srvos",
+        "type": "github"
+      }
+    },
+    "step-ca-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1766089820,
+        "narHash": "sha256-cPamavLGFAIgdEdzweFTubZjJ72n7cdkppGQKAdj3Qo=",
+        "owner": "smallstep",
+        "repo": "helm-charts",
+        "rev": "832b83642f9786a8c8b01b392e82504a6af5f33e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "smallstep",
+        "ref": "master",
+        "repo": "helm-charts",
         "type": "github"
       }
     },
