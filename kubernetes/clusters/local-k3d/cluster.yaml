@@ -31,9 +31,6 @@ k3d:
           - arg: --disable-network-policy
             nodeFilters:
               - server:*
-          - arg: --disable-kube-proxy
-            nodeFilters:
-              - server:*
           - arg: --disable=traefik
             nodeFilters:
               - server:*
