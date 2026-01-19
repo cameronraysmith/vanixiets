@@ -4,10 +4,13 @@
 # Cluster runs in k3d containers via OrbStack container runtime.
 { ... }:
 {
-  # Deploy SopsSecret CRs in prio-10 phase (before helm releases in default phase)
-  # This ensures sops-secrets-operator can create Kubernetes Secrets before
-  # helm charts try to create conflicting secrets with the same names
-  kluctl.resourcePriority.SopsSecret = 10;
+  # Deploy SopsSecret CRs in prio-15 phase (after CRDs at prio-10, before helm at default)
+  # This ensures:
+  # 1. SopsSecret CRD is registered first (prio-10)
+  # 2. SopsSecret CRs are applied (prio-15)
+  # 3. sops-secrets-operator creates Kubernetes Secrets
+  # 4. Helm charts deploy (default phase) - secrets already exist
+  kluctl.resourcePriority.SopsSecret = 15;
 
   # Cluster identification
   clusterName = "k3d-dev";
