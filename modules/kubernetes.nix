@@ -25,6 +25,7 @@
           specialArgs = {
             cilium-src = inputs.cilium-src;
             step-ca-src = inputs.step-ca-src;
+            sops-secrets-operator-src = inputs.sops-secrets-operator-src;
           };
         };
 
