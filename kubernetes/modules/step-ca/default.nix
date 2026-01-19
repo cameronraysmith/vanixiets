@@ -132,8 +132,10 @@ in
 
             secrets = {
               # Password for CA key encryption (empty = unencrypted keys)
-              # Note: Helm creates secrets but SopsSecret operator overwrites them
-              # with correct values from the encrypted SopsSecret CR
+              # Note: Empty string causes helm to skip creating the ca-password secret.
+              # SopsSecret operator creates it instead with the correct `password` key.
+              # On fresh deploys, may need `kubectl annotate sopssecret -n step-ca step-ca-secrets reconcile=$(date +%s)`
+              # to trigger re-reconciliation after helm-created secrets are cleaned up.
               ca_password = "";
 
               x509 = {
