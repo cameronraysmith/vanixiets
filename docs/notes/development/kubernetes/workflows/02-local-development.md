@@ -4,26 +4,26 @@ title: Local development workflow
 
 # Local development workflow
 
-This workflow covers day-to-day Kubernetes development using the k3s-dev Colima profile.
-The k3s-dev profile provides a persistent local cluster with production-parity configuration for iterating on applications, testing deployments, and validating configurations before promoting to production.
+This workflow covers day-to-day Kubernetes development using the k3d local cluster.
+The k3d cluster provides a persistent local Kubernetes environment with k3s distribution parity to production, enabling iterating on applications, testing deployments, and validating configurations before promoting to Hetzner.
 
 ## Starting the development cluster
 
-The k3s-dev Colima profile runs a NixOS VM via Rosetta on aarch64-darwin hosts.
-Start the profile and verify cluster health before beginning work.
+The k3d cluster runs k3s in Docker containers on OrbStack.
+Start the cluster and verify health before beginning work.
 
-### Starting Colima
+### Starting the cluster
 
 ```bash
-# Start the k3s-dev profile
-colima start --profile k3s-dev
+# Start the cluster with full infrastructure (Cilium, cert-manager, etc.)
+just k3d-full
 
-# Verify the VM is running
-colima status --profile k3s-dev
+# Or start cluster only, deploy infrastructure separately
+just k3d-up
 ```
 
-The profile configuration lives in `~/.colima/k3s-dev/colima.yaml`.
-On first start, the NixOS system builds and k3s initializes, which may take several minutes.
+The first start may take a few minutes as container images are pulled.
+Subsequent starts are much faster.
 
 ### Verifying cluster health
 
@@ -43,28 +43,28 @@ System pods will remain `Pending` or `ContainerCreating` until Cilium CNI is dep
 
 ### Accessing kubeconfig
 
-The k3s kubeconfig is automatically merged into your default kubeconfig via Colima.
+k3d automatically updates your default kubeconfig and switches context.
 Set the context explicitly if you have multiple clusters configured.
 
 ```bash
 # List available contexts
 kubectl config get-contexts
 
-# Set k3s-dev as current context
-kubectl config use-context colima-k3s-dev
+# Set k3d cluster as current context
+kubectl config use-context k3d-local-k3d
 
 # Verify current context
 kubectl config current-context
 ```
 
-For troubleshooting, you can also SSH into the VM and access the kubeconfig directly at `/etc/rancher/k3s/k3s.yaml`.
+For troubleshooting, you can exec into the k3d server container:
 
 ```bash
-# SSH into the VM
-colima ssh --profile k3s-dev
+# Exec into the k3d server container
+docker exec -it k3d-local-k3d-server-0 sh
 
-# Inside the VM, check k3s status
-sudo k3s kubectl get nodes
+# Inside the container, check k3s status
+k3s kubectl get nodes
 ```
 
 ## Deploying core infrastructure
@@ -297,7 +297,7 @@ The target `-t local` corresponds to a kluctl target configuration referencing y
 # .kluctl.yaml
 targets:
   - name: local
-    context: colima-k3s-dev
+    context: k3d-local-k3d
     args:
       stage: local
 ```
@@ -314,29 +314,21 @@ The pattern `<name>.<ip>.sslip.io` resolves to `<ip>`.
 
 ```bash
 # Examples
-myapp.10.0.2.15.sslip.io  -> 10.0.2.15
-api.192.168.5.1.sslip.io  -> 192.168.5.1
+myapp.127.0.0.1.sslip.io  -> 127.0.0.1
+api.127.0.0.1.sslip.io    -> 127.0.0.1
 ```
 
-First, find your cluster's ingress IP address.
-
-```bash
-# Get the node IP (for single-node clusters)
-kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
-
-# Or get the LoadBalancer IP if using Cilium LB
-kubectl get svc -n kube-system cilium-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-```
+For k3d clusters, use `127.0.0.1` since ports 80/443 are mapped to localhost.
 
 ### Creating Ingress resources
 
-Use the node IP in your Ingress host field.
+Use localhost IP in your Ingress host field.
 
 ```nix
 # apps/myapp/default.nix
 { config, lib, ... }:
 let
-  nodeIP = "10.0.2.15";  # Replace with actual IP
+  nodeIP = "127.0.0.1";
 in
 {
   kubernetes.resources.default.Ingress.myapp = {
@@ -380,10 +372,10 @@ After deploying the Ingress, access your service.
 kubectl get ingress myapp -o jsonpath='{.spec.rules[0].host}'
 
 # Open in browser (with HTTP until TLS is configured)
-open http://myapp.10.0.2.15.sslip.io
+open http://myapp.127.0.0.1.sslip.io
 
 # Or with HTTPS after certificates are issued
-open https://myapp.10.0.2.15.sslip.io
+open https://myapp.127.0.0.1.sslip.io
 ```
 
 ### Cilium Gateway API alternative
@@ -425,7 +417,7 @@ kubernetes.resources.default.HTTPRoute.myapp-route = {
     parentRefs = [
       { name = "main-gateway"; }
     ];
-    hostnames = [ "myapp.${nodeIP}.sslip.io" ];
+    hostnames = [ "myapp.127.0.0.1.sslip.io" ];
     rules = [
       {
         matches = [
@@ -456,7 +448,7 @@ metadata:
 spec:
   tls:
     - hosts:
-        - myapp.10.0.2.15.sslip.io
+        - myapp.127.0.0.1.sslip.io
       secretName: myapp-tls
 ```
 
@@ -494,14 +486,8 @@ kubectl describe certificate myapp-tls
 To avoid browser security warnings, trust the step-ca root certificate.
 
 ```bash
-# SSH into the VM to get the root CA
-colima ssh --profile k3s-dev
-
-# Inside VM, find the root CA
-cat /home/step/certs/root_ca.crt
-
-# Exit VM and save root CA locally
-colima ssh --profile k3s-dev -- cat /home/step/certs/root_ca.crt > ~/step-ca-root.crt
+# Get the root CA from the step-ca pod
+kubectl -n step-ca exec deploy/step-certificates -- step ca root > ~/step-ca-root.crt
 ```
 
 Add the root CA to your system keychain.
@@ -528,7 +514,7 @@ A minimal web application deployment.
 # apps/hello/default.nix
 { config, lib, pkgs, ... }:
 let
-  nodeIP = config.clusterHost or "10.0.2.15";
+  nodeIP = config.clusterHost or "127.0.0.1";
 in
 {
   kubernetes.resources.default = {
@@ -597,7 +583,7 @@ kubectl get svc hello
 kubectl get ingress hello
 
 # Test the endpoint
-curl http://hello.10.0.2.15.sslip.io
+curl http://hello.127.0.0.1.sslip.io
 ```
 
 ### Iterating on changes
@@ -722,20 +708,20 @@ kubectl describe csinode <node-name>
 Check for mount propagation issues.
 
 ```bash
-# SSH into the VM
-colima ssh --profile k3s-dev
+# Exec into the k3d server container
+docker exec -it k3d-local-k3d-server-0 sh
 
 # Verify nix-csi host path exists
 ls -la /var/lib/nix-csi
 
 # Check kubelet logs for CSI errors
-journalctl -u k3s -f | grep -i csi
+journalctl -u k3s | grep -i csi
 ```
 
-If builds fail, verify network connectivity from the VM.
+If builds fail, verify network connectivity from inside the container.
 
 ```bash
-colima ssh --profile k3s-dev -- curl -I https://cache.nixos.org
+docker exec k3d-local-k3d-server-0 curl -I https://cache.nixos.org
 ```
 
 ## Troubleshooting
@@ -803,8 +789,8 @@ hubble observe --verdict DROPPED
 Inspect component logs for errors.
 
 ```bash
-# k3s server logs (inside VM)
-colima ssh --profile k3s-dev -- journalctl -u k3s -f
+# k3s server logs (via docker)
+docker logs k3d-local-k3d-server-0
 
 # Cilium agent logs
 kubectl logs -n kube-system -l k8s-app=cilium --tail=100
@@ -837,7 +823,7 @@ Verify Cilium is running and CNI configuration exists.
 
 ```bash
 kubectl get pods -n kube-system -l k8s-app=cilium
-colima ssh --profile k3s-dev -- ls /etc/cni/net.d/
+docker exec k3d-local-k3d-server-0 ls /etc/cni/net.d/
 ```
 
 *Service unreachable*
@@ -862,25 +848,37 @@ kubectl describe ingress <ingress-name>
 
 ## Stopping and resuming
 
-The k3s-dev profile maintains state between sessions.
+The k3d cluster maintains state between sessions.
 Stop the cluster when not in use to free resources.
 
-### colima stop
+### Stopping the cluster
 
 ```bash
-# Stop the VM (preserves state)
-colima stop --profile k3s-dev
+# Stop the cluster (preserves state)
+k3d cluster stop local-k3d
+
+# Or use justfile
+just k3d-stop
 
 # Verify stopped
-colima list
+k3d cluster list
+```
+
+### Starting a stopped cluster
+
+```bash
+# Start a previously stopped cluster
+k3d cluster start local-k3d
+
+# Or use justfile
+just k3d-start
 ```
 
 ### Data persistence
 
 The following data persists across restarts.
 
-- k3s cluster state in `/var/lib/rancher/k3s/`
-- etcd data (if using HA mode)
+- k3s cluster state in container volumes
 - Container images in containerd storage
 - PersistentVolumeClaims bound to local storage
 
@@ -889,24 +887,17 @@ StatefulSet pods may need manual intervention if storage is corrupted.
 
 ### Clean restart
 
-To restart the cluster from scratch without destroying configuration.
+To restart the cluster from scratch.
 
 ```bash
-# Stop the profile
-colima stop --profile k3s-dev
+# Delete the cluster entirely
+k3d cluster delete local-k3d
 
-# Start fresh
-colima start --profile k3s-dev
-```
+# Or use justfile
+just k3d-down
 
-To fully reset the cluster state.
-
-```bash
-# Delete the profile entirely
-colima delete --profile k3s-dev
-
-# Recreate from configuration
-colima start --profile k3s-dev
+# Recreate with full infrastructure
+just k3d-full
 ```
 
 This destroys all cluster data including persistent volumes.
@@ -920,3 +911,4 @@ Use this only when you need a completely fresh environment.
 - easykubenix documentation: `~/projects/sciops-workspace/easykubenix`
 - kluctl documentation: https://kluctl.io/docs/
 - step-ca documentation: https://smallstep.com/docs/step-ca/
+- ADR-005: [Local cluster architecture revision](../decisions/ADR-005-local-cluster-architecture-revision.md)
