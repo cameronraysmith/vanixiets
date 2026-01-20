@@ -61,6 +61,13 @@ in
           "--cluster-resource-namespace=${namespace}"
         ];
 
+        # Controller configuration for Gateway API support
+        config = {
+          apiVersion = "controller.config.cert-manager.io/v1alpha1";
+          kind = "ControllerConfiguration";
+          enableGatewayAPI = true;
+        };
+
         # Resource limits for local dev
         resources = {
           requests = {
