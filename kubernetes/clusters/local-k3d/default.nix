@@ -12,14 +12,14 @@
   # - prio-10: CustomResourceDefinitions (must register before CRs can be applied)
   # - prio-15: SopsSecret CRs (depends on CRD from prio-10)
   # - prio-18: RBAC resources (ServiceAccount, Role, RoleBinding, etc. must exist before workloads)
-  # - prio-20: Cilium workloads (Operator Deployment + Agent DaemonSet co-deployed)
-  # - default: All other resources (Services, etc.)
+  # - prio-20: DaemonSets (Cilium Agent needs CNI ready before other workloads)
+  # - default: All other resources (Deployments, Services, etc.)
   #
   # The prio-18 barrier ensures RBAC resources exist before workloads reference them.
-  # The prio-20 barrier co-deploys Cilium Operator (Deployment) and Agent (DaemonSet).
-  # The operator registers CRDs while the agent waits, then agent becomes Ready.
-  # This breaks the circular dependency: agent needs operator CRDs, but operator
-  # was previously in default phase (after prio-20 barrier).
+  # The prio-20 barrier deploys the Cilium Agent DaemonSet before other workloads.
+  # Deployments (including Cilium Operator and ArgoCD) deploy in default phase together.
+  # Using Deployment = 20 would deadlock: ArgoCD needs CNI but would be in the same
+  # barrier phase waiting for Cilium Agent to be Ready.
   #
   # NOTE: Must use lib.mkOptionDefault to merge with easykubenix defaults,
   # otherwise this assignment replaces the entire default attrset.
@@ -32,10 +32,10 @@
     RoleBinding = 18;
     # SopsSecret depends on CRD
     SopsSecret = 15;
-    # CNI workloads: Operator (Deployment) and Agent (DaemonSet) co-deployed
-    # to allow operator to register CRDs while agent waits for them
+    # Cilium Agent DaemonSet in prio-20 to establish CNI before other workloads
+    # NOTE: Do NOT add Deployment = 20 here - it affects ALL Deployments (ArgoCD,
+    # sops-secrets-operator, Cilium Operator) causing scheduling deadlock
     DaemonSet = 20;
-    Deployment = 20;
   };
 
   # Cluster identification
