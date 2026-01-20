@@ -16,9 +16,9 @@
   ...
 }:
 let
-  # Match easykubenix clusterName/clusterHost (from kubernetes/clusters/local-k3d.nix)
-  clusterName = "local-k3d";
-  clusterHost = "host.k3d.internal";
+  # Match easykubenix clusterName/clusterHost (from kubernetes/clusters/local-k3d/default.nix)
+  clusterName = "k3d-dev";
+  clusterHost = "127.0.0.1";
 in
 {
   applications.cilium = {
