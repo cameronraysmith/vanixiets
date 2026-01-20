@@ -67,8 +67,11 @@ in
     sysctlfix.enabled = false;
     # Gateway API support for ingress
     # nodePort required when kubeProxyReplacement=false (k3d eBPF constraints)
+    # NodePort mode instead of hostNetwork for reliable address assignment
     gatewayAPI.enabled = true;
-    gatewayAPI.hostNetwork.enabled = true;
+    gatewayAPI.hostNetwork.enabled = false;
+    gatewayAPI.insecureNodePort = 30080;
+    gatewayAPI.secureNodePort = 30443;
     nodePort.enabled = true;
   };
 
