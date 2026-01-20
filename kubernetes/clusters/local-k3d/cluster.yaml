@@ -1,5 +1,7 @@
 # ctlptl cluster configuration for local k3d development cluster
 # This configuration creates a single-node k3d cluster (k3s v1.31) with:
+# - Static subnet 192.168.100.0/24 for predictable node IPs (server at .2)
+#   Enables sslip.io domains: *.192.168.100.2.sslip.io resolves to server node
 # - Disabled Flannel (for Cilium CNI - pod networking)
 # - k3s kube-proxy enabled (Cilium kube-proxy replacement has eBPF issues in k3d)
 # - Disabled Traefik and ServiceLB (using custom ingress setup)
@@ -12,6 +14,7 @@ product: k3d
 k3d:
   v1alpha5Simple:
     servers: 1
+    subnet: "192.168.100.0/24"
     image: rancher/k3s:v1.31.4-k3s1
     env:
       - envVar: K3D_FIX_MOUNTS=1
