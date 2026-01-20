@@ -112,6 +112,11 @@ in
         # Disable HA redis for local dev
         redis-ha.enabled = false;
 
+        # Disable the redis-secret-init Job hook
+        # The Job has no hook-weight annotations, causing sync issues.
+        # We provide the redis secret ourselves below (matches kluctl config).
+        redisSecretInit.enabled = false;
+
         # ApplicationSet Controller
         applicationSet = {
           replicas = 1;
@@ -142,6 +147,15 @@ in
           keep = true;
         };
       };
+    };
+
+    # Redis authentication secret (required when redisSecretInit.enabled = false)
+    # For local dev, use a static password. Production should use SopsSecret.
+    # This matches the kluctl deployment at kubernetes/modules/argocd/default.nix
+    resources.secrets.argocd-redis = {
+      metadata.namespace = namespace;
+      type = "Opaque";
+      stringData.auth = "argocd-redis-password-local-dev";
     };
 
     # Ignore controller-managed fields
