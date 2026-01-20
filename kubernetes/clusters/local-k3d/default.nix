@@ -12,13 +12,14 @@
   # - prio-10: CustomResourceDefinitions (must register before CRs can be applied)
   # - prio-15: SopsSecret CRs (depends on CRD from prio-10)
   # - prio-18: RBAC resources (ServiceAccount, Role, RoleBinding, etc. must exist before workloads)
-  # - prio-20: DaemonSet (Cilium CNI agents must be running before other pods can schedule)
-  # - default: All other resources (Deployments, Services, etc.)
+  # - prio-20: Cilium workloads (Operator Deployment + Agent DaemonSet co-deployed)
+  # - default: All other resources (Services, etc.)
   #
-  # The prio-18 barrier ensures RBAC resources exist before DaemonSets reference them.
-  # The prio-20 barrier ensures Cilium DaemonSets are applied before services like
-  # ArgoCD, step-ca, and sops-secrets-operator attempt to schedule pods.
-  # Without CNI readiness, pods fail with "network plugin is not ready".
+  # The prio-18 barrier ensures RBAC resources exist before workloads reference them.
+  # The prio-20 barrier co-deploys Cilium Operator (Deployment) and Agent (DaemonSet).
+  # The operator registers CRDs while the agent waits, then agent becomes Ready.
+  # This breaks the circular dependency: agent needs operator CRDs, but operator
+  # was previously in default phase (after prio-20 barrier).
   #
   # NOTE: Must use lib.mkOptionDefault to merge with easykubenix defaults,
   # otherwise this assignment replaces the entire default attrset.
@@ -31,8 +32,10 @@
     RoleBinding = 18;
     # SopsSecret depends on CRD
     SopsSecret = 15;
-    # CNI DaemonSets must run before other pods can schedule
+    # CNI workloads: Operator (Deployment) and Agent (DaemonSet) co-deployed
+    # to allow operator to register CRDs while agent waits for them
     DaemonSet = 20;
+    Deployment = 20;
   };
 
   # Cluster identification
