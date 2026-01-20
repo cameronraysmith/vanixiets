@@ -271,11 +271,11 @@
     "easykubenix": {
       "flake": false,
       "locked": {
-        "lastModified": 1768849857,
-        "narHash": "sha256-Gio4XKCKRhRL1VG2wVcsElXa8ztWhIZ46f0RqWp4tZw=",
+        "lastModified": 1768881878,
+        "narHash": "sha256-yzSE6jBn6rfonx93aMkC9Ie5SJO08UqTPtzkIFPJNVU=",
         "owner": "cameronraysmith",
         "repo": "easykubenix",
-        "rev": "ee807900d35bdbd3359d6c37f5c1879c135c6d77",
+        "rev": "f6f8e8e41663da1cd6cf2a6e7493b898765ef2cc",
         "type": "github"
       },
       "original": {
