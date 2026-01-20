@@ -7,35 +7,20 @@
   # Deploy resources in dependency order via kluctl priority phases.
   # Priority values create barrier phases: all resources in prio-N complete before prio-N+1 starts.
   #
-  # Phase ordering:
-  # - prio-10: Namespaces (must exist before namespaced resources)
-  # - prio-10: CustomResourceDefinitions (must register before CRs can be applied)
-  # - prio-15: SopsSecret CRs (depends on CRD from prio-10)
-  # - prio-18: RBAC resources (ServiceAccount, Role, RoleBinding, etc. must exist before workloads)
-  # - prio-20: DaemonSets (Cilium Agent needs CNI ready before other workloads)
-  # - default: All other resources (Deployments, Services, etc.)
+  # Phase ordering (easykubenix defaults + local overrides):
+  # - prio-10: Namespaces, CustomResourceDefinitions (easykubenix defaults)
+  # - prio-15: SopsSecret CRs (local override, depends on CRD from prio-10)
+  # - default: All workloads (DaemonSets, Deployments, Services, etc.)
   #
-  # The prio-18 barrier ensures RBAC resources exist before workloads reference them.
-  # The prio-20 barrier deploys the Cilium Agent DaemonSet before other workloads.
-  # Deployments (including Cilium Operator and ArgoCD) deploy in default phase together.
-  # Using Deployment = 20 would deadlock: ArgoCD needs CNI but would be in the same
-  # barrier phase waiting for Cilium Agent to be Ready.
+  # Cilium Agent (DaemonSet) and Operator (Deployment) must deploy together in
+  # the same phase. Separating them (e.g., DaemonSet = 20) creates circular
+  # dependencies: Agent waits for Operator CRDs, but Operator can't schedule
+  # until Agent provides CNI.
   #
   # NOTE: Must use lib.mkOptionDefault to merge with easykubenix defaults,
   # otherwise this assignment replaces the entire default attrset.
   kluctl.resourcePriority = lib.mkOptionDefault {
-    # RBAC resources must exist before workloads reference them
-    ServiceAccount = 18;
-    ClusterRole = 18;
-    ClusterRoleBinding = 18;
-    Role = 18;
-    RoleBinding = 18;
-    # SopsSecret depends on CRD
     SopsSecret = 15;
-    # Cilium Agent DaemonSet in prio-20 to establish CNI before other workloads
-    # NOTE: Do NOT add Deployment = 20 here - it affects ALL Deployments (ArgoCD,
-    # sops-secrets-operator, Cilium Operator) causing scheduling deadlock
-    DaemonSet = 20;
   };
 
   # Cluster identification
