@@ -62,6 +62,12 @@ in
     kubeProxyReplacement = false;
     bpf.masquerade = false;
     enableIPv4Masquerade = true;
+    # Disable sysctlfix init container - fails in k3d/kind containers
+    # because /proc/sys is read-only
+    sysctlfix.enabled = false;
+    # Gateway API support for ingress
+    gatewayAPI.enabled = true;
+    gatewayAPI.hostNetwork.enabled = true;
   };
 
   # ==========================================================================
