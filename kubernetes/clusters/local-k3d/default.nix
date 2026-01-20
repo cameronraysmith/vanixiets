@@ -2,7 +2,24 @@
 #
 # Cilium CNI and step-ca ACME server for k3d-dev cluster.
 # Cluster runs in k3d containers via OrbStack container runtime.
-{ lib, ... }:
+#
+# Supports staged deployment via deploymentLayer parameter:
+# - "foundation": CNI only (Cilium) - must be ready before infrastructure
+# - "infrastructure": Platform services (ArgoCD, cert-manager, secrets)
+# - "all" (default): Everything - use only after foundation is ready
+#
+# This mirrors the kargo pattern of sequential helm --wait installs but in
+# declarative Nix. Foundation must be deployed first because infrastructure
+# pods cannot schedule until CNI is ready.
+{
+  lib,
+  deploymentLayer ? "all",
+  ...
+}:
+let
+  isFoundation = deploymentLayer == "foundation" || deploymentLayer == "all";
+  isInfrastructure = deploymentLayer == "infrastructure" || deploymentLayer == "all";
+in
 {
   # Deploy resources in dependency order via kluctl priority phases.
   # Priority values create barrier phases: all resources in prio-N complete before prio-N+1 starts.
@@ -31,8 +48,12 @@
   clusterPodCIDR = "10.42.0.0/16";
   clusterServiceCIDR = "10.43.0.0/16";
 
+  # ==========================================================================
+  # Foundation layer (CNI) - must be deployed and ready before infrastructure
+  # ==========================================================================
+
   # Enable Cilium CNI
-  cilium.enable = true;
+  cilium.enable = isFoundation;
   cilium.version = "1.18.6";
   # k3d/OrbStack eBPF accommodations:
   # - Disable kube-proxy replacement (use k3s native kube-proxy)
@@ -43,8 +64,15 @@
     enableIPv4Masquerade = true;
   };
 
+  # ==========================================================================
+  # Infrastructure layer (platform services) - requires CNI to be ready
+  # ==========================================================================
+
+  # Enable sops-secrets-operator for secret management
+  sops-secrets-operator.enable = isInfrastructure;
+
   # Enable step-ca ACME server for local TLS
-  step-ca.enable = true;
+  step-ca.enable = isInfrastructure;
   step-ca.caCerts = {
     rootCert = ../local/pki/root_ca.crt;
     intermediateCert = ../local/pki/intermediate_ca.crt;
@@ -52,10 +80,7 @@
   # SopsSecret for CA private keys (processed by sops-secrets-operator)
   step-ca.sopsSecretFile = ../../../secrets/clusters/local/step-ca-sopssecret.enc.yaml;
 
-  # Enable sops-secrets-operator for secret management
-  sops-secrets-operator.enable = true;
-
   # Enable ArgoCD for GitOps (Phase 3b)
   # Insecure mode for local dev - access via kubectl port-forward
-  argocd.enable = true;
+  argocd.enable = isInfrastructure;
 }
