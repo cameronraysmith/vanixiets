@@ -4,7 +4,10 @@
 # Phase 3 infrastructure (Cilium, sops-secrets-operator, step-ca, ArgoCD)
 # and managing future applications.
 #
-# Output: ./manifests/local-k3d/ (rendered Application CRs)
+# Rendered manifests are pushed to a separate private repository per ADR-006:
+# https://github.com/cameronraysmith/local-k3d (private)
+#
+# Workflow: edit Nix here → nixidy build → push to local-k3d repo → ArgoCD syncs
 { lib, ... }:
 {
   imports = [
@@ -13,12 +16,11 @@
 
   nixidy = {
     target = {
-      # Repository URL for ArgoCD to fetch manifests
-      repository = "https://github.com/cameronraysmith/vanixiets.git";
-      # TODO: change back to "main" before merging PR
-      branch = "nix-50f";
-      # Output path relative to repository root
-      rootPath = "./manifests/local-k3d";
+      # Separate private repository for rendered manifests (ADR-006)
+      repository = "https://github.com/cameronraysmith/local-k3d.git";
+      branch = "main";
+      # Manifests at repository root
+      rootPath = ".";
     };
 
     # App-of-Apps pattern: single root Application manages all others
