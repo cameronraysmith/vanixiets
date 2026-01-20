@@ -680,6 +680,7 @@ container-release VERSION="1.0.0" TAGS="":
 [group('k3d')]
 k3d-up:
   ctlptl apply -f kubernetes/clusters/local-k3d/cluster.yaml
+  @just k3d-configure-dns
   @just k3d-bootstrap-secrets
 
 # Bootstrap secrets required before first deployment (idempotent)
@@ -690,6 +691,30 @@ k3d-bootstrap-secrets:
     --namespace=sops-secrets-operator \
     --from-file=age.key=${HOME}/.config/sops/age/keys.txt \
     --dry-run=client -o yaml | kubectl apply -f -
+
+# Configure CoreDNS to forward sslip.io queries to public DNS resolvers
+# Required because OrbStack's DNS (192.168.107.1) cannot resolve sslip.io wildcards
+[group('k3d')]
+k3d-configure-dns:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  echo "Waiting for CoreDNS to be running..."
+  kubectl wait --for=condition=Ready pod -l k8s-app=kube-dns -n kube-system --timeout=60s
+  echo "Patching CoreDNS ConfigMap to forward sslip.io to public DNS..."
+  CURRENT=$(kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}')
+  if echo "$CURRENT" | grep -q "sslip.io"; then
+    echo "CoreDNS already configured for sslip.io forwarding"
+    exit 0
+  fi
+  SSLIP_BLOCK=$'sslip.io:53 {\n    forward . 1.1.1.1 8.8.8.8\n    cache 30\n}\n'
+  PATCHED="${SSLIP_BLOCK}${CURRENT}"
+  PATCH_JSON=$(jq -n --arg corefile "$PATCHED" '{"data": {"Corefile": $corefile}}')
+  kubectl patch configmap coredns -n kube-system --type=merge -p "$PATCH_JSON"
+  echo "Restarting CoreDNS deployment..."
+  kubectl rollout restart deployment coredns -n kube-system
+  echo "Waiting for CoreDNS to be ready..."
+  kubectl rollout status deployment coredns -n kube-system --timeout=60s
+  echo "CoreDNS configured for sslip.io forwarding"
 
 # Delete local k3d cluster
 [group('k3d')]
