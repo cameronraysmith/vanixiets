@@ -156,6 +156,11 @@ in
           # Disable HA redis for local dev
           redis-ha.enabled = false;
 
+          # Disable the redis-secret-init Job hook
+          # The Job has no hook-weight annotations, causing kluctl to apply it before
+          # its ServiceAccount dependency. We provide the redis secret ourselves below.
+          redisSecretInit.enabled = false;
+
           # ApplicationSet Controller
           applicationSet = {
             replicas = 1;
@@ -188,30 +193,40 @@ in
         } cfg.helmValues;
       };
 
-      # Default AppProject for cluster-wide access
-      # Allows applications to deploy to any namespace and use any source
-      kubernetes.resources.${cfg.namespace}.AppProject.default = {
-        spec = {
-          description = "Default project for all applications";
-          sourceRepos = [ "*" ];
-          destinations = [
-            {
-              namespace = "*";
-              server = "https://kubernetes.default.svc";
-            }
-          ];
-          clusterResourceWhitelist = [
-            {
-              group = "*";
-              kind = "*";
-            }
-          ];
-          namespaceResourceWhitelist = [
-            {
-              group = "*";
-              kind = "*";
-            }
-          ];
+      # Namespaced resources for ArgoCD
+      kubernetes.resources.${cfg.namespace} = {
+        # Redis authentication secret (required when redisSecretInit.enabled = false)
+        # For local dev, use a static password. Production should use SopsSecret.
+        Secret.argocd-redis = {
+          type = "Opaque";
+          stringData.auth = "argocd-redis-password-local-dev";
+        };
+
+        # Default AppProject for cluster-wide access
+        # Allows applications to deploy to any namespace and use any source
+        AppProject.default = {
+          spec = {
+            description = "Default project for all applications";
+            sourceRepos = [ "*" ];
+            destinations = [
+              {
+                namespace = "*";
+                server = "https://kubernetes.default.svc";
+              }
+            ];
+            clusterResourceWhitelist = [
+              {
+                group = "*";
+                kind = "*";
+              }
+            ];
+            namespaceResourceWhitelist = [
+              {
+                group = "*";
+                kind = "*";
+              }
+            ];
+          };
         };
       };
     })

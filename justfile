@@ -713,8 +713,13 @@ k3d-deploy:
   nix run .#k8s-deploy-local-k3d-foundation -- --yes
 
   echo ""
-  echo "Waiting for Cilium to be ready..."
-  kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium -n kube-system --timeout=120s
+  echo "Waiting for Cilium pods to be created..."
+  sleep 5  # Brief delay for pods to be scheduled
+
+  echo "Waiting for Cilium Agent to be ready..."
+  kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-agent -n kube-system --timeout=120s
+
+  echo "Waiting for Cilium Operator to be ready..."
   kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=120s
 
   echo ""
