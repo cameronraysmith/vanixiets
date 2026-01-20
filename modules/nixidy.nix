@@ -5,21 +5,34 @@
 # and manages future applications declaratively.
 #
 # Usage:
-#   nix build .#nixidyEnvs.local-k3d.config.build.app  # Build app-of-apps manifest
-#   nix run .#nixidy -- build .#nixidyEnvs.local-k3d   # Build with nixidy CLI
-#   nix run .#nixidy -- info .#nixidyEnvs.local-k3d    # Show environment info
-{ inputs, ... }:
+#   nix run .#nixidy -- build .#local-k3d        # Build environment manifests
+#   nix run .#nixidy -- info .#local-k3d         # Show environment info
+#   nix run .#nixidy -- bootstrap .#local-k3d    # Output bootstrap Application CR
+#   nix run .#nixidy-build-local-k3d             # Convenience wrapper for build
+#
+# Direct nix build (alternative):
+#   nix build .#nixidyEnvs.aarch64-darwin.local-k3d.environmentPackage  # Full environment
+#   nix build .#nixidyEnvs.aarch64-darwin.local-k3d.bootstrapPackage    # Bootstrap Application CR
+{ inputs, lib, ... }:
 {
-  perSystem =
-    { pkgs, system, ... }:
+  # Expose nixidyEnvs as a top-level flake output (per-system)
+  flake.nixidyEnvs = lib.genAttrs [ "aarch64-darwin" "x86_64-linux" "aarch64-linux" ] (
+    system:
+    let
+      pkgs = import inputs.nixpkgs { inherit system; };
+    in
     {
-      # nixidy environments - one per cluster
-      nixidyEnvs.local-k3d = inputs.nixidy.lib.mkEnv {
+      local-k3d = inputs.nixidy.lib.mkEnv {
         inherit pkgs;
         charts = inputs.nixhelm.chartsDerivations.${system};
         modules = [ ../kubernetes/nixidy/local-k3d ];
       };
+    }
+  );
 
+  perSystem =
+    { pkgs, system, ... }:
+    {
       # nixidy CLI tool for build/info commands
       packages.nixidy = inputs.nixidy.packages.${system}.cli;
 
@@ -29,7 +42,7 @@
         program =
           (pkgs.writeShellScript "nixidy-build-local-k3d" ''
             set -euo pipefail
-            ${inputs.nixidy.packages.${system}.cli}/bin/nixidy build .#nixidyEnvs.local-k3d
+            ${inputs.nixidy.packages.${system}.cli}/bin/nixidy build .#nixidyEnvs.${system}.local-k3d
           '').outPath;
       };
     };
