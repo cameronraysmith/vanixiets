@@ -26,6 +26,16 @@
         inherit pkgs;
         charts = inputs.nixhelm.chartsDerivations.${system};
         modules = [ ../kubernetes/nixidy/local-k3d ];
+        # Pass flake inputs for charts not available in nixhelm
+        extraSpecialArgs = {
+          inherit (inputs)
+            cilium-src
+            step-ca-src
+            sops-secrets-operator-src
+            argocd-src
+            argocd-helm-src
+            ;
+        };
       };
     }
   );
