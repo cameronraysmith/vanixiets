@@ -53,6 +53,9 @@
   # Enable Cilium CNI with Gateway API
   cilium.enable = true;
   cilium.version = "1.18.6";
+  # Containerized environment (k3d) - disables sysctlfix init container
+  # which fails because /proc/sys is read-only in container environments
+  cilium.containerized = true;
   # k3d/OrbStack eBPF accommodations:
   # - Disable kube-proxy replacement (use k3s native kube-proxy)
   # - Disable BPF masquerade (use iptables masquerade instead)
