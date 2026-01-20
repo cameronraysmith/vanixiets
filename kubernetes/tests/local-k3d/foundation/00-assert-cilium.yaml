@@ -1,0 +1,19 @@
+# Assert Cilium CNI components are healthy in k3d cluster
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cilium
+  namespace: kube-system
+status:
+  (numberReady >= `1`): true
+  (numberAvailable >= `1`): true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cilium-operator
+  namespace: kube-system
+status:
+  (readyReplicas >= `1`): true
+  (availableReplicas >= `1`): true
