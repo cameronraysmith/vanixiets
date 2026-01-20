@@ -78,6 +78,16 @@ in
       default = { };
       description = "Additional Helm values to merge";
     };
+
+    repoCredentialsSopsSecretFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        Path to a sops-encrypted SopsSecret file containing repository credentials.
+        The SopsSecret should create a Kubernetes Secret with the ArgoCD repository
+        label (argocd.argoproj.io/secret-type: repository) for automatic discovery.
+      '';
+    };
   };
 
   config = lib.mkMerge [
@@ -229,6 +239,14 @@ in
           };
         };
       };
+    })
+
+    # Repository credentials SopsSecret (if configured)
+    (lib.mkIf (cfg.enable && cfg.repoCredentialsSopsSecretFile != null) {
+      # Import pre-encrypted SopsSecret for repository credentials
+      # sops-secrets-operator will decrypt this and create the Kubernetes Secret
+      # ArgoCD discovers repository credentials via label selector
+      importyaml.argocd-repo-credentials.src = cfg.repoCredentialsSopsSecretFile;
     })
 
     # API mappings always defined (allows other modules to reference ArgoCD types)
