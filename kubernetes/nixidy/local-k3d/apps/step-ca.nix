@@ -132,6 +132,17 @@ in
           "/spec/volumeMode"
         ];
       };
+      # Helm test pod (expected to fail, ignore status drift)
+      Pod-test-connection = {
+        group = "";
+        kind = "Pod";
+        name = "step-ca-step-certificates-test-connection";
+        inherit namespace;
+        jsonPointers = [
+          "/status"
+          "/metadata/resourceVersion"
+        ];
+      };
     };
   };
 }
