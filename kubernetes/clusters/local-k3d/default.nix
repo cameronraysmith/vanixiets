@@ -1,6 +1,6 @@
 # Local k3d development cluster configuration
 #
-# Cilium CNI and step-ca ACME server for k3d-dev cluster.
+# Cilium CNI with Gateway API and step-ca ACME server for k3d-dev cluster.
 # Cluster runs in k3d containers via OrbStack container runtime.
 { lib, ... }:
 {
@@ -27,16 +27,28 @@
   clusterPodCIDR = "10.42.0.0/16";
   clusterServiceCIDR = "10.43.0.0/16";
 
-  # Enable Cilium CNI
+  # Enable Gateway API CRDs (must be installed before Cilium gatewayAPI)
+  gateway-api.enable = true;
+  gateway-api.version = "1.4.1";
+
+  # Enable Cilium CNI with Gateway API
   cilium.enable = true;
   cilium.version = "1.18.6";
   # k3d/OrbStack eBPF accommodations:
   # - Disable kube-proxy replacement (use k3s native kube-proxy)
   # - Disable BPF masquerade (use iptables masquerade instead)
+  # Gateway API enablement for ingress via Cilium
   cilium.helmValues = {
     kubeProxyReplacement = false;
     bpf.masquerade = false;
     enableIPv4Masquerade = true;
+
+    # Gateway API support
+    gatewayAPI.enabled = true;
+
+    # Host network mode for gateway pods in k3d (no cloud LoadBalancer)
+    # Allows external access via node ports
+    gatewayAPI.hostNetwork.enabled = true;
   };
 
   # Enable step-ca ACME server for local TLS
