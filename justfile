@@ -679,7 +679,7 @@ container-release VERSION="1.0.0" TAGS="":
 # Create local k3d cluster with OrbStack and bootstrap secrets
 [group('k3d')]
 k3d-up:
-  K3D_FIX_MOUNTS=1 ctlptl apply -f kubernetes/clusters/local-k3d/cluster.yaml
+  ctlptl apply -f kubernetes/clusters/local-k3d/cluster.yaml
   @just k3d-bootstrap-secrets
 
 # Bootstrap secrets required before first deployment (idempotent)
