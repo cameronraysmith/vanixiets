@@ -797,7 +797,8 @@ k3d-wait-ready:
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller -n argocd --timeout=300s
 
   echo "Waiting for step-ca..."
-  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=step-certificates -n step-ca --timeout=300s
+  # Use StatefulSet pod label to exclude Helm test-connection pod (which always fails)
+  kubectl wait --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=step-ca-step-certificates-0 -n step-ca --timeout=300s
 
   echo "Waiting for sops-secrets-operator..."
   kubectl wait --for=condition=Available deployment --all -n sops-secrets-operator --timeout=120s
