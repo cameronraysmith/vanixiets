@@ -50,4 +50,8 @@
 
   # Enable sops-secrets-operator for secret management
   sops-secrets-operator.enable = true;
+
+  # Enable ArgoCD for GitOps (Phase 3b)
+  # Insecure mode for local dev - access via kubectl port-forward
+  argocd.enable = true;
 }
