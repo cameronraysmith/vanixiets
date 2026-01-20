@@ -79,6 +79,10 @@ in
         bpf.masquerade = false;
         enableIPv4Masquerade = true;
 
+        # Disable sysctlfix init container - it fails in k3d/kind containers
+        # because /proc/sys is read-only and systemd-sysctl.service doesn't exist
+        sysctlfix.enabled = false;
+
         # Roll out pods on config changes
         rollOutCiliumPods = true;
         operator.rollOutPods = true;
