@@ -5,7 +5,7 @@
 # - Disabled Flannel (for Cilium CNI - pod networking)
 # - k3s kube-proxy enabled (Cilium kube-proxy replacement has eBPF issues in k3d)
 # - Disabled Traefik and ServiceLB (using custom ingress setup)
-# - Port 30080 exposed for ArgoCD access via NodePort
+# - Ports 80/443 mapped to Gateway NodePorts 30080/30443 for HTTP/HTTPS ingress
 # - K3D_FIX_MOUNTS=1 environment variable for OrbStack compatibility
 apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
@@ -22,7 +22,10 @@ k3d:
           - server:*
           - agent:*
     ports:
-      - port: 30080:30080
+      - port: 80:30080
+        nodeFilters:
+          - loadbalancer
+      - port: 443:30443
         nodeFilters:
           - loadbalancer
     options:
