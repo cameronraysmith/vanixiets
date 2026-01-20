@@ -51,9 +51,14 @@ in
             # step-ca uses self-signed certificates
             skipTLSVerify: true
             # Solvers for ACME challenges
+            # Uses Gateway API HTTP-01 solver with Cilium Gateway
             solvers:
               - http01:
-                  ingress: {}
+                  gatewayHTTPRoute:
+                    parentRefs:
+                      - name: main-gateway
+                        namespace: gateway-system
+                        kind: Gateway
       ''
     ];
   };
