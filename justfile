@@ -775,6 +775,96 @@ k3d-test-foundation:
 k3d-test-infrastructure:
   chainsaw test kubernetes/tests/local-k3d/infrastructure/
 
+# Wait for kluctl-deployed foundation and infrastructure pods to be ready
+[group('k3d')]
+k3d-wait-ready:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  echo "=== Waiting for Foundation (CNI) ==="
+  echo "Waiting for Cilium Agent..."
+  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cilium-agent -n kube-system --timeout=300s
+
+  echo "Waiting for Cilium Operator..."
+  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=120s
+
+  echo ""
+  echo "=== Waiting for Infrastructure ==="
+  echo "Waiting for ArgoCD deployments..."
+  kubectl wait --for=condition=Available deployment --all -n argocd --timeout=300s
+
+  echo "Waiting for ArgoCD Application Controller..."
+  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller -n argocd --timeout=300s
+
+  echo "Waiting for step-ca..."
+  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=step-certificates -n step-ca --timeout=300s
+
+  echo "Waiting for sops-secrets-operator..."
+  kubectl wait --for=condition=Available deployment --all -n sops-secrets-operator --timeout=120s
+
+  echo ""
+  echo "=== All foundation and infrastructure pods ready ==="
+
+# Wait for all ArgoCD Applications to reach Synced + Healthy status
+[group('k3d')]
+k3d-wait-argocd-sync:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  echo "=== Waiting for ArgoCD Applications ==="
+  echo "Applications managed by nixidy sync waves:"
+  echo "  Wave -1 (adoption): cilium, argocd, sops-secrets-operator, step-ca"
+  echo "  Wave 0: cert-manager"
+  echo "  Wave 1-2: cluster-issuer, gateway, test-certificate"
+  echo "  Wave 3: argocd-route"
+  echo ""
+
+  echo "Listing current applications..."
+  kubectl get applications -n argocd -o wide || true
+  echo ""
+
+  echo "Waiting for all applications to be Healthy..."
+  kubectl wait --for=jsonpath='{.status.health.status}'=Healthy application --all -n argocd --timeout=600s
+
+  echo "Waiting for all applications to be Synced..."
+  kubectl wait --for=jsonpath='{.status.sync.status}'=Synced application --all -n argocd --timeout=600s
+
+  echo ""
+  echo "=== All ArgoCD applications synced and healthy ==="
+  kubectl get applications -n argocd -o wide
+
+# Full integration test: cluster creation, deployment, GitOps sync, and validation
+[group('k3d')]
+k3d-integration:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  echo "=== Phase 1: Cluster Bootstrap ==="
+  just k3d-full
+
+  echo ""
+  echo "=== Phase 2: Wait for Infrastructure Ready ==="
+  just k3d-wait-ready
+
+  echo ""
+  echo "=== Phase 3: GitOps Sync ==="
+  just nixidy-sync
+
+  echo ""
+  echo "=== Phase 4: ArgoCD Bootstrap ==="
+  just nixidy-bootstrap
+
+  echo ""
+  echo "=== Phase 5: Wait for ArgoCD Sync ==="
+  just k3d-wait-argocd-sync
+
+  echo ""
+  echo "=== Phase 6: Integration Tests ==="
+  just k3d-test
+
+  echo ""
+  echo "=== Integration complete ==="
+
 ## nixidy (Phase 4 GitOps)
 # Per ADR-006: Rendered manifests are pushed to separate private repos per cluster.
 # local-k3d manifests → ~/projects/nix-workspace/local-k3d (github.com/cameronraysmith/local-k3d)
