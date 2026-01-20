@@ -1,0 +1,17 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: foundation
+spec:
+  description: Verify foundation components (Cilium CNI, ArgoCD) are healthy
+  steps:
+    - name: cilium
+      description: Assert Cilium CNI components are running
+      try:
+        - assert:
+            file: 00-assert-cilium.yaml
+    - name: argocd
+      description: Assert ArgoCD components are running and adopted manifests
+      try:
+        - assert:
+            file: 00-assert-argocd-adoption.yaml
