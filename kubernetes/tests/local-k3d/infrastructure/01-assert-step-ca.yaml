@@ -3,7 +3,7 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: step-certificates
+  name: step-ca-step-certificates
   namespace: step-ca
 status:
   (readyReplicas >= `1`): true
