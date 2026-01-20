@@ -83,4 +83,7 @@ in
   # Enable ArgoCD for GitOps (Phase 3b)
   # Insecure mode for local dev - access via kubectl port-forward
   argocd.enable = isInfrastructure;
+  # Repository credentials for private local-k3d manifest repo (ADR-006)
+  # SopsSecret decrypted by sops-secrets-operator, discovered by ArgoCD via label
+  argocd.repoCredentialsSopsSecretFile = ../../../secrets/clusters/local/argocd-repo-credentials.enc.yaml;
 }

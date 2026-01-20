@@ -242,12 +242,20 @@ in
     })
 
     # Repository credentials SopsSecret (if configured)
-    (lib.mkIf (cfg.enable && cfg.repoCredentialsSopsSecretFile != null) {
-      # Import pre-encrypted SopsSecret for repository credentials
-      # sops-secrets-operator will decrypt this and create the Kubernetes Secret
-      # ArgoCD discovers repository credentials via label selector
-      importyaml.argocd-repo-credentials.src = cfg.repoCredentialsSopsSecretFile;
-    })
+    (lib.mkIf (cfg.enable && cfg.repoCredentialsSopsSecretFile != null) (
+      let
+        # Create derivation for SopsSecret file (importyaml requires derivation, not path)
+        repoCredentialsSopsSecretDrv = pkgs.runCommand "argocd-repo-credentials-sopssecret" { } ''
+          cp ${cfg.repoCredentialsSopsSecretFile} $out
+        '';
+      in
+      {
+        # Import pre-encrypted SopsSecret for repository credentials
+        # sops-secrets-operator will decrypt this and create the Kubernetes Secret
+        # ArgoCD discovers repository credentials via label selector
+        importyaml.argocd-repo-credentials.src = repoCredentialsSopsSecretDrv;
+      }
+    ))
 
     # API mappings always defined (allows other modules to reference ArgoCD types)
     {
