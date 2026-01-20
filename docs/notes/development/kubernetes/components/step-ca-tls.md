@@ -103,7 +103,7 @@ The CA private keys must persist across pod restarts.
 Losing the CA key invalidates all issued certificates and breaks trust relationships.
 The `local-path` storage class works for single-node development clusters.
 
-For Colima with k3s, the default local-path provisioner handles this automatically.
+For k3d with k3s, the default local-path provisioner handles this automatically.
 Multi-node clusters require a distributed storage class or node affinity to ensure the volume remains accessible.
 
 ## Root CA setup
@@ -317,12 +317,12 @@ Local development uses wildcard DNS services that map any hostname to embedded I
 ### sslip.io integration
 
 sslip.io provides wildcard DNS where any subdomain containing an IP address resolves to that IP.
-For a Colima cluster with ingress at 192.168.5.2:
+For a k3d cluster with ingress at 127.0.0.1:
 
 ```
-app.192.168.5.2.sslip.io -> 192.168.5.2
-api.192.168.5.2.sslip.io -> 192.168.5.2
-*.192.168.5.2.sslip.io   -> 192.168.5.2
+app.127.0.0.1.sslip.io -> 127.0.0.1
+api.127.0.0.1.sslip.io -> 127.0.0.1
+*.127.0.0.1.sslip.io   -> 127.0.0.1
 ```
 
 This requires no DNS server configuration.
