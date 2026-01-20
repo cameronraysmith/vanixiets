@@ -1,0 +1,41 @@
+# Assert ArgoCD components are healthy and have adopted nixidy manifests
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-application-controller
+  namespace: argocd
+status:
+  (readyReplicas >= `1`): true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-server
+  namespace: argocd
+status:
+  (readyReplicas >= `1`): true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-repo-server
+  namespace: argocd
+status:
+  (readyReplicas >= `1`): true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-redis
+  namespace: argocd
+status:
+  (readyReplicas >= `1`): true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-applicationset-controller
+  namespace: argocd
+status:
+  (readyReplicas >= `1`): true
