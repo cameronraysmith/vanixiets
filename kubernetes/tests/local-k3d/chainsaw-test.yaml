@@ -1,0 +1,32 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: local-k3d
+spec:
+  description: Verify local k3d cluster has expected components deployed and healthy
+  steps:
+    - name: foundation-cilium
+      description: Assert Cilium CNI components are running
+      try:
+        - assert:
+            file: foundation/00-assert-cilium.yaml
+    - name: foundation-argocd
+      description: Assert ArgoCD components are running and adopted manifests
+      try:
+        - assert:
+            file: foundation/00-assert-argocd-adoption.yaml
+    - name: infrastructure-cert-manager
+      description: Assert cert-manager components are running
+      try:
+        - assert:
+            file: infrastructure/01-assert-cert-manager.yaml
+    - name: infrastructure-step-ca
+      description: Assert step-ca internal PKI is running
+      try:
+        - assert:
+            file: infrastructure/01-assert-step-ca.yaml
+    - name: infrastructure-sops-operator
+      description: Assert sops-secrets-operator is running
+      try:
+        - assert:
+            file: infrastructure/01-assert-sops-operator.yaml
