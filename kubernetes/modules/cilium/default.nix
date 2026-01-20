@@ -41,15 +41,27 @@ in
 
       # Create derivation for each CRD file (required for importyaml)
       # importyaml expects either a derivation or URL, not a store path string
-      mkCrdDrv = filename: pkgs.runCommand "cilium-crd-${filename}" { } ''
-        cp ${crdDir}/${filename} $out
-      '';
+      mkCrdDrv =
+        filename:
+        pkgs.runCommand "cilium-crd-${filename}" { } ''
+          cp ${crdDir}/${filename} $out
+        '';
     in
     lib.mkMerge [
       (lib.mkIf cfg.enable {
         helm.releases.${moduleName} = {
           namespace = "kube-system";
           chart = "${src}/install/kubernetes/cilium";
+
+          # Add kluctl wait-readiness annotation to DaemonSets
+          # This ensures prio-20 barrier waits for Cilium pods to be Ready,
+          # not just applied. Without this, dependent pods fail with
+          # "network plugin is not ready" because CNI isn't running yet.
+          overrides = [
+            {
+              metadata.annotations."kluctl.io/wait-readiness" = "true";
+            }
+          ];
 
           values = lib.recursiveUpdate {
             # Core settings for local dev
