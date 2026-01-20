@@ -23,5 +23,6 @@
     ./cluster-issuer.nix # sync wave 1
     ./gateway.nix # sync wave 2
     ./test-certificate.nix # sync wave 2
+    ./argocd-route.nix # sync wave 3
   ];
 }
