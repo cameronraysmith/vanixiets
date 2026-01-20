@@ -31,6 +31,25 @@ let
     pkgs.runCommand "argocd-crd-${filename}" { } ''
       cp ${crdDir}/${filename} $out
     '';
+
+  # Pre-process Helm chart to remove external dependency
+  # The argo-cd chart has a conditional dependency on redis-ha that helm checks for
+  # even when disabled. Since we're disabling redis-ha for local dev, we patch
+  # Chart.yaml to remove the dependency entirely (avoids network fetch in sandbox).
+  chartWithDeps =
+    pkgs.runCommand "argocd-helm-chart"
+      {
+        nativeBuildInputs = [ pkgs.yq-go ];
+      }
+      ''
+        cp -r ${argocd-helm-src}/charts/argo-cd $out
+        chmod -R u+w $out
+        # Remove the redis-ha dependency from Chart.yaml
+        # This is safe because we're disabling redis-ha in our values anyway
+        yq -i 'del(.dependencies)' $out/Chart.yaml
+        # Also remove Chart.lock to avoid dependency check
+        rm -f $out/Chart.lock
+      '';
 in
 {
   options.${moduleName} = {
@@ -38,13 +57,13 @@ in
 
     version = lib.mkOption {
       type = lib.types.str;
-      default = "2.14.8";
+      default = "3.2.5";
       description = "ArgoCD version (must match argocd-src flake input)";
     };
 
     chartVersion = lib.mkOption {
       type = lib.types.str;
-      default = "7.9.2";
+      default = "9.3.4";
       description = "ArgoCD Helm chart version (must match argocd-helm-src flake input)";
     };
 
@@ -70,9 +89,11 @@ in
       # Import ArgoCD CRDs from source
       # Helm chart includeCRDs=false by default, so we import them separately
       # This ensures CRDs are deployed before ArgoCD controller starts
+      # Filter out kustomization.yaml which is not a Kubernetes resource
       importyaml = lib.pipe (builtins.readDir crdDir) [
         (lib.filterAttrs (_name: type: type == "regular"))
         (lib.filterAttrs (name: _type: lib.hasSuffix ".yaml" name))
+        (lib.filterAttrs (name: _type: name != "kustomization.yaml"))
         (lib.mapAttrs' (
           filename: _type: {
             name = "argocd-${filename}";
@@ -83,7 +104,7 @@ in
 
       helm.releases.${moduleName} = {
         namespace = cfg.namespace;
-        chart = "${argocd-helm-src}/charts/argo-cd";
+        chart = chartWithDeps;
 
         # Fix namespace for resources - some Helm charts don't template
         # metadata.namespace in all resources
