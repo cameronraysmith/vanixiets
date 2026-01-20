@@ -1,0 +1,22 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: infrastructure
+spec:
+  description: Verify infrastructure components (cert-manager, step-ca, sops-operator) are healthy
+  steps:
+    - name: cert-manager
+      description: Assert cert-manager components are running
+      try:
+        - assert:
+            file: 01-assert-cert-manager.yaml
+    - name: step-ca
+      description: Assert step-ca internal PKI is running
+      try:
+        - assert:
+            file: 01-assert-step-ca.yaml
+    - name: sops-operator
+      description: Assert sops-secrets-operator is running
+      try:
+        - assert:
+            file: 01-assert-sops-operator.yaml
