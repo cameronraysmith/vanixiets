@@ -761,8 +761,13 @@ k3d-full:
   just k3d-deploy
 
 ## nixidy (Phase 4 GitOps)
+# Per ADR-006: Rendered manifests are pushed to separate private repos per cluster.
+# local-k3d manifests → ~/projects/nix-workspace/local-k3d (github.com/cameronraysmith/local-k3d)
 
-# Build nixidy manifests for local-k3d environment
+# Path to local-k3d manifest repository
+local_k3d_repo := env("LOCAL_K3D_REPO", home_directory() / "projects/nix-workspace/local-k3d")
+
+# Build nixidy manifests for local-k3d environment (renders to ./result)
 [group('nixidy')]
 nixidy-build:
   nix run .#nixidy -- build .#local-k3d
@@ -772,13 +777,51 @@ nixidy-build:
 nixidy-info:
   nix run .#nixidy -- info .#local-k3d
 
+# Push rendered manifests to local-k3d private repository
+# Prerequisites: nixidy-build must be run first, local-k3d repo must exist
+[group('nixidy')]
+nixidy-push:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  if [[ ! -d "result" ]]; then
+    echo "Error: result/ directory not found. Run 'just nixidy-build' first."
+    exit 1
+  fi
+
+  if [[ ! -d "{{ local_k3d_repo }}" ]]; then
+    echo "Error: local-k3d repo not found at {{ local_k3d_repo }}"
+    echo "Clone it with: git clone git@github.com:cameronraysmith/local-k3d.git {{ local_k3d_repo }}"
+    exit 1
+  fi
+
+  echo "Syncing rendered manifests to {{ local_k3d_repo }}..."
+  rsync -a --delete --exclude='.git' result/ "{{ local_k3d_repo }}/"
+
+  echo "Committing and pushing to local-k3d repo..."
+  cd "{{ local_k3d_repo }}"
+  git add -A
+  if git diff --cached --quiet; then
+    echo "No changes to push."
+  else
+    git commit -m "chore: update rendered manifests from vanixiets"
+    git push
+    echo "Manifests pushed to local-k3d repo."
+  fi
+
+# Build and push manifests in one step
+[group('nixidy')]
+nixidy-sync: nixidy-build nixidy-push
+
 # Bootstrap ArgoCD app-of-apps (transition from Phase 3 to Phase 4)
-# Prerequisites: k3d-full must complete successfully first
+# Prerequisites: k3d-full must complete, manifests must be pushed to local-k3d repo
+# Note: ArgoCD needs credentials to access private repo (configure via argocd CLI or UI)
 [group('nixidy')]
 nixidy-bootstrap:
   nix run .#nixidy -- bootstrap .#local-k3d | kubectl apply -f -
 
 # Full GitOps workflow: Phase 3 bootstrap + Phase 4 ArgoCD takeover
+# Note: Requires local-k3d repo to exist and ArgoCD to have access credentials
 [group('nixidy')]
 nixidy-full:
   #!/usr/bin/env bash
@@ -786,6 +829,10 @@ nixidy-full:
 
   echo "=== Phase 3: Bootstrap (easykubenix/kluctl) ==="
   just k3d-full
+
+  echo ""
+  echo "=== Phase 4: Render and push manifests ==="
+  just nixidy-sync
 
   echo ""
   echo "=== Phase 4: GitOps (nixidy/ArgoCD) ==="
@@ -800,6 +847,9 @@ nixidy-full:
   echo "=== GitOps transition complete ==="
   echo "ArgoCD will now manage all applications via sync waves."
   echo "Access ArgoCD UI: kubectl port-forward svc/argocd-server -n argocd 8080:80"
+  echo ""
+  echo "NOTE: ArgoCD needs credentials to access the private local-k3d repo."
+  echo "Configure via: argocd repo add https://github.com/cameronraysmith/local-k3d.git --username <user> --password <token>"
 
 ## secrets
 
