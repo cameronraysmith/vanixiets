@@ -1,0 +1,9 @@
+# Assert step-ca internal PKI StatefulSet is healthy
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: step-certificates
+  namespace: step-ca
+status:
+  (readyReplicas >= `1`): true
