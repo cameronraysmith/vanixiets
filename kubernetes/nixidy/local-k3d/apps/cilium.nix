@@ -91,11 +91,10 @@ in
         ipv6.enabled = false;
 
         # Gateway API support
+        # nodePort required when kubeProxyReplacement=false (k3d eBPF constraints)
         gatewayAPI.enabled = true;
-
-        # Host network mode for gateway pods in k3d (no cloud LoadBalancer)
-        # Allows external access via node ports
         gatewayAPI.hostNetwork.enabled = true;
+        nodePort.enabled = true;
       };
     };
 

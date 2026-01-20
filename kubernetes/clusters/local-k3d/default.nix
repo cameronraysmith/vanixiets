@@ -66,8 +66,10 @@ in
     # because /proc/sys is read-only
     sysctlfix.enabled = false;
     # Gateway API support for ingress
+    # nodePort required when kubeProxyReplacement=false (k3d eBPF constraints)
     gatewayAPI.enabled = true;
     gatewayAPI.hostNetwork.enabled = true;
+    nodePort.enabled = true;
   };
 
   # ==========================================================================
