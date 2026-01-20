@@ -72,14 +72,6 @@ in
             memory = "256Mi";
           };
         };
-
-        # DNS config for proper resolution
-        dnsConfig.options = [
-          {
-            name = "ndots";
-            value = "1";
-          }
-        ];
       };
     };
 
