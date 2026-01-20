@@ -31,6 +31,22 @@ in
       default = { };
       description = "Additional Helm values to merge";
     };
+
+    containerized = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable accommodations for containerized environments (k3d, kind, etc.)
+        where /proc/sys is read-only and direct sysctl writes fail.
+
+        When enabled:
+        - sysctlfix init container is disabled (would fail writing to /etc/sysctl.d)
+        - BPF and cgroup automount remain enabled (K3D_FIX_MOUNTS handles mount sharing)
+
+        Note: K3D_FIX_MOUNTS=1 must be set in the k3d cluster configuration
+        to enable shared mounts for BPF filesystem operations.
+      '';
+    };
   };
 
   config =
@@ -76,41 +92,51 @@ in
             }
           ];
 
-          values = lib.recursiveUpdate {
-            # Core settings for local dev
-            cluster.name = config.clusterName;
+          values = lib.recursiveUpdate (
+            {
+              # Core settings for local dev
+              cluster.name = config.clusterName;
 
-            # kube-proxy replacement with eBPF
-            kubeProxyReplacement = true;
+              # kube-proxy replacement with eBPF
+              kubeProxyReplacement = true;
 
-            # Use tunnel mode for simplicity (works with any network)
-            routingMode = "tunnel";
-            tunnelProtocol = "geneve";
+              # Use tunnel mode for simplicity (works with any network)
+              routingMode = "tunnel";
+              tunnelProtocol = "geneve";
 
-            # IPAM via kubernetes (simple, works with k3s)
-            ipam.mode = "kubernetes";
+              # IPAM via kubernetes (simple, works with k3s)
+              ipam.mode = "kubernetes";
 
-            # API server access (local/loopback for single-node)
-            k8sServiceHost = config.clusterHost;
-            k8sServicePort = 6443;
+              # API server access (local/loopback for single-node)
+              k8sServiceHost = config.clusterHost;
+              k8sServicePort = 6443;
 
-            # Single replica for local dev
-            operator.replicas = 1;
+              # Single replica for local dev
+              operator.replicas = 1;
 
-            # Disable optional features for minimal footprint
-            hubble.relay.enabled = false;
-            hubble.ui.enabled = false;
+              # Disable optional features for minimal footprint
+              hubble.relay.enabled = false;
+              hubble.ui.enabled = false;
 
-            # BPF masquerade for outbound NAT
-            bpf.masquerade = true;
+              # BPF masquerade for outbound NAT
+              bpf.masquerade = true;
 
-            # Roll out pods on config changes
-            rollOutCiliumPods = true;
-            operator.rollOutPods = true;
+              # Roll out pods on config changes
+              rollOutCiliumPods = true;
+              operator.rollOutPods = true;
 
-            # IPv4 only for local dev (simpler)
-            ipv6.enabled = false;
-          } cfg.helmValues;
+              # IPv4 only for local dev (simpler)
+              ipv6.enabled = false;
+            }
+            // lib.optionalAttrs cfg.containerized {
+              # Containerized environment accommodations (k3d, kind, etc.)
+              # Disable sysctlfix init container - it fails in containers because
+              # /proc/sys/net is read-only and systemd-sysctl.service doesn't exist.
+              # The sysctl settings it would configure (rp_filter=0 for Cilium interfaces)
+              # are not strictly required for basic functionality in dev environments.
+              sysctlfix.enabled = false;
+            }
+          ) cfg.helmValues;
         };
 
         # Import Cilium CRDs from source (v2 + v2alpha1)
