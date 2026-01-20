@@ -1,7 +1,11 @@
 # Test Certificate Application for verification
 #
 # Creates a test Certificate to verify cert-manager and ClusterIssuer work correctly.
-# Issues a TLS certificate using the step-ca ACME ClusterIssuer.
+# Issues a TLS certificate using the step-ca ACME ClusterIssuer with HTTP-01 challenge.
+#
+# Uses sslip.io wildcard DNS for HTTP-01 challenge resolution.
+# sslip.io resolves *.127.0.0.1.sslip.io to 127.0.0.1, enabling HTTP-01 challenges
+# for local development where the Gateway is exposed on localhost.
 #
 # Uses yamls option for cert-manager CRDs (no typed options generated).
 # Sync wave 2: after ClusterIssuer (1).
@@ -9,6 +13,10 @@
 let
   # Test namespace for certificate verification
   testNamespace = "cert-manager-test";
+
+  # sslip.io domain for HTTP-01 challenge validation
+  # 127.0.0.1 is reachable from k3d cluster via host networking
+  testDomain = "test.127.0.0.1.sslip.io";
 in
 {
   applications.test-certificate = {
@@ -47,12 +55,11 @@ in
           issuerRef:
             name: step-ca-acme
             kind: ClusterIssuer
-          # Certificate subject
-          commonName: test.local.cluster
-          # DNS SANs
+          # Certificate subject using sslip.io domain
+          commonName: ${testDomain}
+          # DNS SANs - sslip.io domain for HTTP-01 validation
           dnsNames:
-            - test.local.cluster
-            - test.${testNamespace}.svc.cluster.local
+            - ${testDomain}
           # Private key configuration
           privateKey:
             algorithm: ECDSA
