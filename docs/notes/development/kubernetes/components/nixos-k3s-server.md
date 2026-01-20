@@ -5,8 +5,8 @@ title: NixOS k3s server configuration
 # NixOS k3s server configuration
 
 This document describes configuring the nixpkgs `services.k3s` module and accompanying system settings for running k3s as a Kubernetes server node.
-The configuration targets x86_64-linux VMs running via Rosetta on aarch64-darwin hosts using Colima's vz backend.
-Production parity with Hetzner deployment is maintained through consistent module configuration.
+The configuration targets NixOS hosts for production Hetzner deployments via clan.
+Local development uses k3d (k3s-in-docker) per ADR-005; this document focuses on production NixOS configuration.
 
 ## Overview
 
@@ -257,15 +257,19 @@ environment.persistence."/persist".directories = [
 
 ## Local development vs production
 
-Configuration differences between local Colima VMs and Hetzner production.
+Local development uses k3d (k3s-in-docker) rather than NixOS VMs per ADR-005.
+This section documents the production NixOS configuration differences.
 
-### Local development
+### Local development (k3d)
 
-- Single-node cluster without `clusterInit` (sqlite backend)
-- Firewall disabled for simplicity
-- No TLS SAN configuration needed
-- VM-local storage sufficient
-- Token can be auto-generated
+Local development uses k3d with pre-configured k3s flags.
+See [02-local-development.md](../workflows/02-local-development.md) for the k3d workflow.
+The k3d configuration handles:
+
+- Single-node cluster (container-based, not VM)
+- Cilium-compatible flags via k3d config
+- `K3D_FIX_MOUNTS=1` for BPF mount propagation
+- Port forwarding for localhost access
 
 ### Production (Hetzner)
 
