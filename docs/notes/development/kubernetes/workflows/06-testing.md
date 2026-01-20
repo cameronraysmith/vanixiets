@@ -21,19 +21,22 @@ Tests are YAML-based with apply/assert steps that verify resources reach expecte
 
 ### Test structure
 
-Tests live in `tests/kubernetes/` with a structure mirroring deployment stages:
+Tests live in `kubernetes/tests/[cluster-name]/` with cluster-specific test suites and shared assertions:
 
 ```text
-tests/kubernetes/
-├── foundation/           # Cilium, ArgoCD base
-│   ├── chainsaw-test.yaml
-│   └── assert-cilium.yaml
-├── infrastructure/       # cert-manager, step-ca, sops-operator
-│   ├── chainsaw-test.yaml
+kubernetes/tests/
+├── common/               # Shared assertions across clusters
 │   └── assert-*.yaml
-└── common/               # Shared assertions
-    └── assert-*.yaml
+└── local-k3d/
+    ├── chainsaw-test.yaml
+    ├── foundation/       # Cilium, ArgoCD adoption
+    │   └── assert-*.yaml
+    └── infrastructure/   # cert-manager, step-ca, sops
+        └── assert-*.yaml
 ```
+
+This organization follows the existing `kubernetes/clusters/[cluster-name]/` and `kubernetes/nixidy/[cluster-name]/` patterns, colocating tests with the kubernetes configurations they validate.
+The structure supports multi-cluster scalability with natural paths for cluster-specific test suites (local-k3d, cinnabar, ephemeral-*, production) while `kubernetes/tests/common/` holds cross-cluster assertions.
 
 ### Test pattern
 
@@ -105,11 +108,11 @@ Run tests locally against the k3d cluster:
 # Ensure cluster is running
 just k3d-full
 
-# Run chainsaw tests
-chainsaw test tests/kubernetes/
+# Run chainsaw tests for local-k3d
+chainsaw test kubernetes/tests/local-k3d/
 
 # Run specific test suite
-chainsaw test tests/kubernetes/foundation/
+chainsaw test kubernetes/tests/local-k3d/foundation/
 ```
 
 ## Test development workflow
