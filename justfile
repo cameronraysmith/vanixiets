@@ -760,6 +760,21 @@ k3d-full:
   just k3d-up
   just k3d-deploy
 
+# Run all kubernetes tests (foundation + infrastructure)
+[group('k3d')]
+k3d-test:
+  chainsaw test kubernetes/tests/local-k3d/
+
+# Run only foundation tests
+[group('k3d')]
+k3d-test-foundation:
+  chainsaw test kubernetes/tests/local-k3d/foundation/
+
+# Run only infrastructure tests
+[group('k3d')]
+k3d-test-infrastructure:
+  chainsaw test kubernetes/tests/local-k3d/infrastructure/
+
 ## nixidy (Phase 4 GitOps)
 # Per ADR-006: Rendered manifests are pushed to separate private repos per cluster.
 # local-k3d manifests → ~/projects/nix-workspace/local-k3d (github.com/cameronraysmith/local-k3d)
