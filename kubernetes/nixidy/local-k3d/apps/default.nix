@@ -21,6 +21,7 @@
     # Phase 4 native: fresh deployments via ArgoCD
     ./cert-manager.nix # sync wave 0
     ./cluster-issuer.nix # sync wave 1
+    ./gateway.nix # sync wave 2
     ./test-certificate.nix # sync wave 2
   ];
 }
