@@ -4,8 +4,9 @@
 #   Enables sslip.io domains: *.192.168.100.2.sslip.io resolves to server node
 # - Disabled Flannel (for Cilium CNI - pod networking)
 # - k3s kube-proxy enabled (Cilium kube-proxy replacement has eBPF issues in k3d)
-# - Disabled Traefik and ServiceLB (using custom ingress setup)
-# - Ports 80/443 mapped to Gateway NodePorts 30080/30443 for HTTP/HTTPS ingress
+# - Disabled Traefik (using Cilium Gateway API for ingress)
+# - ServiceLB enabled (klipper-lb assigns node IPs to LoadBalancer services)
+# - Ports 80/443 exposed for Gateway API ingress via servicelb
 # - K3D_FIX_MOUNTS=1 environment variable for OrbStack compatibility
 apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
@@ -22,10 +23,10 @@ k3d:
           - server:*
           - agent:*
     ports:
-      - port: 80:30080
+      - port: 80:80
         nodeFilters:
           - loadbalancer
-      - port: 443:30443
+      - port: 443:443
         nodeFilters:
           - loadbalancer
     options:
@@ -38,8 +39,5 @@ k3d:
             nodeFilters:
               - server:*
           - arg: --disable=traefik
-            nodeFilters:
-              - server:*
-          - arg: --disable=servicelb
             nodeFilters:
               - server:*
