@@ -3,6 +3,7 @@
 # Creates ClusterIssuer pointing to step-ca's ACME endpoint.
 # Enables automated TLS certificate issuance via ACME protocol.
 #
+# Uses yamls option for cert-manager CRDs (no typed options generated).
 # Sync wave 1: after cert-manager (0), before test certificates (2).
 { lib, ... }:
 let
@@ -30,64 +31,30 @@ in
     # Sync wave 1: after cert-manager at wave 0
     annotations."argocd.argoproj.io/sync-wave" = "1";
 
-    # Raw Kubernetes resources (not Helm)
-    resources = {
-      # step-ca ACME ClusterIssuer
-      "cert-manager.io"."v1".ClusterIssuer.step-ca-acme = {
-        spec = {
-          acme = {
+    # Use yamls for cert-manager CRDs (no typed options)
+    yamls = [
+      ''
+        apiVersion: cert-manager.io/v1
+        kind: ClusterIssuer
+        metadata:
+          name: step-ca-acme
+        spec:
+          acme:
             # step-ca ACME endpoint
-            server = stepCaAcmeUrl;
-
+            server: "${stepCaAcmeUrl}"
             # Email for ACME account (required but not used for internal CA)
-            email = "admin@local.cluster";
-
+            email: admin@local.cluster
             # Secret to store ACME account private key
-            privateKeySecretRef = {
-              name = "step-ca-acme-account-key";
-            };
-
+            privateKeySecretRef:
+              name: step-ca-acme-account-key
             # Skip TLS verification for internal CA
             # step-ca uses self-signed certificates
-            skipTLSVerify = true;
-
+            skipTLSVerify: true
             # Solvers for ACME challenges
-            # HTTP-01 is simplest for internal cluster use
-            solvers = [
-              {
-                # Default solver: HTTP-01 challenge
-                # Works for any certificate request without ingress dependencies
-                http01 = {
-                  ingress = {
-                    # Empty class: use default ingress controller
-                    # For local dev, we may not have ingress configured
-                  };
-                };
-              }
-            ];
-          };
-        };
-      };
-
-      # Alternative: self-signed issuer for testing without ACME
-      # Uncomment if step-ca ACME has issues
-      # "cert-manager.io"."v1".ClusterIssuer.self-signed = {
-      #   spec = {
-      #     selfSigned = {};
-      #   };
-      # };
-    };
-
-    # Ignore status conditions (reconciled by cert-manager)
-    ignoreDifferences = {
-      ClusterIssuer-step-ca-acme = {
-        group = "cert-manager.io";
-        kind = "ClusterIssuer";
-        name = "step-ca-acme";
-        jsonPointers = [
-          "/status"
-        ];
-      };
-    };
+            solvers:
+              - http01:
+                  ingress: {}
+      ''
+    ];
   };
 }
