@@ -13,7 +13,7 @@ Target audience: developers working with vanixiets infrastructure who need to un
 
 For local development:
 1. [Environment setup](workflows/01-environment-setup.md) - Install and configure local tools
-2. [Local development](workflows/02-local-development.md) - Start k3s in Colima VM
+2. [Local development](workflows/02-local-development.md) - Start k3s via k3d on OrbStack
 
 For production deployment:
 1. [ClusterAPI bootstrap](workflows/03-clusterapi-bootstrap.md) - Prepare management cluster
@@ -31,7 +31,7 @@ For production deployment:
 | sops-secrets-operator | [components/sops-secrets-operator.md](components/sops-secrets-operator.md) | GitOps-native secret management |
 | nix-csi | [components/nix-csi.md](components/nix-csi.md) | Container storage interface with Nix integration |
 | Environment setup | [workflows/01-environment-setup.md](workflows/01-environment-setup.md) | Initial local environment configuration |
-| Local development | [workflows/02-local-development.md](workflows/02-local-development.md) | Running k3s locally in Colima |
+| Local development | [workflows/02-local-development.md](workflows/02-local-development.md) | Running k3s locally via k3d |
 | ClusterAPI bootstrap | [workflows/03-clusterapi-bootstrap.md](workflows/03-clusterapi-bootstrap.md) | Management cluster preparation |
 | Hetzner deployment | [workflows/04-hetzner-deployment.md](workflows/04-hetzner-deployment.md) | Production deployment to Hetzner |
 | GitOps operations | [workflows/05-gitops-operations.md](workflows/05-gitops-operations.md) | Day-2 operations and maintenance |
@@ -46,14 +46,14 @@ The platform follows a four-layer architecture with production parity between lo
 +------------------+     +------------------+
 |  LOCAL (macOS)   |     |  PRODUCTION      |
 +------------------+     +------------------+
-| Colima + Rosetta |     | Hetzner VMs      |
-| NixOS VM (x86)   |     | NixOS + clan     |
-| k3s server       |     | k3s / ClusterAPI |
-| Cluster stack    |     | Cluster stack    |
-+------------------+     +------------------+
-           \                   /
-            \                 /
-             v               v
+| OrbStack + k3d   |     | Hetzner VMs      |
+| k3s (arm64)      |     | NixOS + clan     |
+| Cluster stack    |     | k3s / ClusterAPI |
++------------------+     | Cluster stack    |
+           \             +------------------+
+            \                   /
+             \                 /
+              v               v
         +------------------------+
         |   Shared Nix Modules   |
         +------------------------+
@@ -72,8 +72,8 @@ See [reference architecture](architecture/reference-architecture.md) for the com
 
 ## Workflow index
 
-- [01-environment-setup.md](workflows/01-environment-setup.md) - Install Colima, Nix tools, and configure local environment
-- [02-local-development.md](workflows/02-local-development.md) - Start NixOS VM with k3s for local Kubernetes development
+- [01-environment-setup.md](workflows/01-environment-setup.md) - Install k3d, ctlptl, OrbStack, and configure local environment
+- [02-local-development.md](workflows/02-local-development.md) - Start k3d cluster for local Kubernetes development
 - [03-clusterapi-bootstrap.md](workflows/03-clusterapi-bootstrap.md) - Initialize ClusterAPI management cluster
 - [04-hetzner-deployment.md](workflows/04-hetzner-deployment.md) - Deploy workload clusters to Hetzner Cloud
 - [05-gitops-operations.md](workflows/05-gitops-operations.md) - Ongoing cluster operations and maintenance procedures
@@ -81,13 +81,15 @@ See [reference architecture](architecture/reference-architecture.md) for the com
 
 ## Decision records
 
-- [ADR-001: Local development architecture](decisions/ADR-001-local-dev-architecture.md) - Selection of Colima + NixOS VM approach for local k3s development
+- [ADR-001: Local development architecture](decisions/ADR-001-local-dev-architecture.md) - Original local development architecture (historical)
+- [ADR-005: Local cluster architecture revision](decisions/ADR-005-local-cluster-architecture-revision.md) - k3d + ctlptl via OrbStack (current approach)
 
 ## Key commands quick reference
 
 | Action | Command |
 |--------|---------|
-| Start local VM | `colima start nixos --vm-type=vz --arch=x86_64` |
+| Start local cluster | `just k3d-full` |
+| Stop local cluster | `just k3d-down` |
 | Check k3s status | `kubectl get nodes` |
 | Deploy manifests | `kluctl deploy -t local` |
 | View cluster info | `kubectl cluster-info` |
