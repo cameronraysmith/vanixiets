@@ -33,6 +33,7 @@
           pkgs.clusterctl
           pkgs.kluctl
           pkgs.k3d
+          pkgs.kyverno-chainsaw
           # Tools required by TypeScript packages CI
           pkgs.bun
           pkgs.nodejs_24 # semantic-release >= 24.10.0
