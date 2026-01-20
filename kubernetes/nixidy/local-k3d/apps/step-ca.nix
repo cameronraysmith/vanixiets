@@ -94,10 +94,10 @@ in
 
     # Ignore controller-managed fields and externally-managed resources
     ignoreDifferences = {
-      # step-ca deployment
-      Deployment-step-ca = {
+      # step-ca statefulset (NOT Deployment - step-ca uses StatefulSet)
+      StatefulSet-step-ca = {
         group = "apps";
-        kind = "Deployment";
+        kind = "StatefulSet";
         name = "step-ca-step-certificates";
         inherit namespace;
         jsonPointers = [
