@@ -117,6 +117,12 @@
 
     argocd-helm-src.url = "github:argoproj/argo-helm/argo-cd-9.3.4";
     argocd-helm-src.flake = false;
+
+    nixidy.url = "github:arnarg/nixidy";
+    nixidy.inputs.nixpkgs.follows = "nixpkgs";
+
+    nixhelm.url = "github:farcaller/nixhelm";
+    nixhelm.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   # sync with lib/caches.nix for machine modules
