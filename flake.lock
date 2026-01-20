@@ -25,6 +25,40 @@
         "type": "github"
       }
     },
+    "argocd-helm-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1768426756,
+        "narHash": "sha256-nRHaFZ0dZSEMwlsNtJ1azEmrrdpIvPRJ2lXp9cqf56U=",
+        "owner": "argoproj",
+        "repo": "argo-helm",
+        "rev": "9bf494533692653b3abe91b9762ae9c2d1fa2f03",
+        "type": "github"
+      },
+      "original": {
+        "owner": "argoproj",
+        "ref": "argo-cd-9.3.4",
+        "repo": "argo-helm",
+        "type": "github"
+      }
+    },
+    "argocd-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1768407041,
+        "narHash": "sha256-oSIn+EQUSwi2FCzvPgnidZSJ+QwdMQlS2ZuHm6KryJ0=",
+        "owner": "argoproj",
+        "repo": "argo-cd",
+        "rev": "c56f4400f22c7e9fe9c5c12b85576b74369fb6b8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "argoproj",
+        "ref": "v3.2.5",
+        "repo": "argo-cd",
+        "type": "github"
+      }
+    },
     "blueprint": {
       "inputs": {
         "nixpkgs": [
@@ -1006,6 +1040,8 @@
     "root": {
       "inputs": {
         "agenix": "agenix",
+        "argocd-helm-src": "argocd-helm-src",
+        "argocd-src": "argocd-src",
         "catppuccin": "catppuccin",
         "cilium-src": "cilium-src",
         "clan-core": "clan-core",
