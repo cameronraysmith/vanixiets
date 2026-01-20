@@ -5,19 +5,19 @@ title: ClusterAPI bootstrap workflow
 # ClusterAPI bootstrap workflow
 
 This workflow covers bootstrapping a Hetzner Kubernetes cluster using ClusterAPI with the Hetzner provider (CAPH).
-The local k3s-capi Colima profile serves as a temporary management cluster.
+A local k3d cluster serves as a temporary management cluster.
 After ClusterAPI provisions the Hetzner cluster, a pivot operation transfers management to the cloud cluster, which then becomes self-managing.
 
 ## Architecture overview
 
 The ClusterAPI bootstrap follows a temporary management cluster pattern:
 
-1. Local k3s-capi cluster (Colima) provides the initial management plane
+1. Local k3d cluster provides the initial management plane
 2. ClusterAPI controllers deploy to the local cluster
 3. ClusterAPI provisions Hetzner VMs and orchestrates kubeadm bootstrap
 4. Pivot operation moves ClusterAPI resources to the cloud cluster
 5. Cloud cluster assumes self-management responsibility
-6. Local k3s-capi cluster becomes disposable
+6. Local k3d cluster becomes disposable
 
 This architecture avoids external dependencies for cluster lifecycle management.
 The cloud cluster owns its own ClusterAPI resources after pivot, enabling infrastructure changes without an external management plane.
@@ -92,18 +92,22 @@ The node decryption key deploys to `/etc/nodekey` during image creation.
 
 ## Step 1: Start the bootstrap cluster
 
-Start the k3s-capi Colima profile to provide a temporary management cluster.
+Create a k3d cluster to serve as the temporary management cluster.
 This cluster exists solely for ClusterAPI bootstrapping and will be destroyed after pivot.
 
 ```bash
-colima start --profile k3s-capi
+# Create a minimal k3d cluster for ClusterAPI
+k3d cluster create capi-bootstrap --servers 1 --agents 0
+
+# Or use a configuration file
+k3d cluster create --config k3d/capi-bootstrap.yaml
 ```
 
 Verify the cluster is ready.
 
 ```bash
-# Check colima status
-colima status --profile k3s-capi
+# Check k3d cluster status
+k3d cluster list
 
 # Verify kubectl connectivity
 kubectl cluster-info
@@ -113,8 +117,8 @@ kubectl get nodes
 Expected output shows a single-node k3s cluster ready to accept ClusterAPI controllers.
 
 ```
-NAME                   STATUS   ROLES                  AGE   VERSION
-lima-k3s-capi          Ready    control-plane,master   1m    v1.31.x
+NAME                           STATUS   ROLES                  AGE   VERSION
+k3d-capi-bootstrap-server-0    Ready    control-plane,master   1m    v1.31.x
 ```
 
 ## Step 2: Install ClusterAPI
@@ -403,18 +407,18 @@ Scaling, upgrades, and node replacement operate without the bootstrap cluster.
 
 ### Destroy local bootstrap cluster
 
-The k3s-capi cluster is no longer needed after successful pivot.
+The bootstrap cluster is no longer needed after successful pivot.
 
 ```bash
-# Delete the colima profile
-colima delete --profile k3s-capi
+# Delete the k3d cluster
+k3d cluster delete capi-bootstrap
 ```
 
 Verify deletion.
 
 ```bash
-colima list
-# k3s-capi should not appear
+k3d cluster list
+# capi-bootstrap should not appear
 ```
 
 ### Archive bootstrap state (optional)
@@ -511,7 +515,7 @@ Adjust KubeadmControlPlane replicas and ensure odd numbers for etcd quorum.
 
 ## Related components
 
-- Colima profile setup: See [01-environment-setup.md](./01-environment-setup.md) for k3s-capi profile creation
+- k3d cluster setup: See [01-environment-setup.md](./01-environment-setup.md) for k3d configuration
 - NixOS k3s module: See [nixos-k3s-server.md](../components/nixos-k3s-server.md)
 - Cilium CNI deployment: Deploy after ClusterAPI bootstrap via easykubenix full stage
 - External-dns: Takes over DNS management after initial bootstrap
