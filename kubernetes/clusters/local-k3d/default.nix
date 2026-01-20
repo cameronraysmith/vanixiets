@@ -2,12 +2,22 @@
 #
 # Cilium CNI and step-ca ACME server for k3d-dev cluster.
 # Cluster runs in k3d containers via OrbStack container runtime.
-{ ... }:
+{ lib, ... }:
 {
-  # Deploy SopsSecret CRs after CRD registration.
-  # CRDs deploy at prio-10 (easykubenix default), SopsSecret CRs at prio-15.
-  # This guarantees the SopsSecret CRD exists before any SopsSecret CRs are applied.
-  kluctl.resourcePriority.SopsSecret = 15;
+  # Deploy resources in dependency order via kluctl priority phases.
+  # Priority values create barrier phases: all resources in prio-N complete before prio-N+1 starts.
+  #
+  # Phase ordering:
+  # - prio-10: Namespaces (must exist before namespaced resources)
+  # - prio-10: CustomResourceDefinitions (must register before CRs can be applied)
+  # - prio-15: SopsSecret CRs (depends on CRD from prio-10)
+  # - default: All other resources (depends on namespaces from prio-10)
+  #
+  # NOTE: Must use lib.mkOptionDefault to merge with easykubenix defaults,
+  # otherwise this assignment replaces the entire default attrset.
+  kluctl.resourcePriority = lib.mkOptionDefault {
+    SopsSecret = 15;
+  };
 
   # Cluster identification
   clusterName = "k3d-dev";
