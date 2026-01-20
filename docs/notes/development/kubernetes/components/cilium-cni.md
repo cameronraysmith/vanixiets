@@ -5,7 +5,7 @@ title: Cilium CNI
 # Cilium CNI
 
 Cilium provides eBPF-based container networking, replacing both the default flannel CNI and kube-proxy in our k3s clusters.
-This document covers deployment via easykubenix/kubenix Helm integration with configuration suitable for both local development (Colima) and production (Hetzner via ClusterAPI).
+This document covers deployment via easykubenix/kubenix Helm integration with configuration suitable for both local development (k3d on OrbStack) and production (Hetzner via ClusterAPI).
 
 ## Why Cilium over flannel
 
@@ -14,7 +14,7 @@ Cilium offers eBPF-based packet processing that scales better than iptables, nat
 
 Production parity matters because networking issues that only manifest in production are difficult to debug.
 Running identical CNI configuration locally catches configuration errors, network policy violations, and routing issues before deployment.
-The GENEVE tunnel mode works identically on a single-node Colima cluster and multi-node Hetzner infrastructure.
+The GENEVE tunnel mode works identically on a single-node k3d cluster and multi-node Hetzner infrastructure.
 
 ## Deployment method
 
@@ -172,7 +172,7 @@ For single-node clusters, use the node IP or localhost.
 For multi-node clusters, use the control plane endpoint IP or a stable load-balanced address.
 
 ```nix
-# Single node (Colima local)
+# Single node (k3d local)
 k8sServiceHost = "127.0.0.1";
 k8sServicePort = 6443;
 
@@ -206,10 +206,12 @@ Cilium loads these modules automatically when available:
 
 On NixOS, ensure these are available via `boot.kernelModules` if not built-in.
 
-### Colima/macOS considerations
+### k3d/OrbStack considerations
 
-Colima runs a Linux VM (Lima) on macOS, which has a modern kernel with full eBPF support.
-No special kernel configuration is needed for Colima-based local development.
+k3d runs k3s in Docker containers on OrbStack.
+OrbStack's Linux VM has a modern kernel, but eBPF support is limited compared to bare-metal or full VMs.
+See ADR-005 for details on eBPF limitations in container-based local development.
+The `K3D_FIX_MOUNTS=1` environment variable is required for proper `/sys/fs/bpf` mount propagation.
 
 ## Network policies
 
@@ -412,14 +414,15 @@ ingressController = {
 Most configuration remains identical between environments.
 The following parameters typically differ:
 
-| Parameter | Local (Colima) | Production (Hetzner) |
-|-----------|---------------|---------------------|
+| Parameter | Local (k3d) | Production (Hetzner) |
+|-----------|-------------|---------------------|
 | `k8sServiceHost` | `127.0.0.1` | Control plane VIP |
 | `operator.replicas` | `1` | `2` |
 | `hubble.ui.enabled` | `false` | `true` |
 | `hubble.relay.enabled` | `false` | `true` |
 | IPv6 | disabled | enabled |
 | BGP | disabled | enabled |
+| eBPF features | limited (container runtime) | full |
 
 ### Production-specific features
 
