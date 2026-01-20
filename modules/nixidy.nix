@@ -34,6 +34,7 @@
             sops-secrets-operator-src
             argocd-src
             argocd-helm-src
+            gateway-api-src
             ;
         };
       };
