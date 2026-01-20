@@ -24,6 +24,16 @@ let
 
   # Read CRD file contents as YAML strings
   crdYamls = map (filename: builtins.readFile "${crdDir}/${filename}") crdFiles;
+
+  # Cilium GatewayClass - required for Cilium Gateway controller to reconcile Gateways
+  ciliumGatewayClass = ''
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: GatewayClass
+    metadata:
+      name: cilium
+    spec:
+      controllerName: io.cilium/gateway-controller
+  '';
 in
 {
   applications.gateway-api = {
@@ -49,7 +59,7 @@ in
     # Sync wave -2: CRDs before Cilium (-1)
     annotations."argocd.argoproj.io/sync-wave" = "-2";
 
-    # Use yamls for raw CRD content
-    yamls = crdYamls;
+    # Use yamls for raw CRD content (CRDs + GatewayClass)
+    yamls = crdYamls ++ [ ciliumGatewayClass ];
   };
 }
