@@ -37,15 +37,28 @@ in
     let
       # Use flake input instead of dynamic fetchTree for pure evaluation
       src = cilium-src;
-      crdDir = "${src}/pkg/k8s/apis/cilium.io/client/crds/v2";
+      crdDirV2 = "${src}/pkg/k8s/apis/cilium.io/client/crds/v2";
+      crdDirV2alpha1 = "${src}/pkg/k8s/apis/cilium.io/client/crds/v2alpha1";
 
       # Create derivation for each CRD file (required for importyaml)
       # importyaml expects either a derivation or URL, not a store path string
       mkCrdDrv =
-        filename:
+        crdDir: filename:
         pkgs.runCommand "cilium-crd-${filename}" { } ''
           cp ${crdDir}/${filename} $out
         '';
+
+      # Import CRDs from a directory as importyaml attrset
+      importCrdsFromDir =
+        crdDir:
+        lib.pipe (builtins.readDir crdDir) [
+          (lib.mapAttrs' (
+            filename: _type: {
+              name = filename;
+              value.src = mkCrdDrv crdDir filename;
+            }
+          ))
+        ];
     in
     lib.mkMerge [
       (lib.mkIf cfg.enable {
@@ -100,15 +113,9 @@ in
           } cfg.helmValues;
         };
 
-        # Import Cilium CRDs from source
-        importyaml = lib.pipe (builtins.readDir crdDir) [
-          (lib.mapAttrs' (
-            filename: _type: {
-              name = filename;
-              value.src = mkCrdDrv filename;
-            }
-          ))
-        ];
+        # Import Cilium CRDs from source (v2 + v2alpha1)
+        # v2alpha1 contains L2 announcement policies and pod IP pools
+        importyaml = importCrdsFromDir crdDirV2 // importCrdsFromDir crdDirV2alpha1;
       })
 
       # API mappings always defined (allows other modules to reference Cilium types)
