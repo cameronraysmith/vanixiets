@@ -28,6 +28,7 @@
             sops-secrets-operator-src = inputs.sops-secrets-operator-src;
             argocd-src = inputs.argocd-src;
             argocd-helm-src = inputs.argocd-helm-src;
+            gateway-api-src = inputs.gateway-api-src;
           };
         };
 
