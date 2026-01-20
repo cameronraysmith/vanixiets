@@ -26,6 +26,8 @@
             cilium-src = inputs.cilium-src;
             step-ca-src = inputs.step-ca-src;
             sops-secrets-operator-src = inputs.sops-secrets-operator-src;
+            argocd-src = inputs.argocd-src;
+            argocd-helm-src = inputs.argocd-helm-src;
           };
         };
 
