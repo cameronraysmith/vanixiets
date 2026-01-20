@@ -1,7 +1,7 @@
 # Assert ArgoCD components are healthy and have adopted nixidy manifests
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: argocd-application-controller
   namespace: argocd
