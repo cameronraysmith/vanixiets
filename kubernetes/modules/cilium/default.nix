@@ -108,20 +108,24 @@ in
           CiliumClusterwideNetworkPolicy = "cilium.io/v2";
           CiliumEndpoint = "cilium.io/v2";
           CiliumIdentity = "cilium.io/v2";
+          CiliumL2AnnouncementPolicy = "cilium.io/v2alpha1";
           CiliumLoadBalancerIPPool = "cilium.io/v2";
           CiliumNetworkPolicy = "cilium.io/v2";
           CiliumNode = "cilium.io/v2";
           CiliumNodeConfig = "cilium.io/v2";
+          CiliumPodIPPool = "cilium.io/v2alpha1";
         };
         kubernetes.namespacedMappings = {
           CiliumCIDRGroup = false;
           CiliumClusterwideNetworkPolicy = false;
           CiliumEndpoint = true;
           CiliumIdentity = false;
+          CiliumL2AnnouncementPolicy = false;
           CiliumLoadBalancerIPPool = false;
           CiliumNetworkPolicy = true;
           CiliumNode = false;
           CiliumNodeConfig = true;
+          CiliumPodIPPool = false;
         };
       }
     ];
