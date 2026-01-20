@@ -723,7 +723,20 @@ k3d-deploy:
   kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=120s
 
   echo ""
-  echo "=== Stage 2: Infrastructure ==="
+  echo "=== Stage 2: Infrastructure (CRDs) ==="
+  # First pass: applies CRDs in prio-10, CRs may fail (CRDs not yet registered)
+  nix run .#k8s-deploy-local-k3d-infrastructure -- --yes || true
+
+  echo ""
+  echo "Waiting for CRDs to be established..."
+  kubectl wait --for=condition=Established crd/sopssecrets.isindir.github.com --timeout=60s
+  kubectl wait --for=condition=Established crd/appprojects.argoproj.io --timeout=60s
+  kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
+  kubectl wait --for=condition=Established crd/applicationsets.argoproj.io --timeout=60s
+
+  echo ""
+  echo "=== Stage 2: Infrastructure (CRs) ==="
+  # Second pass: CRDs are now registered, CRs will succeed
   nix run .#k8s-deploy-local-k3d-infrastructure -- --yes
 
   echo ""
