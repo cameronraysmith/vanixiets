@@ -35,6 +35,7 @@ For production deployment:
 | ClusterAPI bootstrap | [workflows/03-clusterapi-bootstrap.md](workflows/03-clusterapi-bootstrap.md) | Management cluster preparation |
 | Hetzner deployment | [workflows/04-hetzner-deployment.md](workflows/04-hetzner-deployment.md) | Production deployment to Hetzner |
 | GitOps operations | [workflows/05-gitops-operations.md](workflows/05-gitops-operations.md) | Day-2 operations and maintenance |
+| Testing | [workflows/06-testing.md](workflows/06-testing.md) | Chainsaw integration tests and CI workflow |
 | ADR-001 | [decisions/ADR-001-local-dev-architecture.md](decisions/ADR-001-local-dev-architecture.md) | Local development architecture decision |
 
 ## Architecture overview
@@ -76,6 +77,7 @@ See [reference architecture](architecture/reference-architecture.md) for the com
 - [03-clusterapi-bootstrap.md](workflows/03-clusterapi-bootstrap.md) - Initialize ClusterAPI management cluster
 - [04-hetzner-deployment.md](workflows/04-hetzner-deployment.md) - Deploy workload clusters to Hetzner Cloud
 - [05-gitops-operations.md](workflows/05-gitops-operations.md) - Ongoing cluster operations and maintenance procedures
+- [06-testing.md](workflows/06-testing.md) - Chainsaw integration tests and CI workflow
 
 ## Decision records
 
