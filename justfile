@@ -760,6 +760,47 @@ k3d-full:
   just k3d-up
   just k3d-deploy
 
+## nixidy (Phase 4 GitOps)
+
+# Build nixidy manifests for local-k3d environment
+[group('nixidy')]
+nixidy-build:
+  nix run .#nixidy -- build .#local-k3d
+
+# Show nixidy environment info
+[group('nixidy')]
+nixidy-info:
+  nix run .#nixidy -- info .#local-k3d
+
+# Bootstrap ArgoCD app-of-apps (transition from Phase 3 to Phase 4)
+# Prerequisites: k3d-full must complete successfully first
+[group('nixidy')]
+nixidy-bootstrap:
+  nix run .#nixidy -- bootstrap .#local-k3d | kubectl apply -f -
+
+# Full GitOps workflow: Phase 3 bootstrap + Phase 4 ArgoCD takeover
+[group('nixidy')]
+nixidy-full:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  echo "=== Phase 3: Bootstrap (easykubenix/kluctl) ==="
+  just k3d-full
+
+  echo ""
+  echo "=== Phase 4: GitOps (nixidy/ArgoCD) ==="
+  echo "Waiting for ArgoCD to be fully ready..."
+  kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=120s
+
+  echo ""
+  echo "Applying app-of-apps bootstrap Application..."
+  nix run .#nixidy -- bootstrap .#local-k3d | kubectl apply -f -
+
+  echo ""
+  echo "=== GitOps transition complete ==="
+  echo "ArgoCD will now manage all applications via sync waves."
+  echo "Access ArgoCD UI: kubectl port-forward svc/argocd-server -n argocd 8080:80"
+
 ## secrets
 
 # Scan repository for hardcoded secrets (full history)
