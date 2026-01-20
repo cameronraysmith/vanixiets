@@ -1,0 +1,9 @@
+# Assert sops-secrets-operator is healthy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sops-secrets-operator
+  namespace: sops-secrets-operator
+status:
+  (readyReplicas >= `1`): true
