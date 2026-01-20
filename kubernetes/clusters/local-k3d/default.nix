@@ -11,12 +11,18 @@
   # - prio-10: Namespaces (must exist before namespaced resources)
   # - prio-10: CustomResourceDefinitions (must register before CRs can be applied)
   # - prio-15: SopsSecret CRs (depends on CRD from prio-10)
-  # - default: All other resources (depends on namespaces from prio-10)
+  # - prio-20: DaemonSet (Cilium CNI agents must be running before other pods can schedule)
+  # - default: All other resources (Deployments, Services, etc.)
+  #
+  # The prio-20 barrier ensures Cilium DaemonSets are applied before services like
+  # ArgoCD, step-ca, and sops-secrets-operator attempt to schedule pods.
+  # Without CNI readiness, pods fail with "network plugin is not ready".
   #
   # NOTE: Must use lib.mkOptionDefault to merge with easykubenix defaults,
   # otherwise this assignment replaces the entire default attrset.
   kluctl.resourcePriority = lib.mkOptionDefault {
     SopsSecret = 15;
+    DaemonSet = 20;
   };
 
   # Cluster identification
