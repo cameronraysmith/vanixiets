@@ -15,8 +15,8 @@ let
   clusterIssuerName = "step-ca-acme";
 
   # sslip.io domain for local development
-  # k3d with hostNetwork exposes on localhost
-  localDomain = "127.0.0.1.sslip.io";
+  # k3d server node IP from static subnet (192.168.100.0/24)
+  localDomain = "192.168.100.2.sslip.io";
   wildcardDomain = "*.${localDomain}";
 in
 {

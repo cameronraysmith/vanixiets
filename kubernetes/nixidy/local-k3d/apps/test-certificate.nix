@@ -15,8 +15,8 @@ let
   testNamespace = "cert-manager-test";
 
   # sslip.io domain for HTTP-01 challenge validation
-  # 127.0.0.1 is reachable from k3d cluster via host networking
-  testDomain = "test.127.0.0.1.sslip.io";
+  # k3d server node IP from static subnet (192.168.100.0/24)
+  testDomain = "test.192.168.100.2.sslip.io";
 in
 {
   applications.test-certificate = {

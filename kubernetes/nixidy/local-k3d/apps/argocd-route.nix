@@ -1,7 +1,7 @@
 # ArgoCD HTTPRoute for Gateway API ingress
 #
 # Exposes ArgoCD UI via Cilium Gateway API.
-# Routes argocd.127.0.0.1.sslip.io to the ArgoCD server service.
+# Routes argocd.192.168.100.2.sslip.io to the ArgoCD server service.
 #
 # ArgoCD server runs in insecure mode (HTTP on port 80) for local development,
 # so the HTTPRoute targets port 80. TLS termination happens at the Gateway.
@@ -17,8 +17,8 @@ let
   gatewayNamespace = "gateway-system";
   gatewayName = "main-gateway";
 
-  # sslip.io domain for local development
-  hostname = "argocd.127.0.0.1.sslip.io";
+  # sslip.io domain for local development (k3d server node IP)
+  hostname = "argocd.192.168.100.2.sslip.io";
 
   # ArgoCD server service (from Helm chart)
   # Server runs in insecure mode (HTTP on port 80)
