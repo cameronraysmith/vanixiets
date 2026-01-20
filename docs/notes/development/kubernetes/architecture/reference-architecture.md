@@ -41,13 +41,13 @@ It synthesizes all component and workflow documentation into an authoritative re
 |             |                              |  | terranix/opentofu   |  |          |
 |             v                              |  | (VM provisioning)   |  |          |
 |  +----------+-----------+                  |  +----------+----------+  |          |
-|  | Colima (vz backend)  |                  |             |             |          |
-|  | Rosetta x86_64 emu   |                  |             v             |          |
+|  | OrbStack             |                  |             |             |          |
+|  | (container runtime)  |                  |             v             |          |
 |  +----------+-----------+                  |  +----------+----------+  |          |
 |             |                              |  | clan/NixOS          |  |          |
 |             v                              |  | (OS configuration)  |  |          |
 |  +----------+-----------+                  |  +----------+----------+  |          |
-|  | NixOS VM (x86_64)    |                  |             |             |          |
+|  | k3d (k3s-in-docker)  |                  |             |             |          |
 |  |  +----------------+  |                  |             v             |          |
 |  |  | k3s server     |  |                  |  +----------+----------+  |          |
 |  |  +----------------+  |                  |  | k3s / ClusterAPI    |  |          |
@@ -72,7 +72,7 @@ It synthesizes all component and workflow documentation into an authoritative re
 |                                            |  | - ArgoCD            |  |          |
 |                                            |  +---------------------+  |          |
 |  +----------------------+                  +---------------------------+          |
-|  | k3s-capi (ephemeral) |                                                         |
+|  | k3d (ephemeral)      |                                                         |
 |  | ClusterAPI bootstrap |-------> pivot -------> self-managing cluster            |
 |  +----------------------+                                                         |
 |                                                                                   |
@@ -88,8 +88,8 @@ It synthesizes all component and workflow documentation into an authoritative re
 
 The architecture follows these foundational principles.
 
-*Production parity*: Local development environments run the identical stack as production, using x86_64-linux via Rosetta to match Hetzner hardware.
-This catches configuration errors, networking issues, and compatibility problems before deployment.
+*Production parity*: Local development environments run the identical Kubernetes distribution (k3s) as production.
+While architecture differs (aarch64 local vs x86_64 production), the k3s and Cilium configuration catches most configuration errors, networking issues, and compatibility problems before deployment.
 
 *Declarative configuration*: All infrastructure, cluster state, and application deployments are defined in Nix modules.
 Changes flow through version control with reproducible builds.
@@ -409,69 +409,61 @@ Local development validates this entire sequence before production deployment.
 
 ## Local development environment
 
-### Dual Colima VM architecture
+### k3d architecture
 
-Local development uses two Colima profiles serving distinct purposes.
+Local development uses k3d (k3s-in-docker) running on OrbStack per ADR-005.
+This approach supersedes the previous Colima + NixOS VM architecture due to nested virtualization issues with Cilium eBPF.
 
-*k3s-dev*: Development workloads and day-to-day iteration.
-This profile runs continuously during development sessions with moderate resource allocation.
-
-| Setting | Value | Rationale |
-|---------|-------|-----------|
-| CPU | 4 cores | Sufficient for typical workloads |
-| Memory | 8 GiB | Covers common application pods |
-| Disk | 60 GiB | Standard container image storage |
-| Architecture | x86_64 | Hetzner production parity |
-| VM type | vz | Virtualization.framework performance |
-| Rosetta | enabled | x86_64 binary execution |
-
-*k3s-capi*: ClusterAPI bootstrap operations.
-This profile is ephemeral, created when bootstrapping Hetzner clusters and destroyed after pivot.
+*local-k3d*: Development workloads and day-to-day iteration.
+This cluster runs continuously during development sessions.
 
 | Setting | Value | Rationale |
 |---------|-------|-----------|
-| CPU | 6 cores | ClusterAPI controller overhead |
-| Memory | 12 GiB | Management cluster requirements |
-| Disk | 80 GiB | Additional manifest storage |
-| Architecture | x86_64 | Hetzner parity |
-| VM type | vz | Virtualization.framework performance |
-| Rosetta | enabled | x86_64 binary execution |
+| Servers | 1 | Single control-plane node |
+| Agents | 0 | No dedicated worker nodes |
+| Architecture | arm64 | Native Apple Silicon |
+| Container runtime | OrbStack | Superior macOS performance |
+| CNI | Cilium | Production parity |
 
-### x86_64 via Rosetta rationale
+*capi-bootstrap*: ClusterAPI bootstrap operations.
+This cluster is ephemeral, created when bootstrapping Hetzner clusters and destroyed after pivot.
 
-The architecture mandates x86_64-linux for both local VMs and production, despite running on aarch64-darwin hosts.
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| Servers | 1 | Minimal management cluster |
+| Agents | 0 | ClusterAPI controllers only |
+| Architecture | arm64 | Native performance |
+| Lifecycle | Ephemeral | Destroyed after pivot |
 
-*Production parity*: Hetzner Cloud VMs run x86_64-linux.
-Running the same architecture locally catches binary compatibility issues, library mismatches, and architecture-specific bugs.
+### Architecture difference rationale
 
-*Container image availability*: Many container images lack arm64 variants.
-Using x86_64 ensures the same images work locally and in production.
+ADR-005 documents the decision to use native arm64 locally rather than x86_64 emulation.
 
-*ClusterAPI compatibility*: ClusterAPI tools and controllers assume linux/amd64.
-Cross-architecture complications are avoided.
+*Kubernetes distribution parity*: k3d uses k3s, matching Hetzner production exactly.
+Distribution-level compatibility is more valuable than architecture parity for most development workflows.
 
-Rosetta 2 provides efficient x86_64 emulation on Apple Silicon.
-The performance overhead is acceptable for development workloads.
+*Container image availability*: Modern container images (including Cilium) provide multi-arch support.
+arm64 variants work seamlessly.
 
-### NixOS VM image generation
+*Performance*: Native arm64 execution avoids Rosetta overhead (20% performance cost).
+OrbStack container runtime provides 10x faster startup than Docker Desktop.
 
-The Colima VMs run custom NixOS images built via nixos-generators.
+*eBPF compatibility*: Nested virtualization (Colima VM inside macOS) broke Cilium eBPF networking.
+Container-based k3d provides functional (though limited) eBPF support.
 
-Key image characteristics:
+Architecture-specific issues are rare and better caught in CI on actual x86_64 infrastructure.
 
-- UEFI boot with systemd-boot
-- Rosetta integration via virtiofs mount
-- k3s server configured for Cilium CNI
-- Nix with flakes enabled
-- SSH server for Colima access
+### k3d cluster configuration
 
-Build command:
+k3d clusters are configured via YAML files with Cilium-compatible flags.
 
-```sh
-nix build .#k3s-local-image
-```
+Key configuration:
 
-Output: `./result/nixos.qcow2` for Colima import.
+- `K3D_FIX_MOUNTS=1` for BPF mount propagation
+- `--flannel-backend=none` for external CNI
+- `--disable-network-policy` for Cilium replacement
+- `--disable-kube-proxy` for Cilium kube-proxy replacement
+- Port mappings for localhost access (80, 443, 6443)
 
 ### k3s configuration
 
@@ -583,17 +575,18 @@ kluctl deploy --discriminator vanixiets-full -y
 
 | Component | Purpose | Local configuration | Production configuration |
 |-----------|---------|---------------------|--------------------------|
-| Colima | VM runtime | vz backend, Rosetta | N/A |
-| NixOS | Operating system | nixos-generators qcow | clan deployment |
+| OrbStack | Container runtime | Docker API for k3d | N/A |
+| k3d | k3s-in-docker | Single-node cluster | N/A |
+| NixOS | Operating system | N/A (container-based) | clan deployment |
 | k3s | Kubernetes distribution | Single node, sqlite | Multi-node, etcd |
-| Cilium | CNI + kube-proxy replacement | k8sServiceHost=127.0.0.1, minimal Hubble | k8sServiceHost=VIP, full Hubble |
+| Cilium | CNI + kube-proxy replacement | k8sServiceHost=127.0.0.1, limited eBPF | k8sServiceHost=VIP, full eBPF |
 | step-ca | Local TLS CA | In-cluster ACME server | N/A |
 | cert-manager | Certificate lifecycle | step-ca ClusterIssuer | Let's Encrypt ClusterIssuer |
-| sops-secrets-operator | Secret decryption | &dev age key | &ci age key |
+| sops-secrets-operator | Secret decryption | dev age key | ci age key |
 | nix-csi | Nix store volumes | Single-node, no cache | Multi-node with cache |
 | external-dns | DNS automation | N/A | Cloudflare integration |
 | local-path-provisioner | Storage | Default storage class | Default storage class |
-| ClusterAPI | Cluster lifecycle | k3s-capi bootstrap only | Self-managing after pivot |
+| ClusterAPI | Cluster lifecycle | k3d bootstrap only | Self-managing after pivot |
 
 ## Tool boundaries
 
@@ -723,20 +716,21 @@ Shared defaults with environment overrides minimize duplication while preserving
 
 ## Local to production parity matrix
 
-| Aspect | Local (k3s-dev) | Production (Hetzner) | Intentional difference |
-|--------|-----------------|----------------------|------------------------|
-| Architecture | x86_64-linux (Rosetta) | x86_64-linux | No |
+| Aspect | Local (k3d) | Production (Hetzner) | Intentional difference |
+|--------|-------------|----------------------|------------------------|
+| Architecture | aarch64-linux (native) | x86_64-linux | Yes: native performance, CI catches arch issues |
 | Kubernetes | k3s v1.31 | k3s v1.31 | No |
 | CNI | Cilium (tunnel mode) | Cilium (tunnel mode) | No |
 | kube-proxy | Cilium replacement | Cilium replacement | No |
+| eBPF support | Limited (container runtime) | Full | Yes: container constraints |
 | TLS CA | step-ca (local ACME) | Let's Encrypt | Yes: external CA requires public DNS |
 | DNS | sslip.io | Cloudflare + external-dns | Yes: local lacks DNS management |
-| Secrets | &dev age key | &ci age key | Yes: key separation for security |
+| Secrets | dev age key | ci age key | Yes: key separation for security |
 | Storage | local-path-provisioner | local-path-provisioner | No |
 | Node count | 1 | 3+ | Yes: HA unnecessary locally |
-| ClusterAPI | Not used (direct k3s) | Self-managing | Yes: local uses simpler bootstrap |
+| ClusterAPI | Not used (direct k3d) | Self-managing | Yes: local uses simpler bootstrap |
 | Hubble | Disabled | Full stack | Yes: resource savings locally |
-| Firewall | Disabled | Enabled | Yes: simplicity vs security |
+| Networking | Docker bridge | Overlay | Yes: container-based vs VM-based |
 
 ## Migration path
 
@@ -794,14 +788,14 @@ Tool boundary:
 
 ### Multi-node local clusters
 
-Current local development uses single-node k3s.
-Future expansion may use multiple Colima profiles for multi-node testing.
+Current local development uses single-node k3d.
+k3d supports multi-node clusters for testing HA configurations.
 
 Approach:
 
-- Create k3s-dev-2, k3s-dev-3 profiles
-- Configure k3s agents joining the k3s-dev server
+- Configure `servers: 3, agents: 2` in k3d config
 - Test HA configurations and node failure scenarios
+- Note: Multi-node k3d still uses container-based networking, not true VM isolation
 
 ### Additional cloud providers
 
@@ -823,14 +817,15 @@ Each provider requires:
 
 | Task | Command |
 |------|---------|
-| Start local cluster | `colima start --profile k3s-dev` |
+| Start local cluster | `just k3d-full` |
+| Stop local cluster | `just k3d-down` |
 | Build local manifests | `nix build .#k8s-manifests-local` |
 | Deploy to local | `kluctl deploy --discriminator local -y` |
 | Preview changes | `kluctl deploy --discriminator local --dry-run` |
 | Check Cilium status | `kubectl exec -n kube-system ds/cilium -- cilium status` |
 | View certificates | `kubectl get certificates -A` |
 | Decrypt secret for editing | `sops k8s/secrets/local/secret.enc.yaml` |
-| SSH to local VM | `colima ssh --profile k3s-dev` |
+| Exec into k3d server | `docker exec -it k3d-local-k3d-server-0 sh` |
 | Build production manifests | `nix build .#k8s-manifests-full` |
 | Deploy to production | `kluctl deploy --discriminator vanixiets-full -y` |
 | Check cluster nodes | `kubectl get nodes -o wide` |
@@ -847,8 +842,8 @@ Each provider requires:
 | `k8s/secrets/` | SOPS-encrypted SopsSecret files |
 | `.sops.yaml` | SOPS key configuration |
 | `terraform/` | Generated terraform files |
-| `~/.colima/k3s-dev/` | Colima profile data |
-| `/etc/rancher/k3s/k3s.yaml` | k3s kubeconfig (in VM) |
+| `k3d/` | k3d cluster configuration files |
+| `~/.kube/config` | kubectl configuration with k3d context |
 | `result/` | Nix build output (manifests) |
 
 ### Troubleshooting decision tree
@@ -938,9 +933,10 @@ Problem: Secrets not created
 ### External references
 
 - k3s documentation: https://docs.k3s.io/
+- k3d documentation: https://k3d.io/
 - Cilium documentation: https://docs.cilium.io/
 - cert-manager documentation: https://cert-manager.io/docs/
 - ClusterAPI documentation: https://cluster-api.sigs.k8s.io/
-- Colima documentation: https://github.com/abiosoft/colima
+- OrbStack documentation: https://docs.orbstack.dev/
 - easykubenix repository: `~/projects/sciops-workspace/easykubenix`
 - hetzkube reference: `~/projects/sciops-workspace/hetzkube`
