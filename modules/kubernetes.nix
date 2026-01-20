@@ -13,8 +13,12 @@
     { pkgs, ... }:
     let
       # Evaluate easykubenix with cluster configuration
+      # Optional deploymentLayer parameter for staged deployments
       evalCluster =
         clusterPath:
+        {
+          deploymentLayer ? "all",
+        }:
         import inputs.easykubenix {
           inherit pkgs;
           modules = [
@@ -23,6 +27,7 @@
           ];
           # Pass flake inputs to easykubenix modules via specialArgs
           specialArgs = {
+            inherit deploymentLayer;
             cilium-src = inputs.cilium-src;
             step-ca-src = inputs.step-ca-src;
             sops-secrets-operator-src = inputs.sops-secrets-operator-src;
@@ -33,10 +38,18 @@
         };
 
       # Local development cluster
-      localCluster = evalCluster ../kubernetes/clusters/local;
+      localCluster = evalCluster ../kubernetes/clusters/local { };
 
-      # Local k3d cluster
-      localK3dCluster = evalCluster ../kubernetes/clusters/local-k3d;
+      # Local k3d cluster - staged deployment support
+      # Foundation: CNI (Cilium) - must be ready before infrastructure
+      # Infrastructure: Platform services (ArgoCD, cert-manager, secrets)
+      localK3dCluster = evalCluster ../kubernetes/clusters/local-k3d { };
+      localK3dFoundation = evalCluster ../kubernetes/clusters/local-k3d {
+        deploymentLayer = "foundation";
+      };
+      localK3dInfrastructure = evalCluster ../kubernetes/clusters/local-k3d {
+        deploymentLayer = "infrastructure";
+      };
     in
     {
       packages = {
@@ -62,6 +75,18 @@
       apps.k8s-deploy-local-k3d = {
         type = "app";
         program = "${localK3dCluster.deploymentScript}/bin/kubenixDeploy";
+      };
+
+      # Staged deployment for local k3d cluster
+      # Usage: deploy foundation first, wait for CNI, then deploy infrastructure
+      apps.k8s-deploy-local-k3d-foundation = {
+        type = "app";
+        program = "${localK3dFoundation.deploymentScript}/bin/kubenixDeploy";
+      };
+
+      apps.k8s-deploy-local-k3d-infrastructure = {
+        type = "app";
+        program = "${localK3dInfrastructure.deploymentScript}/bin/kubenixDeploy";
       };
     };
 }

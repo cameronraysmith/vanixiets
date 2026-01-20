@@ -701,6 +701,47 @@ k3d-down:
 k3d-status:
   k3d cluster list
 
+# Deploy to k3d cluster using staged deployment (foundation then infrastructure)
+# This mirrors the kargo pattern of sequential helm --wait installs but declaratively.
+# Foundation (CNI) must be ready before infrastructure pods can schedule.
+[group('k3d')]
+k3d-deploy:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  echo "=== Stage 1: Foundation (CNI) ==="
+  nix run .#k8s-deploy-local-k3d-foundation -- --yes
+
+  echo ""
+  echo "Waiting for Cilium to be ready..."
+  kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium -n kube-system --timeout=120s
+  kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=120s
+
+  echo ""
+  echo "=== Stage 2: Infrastructure ==="
+  nix run .#k8s-deploy-local-k3d-infrastructure -- --yes
+
+  echo ""
+  echo "=== Deployment complete ==="
+  kubectl get pods -A
+
+# Deploy only foundation layer (Cilium CNI) - use for debugging or manual staging
+[group('k3d')]
+k3d-deploy-foundation:
+  nix run .#k8s-deploy-local-k3d-foundation -- --yes
+
+# Deploy only infrastructure layer - use after foundation is ready
+[group('k3d')]
+k3d-deploy-infrastructure:
+  nix run .#k8s-deploy-local-k3d-infrastructure -- --yes
+
+# Full k3d workflow: create cluster, bootstrap secrets, deploy all layers
+[group('k3d')]
+k3d-full:
+  just k3d-down || true
+  just k3d-up
+  just k3d-deploy
+
 ## secrets
 
 # Scan repository for hardcoded secrets (full history)
