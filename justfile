@@ -796,7 +796,8 @@ nixidy-push:
   fi
 
   echo "Syncing rendered manifests to {{ local_k3d_repo }}..."
-  rsync -a --delete --exclude='.git' result/ "{{ local_k3d_repo }}/"
+  # -L dereferences symlinks (nix store paths) to copy actual content
+  rsync -aL --delete --exclude='.git' result/ "{{ local_k3d_repo }}/"
 
   echo "Committing and pushing to local-k3d repo..."
   cd "{{ local_k3d_repo }}"
