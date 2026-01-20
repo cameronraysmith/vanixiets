@@ -450,6 +450,23 @@
         "type": "github"
       }
     },
+    "gateway-api-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1764825980,
+        "narHash": "sha256-/GHyikcC2QGDN0ndpY6/xvSEEnpSsLrNU+lFElCKBs8=",
+        "owner": "kubernetes-sigs",
+        "repo": "gateway-api",
+        "rev": "477d172e6ac5eccb82b65781ddb8f924afec4170",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kubernetes-sigs",
+        "ref": "v1.4.1",
+        "repo": "gateway-api",
+        "type": "github"
+      }
+    },
     "git-hooks": {
       "inputs": {
         "flake-compat": [],
@@ -1235,6 +1252,7 @@
         "disko": "disko",
         "easykubenix": "easykubenix",
         "flake-parts": "flake-parts",
+        "gateway-api-src": "gateway-api-src",
         "git-hooks": "git-hooks",
         "home-manager": "home-manager",
         "import-tree": "import-tree",
