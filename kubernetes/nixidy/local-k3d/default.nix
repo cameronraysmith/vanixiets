@@ -15,7 +15,8 @@
     target = {
       # Repository URL for ArgoCD to fetch manifests
       repository = "https://github.com/cameronraysmith/vanixiets.git";
-      branch = "main";
+      # TODO: change back to "main" before merging PR
+      branch = "nix-50f";
       # Output path relative to repository root
       rootPath = "./manifests/local-k3d";
     };
