@@ -886,7 +886,8 @@ k3d-wait-argocd-sync:
   echo "Waiting for all ${#EXPECTED_APPS[@]} applications to exist..."
   for app in "${EXPECTED_APPS[@]}"; do
     echo -n "  Waiting for $app... "
-    kubectl wait --for=jsonpath='{.metadata.name}'="$app" application/"$app" -n argocd --timeout=300s >/dev/null
+    # kubectl wait fails immediately if resource doesn't exist, so poll instead
+    timeout 300 bash -c "until kubectl get application/$app -n argocd &>/dev/null; do sleep 2; done"
     echo "exists"
   done
 
