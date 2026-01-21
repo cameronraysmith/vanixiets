@@ -133,10 +133,12 @@
           '';
         };
 
-        # Route ALL DNS through local dnsmasq when forcing a provider
-        # Uses networksetup -setdnsservers via nix-darwin's networking module
-        networking.knownNetworkServices = lib.mkIf (cfg.forceDnsProvider != null) cfg.networkServices;
-        networking.dns = lib.mkIf (cfg.forceDnsProvider != null) [ "127.0.0.1" ];
+        # Configure system DNS via nix-darwin's networking module
+        # Always set knownNetworkServices so activation script runs on revert
+        # When forceDnsProvider is null, empty list triggers "empty" sentinel
+        # which clears DNS back to DHCP; other modules' values concatenate safely
+        networking.knownNetworkServices = cfg.networkServices;
+        networking.dns = if cfg.forceDnsProvider != null then [ "127.0.0.1" ] else [ ];
       };
     };
 }
