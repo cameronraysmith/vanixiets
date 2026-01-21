@@ -196,7 +196,7 @@ in
       # Set to null to revert to gateway DNS with sslip.io exception only
       services.localDnsmasq = {
         enable = true;
-        forceDnsProvider = "quad9";
+        forceDnsProvider = null; # "quad9" usually preferred, default null defers to gateway
       };
 
       # Trust local k8s development CA for curl/git/OpenSSL tools
