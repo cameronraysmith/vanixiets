@@ -1,4 +1,6 @@
 # Assert Gateway certificates are Ready
+#
+# Uses JMESPath expressions to check Ready condition without exact array matching.
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -6,9 +8,7 @@ metadata:
   name: argocd-tls
   namespace: gateway-system
 status:
-  conditions:
-    - type: Ready
-      status: "True"
+  (length(conditions[?type=='Ready' && status=='True']) > `0`): true
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -16,6 +16,4 @@ metadata:
   name: test-cert
   namespace: gateway-system
 status:
-  conditions:
-    - type: Ready
-      status: "True"
+  (length(conditions[?type=='Ready' && status=='True']) > `0`): true
