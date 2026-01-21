@@ -70,6 +70,17 @@
             # Default upstream (if specified)
             ++ lib.optional (cfg.defaultUpstream != "") cfg.defaultUpstream;
         };
+
+        # Tell macOS to route sslip.io queries to local dnsmasq
+        # nix-darwin's dnsmasq module only creates resolver files for 'addresses',
+        # not 'servers', so we create it explicitly here
+        environment.etc."resolver/sslip.io" = {
+          enable = true;
+          text = ''
+            nameserver 127.0.0.1
+            port 53
+          '';
+        };
       };
     };
 }
