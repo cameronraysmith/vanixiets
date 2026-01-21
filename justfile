@@ -864,7 +864,7 @@ k3d-wait-argocd-sync:
   echo "Applications managed by nixidy sync waves:"
   echo "  Wave -1 (adoption): cilium, argocd, sops-secrets-operator, step-ca"
   echo "  Wave 0: cert-manager"
-  echo "  Wave 1-2: cluster-issuer, gateway, gateway-api, test-certificate"
+  echo "  Wave 1-2: cluster-issuer, gateway, gateway-api"
   echo "  Wave 3: argocd-route"
   echo ""
 
@@ -880,7 +880,6 @@ k3d-wait-argocd-sync:
     gateway-api
     sops-secrets-operator
     step-ca
-    test-certificate
   )
 
   echo "Waiting for all ${#EXPECTED_APPS[@]} applications to exist..."
