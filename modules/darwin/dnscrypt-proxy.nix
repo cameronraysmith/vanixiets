@@ -126,8 +126,11 @@
         services.dnscrypt-proxy = {
           enable = true;
           settings = {
-            # Listen on localhost port 53 for system DNS
-            listen_addresses = [ "127.0.0.1:53" ];
+            # Listen on localhost port 53 for system DNS (IPv4 and IPv6)
+            listen_addresses = [
+              "127.0.0.1:53"
+              "[::1]:53"
+            ];
 
             # Server selection
             server_names = selectedProvider.server_names;
@@ -188,9 +191,12 @@
           GroupName = lib.mkForce "wheel";
         };
 
-        # Configure system DNS to use local dnscrypt-proxy
+        # Configure system DNS to use local dnscrypt-proxy (IPv4 and IPv6)
         networking.knownNetworkServices = cfg.networkServices;
-        networking.dns = [ "127.0.0.1" ];
+        networking.dns = [
+          "127.0.0.1"
+          "::1"
+        ];
 
         # Health check: ensure dnscrypt-proxy is responding after activation
         system.activationScripts.postActivation.text = lib.mkAfter ''
