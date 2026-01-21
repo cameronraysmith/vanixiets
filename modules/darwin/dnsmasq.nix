@@ -107,6 +107,14 @@
       };
 
       config = lib.mkIf cfg.enable {
+        # Ensure dnsmasq and dnscrypt-proxy are not both enabled
+        assertions = [
+          {
+            assertion = !(config.services.localDnscryptProxy.enable or false);
+            message = "Cannot enable both localDnsmasq and localDnscryptProxy - they both bind to port 53";
+          }
+        ];
+
         services.dnsmasq = {
           enable = true;
           bind = "127.0.0.1";
