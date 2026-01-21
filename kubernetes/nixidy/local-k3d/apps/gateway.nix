@@ -55,9 +55,11 @@ in
           gatewayClassName: cilium
           listeners:
             # HTTP listener for ACME HTTP-01 challenges and HTTP traffic
+            # Hostname required for Cilium to attach hostname-matching HTTPRoutes
             - name: http
               protocol: HTTP
               port: 80
+              hostname: "${wildcardDomain}"
               allowedRoutes:
                 namespaces:
                   from: All
