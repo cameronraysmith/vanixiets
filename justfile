@@ -926,7 +926,7 @@ k3d-integration-ci:
   echo "=== Phase 2: Prepare local git repo (before cluster for volume mount) ==="
   rm -rf /tmp/k3d-manifests
   mkdir -p /tmp/k3d-manifests
-  cp -r "$(readlink -f result)"/* /tmp/k3d-manifests/
+  cp -rL "$(readlink -f result)"/* /tmp/k3d-manifests/
   cd /tmp/k3d-manifests
   git init
   git add .
