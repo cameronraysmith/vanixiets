@@ -34,7 +34,8 @@
       #   Spec: https://dnscrypt.info/stamps-specifications/
       #   Public list: https://dnscrypt.info/public-servers (filter: DoH, embedded IP)
       #   Generator: https://dnscrypt.info/stamps/ (create/decode stamps)
-      #   Decode to verify embedded IP: paste stamp into generator, check "IP address"
+      #   CLI decode: uvx --from dnsstamps dnsstamp.py parse "sdns://..."
+      #   Verify Hashes: [] (pin-free) and correct IP/hostname/path
       #
       # Provider docs (verify IPs match current infrastructure):
       #   Quad9: https://quad9.net/news/blog/doh-with-quad9-dns-servers/
