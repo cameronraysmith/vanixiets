@@ -21,7 +21,8 @@ let
 
   # sslip.io domain for local development
   # k3d server node IP from static subnet (192.168.100.0/24)
-  localDomain = "192.168.100.2.sslip.io";
+  # .2 = k3d-serverlb (load balancer), .3 = k3s node (where servicelb binds)
+  localDomain = "192.168.100.3.sslip.io";
 
   # Service-specific hostnames (add more as services need exposure)
   argoCDHostname = "argocd.${localDomain}";
