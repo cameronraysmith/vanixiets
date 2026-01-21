@@ -1,0 +1,10 @@
+# Assert step-ca-acme ClusterIssuer is ready
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: step-ca-acme
+status:
+  conditions:
+    - type: Ready
+      status: "True"
