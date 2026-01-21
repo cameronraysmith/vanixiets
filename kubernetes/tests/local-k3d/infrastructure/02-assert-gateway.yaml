@@ -1,4 +1,12 @@
 # Assert Cilium Gateway is programmed and all listeners are accepted
+#
+# Uses JMESPath expressions to validate status conditions without requiring
+# exact array matching. This avoids failures from additional fields like
+# lastTransitionTime, message, reason, etc.
+#
+# Validates:
+# - Gateway has Programmed=True condition (Cilium configured it)
+# - All 4 listeners exist and have Accepted=True condition
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -6,10 +14,9 @@ metadata:
   name: main-gateway
   namespace: gateway-system
 status:
-  conditions:
-    - type: Programmed
-      status: "True"
-  (contains(listeners[?name=='http-argocd'].conditions[?type=='Accepted'].status, 'True')): true
-  (contains(listeners[?name=='https-argocd'].conditions[?type=='Accepted'].status, 'True')): true
-  (contains(listeners[?name=='http-test'].conditions[?type=='Accepted'].status, 'True')): true
-  (contains(listeners[?name=='https-test'].conditions[?type=='Accepted'].status, 'True')): true
+  # Gateway is programmed (Cilium accepted and configured it)
+  (length(conditions[?type=='Programmed' && status=='True']) > `0`): true
+  # Exactly 4 listeners exist
+  (length(listeners) == `4`): true
+  # All 4 listeners have Accepted=True condition
+  (length(listeners[?conditions[?type=='Accepted' && status=='True']]) == `4`): true
