@@ -65,7 +65,7 @@ jobs:
         uses: ./.github/actions/setup-nix
         with:
           installer: full
-          hatchet: carve
+          hatchet: holster
           system: x86_64-linux
 
       - name: Verify Docker available
@@ -79,28 +79,30 @@ jobs:
       - name: Collect failure diagnostics
         if: failure()
         run: |
-          echo "=== k3d cluster status ==="
-          k3d cluster list || true
+          nix develop .#kubernetes --accept-flake-config -c bash -c '
+            echo "=== k3d cluster status ==="
+            k3d cluster list || true
 
-          echo ""
-          echo "=== Docker containers ==="
-          docker ps -a || true
+            echo ""
+            echo "=== Docker containers ==="
+            docker ps -a || true
 
-          echo ""
-          echo "=== k3d server logs (last 100 lines) ==="
-          docker logs k3d-dev-server-0 --tail 100 2>&1 || true
+            echo ""
+            echo "=== k3d server logs (last 100 lines) ==="
+            docker logs k3d-dev-server-0 --tail 100 2>&1 || true
 
-          echo ""
-          echo "=== ArgoCD Applications ==="
-          kubectl get applications -n argocd -o yaml 2>/dev/null || echo "kubectl not available or ArgoCD not deployed"
+            echo ""
+            echo "=== ArgoCD Applications ==="
+            kubectl get applications -n argocd -o yaml 2>/dev/null || echo "ArgoCD not deployed"
 
-          echo ""
-          echo "=== Non-running pods ==="
-          kubectl get pods -A --field-selector=status.phase!=Running 2>/dev/null || echo "kubectl not available"
+            echo ""
+            echo "=== Non-running pods ==="
+            kubectl get pods -A --field-selector=status.phase!=Running 2>/dev/null || echo "kubectl not available"
 
-          echo ""
-          echo "=== Pod events (warnings/errors) ==="
-          kubectl get events -A --field-selector=type!=Normal --sort-by='.lastTimestamp' 2>/dev/null | tail -50 || true
+            echo ""
+            echo "=== Pod events (warnings/errors) ==="
+            kubectl get events -A --field-selector=type!=Normal --sort-by=.lastTimestamp 2>/dev/null | tail -50 || true
+          '
 
       - name: Upload test reports
         if: always()
