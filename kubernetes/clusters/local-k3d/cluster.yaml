@@ -10,6 +10,7 @@
 # - ServiceLB enabled (klipper-lb assigns node IPs to LoadBalancer services)
 # - Ports 80/443 exposed for Gateway API ingress via servicelb
 # - K3D_FIX_MOUNTS=1 environment variable for OrbStack compatibility
+# - Host volume mount at /manifests for CI ArgoCD file:// repo access
 apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
 name: k3d-dev
@@ -19,6 +20,10 @@ k3d:
     servers: 1
     subnet: "192.168.100.0/24"
     image: rancher/k3s:v1.31.4-k3s1
+    volumes:
+      - volume: /tmp/k3d-manifests:/manifests
+        nodeFilters:
+          - server:*
     env:
       - envVar: K3D_FIX_MOUNTS=1
         nodeFilters:
