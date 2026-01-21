@@ -885,6 +885,13 @@ k3d-wait-argocd-sync:
   kubectl wait --for=condition=Programmed gateway/main-gateway -n gateway-system --timeout=120s
 
   echo ""
+  echo "=== Stabilization period ==="
+  # Kubernetes controllers are eventually consistent. After all conditions are met,
+  # allow a brief period for status propagation and controller convergence.
+  # This prevents race conditions where status flaps between checks and test execution.
+  sleep 10
+
+  echo ""
   echo "=== All ArgoCD applications synced and healthy ==="
   kubectl get applications -n argocd -o wide
 
