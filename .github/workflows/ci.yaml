@@ -80,7 +80,7 @@ jobs:
        inputs.job == 'cache-overlay-packages' ||
        inputs.job == 'nix' ||
        inputs.job == 'typescript' ||
-       inputs.job == 'kubernetes')
+       inputs.job == 'test-cluster')
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
@@ -593,18 +593,18 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 7: kubernetes
+  # job 7: test-cluster
   # validates kubernetes manifests and local cluster integration
   # informational only - does not block production releases
-  kubernetes:
+  test-cluster:
     needs: [secrets-scan, set-variables]
     if: |
       !cancelled() &&
       needs.secrets-scan.result == 'success' &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
-       inputs.job == 'kubernetes')
-    uses: ./.github/workflows/kubernetes.yaml
+       inputs.job == 'test-cluster')
+    uses: ./.github/workflows/test-cluster.yaml
     with:
       debug_enabled: ${{ needs.set-variables.outputs.debug }}
     secrets: inherit

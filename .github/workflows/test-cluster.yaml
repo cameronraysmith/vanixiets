@@ -1,16 +1,5 @@
-name: Kubernetes
+name: Test Cluster
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'kubernetes/**'
-      - 'justfile'
-      - 'flake.nix'
-      - 'flake.lock'
-      - 'secrets/**'
-      - '.github/workflows/kubernetes.yaml'
-      - '.github/actions/setup-nix/**'
   workflow_dispatch:
     inputs:
       debug_enabled:
@@ -27,7 +16,7 @@ on:
         default: "false"
 
 concurrency:
-  group: kubernetes-${{ github.event.pull_request.number || github.ref }}-${{ github.workflow }}
+  group: test-cluster-${{ github.event.pull_request.number || github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
 defaults:
