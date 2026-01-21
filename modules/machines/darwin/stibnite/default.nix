@@ -195,6 +195,29 @@ in
       # No defaultUpstream: use network's DNS for non-sslip.io queries
       services.localDnsmasq.enable = true;
 
+      # Trust local k8s development CA for curl/git/OpenSSL tools
+      # Certificate is public (committed to git), private key is sops-encrypted
+      security.pki.certificateFiles = [
+        ../../../../kubernetes/clusters/local/pki/root_ca.crt
+      ];
+
+      # Trust local k8s development CA in macOS Keychain (for browsers)
+      # Uses security add-trusted-cert which requires the cert to already be in keychain
+      # or adds it with trust settings
+      system.activationScripts.postActivation.text = ''
+        echo "Adding local k8s development CA to macOS Keychain..."
+        CERT_PATH="${../../../../kubernetes/clusters/local/pki/root_ca.crt}"
+        CERT_NAME="Local Development Root CA"
+
+        # Check if cert already exists in System keychain
+        if ! /usr/bin/security find-certificate -c "$CERT_NAME" /Library/Keychains/System.keychain >/dev/null 2>&1; then
+          echo "Installing $CERT_NAME to System keychain..."
+          /usr/bin/security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$CERT_PATH"
+        else
+          echo "$CERT_NAME already installed in System keychain"
+        fi
+      '';
+
       home-manager = {
         useGlobalPkgs = true;
         useUserPackages = true;
