@@ -92,25 +92,51 @@
         };
       };
 
-      selectedProvider = providerConfig.${cfg.provider};
+      # Merge stamps and server_names from all selected providers
+      mergedConfig =
+        lib.foldl'
+          (acc: name: {
+            stamps = acc.stamps // providerConfig.${name}.stamps;
+            server_names = acc.server_names ++ providerConfig.${name}.server_names;
+          })
+          {
+            stamps = { };
+            server_names = [ ];
+          }
+          cfg.providers;
+
+      # First provider's first IP for netprobe (any will do - just needs reachability check)
+      firstProviderFirstIp =
+        {
+          quad9 = "9.9.9.9";
+          cloudflare = "1.1.1.1";
+          google = "8.8.8.8";
+        }
+        .${builtins.head cfg.providers};
     in
     {
       options.services.localDnscryptProxy = {
         enable = lib.mkEnableOption "local dnscrypt-proxy for encrypted DNS-over-HTTPS";
 
-        provider = lib.mkOption {
-          type = lib.types.enum [
+        providers = lib.mkOption {
+          type = lib.types.listOf (
+            lib.types.enum [
+              "quad9"
+              "cloudflare"
+              "google"
+            ]
+          );
+          default = [
             "quad9"
             "cloudflare"
-            "google"
           ];
-          default = "quad9";
-          example = "cloudflare";
+          example = [ "quad9" ];
           description = ''
-            DNS-over-HTTPS provider to use.
-            - quad9: Privacy-focused, malware blocking (9.9.9.9)
-            - cloudflare: Fast, privacy-focused (1.1.1.1)
-            - google: Fast, extensive logging (8.8.8.8)
+            DNS-over-HTTPS providers to use. Multiple providers increases robustness
+            (load balancer picks fastest available). Default uses both no-logging providers.
+            - quad9: Privacy-focused, malware blocking, DNSSEC (9.9.9.9, 149.112.112.112)
+            - cloudflare: Fast, privacy-focused, DNSSEC (1.1.1.1, 1.0.0.1)
+            - google: Fast, logs queries, DNSSEC (8.8.8.8, 8.8.4.4)
           '';
         };
 
@@ -147,8 +173,8 @@
               "[::1]:53"
             ];
 
-            # Server selection
-            server_names = selectedProvider.server_names;
+            # Server selection (merged from all configured providers)
+            server_names = mergedConfig.server_names;
 
             # Protocol settings - DoH only, no DNSCrypt
             ipv4_servers = true;
@@ -188,14 +214,14 @@
 
             # Network probe - verify connectivity before accepting queries
             netprobe_timeout = 60;
-            netprobe_address = "9.9.9.9:443"; # HTTPS port for consistency with DoH
+            netprobe_address = "${firstProviderFirstIp}:443"; # HTTPS port for DoH
 
             # Load balancing - probabilistic selection weighted by RTT
             lb_strategy = "p2";
             lb_estimator = true;
 
             # Static server definitions with embedded-IP stamps
-            static = selectedProvider.stamps;
+            static = mergedConfig.stamps;
           };
         };
 

@@ -197,7 +197,8 @@ in
       # Rollback: sudo darwin-rebuild --rollback
       services.localDnscryptProxy = {
         enable = true;
-        provider = "quad9"; # Options: quad9, cloudflare, google
+        # Default: ["quad9" "cloudflare"] - 4 IPs across 2 independent infrastructures
+        # Both are no-logging, DNSSEC-validating. Load balancer picks fastest available.
       };
 
       # Trust local k8s development CA for curl/git/OpenSSL tools
