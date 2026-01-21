@@ -79,7 +79,8 @@ jobs:
        inputs.job == 'flake-validation' ||
        inputs.job == 'cache-overlay-packages' ||
        inputs.job == 'nix' ||
-       inputs.job == 'typescript')
+       inputs.job == 'typescript' ||
+       inputs.job == 'kubernetes')
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
@@ -592,7 +593,23 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 7: cache-overlay-packages
+  # job 7: kubernetes
+  # validates kubernetes manifests and local cluster integration
+  # informational only - does not block production releases
+  kubernetes:
+    needs: [secrets-scan, set-variables]
+    if: |
+      !cancelled() &&
+      needs.secrets-scan.result == 'success' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'kubernetes')
+    uses: ./.github/workflows/kubernetes.yaml
+    with:
+      debug_enabled: ${{ needs.set-variables.outputs.debug }}
+    secrets: inherit
+
+  # job 8: cache-overlay-packages
   # pre-cache resource-intensive overlay packages before main build
   # prevents disk space exhaustion during CI builds (especially rust packages)
   cache-overlay-packages:
@@ -668,7 +685,7 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 8: nix
+  # job 9: nix
   # builds flake outputs via category-based matrix for disk space optimization
   # distributes builds across multiple machines to avoid disk space exhaustion
   # each job builds a specific category (packages, home configs, system configs)
@@ -773,7 +790,7 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 11: typescript
+  # job 10: typescript
   # TypeScript package testing via reusable workflow
   # Note: Cannot add composite action steps to reusable workflow calls
   # Job-level caching happens via GitHub Checks API query in the called workflow
@@ -799,7 +816,7 @@ jobs:
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-  # job 12: production-release-packages
+  # job 11: production-release-packages
   # Release packages via semantic-release on main/beta branches
   # Semantic-release determines if actual release is needed
   production-release-packages:
@@ -829,7 +846,7 @@ jobs:
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-  # job 13: production-docs-deploy
+  # job 12: production-docs-deploy
   # Documentation deployment to production (conditional)
   # Depends on production-release-packages to ensure packages are released first
   production-docs-deploy:
