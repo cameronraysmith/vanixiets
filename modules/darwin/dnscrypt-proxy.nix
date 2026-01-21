@@ -139,16 +139,22 @@
             doh_servers = true;
 
             # Security settings
-            require_dnssec = false; # Let upstream handle DNSSEC
+            # DNSSEC validation delegated to upstream (Quad9/Cloudflare/Google all
+            # perform DNSSEC validation and return SERVFAIL for invalid signatures)
+            require_dnssec = false;
             require_nolog = true; # Prefer no-logging servers
             require_nofilter = false; # Allow filtering (Quad9 blocks malware)
+
+            # Prevent internal name leakage to upstream resolvers
+            block_unqualified = true; # Block A/AAAA for single-label hostnames
+            block_undelegated = true; # Block queries for undelegated TLDs
 
             # Performance settings
             force_tcp = false;
             cache = true;
             cache_size = 4096;
-            cache_min_ttl = 2400;
-            cache_max_ttl = 86400;
+            cache_min_ttl = 600; # 10 minutes - balanced freshness vs performance
+            cache_max_ttl = 86400; # 24 hours - reasonable upper bound for stable records
             cache_neg_min_ttl = 60;
             cache_neg_max_ttl = 600;
 
@@ -157,10 +163,18 @@
             keepalive = 30;
             max_clients = 250;
 
-            # Disable bootstrap resolvers - stamps have embedded IPs
-            # Setting to invalid address ensures no plaintext DNS leaks
-            bootstrap_resolvers = [ "127.0.0.1:5399" ];
+            # Bootstrap resolvers disabled - DoH stamps embed IP addresses directly,
+            # eliminating the need for plaintext DNS bootstrap lookups
+            bootstrap_resolvers = [ ];
             ignore_system_dns = true;
+
+            # Network probe - verify connectivity before accepting queries
+            netprobe_timeout = 60;
+            netprobe_address = "9.9.9.9:443"; # HTTPS port for consistency with DoH
+
+            # Load balancing - probabilistic selection weighted by RTT
+            lb_strategy = "p2";
+            lb_estimator = true;
 
             # Static server definitions with embedded-IP stamps
             static = selectedProvider.stamps;
