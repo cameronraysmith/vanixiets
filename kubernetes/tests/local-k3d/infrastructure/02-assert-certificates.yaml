@@ -13,7 +13,7 @@ status:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: test-cert
+  name: test-cert-tls
   namespace: gateway-system
 status:
   (length(conditions[?type=='Ready' && status=='True']) > `0`): true
