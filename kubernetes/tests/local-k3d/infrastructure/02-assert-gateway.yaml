@@ -1,0 +1,15 @@
+# Assert Cilium Gateway is programmed and all listeners are accepted
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: main-gateway
+  namespace: gateway-system
+status:
+  conditions:
+    - type: Programmed
+      status: "True"
+  (contains(listeners[?name=='http-argocd'].conditions[?type=='Accepted'].status, 'True')): true
+  (contains(listeners[?name=='https-argocd'].conditions[?type=='Accepted'].status, 'True')): true
+  (contains(listeners[?name=='http-test'].conditions[?type=='Accepted'].status, 'True')): true
+  (contains(listeners[?name=='https-test'].conditions[?type=='Accepted'].status, 'True')): true
