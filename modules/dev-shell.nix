@@ -63,6 +63,7 @@
           pkgs.just
           pkgs.k3d
           pkgs.ctlptl
+          pkgs.kubectl
           pkgs.kluctl
           pkgs.sops
           pkgs.age
