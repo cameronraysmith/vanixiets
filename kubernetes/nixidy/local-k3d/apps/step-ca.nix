@@ -108,6 +108,8 @@ in
           "/spec/podManagementPolicy"
           "/spec/revisionHistoryLimit"
           "/spec/updateStrategy"
+          # Tracking annotation applied by ArgoCD after adoption from kluctl
+          "/metadata/annotations/argocd.argoproj.io~1tracking-id"
         ];
       };
       # CA password secret (managed by SopsSecret, not ArgoCD)
