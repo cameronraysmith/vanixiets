@@ -1,16 +1,5 @@
 name: Kubernetes
 on:
-  push:
-    branches:
-      - nix-50f
-    paths:
-      - 'kubernetes/**'
-      - 'justfile'
-      - 'flake.nix'
-      - 'flake.lock'
-      - 'secrets/**'
-      - '.github/workflows/kubernetes.yaml'
-      - '.github/actions/setup-nix/**'
   pull_request:
     branches:
       - main
@@ -38,7 +27,7 @@ on:
         default: "false"
 
 concurrency:
-  group: kubernetes-${{ github.event.pull_request.number || github.ref }}
+  group: kubernetes-${{ github.event.pull_request.number || github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
 defaults:
