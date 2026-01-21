@@ -26,9 +26,20 @@
     let
       cfg = config.services.localDnscryptProxy;
 
-      # DoH stamps with embedded IP addresses (no DNS lookup required)
-      # Format: sdns://... with IP address encoded in the stamp
-      # This completely bypasses any DNS interception for bootstrap
+      # DoH stamps with embedded IP addresses (no DNS lookup required).
+      # Stamps encode: protocol, IP, hostname, path, flags in base64 sdns:// URI.
+      # This bypasses DNS interception for bootstrap - no plaintext DNS needed.
+      #
+      # Stamp sources and verification:
+      #   Spec: https://dnscrypt.info/stamps-specifications/
+      #   Public list: https://dnscrypt.info/public-servers (filter: DoH, embedded IP)
+      #   Generator: https://dnscrypt.info/stamps/ (create/decode stamps)
+      #   Decode to verify embedded IP: paste stamp into generator, check "IP address"
+      #
+      # Provider docs (verify IPs match current infrastructure):
+      #   Quad9: https://quad9.net/news/blog/doh-with-quad9-dns-servers/
+      #   Cloudflare: https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/
+      #   Google: https://developers.google.com/speed/public-dns/docs/doh
       providerConfig = {
         quad9 = {
           # Quad9 secured (malware blocking enabled)
