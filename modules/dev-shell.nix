@@ -34,6 +34,7 @@
           pkgs.kluctl
           pkgs.k3d
           pkgs.kyverno-chainsaw
+          pkgs.rsync # nixidy-sync manifest deployment
           # Tools required by TypeScript packages CI
           pkgs.bun
           pkgs.nodejs_24 # semantic-release >= 24.10.0
