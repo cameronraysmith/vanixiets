@@ -192,13 +192,15 @@ in
       };
 
       # Encrypted DNS via DNS-over-HTTPS (DoH)
-      # Routes all DNS through Quad9 DoH, bypassing enterprise DNS interception
+      # Routes all DNS through Quad9+Cloudflare DoH, bypassing enterprise DNS interception
       # DoH uses HTTPS (port 443), invisible to Cisco/enterprise DNS proxies
-      # Rollback: sudo darwin-rebuild --rollback
+      # Rollback: sudo /nix/var/nix/profiles/system-N-link/activate (N = previous gen)
       services.localDnscryptProxy = {
         enable = true;
-        # Default: ["quad9" "cloudflare"] - 4 IPs across 2 independent infrastructures
-        # Both are no-logging, DNSSEC-validating. Load balancer picks fastest available.
+        providers = [
+          "quad9"
+          "cloudflare"
+        ]; # 4 IPs across 2 independent infrastructures
       };
 
       # Trust local k8s development CA for curl/git/OpenSSL tools
