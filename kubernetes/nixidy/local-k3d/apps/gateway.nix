@@ -1,11 +1,12 @@
 # Gateway Application for Cilium Gateway API integration
 #
 # Creates Gateway resource for ingress traffic routing.
-# Uses Cilium as GatewayClass with HTTP and HTTPS listeners.
+# Uses Cilium as GatewayClass with explicit per-service listeners.
 #
-# HTTP listener uses wildcard hostname to accept ACME HTTP-01 challenges
-# for any service. HTTPS listeners use service-specific hostnames to
-# trigger non-wildcard certificate requests (HTTP-01 compatible).
+# Each service gets paired HTTP + HTTPS listeners with specific hostnames.
+# This explicit pattern ensures declarative routing with no implicit
+# precedence rules, mirrors Istio Gateway patterns, and makes service
+# exposure GitOps-reviewable.
 #
 # cert-manager annotation enables automatic TLS certificate provisioning
 # via the step-ca ACME ClusterIssuer.
@@ -21,9 +22,8 @@ let
   # sslip.io domain for local development
   # k3d server node IP from static subnet (192.168.100.0/24)
   localDomain = "192.168.100.2.sslip.io";
-  wildcardDomain = "*.${localDomain}";
 
-  # Service-specific hostnames (add more as services need HTTPS)
+  # Service-specific hostnames (add more as services need exposure)
   argoCDHostname = "argocd.${localDomain}";
 in
 {
@@ -61,17 +61,15 @@ in
           # Cilium provides GatewayClass
           gatewayClassName: cilium
           listeners:
-            # HTTP listener for ACME HTTP-01 challenges and HTTP traffic
-            # Hostname required for Cilium to attach hostname-matching HTTPRoutes
-            - name: http
+            # ArgoCD HTTP listener (ACME HTTP-01 challenges + redirects)
+            - name: http-argocd
               protocol: HTTP
               port: 80
-              hostname: "${wildcardDomain}"
+              hostname: "${argoCDHostname}"
               allowedRoutes:
                 namespaces:
                   from: All
-            # HTTPS listener for ArgoCD (add more listeners as services need HTTPS)
-            # Service-specific hostname triggers non-wildcard cert (HTTP-01 compatible)
+            # ArgoCD HTTPS listener (TLS-terminated traffic)
             - name: https-argocd
               protocol: HTTPS
               port: 443
@@ -79,7 +77,6 @@ in
               tls:
                 mode: Terminate
                 certificateRefs:
-                  # cert-manager creates this secret via annotation
                   - name: argocd-tls
               allowedRoutes:
                 namespaces:
