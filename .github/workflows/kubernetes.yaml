@@ -74,7 +74,7 @@ jobs:
           docker info
 
       - name: Run k3d integration tests
-        run: nix develop --accept-flake-config -c just k3d-integration-ci
+        run: nix develop .#kubernetes --accept-flake-config -c just k3d-integration-ci
 
       - name: Collect failure diagnostics
         if: failure()
