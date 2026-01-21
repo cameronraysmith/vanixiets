@@ -139,6 +139,23 @@
         # which clears DNS back to DHCP; other modules' values concatenate safely
         networking.knownNetworkServices = cfg.networkServices;
         networking.dns = if cfg.forceDnsProvider != null then [ "127.0.0.1" ] else [ ];
+
+        # Health check: ensure dnsmasq is responding after activation
+        # nix-darwin's launchctl unload/load sometimes leaves service unresponsive
+        system.activationScripts.postActivation.text = lib.mkAfter ''
+          echo "checking dnsmasq health..." >&2
+          if ! ${pkgs.dig}/bin/dig @127.0.0.1 +short +time=1 +tries=1 example.com &>/dev/null; then
+            echo "dnsmasq not responding, restarting..." >&2
+            launchctl bootout system/org.nixos.dnsmasq 2>/dev/null || true
+            launchctl bootstrap system /Library/LaunchDaemons/org.nixos.dnsmasq.plist
+            sleep 0.5
+            if ${pkgs.dig}/bin/dig @127.0.0.1 +short +time=1 +tries=1 example.com &>/dev/null; then
+              echo "dnsmasq restart successful" >&2
+            else
+              echo "warning: dnsmasq still not responding after restart" >&2
+            fi
+          fi
+        '';
       };
     };
 }
