@@ -26,6 +26,7 @@ let
 
   # Service-specific hostnames (add more as services need exposure)
   argoCDHostname = "argocd.${localDomain}";
+  testHostname = "test.${localDomain}";
 in
 {
   applications.gateway = {
@@ -79,6 +80,26 @@ in
                 mode: Terminate
                 certificateRefs:
                   - name: argocd-tls
+              allowedRoutes:
+                namespaces:
+                  from: All
+            # Test Certificate HTTP listener (ACME HTTP-01 challenges)
+            - name: http-test
+              protocol: HTTP
+              port: 80
+              hostname: "${testHostname}"
+              allowedRoutes:
+                namespaces:
+                  from: All
+            # Test Certificate HTTPS listener (TLS-terminated traffic)
+            - name: https-test
+              protocol: HTTPS
+              port: 443
+              hostname: "${testHostname}"
+              tls:
+                mode: Terminate
+                certificateRefs:
+                  - name: test-cert-tls
               allowedRoutes:
                 namespaces:
                   from: All

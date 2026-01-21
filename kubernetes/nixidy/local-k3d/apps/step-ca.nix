@@ -103,6 +103,11 @@ in
         jsonPointers = [
           "/spec/replicas"
           "/spec/template/metadata/annotations/kubectl.kubernetes.io~1restartedAt"
+          # Kubernetes-default fields not declared in nixidy manifest
+          "/spec/persistentVolumeClaimRetentionPolicy"
+          "/spec/podManagementPolicy"
+          "/spec/revisionHistoryLimit"
+          "/spec/updateStrategy"
         ];
       };
       # CA password secret (managed by SopsSecret, not ArgoCD)
