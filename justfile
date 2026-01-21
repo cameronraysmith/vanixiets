@@ -800,6 +800,12 @@ k3d-test-foundation:
 k3d-test-infrastructure:
   chainsaw test kubernetes/tests/local-k3d/infrastructure/
 
+# Run tests with coverage report showing tested vs deployed resources
+# Respects NO_COLOR env var and auto-detects CI environments
+[group('k3d')]
+k3d-test-coverage *ARGS:
+  ./scripts/k3d-test-coverage.sh {{ARGS}}
+
 # Wait for kluctl-deployed foundation and infrastructure pods to be ready
 [group('k3d')]
 k3d-wait-ready:
