@@ -1,13 +1,16 @@
-# Local dnsmasq configuration for sslip.io wildcard DNS resolution
+# Local dnsmasq configuration for DNS management
 #
-# Enables domain-specific DNS forwarding to bypass router-level DNS rebind
-# protection that blocks responses with private IPs (192.168.x.x, 10.x.x.x).
+# Two modes of operation:
+# 1. Default (forceDnsProvider = null): Gateway DNS with sslip.io exception
+#    - Forwards sslip.io queries to Quad9 to bypass router DNS rebind protection
+#    - All other queries use the network's default resolver
+#
+# 2. Forced provider (forceDnsProvider = "quad9"|"cloudflare"|"google"):
+#    - Routes ALL DNS through local dnsmasq to specified provider
+#    - Bypasses gateway/network DNS entirely
 #
 # sslip.io is a wildcard DNS service where *.192.168.100.3.sslip.io resolves
 # to 192.168.100.3. Many routers block this as a potential DNS rebinding attack.
-#
-# This module forwards sslip.io queries to Quad9 while keeping all other
-# queries on the default resolver.
 { ... }:
 {
   flake.modules.darwin.dnsmasq =
@@ -19,10 +22,26 @@
     }:
     let
       cfg = config.services.localDnsmasq;
+
+      # DNS provider IP mappings (primary + secondary for redundancy)
+      dnsProviders = {
+        quad9 = [
+          "9.9.9.9"
+          "149.112.112.112"
+        ];
+        cloudflare = [
+          "1.1.1.1"
+          "1.0.0.1"
+        ];
+        google = [
+          "8.8.8.8"
+          "8.8.4.4"
+        ];
+      };
     in
     {
       options.services.localDnsmasq = {
-        enable = lib.mkEnableOption "local dnsmasq for sslip.io wildcard resolution";
+        enable = lib.mkEnableOption "local dnsmasq for DNS management";
 
         sslipUpstream = lib.mkOption {
           type = lib.types.listOf lib.types.str;
@@ -55,6 +74,23 @@
             Format: /domain/server or server for catch-all.
           '';
         };
+
+        forceDnsProvider = lib.mkOption {
+          type = lib.types.nullOr (
+            lib.types.enum [
+              "quad9"
+              "cloudflare"
+              "google"
+            ]
+          );
+          default = null;
+          example = "quad9";
+          description = ''
+            Force all DNS queries through specified provider, bypassing gateway DNS.
+            When null (default), uses gateway DNS with sslip.io exception only.
+            Options: quad9, cloudflare, google.
+          '';
+        };
       };
 
       config = lib.mkIf cfg.enable {
@@ -67,14 +103,25 @@
             (map (server: "/sslip.io/${server}") cfg.sslipUpstream)
             # Extra domain-specific servers
             ++ cfg.extraServers
-            # Default upstream (if specified)
-            ++ lib.optional (cfg.defaultUpstream != "") cfg.defaultUpstream;
+            # Default upstream (if specified via legacy option)
+            ++ lib.optional (cfg.defaultUpstream != "") cfg.defaultUpstream
+            # Forced provider catch-all (when forceDnsProvider is set)
+            ++ lib.optionals (cfg.forceDnsProvider != null) dnsProviders.${cfg.forceDnsProvider};
         };
 
         # Tell macOS to route sslip.io queries to local dnsmasq
         # nix-darwin's dnsmasq module only creates resolver files for 'addresses',
         # not 'servers', so we create it explicitly here
         environment.etc."resolver/sslip.io" = {
+          enable = true;
+          text = ''
+            nameserver 127.0.0.1
+            port 53
+          '';
+        };
+
+        # Route ALL DNS through local dnsmasq when forcing a provider
+        environment.etc."resolver/default" = lib.mkIf (cfg.forceDnsProvider != null) {
           enable = true;
           text = ''
             nameserver 127.0.0.1
