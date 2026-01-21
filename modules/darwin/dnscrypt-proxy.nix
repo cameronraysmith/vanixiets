@@ -40,15 +40,18 @@
       #   Quad9: https://quad9.net/news/blog/doh-with-quad9-dns-servers/
       #   Cloudflare: https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/
       #   Google: https://developers.google.com/speed/public-dns/docs/doh
+      # Pin-free stamps: omit SPKI hashes to avoid breakage on provider key rotation.
+      # TLS still validated via system CA chain. Trade-off: lose protection against
+      # CA compromise + MITM (extremely unlikely for personal infrastructure).
       providerConfig = {
         quad9 = {
           # Quad9 secured (malware blocking enabled)
           stamps = {
             "quad9-doh-ip4-primary" = {
-              stamp = "sdns://AgMAAAAAAAAABzkuOS45LjkgsBkgdEu7dsmrBT4B4Ht-BQ5HPSD3n3vqQ1-v5DydJC8SZG5zOS5xdWFkOS5uZXQ6NDQzCi9kbnMtcXVlcnk";
+              stamp = "sdns://AgMAAAAAAAAABzkuOS45LjkADWRucy5xdWFkOS5uZXQKL2Rucy1xdWVyeQ";
             };
             "quad9-doh-ip4-secondary" = {
-              stamp = "sdns://AgMAAAAAAAAADzE0OS4xMTIuMTEyLjExMiCwGSB0S7t2yasFPgHge34FDkc9IPefe-pDX6_kPJ0kLxFkbnMucXVhZDkubmV0OjQ0MwovZG5zLXF1ZXJ5";
+              stamp = "sdns://AgMAAAAAAAAADzE0OS4xMTIuMTEyLjExMgANZG5zLnF1YWQ5Lm5ldAovZG5zLXF1ZXJ5";
             };
           };
           server_names = [
