@@ -1,5 +1,27 @@
 name: Kubernetes
 on:
+  push:
+    branches:
+      - nix-50f
+    paths:
+      - 'kubernetes/**'
+      - 'justfile'
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'secrets/**'
+      - '.github/workflows/kubernetes.yaml'
+      - '.github/actions/setup-nix/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/**'
+      - 'justfile'
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'secrets/**'
+      - '.github/workflows/kubernetes.yaml'
+      - '.github/actions/setup-nix/**'
   workflow_dispatch:
     inputs:
       debug_enabled:
@@ -30,11 +52,14 @@ env:
   CACHIX_BINARY_CACHE: cameronraysmith
 
 jobs:
-  validate:
+  integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
@@ -43,11 +68,46 @@ jobs:
           hatchet: carve
           system: x86_64-linux
 
-      - name: Kubernetes validation placeholder
+      - name: Verify Docker available
         run: |
-          echo "Kubernetes validation workflow - implementation pending"
-          echo "Future validations:"
-          echo "  - easykubenix module builds"
-          echo "  - kluctl manifest generation"
-          echo "  - nixidy application rendering"
-          echo "  - k3s NixOS module checks"
+          docker version
+          docker info
+
+      - name: Run k3d integration tests
+        run: nix develop --accept-flake-config -c just k3d-integration-ci
+
+      - name: Collect failure diagnostics
+        if: failure()
+        run: |
+          echo "=== k3d cluster status ==="
+          k3d cluster list || true
+
+          echo ""
+          echo "=== Docker containers ==="
+          docker ps -a || true
+
+          echo ""
+          echo "=== k3d server logs (last 100 lines) ==="
+          docker logs k3d-local-k3d-server-0 --tail 100 2>&1 || true
+
+          echo ""
+          echo "=== ArgoCD Applications ==="
+          kubectl get applications -n argocd -o yaml 2>/dev/null || echo "kubectl not available or ArgoCD not deployed"
+
+          echo ""
+          echo "=== Non-running pods ==="
+          kubectl get pods -A --field-selector=status.phase!=Running 2>/dev/null || echo "kubectl not available"
+
+          echo ""
+          echo "=== Pod events (warnings/errors) ==="
+          kubectl get events -A --field-selector=type!=Normal --sort-by='.lastTimestamp' 2>/dev/null | tail -50 || true
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: chainsaw-reports
+          path: |
+            /tmp/chainsaw-*/
+          if-no-files-found: ignore
+          retention-days: 7
