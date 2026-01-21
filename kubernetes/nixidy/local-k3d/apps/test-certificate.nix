@@ -16,7 +16,8 @@ let
 
   # sslip.io domain for HTTP-01 challenge validation
   # k3d server node IP from static subnet (192.168.100.0/24)
-  testDomain = "test.192.168.100.2.sslip.io";
+  # .3 = k3s node where servicelb binds LoadBalancer IPs
+  testDomain = "test.192.168.100.3.sslip.io";
 in
 {
   applications.test-certificate = {
