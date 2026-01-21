@@ -1,10 +1,10 @@
 # Assert step-ca-acme ClusterIssuer is ready
+#
+# Uses JMESPath expression to check Ready condition without exact array matching.
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: step-ca-acme
 status:
-  conditions:
-    - type: Ready
-      status: "True"
+  (length(conditions[?type=='Ready' && status=='True']) > `0`): true
