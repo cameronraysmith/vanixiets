@@ -928,9 +928,11 @@ k3d-integration-ci:
 
   echo ""
   echo "=== Phase 2: Prepare local git repo (before cluster for volume mount) ==="
+  # Ensure writable before cleanup (Nix store copies may be read-only)
+  chmod -R +w /tmp/k3d-manifests 2>/dev/null || true
   rm -rf /tmp/k3d-manifests
   mkdir -p /tmp/k3d-manifests
-  cp -rL "$(readlink -f result)"/* /tmp/k3d-manifests/
+  rsync -aL --delete --chmod=Du+w,Fu+w result/ /tmp/k3d-manifests/
   cd /tmp/k3d-manifests
   git init
   git add .
