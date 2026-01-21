@@ -892,7 +892,7 @@ k3d-integration:
 
   echo ""
   echo "=== Phase 6: Integration Tests ==="
-  just k3d-test
+  just k3d-test-coverage
 
   echo ""
   echo "=== Integration complete ==="
