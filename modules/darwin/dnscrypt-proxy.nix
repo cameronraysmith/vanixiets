@@ -13,6 +13,12 @@
 #   sudo /nix/var/nix/profiles/system-N-link/activate  # where N is previous gen
 #   OR: sudo darwin-rebuild --rollback
 #
+# Captive portals (public WiFi login pages):
+#   Portal auth requires DNS before external traffic works. Temporarily disable:
+#     sudo launchctl bootout system/org.nixos.dnscrypt-proxy
+#   Complete portal login, then re-enable:
+#     sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.dnscrypt-proxy.plist
+#
 # Cannot be enabled simultaneously with localDnsmasq (both bind to port 53).
 { ... }:
 {
