@@ -684,13 +684,26 @@ k3d-up:
   @just k3d-bootstrap-secrets
 
 # Bootstrap secrets required before first deployment (idempotent)
+# Supports both CI (SOPS_AGE_KEY env var) and local dev (file-based) workflows
 [group('k3d')]
 k3d-bootstrap-secrets:
+  #!/usr/bin/env bash
+  set -euo pipefail
   kubectl create namespace sops-secrets-operator --dry-run=client -o yaml | kubectl apply -f -
-  kubectl create secret generic sops-age-key \
-    --namespace=sops-secrets-operator \
-    --from-file=age.key=${HOME}/.config/sops/age/keys.txt \
-    --dry-run=client -o yaml | kubectl apply -f -
+  # Check env var first (CI path), fall back to file (local dev path)
+  if [ -n "${SOPS_AGE_KEY:-}" ]; then
+    echo "Using SOPS_AGE_KEY from environment variable"
+    kubectl create secret generic sops-age-key \
+      --namespace=sops-secrets-operator \
+      --from-literal=age.key="${SOPS_AGE_KEY}" \
+      --dry-run=client -o yaml | kubectl apply -f -
+  else
+    echo "Using SOPS age key from file: ${HOME}/.config/sops/age/keys.txt"
+    kubectl create secret generic sops-age-key \
+      --namespace=sops-secrets-operator \
+      --from-file=age.key=${HOME}/.config/sops/age/keys.txt \
+      --dry-run=client -o yaml | kubectl apply -f -
+  fi
 
 # Configure CoreDNS to forward sslip.io queries to public DNS resolvers
 # Required because OrbStack's DNS (192.168.107.1) cannot resolve sslip.io wildcards

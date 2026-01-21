@@ -39,6 +39,16 @@ inputs:
     type: string
     required: false
     default: "2.32.4"
+  hatchet:
+    description: |
+      nothing-but-nix hatchet protocol for space reclamation (linux only):
+      - 'holster' (level 0): ~65GB, preserves Docker
+      - 'carve' (level 1): ~85GB, preserves Docker
+      - 'cleave' (level 2, default): ~115GB, removes Docker
+      - 'rampage' (level 3): ~130GB, removes Docker
+    type: string
+    required: false
+    default: "cleave"
 
 runs:
   using: composite
@@ -47,7 +57,7 @@ runs:
       if: runner.os == 'Linux' && inputs.installer == 'full'
       uses: wimpysworld/nothing-but-nix@10c936d9e46521bf923f75458e0cbd4fa309300d # main
       with:
-        hatchet-protocol: cleave
+        hatchet-protocol: ${{ inputs.hatchet }}
         nix-permission-edict: true
         # Reserve 4GB on /mnt for non-Nix TMPDIR usage
         # Nix build temps now go to /nix/build (see build-dir in extra_nix_config)
