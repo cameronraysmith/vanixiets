@@ -39,7 +39,8 @@ jobs:
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
         with:
-          installer: quick
+          installer: full
+          hatchet: carve
           system: x86_64-linux
 
       - name: Kubernetes validation placeholder
