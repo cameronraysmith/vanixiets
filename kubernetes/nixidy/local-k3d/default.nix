@@ -8,7 +8,14 @@
 # https://github.com/cameronraysmith/local-k3d (private)
 #
 # Workflow: edit Nix here → nixidy build → push to local-k3d repo → ArgoCD syncs
+#
+# CI override: set ARGOCD_REPO_URL=file:///manifests to use local git mount
 { lib, ... }:
+let
+  # Allow CI to override repository URL (e.g., file:///manifests for local mount)
+  repoURLOverride = builtins.getEnv "ARGOCD_REPO_URL";
+  defaultRepoURL = "https://github.com/cameronraysmith/local-k3d.git";
+in
 {
   imports = [
     ./apps
@@ -17,7 +24,8 @@
   nixidy = {
     target = {
       # Separate private repository for rendered manifests (ADR-006)
-      repository = "https://github.com/cameronraysmith/local-k3d.git";
+      # CI can override via ARGOCD_REPO_URL environment variable
+      repository = if repoURLOverride != "" then repoURLOverride else defaultRepoURL;
       branch = "main";
       # Manifests at repository root
       rootPath = ".";
