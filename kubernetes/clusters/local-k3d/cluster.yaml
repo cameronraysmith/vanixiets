@@ -1,7 +1,9 @@
 # ctlptl cluster configuration for local k3d development cluster
 # This configuration creates a single-node k3d cluster (k3s v1.31) with:
-# - Static subnet 192.168.100.0/24 for predictable node IPs (server at .2)
-#   Enables sslip.io domains: *.192.168.100.2.sslip.io resolves to server node
+# - Static subnet 192.168.100.0/24 for predictable IPs:
+#   - .2 = k3d-serverlb (load balancer container)
+#   - .3 = k3d-dev-server-0 (k3s node, where servicelb binds)
+#   sslip.io domains use .3: *.192.168.100.3.sslip.io resolves to k3s node
 # - Disabled Flannel (for Cilium CNI - pod networking)
 # - k3s kube-proxy enabled (Cilium kube-proxy replacement has eBPF issues in k3d)
 # - Disabled Traefik (using Cilium Gateway API for ingress)
