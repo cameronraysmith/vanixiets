@@ -156,6 +156,25 @@ in
                 value = "1";
               }
             ];
+            # Host path volume for local/CI file:// repository access
+            # k3d mounts host /tmp/k3d-manifests to node /manifests
+            # This mounts node /manifests into the repo-server container
+            volumes = [
+              {
+                name = "local-manifests";
+                hostPath = {
+                  path = "/manifests";
+                  type = "DirectoryOrCreate";
+                };
+              }
+            ];
+            volumeMounts = [
+              {
+                name = "local-manifests";
+                mountPath = "/manifests";
+                readOnly = true;
+              }
+            ];
           };
 
           # Redis (for caching)
