@@ -35,7 +35,7 @@ in
         base
         ssh-known-hosts
         colima
-        dnsmasq
+        dnscrypt-proxy
         # Note: Not importing users module (defines testuser at UID 550)
         # stibnite defines its own user (crs58)
       ]);
@@ -191,12 +191,13 @@ in
         };
       };
 
-      # Local DNS management
-      # forceDnsProvider routes ALL queries through Quad9, bypassing gateway DNS
-      # Set to null to revert to gateway DNS with sslip.io exception only
-      services.localDnsmasq = {
+      # Encrypted DNS via DNS-over-HTTPS (DoH)
+      # Routes all DNS through Quad9 DoH, bypassing enterprise DNS interception
+      # DoH uses HTTPS (port 443), invisible to Cisco/enterprise DNS proxies
+      # Rollback: sudo darwin-rebuild --rollback
+      services.localDnscryptProxy = {
         enable = true;
-        forceDnsProvider = null; # "quad9" usually preferred, default null defers to gateway
+        provider = "quad9"; # Options: quad9, cloudflare, google
       };
 
       # Trust local k8s development CA for curl/git/OpenSSL tools
