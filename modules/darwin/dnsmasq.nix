@@ -91,6 +91,19 @@
             Options: quad9, cloudflare, google.
           '';
         };
+
+        networkServices = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "Wi-Fi" ];
+          example = [
+            "Wi-Fi"
+            "Ethernet"
+          ];
+          description = ''
+            Network services to configure DNS for when forceDnsProvider is set.
+            Use `networksetup -listallnetworkservices` to list available services.
+          '';
+        };
       };
 
       config = lib.mkIf cfg.enable {
@@ -121,13 +134,9 @@
         };
 
         # Route ALL DNS through local dnsmasq when forcing a provider
-        environment.etc."resolver/default" = lib.mkIf (cfg.forceDnsProvider != null) {
-          enable = true;
-          text = ''
-            nameserver 127.0.0.1
-            port 53
-          '';
-        };
+        # Uses networksetup -setdnsservers via nix-darwin's networking module
+        networking.knownNetworkServices = lib.mkIf (cfg.forceDnsProvider != null) cfg.networkServices;
+        networking.dns = lib.mkIf (cfg.forceDnsProvider != null) [ "127.0.0.1" ];
       };
     };
 }
