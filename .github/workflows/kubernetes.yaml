@@ -88,8 +88,28 @@ jobs:
             docker ps -a || true
 
             echo ""
-            echo "=== k3d server logs (last 100 lines) ==="
-            docker logs k3d-dev-server-0 --tail 100 2>&1 || true
+            echo "=== sops-age-key secret (structure only) ==="
+            kubectl get secret sops-age-key -n sops-secrets-operator -o jsonpath="{.data}" 2>/dev/null | jq -r "keys" || echo "sops-age-key secret not found"
+
+            echo ""
+            echo "=== SopsSecret CRs ==="
+            kubectl get sopssecrets -A 2>/dev/null || echo "No SopsSecrets found"
+
+            echo ""
+            echo "=== step-ca secrets ==="
+            kubectl get secrets -n step-ca 2>/dev/null || echo "step-ca namespace not found"
+
+            echo ""
+            echo "=== sops-secrets-operator logs ==="
+            kubectl logs -n sops-secrets-operator -l app.kubernetes.io/name=sops-secrets-operator --tail=50 2>/dev/null || echo "sops-secrets-operator logs not available"
+
+            echo ""
+            echo "=== sops-secrets-operator pod status ==="
+            kubectl get pods -n sops-secrets-operator -o wide 2>/dev/null || echo "sops-secrets-operator namespace not found"
+
+            echo ""
+            echo "=== k3d server logs (last 50 lines) ==="
+            docker logs k3d-dev-server-0 --tail 50 2>&1 || true
 
             echo ""
             echo "=== ArgoCD Applications ==="
