@@ -60,6 +60,7 @@
       # Minimal shell for kubernetes CI (k3d integration tests)
       devShells.kubernetes = pkgs.mkShell {
         packages = [
+          pkgs.git
           pkgs.just
           pkgs.k3d
           pkgs.ctlptl
