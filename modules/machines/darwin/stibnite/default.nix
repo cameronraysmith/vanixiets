@@ -191,9 +191,13 @@ in
         };
       };
 
-      # Local DNS for sslip.io wildcard resolution
-      # No defaultUpstream: use network's DNS for non-sslip.io queries
-      services.localDnsmasq.enable = true;
+      # Local DNS management
+      # forceDnsProvider routes ALL queries through Quad9, bypassing gateway DNS
+      # Set to null to revert to gateway DNS with sslip.io exception only
+      services.localDnsmasq = {
+        enable = true;
+        forceDnsProvider = "quad9";
+      };
 
       # Trust local k8s development CA for curl/git/OpenSSL tools
       # Certificate is public (committed to git), private key is sops-encrypted
