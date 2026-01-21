@@ -199,8 +199,8 @@ in
         enable = true;
         providers = [
           "quad9"
-          "cloudflare"
-        ]; # 4 IPs across 2 independent infrastructures
+          # "cloudflare"
+        ];
       };
 
       # Trust local k8s development CA for curl/git/OpenSSL tools
