@@ -33,6 +33,7 @@
           pkgs.clusterctl
           pkgs.kluctl
           pkgs.k3d
+          pkgs.ctlptl
           pkgs.kyverno-chainsaw
           pkgs.rsync # nixidy-sync manifest deployment
           # Tools required by TypeScript packages CI
