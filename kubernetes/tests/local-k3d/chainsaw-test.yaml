@@ -30,3 +30,23 @@ spec:
       try:
         - assert:
             file: infrastructure/01-assert-sops-operator.yaml
+    - name: infrastructure-cluster-issuer
+      description: Assert step-ca-acme ClusterIssuer is ready
+      try:
+        - assert:
+            file: infrastructure/02-assert-cluster-issuer.yaml
+    - name: infrastructure-gateway
+      description: Assert Cilium Gateway is programmed
+      try:
+        - assert:
+            file: infrastructure/02-assert-gateway.yaml
+    - name: infrastructure-certificates
+      description: Assert Gateway certificates are ready
+      try:
+        - assert:
+            file: infrastructure/02-assert-certificates.yaml
+    - name: infrastructure-httproute
+      description: Assert ArgoCD HTTPRoute is accepted
+      try:
+        - assert:
+            file: infrastructure/02-assert-httproute.yaml
