@@ -108,8 +108,9 @@ in
           "/spec/podManagementPolicy"
           "/spec/revisionHistoryLimit"
           "/spec/updateStrategy"
-          # Tracking annotation applied by ArgoCD after adoption from kluctl
-          "/metadata/annotations/argocd.argoproj.io~1tracking-id"
+          # Kubernetes API adds apiVersion/kind to volumeClaimTemplates items
+          "/spec/volumeClaimTemplates/0/apiVersion"
+          "/spec/volumeClaimTemplates/0/kind"
         ];
       };
       # CA password secret (managed by SopsSecret, not ArgoCD)
