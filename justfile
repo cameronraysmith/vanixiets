@@ -974,6 +974,8 @@ k3d-integration-ci:
   rsync -aL --delete --chmod=Du+w,Fu+w result/ /tmp/k3d-manifests/
   cd /tmp/k3d-manifests
   git init
+  git config user.email "ci@localhost"
+  git config user.name "CI"
   git add .
   git commit -m "CI manifests"
   cd -
