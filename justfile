@@ -910,6 +910,52 @@ k3d-integration:
   echo ""
   echo "=== Integration complete ==="
 
+# Full CI integration test: local manifests, cluster, GitOps sync, tests
+# Uses file:///manifests instead of remote repo - no GitHub credentials needed
+# The /tmp/k3d-manifests directory is volume-mounted into the cluster at /manifests
+[group('k3d')]
+k3d-integration-ci:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  echo "=== Phase 1: Build manifests with local repo URL ==="
+  export ARGOCD_REPO_URL="file:///manifests"
+  just nixidy-build
+
+  echo ""
+  echo "=== Phase 2: Prepare local git repo (before cluster for volume mount) ==="
+  rm -rf /tmp/k3d-manifests
+  mkdir -p /tmp/k3d-manifests
+  cp -r "$(readlink -f result)"/* /tmp/k3d-manifests/
+  cd /tmp/k3d-manifests
+  git init
+  git add .
+  git commit -m "CI manifests"
+  cd -
+
+  echo ""
+  echo "=== Phase 3: Create cluster and deploy via kluctl ==="
+  just k3d-full
+
+  echo ""
+  echo "=== Phase 4: Wait for infrastructure ready ==="
+  just k3d-wait-ready
+
+  echo ""
+  echo "=== Phase 5: Bootstrap ArgoCD (syncs from file:///manifests) ==="
+  just nixidy-bootstrap
+
+  echo ""
+  echo "=== Phase 6: Wait for ArgoCD sync ==="
+  just k3d-wait-argocd-sync
+
+  echo ""
+  echo "=== Phase 7: Run integration tests ==="
+  just k3d-test-coverage
+
+  echo ""
+  echo "=== CI integration complete ==="
+
 ## nixidy (Phase 4 GitOps)
 # Per ADR-006: Rendered manifests are pushed to separate private repos per cluster.
 # local-k3d manifests → ~/projects/nix-workspace/local-k3d (github.com/cameronraysmith/local-k3d)
