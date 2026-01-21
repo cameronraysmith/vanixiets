@@ -879,6 +879,12 @@ k3d-wait-argocd-sync:
   kubectl wait --for=jsonpath='{.status.sync.status}'=Synced application --all -n argocd --timeout=600s
 
   echo ""
+  echo "=== Waiting for Gateway to be programmed ==="
+  # ArgoCD reports Healthy before Cilium fully programs the Gateway
+  # Wait for the actual Gateway condition, not just ArgoCD's view
+  kubectl wait --for=condition=Programmed gateway/main-gateway -n gateway-system --timeout=120s
+
+  echo ""
   echo "=== All ArgoCD applications synced and healthy ==="
   kubectl get applications -n argocd -o wide
 
