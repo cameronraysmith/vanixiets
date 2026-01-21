@@ -7,12 +7,17 @@
 # sslip.io resolves *.127.0.0.1.sslip.io to 127.0.0.1, enabling HTTP-01 challenges
 # for local development where the Gateway is exposed on localhost.
 #
+# Certificate is in gateway-system namespace (same as Gateway) to avoid
+# cross-namespace secret references. Gateway listeners reference the TLS secret
+# directly without ReferenceGrant complexity.
+#
 # Uses yamls option for cert-manager CRDs (no typed options generated).
 # Sync wave 2: after ClusterIssuer (1).
 { lib, ... }:
 let
-  # Test namespace for certificate verification
-  testNamespace = "cert-manager-test";
+  # Certificate in gateway-system namespace (same as Gateway)
+  # Avoids cross-namespace secret reference issues
+  certificateNamespace = "gateway-system";
 
   # sslip.io domain for HTTP-01 challenge validation
   # k3d server node IP from static subnet (192.168.100.0/24)
@@ -21,7 +26,7 @@ let
 in
 {
   applications.test-certificate = {
-    namespace = testNamespace;
+    namespace = certificateNamespace;
 
     # Phase 4 native: create namespace
     syncPolicy = {
@@ -45,7 +50,7 @@ in
         kind: Certificate
         metadata:
           name: test-cert
-          namespace: ${testNamespace}
+          namespace: ${certificateNamespace}
         spec:
           # Secret to store the issued certificate
           secretName: test-cert-tls
