@@ -677,10 +677,10 @@ container-release VERSION="1.0.0" TAGS="":
 ## k3d
 
 # Create local k3d cluster with OrbStack and bootstrap secrets
+# Note: DNS configuration happens in k3d-deploy after Cilium CNI is ready
 [group('k3d')]
 k3d-up:
   ctlptl apply -f kubernetes/clusters/local-k3d/cluster.yaml
-  @just k3d-configure-dns
   @just k3d-bootstrap-secrets
 
 # Bootstrap secrets required before first deployment (idempotent)
@@ -759,6 +759,10 @@ k3d-deploy:
 
   echo "Waiting for Cilium Operator to be ready..."
   kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=120s
+
+  echo ""
+  echo "=== Configure CoreDNS (requires CNI) ==="
+  just k3d-configure-dns
 
   echo ""
   echo "=== Stage 2: Infrastructure (CRDs) ==="
