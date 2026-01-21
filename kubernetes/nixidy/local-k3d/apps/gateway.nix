@@ -3,6 +3,10 @@
 # Creates Gateway resource for ingress traffic routing.
 # Uses Cilium as GatewayClass with HTTP and HTTPS listeners.
 #
+# HTTP listener uses wildcard hostname to accept ACME HTTP-01 challenges
+# for any service. HTTPS listeners use service-specific hostnames to
+# trigger non-wildcard certificate requests (HTTP-01 compatible).
+#
 # cert-manager annotation enables automatic TLS certificate provisioning
 # via the step-ca ACME ClusterIssuer.
 #
@@ -18,6 +22,9 @@ let
   # k3d server node IP from static subnet (192.168.100.0/24)
   localDomain = "192.168.100.2.sslip.io";
   wildcardDomain = "*.${localDomain}";
+
+  # Service-specific hostnames (add more as services need HTTPS)
+  argoCDHostname = "argocd.${localDomain}";
 in
 {
   applications.gateway = {
@@ -63,16 +70,17 @@ in
               allowedRoutes:
                 namespaces:
                   from: All
-            # HTTPS listener for TLS-terminated traffic
-            - name: https
+            # HTTPS listener for ArgoCD (add more listeners as services need HTTPS)
+            # Service-specific hostname triggers non-wildcard cert (HTTP-01 compatible)
+            - name: https-argocd
               protocol: HTTPS
               port: 443
-              hostname: "${wildcardDomain}"
+              hostname: "${argoCDHostname}"
               tls:
                 mode: Terminate
                 certificateRefs:
                   # cert-manager creates this secret via annotation
-                  - name: gateway-tls
+                  - name: argocd-tls
               allowedRoutes:
                 namespaces:
                   from: All
