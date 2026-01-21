@@ -864,32 +864,57 @@ k3d-wait-argocd-sync:
   echo "Applications managed by nixidy sync waves:"
   echo "  Wave -1 (adoption): cilium, argocd, sops-secrets-operator, step-ca"
   echo "  Wave 0: cert-manager"
-  echo "  Wave 1-2: cluster-issuer, gateway, test-certificate"
+  echo "  Wave 1-2: cluster-issuer, gateway, gateway-api, test-certificate"
   echo "  Wave 3: argocd-route"
   echo ""
 
-  echo "Listing current applications..."
+  # All expected applications (app-of-apps creates these asynchronously)
+  EXPECTED_APPS=(
+    apps
+    argocd
+    argocd-route
+    cert-manager
+    cilium
+    cluster-issuer
+    gateway
+    gateway-api
+    sops-secrets-operator
+    step-ca
+    test-certificate
+  )
+
+  echo "Waiting for all ${#EXPECTED_APPS[@]} applications to exist..."
+  for app in "${EXPECTED_APPS[@]}"; do
+    echo -n "  Waiting for $app... "
+    kubectl wait --for=jsonpath='{.metadata.name}'="$app" application/"$app" -n argocd --timeout=300s >/dev/null
+    echo "exists"
+  done
+
+  echo ""
+  echo "Listing applications..."
   kubectl get applications -n argocd -o wide || true
   echo ""
 
   echo "Waiting for all applications to be Healthy..."
-  kubectl wait --for=jsonpath='{.status.health.status}'=Healthy application --all -n argocd --timeout=600s
+  for app in "${EXPECTED_APPS[@]}"; do
+    echo -n "  Waiting for $app to be Healthy... "
+    kubectl wait --for=jsonpath='{.status.health.status}'=Healthy application/"$app" -n argocd --timeout=600s >/dev/null
+    echo "done"
+  done
 
+  echo ""
   echo "Waiting for all applications to be Synced..."
-  kubectl wait --for=jsonpath='{.status.sync.status}'=Synced application --all -n argocd --timeout=600s
+  for app in "${EXPECTED_APPS[@]}"; do
+    echo -n "  Waiting for $app to be Synced... "
+    kubectl wait --for=jsonpath='{.status.sync.status}'=Synced application/"$app" -n argocd --timeout=300s >/dev/null
+    echo "done"
+  done
 
   echo ""
   echo "=== Waiting for Gateway to be programmed ==="
   # ArgoCD reports Healthy before Cilium fully programs the Gateway
   # Wait for the actual Gateway condition, not just ArgoCD's view
   kubectl wait --for=condition=Programmed gateway/main-gateway -n gateway-system --timeout=120s
-
-  echo ""
-  echo "=== Stabilization period ==="
-  # Kubernetes controllers are eventually consistent. After all conditions are met,
-  # allow a brief period for status propagation and controller convergence.
-  # This prevents race conditions where status flaps between checks and test execution.
-  sleep 10
 
   echo ""
   echo "=== All ArgoCD applications synced and healthy ==="
