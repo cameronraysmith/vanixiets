@@ -928,8 +928,9 @@ nixidy-push:
 
   echo "Syncing rendered manifests to {{ local_k3d_repo }}..."
   # -L dereferences symlinks (nix store paths) to copy actual content
+  # --checksum compares by content hash (Nix store files have epoch timestamps)
   # --chmod fixes read-only permissions from nix store
-  rsync -aL --delete --chmod=Du+w,Fu+w --exclude='.git' result/ "{{ local_k3d_repo }}/"
+  rsync -aL --delete --checksum --chmod=Du+w,Fu+w --exclude='.git' result/ "{{ local_k3d_repo }}/"
 
   echo "Committing and pushing to local-k3d repo..."
   cd "{{ local_k3d_repo }}"
