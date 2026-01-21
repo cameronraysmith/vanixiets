@@ -35,6 +35,7 @@ in
         base
         ssh-known-hosts
         colima
+        dnsmasq
         # Note: Not importing users module (defines testuser at UID 550)
         # stibnite defines its own user (crs58)
       ]);
@@ -189,6 +190,10 @@ in
           };
         };
       };
+
+      # Local DNS for sslip.io wildcard resolution
+      # No defaultUpstream: use network's DNS for non-sslip.io queries
+      services.localDnsmasq.enable = true;
 
       home-manager = {
         useGlobalPkgs = true;
