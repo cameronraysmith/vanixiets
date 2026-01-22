@@ -855,11 +855,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1768850708,
-        "narHash": "sha256-HUlmWP326vPtpjPOfpnDm7EF2d5wkT6KB5qqyv1NUY8=",
+        "lastModified": 1769038156,
+        "narHash": "sha256-wa/dxRWGX5ooAGt+RtPYT7oDBbI2kr7ef5OKhfu+EMA=",
         "owner": "arnarg",
         "repo": "nixidy",
-        "rev": "2f40fbb65c84e0ba2ffcf8f7727635bb6ace91c1",
+        "rev": "a09a0b69ce6f38cebdda9f76e88fe14058247d07",
         "type": "github"
       },
       "original": {
