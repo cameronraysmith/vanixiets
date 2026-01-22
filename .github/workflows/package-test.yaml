@@ -76,7 +76,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ inputs.package-name }}-test
-          hash-sources: 'packages/${{ inputs.package-name }}/**/* bun.lock flake.nix flake.lock .github/actions/setup-nix/action.yml .github/workflows/package-test.yaml'
+          hash-sources: 'packages/${{ inputs.package-name }}/**/* bun.lock flake.nix flake.lock .github/actions/setup-nix/action.yml .github/workflows/package-test.yaml justfile'
           force-run: ${{ inputs.force-run }}
 
       - name: setup nix

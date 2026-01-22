@@ -218,7 +218,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ matrix.package.name }}-preview-release
-          hash-sources: 'packages/${{ matrix.package.name }}/**/* .github/actions/setup-nix/action.yml'
+          hash-sources: 'packages/${{ matrix.package.name }}/**/* .github/actions/setup-nix/action.yml justfile scripts/preview-version.sh'
           # Always run: semantic-release analyzes commit history which changes constantly
           force-run: 'true'
 
@@ -741,7 +741,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }} (${{ matrix.category }}${{ matrix.config && format(', {0}', matrix.config) || '' }}, ${{ matrix.system }})
-          hash-sources: 'flake.nix flake.lock pkgs/by-name/**/* modules/**/*.nix justfile .github/actions/setup-nix/action.yml'
+          hash-sources: 'flake.nix flake.lock pkgs/by-name/**/* modules/**/*.nix justfile .github/actions/setup-nix/action.yml scripts/ci/ci-build-category.sh scripts/ci/ci-shared.sh'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix

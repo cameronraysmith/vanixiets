@@ -83,7 +83,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: preview-docs-deploy
-          hash-sources: 'packages/docs/**/* .github/actions/setup-nix/action.yml .github/workflows/deploy-docs.yaml'
+          hash-sources: 'packages/docs/**/* .github/actions/setup-nix/action.yml .github/workflows/deploy-docs.yaml justfile scripts/docs/deploy-production.sh'
           force-run: ${{ inputs.force_run }}
 
       - name: Setup Nix
