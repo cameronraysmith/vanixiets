@@ -43,10 +43,9 @@
           # Enable zsh system-wide (works on both platforms)
           programs.zsh.enable = true;
 
-          # Home-Manager: Import SAME crs58 identity module, keep username=crs58
-          # Note: home.homeDirectory is automatically set by crs58 module's conditional:
-          #   - /home/crs58 on Linux (if any)
-          #   - /Users/crs58 on Darwin (blackphos, stibnite)
+          # Home-Manager infrastructure settings only
+          # Module imports are defined at machine level (blackphos, stibnite modules)
+          # to avoid duplicate catppuccin imports when clan deploys
           home-manager = {
             useGlobalPkgs = true;
             useUserPackages = true;
@@ -59,29 +58,6 @@
               flake = inputs.self // {
                 inherit inputs;
               };
-            };
-
-            users.crs58 = {
-              imports = [
-                inputs.self.modules.homeManager."users/crs58"
-                inputs.self.modules.homeManager.base-sops
-                # Import aggregate modules for crs58
-                # All aggregates (matches blackphos configuration)
-                inputs.self.modules.homeManager.ai
-                inputs.self.modules.homeManager.core
-                inputs.self.modules.homeManager.development
-                inputs.self.modules.homeManager.packages
-                inputs.self.modules.homeManager.shell
-                inputs.self.modules.homeManager.terminal
-                inputs.self.modules.homeManager.tools
-                # LazyVim home-manager module
-                inputs.lazyvim-nix.homeManagerModules.default
-                # nix-index-database for comma command-not-found (terminal aggregate)
-                inputs.nix-index-database.homeModules.nix-index
-                # agents-md option module (requires flake arg from extraSpecialArgs)
-                ../../../../home/modules/_agents-md.nix
-              ];
-              home.username = "crs58";
             };
           };
         }
