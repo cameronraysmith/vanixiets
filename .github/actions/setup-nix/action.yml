@@ -55,7 +55,7 @@ runs:
   steps:
     - name: reclaim space (linux)
       if: runner.os == 'Linux' && inputs.installer == 'full'
-      uses: cameronraysmith/nothing-but-nix@cd91c27edba264e3216bd608bc34d9dea8a173cc # fix-mnt-tmpdir-permissions
+      uses: cameronraysmith/nothing-but-nix@a77b09ee91691223ff188d8fb6a87d699d457b4f # fix-mnt-tmpdir-permissions
       with:
         hatchet-protocol: ${{ inputs.hatchet }}
         nix-permission-edict: true
