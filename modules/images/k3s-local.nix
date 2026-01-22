@@ -145,29 +145,44 @@ in
     {
       packages = {
         # Raw qcow2 for Hetzner VPS, QEMU, and other hypervisors
-        k3s-local-qcow = qcowImage;
+        # hydraPlatforms = [] excludes from CI (requires cross-compilation to aarch64-linux)
+        k3s-local-qcow = qcowImage // {
+          meta = (qcowImage.meta or { }) // {
+            hydraPlatforms = [ ];
+          };
+        };
 
         # Unified incus image (metadata + qcow2 in tarball)
-        k3s-local-image = pkgs.runCommand "k3s-local-incus-image" { } ''
-          mkdir -p $out
+        # hydraPlatforms = [] excludes from CI (depends on k3s-local-qcow)
+        k3s-local-image =
+          let
+            image = pkgs.runCommand "k3s-local-incus-image" { } ''
+              mkdir -p $out
 
-          # Generate incus metadata
-          cat > metadata.yaml <<EOF
-          architecture: ${incusArch}
-          creation_date: $(date +%s)
-          properties:
-            os: nixos
-            release: unstable
-            variant: k3s-local
-            description: NixOS k3s local development VM (${targetSystem})
-          EOF
+              # Generate incus metadata
+              cat > metadata.yaml <<EOF
+              architecture: ${incusArch}
+              creation_date: $(date +%s)
+              properties:
+                os: nixos
+                release: unstable
+                variant: k3s-local
+                description: NixOS k3s local development VM (${targetSystem})
+              EOF
 
-          # Create unified incus image tarball
-          # incus expects: metadata.yaml + rootfs.img (qcow2 renamed)
-          # Use symlink + dereference (-h) to avoid copying 3GB+ file
-          ln -s ${qcowImage}/nixos.qcow2 rootfs.img
-          tar -czhvf $out/k3s-local.tar.gz metadata.yaml rootfs.img
-        '';
+              # Create unified incus image tarball
+              # incus expects: metadata.yaml + rootfs.img (qcow2 renamed)
+              # Use symlink + dereference (-h) to avoid copying 3GB+ file
+              ln -s ${qcowImage}/nixos.qcow2 rootfs.img
+              tar -czhvf $out/k3s-local.tar.gz metadata.yaml rootfs.img
+            '';
+          in
+          image
+          // {
+            meta = (image.meta or { }) // {
+              hydraPlatforms = [ ];
+            };
+          };
       };
     };
 }
