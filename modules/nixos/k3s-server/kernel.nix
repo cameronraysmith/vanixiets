@@ -4,7 +4,12 @@
 # Imported by k3s-server main module via deferred module composition.
 {
   flake.modules.nixos.k3s-server-kernel =
-    { config, lib, pkgs, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     {
       config = lib.mkIf config.k3s-server.enable {
         # Use latest kernel to test ARM64 BPF stack delivery fix (nix-2hd)

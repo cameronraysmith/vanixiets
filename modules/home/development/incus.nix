@@ -53,38 +53,36 @@
       };
 
       # Generate profile YAML with cloud-init configuration
-      mkProfileYaml =
-        name: profileCfg:
-        ''
-          name: ${name}
-          description: "${name} VM profile with static IP"
-          config:
-            security.secureboot: "false"
-            limits.cpu: "${toString profileCfg.cpu}"
-            limits.memory: "${profileCfg.memory}"
-            user.network-config: |
-              network:
-                version: 2
-                ethernets:
-                  enp5s0:
-                    addresses:
-                      - ${profileCfg.ip}/24
-                    routes:
-                      - to: 0.0.0.0/0
-                        via: ${profileCfg.gateway}
-            user.meta-data: |
-              #cloud-config
-              hostname: ${name}
-          devices:
-            eth0:
-              name: eth0
-              network: incusbr0
-              type: nic
-            root:
-              path: /
-              pool: default
-              type: disk
-        '';
+      mkProfileYaml = name: profileCfg: ''
+        name: ${name}
+        description: "${name} VM profile with static IP"
+        config:
+          security.secureboot: "false"
+          limits.cpu: "${toString profileCfg.cpu}"
+          limits.memory: "${profileCfg.memory}"
+          user.network-config: |
+            network:
+              version: 2
+              ethernets:
+                enp5s0:
+                  addresses:
+                    - ${profileCfg.ip}/24
+                  routes:
+                    - to: 0.0.0.0/0
+                      via: ${profileCfg.gateway}
+          user.meta-data: |
+            #cloud-config
+            hostname: ${name}
+        devices:
+          eth0:
+            name: eth0
+            network: incusbr0
+            type: nic
+          root:
+            path: /
+            pool: default
+            type: disk
+      '';
 
       # Filter to enabled profiles only
       enabledProfiles = lib.filterAttrs (_name: profileCfg: profileCfg.enable) cfg.k3sProfiles;

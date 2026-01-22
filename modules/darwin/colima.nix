@@ -62,31 +62,35 @@
       '';
 
       # Generate all socat services for a cluster
-      mkClusterServices = clusterName: clusterCfg:
+      mkClusterServices =
+        clusterName: clusterCfg:
         let
           sanitizedName = builtins.replaceStrings [ "-" ] [ "_" ] clusterName;
         in
         {
           "${sanitizedName}_api" = mkSocatService "${clusterName}-api" clusterCfg.apiPort clusterCfg.ip 6443;
           "${sanitizedName}_http" = mkSocatService "${clusterName}-http" clusterCfg.httpPort clusterCfg.ip 80;
-          "${sanitizedName}_https" = mkSocatService "${clusterName}-https" clusterCfg.httpsPort clusterCfg.ip 443;
+          "${sanitizedName}_https" =
+            mkSocatService "${clusterName}-https" clusterCfg.httpsPort clusterCfg.ip
+              443;
           "${sanitizedName}_ssh" = mkSocatService "${clusterName}-ssh" clusterCfg.sshPort clusterCfg.ip 22;
         };
 
       # Merge all cluster services
-      allServices = lib.foldlAttrs (acc: name: value: acc // mkClusterServices name value) { } cfg.portForwards;
+      allServices = lib.foldlAttrs (
+        acc: name: value:
+        acc // mkClusterServices name value
+      ) { } cfg.portForwards;
 
       # Generate Lima provision script for socat services
       provisionScript =
         let
-          serviceFiles = lib.mapAttrsToList (
-            name: content: ''
-              cat > ~/.config/systemd/user/socat-${name}.service << 'SERVICEEOF'
-              ${content}
-              SERVICEEOF
-              systemctl --user enable socat-${name}.service
-            ''
-          ) allServices;
+          serviceFiles = lib.mapAttrsToList (name: content: ''
+            cat > ~/.config/systemd/user/socat-${name}.service << 'SERVICEEOF'
+            ${content}
+            SERVICEEOF
+            systemctl --user enable socat-${name}.service
+          '') allServices;
           serviceNames = lib.mapAttrsToList (name: _: "socat-${name}.service") allServices;
         in
         ''
@@ -109,26 +113,24 @@
 
       # Generate Lima port forwards (macOS -> Colima VM)
       limaPortForwards = lib.concatLists (
-        lib.mapAttrsToList (
-          _: clusterCfg: [
-            {
-              guestPort = clusterCfg.apiPort;
-              hostIP = "127.0.0.1";
-            }
-            {
-              guestPort = clusterCfg.httpPort;
-              hostIP = "127.0.0.1";
-            }
-            {
-              guestPort = clusterCfg.httpsPort;
-              hostIP = "127.0.0.1";
-            }
-            {
-              guestPort = clusterCfg.sshPort;
-              hostIP = "127.0.0.1";
-            }
-          ]
-        ) cfg.portForwards
+        lib.mapAttrsToList (_: clusterCfg: [
+          {
+            guestPort = clusterCfg.apiPort;
+            hostIP = "127.0.0.1";
+          }
+          {
+            guestPort = clusterCfg.httpPort;
+            hostIP = "127.0.0.1";
+          }
+          {
+            guestPort = clusterCfg.httpsPort;
+            hostIP = "127.0.0.1";
+          }
+          {
+            guestPort = clusterCfg.sshPort;
+            hostIP = "127.0.0.1";
+          }
+        ]) cfg.portForwards
       );
 
       # Generate colima.yaml content with port forwards and provision scripts
