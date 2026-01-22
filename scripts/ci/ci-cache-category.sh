@@ -93,12 +93,11 @@ cache_packages() {
         fi
     done <<< "$packages"
 
-    # Display package targets for debugging
-    echo "package targets:"
-    echo "$package_targets" | tr ' ' '\n' | grep -v "^$" | head -10
-    if [ $(echo "$package_targets" | tr ' ' '\n' | grep -v "^$" | wc -l) -gt 10 ]; then
-        echo "  ... ($(echo "$package_targets" | tr ' ' '\n' | grep -v "^$" | wc -l) total)"
-    fi
+    # Display all package targets for debugging
+    local target_count
+    target_count=$(echo "$package_targets" | tr ' ' '\n' | grep -v "^$" | wc -l | tr -d ' ')
+    echo "package targets ($target_count):"
+    echo "$package_targets" | tr ' ' '\n' | grep -v "^$"
     echo ""
 
     echo "building all packages with captured paths..."
