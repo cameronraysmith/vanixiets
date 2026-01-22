@@ -641,7 +641,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }} (${{ matrix.system }})
-          hash-sources: 'pkgs/by-name/**/* modules/nixpkgs/overlays/**/*.nix flake.nix flake.lock .github/actions/setup-nix/action.yml'
+          hash-sources: 'pkgs/by-name/**/* modules/nixpkgs/overlays/**/*.nix flake.nix flake.lock .github/actions/setup-nix/action.yml scripts/ci/ci-cache-category.sh scripts/ci/ci-shared.sh'
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: setup nix
