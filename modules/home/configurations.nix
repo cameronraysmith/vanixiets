@@ -20,12 +20,14 @@ let
       aggregateImports =
         if username == "crs58" then
           [
+            config.flake.modules.homeManager.core
             config.flake.modules.homeManager.development
             config.flake.modules.homeManager.ai
             config.flake.modules.homeManager.shell
           ]
         else if username == "raquel" then
           [
+            config.flake.modules.homeManager.core
             config.flake.modules.homeManager.development
             config.flake.modules.homeManager.shell
           ]
@@ -56,6 +58,8 @@ let
         config.flake.modules.homeManager.base-sops
         # Add lazyvim home-manager module for neovim
         inputs.lazyvim-nix.homeManagerModules.default
+        # Add catppuccin theming module
+        inputs.catppuccin.homeModules.catppuccin
       ];
     };
 

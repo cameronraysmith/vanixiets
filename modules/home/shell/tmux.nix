@@ -35,8 +35,6 @@
         };
       in
       {
-        imports = [ flake.inputs.catppuccin.homeModules.catppuccin ];
-
         catppuccin.tmux = {
           enable = true;
           extraConfig = ''
