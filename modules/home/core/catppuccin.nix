@@ -3,8 +3,10 @@
 { ... }:
 {
   flake.modules.homeManager.core =
-    { ... }:
+    { flake, ... }:
     {
+      imports = [ flake.inputs.catppuccin.homeModules.catppuccin ];
+
       # Global catppuccin theme enable
       # Individual programs (tmux, bat, etc.) will use this theme automatically
       catppuccin = {

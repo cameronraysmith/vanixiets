@@ -58,8 +58,6 @@ let
         config.flake.modules.homeManager.base-sops
         # Add lazyvim home-manager module for neovim
         inputs.lazyvim-nix.homeManagerModules.default
-        # Add catppuccin theming module
-        inputs.catppuccin.homeModules.catppuccin
       ];
     };
 
