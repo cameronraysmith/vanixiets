@@ -12,7 +12,7 @@
     };
 
     # Machine-specific targeting (legacy machines)
-    # roles.default.machines."stibnite" = { };  # Uncomment when stibnite is configured
+    roles.default.machines."stibnite" = { };
     roles.default.machines."blackphos" = { };
 
     roles.default.settings = {
@@ -35,14 +35,6 @@
           ...
         }:
         {
-          # Shell preference (works on both platforms)
-          users.users.crs58.shell = pkgs.zsh;
-
-          users.users.crs58.openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
-
-          # Enable zsh system-wide (works on both platforms)
-          programs.zsh.enable = true;
-
           # Home-Manager infrastructure settings only
           # Module imports are defined at machine level (blackphos, stibnite modules)
           # to avoid duplicate catppuccin imports when clan deploys
