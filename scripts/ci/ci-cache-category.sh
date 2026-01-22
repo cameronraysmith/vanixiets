@@ -93,12 +93,39 @@ cache_packages() {
         fi
     done <<< "$packages"
 
+    # Display package targets for debugging
+    echo "package targets:"
+    echo "$package_targets" | tr ' ' '\n' | grep -v "^$" | head -10
+    if [ $(echo "$package_targets" | tr ' ' '\n' | grep -v "^$" | wc -l) -gt 10 ]; then
+        echo "  ... ($(echo "$package_targets" | tr ' ' '\n' | grep -v "^$" | wc -l) total)"
+    fi
+    echo ""
+
     echo "building all packages with captured paths..."
+    local build_output
+    local build_exit_code
+
+    # Capture both output and exit code to provide better diagnostics
+    build_output=$(nix build $package_targets -L --print-out-paths --no-link 2>&1) || build_exit_code=$?
+
     local store_paths
-    store_paths=$(nix build $package_targets -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
+    store_paths=$(echo "$build_output" | grep "^/nix/store/" || echo "")
 
     if [ -z "$store_paths" ]; then
+        echo ""
         echo "error: no store paths captured from build"
+        if [ -n "${build_exit_code:-}" ]; then
+            echo "build exit code: $build_exit_code"
+            echo ""
+            echo "build output (last 50 lines):"
+            echo "$build_output" | tail -50
+            echo ""
+            echo "hint: one or more packages may have failed to build"
+            echo "hint: check if packages need hydraPlatforms exclusion for CI"
+        else
+            echo "build succeeded but produced no store paths"
+            echo "hint: all packages may already be cached (nothing to build)"
+        fi
         return 1
     fi
 
