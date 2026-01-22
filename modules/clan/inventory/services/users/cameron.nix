@@ -29,10 +29,10 @@
       prompt = false; # Auto-generate password via xkcdpass (nixos only currently)
     };
 
-    # User overlay: shell, SSH keys, home-manager integration
-    # Provides cross-platform user configuration (works on both nixos and darwin)
+    # User overlay: shell, SSH keys, home-manager configuration
+    # Home-manager module is imported at machine level (nixos/darwin specific)
+    # This extraModule only provides configuration
     roles.default.extraModules = [
-      inputs.home-manager.nixosModules.home-manager # Cross-platform (adapts via common.nix)
       (
         {
           pkgs,
