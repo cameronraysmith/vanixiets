@@ -33,6 +33,7 @@ in
       ++ (with flakeModules; [
         base
         ssh-known-hosts
+        dnscrypt-proxy
         # Note: Not importing users module (defines testuser at UID 550)
         # blackphos defines its own users (crs58 + raquel)
       ]);
@@ -106,6 +107,16 @@ in
       services.openssh.extraConfig = ''
         MaxAuthTries 20
       '';
+
+      # Encrypted DNS via DoH (DNS-over-HTTPS)
+      # Routes all DNS through Quad9 DoH, bypassing enterprise DNS interception
+      # DoH uses HTTPS (port 443)
+      services.localDnscryptProxy = {
+        enable = true;
+        providers = [
+          "quad9"
+        ];
+      };
 
       # crs58: admin (UID 502), raquel: primary (UID 506) - matches existing system
       users.users.crs58 = {
