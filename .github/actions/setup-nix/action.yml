@@ -111,7 +111,7 @@ runs:
 
     - name: setup magic-nix-cache
       if: inputs.installer == 'full'
-      uses: DeterminateSystems/magic-nix-cache-action@18f387d6764e62a1ef95201d3ad9d594a2b0a455 # main
+      uses: DeterminateSystems/magic-nix-cache-action@b4ad0b1e587499958543d6e793cd46510a21e7c2 # main
       with:
         # Disable FlakeHub cache (we use Cachix instead)
         use-flakehub: false
