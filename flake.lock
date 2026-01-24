@@ -1155,11 +1155,11 @@
     },
     "pkgs-by-name-for-flake-parts": {
       "locked": {
-        "lastModified": 1768881421,
-        "narHash": "sha256-WuP/Nfm41KiY0kAVm9c/cB87fys7Y52TETr1z6il1hY=",
+        "lastModified": 1769241910,
+        "narHash": "sha256-6xNpg+oJefBEJKSqwWINyV4bAnciEyXideNt+FEeWx4=",
         "owner": "drupol",
         "repo": "pkgs-by-name-for-flake-parts",
-        "rev": "eb126683e3d2ff697aad9fd8dee2140cda97fece",
+        "rev": "e0f9d279fe1f97184482b202ebaf52d013d38f7f",
         "type": "github"
       },
       "original": {
