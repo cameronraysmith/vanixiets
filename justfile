@@ -66,7 +66,7 @@ flake-info:
 # Lint nix files
 [group('nix')]
 lint:
-  pre-commit run --all-files
+  prek run --all-files
 
 # Manually enter dev shell
 [group('nix')]
