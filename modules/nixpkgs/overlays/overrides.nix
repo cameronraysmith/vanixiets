@@ -12,6 +12,17 @@
 {
   flake.nixpkgsOverlays = [
     (final: prev: {
+      # pygame: SDL2 surface flag tests fail on Python 3.13
+      # Upstream: https://github.com/libsdl-org/SDL/issues/14424
+      # Failing: test_fill_rle, test_make_surface__subclassed_surface
+      # TODO: Remove when nixpkgs skip-rle-tests.patch covers these tests
+      # Date added: 2026-01-24
+      pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
+        (python-final: python-prev: {
+          pygame = python-prev.pygame.overrideAttrs { doCheck = false; };
+        })
+      ];
+
       # mactop: Test fails in Nix sandbox environment
       # Issue: TestHeadlessIntegration tries to mkdir /homeless-shelter (sandbox $HOME)
       # Symptom: mkdir /homeless-shelter: read-only file system
