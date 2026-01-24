@@ -5,6 +5,7 @@
     {
       home.packages = with pkgs; [
         # db
+        dbt-fusion
         duckdb
         turso
         pgcli
