@@ -17,11 +17,12 @@
       # Failing: test_fill_rle, test_make_surface__subclassed_surface
       # TODO: Remove when nixpkgs skip-rle-tests.patch covers these tests
       # Date added: 2026-01-24
-      pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
-        (python-final: python-prev: {
-          pygame = python-prev.pygame.overrideAttrs { doCheck = false; };
-        })
-      ];
+      python3 = prev.python3.override {
+        packageOverrides = pyFinal: pyPrev: {
+          pygame = pyPrev.pygame.overrideAttrs { doCheck = false; };
+        };
+      };
+      python3Packages = final.python3.pkgs;
 
       # mactop: Test fails in Nix sandbox environment
       # Issue: TestHeadlessIntegration tries to mkdir /homeless-shelter (sandbox $HOME)
