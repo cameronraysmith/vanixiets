@@ -755,7 +755,7 @@ k3d-deploy:
   sleep 5  # Brief delay for pods to be scheduled
 
   echo "Waiting for Cilium Agent to be ready..."
-  kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-agent -n kube-system --timeout=120s
+  kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-agent -n kube-system --timeout=300s
 
   echo "Waiting for Cilium Operator to be ready..."
   kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=120s
