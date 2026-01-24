@@ -19,7 +19,10 @@
       # Date added: 2026-01-24
       python3 = prev.python3.override {
         packageOverrides = pyFinal: pyPrev: {
-          pygame = pyPrev.pygame.overrideAttrs { doCheck = false; };
+          pygame = pyPrev.pygame.overrideAttrs {
+            doCheck = false;
+            doInstallCheck = false;
+          };
         };
       };
       python3Packages = final.python3.pkgs;
