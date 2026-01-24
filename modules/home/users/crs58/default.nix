@@ -18,7 +18,7 @@
       # No local imports needed - all 17 modules available via aggregate merging
 
       # sops-nix configuration for crs58/cameron user
-      # 10 secrets: development + ai + shell aggregates
+      # 11 secrets: development + ai + shell aggregates
       sops = {
         defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
         secrets = {
@@ -37,6 +37,10 @@
           git-credentials = {
             mode = "0400"; # Read-only: prevent git credential-store from modifying
             path = "${config.home.homeDirectory}/.git-credentials";
+          };
+          aws-credentials = {
+            mode = "0600"; # AWS SDK requires 600 for credentials file
+            path = "${config.home.homeDirectory}/.aws/credentials";
           };
         };
 
