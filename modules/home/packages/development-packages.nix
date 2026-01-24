@@ -85,7 +85,13 @@
           golem-cli
           #------
           plantuml-c4
-          pre-commit
+          # Disabled: pre-commit depends on dotnet-sdk on Darwin which requires Swift.
+          # Swift has not been cached on Hydra for aarch64-darwin since Dec 30, 2025.
+          # Upstream issue: https://github.com/NixOS/nixpkgs/issues/450554
+          # Monitor build status:
+          #   https://hydra.nixos.org/job/nixpkgs/trunk/swiftPackages.swift.aarch64-darwin
+          #   https://hydra.nixos.org/job/nixpkgs/trunk/pre-commit.aarch64-darwin
+          # pre-commit
           proto # version manager NOT protobuf-related
           ratchet
           shellcheck
