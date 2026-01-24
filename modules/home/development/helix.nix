@@ -11,7 +11,12 @@
       options = {
         my.helix = {
           markdown.enable = lib.mkEnableOption "Enable markdown support" // {
-            default = true;
+            # Disabled: marksman requires dotnet which requires Swift.
+            # Swift has not been cached on Hydra for aarch64-darwin since Dec 30, 2025.
+            # Monitor build status:
+            #   https://hydra.nixos.org/job/nixpkgs/trunk/swiftPackages.swift.aarch64-darwin
+            #   https://hydra.nixos.org/job/nixpkgs/trunk/marksman.aarch64-darwin
+            default = false;
           };
         };
       };
