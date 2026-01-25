@@ -53,6 +53,34 @@ Avoid splitting when it would fragment a genuinely cohesive unit or create exces
 
 - Always at least consider testing changes with the relevant framework like bash shell commands where you can validate output, `cargo test`, `pytest`, `vitest`, `nix eval` or `nix build`, a task runner like `just test` or `make test`, or `gh workflow run` before considering any work to be complete and correct.
 - Be judicious about test execution. If a test might take a very long time, be resource-intensive, or require elevated security privileges but is important, pause to provide the proposed command and reason why it's an important test.
+- Local test execution is the primary feedback loop during development.
+  Run tests iteratively as you work, fixing issues before committing.
+  CI workflow verification is a distinct stage that occurs when validating a branch for merge/pull request, not during routine local development.
+
+### CI workflow log verification
+
+When validating changes for merge, verify CI results by downloading and analyzing complete workflow logs rather than piecing together fragments via repeated API calls.
+
+Wait for relevant workflows to complete:
+```bash
+gh run watch <run_id>
+# or poll with: gh run list --branch <branch> --status completed
+```
+
+Download the complete logs archive:
+```bash
+run_id=<run_id>
+gh api "repos/<owner>/<repo>/actions/runs/${run_id}/logs" > "logs_${run_id}.zip"
+unzip -d "logs_${run_id}" "logs_${run_id}.zip"
+```
+
+Survey available jobs and steps:
+```bash
+tree --du -ah "logs_${run_id}"
+```
+
+Dispatch subagent Tasks to analyze specific log files for the problem at hand rather than manually reading large logs inline.
+This approach provides a complete, well-organized view of CI results and avoids the antipattern of fragmented API-based log retrieval that never yields a clear picture of what happened.
 - Use performant CLI tools matched to task intent:
   - File search (by name/path): use `fd` instead of `find`
   - Content search (within files): use `rg` (ripgrep) instead of `grep`
