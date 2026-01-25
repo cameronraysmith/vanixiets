@@ -712,7 +712,7 @@ k3d-configure-dns:
   #!/usr/bin/env bash
   set -euo pipefail
   echo "Waiting for CoreDNS to be running..."
-  kubectl wait --for=condition=Ready pod -l k8s-app=kube-dns -n kube-system --timeout=60s
+  kubectl wait --for=condition=Ready pod -l k8s-app=kube-dns -n kube-system --timeout=120s
   echo "Patching CoreDNS ConfigMap to forward sslip.io to public DNS..."
   CURRENT=$(kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}')
   if echo "$CURRENT" | grep -q "sslip.io"; then
@@ -726,7 +726,7 @@ k3d-configure-dns:
   echo "Restarting CoreDNS deployment..."
   kubectl rollout restart deployment coredns -n kube-system
   echo "Waiting for CoreDNS to be ready..."
-  kubectl rollout status deployment coredns -n kube-system --timeout=60s
+  kubectl rollout status deployment coredns -n kube-system --timeout=120s
   echo "CoreDNS configured for sslip.io forwarding"
 
 # Delete local k3d cluster
@@ -758,7 +758,7 @@ k3d-deploy:
   kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-agent -n kube-system --timeout=300s
 
   echo "Waiting for Cilium Operator to be ready..."
-  kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=120s
+  kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=300s
 
   echo ""
   echo "=== Configure CoreDNS (requires CNI) ==="
@@ -834,7 +834,7 @@ k3d-wait-ready:
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cilium-agent -n kube-system --timeout=300s
 
   echo "Waiting for Cilium Operator..."
-  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=120s
+  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=300s
 
   echo ""
   echo "=== Waiting for Infrastructure ==="
@@ -849,7 +849,7 @@ k3d-wait-ready:
   kubectl wait --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=step-ca-step-certificates-0 -n step-ca --timeout=300s
 
   echo "Waiting for sops-secrets-operator..."
-  kubectl wait --for=condition=Available deployment --all -n sops-secrets-operator --timeout=120s
+  kubectl wait --for=condition=Available deployment --all -n sops-secrets-operator --timeout=300s
 
   echo ""
   echo "=== All foundation and infrastructure pods ready ==="
@@ -914,7 +914,7 @@ k3d-wait-argocd-sync:
   echo "=== Waiting for Gateway to be programmed ==="
   # ArgoCD reports Healthy before Cilium fully programs the Gateway
   # Wait for the actual Gateway condition, not just ArgoCD's view
-  kubectl wait --for=condition=Programmed gateway/main-gateway -n gateway-system --timeout=120s
+  kubectl wait --for=condition=Programmed gateway/main-gateway -n gateway-system --timeout=300s
 
   echo ""
   echo "=== All ArgoCD applications synced and healthy ==="
