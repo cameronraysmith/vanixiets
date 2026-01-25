@@ -42,7 +42,7 @@ env:
 jobs:
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
     steps:
