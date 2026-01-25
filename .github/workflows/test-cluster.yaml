@@ -57,12 +57,22 @@ jobs:
           hash-sources: 'kubernetes/**/* justfile flake.nix flake.lock secrets/** scripts/k3d-test-coverage.sh .github/workflows/test-cluster.yaml .github/actions/setup-nix/action.yml'
           force-run: ${{ inputs.force_run }}
 
+      - name: Prune Docker to free root space
+        if: steps.cache.outputs.should-run == 'true'
+        run: |
+          echo "Pruning pre-cached Docker images to free root filesystem space..."
+          docker system prune -af --volumes
+          echo "Root filesystem after prune:"
+          df -h /
+
       - name: Setup Nix
         if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           installer: full
-          hatchet: holster
+          hatchet: carve
+          # Reserve 10GB on root for Docker overlay storage to prevent kubelet disk pressure
+          root-safe-haven: '10240'
           system: x86_64-linux
 
       - name: Verify Docker available
