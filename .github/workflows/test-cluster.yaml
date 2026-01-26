@@ -71,8 +71,9 @@ jobs:
         with:
           installer: full
           hatchet: carve
-          # Reserve 10GB on root for Docker overlay storage to prevent kubelet disk pressure
-          root-safe-haven: '10240'
+          # Reserve 25GB on root for Docker overlay storage to prevent kubelet disk pressure
+          # k3d pulls ~15-20GB of container images (k3s, cilium, argocd, etc.)
+          root-safe-haven: '25600'
           system: x86_64-linux
 
       - name: Verify Docker available
