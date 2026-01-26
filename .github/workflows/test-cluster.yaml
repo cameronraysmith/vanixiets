@@ -70,10 +70,11 @@ jobs:
         uses: ./.github/actions/setup-nix
         with:
           installer: full
-          hatchet: carve
-          # Reserve 25GB on root for Docker overlay storage to prevent kubelet disk pressure
-          # k3d pulls ~15-20GB of container images (k3s, cilium, argocd, etc.)
-          root-safe-haven: '25600'
+          hatchet: holster
+          # Reserve 30GB on /mnt. On single-disk runners where /mnt is on root,
+          # this reserves space for Docker overlay. holster never expands from root,
+          # making this configuration work on both single-disk and two-disk runners.
+          mnt-safe-haven: '30720'
           system: x86_64-linux
 
       - name: Verify Docker available
