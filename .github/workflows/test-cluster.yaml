@@ -67,30 +67,31 @@ jobs:
 
       # nothing-but-nix configuration for k3d integration tests
       #
-      # GitHub runners come in two disk topologies:
+      # GitHub runners come in three disk topologies:
       #   - Single-disk (145G): /mnt is a directory ON root
       #   - Two-disk (72G+74G): /mnt is separate /dev/sdb1
+      #   - Small /mnt (~20G): limited /mnt partition
       #
       # k3d tests need both:
       #   - /nix store: ~1GB for Nix derivations
       #   - Docker overlay on root: ~4GB for k3s, cilium, argocd images
       #
-      # Using holster (never expands from root) + large mnt-safe-haven:
-      #   - Single-disk: mnt-safe-haven reserves ROOT space (30GB free after k3d)
-      #   - Two-disk: mnt-safe-haven reserves /mnt space, root untouched (20GB free)
+      # Using holster (never expands from root) + mnt-safe-haven:
+      #   - Single-disk: mnt-safe-haven reserves ROOT space for Docker
+      #   - Two-disk: mnt-safe-haven reserves /mnt space, root untouched
+      #   - Small /mnt: must fit within 20GB (requires mnt-safe-haven + 1GB < 20GB)
       #
-      # Measured allocations (Jan 2026):
-      #   Single-disk: /nix=63G (1G used), root=27G free after k3d
-      #   Two-disk:    /nix=36G (1G used), root=20G free after k3d
-      #
-      # The 30GB reserve provides ~7x headroom over actual Docker usage (~4GB).
+      # mnt-safe-haven=15GB balances all topologies:
+      #   - Requires 16GB /mnt (fits 20GB minimum)
+      #   - Reserves 15GB for Docker (~4x measured 4GB usage)
+      #   - Leaves 5-78GB for /nix depending on runner (need ~1GB)
       - name: Setup Nix
         if: steps.cache.outputs.should-run == 'true'
         uses: ./.github/actions/setup-nix
         with:
           installer: full
           hatchet: holster
-          mnt-safe-haven: '30720'
+          mnt-safe-haven: '15360'
           system: x86_64-linux
 
       - name: Verify Docker available
