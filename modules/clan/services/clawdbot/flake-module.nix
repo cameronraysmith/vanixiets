@@ -96,6 +96,7 @@
               in
               {
                 environment.etc."clawdbot/clawdbot.json".source = configFile;
+                environment.systemPackages = [ pkgs.clawdbot-gateway ];
 
                 users.users.clawdbot = {
                   isSystemUser = true;
