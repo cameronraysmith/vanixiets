@@ -1,15 +1,7 @@
-# ZeroTier network configuration for clawdbot infrastructure on cinnabar
-#
-# DNS entries resolve .zt hostnames to cinnabar's ZeroTier IPv6 address.
-# Caddy CA cert enables HTTPS trust for its tls-internal certificates.
+# Caddy CA cert trust for cinnabar's tls-internal certificates
 { lib, ... }:
 {
   flake.modules.darwin."machines/darwin/stibnite" = {
-    clan.core.networking.extraHosts.clawdbot-services = ''
-      fddb:4344:343b:14b9:399:93db:4344:343b matrix.zt
-      fddb:4344:343b:14b9:399:93db:4344:343b clawdbot.zt
-    '';
-
     # Trust Caddy internal CA for curl/git/OpenSSL tools
     security.pki.certificateFiles = [
       ../../nixos/cinnabar/pki/caddy-root-ca.crt
