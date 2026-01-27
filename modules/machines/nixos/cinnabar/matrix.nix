@@ -1,4 +1,3 @@
-# Matrix Synapse configuration for cinnabar
 # ZeroTier-only private access (no federation)
 # Caddy reverse proxies to localhost:8008
 { ... }:
@@ -11,7 +10,6 @@
       ...
     }:
     {
-      # PostgreSQL database for Synapse
       services.postgresql = {
         enable = true;
         ensureDatabases = [ "matrix-synapse" ];
@@ -23,7 +21,6 @@
         ];
       };
 
-      # Matrix Synapse homeserver
       services.matrix-synapse = {
         enable = true;
         settings = {
@@ -48,7 +45,6 @@
             }
           ];
 
-          # No federation (ZeroTier-only private instance)
           federation_domain_whitelist = [ ];
 
           database = {
@@ -71,7 +67,6 @@
         ];
       };
 
-      # Clan vars generators for secrets
       clan.core.vars.generators.synapse-registration-shared-secret = {
         files."shared-secret.yaml" = {
           neededFor = "services";
@@ -112,7 +107,7 @@
         '';
       };
 
-      # Oneshot service to register users after Synapse starts
+      # Register Matrix users on first boot
       systemd.services.matrix-synapse-register-users = {
         description = "Register Matrix Synapse users";
         after = [ "matrix-synapse.service" ];

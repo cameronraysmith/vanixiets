@@ -37,11 +37,9 @@
         };
       };
 
-      # Allow DNS queries from ZeroTier peers
       networking.firewall.interfaces."zt+".allowedTCPPorts = [ 53 ];
       networking.firewall.interfaces."zt+".allowedUDPPorts = [ 53 ];
 
-      # Push DNS server to all ZeroTier network members
       clan.core.networking.zerotier.settings = {
         dns = {
           domain = "zt";
