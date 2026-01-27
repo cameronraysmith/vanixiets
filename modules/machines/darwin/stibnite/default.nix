@@ -6,10 +6,9 @@
   ...
 }:
 let
-  # Capture outer config for use in imports
   flakeModules = config.flake.modules.darwin;
   flakeModulesHome = config.flake.modules.homeManager;
-  # Capture flake for extraSpecialArgs (needed by sops-nix)
+  # sops-nix requires flake in extraSpecialArgs
   flakeForHomeManager = config.flake // {
     inherit inputs;
   };
@@ -23,7 +22,6 @@ in
       ...
     }:
     {
-      # Make flake available to all darwin modules
       _module.args.flake = inputs.self;
 
       imports = [
@@ -37,7 +35,7 @@ in
         colima
         dnscrypt-proxy
         zt-dns
-        # Note: Not importing users module (defines testuser at UID 550)
+        # Not importing users module (defines testuser at UID 550)
         # stibnite defines its own user (crs58)
       ]);
 
@@ -71,7 +69,7 @@ in
       system.stateVersion = lib.mkForce 4;
 
       # Primary user for homebrew and system-level user operations
-      # Note: crs58 is both admin and primary user on stibnite
+      # crs58 is both admin and primary user on stibnite
       system.primaryUser = "crs58";
 
       custom.profile.isDesktop = true;
@@ -80,7 +78,6 @@ in
       custom.homebrew = {
         enable = true;
 
-        # Machine-specific casks (stibnite-only)
         additionalCasks = [
           "codelayer-nightly"
           "dbeaver-community"
@@ -93,7 +90,6 @@ in
           "zerotier-one"
         ];
 
-        # Machine-specific brews (stibnite-only)
         additionalBrews = [
           "incus" # Incus client for Colima incus runtime (not available in nixpkgs)
         ];
@@ -108,7 +104,6 @@ in
 
       security.pam.services.sudo_local.touchIdAuth = true;
 
-      # SSH daemon configuration
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       # nix-darwin writes this to /etc/ssh/sshd_config.d/100-nix-darwin.conf
@@ -137,7 +132,7 @@ in
       };
 
       # Darwin requires explicit knownUsers
-      # Note: Not managing root user (no users.users.root definition)
+      # Not managing root user (no users.users.root definition)
       users.knownUsers = [
         "crs58"
       ];
@@ -231,11 +226,9 @@ in
         useGlobalPkgs = true;
         useUserPackages = true;
 
-        # Backup existing files with this extension when home-manager needs to replace them
         backupFileExtension = "before-home-manager";
 
         # Pass flake as extraSpecialArgs for sops-nix access
-        # Bridge from flake-parts layer to home-manager layer
         extraSpecialArgs = {
           flake = flakeForHomeManager;
         };
@@ -245,8 +238,6 @@ in
           imports = [
             flakeModulesHome."users/crs58"
             flakeModulesHome.base-sops
-            # Import aggregate modules for crs58
-            # All aggregates via auto-merge
             flakeModulesHome.ai
             flakeModulesHome.core
             flakeModulesHome.development
@@ -254,7 +245,6 @@ in
             flakeModulesHome.shell
             flakeModulesHome.terminal
             flakeModulesHome.tools
-            # LazyVim home-manager module
             inputs.lazyvim-nix.homeManagerModules.default
             # nix-index-database for comma command-not-found
             inputs.nix-index-database.homeModules.nix-index

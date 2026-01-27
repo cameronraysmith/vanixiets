@@ -6,10 +6,9 @@
   ...
 }:
 let
-  # Capture outer config for use in imports
   flakeModules = config.flake.modules.darwin;
   flakeModulesHome = config.flake.modules.homeManager;
-  # Capture flake for extraSpecialArgs (needed by sops-nix)
+  # sops-nix requires flake in extraSpecialArgs
   flakeForHomeManager = config.flake // {
     inherit inputs;
   };
@@ -23,7 +22,6 @@ in
       ...
     }:
     {
-      # Make flake available to all darwin modules
       _module.args.flake = inputs.self;
 
       imports = [
@@ -34,7 +32,7 @@ in
         base
         ssh-known-hosts
         zt-dns
-        # Note: Not importing users module (defines testuser at UID 550)
+        # Not importing users module (defines testuser at UID 550)
         # rosegold defines its own users (janettesmith + cameron)
       ]);
 
@@ -87,7 +85,7 @@ in
       ];
 
       # Primary user for homebrew and system-level user operations
-      # Note: cameron is the admin user on rosegold (manages homebrew)
+      # cameron is the admin user on rosegold (manages homebrew)
       system.primaryUser = "cameron";
 
       custom.profile.isDesktop = true;
@@ -96,7 +94,6 @@ in
       custom.homebrew = {
         enable = true;
 
-        # Machine-specific casks (rosegold-only)
         # Simplified for basic user - only zerotier for network connectivity
         # Omitted developer casks: codelayer-nightly, dbeaver-community, docker-desktop,
         # gpg-suite, inkscape, keycastr, meld, postgres-unofficial
@@ -104,14 +101,11 @@ in
           "zerotier-one"
         ];
 
-        # No machine-specific Mac App Store apps for rosegold
-
         # Fonts managed via base homebrew module (manageFonts defaults to true)
       };
 
       security.pam.services.sudo_local.touchIdAuth = true;
 
-      # SSH daemon configuration
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       # nix-darwin writes this to /etc/ssh/sshd_config.d/100-nix-darwin.conf
@@ -137,7 +131,7 @@ in
       };
 
       # Darwin requires explicit knownUsers
-      # Note: Not managing root user (no users.users.root definition)
+      # Not managing root user (no users.users.root definition)
       users.knownUsers = [
         "janettesmith"
         "cameron"
@@ -154,11 +148,9 @@ in
         useGlobalPkgs = true;
         useUserPackages = true;
 
-        # Backup existing files with this extension when home-manager needs to replace them
         backupFileExtension = "before-home-manager";
 
         # Pass flake as extraSpecialArgs for sops-nix access
-        # Bridge from flake-parts layer to home-manager layer
         extraSpecialArgs = {
           flake = flakeForHomeManager;
         };
@@ -167,15 +159,12 @@ in
         users.janettesmith.imports = [
           flakeModulesHome."users/janettesmith"
           flakeModulesHome.base-sops
-          # Import aggregate modules for janettesmith
-          # Productivity aggregates (NO ai)
           flakeModulesHome.core
           flakeModulesHome.development
           flakeModulesHome.packages
           flakeModulesHome.shell
           flakeModulesHome.terminal
           flakeModulesHome.tools
-          # LazyVim home-manager module
           inputs.lazyvim-nix.homeManagerModules.default
           # nix-index-database for comma command-not-found
           inputs.nix-index-database.homeModules.nix-index
@@ -187,8 +176,6 @@ in
         users.cameron.imports = [
           flakeModulesHome."users/crs58"
           flakeModulesHome.base-sops
-          # Import aggregate modules for cameron (crs58 identity)
-          # All aggregates including ai
           flakeModulesHome.ai
           flakeModulesHome.core
           flakeModulesHome.development
@@ -196,7 +183,6 @@ in
           flakeModulesHome.shell
           flakeModulesHome.terminal
           flakeModulesHome.tools
-          # LazyVim home-manager module
           inputs.lazyvim-nix.homeManagerModules.default
           # nix-index-database for comma command-not-found
           inputs.nix-index-database.homeModules.nix-index
