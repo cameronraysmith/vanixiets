@@ -79,6 +79,7 @@
                 );
 
                 passwordVarPath = config.clan.core.vars.generators.matrix-password-clawd.files."password".path;
+                oauthTokenPath = config.clan.core.vars.generators.clawdbot-claude-oauth.files."token".path;
 
                 wrapper = pkgs.writeShellScript "clawdbot-gateway-wrapper" ''
                   # Copy declarative config to writable state directory so the
@@ -88,6 +89,7 @@
                   export CLAWDBOT_NIX_MODE=1
                   export MATRIX_USER_ID="${settings.botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
+                  export CLAUDE_CODE_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
                   export HOME="/var/lib/clawdbot"
                   exec ${lib.getExe' pkgs.clawdbot-gateway "clawdbot"} gateway run --bind ${settings.bindMode}
                 '';
@@ -107,6 +109,20 @@
                   runtimeInputs = [ pkgs.pwgen ];
                   script = ''
                     pwgen -s 64 1 > "$out"/token
+                  '';
+                };
+
+                clan.core.vars.generators."clawdbot-claude-oauth" = {
+                  prompts.token = {
+                    description = "Claude Code OAuth token (from 'claude setup-token')";
+                    type = "hidden";
+                  };
+                  files."token" = {
+                    neededFor = "services";
+                    owner = "clawdbot";
+                  };
+                  script = ''
+                    cat "$prompts"/token > "$out"/token
                   '';
                 };
 
