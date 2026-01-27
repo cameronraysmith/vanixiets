@@ -14,18 +14,21 @@
       # PostgreSQL database for Synapse
       services.postgresql = {
         enable = true;
-        ensureDatabases = [ "matrix-synapse" ];
         ensureUsers = [
           {
             name = "matrix-synapse";
             ensureDBOwnership = true;
           }
         ];
+        # Create database with C locale (required by Synapse).
+        # ensureDatabases uses system locale, so we create manually in initialScript.
         initialScript = pkgs.writeText "synapse-init.sql" ''
-          ALTER DATABASE "matrix-synapse" SET lc_messages TO 'C';
-          ALTER DATABASE "matrix-synapse" SET lc_monetary TO 'C';
-          ALTER DATABASE "matrix-synapse" SET lc_numeric TO 'C';
-          ALTER DATABASE "matrix-synapse" SET lc_time TO 'C';
+          CREATE DATABASE "matrix-synapse"
+            OWNER "matrix-synapse"
+            ENCODING 'UTF8'
+            LC_COLLATE 'C'
+            LC_CTYPE 'C'
+            TEMPLATE template0;
         '';
       };
 
@@ -100,7 +103,10 @@
       };
 
       clan.core.vars.generators.matrix-password-clawd = {
-        files."password".neededFor = "services";
+        files."password" = {
+          neededFor = "services";
+          owner = "clawdbot";
+        };
         runtimeInputs = [
           pkgs.coreutils
           pkgs.xkcdpass
