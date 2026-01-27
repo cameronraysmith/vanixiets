@@ -1,9 +1,11 @@
 # DNS server for .zt zone on cinnabar's ZeroTier interface
 #
 # dnsmasq serves authoritative AAAA records for .zt hostnames, resolving
-# them to cinnabar's ZeroTier IPv6 address. The ZeroTier controller pushes
-# this DNS server to all network members. systemd-resolved routes .zt
-# queries to dnsmasq via split DNS on the ZeroTier interface.
+# them to cinnabar's ZeroTier IPv6 address. Non-.zt queries are forwarded
+# to Quad9 for clients that use ZeroTier-pushed DNS globally (Android).
+# The ZeroTier controller pushes this DNS server to all network members.
+# systemd-resolved routes .zt queries to dnsmasq via split DNS on the
+# ZeroTier interface.
 { ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" = {
@@ -15,6 +17,10 @@
         "bind-dynamic" = true;
         "no-resolv" = true;
         "no-hosts" = true;
+        server = [
+          "9.9.9.9"
+          "149.112.112.112"
+        ];
         address = [
           "/matrix.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
           "/clawdbot.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
