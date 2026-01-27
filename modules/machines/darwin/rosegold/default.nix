@@ -33,6 +33,7 @@ in
       ++ (with flakeModules; [
         base
         ssh-known-hosts
+        zt-dns
         # Note: Not importing users module (defines testuser at UID 550)
         # rosegold defines its own users (janettesmith + cameron)
       ]);
