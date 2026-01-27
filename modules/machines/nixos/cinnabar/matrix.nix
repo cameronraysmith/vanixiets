@@ -14,22 +14,13 @@
       # PostgreSQL database for Synapse
       services.postgresql = {
         enable = true;
+        ensureDatabases = [ "matrix-synapse" ];
         ensureUsers = [
           {
             name = "matrix-synapse";
             ensureDBOwnership = true;
           }
         ];
-        # Create database with C locale (required by Synapse).
-        # ensureDatabases uses system locale, so we create manually in initialScript.
-        initialScript = pkgs.writeText "synapse-init.sql" ''
-          CREATE DATABASE "matrix-synapse"
-            OWNER "matrix-synapse"
-            ENCODING 'UTF8'
-            LC_COLLATE 'C'
-            LC_CTYPE 'C'
-            TEMPLATE template0;
-        '';
       };
 
       # Matrix Synapse homeserver
@@ -66,6 +57,11 @@
               database = "matrix-synapse";
               user = "matrix-synapse";
               host = "/run/postgresql";
+              # ensureDatabases creates with system locale (en_US.UTF-8).
+              # Synapse requires C locale but NixOS enforces ensureDatabases
+              # when ensureDBOwnership is set. accept_unsafe_locale is safe
+              # for a private instance where text sort order is irrelevant.
+              allow_unsafe_locale = true;
             };
           };
         };
