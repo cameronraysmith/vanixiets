@@ -90,10 +90,14 @@
       # without sending ICMP fragmentation-needed. The ZeroTier tun0 advertises
       # MTU 2800 but the real path MTU is lower, causing TLS handshakes (~1500
       # bytes) to time out. Clamping MSS to 1300 keeps TCP segments within the
-      # constrained path MTU. OUTPUT handles locally-originated traffic (Caddy).
+      # constrained path MTU. OUTPUT clamps cinnabar's SYN-ACK (tells remote
+      # to send small segments). INPUT clamps incoming SYN (tells Caddy the
+      # remote accepts small segments, so Caddy sends small responses).
       networking.firewall.extraCommands = ''
         iptables -t mangle -A OUTPUT -o zt+ -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300
         ip6tables -t mangle -A OUTPUT -o zt+ -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300
+        iptables -t mangle -A INPUT -i zt+ -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300
+        ip6tables -t mangle -A INPUT -i zt+ -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300
       '';
 
       # Route .zt queries to local dnsmasq via systemd-resolved split DNS
