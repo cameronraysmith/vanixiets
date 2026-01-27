@@ -81,7 +81,10 @@
                 passwordVarPath = config.clan.core.vars.generators.matrix-password-clawd.files."password".path;
 
                 wrapper = pkgs.writeShellScript "clawdbot-gateway-wrapper" ''
-                  export CLAWDBOT_CONFIG_PATH="/etc/clawdbot/clawdbot.json"
+                  # Copy declarative config to writable state directory so the
+                  # gateway can persist runtime changes (plugin auto-enable, etc.)
+                  cp /etc/clawdbot/clawdbot.json /var/lib/clawdbot/clawdbot.json
+                  export CLAWDBOT_CONFIG_PATH="/var/lib/clawdbot/clawdbot.json"
                   export CLAWDBOT_NIX_MODE=1
                   export MATRIX_USER_ID="${settings.botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
