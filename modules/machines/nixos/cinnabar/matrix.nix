@@ -101,7 +101,7 @@
       clan.core.vars.generators.matrix-password-clawd = {
         files."password" = {
           neededFor = "services";
-          owner = "clawdbot";
+          owner = "cameron";
         };
         runtimeInputs = [
           pkgs.coreutils
