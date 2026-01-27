@@ -81,16 +81,16 @@
                 passwordVarPath = config.clan.core.vars.generators.matrix-password-clawd.files."password".path;
                 oauthTokenPath = config.clan.core.vars.generators.clawdbot-claude-oauth.files."token".path;
 
+                stateDir = "/home/cameron/.clawdbot";
+
                 wrapper = pkgs.writeShellScript "clawdbot-gateway-wrapper" ''
-                  # Copy declarative config to writable state directory so the
-                  # gateway can persist runtime changes (plugin auto-enable, etc.)
-                  cp /etc/clawdbot/clawdbot.json /var/lib/clawdbot/clawdbot.json
-                  export CLAWDBOT_CONFIG_PATH="/var/lib/clawdbot/clawdbot.json"
+                  mkdir -p ${stateDir}
+                  cp /etc/clawdbot/clawdbot.json ${stateDir}/clawdbot.json
+                  export CLAWDBOT_CONFIG_PATH="${stateDir}/clawdbot.json"
                   export CLAWDBOT_NIX_MODE=1
                   export MATRIX_USER_ID="${settings.botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
                   export ANTHROPIC_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
-                  export HOME="/var/lib/clawdbot"
                   exec ${lib.getExe' pkgs.clawdbot-gateway "clawdbot"} gateway run --bind ${settings.bindMode}
                 '';
               in
@@ -121,7 +121,7 @@
                   };
                   files."token" = {
                     neededFor = "services";
-                    owner = "clawdbot";
+                    owner = "cameron";
                   };
                   script = ''
                     cat "$prompts"/token > "$out"/token
@@ -142,9 +142,8 @@
                     ExecStart = wrapper;
                     Restart = "on-failure";
                     RestartSec = 10;
-                    User = "clawdbot";
-                    Group = "clawdbot";
-                    StateDirectory = "clawdbot";
+                    User = "cameron";
+                    Group = "users";
                   };
                 };
               };
