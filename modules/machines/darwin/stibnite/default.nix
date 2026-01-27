@@ -36,6 +36,7 @@ in
         ssh-known-hosts
         colima
         dnscrypt-proxy
+        zt-dns
         # Note: Not importing users module (defines testuser at UID 550)
         # stibnite defines its own user (crs58)
       ]);
