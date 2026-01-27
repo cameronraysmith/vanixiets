@@ -67,7 +67,10 @@
               let
                 configFile = pkgs.writeText "clawdbot.json" (
                   builtins.toJSON {
-                    gateway.port = settings.port;
+                    gateway = {
+                      port = settings.port;
+                      mode = "local";
+                    };
                     channels.matrix = {
                       enabled = true;
                       homeserver = settings.homeserver;
