@@ -178,7 +178,7 @@ in
           # inputs.mac-app-util.homeManagerModules.default
         ];
 
-        # raquel (primary user): Import portable home modules + base-sops
+        # raquel (primary user): Import portable home modules + base-sops (NO ai)
         users.raquel.imports = [
           flakeModulesHome."users/raquel"
           flakeModulesHome.base-sops
