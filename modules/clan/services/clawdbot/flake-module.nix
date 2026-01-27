@@ -102,6 +102,7 @@
                   isSystemUser = true;
                   group = "clawdbot";
                   home = "/var/lib/clawdbot";
+                  shell = pkgs.bashInteractive;
                 };
                 users.groups.clawdbot = { };
 
