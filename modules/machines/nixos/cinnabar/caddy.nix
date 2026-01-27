@@ -1,4 +1,4 @@
-# Caddy reverse proxy on cinnabar's ZeroTier interface
+# Caddy reverse proxy on cinnabar's ZeroTier interface (dual-stack)
 { ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" = {
@@ -6,14 +6,20 @@
       enable = true;
       virtualHosts = {
         "matrix.zt" = {
-          listenAddresses = [ "fddb:4344:343b:14b9:399:93db:4344:343b" ];
+          listenAddresses = [
+            "fddb:4344:343b:14b9:399:93db:4344:343b"
+            "10.147.17.1"
+          ];
           extraConfig = ''
             tls internal
             reverse_proxy [::1]:8008
           '';
         };
         "clawdbot.zt" = {
-          listenAddresses = [ "fddb:4344:343b:14b9:399:93db:4344:343b" ];
+          listenAddresses = [
+            "fddb:4344:343b:14b9:399:93db:4344:343b"
+            "10.147.17.1"
+          ];
           extraConfig = ''
             tls internal
             reverse_proxy [::1]:18789
