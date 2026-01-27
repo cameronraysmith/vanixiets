@@ -89,7 +89,7 @@
                   export CLAWDBOT_NIX_MODE=1
                   export MATRIX_USER_ID="${settings.botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
-                  export CLAUDE_CODE_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
+                  export ANTHROPIC_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
                   export HOME="/var/lib/clawdbot"
                   exec ${lib.getExe' pkgs.clawdbot-gateway "clawdbot"} gateway run --bind ${settings.bindMode}
                 '';
