@@ -1,4 +1,4 @@
 { ... }:
 {
-  clan.modules.clawdbot = ./default.nix;
+  clan.modules.clawdbot = ./service.nix;
 }
