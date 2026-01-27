@@ -57,6 +57,12 @@
           ipRangeEnd = "10.147.17.254";
         }
       ];
+      routes = [
+        {
+          target = "10.147.17.0/24";
+          via = null;
+        }
+      ];
     };
 
     # Route .zt queries to local dnsmasq via systemd-resolved split DNS
