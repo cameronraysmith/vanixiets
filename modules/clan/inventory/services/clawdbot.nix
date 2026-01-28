@@ -9,6 +9,7 @@
         homeserver = "http://localhost:8008";
         botUserId = "@clawd:matrix.zt";
         port = 18789;
+        serviceUser = "cameron";
       };
     };
   };
