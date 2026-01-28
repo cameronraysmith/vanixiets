@@ -1,4 +1,3 @@
-# Caddy reverse proxy on cinnabar's ZeroTier interface (dual-stack)
 { ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" = {
@@ -28,7 +27,7 @@
       };
     };
 
-    # Only allow HTTPS on ZeroTier interfaces, not public
+    # only allow https on zerotier interfaces
     networking.firewall.interfaces."zt+".allowedTCPPorts = [ 443 ];
   };
 }

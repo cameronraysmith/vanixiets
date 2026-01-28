@@ -1,5 +1,3 @@
-# ZeroTier-only private access (no federation)
-# Caddy reverse proxies to localhost:8008
 { ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" =

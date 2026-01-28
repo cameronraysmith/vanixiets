@@ -1,6 +1,4 @@
-# Clawdbot gateway with bundled extensions environment
-#
-# Flake-parts module exporting clawdbot overlay via list concatenation
+# flake-parts module exporting clawdbot overlay
 #
 # The llm-agents flake provides a clawdbot package that bundles all extensions
 # (including matrix) at $out/lib/clawdbot/extensions/, but the upstream
@@ -8,7 +6,7 @@
 #   1. CLAWDBOT_BUNDLED_PLUGINS_DIR env var pointing to extensions/
 #   2. The @matrix-org/matrix-sdk-crypto-nodejs native .node addon,
 #      which is normally downloaded at npm install time via download-lib.js
-#      but skipped in the Nix sandbox
+#      but unavailable in the nix sandbox
 #
 { inputs, ... }:
 {

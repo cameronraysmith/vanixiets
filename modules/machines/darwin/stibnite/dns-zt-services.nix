@@ -1,13 +1,12 @@
-# Caddy CA cert trust for cinnabar's tls-internal certificates
 { lib, ... }:
 {
   flake.modules.darwin."machines/darwin/stibnite" = {
-    # Trust Caddy internal CA for curl/git/OpenSSL tools
+    # trust caddy internal CA for curl/git/openssl tools
     security.pki.certificateFiles = [
       ../../nixos/cinnabar/pki/caddy-root-ca.crt
     ];
 
-    # Trust Caddy internal CA in macOS Keychain (for browsers and Element)
+    # trust caddy internal CA in darwin keychain
     system.activationScripts.postActivation.text = lib.mkAfter ''
       echo "Adding Caddy cinnabar internal CA to macOS Keychain..."
       CADDY_CERT_PATH="${../../nixos/cinnabar/pki/caddy-root-ca.crt}"

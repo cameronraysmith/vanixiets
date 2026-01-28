@@ -1,4 +1,3 @@
-# Clawdbot Matrix gateway on cinnabar
 {
   clan.inventory.instances.clawdbot = {
     module = {

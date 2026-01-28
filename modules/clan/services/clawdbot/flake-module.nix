@@ -1,9 +1,3 @@
-# Clawdbot clan service registration
-#
-# The service definition is inlined here rather than in a separate file
-# because import-tree auto-discovers all .nix files under modules/ and
-# would attempt to import a standalone service.nix as a flake module,
-# causing a class mismatch (_class = "clan.service" vs expected "flake").
 { ... }:
 {
   clan.modules.clawdbot =

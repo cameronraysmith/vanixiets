@@ -1,16 +1,12 @@
-# DNS server for .zt zone on cinnabar's ZeroTier interface
+# DNS server for .zt zone on cinnabar's zerotier interface
 #
 # dnsmasq serves authoritative A and AAAA records for .zt hostnames,
-# resolving them to cinnabar's ZeroTier IPv4 and IPv6 addresses.
-# Non-.zt queries are forwarded to Quad9 for clients that use
-# ZeroTier-pushed DNS globally (Android).
-# The ZeroTier controller pushes this DNS server to all network members.
+# resolving them to zerotier controller's IPv4 and IPv6 addresses.
+# Non-.zt queries are forwarded to quad9 for clients that use
+# zerotier-pushed DNS globally.
+# The zerotier controller pushes this DNS server to all network members.
 # systemd-resolved routes .zt queries to dnsmasq via split DNS on the
-# ZeroTier interface.
-#
-# Dual-stack (IPv4 + IPv6) is required because Android browsers query
-# A records first and treat NXDOMAIN as a hard failure without falling
-# back to AAAA.
+# zerotier interface.
 { lib, ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
@@ -65,7 +61,7 @@
         ];
       };
 
-      # Pin cinnabar's own ZeroTier member to 10.147.17.1 so dnsmasq and
+      # Pin cinnabar's own zerotier member to 10.147.17.1 so dnsmasq and
       # Caddy bind addresses are deterministic across rebuilds.
       # Appends to clan-core's ExecStartPost list (configure-interface,
       # whitelist-controller).
@@ -85,9 +81,9 @@
         ''}"
       ];
 
-      # TCP MSS clamping on ZeroTier interfaces to avoid PMTU black holes.
+      # TCP MSS clamping on zerotier interfaces to avoid PMTU black holes.
       # Mobile carriers (5G/LTE) silently drop packets exceeding ~1374 bytes
-      # without sending ICMP fragmentation-needed. The ZeroTier tun0 advertises
+      # without sending ICMP fragmentation-needed. The zerotier tun0 advertises
       # MTU 2800 but the real path MTU is lower, causing TLS handshakes (~1500
       # bytes) to time out. Clamping MSS to 1300 keeps TCP segments within the
       # constrained path MTU. OUTPUT clamps cinnabar's SYN-ACK (tells remote
