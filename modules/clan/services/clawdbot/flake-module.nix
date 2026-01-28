@@ -47,6 +47,20 @@
                 type = lib.types.str;
                 description = "Unix user to run the clawdbot gateway as";
               };
+
+              gatewayMode = lib.mkOption {
+                type = lib.types.enum [
+                  "local"
+                  "server"
+                ];
+                default = "local";
+                description = "Gateway operation mode";
+              };
+
+              matrixBotPasswordGenerator = lib.mkOption {
+                type = lib.types.str;
+                description = "Name of the clan vars generator providing the Matrix bot password";
+              };
             };
           };
 
@@ -65,11 +79,14 @@
                 ...
               }:
               let
+                # TODO: expose as a configurable option once clawdbot is in nixpkgs
+                package = pkgs.clawdbot-gateway;
+
                 configFile = pkgs.writeText "clawdbot.json" (
                   builtins.toJSON {
                     gateway = {
                       port = settings.port;
-                      mode = "local";
+                      mode = settings.gatewayMode;
                     };
                     channels.matrix = {
                       enabled = true;
@@ -78,10 +95,15 @@
                   }
                 );
 
-                passwordVarPath = config.clan.core.vars.generators.matrix-password-clawd.files."password".path;
+                passwordVarPath =
+                  config.clan.core.vars.generators.${settings.matrixBotPasswordGenerator}.files."password".path;
                 oauthTokenPath = config.clan.core.vars.generators.clawdbot-claude-oauth.files."token".path;
 
                 stateDir = "${config.users.users.${settings.serviceUser}.home}/.clawdbot";
+
+                isLocalHomeserver =
+                  builtins.match "https?://(localhost|127\\.0\\.0\\.1|\\[::1\\]).*" settings.homeserver != null;
+                synapseService = lib.optional isLocalHomeserver "matrix-synapse.service";
 
                 wrapper = pkgs.writeShellScript "clawdbot-gateway-wrapper" ''
                   mkdir -p ${stateDir}
@@ -91,20 +113,12 @@
                   export MATRIX_USER_ID="${settings.botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
                   export ANTHROPIC_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
-                  exec ${lib.getExe' pkgs.clawdbot-gateway "clawdbot"} gateway run --bind ${settings.bindMode}
+                  exec ${lib.getExe' package "clawdbot"} gateway run --bind ${settings.bindMode}
                 '';
               in
               {
                 environment.etc."clawdbot/clawdbot.json".source = configFile;
-                environment.systemPackages = [ pkgs.clawdbot-gateway ];
-
-                users.users.clawdbot = {
-                  isSystemUser = true;
-                  group = "clawdbot";
-                  home = "/var/lib/clawdbot";
-                  shell = pkgs.bashInteractive;
-                };
-                users.groups.clawdbot = { };
+                environment.systemPackages = [ package ];
 
                 clan.core.vars.generators."clawdbot-gateway-token" = {
                   files."token" = { };
@@ -130,11 +144,8 @@
 
                 systemd.services."clawdbot-gateway" = {
                   description = "Clawdbot Matrix Gateway";
-                  after = [
-                    "network.target"
-                    "matrix-synapse.service"
-                  ];
-                  wants = [ "matrix-synapse.service" ];
+                  after = [ "network.target" ] ++ synapseService;
+                  wants = synapseService;
                   wantedBy = [ "multi-user.target" ];
 
                   serviceConfig = {
