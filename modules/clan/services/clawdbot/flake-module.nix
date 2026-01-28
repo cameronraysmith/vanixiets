@@ -4,6 +4,7 @@
     { ... }:
     {
       _class = "clan.service";
+      # TODO: rename to "clan-core/clawdbot" when upstreamed
       manifest.name = "clawdbot";
       manifest.description = "Clawdbot Matrix gateway service with plugin architecture";
       manifest.categories = [ "Communication" ];
