@@ -117,6 +117,8 @@
 
         home.shellAliases = {
           ccds = "claude --dangerously-skip-permissions";
+          ccglm = "claude-glm --dangerously-skip-permissions";
+          cccb = "claude-cerebras --dangerously-skip-permissions";
         };
 
         # symlink .local/bin to satisfy claude doctor
