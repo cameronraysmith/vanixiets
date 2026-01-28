@@ -30,6 +30,7 @@
           glm-api-key = { };
           firecrawl-api-key = { };
           huggingface-token = { };
+          cerebras-api-key = { };
           context7-api-key = { };
           bitwarden-email = { };
           atuin-key = { };
