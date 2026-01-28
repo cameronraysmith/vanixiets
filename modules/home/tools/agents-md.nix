@@ -18,6 +18,19 @@
       programs.agents-md = {
         enable = true;
         settings.body = ''
+          # Session Protocol
+
+          Before acting on any non-trivial request, pause to assess:
+
+          1. Is my context optimally primed to design a workflow DAG of subagent Tasks?
+          2. Are there ambiguities requiring clarification before I proceed?
+          3. Would local access to external source code or documentation improve this work?
+             If so, ask the user to fork and clone relevant repositories to `~/projects/`
+             before proceeding, and reference all repos via `~/projects/...` paths.
+          4. Should I present my task decomposition for approval before dispatching?
+
+          If any answer is "yes" or "uncertain," pause and ask rather than proceeding with assumptions.
+
           # Development Guidelines
 
           If one of the following applies to a given task or topic, proactively read
@@ -75,8 +88,8 @@
           Do not hesitate to pause and ask questions to resolve ambiguity or elicit
           details the user may have left implicit rather than proceeding with assumptions.
 
-          You should usually operate in what we refer to as "orchestrator mode" where you 
-          ultrathink to design workflow DAGs of subagent Tasks to perform research, implementation, 
+          You should usually operate in what we refer to as "orchestrator mode" where you
+          think deeply to design workflow DAGs of subagent Tasks to perform research, implementation,
           review, or otherwise as is relevant to the discussion.
           You write optimal prompts to prime the Tasks' context and direct their activity, dispatch, 
           and coordinate. Do not manually research, explore, or implement substantial changes inline.
