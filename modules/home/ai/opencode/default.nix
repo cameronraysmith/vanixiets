@@ -1,4 +1,4 @@
-# opencode CLI configuration with Z.ai and Cerebras provider support
+# opencode CLI configuration with Z.AI Coding Plan and Cerebras provider support
 { ... }:
 {
   flake.modules = {
@@ -45,12 +45,14 @@
 
         xdg.configFile."opencode/opencode.jsonc".text = builtins.toJSON {
           "$schema" = "https://opencode.ai/config.json";
-          model = "cerebras/zai-glm-4.7";
+          model = "zai-coding-plan/glm-4.7";
           disabled_providers = [
             "anthropic"
             "openai"
             "google"
             "github-copilot"
+            "zai" # Use zai-coding-plan instead of basic zai
+            "zhipuai" # Use zai-coding-plan instead of zhipuai
           ];
           permission = {
             bash = {
