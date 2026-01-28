@@ -36,8 +36,7 @@
                 export ZHIPU_API_KEY
                 CEREBRAS_API_KEY="$(cat ${config.sops.secrets.cerebras-api-key.path})"
                 export CEREBRAS_API_KEY
-                OPENCODE_PERMISSION='{"*":"allow"}'
-                export OPENCODE_PERMISSION
+                export OPENCODE_PERMISSION='{"*":"allow"}'
 
                 exec opencode "$@"
               '';
