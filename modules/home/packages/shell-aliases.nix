@@ -34,7 +34,8 @@
         lg = "lazygit";
         lsdir = "ls -d1 */";
         nr = "nix run";
-        oc = "bunx -p opencode-ai@latest opencode";
+        npmoc = "bunx -p opencode-ai@latest opencode";
+        oc = "opencode";
         p = "procs --tree";
         py = "poetry run python";
         rn = "fd -d 1 -t f '.*' | renamer";
