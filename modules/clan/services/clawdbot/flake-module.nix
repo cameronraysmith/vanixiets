@@ -87,12 +87,47 @@
                       enabled = true;
                       homeserver = settings.homeserver;
                     };
+                    models = {
+                      mode = "merge";
+                      providers = {
+                        "zai-coding-plan" = {
+                          baseUrl = "https://api.z.ai/api/coding/paas/v4";
+                          apiKey = "\${ZAI_API_KEY}";
+                          api = "openai-completions";
+                          models = [
+                            {
+                              id = "glm-4.7";
+                              name = "GLM 4.7 (Z.AI Coding Plan)";
+                              reasoning = true;
+                              input = [ "text" ];
+                              cost = {
+                                input = 0;
+                                output = 0;
+                                cacheRead = 0;
+                                cacheWrite = 0;
+                              };
+                              contextWindow = 131072;
+                              maxTokens = 131072;
+                            }
+                          ];
+                        };
+                      };
+                    };
+                    agents = {
+                      defaults = {
+                        model = {
+                          primary = "zai-coding-plan/glm-4.7";
+                          fallbacks = [ "anthropic/claude-opus-4-5" ];
+                        };
+                      };
+                    };
                   }
                 );
 
                 passwordVarPath =
                   config.clan.core.vars.generators.${settings.matrixBotPasswordGenerator}.files."password".path;
                 oauthTokenPath = config.clan.core.vars.generators.clawdbot-claude-oauth.files."token".path;
+                zaiApiKeyPath = config.clan.core.vars.generators."clawdbot-zai-coding-api".files."api-key".path;
 
                 stateDir = "${config.users.users.${settings.serviceUser}.home}/.clawdbot";
 
@@ -117,6 +152,7 @@
                   export MATRIX_USER_ID="${settings.botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
                   export ANTHROPIC_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
+                  export ZAI_API_KEY="$(cat ${zaiApiKeyPath})"
                   exec ${lib.getExe' package "clawdbot"} gateway run --bind ${settings.bindMode}
                 '';
               in
@@ -151,6 +187,20 @@
                     };
                     script = ''
                       cat "$prompts"/token > "$out"/token
+                    '';
+                  };
+
+                  clan.core.vars.generators."clawdbot-zai-coding-api" = {
+                    prompts.api-key = {
+                      description = "Z.AI Coding Plan API key for clawdbot";
+                      type = "hidden";
+                    };
+                    files."api-key" = {
+                      neededFor = "services";
+                      owner = settings.serviceUser;
+                    };
+                    script = ''
+                      cat "$prompts"/api-key > "$out"/api-key
                     '';
                   };
 
