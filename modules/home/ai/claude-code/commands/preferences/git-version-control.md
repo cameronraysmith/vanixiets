@@ -31,15 +31,35 @@ Do not commit if:
 
 ## Branch workflow
 
-Branch naming: N-descriptor where N is the work-item/issue/PR number in lowercase kebab-case (6-docs, 42-refactor, 142-bugfix, 1337-feature).
+Whenever you are working on a beads issue or epic, check the current branch name first.
+If it does not correspond to the issue you're working on, pause to ask the user whether to create or switch to a matching branch before proceeding.
+
+Branch naming follows the pattern `ID-descriptor` in lowercase kebab-case, where ID references the issue tracker:
+
+- **Beads repos** (`.beads/` exists): Use the beads issue ID with dots replaced by dashes.
+  Examples: `nix-pxj-ntfy-server` (epic), `nix-pxj-4-deploy-validate` (task under epic), `nix-i37-fix-flake-lock` (standalone issue).
+- **GitHub-only repos**: Use the issue or PR number.
+  Examples: `42-refactor-auth`, `1337-add-feature`.
+
 Never use forward slashes in branch names as they break compatibility with URLs, docker image tags, and other tooling that embeds branch names.
 
-Create a new branch when your next commits won't match the current branch's N-descriptor:
-- Example: current branch is "42-feature-auth" but you're fixing bug #58 in logging → create "58-bugfix-logging"
-- Branch off current HEAD: `git checkout -b N-descriptor`
-- When the unit of work is complete and tests pass, offer to merge back via fast-forward
+Create a new branch when your next commits won't match the current branch's ID-descriptor:
+- Example: current branch is `nix-pxj-4-deploy-validate` but you discover issue `nix-di8` needs fixing first → create `nix-di8-fix-dependency`
+- Branch off current HEAD: `git checkout -b ID-descriptor`
+- When the unit of work is complete and tests pass, offer to merge back
 
 Default bias: if in doubt whether work is related, create a new branch - branches are cheap, tangled history is expensive.
+
+### Branch stacks with graphite
+
+Use the graphite CLI (invoke as `graphite`, not `gt` as shown in official documentation) to manage stacks of dependent branches that mirror beads issue dependencies:
+
+- `graphite log` — view branch stack relationships
+- `graphite track` — register an existing branch with graphite, selecting its parent
+- `graphite create -m "message"` — create a new branch stacked on current, with initial commit
+
+When beads issues have dependencies (e.g., `nix-pxj.2` blocks `nix-pxj.3`), the corresponding branches should form a graphite stack with matching parent-child relationships.
+If you identify a reason to modify beads dependencies while working, evaluate and present a plan to use graphite to reorder the branches associated with previously completed work in the stack, handling any git conflicts that arise.
 
 ## File state verification
 
