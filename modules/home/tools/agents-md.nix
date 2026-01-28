@@ -31,6 +31,11 @@
 
           If any answer is "yes" or "uncertain," pause and ask rather than proceeding with assumptions.
 
+          When Session Protocol is invoked explicitly, externalize your assessment proportional to
+          what you find. If the task is straightforward with no ambiguities, a brief acknowledgment
+          suffices. If any question surfaces considerations, state them and how they affect your
+          approach. The goal is surfacing substance, not merely demonstrating procedure.
+
           # Development Guidelines
 
           If one of the following applies to a given task or topic, proactively read
