@@ -10,6 +10,8 @@
         botUserId = "@clawd:matrix.zt";
         port = 18789;
         serviceUser = "cameron";
+        gatewayMode = "local";
+        matrixBotPasswordGenerator = "matrix-password-clawd";
       };
     };
   };
