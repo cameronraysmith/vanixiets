@@ -39,7 +39,7 @@
   "dependencies": {
     "@astrojs/cloudflare": "12.6.12",
     "@astrojs/starlight": "0.37.4",
-    "astro": "5.16.15"
+    "astro": "5.16.16"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.0",
