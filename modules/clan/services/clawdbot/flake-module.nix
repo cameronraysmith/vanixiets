@@ -41,6 +41,11 @@
                 default = "loopback";
                 description = "Network bind mode for the gateway";
               };
+
+              serviceUser = lib.mkOption {
+                type = lib.types.str;
+                description = "Unix user to run the clawdbot gateway as";
+              };
             };
           };
 
@@ -75,7 +80,7 @@
                 passwordVarPath = config.clan.core.vars.generators.matrix-password-clawd.files."password".path;
                 oauthTokenPath = config.clan.core.vars.generators.clawdbot-claude-oauth.files."token".path;
 
-                stateDir = "/home/cameron/.clawdbot";
+                stateDir = "${config.users.users.${settings.serviceUser}.home}/.clawdbot";
 
                 wrapper = pkgs.writeShellScript "clawdbot-gateway-wrapper" ''
                   mkdir -p ${stateDir}
@@ -115,7 +120,7 @@
                   };
                   files."token" = {
                     neededFor = "services";
-                    owner = "cameron";
+                    owner = settings.serviceUser;
                   };
                   script = ''
                     cat "$prompts"/token > "$out"/token
@@ -136,7 +141,7 @@
                     ExecStart = wrapper;
                     Restart = "on-failure";
                     RestartSec = 10;
-                    User = "cameron";
+                    User = settings.serviceUser;
                     Group = "users";
                   };
                 };
