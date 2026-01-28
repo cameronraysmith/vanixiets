@@ -182,6 +182,12 @@
                       # Misc hardening
                       PrivateTmp = true;
                       RestrictRealtime = true;
+
+                      # Not hardened (service needs user's home for projects
+                      # and Claude CLI state; Claude CLI may use namespaces):
+                      # ProtectHome = "read-only";
+                      # ProtectSystem = "strict";
+                      # RestrictNamespaces = true;
                     };
                   };
                 };
