@@ -18,3 +18,13 @@ The `default` role runs the clawdbot gateway on the assigned machine.
 
 The matrix bot password is read at runtime from the clan vars file for `matrix-password-clawd`.
 A gateway auth token is generated via the `clawdbot-gateway-token` vars generator.
+
+The Z.AI Coding Plan API key is provisioned through the `clawdbot-zai-coding-api` clan vars generator.
+To obtain an API key, follow the Z.AI Coding Plan documentation at https://docs.z.ai/devpack/tool/others for registration and key generation.
+Store the key in the vars file before deploying the service.
+
+## Model configuration
+
+The service uses `zai-coding-plan/glm-4.7` as the primary model for processing requests.
+When the primary model is unavailable or encounters errors, the service falls back to `anthropic/claude-opus-4-5` to maintain availability.
+This fallback behavior ensures continuous operation even during Z.AI service disruptions while providing access to a capable alternative model.
