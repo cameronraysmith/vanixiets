@@ -97,7 +97,16 @@
                 stateDir = "${config.users.users.${settings.serviceUser}.home}/.clawdbot";
 
                 isLocalHomeserver =
-                  builtins.match "https?://(localhost|127\\.0\\.0\\.1|\\[::1\\]).*" settings.homeserver != null;
+                  let
+                    url = settings.homeserver;
+                    hasLocal = prefix: lib.hasPrefix prefix url;
+                  in
+                  hasLocal "http://localhost"
+                  || hasLocal "https://localhost"
+                  || hasLocal "http://127.0.0.1"
+                  || hasLocal "https://127.0.0.1"
+                  || hasLocal "http://[::1]"
+                  || hasLocal "https://[::1]";
                 synapseService = lib.optional isLocalHomeserver "matrix-synapse.service";
 
                 wrapper = pkgs.writeShellScript "clawdbot-gateway-wrapper" ''
