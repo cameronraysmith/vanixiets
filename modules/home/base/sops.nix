@@ -11,6 +11,7 @@
     homeManager.base-sops =
       {
         config,
+        lib,
         pkgs,
         flake,
         ...
@@ -25,9 +26,23 @@
         sops.age.keyFile = "${config.xdg.configHome}/sops/age/keys.txt";
 
         # Age plugins for hardware token support
-        # Also fixes Darwin launchd PATH issue (sops-nix#890) by ensuring
-        # PATH is non-empty, allowing getconf to be found
         sops.age.plugins = [ pkgs.age-plugin-yubikey ];
+
+        # Workaround: Darwin LaunchAgent needs system paths for getconf
+        # The LaunchAgent sets PATH to only age plugin paths, but sops-install-secrets
+        # needs /usr/bin/getconf to determine DARWIN_USER_TEMP_DIR.
+        # TODO: Remove after sops-nix is updated with upstream fix that adds system paths
+        launchd.agents.sops-nix.config.EnvironmentVariables.PATH = lib.mkIf pkgs.stdenv.isDarwin (
+          lib.mkForce (
+            lib.concatStringsSep ":" [
+              (lib.makeBinPath config.sops.age.plugins)
+              "/usr/bin"
+              "/bin"
+              "/usr/sbin"
+              "/sbin"
+            ]
+          )
+        );
 
         # Per-user modules will set defaultSopsFile to their specific secrets file
         # Example: secrets/home-manager/users/crs58/secrets.yaml
