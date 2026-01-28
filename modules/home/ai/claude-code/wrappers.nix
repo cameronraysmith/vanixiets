@@ -40,6 +40,8 @@
                 export ANTHROPIC_DEFAULT_SONNET_MODEL="${models.sonnet}"
                 export ANTHROPIC_DEFAULT_HAIKU_MODEL="${models.haiku}"
 
+                export DISABLE_COST_WARNINGS=1
+
                 exec claude "$@"
               '';
             };
