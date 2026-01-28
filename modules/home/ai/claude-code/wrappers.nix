@@ -1,4 +1,4 @@
-# GLM (zhipu.ai) alternative LLM backend wrapper for Claude Code
+# Alternative LLM backend wrappers for Claude Code
 { ... }:
 {
   flake.modules = {
@@ -11,47 +11,88 @@
         ...
       }:
       let
-        home = config.home.homeDirectory;
+        mkClaudeWrapper =
+          {
+            name,
+            apiBase,
+            apiKeySecret,
+            models,
+          }:
+          let
+            wrapperName = "claude-${name}";
+            configDir = "${config.xdg.configHome}/${wrapperName}";
+            envVarPrefix = lib.toUpper (lib.replaceStrings [ "-" ] [ "_" ] name);
+          in
+          {
+            package = pkgs.writeShellApplication {
+              name = wrapperName;
+              runtimeInputs = [ config.programs.claude-code.finalPackage ];
+              text = ''
+                export CLAUDE_CONFIG_DIR="${configDir}"
+                mkdir -p "$CLAUDE_CONFIG_DIR"
+
+                # Use sops secret path at runtime (available after activation)
+                API_KEY="$(cat ${config.sops.secrets.${apiKeySecret}.path})"
+                export ${envVarPrefix}_API_KEY="$API_KEY"
+                export ANTHROPIC_BASE_URL="${apiBase}"
+                export ANTHROPIC_AUTH_TOKEN="$API_KEY"
+                export ANTHROPIC_DEFAULT_OPUS_MODEL="${models.opus}"
+                export ANTHROPIC_DEFAULT_SONNET_MODEL="${models.sonnet}"
+                export ANTHROPIC_DEFAULT_HAIKU_MODEL="${models.haiku}"
+
+                exec claude "$@"
+              '';
+            };
+
+            configFiles = {
+              # Share settings from default profile
+              "${wrapperName}/settings.json" = {
+                source = config.home.file.".claude/settings.json".source;
+              };
+
+              # Share commands directory
+              "${wrapperName}/commands" = lib.mkIf (config.programs.claude-code.commandsDir != null) {
+                source = config.programs.claude-code.commandsDir;
+                recursive = true;
+              };
+
+              # Share agents directory
+              "${wrapperName}/agents" = lib.mkIf (config.programs.claude-code.agentsDir != null) {
+                source = config.programs.claude-code.agentsDir;
+                recursive = true;
+              };
+            };
+          };
+
+        glmWrapper = mkClaudeWrapper {
+          name = "glm";
+          apiBase = "https://api.z.ai/api/anthropic";
+          apiKeySecret = "glm-api-key";
+          models = {
+            opus = "glm-4.7";
+            sonnet = "glm-4.7";
+            haiku = "glm-4.5-air";
+          };
+        };
+
+        cerebrasWrapper = mkClaudeWrapper {
+          name = "cerebras";
+          apiBase = "https://api.cerebras.ai/v1";
+          apiKeySecret = "cerebras-api-key";
+          models = {
+            opus = "zai-glm-4.7";
+            sonnet = "zai-glm-4.7";
+            haiku = "llama3.1-8b";
+          };
+        };
       in
       {
         home.packages = [
-          (pkgs.writeShellApplication {
-            name = "claude-glm";
-            runtimeInputs = [ config.programs.claude-code.finalPackage ];
-            text = ''
-              export CLAUDE_CONFIG_DIR="${config.xdg.configHome}/claude-glm"
-              mkdir -p "$CLAUDE_CONFIG_DIR"
-
-              # Use sops secret path at runtime (available after activation)
-              GLM_API_KEY="$(cat ${config.sops.secrets.glm-api-key.path})"
-              export GLM_API_KEY
-              export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
-              export ANTHROPIC_AUTH_TOKEN="$GLM_API_KEY"
-              export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-4.6"
-              export ANTHROPIC_DEFAULT_SONNET_MODEL="glm-4.6"
-              export ANTHROPIC_DEFAULT_HAIKU_MODEL="glm-4.5-air"
-
-              exec claude "$@"
-            '';
-          })
+          glmWrapper.package
+          cerebrasWrapper.package
         ];
 
-        # Share settings from default profile
-        xdg.configFile."claude-glm/settings.json" = {
-          source = config.home.file.".claude/settings.json".source;
-        };
-
-        # Share commands directory
-        xdg.configFile."claude-glm/commands" = lib.mkIf (config.programs.claude-code.commandsDir != null) {
-          source = config.programs.claude-code.commandsDir;
-          recursive = true;
-        };
-
-        # Share agents directory
-        xdg.configFile."claude-glm/agents" = lib.mkIf (config.programs.claude-code.agentsDir != null) {
-          source = config.programs.claude-code.agentsDir;
-          recursive = true;
-        };
+        xdg.configFile = glmWrapper.configFiles // cerebrasWrapper.configFiles;
       };
   };
 }
