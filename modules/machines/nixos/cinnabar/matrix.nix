@@ -94,7 +94,7 @@
       clan.core.vars.generators.matrix-password-clawd = {
         files."password" = {
           neededFor = "services";
-          owner = "cameron";
+          owner = config.users.users.cameron.name;
         };
         runtimeInputs = [
           pkgs.coreutils
@@ -118,6 +118,7 @@
         path = [ config.services.matrix-synapse.package ];
         script =
           let
+            adminUser = config.users.users.cameron.name;
             sharedSecretFile =
               config.clan.core.vars.generators.synapse-registration-shared-secret.files."shared-secret.yaml".path;
             cameronPasswordFile =
@@ -130,7 +131,7 @@
             register_new_matrix_user \
               --exists-ok \
               --admin \
-              --user cameron \
+              --user ${adminUser} \
               --password "$(cat ${cameronPasswordFile})" \
               --shared-secret "$SHARED_SECRET" \
               http://localhost:8008
