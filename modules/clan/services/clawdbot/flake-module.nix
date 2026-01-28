@@ -4,7 +4,7 @@
     { ... }:
     {
       _class = "clan.service";
-      # TODO: rename to "clan-core/clawdbot" when upstreamed
+      # TODO: rename to "clan-core/clawdbot"
       manifest.name = "clawdbot";
       manifest.description = "Clawdbot Matrix gateway service with plugin architecture";
       manifest.categories = [ "Communication" ];
@@ -79,8 +79,7 @@
                 ...
               }:
               let
-                # TODO: expose as a configurable option once clawdbot is in nixpkgs
-                package = pkgs.clawdbot-gateway;
+                package = config.services.clawdbot.package;
 
                 configFile = pkgs.writeText "clawdbot.json" (
                   builtins.toJSON {
@@ -117,44 +116,53 @@
                 '';
               in
               {
-                environment.etc."clawdbot/clawdbot.json".source = configFile;
-                environment.systemPackages = [ package ];
-
-                clan.core.vars.generators."clawdbot-gateway-token" = {
-                  files."token" = { };
-                  runtimeInputs = [ pkgs.pwgen ];
-                  script = ''
-                    pwgen -s 64 1 > "$out"/token
-                  '';
+                options.services.clawdbot.package = lib.mkOption {
+                  type = lib.types.package;
+                  default = pkgs.clawdbot-gateway;
+                  defaultText = lib.literalExpression "pkgs.clawdbot-gateway";
+                  description = "The clawdbot gateway package with bundled plugins";
                 };
 
-                clan.core.vars.generators."clawdbot-claude-oauth" = {
-                  prompts.token = {
-                    description = "Claude Code OAuth token (from 'claude setup-token')";
-                    type = "hidden";
-                  };
-                  files."token" = {
-                    neededFor = "services";
-                    owner = settings.serviceUser;
-                  };
-                  script = ''
-                    cat "$prompts"/token > "$out"/token
-                  '';
-                };
+                config = {
+                  environment.etc."clawdbot/clawdbot.json".source = configFile;
+                  environment.systemPackages = [ package ];
 
-                systemd.services."clawdbot-gateway" = {
-                  description = "Clawdbot Matrix Gateway";
-                  after = [ "network.target" ] ++ synapseService;
-                  wants = synapseService;
-                  wantedBy = [ "multi-user.target" ];
+                  clan.core.vars.generators."clawdbot-gateway-token" = {
+                    files."token" = { };
+                    runtimeInputs = [ pkgs.pwgen ];
+                    script = ''
+                      pwgen -s 64 1 > "$out"/token
+                    '';
+                  };
 
-                  serviceConfig = {
-                    Type = "simple";
-                    ExecStart = wrapper;
-                    Restart = "on-failure";
-                    RestartSec = 10;
-                    User = settings.serviceUser;
-                    Group = "users";
+                  clan.core.vars.generators."clawdbot-claude-oauth" = {
+                    prompts.token = {
+                      description = "Claude Code OAuth token (from 'claude setup-token')";
+                      type = "hidden";
+                    };
+                    files."token" = {
+                      neededFor = "services";
+                      owner = settings.serviceUser;
+                    };
+                    script = ''
+                      cat "$prompts"/token > "$out"/token
+                    '';
+                  };
+
+                  systemd.services."clawdbot-gateway" = {
+                    description = "Clawdbot Matrix Gateway";
+                    after = [ "network.target" ] ++ synapseService;
+                    wants = synapseService;
+                    wantedBy = [ "multi-user.target" ];
+
+                    serviceConfig = {
+                      Type = "simple";
+                      ExecStart = wrapper;
+                      Restart = "on-failure";
+                      RestartSec = 10;
+                      User = settings.serviceUser;
+                      Group = "users";
+                    };
                   };
                 };
               };
