@@ -167,6 +167,21 @@
                       RestartSec = 10;
                       User = settings.serviceUser;
                       Group = "users";
+
+                      # Privilege escalation prevention
+                      NoNewPrivileges = true;
+                      RestrictSUIDSGID = true;
+                      SystemCallArchitectures = "native";
+
+                      # Kernel and device isolation
+                      PrivateDevices = true;
+                      ProtectKernelTunables = true;
+                      ProtectKernelModules = true;
+                      ProtectControlGroups = true;
+
+                      # Misc hardening
+                      PrivateTmp = true;
+                      RestrictRealtime = true;
                     };
                   };
                 };
