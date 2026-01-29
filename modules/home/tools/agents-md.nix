@@ -6,10 +6,10 @@
   flake.modules.homeManager.tools =
     { config, ... }:
     let
-      # Base path for preference documents (without @ prefix)
+      # Base path for skills (without @ prefix)
       # The @ prefix must be added when referencing to enable auto-loading
-      prefsPath = "${config.home.homeDirectory}/.claude/commands/preferences";
-      commandsPath = "${config.home.homeDirectory}/.claude/commands";
+      # All tools share the same text; @ auto-loading is Claude Code-specific
+      skillsPath = "${config.home.homeDirectory}/.claude/skills";
     in
     {
       # https://github.com/mirkolenz/nixos/blob/0911e2e/home/options/agents-md.nix#L22-L31
@@ -42,42 +42,42 @@
           the corresponding document, without pausing to ask if you should, to ensure
           you are aware of our ideal guidelines and conventions:
 
-          - style and conventions: @${prefsPath}/style-and-conventions.md
-          - git version control: @${prefsPath}/git-version-control.md
-          - git history cleanup: ${prefsPath}/git-history-cleanup.md
-          - jj version control: ${commandsPath}/jj/jj-summary.md
-          - jj workflow (full): ${commandsPath}/jj/jj-workflow.md
-          - documentation: ${prefsPath}/documentation.md
-          - change management: ${prefsPath}/change-management.md
-          - issue tracking: ${commandsPath}/issues/beads.md
-          - architectural patterns: ${prefsPath}/architectural-patterns.md
-          - functional domain modeling (DDD, types, aggregates): ${prefsPath}/domain-modeling.md
-          - event sourcing (event replay, state reconstruction, CQRS): ${prefsPath}/event-sourcing.md
-          - event catalog tooling (EventCatalog, schema documentation): ${prefsPath}/event-catalog-tooling.md
-          - qlerify to eventcatalog (transformation workflow): ${prefsPath}/event-catalog-qlerify.md
-          - event modeling (Event Modeling, Qlerify, D2 diagrams): ${prefsPath}/event-modeling.md
-          - discovery process: ${prefsPath}/discovery-process.md
-          - collaborative modeling (EventStorming, Domain Storytelling): ${prefsPath}/collaborative-modeling.md
-          - strategic domain analysis (Core/Supporting/Generic classification): ${prefsPath}/strategic-domain-analysis.md
-          - bounded context design (context mapping, integration, ACL): ${prefsPath}/bounded-context-design.md
-          - functional reactive programming (FRP foundations, arrows, presheaves): ${prefsPath}/functional-reactive-programming.md
-          - theoretical foundations (category theory, type theory): ${prefsPath}/theoretical-foundations.md
-          - algebraic laws (functor/monad laws, property-based testing): ${prefsPath}/algebraic-laws.md
-          - smart constructors and validation patterns: see domain-modeling.md
-          - error handling and workflow composition (Result types, railway-oriented): ${prefsPath}/railway-oriented-programming.md
-          - data modeling (database schemas, normalization, ER diagrams): ${prefsPath}/data-modeling.md
-          - json querying (duckdb, jaq): ${prefsPath}/json-querying.md
-          - schema versioning: ${prefsPath}/schema-versioning.md
-          - web application deployment: ${prefsPath}/web-application-deployment.md
-          - cloudflare wrangler configuration: ${prefsPath}/cloudflare-wrangler-reference.md
-          - secrets management: ${prefsPath}/secrets.md
-          - nix development: ${prefsPath}/nix-development.md
-          - python development: ${prefsPath}/python-development.md
-          - rust development: ${prefsPath}/rust-development/00-index.md
-          - haskell development: ${prefsPath}/haskell-development.md
-          - typescript/node.js development: ${prefsPath}/typescript-nodejs-development.md
-          - react/ui development: ${prefsPath}/react-tanstack-ui-development.md
-          - hypermedia/server-driven UI development: ${prefsPath}/hypermedia-development/00-index.md
+          - style and conventions: @${skillsPath}/preferences-style-and-conventions/SKILL.md
+          - git version control: @${skillsPath}/preferences-git-version-control/SKILL.md
+          - git history cleanup: ${skillsPath}/preferences-git-history-cleanup/SKILL.md
+          - jj version control: ${skillsPath}/jj-summary/SKILL.md
+          - jj workflow (full): ${skillsPath}/jj-workflow/SKILL.md
+          - documentation: ${skillsPath}/preferences-documentation/SKILL.md
+          - change management: ${skillsPath}/preferences-change-management/SKILL.md
+          - issue tracking: ${skillsPath}/issues-beads/SKILL.md
+          - architectural patterns: ${skillsPath}/preferences-architectural-patterns/SKILL.md
+          - functional domain modeling (DDD, types, aggregates): ${skillsPath}/preferences-domain-modeling/SKILL.md
+          - event sourcing (event replay, state reconstruction, CQRS): ${skillsPath}/preferences-event-sourcing/SKILL.md
+          - event catalog tooling (EventCatalog, schema documentation): ${skillsPath}/preferences-event-catalog-tooling/SKILL.md
+          - qlerify to eventcatalog (transformation workflow): ${skillsPath}/preferences-event-catalog-qlerify/SKILL.md
+          - event modeling (Event Modeling, Qlerify, D2 diagrams): ${skillsPath}/preferences-event-modeling/SKILL.md
+          - discovery process: ${skillsPath}/preferences-discovery-process/SKILL.md
+          - collaborative modeling (EventStorming, Domain Storytelling): ${skillsPath}/preferences-collaborative-modeling/SKILL.md
+          - strategic domain analysis (Core/Supporting/Generic classification): ${skillsPath}/preferences-strategic-domain-analysis/SKILL.md
+          - bounded context design (context mapping, integration, ACL): ${skillsPath}/preferences-bounded-context-design/SKILL.md
+          - functional reactive programming (FRP foundations, arrows, presheaves): ${skillsPath}/preferences-functional-reactive-programming/SKILL.md
+          - theoretical foundations (category theory, type theory): ${skillsPath}/preferences-theoretical-foundations/SKILL.md
+          - algebraic laws (functor/monad laws, property-based testing): ${skillsPath}/preferences-algebraic-laws/SKILL.md
+          - smart constructors and validation patterns: see preferences-domain-modeling
+          - error handling and workflow composition (Result types, railway-oriented): ${skillsPath}/preferences-railway-oriented-programming/SKILL.md
+          - data modeling (database schemas, normalization, ER diagrams): ${skillsPath}/preferences-data-modeling/SKILL.md
+          - json querying (duckdb, jaq): ${skillsPath}/preferences-json-querying/SKILL.md
+          - schema versioning: ${skillsPath}/preferences-schema-versioning/SKILL.md
+          - web application deployment: ${skillsPath}/preferences-web-application-deployment/SKILL.md
+          - cloudflare wrangler configuration: ${skillsPath}/preferences-cloudflare-wrangler-reference/SKILL.md
+          - secrets management: ${skillsPath}/preferences-secrets/SKILL.md
+          - nix development: ${skillsPath}/preferences-nix-development/SKILL.md
+          - python development: ${skillsPath}/preferences-python-development/SKILL.md
+          - rust development: ${skillsPath}/preferences-rust-development/SKILL.md
+          - haskell development: ${skillsPath}/preferences-haskell-development/SKILL.md
+          - typescript/node.js development: ${skillsPath}/preferences-typescript-nodejs-development/SKILL.md
+          - react/ui development: ${skillsPath}/preferences-react-tanstack-ui-development/SKILL.md
+          - hypermedia/server-driven UI development: ${skillsPath}/preferences-hypermedia-development/SKILL.md
 
           Always remember to fallback to using practical features and architectural
           patterns that emphasize algebraic data types, type-safety, and functional
