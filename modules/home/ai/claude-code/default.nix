@@ -15,8 +15,7 @@
           enable = true;
           package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
 
-          # symlink commands and agents directory trees
-          commandsDir = ./commands;
+          # symlink agents directory tree (skills managed by skills/default.nix)
           agentsDir = ./agents;
 
           # https://schemastore.org/claude-code-settings.json
