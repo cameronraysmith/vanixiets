@@ -126,6 +126,9 @@
 
     nixhelm.url = "github:farcaller/nixhelm";
     nixhelm.inputs.nixpkgs.follows = "nixpkgs";
+
+    bioSkills.url = "github:GPTomics/bioSkills/598009f4978795677fb50b37871a4ab366805aca";
+    bioSkills.flake = false;
   };
 
   # sync with lib/caches.nix for machine modules
