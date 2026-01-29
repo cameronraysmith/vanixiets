@@ -40,11 +40,7 @@
       coreSkills = readSkillsFrom ./src/core;
       claudeSkills = readSkillsFrom ./src/claude;
 
-      # Convert flake input to Nix path type so upstream modules recognize
-      # directory values via lib.isPath (flake inputs coerce to store path
-      # strings which fail the lib.isPath check in claude-code and codex modules)
-      bioSkillsSrc = /. + "${flake.inputs.bioSkills}";
-      bioSkills = readSkillsNested "bio" bioSkillsSrc;
+      bioSkills = readSkillsNested "bio" flake.inputs.bioSkills;
 
       allCoreSkills = coreSkills // bioSkills;
     in
