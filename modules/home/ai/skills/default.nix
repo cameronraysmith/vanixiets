@@ -71,11 +71,12 @@
       programs.codex.skills = coreSkills;
 
       # opencode module handles both Nix paths and store path strings
-      programs.opencode.skills = coreSkills // bioSkills;
+      # programs.opencode.skills = coreSkills // bioSkills;
+      programs.opencode.skills = coreSkills;
 
       # Third-party skills: store path strings bypass upstream skills options
       # and go directly to home.file / xdg.configFile with recursive symlinks
-      home.file =
-        storePathSkillFiles ".claude/skills" bioSkills // storePathSkillFiles ".codex/skills" bioSkills;
+      # home.file =
+      #   storePathSkillFiles ".claude/skills" bioSkills // storePathSkillFiles ".codex/skills" bioSkills;
     };
 }
