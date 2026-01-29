@@ -120,7 +120,10 @@
               no_quarantine = true;
             };
 
-            taps = [ "humanlayer/humanlayer" ];
+            taps = [
+              "humanlayer/humanlayer"
+              "steipete/tap"
+            ];
 
             brews = [
               "mas"
