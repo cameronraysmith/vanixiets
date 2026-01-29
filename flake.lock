@@ -59,6 +59,23 @@
         "type": "github"
       }
     },
+    "bioSkills": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1769199226,
+        "narHash": "sha256-FPNGdp1TSKKRG/b5OIG+n6Dnu9wZTgfbg5OmcnYPdnE=",
+        "owner": "GPTomics",
+        "repo": "bioSkills",
+        "rev": "598009f4978795677fb50b37871a4ab366805aca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "GPTomics",
+        "repo": "bioSkills",
+        "rev": "598009f4978795677fb50b37871a4ab366805aca",
+        "type": "github"
+      }
+    },
     "blueprint": {
       "inputs": {
         "nixpkgs": [
@@ -1245,6 +1262,7 @@
         "agenix": "agenix",
         "argocd-helm-src": "argocd-helm-src",
         "argocd-src": "argocd-src",
+        "bioSkills": "bioSkills",
         "catppuccin": "catppuccin",
         "cilium-src": "cilium-src",
         "clan-core": "clan-core",
