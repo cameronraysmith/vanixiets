@@ -85,6 +85,7 @@ in
           "keycastr"
           "meld"
           "postgres-unofficial"
+          "steipete/tap/codexbar"
           "zerotier-one"
         ];
 
