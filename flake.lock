@@ -62,17 +62,17 @@
     "bioSkills": {
       "flake": false,
       "locked": {
-        "lastModified": 1769199226,
-        "narHash": "sha256-FPNGdp1TSKKRG/b5OIG+n6Dnu9wZTgfbg5OmcnYPdnE=",
+        "lastModified": 1769718915,
+        "narHash": "sha256-HlGtKvg6XEdKzsEGtw9UeoOYef1I1Jb9JuZ1alG9gRE=",
         "owner": "GPTomics",
         "repo": "bioSkills",
-        "rev": "598009f4978795677fb50b37871a4ab366805aca",
+        "rev": "69149e3f42d9afcf41898c3aac258ae1c2adbb45",
         "type": "github"
       },
       "original": {
         "owner": "GPTomics",
         "repo": "bioSkills",
-        "rev": "598009f4978795677fb50b37871a4ab366805aca",
+        "rev": "69149e3f42d9afcf41898c3aac258ae1c2adbb45",
         "type": "github"
       }
     },

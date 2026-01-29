@@ -127,7 +127,7 @@
     nixhelm.url = "github:farcaller/nixhelm";
     nixhelm.inputs.nixpkgs.follows = "nixpkgs";
 
-    bioSkills.url = "github:GPTomics/bioSkills/598009f4978795677fb50b37871a4ab366805aca";
+    bioSkills.url = "github:GPTomics/bioSkills/69149e3f42d9afcf41898c3aac258ae1c2adbb45";
     bioSkills.flake = false;
   };
 
