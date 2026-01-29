@@ -31,13 +31,8 @@
                 type = "current-working-dir";
                 backgroundColor = "bgBrightCyan";
                 metadata = {
-                  segments = "2";
+                  segments = "1";
                 };
-              }
-              {
-                id = "1";
-                type = "model";
-                color = "cyan";
               }
               {
                 id = "623e7826-c7a2-4ab5-949a-85959bd2c0cf";
@@ -53,6 +48,11 @@
                 type = "git-changes";
                 color = "yellow";
               }
+              {
+                id = "1";
+                type = "model";
+                color = "cyan";
+              }
             ]
 
             # Line 2: Session metrics
@@ -63,6 +63,12 @@
                 backgroundColor = "bgRed";
               }
               {
+                id = "fe0ecc3f-aeff-4fa9-8fa2-4012a2494cb6";
+                type = "custom-command";
+                backgroundColor = "bgBrightRed";
+                commandPath = "jq -r '.session_id // \"no-session\"'";
+              }
+              {
                 id = "639ae281-0919-4c49-9e52-6f24d534f2bd";
                 type = "tokens-cached";
                 backgroundColor = "bgGreen";
@@ -71,12 +77,6 @@
                 id = "a19ecd03-5bbe-4545-97ba-3e624442ec7e";
                 type = "tokens-total";
                 backgroundColor = "bgCyan";
-              }
-              {
-                id = "fe0ecc3f-aeff-4fa9-8fa2-4012a2494cb6";
-                type = "custom-command";
-                backgroundColor = "bgBrightRed";
-                commandPath = "jq -r '.session_id // \"no-session\"'";
               }
             ]
 
