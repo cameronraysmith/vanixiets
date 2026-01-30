@@ -2,11 +2,12 @@
 #
 # The llm-agents flake provides an openclaw package that bundles all extensions
 # (including matrix) at $out/lib/openclaw/extensions/, but the upstream
-# build is missing two things:
+# build is missing three things:
 #   1. OPENCLAW_BUNDLED_PLUGINS_DIR env var pointing to extensions/
 #   2. The @matrix-org/matrix-sdk-crypto-nodejs native .node addon,
 #      which is normally downloaded at npm install time via download-lib.js
 #      but unavailable in the nix sandbox
+#   3. The control UI assets (built separately via pnpm ui:build)
 #
 { inputs, ... }:
 {
@@ -23,6 +24,11 @@
           };
         in
         basePkg.overrideAttrs (old: {
+          # Build control UI assets (upstream only runs pnpm build for backend)
+          postBuild = (old.postBuild or "") + ''
+            pnpm ui:build
+          '';
+
           postFixup = (old.postFixup or "") + ''
             # Inject native Matrix crypto addon where the SDK expects it
             cp ${matrixCryptoNode} $out/lib/openclaw/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-nodejs@0.4.0/node_modules/@matrix-org/matrix-sdk-crypto-nodejs/matrix-sdk-crypto.linux-x64-gnu.node
