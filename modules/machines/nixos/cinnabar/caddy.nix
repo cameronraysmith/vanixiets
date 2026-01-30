@@ -14,7 +14,7 @@
             reverse_proxy [::1]:8008
           '';
         };
-        "clawdbot.zt" = {
+        "openclaw.zt" = {
           listenAddresses = [
             "fddb:4344:343b:14b9:399:93db:4344:343b"
             "10.147.17.1"
