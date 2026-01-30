@@ -233,8 +233,8 @@
                     serviceConfig = {
                       Type = "simple";
                       ExecStart = wrapper;
-                      Restart = "on-failure";
-                      RestartSec = 10;
+                      Restart = "always";
+                      RestartSec = 5;
                       User = settings.serviceUser;
                       Group = "users";
 
