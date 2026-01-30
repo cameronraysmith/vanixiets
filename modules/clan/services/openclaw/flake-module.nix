@@ -86,6 +86,9 @@
                       enabled = true;
                       homeserver = settings.homeserver;
                     };
+                    plugins.entries.matrix = {
+                      enabled = true;
+                    };
                     models = {
                       mode = "merge";
                       providers = {
@@ -125,6 +128,7 @@
 
                 passwordVarPath =
                   config.clan.core.vars.generators.${settings.matrixBotPasswordGenerator}.files."password".path;
+                gatewayTokenPath = config.clan.core.vars.generators."clawdbot-gateway-token".files."token".path;
                 oauthTokenPath = config.clan.core.vars.generators.clawdbot-claude-oauth.files."token".path;
                 zaiApiKeyPath = config.clan.core.vars.generators."clawdbot-zai-coding-api".files."api-key".path;
 
@@ -145,9 +149,10 @@
 
                 wrapper = pkgs.writeShellScript "openclaw-gateway-wrapper" ''
                   mkdir -p ${stateDir}
-                  cp /etc/openclaw/openclaw.json ${stateDir}/openclaw.json
+                  install -m 0600 /etc/openclaw/openclaw.json ${stateDir}/openclaw.json
                   export OPENCLAW_CONFIG_PATH="${stateDir}/openclaw.json"
                   export OPENCLAW_NIX_MODE=1
+                  export OPENCLAW_GATEWAY_TOKEN="$(cat ${gatewayTokenPath})"
                   export MATRIX_USER_ID="${settings.botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
                   export ANTHROPIC_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
@@ -168,7 +173,10 @@
                   environment.systemPackages = [ package ];
 
                   clan.core.vars.generators."clawdbot-gateway-token" = {
-                    files."token" = { };
+                    files."token" = {
+                      neededFor = "services";
+                      owner = settings.serviceUser;
+                    };
                     runtimeInputs = [ pkgs.pwgen ];
                     script = ''
                       pwgen -s 64 1 > "$out"/token
