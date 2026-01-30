@@ -7,7 +7,8 @@
     roles.default.machines."cinnabar" = {
       settings = {
         homeserver = "http://localhost:8008";
-        botUserId = "@clawd:matrix.zt";
+        botUserName = "clawd";
+        matrixServerName = "matrix.zt";
         port = 18789;
         serviceUser = "cameron";
         gatewayMode = "local";
