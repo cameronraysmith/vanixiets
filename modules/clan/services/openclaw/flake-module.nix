@@ -21,9 +21,14 @@
                 description = "Matrix homeserver URL";
               };
 
-              botUserId = lib.mkOption {
+              botUserName = lib.mkOption {
                 type = lib.types.str;
-                description = "Matrix bot user ID (e.g., @clawd:matrix.zt)";
+                description = "Bot username (workspace directory name and Matrix localpart)";
+              };
+
+              matrixServerName = lib.mkOption {
+                type = lib.types.str;
+                description = "Matrix server name for the bot user ID (e.g., matrix.zt)";
               };
 
               port = lib.mkOption {
@@ -81,6 +86,9 @@
               }:
               let
                 package = config.services.openclaw.package;
+                botUserId = "@${settings.botUserName}:${settings.matrixServerName}";
+                userHome = config.users.users.${settings.serviceUser}.home;
+                workspaceDir = "${userHome}/${settings.botUserName}";
 
                 baseConfig = {
                   gateway = {
@@ -127,6 +135,7 @@
                   };
                   agents = {
                     defaults = {
+                      workspace = workspaceDir;
                       model = {
                         primary = "zai-coding-plan/glm-4.7";
                         fallbacks = [ "anthropic/claude-opus-4-5" ];
@@ -145,7 +154,7 @@
                 oauthTokenPath = config.clan.core.vars.generators.clawdbot-claude-oauth.files."token".path;
                 zaiApiKeyPath = config.clan.core.vars.generators."clawdbot-zai-coding-api".files."api-key".path;
 
-                stateDir = "${config.users.users.${settings.serviceUser}.home}/.openclaw";
+                stateDir = "${userHome}/.openclaw";
 
                 isLocalHomeserver =
                   let
@@ -166,7 +175,7 @@
                   export OPENCLAW_CONFIG_PATH="${stateDir}/openclaw.json"
                   export OPENCLAW_NIX_MODE=1
                   export OPENCLAW_GATEWAY_TOKEN="$(cat ${gatewayTokenPath})"
-                  export MATRIX_USER_ID="${settings.botUserId}"
+                  export MATRIX_USER_ID="${botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
                   export ANTHROPIC_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
                   export ZAI_API_KEY="$(cat ${zaiApiKeyPath})"
