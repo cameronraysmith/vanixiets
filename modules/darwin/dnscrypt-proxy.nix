@@ -231,6 +231,10 @@
           };
         };
 
+        # Declare existing system user's home directory to satisfy nix-darwin
+        # activation check (nix-darwin refuses to change existing users' homes)
+        users.users._dnscrypt-proxy.home = "/private/var/lib/dnscrypt-proxy";
+
         # Override launchd config to run as root (required for port 53 binding)
         # The default _dnscrypt-proxy user cannot bind to privileged ports
         launchd.daemons.dnscrypt-proxy.serviceConfig = {
