@@ -224,11 +224,17 @@
                     '';
                   };
 
+                  # TODO: Once config has stabilized, migrate from mutable copy to
+                  # immutable symlink following the nix-openclaw HM module pattern:
+                  #   ln -sfn /etc/openclaw/openclaw.json ${stateDir}/openclaw.json
+                  # This eliminates the wrapper copy and makes config fully Nix-managed.
+                  # See nix-clawdbot/nix/modules/home-manager/openclaw.nix (activation phase).
                   systemd.services."openclaw-gateway" = {
                     description = "OpenClaw Matrix Gateway";
                     after = [ "network.target" ] ++ synapseService;
                     wants = synapseService;
                     wantedBy = [ "multi-user.target" ];
+                    restartTriggers = [ configFile ];
 
                     serviceConfig = {
                       Type = "simple";
