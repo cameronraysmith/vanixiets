@@ -12,9 +12,6 @@
         serviceUser = "cameron";
         gatewayMode = "local";
         matrixBotPasswordGenerator = "matrix-password-clawd";
-        configOverrides = {
-          gateway.controlUi.allowInsecureAuth = false;
-        };
       };
     };
   };
