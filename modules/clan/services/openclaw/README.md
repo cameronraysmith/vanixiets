@@ -1,11 +1,11 @@
-# clawdbot service
+# openclaw service
 
-clan service module for the clawdbot matrix gateway.
-Deploys a systemd service that connects to a matrix homeserver via the clawdbot plugin-based gateway architecture.
+Clan service module for the openclaw matrix gateway.
+Deploys a systemd service that connects to a matrix homeserver via the openclaw plugin-based gateway architecture.
 
 ## Roles
 
-The `default` role runs the clawdbot gateway on the assigned machine.
+The `default` role runs the openclaw gateway on the assigned machine.
 
 ## Settings
 
