@@ -1,9 +1,9 @@
-# flake-parts module exporting clawdbot overlay
+# flake-parts module exporting openclaw overlay
 #
-# The llm-agents flake provides a clawdbot package that bundles all extensions
-# (including matrix) at $out/lib/clawdbot/extensions/, but the upstream
+# The llm-agents flake provides an openclaw package that bundles all extensions
+# (including matrix) at $out/lib/openclaw/extensions/, but the upstream
 # build is missing two things:
-#   1. CLAWDBOT_BUNDLED_PLUGINS_DIR env var pointing to extensions/
+#   1. OPENCLAW_BUNDLED_PLUGINS_DIR env var pointing to extensions/
 #   2. The @matrix-org/matrix-sdk-crypto-nodejs native .node addon,
 #      which is normally downloaded at npm install time via download-lib.js
 #      but unavailable in the nix sandbox
@@ -12,9 +12,9 @@
 {
   flake.nixpkgsOverlays = [
     (final: prev: {
-      clawdbot-gateway =
+      openclaw-gateway =
         let
-          basePkg = inputs.llm-agents.packages.${prev.stdenv.hostPlatform.system}.clawdbot;
+          basePkg = inputs.llm-agents.packages.${prev.stdenv.hostPlatform.system}.openclaw;
 
           # Native addon for Matrix E2EE crypto, downloaded from upstream GitHub release
           matrixCryptoNode = prev.fetchurl {
@@ -25,11 +25,11 @@
         basePkg.overrideAttrs (old: {
           postFixup = (old.postFixup or "") + ''
             # Inject native Matrix crypto addon where the SDK expects it
-            cp ${matrixCryptoNode} $out/lib/clawdbot/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-nodejs@0.4.0/node_modules/@matrix-org/matrix-sdk-crypto-nodejs/matrix-sdk-crypto.linux-x64-gnu.node
+            cp ${matrixCryptoNode} $out/lib/openclaw/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-nodejs@0.4.0/node_modules/@matrix-org/matrix-sdk-crypto-nodejs/matrix-sdk-crypto.linux-x64-gnu.node
 
-            wrapProgram $out/bin/clawdbot \
-              --set CLAWDBOT_BUNDLED_PLUGINS_DIR "$out/lib/clawdbot/extensions" \
-              --set CLAWDBOT_NIX_MODE 1
+            wrapProgram $out/bin/openclaw \
+              --set OPENCLAW_BUNDLED_PLUGINS_DIR "$out/lib/openclaw/extensions" \
+              --set OPENCLAW_NIX_MODE 1
           '';
 
           nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ prev.makeWrapper ];
