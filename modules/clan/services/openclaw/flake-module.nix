@@ -82,6 +82,10 @@
                       port = settings.port;
                       mode = settings.gatewayMode;
                       controlUi.allowInsecureAuth = true;
+                      trustedProxies = [
+                        "::1"
+                        "127.0.0.1"
+                      ];
                     };
                     channels.matrix = {
                       enabled = true;
