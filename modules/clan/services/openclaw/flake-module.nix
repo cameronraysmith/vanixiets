@@ -60,6 +60,12 @@
                 type = lib.types.str;
                 description = "Name of the clan vars generator providing the Matrix bot password";
               };
+
+              configOverrides = lib.mkOption {
+                type = lib.types.attrs;
+                default = { };
+                description = "Additional config merged on top of the generated openclaw.json via lib.recursiveUpdate";
+              };
             };
           };
 
@@ -76,59 +82,61 @@
               let
                 package = config.services.openclaw.package;
 
+                baseConfig = {
+                  gateway = {
+                    port = settings.port;
+                    mode = settings.gatewayMode;
+                    controlUi.allowInsecureAuth = true;
+                    trustedProxies = [
+                      "::1"
+                      "127.0.0.1"
+                    ];
+                  };
+                  channels.matrix = {
+                    enabled = true;
+                    homeserver = settings.homeserver;
+                  };
+                  plugins.entries.matrix = {
+                    enabled = true;
+                  };
+                  models = {
+                    mode = "merge";
+                    providers = {
+                      "zai-coding-plan" = {
+                        baseUrl = "https://api.z.ai/api/coding/paas/v4";
+                        apiKey = "\${ZAI_API_KEY}";
+                        api = "openai-completions";
+                        models = [
+                          {
+                            id = "glm-4.7";
+                            name = "GLM 4.7 (Z.AI Coding Plan)";
+                            reasoning = true;
+                            input = [ "text" ];
+                            cost = {
+                              input = 0;
+                              output = 0;
+                              cacheRead = 0;
+                              cacheWrite = 0;
+                            };
+                            contextWindow = 131072;
+                            maxTokens = 131072;
+                          }
+                        ];
+                      };
+                    };
+                  };
+                  agents = {
+                    defaults = {
+                      model = {
+                        primary = "zai-coding-plan/glm-4.7";
+                        fallbacks = [ "anthropic/claude-opus-4-5" ];
+                      };
+                    };
+                  };
+                };
+
                 configFile = pkgs.writeText "openclaw.json" (
-                  builtins.toJSON {
-                    gateway = {
-                      port = settings.port;
-                      mode = settings.gatewayMode;
-                      controlUi.allowInsecureAuth = true;
-                      trustedProxies = [
-                        "::1"
-                        "127.0.0.1"
-                      ];
-                    };
-                    channels.matrix = {
-                      enabled = true;
-                      homeserver = settings.homeserver;
-                    };
-                    plugins.entries.matrix = {
-                      enabled = true;
-                    };
-                    models = {
-                      mode = "merge";
-                      providers = {
-                        "zai-coding-plan" = {
-                          baseUrl = "https://api.z.ai/api/coding/paas/v4";
-                          apiKey = "\${ZAI_API_KEY}";
-                          api = "openai-completions";
-                          models = [
-                            {
-                              id = "glm-4.7";
-                              name = "GLM 4.7 (Z.AI Coding Plan)";
-                              reasoning = true;
-                              input = [ "text" ];
-                              cost = {
-                                input = 0;
-                                output = 0;
-                                cacheRead = 0;
-                                cacheWrite = 0;
-                              };
-                              contextWindow = 131072;
-                              maxTokens = 131072;
-                            }
-                          ];
-                        };
-                      };
-                    };
-                    agents = {
-                      defaults = {
-                        model = {
-                          primary = "zai-coding-plan/glm-4.7";
-                          fallbacks = [ "anthropic/claude-opus-4-5" ];
-                        };
-                      };
-                    };
-                  }
+                  builtins.toJSON (lib.recursiveUpdate baseConfig settings.configOverrides)
                 );
 
                 passwordVarPath =
