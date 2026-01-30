@@ -81,6 +81,7 @@
                     gateway = {
                       port = settings.port;
                       mode = settings.gatewayMode;
+                      controlUi.allowInsecureAuth = true;
                     };
                     channels.matrix = {
                       enabled = true;
