@@ -1,17 +1,16 @@
 { ... }:
 {
-  clan.modules.clawdbot =
+  clan.modules.openclaw =
     { ... }:
     {
       _class = "clan.service";
-      # TODO: rename to "clan-core/clawdbot"
-      manifest.name = "clawdbot";
-      manifest.description = "Clawdbot Matrix gateway service with plugin architecture";
+      manifest.name = "openclaw";
+      manifest.description = "OpenClaw Matrix gateway service with plugin architecture";
       manifest.categories = [ "Communication" ];
       manifest.readme = builtins.readFile ./README.md;
 
       roles.default = {
-        description = "Runs the clawdbot gateway connecting to a Matrix homeserver";
+        description = "Runs the openclaw gateway connecting to a Matrix homeserver";
 
         interface =
           { lib, ... }:
@@ -45,7 +44,7 @@
 
               serviceUser = lib.mkOption {
                 type = lib.types.str;
-                description = "Unix user to run the clawdbot gateway as";
+                description = "Unix user to run the openclaw gateway as";
               };
 
               gatewayMode = lib.mkOption {
@@ -75,9 +74,9 @@
                 ...
               }:
               let
-                package = config.services.clawdbot.package;
+                package = config.services.openclaw.package;
 
-                configFile = pkgs.writeText "clawdbot.json" (
+                configFile = pkgs.writeText "openclaw.json" (
                   builtins.toJSON {
                     gateway = {
                       port = settings.port;
@@ -129,7 +128,7 @@
                 oauthTokenPath = config.clan.core.vars.generators.clawdbot-claude-oauth.files."token".path;
                 zaiApiKeyPath = config.clan.core.vars.generators."clawdbot-zai-coding-api".files."api-key".path;
 
-                stateDir = "${config.users.users.${settings.serviceUser}.home}/.clawdbot";
+                stateDir = "${config.users.users.${settings.serviceUser}.home}/.openclaw";
 
                 isLocalHomeserver =
                   let
@@ -144,28 +143,28 @@
                   || hasLocal "https://[::1]";
                 synapseService = lib.optional isLocalHomeserver "matrix-synapse.service";
 
-                wrapper = pkgs.writeShellScript "clawdbot-gateway-wrapper" ''
+                wrapper = pkgs.writeShellScript "openclaw-gateway-wrapper" ''
                   mkdir -p ${stateDir}
-                  cp /etc/clawdbot/clawdbot.json ${stateDir}/clawdbot.json
-                  export CLAWDBOT_CONFIG_PATH="${stateDir}/clawdbot.json"
-                  export CLAWDBOT_NIX_MODE=1
+                  cp /etc/openclaw/openclaw.json ${stateDir}/openclaw.json
+                  export OPENCLAW_CONFIG_PATH="${stateDir}/openclaw.json"
+                  export OPENCLAW_NIX_MODE=1
                   export MATRIX_USER_ID="${settings.botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
                   export ANTHROPIC_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
                   export ZAI_API_KEY="$(cat ${zaiApiKeyPath})"
-                  exec ${lib.getExe' package "clawdbot"} gateway run --bind ${settings.bindMode}
+                  exec ${lib.getExe' package "openclaw"} gateway run --bind ${settings.bindMode}
                 '';
               in
               {
-                options.services.clawdbot.package = lib.mkOption {
+                options.services.openclaw.package = lib.mkOption {
                   type = lib.types.package;
-                  default = pkgs.clawdbot-gateway;
-                  defaultText = lib.literalExpression "pkgs.clawdbot-gateway";
-                  description = "The clawdbot gateway package with bundled plugins";
+                  default = pkgs.openclaw-gateway;
+                  defaultText = lib.literalExpression "pkgs.openclaw-gateway";
+                  description = "The openclaw gateway package with bundled plugins";
                 };
 
                 config = {
-                  environment.etc."clawdbot/clawdbot.json".source = configFile;
+                  environment.etc."openclaw/openclaw.json".source = configFile;
                   environment.systemPackages = [ package ];
 
                   clan.core.vars.generators."clawdbot-gateway-token" = {
@@ -192,7 +191,7 @@
 
                   clan.core.vars.generators."clawdbot-zai-coding-api" = {
                     prompts.api-key = {
-                      description = "Z.AI Coding Plan API key for clawdbot";
+                      description = "Z.AI Coding Plan API key for openclaw";
                       type = "hidden";
                     };
                     files."api-key" = {
@@ -204,8 +203,8 @@
                     '';
                   };
 
-                  systemd.services."clawdbot-gateway" = {
-                    description = "Clawdbot Matrix Gateway";
+                  systemd.services."openclaw-gateway" = {
+                    description = "OpenClaw Matrix Gateway";
                     after = [ "network.target" ] ++ synapseService;
                     wants = synapseService;
                     wantedBy = [ "multi-user.target" ];
