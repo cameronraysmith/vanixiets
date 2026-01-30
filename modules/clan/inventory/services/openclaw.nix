@@ -1,7 +1,7 @@
 {
-  clan.inventory.instances.clawdbot = {
+  clan.inventory.instances.openclaw = {
     module = {
-      name = "clawdbot";
+      name = "openclaw";
       input = "self";
     };
     roles.default.machines."cinnabar" = {
