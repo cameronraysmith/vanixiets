@@ -4,8 +4,44 @@
     "config:recommended",
     "helpers:pinGitHubActionDigests"
   ],
+  "rangeStrategy": "bump",
   "nix": {
     "enabled": true
   },
-  "labels": ["dependencies"]
+  "labels": ["dependencies"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["flake.nix"],
+      "matchStrings": [
+        "playwright-web-flake\\.url\\s*=\\s*\"github:(?<depName>[^/]+/[^/]+)/(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-tags"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Disable nix manager for playwright-web-flake to avoid conflict with custom regex manager",
+      "matchManagers": ["nix"],
+      "matchPackageNames": ["playwright-web-flake"],
+      "enabled": false
+    },
+    {
+      "description": "Group playwright across npm and flake.nix into a single PR",
+      "matchPackageNames": [
+        "playwright",
+        "@playwright/test",
+        "pietdevries94/playwright-web-flake"
+      ],
+      "groupName": "playwright"
+    },
+    {
+      "description": "Pin playwright npm packages to exact versions for flake input sync",
+      "matchPackageNames": [
+        "playwright",
+        "@playwright/test"
+      ],
+      "rangeStrategy": "pin"
+    }
+  ]
 }
