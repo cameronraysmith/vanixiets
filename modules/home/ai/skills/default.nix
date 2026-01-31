@@ -1,16 +1,15 @@
 # Unified AI agent skills for claude-code, codex, and opencode
 #
 # Skills are partitioned into core (shared across all agents), claude
-# (Claude Code-only), and third-party (e.g. bioSkills from flake inputs).
+# (Claude Code-only), and third-party (from flake inputs).
 #
 # Core and claude skills are Nix path values (from relative path literals)
 # and pass through programs.X.skills where upstream modules handle them via
 # lib.isPath. Third-party skills from flake inputs coerce to store path
-# strings via outPath, which the claude-code and codex modules do not
-# recognize as directories (they check lib.isPath, not store path strings).
-# The opencode module already handles both. We create home.file and
-# xdg.configFile entries directly for third-party skills on claude-code
-# and codex, bypassing their skills option for store path values.
+# strings via outPath, which claude-code and codex modules do not recognize
+# as directories (they check lib.isPath). The opencode module handles both.
+# For third-party skills on claude-code and codex, create home.file or
+# xdg.configFile entries directly, bypassing their skills option.
 { ... }:
 {
   flake.modules.homeManager.ai =
@@ -29,9 +28,10 @@
           lib.filterAttrs (_: type: type == "directory") (builtins.readDir dir)
         );
 
-      # Scan two-level directory (category/skill) and flatten with prefix.
-      # Produces keys like "${prefix}-${category}-${skill}" to preserve
-      # semantic context from the nested directory hierarchy.
+      # Scan a two-level directory (category/skill) and flatten with prefix.
+      # Useful for external skill repos that organize skills into domain
+      # subdirectories rather than a flat layout. Produces keys like
+      # "${prefix}-${category}-${skill}" to preserve semantic context.
       # When dir is a flake input, values are store path strings via outPath.
       readSkillsNested =
         prefix: dir:
@@ -52,7 +52,6 @@
 
       coreSkills = readSkillsFrom ./src/core;
       claudeSkills = readSkillsFrom ./src/claude;
-      bioSkills = readSkillsNested "bio" flake.inputs.bioSkills;
 
       # Generate home.file or xdg.configFile entries for store path skills
       storePathSkillFiles =
@@ -71,12 +70,9 @@
       programs.codex.skills = coreSkills;
 
       # opencode module handles both Nix paths and store path strings
-      # programs.opencode.skills = coreSkills // bioSkills;
       programs.opencode.skills = coreSkills;
 
       # Third-party skills: store path strings bypass upstream skills options
       # and go directly to home.file / xdg.configFile with recursive symlinks
-      # home.file =
-      #   storePathSkillFiles ".claude/skills" bioSkills // storePathSkillFiles ".codex/skills" bioSkills;
     };
 }
