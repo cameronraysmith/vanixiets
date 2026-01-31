@@ -181,6 +181,21 @@
                   export ZAI_API_KEY="$(cat ${zaiApiKeyPath})"
                   exec ${lib.getExe' package "openclaw"} gateway run --bind ${settings.bindMode}
                 '';
+
+                interactiveWrapper = pkgs.writeShellApplication {
+                  name = "openclaw";
+                  text = ''
+                    mkdir -p ${stateDir}
+                    install -m 0600 /etc/openclaw/openclaw.json ${stateDir}/openclaw.json
+                    export OPENCLAW_CONFIG_PATH="${stateDir}/openclaw.json"
+                    export OPENCLAW_NIX_MODE=1
+                    ZAI_API_KEY="$(cat ${zaiApiKeyPath})"
+                    export ZAI_API_KEY
+                    ANTHROPIC_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
+                    export ANTHROPIC_OAUTH_TOKEN
+                    exec ${lib.getExe' package "openclaw"} "$@"
+                  '';
+                };
               in
               {
                 options.services.openclaw.package = lib.mkOption {
@@ -192,7 +207,7 @@
 
                 config = {
                   environment.etc."openclaw/openclaw.json".source = configFile;
-                  environment.systemPackages = [ package ];
+                  environment.systemPackages = [ interactiveWrapper ];
 
                   clan.core.vars.generators."clawdbot-gateway-token" = {
                     files."token" = {
