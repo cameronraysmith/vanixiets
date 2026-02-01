@@ -12,7 +12,9 @@
           apacite
           appendix
           caption
+          classicthesis
           cm-super
+          currvita
           dvipng
           framed
           git-latexdiff
