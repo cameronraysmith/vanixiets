@@ -32,10 +32,6 @@
           # Added: 2025-10-14
           micromamba
 
-          # https://hydra.nixos.org/job/nixpkgs/trunk/git-machete.x86_64-linux
-          # https://hydra.nixos.org/job/nixpkgs/trunk/git-machete.aarch64-darwin
-          # Added: 2025-12-31
-          git-machete
           ;
       }
       // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
