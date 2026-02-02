@@ -36,6 +36,15 @@
       mactop = prev.mactop.overrideAttrs (old: {
         doCheck = false;
       });
+      # git-machete: disable tests to avoid 19-minute pytestCheckPhase
+      # Tests validated by upstream CI; sandbox run adds no value
+      # Previously in stable-fallbacks.nix; moved here to use unstable version
+      # Date added: 2026-02-02
+      git-machete = prev.git-machete.overrideAttrs (old: {
+        doCheck = false;
+        doInstallCheck = false;
+      });
+
       # nushell: skip path_is_a_list_in_repl test on darwin
       # Upstream: nushell/nushell#17085 added env_clear() to test harness,
       # stripping macOS sandbox-required environment variables
