@@ -14,20 +14,20 @@
 
 buildGoModule rec {
   pname = "beads-viewer";
-  version = "0.13.0";
+  version = "0.14.0";
 
   src = fetchFromGitHub {
     owner = "Dicklesworthstone";
     repo = "beads_viewer";
     rev = "v${version}";
-    hash = "sha256-lFJPZFeXnhLhfGvZybpSJOi/11xcaP8bn+6KpxljlPM=";
+    hash = "sha256-ECEL3rALyo5Ebef9cY6k8dfz7Ct1HrBsj0sVf0phLcU=";
   };
 
-  vendorHash = "sha256-V8Bl5lW9vd7o1ZcQ6rvs3WJ1ueYX7xKnHTyRAASHlng=";
+  vendorHash = null;
 
   subPackages = [ "cmd/bv" ];
 
-  # Upstream forgot to bump version constant for v0.13.0 (still says v0.12.1)
+  # Upstream forgot to bump version constant for v0.14.0 (still says v0.12.1)
   postPatch = ''
     sed -i 's/var Version = "v[^"]*"/var Version = "v${version}"/' pkg/version/version.go
   '';
