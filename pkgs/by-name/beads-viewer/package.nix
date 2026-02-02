@@ -27,11 +27,6 @@ buildGoModule rec {
 
   subPackages = [ "cmd/bv" ];
 
-  # Upstream forgot to bump version constant for v0.14.0 (still says v0.12.1)
-  postPatch = ''
-    sed -i 's/var Version = "v[^"]*"/var Version = "v${version}"/' pkg/version/version.go
-  '';
-
   # Tests require fixtures and git history
   doCheck = false;
 
