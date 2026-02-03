@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+NIX_CMD="nix --accept-flake-config"
+
 if [ $# -eq 0 ]; then
     echo "Usage: $0 <flake-ref>"
     echo "Example: $0 .#nvim-treesitter-main"
@@ -12,32 +14,32 @@ fi
 FLAKE_REF="$1"
 
 echo "=== Basic Info ==="
-nix eval "${FLAKE_REF}.name" --raw && echo
-nix eval "${FLAKE_REF}.version" --raw 2>/dev/null && echo || true
-nix eval "${FLAKE_REF}.pname" --raw 2>/dev/null && echo || true
+$NIX_CMD eval "${FLAKE_REF}.name" --raw && echo
+$NIX_CMD eval "${FLAKE_REF}.version" --raw 2>/dev/null && echo || true
+$NIX_CMD eval "${FLAKE_REF}.pname" --raw 2>/dev/null && echo || true
 
 echo -e "\n=== Source ==="
-nix derivation show "${FLAKE_REF}" | jq -r '.[] | .env.src // "unknown"' | head -1
+$NIX_CMD derivation show "${FLAKE_REF}" | jq -r '.[] | .env.src // "unknown"' | head -1
 
 echo -e "\n=== Build Phases ==="
 echo "postPatch:"
-nix eval "${FLAKE_REF}.postPatch" --raw 2>/dev/null | sed 's/^/  /' || echo "  (default)"
+$NIX_CMD eval "${FLAKE_REF}.postPatch" --raw 2>/dev/null | sed 's/^/  /' || echo "  (default)"
 echo "buildPhase:"
-nix eval "${FLAKE_REF}.buildPhase" --raw 2>/dev/null | head -c 100 | sed 's/^/  /' || echo "  (default)"
+$NIX_CMD eval "${FLAKE_REF}.buildPhase" --raw 2>/dev/null | head -c 100 | sed 's/^/  /' || echo "  (default)"
 
 echo -e "\n=== Neovim Plugin Attributes ==="
 echo "nvimSkipModules:"
-nix eval "${FLAKE_REF}.nvimSkipModules" --json 2>/dev/null | jq -r '.[]' | sed 's/^/  - /' || echo "  (none)"
+$NIX_CMD eval "${FLAKE_REF}.nvimSkipModules" --json 2>/dev/null | jq -r '.[]' | sed 's/^/  - /' || echo "  (none)"
 echo "nvimRequireCheck:"
-nix eval "${FLAKE_REF}.nvimRequireCheck" --json 2>/dev/null | jq -r '.[]' | sed 's/^/  - /' || echo "  (auto-discover)"
+$NIX_CMD eval "${FLAKE_REF}.nvimRequireCheck" --json 2>/dev/null | jq -r '.[]' | sed 's/^/  - /' || echo "  (auto-discover)"
 
 echo -e "\n=== Passthru Attributes ==="
-nix eval "${FLAKE_REF}.passthru" --apply 'x: builtins.attrNames x' 2>/dev/null || echo "No passthru"
+$NIX_CMD eval "${FLAKE_REF}.passthru" --apply 'x: builtins.attrNames x' 2>/dev/null || echo "No passthru"
 
 echo -e "\n=== Dependencies Count ==="
-nix derivation show "${FLAKE_REF}" | jq -r '.[] |
+$NIX_CMD derivation show "${FLAKE_REF}" | jq -r '.[] |
   "Build dependencies: " + (.inputDrvs | length | tostring) + "\n" +
   "Outputs: " + (.outputs | keys | join(", "))'
 
 echo -e "\n=== Would Build ==="
-nix build "${FLAKE_REF}" --dry-run 2>&1 | grep -E "will be (built|fetched)" || echo "Nothing new to build"
+$NIX_CMD build "${FLAKE_REF}" --dry-run 2>&1 | grep -E "will be (built|fetched)" || echo "Nothing new to build"
