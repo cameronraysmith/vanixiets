@@ -79,10 +79,8 @@
     lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     nvim-treesitter-main.url = "github:iofq/nvim-treesitter-main";
-    nvim-treesitter-main.inputs.nixpkgs.follows = "nixpkgs";
 
     nix-index-database.url = "github:nix-community/nix-index-database";
-    nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
 
     nix2container.url = "github:nlewo/nix2container";
     nix2container.inputs.nixpkgs.follows = "nixpkgs";
