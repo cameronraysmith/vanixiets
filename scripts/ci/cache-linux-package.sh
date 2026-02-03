@@ -31,6 +31,8 @@ set -euo pipefail
 # Working directory normalization
 cd "$(git rev-parse --show-toplevel)"
 
+NIX_CMD="nix --accept-flake-config"
+
 # Help flag
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat <<EOF
@@ -84,8 +86,8 @@ echo ""
 # Interactive prompts belong here in the wrapper, not in general scripts
 
 echo "Checking if package is redundant with nixpkgs..."
-OUR_DRV=$(nix eval --raw ".#packages.aarch64-linux.$PACKAGE.drvPath" 2>/dev/null || echo "none")
-NIXPKGS_DRV=$(nix eval --raw "nixpkgs#$PACKAGE.drvPath" --system aarch64-linux 2>/dev/null || echo "none")
+OUR_DRV=$($NIX_CMD eval --raw ".#packages.aarch64-linux.$PACKAGE.drvPath" 2>/dev/null || echo "none")
+NIXPKGS_DRV=$($NIX_CMD eval --raw "nixpkgs#$PACKAGE.drvPath" --system aarch64-linux 2>/dev/null || echo "none")
 
 REDUNDANT_OVERLAY=false
 if [[ "$OUR_DRV" != "none" && "$NIXPKGS_DRV" != "none" && "$OUR_DRV" == "$NIXPKGS_DRV" ]]; then
@@ -155,14 +157,14 @@ if [[ "$DRY_RUN" == "true" ]]; then
     echo "[DRY RUN] Would check: nix path-info --store https://$CACHE_NAME.cachix.org .#packages.aarch64-linux.$PACKAGE"
     echo "[DRY RUN] Would check: nix path-info --store https://$CACHE_NAME.cachix.org .#packages.x86_64-linux.$PACKAGE"
 else
-    if nix path-info --store "https://$CACHE_NAME.cachix.org" ".#packages.aarch64-linux.$PACKAGE" &>/dev/null; then
+    if $NIX_CMD path-info --store "https://$CACHE_NAME.cachix.org" ".#packages.aarch64-linux.$PACKAGE" &>/dev/null; then
         echo "aarch64-linux: already in cache"
         AARCH64_CACHED=true
     else
         echo "aarch64-linux: need to build"
     fi
 
-    if nix path-info --store "https://$CACHE_NAME.cachix.org" ".#packages.x86_64-linux.$PACKAGE" &>/dev/null; then
+    if $NIX_CMD path-info --store "https://$CACHE_NAME.cachix.org" ".#packages.x86_64-linux.$PACKAGE" &>/dev/null; then
         echo "x86_64-linux: already in cache"
         X86_64_CACHED=true
     else
@@ -223,7 +225,7 @@ build_and_cache_arch() {
         # Verify it's actually in our cachix before pinning
         echo "Verifying path is in cache..."
         sleep 3  # Allow CDN propagation
-        if ! nix path-info --store "https://$CACHE_NAME.cachix.org" "$store_path" &>/dev/null; then
+        if ! $NIX_CMD path-info --store "https://$CACHE_NAME.cachix.org" "$store_path" &>/dev/null; then
             echo "warning: path not in cache after push, retrying..."
             sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $store_path"
             sleep 3
