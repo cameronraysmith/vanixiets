@@ -8,6 +8,8 @@
 # This file is intended to be sourced, not executed directly.
 # ============================================================================
 
+NIX_CMD="nix --accept-flake-config"
+
 # ============================================================================
 # Argument Parsing
 # ============================================================================
@@ -111,7 +113,7 @@ discover_packages() {
     # - hydraPlatforms unset: include package (default behavior)
     # - hydraPlatforms = []: exclude from all CI builds
     # - hydraPlatforms = ["x86_64-linux"]: include only for that system
-    nix eval ".#packages.$system" --apply '
+    $NIX_CMD eval ".#packages.$system" --apply '
       pkgs: builtins.filter (name:
         let
           pkg = pkgs.${name};
@@ -124,15 +126,15 @@ discover_packages() {
 
 discover_checks() {
     local system="$1"
-    nix eval ".#checks.$system" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo ""
+    $NIX_CMD eval ".#checks.$system" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo ""
 }
 
 discover_devshells() {
     local system="$1"
-    nix eval ".#devShells.$system" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo ""
+    $NIX_CMD eval ".#devShells.$system" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo ""
 }
 
 discover_homes() {
     local system="$1"
-    nix eval ".#legacyPackages.$system.homeConfigurations" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo ""
+    $NIX_CMD eval ".#legacyPackages.$system.homeConfigurations" --apply 'builtins.attrNames' --json 2>/dev/null | jq -r '.[]' || echo ""
 }
