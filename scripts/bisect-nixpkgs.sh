@@ -21,6 +21,8 @@
 
 set -euo pipefail
 
+NIX_CMD="nix --accept-flake-config"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 STATE_FILE="$REPO_ROOT/.bisect-nixpkgs-state"
@@ -109,7 +111,7 @@ update_flake_lock_commit() {
 
     # Use nix flake lock with override-input
     cd "$REPO_ROOT"
-    if nix flake lock --override-input nixpkgs "github:nixos/nixpkgs/$commit" 2>&1 | \
+    if $NIX_CMD flake lock --override-input nixpkgs "github:nixos/nixpkgs/$commit" 2>&1 | \
         grep -v "warning:" | grep -v "trace:"; then
         log_success "Updated flake.lock"
         return 0
