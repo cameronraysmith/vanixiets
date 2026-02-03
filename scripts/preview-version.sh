@@ -14,6 +14,8 @@
 
 set -euo pipefail
 
+NIX_CMD="nix --accept-flake-config"
+
 # Configuration
 TARGET_BRANCH="${1:-main}"
 PACKAGE_PATH="${2:-}"
@@ -67,7 +69,7 @@ if [ "$CURRENT_BRANCH" == "$TARGET_BRANCH" ]; then
   if [ -n "$PACKAGE_PATH" ]; then
     cd "$REPO_ROOT/$PACKAGE_PATH"
   fi
-  exec nix develop -c bun run test-release
+  exec $NIX_CMD develop -c bun run test-release
 fi
 
 # Display what we're doing
@@ -146,7 +148,7 @@ cd "$WORKTREE_DIR"
 
 # Install dependencies in worktree (bun uses global cache, so this is fast)
 echo -e "${BLUE}installing dependencies in worktree...${NC}"
-nix develop -c bun install --silent
+$NIX_CMD develop -c bun install --silent
 
 # Navigate to package if specified
 if [ -n "$PACKAGE_PATH" ]; then
@@ -167,10 +169,10 @@ PLUGINS="@semantic-release/commit-analyzer,@semantic-release/release-notes-gener
 
 if [ -n "$PACKAGE_PATH" ]; then
   # For monorepo packages, check if package.json has specific plugins configured
-  OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" nix develop -c bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+  OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" $NIX_CMD develop -c bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 else
   # For root package
-  OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" nix develop -c bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+  OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" $NIX_CMD develop -c bun run semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 fi
 
 # Display semantic-release summary (filter out verbose plugin repetition)
