@@ -105,7 +105,7 @@ cache_packages() {
     local build_exit_code
 
     # Capture both output and exit code to provide better diagnostics
-    build_output=$(nix build $package_targets -L --print-out-paths --no-link 2>&1) || build_exit_code=$?
+    build_output=$($NIX_CMD build $package_targets -L --print-out-paths --no-link 2>&1) || build_exit_code=$?
 
     local store_paths
     store_paths=$(echo "$build_output" | grep "^/nix/store/" || echo "")
@@ -159,7 +159,7 @@ cache_checks_devshells() {
 
         echo "building checks..."
         local check_paths
-        check_paths=$(nix build $check_targets -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
+        check_paths=$($NIX_CMD build $check_targets -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
         store_paths="$store_paths"$'\n'"$check_paths"
     else
         echo "no checks found"
@@ -179,7 +179,7 @@ cache_checks_devshells() {
 
         echo "building devshells..."
         local shell_paths
-        shell_paths=$(nix build $shell_targets -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
+        shell_paths=$($NIX_CMD build $shell_targets -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
         store_paths="$store_paths"$'\n'"$shell_paths"
     else
         echo "no devshells found"
@@ -227,7 +227,7 @@ cache_home() {
 
     echo "building all home configurations..."
     local store_paths
-    store_paths=$(nix build $home_targets -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
+    store_paths=$($NIX_CMD build $home_targets -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
 
     if [ -z "$store_paths" ]; then
         echo "error: no store paths captured from build"
@@ -250,20 +250,20 @@ cache_nixos() {
     print_header "caching nixos configuration: $config"
 
     print_step "validating configuration exists"
-    if ! nix eval ".#nixosConfigurations.$config" --apply 'x: true' 2>/dev/null; then
+    if ! $NIX_CMD eval ".#nixosConfigurations.$config" --apply 'x: true' 2>/dev/null; then
         echo "error: nixosConfigurations.$config does not exist"
         return 1
     fi
 
     local config_system
-    config_system=$(nix eval ".#nixosConfigurations.$config.config.nixpkgs.system" --raw 2>/dev/null || echo "unknown")
+    config_system=$($NIX_CMD eval ".#nixosConfigurations.$config.config.nixpkgs.system" --raw 2>/dev/null || echo "unknown")
     echo "configuration system: $config_system"
 
     print_step "building system"
     echo "building nixosConfigurations.$config.config.system.build.toplevel"
 
     local store_path
-    store_path=$(nix build ".#nixosConfigurations.$config.config.system.build.toplevel" -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
+    store_path=$($NIX_CMD build ".#nixosConfigurations.$config.config.system.build.toplevel" -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
 
     if [ -z "$store_path" ]; then
         echo "error: no store path captured from build"
@@ -284,20 +284,20 @@ cache_darwin() {
     print_header "caching darwin configuration: $config"
 
     print_step "validating configuration exists"
-    if ! nix eval ".#darwinConfigurations.$config" --apply 'x: true' 2>/dev/null; then
+    if ! $NIX_CMD eval ".#darwinConfigurations.$config" --apply 'x: true' 2>/dev/null; then
         echo "error: darwinConfigurations.$config does not exist"
         return 1
     fi
 
     local config_system
-    config_system=$(nix eval ".#darwinConfigurations.$config.pkgs.stdenv.hostPlatform.system" --raw 2>/dev/null || echo "unknown")
+    config_system=$($NIX_CMD eval ".#darwinConfigurations.$config.pkgs.stdenv.hostPlatform.system" --raw 2>/dev/null || echo "unknown")
     echo "configuration system: $config_system"
 
     print_step "building system"
     echo "building darwinConfigurations.$config.system"
 
     local store_path
-    store_path=$(nix build ".#darwinConfigurations.$config.system" -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
+    store_path=$($NIX_CMD build ".#darwinConfigurations.$config.system" -L --print-out-paths --no-link 2>&1 | grep "^/nix/store/" || echo "")
 
     if [ -z "$store_path" ]; then
         echo "error: no store path captured from build"
