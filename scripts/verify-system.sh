@@ -9,6 +9,8 @@
 
 set -uo pipefail
 
+NIX_CMD="nix --accept-flake-config"
+
 FAILED=0
 
 echo "=== Verifying infra after updates ==="
@@ -16,7 +18,7 @@ echo ""
 
 # Step 1: Flake check
 echo "Step 1/2: Running flake check..."
-if nix flake check; then
+if $NIX_CMD flake check; then
     echo "✓ Flake check passed"
 else
     echo "✗ Flake check failed"
@@ -39,7 +41,7 @@ if [ $FAILED -eq 0 ]; then
                 FAILED=1
             fi
         else
-            if nix build ".#darwinConfigurations.$HOSTNAME.system"; then
+            if $NIX_CMD build ".#darwinConfigurations.$HOSTNAME.system"; then
                 echo "✓ Darwin system builds successfully"
             else
                 echo "✗ Darwin build failed"
@@ -57,7 +59,7 @@ if [ $FAILED -eq 0 ]; then
                 FAILED=1
             fi
         else
-            if nix build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel"; then
+            if $NIX_CMD build ".#nixosConfigurations.$HOSTNAME.config.system.build.toplevel"; then
                 echo "✓ NixOS system builds successfully"
             else
                 echo "✗ NixOS build failed"
@@ -66,7 +68,7 @@ if [ $FAILED -eq 0 ]; then
         fi
     else
         echo "Detected home-manager-only configuration: $USER"
-        SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+        SYSTEM=$($NIX_CMD eval --impure --raw --expr 'builtins.currentSystem')
         if command -v nom &> /dev/null; then
             if nom build ".#legacyPackages.$SYSTEM.homeConfigurations.$USER.activationPackage"; then
                 echo "✓ Home-manager configuration builds successfully"
@@ -75,7 +77,7 @@ if [ $FAILED -eq 0 ]; then
                 FAILED=1
             fi
         else
-            if nix build ".#legacyPackages.$SYSTEM.homeConfigurations.$USER.activationPackage"; then
+            if $NIX_CMD build ".#legacyPackages.$SYSTEM.homeConfigurations.$USER.activationPackage"; then
                 echo "✓ Home-manager configuration builds successfully"
             else
                 echo "✗ Home-manager build failed"
