@@ -36,25 +36,6 @@
       mactop = prev.mactop.overrideAttrs (old: {
         doCheck = false;
       });
-      # nushell: skip path_is_a_list_in_repl test on darwin
-      # Upstream: nushell/nushell#17085 added env_clear() to test harness,
-      # stripping macOS sandbox-required environment variables
-      # Hydra: https://hydra.nixos.org/build/320764024 (aarch64-darwin)
-      # nixpkgs: NixOS/nixpkgs#485915, fix PR NixOS/nixpkgs#486233
-      # TODO: Remove when NixOS/nixpkgs#486233 merges into unstable channel
-      # Date added: 2026-02-02
-      nushell = prev.nushell.overrideAttrs (
-        old:
-        prev.lib.optionalAttrs prev.stdenv.isDarwin {
-          checkPhase =
-            builtins.replaceStrings
-              [ "--skip=plugins::stress_internals::test_local_socket" ]
-              [
-                "--skip=plugins::stress_internals::test_local_socket --skip=shell::environment::env::path_is_a_list_in_repl"
-              ]
-              old.checkPhase;
-        }
-      );
 
       # Rename graphite-cli binary from `gt` to `gph`
       #
