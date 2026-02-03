@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+NIX_CMD="nix --accept-flake-config"
+
 # ============================================================================
 # Helper Functions
 # ============================================================================
 
 get_target_system() {
     if [ -z "$1" ]; then
-        nix eval --impure --raw --expr 'builtins.currentSystem'
+        $NIX_CMD eval --impure --raw --expr 'builtins.currentSystem'
     else
         echo "$1"
     fi
@@ -19,22 +21,22 @@ discover_items() {
 
     case "$category" in
         packages)
-            nix eval ".#packages.$target_system" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
+            $NIX_CMD eval ".#packages.$target_system" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
             ;;
         checks)
-            nix eval ".#checks.$target_system" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
+            $NIX_CMD eval ".#checks.$target_system" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
             ;;
         devshells)
-            nix eval ".#devShells.$target_system" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
+            $NIX_CMD eval ".#devShells.$target_system" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
             ;;
         nixos)
-            nix eval ".#nixosConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
+            $NIX_CMD eval ".#nixosConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
             ;;
         darwin)
-            nix eval ".#darwinConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
+            $NIX_CMD eval ".#darwinConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
             ;;
         home)
-            nix eval ".#legacyPackages.$target_system.homeConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
+            $NIX_CMD eval ".#legacyPackages.$target_system.homeConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]' || echo ""
             ;;
         *)
             echo ""
@@ -75,10 +77,10 @@ get_config_system() {
 
     case "$category" in
         nixos)
-            nix eval ".#nixosConfigurations.$item.config.nixpkgs.system" --raw 2>/dev/null || echo "unknown"
+            $NIX_CMD eval ".#nixosConfigurations.$item.config.nixpkgs.system" --raw 2>/dev/null || echo "unknown"
             ;;
         darwin)
-            nix eval ".#darwinConfigurations.$item.pkgs.stdenv.hostPlatform.system" --raw 2>/dev/null || echo "unknown"
+            $NIX_CMD eval ".#darwinConfigurations.$item.pkgs.stdenv.hostPlatform.system" --raw 2>/dev/null || echo "unknown"
             ;;
         *)
             echo ""
