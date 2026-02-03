@@ -9,6 +9,8 @@
 ## sops
 ## CI/CD
 
+nix_cmd := "nix --accept-flake-config"
+
 # Default command when 'just' is run without arguments
 # Run 'just <command>' to execute a command.
 default: help
@@ -43,25 +45,25 @@ activate *FLAGS:
 [group('activation')]
 activate-darwin hostname *FLAGS:
     @echo "Activating darwin configuration for {{hostname}}..."
-    nix run --accept-flake-config .#darwin -- {{hostname}} . {{FLAGS}}
+    {{nix_cmd}} run .#darwin -- {{hostname}} . {{FLAGS}}
 
 # Activate NixOS configuration
 [group('activation')]
 activate-os hostname *FLAGS:
     @echo "Activating NixOS configuration for {{hostname}}..."
-    nix run --accept-flake-config .#os -- {{hostname}} . {{FLAGS}}
+    {{nix_cmd}} run .#os -- {{hostname}} . {{FLAGS}}
 
 # Activate home-manager configuration
 [group('activation')]
 activate-home username *FLAGS:
     @echo "Activating home-manager configuration for {{username}}..."
-    nix run --accept-flake-config .#home -- {{username}} . {{FLAGS}}
+    {{nix_cmd}} run .#home -- {{username}} . {{FLAGS}}
 
 # Print nix flake inputs and outputs
 [group('nix')]
 flake-info:
-  nix flake metadata
-  nix flake show --legacy --all-systems
+  {{nix_cmd}} flake metadata
+  {{nix_cmd}} flake show --legacy --all-systems
 
 # Lint nix files
 [group('nix')]
@@ -71,7 +73,7 @@ lint:
 # Manually enter dev shell
 [group('nix')]
 dev:
-  nix develop
+  {{nix_cmd}} develop
 
 # Remove build output link (no garbage collection)
 [group('nix')]
@@ -97,7 +99,7 @@ gc keep="5" keep_since="7d":
 # Build nix flake
 [group('nix')]
 build profile: lint check
-  nix build --json --no-link --print-build-logs ".#{{ profile }}"
+  {{nix_cmd}} build --json --no-link --print-build-logs ".#{{ profile }}"
 
 # Build an experimental debug package with nom (isolated from nixpkgs/CI builds)
 [group('nix')]
@@ -108,7 +110,7 @@ debug-build package:
 [group('nix')]
 debug-list:
   @echo "Available debug packages:"
-  @nix eval .#debug --apply 'builtins.attrNames' --json | jq -r '.[]' | sort
+  @{{nix_cmd}} eval .#debug --apply 'builtins.attrNames' --json | jq -r '.[]' | sort
 
 # Check nix flake
 [group('nix')]
@@ -123,7 +125,7 @@ check:
   echo "  - 'input has an override for non-existent input self' (nix-unit internal mechanism)"
   echo "  - 'not writing modified lock file' (expected for read-only check)"
   echo ""
-  nix flake check
+  {{nix_cmd}} flake check
 
 # Fast checks excluding heavy VM integration tests (~1-2 min vs ~7 min for full)
 [group('nix')]
@@ -140,7 +142,7 @@ check-fast system="x86_64-linux":
   echo ""
 
   # Get all checks except vm-* which are heavy integration tests
-  CHECKS=$(nix eval ".#checks.{{system}}" --apply 'builtins.attrNames' --json | jq -r '.[] | select(startswith("vm-") | not)')
+  CHECKS=$({{nix_cmd}} eval ".#checks.{{system}}" --apply 'builtins.attrNames' --json | jq -r '.[] | select(startswith("vm-") | not)')
 
   echo "Checks to run:"
   echo "$CHECKS" | while read check; do echo "  - $check"; done
@@ -149,7 +151,7 @@ check-fast system="x86_64-linux":
   # Build each check
   for check in $CHECKS; do
     echo "::group::$check"
-    nix build ".#checks.{{system}}.$check" --print-build-logs
+    {{nix_cmd}} build ".#checks.{{system}}.$check" --print-build-logs
     echo "::endgroup::"
   done
 
@@ -216,7 +218,7 @@ home-manager-switch profile="aarch64-linux":
 # Bootstrap nix-darwin with flake
 [group('nix-darwin')]
 darwin-bootstrap profile="aarch64":
-  nix run nix-darwin -- switch --flake ".#{{ profile }}"
+  {{nix_cmd}} run nix-darwin -- switch --flake ".#{{ profile }}"
 
 # Build darwin from flake
 [group('nix-darwin')]
@@ -289,7 +291,7 @@ nixos-test profile="aarch64":
 # Update nix flake
 [group('nix')]
 update:
-  nix flake update
+  {{nix_cmd}} flake update
 
 # Update a package using its updateScript
 # Note: claude-code-bin and ccstatusline are now from llm-agents and update via flake update
@@ -297,7 +299,7 @@ update:
 update-package package="atuin-format":
   #!/usr/bin/env bash
   set -euo pipefail
-  UPDATE_SCRIPT=$(nix build .#{{ package }}.updateScript --no-link --print-out-paths)
+  UPDATE_SCRIPT=$({{nix_cmd}} build .#{{ package }}.updateScript --no-link --print-out-paths)
   echo "Running updateScript for {{ package }}..."
   $UPDATE_SCRIPT
   echo "Update complete. Review changes with: git diff"
@@ -309,21 +311,21 @@ update-package package="atuin-format":
 terraform *ARGS:
   rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
-  nix run .#terraform -- {{ARGS}}
+  {{nix_cmd}} run .#terraform -- {{ARGS}}
 
 # Run terraform plan only
 [group('terraform')]
 terraform-plan *ARGS:
   rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
-  nix run .#terraform.plan -- {{ARGS}}
+  {{nix_cmd}} run .#terraform.plan -- {{ARGS}}
 
 # Run terraform destroy
 [group('terraform')]
 terraform-destroy *ARGS:
   rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
-  nix run .#terraform.destroy -- {{ARGS}}
+  {{nix_cmd}} run .#terraform.destroy -- {{ARGS}}
 
 ## clan
 # Commands for clan-based machine management (deferred module composition+clan architecture)
@@ -331,23 +333,23 @@ terraform-destroy *ARGS:
 # Run all tests (nix flake check)
 [group('clan')]
 test:
-  nix flake check
+  {{nix_cmd}} flake check
 
 # Run fast tests only (nix-unit + validation tests)
 [group('clan')]
 test-quick:
   @echo "Running fast validation tests..."
   @echo "TC-017: Naming conventions"
-  nix build .#checks.aarch64-darwin.naming-conventions --print-build-logs
+  {{nix_cmd}} build .#checks.aarch64-darwin.naming-conventions --print-build-logs
   @echo ""
   @echo "TC-007: Secrets generation"
-  nix build .#checks.aarch64-darwin.secrets-generation --print-build-logs
+  {{nix_cmd}} build .#checks.aarch64-darwin.secrets-generation --print-build-logs
   @echo ""
   @echo "TC-006: Deployment safety"
-  nix build .#checks.aarch64-darwin.deployment-safety --print-build-logs
+  {{nix_cmd}} build .#checks.aarch64-darwin.deployment-safety --print-build-logs
   @echo ""
   @echo "TC-012: Terraform validation"
-  nix build .#checks.aarch64-darwin.terraform-validate --print-build-logs
+  {{nix_cmd}} build .#checks.aarch64-darwin.terraform-validate --print-build-logs
   @echo ""
   @echo "✓ All validation tests passed"
 
@@ -357,10 +359,10 @@ test-integration:
   @echo "Running VM integration tests (Linux only)..."
   @echo ""
   @echo "TC-005: VM test framework validation"
-  nix build .#checks.x86_64-linux.vm-test-framework --print-build-logs
+  {{nix_cmd}} build .#checks.x86_64-linux.vm-test-framework --print-build-logs
   @echo ""
   @echo "TC-010: VM boot all machines"
-  nix build .#checks.x86_64-linux.vm-boot-all-machines --print-build-logs
+  {{nix_cmd}} build .#checks.x86_64-linux.vm-boot-all-machines --print-build-logs
   @echo ""
   @echo "All VM integration tests passed!"
 
@@ -383,12 +385,12 @@ build-machine machine:
 # Show flake outputs
 [group('clan')]
 clan-show:
-  nix flake show
+  {{nix_cmd}} flake show
 
 # Show flake metadata
 [group('clan')]
 clan-metadata:
-  nix flake metadata
+  {{nix_cmd}} flake metadata
 
 ## docs
 
@@ -569,37 +571,37 @@ docs-versions limit="10":
 # Build a container for target architecture (x86_64 or aarch64)
 [group('containers')]
 container-build CONTAINER="fd" TARGET="aarch64":
-  nix build '.#{{CONTAINER}}Container-{{TARGET}}'
+  {{nix_cmd}} build '.#{{CONTAINER}}Container-{{TARGET}}'
 
 # Build containers for both architectures
 [group('containers')]
 container-build-all CONTAINER="fd":
   @echo "Building x86_64-linux..."
-  nix build '.#{{CONTAINER}}Container-x86_64' -o result-x86_64
+  {{nix_cmd}} build '.#{{CONTAINER}}Container-x86_64' -o result-x86_64
   @echo "Building aarch64-linux..."
-  nix build '.#{{CONTAINER}}Container-aarch64' -o result-aarch64
+  {{nix_cmd}} build '.#{{CONTAINER}}Container-aarch64' -o result-aarch64
   @echo "✓ Both architectures built successfully"
 
 # Push multi-arch manifest to registry (requires GITHUB_TOKEN)
 # TAGS: comma-separated additional tags applied via crane (no re-upload)
 [group('containers')]
 container-push CONTAINER="fd" VERSION="1.0.0" TAGS="":
-  VERSION={{VERSION}} TAGS={{TAGS}} nix run --impure '.#{{CONTAINER}}Manifest'
+  VERSION={{VERSION}} TAGS={{TAGS}} {{nix_cmd}} run --impure '.#{{CONTAINER}}Manifest'
 
 # Push single-arch manifest (x86_64 only)
 [group('containers')]
 container-push-x86 CONTAINER="fd" VERSION="1.0.0" TAGS="":
-  VERSION={{VERSION}} TAGS={{TAGS}} nix run --impure '.#{{CONTAINER}}Manifest-x86_64'
+  VERSION={{VERSION}} TAGS={{TAGS}} {{nix_cmd}} run --impure '.#{{CONTAINER}}Manifest-x86_64'
 
 # Push single-arch manifest (aarch64 only)
 [group('containers')]
 container-push-arm CONTAINER="fd" VERSION="1.0.0" TAGS="":
-  VERSION={{VERSION}} TAGS={{TAGS}} nix run --impure '.#{{CONTAINER}}Manifest-aarch64'
+  VERSION={{VERSION}} TAGS={{TAGS}} {{nix_cmd}} run --impure '.#{{CONTAINER}}Manifest-aarch64'
 
 # Load container image to Docker daemon via nix2container
 [group('containers')]
 container-load CONTAINER="fd" TARGET="aarch64":
-  nix run '.#{{CONTAINER}}Container-{{TARGET}}.copyToDockerDaemon'
+  {{nix_cmd}} run '.#{{CONTAINER}}Container-{{TARGET}}.copyToDockerDaemon'
 
 # Test container by running with --help
 [group('containers')]
@@ -621,7 +623,7 @@ container-all CONTAINER="fd" BINARY="" TARGET="aarch64":
 container-verify CONTAINER="fd" TARGET="aarch64":
   #!/usr/bin/env bash
   set -euo pipefail
-  RESULT=$(nix build '.#{{CONTAINER}}Container-{{TARGET}}' --no-link --print-out-paths)
+  RESULT=$({{nix_cmd}} build '.#{{CONTAINER}}Container-{{TARGET}}' --no-link --print-out-paths)
   echo "Container: $RESULT"
   echo "Architecture: $(jq -r '.arch' "$RESULT")"
   echo "Layers: $(jq '.layers | length' "$RESULT")"
@@ -634,7 +636,7 @@ _containers := "fd rg"
 [group('containers')]
 container-matrix:
   @echo "=== Container Matrix (from Nix) ==="
-  @nix eval .#containerMatrix --json | jq .
+  @{{nix_cmd}} eval .#containerMatrix --json | jq .
 
 # Build all defined containers for all architectures
 [group('containers')]
@@ -748,7 +750,7 @@ k3d-deploy:
   set -euo pipefail
 
   echo "=== Stage 1: Foundation (CNI) ==="
-  nix run .#k8s-deploy-local-k3d-foundation -- --yes
+  {{nix_cmd}} run .#k8s-deploy-local-k3d-foundation -- --yes
 
   echo ""
   echo "Waiting for Cilium pods to be created..."
@@ -767,7 +769,7 @@ k3d-deploy:
   echo ""
   echo "=== Stage 2: Infrastructure (CRDs) ==="
   # First pass: applies CRDs in prio-10, CRs may fail (CRDs not yet registered)
-  nix run .#k8s-deploy-local-k3d-infrastructure -- --yes || true
+  {{nix_cmd}} run .#k8s-deploy-local-k3d-infrastructure -- --yes || true
 
   echo ""
   echo "Waiting for CRDs to be established..."
@@ -779,7 +781,7 @@ k3d-deploy:
   echo ""
   echo "=== Stage 2: Infrastructure (CRs) ==="
   # Second pass: CRDs are now registered, CRs will succeed
-  nix run .#k8s-deploy-local-k3d-infrastructure -- --yes
+  {{nix_cmd}} run .#k8s-deploy-local-k3d-infrastructure -- --yes
 
   echo ""
   echo "=== Deployment complete ==="
@@ -788,12 +790,12 @@ k3d-deploy:
 # Deploy only foundation layer (Cilium CNI) - use for debugging or manual staging
 [group('k3d')]
 k3d-deploy-foundation:
-  nix run .#k8s-deploy-local-k3d-foundation -- --yes
+  {{nix_cmd}} run .#k8s-deploy-local-k3d-foundation -- --yes
 
 # Deploy only infrastructure layer - use after foundation is ready
 [group('k3d')]
 k3d-deploy-infrastructure:
-  nix run .#k8s-deploy-local-k3d-infrastructure -- --yes
+  {{nix_cmd}} run .#k8s-deploy-local-k3d-infrastructure -- --yes
 
 # Full k3d workflow: create cluster, bootstrap secrets, deploy all layers
 [group('k3d')]
@@ -1012,12 +1014,12 @@ local_k3d_repo := env("LOCAL_K3D_REPO", home_directory() / "projects/nix-workspa
 # Build nixidy manifests for local-k3d environment (renders to ./result)
 [group('nixidy')]
 nixidy-build:
-  nix run .#nixidy -- build .#local-k3d
+  {{nix_cmd}} run .#nixidy -- build .#local-k3d
 
 # Show nixidy environment info
 [group('nixidy')]
 nixidy-info:
-  nix run .#nixidy -- info .#local-k3d
+  {{nix_cmd}} run .#nixidy -- info .#local-k3d
 
 # Push rendered manifests to local-k3d private repository
 # Prerequisites: nixidy-build must be run first, local-k3d repo must exist
@@ -1063,7 +1065,7 @@ nixidy-sync: nixidy-build nixidy-push
 # Note: ArgoCD needs credentials to access private repo (configure via argocd CLI or UI)
 [group('nixidy')]
 nixidy-bootstrap:
-  nix run .#nixidy -- bootstrap .#local-k3d | kubectl apply -f -
+  {{nix_cmd}} run .#nixidy -- bootstrap .#local-k3d | kubectl apply -f -
 
 # Full GitOps workflow: Phase 3 bootstrap + Phase 4 ArgoCD takeover
 # Note: Requires local-k3d repo to exist and ArgoCD to have access credentials
@@ -1086,7 +1088,7 @@ nixidy-full:
 
   echo ""
   echo "Applying app-of-apps bootstrap Application..."
-  nix run .#nixidy -- bootstrap .#local-k3d | kubectl apply -f -
+  {{nix_cmd}} run .#nixidy -- bootstrap .#local-k3d | kubectl apply -f -
 
   echo ""
   echo "=== GitOps transition complete ==="
@@ -1464,7 +1466,7 @@ check-rosetta-cache:
     # Check if the image is in cache
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
 
-    if nix path-info --store "https://$CACHE_NAME.cachix.org" "$IMAGE_PATH" &>/dev/null; then
+    if {{nix_cmd}} path-info --store "https://$CACHE_NAME.cachix.org" "$IMAGE_PATH" &>/dev/null; then
         echo "● Image is cached"
         echo "   Cache: https://$CACHE_NAME.cachix.org"
         echo "   Path: $IMAGE_PATH"
@@ -1488,7 +1490,7 @@ test-cachix:
     echo "Testing cachix push/pull..."
 
     # Build a simple derivation
-    STORE_PATH=$(nix build nixpkgs#hello --no-link --print-out-paths)
+    STORE_PATH=$({{nix_cmd}} build nixpkgs#hello --no-link --print-out-paths)
     echo "Built: $STORE_PATH"
 
     # Push to cachix
@@ -1520,8 +1522,8 @@ cache-darwin-system:
     # Check if already cached
     FLAKE_OUTPUT=".#darwinConfigurations.$HOSTNAME.system"
     echo "Checking if system is already cached..."
-    if nix path-info --store "https://$CACHE_NAME.cachix.org" "$FLAKE_OUTPUT" &>/dev/null; then
-        CACHED_PATH=$(nix path-info --store "https://$CACHE_NAME.cachix.org" "$FLAKE_OUTPUT")
+    if {{nix_cmd}} path-info --store "https://$CACHE_NAME.cachix.org" "$FLAKE_OUTPUT" &>/dev/null; then
+        CACHED_PATH=$({{nix_cmd}} path-info --store "https://$CACHE_NAME.cachix.org" "$FLAKE_OUTPUT")
         echo "✓ System already cached: $CACHED_PATH"
         echo ""
         read -p "Push again anyway? (y/N) " -n 1 -r
