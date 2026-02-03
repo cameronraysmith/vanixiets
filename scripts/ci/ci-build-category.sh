@@ -64,7 +64,7 @@ build_packages() {
         if [ -n "$pkg" ]; then
             echo ""
             echo "building packages.$system.$pkg"
-            if ! nix build ".#packages.$system.$pkg" -L --no-link; then
+            if ! $NIX_CMD build ".#packages.$system.$pkg" -L --no-link; then
                 echo "failed to build packages.$system.$pkg"
                 failed=$((failed + 1))
             fi
@@ -101,7 +101,7 @@ build_checks_devshells() {
             if [ -n "$check" ]; then
                 echo ""
                 echo "building checks.$system.$check"
-                if ! nix build ".#checks.$system.$check" -L --no-link; then
+                if ! $NIX_CMD build ".#checks.$system.$check" -L --no-link; then
                     echo "failed to build checks.$system.$check"
                     failed=$((failed + 1))
                 fi
@@ -124,7 +124,7 @@ build_checks_devshells() {
             if [ -n "$shell" ]; then
                 echo ""
                 echo "building devShells.$system.$shell"
-                if ! nix build ".#devShells.$system.$shell" -L --no-link; then
+                if ! $NIX_CMD build ".#devShells.$system.$shell" -L --no-link; then
                     echo "failed to build devShells.$system.$shell"
                     failed=$((failed + 1))
                 fi
@@ -168,7 +168,7 @@ build_home() {
         if [ -n "$home" ]; then
             echo ""
             echo "building legacyPackages.$system.homeConfigurations.$home"
-            if ! nix build ".#legacyPackages.$system.homeConfigurations.\"$home\".activationPackage" -L --no-link; then
+            if ! $NIX_CMD build ".#legacyPackages.$system.homeConfigurations.\"$home\".activationPackage" -L --no-link; then
                 echo "failed to build home configuration: $home"
                 failed=$((failed + 1))
             fi
@@ -191,19 +191,19 @@ build_nixos() {
     print_header "building nixos configuration: $config"
 
     print_step "validating configuration exists"
-    if ! nix eval ".#nixosConfigurations.$config" --apply 'x: true' 2>/dev/null; then
+    if ! $NIX_CMD eval ".#nixosConfigurations.$config" --apply 'x: true' 2>/dev/null; then
         echo "error: nixosConfigurations.$config does not exist"
         return 1
     fi
 
     local config_system
-    config_system=$(nix eval ".#nixosConfigurations.$config.config.nixpkgs.system" --raw 2>/dev/null || echo "unknown")
+    config_system=$($NIX_CMD eval ".#nixosConfigurations.$config.config.nixpkgs.system" --raw 2>/dev/null || echo "unknown")
     echo "configuration system: $config_system"
 
     print_step "building system"
     echo ""
     echo "building nixosConfigurations.$config.config.system.build.toplevel"
-    if ! nix build ".#nixosConfigurations.$config.config.system.build.toplevel" -L --no-link; then
+    if ! $NIX_CMD build ".#nixosConfigurations.$config.config.system.build.toplevel" -L --no-link; then
         echo "failed to build nixos configuration: $config"
         return 1
     fi
@@ -218,19 +218,19 @@ build_darwin() {
     print_header "building darwin configuration: $config"
 
     print_step "validating configuration exists"
-    if ! nix eval ".#darwinConfigurations.$config" --apply 'x: true' 2>/dev/null; then
+    if ! $NIX_CMD eval ".#darwinConfigurations.$config" --apply 'x: true' 2>/dev/null; then
         echo "error: darwinConfigurations.$config does not exist"
         return 1
     fi
 
     local config_system
-    config_system=$(nix eval ".#darwinConfigurations.$config.pkgs.stdenv.hostPlatform.system" --raw 2>/dev/null || echo "unknown")
+    config_system=$($NIX_CMD eval ".#darwinConfigurations.$config.pkgs.stdenv.hostPlatform.system" --raw 2>/dev/null || echo "unknown")
     echo "configuration system: $config_system"
 
     print_step "building system"
     echo ""
     echo "building darwinConfigurations.$config.system"
-    if ! nix build ".#darwinConfigurations.$config.system" -L --no-link; then
+    if ! $NIX_CMD build ".#darwinConfigurations.$config.system" -L --no-link; then
         echo "failed to build darwin configuration: $config"
         return 1
     fi
