@@ -27,6 +27,8 @@ set -euo pipefail
 # Working directory normalization
 cd "$(git rev-parse --show-toplevel)"
 
+NIX_CMD="nix --accept-flake-config"
+
 # Help flag
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat <<EOF
@@ -64,7 +66,7 @@ fi
 
 # Determine target system (default to current system if not specified)
 if [ -z "${1:-}" ]; then
-    TARGET_SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+    TARGET_SYSTEM=$($NIX_CMD eval --impure --raw --expr 'builtins.currentSystem')
 else
     TARGET_SYSTEM="$1"
 fi
@@ -134,35 +136,35 @@ else
     STORE_PATHS=""
 
     # Packages
-    for pkg in $(nix eval ".#packages.$TARGET_SYSTEM" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
-        path=$(nix build ".#packages.$TARGET_SYSTEM.$pkg" --no-link --print-out-paths 2>/dev/null || true)
+    for pkg in $($NIX_CMD eval ".#packages.$TARGET_SYSTEM" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+        path=$($NIX_CMD build ".#packages.$TARGET_SYSTEM.$pkg" --no-link --print-out-paths 2>/dev/null || true)
         [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
     done
 
     # DevShells
-    for shell in $(nix eval ".#devShells.$TARGET_SYSTEM" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
-        path=$(nix build ".#devShells.$TARGET_SYSTEM.$shell" --no-link --print-out-paths 2>/dev/null || true)
+    for shell in $($NIX_CMD eval ".#devShells.$TARGET_SYSTEM" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+        path=$($NIX_CMD build ".#devShells.$TARGET_SYSTEM.$shell" --no-link --print-out-paths 2>/dev/null || true)
         [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
     done
 
     # Checks
-    for check in $(nix eval ".#checks.$TARGET_SYSTEM" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
-        path=$(nix build ".#checks.$TARGET_SYSTEM.$check" --no-link --print-out-paths 2>/dev/null || true)
+    for check in $($NIX_CMD eval ".#checks.$TARGET_SYSTEM" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+        path=$($NIX_CMD build ".#checks.$TARGET_SYSTEM.$check" --no-link --print-out-paths 2>/dev/null || true)
         [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
     done
 
     # Darwin configurations (only on darwin)
     if [[ "$TARGET_SYSTEM" == *-darwin ]]; then
-        for cfg in $(nix eval ".#darwinConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
-            path=$(nix build ".#darwinConfigurations.$cfg.system" --no-link --print-out-paths 2>/dev/null || true)
+        for cfg in $($NIX_CMD eval ".#darwinConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+            path=$($NIX_CMD build ".#darwinConfigurations.$cfg.system" --no-link --print-out-paths 2>/dev/null || true)
             [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
         done
     fi
 
     # NixOS configurations (only on linux)
     if [[ "$TARGET_SYSTEM" == *-linux ]]; then
-        for cfg in $(nix eval ".#nixosConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
-            path=$(nix build ".#nixosConfigurations.$cfg.config.system.build.toplevel" --no-link --print-out-paths 2>/dev/null || true)
+        for cfg in $($NIX_CMD eval ".#nixosConfigurations" --apply 'x: builtins.attrNames x' --json 2>/dev/null | jq -r '.[]'); do
+            path=$($NIX_CMD build ".#nixosConfigurations.$cfg.config.system.build.toplevel" --no-link --print-out-paths 2>/dev/null || true)
             [ -n "$path" ] && STORE_PATHS="$STORE_PATHS $path"
         done
     fi
