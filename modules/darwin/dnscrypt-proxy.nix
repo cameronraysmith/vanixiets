@@ -158,6 +158,19 @@
             Use `networksetup -listallnetworkservices` to list available services.
           '';
         };
+
+        userHome = lib.mkOption {
+          type = lib.types.path;
+          default = "/var/lib/dnscrypt-proxy";
+          example = "/private/var/lib/dnscrypt-proxy";
+          description = ''
+            Home directory for the _dnscrypt-proxy system user.
+            Must match the existing user's NFSHomeDirectory on this machine.
+            Check with: dscl . -read /Users/_dnscrypt-proxy NFSHomeDirectory
+            macOS symlinks /var to /private/var, but nix-darwin does string
+            comparison, so the path must match exactly.
+          '';
+        };
       };
 
       config = lib.mkIf cfg.enable {
@@ -233,7 +246,7 @@
 
         # Declare existing system user's home directory to satisfy nix-darwin
         # activation check (nix-darwin refuses to change existing users' homes)
-        users.users._dnscrypt-proxy.home = lib.mkForce "/var/lib/dnscrypt-proxy";
+        users.users._dnscrypt-proxy.home = lib.mkForce cfg.userHome;
 
         # Override launchd config to run as root (required for port 53 binding)
         # The default _dnscrypt-proxy user cannot bind to privileged ports
