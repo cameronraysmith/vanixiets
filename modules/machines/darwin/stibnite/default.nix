@@ -198,6 +198,7 @@ in
           "quad9"
           # "cloudflare"
         ];
+        userHome = "/private/var/lib/dnscrypt-proxy";
       };
 
       # Trust local k8s development CA for curl/git/OpenSSL tools
