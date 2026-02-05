@@ -52,6 +52,8 @@ in
 
       # Hostname configuration
       networking.hostName = "cinnabar";
+      networking.domain = null;
+      networking.search = [ ];
 
       # Override state version for new deployment
       system.stateVersion = "25.05";
