@@ -106,8 +106,9 @@ Pin the version explicitly to avoid build failures from the system Python.
 uv init --name doc-convert --python 3.12
 uv python pin 3.12
 uv add "marker-pdf>=1.7.4,<1.11" tiktoken
-source .venv/bin/activate
 ```
+
+Use `uv run` to invoke marker rather than activating the venv, since shell state does not persist between tool calls.
 
 Add a `.gitignore`:
 
@@ -123,14 +124,14 @@ git add .gitignore pyproject.toml uv.lock && git commit -m "chore: add uv projec
 ### Convert PDFs
 
 ```bash
-marker_single pdfs/<main>.pdf --output_dir ./ --output_format markdown
+uv run marker_single pdfs/<main>.pdf --output_dir ./ --output_format markdown
 git add <output-dir>/ && git commit -m "feat: convert main PDF via marker"
 ```
 
 If a supplement PDF exists:
 
 ```bash
-marker_single pdfs/<supplement>.pdf --output_dir ./ --output_format markdown
+uv run marker_single pdfs/<supplement>.pdf --output_dir ./ --output_format markdown
 git add <output-dir>/ && git commit -m "feat: convert supplement PDF via marker"
 ```
 
@@ -144,13 +145,13 @@ If `marker_single` crashes, apply these fallbacks in order, stopping at the firs
 **Fallback 1** — force CPU backend (slower but avoids MPS bugs):
 
 ```bash
-PYTORCH_MPS_DISABLE=1 marker_single pdfs/<file>.pdf --output_dir ./ --output_format markdown
+PYTORCH_MPS_DISABLE=1 uv run marker_single pdfs/<file>.pdf --output_dir ./ --output_format markdown
 ```
 
 **Fallback 2** — CPU with reduced batch sizes and no multiprocessing:
 
 ```bash
-PYTORCH_MPS_DISABLE=1 marker_single pdfs/<file>.pdf \
+PYTORCH_MPS_DISABLE=1 uv run marker_single pdfs/<file>.pdf \
   --output_dir ./ --output_format markdown \
   --disable_multiprocessing \
   --layout_batch_size 1 \
@@ -161,12 +162,17 @@ PYTORCH_MPS_DISABLE=1 marker_single pdfs/<file>.pdf \
 **Fallback 3** — skip the layout model entirely by forcing all pages to be treated as text blocks (fastest, loses layout fidelity for tables and figures):
 
 ```bash
-PYTORCH_MPS_DISABLE=1 marker_single pdfs/<file>.pdf \
+PYTORCH_MPS_DISABLE=1 uv run marker_single pdfs/<file>.pdf \
   --output_dir ./ --output_format markdown \
   --force_layout_block Text
 ```
 
 Note which fallback was required in the README so the user understands any quality tradeoffs in the conversion.
+
+Do not substitute alternative PDF extraction tools (e.g. pymupdf4llm, pdfplumber, pdfminer) for marker-pdf.
+Marker's Surya OCR pipeline is the only open-source option here that extracts mathematical notation as LaTeX (`$...$` and `$$...$$`).
+Alternatives output Unicode approximations or render equations as images, which destroys math fidelity for scholarly content.
+If all three marker fallbacks fail, stop and report the issue to the user rather than switching tools.
 
 ## Phase 3: structure analysis and splitting
 
