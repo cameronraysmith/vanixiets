@@ -99,8 +99,12 @@ git add pdfs/ && git commit -m "feat: add source PDFs"
 
 ### Set up Python environment
 
+`marker-pdf` requires Python 3.12 or earlier (incompatible with 3.13+).
+Pin the version explicitly to avoid build failures from the system Python.
+
 ```bash
-uv init --name doc-convert
+uv init --name doc-convert --python 3.12
+uv python pin 3.12
 uv add marker-pdf tiktoken
 source .venv/bin/activate
 ```
