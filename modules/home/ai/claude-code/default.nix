@@ -37,6 +37,11 @@
             enableAllProjectMcpServers = false;
             alwaysThinkingEnabled = true;
 
+            env = {
+              CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1";
+            };
+            teammateMode = "tmux";
+
             permissions = {
               defaultMode = "acceptEdits";
               allow = [
