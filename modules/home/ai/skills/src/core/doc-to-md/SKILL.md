@@ -128,16 +128,26 @@ git add .gitignore pyproject.toml uv.lock && git commit -m "chore: add uv projec
 
 ### Convert PDFs
 
+Marker conversion can be slow, especially on CPU fallback (potentially hours for long documents).
+Run marker in the background using the Bash tool's `run_in_background: true` parameter to avoid the 10-minute timeout limit, then poll for completion.
+
 ```bash
-uv run marker_single pdfs/<main>.pdf --output_dir ./ --output_format markdown
+# run in background:
+cd <repo-dir> && uv run marker_single pdfs/<main>.pdf --output_dir ./ --output_format markdown
+```
+
+Check progress by reading the background task output.
+Once complete:
+
+```bash
 git add <output-dir>/ && git commit -m "feat: convert main PDF via marker"
 ```
 
-If a supplement PDF exists:
+If a supplement PDF exists, run it the same way (background, then commit):
 
 ```bash
-uv run marker_single pdfs/<supplement>.pdf --output_dir ./ --output_format markdown
-git add <output-dir>/ && git commit -m "feat: convert supplement PDF via marker"
+# run in background:
+cd <repo-dir> && uv run marker_single pdfs/<supplement>.pdf --output_dir ./ --output_format markdown
 ```
 
 ### Marker troubleshooting on macOS Apple Silicon
@@ -147,17 +157,19 @@ These errors typically manifest as `IndexError` or `RuntimeError` inside `torch/
 
 If `marker_single` crashes, apply these fallbacks in order, stopping at the first one that succeeds.
 Both `PYTORCH_MPS_DISABLE=1` and `TORCH_DEVICE=cpu` are needed — torch 2.10+ may ignore `PYTORCH_MPS_DISABLE` alone.
+CPU fallbacks are significantly slower (potentially hours for long documents).
+Always run these in the background using `run_in_background: true` and poll for completion.
 
 **Fallback 1** — force CPU backend (slower but avoids MPS bugs):
 
 ```bash
-PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf --output_dir ./ --output_format markdown
+cd <repo-dir> && PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf --output_dir ./ --output_format markdown
 ```
 
 **Fallback 2** — CPU with reduced batch sizes and no multiprocessing:
 
 ```bash
-PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf \
+cd <repo-dir> && PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf \
   --output_dir ./ --output_format markdown \
   --disable_multiprocessing \
   --layout_batch_size 1 \
@@ -168,7 +180,7 @@ PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf \
 **Fallback 3** — skip the layout model entirely by forcing all pages to be treated as text blocks (fastest, loses layout fidelity for tables and figures):
 
 ```bash
-PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf \
+cd <repo-dir> && PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf \
   --output_dir ./ --output_format markdown \
   --force_layout_block Text
 ```
