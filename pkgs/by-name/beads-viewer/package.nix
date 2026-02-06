@@ -27,6 +27,14 @@ buildGoModule rec {
 
   subPackages = [ "cmd/bv" ];
 
+  # Inject version via ldflags, matching upstream goreleaser config.
+  # Upstream often tags releases without bumping pkg/version/version.go.
+  ldflags = [
+    "-s"
+    "-w"
+    "-X github.com/Dicklesworthstone/beads_viewer/pkg/version.Version=v${version}"
+  ];
+
   # Tests require fixtures and git history
   doCheck = false;
 
