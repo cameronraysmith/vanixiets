@@ -145,18 +145,19 @@ git add <output-dir>/ && git commit -m "feat: convert supplement PDF via marker"
 The `surya-ocr` layout model used by marker can fail with torch tensor index errors on the MPS (Metal Performance Shaders) backend.
 These errors typically manifest as `IndexError` or `RuntimeError` inside `torch/nn/modules/module.py` during the layout recognition step.
 
-If `marker_single` crashes, apply these fallbacks in order, stopping at the first one that succeeds:
+If `marker_single` crashes, apply these fallbacks in order, stopping at the first one that succeeds.
+Both `PYTORCH_MPS_DISABLE=1` and `TORCH_DEVICE=cpu` are needed — torch 2.10+ may ignore `PYTORCH_MPS_DISABLE` alone.
 
 **Fallback 1** — force CPU backend (slower but avoids MPS bugs):
 
 ```bash
-PYTORCH_MPS_DISABLE=1 uv run marker_single pdfs/<file>.pdf --output_dir ./ --output_format markdown
+PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf --output_dir ./ --output_format markdown
 ```
 
 **Fallback 2** — CPU with reduced batch sizes and no multiprocessing:
 
 ```bash
-PYTORCH_MPS_DISABLE=1 uv run marker_single pdfs/<file>.pdf \
+PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf \
   --output_dir ./ --output_format markdown \
   --disable_multiprocessing \
   --layout_batch_size 1 \
@@ -167,7 +168,7 @@ PYTORCH_MPS_DISABLE=1 uv run marker_single pdfs/<file>.pdf \
 **Fallback 3** — skip the layout model entirely by forcing all pages to be treated as text blocks (fastest, loses layout fidelity for tables and figures):
 
 ```bash
-PYTORCH_MPS_DISABLE=1 uv run marker_single pdfs/<file>.pdf \
+PYTORCH_MPS_DISABLE=1 TORCH_DEVICE=cpu uv run marker_single pdfs/<file>.pdf \
   --output_dir ./ --output_format markdown \
   --force_layout_block Text
 ```
