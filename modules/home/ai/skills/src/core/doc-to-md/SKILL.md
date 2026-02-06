@@ -72,10 +72,10 @@ Note the fallback in the README if this occurs.
 
 ### Copy local PDF
 
-If a local PDF was also provided:
+If a local PDF was also provided, rename to lowercase kebab-case on copy (see Path B for naming convention):
 
 ```bash
-mkdir -p pdfs && cp <pdf-path> pdfs/
+mkdir -p pdfs && cp "<pdf-path>" "pdfs/<first-author>-<year>-<title-fragment>.pdf"
 git add pdfs/ && git commit -m "feat: add source PDF"
 ```
 
@@ -90,10 +90,15 @@ mkdir -p ~/projects/<workspace>/<repo-name> && cd "$_"
 git init && git commit --allow-empty -m "initial commit (empty)"
 ```
 
-### Copy source PDFs
+### Copy and rename source PDFs
+
+Rename PDFs to lowercase kebab-case on copy: `<first-author>-<year>-<title-fragment>.pdf`.
+For multiple PDFs from the same reference, append a disambiguating suffix like `-supplement`.
+Example: `gorin-2022-rna-velocity-unraveled.pdf` and `gorin-2022-rna-velocity-unraveled-supplement.pdf`.
 
 ```bash
-mkdir -p pdfs && cp <pdf-path(s)> pdfs/
+mkdir -p pdfs
+cp "<original-path>" "pdfs/<first-author>-<year>-<title-fragment>.pdf"
 git add pdfs/ && git commit -m "feat: add source PDFs"
 ```
 
