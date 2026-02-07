@@ -48,7 +48,7 @@
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
-    srvos.url = "github:nix-community/srvos";
+    srvos.url = "github:cameronraysmith/srvos/fix-userborn-nix-required-mounts-recursion";
     srvos.inputs.nixpkgs.follows = "nixpkgs";
 
     nixos-generators.url = "github:nix-community/nixos-generators";
