@@ -10,7 +10,12 @@
 # Reference: docs/notes/development/nvidia-module-analysis.md
 {
   flake.modules.nixos.nvidia =
-    { config, pkgs, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     {
       # Allow unfree packages (required for NVIDIA proprietary drivers)
       nixpkgs.config.allowUnfree = true;
@@ -96,6 +101,12 @@
         enable = true;
         presets.nvidia-gpu.enable = true;
       };
+
+      # Disable userborn to prevent infinite recursion with nix-required-mounts.
+      # The nvidia-gpu preset reads systemd.tmpfiles.settings which, when
+      # userborn is enabled, reads config.users.users, cycling back through
+      # nix.settings -> nix-required-mounts -> systemd.tmpfiles.settings.
+      services.userborn.enable = lib.mkForce false;
 
       # GPU monitoring and debugging tools
       environment.systemPackages = with pkgs; [
