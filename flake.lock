@@ -1391,15 +1391,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1770257911,
-        "narHash": "sha256-yCsQ6UJNWyrLc6OI41uA8R3u2z60aNYCzcVzM1AG3qY=",
-        "owner": "nix-community",
+        "lastModified": 1770499977,
+        "narHash": "sha256-HSpiTSu0HD8pAUTzv7f4IRNOKcNxGZUn8eEXWGURQLY=",
+        "owner": "cameronraysmith",
         "repo": "srvos",
-        "rev": "5086dcb3f4212c90ab0e5c30391c92116db7e035",
+        "rev": "75c13dfe4113ecb36735b87ae09d258324d88688",
         "type": "github"
       },
       "original": {
-        "owner": "nix-community",
+        "owner": "cameronraysmith",
+        "ref": "fix-userborn-nix-required-mounts-recursion",
         "repo": "srvos",
         "type": "github"
       }
