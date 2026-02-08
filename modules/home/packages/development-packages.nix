@@ -82,6 +82,7 @@
           # from pkgs/by-name
           beads-viewer
           gastown
+          gitbutler-cli
           golem-cli
           #------
           plantuml-c4
