@@ -1040,11 +1040,11 @@
     },
     "nixpkgs_7": {
       "locked": {
-        "lastModified": 1770579290,
-        "narHash": "sha256-7HvYdpaLFhYT9xqwiSt/ONIewjCgFmheRg8uu51zIKs=",
+        "lastModified": 1770582032,
+        "narHash": "sha256-GplHI7TtxCEtxt72AzSURs9EULR1uYO3niS3HSYz17A=",
         "owner": "cameronraysmith",
         "repo": "nixpkgs",
-        "rev": "a5c7c5ddcd4230c0fe205efbc1f7ef5199e22a71",
+        "rev": "c54208c2dca219e10090b08b6880cf5fca7a55ff",
         "type": "github"
       },
       "original": {
