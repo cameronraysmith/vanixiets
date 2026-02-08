@@ -82,6 +82,7 @@ in
           "codelayer-nightly"
           "dbeaver-community"
           # "docker-desktop" # defer to orbstack and colima/incus
+          "gitbutler"
           "gpg-suite"
           "inkscape"
           "keycastr"
