@@ -80,6 +80,7 @@ in
           "codelayer-nightly"
           "dbeaver-community"
           "docker-desktop"
+          "gitbutler"
           "gpg-suite"
           "inkscape"
           "keycastr"
