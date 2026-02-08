@@ -70,7 +70,7 @@ jobs:
           system: x86_64-linux
 
       - name: Update flake inputs
-        uses: mic92/update-flake-inputs@73cb58f118541b956f5a061d12838ef1dd997867 # v1
+        uses: mic92/update-flake-inputs@1e056167bd2101e587bd39deb2f64909b4759652 # v1
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           exclude-patterns: ${{ inputs.exclude_patterns }}
