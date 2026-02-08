@@ -1092,15 +1092,18 @@
     },
     "nixpkgs_8": {
       "locked": {
-        "lastModified": 1770169770,
-        "narHash": "sha256-geJaJAEKCx1J2RH2Jt8fGxuPys6TCMRQPwtOwiVrE/A=",
-        "rev": "aa290c9891fa4ebe88f8889e59633d20cc06a5f2",
-        "type": "tarball",
-        "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.05pre940087.aa290c9891fa/nixexprs.tar.xz"
+        "lastModified": 1770521928,
+        "narHash": "sha256-ETQEZlCIOiQrK41o4O/8dsJ4KdYM6MBv+3SnGBmflpA=",
+        "owner": "cameronraysmith",
+        "repo": "nixpkgs",
+        "rev": "7e20b45938f40f3dd60bea26a23bcaa82d63cf1b",
+        "type": "github"
       },
       "original": {
-        "type": "tarball",
-        "url": "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
+        "owner": "cameronraysmith",
+        "ref": "fix-userborn-nrm-recursion",
+        "repo": "nixpkgs",
+        "type": "github"
       }
     },
     "nixpkgs_9": {
