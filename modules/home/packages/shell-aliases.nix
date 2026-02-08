@@ -5,7 +5,7 @@
     {
       home.shellAliases = {
         agc = "bunx -p @augmentcode/auggie auggie";
-        b = "bat";
+        b = "but";
         bt = "btop";
         bm = "btm";
         bazel = "bazelisk";
