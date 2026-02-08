@@ -15,6 +15,7 @@
     text = ''
       DO_GC=false
       NO_VERIFY=false
+      DO_STATUS=false
       DO_STOP=false
       DO_START=false
 
@@ -24,9 +25,10 @@
             cat <<'HELP'
       Manage nix-rosetta-builder VM service
 
-      Usage: rosetta-manage [--gc] [--idle] [--stop] [--start]
+      Usage: rosetta-manage [--status] [--gc] [--idle] [--stop] [--start]
 
       Options:
+        --status Show VM status and diagnostic commands
         --gc     Run garbage collection on rosetta-builder before restart
         --idle   Don't verify connection (leaves VM in idle/stopped state)
         --stop   Disable the rosetta-builder service entirely (for remote builds)
@@ -54,6 +56,7 @@
       (does not share with host). Use --gc to free disk space on the VM.
 
       Examples:
+        rosetta-manage --status     # Check VM state and get diagnostic commands
         rosetta-manage              # Restart and verify (fresh VM ready)
         rosetta-manage --idle       # Restart only (VM stays stopped)
         rosetta-manage --gc         # GC on VM, then restart and verify
@@ -61,6 +64,9 @@
         rosetta-manage --start      # Re-enable after remote builds
       HELP
             exit 0
+            ;;
+          --status)
+            DO_STATUS=true
             ;;
           --gc)
             DO_GC=true
@@ -79,6 +85,51 @@
 
       # Find the launchd plist path
       PLIST_PATH="/Library/LaunchDaemons/org.nixos.rosetta-builderd.plist"
+
+      # Handle --status: quick status overview without SSH
+      if $DO_STATUS; then
+        echo "rosetta-builder status"
+
+        # Launchd service state
+        SERVICE_LINE=$(sudo launchctl list 2>/dev/null | grep rosetta || true)
+        if [ -n "$SERVICE_LINE" ]; then
+          SERVICE_LABEL=$(echo "$SERVICE_LINE" | awk '{print $3}')
+          echo "  Service:     loaded ($SERVICE_LABEL)"
+        else
+          echo "  Service:     not loaded"
+        fi
+
+        # VM process
+        VM_PID=$(pgrep -f "com.apple.Virtualization.VirtualMachine" 2>/dev/null || true)
+        if [ -n "$VM_PID" ]; then
+          echo "  VM process:  running (PID $VM_PID)"
+
+          # Host-side resident memory
+          RSS_KB=$(/bin/ps -p "$VM_PID" -o rss 2>/dev/null | tail -1 | tr -d ' ' || true)
+          if [ -n "$RSS_KB" ]; then
+            RSS_GB=$(awk "BEGIN {printf \"%.1f\", $RSS_KB / 1048576}")
+            echo "  Host memory: $RSS_GB GB resident (48 GiB allocated)"
+          fi
+
+          echo "  Resources:   12 CPUs, 500 GiB disk"
+        else
+          echo "  VM process:  not running"
+        fi
+
+        echo ""
+
+        # Follow-up commands or start hint
+        if [ -n "$VM_PID" ]; then
+          echo "Diagnostic commands:"
+          echo "  nix store info --store ssh-ng://rosetta-builder   # Nix daemon version"
+          echo "  ssh rosetta-builder \"free -h\"                     # VM memory breakdown"
+          echo "  ssh rosetta-builder \"df -h /\"                     # VM disk usage"
+          echo "  sudo launchctl list org.nixos.rosetta-builderd     # Launchd service details"
+        else
+          echo "To start: rosetta-manage --start"
+        fi
+        exit 0
+      fi
 
       # Handle --stop: disable the service entirely
       if $DO_STOP; then
