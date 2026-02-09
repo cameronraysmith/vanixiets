@@ -204,7 +204,18 @@
       fi
 
       echo "Restarting rosetta-builderd..."
-      sudo launchctl kickstart -k system/org.nixos.rosetta-builderd
+      if sudo launchctl list org.nixos.rosetta-builderd &>/dev/null; then
+        sudo launchctl kickstart -k system/org.nixos.rosetta-builderd
+      else
+        # Service not loaded -- bootstrap it first
+        if [ ! -f "$PLIST_PATH" ]; then
+          echo "Error: Plist not found at $PLIST_PATH"
+          echo "The rosetta-builder may not be installed in this system."
+          exit 1
+        fi
+        echo "Service not loaded, bootstrapping..."
+        sudo launchctl bootstrap system "$PLIST_PATH"
+      fi
 
       sleep 2
       NEW_PID=$(pgrep -f "com.apple.Virtualization.VirtualMachine" 2>/dev/null || echo "none")
