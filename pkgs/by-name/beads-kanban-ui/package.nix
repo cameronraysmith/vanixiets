@@ -21,7 +21,7 @@ let
     owner = "AvivK5498";
     repo = "Beads-Kanban-UI";
     tag = "v${version}";
-    hash = lib.fakeHash;
+    hash = "sha256-VBvicJQ/cpbdppwLYsB/i1UX06O/Spg7XavqcuWcHwA=";
   };
 
   frontend = buildNpmPackage {
