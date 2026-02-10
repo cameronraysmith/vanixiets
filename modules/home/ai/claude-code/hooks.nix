@@ -17,6 +17,24 @@
                 }
               ];
             }
+            {
+              matcher = "Edit|Write|MultiEdit";
+              hooks = [
+                {
+                  type = "command";
+                  command = "enforce-branch-before-edit";
+                }
+              ];
+            }
+            {
+              matcher = "Task";
+              hooks = [
+                {
+                  type = "command";
+                  command = "enforce-sequential-dispatch";
+                }
+              ];
+            }
           ];
 
           PostToolUse = [
@@ -48,6 +66,50 @@
                 {
                   type = "command";
                   command = "nudge-claude-md-update";
+                }
+              ];
+            }
+          ];
+
+          SessionStart = [
+            {
+              hooks = [
+                {
+                  type = "command";
+                  command = "session-start";
+                }
+              ];
+            }
+          ];
+
+          UserPromptSubmit = [
+            {
+              hooks = [
+                {
+                  type = "command";
+                  command = "clarify-vague-request";
+                }
+              ];
+            }
+          ];
+
+          SubagentStop = [
+            {
+              hooks = [
+                {
+                  type = "command";
+                  command = "validate-completion";
+                }
+              ];
+            }
+          ];
+
+          TaskCompleted = [
+            {
+              hooks = [
+                {
+                  type = "command";
+                  command = "validate-completion";
                 }
               ];
             }
