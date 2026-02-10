@@ -90,25 +90,6 @@
               ];
               ask = [ ];
             };
-
-            # hooks = {
-            #   PostToolUse = [
-            #     {
-            #       matcher = "Edit|MultiEdit|Write";
-            #       hooks = [
-            #         {
-            #           type = "command";
-            #           command = ''
-            #             file_path=$(echo "$CLAUDE_TOOL_INPUT" | jq -r '.file_path // .files[0].file_path // empty')
-            #             if [ -n "$file_path" ] && [[ "$file_path" == *.nix ]]; then
-            #               nix fmt "$file_path" 2>/dev/null || true
-            #             fi
-            #           '';
-            #         }
-            #       ];
-            #     }
-            #   ];
-            # };
           };
         };
 
