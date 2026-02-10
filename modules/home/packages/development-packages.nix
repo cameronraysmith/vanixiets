@@ -80,6 +80,7 @@
           # gemini-cli # disabled: requires nodejs_22 pin
           # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
+          beads-kanban-ui
           beads-viewer
           gastown
           gitbutler-cli
