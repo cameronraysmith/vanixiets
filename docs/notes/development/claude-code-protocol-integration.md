@@ -29,7 +29,15 @@ The-Claude-Protocol source is at `~/projects/planning-workspace/The-Claude-Proto
 
 ## Hook system design
 
-Hooks use a two-tier architecture: hook configuration in `settings.json` (matchers, events, handler metadata) pointing to hook scripts in `~/.claude/hooks/` (executable shell scripts).
+Hooks use a three-layer architecture reflecting the dendritic flake-parts separation of concerns.
+The first layer is hook configuration in `settings.json` (matchers, events, handler metadata), managed by `modules/home/ai/claude-code/hooks.nix` which contributes to `programs.claude-code.settings.hooks` and references hook commands by bare name.
+The second layer is hook script packaging in `modules/home/tools/hooks/default.nix`, which defines `writeShellApplication` packages for each hook script with explicit `runtimeInputs` for dependencies, adds them to `home.packages` so they are on the global PATH, and resolves beads via `flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.beads`.
+The third layer is hook source scripts as `.sh` files in `modules/home/tools/hooks/`, living alongside the nix module that packages them.
+
+This separation places script packaging (what a hook does and its dependencies) in the tools layer and hook configuration (when a hook fires and what it matches) in the AI layer.
+Scripts on PATH enables manual debugging (e.g. `echo '{}' | validate-epic-close`) and `writeShellApplication` provides shellcheck validation at build time.
+Bare command names in settings.json trade nix-level build-time path linkage for home-manager activation-time PATH guarantee, which is negligible practical risk since both happen before any hook runs.
+
 All hooks are placed at user level so they apply globally but include runtime guards (checking for `.beads/` existence, git state, etc.) to degrade gracefully in projects without beads.
 
 ### Hooks to adopt directly
@@ -172,15 +180,12 @@ For agent team teammates, the spawn prompt should include equivalent identity co
 
 ### New files
 
-`modules/home/ai/claude-code/hooks.nix` — Hook configuration contributing to `programs.claude-code.settings.hooks`.
-Defines all 9 hooks with their event types, matchers, and references to script paths at `~/.claude/hooks/`.
+`modules/home/tools/hooks/default.nix` — Hook script packaging module contributing to `homeManager.tools`.
+Defines `writeShellApplication` packages for all 9 hook scripts with explicit `runtimeInputs` for each script's dependencies (jq, bd, gh, git, etc.).
+Adds all hook packages to `home.packages` so they are available on the global PATH.
+Resolves beads via `flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.beads` following the established pattern from the commands module.
 
-`modules/home/ai/claude-code/hooks/` — Directory containing 9 adapted hook shell scripts.
-Each script should have its tool dependencies (jq, bd, gh, git, etc.) available via PATH.
-The nix module should ensure these are wrapped or that the PATH is set correctly in the hook execution environment.
-Scripts are symlinked to `~/.claude/hooks/` via `home.file`.
-
-Hook scripts (9 files):
+`modules/home/tools/hooks/*.sh` — Hook shell script source files (9 total across all phases), living alongside the nix module:
 
 - `validate-epic-close.sh`
 - `log-dispatch-prompt.sh`
@@ -191,6 +196,9 @@ Hook scripts (9 files):
 - `session-start.sh`
 - `clarify-vague-request.sh`
 - `validate-completion.sh`
+
+`modules/home/ai/claude-code/hooks.nix` — Hook configuration contributing to `programs.claude-code.settings.hooks`.
+Defines all 9 hooks with their event types, matchers, and bare command name references (PATH-resolved at runtime since scripts are on PATH via the tools/hooks module).
 
 `modules/home/ai/claude-code/agents/code-reviewer.md` — Code review agent definition.
 
@@ -210,8 +218,9 @@ Adjust the agents directory to remove git-committer and include new agents.
 
 ## Implementation phasing
 
-Phase 1 covers hooks infrastructure.
-Create `hooks.nix` and the `hooks/` directory with all 9 scripts.
+Phase 1 covers hooks infrastructure using the two-layer architecture.
+Create `modules/home/tools/hooks/default.nix` and the hook shell scripts in `modules/home/tools/hooks/` first, packaging each script as a `writeShellApplication` with its dependencies on the global PATH.
+Then create `modules/home/ai/claude-code/hooks.nix` with settings-only configuration referencing hooks by bare command name.
 Start with the 4 "adopt directly" hooks, then the 5 adapted hooks.
 Test each hook individually by triggering its event.
 
