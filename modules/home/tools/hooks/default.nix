@@ -59,6 +59,59 @@
         ];
         text = builtins.readFile ./nudge-claude-md-update.sh;
       };
+
+      enforce-branch-before-edit = pkgs.writeShellApplication {
+        name = "enforce-branch-before-edit";
+        runtimeInputs = with pkgs; [
+          git
+          jq
+        ];
+        text = builtins.readFile ./enforce-branch-before-edit.sh;
+      };
+
+      enforce-sequential-dispatch = pkgs.writeShellApplication {
+        name = "enforce-sequential-dispatch";
+        runtimeInputs = with pkgs; [
+          beads
+          jq
+          git
+          gnused
+          gnugrep
+        ];
+        text = builtins.readFile ./enforce-sequential-dispatch.sh;
+      };
+
+      session-start = pkgs.writeShellApplication {
+        name = "session-start";
+        runtimeInputs = with pkgs; [
+          git
+          gh
+          jq
+          beads
+          coreutils
+        ];
+        text = builtins.readFile ./session-start.sh;
+      };
+
+      clarify-vague-request = pkgs.writeShellApplication {
+        name = "clarify-vague-request";
+        runtimeInputs = with pkgs; [
+          jq
+        ];
+        text = builtins.readFile ./clarify-vague-request.sh;
+      };
+
+      validate-completion = pkgs.writeShellApplication {
+        name = "validate-completion";
+        runtimeInputs = with pkgs; [
+          git
+          beads
+          jq
+          coreutils
+          gnugrep
+        ];
+        text = builtins.readFile ./validate-completion.sh;
+      };
     in
     {
       home.packages = [
@@ -66,6 +119,11 @@
         log-dispatch-prompt
         memory-capture
         nudge-claude-md-update
+        enforce-branch-before-edit
+        enforce-sequential-dispatch
+        session-start
+        clarify-vague-request
+        validate-completion
       ];
     };
 }
