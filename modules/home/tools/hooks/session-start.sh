@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Hook: Lightweight session start grounding
 # Surfaces uncommitted changes, open PRs, and recent knowledge entries.
 # SessionStart (sync) -- reads JSON context from stdin, outputs plain text to stdout.

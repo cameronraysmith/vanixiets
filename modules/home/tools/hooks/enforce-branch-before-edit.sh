@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Hook: Enforce feature branch before file edits
 # Prevents editing tracked files on main/master branch.
 # Allows configuration, plan, and issue tracking files unconditionally.

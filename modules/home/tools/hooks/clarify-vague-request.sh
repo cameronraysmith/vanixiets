@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Hook: Nudge clarification on short prompts
 # Injects a system-reminder referencing the Session Protocol assessment.
 # UserPromptSubmit (sync) -- reads JSON context from stdin, outputs plain text to stdout.

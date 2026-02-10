@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Hook: Validate bead close -- PR must be merged, epic children must be complete
 # Prevents closing a bead whose branch has no merged PR.
 # Prevents closing an epic when children are still open.

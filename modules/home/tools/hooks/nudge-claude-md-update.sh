@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Hook: Nudge orchestrator to update CLAUDE.md before context compaction
 # When context is compacted, remind the orchestrator to capture important
 # project state in CLAUDE.md so it survives across sessions.

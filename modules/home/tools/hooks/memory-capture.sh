@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Hook: Capture knowledge from bd comment commands
 # Detects: bd comment {BEAD_ID} "LEARNED: ..."
 # Extracts knowledge entries into .beads/memory/knowledge.jsonl

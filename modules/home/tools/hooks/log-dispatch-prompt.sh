@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Hook: Auto-log dispatch prompts to bead comments
 # When a Task is dispatched whose prompt contains a BEAD_ID: marker,
 # capture the prompt and log it as a DISPATCH comment on the bead.

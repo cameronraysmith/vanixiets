@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Hook: Quality gate for subagent and task completion
 # Validates bead status updates, committed changes, and branch push state.
 # SubagentStop and TaskCompleted (sync) -- reads JSON context from stdin.

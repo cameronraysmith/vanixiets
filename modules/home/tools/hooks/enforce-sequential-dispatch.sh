@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Hook: Enforce sequential dispatch for bead-tagged tasks
 # Prevents dispatching work on closed beads or beads with unresolved blockers.
 # PreToolUse:Task (sync) -- reads JSON context from stdin.
@@ -38,7 +39,7 @@ fi
 # Epic children have dots in their IDs (e.g., nix-d4o.2)
 if echo "$BEAD_ID" | grep -qF '.'; then
   # Extract parent epic ID (everything before the last dot)
-  EPIC_ID=$(echo "$BEAD_ID" | sed 's/\.[^.]*$//')
+  EPIC_ID="${BEAD_ID%.*}"
 
   # Get blockers for this bead
   BLOCKERS=$(bd dep list "$BEAD_ID" --json 2>/dev/null || echo "[]")
@@ -64,7 +65,7 @@ fi
 # === CHECK 3: Design doc ===
 # If the parent epic has a design field, check the file exists
 if echo "$BEAD_ID" | grep -qF '.'; then
-  EPIC_ID=$(echo "$BEAD_ID" | sed 's/\.[^.]*$//')
+  EPIC_ID="${BEAD_ID%.*}"
   DESIGN_DOC=$(bd show "$EPIC_ID" --json 2>/dev/null | jq -r '.[0].design // ""' 2>/dev/null || echo "")
 
   if [ -n "$DESIGN_DOC" ] && [ ! -f "$REPO_ROOT/$DESIGN_DOC" ]; then
