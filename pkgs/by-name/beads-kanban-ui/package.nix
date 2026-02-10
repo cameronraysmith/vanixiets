@@ -34,7 +34,7 @@ let
         '"prepare": "true"'
     '';
 
-    npmDepsHash = lib.fakeHash;
+    npmDepsHash = "sha256-+eHchwoDfQ8Dt1e4DSJfVCFImT0cbf7bCddYhn4SBkA=";
 
     # next build produces static export in out/ via output: 'export' in next.config.js
     buildPhase = ''
