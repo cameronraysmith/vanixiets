@@ -56,7 +56,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
   cargoRoot = "server";
   buildAndTestSubdir = "server";
 
-  cargoHash = lib.fakeHash;
+  cargoHash = "sha256-vE61rnUiQjA4VPxU5G/QDc3XFg+5+Nsx8RR7RE8wJwM=";
 
   preBuild = ''
     cp -r ${frontend} out
