@@ -14,7 +14,7 @@ if [ -z "$PROMPT" ]; then
 fi
 
 # Look for BEAD_ID marker in prompt
-BEAD_ID=$(echo "$PROMPT" | grep -oE 'BEAD_ID: [A-Za-z0-9._-]+' | head -1 | sed 's/BEAD_ID: //')
+BEAD_ID=$(echo "$PROMPT" | grep -oE 'BEAD_ID: [A-Za-z0-9._-]+' | head -1 | sed 's/BEAD_ID: //' || true)
 if [ -z "$BEAD_ID" ]; then
   # No BEAD_ID marker; allow dispatch
   exit 0
