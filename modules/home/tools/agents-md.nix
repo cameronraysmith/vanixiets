@@ -114,6 +114,48 @@
           To the extent that you make reasonable inferences during updates or implementations,
           explain why your proposal is optimal and determine appropriate verification. Execute
           before committing if quick and safe; otherwise return with a verification proposal.
+
+          When the work involves parallel independent work streams, adversarial review,
+          multi-perspective analysis, or long-running collaborative phases, consider using
+          agent teams as a second orchestration mode. Agent teams spawn persistent teammates
+          that coordinate via shared task list and messaging rather than returning results.
+
+          Orchestration mode selection criteria:
+          - DAG dispatch (subagent Tasks): sequential dependencies, focused research, tight
+            orchestrator control, one-shot work items that return a result
+          - Agent teams: parallel independent work streams, adversarial review (e.g. dispatching
+            code-reviewer as a teammate), multi-perspective analysis, long-running collaborative phases
+          - Hybrid: DAG dispatch for initial research, then spawn a team for implementation and review
+
+          Agent teams conventions follow from the nature of teammate isolation.
+          Teammates do not inherit the orchestrator's conversation context, so spawn prompts
+          must be self-contained with all necessary context, file paths, and objectives.
+          Teammates coordinate via shared task list (TaskCreate/TaskUpdate/TaskList) and
+          messaging (SendMessage), not by returning results to the orchestrator.
+          The orchestrator remains responsible for teammate lifecycle management.
+
+          Beads-to-task-list mirroring is the convention for aligning ephemeral team coordination
+          with persistent issue tracking. When an agent team works on an epic lineage or
+          cross-cutting collection of beads issues, mirror the relevant issues and their
+          dependencies into the team's shared task list via TaskCreate with appropriate
+          blockedBy/blocks relationships. The team's shared task list is the ephemeral
+          coordination substrate; beads issues remain the persistent source of truth.
+          Keep both in sync: when a team task completes, update the corresponding bead.
+
+          Teammate lifecycle management integrates with the orient/checkpoint pattern.
+          Every new teammate should be instructed to execute `/issues-beads-orient` at session
+          start to establish full context on the issue graph and current state. Teammates
+          should monitor context usage and, when approaching 50% capacity (approximately
+          100k tokens), execute `/issues-beads-checkpoint` to capture learnings, update
+          issue status, and produce a handoff narrative. After checkpoint, the teammate
+          requests shutdown; the orchestrator spawns a replacement oriented with
+          `/issues-beads-orient` to continue the work. This creates a clean lifecycle:
+          orient, work, checkpoint, shutdown, replace.
+
+          The existing "You are a subagent Task" identity marker and return-with-questions
+          pattern remain unchanged for DAG-dispatched tasks. For agent team teammates,
+          spawn prompts should include equivalent identity context plus instructions about
+          the orient/checkpoint lifecycle.
         '';
       };
     };
