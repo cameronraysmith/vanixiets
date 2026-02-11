@@ -276,7 +276,7 @@ bd close <issue-id> --reason "Implemented in..." --suggest-next
 # Option B: Manual review of dependencies
 bd dep tree <completed-id> --direction up
 
-# Check if any epics can close
+# Check if any epics are ready for human review (epic closure is human-only)
 bd epic close-eligible --dry-run
 ```
 
