@@ -37,8 +37,23 @@ if [ "$IN_GIT_REPO" = true ]; then
   if [ -n "$DIRTY" ]; then
     CHANGED_COUNT=$(echo "$DIRTY" | wc -l | tr -d ' ')
     echo "Warning: $CHANGED_COUNT uncommitted change(s) in working tree."
+    echo "  Implementation work should happen in .worktrees/ for isolation."
     HAS_OUTPUT=true
   fi
+fi
+
+# === Worktree cleanup suggestions ===
+if [ "$IN_GIT_REPO" = true ] && [ -d "$REPO_ROOT/.worktrees" ]; then
+  for worktree in $(git worktree list --porcelain 2>/dev/null | grep "^worktree.*\.worktrees/bd-" | sed 's/^worktree //'); do
+    WT_BASENAME=$(basename "$worktree")
+    WT_BEAD_ID="${WT_BASENAME#bd-}"
+    if git branch --merged main 2>/dev/null | grep -q "$WT_BASENAME"; then
+      if [ "$HAS_OUTPUT" = true ]; then echo ""; fi
+      echo "Merged worktree $WT_BASENAME can be cleaned up:"
+      echo "  git worktree remove $worktree && bd close $WT_BEAD_ID"
+      HAS_OUTPUT=true
+    fi
+  done
 fi
 
 # === Open PR reminder ===
