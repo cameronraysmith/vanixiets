@@ -16,11 +16,10 @@
           package = pkgs.gitFull;
           enable = true;
 
-          # SSH signing configuration using sops-nix
-          # sops-nix manages user-level secrets for home-manager
-          # Private key stored in encrypted secrets/home-manager/users/{user}/secrets.yaml
+          # SSH signing via agent: public key tells git which agent key to use
+          # Darwin: Bitwarden SSH agent, Linux: systemd ssh-agent (see bitwarden.nix)
           signing = lib.mkDefault {
-            key = config.sops.secrets.ssh-signing-key.path;
+            key = config.sops.secrets.ssh-public-key.path;
             format = "ssh";
             signByDefault = true;
           };
