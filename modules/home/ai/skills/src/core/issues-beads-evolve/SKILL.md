@@ -207,9 +207,8 @@ bd update <unblocked-id> --description "Note: X is now available from completed 
 # Check if epic is complete
 bd epic status
 
-# If all children closed, close the epic
+# If all children closed, the epic is ready for human review (do not close epics directly)
 bd epic close-eligible --dry-run
-bd epic close-eligible
 
 # If epic scope changed significantly, update its description
 bd update <epic-id> --description "Revised scope: originally N tasks, expanded to M due to discovered complexity"
