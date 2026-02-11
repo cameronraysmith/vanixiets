@@ -48,8 +48,12 @@ fi
 SLUG=$(echo "$CONTENT" | head -c 60 | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
 KEY="${TYPE}-${SLUG}"
 
-# Source is always "agent" (we do not use worktrees)
+# Detect source from CWD context
 SOURCE="agent"
+CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+if echo "$CWD" | grep -qE '/\.worktrees/'; then
+  SOURCE="teammate"
+fi
 
 # Build tags array -- start with type tag
 TAGS_ARRAY=("$TYPE")
