@@ -156,6 +156,11 @@
           pattern remain unchanged for DAG-dispatched tasks. For agent team teammates,
           spawn prompts should include equivalent identity context plus instructions about
           the orient/checkpoint lifecycle.
+
+          Agents must never close epics directly. Close only individual issues within
+          an epic. When all children of an epic are closed, the Kanban UI automatically
+          moves the epic to "In Review" for human verification. This convention ensures
+          human oversight of aggregate work before epic completion.
         '';
       };
     };
