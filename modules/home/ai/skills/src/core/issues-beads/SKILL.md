@@ -304,12 +304,14 @@ bd epic status --eligible-only    # epics where all children are closed
 bd epic status --json             # structured output
 ```
 
-Auto-close epics when all child issues are resolved:
+Check epic readiness (epic closure is a human-only action):
 
 ```bash
-bd epic close-eligible --dry-run  # preview what would close
-bd epic close-eligible            # actually close eligible epics
+bd epic close-eligible --dry-run  # check which epics are ready for human review
 ```
+
+When all children of an epic are closed, report to the user that the epic is ready for review.
+Do not close epics directly; the Kanban UI automatically moves eligible epics to "In Review" for human verification.
 
 Search and list operations:
 
@@ -519,11 +521,10 @@ Check what this unblocks:
 bd dep tree <issue-id> --direction up
 ```
 
-Check if any epics are now eligible for closure:
+Verify epic readiness and report to user (epic closure is a human decision):
 
 ```bash
-bd epic close-eligible --dry-run
-bd epic close-eligible  # if appropriate
+bd epic close-eligible --dry-run  # check if any epics are ready for human review
 ```
 
 Commit beads changes:
@@ -735,7 +736,7 @@ When architectural assumptions change during implementation, use `/issues:beads-
 | Stale issues | `bd stale` |
 | Activity feed | `bd activity` |
 | Epic status | `bd epic status [--eligible-only]` |
-| Auto-close epics | `bd epic close-eligible [--dry-run]` |
+| Check epic readiness (human-only closure) | `bd epic close-eligible --dry-run` |
 | **Maintenance** | |
 | Health check | `bd doctor` |
 | Lint issues | `bd lint` |
