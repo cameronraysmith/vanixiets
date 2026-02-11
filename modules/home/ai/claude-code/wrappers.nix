@@ -71,8 +71,8 @@
           apiBase = "https://api.z.ai/api/anthropic";
           apiKeySecret = "glm-api-key";
           models = {
-            opus = "glm-4.7";
-            sonnet = "glm-4.7";
+            opus = "glm-5";
+            sonnet = "glm-5";
             haiku = "glm-4.5-air";
           };
         };
