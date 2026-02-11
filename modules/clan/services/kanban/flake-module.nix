@@ -75,6 +75,7 @@
                       # Filesystem protection
                       ProtectSystem = "strict";
                       ReadWritePaths = [ "${userHome}/.local/share/beads" ];
+                      ReadOnlyPaths = [ "${userHome}/projects" ];
 
                       # Privilege escalation prevention
                       NoNewPrivileges = true;
