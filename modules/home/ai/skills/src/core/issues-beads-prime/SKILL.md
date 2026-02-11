@@ -101,7 +101,7 @@ bd dep add <blocker-id> <current-id>
 
 ```bash
 bd close <id> --reason "Implemented in commit $(git rev-parse --short HEAD)"
-bd epic close-eligible --dry-run
+bd epic close-eligible --dry-run  # report readiness to user; epic closure is human-only
 ```
 
 ## Health
