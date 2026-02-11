@@ -21,7 +21,7 @@ if ! echo "$COMMAND" | grep -qE 'bd\s+close'; then
 fi
 
 # Allow --force override
-if echo "$COMMAND" | grep -qE '\-\-force'; then
+if echo "$COMMAND" | grep -qE -- '--force'; then
   exit 0
 fi
 
