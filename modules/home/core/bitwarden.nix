@@ -26,10 +26,14 @@
           "${config.home.homeDirectory}/.bitwarden-ssh-agent.sock";
     in
     {
-      # Set SSH_AUTH_SOCK for the Bitwarden SSH agent
+      # SSH agent provider: Bitwarden on Darwin, systemd ssh-agent on Linux
       # https://bitwarden.com/help/ssh-agent/#configure-bitwarden-ssh-agent
       home.sessionVariables = lib.mkIf bitwardenEnabled {
         SSH_AUTH_SOCK = socketPath;
       };
+
+      # Linux: systemd user ssh-agent for git signing and SSH authentication
+      # Add signing key once per session: ssh-add ~/.config/sops-nix/secrets/ssh-signing-key
+      services.ssh-agent.enable = !isDarwin;
     };
 }
