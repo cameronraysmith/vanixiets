@@ -205,19 +205,16 @@ bd delete <old-epic-id>
 
 ### Cleaning up completed work
 
-After epic completion:
+After all children of an epic are closed:
 
 ```bash
-# Close epic and all stories
-bd close <epic-id>
-bd list --parent <epic-id> | while read id; do
-  bd close "$id"
-done
+# Check if any epics are ready for human review (epic closure is human-only)
+bd epic close-eligible --dry-run
 
-# Check for epics ready to close automatically
-bd epic close-eligible
+# Report eligible epics to the user for manual closure
+# Do not close epics directly; the Kanban UI moves them to In Review automatically
 
-# Or delete if no historical value
+# Or delete if no historical value (requires human decision)
 bd delete --cascade <epic-id>
 ```
 
