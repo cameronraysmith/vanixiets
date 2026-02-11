@@ -16,10 +16,13 @@
           package = pkgs.gitFull;
           enable = true;
 
-          # SSH signing via agent: public key tells git which agent key to use
-          # Darwin: Bitwarden SSH agent, Linux: systemd ssh-agent (see bitwarden.nix)
+          # SSH signing: agent-based on Darwin (Bitwarden), direct key on Linux
           signing = lib.mkDefault {
-            key = config.sops.secrets.ssh-public-key.path;
+            key =
+              if pkgs.stdenv.isDarwin then
+                config.sops.secrets.ssh-public-key.path # Bitwarden agent
+              else
+                config.sops.secrets.ssh-signing-key.path; # passwordless private key
             format = "ssh";
             signByDefault = true;
           };
