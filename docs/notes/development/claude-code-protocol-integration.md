@@ -255,6 +255,22 @@ Test the full workflow: create a beads epic with children, start an agent team, 
 
 Note: nix-d4o.6 tracks reworking the adapted hooks to restore worktree support, ensuring enforce-branch-before-edit and validate-completion properly handle the `.worktrees/bd-{BEAD_ID}/` pattern.
 
+## Human-only epic closure convention
+
+Epics represent aggregate work packages that require human judgment before being marked complete.
+The convention is that AI agents close individual issues but never close epics directly.
+
+When all children of an epic are closed, the Kanban UI's `compute_epic_status_from_children` function automatically infers the epic status as `inreview`, presenting it for human verification without any agent action.
+This removes the need for agents to run `bd epic close-eligible` to close epics and instead positions them as reporters of readiness.
+
+Enforcement operates at three levels.
+The `validate-epic-close` hook (PreToolUse, Bash matcher) intercepts any `bd close` command targeting an epic and unconditionally denies it within Claude Code sessions.
+Since this hook only runs inside Claude Code, humans closing epics from their terminal are unaffected.
+The `agents-md.nix` orchestrator instructions include a directive that agents must never close epics directly.
+All beads skill files (`issues-beads`, `issues-beads-prime`, `issues-beads-checkpoint`, `issues-beads-evolve`, `issues-beads-audit`) replace any `bd epic close-eligible` usage with dry-run checks and guidance to report readiness to the user.
+
+The resulting workflow is: agents close individual issues, the Kanban UI automatically sets the parent epic to "In Review" when all children are closed, and a human reviews and closes the epic.
+
 ## Reference documentation
 
 - Hooks documentation: `./claude-code-hooks.md` (not committed)
