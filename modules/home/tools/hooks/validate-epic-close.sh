@@ -69,7 +69,7 @@ INCOMPLETE=$(bd list --json 2>/dev/null | jq -r --arg epic "$CLOSE_ID" '
 if [ "$INCOMPLETE" != "0" ] && [ "$INCOMPLETE" != "" ]; then
   INCOMPLETE_LIST=$(bd list --json 2>/dev/null | jq -r --arg epic "$CLOSE_ID" '
     [.[] | select((.id | startswith($epic + ".")) and .status != "done" and .status != "closed")] | .[] | "\(.id) (\(.status))"
-  ' 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
+  ' 2>/dev/null | tr '\n' ', ' | sed 's/,$//' || true)
 
   cat << EOF
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Cannot close epic '$CLOSE_ID' -- has $INCOMPLETE incomplete children: $INCOMPLETE_LIST. Mark all children as done first."}}
