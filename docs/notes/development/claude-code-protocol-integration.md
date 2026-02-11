@@ -65,13 +65,16 @@ Dependencies: `git`, `sed`.
 
 ### Hooks to adapt
 
-These capture valuable enforcement concepts but need rework for the branch-based workflow (not worktree-based) and generalized Task dispatch (not supervisor-typed agents).
+These capture valuable enforcement concepts but need rework for generalized Task dispatch (not supervisor-typed agents).
+The adapted hooks should preserve worktree awareness following The-Claude-Protocol's `.worktrees/bd-{BEAD_ID}/` pattern.
+Worktree compatibility was validated: absolute symlinks work correctly in worktrees, beads hooks already handle worktrees (the planning repo has worktree-aware pre-commit and post-merge hooks), nix flakes work from worktrees, and sops-nix has no issues.
 
 **enforce-branch-before-edit** (PreToolUse, Edit/Write matcher): Merged with concepts from `block-orchestrator-tools.sh`, this hook prevents file edits on main/master branch.
-It allows edits to `.claude/`, `CLAUDE.md`, and coordination files.
+It allows edits to `.claude/`, `CLAUDE.md`, coordination files, and any path within `.worktrees/`.
 A quick-fix escape hatch asks permission for small changes on feature branches when no bead is active.
 The hook enforces the existing git preference "check the current branch name first... pause to ask the user whether to create or switch to a matching branch."
-If worktrees are adopted (`.worktrees/` directory pattern from The-Claude-Protocol), edits within worktree paths are allowed.
+Edits within `.worktrees/` paths are always allowed since worktrees are the standard isolation mechanism for bead tasks.
+When denying an edit on main/master, the hook's denial message should guide the user toward creating a worktree via `git worktree add .worktrees/bd-{BEAD_ID} -b bd-{BEAD_ID}`.
 Source: adapted from `templates/hooks/enforce-branch-before-edit.sh` and `templates/hooks/block-orchestrator-tools.sh`.
 Dependencies: `git`, `jq`.
 
@@ -95,11 +98,26 @@ Source: adapted from `templates/hooks/clarify-vague-request.sh`.
 Dependencies: `jq`.
 
 **validate-completion** (TaskCompleted for teams, SubagentStop for individual tasks): Ground-up rewrite as a quality gate for subagent/teammate completion.
-Checks include: (1) if prompt contained `BEAD_ID:`, verify bead status was updated, (2) verify any modified files were committed, (3) verify branch was pushed to remote if remote exists.
+Checks include: (1) if prompt contained `BEAD_ID:`, verify bead status was updated, (2) verify any modified files were committed, (3) verify branch was pushed to remote if remote exists, (4) if working in a `.worktrees/bd-{BEAD_ID}/` directory, verify the worktree has no uncommitted changes and the worktree's branch has been pushed.
 This hook does not enforce response verbosity limits (which conflict with detailed subagent returns) or Protocol-specific completion format.
 For agent teams, it uses the TaskCompleted hook event.
 Source: inspired by `templates/hooks/validate-completion.sh` but rewritten.
 Dependencies: `git`, `bd`, `jq`.
+
+## Worktree workflow convention
+
+Each bead task gets a dedicated worktree at `.worktrees/bd-{BEAD_ID}/` created via `git worktree add .worktrees/bd-{BEAD_ID} -b bd-{BEAD_ID}`.
+The `.worktrees/` directory should be listed in `.gitignore` to avoid tracking worktree checkouts.
+
+Worktrees provide isolation: each task works in its own checkout without interfering with the main branch or other concurrent tasks.
+Beads issues track which worktree is active via the branch name matching the bead ID (e.g., bead `nix-d4o` maps to branch and worktree `bd-nix-d4o`).
+
+On completion: commit all changes, push the branch to remote, and mark the bead `inreview`.
+The worktree can be cleaned up after merge via `git worktree remove .worktrees/bd-{BEAD_ID}`.
+
+Agent team teammates each work in their own worktree for their assigned bead, ensuring parallel work streams do not conflict.
+The enforce-branch-before-edit hook denies edits on main/master and guides the user toward worktree creation as the standard path for starting work on a bead.
+The validate-completion hook verifies worktree state as part of its quality gate: no uncommitted changes in the worktree and the worktree's branch pushed to remote.
 
 ## Custom agents
 
@@ -234,6 +252,8 @@ This is the most sensitive change since it affects all sessions globally.
 
 Phase 4 covers integration testing.
 Test the full workflow: create a beads epic with children, start an agent team, verify hooks fire correctly, verify orient/checkpoint lifecycle works, verify beads-to-task-list mirroring.
+
+Note: nix-d4o.6 tracks reworking the adapted hooks to restore worktree support, ensuring enforce-branch-before-edit and validate-completion properly handle the `.worktrees/bd-{BEAD_ID}/` pattern.
 
 ## Reference documentation
 
