@@ -21,6 +21,17 @@ if echo "$FILE_PATH" | grep -qE '(/\.claude/|CLAUDE\.md$|CLAUDE\.local\.md$|/pla
   exit 0
 fi
 
+# Allow edits within .worktrees/ (worktrees are the standard isolation mechanism)
+if echo "$FILE_PATH" | grep -qE '/\.worktrees/'; then
+  exit 0
+fi
+
+# Allow if CWD is inside a .worktrees/ directory
+CWD=$(pwd)
+if echo "$CWD" | grep -qE '/\.worktrees/'; then
+  exit 0
+fi
+
 # Check if we're in a git repo
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 0
@@ -36,7 +47,7 @@ fi
 # Block edits on main or master
 if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
   cat << EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Cannot edit files on $BRANCH branch. Create a feature branch first:\n  git checkout -b <id>-<descriptor>\nThen retry the edit."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Cannot edit files on $BRANCH branch. Create a worktree for your bead:\n  git worktree add .worktrees/bd-{BEAD_ID} -b bd-{BEAD_ID}\n  cd .worktrees/bd-{BEAD_ID}\nOr create a feature branch:\n  git checkout -b <id>-<descriptor>\nThen retry the edit."}}
 EOF
   exit 0
 fi
