@@ -17,7 +17,7 @@ CLAUDE_MD="$REPO_ROOT/CLAUDE.md"
 [[ ! -f "$CLAUDE_MD" ]] && exit 0
 
 # Check if Current State section exists and has content
-CURRENT_STATE=$(sed -n '/^## Current State/,/^## /p' "$CLAUDE_MD" | grep -v '^## ' | grep -v '^<!--' | grep -v '^-->' | grep -v '^$' | head -5)
+CURRENT_STATE=$(sed -n '/^## Current State/,/^## /p' "$CLAUDE_MD" | grep -v '^## ' | grep -v '^<!--' | grep -v '^-->' | grep -v '^$' | head -5 || true)
 
 if [[ -z "$CURRENT_STATE" ]]; then
   # Current State is empty -- strong nudge
