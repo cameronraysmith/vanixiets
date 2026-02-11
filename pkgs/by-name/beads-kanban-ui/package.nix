@@ -40,6 +40,10 @@ let
         'nextConfig.eslint = { ignoreDuringBuilds: true }; nextConfig.typescript = { ignoreBuildErrors: true }; module.exports = nextConfig;'
 
       cp ${./layout.tsx} src/app/layout.tsx
+
+      # Use relative API URLs so the frontend works behind a reverse proxy
+      substituteInPlace src/lib/api.ts src/lib/design-doc.ts src/components/design-doc-viewer.tsx \
+        --replace-fail "|| 'http://localhost:3008'" "|| '''"
     '';
 
     npmDepsHash = "sha256-+eHchwoDfQ8Dt1e4DSJfVCFImT0cbf7bCddYhn4SBkA=";
