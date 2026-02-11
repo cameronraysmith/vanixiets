@@ -23,7 +23,7 @@ PROMPT=$(echo "$INPUT" | jq -r '.tool_input.prompt // empty')
 [[ -z "$PROMPT" ]] && exit 0
 
 # Extract BEAD_ID from prompt (only log dispatches with a BEAD_ID marker)
-BEAD_ID=$(echo "$PROMPT" | grep -oE 'BEAD_ID: [A-Za-z0-9._-]+' | head -1 | sed 's/BEAD_ID: //')
+BEAD_ID=$(echo "$PROMPT" | grep -oE 'BEAD_ID: [A-Za-z0-9._-]+' | head -1 | sed 's/BEAD_ID: //' || true)
 [[ -z "$BEAD_ID" ]] && exit 0
 
 # Extract subagent_type for labeling (default to "task" if not present)
