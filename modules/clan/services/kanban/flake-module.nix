@@ -66,6 +66,12 @@
 
                     serviceConfig = {
                       Type = "simple";
+                      ExecStartPre = [
+                        "+${pkgs.coreutils}/bin/mkdir -p ${userHome}/.local/share/beads"
+                        "+${pkgs.coreutils}/bin/chown ${settings.serviceUser}:users ${userHome}/.local/share/beads"
+                        "+${pkgs.coreutils}/bin/mkdir -p ${userHome}/projects"
+                        "+${pkgs.coreutils}/bin/chown ${settings.serviceUser}:users ${userHome}/projects"
+                      ];
                       ExecStart = lib.getExe package;
                       Restart = "always";
                       RestartSec = 5;
