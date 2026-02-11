@@ -25,6 +25,6 @@ Store the key in the vars file before deploying the service.
 
 ## Model configuration
 
-The service uses `zai-coding-plan/glm-4.7` as the primary model for processing requests.
+The service uses `zai-coding-plan/glm-5` as the primary model for processing requests.
 When the primary model is unavailable or encounters errors, the service falls back to `anthropic/claude-opus-4-5` to maintain availability.
 This fallback behavior ensures continuous operation even during Z.AI service disruptions while providing access to a capable alternative model.
