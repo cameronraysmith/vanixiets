@@ -66,38 +66,22 @@
 
                     serviceConfig = {
                       Type = "simple";
-                      ExecStartPre = [
-                        "+${pkgs.coreutils}/bin/mkdir -p ${userHome}/.local/share/beads"
-                        "+${pkgs.coreutils}/bin/chown ${settings.serviceUser}:users ${userHome}/.local/share/beads"
-                        "+${pkgs.coreutils}/bin/mkdir -p ${userHome}/projects"
-                        "+${pkgs.coreutils}/bin/chown ${settings.serviceUser}:users ${userHome}/projects"
-                      ];
                       ExecStart = lib.getExe package;
                       Restart = "always";
                       RestartSec = 5;
                       User = settings.serviceUser;
                       Group = "users";
 
-                      # Filesystem protection
-                      ProtectSystem = "strict";
-                      ReadWritePaths = [ "${userHome}/.local/share/beads" ];
-                      ReadOnlyPaths = [ "${userHome}/projects" ];
-
-                      # Privilege escalation prevention
+                      # Hardening (no ProtectSystem=strict; service needs
+                      # read/write access to home directory for SQLite data
+                      # and project .beads/ directories)
                       NoNewPrivileges = true;
                       RestrictSUIDSGID = true;
-                      SystemCallArchitectures = "native";
-
-                      # Kernel and device isolation
                       PrivateDevices = true;
                       ProtectKernelTunables = true;
                       ProtectKernelModules = true;
                       ProtectControlGroups = true;
-
-                      # Misc hardening
                       PrivateTmp = true;
-                      RestrictRealtime = true;
-                      RestrictNamespaces = true;
                     };
                   };
                 };
