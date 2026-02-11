@@ -26,5 +26,5 @@ Project registration (seeding) is performed manually through the web UI after th
 
 ## Hardening
 
-The systemd service runs with `ProtectSystem=strict` and grants write access only to the SQLite data directory (`~/.local/share/beads`).
+The systemd service runs with `ProtectSystem=strict`, granting write access to the SQLite data directory (`~/.local/share/beads`) and read-only access to the project directory (`~/projects`) for reading `.beads/issues.jsonl` files.
 The service does not require secrets, external databases, or network access beyond its listen port.
