@@ -79,7 +79,7 @@ Each issue has a type (task, bug, feature, epic, milestone), priority (0-4, 0=hi
 
 Status lifecycle:
 - **open**: Work not yet started or resumed after being blocked
-- **in_progress**: Actively being worked on (optional convention, not enforced)
+- **in_progress**: Actively being worked on (the bd tool does not enforce this, but the team convention requires marking issues in_progress before beginning implementation)
 - **closed**: Completed, abandoned, or merged as duplicate
 
 ### Epics
@@ -467,7 +467,7 @@ bd show "$TOP"
 
 ### Phase 3: During work
 
-Mark issue as in-progress (optional):
+Mark issue as in-progress before beginning implementation:
 
 ```bash
 bd update <issue-id> --status in_progress
