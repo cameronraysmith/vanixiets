@@ -88,5 +88,12 @@ EOF
   fi
 fi
 
+# === CHECK 5: Remind bead in_progress ===
+# When dispatching work on a bead that is still open, emit a stderr reminder
+# suggesting the user set it to in_progress. Advisory only -- does not block.
+if [ "$BEAD_STATUS" = "open" ]; then
+  echo "Bead $BEAD_ID is still open (not in_progress). Consider running: bd update $BEAD_ID --status in_progress" >&2
+fi
+
 # All checks passed
 exit 0
