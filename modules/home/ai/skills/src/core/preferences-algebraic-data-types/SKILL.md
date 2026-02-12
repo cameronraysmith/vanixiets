@@ -1139,11 +1139,11 @@ See `event-sourcing.md#the-decider-pattern` for operational patterns and `theore
 
 ## Integration with schema versioning
 
-See `~/.claude/commands/preferences/schema-versioning.md` for:
+See `~/.claude/skills/preferences-schema-versioning/SKILL.md` for:
 - How to configure sqlc to generate ADT types
 - Cross-database compatibility (PostgreSQL ENUMs → DuckDB CHECK)
 - Migration patterns for evolving ADTs
 
-See `~/.claude/commands/preferences/railway-oriented-programming.md` for:
+See `~/.claude/skills/preferences-railway-oriented-programming/SKILL.md` for:
 - How to use ADTs with Result types for error handling
 - Composing operations on sum types with bind/apply

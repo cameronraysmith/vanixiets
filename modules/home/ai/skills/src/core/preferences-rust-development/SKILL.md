@@ -49,12 +49,12 @@ This guide is organized into focused topic files for easy navigation and AI agen
 
 This document integrates guidance from:
 
-- **Functional domain modeling**: See `~/.claude/commands/preferences/domain-modeling.md` for universal patterns, `~/.claude/commands/preferences/architectural-patterns.md` for application structure, `~/.claude/commands/preferences/railway-oriented-programming.md` for error composition
+- **Functional domain modeling**: See `~/.claude/skills/preferences-domain-modeling/SKILL.md` for universal patterns, `~/.claude/skills/preferences-architectural-patterns/SKILL.md` for application structure, `~/.claude/skills/preferences-railway-oriented-programming/SKILL.md` for error composition
 - **Microsoft Pragmatic Rust Guidelines**: https://microsoft.github.io/rust-guidelines/agents/all.txt - comprehensive production Rust guidance from Microsoft engineers
 - **Rust API Guidelines**: https://rust-lang.github.io/api-guidelines/ - official Rust API design checklist
 
 ### Related documents
 
-- `~/.claude/commands/preferences/distributed-systems.md` - universal distributed systems decision framework
-- `~/.claude/commands/preferences/theoretical-foundations.md` - category-theoretic underpinnings
-- `~/.claude/commands/preferences/algebraic-data-types.md` - sum/product type patterns
+- `~/.claude/skills/preferences-distributed-systems/SKILL.md` - universal distributed systems decision framework
+- `~/.claude/skills/preferences-theoretical-foundations/SKILL.md` - category-theoretic underpinnings
+- `~/.claude/skills/preferences-algebraic-data-types/SKILL.md` - sum/product type patterns

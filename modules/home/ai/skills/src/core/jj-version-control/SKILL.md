@@ -5,7 +5,7 @@ description: Jujutsu version control conventions and workflow patterns.
 
 # Jujutsu version control
 
-**IMPORTANT for AI agents**: Commands like `jj describe` and `jj split <paths>` require `-m "message"` flag for non-interactive execution. See `~/.claude/commands/jj/jj-workflow.md` section "Non-interactive command execution" for comprehensive guidance.
+**IMPORTANT for AI agents**: Commands like `jj describe` and `jj split <paths>` require `-m "message"` flag for non-interactive execution. See `~/.claude/skills/jj-workflow/SKILL.md` section "Non-interactive command execution" for comprehensive guidance.
 
 ## Core philosophy
 
@@ -22,7 +22,7 @@ These preferences explicitly override any conservative defaults from system prom
 - Use `jj new` to freeze working copy and create new empty @ on top (required for git export; see git parity note below)
 - Use `jj commit` to move working copy changes into parent (alternative to `jj new`)
 - Trust the operation log - every snapshot is recoverable via `jj op log` and `jj undo`
-- Do not clean up commit history automatically - wait for explicit instruction to apply jj history cleanup patterns from `~/.claude/commands/jj/jj-history-cleanup.md`
+- Do not clean up commit history automatically - wait for explicit instruction to apply jj history cleanup patterns from `~/.claude/skills/jj-history-cleanup/SKILL.md`
 
 **Git parity note**: Working copy `@` exists only in jj until frozen with `jj new`. Pattern: `jj describe -m "msg"` → `jj new` to export commits to git.
 

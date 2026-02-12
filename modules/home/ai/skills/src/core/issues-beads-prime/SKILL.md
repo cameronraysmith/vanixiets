@@ -4,7 +4,7 @@ description: Minimal quick reference for beads commands when context is constrai
 ---
 # Beads quick reference
 
-Symlink location: `~/.claude/commands/issues/beads-prime.md`
+Symlink location: `~/.claude/skills/issues-beads-prime/SKILL.md`
 Slash command: `/issues:beads-prime`
 
 Minimal quick reference when context is constrained.

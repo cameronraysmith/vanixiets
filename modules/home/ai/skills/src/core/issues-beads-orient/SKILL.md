@@ -5,7 +5,7 @@ disable-model-invocation: true
 ---
 # Session orientation
 
-Symlink location: `~/.claude/commands/issues/beads-orient.md`
+Symlink location: `~/.claude/skills/issues-beads-orient/SKILL.md`
 Slash command: `/issues:beads-orient`
 
 Action prompt for session start.

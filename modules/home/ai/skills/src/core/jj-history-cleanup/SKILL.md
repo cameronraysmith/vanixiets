@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Jujutsu history cleanup
 
-**IMPORTANT for AI agents**: Commands like `jj describe -r` and `jj split <paths>` require `-m "message"` flag for non-interactive execution. See `~/.claude/commands/jj/jj-workflow.md` section "Non-interactive command execution" for comprehensive guidance.
+**IMPORTANT for AI agents**: Commands like `jj describe -r` and `jj split <paths>` require `-m "message"` flag for non-interactive execution. See `~/.claude/skills/jj-workflow/SKILL.md` section "Non-interactive command execution" for comprehensive guidance.
 
 ## Purpose
 
@@ -39,7 +39,7 @@ Use the operation log (`jj op log`) as your safety net instead of backup branche
 
 ## Operations
 
-For detailed command mappings from git interactive rebase, see `~/.claude/commands/jj/git-interactive-rebase-to-jj.md`.
+For detailed command mappings from git interactive rebase, see `~/.claude/skills/jj-git-interactive-rebase-to-jj/SKILL.md`.
 
 ### Reorder commits
 
@@ -442,7 +442,7 @@ jj op log --limit 20
 - Use revsets to operate on multiple commits at once
 - `jj op restore <id>` returns to any prior state
 - Test incrementally instead of at the end
-- Reference `~/.claude/commands/jj/git-interactive-rebase-to-jj.md` for detailed command mappings
+- Reference `~/.claude/skills/jj-git-interactive-rebase-to-jj/SKILL.md` for detailed command mappings
 
 ## Advanced patterns
 

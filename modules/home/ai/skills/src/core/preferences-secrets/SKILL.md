@@ -785,7 +785,7 @@ cf-secrets-list env="production":
 
 **Pattern**: Non-sensitive config in `wrangler.jsonc`, sensitive secrets via `wrangler secret put` from sops.
 
-See @~/.claude/commands/preferences/web-application-deployment.md for Cloudflare secrets management details.
+See @~/.claude/skills/preferences-web-application-deployment/SKILL.md for Cloudflare secrets management details.
 
 ## Best practices
 
@@ -918,7 +918,7 @@ This project uses sops for secrets management.
 
 ## Integration with other preferences
 
-- Cloudflare Workers secrets: @~/.claude/commands/preferences/web-application-deployment.md
-- sops-nix in flakes: @~/.claude/commands/preferences/nix-development.md
-- Pre-commit hooks: @~/.claude/commands/preferences/git-version-control.md
-- CI/CD patterns: @~/.claude/commands/preferences/typescript-nodejs-development.md
+- Cloudflare Workers secrets: @~/.claude/skills/preferences-web-application-deployment/SKILL.md
+- sops-nix in flakes: @~/.claude/skills/preferences-nix-development/SKILL.md
+- Pre-commit hooks: @~/.claude/skills/preferences-git-version-control/SKILL.md
+- CI/CD patterns: @~/.claude/skills/preferences-typescript-nodejs-development/SKILL.md

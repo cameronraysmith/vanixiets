@@ -5,7 +5,7 @@ disable-model-invocation: true
 ---
 # Session checkpoint
 
-Symlink location: `~/.claude/commands/issues/beads-checkpoint.md`
+Symlink location: `~/.claude/skills/issues-beads-checkpoint/SKILL.md`
 Slash command: `/issues:beads-checkpoint`
 
 Action prompt for session wind-down.

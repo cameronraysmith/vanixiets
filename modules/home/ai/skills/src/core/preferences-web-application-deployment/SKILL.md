@@ -243,7 +243,7 @@ pnpm run drizzle:migrate              # Apply to database
 pnpm run pull-drizzle-schema          # Verify schema sync
 ```
 
-See @~/.claude/commands/preferences/schema-versioning.md for migration patterns and versioning strategies.
+See @~/.claude/skills/preferences-schema-versioning/SKILL.md for migration patterns and versioning strategies.
 
 ## Wrangler configuration
 
@@ -358,7 +358,7 @@ env.MY_VAR    // Type: string
 
 Cloudflare Workers integrate with platform resources via bindings configured in wrangler.jsonc.
 
-See @~/.claude/commands/preferences/cloudflare-wrangler-reference.md for comprehensive binding configuration.
+See @~/.claude/skills/preferences-cloudflare-wrangler-reference/SKILL.md for comprehensive binding configuration.
 
 ### D1 databases (serverless SQL)
 
@@ -1153,8 +1153,8 @@ env.ANALYTICS.writeDataPoint({
 
 See related preference files for complementary patterns:
 
-- @~/.claude/commands/preferences/react-tanstack-ui-development.md - TanStack Start SSR patterns
-- @~/.claude/commands/preferences/typescript-nodejs-development.md - Hono backend patterns
-- @~/.claude/commands/preferences/schema-versioning.md - Database migration workflows
-- @~/.claude/commands/preferences/railway-oriented-programming.md - Error handling in server functions
-- @~/.claude/commands/preferences/cloudflare-wrangler-reference.md - Comprehensive wrangler configuration
+- @~/.claude/skills/preferences-react-tanstack-ui-development/SKILL.md - TanStack Start SSR patterns
+- @~/.claude/skills/preferences-typescript-nodejs-development/SKILL.md - Hono backend patterns
+- @~/.claude/skills/preferences-schema-versioning/SKILL.md - Database migration workflows
+- @~/.claude/skills/preferences-railway-oriented-programming/SKILL.md - Error handling in server functions
+- @~/.claude/skills/preferences-cloudflare-wrangler-reference/SKILL.md - Comprehensive wrangler configuration

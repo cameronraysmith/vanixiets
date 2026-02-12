@@ -7,7 +7,7 @@ description: React and TanStack UI development patterns including component desi
 
 ## Architectural patterns alignment
 
-See @~/.claude/commands/preferences/architectural-patterns.md for overarching principles.
+See @~/.claude/skills/preferences-architectural-patterns/SKILL.md for overarching principles.
 
 Apply functional programming patterns to React UI development:
 - Components are pure functions from props to JSX
@@ -182,7 +182,7 @@ const { roomStore, useRoomStore } = createRoomStore<RoomConfig, RoomState>(
 
 #### Type-safe S3/HTTPFS data sources with Zod
 
-Use discriminated unions for data source configuration (matches ADT patterns from @~/.claude/commands/preferences/algebraic-data-types.md):
+Use discriminated unions for data source configuration (matches ADT patterns from @~/.claude/skills/preferences-algebraic-data-types/SKILL.md):
 
 ```typescript
 // From @sqlrooms/room-config - Zod schemas for type safety
@@ -237,7 +237,7 @@ RoomConfig.parse(config) // Runtime validation
 
 Apply Result types to query execution for explicit error handling.
 
-See @~/.claude/commands/preferences/railway-oriented-programming.md for Result patterns and error composition.
+See @~/.claude/skills/preferences-railway-oriented-programming/SKILL.md for Result patterns and error composition.
 
 ```typescript
 import { z } from 'zod'
@@ -629,7 +629,7 @@ Integrate TanStack Form with Zod for type-safe validation and railway-oriented s
 
 ### Form patterns with railway-oriented programming
 
-See @~/.claude/commands/preferences/railway-oriented-programming.md for Result types and error composition.
+See @~/.claude/skills/preferences-railway-oriented-programming/SKILL.md for Result types and error composition.
 
 ```typescript
 import { useForm } from '@tanstack/react-form'
@@ -709,7 +709,7 @@ function UserForm() {
 
 Use applicative validation for better UX - show all errors at once.
 
-See @~/.claude/commands/preferences/railway-oriented-programming.md for applicative patterns.
+See @~/.claude/skills/preferences-railway-oriented-programming/SKILL.md for applicative patterns.
 
 ```typescript
 // TanStack Form validates all fields before submit
@@ -991,7 +991,7 @@ export default defineConfig({
 
 ## Deployment
 
-See @~/.claude/commands/preferences/web-application-deployment.md for comprehensive deployment guidance including:
+See @~/.claude/skills/preferences-web-application-deployment/SKILL.md for comprehensive deployment guidance including:
 - Cloudflare Workers/Pages deployment (preferred)
 - Database configuration (D1, PostgreSQL)
 - Wrangler configuration and platform bindings
@@ -1183,7 +1183,7 @@ Most UI code should use simpler patterns (TanStack Query, tRPC) unless:
 - Multiple dependent effects need composition
 - Advanced concurrency control needed
 
-See @~/.claude/commands/preferences/typescript-nodejs-development.md for Effect-TS patterns in backend code.
+See @~/.claude/skills/preferences-typescript-nodejs-development/SKILL.md for Effect-TS patterns in backend code.
 
 ## Testing UI components
 
@@ -1243,7 +1243,7 @@ describe('UserList', () => {
 
 ## Integration with algebraic data types
 
-See @~/.claude/commands/preferences/algebraic-data-types.md for ADT patterns in TypeScript.
+See @~/.claude/skills/preferences-algebraic-data-types/SKILL.md for ADT patterns in TypeScript.
 
 **Use discriminated unions for component state machines**:
 

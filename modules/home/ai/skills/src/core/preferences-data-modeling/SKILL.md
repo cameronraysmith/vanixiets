@@ -91,8 +91,8 @@ Validate data shape and constraints at system boundaries.
 
 For comprehensive guidance on modeling domain types and error handling, see:
 
-- **~/.claude/commands/preferences/algebraic-data-types.md** - Sum types (discriminated unions), product types, newtype pattern, making illegal states unrepresentable
-- **~/.claude/commands/preferences/railway-oriented-programming.md** - Result types, bind/apply composition, effect signatures, two-track model
+- **~/.claude/skills/preferences-algebraic-data-types/SKILL.md** - Sum types (discriminated unions), product types, newtype pattern, making illegal states unrepresentable
+- **~/.claude/skills/preferences-railway-oriented-programming/SKILL.md** - Result types, bind/apply composition, effect signatures, two-track model
 
 Key principles from ADT design:
 - Use sum types (ENUMs, discriminated unions) to model "OR" relationships
@@ -258,4 +258,4 @@ When modeling data, prioritize:
 
 Remember that in the ideal case, data pipelines should behave as a monad transformer stack where side effects are explicit in signatures and isolated at boundaries to preserve compositionality.
 
-For concrete implementation patterns see ~/.claude/commands/preferences/railway-oriented-programming.md (Result types, bind/apply, effect signatures) and ~/.claude/commands/preferences/algebraic-data-types.md (domain modeling with sum/product types).
+For concrete implementation patterns see ~/.claude/skills/preferences-railway-oriented-programming/SKILL.md (Result types, bind/apply, effect signatures) and ~/.claude/skills/preferences-algebraic-data-types/SKILL.md (domain modeling with sum/product types).

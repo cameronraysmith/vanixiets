@@ -64,11 +64,11 @@ This paradigm complements functional domain modeling by maintaining clear effect
 
 ## Related documents
 
-- `~/.claude/commands/preferences/theoretical-foundations.md` - algebraic foundations: signals as comonads, web components as coalgebras, event sourcing as free monoids
-- `~/.claude/commands/preferences/architectural-patterns.md` - onion/hexagonal architecture, effect boundaries
-- `~/.claude/commands/preferences/domain-modeling.md` - functional domain modeling, smart constructors
-- `~/.claude/commands/preferences/railway-oriented-programming.md` - Result-based error handling
-- `~/.claude/commands/preferences/distributed-systems.md` - event log authority, CQRS, idempotency patterns
-- `~/.claude/commands/preferences/data-modeling.md` - materialized views, DuckDB/DuckLake patterns
-- `~/.claude/commands/preferences/rust-development/` - Rust-specific patterns (integrates with Datastar-Rust/hypertext)
-- `~/.claude/commands/preferences/typescript-nodejs-development.md` - TypeScript patterns for Node.js backends
+- `~/.claude/skills/preferences-theoretical-foundations/SKILL.md` - algebraic foundations: signals as comonads, web components as coalgebras, event sourcing as free monoids
+- `~/.claude/skills/preferences-architectural-patterns/SKILL.md` - onion/hexagonal architecture, effect boundaries
+- `~/.claude/skills/preferences-domain-modeling/SKILL.md` - functional domain modeling, smart constructors
+- `~/.claude/skills/preferences-railway-oriented-programming/SKILL.md` - Result-based error handling
+- `~/.claude/skills/preferences-distributed-systems/SKILL.md` - event log authority, CQRS, idempotency patterns
+- `~/.claude/skills/preferences-data-modeling/SKILL.md` - materialized views, DuckDB/DuckLake patterns
+- `~/.claude/skills/preferences-rust-development/SKILL.md` - Rust-specific patterns (integrates with Datastar-Rust/hypertext)
+- `~/.claude/skills/preferences-typescript-nodejs-development/SKILL.md` - TypeScript patterns for Node.js backends

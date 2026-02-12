@@ -5,7 +5,7 @@ description: Jujutsu workflow summary with essential paradigm shifts and decisio
 
 # Jujutsu workflow summary
 
-Quick reference and decision guide for jj version control. Full documentation: ~/.claude/commands/jj/jj-workflow.md
+Quick reference and decision guide for jj version control. Full documentation: ~/.claude/skills/jj-workflow/SKILL.md
 
 ## When to read full documentation
 
@@ -284,4 +284,4 @@ jj log -r 'mine() & ~bookmarks()'
 
 ## For full documentation
 
-All details, examples, and comprehensive explanations: ~/.claude/commands/jj/jj-workflow.md
+All details, examples, and comprehensive explanations: ~/.claude/skills/jj-workflow/SKILL.md

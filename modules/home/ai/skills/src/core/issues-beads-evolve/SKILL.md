@@ -5,7 +5,7 @@ disable-model-invocation: true
 ---
 # Adaptive issue evolution
 
-Symlink location: `~/.claude/commands/issues/beads-evolve.md`
+Symlink location: `~/.claude/skills/issues-beads-evolve/SKILL.md`
 Slash command: `/issues:beads-evolve`
 
 Reference document for adaptive issue graph evolution.
@@ -14,10 +14,10 @@ Issues, epics, dependencies, and priorities are hypotheses refined through imple
 For session lifecycle, use the action commands: `/issues:beads-orient` (start) and `/issues:beads-checkpoint` (wind-down).
 
 Related commands:
-- `/issues:beads-orient` (`~/.claude/commands/issues/beads-orient.md`) — action: session start
-- `/issues:beads-checkpoint` (`~/.claude/commands/issues/beads-checkpoint.md`) — action: session wind-down
-- `/issues:beads` (`~/.claude/commands/issues/beads.md`) — comprehensive reference
-- `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference
+- `/issues:beads-orient` (`~/.claude/skills/issues-beads-orient/SKILL.md`) — action: session start
+- `/issues:beads-checkpoint` (`~/.claude/skills/issues-beads-checkpoint/SKILL.md`) — action: session wind-down
+- `/issues:beads` (`~/.claude/skills/issues-beads/SKILL.md`) — comprehensive reference
+- `/issues:beads-prime` (`~/.claude/skills/issues-beads-prime/SKILL.md`) — minimal quick reference
 
 ## When to use this command
 

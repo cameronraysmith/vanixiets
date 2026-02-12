@@ -7,9 +7,9 @@ description: TypeScript and Node.js development conventions including strict typ
 
 ## Architectural patterns alignment
 
-See @~/.claude/commands/preferences/architectural-patterns.md for overarching principles.
+See @~/.claude/skills/preferences-architectural-patterns/SKILL.md for overarching principles.
 
-For React UI development with TanStack ecosystem, see @~/.claude/commands/preferences/react-tanstack-ui-development.md.
+For React UI development with TanStack ecosystem, see @~/.claude/skills/preferences-react-tanstack-ui-development/SKILL.md.
 
 TypeScript with Effect-TS provides excellent support for functional programming and effect management in the JavaScript ecosystem.
 
@@ -29,8 +29,8 @@ TypeScript with Effect-TS provides excellent support for functional programming 
 - Layer your application as effect transformers (similar to monad transformer stacks)
 
 For detailed patterns on Result types, error composition, and ADT modeling in TypeScript:
-- **~/.claude/commands/preferences/railway-oriented-programming.md** - Result type implementation, bind/apply, effect composition
-- **~/.claude/commands/preferences/algebraic-data-types.md** - Discriminated unions, branded types (newtypes), domain modeling
+- **~/.claude/skills/preferences-railway-oriented-programming/SKILL.md** - Result type implementation, bind/apply, effect composition
+- **~/.claude/skills/preferences-algebraic-data-types/SKILL.md** - Discriminated unions, branded types (newtypes), domain modeling
 
 ### TypeScript-specific practices
 - Enable strict mode in tsconfig.json (`strict: true`)

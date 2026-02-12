@@ -12,7 +12,7 @@ description: Style and formatting conventions for code, documentation, naming, a
 - Keep section header nesting shallow. Avoid deeply nested subsections (###, ####) when flatter structure with clear prose transitions would be more readable. Most documents should rarely need headers beyond three levels.
 - Use bold text (`**`) sparingly, primarily for critical emphasis within sentences. Avoid bolding section labels, definitions, or key terms when plain text suffices. Prefer italic (`*`) for subtle emphasis.
 - Avoid using emojis in code, comments, documentation, markdown files, etc unless explicitly requested to do so.
-- For documentation-specific markdown conventions (frontmatter titles, header levels), see "Markdown formatting conventions" in `~/.claude/commands/preferences/documentation.md`.
+- For documentation-specific markdown conventions (frontmatter titles, header levels), see "Markdown formatting conventions" in `~/.claude/skills/preferences-documentation/SKILL.md`.
 
 ## Naming and case conventions
 
@@ -35,7 +35,7 @@ State what code does, not speculative narratives about why.
 
 ## File organization
 
-- Never pollute the repository root or other working directory with markdown files. Always place these types of working notes in suitable paths like: `./docs/notes/[category]/[lower-kebab-case-filename.md]` where you may need to create the directory if it doesn't exist before creating the file. See "Working notes" in `~/.claude/commands/preferences/documentation.md` for lifecycle management and integration with formal documentation.
+- Never pollute the repository root or other working directory with markdown files. Always place these types of working notes in suitable paths like: `./docs/notes/[category]/[lower-kebab-case-filename.md]` where you may need to create the directory if it doesn't exist before creating the file. See "Working notes" in `~/.claude/skills/preferences-documentation/SKILL.md` for lifecycle management and integration with formal documentation.
 
 ### File length and modularization
 

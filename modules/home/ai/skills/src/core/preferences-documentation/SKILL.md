@@ -197,7 +197,7 @@ Use `- **Term**: description` bullet format for 2+ definitions.
   future point.
 - Commit documentation updates atomically in series with the related code changes,
   following the same proactive atomic commit workflow specified in
-  `~/.claude/commands/preferences/git-version-control.md`.
+  `~/.claude/skills/preferences-git-version-control/SKILL.md`.
 - Be judicious in the use of documentation, ensuring that it is clear, concise,
   and accurate for humans to read and understand.
 - Proactively remove, refactor, and consolidate documentation as relevant to

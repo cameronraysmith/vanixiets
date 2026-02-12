@@ -290,7 +290,7 @@ Railway-oriented programming treats error handling as a two-track railway: succe
 The `?` operator provides monadic composition (bind) for fail-fast behavior.
 This section focuses on applicative composition for error accumulation.
 
-See `~/.claude/commands/preferences/railway-oriented-programming.md` for comprehensive patterns including bind vs apply, effect signatures, and the two-track model.
+See `~/.claude/skills/preferences-railway-oriented-programming/SKILL.md` for comprehensive patterns including bind vs apply, effect signatures, and the two-track model.
 
 ### Fail-fast vs error accumulation
 

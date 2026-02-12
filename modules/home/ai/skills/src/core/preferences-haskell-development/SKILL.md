@@ -7,7 +7,7 @@ description: Haskell development conventions covering type classes, monadic comp
 
 ## Architectural patterns alignment
 
-See @~/.claude/commands/preferences/architectural-patterns.md for overarching principles.
+See @~/.claude/skills/preferences-architectural-patterns/SKILL.md for overarching principles.
 
 Haskell embodies the theoretical ideal of functional programming with native support for monad transformers, lawful abstractions, and referential transparency.
 It serves as the reference model that other languages approximate with their respective libraries (Effect-TS, ZIO, etc.).

@@ -292,7 +292,7 @@ See [01-functional-domain-modeling.md](./01-functional-domain-modeling.md#patter
 
 Domain types should remain ignorant of serialization concerns.
 This preserves persistence ignorance and keeps domain logic independent of infrastructure choices.
-For conceptual foundation, see `~/.claude/commands/preferences/architectural-patterns.md` (Onion/hexagonal architecture, infrastructure layer responsibilities).
+For conceptual foundation, see `~/.claude/skills/preferences-architectural-patterns/SKILL.md` (Onion/hexagonal architecture, infrastructure layer responsibilities).
 
 ### DTO separation pattern
 
@@ -435,7 +435,7 @@ This organization makes it clear:
 
 Workflows have typed inputs (commands) and outputs (events) that document intent and outcomes.
 Commands represent actions to perform; events represent facts about what occurred.
-For conceptual foundation, see `~/.claude/commands/preferences/architectural-patterns.md` (Commands and events as workflow boundaries).
+For conceptual foundation, see `~/.claude/skills/preferences-architectural-patterns/SKILL.md` (Commands and events as workflow boundaries).
 
 **Local vs. distributed semantics**: The command/event pattern here describes in-process workflow documentation.
 When commands or events cross service boundaries (HTTP, gRPC, message queues), additional concerns apply:

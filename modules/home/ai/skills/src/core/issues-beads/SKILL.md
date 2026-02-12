@@ -4,7 +4,7 @@ description: Comprehensive reference for beads issue tracking with bd CLI and bv
 ---
 # Issue tracking with beads
 
-Symlink location: `~/.claude/commands/issues/beads.md`
+Symlink location: `~/.claude/skills/issues-beads/SKILL.md`
 Slash command: `/issues:beads`
 
 Beads is a git-friendly issue tracker that stores data in SQLite with a JSONL file for synchronization.
@@ -12,12 +12,12 @@ The `bd` CLI provides comprehensive issue, epic, and dependency management from 
 Data lives in `.beads/` at the repository root, making it portable and version-controllable.
 
 Action commands:
-- `/issues:beads-seed` (`~/.claude/commands/issues/beads-seed.md`) — convert architecture docs into beads issues
-- `/issues:beads-orient` (`~/.claude/commands/issues/beads-orient.md`) — session start: run diagnostics, synthesize state, select work
-- `/issues:beads-evolve` (`~/.claude/commands/issues/beads-evolve.md`) — adaptive refinement: refactor graph structure and feed back to architecture
-- `/issues:beads-checkpoint` (`~/.claude/commands/issues/beads-checkpoint.md`) — session wind-down: update status, capture learnings, prepare handoff
-- `/issues:beads-audit` (`~/.claude/commands/issues/beads-audit.md`) — periodic graph health checks and maintenance
-- `/issues:beads-prime` (`~/.claude/commands/issues/beads-prime.md`) — minimal quick reference for token-constrained contexts
+- `/issues:beads-seed` (`~/.claude/skills/issues-beads-seed/SKILL.md`) — convert architecture docs into beads issues
+- `/issues:beads-orient` (`~/.claude/skills/issues-beads-orient/SKILL.md`) — session start: run diagnostics, synthesize state, select work
+- `/issues:beads-evolve` (`~/.claude/skills/issues-beads-evolve/SKILL.md`) — adaptive refinement: refactor graph structure and feed back to architecture
+- `/issues:beads-checkpoint` (`~/.claude/skills/issues-beads-checkpoint/SKILL.md`) — session wind-down: update status, capture learnings, prepare handoff
+- `/issues:beads-audit` (`~/.claude/skills/issues-beads-audit/SKILL.md`) — periodic graph health checks and maintenance
+- `/issues:beads-prime` (`~/.claude/skills/issues-beads-prime/SKILL.md`) — minimal quick reference for token-constrained contexts
 
 ## Development lifecycle overview
 

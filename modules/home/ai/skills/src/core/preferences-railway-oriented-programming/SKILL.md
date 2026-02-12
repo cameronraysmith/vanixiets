@@ -243,7 +243,7 @@ When in doubt, follow this decision tree:
 | Combine independent validations | Applicative | `apply`, `mapN` | Parallel execution, error accumulation |
 | Chain dependent operations | Monad | `bind`, `and_then` | Sequential dependency, fail-fast |
 
-See `~/.claude/commands/preferences/theoretical-foundations.md#functor-applicative-monad-hierarchy` for the mathematical laws each abstraction must satisfy.
+See `~/.claude/skills/preferences-theoretical-foundations/SKILL.md#functor-applicative-monad-hierarchy` for the mathematical laws each abstraction must satisfy.
 
 ## bind: Monadic composition
 
@@ -904,7 +904,7 @@ async function processOrder(config: Config): Promise<Result<Order, AppError>> {
 4. **Use language idioms**: async/await with Result is more idiomatic than custom transformers in most languages
 5. **Consider effect libraries**: fp-ts (TypeScript), cats-effect (Scala), polysemy (Haskell) when transformer stacks become complex
 
-See `~/.claude/commands/preferences/theoretical-foundations.md#monad-transformers` for the mathematical foundation and `~/.claude/commands/preferences/theoretical-foundations.md#indexed-monad-transformer-stacks-in-practice` for practical considerations when stacking effects.
+See `~/.claude/skills/preferences-theoretical-foundations/SKILL.md#monad-transformers` for the mathematical foundation and `~/.claude/skills/preferences-theoretical-foundations/SKILL.md#indexed-monad-transformer-stacks-in-practice` for practical considerations when stacking effects.
 
 ## The two-track model
 
@@ -1365,16 +1365,16 @@ def test_apply_collects_errors(email: str, name: str, age: str):
 
 ## Integration with other preferences
 
-See `~/.claude/commands/preferences/algebraic-data-types.md` for:
+See `~/.claude/skills/preferences-algebraic-data-types/SKILL.md` for:
 - How to model domain types that work with Result
 - Sum types for error variants
 - Newtypes for validated values
 
-See `~/.claude/commands/preferences/schema-versioning.md` for:
+See `~/.claude/skills/preferences-schema-versioning/SKILL.md` for:
 - Configuring sqlc to generate Result-returning queries
 - Database operations in railway-oriented style
 
-See `~/.claude/commands/preferences/data-modeling.md` for:
+See `~/.claude/skills/preferences-data-modeling/SKILL.md` for:
 - How ROP fits into data pipeline architecture
 - Effect isolation at boundaries
 - Monad transformer stack vision

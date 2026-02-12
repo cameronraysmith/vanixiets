@@ -385,6 +385,6 @@ SPAs trade large client bundles and dual state management for richer client-side
 - `02-sse-patterns.md` - Server-Sent Events streaming patterns and error handling
 - `03-signals.md` - Reactive state synchronization between server and client
 - `04-testing.md` - Testing strategies for hypermedia applications
-- `~/.claude/commands/preferences/domain-modeling.md` - Functional domain modeling with algebraic types
-- `~/.claude/commands/preferences/railway-oriented-programming.md` - Result-based error handling patterns
-- `~/.claude/commands/preferences/architectural-patterns.md` - General architectural principles
+- `~/.claude/skills/preferences-domain-modeling/SKILL.md` - Functional domain modeling with algebraic types
+- `~/.claude/skills/preferences-railway-oriented-programming/SKILL.md` - Result-based error handling patterns
+- `~/.claude/skills/preferences-architectural-patterns/SKILL.md` - General architectural principles

@@ -7,7 +7,7 @@ description: Python development conventions including type safety with basedpyri
 
 ## Architectural patterns alignment
 
-See @~/.claude/commands/preferences/architectural-patterns.md for overarching principles.
+See @~/.claude/skills/preferences-architectural-patterns/SKILL.md for overarching principles.
 
 Python can approximate functional programming patterns through careful library selection and disciplined type usage.
 
@@ -26,8 +26,8 @@ Python can approximate functional programming patterns through careful library s
 - Isolate IO and side effects to specific layers or boundaries
 
 For detailed patterns on Result types, error composition, and ADT modeling in Python:
-- **~/.claude/commands/preferences/railway-oriented-programming.md** - Result type implementation, bind/apply, async effects
-- **~/.claude/commands/preferences/algebraic-data-types.md** - Discriminated unions with Pydantic, newtypes, domain modeling
+- **~/.claude/skills/preferences-railway-oriented-programming/SKILL.md** - Result type implementation, bind/apply, async effects
+- **~/.claude/skills/preferences-algebraic-data-types/SKILL.md** - Discriminated unions with Pydantic, newtypes, domain modeling
 
 ## Functional domain modeling in Python
 
