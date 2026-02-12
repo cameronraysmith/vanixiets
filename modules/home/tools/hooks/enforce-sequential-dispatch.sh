@@ -62,7 +62,19 @@ EOF
   fi
 fi
 
-# === CHECK 3: Design doc ===
+# === CHECK 3: Parent epic in_progress advisory ===
+# When dispatching work on an epic child, verify the parent epic is in_progress.
+# Soft warning only: outputs reminder to stderr but allows the dispatch to proceed.
+if echo "$BEAD_ID" | grep -qF '.'; then
+  EPIC_ID="${BEAD_ID%.*}"
+  EPIC_STATUS=$(bd show "$EPIC_ID" --json 2>/dev/null | jq -r '.[0].status // ""' 2>/dev/null || echo "")
+
+  if [ -n "$EPIC_STATUS" ] && [ "$EPIC_STATUS" != "in_progress" ] && [ "$EPIC_STATUS" != "closed" ] && [ "$EPIC_STATUS" != "done" ]; then
+    echo "Parent epic $EPIC_ID is not yet in_progress (currently: $EPIC_STATUS). Consider running: bd update $EPIC_ID --status in_progress" >&2
+  fi
+fi
+
+# === CHECK 4: Design doc ===
 # If the parent epic has a design field, check the file exists
 if echo "$BEAD_ID" | grep -qF '.'; then
   EPIC_ID="${BEAD_ID%.*}"
