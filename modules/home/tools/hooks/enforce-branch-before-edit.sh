@@ -47,7 +47,7 @@ fi
 # Block edits on main or master
 if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
   cat << EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Cannot edit files on $BRANCH branch. Create a worktree for your bead:\n  git worktree add .worktrees/bd-{BEAD_ID} -b bd-{BEAD_ID}\n  cd .worktrees/bd-{BEAD_ID}\nOr create a feature branch:\n  git checkout -b <id>-<descriptor>\nThen retry the edit."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Cannot edit files on $BRANCH branch. Create a worktree for your bead:\n  git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor\n  cd .worktrees/{ID}-descriptor\n(e.g. git worktree add .worktrees/nix-btd-2-my-task -b nix-btd-2-my-task)\nOr create a feature branch:\n  git checkout -b {ID}-descriptor\nThen retry the edit."}}
 EOF
   exit 0
 fi

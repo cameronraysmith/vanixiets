@@ -43,25 +43,30 @@ EOF
 fi
 
 # === CHECK 2: Worktree verification (if worktree exists) ===
-WORKTREE_PATH="$REPO_ROOT/.worktrees/bd-${BEAD_ID}"
-if [ -d "$WORKTREE_PATH" ]; then
+# Convert dots in BEAD_ID to dashes for path/branch prefix matching
+BEAD_PREFIX="${BEAD_ID//\./-}"
+WORKTREE_MATCH=$(find "$REPO_ROOT/.worktrees" -maxdepth 1 -mindepth 1 -type d -name "${BEAD_PREFIX}-*" 2>/dev/null | head -1)
+if [ -n "$WORKTREE_MATCH" ]; then
+  WORKTREE_PATH="$WORKTREE_MATCH"
+  WT_BASENAME=$(basename "$WORKTREE_PATH")
+
   # Check for uncommitted changes in the worktree
   WORKTREE_DIRTY=$(git -C "$WORKTREE_PATH" status --porcelain 2>/dev/null || echo "")
   if [ -n "$WORKTREE_DIRTY" ]; then
     cat << EOF
-{"decision":"block","reason":"Uncommitted changes in worktree .worktrees/bd-$BEAD_ID. Commit all work before completing."}
+{"decision":"block","reason":"Uncommitted changes in worktree .worktrees/$WT_BASENAME. Commit all work before completing."}
 EOF
     exit 0
   fi
 
   # Check that worktree branch was pushed
-  WORKTREE_BRANCH="bd-${BEAD_ID}"
+  WORKTREE_BRANCH="$WT_BASENAME"
   WORKTREE_REMOTE=$(git -C "$WORKTREE_PATH" remote get-url origin 2>/dev/null || echo "")
   if [ -n "$WORKTREE_REMOTE" ]; then
     REMOTE_REF=$(git -C "$WORKTREE_PATH" ls-remote --heads origin "$WORKTREE_BRANCH" 2>/dev/null || echo "")
     if [ -z "$REMOTE_REF" ]; then
       cat << EOF
-{"decision":"block","reason":"Worktree branch $WORKTREE_BRANCH not pushed to remote. Push before completing:\n  git -C .worktrees/bd-$BEAD_ID push -u origin $WORKTREE_BRANCH"}
+{"decision":"block","reason":"Worktree branch $WORKTREE_BRANCH not pushed to remote. Push before completing:\n  git -C .worktrees/$WT_BASENAME push -u origin $WORKTREE_BRANCH"}
 EOF
       exit 0
     fi
