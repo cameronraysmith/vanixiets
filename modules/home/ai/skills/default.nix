@@ -20,38 +20,9 @@
           lib.filterAttrs (_: type: type == "directory") (builtins.readDir dir)
         );
 
-      # Flatten a two-level category/skill directory into keys like
-      # "${prefix}-${category}-${skill}".
-      readSkillsNested =
-        prefix: dir:
-        let
-          categories = lib.filterAttrs (_: type: type == "directory") (builtins.readDir dir);
-        in
-        lib.foldlAttrs (
-          acc: catName: _:
-          let
-            catDir = "${dir}/${catName}";
-            skills = lib.filterAttrs (_: type: type == "directory") (builtins.readDir catDir);
-          in
-          acc
-          // lib.mapAttrs' (
-            name: _: lib.nameValuePair "${prefix}-${catName}-${name}" "${catDir}/${name}"
-          ) skills
-        ) { } categories;
-
       coreSkills = readSkillsFrom ./src/core;
       claudeSkills = readSkillsFrom ./src/claude;
 
-      # Generate home.file or xdg.configFile entries for store path skills
-      storePathSkillFiles =
-        prefix:
-        lib.mapAttrs' (
-          name: source:
-          lib.nameValuePair "${prefix}/${name}" {
-            inherit source;
-            recursive = true;
-          }
-        );
     in
     {
       programs.claude-code.skills = coreSkills // claudeSkills;
