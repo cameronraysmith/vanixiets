@@ -68,6 +68,32 @@ Dispatch clarity:
 - Subagents working on different issues get different worktrees.
 - If a dispatch prompt does not mention a worktree or branch, the subagent should ask rather than assuming.
 
+Worktree lifecycle (create, work, rebase, merge, clean up):
+
+```bash
+# 1. Create worktree and branch
+git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor
+
+# 2. Work in the worktree, making atomic commits
+
+# 3. When work is complete, rebase onto main
+cd .worktrees/{ID}-descriptor
+git rebase main
+
+# 4. Fast-forward merge to main (from repo root)
+cd ../..
+git checkout main
+git merge --ff-only {ID}-descriptor
+
+# 5. Clean up
+git worktree remove .worktrees/{ID}-descriptor
+git branch -d {ID}-descriptor
+```
+
+All merges to main must be fast-forward.
+Rebase the branch onto main before merging to ensure this.
+The repository `merge.ff=only` git config rejects non-fast-forward merges as a safety net.
+
 ## Manual sync workflow
 
 After git operations that modify beads state (pull, checkout, merge, rebase):
