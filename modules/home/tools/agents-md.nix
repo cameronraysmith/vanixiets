@@ -112,6 +112,11 @@
           explain why your proposal is optimal and determine appropriate verification. Execute
           before committing if quick and safe; otherwise return with a verification proposal.
 
+          When dispatching a Task with a BEAD_ID for implementation work, include the target worktree path in the prompt.
+          Convention: `.worktrees/{ID}-descriptor` where dots in bead IDs become dashes.
+          The subagent creates the worktree as its first action; the orchestrator specifies the path, not the mechanics.
+          Example prompt fragment: "Work in .worktrees/nix-btd-2-codify-worktree (create via git worktree add if needed)."
+
           When the work involves parallel independent work streams, adversarial review,
           multi-perspective analysis, or long-running collaborative phases, consider using
           agent teams as a second orchestration mode. Agent teams spawn persistent teammates
