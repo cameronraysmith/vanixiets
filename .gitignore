@@ -49,3 +49,6 @@ secrets/home-manager.backup-pre-2.4/
 
 # bv (beads viewer) local config and caches
 .bv/
+
+# Git worktree checkout directories
+.worktrees/
