@@ -47,10 +47,10 @@ REPO=$(basename "$(git rev-parse --show-toplevel)")
 TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
 bv --robot-triage > "$TRIAGE"
 
-# Extract specific fields
-jq '.quick_ref' "$TRIAGE"              # summary counts and top picks
-jq '.recommendations[:3]' "$TRIAGE"    # top 3 recommendations
-jq '.project_health.graph_metrics.cycles' "$TRIAGE"  # circular deps
+# Extract specific fields (all nested under .triage)
+jq '.triage.quick_ref' "$TRIAGE"              # summary counts and top picks
+jq '.triage.recommendations[:3]' "$TRIAGE"    # top 3 recommendations
+jq '.triage.project_health.graph_metrics.cycles' "$TRIAGE"  # circular deps
 
 # Clean up when done
 rm "$TRIAGE"
