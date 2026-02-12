@@ -314,3 +314,24 @@ Pushing to git remotes:
 - `jj git push` works identically to git push for bookmarks
 - Remote bookmark tracking is automatic
 - Git-specific features (like GitHub PRs) work normally with jj-managed bookmarks
+
+## Beads integration
+
+When `.beads/` exists alongside `.jj/` in a colocated repository, beads issue tracking integrates with jj bookmarks.
+
+Bookmark naming for bead work follows the same `{ID}-descriptor` pattern used in git branch naming, with dots in bead IDs replaced by dashes.
+For example, beads issue `nix-pxj.4` becomes bookmark `nix-pxj-4-deploy-validate`.
+
+Beads IDs take precedence over the `exp-N-description` experiment naming convention when working on tracked issues.
+Use experiment naming only for exploratory work not tied to a beads issue.
+
+Worktrees are a git-only mechanism; jj uses bookmarks for branch-like semantics.
+When in a jj-managed repo, create a bookmark at the working copy for bead work rather than using `git worktree add`:
+
+```bash
+jj bookmark create {ID}-descriptor
+# work, then push:
+jj git push --bookmark {ID}-descriptor
+```
+
+After completing bead work, commit beads changes following the manual sync workflow and update the bookmark before pushing.
