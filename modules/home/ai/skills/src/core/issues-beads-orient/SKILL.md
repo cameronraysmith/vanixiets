@@ -392,6 +392,8 @@ If updates were made, commit the database:
 git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
 ```
 
+Before starting implementation, ensure a branch is created following the worktree and branch conventions in `/issues:beads-prime`.
+
 ---
 
 *Reference docs (read only if deeper patterns needed):*
