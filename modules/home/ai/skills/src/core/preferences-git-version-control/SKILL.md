@@ -124,7 +124,7 @@ Make one logical edit per file (even when using MultiEdit to edit multiple files
 ## Handling pre-existing mixed changes
 
 If you encounter a file with multiple distinct logical changes already present:
-- Preferred: inform user and pause for them to stage interactively with `git add -p [file]`
+- Preferred: inform the user that the file contains mixed changes and pause for them to stage interactively with `git add -p [file]` (this is a human-delegated action; the AI does not execute interactive staging)
 - Alternative: construct patch files manually using `git diff [file]` and `git apply --cached [patch]`, but only when hunks have clear boundaries, are semantically distinct, and you can confidently construct valid unified diff format
 
 ## Commit formatting
@@ -135,7 +135,7 @@ If you encounter a file with multiple distinct logical changes already present:
 - Never @-mention usernames or reference issues/PRs (#NNN, URLs) in commit messages - causes unwanted notifications and immutable backlinks
 - Fixup commits: prefix with "fixup! " followed by exact subject from commit being revised (use only once, not repeated)
 - Stage one file per commit via `git add [file]` after verifying exactly one logical change
-- Never use `git add .`, `git add -A`, or interactive staging (`git add -p`, `git add -i`, `git add -e`) - interactive commands hang
+- Never use `git add .`, `git add -A`, or interactive staging (`git add -p`, `git add -i`, `git add -e`) — interactive commands hang in AI tool execution (the human may run `git add -p` when delegated; see "Handling pre-existing mixed changes")
 
 ## History investigation with pickaxe
 
