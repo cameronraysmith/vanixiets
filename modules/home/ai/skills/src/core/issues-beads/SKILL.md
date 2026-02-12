@@ -75,7 +75,7 @@ When to use each beads command:
 ### Issues
 
 Issues are the fundamental unit of work, identified by short alphanumeric IDs like `bd-a3f8` or project-prefixed IDs like `ironstar-jzb`.
-Each issue has a type (task, bug, feature, epic, milestone), priority (0-3, lower is higher), status (open, closed, in_progress), and optional labels.
+Each issue has a type (task, bug, feature, epic, milestone), priority (0-4, 0=highest, default=2), status (open, closed, in_progress), and optional labels.
 
 Status lifecycle:
 - **open**: Work not yet started or resumed after being blocked
