@@ -109,6 +109,24 @@ Use the graphite CLI (invoke as `graphite`, not `gt` as shown in official docume
 When beads issues have dependencies (e.g., `nix-pxj.2` blocks `nix-pxj.3`), the corresponding branches should form a graphite stack with matching parent-child relationships.
 If you identify a reason to modify beads dependencies while working, evaluate and present a plan to use graphite to reorder the branches associated with previously completed work in the stack, handling any git conflicts that arise.
 
+## Merge strategy selection
+
+Two strategies exist for integrating branches into main.
+The choice depends on whether the project benefits from CI validation or historical change visibility for a given unit of work.
+
+Fast-forward merge to main is the default.
+Branch from main, work in atomic commits, rebase onto main, then `git merge --ff-only` and clean up the branch.
+This suits new projects, straightforward changes, and early-stage repositories where the overhead of a pull request adds no value.
+The fast-forward-only merge policy described above applies in all cases regardless of strategy.
+
+The GitHub PR workflow is preferred when change visibility matters.
+Mature repositories, public-facing changes, and collaborative projects benefit from PRs because the full changeset is referenceable as a single unit with discussion history.
+PRs are also the appropriate path when CI workflow validation via PR checks provides meaningful confidence in the change, beyond what local testing alone offers.
+Follow the PR creation protocol documented below when using this strategy.
+
+When uncertain which strategy to use, ask the user.
+The user can always override in either direction on a per-change basis.
+
 ## File state verification
 
 Before editing any file, run `git status --short [file]` and `git diff [file]` to check for uncommitted changes:
