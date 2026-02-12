@@ -11,6 +11,10 @@ Minimal quick reference when context is constrained.
 For session lifecycle, prefer action commands: `/issues:beads-orient` (start), `/issues:beads-checkpoint` (wind-down).
 For comprehensive reference: `/issues:beads` (complete workflows, concepts, and operations).
 
+This module serves as the common conventions and quick-reference layer that other beads skills reference for core context.
+In particular, orient loads prime as a conventions preamble before performing session diagnostics.
+All beads-related skills should treat the conventions defined here as authoritative.
+
 ## Command index
 
 - `beads-init` - Initial setup for beads issue tracking
@@ -19,6 +23,27 @@ For comprehensive reference: `/issues:beads` (complete workflows, concepts, and 
 - `beads-evolve` - Issue graph refactoring patterns
 - `beads-checkpoint` - Session wind-down and handoff prep
 - `beads-audit` - Database health check and validation
+
+## Conventions
+
+### Epic structure
+
+- Single-layer parent-child only: epics contain issues, not sub-epics. Do not create nested epics without explicit human request.
+- Use `--type parent-child` when wiring parent-child relationships via `bd dep add`. Do not use `--type parent` — beads silently accepts it but does not recognize it for epic tracking.
+- Every issue should be a child of an epic. Standalone orphan issues are discouraged.
+- Create children with `bd create "title" --parent <epic-id>` for auto-incrementing hierarchical IDs, or create standalone and wire with `bd dep add <child> <epic> --type parent-child`.
+
+### Status management
+
+- When starting work on an issue, mark it `in_progress`: `bd update <id> --status in_progress`
+- When starting work on any issue under an epic, also mark the parent epic `in_progress` if not already.
+- Use `bd update <id> --status in_progress` before beginning implementation, not after.
+
+### Closure policy
+
+- LLMs and subagent Tasks can close individual issues automatically: `bd close <id> --reason "Implemented in $(git rev-parse --short HEAD)"`
+- Never close epics directly. Use `bd epic close-eligible --dry-run` to surface readiness, then report to the human for review.
+- After closing issues, check whether additional follow-up issues are needed. Use `bd close <id> --suggest-next` to see newly unblocked work.
 
 ## Manual sync workflow
 
