@@ -23,6 +23,9 @@ The conventions section in that skill establishes the rules that govern all bead
 Execute these commands now:
 
 ```bash
+# For formatted ready/blocked output, use bd list --ready --pretty / bd list --blocked --pretty
+# (--pretty is a bd list flag, not available on bd ready/bd blocked subcommands)
+
 # First, ensure local DB is current
 bd sync --import-only
 
