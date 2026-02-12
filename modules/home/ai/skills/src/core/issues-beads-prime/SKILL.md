@@ -47,15 +47,26 @@ All beads-related skills should treat the conventions defined here as authoritat
 
 ### Worktree and branch workflow
 
-- When to create: after session discussion clarifies what to work on, not at session start.
-  The orient, discuss, decide cycle completes before any branch is created.
-- Branch naming: follow the `<issue-id>-descriptor` pattern in lowercase kebab-case, dots replaced with dashes.
-  Use epic-level branches (e.g. `nix-c6z-beads-conventions`) when working across multiple children; per-issue branches when work is isolated.
-- Creation command: `git checkout -b <branch-name>` from the appropriate base (usually main).
-- Dispatch clarity: when dispatching subagent Tasks for implementation work, the prompt must specify which branch the subagent works in.
-  Subagents working on the same issue share a branch.
-  Subagents working on different issues get different branches.
-- No implicit assumptions: if a dispatch prompt does not mention a branch, the subagent should ask rather than assuming.
+Bead implementation work uses worktrees for isolation; non-bead work uses plain branches.
+Branch naming follows the `{ID}-descriptor` pattern in lowercase kebab-case, with dots in bead IDs replaced by dashes.
+Default granularity is per-issue; use epic-level worktrees only when the orchestrator explicitly specifies.
+
+Worktree creation command (from repo root):
+
+```bash
+git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor
+```
+
+The subagent creates the worktree as its first action before any implementation work begins.
+The `.worktrees/` directory must be listed in `.gitignore`.
+
+For non-bead or quick-fix work, use a plain branch instead: `git checkout -b {ID}-descriptor`.
+
+Dispatch clarity:
+- When dispatching subagent Tasks, the prompt must specify which worktree or branch the subagent works in.
+- Subagents working on the same issue share a worktree.
+- Subagents working on different issues get different worktrees.
+- If a dispatch prompt does not mention a worktree or branch, the subagent should ask rather than assuming.
 
 ## Manual sync workflow
 
