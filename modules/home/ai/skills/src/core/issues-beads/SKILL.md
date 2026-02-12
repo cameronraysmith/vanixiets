@@ -86,7 +86,8 @@ Status lifecycle:
 
 Epics are issues with type `epic` that serve as containers for related work.
 Child issues can be created under epics with hierarchical IDs that auto-increment: `bd-a3f8.1`, `bd-a3f8.2`, and so on.
-This hierarchy supports up to three levels of nesting for complex work breakdown structures.
+The beads tool supports up to three levels of hierarchical IDs for complex work breakdown structures, but the team convention is single-layer parent-child only: epics contain issues, not sub-epics.
+Do not create nested epics without explicit human request.
 
 Epics should represent coherent work packages, not just organizational groupings.
 An epic is eligible for closure when all its child issues are closed.
