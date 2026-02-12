@@ -126,11 +126,6 @@
 
           For detailed agent team conventions including teammate isolation, beads-to-task-list
           mirroring, and the orient/checkpoint lifecycle, see ${skillsPath}/meta-agent-teams/SKILL.md
-
-          Agents must never close epics directly. Close only individual issues within
-          an epic. When all children of an epic are closed, the Kanban UI automatically
-          moves the epic to "In Review" for human verification. This convention ensures
-          human oversight of aggregate work before epic completion.
         '';
       };
     };
