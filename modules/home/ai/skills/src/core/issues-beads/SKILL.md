@@ -140,13 +140,13 @@ bd hooks run pre-commit
 
 # Commit the database
 git add .beads/issues.jsonl
-git commit -m "chore(issues): <description of changes>"
+git commit -m "chore(beads): <description of changes>"
 ```
 
 Commit frequency recommendations:
 - **Eager**: After each logical batch (creating an epic with children, wiring dependencies)
 - **Session boundary**: At minimum, commit before ending work via `/issues:beads-checkpoint`
-- **Descriptive when relevant**: For significant changes, use specific messages like `chore(issues): close auth epic after implementation`
+- **Descriptive when relevant**: For significant changes, use specific messages like `chore(beads): close auth epic after implementation`
 
 ### After git pull/checkout/merge
 
@@ -533,7 +533,7 @@ Commit beads changes:
 ```bash
 bd hooks run pre-commit
 git add .beads/issues.jsonl
-git commit -m "chore(issues): close <issue-id> and update graph"
+git commit -m "chore(beads): close <issue-id> and update graph"
 ```
 
 ### Phase 5: Session wind-down

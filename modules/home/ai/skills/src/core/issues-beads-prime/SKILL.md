@@ -111,7 +111,7 @@ bd hooks run pre-commit
 
 # Commit beads changes
 git add .beads/issues.jsonl
-git commit -m "chore(issues): ..."
+git commit -m "chore(beads): ..."
 ```
 
 Additional sync flags:

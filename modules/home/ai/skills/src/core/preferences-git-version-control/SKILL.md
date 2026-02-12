@@ -24,7 +24,7 @@ When `.beads/` exists, maintain the issue graph alongside git commits:
 - Create issues discovered during work and wire with `bd dep add <new> <current> --type discovered-from`
 - Close with implementation context: `bd close <id> --reason "Implemented in $(git rev-parse --short HEAD)"`
 - Check what's unblocked after completion; consider updating newly-ready issues with helpful context
-- Commit beads changes: `bd hooks run pre-commit && git add .beads/issues.jsonl && git commit -m "chore(issues): ..."`
+- Commit beads changes: `bd hooks run pre-commit && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`
 
 For beads usage conventions (epic structure, status management, closure policy), see the conventions section of issues-beads-prime.
 Consult `~/.claude/commands/issues/beads-prime.md` for command quick reference.
