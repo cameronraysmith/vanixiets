@@ -45,6 +45,18 @@ All beads-related skills should treat the conventions defined here as authoritat
 - Never close epics directly. Use `bd epic close-eligible --dry-run` to surface readiness, then report to the human for review.
 - After closing issues, check whether additional follow-up issues are needed. Use `bd close <id> --suggest-next` to see newly unblocked work.
 
+### Worktree and branch workflow
+
+- When to create: after session discussion clarifies what to work on, not at session start.
+  The orient, discuss, decide cycle completes before any branch is created.
+- Branch naming: follow the `<issue-id>-descriptor` pattern in lowercase kebab-case, dots replaced with dashes.
+  Use epic-level branches (e.g. `nix-c6z-beads-conventions`) when working across multiple children; per-issue branches when work is isolated.
+- Creation command: `git checkout -b <branch-name>` from the appropriate base (usually main).
+- Dispatch clarity: when dispatching subagent Tasks for implementation work, the prompt must specify which branch the subagent works in.
+  Subagents working on the same issue share a branch.
+  Subagents working on different issues get different branches.
+- No implicit assumptions: if a dispatch prompt does not mention a branch, the subagent should ask rather than assuming.
+
 ## Manual sync workflow
 
 After git operations that modify beads state (pull, checkout, merge, rebase):
