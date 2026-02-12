@@ -73,6 +73,31 @@ Per-issue granularity is the default; epic-level worktrees are used only when th
 
 After the branch is merged, clean up the worktree: `git worktree remove .worktrees/{ID}-descriptor`.
 
+### Fast-forward-only merge policy
+
+All merges to main must be fast-forward.
+This preserves linear history, making bisect, revert, and log traversal straightforward.
+
+Set the repository-level guardrail so non-fast-forward merges are rejected:
+
+```bash
+git config merge.ff only
+```
+
+Before merging a branch, rebase it onto main to ensure the merge is a fast-forward:
+
+```bash
+git checkout {branch}
+git rebase main
+# resolve any conflicts, then:
+git checkout main
+git merge --ff-only {branch}
+```
+
+Never use `git merge` without `--ff-only` on main.
+If a branch has diverged and rebase produces conflicts, resolve them during the rebase rather than creating a merge commit.
+The `merge.ff=only` git config rejects non-fast-forward merges automatically, serving as a safety net even if `--ff-only` is omitted.
+
 ### Branch stacks with graphite
 
 Use the graphite CLI (invoke as `graphite`, not `gt` as shown in official documentation) to manage stacks of dependent branches that mirror beads issue dependencies:
