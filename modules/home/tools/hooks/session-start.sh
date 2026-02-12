@@ -44,13 +44,12 @@ fi
 
 # === Worktree cleanup suggestions ===
 if [ "$IN_GIT_REPO" = true ] && [ -d "$REPO_ROOT/.worktrees" ]; then
-  for worktree in $(git worktree list --porcelain 2>/dev/null | grep "^worktree.*\.worktrees/bd-" | sed 's/^worktree //'); do
+  for worktree in $(git worktree list --porcelain 2>/dev/null | grep "^worktree.*\.worktrees/" | sed 's/^worktree //'); do
     WT_BASENAME=$(basename "$worktree")
-    WT_BEAD_ID="${WT_BASENAME#bd-}"
     if git branch --merged main 2>/dev/null | grep -q "$WT_BASENAME"; then
       if [ "$HAS_OUTPUT" = true ]; then echo ""; fi
       echo "Merged worktree $WT_BASENAME can be cleaned up:"
-      echo "  git worktree remove $worktree && bd close $WT_BEAD_ID"
+      echo "  git worktree remove $worktree"
       HAS_OUTPUT=true
     fi
   done
