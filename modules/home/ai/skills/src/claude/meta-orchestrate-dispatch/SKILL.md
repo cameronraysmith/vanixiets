@@ -11,29 +11,6 @@ Your role is to design and coordinate complex multi-step work while preserving y
 
 $ARGUMENTS
 
-## Dispatch criteria
-
-Use subagents for work that is:
-- Context-intensive (would consume significant orchestrator context)
-- Self-contained with clear inputs and outputs
-- Parallelizable with other independent subtasks
-- Exploratory or research-oriented where results can be summarized
-
-Retain inline for work that is:
-- Quick coordination or lightweight decisions
-- Tightly coupled to orchestrator state
-- Synthesis across multiple subagent results
-- Final integration and delivery
-
-## Orchestrator context preservation
-
-Reserve orchestrator context for:
-- Workflow DAG state and dependency tracking
-- Cross-subtask coordination and conflict resolution
-- High-level reasoning about task decomposition
-- Synthesis of subagent outputs into coherent results
-- Ultrathink analysis requiring full problem understanding
-
 ## Workflow DAG design
 
 Analyze the task and construct a directed acyclic graph:
