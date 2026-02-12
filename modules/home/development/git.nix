@@ -72,6 +72,7 @@
               templateDir = ""; # Explicitly disable legacy template directory
             };
             merge.conflictstyle = "diff3";
+            merge.ff = "only";
             push = {
               autoSetupRemote = true;
               useForceIfIncludes = true;
