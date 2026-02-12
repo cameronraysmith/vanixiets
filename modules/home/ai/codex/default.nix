@@ -16,9 +16,12 @@
         # https://github.com/openai/codex/blob/main/codex-rs/config.md
         settings = {
           # Model configuration
-          model = "gpt-5.2-codex";
+          model = "gpt-5.3-codex";
           # model_reasoning_effort = "high";
           # model_reasoning_summary = "auto";
+
+          # Web search (replaces deprecated features.web_search_cached)
+          web_search = "cached";
 
           # Approval and interaction
           approval_policy = "on-request";
@@ -54,7 +57,6 @@
             shell_snapshot = true;
             steer = true;
             unified_exec = true;
-            web_search_cached = true;
           };
         };
 
