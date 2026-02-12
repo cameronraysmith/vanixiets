@@ -15,6 +15,9 @@ This command assumes the issue graph is healthy.
 If you discover structural problems (cycles, broken references, inconsistent states), use `/issues:beads-evolve` instead.
 If you need to validate graph health, use `/issues:beads-audit` first.
 
+Before running orientation commands, load `/issues:beads-prime` for core beads conventions and command quick reference.
+The conventions section in that skill establishes the rules that govern all beads operations during this session.
+
 ## Run orientation commands
 
 Execute these commands now:
