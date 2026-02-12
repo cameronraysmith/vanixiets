@@ -22,10 +22,11 @@ When `.beads/` exists, maintain the issue graph alongside git commits:
 - Orient with `bd status` at session start; sync with `bd sync --import-only` after git operations
 - Mark issues `in_progress` when starting work; update descriptions when assumptions prove incorrect
 - Create issues discovered during work and wire with `bd dep add <new> <current> --type discovered-from`
-- Close with implementation context: `bd close <id> --comment "Implemented in $(git rev-parse --short HEAD)"`
+- Close with implementation context: `bd close <id> --reason "Implemented in $(git rev-parse --short HEAD)"`
 - Check what's unblocked after completion; consider updating newly-ready issues with helpful context
 - Commit beads changes: `bd hooks run pre-commit && git add .beads/issues.jsonl && git commit -m "chore(issues): ..."`
 
+For beads usage conventions (epic structure, status management, closure policy), see the conventions section of issues-beads-prime.
 Consult `~/.claude/commands/issues/beads-prime.md` for command quick reference.
 
 ## Escape hatches
