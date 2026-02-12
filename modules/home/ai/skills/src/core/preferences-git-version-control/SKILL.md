@@ -56,6 +56,23 @@ Create a new branch when your next commits won't match the current branch's ID-d
 
 Default bias: if in doubt whether work is related, create a new branch - branches are cheap, tangled history is expensive.
 
+### Worktree isolation
+
+Bead implementation work uses worktrees rooted in `.worktrees/` at the repository root.
+This directory must be listed in `.gitignore`.
+
+Create a worktree and its tracking branch in one command (from repo root):
+
+```bash
+git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor
+```
+
+Use worktrees for bead-tracked implementation work; use plain branches (`git checkout -b`) for non-bead or quick-fix work.
+The working agent creates the worktree as its first action before any implementation begins.
+Per-issue granularity is the default; epic-level worktrees are used only when the orchestrator explicitly specifies.
+
+After the branch is merged, clean up the worktree: `git worktree remove .worktrees/{ID}-descriptor`.
+
 ### Branch stacks with graphite
 
 Use the graphite CLI (invoke as `graphite`, not `gt` as shown in official documentation) to manage stacks of dependent branches that mirror beads issue dependencies:
