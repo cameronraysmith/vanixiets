@@ -60,14 +60,14 @@
               autoAllowBashIfSandboxed = true;
               allowUnsandboxedCommands = false;
               excludedCommands = [
-                "atuin"
-                "docker"
-                "gh"
-                "git"
-                "nix"
-                "pbcopy"
-                "pbpaste"
-                "prek"
+                "atuin:*"
+                "docker:*"
+                "gh:*"
+                "git:*"
+                "nix:*"
+                "pbcopy:*"
+                "pbpaste:*"
+                "prek:*"
               ];
               network = {
                 allowedDomains = [
