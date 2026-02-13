@@ -121,6 +121,31 @@ bd dep remove <upstream> <downstream>
 If lint issues are found, resolve before committing.
 This prevents corrupting the graph during wind-down.
 
+### Parent-child integrity
+
+Verify that any issues created during this session have proper epic parentage:
+
+```bash
+bd epic status
+bd list --pretty
+```
+
+If any epic shows `0/0 children` that previously had children, or if newly created issues don't appear under an epic in the tree, containment may have been wired as `blocks` instead of `parent-child`.
+
+When creating issues during checkpoint (discovered work, follow-ups), always specify the parent epic:
+
+```bash
+# Preferred: parent at creation time
+bd create "Discovered: ..." -t bug -p 2 --parent <relevant-epic-id>
+bd dep add <new-id> <current-id> --type discovered-from
+
+# If parent was omitted at creation, add it explicitly
+bd dep add <new-id> <relevant-epic-id> --type parent-child
+```
+
+Do not rely on `blocks` relationships for containment.
+An issue connected to an epic via `blocks` is a sequencing constraint, not containment, and will not appear in `bd epic status` child counts.
+
 ## Reflect
 
 Consider what was learned this session that the issue graph does not yet reflect.
@@ -176,8 +201,8 @@ bd update <issue-id> --description "Revised: <what changed and why>"
 
 **Discovered issues:**
 ```bash
-# Create with traceability to current work
-bd create "<title>" -t <bug|task|feature> -p <priority>
+# Create with traceability and epic parentage
+bd create "<title>" -t <bug|task|feature> -p <priority> --parent <relevant-epic-id>
 bd dep add <new-id> <current-issue-id> --type discovered-from
 ```
 
