@@ -23,6 +23,10 @@
                   type = "command";
                   command = "gate-mutating-http";
                 }
+                {
+                  type = "command";
+                  command = "gate-dangerous-commands";
+                }
               ];
             }
             {
