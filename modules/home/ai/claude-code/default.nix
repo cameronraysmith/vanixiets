@@ -112,6 +112,7 @@
                 "Bash(rm -rf:*)"
                 "Read(.env*)"
                 "Read(*secret*)"
+                "Read(~/.config/sops/age/**)"
               ];
               ask = [ ];
             };
