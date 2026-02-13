@@ -46,12 +46,21 @@
             alwaysThinkingEnabled = true;
 
             env = {
+              ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-4-5-20250929";
+              ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-4-6";
+              ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-opus-4-6";
+              ASTRO_TELEMETRY_DISABLED = "1";
+              CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR = "1";
+              CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY = "1";
               CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1";
-              # CLAUDE_CODE_SUBAGENT_MODEL = "claude-opus-4-6";
-              UV_NO_SYNC = "1";
+              CLAUDE_CODE_SUBAGENT_MODEL = "claude-opus-4-6";
+              DISABLE_BUG_COMMAND = "1";
+              DISABLE_ERROR_REPORTING = "1";
+              DISABLE_TELEMETRY = "1";
+              MAX_MCP_OUTPUT_TOKENS = "40000";
               TMPDIR = "/tmp/claude";
               TMPPREFIX = "/tmp/claude/zsh";
-              ASTRO_TELEMETRY_DISABLED = "1";
+              UV_NO_SYNC = "1";
             };
             teammateMode = "tmux";
 
