@@ -42,6 +42,8 @@
 
             env = {
               CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1";
+              TMPDIR = "/tmp/claude";
+              TMPPREFIX = "/tmp/claude/zsh";
             };
             teammateMode = "tmux";
 
