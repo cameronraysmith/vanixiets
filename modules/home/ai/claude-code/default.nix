@@ -172,19 +172,42 @@
                 "mcp__*"
               ];
               deny = [
+                # Privilege escalation
                 "Bash(sudo:*)"
-                "Bash(rm -rf:*)"
+                # rm is handled by redirect-rm-to-rip PreToolUse hook
+                "Bash(rm *)"
+                # Secrets
                 "Read(.env*)"
                 "Read(~/.config/sops/age/**)"
               ];
               ask = [
+                # Git: push and destructive operations
                 "Bash(git push:*)"
+                "Bash(git reset --hard*)"
+                "Bash(git clean *)"
+                "Bash(git checkout .)"
+                "Bash(git checkout -- .)"
+                "Bash(git restore .)"
+                "Bash(git restore --staged .)"
+                # GitHub CLI: mutating operations
                 "Bash(gh pr create:*)"
                 "Bash(gh pr comment:*)"
+                "Bash(gh pr merge:*)"
+                "Bash(gh pr close:*)"
+                "Bash(gh pr edit:*)"
+                "Bash(gh pr review:*)"
                 "Bash(gh issue create:*)"
                 "Bash(gh issue comment:*)"
+                "Bash(gh issue close:*)"
+                "Bash(gh issue edit:*)"
+                "Bash(gh repo create:*)"
                 "Bash(gh repo delete:*)"
+                "Bash(gh repo rename:*)"
+                "Bash(gh release create:*)"
+                "Bash(gh release delete:*)"
+                # Nix: arbitrary code execution
                 "Bash(nix run *)"
+                "Bash(nix shell *)"
               ];
             };
           };
