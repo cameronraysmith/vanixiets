@@ -4,7 +4,7 @@
 # Fetches platform-specific binaries from the official GCS release bucket.
 # Version and checksums tracked in manifest.json alongside this file.
 #
-# Update: cd pkgs/by-name/claude-code && ./update.sh
+# Update: $(nix build --no-link --print-out-paths .#claude-code.updateScript)
 # Source: https://github.com/anthropics/claude-code
 # Based on: https://github.com/mirkolenz/nixos (pkgs/derivations/claude-code-bin)
 {
