@@ -61,6 +61,7 @@
               allowUnsandboxedCommands = false;
               excludedCommands = [
                 "docker"
+                "gh"
                 "git"
                 "nix"
               ];
