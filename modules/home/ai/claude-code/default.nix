@@ -79,6 +79,7 @@
               defaultMode = "acceptEdits";
               # only enforced from managed-settings.json, included here as intent marker
               disableBypassPermissionsMode = "disable";
+              additionalDirectories = [ "~/projects" ];
               allow = [
                 # Basics
                 "Bash(cat:*)"
