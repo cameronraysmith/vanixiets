@@ -76,13 +76,13 @@ git -C <target-repo> commit -m "chore: update worktree sparsity metrics"
 When sparse checkout is recommended, use this command template instead of plain `git worktree add`:
 
 ```bash
-git worktree add --no-checkout .worktrees/{ID}-descriptor -b {ID}-descriptor
+git worktree add --no-checkout .worktrees/{ID}-descriptor -b {ID}-descriptor main
 cd .worktrees/{ID}-descriptor
 git sparse-checkout init --cone
 git sparse-checkout set <paths-relevant-to-task>
 git checkout
 ```
 
-When not recommended, use standard `git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor`.
+When not recommended, use standard `git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main`.
 
 For guidance on choosing paths for `git sparse-checkout set`, see `references/sparse-checkout-patterns.md`.
