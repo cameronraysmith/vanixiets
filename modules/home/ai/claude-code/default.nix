@@ -60,6 +60,8 @@
 
             permissions = {
               defaultMode = "acceptEdits";
+              # only enforced from managed-settings.json, included here as intent marker
+              disableBypassPermissionsMode = "disable";
               allow = [
                 # Basics
                 "Bash(cat:*)"
@@ -120,9 +122,9 @@
         ];
 
         home.shellAliases = {
-          ccds = "claude --dangerously-skip-permissions";
-          ccglm = "claude-glm --dangerously-skip-permissions";
-          cccb = "claude-cerebras --dangerously-skip-permissions";
+          ccds = "claude";
+          ccglm = "claude-glm";
+          cccb = "claude-cerebras";
         };
 
         # symlink .local/bin to satisfy claude doctor
