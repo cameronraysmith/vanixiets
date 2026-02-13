@@ -1,7 +1,10 @@
 #!/usr/bin/env nix-shell
-#!nix-shell --pure -i bash -p curl jq cacert
+#!nix-shell --pure -i bash -p curl jq cacert git
 
 set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+MANIFEST="${REPO_ROOT}/pkgs/by-name/claude-code/manifest.json"
 
 GCS_BUCKET="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
 
@@ -19,4 +22,4 @@ manifest="$(
     )
   }'
 )"
-echo "$manifest" > ./manifest.json
+echo "$manifest" > "$MANIFEST"
