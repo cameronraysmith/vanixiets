@@ -241,6 +241,15 @@
                 # Does not cover httpie (http/https) or xh; add if these enter the workflow
                 "Bash(curl *)"
                 "Bash(wget *)"
+                # Destructive find/xargs patterns (bypass rm deny via -exec/xargs)
+                "Bash(find *-delete*)"
+                "Bash(find *-exec*rm *)"
+                "Bash(xargs rm*)"
+                "Bash(xargs *rm*)"
+                # Raw writes and secure deletion
+                "Bash(dd *)"
+                "Bash(truncate *)"
+                "Bash(shred *)"
               ];
             };
           };
