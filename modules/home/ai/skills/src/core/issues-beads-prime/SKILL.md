@@ -54,7 +54,7 @@ Default granularity is per-issue; use epic-level worktrees only when the orchest
 Worktree creation command (from repo root):
 
 ```bash
-git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor
+git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main
 ```
 
 The subagent creates the worktree as its first action before any implementation work begins.
@@ -72,7 +72,7 @@ Worktree lifecycle (create, work, rebase, merge, clean up):
 
 ```bash
 # 1. Create worktree and branch
-git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor
+git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main
 
 # 2. Work in the worktree, making atomic commits
 
