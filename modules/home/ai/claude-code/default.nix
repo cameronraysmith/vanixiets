@@ -47,7 +47,7 @@
 
             env = {
               CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1";
-              CLAUDE_CODE_SUBAGENT_MODEL = "claude-opus-4-6";
+              # CLAUDE_CODE_SUBAGENT_MODEL = "claude-opus-4-6";
               UV_NO_SYNC = "1";
               TMPDIR = "/tmp/claude";
               TMPPREFIX = "/tmp/claude/zsh";
