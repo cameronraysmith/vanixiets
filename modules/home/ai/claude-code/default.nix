@@ -60,6 +60,7 @@
               autoAllowBashIfSandboxed = true;
               allowUnsandboxedCommands = false;
               excludedCommands = [
+                "atuin"
                 "docker"
                 "gh"
                 "git"
