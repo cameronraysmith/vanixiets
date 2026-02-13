@@ -172,8 +172,6 @@
                 "mcp__*"
               ];
               deny = [
-                # Privilege escalation
-                "Bash(sudo:*)"
                 # rm is handled by redirect-rm-to-rip PreToolUse hook
                 "Bash(rm *)"
                 # Secrets
@@ -181,6 +179,8 @@
                 "Read(~/.config/sops/age/**)"
               ];
               ask = [
+                # Privilege escalation
+                "Bash(sudo:*)"
                 # Git: push and destructive operations
                 "Bash(git push:*)"
                 "Bash(git reset --hard*)"
