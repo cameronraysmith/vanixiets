@@ -61,6 +61,7 @@
               allowUnsandboxedCommands = false;
               excludedCommands = [
                 "docker"
+                "git"
                 "nix"
               ];
               network = {
