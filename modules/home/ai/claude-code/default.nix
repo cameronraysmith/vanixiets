@@ -152,6 +152,10 @@
                 "Bash(nvidia-smi:*)"
                 "Bash(test:*)"
                 "Bash(typst:*)"
+                # Shell utilities
+                "Bash(atuin:*)"
+                "Bash(pbcopy:*)"
+                "Bash(pbpaste:*)"
                 # Web tools
                 "WebFetch"
                 "WebSearch"
