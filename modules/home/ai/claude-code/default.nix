@@ -97,6 +97,9 @@
                 # Development tools
                 "Bash(jq:*)"
                 "Bash(test:*)"
+                # Web tools
+                "WebFetch"
+                "WebSearch"
                 # mcps
                 "mcp__*"
               ];
