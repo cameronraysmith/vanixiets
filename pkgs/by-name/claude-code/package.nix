@@ -1,12 +1,12 @@
-# Claude Code CLI - prebuilt binary from Anthropic GCS distribution
+# credit to mirkolenz' derivation for installing the prebuilt binary
+# https://github.com/NixOS/nixpkgs/pull/447265
+# https://github.com/mirkolenz/nixos/tree/main/pkgs/derivations/claude-code-bin
 #
-# Agentic coding tool that lives in the terminal.
-# Fetches platform-specific binaries from the official GCS release bucket.
-# Version and checksums tracked in manifest.json alongside this file.
+# fetches platform-specific binaries from the official gcs release bucket.
+# version and checksums tracked in manifest.json alongside this file.
 #
-# Update: nix run .#update-claude-code
-# Source: https://github.com/anthropics/claude-code
-# Based on: https://github.com/mirkolenz/nixos (pkgs/derivations/claude-code-bin)
+# update: nix run .#update-claude-code
+# source: https://github.com/anthropics/claude-code
 {
   lib,
   stdenvNoCC,
