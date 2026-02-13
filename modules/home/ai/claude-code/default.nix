@@ -79,7 +79,10 @@
               defaultMode = "acceptEdits";
               # only enforced from managed-settings.json, included here as intent marker
               disableBypassPermissionsMode = "disable";
-              additionalDirectories = [ "~/projects" ];
+              additionalDirectories = [
+                "~/projects"
+                "/nix/store"
+              ];
               allow = [
                 # Basics
                 "Bash(cat:*)"
@@ -122,8 +125,10 @@
                 # Web tools
                 "WebFetch"
                 "WebSearch"
-                # Allow all reads; deny rules below still block .env, secrets, sops keys
+                # Allow all reads and searches; deny rules still block .env, secrets, sops keys
                 "Read"
+                "Grep"
+                "Glob"
                 # mcps
                 "mcp__*"
               ];
