@@ -132,13 +132,6 @@
           };
         };
 
-        # Sandboxed Claude variants (Linux only via landrun/Landlock)
-        # These are on PATH directly, not requiring `nix run`
-        home.packages = lib.optionals pkgs.stdenv.isLinux [
-          flake.packages.${pkgs.stdenv.hostPlatform.system}.claude-sandboxed
-          flake.packages.${pkgs.stdenv.hostPlatform.system}.ccds-sandboxed
-        ];
-
         home.shellAliases = {
           ccds = "claude";
           ccglm = "claude-glm";
