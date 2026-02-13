@@ -33,6 +33,33 @@ All beads-related skills should treat the conventions defined here as authoritat
 - Every issue should be a child of an epic. Standalone orphan issues are discouraged.
 - Create children with `bd create "title" --parent <epic-id>` for auto-incrementing hierarchical IDs, or create standalone and wire with `bd dep add <child> <epic> --type parent-child`.
 
+### Dependency type discipline
+
+Two dependency types serve fundamentally different purposes and must never be conflated.
+
+*Containment* (issue belongs to an epic) uses `parent-child` type exclusively.
+Establish at creation via `bd create "title" --parent <epic-id>`, or post-hoc via `bd dep add <child> <epic> --type parent-child`.
+Every non-epic issue must have exactly one parent-child relationship to an epic.
+An epic does not "block" its children — children are ready to work as soon as their sibling and cross-epic dependencies allow.
+
+*Sequencing* (A must complete before B can start) uses `blocks` type, the default.
+Establish via `bd dep add <blocker> <blocked>` between siblings, across epics, or between epics themselves.
+
+The antipattern to avoid: wiring an issue as "blocked by" its containing epic instead of as a "child of" that epic.
+This causes `bd epic status` to report 0 children for the epic and makes the issue appear blocked when it should be ready.
+
+When an issue relates to multiple epics, use `parent-child` for the primary and `related` for secondary associations.
+An issue can have at most one parent-child relationship.
+
+Verification after bulk operations:
+
+```bash
+# Any epic showing 0/0 children that has BLOCKS deps to non-epic issues has the antipattern
+bd epic status
+```
+
+If `bd epic status` shows `0/0 children` for an epic known to contain issues, the containment relationships were likely wired as `blocks` instead of `parent-child`.
+
 ### Status management
 
 - When starting work on an issue, mark it `in_progress`: `bd update <id> --status in_progress`
