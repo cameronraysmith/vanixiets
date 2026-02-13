@@ -567,21 +567,6 @@
         "type": "github"
       }
     },
-    "landrun-nix": {
-      "locked": {
-        "lastModified": 1770244661,
-        "narHash": "sha256-IdDKAbTVX+75OyR8gD4HCq9t4odmNL/6an45kWgjoYc=",
-        "owner": "srid",
-        "repo": "landrun-nix",
-        "rev": "5d3c76575cc23e787f49989977c87af507c9bcaa",
-        "type": "github"
-      },
-      "original": {
-        "owner": "srid",
-        "repo": "landrun-nix",
-        "type": "github"
-      }
-    },
     "lazyvim-nix": {
       "inputs": {
         "flake-utils": "flake-utils",
@@ -1249,7 +1234,6 @@
         "git-hooks": "git-hooks",
         "home-manager": "home-manager",
         "import-tree": "import-tree",
-        "landrun-nix": "landrun-nix",
         "lazyvim-nix": "lazyvim-nix",
         "llm-agents": "llm-agents",
         "mac-app-util": "mac-app-util",
