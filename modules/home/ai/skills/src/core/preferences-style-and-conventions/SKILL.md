@@ -56,6 +56,14 @@ Avoid splitting when it would fragment a genuinely cohesive unit or create exces
 
 ## Development workflow and tooling
 
+### Pre-implementation checkpoint
+
+Before transitioning from planning to implementation, materialize the plan into concrete commitments.
+Determine precisely which files and directories will be modified, created, or removed.
+Define the grouping and sequence of commits with draft commit messages.
+Specify how each commit or collection of changes will be verified as useful progress: passing new or existing tests, producing observable output, improving conceptual clarity, or satisfying other criteria appropriate to the change.
+This checkpoint converts abstract plans into auditable intentions, reducing rework from misaligned assumptions.
+
 - Always at least consider testing changes with the relevant framework like bash shell commands where you can validate output, `cargo test`, `pytest`, `vitest`, `nix eval` or `nix build`, a task runner like `just test` or `make test`, or `gh workflow run` before considering any work to be complete and correct.
 - Be judicious about test execution. If a test might take a very long time, be resource-intensive, or require elevated security privileges but is important, pause to provide the proposed command and reason why it's an important test.
 - Local test execution is the primary feedback loop during development.
