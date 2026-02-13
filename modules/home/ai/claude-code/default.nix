@@ -100,62 +100,67 @@
               disableBypassPermissionsMode = "disable";
               additionalDirectories = [ "~/projects" ];
               allow = [
-                # Basics
-                "Bash(cat:*)"
-                "Bash(echo:*)"
-                "Bash(fd:*)"
-                "Bash(find:*)"
-                "Bash(grep:*)"
-                "Bash(head:*)"
-                "Bash(ls:*)"
-                "Bash(mkdir:*)"
-                "Bash(pwd)"
-                "Bash(rg:*)"
-                "Bash(tail:*)"
-                "Bash(pgrep:*)"
-                "Bash(ps:*)"
-                "Bash(sed:*)"
-                "Bash(sort:*)"
-                "Bash(tree:*)"
-                "Bash(wc:*)"
-                "Bash(which:*)"
-                # Git operations
+                # Blanket Bash allow; dangerous commands gated via deny/ask lists.
+                # Replaces per-command opt-in which couldn't handle shell constructs
+                # like env var prefixes, command substitution, or pipes.
+                "Bash"
+                # --- Legacy per-command Bash patterns (retained for reference) ---
+                # # Basics
+                # "Bash(cat:*)"
+                # "Bash(echo:*)"
+                # "Bash(fd:*)"
+                # "Bash(find:*)"
+                # "Bash(grep:*)"
+                # "Bash(head:*)"
+                # "Bash(ls:*)"
+                # "Bash(mkdir:*)"
+                # "Bash(pwd)"
+                # "Bash(rg:*)"
+                # "Bash(tail:*)"
+                # "Bash(pgrep:*)"
+                # "Bash(ps:*)"
+                # "Bash(sed:*)"
+                # "Bash(sort:*)"
+                # "Bash(tree:*)"
+                # "Bash(wc:*)"
+                # "Bash(which:*)"
+                # # Git operations
                 # "Bash(git:*)"
-                "Bash(git add:*)"
-                "Bash(git branch:*)"
-                "Bash(git checkout:*)"
-                "Bash(git commit:*)"
-                "Bash(git config:*)"
-                "Bash(git diff:*)"
-                "Bash(git log:*)"
-                "Bash(git ls-files:*)"
-                "Bash(git ls-remote:*)"
-                "Bash(git merge:*)"
-                "Bash(git rebase:*)"
-                "Bash(git remote:*)"
-                "Bash(git rev-parse:*)"
-                "Bash(git show:*)"
-                "Bash(git stash:*)"
-                "Bash(git status:*)"
-                "Bash(git subtree:*)"
-                "Bash(git tag:*)"
-                "Bash(git worktree:*)"
-                # GitHub CLI
-                "Bash(gh:*)"
-                # Nix operations
-                "Bash(nix build:*)"
-                "Bash(nix develop:*)"
-                "Bash(nix flake:*)"
-                # Development tools
-                "Bash(jq:*)"
-                "Bash(latexmk:*)"
-                "Bash(nvidia-smi:*)"
-                "Bash(test:*)"
-                "Bash(typst:*)"
-                # Shell utilities
-                "Bash(atuin:*)"
-                "Bash(pbcopy:*)"
-                "Bash(pbpaste:*)"
+                # "Bash(git add:*)"
+                # "Bash(git branch:*)"
+                # "Bash(git checkout:*)"
+                # "Bash(git commit:*)"
+                # "Bash(git config:*)"
+                # "Bash(git diff:*)"
+                # "Bash(git log:*)"
+                # "Bash(git ls-files:*)"
+                # "Bash(git ls-remote:*)"
+                # "Bash(git merge:*)"
+                # "Bash(git rebase:*)"
+                # "Bash(git remote:*)"
+                # "Bash(git rev-parse:*)"
+                # "Bash(git show:*)"
+                # "Bash(git stash:*)"
+                # "Bash(git status:*)"
+                # "Bash(git subtree:*)"
+                # "Bash(git tag:*)"
+                # "Bash(git worktree:*)"
+                # # GitHub CLI
+                # "Bash(gh:*)"
+                # # Nix operations
+                # "Bash(nix build:*)"
+                # "Bash(nix develop:*)"
+                # "Bash(nix flake:*)"
+                # # Development tools
+                # "Bash(jq:*)"
+                # "Bash(latexmk:*)"
+                # "Bash(nvidia-smi:*)"
+                # "Bash(test:*)"
+                # "Bash(typst:*)"
+                # # Shell utilities
+                # "Bash(atuin:*)"
+                # "Bash(pbcopy:*)"
+                # "Bash(pbpaste:*)"
                 # Web tools
                 "WebFetch"
                 "WebSearch"
@@ -168,18 +173,18 @@
               ];
               deny = [
                 "Bash(sudo:*)"
+                "Bash(rm -rf:*)"
+                "Read(.env*)"
+                "Read(~/.config/sops/age/**)"
+              ];
+              ask = [
+                "Bash(git push:*)"
                 "Bash(gh pr create:*)"
                 "Bash(gh pr comment:*)"
                 "Bash(gh issue create:*)"
                 "Bash(gh issue comment:*)"
                 "Bash(gh repo delete:*)"
-                "Bash(rm -rf:*)"
-                "Read(.env*)"
-                "Read(~/.config/sops/age/**)"
                 "Bash(nix run *)"
-              ];
-              ask = [
-                "Bash(git push:*)"
               ];
             };
           };
