@@ -37,6 +37,41 @@ Transform architecture documents into beads work items:
 
 The beads database becomes the living work tracker while architecture docs remain as context and rationale.
 
+## Containment vs sequencing
+
+Two distinct relationship types connect issues in the graph.
+Conflating them is the most common structural error in seeded graphs.
+
+*Containment* answers "which epic does this issue belong to?"
+Use `--parent <epic-id>` at creation time, which also assigns hierarchical IDs (e.g., `bd-auth.1`, `bd-auth.2`).
+Alternatively, use `bd dep add <child> <epic> --type parent-child` after creation.
+
+*Sequencing* answers "what must complete before this issue can start?"
+Use `bd dep add <blocker> <blocked>` (default `blocks` type) for ordering between siblings or across epics.
+
+Correct pattern:
+
+```bash
+# Containment: issue belongs to epic (use --parent at creation)
+JWT_STORY=$(bd create "JWT token generation" --parent $AUTH_EPIC --silent)
+
+# Sequencing: sibling ordering (use blocks between children)
+bd dep add $JWT_STORY $SESSION_STORY
+```
+
+Antipattern:
+
+```bash
+# Wrong: epic "blocks" its child (containment expressed as sequencing)
+bd dep add $JWT_STORY $AUTH_EPIC
+# This makes JWT appear "blocked by" the epic rather than "contained in" it
+# bd epic status will show 0 children for the epic
+```
+
+The `--parent` flag handles containment correctly at creation.
+Only use `bd dep add --type parent-child` when parenting an issue after creation or when `--parent` was omitted.
+See the "Dependency type discipline" convention in beads-prime for the full invariant.
+
 ## Workflow steps
 
 ### 1. Read and analyze architecture documents
@@ -71,6 +106,9 @@ Add tasks under stories only when additional granularity aids tracking.
 ### 4. Identify and wire dependencies
 
 Map architectural dependencies to beads dependencies:
+
+This step wires *sequencing* dependencies only — ordering constraints between siblings and across epics.
+Containment (which epic an issue belongs to) is handled by `--parent` in step 5, not by `blocks` here.
 
 - Component A cannot function without component B → `bd dep add story-a story-b --type blocks`
 - Feature X builds on feature Y → blocks relationship
@@ -138,6 +176,32 @@ Translate architecture planning into work items:
 ```
 
 Include a summary of what was created in the commit message.
+
+### 7. Verify parent-child integrity
+
+After seeding, verify that every issue is properly parented to an epic:
+
+```bash
+# Every epic should show a non-zero child count
+bd epic status
+
+# Tree view should show issues nested under their epics via parent-child
+bd list --pretty
+```
+
+If any epic shows `0/0 children closed` but you created issues for it, the containment relationships were wired as `blocks` instead of `parent-child`.
+Fix by adding the missing parent-child deps:
+
+```bash
+bd dep add <child-id> <epic-id> --type parent-child
+```
+
+If an issue was accidentally connected via `blocks` from the epic, remove that dep first:
+
+```bash
+bd dep remove <child-id> <epic-id>
+bd dep add <child-id> <epic-id> --type parent-child
+```
 
 ## Example workflow
 
