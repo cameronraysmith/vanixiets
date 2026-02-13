@@ -111,6 +111,7 @@
                 "Bash(sudo:*)"
                 "Bash(rm -rf:*)"
                 "Read(.env*)"
+                "Read(*secret*)"
               ];
               ask = [ ];
             };
