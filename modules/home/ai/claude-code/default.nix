@@ -189,7 +189,11 @@
                 "Bash(git checkout -- .)"
                 "Bash(git restore .)"
                 "Bash(git restore --staged .)"
+                "Bash(git branch -D *)"
+                "Bash(git stash drop*)"
+                "Bash(git stash clear*)"
                 # GitHub CLI: mutating operations
+                "Bash(gh api *)"
                 "Bash(gh pr create:*)"
                 "Bash(gh pr comment:*)"
                 "Bash(gh pr merge:*)"
@@ -205,9 +209,34 @@
                 "Bash(gh repo rename:*)"
                 "Bash(gh release create:*)"
                 "Bash(gh release delete:*)"
+                "Bash(gh workflow run:*)"
+                "Bash(gh gist create:*)"
                 # Nix: arbitrary code execution
                 "Bash(nix run *)"
                 "Bash(nix shell *)"
+                # Infrastructure mutation
+                "Bash(tofu apply*)"
+                "Bash(tofu destroy*)"
+                "Bash(terraform apply*)"
+                "Bash(terraform destroy*)"
+                "Bash(kubectl apply *)"
+                "Bash(kubectl create *)"
+                "Bash(kubectl delete *)"
+                "Bash(kubectl exec *)"
+                "Bash(helm install *)"
+                "Bash(helm upgrade *)"
+                "Bash(helm uninstall *)"
+                # Remote access
+                "Bash(ssh *)"
+                "Bash(scp *)"
+                "Bash(rsync *)"
+                # Container publishing
+                "Bash(docker push *)"
+                "Bash(podman push *)"
+                # Process management
+                "Bash(kill *)"
+                "Bash(killall *)"
+                "Bash(pkill *)"
               ];
             };
           };
