@@ -156,7 +156,6 @@
               ];
               ask = [
                 "Bash(git push:*)"
-                "Bash(git push)"
               ];
             };
           };
