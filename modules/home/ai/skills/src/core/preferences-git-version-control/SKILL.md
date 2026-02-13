@@ -68,8 +68,12 @@ This directory must be listed in `.gitignore`.
 Create a worktree and its tracking branch in one command (from repo root):
 
 ```bash
-git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor
+git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main
 ```
+
+Always specify an explicit start-point (the final argument).
+Usually this is `main`, but when stacking branches it should be whichever branch you intend to build on.
+Without a start-point, git branches from whatever happens to be checked out, which may not be the intended base.
 
 Use worktrees for bead-tracked implementation work; use plain branches (`git checkout -b`) for non-bead or quick-fix work.
 The working agent creates the worktree as its first action before any implementation begins.
