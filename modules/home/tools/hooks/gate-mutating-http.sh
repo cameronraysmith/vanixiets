@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Hook: Gate mutating HTTP requests
-# Auto-approves safe (read-only) curl/wget commands so they bypass the ask list.
-# Mutating requests fall through to normal permission evaluation (ask list prompts user).
+# Auto-approves safe (read-only) curl/wget commands.
+# Returns "ask" for mutating requests so the user is prompted.
 # Does not cover httpie (http/https commands) or xh which use positional method
 # arguments -- add patterns if these tools enter the workflow.
 # PreToolUse:Bash (sync) -- reads JSON context from stdin.
@@ -32,45 +32,55 @@ if ! $HAS_CURL && ! $HAS_WGET; then
   exit 0
 fi
 
+REASON=""
+
 # --- curl mutation detection ---
 if $HAS_CURL; then
   # Explicit mutating method flags
   if echo "$COMMAND" | grep -qiE -- '-X\s*(POST|PUT|DELETE|PATCH)'; then
-    exit 0  # fall through to ask list
+    REASON="curl with mutating HTTP method"
   fi
-  if echo "$COMMAND" | grep -qiE -- '--request\s*(POST|PUT|DELETE|PATCH)'; then
-    exit 0
+  if [ -z "$REASON" ] && echo "$COMMAND" | grep -qiE -- '--request\s*(POST|PUT|DELETE|PATCH)'; then
+    REASON="curl with mutating HTTP method"
   fi
   # No-space variant: -XPOST, -XPUT, etc.
-  if echo "$COMMAND" | grep -qiE -- '-X(POST|PUT|DELETE|PATCH)'; then
-    exit 0
+  if [ -z "$REASON" ] && echo "$COMMAND" | grep -qiE -- '-X(POST|PUT|DELETE|PATCH)'; then
+    REASON="curl with mutating HTTP method"
   fi
   # Implicit POST via data flags
-  if echo "$COMMAND" | grep -qE -- '(\s-d\s|--data\b|--data-raw\b|--data-binary\b|--data-urlencode\b)'; then
-    exit 0
+  if [ -z "$REASON" ] && echo "$COMMAND" | grep -qE -- '(\s-d\s|--data\b|--data-raw\b|--data-binary\b|--data-urlencode\b)'; then
+    REASON="curl with data payload (implicit POST)"
   fi
   # Implicit POST via form upload
-  if echo "$COMMAND" | grep -qE -- '(\s-F\s|--form\b)'; then
-    exit 0
+  if [ -z "$REASON" ] && echo "$COMMAND" | grep -qE -- '(\s-F\s|--form\b)'; then
+    REASON="curl with form upload (implicit POST)"
   fi
   # Implicit PUT via file upload
-  if echo "$COMMAND" | grep -qE -- '(\s-T\s|--upload-file\b)'; then
-    exit 0
+  if [ -z "$REASON" ] && echo "$COMMAND" | grep -qE -- '(\s-T\s|--upload-file\b)'; then
+    REASON="curl with file upload (implicit PUT)"
   fi
   # Implicit POST via --json flag
-  if echo "$COMMAND" | grep -qE -- '--json\b'; then
-    exit 0
+  if [ -z "$REASON" ] && echo "$COMMAND" | grep -qE -- '--json\b'; then
+    REASON="curl with --json (implicit POST)"
   fi
 fi
 
 # --- wget mutation detection ---
-if $HAS_WGET; then
+if $HAS_WGET && [ -z "$REASON" ]; then
   if echo "$COMMAND" | grep -qE -- '(--post-data\b|--post-file\b)'; then
-    exit 0  # fall through to ask list
+    REASON="wget with POST data"
   fi
-  if echo "$COMMAND" | grep -qiE -- '--method=(POST|PUT|DELETE|PATCH)'; then
-    exit 0
+  if [ -z "$REASON" ] && echo "$COMMAND" | grep -qiE -- '--method=(POST|PUT|DELETE|PATCH)'; then
+    REASON="wget with mutating HTTP method"
   fi
+fi
+
+# Mutating request detected: escalate to user
+if [ -n "$REASON" ]; then
+  cat << EOF
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"$REASON"}}
+EOF
+  exit 0
 fi
 
 # No mutating indicators detected; auto-approve as read-only
