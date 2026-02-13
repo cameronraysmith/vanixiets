@@ -4,7 +4,7 @@
 # Fetches platform-specific binaries from the official GCS release bucket.
 # Version and checksums tracked in manifest.json alongside this file.
 #
-# Update: run the passthru.updateScript or manually update manifest.json
+# Update: cd pkgs/by-name/claude-code && ./update.sh
 # Source: https://github.com/anthropics/claude-code
 # Based on: https://github.com/mirkolenz/nixos (pkgs/derivations/claude-code-bin)
 {
@@ -16,17 +16,13 @@
   writableTmpDirAsHomeHook,
   makeBinaryWrapper,
   installShellFiles,
-  writeScript,
   bubblewrap,
   socat,
   procps,
   ripgrep,
-  updateChannel ? "latest",
-  manifestFile ? ./manifest.json,
 }:
 let
-  gcsBucket = "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases";
-  manifest = lib.importJSON manifestFile;
+  manifest = lib.importJSON ./manifest.json;
   platforms = {
     x86_64-linux = "linux-x64";
     aarch64-linux = "linux-arm64";
@@ -38,10 +34,14 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "claude-code";
   version = manifest.version or "unstable";
 
-  src = fetchurl {
-    url = "${gcsBucket}/${finalAttrs.version}/${platform}/claude";
-    sha256 = manifest.platforms.${platform}.checksum;
-  };
+  src =
+    let
+      gcsBucket = "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases";
+    in
+    fetchurl {
+      url = "${gcsBucket}/${finalAttrs.version}/${platform}/claude";
+      sha256 = manifest.platforms.${platform}.checksum;
+    };
 
   dontUnpack = true;
   dontBuild = true;
@@ -89,28 +89,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   strictDeps = true;
 
-  passthru.updateScript = writeScript "update-claude-code" ''
-    #!/usr/bin/env nix-shell
-    #!nix-shell --pure -i bash -p curl jq cacert
-
-    set -euo pipefail
-
-    version="$(curl -fsSL "${gcsBucket}/${updateChannel}")"
-    manifest="$(
-      curl -fsSL "${gcsBucket}/$version/manifest.json" \
-      | jq '{
-        version,
-        platforms: .platforms | with_entries(
-          select(.key | test("^(darwin|linux)-(x64|arm64)$"))
-          | {
-            key,
-            value: { checksum: .value.checksum }
-          }
-        )
-      }'
-    )"
-    echo "$manifest" > "${toString manifestFile}"
-  '';
+  passthru.updateScript = ./update.sh;
 
   meta = {
     description = "Agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster";
