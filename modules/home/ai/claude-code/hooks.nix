@@ -15,6 +15,10 @@
                   type = "command";
                   command = "validate-epic-close";
                 }
+                {
+                  type = "command";
+                  command = "redirect-rm-to-rip";
+                }
               ];
             }
             {
