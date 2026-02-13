@@ -37,6 +37,10 @@ Do not commit if:
 
 ## Branch workflow
 
+File edits on main/master are blocked by the `enforce-branch-before-edit` hook.
+Before attempting to edit any files, create a worktree or feature branch to which you will commit your changes.
+If you haven't already, invoke `/issues-beads-prime` for beads command reference before proceeding with any editing.
+
 Whenever you are working on a beads issue or epic, check the current branch name first.
 If it does not correspond to the issue you're working on, pause to ask the user whether to create or switch to a matching branch before proceeding.
 
