@@ -14,7 +14,7 @@
         programs.claude-code = {
           enable = true;
           # package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
-          package = pkgs.claude-code;
+          package = flake.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
 
           # symlink agents directory tree (skills managed by skills/default.nix)
           agentsDir = ./agents;
