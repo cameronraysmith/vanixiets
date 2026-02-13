@@ -32,6 +32,7 @@
 
             model = "opus";
             effortLevel = "high";
+            forceLoginMethod = "claudeai";
             theme = "dark";
             autoCompactEnabled = false;
             spinnerTipsEnabled = false;
