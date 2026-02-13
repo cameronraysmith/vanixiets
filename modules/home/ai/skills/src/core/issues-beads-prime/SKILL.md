@@ -43,7 +43,7 @@ Every non-epic issue must have exactly one parent-child relationship to an epic.
 An epic does not "block" its children — children are ready to work as soon as their sibling and cross-epic dependencies allow.
 
 *Sequencing* (A must complete before B can start) uses `blocks` type, the default.
-Establish via `bd dep add <blocker> <blocked>` between siblings, across epics, or between epics themselves.
+Establish via `bd dep add <blocked> <blocker>` between siblings, across epics, or between epics themselves.
 
 The antipattern to avoid: wiring an issue as "blocked by" its containing epic instead of as a "child of" that epic.
 This causes `bd epic status` to report 0 children for the epic and makes the issue appear blocked when it should be ready.
@@ -193,9 +193,9 @@ rm "$TRIAGE"
 bd create "Found: ..." -t bug -p 2
 bd dep add <new-id> <current-id> --type discovered-from
 
-# Add blocker
+# Add blocker to current issue
 bd create "Need X first" -t task -p 1
-bd dep add <blocker-id> <current-id>
+bd dep add <current-id> <blocker-id>
 ```
 
 ## Complete work
