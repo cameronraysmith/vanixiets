@@ -110,6 +110,7 @@
               deny = [
                 "Bash(sudo:*)"
                 "Bash(rm -rf:*)"
+                "Read(.env*)"
               ];
               ask = [ ];
             };
