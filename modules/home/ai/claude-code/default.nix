@@ -122,6 +122,8 @@
                 # Web tools
                 "WebFetch"
                 "WebSearch"
+                # Nix store read access for tracing derivation sources
+                "Read(//nix/store/**)"
                 # mcps
                 "mcp__*"
               ];
