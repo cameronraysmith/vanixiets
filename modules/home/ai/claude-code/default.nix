@@ -38,6 +38,10 @@
             cleanupPeriodDays = 1100;
             includeCoAuthoredBy = false;
             enableAllProjectMcpServers = false;
+            enabledPlugins = {
+              "feature-dev@claude-plugins-official" = true;
+              "frontend-design@claude-plugins-official" = true;
+            };
             alwaysThinkingEnabled = true;
 
             env = {
