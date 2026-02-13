@@ -152,7 +152,7 @@
                 # Web tools
                 "WebFetch"
                 "WebSearch"
-                # Allow all reads and searches; deny rules still block .env, secrets, sops keys
+                # Allow all reads and searches; deny rules still block .env and sops age keys
                 "Read"
                 "Grep"
                 "Glob"
@@ -168,7 +168,6 @@
                 "Bash(gh repo delete:*)"
                 "Bash(rm -rf:*)"
                 "Read(.env*)"
-                "Read(*secret*)"
                 "Read(~/.config/sops/age/**)"
                 "Bash(nix run *)"
               ];
