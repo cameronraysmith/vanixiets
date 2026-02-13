@@ -94,8 +94,6 @@
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.home-manager.follows = "home-manager";
 
-    landrun-nix.url = "github:srid/landrun-nix";
-
     playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.58.2";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
 
