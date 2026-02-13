@@ -51,13 +51,18 @@
               enabled = true;
               autoAllowBashIfSandboxed = true;
               allowUnsandboxedCommands = false;
-              excludedCommands = [ "docker" ];
+              excludedCommands = [
+                "docker"
+                "nix"
+              ];
               network = {
                 allowedDomains = [
                   "hydra.nixos.org"
                   "github.com"
                   "*.githubusercontent.com"
                 ];
+                # does not work as of 2026-02-08 (ref mirkolenz-nixos)
+                allowUnixSockets = [ "/nix/var/nix/daemon-socket/socket" ];
                 allowLocalBinding = true;
               };
             };
@@ -87,12 +92,15 @@
                 "Bash(git diff:*)"
                 "Bash(git log:*)"
                 "Bash(git push)"
+                "Bash(git rebase:*)"
                 "Bash(git reset:*)"
                 "Bash(git rev-parse:*)"
                 "Bash(git show:*)"
                 "Bash(git stash:*)"
                 "Bash(git status:*)"
+                "Bash(git subtree:*)"
                 "Bash(git tag:*)"
+                "Bash(git worktree:*)"
                 # GitHub CLI
                 "Bash(gh:*)"
                 # Nix operations
