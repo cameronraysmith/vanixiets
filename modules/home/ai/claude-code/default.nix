@@ -178,78 +178,84 @@
                 "Read(.env*)"
                 "Read(~/.config/sops/age/**)"
               ];
+              # --- Static ask list (superseded by PreToolUse hooks) ---
+              # Blanket "Bash" in allow overrides static ask patterns due to
+              # evaluation order (deny -> allow -> ask in practice, despite docs
+              # stating deny -> ask -> allow). Hooks run before the permission
+              # system and are not affected by this ordering issue.
+              # Enforcement is in: gate-dangerous-commands, gate-mutating-http
+              # Retained as documentation of gated command categories.
               ask = [
-                # Privilege escalation
-                "Bash(sudo:*)"
-                # Git: push and destructive operations
-                "Bash(git push:*)"
-                "Bash(git reset --hard*)"
-                "Bash(git clean *)"
-                "Bash(git checkout .)"
-                "Bash(git checkout -- .)"
-                "Bash(git restore .)"
-                "Bash(git restore --staged .)"
-                "Bash(git branch -D *)"
-                "Bash(git stash drop*)"
-                "Bash(git stash clear*)"
-                # GitHub CLI: mutating operations
-                "Bash(gh api *)"
-                "Bash(gh pr create:*)"
-                "Bash(gh pr comment:*)"
-                "Bash(gh pr merge:*)"
-                "Bash(gh pr close:*)"
-                "Bash(gh pr edit:*)"
-                "Bash(gh pr review:*)"
-                "Bash(gh issue create:*)"
-                "Bash(gh issue comment:*)"
-                "Bash(gh issue close:*)"
-                "Bash(gh issue edit:*)"
-                "Bash(gh repo create:*)"
-                "Bash(gh repo delete:*)"
-                "Bash(gh repo rename:*)"
-                "Bash(gh release create:*)"
-                "Bash(gh release delete:*)"
-                "Bash(gh workflow run:*)"
-                "Bash(gh gist create:*)"
-                # Nix: arbitrary code execution
-                "Bash(nix run *)"
-                "Bash(nix shell *)"
-                # Infrastructure mutation
-                "Bash(tofu apply*)"
-                "Bash(tofu destroy*)"
-                "Bash(terraform apply*)"
-                "Bash(terraform destroy*)"
-                "Bash(kubectl apply *)"
-                "Bash(kubectl create *)"
-                "Bash(kubectl delete *)"
-                "Bash(kubectl exec *)"
-                "Bash(helm install *)"
-                "Bash(helm upgrade *)"
-                "Bash(helm uninstall *)"
-                # Remote access
-                "Bash(ssh *)"
-                "Bash(scp *)"
-                "Bash(rsync *)"
-                # Container publishing
-                "Bash(docker push *)"
-                "Bash(podman push *)"
-                # Process management
-                "Bash(kill *)"
-                "Bash(killall *)"
-                "Bash(pkill *)"
-                # HTTP: mutating requests (gate-mutating-http hook auto-approves safe GETs)
-                # Does not cover httpie (http/https) or xh; add if these enter the workflow
-                "Bash(curl *)"
-                "Bash(wget *)"
-                # Destructive find/xargs patterns (bypass rm deny via -exec/xargs)
-                "Bash(find *-delete*)"
-                "Bash(find *-exec*rm *)"
-                "Bash(xargs rm*)"
-                "Bash(xargs *rm*)"
-                # Raw writes and secure deletion
-                "Bash(dd *)"
-                "Bash(truncate *)"
-                "Bash(shred *)"
+                # # Privilege escalation
+                # "Bash(sudo *)"
+                # # Git: push and destructive operations
+                # "Bash(git push *)"
+                # "Bash(git reset --hard*)"
+                # "Bash(git clean *)"
+                # "Bash(git checkout .)"
+                # "Bash(git checkout -- .)"
+                # "Bash(git restore .)"
+                # "Bash(git restore --staged .)"
+                # "Bash(git branch -D *)"
+                # "Bash(git stash drop*)"
+                # "Bash(git stash clear*)"
+                # # GitHub CLI: mutating operations
+                # "Bash(gh api *)"
+                # "Bash(gh pr create *)"
+                # "Bash(gh pr comment *)"
+                # "Bash(gh pr merge *)"
+                # "Bash(gh pr close *)"
+                # "Bash(gh pr edit *)"
+                # "Bash(gh pr review *)"
+                # "Bash(gh issue create *)"
+                # "Bash(gh issue comment *)"
+                # "Bash(gh issue close *)"
+                # "Bash(gh issue edit *)"
+                # "Bash(gh repo create *)"
+                # "Bash(gh repo delete *)"
+                # "Bash(gh repo rename *)"
+                # "Bash(gh release create *)"
+                # "Bash(gh release delete *)"
+                # "Bash(gh workflow run *)"
+                # "Bash(gh gist create *)"
+                # # Nix: arbitrary code execution
+                # "Bash(nix run *)"
+                # "Bash(nix shell *)"
+                # # Infrastructure mutation
+                # "Bash(tofu apply*)"
+                # "Bash(tofu destroy*)"
+                # "Bash(terraform apply*)"
+                # "Bash(terraform destroy*)"
+                # "Bash(kubectl apply *)"
+                # "Bash(kubectl create *)"
+                # "Bash(kubectl delete *)"
+                # "Bash(kubectl exec *)"
+                # "Bash(helm install *)"
+                # "Bash(helm upgrade *)"
+                # "Bash(helm uninstall *)"
+                # # Remote access
+                # "Bash(ssh *)"
+                # "Bash(scp *)"
+                # "Bash(rsync *)"
+                # # Container publishing
+                # "Bash(docker push *)"
+                # "Bash(podman push *)"
+                # # Process management
+                # "Bash(kill *)"
+                # "Bash(killall *)"
+                # "Bash(pkill *)"
+                # # HTTP: mutating requests (gate-mutating-http hook handles)
+                # "Bash(curl *)"
+                # "Bash(wget *)"
+                # # Destructive find/xargs patterns
+                # "Bash(find *-delete*)"
+                # "Bash(find *-exec*rm *)"
+                # "Bash(xargs rm*)"
+                # "Bash(xargs *rm*)"
+                # # Raw writes and secure deletion
+                # "Bash(dd *)"
+                # "Bash(truncate *)"
+                # "Bash(shred *)"
               ];
             };
           };
