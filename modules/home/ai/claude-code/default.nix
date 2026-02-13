@@ -97,7 +97,6 @@
                 "Bash(nix build:*)"
                 "Bash(nix develop:*)"
                 "Bash(nix flake:*)"
-                "Bash(nix run:*)"
                 # Development tools
                 "Bash(jq:*)"
                 "Bash(test:*)"
@@ -113,6 +112,7 @@
                 "Read(.env*)"
                 "Read(*secret*)"
                 "Read(~/.config/sops/age/**)"
+                "Bash(nix run *)"
               ];
               ask = [ ];
             };
