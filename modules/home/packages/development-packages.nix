@@ -29,7 +29,7 @@
       # crush = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.crush;
       # droid: disabled - auto-patchelf fails on rosetta-builder (missing pyelftools)
       # opencode: disabled - bun node_modules cleanup fails during build
-      # gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
+      gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
     in
     {
       home.packages =
@@ -77,7 +77,7 @@
           # coderabbit-cli # disabled: unused
           # crush      # disabled: unused
           # droid      # disabled: auto-patchelf fails
-          # gemini-cli # disabled: requires nodejs_22 pin
+          gemini-cli
           # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
           beads-kanban-ui
