@@ -112,6 +112,7 @@
                 "Bash(git log:*)"
                 "Bash(git ls-files:*)"
                 "Bash(git ls-remote:*)"
+                "Bash(git merge:*)"
                 "Bash(git rebase:*)"
                 "Bash(git remote:*)"
                 "Bash(git rev-parse:*)"
@@ -153,7 +154,10 @@
                 "Read(~/.config/sops/age/**)"
                 "Bash(nix run *)"
               ];
-              ask = [ ];
+              ask = [
+                "Bash(git push:*)"
+                "Bash(git push)"
+              ];
             };
           };
         };
