@@ -86,7 +86,10 @@
                   "api.github.com"
                 ];
                 # does not work as of 2026-02-08 (ref mirkolenz-nixos)
-                allowUnixSockets = [ "/nix/var/nix/daemon-socket/socket" ];
+                allowUnixSockets = [
+                  "/nix/var/nix/daemon-socket/socket"
+                  "${config.home.homeDirectory}/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock"
+                ];
                 allowLocalBinding = true;
               };
             };
