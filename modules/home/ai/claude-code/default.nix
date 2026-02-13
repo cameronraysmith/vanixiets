@@ -65,7 +65,7 @@
             teammateMode = "tmux";
 
             sandbox = {
-              enabled = true;
+              enabled = false;
               autoAllowBashIfSandboxed = true;
               allowUnsandboxedCommands = false;
               excludedCommands = [
