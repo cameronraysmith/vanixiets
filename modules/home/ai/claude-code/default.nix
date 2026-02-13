@@ -30,6 +30,8 @@
               padding = 0;
             };
 
+            model = "opus";
+            effortLevel = "high";
             theme = "dark";
             autoCompactEnabled = false;
             spinnerTipsEnabled = false;
