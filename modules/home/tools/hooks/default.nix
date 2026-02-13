@@ -112,6 +112,15 @@
         ];
         text = builtins.readFile ./validate-completion.sh;
       };
+
+      redirect-rm-to-rip = pkgs.writeShellApplication {
+        name = "redirect-rm-to-rip";
+        runtimeInputs = with pkgs; [
+          jq
+          gnugrep
+        ];
+        text = builtins.readFile ./redirect-rm-to-rip.sh;
+      };
     in
     {
       home.packages = [
@@ -124,6 +133,7 @@
         session-start
         clarify-vague-request
         validate-completion
+        redirect-rm-to-rip
       ];
     };
 }
