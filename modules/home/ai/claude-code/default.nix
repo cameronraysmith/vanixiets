@@ -64,6 +64,8 @@
                 "gh"
                 "git"
                 "nix"
+                "pbcopy"
+                "pbpaste"
               ];
               network = {
                 allowedDomains = [
