@@ -77,6 +77,51 @@ For drift detection with exit codes (useful for automation):
 bv --check-drift
 ```
 
+## Structural integrity check
+
+Before proceeding with execution planning, verify that the parent-child structure is sound.
+This detects the most common structural error: containment relationships wired as `blocks` instead of `parent-child`.
+
+### Detect empty epics with mistyped containment
+
+Check `bd epic status` output for epics that report 0 children:
+
+```bash
+bd epic status | grep "0/0"
+```
+
+For each epic showing `0/0 children`, check whether it has `blocks` relationships to non-epic issues:
+
+```bash
+bd show <epic-id>
+```
+
+If the BLOCKS section lists non-epic issues, those are likely containment relationships that should be `parent-child`.
+An epic blocking its own child issues is the antipattern — child issues should be connected via `parent-child`, not `blocks`.
+
+If this pattern is detected, report to the user:
+
+```
+Structural issue: <epic-id> has 0 children per bd epic status but BLOCKS
+N non-epic issues that appear to be its children. These containment
+relationships are wired as blocks instead of parent-child.
+
+Suggested fix for each affected child:
+  bd dep remove <child-id> <epic-id>
+  bd dep add <child-id> <epic-id> --type parent-child
+```
+
+Offer to apply corrections before continuing orientation, or note the issue and proceed if the user prefers.
+
+### Detect orphan issues
+
+Compare the total non-epic open issue count against the sum of epic child counts from `bd epic status`.
+If significantly fewer issues appear as epic children than exist in the database, some issues lack parent-child relationships.
+Use `bd list --pretty` to identify which issues appear at the top level without an epic parent.
+
+Systemic issues (all containment wired as blocks) should be corrected before orientation proceeds.
+Minor issues (1-2 orphans from recent ad-hoc creation) can be noted and deferred.
+
 ## Run execution planning commands
 
 Extract three complementary perspectives on work prioritization:
