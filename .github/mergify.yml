@@ -129,7 +129,7 @@ queue_rules:
     update_method: rebase
     update_bot_account: cameronraysmith
     batch_size: 10
-    batch_max_wait_time: 5 min
+    batch_max_wait_time: 30s
     checks_timeout: 3600
     queue_conditions:
       - -conflict
