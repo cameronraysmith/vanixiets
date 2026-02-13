@@ -121,6 +121,15 @@
         ];
         text = builtins.readFile ./redirect-rm-to-rip.sh;
       };
+
+      gate-mutating-http = pkgs.writeShellApplication {
+        name = "gate-mutating-http";
+        runtimeInputs = with pkgs; [
+          jq
+          gnugrep
+        ];
+        text = builtins.readFile ./gate-mutating-http.sh;
+      };
     in
     {
       home.packages = [
@@ -134,6 +143,7 @@
         clarify-vague-request
         validate-completion
         redirect-rm-to-rip
+        gate-mutating-http
       ];
     };
 }
