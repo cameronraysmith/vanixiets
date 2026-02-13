@@ -50,7 +50,8 @@
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
-    srvos.url = "github:nix-community/srvos";
+    # TODO: revert to nix-community/srvos after PR #765 merges
+    srvos.url = "github:cameronraysmith/srvos/fix-darwin-homebrew-brewprefix-removal";
     srvos.inputs.nixpkgs.follows = "nixpkgs";
 
     nixos-generators.url = "github:nix-community/nixos-generators";
