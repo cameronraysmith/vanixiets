@@ -100,6 +100,12 @@
                 "Bash(pwd)"
                 "Bash(rg:*)"
                 "Bash(tail:*)"
+                "Bash(pgrep:*)"
+                "Bash(ps:*)"
+                "Bash(sed:*)"
+                "Bash(sort:*)"
+                "Bash(tree:*)"
+                "Bash(wc:*)"
                 "Bash(which:*)"
                 # Git operations
                 # "Bash(git:*)"
@@ -130,7 +136,10 @@
                 "Bash(nix flake:*)"
                 # Development tools
                 "Bash(jq:*)"
+                "Bash(latexmk:*)"
+                "Bash(nvidia-smi:*)"
                 "Bash(test:*)"
+                "Bash(typst:*)"
                 # Web tools
                 "WebFetch"
                 "WebSearch"
