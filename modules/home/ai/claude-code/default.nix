@@ -122,8 +122,8 @@
                 # Web tools
                 "WebFetch"
                 "WebSearch"
-                # Nix store read access for tracing derivation sources
-                "Read(//nix/store/**)"
+                # Allow all reads; deny rules below still block .env, secrets, sops keys
+                "Read"
                 # mcps
                 "mcp__*"
               ];
