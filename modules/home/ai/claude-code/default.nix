@@ -43,6 +43,21 @@
             };
             teammateMode = "tmux";
 
+            sandbox = {
+              enabled = true;
+              autoAllowBashIfSandboxed = true;
+              allowUnsandboxedCommands = false;
+              excludedCommands = [ "docker" ];
+              network = {
+                allowedDomains = [
+                  "hydra.nixos.org"
+                  "github.com"
+                  "*.githubusercontent.com"
+                ];
+                allowLocalBinding = true;
+              };
+            };
+
             permissions = {
               defaultMode = "acceptEdits";
               allow = [
