@@ -19,6 +19,10 @@
                   type = "command";
                   command = "redirect-rm-to-rip";
                 }
+                {
+                  type = "command";
+                  command = "gate-mutating-http";
+                }
               ];
             }
             {
