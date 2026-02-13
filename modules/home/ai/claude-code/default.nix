@@ -66,6 +66,7 @@
                 "nix"
                 "pbcopy"
                 "pbpaste"
+                "prek"
               ];
               network = {
                 allowedDomains = [
