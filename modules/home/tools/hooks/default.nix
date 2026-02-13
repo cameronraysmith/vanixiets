@@ -130,6 +130,15 @@
         ];
         text = builtins.readFile ./gate-mutating-http.sh;
       };
+
+      gate-dangerous-commands = pkgs.writeShellApplication {
+        name = "gate-dangerous-commands";
+        runtimeInputs = with pkgs; [
+          jq
+          gnugrep
+        ];
+        text = builtins.readFile ./gate-dangerous-commands.sh;
+      };
     in
     {
       home.packages = [
@@ -144,6 +153,7 @@
         validate-completion
         redirect-rm-to-rip
         gate-mutating-http
+        gate-dangerous-commands
       ];
     };
 }
