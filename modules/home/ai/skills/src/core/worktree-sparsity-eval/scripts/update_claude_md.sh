@@ -62,7 +62,7 @@ fi
 if [ "$has_existing" = "yes" ]; then
   existing_section=$(sed -n "/$sentinel_start/,/$sentinel_end/p" "$target")
   existing_file_count=$(echo "$existing_section" | grep "File count" | awk -F'|' '{gsub(/[^0-9]/, "", $3); print $3}')
-  existing_locality_pct=$(echo "$existing_section" | grep "Change locality" | sed -n 's/.*| *\([0-9.]*\)%.*/\1/p' | head -1)
+  existing_locality_pct=$(echo "$existing_section" | grep "Change locality" | awk -F'|' '{gsub(/[^0-9.]/, "", $3); print $3}')
   existing_recommend=$(echo "$existing_section" | grep -c "Use sparse checkout" || true)
 
   skip_update="yes"
