@@ -47,7 +47,7 @@
 
             env = {
               CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1";
-              CLAUDE_CODE_SUBAGENT_MODEL = "opus";
+              CLAUDE_CODE_SUBAGENT_MODEL = "claude-opus-4-6";
               UV_NO_SYNC = "1";
               TMPDIR = "/tmp/claude";
               TMPPREFIX = "/tmp/claude/zsh";
@@ -61,7 +61,7 @@
               allowUnsandboxedCommands = false;
               excludedCommands = [
                 "atuin:*"
-                "docker:*"
+                "bd:*"
                 "gh:*"
                 "git:*"
                 "nix:*"
@@ -91,15 +91,18 @@
                 # Basics
                 "Bash(cat:*)"
                 "Bash(echo:*)"
+                "Bash(fd:*)"
                 "Bash(find:*)"
                 "Bash(grep:*)"
                 "Bash(head:*)"
                 "Bash(ls:*)"
                 "Bash(mkdir:*)"
                 "Bash(pwd)"
+                "Bash(rg:*)"
                 "Bash(tail:*)"
                 "Bash(which:*)"
                 # Git operations
+                # "Bash(git:*)"
                 "Bash(git add:*)"
                 "Bash(git branch:*)"
                 "Bash(git checkout:*)"
@@ -107,9 +110,10 @@
                 "Bash(git config:*)"
                 "Bash(git diff:*)"
                 "Bash(git log:*)"
-                "Bash(git push)"
+                "Bash(git ls-files:*)"
+                "Bash(git ls-remote:*)"
                 "Bash(git rebase:*)"
-                "Bash(git reset:*)"
+                "Bash(git remote:*)"
                 "Bash(git rev-parse:*)"
                 "Bash(git show:*)"
                 "Bash(git stash:*)"
@@ -138,6 +142,11 @@
               ];
               deny = [
                 "Bash(sudo:*)"
+                "Bash(gh pr create:*)"
+                "Bash(gh pr comment:*)"
+                "Bash(gh issue create:*)"
+                "Bash(gh issue comment:*)"
+                "Bash(gh repo delete:*)"
                 "Bash(rm -rf:*)"
                 "Read(.env*)"
                 "Read(*secret*)"
