@@ -237,6 +237,10 @@
                 "Bash(kill *)"
                 "Bash(killall *)"
                 "Bash(pkill *)"
+                # HTTP: mutating requests (gate-mutating-http hook auto-approves safe GETs)
+                # Does not cover httpie (http/https) or xh; add if these enter the workflow
+                "Bash(curl *)"
+                "Bash(wget *)"
               ];
             };
           };
