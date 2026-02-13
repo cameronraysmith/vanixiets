@@ -1,4 +1,4 @@
-# Claude Code CLI configuration with MCP servers and ccstatusline (from llm-agents)
+# Claude Code CLI configuration with MCP servers and ccstatusline
 { ... }:
 {
   flake.modules = {
@@ -13,7 +13,8 @@
       {
         programs.claude-code = {
           enable = true;
-          package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
+          # package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
+          package = pkgs.claude-code;
 
           # symlink agents directory tree (skills managed by skills/default.nix)
           agentsDir = ./agents;
