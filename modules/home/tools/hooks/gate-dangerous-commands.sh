@@ -13,6 +13,73 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat << 'HELPEOF'
+gate-dangerous-commands: PreToolUse hook returning "ask" for dangerous Bash commands.
+
+Companion hooks (not listed here):
+  redirect-rm-to-rip   denies rm, redirects to rip (rm-improved)
+  gate-mutating-http   allows safe curl/wget GETs, asks for mutations
+
+Gated patterns (each returns permissionDecision "ask"):
+
+  Privilege escalation
+    sudo *
+
+  Git: push and destructive operations
+    git push
+    git reset --hard *
+    git clean *
+    git checkout [--] .
+    git restore [--staged] .
+    git branch -D *
+    git stash drop/clear
+
+  GitHub CLI: mutating operations
+    gh api *
+    gh pr create/comment/merge/close/edit/review
+    gh issue create/comment/merge/close/edit/review
+    gh repo create/delete/rename
+    gh release create/delete
+    gh workflow run
+    gh gist create
+
+  Nix: arbitrary code execution
+    nix run *
+    nix shell *
+
+  Infrastructure mutation
+    tofu/terraform apply/destroy
+    kubectl apply/create/delete/exec
+    helm install/upgrade/uninstall
+
+  Remote access
+    ssh *
+    scp *
+    rsync *
+
+  Container publishing
+    docker/podman push *
+
+  Process management
+    kill/killall/pkill *
+
+  Destructive file operations (rm bypass vectors)
+    find ... -delete
+    find ... -exec rm
+    xargs ... rm
+
+  Raw writes and secure deletion
+    dd *
+    truncate *
+    shred *
+
+Patterns match commands at start-of-line or after shell operators (&&, ||, ;, |, $()).
+Commands not matching any pattern fall through to blanket Bash allow.
+HELPEOF
+  exit 0
+fi
+
 INPUT=$(cat)
 
 TOOL_INPUT=$(echo "$INPUT" | jq -r '.tool_input // empty')
