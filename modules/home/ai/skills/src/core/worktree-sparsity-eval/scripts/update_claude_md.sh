@@ -129,7 +129,7 @@ if [ "$recommend" = "yes" ]; then
 Recommendation: Use sparse checkout for worktrees.
 
 \`\`\`bash
-git worktree add --no-checkout .worktrees/{ID}-descriptor -b {ID}-descriptor
+git worktree add --no-checkout .worktrees/{ID}-descriptor -b {ID}-descriptor main
 cd .worktrees/{ID}-descriptor
 git sparse-checkout init --cone
 git sparse-checkout set <paths-relevant-to-task>
