@@ -116,7 +116,7 @@ while IFS= read -r cmd; do
   # Execute the command, capturing output and exit code
   CMD_OUTPUT=""
   CMD_EXIT=0
-  CMD_OUTPUT=$(bash -c "$cmd" 2>&1) || CMD_EXIT=$?
+  CMD_OUTPUT=$(timeout 30 bash -c "$cmd" 2>&1) || CMD_EXIT=$?
 
   if [ "$CMD_EXIT" -eq 0 ]; then
     PASS_COUNT=$((PASS_COUNT + 1))
@@ -141,7 +141,7 @@ fi
 
 # Some commands failed: block closure
 TOTAL=$((PASS_COUNT + FAIL_COUNT))
-ESCAPED_RESULTS=$(printf '%s' "$RESULTS" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+ESCAPED_RESULTS=$(printf '%s' "$RESULTS" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
 
 cat << EOF
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Self-verification gate: ${FAIL_COUNT}/${TOTAL} commands failed. Fix failures before closing ${CLOSE_ID}.\n\nResults:\n${ESCAPED_RESULTS}\n\nEither fix the issues and retry closure, or escalate with failure details."}}
