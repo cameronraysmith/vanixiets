@@ -55,6 +55,7 @@
           buf
           smithy-cli
           claude-monitor
+          clipboard-jh
           dvcWithOptionalRemotes
           gh
           git-filter-repo
