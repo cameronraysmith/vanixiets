@@ -139,6 +139,19 @@
         ];
         text = builtins.readFile ./gate-dangerous-commands.sh;
       };
+
+      gate-issue-close = pkgs.writeShellApplication {
+        name = "gate-issue-close";
+        runtimeInputs = with pkgs; [
+          beads
+          jq
+          gnused
+          gnugrep
+          bash
+          coreutils
+        ];
+        text = builtins.readFile ./gate-issue-close.sh;
+      };
     in
     {
       home.packages = [
@@ -154,6 +167,7 @@
         redirect-rm-to-rip
         gate-mutating-http
         gate-dangerous-commands
+        gate-issue-close
       ];
     };
 }
