@@ -338,6 +338,9 @@ When wiring dependencies with `bd dep add`, the following types are available:
 
 The `blocks` type is the default and can be omitted.
 
+Types not in this list (such as `child-of`, `parent`, `child`) are silently accepted by bd but functionally broken for epic tracking.
+Always use `parent-child` for containment relationships.
+
 ## Common patterns
 
 **Layered architecture seeding**:
