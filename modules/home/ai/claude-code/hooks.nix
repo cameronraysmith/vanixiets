@@ -72,6 +72,11 @@
                   command = "memory-capture";
                   async = true;
                 }
+                {
+                  type = "command";
+                  command = "notify-escalation";
+                  async = true;
+                }
               ];
             }
           ];
