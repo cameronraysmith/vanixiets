@@ -79,7 +79,7 @@ fi
 # Filter to lines that look like executable shell commands.
 # Heuristic: starts with a known command prefix or path-like token.
 # This avoids treating variable names, descriptions, or partial fragments as commands.
-COMMAND_PREFIXES='(bd |nix |git |make |just |cargo |pytest |npm |npx |yarn |pnpm |bash |sh |zsh |test |echo |cat |ls |cd |mkdir |rm |cp |mv |grep |rg |fd |jq |curl |wget |python |node |deno |bun |tofu |terraform |kubectl |helm |docker |podman |gh |\.\/)'
+COMMAND_PREFIXES='(bd |nix |git |make |just |cargo |pytest |npm |npx |yarn |pnpm |bash |sh |zsh |test |echo |cat |ls |cd |mkdir |rm |cp |mv |grep |rg |fd |jq |curl |wget |python |node |deno |bun |tofu |terraform |kubectl |helm |docker |podman |gh |[.]/)'
 
 RUNNABLE_COMMANDS=""
 while IFS= read -r line; do
