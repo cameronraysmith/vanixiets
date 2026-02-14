@@ -67,30 +67,52 @@ This directory must be listed in `.gitignore`.
 
 The worktree model has two tiers: epic worktrees for coordination and issue worktrees for implementation.
 
-#### Epic worktrees
+#### Epic branches
 
-Each active epic gets its own worktree.
-The repo root checkout stays on the default branch (usually `main`) as the stable coordination point.
-Epic worktrees are where orientation, dispatch, merge operations, and coordination happen for that epic's work.
+Each active epic gets its own branch.
+The *focus epic* — the primary epic being actively coordinated — is checked out in the repo root.
+This keeps beads issue state, orientation commands (`bd status`, `bd activity`, `bd epic status`), and monitoring aligned with the active work, since `.beads/issues.jsonl` is tracked in git and reflects the checked-out branch's state.
 
-Create an epic worktree when starting work on an epic:
+Create a focus epic branch when starting work on an epic:
+
+```bash
+git checkout -b {epic-ID}-descriptor main
+```
+
+*Secondary epics* being worked in parallel get worktrees in `.worktrees/`:
 
 ```bash
 git worktree add .worktrees/{epic-ID}-descriptor -b {epic-ID}-descriptor main
 ```
 
-Parallel epics branch independently from main.
-When one epic depends on another, stack the dependent epic's worktree on the parent epic's branch:
+When one epic depends on another, stack it on the parent epic's branch rather than main:
 
 ```bash
 # nix-pxj depends on nix-1kj, so stack it
+git checkout -b nix-pxj-ntfy-server nix-1kj-stigmergic-tooling
+# or as a secondary worktree:
 git worktree add .worktrees/nix-pxj-ntfy-server -b nix-pxj-ntfy-server nix-1kj-stigmergic-tooling
 ```
 
-An epic worktree accumulates all commits from its child issue worktrees via fast-forward merges.
-When the epic is complete, its worktree contains the full linearized commit history for review, validation, and merge to main.
+An epic branch accumulates all commits from its child issue worktrees via fast-forward merges.
+When the epic is complete, it contains the full linearized commit history for review, validation, and merge to main.
 
-To commit changes directly to an epic branch (e.g., beads state updates, convention edits, or coordination commits), the orchestrator must operate from the epic's worktree directory rather than the repo root, since the repo root remains on the default branch.
+#### Switching focus
+
+To promote a secondary epic to focus (and optionally demote the current focus):
+
+```bash
+# Remove the secondary epic's worktree
+git worktree remove .worktrees/{new-focus-epic}-descriptor
+
+# Optionally preserve the old focus as a secondary worktree
+git worktree add .worktrees/{old-focus-epic}-descriptor {old-focus-epic}-descriptor
+
+# Check out the new focus epic in repo root
+git checkout {new-focus-epic}-descriptor
+```
+
+When no epic is active, the repo root returns to the default branch.
 
 #### Issue worktrees
 
@@ -107,7 +129,9 @@ When issue work is complete, rebase onto the epic branch and fast-forward merge 
 cd .worktrees/{issue-ID}-descriptor
 git rebase {epic-ID}-descriptor
 cd ../..
-# merge from the epic worktree or from repo root:
+# merge into the epic branch (from repo root if it's the focus epic):
+git merge --ff-only {issue-ID}-descriptor
+# or from the epic worktree if it's a secondary epic:
 git -C .worktrees/{epic-ID}-descriptor merge --ff-only {issue-ID}-descriptor
 ```
 
@@ -120,17 +144,19 @@ git branch -d {issue-ID}-descriptor
 
 #### General rules
 
-Always specify an explicit start-point (the final argument to `git worktree add`).
-Epic worktrees branch from `main` (or from another epic's branch when stacking).
+Always specify an explicit start-point when creating branches or worktrees.
+Epic branches start from `main` (or from another epic's branch when stacking).
 Issue worktrees branch from their parent epic's branch.
 Without a start-point, git branches from whatever happens to be checked out, which may not be the intended base.
 
 Use worktrees for bead-tracked work; use plain branches (`git checkout -b`) for non-bead or quick-fix work.
 
-When the epic is complete and merged to main, clean up the epic worktree:
+When the epic is complete and merged to main, clean up:
 
 ```bash
+# If it was a secondary epic worktree:
 git worktree remove .worktrees/{epic-ID}-descriptor
+# Delete the branch:
 git branch -d {epic-ID}-descriptor
 ```
 
