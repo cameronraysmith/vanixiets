@@ -90,7 +90,8 @@ The beads tool supports up to three levels of hierarchical IDs for complex work 
 Do not create nested epics without explicit human request.
 
 Epics should represent coherent work packages, not just organizational groupings.
-An epic is eligible for closure when all its child issues are closed.
+An epic becomes *eligible* for closure when all its child issues are closed, but eligible epics are intentionally kept open for human validation and follow-up issue creation.
+See the closure policy in `/issues:beads-prime` for the authoritative convention.
 
 ### Dependencies
 
@@ -305,14 +306,15 @@ bd epic status --eligible-only    # epics where all children are closed
 bd epic status --json             # structured output
 ```
 
-Check epic readiness (epic closure is a human-only action):
+Check epic closure eligibility (on-demand, when human requests):
 
 ```bash
-bd epic close-eligible --dry-run  # check which epics are ready for human review
+bd epic close-eligible --dry-run  # on-demand only, when user requests epic closure review
 ```
 
-When all children of an epic are closed, report to the user that the epic is ready for review.
-Do not close epics directly; the Kanban UI automatically moves eligible epics to "In Review" for human verification.
+Epics whose children are all closed are intentionally kept open for human validation and follow-up issue creation.
+Do not proactively check, report, or suggest closing eligible epics.
+The Kanban UI shows eligible epics in "In Review" status; the human initiates closure when ready.
 
 Search and list operations:
 
@@ -522,10 +524,10 @@ Check what this unblocks:
 bd dep tree <issue-id> --direction up
 ```
 
-Verify epic readiness and report to user (epic closure is a human decision):
+Epic closure eligibility (on-demand only, when user requests):
 
 ```bash
-bd epic close-eligible --dry-run  # check if any epics are ready for human review
+bd epic close-eligible --dry-run  # on-demand only, when user requests epic closure review
 ```
 
 Commit beads changes:
