@@ -434,13 +434,21 @@ If no signal table exists in the notes, apply defaults: cynefin=complicated, sur
 For each blocking dependency that is closed, read its closure reason and checkpoint context.
 These are the pheromone trails that propagate implementation context through the DAG.
 
+First, identify closed dependencies from the embedded dependency list:
+
 ```bash
-# Get dependency details including closure reasons
-bd show <selected-id> --json | jq '.[0].dependencies[] | select(.status == "closed") | {id, title, close_reason, notes}'
+bd show <selected-id> --json | jq '[.[0].dependencies[] | select(.status == "closed") | {id, title}]'
+```
+
+The embedded dependency objects include `notes` and `status` but do not include `close_reason`.
+To read the closure reason, query each closed dependency individually:
+
+```bash
+bd show <dep-id> --json | jq '.[0].close_reason // empty'
 ```
 
 The `close_reason` field contains what was implemented and how it was verified.
-The `notes` field may contain a `<!-- checkpoint-context -->` section with additional state from the worker who closed the issue.
+The `notes` field (available on the embedded dependency object or via direct query) may contain a `<!-- checkpoint-context -->` section with additional state from the worker who closed the issue.
 
 Present closed dependency context in topological order (dependencies before dependents) so the worker understands the foundation their work builds on.
 
