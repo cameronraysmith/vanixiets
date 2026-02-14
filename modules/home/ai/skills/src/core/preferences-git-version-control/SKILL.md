@@ -65,21 +65,74 @@ Default bias: if in doubt whether work is related, create a new branch - branche
 Bead implementation work uses worktrees rooted in `.worktrees/` at the repository root.
 This directory must be listed in `.gitignore`.
 
-Create a worktree and its tracking branch in one command (from repo root):
+The worktree model has two tiers: epic worktrees for coordination and issue worktrees for implementation.
+
+#### Epic worktrees
+
+Each active epic gets its own worktree.
+The repo root checkout stays on the default branch (usually `main`) as the stable coordination point.
+Epic worktrees are where orientation, dispatch, merge operations, and coordination happen for that epic's work.
+
+Create an epic worktree when starting work on an epic:
 
 ```bash
-git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main
+git worktree add .worktrees/{epic-ID}-descriptor -b {epic-ID}-descriptor main
 ```
 
-Always specify an explicit start-point (the final argument).
-Usually this is `main`, but when stacking branches it should be whichever branch you intend to build on.
+Parallel epics branch independently from main.
+When one epic depends on another, stack the dependent epic's worktree on the parent epic's branch:
+
+```bash
+# nix-pxj depends on nix-1kj, so stack it
+git worktree add .worktrees/nix-pxj-ntfy-server -b nix-pxj-ntfy-server nix-1kj-stigmergic-tooling
+```
+
+An epic worktree accumulates all commits from its child issue worktrees via fast-forward merges.
+When the epic is complete, its worktree contains the full linearized commit history for review, validation, and merge to main.
+
+To commit changes directly to an epic branch (e.g., beads state updates, convention edits, or coordination commits), the orchestrator must operate from the epic's worktree directory rather than the repo root, since the repo root remains on the default branch.
+
+#### Issue worktrees
+
+Each issue within an epic gets its own worktree, branching from the parent epic's branch.
+The working agent creates the issue worktree as its first action before any implementation begins.
+
+```bash
+git worktree add .worktrees/{issue-ID}-descriptor -b {issue-ID}-descriptor {epic-ID}-descriptor
+```
+
+When issue work is complete, rebase onto the epic branch and fast-forward merge back into it:
+
+```bash
+cd .worktrees/{issue-ID}-descriptor
+git rebase {epic-ID}-descriptor
+cd ../..
+# merge from the epic worktree or from repo root:
+git -C .worktrees/{epic-ID}-descriptor merge --ff-only {issue-ID}-descriptor
+```
+
+Then clean up the issue worktree:
+
+```bash
+git worktree remove .worktrees/{issue-ID}-descriptor
+git branch -d {issue-ID}-descriptor
+```
+
+#### General rules
+
+Always specify an explicit start-point (the final argument to `git worktree add`).
+Epic worktrees branch from `main` (or from another epic's branch when stacking).
+Issue worktrees branch from their parent epic's branch.
 Without a start-point, git branches from whatever happens to be checked out, which may not be the intended base.
 
-Use worktrees for bead-tracked implementation work; use plain branches (`git checkout -b`) for non-bead or quick-fix work.
-The working agent creates the worktree as its first action before any implementation begins.
-Per-issue granularity is the default; epic-level worktrees are used only when the orchestrator explicitly specifies.
+Use worktrees for bead-tracked work; use plain branches (`git checkout -b`) for non-bead or quick-fix work.
 
-After the branch is merged, clean up the worktree: `git worktree remove .worktrees/{ID}-descriptor`.
+When the epic is complete and merged to main, clean up the epic worktree:
+
+```bash
+git worktree remove .worktrees/{epic-ID}-descriptor
+git branch -d {epic-ID}-descriptor
+```
 
 ### Fast-forward-only merge policy
 
