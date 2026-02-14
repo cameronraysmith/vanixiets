@@ -396,12 +396,10 @@ If work is complete:
 ```bash
 # Close and immediately see what was unblocked
 bd close <issue-id> --reason "Implemented in..." --suggest-next
-
-# Check if any epics are ready for human review (epic closure is human-only)
-bd epic close-eligible --dry-run
 ```
 
 Review unblocked issues and check whether their descriptions need updating given what was learned.
+Do not check or report epic closure eligibility; see the closure policy in `/issues:beads-prime`.
 
 If work is incomplete, ensure the checkpoint-context section written in step 3 is self-contained.
 The signal table's progress field should be `implementing` or `blocked` as appropriate.
