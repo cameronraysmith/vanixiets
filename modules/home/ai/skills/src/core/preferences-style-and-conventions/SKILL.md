@@ -98,6 +98,7 @@ This approach provides a complete, well-organized view of CI results and avoids 
   - File search (by name/path): use `fd` instead of `find`
   - Content search (within files): use `rg` (ripgrep) instead of `grep`
   - Disk usage (directory sizes): use `diskus` instead of `du -sh`
+  - Clipboard (copy to system clipboard): use `cb copy` (`clipboard-jh`) instead of platform-specific `pbcopy` (macOS) or `xclip`/`xsel` (Linux)
 - When given a GitHub file URL (e.g., `https://github.com/org/repo/blob/ref/path/to/file.ext#L119-L131`), check for a local copy before using web tools:
   1. Search for repo: `fd -t d '^repo$' ~/projects` (repo name may have variants)
   2. Verify remote: `cd candidate-dir && git remote -v` (confirm origin matches GitHub org/repo)
