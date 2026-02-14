@@ -266,9 +266,9 @@ SUMMARY=$(mktemp "/tmp/bd-${REPO}-checkpoint.XXXXXX.json")
 bv --robot-triage > "$SUMMARY"
 
 # Session-relevant extractions
-jq '.quick_ref' "$SUMMARY"                    # current counts
-jq '.project_health.graph_metrics' "$SUMMARY"  # health metrics
-jq '.stale_alerts' "$SUMMARY"                  # attention needed
+jq '.triage.quick_ref' "$SUMMARY"                    # current counts
+jq '.triage.project_health.graph_metrics' "$SUMMARY"  # health metrics
+jq '.triage.stale_alerts' "$SUMMARY"                  # attention needed
 
 # Clean up when done
 rm "$SUMMARY"
@@ -442,7 +442,7 @@ Before ending the session, ensure the next agent can pick up cleanly via `/issue
 
 ```bash
 # Quick check of top recommendation
-bv --robot-triage | jq '.quick_ref'
+bv --robot-triage | jq '.triage.quick_ref'
 
 # Or minimal: just the top pick
 bv --robot-next
