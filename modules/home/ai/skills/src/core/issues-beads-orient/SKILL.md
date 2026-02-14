@@ -400,6 +400,12 @@ bd dep tree <selected-id> --direction both
 # Detailed description
 bd show <selected-id>
 
+# Reverse cross-references from other issues (surfaces impact beyond direct dependencies)
+bd show <selected-id> --refs
+
+# Full conversation thread if prior workers left messages or checkpoint notes
+bd show <selected-id> --thread
+
 # Structured data for signal parsing
 bd show <selected-id> --json
 ```
