@@ -99,12 +99,17 @@ bd show <epic-id>
 If the BLOCKS section lists non-epic issues, those are likely containment relationships that should be `parent-child`.
 An epic blocking its own child issues is the antipattern — child issues should be connected via `parent-child`, not `blocks`.
 
-If this pattern is detected, report to the user:
+Also check for dependencies typed as `child-of` on any epic in scope.
+The `child-of` type is silently accepted by bd but not recognized by `bd epic status` for child counting, producing the same symptom as `blocks` misuse: epics that appear to have 0 children.
+Inspect dependency details with `bd show <epic-id> --json` or review `bd dep tree <epic-id>` output for non-standard relationship types.
+
+If either pattern is detected (`blocks` or `child-of` used for containment), report to the user:
 
 ```
-Structural issue: <epic-id> has 0 children per bd epic status but BLOCKS
-N non-epic issues that appear to be its children. These containment
-relationships are wired as blocks instead of parent-child.
+Structural issue: <epic-id> has 0 children per bd epic status but has
+N non-epic issues connected via blocks or child-of that appear to be
+its children. These containment relationships need conversion to
+parent-child.
 
 Suggested fix for each affected child:
   bd dep remove <child-id> <epic-id>
