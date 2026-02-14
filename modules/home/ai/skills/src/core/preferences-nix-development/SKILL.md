@@ -22,6 +22,15 @@ description: Nix development conventions including flake patterns, module struct
 - Place user-level config in modules/home/all/ (cross-platform) or darwin-only.nix/linux-only.nix
 - Use home-manager.sharedModules for platform-specific home configuration
 
+## Shell scripts and writeShellApplication
+
+`pkgs.writeShellApplication` runs shellcheck during its `checkPhase`.
+`nix build --dry-run` evaluates the derivation graph but does not execute build phases, so it will not catch shellcheck errors.
+
+Run `shellcheck <file>` directly on shell scripts before committing.
+This is faster than a full `nix build` and catches the same class of errors that `checkPhase` would surface.
+A full `nix build` (without `--dry-run`) of the relevant derivation remains the definitive verification, as it executes `checkPhase` with the exact shellcheck configuration the derivation specifies.
+
 ## Nix Code Style
 - Format with `nix fmt`
 - Use explicit function arguments, not `with` statements
