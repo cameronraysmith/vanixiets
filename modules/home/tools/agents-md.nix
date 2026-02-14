@@ -114,7 +114,7 @@
 
           When dispatching a Task with a BEAD_ID for implementation work, include the target worktree path in the prompt.
           Issue-level work goes in `.worktrees/{issue-ID}-descriptor`, branching from the parent epic's branch.
-          Epic-level coordination happens in `.worktrees/{epic-ID}-descriptor`, branching from main (or from a parent epic when stacking).
+          Secondary (non-focus) epics use `.worktrees/{epic-ID}-descriptor`; the focus epic is checked out in the repo root.
           The subagent creates the worktree as its first action; the orchestrator specifies the path and the start-point branch.
           Example prompt fragment: "Work in .worktrees/nix-pxj-4-deploy-validate (create via git worktree add, branching from nix-pxj-ntfy-server)."
 
