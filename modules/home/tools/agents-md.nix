@@ -113,9 +113,10 @@
           before committing if quick and safe; otherwise return with a verification proposal.
 
           When dispatching a Task with a BEAD_ID for implementation work, include the target worktree path in the prompt.
-          Convention: `.worktrees/{ID}-descriptor` where dots in bead IDs become dashes.
-          The subagent creates the worktree as its first action; the orchestrator specifies the path, not the mechanics.
-          Example prompt fragment: "Work in .worktrees/nix-btd-2-codify-worktree (create via git worktree add if needed)."
+          Issue-level work goes in `.worktrees/{issue-ID}-descriptor`, branching from the parent epic's branch.
+          Epic-level coordination happens in `.worktrees/{epic-ID}-descriptor`, branching from main (or from a parent epic when stacking).
+          The subagent creates the worktree as its first action; the orchestrator specifies the path and the start-point branch.
+          Example prompt fragment: "Work in .worktrees/nix-pxj-4-deploy-validate (create via git worktree add, branching from nix-pxj-ntfy-server)."
 
           When the work involves parallel independent work streams, adversarial review,
           multi-perspective analysis, or long-running collaborative phases, consider using
