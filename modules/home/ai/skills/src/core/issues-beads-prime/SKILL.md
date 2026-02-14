@@ -72,7 +72,11 @@ If `bd epic status` shows `0/0 children` for an epic known to contain issues, th
 ### Closure policy
 
 - LLMs and subagent Tasks can close individual issues automatically: `bd close <id> --reason "Implemented in $(git rev-parse --short HEAD)"`
-- Never close epics directly. Use `bd epic close-eligible --dry-run` to surface readiness, then report to the human for review.
+- Never close epics without explicit human request.
+  Epics whose children are all closed are intentionally kept open for human validation, follow-up issue creation, and iterative refinement.
+  This is a normal steady-state, not an action item.
+  Do not prompt, offer, or suggest closing eligible epics during orientation, checkpoint, or any other workflow phase.
+  The human will request epic closure when ready, at which point `bd epic close-eligible --dry-run` can confirm readiness.
 - After closing issues, check whether additional follow-up issues are needed. Use `bd close <id> --suggest-next` to see newly unblocked work.
 
 ### Worktree and branch workflow
@@ -205,7 +209,7 @@ bd dep add <current-id> <blocker-id>
 
 ```bash
 bd close <id> --reason "Implemented in commit $(git rev-parse --short HEAD)"
-bd epic close-eligible --dry-run  # report readiness to user; epic closure is human-only
+bd epic close-eligible --dry-run  # on-demand only, when user requests epic closure review
 ```
 
 ## Health
