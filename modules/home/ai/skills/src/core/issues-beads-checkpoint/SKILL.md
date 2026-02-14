@@ -121,16 +121,32 @@ bd dep remove <upstream> <downstream>
 If lint issues are found, resolve before committing.
 This prevents corrupting the graph during wind-down.
 
-### Parent-child integrity
+### Parent-child integrity scan
 
-Verify that any issues created during this session have proper epic parentage:
+Verify epic containment for all issues touched during the session.
+
+For each issue worked on, check its relationship to its parent epic.
+Run `bd show <id> --json` and verify that the dependency linking it to its epic uses type `parent-child`.
+If it uses `child-of`, `parent`, `blocks`, or any other type for what should be containment, fix it:
+
+```bash
+bd dep remove <child-id> <epic-id>
+bd dep add <child-id> <epic-id> --type parent-child
+```
+
+For each active epic, verify that `bd epic status <epic-id>` shows the expected child count.
+If the count is zero or lower than expected, investigate for mistyped containment dependencies.
+
+For any issues created during this session, verify they were wired to their parent epic with `--parent <epic-id>` at creation time or with `bd dep add <id> <epic-id> --type parent-child` post-creation.
+
+Broader parentage verification:
 
 ```bash
 bd epic status
 bd list --pretty
 ```
 
-If any epic shows `0/0 children` that previously had children, or if newly created issues don't appear under an epic in the tree, containment may have been wired as `blocks` instead of `parent-child`.
+If any epic shows `0/0 children` that previously had children, or if newly created issues don't appear under an epic in the tree, containment may have been wired as `blocks`, `child-of`, or another invalid type instead of `parent-child`.
 
 When creating issues during checkpoint (discovered work, follow-ups), always specify the parent epic:
 
@@ -145,6 +161,21 @@ bd dep add <new-id> <relevant-epic-id> --type parent-child
 
 Do not rely on `blocks` relationships for containment.
 An issue connected to an epic via `blocks` is a sequencing constraint, not containment, and will not appear in `bd epic status` child counts.
+
+### Signal table validity check
+
+Verify that stigmergic signal tables on touched issues reflect actual work state rather than stale defaults.
+
+For each issue that was actively worked on (not just read), verify its signal table's `progress` field has been updated from `not-started` to reflect current state.
+An issue that received implementation work but still shows `progress=not-started` indicates an incomplete checkpoint.
+
+Verify that `surprise` has been assessed.
+If the worker encountered any deviation from expectations, surprise should be non-zero.
+A reflexive `surprise=0.0` on an issue where work encountered difficulties is misleading pheromone for the next worker.
+
+If the issue's cynefin classification changed during work (e.g., what appeared `clear` turned out to be `complicated`), verify the signal table reflects the updated classification and that `planning-depth` was re-derived accordingly.
+
+For issues being left incomplete (`progress=implementing` or `progress=blocked`), verify that a `<!-- checkpoint-context -->` section exists in the notes with a self-contained state estimate sufficient for the next worker to orient without advisory input.
 
 ## Reflect
 
