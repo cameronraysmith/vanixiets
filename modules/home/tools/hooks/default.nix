@@ -152,6 +152,20 @@
         ];
         text = builtins.readFile ./gate-issue-close.sh;
       };
+
+      notify-escalation = pkgs.writeShellApplication {
+        name = "notify-escalation";
+        runtimeInputs = with pkgs; [
+          beads
+          curl
+          git
+          jq
+          gnused
+          gnugrep
+          coreutils
+        ];
+        text = builtins.readFile ./notify-escalation.sh;
+      };
     in
     {
       home.packages = [
@@ -168,6 +182,7 @@
         gate-mutating-http
         gate-dangerous-commands
         gate-issue-close
+        notify-escalation
       ];
     };
 }
