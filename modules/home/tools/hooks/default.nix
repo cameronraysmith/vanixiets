@@ -166,6 +166,17 @@
         ];
         text = builtins.readFile ./notify-escalation.sh;
       };
+
+      bulk-signal-init = pkgs.writeShellApplication {
+        name = "bulk-signal-init";
+        runtimeInputs = with pkgs; [
+          beads
+          jq
+          coreutils
+          gnugrep
+        ];
+        text = builtins.readFile ./bulk-signal-init.sh;
+      };
     in
     {
       home.packages = [
@@ -183,6 +194,7 @@
         gate-dangerous-commands
         gate-issue-close
         notify-escalation
+        bulk-signal-init
       ];
     };
 }
