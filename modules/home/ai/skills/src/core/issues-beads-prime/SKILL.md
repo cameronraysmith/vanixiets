@@ -29,7 +29,7 @@ All beads-related skills should treat the conventions defined here as authoritat
 ### Epic structure
 
 - Single-layer parent-child only: epics contain issues, not sub-epics. Do not create nested epics without explicit human request.
-- Use `--type parent-child` when wiring parent-child relationships via `bd dep add`. Do not use `--type parent` — beads silently accepts it but does not recognize it for epic tracking.
+- Use `--type parent-child` when wiring parent-child relationships via `bd dep add`. Do not use `--type parent` or `--type child-of` — beads silently accepts both but neither is recognized for epic tracking. The only valid containment type is `parent-child`.
 - Every issue should be a child of an epic. Standalone orphan issues are discouraged.
 - Create children with `bd create "title" --parent <epic-id>` for auto-incrementing hierarchical IDs, or create standalone and wire with `bd dep add <child> <epic> --type parent-child`.
 
@@ -50,6 +50,9 @@ This causes `bd epic status` to report 0 children for the epic and makes the iss
 
 When an issue relates to multiple epics, use `parent-child` for the primary and `related` for secondary associations.
 An issue can have at most one parent-child relationship.
+
+Valid dependency types: `blocks`, `tracks`, `related`, `parent-child`, `discovered-from`, `until`, `caused-by`, `validates`, `relates-to`, `supersedes`.
+Any other value is silently accepted but functionally broken.
 
 Verification after bulk operations:
 
