@@ -55,6 +55,8 @@ EXTRACTED_COMMANDS=""
 
 # Extract from fenced code blocks (```...```)
 # Use sed to extract content between ``` markers
+# Backticks are literal sed pattern chars, not shell expressions
+# shellcheck disable=SC2016
 FENCED=$(echo "$ACCEPTANCE_CRITERIA" | sed -n '/^```/,/^```/{/^```/d;p}')
 if [ -n "$FENCED" ]; then
   EXTRACTED_COMMANDS="$FENCED"
@@ -62,6 +64,8 @@ fi
 
 # Extract from inline code (`...`)
 # Match single-backtick pairs, excluding those inside fenced blocks
+# Backticks are literal pattern chars for matching markdown inline code
+# shellcheck disable=SC2016
 INLINE=$(echo "$ACCEPTANCE_CRITERIA" | grep -oE '`[^`]+`' | sed 's/^`//;s/`$//' || true)
 if [ -n "$INLINE" ]; then
   if [ -n "$EXTRACTED_COMMANDS" ]; then
@@ -84,7 +88,7 @@ COMMAND_PREFIXES='(bd |nix |git |make |just |cargo |pytest |npm |npx |yarn |pnpm
 RUNNABLE_COMMANDS=""
 while IFS= read -r line; do
   # Skip empty lines and comments
-  trimmed=$(echo "$line" | sed 's/^[[:space:]]*//')
+  trimmed="${line#"${line%%[![:space:]]*}"}"
   if [ -z "$trimmed" ] || [[ "$trimmed" == \#* ]]; then
     continue
   fi
