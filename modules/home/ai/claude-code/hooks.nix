@@ -27,6 +27,10 @@
                   type = "command";
                   command = "gate-dangerous-commands";
                 }
+                {
+                  type = "command";
+                  command = "gate-issue-close";
+                }
               ];
             }
             {
