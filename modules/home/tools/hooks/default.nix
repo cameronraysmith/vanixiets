@@ -144,6 +144,8 @@
         name = "gate-issue-close";
         runtimeInputs = with pkgs; [
           beads
+          curl
+          git
           jq
           gnused
           gnugrep
