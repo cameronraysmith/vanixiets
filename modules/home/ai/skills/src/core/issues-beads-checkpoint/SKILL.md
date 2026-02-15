@@ -102,6 +102,7 @@ Each checkpoint context must be self-contained.
 It synthesizes the current position, approach, and remaining work rather than referencing prior checkpoints.
 Workers need only the current state to proceed.
 Trajectory data is available through git history of `.beads/issues.jsonl` via `chore(beads): checkpoint <id>` commits.
+In worktree contexts, trajectory data appears in the orchestrator's post-merge JSONL commits rather than in per-worktree commits.
 
 ```
 <!-- checkpoint-context -->
