@@ -521,11 +521,14 @@ After assembling the briefing, review with the user:
 - Does the cynefin classification match their assessment? (Offer to override planning-depth if not.)
 
 Update the issue if anything is stale before beginning work.
-If updates were made, commit the database:
+If updates were made, commit the database from the repo root or focus epic branch:
 
 ```bash
 git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"
 ```
+
+If you are working in a `.worktrees/` subdirectory, skip the JSONL commit.
+The orchestrator handles serialization after merging worktree branches back.
 
 Before starting implementation, ensure a branch is created following the worktree and branch conventions in `/issues:beads-prime`.
 

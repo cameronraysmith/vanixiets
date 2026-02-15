@@ -226,7 +226,11 @@ For issues being left incomplete (progress=implementing or progress=blocked), ve
 
 ## Step 7: Commit beads state
 
-Execute the commit sequence:
+If you are working in a `.worktrees/` subdirectory, skip this step.
+The `bd` commands in earlier steps already updated the shared SQLite DB.
+The orchestrator serializes JSONL after merging worktree branches back: `bd sync --flush-only && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`.
+
+From the repo root or focus epic branch, execute the commit sequence:
 
 ```bash
 # Validate beads database integrity

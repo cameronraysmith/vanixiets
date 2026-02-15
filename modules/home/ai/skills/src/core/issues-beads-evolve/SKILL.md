@@ -521,7 +521,7 @@ Always create a beads issue to track deferred doc updates so they don't get lost
 
 ## Manual sync workflow
 
-After evolving the graph, commit changes to preserve them:
+After evolving the graph, commit changes to preserve them from the repo root or focus epic branch:
 
 ```bash
 # Run pre-commit hooks to ensure database integrity
@@ -530,6 +530,10 @@ bd hooks run pre-commit
 # Commit with descriptive message about what changed
 git commit -m "chore(issues): [describe graph changes]"
 ```
+
+If you are working in a `.worktrees/` subdirectory, skip the JSONL commit.
+The `bd` commands already updated the shared SQLite DB.
+The orchestrator serializes JSONL after merging worktree branches back.
 
 Examples of commit messages:
 - `chore(issues): split auth task into subtasks due to scope expansion`
