@@ -16,7 +16,7 @@ If you need to refactor the issue graph structure during checkpoint (e.g., split
 
 ## Checkpoint workflow overview
 
-The checkpoint protocol follows seven steps, matching the convention specification's checkpoint write protocol.
+The checkpoint protocol follows eight steps, extending the convention specification's checkpoint write protocol with a buffer depletion check.
 Execute them in order for each issue that received active work this session.
 
 1. Read existing signal table from notes
@@ -24,8 +24,9 @@ Execute them in order for each issue that received active work this session.
 3. Write checkpoint context (replacement semantics)
 4. Handle escalation if needed
 5. Propagate context to downstream issues
-6. Verify graph health
-7. Commit beads state
+6. Check for buffer depletion
+7. Verify graph health
+8. Commit beads state
 
 ## Step 1: Read existing signal table
 
@@ -198,7 +199,67 @@ bd update <downstream-id> --description "Updated: <incorporate discovery that af
 
 Common propagation scenarios include an interface or API changing from what the downstream issue expects, a prerequisite proving harder than expected and changing the downstream scope, an assumption in the downstream description being invalidated, or a technical constraint being discovered that the downstream worker needs to know.
 
-## Step 6: Verify graph health
+## Step 6: Check for buffer depletion
+
+After writing checkpoint state, check whether the current epic has ready work remaining.
+An epic with unclosed children but zero ready issues is *stuck*: all remaining work is blocked, and the next session will waste orient time discovering an empty queue.
+Detecting this at checkpoint time lets the current worker emit a notification before winding down.
+
+Identify the current issue's parent epic:
+
+```bash
+EPIC_ID=$(bd show <id> --json | jq -r '[.[0].dependencies[] | select(.dependency_type == "parent-child")] | .[0].id // empty')
+```
+
+If the issue has no parent epic (standalone issue or the issue itself is an epic), skip this check.
+
+Query the epic's children to determine total and closed counts:
+
+```bash
+EPIC_JSON=$(bd show "$EPIC_ID" --json)
+TOTAL_CHILDREN=$(echo "$EPIC_JSON" | jq '[.[0].dependents[] | select(.dependency_type == "parent-child")] | length')
+CLOSED_CHILDREN=$(echo "$EPIC_JSON" | jq '[.[0].dependents[] | select(.dependency_type == "parent-child") | select(.status == "closed")] | length')
+```
+
+Three outcomes are possible:
+
+*Epic complete* (all children closed, TOTAL == CLOSED): no notification.
+Epic completion is handled by a separate notification (nix-iwo.1).
+Skip the rest of this step.
+
+*Normal state* (unclosed children exist and some are ready): no notification.
+The buffer is healthy and the next worker has work to pick up.
+
+*Epic stuck* (unclosed children exist but none are ready): send notification.
+All remaining work is blocked, and no forward progress is possible without unblocking action.
+
+Check the ready count scoped to this epic:
+
+```bash
+READY_COUNT=$(bd ready --parent "$EPIC_ID" --json 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
+```
+
+If ready issues remain or the epic is complete, no action is needed.
+If the buffer is depleted, send a notification:
+
+```bash
+if [ "$READY_COUNT" -eq 0 ] && [ "$CLOSED_CHILDREN" -lt "$TOTAL_CHILDREN" ]; then
+  REPO_NAME=$(basename -s .git "$(git remote get-url origin 2>/dev/null || echo "unknown")")
+  UNCLOSED=$((TOTAL_CHILDREN - CLOSED_CHILDREN))
+  curl -sf -m 5 \
+    -H "Title: Buffer depleted: ${EPIC_ID}" \
+    -H "Priority: high" \
+    -H "Tags: warning,${REPO_NAME}" \
+    -d "Epic ${EPIC_ID} has ${UNCLOSED} unclosed issues but 0 are ready. All remaining work is blocked. Review dependencies to unblock progress." \
+    "https://ntfy.zt/${REPO_NAME}" 2>/dev/null || true
+fi
+```
+
+This check is best-effort.
+Failures in any command (network errors, unexpected `bd` output, jq parsing) must not block the checkpoint workflow.
+The `|| true` and `|| echo "0"` guards ensure the surrounding steps proceed regardless.
+
+## Step 7: Verify graph health
 
 Before committing, verify graph integrity:
 
@@ -258,7 +319,7 @@ If cynefin classification changed during work, verify the signal table reflects 
 
 For issues being left incomplete (progress=implementing or progress=blocked), verify that a checkpoint-context section exists with a self-contained state estimate.
 
-## Step 7: Commit beads state
+## Step 8: Commit beads state
 
 If you are working in a `.worktrees/` subdirectory, skip this step.
 The `bd` commands in earlier steps already updated the shared SQLite DB.
