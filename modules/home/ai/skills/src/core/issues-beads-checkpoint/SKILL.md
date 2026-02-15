@@ -18,12 +18,14 @@ If you need to refactor the issue graph structure during checkpoint (e.g., split
 
 The checkpoint protocol follows eight steps, extending the convention specification's checkpoint write protocol with a buffer depletion check.
 Execute them in order for each issue that received active work this session.
+Post-checkpoint checks run between propagation and verification as best-effort notifications.
 
 1. Read existing signal table from notes
 2. Update signal table values (surprise, progress, cynefin if warranted)
 3. Write checkpoint context (replacement semantics)
 4. Handle escalation if needed
 5. Propagate context to downstream issues
+   - Post-checkpoint: replanning threshold check (best-effort, never blocks)
 6. Check for buffer depletion
 7. Verify graph health
 8. Commit beads state
@@ -198,6 +200,70 @@ bd update <downstream-id> --description "Updated: <incorporate discovery that af
 ```
 
 Common propagation scenarios include an interface or API changing from what the downstream issue expects, a prerequisite proving harder than expected and changing the downstream scope, an assumption in the downstream description being invalidated, or a technical constraint being discovered that the downstream worker needs to know.
+
+## Post-checkpoint: replanning threshold check
+
+After propagating context, check whether accumulated surprise across the parent epic's children has exceeded the replanning threshold.
+This implements the MPC (model predictive control) decision rule: when the model (plan) diverges sufficiently from reality (measured surprise), replan rather than continuing on the original trajectory.
+
+This check is best-effort and must never block the checkpoint workflow.
+If any command fails or the parent epic cannot be determined, skip silently and proceed to step 6 (buffer depletion check).
+
+### Identify the parent epic
+
+```bash
+EPIC_ID=$(bd show <id> --json | jq -r '[.[0].dependencies[] | select(.type == "parent-child")] | .[0].id // empty')
+```
+
+If `EPIC_ID` is empty, the current issue has no parent epic.
+Skip the remainder of this section and proceed to step 6.
+
+### Sum surprise scores across epic children
+
+Read all children of the epic and extract their surprise scores from the signal tables in their notes.
+
+```bash
+EPIC_JSON=$(bd show "$EPIC_ID" --json)
+
+# Extract child IDs (issues linked to the epic via parent-child)
+CHILDREN=$(echo "$EPIC_JSON" | jq -r '[.[0].dependencies[] | select(.type == "parent-child")] | .[].id')
+
+# Sum surprise scores across children
+TOTAL_SURPRISE=0
+CONTRIBUTING=0
+for child_id in $CHILDREN; do
+  CHILD_NOTES=$(bd show "$child_id" --json | jq -r '.[0].notes // ""')
+  # Extract surprise value from signal table row: | surprise | <value> | <date> |
+  SURPRISE=$(echo "$CHILD_NOTES" | grep -oP 'surprise\s*\|\s*\K[0-9.]+' || echo "0.0")
+  if [ "$SURPRISE" != "0.0" ] && [ "$SURPRISE" != "0" ]; then
+    TOTAL_SURPRISE=$(echo "$TOTAL_SURPRISE + $SURPRISE" | bc)
+    CONTRIBUTING=$((CONTRIBUTING + 1))
+  fi
+done
+```
+
+### Compare against threshold and notify
+
+The replanning threshold default is 2.0, representing the cumulative surprise budget before the plan should be reconsidered.
+When the CUE schema at `~/projects/sciexp/planning/schemas/stigmergic-workflow/schema.cue` is updated with `#ReplanningThreshold`, this hardcoded value should be read from there instead.
+
+```bash
+REPLANNING_THRESHOLD=2.0
+
+EXCEEDS=$(echo "$TOTAL_SURPRISE > $REPLANNING_THRESHOLD" | bc -l)
+if [ "$EXCEEDS" -eq 1 ]; then
+  REPO_NAME=$(basename -s .git "$(git remote get-url origin 2>/dev/null || echo "unknown")")
+  curl -sf -m 5 \
+    -H "Title: Replanning needed: ${EPIC_ID}" \
+    -H "Priority: urgent" \
+    -H "Tags: rotating_light,${REPO_NAME}" \
+    -d "Epic ${EPIC_ID}: accumulated surprise ${TOTAL_SURPRISE} exceeds threshold ${REPLANNING_THRESHOLD} (${CONTRIBUTING} issues contributing). Consider running /issues:beads-evolve to restructure the plan." \
+    "https://ntfy.zt/${REPO_NAME}" 2>/dev/null || true
+fi
+```
+
+When the notification fires, it means the epic's plan has drifted far enough from reality that continuing on the original trajectory is likely wasteful.
+The recommended response is to run `/issues:beads-evolve` to restructure the plan based on what has been learned, then resume work from the revised issue graph.
 
 ## Step 6: Check for buffer depletion
 
