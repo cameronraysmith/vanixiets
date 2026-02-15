@@ -212,7 +212,7 @@ If any command fails or the parent epic cannot be determined, skip silently and 
 ### Identify the parent epic
 
 ```bash
-EPIC_ID=$(bd show <id> --json | jq -r '[.[0].dependencies[] | select(.type == "parent-child")] | .[0].id // empty')
+EPIC_ID=$(bd show <id> --json | jq -r '[.[0].dependencies[] | select(.dependency_type == "parent-child")] | .[0].id // empty')
 ```
 
 If `EPIC_ID` is empty, the current issue has no parent epic.
@@ -226,7 +226,7 @@ Read all children of the epic and extract their surprise scores from the signal 
 EPIC_JSON=$(bd show "$EPIC_ID" --json)
 
 # Extract child IDs (issues linked to the epic via parent-child)
-CHILDREN=$(echo "$EPIC_JSON" | jq -r '[.[0].dependencies[] | select(.type == "parent-child")] | .[].id')
+CHILDREN=$(echo "$EPIC_JSON" | jq -r '[.[0].dependents[] | select(.dependency_type == "parent-child")] | .[].id')
 
 # Sum surprise scores across children
 TOTAL_SURPRISE=0
