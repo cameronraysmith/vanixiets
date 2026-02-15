@@ -78,6 +78,39 @@ When cynefin changes, re-derive planning-depth using the default mapping unless 
 
 The cynefin-to-planning-depth mapping: clear to shallow, complicated to standard, complex to deep, chaotic to probe.
 
+### Cynefin reclassification notification
+
+When updating cynefin, compare the new value against the prior value read from the signal table in step 1.
+If the new value represents an upward shift in complexity, send an ntfy notification alerting System 5 that work originally planned as simpler may now require advisory coupling.
+
+The complexity ordering is: clear < complicated < complex < chaotic.
+Only upward shifts trigger notification.
+Do not notify on downward reclassification (e.g. complex to complicated) or unchanged values.
+
+This check is best-effort and must never block the checkpoint workflow.
+If the notification fails (network unavailable, ntfy unreachable), the checkpoint proceeds normally.
+
+```bash
+# Cynefin reclassification notification
+# Only fires on upward complexity shifts
+CYNEFIN_ORDER="clear complicated complex chaotic"
+old_rank=$(echo "$CYNEFIN_ORDER" | tr ' ' '\n' | grep -n "^${OLD_CYNEFIN}$" | cut -d: -f1)
+new_rank=$(echo "$CYNEFIN_ORDER" | tr ' ' '\n' | grep -n "^${NEW_CYNEFIN}$" | cut -d: -f1)
+
+if [ "$new_rank" -gt "$old_rank" ] 2>/dev/null; then
+  REPO_NAME=$(basename -s .git "$(git remote get-url origin 2>/dev/null || echo "unknown")")
+  curl -sf -m 5 \
+    -H "Title: Cynefin shift: ${ISSUE_ID}" \
+    -H "Priority: high" \
+    -H "Tags: warning,${REPO_NAME}" \
+    -d "Issue ${ISSUE_ID} reclassified from ${OLD_CYNEFIN} to ${NEW_CYNEFIN}. May now require advisory coupling." \
+    "https://ntfy.zt/${REPO_NAME}" 2>/dev/null || true
+fi
+```
+
+Where `OLD_CYNEFIN` is the value from the signal table read in step 1, `NEW_CYNEFIN` is the value just assessed, and `ISSUE_ID` is the current issue identifier.
+The `|| true` ensures a failed notification does not interrupt the checkpoint sequence.
+
 ### Reconstruct and write
 
 After modifying signal values, reconstruct the full notes content.
