@@ -37,12 +37,12 @@ ISSUE_TYPE=$(echo "$ISSUE_JSON" | jq -r '.[0].issue_type // empty' 2>/dev/null |
 [[ "$ISSUE_TYPE" == "epic" ]] && exit 0
 
 # Find the parent epic via parent-child dependency
-PARENT_EPIC_ID=$(echo "$ISSUE_JSON" | jq -r '[.[0].dependencies[] | select(.type == "parent-child")] | .[0].id // empty' 2>/dev/null || echo "")
+PARENT_EPIC_ID=$(echo "$ISSUE_JSON" | jq -r '[.[0].dependencies[] | select(.dependency_type == "parent-child")] | .[0].id // empty' 2>/dev/null || echo "")
 [[ -z "$PARENT_EPIC_ID" ]] && exit 0
 
 # Check if all children of the parent epic are now closed
 EPIC_JSON=$(bd show "$PARENT_EPIC_ID" --json 2>/dev/null || echo "[]")
-OPEN_CHILDREN=$(echo "$EPIC_JSON" | jq '[.[0].dependencies[] | select(.type == "parent-child") | select(.status != "closed")] | length' 2>/dev/null || echo "1")
+OPEN_CHILDREN=$(echo "$EPIC_JSON" | jq '[.[0].dependents[] | select(.dependency_type == "parent-child") | select(.status != "closed")] | length' 2>/dev/null || echo "1")
 
 # If any children are still open, do not notify
 [[ "$OPEN_CHILDREN" -ne 0 ]] && exit 0
