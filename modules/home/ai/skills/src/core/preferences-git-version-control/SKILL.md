@@ -24,7 +24,10 @@ When `.beads/` exists, maintain the issue graph alongside git commits:
 - Create issues discovered during work and wire with `bd dep add <new> <current> --type discovered-from`
 - Close with implementation context: `bd close <id> --reason "Implemented in $(git rev-parse --short HEAD)"`
 - Check what's unblocked after completion; consider updating newly-ready issues with helpful context
-- Commit beads changes: `bd hooks run pre-commit && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`
+- Commit beads changes from the repo root or focus epic branch: `bd hooks run pre-commit && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`
+- In issue worktrees (`.worktrees/` subdirectories): do not commit `.beads/issues.jsonl`.
+  All `bd` mutation commands (`close`, `update`, `create`) write to the shared SQLite DB correctly from any worktree.
+  The orchestrator serializes JSONL after merging worktree branches back: `bd sync --flush-only && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`.
 
 For beads usage conventions (epic structure, status management, closure policy), see the conventions section of issues-beads-prime.
 Consult `~/.claude/skills/issues-beads-prime/SKILL.md` for command quick reference.
