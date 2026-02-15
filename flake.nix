@@ -6,9 +6,7 @@
     flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
 
   inputs = {
-    # TODO: switch back to upstream following https://github.com/NixOS/nixpkgs/pull/488199
-    # nixpkgs.url = "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz";
-    nixpkgs.url = "github:cameronraysmith/nixpkgs/fix-userborn-nrm-recursion";
+    nixpkgs.url = "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz";
 
     nixpkgs-darwin-stable.url = "https://channels.nixos.org/nixpkgs-25.11-darwin/nixexprs.tar.xz";
     nixpkgs-linux-stable.url = "https://channels.nixos.org/nixos-25.11/nixexprs.tar.xz";
