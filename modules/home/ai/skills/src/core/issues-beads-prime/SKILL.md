@@ -137,7 +137,7 @@ After git operations that modify beads state (pull, checkout, merge, rebase):
 bd sync --import-only
 ```
 
-Before committing beads changes:
+Before committing beads changes (from the repo root or focus epic branch):
 
 ```bash
 # Run pre-commit validation
@@ -147,6 +147,10 @@ bd hooks run pre-commit
 git add .beads/issues.jsonl
 git commit -m "chore(beads): ..."
 ```
+
+If you are working in a `.worktrees/` subdirectory, do not commit `.beads/issues.jsonl`.
+The `bd` mutation commands write to the shared SQLite DB correctly from any worktree.
+The orchestrator serializes JSONL after merging worktree branches back: `bd sync --flush-only && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`.
 
 Additional sync flags:
 
@@ -228,7 +232,8 @@ bd lint                     # check issues for missing template sections
 - `bd dep tree <id> --direction both` shows full context (blockers + what completing it unblocks)
 - Always close with `--reason` referencing the implementation
 - Use `--type discovered-from` when creating issues found during other work
-- After `bd` modifications: `git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"`
+- After `bd` modifications (from repo root or focus epic branch): `git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"`
+- In issue worktrees (`.worktrees/` subdirectories): skip the JSONL commit; the orchestrator handles serialization after merging branches back
 
 Other useful robot flags:
 - `bv --robot-plan` - Dependency-respecting execution plan
