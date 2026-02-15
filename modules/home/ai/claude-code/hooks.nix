@@ -77,6 +77,11 @@
                   command = "notify-escalation";
                   async = true;
                 }
+                {
+                  type = "command";
+                  command = "notify-epic-completion";
+                  async = true;
+                }
               ];
             }
           ];
