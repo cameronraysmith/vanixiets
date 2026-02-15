@@ -179,6 +179,17 @@
         ];
         text = builtins.readFile ./bulk-signal-init.sh;
       };
+
+      notify-permission-prompt = pkgs.writeShellApplication {
+        name = "notify-permission-prompt";
+        runtimeInputs = with pkgs; [
+          curl
+          git
+          jq
+          coreutils
+        ];
+        text = builtins.readFile ./notify-permission-prompt.sh;
+      };
     in
     {
       home.packages = [
@@ -197,6 +208,7 @@
         gate-issue-close
         notify-escalation
         bulk-signal-init
+        notify-permission-prompt
       ];
     };
 }
