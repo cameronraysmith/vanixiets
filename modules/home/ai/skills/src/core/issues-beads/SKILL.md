@@ -133,7 +133,7 @@ Changes made with `bd` commands modify `.beads/issues.jsonl`, which must be comm
 
 ### Commit beads changes
 
-After any batch of `bd` modifications (creates, updates, closes, dependency changes):
+After any batch of `bd` modifications (creates, updates, closes, dependency changes), commit from the repo root or focus epic branch:
 
 ```bash
 # Validate and prepare for commit
@@ -144,10 +144,16 @@ git add .beads/issues.jsonl
 git commit -m "chore(beads): <description of changes>"
 ```
 
-Commit frequency recommendations:
+If you are working in a `.worktrees/` subdirectory, do not commit `.beads/issues.jsonl`.
+The `bd` mutation commands write to the shared SQLite DB correctly from any worktree.
+The orchestrator serializes JSONL after merging worktree branches back: `bd sync --flush-only && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`.
+
+Commit frequency recommendations (applicable from the repo root or focus epic branch):
 - **Eager**: After each logical batch (creating an epic with children, wiring dependencies)
 - **Session boundary**: At minimum, commit before ending work via `/issues:beads-checkpoint`
 - **Descriptive when relevant**: For significant changes, use specific messages like `chore(beads): close auth epic after implementation`
+
+In worktree contexts (`.worktrees/` subdirectories), `bd` commands still execute and update the shared SQLite DB, but JSONL commit responsibility shifts to the orchestrator after merging branches back.
 
 ### After git pull/checkout/merge
 
@@ -530,13 +536,16 @@ Epic closure eligibility (on-demand only, when user requests):
 bd epic close-eligible --dry-run  # on-demand only, when user requests epic closure review
 ```
 
-Commit beads changes:
+Commit beads changes (from the repo root or focus epic branch):
 
 ```bash
 bd hooks run pre-commit
 git add .beads/issues.jsonl
 git commit -m "chore(beads): close <issue-id> and update graph"
 ```
+
+In issue worktrees (`.worktrees/` subdirectories), skip the JSONL commit.
+The orchestrator handles serialization after merging worktree branches back.
 
 ### Phase 5: Session wind-down
 
