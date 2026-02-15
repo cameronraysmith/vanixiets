@@ -53,12 +53,16 @@ echo "README.md" >> .beads/.gitignore
 
 ### Committing beads changes
 
-When you've made changes to issues via `bd` commands, flush the database to JSONL and stage the files manually:
+When you've made changes to issues via `bd` commands, flush the database to JSONL and stage the files manually from the repo root or focus epic branch:
 
 ```bash
 bd hooks run pre-commit   # flush DB→JSONL + stage .beads/*.jsonl files
 git commit -m "chore(issues): <description of changes>"
 ```
+
+If you are working in a `.worktrees/` subdirectory, do not commit `.beads/issues.jsonl`.
+The `bd` commands write to the shared SQLite DB correctly from any worktree.
+The orchestrator serializes JSONL after merging worktree branches back.
 
 Example commit messages:
 - `chore(issues): add epic for CI integration`

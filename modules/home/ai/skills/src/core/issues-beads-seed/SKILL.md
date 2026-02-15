@@ -163,7 +163,7 @@ bd create "Integrate auth with database for session storage" \
 
 ### 6. Commit the seeded structure
 
-After creating the initial beads structure, commit the changes:
+After creating the initial beads structure, commit the changes from the repo root or focus epic branch:
 
 ```bash
 git add .beads/
@@ -176,6 +176,10 @@ Translate architecture planning into work items:
 ```
 
 Include a summary of what was created in the commit message.
+
+If you are working in a `.worktrees/` subdirectory, skip the JSONL commit.
+The `bd` commands write to the shared SQLite DB correctly from any worktree.
+The orchestrator serializes JSONL after merging worktree branches back.
 
 ### 7. Verify parent-child integrity
 
@@ -247,7 +251,7 @@ bd list --pretty                               # Tree view with status symbols
 bd dep tree bd-user-mgmt-epic --direction both # Full dependency graph for epic
 bd dep tree bd-content-epic --direction both   # Full dependency graph for epic
 
-# Commit
+# Commit (from repo root or focus epic branch; skip in .worktrees/ subdirectories)
 git add .beads/
 git commit -m "feat: seed beads from system-design.md architecture"
 ```
