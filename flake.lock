@@ -1039,22 +1039,6 @@
         "type": "github"
       }
     },
-    "nixpkgs_8": {
-      "locked": {
-        "lastModified": 1770197578,
-        "narHash": "sha256-AYqlWrX09+HvGs8zM6ebZ1pwUqjkfpnv8mewYwAo+iM=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "nuenv": {
       "inputs": {
         "nixpkgs": [
@@ -1074,60 +1058,6 @@
         "owner": "hallettj",
         "ref": "writeShellApplication",
         "repo": "nuenv",
-        "type": "github"
-      }
-    },
-    "nvim-treesitter": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1770448302,
-        "narHash": "sha256-c8twdp6ASjV/wiwSzau3xrk8d9fIwQwM6lsL4mo5TQ4=",
-        "owner": "nvim-treesitter",
-        "repo": "nvim-treesitter",
-        "rev": "45a07f869b0cffba342276f2c77ba7c116d35db8",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nvim-treesitter",
-        "ref": "main",
-        "repo": "nvim-treesitter",
-        "type": "github"
-      }
-    },
-    "nvim-treesitter-main": {
-      "inputs": {
-        "nixpkgs": "nixpkgs_8",
-        "nvim-treesitter": "nvim-treesitter",
-        "nvim-treesitter-textobjects": "nvim-treesitter-textobjects"
-      },
-      "locked": {
-        "lastModified": 1771049704,
-        "narHash": "sha256-CbWUjrQ3ayneuXc+7ONTd6zzeMWyynVDYSGsLZXV4qw=",
-        "owner": "iofq",
-        "repo": "nvim-treesitter-main",
-        "rev": "d019c356b14295bc54330c2868f3039e2e6bd2eb",
-        "type": "github"
-      },
-      "original": {
-        "owner": "iofq",
-        "repo": "nvim-treesitter-main",
-        "type": "github"
-      }
-    },
-    "nvim-treesitter-textobjects": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1769600306,
-        "narHash": "sha256-J3D+nbalJqZ4aeFBD7veW6TuI0BEU2jbx5pMEew4dkA=",
-        "owner": "nvim-treesitter",
-        "repo": "nvim-treesitter-textobjects",
-        "rev": "a0e182ae21fda68c59d1f36c9ed45600aef50311",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nvim-treesitter",
-        "ref": "main",
-        "repo": "nvim-treesitter-textobjects",
         "type": "github"
       }
     },
@@ -1249,7 +1179,6 @@
         "nixpkgs-darwin-stable": "nixpkgs-darwin-stable",
         "nixpkgs-linux-stable": "nixpkgs-linux-stable",
         "nuenv": "nuenv",
-        "nvim-treesitter-main": "nvim-treesitter-main",
         "pkgs-by-name-for-flake-parts": "pkgs-by-name-for-flake-parts",
         "playwright-web-flake": "playwright-web-flake",
         "sops-nix": "sops-nix",
