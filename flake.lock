@@ -1025,18 +1025,15 @@
     },
     "nixpkgs_7": {
       "locked": {
-        "lastModified": 1770877261,
-        "narHash": "sha256-X39XXSNjWdngzHJvCoc0UKZsxPvZrd1O94LQjvefFCU=",
-        "owner": "cameronraysmith",
-        "repo": "nixpkgs",
-        "rev": "867b4878b711adce951ee21e5e0bdc30039d6e80",
-        "type": "github"
+        "lastModified": 1771025653,
+        "narHash": "sha256-RCtFY7B4CEfUQx10pQbKMU+vPsLcAS7OPjoW2fDrLsk=",
+        "rev": "7d2ae6d8b8b697b5114a4249d0d958ee5f23d8fe",
+        "type": "tarball",
+        "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.05pre946098.7d2ae6d8b8b6/nixexprs.tar.xz"
       },
       "original": {
-        "owner": "cameronraysmith",
-        "ref": "fix-userborn-nrm-recursion",
-        "repo": "nixpkgs",
-        "type": "github"
+        "type": "tarball",
+        "url": "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
       }
     },
     "nuenv": {
