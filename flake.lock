@@ -932,11 +932,11 @@
     },
     "nixpkgs-linux-stable": {
       "locked": {
-        "lastModified": 1770770419,
-        "narHash": "sha256-VT7O9+S7+106Q+x+zdq8lKvAV2K28nJh5BmflMcE4SQ=",
-        "rev": "6c5e707c6b5339359a9a9e215c5e66d6d802fd7a",
+        "lastModified": 1771043024,
+        "narHash": "sha256-WoiezqWJQ3OHILah+p6rzNXdJceEAmAhyDFZFZ6pZzY=",
+        "rev": "3aadb7ca9eac2891d52a9dec199d9580a6e2bf44",
         "type": "tarball",
-        "url": "https://releases.nixos.org/nixos/25.11/nixos-25.11.5776.6c5e707c6b53/nixexprs.tar.xz"
+        "url": "https://releases.nixos.org/nixos/25.11/nixos-25.11.5960.3aadb7ca9eac/nixexprs.tar.xz"
       },
       "original": {
         "type": "tarball",
