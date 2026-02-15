@@ -135,6 +135,19 @@
               ];
             }
           ];
+
+          Notification = [
+            {
+              matcher = "permission_prompt";
+              hooks = [
+                {
+                  type = "command";
+                  command = "notify-permission-prompt";
+                  async = true;
+                }
+              ];
+            }
+          ];
         };
       };
   };
