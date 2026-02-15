@@ -32,6 +32,17 @@
           # Added: 2025-10-14
           micromamba
 
+          # https://hydra.nixos.org/job/nixpkgs/trunk/argocd.aarch64-darwin
+          # https://hydra.nixos.org/job/nixpkgs/trunk/argocd.x86_64-linux
+          # https://hydra.nixos.org/job/nixpkgs/trunk/argocd.aarch64-linux
+          # Error: argocd-ui yarn.lock mismatch in yarnConfigHook
+          # - Offline cache yarn.lock diverges from source yarn.lock
+          # - Version bumps in express, body-parser, cookie, finalhandler, etc.
+          # - Upstream nixpkgs needs to regenerate the yarn offline cache
+          # TODO: Remove when argocd-ui yarn.lock fixed upstream
+          # Added: 2026-02-15
+          argocd
+
           ;
       }
       // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
