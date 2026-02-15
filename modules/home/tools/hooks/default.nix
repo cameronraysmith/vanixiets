@@ -190,6 +190,20 @@
         ];
         text = builtins.readFile ./notify-permission-prompt.sh;
       };
+
+      notify-epic-completion = pkgs.writeShellApplication {
+        name = "notify-epic-completion";
+        runtimeInputs = with pkgs; [
+          beads
+          curl
+          git
+          jq
+          coreutils
+          gnugrep
+          gnused
+        ];
+        text = builtins.readFile ./notify-epic-completion.sh;
+      };
     in
     {
       home.packages = [
@@ -209,6 +223,7 @@
         notify-escalation
         bulk-signal-init
         notify-permission-prompt
+        notify-epic-completion
       ];
     };
 }
