@@ -11,7 +11,13 @@ Beads is a git-friendly issue tracker that stores data in SQLite with a JSONL fi
 The `bd` CLI provides comprehensive issue, epic, and dependency management from the command line.
 Data lives in `.beads/` at the repository root, making it portable and version-controllable.
 
-Action commands:
+Session workflow (default entry points):
+- `/session-orient` — session start: orientation with AMDiRE documentation reading, cross-project context, and beads diagnostics
+- `/session-plan` — structured planning after orientation
+- `/session-review` — session review and retrospective
+- `/session-checkpoint` — session wind-down: checkpoint with learnings capture and handoff preparation
+
+Beads-layer commands (for repos without the full workflow):
 - `/issues:beads-seed` (`~/.claude/skills/issues-beads-seed/SKILL.md`) — convert architecture docs into beads issues
 - `/issues:beads-orient` (`~/.claude/skills/issues-beads-orient/SKILL.md`) — session start: run diagnostics, synthesize state, select work
 - `/issues:beads-evolve` (`~/.claude/skills/issues-beads-evolve/SKILL.md`) — adaptive refinement: refactor graph structure and feed back to architecture
@@ -53,6 +59,7 @@ This is the critical transition from planning to execution.
 **beads-evolve** refactors the issue graph when structural problems emerge (circular dependencies, bottlenecks, misaligned priorities) and feeds insights back to architecture docs when assumptions change.
 
 **beads-checkpoint** winds down sessions by updating issue statuses, capturing learnings in comments, and preparing handoff summaries for future sessions.
+In the full workflow, `/session-orient` and `/session-checkpoint` compose these beads-layer commands with additional context assembly and documentation reading.
 
 **Architecture feedback** happens when implementation reveals that original architectural assumptions need revision, triggering updates to architecture docs and potentially re-seeding portions of the graph.
 
@@ -62,11 +69,15 @@ When to use each beads command:
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
+| session-orient | Full workflow orientation (composes beads-orient) | Session start (default) |
+| session-plan | Structured planning after orientation | After orientation |
+| session-review | Session review and retrospective | Mid-session or pre-checkpoint |
+| session-checkpoint | Full workflow checkpoint (composes beads-checkpoint) | Session end (default) |
 | beads-init | Setup beads without auto-commit hooks | New project initialization |
 | beads-seed | Architecture docs → beads issues | Planning to execution transition |
-| beads-orient | Pick optimal work from graph | Session start or status check |
+| beads-orient | Pick optimal work from graph | Session start in beads-only repos |
 | beads-evolve | Refactor graph structure + architecture feedback | Structural problems detected |
-| beads-checkpoint | Update status, capture learnings, prepare handoff | Session end or before context switch |
+| beads-checkpoint | Update status, capture learnings, prepare handoff | Session end in beads-only repos |
 | beads-audit | Graph health check and validation | Periodic maintenance |
 | beads-prime | Quick command reference | Token-constrained contexts |
 
@@ -150,7 +161,7 @@ The orchestrator serializes JSONL after merging worktree branches back: `bd sync
 
 Commit frequency recommendations (applicable from the repo root or focus epic branch):
 - **Eager**: After each logical batch (creating an epic with children, wiring dependencies)
-- **Session boundary**: At minimum, commit before ending work via `/issues:beads-checkpoint`
+- **Session boundary**: At minimum, commit before ending work via `/session-checkpoint` (or `/issues:beads-checkpoint` in beads-only repos)
 - **Descriptive when relevant**: For significant changes, use specific messages like `chore(beads): close auth epic after implementation`
 
 In worktree contexts (`.worktrees/` subdirectories), `bd` commands still execute and update the shared SQLite DB, but JSONL commit responsibility shifts to the orchestrator after merging branches back.
@@ -549,7 +560,7 @@ The orchestrator handles serialization after merging worktree branches back.
 
 ### Phase 5: Session wind-down
 
-Use `/issues:beads-checkpoint` to update statuses, capture learnings, and prepare handoff.
+Use `/session-checkpoint` (or `/issues:beads-checkpoint` in beads-only repos) to update statuses, capture learnings, and prepare handoff.
 
 ## Maintenance operations
 
