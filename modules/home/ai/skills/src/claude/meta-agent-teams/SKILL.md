@@ -23,9 +23,11 @@ Keep both in sync: when a team task completes, update the corresponding bead.
 ## Teammate lifecycle: orient, work, checkpoint, shutdown, replace
 
 Teammate lifecycle management integrates with the orient/checkpoint pattern.
-Every new teammate should be instructed to execute `/issues-beads-orient` at session start to establish full context on the issue graph and current state.
-Teammates should monitor context usage and, when approaching 50% capacity (approximately 100k tokens), execute `/issues-beads-checkpoint` to capture learnings, update issue status, and produce a handoff narrative.
-After checkpoint, the teammate requests shutdown; the orchestrator spawns a replacement oriented with `/issues-beads-orient` to continue the work.
+Every new teammate should be instructed to execute `/session-orient` at session start to establish full context on the issue graph and current state.
+For repos without the full workflow (no `session-*` skills installed), fall back to `/issues-beads-orient`.
+Teammates should monitor context usage and, when approaching 50% capacity (approximately 100k tokens), execute `/session-checkpoint` to capture learnings, update issue status, and produce a handoff narrative.
+For repos without the full workflow, fall back to `/issues-beads-checkpoint`.
+After checkpoint, the teammate requests shutdown; the orchestrator spawns a replacement oriented with `/session-orient` (or `/issues-beads-orient` in beads-only repos) to continue the work.
 This creates a clean lifecycle: orient, work, checkpoint, shutdown, replace.
 
 ## Subagent identity in team context
