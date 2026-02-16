@@ -8,6 +8,10 @@ disable-model-invocation: true
 Symlink location: `~/.claude/skills/issues-beads-orient/SKILL.md`
 Slash command: `/issues:beads-orient`
 
+This is the beads-layer orientation substrate.
+For full workflow sessions, use `/session-orient` which composes this skill with AMDiRE documentation reading and cross-project context assembly.
+This skill remains independently invocable for repos that do not use the full workflow.
+
 Action prompt for session start.
 This skill operates in two phases: a graph-wide scan to establish project state and identify candidates, then a signal-table-driven briefing once the user selects an issue.
 Run the commands below, synthesize results, and present project state to the user.
