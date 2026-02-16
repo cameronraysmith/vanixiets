@@ -8,7 +8,8 @@ Symlink location: `~/.claude/skills/issues-beads-prime/SKILL.md`
 Slash command: `/issues:beads-prime`
 
 Minimal quick reference when context is constrained.
-For session lifecycle, prefer action commands: `/issues:beads-orient` (start), `/issues:beads-checkpoint` (wind-down).
+For session lifecycle, prefer `/session-orient` (start) and `/session-checkpoint` (wind-down).
+In repos without the full workflow, use `/issues:beads-orient` and `/issues:beads-checkpoint` directly.
 For comprehensive reference: `/issues:beads` (complete workflows, concepts, and operations).
 
 This module serves as the common conventions and quick-reference layer that other beads skills reference for core context.
