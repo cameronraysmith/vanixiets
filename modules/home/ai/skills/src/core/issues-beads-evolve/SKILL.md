@@ -11,11 +11,14 @@ Slash command: `/issues:beads-evolve`
 Reference document for adaptive issue graph evolution.
 Issues, epics, dependencies, and priorities are hypotheses refined through implementation feedback.
 
-For session lifecycle, use the action commands: `/issues:beads-orient` (start) and `/issues:beads-checkpoint` (wind-down).
+For session lifecycle, prefer `/session-orient` (start) and `/session-checkpoint` (wind-down).
+In repos without the full workflow, use `/issues:beads-orient` and `/issues:beads-checkpoint` directly.
 
 Related commands:
-- `/issues:beads-orient` (`~/.claude/skills/issues-beads-orient/SKILL.md`) — action: session start
-- `/issues:beads-checkpoint` (`~/.claude/skills/issues-beads-checkpoint/SKILL.md`) — action: session wind-down
+- `/session-orient` — session start (default, composes beads-orient with additional context)
+- `/session-checkpoint` — session wind-down (default, composes beads-checkpoint with additional context)
+- `/issues:beads-orient` (`~/.claude/skills/issues-beads-orient/SKILL.md`) — beads-layer session start
+- `/issues:beads-checkpoint` (`~/.claude/skills/issues-beads-checkpoint/SKILL.md`) — beads-layer session wind-down
 - `/issues:beads` (`~/.claude/skills/issues-beads/SKILL.md`) — comprehensive reference
 - `/issues:beads-prime` (`~/.claude/skills/issues-beads-prime/SKILL.md`) — minimal quick reference
 
@@ -33,8 +36,8 @@ When to use beads-evolve:
 When NOT to use beads-evolve:
 - **Periodic health checks without implementation context**: use `/issues:beads-audit` instead
 - **Initial creation from architecture docs**: use beads-seed or manual creation
-- **Session start diagnostics**: use `/issues:beads-orient`
-- **Session end capture**: use `/issues:beads-checkpoint`
+- **Session start diagnostics**: use `/session-orient` (or `/issues:beads-orient` in beads-only repos)
+- **Session end capture**: use `/session-checkpoint` (or `/issues:beads-checkpoint` in beads-only repos)
 
 ## Philosophy
 
