@@ -50,6 +50,10 @@
           - documentation: ${skillsPath}/preferences-documentation/SKILL.md
           - change management: ${skillsPath}/preferences-change-management/SKILL.md
           - issue tracking: ${skillsPath}/issues-beads/SKILL.md
+          - session orientation (context priming, signal tables): ${skillsPath}/session-orient/SKILL.md
+          - session planning (task decomposition, workflow DAGs): ${skillsPath}/session-plan/SKILL.md
+          - session review (progress assessment, gap analysis): ${skillsPath}/session-review/SKILL.md
+          - session checkpointing (state capture, resumption): ${skillsPath}/session-checkpoint/SKILL.md
           - architectural patterns: ${skillsPath}/preferences-architectural-patterns/SKILL.md
           - functional domain modeling (DDD, types, aggregates): ${skillsPath}/preferences-domain-modeling/SKILL.md
           - event sourcing (event replay, state reconstruction, CQRS): ${skillsPath}/preferences-event-sourcing/SKILL.md
