@@ -597,11 +597,11 @@ Warnings:
 ```
 
 This mirrors beads-orient's synthesis section but for session end.
-The next session can use this summary plus `/issues:beads-orient` to quickly resume.
+The next session can use this summary plus `/session-orient` (or `/issues:beads-orient` in beads-only repos) to quickly resume.
 
 ## Verify next work is discoverable
 
-Before ending the session, ensure the next agent can pick up cleanly via `/issues:beads-orient`.
+Before ending the session, ensure the next agent can pick up cleanly via `/session-orient` (or `/issues:beads-orient` in beads-only repos).
 
 ```bash
 # Quick check of top recommendation
@@ -621,7 +621,7 @@ bd update <top-recommendation-id> --description "Updated: <incorporate session l
 ```
 
 The issue graph becomes the handoff.
-When descriptions are accurate and signal tables reflect actual state, `/issues:beads-orient` in the next session will find actionable, up-to-date work.
+When descriptions are accurate and signal tables reflect actual state, `/session-orient` (or `/issues:beads-orient` in beads-only repos) in the next session will find actionable, up-to-date work.
 
 ## Summary for user
 
@@ -633,7 +633,7 @@ Medium sessions: category summary with counts, key items named, epic progress de
 
 Large sessions: executive summary with statistics, epic progress deltas, only critical items, next session recommendation with rationale.
 
-The next session can run `/issues:beads-orient` to see the updated project state.
+The next session can run `/session-orient` (or `/issues:beads-orient` in beads-only repos) to see the updated project state.
 
 ---
 
