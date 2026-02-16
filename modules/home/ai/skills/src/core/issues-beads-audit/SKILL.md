@@ -358,7 +358,9 @@ done
 
 ## Related commands
 
+- `/session-orient` — session start (default, composes beads-orient with additional context)
+- `/session-checkpoint` — session wind-down (default, composes beads-checkpoint with additional context)
 - `beads-seed.md` - Architecture docs to beads issues transition
 - `beads-evolve.md` - Adaptive refinement during implementation
 - `beads.md` - Comprehensive reference for all beads workflows and commands
-- `beads-orient.md` - Session start diagnostics
+- `beads-orient.md` - Session start diagnostics (beads-layer substrate)
