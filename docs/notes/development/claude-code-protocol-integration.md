@@ -84,7 +84,7 @@ Checks include: (1) bead not already closed, (2) no unresolved blockers for epic
 Source: adapted from `templates/hooks/enforce-sequential-dispatch.sh`.
 Dependencies: `bd`, `jq`.
 
-**session-start** (SessionStart): Lightweight automatic grounding before the user invokes `/issues-beads-orient`.
+**session-start** (SessionStart): Lightweight automatic grounding before the user invokes `/session-orient` (which delegates to `/issues-beads-orient` as its beads-layer substrate).
 Shows: dirty repo warning, open PR reminder (via `gh`), recent knowledge base entries from `.beads/memory/knowledge.jsonl`.
 This hook does not duplicate orient's full task status analysis.
 Source: adapted from `templates/hooks/session-start.sh`.
@@ -185,11 +185,13 @@ When an agent team is working on an epic lineage or epic cross-cutting lineage o
 The team's shared task list becomes the ephemeral coordination substrate while the beads issues remain the persistent source of truth.
 Both should be kept in sync: when a team task completes, the corresponding bead should be updated, and vice versa.
 
-Teammate lifecycle management integrates with the orient/checkpoint pattern.
-Every new agent team member instantiated by the orchestrator should be instructed to execute the `/issues-beads-orient` skill at the beginning of its session to establish full context on the issue graph and current state.
-Teammates should monitor their context usage and, when approaching 50% context capacity (approximately 100k tokens), work toward executing `/issues-beads-checkpoint` to capture learnings, update issue status, and produce a handoff narrative.
-After checkpoint, the teammate should request shutdown, and the orchestrator should spawn a replacement teammate oriented with `/issues-beads-orient` to continue the work.
-This creates a clean lifecycle: orient, work, checkpoint, shutdown, then a new teammate with orient.
+Teammate lifecycle management integrates with the session-layer orient/checkpoint pattern.
+Every new agent team member instantiated by the orchestrator should be instructed to execute `/session-orient` at the beginning of its session to establish full context on the issue graph and current state.
+The session-orient skill delegates to `/issues-beads-orient` as the beads-layer substrate for task status analysis and dependency resolution.
+Teammates should monitor their context usage and, when approaching 50% context capacity (approximately 100k tokens), work toward executing `/session-checkpoint` to capture learnings, update issue status, and produce a handoff narrative.
+The session-checkpoint skill delegates to `/issues-beads-checkpoint` as the beads-layer substrate for persistent state serialization.
+After checkpoint, the teammate should request shutdown, and the orchestrator should spawn a replacement teammate oriented with `/session-orient` to continue the work.
+This creates a clean lifecycle: session-orient, work, session-checkpoint, shutdown, then a new teammate with session-orient.
 
 The existing "You are a subagent Task" identity marker and return-with-questions pattern remain unchanged for DAG-dispatched tasks.
 For agent team teammates, the spawn prompt should include equivalent identity context plus instructions about the orient/checkpoint lifecycle.
@@ -268,6 +270,7 @@ The `validate-epic-close` hook (PreToolUse, Bash matcher) intercepts any `bd clo
 Since this hook only runs inside Claude Code, humans closing epics from their terminal are unaffected.
 The `agents-md.nix` orchestrator instructions include a directive that agents must never close epics directly.
 All beads skill files (`issues-beads`, `issues-beads-prime`, `issues-beads-checkpoint`, `issues-beads-evolve`, `issues-beads-audit`) replace any `bd epic close-eligible` usage with dry-run checks and guidance to report readiness to the user.
+The session-layer skills (`session-orient`, `session-plan`, `session-review`, `session-checkpoint`) serve as the default session lifecycle entry points and compose these beads skills as their operational substrate.
 
 The resulting workflow is: agents close individual issues, the Kanban UI automatically sets the parent epic to "In Review" when all children are closed, and a human reviews and closes the epic.
 
