@@ -171,7 +171,7 @@ Derived parameters:
   Planning depth: {shallow|medium|deep} ({decomposition description})
 
 {When blocked:}
-Seeding cannot proceed. Address blocking deficiencies by promoting
+Planning cannot proceed. Address blocking deficiencies by promoting
 working notes from docs/notes/ to docs/development/ following the
 documentation promotion workflow specification.
 

@@ -76,11 +76,16 @@ bd show <id> --json | jq -r '.[0].notes // ""'
 Parse the block between `<!-- stigmergic-signals -->` and `<!-- /stigmergic-signals -->` delimiters.
 Read the following values:
 
+- *schema-version* (integer, currently `1`)
 - *cynefin* (clear, complicated, complex, chaotic)
 - *planning-depth* (shallow, standard, deep, probe)
 - *surprise* (0.0 to 1.0)
 - *progress* (not-started, exploring, implementing, verifying, blocked)
 - *escalation* (none, pending, resolved)
+
+If *schema-version* is absent, treat the table as version 1.
+If *schema-version* is present and not `1`, warn the worker that the signal table uses an unrecognized schema version and that field semantics may have changed.
+Continue parsing best-effort but surface the warning prominently in the step 6 synthesis.
 
 When no signal table exists, apply defaults: cynefin=complicated, surprise=0.0, progress=not-started, escalation=none, planning-depth=standard.
 
