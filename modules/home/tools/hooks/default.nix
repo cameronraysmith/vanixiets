@@ -140,11 +140,22 @@
         text = builtins.readFile ./redirect-rm-to-rip.sh;
       };
 
+      notify-permission-wait = pkgs.writeShellApplication {
+        name = "notify-permission-wait";
+        runtimeInputs = with pkgs; [
+          curl
+          git
+          coreutils
+        ];
+        text = builtins.readFile ./notify-permission-wait.sh;
+      };
+
       gate-mutating-http = pkgs.writeShellApplication {
         name = "gate-mutating-http";
-        runtimeInputs = with pkgs; [
-          jq
-          gnugrep
+        runtimeInputs = [
+          notify-permission-wait
+          pkgs.jq
+          pkgs.gnugrep
         ];
         text = builtins.replaceStrings [ "@trustedHostsPattern@" ] [ trustedHostsPattern ] (
           builtins.readFile ./gate-mutating-http.sh
@@ -153,9 +164,10 @@
 
       gate-dangerous-commands = pkgs.writeShellApplication {
         name = "gate-dangerous-commands";
-        runtimeInputs = with pkgs; [
-          jq
-          gnugrep
+        runtimeInputs = [
+          notify-permission-wait
+          pkgs.jq
+          pkgs.gnugrep
         ];
         text = builtins.readFile ./gate-dangerous-commands.sh;
       };
@@ -237,6 +249,7 @@
         clarify-vague-request
         validate-completion
         redirect-rm-to-rip
+        notify-permission-wait
         gate-mutating-http
         gate-dangerous-commands
         gate-issue-close
