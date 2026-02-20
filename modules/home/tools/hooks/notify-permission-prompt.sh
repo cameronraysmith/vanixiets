@@ -61,7 +61,7 @@ else
   REPO_NAME=$(basename "$REPO_ROOT")
 fi
 
-NTFY_TOPIC="$REPO_NAME"
+NTFY_TOPIC=$(echo "$REPO_NAME" | tr '.' '-')
 
 # Build notification message
 MESSAGE="Claude Code needs permission to use ${TOOL_NAME}: ${BRIEF}"
