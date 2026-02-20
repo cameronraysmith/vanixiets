@@ -12,6 +12,24 @@
     let
       beads = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.beads;
 
+      # Hosts where mutating HTTP requests (POST, PUT, etc.) are auto-approved
+      # by gate-mutating-http without prompting. Matched as hostnames in URLs
+      # with or without scheme prefix (e.g. both https://ntfy.zt/topic and
+      # ntfy.zt/topic are recognized).
+      trustedHttpMutationHosts = [
+        "ntfy.zt"
+      ];
+
+      trustedHostsPattern =
+        if trustedHttpMutationHosts == [ ] then
+          ""
+        else
+          let
+            escaped = map (h: builtins.replaceStrings [ "." ] [ "\\." ] h) trustedHttpMutationHosts;
+            alternation = builtins.concatStringsSep "|" escaped;
+          in
+          "(https?://|[[:space:]])(${alternation})(/|:|[[:space:]]|$)";
+
       validate-epic-close = pkgs.writeShellApplication {
         name = "validate-epic-close";
         runtimeInputs = with pkgs; [
@@ -128,7 +146,9 @@
           jq
           gnugrep
         ];
-        text = builtins.readFile ./gate-mutating-http.sh;
+        text = builtins.replaceStrings [ "@trustedHostsPattern@" ] [ trustedHostsPattern ] (
+          builtins.readFile ./gate-mutating-http.sh
+        );
       };
 
       gate-dangerous-commands = pkgs.writeShellApplication {
