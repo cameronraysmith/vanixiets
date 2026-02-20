@@ -87,8 +87,12 @@ if $HAS_WGET && [ -z "$REASON" ]; then
   fi
 fi
 
-# Mutating request detected: escalate to user
+# Mutating request detected: notify before escalating to user
 if [ -n "$REASON" ]; then
+  BRIEF=$(echo "$COMMAND" | head -c 200)
+  notify-permission-wait "Bash" "$BRIEF" &>/dev/null &
+  disown
+
   cat << EOF
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"$REASON"}}
 EOF
