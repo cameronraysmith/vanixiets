@@ -36,7 +36,7 @@ Gated patterns (each returns permissionDecision "ask"):
     git stash drop/clear
 
   GitHub CLI: mutating operations
-    gh api *
+    gh api * (except actions/runs/*/logs)
     gh pr create/comment/merge/close/edit/review
     gh issue create/comment/merge/close/edit/review
     gh repo create/delete/rename
@@ -129,7 +129,12 @@ fi
 
 # --- GitHub CLI: mutating operations ---
 if [ -z "$REASON" ]; then
-  cmd_match 'gh api\s' && REASON="gh api can make arbitrary mutations"
+  if cmd_match 'gh api\s'; then
+    # Auto-approve read-only GitHub API calls with known safe paths
+    if ! echo "$COMMAND" | grep -qE 'gh api\s+["'"'"']?repos/[^/]+/[^/]+/actions/runs/[0-9]+/logs["'"'"']?'; then
+      REASON="gh api can make arbitrary mutations"
+    fi
+  fi
 fi
 if [ -z "$REASON" ]; then
   cmd_match 'gh (pr|issue) (create|comment|merge|close|edit|review)\b' \
