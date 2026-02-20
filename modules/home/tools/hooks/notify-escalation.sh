@@ -59,7 +59,7 @@ else
   REPO_NAME=$(basename "$REPO_ROOT")
 fi
 
-NTFY_TOPIC="$REPO_NAME"
+NTFY_TOPIC=$(echo "$REPO_NAME" | tr '.' '-')
 
 # Extract escalation context from the issue notes for the notification summary.
 # Read the current issue state to get the escalation-context section.
