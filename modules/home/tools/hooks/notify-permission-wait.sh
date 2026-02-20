@@ -33,6 +33,7 @@ else
   REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 fi
 
+NTFY_TOPIC=$(echo "$REPO_NAME" | tr '.' '-')
 MESSAGE="Waiting for permission: ${TOOL_NAME}: ${BRIEF}"
 
 # Best-effort delivery; never fail the caller.
@@ -41,4 +42,4 @@ curl -sfk -m 5 \
   -H "Priority: default" \
   -H "Tags: lock,${REPO_NAME}" \
   -d "$MESSAGE" \
-  "https://ntfy.zt/${REPO_NAME}" &>/dev/null || true
+  "https://ntfy.zt/${NTFY_TOPIC}" &>/dev/null || true
