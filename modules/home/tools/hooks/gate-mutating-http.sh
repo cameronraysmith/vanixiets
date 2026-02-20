@@ -32,6 +32,18 @@ if ! $HAS_CURL && ! $HAS_WGET; then
   exit 0
 fi
 
+# --- Trusted hosts for mutating HTTP (auto-approve) ---
+# Pattern injected by Nix from trustedHttpMutationHosts list.
+# Matches hostname with optional scheme prefix and path/port/whitespace suffix.
+# Empty string disables the check.
+TRUSTED_HOSTS_PATTERN="@trustedHostsPattern@"
+if [ -n "$TRUSTED_HOSTS_PATTERN" ] && echo "$COMMAND" | grep -qE "$TRUSTED_HOSTS_PATTERN"; then
+  cat << 'EOF'
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}
+EOF
+  exit 0
+fi
+
 REASON=""
 
 # --- curl mutation detection ---
