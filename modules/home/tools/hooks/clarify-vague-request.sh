@@ -7,8 +7,8 @@ set -euo pipefail
 
 INPUT=$(cat)
 
-# Extract prompt text
-PROMPT_TEXT=$(echo "$INPUT" | jq -r '.prompt // empty')
+# Extract prompt text; exit gracefully on malformed input
+PROMPT_TEXT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null) || exit 0
 if [ -z "$PROMPT_TEXT" ]; then
   exit 0
 fi
