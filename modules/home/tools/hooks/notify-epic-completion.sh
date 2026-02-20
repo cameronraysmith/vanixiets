@@ -75,7 +75,7 @@ else
   REPO_NAME=$(basename "$REPO_ROOT")
 fi
 
-NTFY_TOPIC="$REPO_NAME"
+NTFY_TOPIC=$(echo "$REPO_NAME" | tr '.' '-')
 
 # Build notification message
 MESSAGE="All children of ${PARENT_EPIC_ID} (${EPIC_TITLE}) are closed. Epic is ready for System 5 review and closure."
