@@ -83,7 +83,7 @@ MESSAGE="All children of ${PARENT_EPIC_ID} (${EPIC_TITLE}) are closed. Epic is r
 # Send notification to ntfy.zt
 # Uses curl so it works from both local and remote SSH sessions over zerotier.
 # Timeout after 5 seconds to avoid blocking if ntfy is unreachable.
-curl -sf -m 5 \
+curl -sfk -m 5 \
   -H "Title: Epic ready: ${PARENT_EPIC_ID}" \
   -H "Priority: default" \
   -H "Tags: checkmark,${REPO_NAME}" \
