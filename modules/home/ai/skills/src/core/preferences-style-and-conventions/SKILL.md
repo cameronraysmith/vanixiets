@@ -99,7 +99,7 @@ This approach provides a complete, well-organized view of CI results and avoids 
   - Content search (within files): use `rg` (ripgrep) instead of `grep`
   - Disk usage (directory sizes): use `diskus` instead of `du -sh`
   - Clipboard (copy to system clipboard): use `cb copy` (`clipboard-jh`) instead of platform-specific `pbcopy` (macOS) or `xclip`/`xsel` (Linux)
-  - Notification (push alert to user): use `curl -k -d "<message>" https://ntfy.zt/<repo-name>` where `<repo-name>` is the current GitHub repository name (from `git remote`) and `<message>` summarizes the completed task
+  - Notification (push alert to user): use `curl -k -d "<message>" https://ntfy.zt/<topic>` where `<topic>` is the current GitHub repository name (from `git remote`) with dots replaced by hyphens (e.g. `fluxome.jl` becomes `fluxome-jl`) and `<message>` summarizes the completed task
 - When given a GitHub file URL (e.g., `https://github.com/org/repo/blob/ref/path/to/file.ext#L119-L131`), check for a local copy before using web tools:
   1. Search for repo: `fd -t d '^repo$' ~/projects` (repo name may have variants)
   2. Verify remote: `cd candidate-dir && git remote -v` (confirm origin matches GitHub org/repo)
