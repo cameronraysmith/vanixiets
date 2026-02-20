@@ -1252,16 +1252,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1770968388,
-        "narHash": "sha256-8QnqgCUmg9HYvrqhNK+HAeg7WRd64gFF1wX26O6c2J0=",
-        "owner": "cameronraysmith",
+        "lastModified": 1771501715,
+        "narHash": "sha256-U0P7KvlJZ3XLB8DhwnISmc5xEQWj9p9shRmCWAgT94k=",
+        "owner": "nix-community",
         "repo": "srvos",
-        "rev": "72b185356173e270bfd0f8e643870c42a82c1255",
+        "rev": "4744487ba359133ac2b04ea49aa0eb90841b8c67",
         "type": "github"
       },
       "original": {
-        "owner": "cameronraysmith",
-        "ref": "fix-darwin-homebrew-brewprefix-removal",
+        "owner": "nix-community",
         "repo": "srvos",
         "type": "github"
       }
