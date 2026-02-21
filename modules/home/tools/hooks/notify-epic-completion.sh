@@ -50,32 +50,9 @@ OPEN_CHILDREN=$(echo "$EPIC_JSON" | jq '[.[0].dependents[] | select(.dependency_
 # All children are closed; prepare notification
 EPIC_TITLE=$(echo "$EPIC_JSON" | jq -r '.[0].title // "unknown"' 2>/dev/null || echo "unknown")
 
-# Derive ntfy topic from git remote repo name
-REMOTE_URL=""
-for remote in origin upstream; do
-  REMOTE_URL=$(git remote get-url "$remote" 2>/dev/null || true)
-  if [ -n "$REMOTE_URL" ]; then
-    break
-  fi
-done
-
-# Fall back to first available remote
-if [ -z "$REMOTE_URL" ]; then
-  FIRST_REMOTE=$(git remote 2>/dev/null | head -1 || true)
-  if [ -n "$FIRST_REMOTE" ]; then
-    REMOTE_URL=$(git remote get-url "$FIRST_REMOTE" 2>/dev/null || true)
-  fi
-fi
-
-# Extract repo name from URL, stripping .git suffix
-if [ -n "$REMOTE_URL" ]; then
-  REPO_NAME=$(basename -s .git "$REMOTE_URL")
-else
-  # Last resort: use directory name
-  REPO_NAME=$(basename "$REPO_ROOT")
-fi
-
-NTFY_TOPIC=$(echo "$REPO_NAME" | tr '.' '-')
+# Derive ntfy topic from hostname; repo name is metadata only
+NTFY_TOPIC=$(hostname -s)
+REPO_NAME=$(basename "$REPO_ROOT")
 
 # Build notification message
 MESSAGE="All children of ${PARENT_EPIC_ID} (${EPIC_TITLE}) are closed. Epic is ready for System 5 review and closure."
