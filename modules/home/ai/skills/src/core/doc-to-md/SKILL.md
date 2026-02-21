@@ -337,40 +337,21 @@ Before presenting results to the user, verify:
 
 Report the final `tree --du -ah` output and any quality issues to the user.
 
-## Phase 5: publish and notify
+## Phase 5: aggregate integration (local)
 
-After verification passes, send a completion notification and create the GitHub repository.
-
-```bash
-curl -k -d "doc-to-md: <repo-name> complete" https://ntfy.zt/$(hostname -s)
-```
-
-Create a private GitHub repository from the local repo.
-Run this from within the repo directory so `-s .` resolves correctly:
-
-```bash
-cd ~/projects/<workspace>/<repo-name> && gh repo create cameronraysmith/<repo-name> --private --push -r github -s .
-```
-
-This command will be intercepted by a Claude Code hook requesting permission before execution.
-The remote name `-r github` matches the convention used across existing doc-to-md repos.
-
-## Phase 6: subtree aggregate integration
-
-When `--aggregate` is provided, add the newly published repo to the subtree aggregate repository and update its README.
+When `--aggregate` is provided, add the new repo to the subtree aggregate repository and update its README.
+All operations in this phase are local and require no user approval.
 Skip this phase if no aggregate path was specified.
-
-GitHub's server-side GH008 pre-receive hook rejects pushes containing LFS pointer references when the corresponding LFS objects are not yet in the target repo's LFS storage.
-The subtree add, LFS object transfer, and push must occur in that order.
 
 ### Add subtree to aggregate
 
+Fetch from the local repo path rather than GitHub so the subtree add completes without requiring the individual repo to be published first.
 The LFS smudge filter must be skipped during subtree add to prevent pointer/blob mismatches in the working tree.
 
 ```bash
 cd <aggregate-path>
 export GIT_LFS_SKIP_SMUDGE=1
-git remote add <repo-name> "https://github.com/cameronraysmith/<repo-name>.git" 2>/dev/null || true
+git remote add <repo-name> ~/projects/<workspace>/<repo-name> 2>/dev/null || true
 git fetch <repo-name> main
 git subtree add --prefix=<repo-name> <repo-name> main -m "subtree: add <repo-name>"
 git checkout -- . 2>/dev/null || true
@@ -407,11 +388,34 @@ cd <aggregate-path>
 git add README.md && git commit -m "docs: add <repo-name> to README"
 ```
 
-### Transfer LFS objects and push
+## Phase 6: publish, transfer, and notify
 
-Transfer LFS objects from the individual repo to the aggregate's GitHub LFS storage before pushing refs.
+All commands in this phase interact with GitHub and will be intercepted by Claude Code hooks requesting permission.
+The ntfy notification fires first so the user sees a summary of completed local work before the approval prompts arrive.
 
 ```bash
+curl -k -d "doc-to-md: <repo-name> complete" https://ntfy.zt/$(hostname -s)
+```
+
+### Create GitHub repository
+
+```bash
+cd ~/projects/<workspace>/<repo-name> && gh repo create cameronraysmith/<repo-name> --private --push -r github -s .
+```
+
+The remote name `-r github` matches the convention used across existing doc-to-md repos.
+
+### Update subtree remote and transfer LFS
+
+After the individual repo exists on GitHub, update the subtree remote in the aggregate from the local path to the GitHub URL for future `git subtree pull` and `git subtree push` operations.
+
+GitHub's server-side GH008 pre-receive hook rejects pushes containing LFS pointer references when the corresponding LFS objects are not yet in the target repo's LFS storage.
+LFS objects must be transferred before pushing the aggregate's refs.
+
+```bash
+cd <aggregate-path>
+git remote set-url <repo-name> "https://github.com/cameronraysmith/<repo-name>.git"
+
 cd ~/projects/<workspace>/<repo-name>
 git remote add aggregate "https://github.com/cameronraysmith/<aggregate-repo-name>.git" 2>/dev/null || true
 git lfs push aggregate --all
@@ -420,7 +424,7 @@ cd <aggregate-path>
 git push github main
 ```
 
-Verify the aggregate is consistent after push:
+### Verify
 
 ```bash
 cd <aggregate-path>
