@@ -357,11 +357,11 @@ The remote name `-r github` matches the convention used across existing doc-to-m
 
 ## Phase 6: subtree aggregate integration
 
-When `--aggregate` is provided, add the newly published repo to the subtree aggregate repository.
+When `--aggregate` is provided, add the newly published repo to the subtree aggregate repository and update its README.
 Skip this phase if no aggregate path was specified.
 
 GitHub's server-side GH008 pre-receive hook rejects pushes containing LFS pointer references when the corresponding LFS objects are not yet in the target repo's LFS storage.
-The steps below follow the required ordering: subtree add, then LFS object transfer, then push.
+The subtree add, LFS object transfer, and push must occur in that order.
 
 ### Add subtree to aggregate
 
@@ -375,6 +375,36 @@ git fetch <repo-name> main
 git subtree add --prefix=<repo-name> <repo-name> main -m "subtree: add <repo-name>"
 git checkout -- . 2>/dev/null || true
 unset GIT_LFS_SKIP_SMUDGE
+```
+
+### Update aggregate README
+
+The aggregate's `README.md` organizes all constituent repos into topical categories, each with a section heading, a brief description, and a table of directory-to-reference mappings.
+
+Read the existing `README.md` to understand the current categories and their scope.
+Determine where the new repo belongs by considering the document's subject matter against the existing categories.
+Three outcomes are possible:
+
+- The new repo fits an existing category.
+  Add a row to that category's table, maintaining chronological order by year within the table.
+- The new repo does not fit any existing category.
+  Create a new section with a heading, a one-to-two sentence description, and a table containing the new entry.
+  Place the new section in a logical position relative to existing sections.
+- Adding the new repo reveals that an existing repo would be better placed in a different category.
+  Move the entry between tables.
+  This should be rare; prefer the simplest change that maintains coherent categories.
+
+Each table row follows the format:
+
+```markdown
+| `<repo-name>` | Authors (Year). Title. |
+```
+
+Commit the README update separately from the subtree add:
+
+```bash
+cd <aggregate-path>
+git add README.md && git commit -m "docs: add <repo-name> to README"
 ```
 
 ### Transfer LFS objects and push
