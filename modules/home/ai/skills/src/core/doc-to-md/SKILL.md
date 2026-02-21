@@ -33,6 +33,12 @@ Otherwise, use Path B (PDF-only).
 
 Present the resolved inputs, chosen pathway, and target path `~/projects/<workspace>/<repo-name>/` to the user for confirmation before proceeding.
 
+### Prerequisites
+
+`git-lfs` must be installed and available on `PATH`.
+All binary file types used in scholarly documents are tracked via git-lfs to keep repository sizes manageable and avoid GitHub's 100 MB file size limit.
+The comprehensive tracking list covers: `*.pdf`, `*.jpeg`, `*.jpg`, `*.png`, `*.eps`, `*.gif`, `*.webp`, `*.tiff`, `*.svg`.
+
 ## Phase 2a: arXiv LaTeX pathway
 
 When arXiv LaTeX source is available, download and convert.
@@ -42,6 +48,19 @@ When arXiv LaTeX source is available, download and convert.
 ```bash
 mkdir -p ~/projects/<workspace>/<repo-name> && cd "$_"
 git init && git commit --allow-empty -m "initial commit (empty)"
+git lfs install --local
+cat > .gitattributes << 'GITATTR'
+*.pdf filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
+*.eps filter=lfs diff=lfs merge=lfs -text
+*.gif filter=lfs diff=lfs merge=lfs -text
+*.webp filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.svg filter=lfs diff=lfs merge=lfs -text
+GITATTR
+git add .gitattributes && git commit -m "chore: configure git-lfs for binary files"
 ```
 
 ### Download LaTeX source
@@ -88,6 +107,19 @@ When only PDF(s) are available, convert via marker.
 ```bash
 mkdir -p ~/projects/<workspace>/<repo-name> && cd "$_"
 git init && git commit --allow-empty -m "initial commit (empty)"
+git lfs install --local
+cat > .gitattributes << 'GITATTR'
+*.pdf filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
+*.eps filter=lfs diff=lfs merge=lfs -text
+*.gif filter=lfs diff=lfs merge=lfs -text
+*.webp filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.svg filter=lfs diff=lfs merge=lfs -text
+GITATTR
+git add .gitattributes && git commit -m "chore: configure git-lfs for binary files"
 ```
 
 ### Copy and rename source PDFs
@@ -299,5 +331,6 @@ Before presenting results to the user, verify:
 - Git history has atomic commits for each phase
 - `.venv/` and `__pycache__/` are gitignored (if uv project was created)
 - Original PDF(s) are preserved in `pdfs/`
+- Git LFS is active (`git lfs ls-files` lists all binary files; `.gitattributes` contains filter/diff/merge entries)
 
 Report the final `tree --du -ah` output and any quality issues to the user.
