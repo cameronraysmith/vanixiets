@@ -354,7 +354,6 @@ export GIT_LFS_SKIP_SMUDGE=1
 git remote add <repo-name> ~/projects/<workspace>/<repo-name> 2>/dev/null || true
 git fetch <repo-name> main
 git subtree add --prefix=<repo-name> <repo-name> main -m "subtree: add <repo-name>"
-git checkout -- . 2>/dev/null || true
 unset GIT_LFS_SKIP_SMUDGE
 ```
 
