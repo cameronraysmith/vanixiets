@@ -148,26 +148,8 @@ TOTAL=$((PASS_COUNT + FAIL_COUNT))
 ESCAPED_RESULTS=$(printf '%s' "$RESULTS" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
 
 # Send ntfy notification for verification failure (best-effort, never blocks the hook)
-REMOTE_URL=""
-for remote in origin upstream; do
-  REMOTE_URL=$(git remote get-url "$remote" 2>/dev/null || true)
-  if [ -n "$REMOTE_URL" ]; then
-    break
-  fi
-done
-if [ -z "$REMOTE_URL" ]; then
-  FIRST_REMOTE=$(git remote 2>/dev/null | head -1 || true)
-  if [ -n "$FIRST_REMOTE" ]; then
-    REMOTE_URL=$(git remote get-url "$FIRST_REMOTE" 2>/dev/null || true)
-  fi
-fi
-if [ -n "$REMOTE_URL" ]; then
-  REPO_NAME=$(basename -s .git "$REMOTE_URL")
-else
-  REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
-  REPO_NAME=$(basename "${REPO_ROOT:-.}")
-fi
-NTFY_TOPIC="$REPO_NAME"
+NTFY_TOPIC=$(hostname -s)
+REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 
 # Truncate failure output for the notification body
 FAIL_SUMMARY=$(printf '%s' "$RESULTS" | grep -E '^FAIL' | head -5)
@@ -175,7 +157,7 @@ NTFY_MESSAGE="Self-verification gate blocked closure of ${CLOSE_ID}: ${FAIL_COUN
 
 ${FAIL_SUMMARY}"
 
-curl -sf -m 5 \
+curl -sfk -m 5 \
   -H "Title: Verification failed: ${CLOSE_ID}" \
   -H "Priority: high" \
   -H "Tags: x,${REPO_NAME}" \
