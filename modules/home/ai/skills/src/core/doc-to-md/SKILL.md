@@ -1,7 +1,7 @@
 ---
 name: doc-to-md
 description: Convert a scholarly reference (paper or book) from PDF or arXiv LaTeX source into a structured, modular markdown repository with indexed sections, README, and token counts.
-argument-hint: <reference> [--pdf <path>...] [--workspace <name>]
+argument-hint: <reference> [--pdf <path>...] [--workspace <name>] [--aggregate <path>]
 disable-model-invocation: true
 ---
 
@@ -17,6 +17,8 @@ Parse `$ARGUMENTS` for:
 - **Reference**: citation text, DOI, or arXiv identifier
 - **PDF paths**: one or more local PDF files (main document, supplement)
 - **Workspace**: target subdirectory name under `~/projects/` (e.g. `modeling-workspace`)
+- **Aggregate**: path to a subtree aggregate repository (e.g. `~/projects/modeling-workspace/modeling-references`).
+  When provided, the completed repo is added as a subtree to the aggregate after GitHub publish.
 
 If arguments are ambiguous or incomplete, ask the user to clarify before proceeding.
 
@@ -352,3 +354,45 @@ cd ~/projects/<workspace>/<repo-name> && gh repo create cameronraysmith/<repo-na
 
 This command will be intercepted by a Claude Code hook requesting permission before execution.
 The remote name `-r github` matches the convention used across existing doc-to-md repos.
+
+## Phase 6: subtree aggregate integration
+
+When `--aggregate` is provided, add the newly published repo to the subtree aggregate repository.
+Skip this phase if no aggregate path was specified.
+
+GitHub's server-side GH008 pre-receive hook rejects pushes containing LFS pointer references when the corresponding LFS objects are not yet in the target repo's LFS storage.
+The steps below follow the required ordering: subtree add, then LFS object transfer, then push.
+
+### Add subtree to aggregate
+
+The LFS smudge filter must be skipped during subtree add to prevent pointer/blob mismatches in the working tree.
+
+```bash
+cd <aggregate-path>
+export GIT_LFS_SKIP_SMUDGE=1
+git remote add <repo-name> "https://github.com/cameronraysmith/<repo-name>.git" 2>/dev/null || true
+git fetch <repo-name> main
+git subtree add --prefix=<repo-name> <repo-name> main -m "subtree: add <repo-name>"
+git checkout -- . 2>/dev/null || true
+unset GIT_LFS_SKIP_SMUDGE
+```
+
+### Transfer LFS objects and push
+
+Transfer LFS objects from the individual repo to the aggregate's GitHub LFS storage before pushing refs.
+
+```bash
+cd ~/projects/<workspace>/<repo-name>
+git remote add aggregate "https://github.com/cameronraysmith/<aggregate-repo-name>.git" 2>/dev/null || true
+git lfs push aggregate --all
+
+cd <aggregate-path>
+git push github main
+```
+
+Verify the aggregate is consistent after push:
+
+```bash
+cd <aggregate-path>
+git lfs ls-files --include="<repo-name>/**" | wc -l
+```
