@@ -334,3 +334,21 @@ Before presenting results to the user, verify:
 - Git LFS is active (`git lfs ls-files` lists all binary files; `.gitattributes` contains filter/diff/merge entries)
 
 Report the final `tree --du -ah` output and any quality issues to the user.
+
+## Phase 5: publish and notify
+
+After verification passes, send a completion notification and create the GitHub repository.
+
+```bash
+curl -k -d "doc-to-md: <repo-name> complete" https://ntfy.zt/$(hostname -s)
+```
+
+Create a private GitHub repository from the local repo.
+Run this from within the repo directory so `-s .` resolves correctly:
+
+```bash
+cd ~/projects/<workspace>/<repo-name> && gh repo create cameronraysmith/<repo-name> --private --push -r github -s .
+```
+
+This command will be intercepted by a Claude Code hook requesting permission before execution.
+The remote name `-r github` matches the convention used across existing doc-to-md repos.
