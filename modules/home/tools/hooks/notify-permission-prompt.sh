@@ -36,32 +36,9 @@ if [ -z "$BRIEF" ]; then
   BRIEF="(no details available)"
 fi
 
-# Derive ntfy topic from git remote repo name
-REMOTE_URL=""
-for remote in origin upstream; do
-  REMOTE_URL=$(git remote get-url "$remote" 2>/dev/null || true)
-  if [ -n "$REMOTE_URL" ]; then
-    break
-  fi
-done
-
-# Fall back to first available remote
-if [ -z "$REMOTE_URL" ]; then
-  FIRST_REMOTE=$(git remote 2>/dev/null | head -1 || true)
-  if [ -n "$FIRST_REMOTE" ]; then
-    REMOTE_URL=$(git remote get-url "$FIRST_REMOTE" 2>/dev/null || true)
-  fi
-fi
-
-# Extract repo name from URL, stripping .git suffix
-if [ -n "$REMOTE_URL" ]; then
-  REPO_NAME=$(basename -s .git "$REMOTE_URL")
-else
-  # Last resort: use directory name
-  REPO_NAME=$(basename "$REPO_ROOT")
-fi
-
-NTFY_TOPIC=$(echo "$REPO_NAME" | tr '.' '-')
+# Derive ntfy topic from hostname; repo name is metadata only
+NTFY_TOPIC=$(hostname -s)
+REPO_NAME=$(basename "$REPO_ROOT")
 
 # Build notification message
 MESSAGE="Claude Code needs permission to use ${TOOL_NAME}: ${BRIEF}"
