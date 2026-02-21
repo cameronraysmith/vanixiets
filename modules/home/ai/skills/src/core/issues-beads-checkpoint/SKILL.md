@@ -101,13 +101,14 @@ old_rank=$(echo "$CYNEFIN_ORDER" | tr ' ' '\n' | grep -n "^${OLD_CYNEFIN}$" | cu
 new_rank=$(echo "$CYNEFIN_ORDER" | tr ' ' '\n' | grep -n "^${NEW_CYNEFIN}$" | cut -d: -f1)
 
 if [ "$new_rank" -gt "$old_rank" ] 2>/dev/null; then
-  REPO_NAME=$(basename -s .git "$(git remote get-url origin 2>/dev/null || echo "unknown")")
-  curl -sf -m 5 \
+  NTFY_TOPIC=$(hostname -s)
+  REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+  curl -sfk -m 5 \
     -H "Title: Cynefin shift: ${ISSUE_ID}" \
     -H "Priority: high" \
     -H "Tags: warning,${REPO_NAME}" \
-    -d "Issue ${ISSUE_ID} reclassified from ${OLD_CYNEFIN} to ${NEW_CYNEFIN}. May now require advisory coupling." \
-    "https://ntfy.zt/${REPO_NAME}" 2>/dev/null || true
+    -d "Issue ${ISSUE_ID} reclassified from ${OLD_CYNEFIN} to ${NEW_CYNEFIN} in ${REPO_NAME}. May now require advisory coupling." \
+    "https://ntfy.zt/${NTFY_TOPIC}" 2>/dev/null || true
 fi
 ```
 
@@ -252,13 +253,14 @@ REPLANNING_THRESHOLD=2.0
 
 EXCEEDS=$(echo "$TOTAL_SURPRISE > $REPLANNING_THRESHOLD" | bc -l)
 if [ "$EXCEEDS" -eq 1 ]; then
-  REPO_NAME=$(basename -s .git "$(git remote get-url origin 2>/dev/null || echo "unknown")")
-  curl -sf -m 5 \
+  NTFY_TOPIC=$(hostname -s)
+  REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+  curl -sfk -m 5 \
     -H "Title: Replanning needed: ${EPIC_ID}" \
     -H "Priority: urgent" \
     -H "Tags: rotating_light,${REPO_NAME}" \
-    -d "Epic ${EPIC_ID}: accumulated surprise ${TOTAL_SURPRISE} exceeds threshold ${REPLANNING_THRESHOLD} (${CONTRIBUTING} issues contributing). Consider running /issues:beads-evolve to restructure the plan." \
-    "https://ntfy.zt/${REPO_NAME}" 2>/dev/null || true
+    -d "Epic ${EPIC_ID} in ${REPO_NAME}: accumulated surprise ${TOTAL_SURPRISE} exceeds threshold ${REPLANNING_THRESHOLD} (${CONTRIBUTING} issues contributing). Consider running /issues:beads-evolve to restructure the plan." \
+    "https://ntfy.zt/${NTFY_TOPIC}" 2>/dev/null || true
 fi
 ```
 
@@ -310,14 +312,15 @@ If the buffer is depleted, send a notification:
 
 ```bash
 if [ "$READY_COUNT" -eq 0 ] && [ "$CLOSED_CHILDREN" -lt "$TOTAL_CHILDREN" ]; then
-  REPO_NAME=$(basename -s .git "$(git remote get-url origin 2>/dev/null || echo "unknown")")
+  NTFY_TOPIC=$(hostname -s)
+  REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
   UNCLOSED=$((TOTAL_CHILDREN - CLOSED_CHILDREN))
-  curl -sf -m 5 \
+  curl -sfk -m 5 \
     -H "Title: Buffer depleted: ${EPIC_ID}" \
     -H "Priority: high" \
     -H "Tags: warning,${REPO_NAME}" \
-    -d "Epic ${EPIC_ID} has ${UNCLOSED} unclosed issues but 0 are ready. All remaining work is blocked. Review dependencies to unblock progress." \
-    "https://ntfy.zt/${REPO_NAME}" 2>/dev/null || true
+    -d "Epic ${EPIC_ID} in ${REPO_NAME} has ${UNCLOSED} unclosed issues but 0 are ready. All remaining work is blocked. Review dependencies to unblock progress." \
+    "https://ntfy.zt/${NTFY_TOPIC}" 2>/dev/null || true
 fi
 ```
 
