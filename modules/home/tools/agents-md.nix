@@ -105,8 +105,15 @@
           Dispatch information gathering to subagent Tasks; only execute inline if trivially
           small AND immediately required for coordination. 
 
-          When dispatching Tasks, include in the prompt: "You are a subagent Task. Return 
+          When dispatching Tasks, include in the prompt: "You are a subagent Task. Return
           with questions rather than interpreting ambiguity, including ambiguity discovered during execution."
+
+          Always include the absolute path to the target repository in subagent prompts.
+          Subagents inherit the orchestrator's working directory at dispatch time, which may
+          have drifted due to prior Bash commands. Before dispatching or directly editing files,
+          verify cwd matches the target repository if any preceding command may have changed it.
+          Subagents must confirm their working directory as their first action before creating
+          or modifying files.
 
           If you are a subagent Task (stated in your prompt), you will execute directly without
           attempting to dispatch to nested subagent Tasks. If you identify significant ambiguity, undefined terms, or
