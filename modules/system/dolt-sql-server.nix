@@ -17,6 +17,8 @@ let
       cfg.dataDir
       "--loglevel"
       cfg.logLevel
+    ]
+    ++ lib.optionals (cfg.maxConnections != null) [
       "--max-connections"
       (toString cfg.maxConnections)
     ]
@@ -63,9 +65,9 @@ let
         description = "Server log level.";
       };
       maxConnections = lib.mkOption {
-        type = lib.types.int;
-        default = 100;
-        description = "Maximum number of simultaneous connections.";
+        type = lib.types.nullOr lib.types.int;
+        default = null;
+        description = "Maximum simultaneous connections. Null uses dolt upstream default (1000).";
       };
       remotesapiPort = lib.mkOption {
         type = lib.types.nullOr lib.types.port;
@@ -93,8 +95,8 @@ in
         ];
 
         system.activationScripts.dolt-data-dir.text = ''
-          mkdir -p ${cfg.dataDir}
-          chown ${config.system.primaryUser}:staff ${cfg.dataDir}
+          mkdir -p "${cfg.dataDir}"
+          chown "${config.system.primaryUser}:staff" "${cfg.dataDir}"
         '';
 
         launchd.daemons.dolt-sql-server = {
@@ -126,6 +128,10 @@ in
             assertion = cfg.port != 3306;
             message = "dolt-sql-server port 3306 conflicts with MySQL; default is 3307";
           }
+          {
+            assertion = lib.hasPrefix "/var/lib/" cfg.dataDir;
+            message = "dolt-sql-server dataDir must be under /var/lib/ when using DynamicUser + StateDirectory";
+          }
         ];
 
         systemd.services.dolt-sql-server = {
@@ -136,10 +142,14 @@ in
             Type = "simple";
             ExecStart = lib.escapeShellArgs (mkServerArgs cfg);
             WorkingDirectory = cfg.dataDir;
-            StateDirectory = "dolt";
+            StateDirectory = lib.removePrefix "/var/lib/" cfg.dataDir;
             DynamicUser = true;
             Restart = "on-failure";
             RestartSec = 5;
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            PrivateTmp = true;
+            NoNewPrivileges = true;
           };
         };
       };
