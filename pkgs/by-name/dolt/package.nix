@@ -4,6 +4,7 @@
   lib,
   buildGoModule,
   go_1_26,
+  nix-update-script,
 }:
 
 (buildGoModule.override { go = go_1_26; }) (finalAttrs: {
@@ -24,6 +25,8 @@
   doCheck = false;
 
   buildInputs = [ icu ];
+
+  passthru.updateScript = nix-update-script { };
 
   meta = {
     description = "Relational database with version control and CLI a-la Git";
