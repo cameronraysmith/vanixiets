@@ -197,6 +197,15 @@
                 run-shell "[ -f ${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux ] && tmux source-file ${config.xdg.dataHome}/tmux/plugins/tmux-which-key/init.tmux"
               '';
             }
+
+            # fzf-powered searchable keybinding palette (prefix+? for prefix table,
+            # prefix+Backspace for root table, prefix+M-m for custom commands)
+            {
+              plugin = tmux-command-palette;
+              extraConfig = ''
+                set -g @cmdpalette-tables 'prefix,root,copy-mode-vi'
+              '';
+            }
           ];
 
           extraConfig = ''
