@@ -275,6 +275,9 @@
             bind -r -T prefix - resize-pane -D 7
             bind -r -T prefix = resize-pane -U 7
 
+            # Override built-in window menu to keep focus on moved window (-d)
+            bind -T prefix < display-menu -T "#[align=centre]#{window_index}:#{window_name}" -x W -y W "#{?#{>:#{session_windows},1},,-}Swap Left" l { swap-window -d -t :-1 } "#{?#{>:#{session_windows},1},,-}Swap Right" r { swap-window -d -t :+1 } "#{?pane_marked_set,,-}Swap Marked" s { swap-window } "" Kill X { kill-window } Respawn R { respawn-window -k } "#{?pane_marked,Unmark,Mark}" m { select-pane -m } Rename n { command-prompt -F -I "#W" { rename-window -t "#{window_id}" "%%" } } "" "New After" w { new-window -a } "New At End" W { new-window }
+
             # Command and navigation helpers
             bind : command-prompt
             bind ^L refresh-client
