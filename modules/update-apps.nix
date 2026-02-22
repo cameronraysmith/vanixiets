@@ -10,6 +10,10 @@
         type = "app";
         program = "${config.packages.beads-next.updateScript}";
       };
+      apps.update-dolt = {
+        type = "app";
+        program = "${config.packages.dolt.updateScript}";
+      };
       apps.update-claude-code = {
         type = "app";
         program = "${config.packages.claude-code.updateScript}";
