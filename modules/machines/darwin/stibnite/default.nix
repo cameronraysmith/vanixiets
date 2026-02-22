@@ -35,6 +35,7 @@ in
         colima
         dnscrypt-proxy
         zt-dns
+        dolt-sql-server
         # Not importing users module (defines testuser at UID 550)
         # stibnite defines its own user (crs58)
       ]);
@@ -224,6 +225,9 @@ in
           echo "$CERT_NAME already installed in System keychain"
         fi
       '';
+
+      # Dolt SQL server for beads issue tracking
+      services.dolt-sql-server.enable = true;
 
       home-manager = {
         useGlobalPkgs = true;
