@@ -3,11 +3,12 @@
   buildGoModule,
   fetchFromGitHub,
   go_1_26,
+  nix-update-script,
 }:
 
 (buildGoModule.override { go = go_1_26; }) {
   pname = "beads-next";
-  version = "0-unstable-2026-02-22";
+  version = "0.55.4-unstable-2026-02-22";
 
   src = fetchFromGitHub {
     owner = "steveyegge";
@@ -29,6 +30,10 @@
   postInstall = ''
     mv $out/bin/bd $out/bin/bd-next
   '';
+
+  passthru.updateScript = nix-update-script {
+    extraArgs = [ "--version=branch=main" ];
+  };
 
   meta = {
     description = "Beads issue tracker (development build from main)";
