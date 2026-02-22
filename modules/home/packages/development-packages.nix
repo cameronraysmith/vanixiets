@@ -83,6 +83,7 @@
           # from pkgs/by-name
           beads-kanban-ui
           beads-viewer
+          dolt
           gastown
           gitbutler-cli
           golem-cli
