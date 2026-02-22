@@ -82,6 +82,7 @@
           # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
           beads-kanban-ui
+          beads-next
           beads-viewer
           dolt
           gastown
