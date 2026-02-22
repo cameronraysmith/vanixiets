@@ -94,7 +94,8 @@ in
           }
         ];
 
-        system.activationScripts.dolt-data-dir.text = ''
+        system.activationScripts.postActivation.text = lib.mkAfter ''
+          echo "ensuring dolt data directory exists..." >&2
           mkdir -p "${cfg.dataDir}"
           chown "${config.system.primaryUser}:staff" "${cfg.dataDir}"
         '';
@@ -105,8 +106,8 @@ in
             RunAtLoad = true;
             KeepAlive = true;
             WorkingDirectory = cfg.dataDir;
-            StandardErrorPath = "/var/log/dolt-sql-server.err.log";
-            StandardOutPath = "/var/log/dolt-sql-server.out.log";
+            StandardErrorPath = "/tmp/dolt-sql-server.err.log";
+            StandardOutPath = "/tmp/dolt-sql-server.out.log";
             UserName = config.system.primaryUser;
             GroupName = "staff";
           };
