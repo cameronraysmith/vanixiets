@@ -8,16 +8,16 @@
 
 (buildGoModule.override { go = go_1_26; }) {
   pname = "beads-next";
-  version = "0.55.4-unstable-2026-02-22";
+  version = "0.55.4-unstable-2026-02-23";
 
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "beads";
-    rev = "4766a4f3d9e5c0da1d853e93b22bd0a0700e117e";
-    hash = "sha256-JyoVINRmsUbAuSQ2YkRRPwPJ814kZPaE5Drh/a90ZkU=";
+    rev = "9b745dce1515885760ad71e82a2adf2f45f16b9e";
+    hash = "sha256-jxB8qSBuUWb8K/n4TotZBdOEvVh6CBonM7iH10GJrxo=";
   };
 
-  vendorHash = "sha256-yhytpwXJHZo68+dEHUvhgsvFJm+gIhM3eKRXySvz2EU=";
+  vendorHash = "sha256-DlEnIVNLHWetwQxTmUNOAuDbHGZ9mmLdITwDdviphPs=";
 
   postPatch = ''
     sed -i '/^toolchain /d' go.mod
