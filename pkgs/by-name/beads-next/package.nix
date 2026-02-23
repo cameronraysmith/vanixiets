@@ -13,12 +13,12 @@
   # --- pin mode: uncomment one block, comment the other ---
 
   # pin to release tag
-  version = "0.55.4";
+  version = "0.56.1";
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "beads";
     rev = "v${version}";
-    hash = "sha256-HTcmGKn2NNoBEg5yRsnVIATNdte5Xw8E86D09e1X5nk=";
+    hash = "sha256-hp+mKVCSzxxxUtOqspXuTbOJpeC8K9+UmmXSDr5Xa0k=";
   };
 
   # pin to commit on main
@@ -30,7 +30,7 @@
   #   hash = "sha256-jxB8qSBuUWb8K/n4TotZBdOEvVh6CBonM7iH10GJrxo=";
   # };
 
-  vendorHash = "sha256-cMvxGJBMUszIbWwBNmWe+ws4m3mfyEZgapxVYNYc5c4=";
+  vendorHash = "sha256-DlEnIVNLHWetwQxTmUNOAuDbHGZ9mmLdITwDdviphPs=";
 
   buildInputs = [ icu ];
 
