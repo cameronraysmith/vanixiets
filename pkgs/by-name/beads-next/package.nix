@@ -8,8 +8,19 @@
 
 (buildGoModule.override { go = go_1_26; }) {
   pname = "beads-next";
-  version = "0.55.4-unstable-2026-02-23";
+  # --- pin mode: uncomment one block, comment the other ---
 
+  # pin to release tag
+  # version = "0.56.0";
+  # src = fetchFromGitHub {
+  #   owner = "steveyegge";
+  #   repo = "beads";
+  #   rev = "v${version}";
+  #   hash = lib.fakeHash;
+  # };
+
+  # pin to commit on main
+  version = "0.55.4-unstable-2026-02-23";
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "beads";
