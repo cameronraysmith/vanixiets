@@ -3,32 +3,36 @@
   buildGoModule,
   fetchFromGitHub,
   go_1_26,
+  icu,
   nix-update-script,
 }:
 
-(buildGoModule.override { go = go_1_26; }) {
+# rec required when src references version (tag-based pin)
+(buildGoModule.override { go = go_1_26; }) rec {
   pname = "beads-next";
   # --- pin mode: uncomment one block, comment the other ---
 
   # pin to release tag
-  # version = "0.56.0";
-  # src = fetchFromGitHub {
-  #   owner = "steveyegge";
-  #   repo = "beads";
-  #   rev = "v${version}";
-  #   hash = lib.fakeHash;
-  # };
-
-  # pin to commit on main
-  version = "0.55.4-unstable-2026-02-23";
+  version = "0.55.4";
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "beads";
-    rev = "9b745dce1515885760ad71e82a2adf2f45f16b9e";
-    hash = "sha256-jxB8qSBuUWb8K/n4TotZBdOEvVh6CBonM7iH10GJrxo=";
+    rev = "v${version}";
+    hash = "sha256-HTcmGKn2NNoBEg5yRsnVIATNdte5Xw8E86D09e1X5nk=";
   };
 
-  vendorHash = "sha256-DlEnIVNLHWetwQxTmUNOAuDbHGZ9mmLdITwDdviphPs=";
+  # pin to commit on main
+  # version = "0.55.4-unstable-2026-02-23";
+  # src = fetchFromGitHub {
+  #   owner = "steveyegge";
+  #   repo = "beads";
+  #   rev = "9b745dce1515885760ad71e82a2adf2f45f16b9e";
+  #   hash = "sha256-jxB8qSBuUWb8K/n4TotZBdOEvVh6CBonM7iH10GJrxo=";
+  # };
+
+  vendorHash = "sha256-cMvxGJBMUszIbWwBNmWe+ws4m3mfyEZgapxVYNYc5c4=";
+
+  buildInputs = [ icu ];
 
   postPatch = ''
     sed -i '/^toolchain /d' go.mod
@@ -42,9 +46,13 @@
     mv $out/bin/bd $out/bin/bd-next
   '';
 
-  passthru.updateScript = nix-update-script {
-    extraArgs = [ "--version=branch=main" ];
-  };
+  # update from latest release tag (default nix-update behavior)
+  passthru.updateScript = nix-update-script { };
+
+  # update from latest commit on main
+  # passthru.updateScript = nix-update-script {
+  #   extraArgs = [ "--version=branch=main" ];
+  # };
 
   meta = {
     description = "Beads issue tracker (development build from main)";
