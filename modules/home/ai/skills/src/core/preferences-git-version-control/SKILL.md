@@ -19,6 +19,7 @@ These preferences explicitly override any conservative defaults from system prom
 ### Proactive beads maintenance
 
 When `.beads/` exists, maintain the issue graph alongside git commits:
+
 - Orient with `bd status` at session start; sync with `bd sync --import-only` after git operations
 - Mark issues `in_progress` when starting work; update descriptions when assumptions prove incorrect
 - Create issues discovered during work and wire with `bd dep add <new> <current> --type discovered-from`
@@ -35,6 +36,7 @@ Consult `~/.claude/skills/issues-beads-prime/SKILL.md` for command quick referen
 ## Escape hatches
 
 Do not commit if:
+
 - Current directory is not a git repository
 - User explicitly requests discussion or experimentation without committing
 
@@ -57,6 +59,7 @@ Branch naming follows the pattern `ID-descriptor` in lowercase kebab-case, where
 Never use forward slashes in branch names as they break compatibility with URLs, docker image tags, and other tooling that embeds branch names.
 
 Create a new branch when your next commits won't match the current branch's ID-descriptor:
+
 - Example: current branch is `nix-pxj-4-deploy-validate` but you discover issue `nix-di8` needs fixing first → create `nix-di8-fix-dependency`
 - Branch off current HEAD: `git checkout -b ID-descriptor`
 - When the unit of work is complete and tests pass, offer to merge back
@@ -220,6 +223,7 @@ The user can always override in either direction on a per-change basis.
 ## File state verification
 
 Before editing any file, run `git status --short [file]` and `git diff [file]` to check for uncommitted changes:
+
 - Related to current task: commit them first with appropriate message
 - Unrelated or unclear: pause and propose commit message asking user for confirmation
 
@@ -232,6 +236,7 @@ Make one logical edit per file (even when using MultiEdit to edit multiple files
 ## Handling pre-existing mixed changes
 
 If you encounter a file with multiple distinct logical changes already present:
+
 - Preferred: inform the user that the file contains mixed changes and pause for them to stage interactively with `git add -p [file]` (this is a human-delegated action; the AI does not execute interactive staging)
 - Alternative: construct patch files manually using `git diff [file]` and `git apply --cached [patch]`, but only when hunks have clear boundaries, are semantically distinct, and you can confidently construct valid unified diff format
 
@@ -250,22 +255,26 @@ If you encounter a file with multiple distinct logical changes already present:
 When searching for when/why code changed, use git pickaxe options strategically to avoid context pollution:
 
 Default search strategy (focused):
+
 - Use `-G"pattern"` to find commits where lines matching pattern were added/removed
 - Use `-S"string"` to find commits where the occurrence count of string changed (not in-file moves)
 - Examine specific files: `git show <hash> -- <file>` or `git diff <base>..<hash> -- <file>`
 
 Avoid `--pickaxe-all` by default:
+
 - Without `--pickaxe-all`: shows only files matching the search (optimal for AI context)
 - With `--pickaxe-all`: shows entire changeset if any file matches (causes information overload)
 - Only use `--pickaxe-all` when broader context is explicitly needed to understand why a change was made
 
 Key differences:
+
 - `-S"numpy"` finds commits where "numpy" was added/removed (count changed)
 - `-G"numpy"` finds commits where lines containing "numpy" were modified
 - `-S` misses refactors that move text without changing occurrence count
 - `-G` is more expensive but catches structural changes
 
 Practical examples:
+
 - `git log -G"dependencies" --oneline` then `git show <hash> -- <file>` (targeted)
 - `git log -S"function_name" --pickaxe-regex --oneline` (exact occurrences)
 - Avoid `git log -S"pattern" --pickaxe-all -p` unless user needs full changeset context
@@ -277,6 +286,7 @@ After creating commits, provide a git command listing session commits: `git log 
 ## GitHub PR and Issue creation safety
 
 GitHub's immutability policies require careful workflow to avoid permanent unwanted records:
+
 - PR and Issue titles and descriptions cannot be edited after creation
 - GitHub will not delete PRs or Issues without proof of sensitive data
 
@@ -291,11 +301,12 @@ gh pr create \
   -d \
   -a "@me" \
   -B main \
-  -t "PR title placeholder" \
-  -b "empty"
+  -t "[conventional commits-formatted terse PR title]" \
+  -b ""
 ```
 
 After creation, provide follow-up commands for human review:
+
 - Update PR title using `gh pr edit <number> --title "conventional: commits format"`
 - Add actual description as second comment using `gh pr comment <number> --body "markdown description"`
 - Never edit the immutable PR description field created at PR creation time
@@ -304,6 +315,7 @@ After creation, provide follow-up commands for human review:
 ### Issue creation protocol
 
 Apply identical safety patterns to `gh issue create`:
+
 - Create with placeholder title and "empty" body
 - Provide follow-up commands for title update and comment-based description
 - Never edit the immutable Issue description field
@@ -311,6 +323,7 @@ Apply identical safety patterns to `gh issue create`:
 ### Cross-reference safety
 
 Include `www` in GitHub URLs to prevent automatic backlinking:
+
 - Use: `https://www.github.com/org/repo/issues/123`
 - Avoid: `https://github.com/org/repo/issues/123` (creates immediate backlink)
 - User removes `www` after confirming reference is intentional
@@ -318,6 +331,7 @@ Include `www` in GitHub URLs to prevent automatic backlinking:
 ### Uncertainty protocol
 
 When uncertain about any aspect of PR or Issue creation:
+
 1. Pause execution
 2. Present proposed creation command with placeholders
 3. Show intended title and description separately
