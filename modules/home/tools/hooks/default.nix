@@ -10,8 +10,6 @@
       ...
     }:
     let
-      beads = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.beads;
-
       # Hosts where mutating HTTP requests (POST, PUT, etc.) are auto-approved
       # by gate-mutating-http without prompting. Matched as hostnames in URLs
       # with or without scheme prefix (e.g. both https://ntfy.zt/topic and
