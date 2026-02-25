@@ -13,6 +13,7 @@
   fetchFromGitHub,
   cmake,
   perl,
+  which,
   nix-update-script,
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
@@ -23,7 +24,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
     owner = "ArcInstitute";
     repo = "xsra";
     tag = "xsra-${finalAttrs.version}";
-    hash = lib.fakeHash;
+    hash = "sha256-2E2a9rxOvcR3zr4vIjvFG9zSFy0BeoM3mWuwJEzR9kc=";
   };
 
   cargoLock.lockFile = ./Cargo.lock;
@@ -35,9 +36,16 @@ rustPlatform.buildRustPackage (finalAttrs: {
   nativeBuildInputs = [
     cmake
     perl
+    which
   ];
 
-  env.NIX_CFLAGS_COMPILE = lib.optionalString stdenv.cc.isClang "-Wno-error=implicit-function-declaration";
+  # ncbi-vdb-sys vendors an old zlib whose zutil.h defines fdopen as a macro,
+  # conflicting with macOS SDK stdio.h. Patch the vendored copy after cargo
+  # sets up the writable vendor directory.
+  preBuild = lib.optionalString stdenv.hostPlatform.isDarwin ''
+    sed -i '/define fdopen.*NULL/d' \
+      ../cargo-vendor-dir/ncbi-vdb-sys-*/vendor/ncbi-vdb/libs/ext/zlib/zutil.h
+  '';
 
   doCheck = false;
 
