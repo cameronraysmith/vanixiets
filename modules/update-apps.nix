@@ -2,7 +2,7 @@
 #
 # Packages using nix-update-script do not need flake apps;
 # invoke nix-update directly, e.g.:
-#   nix-update --flake beads-next --version=branch=main
+#   nix-update --flake beads --version=branch=main
 #   nix-update --flake dolt
 #
 # nix run .#update-claude-code
