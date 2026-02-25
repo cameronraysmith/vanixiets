@@ -25,8 +25,8 @@
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "beads";
-    rev = "b8d9e0ac56f2ef59d12d4137cef8a422a3fed641";
-    hash = "sha256-uw6sgethkZLfbOwWbgCQzcexstRhGOoJ5rrrsT//1Z8=";
+    rev = "a22da6f46fda440ae13fa6564a1716ce662cd4c1";
+    hash = "sha256-IQEJh7xWX0J686yCr8Qz5JHqTENfcyTZRQ01TB7r49A=";
   };
 
   vendorHash = "sha256-nhhntZqWUEDExvXyhlC/640uCU0yUN7J7+P02CuI8YI=";
