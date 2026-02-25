@@ -23,8 +23,6 @@
       # scala - pin sbt to specific JDK
       jdk = pkgs.temurin-bin-21;
       sbtWithJdk = pkgs.sbt.override { jre = jdk; };
-      # from llm-agents
-      beads = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.beads;
       # coderabbit-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
       # crush = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.crush;
       # droid: disabled - auto-patchelf fails on rosetta-builder (missing pyelftools)
@@ -73,7 +71,7 @@
           # lazyjj
           just
           mkcert
-          # from llm-agents
+          # from pkgs/by-name (overrides llm-agents)
           beads
           # coderabbit-cli # disabled: unused
           # crush      # disabled: unused
@@ -82,7 +80,6 @@
           # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
           beads-kanban-ui
-          beads-next
           beads-viewer
           dolt
           gastown
