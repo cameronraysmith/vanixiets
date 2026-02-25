@@ -15,5 +15,10 @@
         type = "app";
         program = "${config.packages.claude-code.updateScript}";
       };
+
+      apps.update-xsra = {
+        type = "app";
+        program = "${config.packages.xsra.updateScript}";
+      };
     };
 }
