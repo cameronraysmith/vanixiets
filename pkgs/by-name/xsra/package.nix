@@ -30,7 +30,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
   cargoLock.lockFile = ./Cargo.lock;
 
   postPatch = ''
-    ln -sf ${./Cargo.lock} Cargo.lock
+    cp ${./Cargo.lock} Cargo.lock
   '';
 
   nativeBuildInputs = [
