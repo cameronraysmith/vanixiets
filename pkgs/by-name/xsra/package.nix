@@ -14,7 +14,6 @@
   cmake,
   perl,
   which,
-  nix-update-script,
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "xsra";
@@ -49,12 +48,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   doCheck = false;
 
-  passthru.updateScript = nix-update-script {
-    extraArgs = [
-      "--version-regex"
-      "xsra-(.*)"
-    ];
-  };
+  passthru.updateScript = ./update.sh;
 
   meta = {
     homepage = "https://github.com/ArcInstitute/xsra";
