@@ -1,5 +1,6 @@
 #!/usr/bin/env nix-shell
 #!nix-shell --pure -i bash -p curl jq cacert git cargo rustc pkg-config cmake perl gnumake
+# shellcheck shell=bash
 
 set -euo pipefail
 
