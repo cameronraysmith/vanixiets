@@ -46,7 +46,7 @@
             alwaysThinkingEnabled = true;
 
             env = {
-              ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-4-5-20250929";
+              ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-4-6-20260217";
               ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-4-6";
               ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-opus-4-6";
               ASTRO_TELEMETRY_DISABLED = "1";
