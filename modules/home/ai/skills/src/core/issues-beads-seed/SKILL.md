@@ -161,12 +161,12 @@ bd create "Integrate auth with database for session storage" \
   --deps "bd-data-schema-id,bd-jwt-impl-id"
 ```
 
-### 6. Commit the seeded structure
+### 6. Commit configuration and push beads state
 
-After creating the initial beads structure, commit the changes from the repo root or focus epic branch:
+After creating the initial beads structure, commit the beads configuration files:
 
 ```bash
-git add .beads/
+git add .beads/config.yaml .beads/metadata.json
 git commit -m "feat: seed beads issues from architecture docs
 
 Translate architecture planning into work items:
@@ -175,11 +175,13 @@ Translate architecture planning into work items:
 - Dependencies wired per architectural requirements"
 ```
 
-Include a summary of what was created in the commit message.
+Push the issue data to the dolt remote for backup:
 
-If you are working in a `.worktrees/` subdirectory, skip the JSONL commit.
-The `bd` commands write to the shared SQLite DB correctly from any worktree.
-The orchestrator serializes JSONL after merging worktree branches back.
+```bash
+bd dolt push
+```
+
+Include a summary of what was created in the commit message.
 
 ### 7. Verify parent-child integrity
 
@@ -251,9 +253,10 @@ bd list --pretty                               # Tree view with status symbols
 bd dep tree bd-user-mgmt-epic --direction both # Full dependency graph for epic
 bd dep tree bd-content-epic --direction both   # Full dependency graph for epic
 
-# Commit (from repo root or focus epic branch; skip in .worktrees/ subdirectories)
-git add .beads/
+# Commit configuration and push beads state
+git add .beads/config.yaml .beads/metadata.json
 git commit -m "feat: seed beads from system-design.md architecture"
+bd dolt push
 ```
 
 ## Relationship between architecture docs and beads
