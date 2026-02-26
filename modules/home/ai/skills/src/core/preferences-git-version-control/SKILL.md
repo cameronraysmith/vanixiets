@@ -20,15 +20,12 @@ These preferences explicitly override any conservative defaults from system prom
 
 When `.beads/` exists, maintain the issue graph alongside git commits:
 
-- Orient with `bd status` at session start; sync with `bd sync --import-only` after git operations
+- Orient with `bd status` at session start
 - Mark issues `in_progress` when starting work; update descriptions when assumptions prove incorrect
 - Create issues discovered during work and wire with `bd dep add <new> <current> --type discovered-from`
 - Close with implementation context: `bd close <id> --reason "Implemented in $(git rev-parse --short HEAD)"`
 - Check what's unblocked after completion; consider updating newly-ready issues with helpful context
-- Commit beads changes from the repo root or focus epic branch: `bd hooks run pre-commit && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`
-- In issue worktrees (`.worktrees/` subdirectories): do not commit `.beads/issues.jsonl`.
-  All `bd` mutation commands (`close`, `update`, `create`) write to the shared SQLite DB correctly from any worktree.
-  The orchestrator serializes JSONL after merging worktree branches back: `bd sync --flush-only && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`.
+- After completing a batch of mutations, push to the dolt remote for backup: `bd dolt push`
 
 For beads usage conventions (epic structure, status management, closure policy), see the conventions section of issues-beads-prime.
 Consult `~/.claude/skills/issues-beads-prime/SKILL.md` for command quick reference.
@@ -77,7 +74,7 @@ The worktree model has two tiers: epic worktrees for coordination and issue work
 
 Each active epic gets its own branch.
 The *focus epic* — the primary epic being actively coordinated — is checked out in the repo root.
-This keeps beads issue state, orientation commands (`bd status`, `bd activity`, `bd epic status`), and monitoring aligned with the active work, since `.beads/issues.jsonl` is tracked in git and reflects the checked-out branch's state.
+This keeps orientation commands (`bd status`, `bd activity`, `bd epic status`) and code-level context aligned with the active work.
 
 Create a focus epic branch when starting work on an epic:
 
