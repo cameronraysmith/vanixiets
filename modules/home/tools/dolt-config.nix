@@ -1,15 +1,15 @@
-# Declarative seed for ~/.dolt/config_global.json
+# Declarative management of ~/.dolt/config_global.json
 #
-# Seeds the dolt CLI config with the beads connection profile and user identity
-# on first activation. The file is mutable so dolt can add runtime keys
-# (server_uuid, user.creds) without conflict. Delete the file and re-activate
-# to reset from nix config.
+# Provides the beads connection profile and user identity for the dolt CLI.
+# Managed as an immutable nix store symlink. The dolt server logs a non-fatal
+# error on startup about being unable to persist runtime state (server_uuid,
+# user.creds) but continues operating normally since those keys are not
+# needed for localhost-only usage with git+https:// remotes.
 { ... }:
 {
   flake.modules.homeManager.tools =
     {
       config,
-      lib,
       pkgs,
       ...
     }:
@@ -40,14 +40,8 @@
         "user.email" = gitCfg.user.email;
         "user.name" = gitCfg.github.user;
       };
-      doltConfigFile = pkgs.writeText "dolt-config-global.json" doltConfig;
     in
     {
-      home.activation.dolt-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        if [ ! -f "$HOME/.dolt/config_global.json" ]; then
-          mkdir -p "$HOME/.dolt"
-          cp ${doltConfigFile} "$HOME/.dolt/config_global.json"
-        fi
-      '';
+      home.file.".dolt/config_global.json".text = doltConfig;
     };
 }
