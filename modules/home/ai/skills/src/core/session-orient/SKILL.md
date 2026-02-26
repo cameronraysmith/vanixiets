@@ -33,7 +33,6 @@ Delegate the graph-wide scan to `/issues-beads-orient` phase 1.
 Run `bd status`, `bd activity`, `bd epic status`, `bd ready`, and `bd blocked` to establish the current state of the issue graph.
 
 ```bash
-bd sync --import-only
 bd status
 bd activity
 bd stale
