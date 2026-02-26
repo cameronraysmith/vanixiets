@@ -206,10 +206,10 @@ Count ready, unblocked issues in the current scope.
 ```bash
 bd status
 bd blocked
-bv --robot-capacity > /tmp/bv-capacity.json
-jq '.capacity' /tmp/bv-capacity.json
-rm /tmp/bv-capacity.json
+bd ready
 ```
+
+Dependency chains for specific issues can be examined with `bd dep tree <id> --direction both` to understand what work is sequentially constrained versus independently actionable.
 
 Compare the ready count against the buffer sizing heuristic to determine whether planning is warranted.
 
@@ -324,14 +324,14 @@ The execution plan serves as the handoff to implementation.
 A worker reading this plan should understand what to work on first, what can proceed concurrently, and where the bottlenecks are.
 
 ```bash
-# Structured plan output
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-PLAN=$(mktemp "/tmp/bv-${REPO}-plan.XXXXXX.json")
-bv --robot-plan > "$PLAN"
-jq '.plan.execution_order' "$PLAN"
-jq '.plan.critical_path' "$PLAN"
-jq '.plan.parallel_groups' "$PLAN"
-rm "$PLAN"
+# Identify all unblocked work as parallel execution candidates
+bd ready
+
+# Examine dependency chains per epic to identify sequential constraints
+bd dep tree <epic-id> --direction both
+
+# Full graph for visual verification of execution order
+bd list --pretty
 ```
 
 ## Replanning triggers
