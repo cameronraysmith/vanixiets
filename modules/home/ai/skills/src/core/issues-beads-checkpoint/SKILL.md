@@ -138,8 +138,7 @@ This section uses replacement semantics: if a prior checkpoint-context exists, r
 Each checkpoint context must be self-contained.
 It synthesizes the current position, approach, and remaining work rather than referencing prior checkpoints.
 Workers need only the current state to proceed.
-Trajectory data is available through git history of `.beads/issues.jsonl` via `chore(beads): checkpoint <id>` commits.
-In worktree contexts, trajectory data appears in the orchestrator's post-merge JSONL commits rather than in per-worktree commits.
+Trajectory data is available through `bd history <id>` which provides native dolt version history per-issue.
 
 ```
 <!-- checkpoint-context -->
@@ -388,23 +387,13 @@ If cynefin classification changed during work, verify the signal table reflects 
 
 For issues being left incomplete (progress=implementing or progress=blocked), verify that a checkpoint-context section exists with a self-contained state estimate.
 
-## Step 8: Commit beads state
+## Step 8: Push beads state
 
-If you are working in a `.worktrees/` subdirectory, skip this step.
-The `bd` commands in earlier steps already updated the shared SQLite DB.
-The orchestrator serializes JSONL after merging worktree branches back: `bd sync --flush-only && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`.
-
-From the repo root or focus epic branch, execute the commit sequence:
+Push beads state to the dolt remote for backup:
 
 ```bash
-# Validate beads database integrity
-bd hooks run pre-commit
-
-# Stage the database file
-git add .beads/issues.jsonl
-
-# Commit with descriptive message
-git commit -m "chore(beads): checkpoint <id>"
+bd dolt commit -m "checkpoint: <id>"
+bd dolt push
 ```
 
 The commit message should reference the specific issue being checkpointed.
