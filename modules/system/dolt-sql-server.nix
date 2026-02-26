@@ -154,6 +154,7 @@ in
             Type = "simple";
             ExecStart = lib.escapeShellArgs (mkServerArgs cfg);
             WorkingDirectory = cfg.dataDir;
+            StateDirectory = lib.removePrefix "/var/lib/" cfg.dataDir;
             Restart = "on-failure";
             RestartSec = 5;
             ProtectSystem = "strict";
@@ -165,7 +166,6 @@ in
               {
                 DynamicUser = true;
                 Environment = "HOME=${cfg.dataDir}";
-                StateDirectory = lib.removePrefix "/var/lib/" cfg.dataDir;
                 ProtectHome = true;
               }
             else
