@@ -70,9 +70,14 @@
                       HOME = userHome;
                     };
 
+                    path = [
+                      package.beads
+                      pkgs.git
+                    ];
+
                     serviceConfig = {
                       Type = "simple";
-                      ExecStart = "${package.nodejs}/bin/node ${serverEntry} --host ${settings.host} --port ${toString settings.port}";
+                      ExecStart = "${package.nodejs_22}/bin/node ${serverEntry} --host ${settings.host} --port ${toString settings.port}";
                       WorkingDirectory = userHome;
                       Restart = "always";
                       RestartSec = 5;
