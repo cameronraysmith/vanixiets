@@ -1,11 +1,11 @@
 ---
 name: issues-beads-init
-description: Initialize beads issue tracking with manual sync workflow for new repositories.
+description: Initialize beads issue tracking with dolt persistence for new repositories.
 disable-model-invocation: true
 ---
 # Beads initialization
 
-Initialize beads issue tracking in a project with manual control over when issue database changes are staged and committed.
+Initialize beads issue tracking in a project with dolt database persistence.
 
 ## Initialize without auto-staging hooks
 
@@ -49,46 +49,20 @@ After `bd init` completes, perform these cleanup steps:
 echo "README.md" >> .beads/.gitignore
 ```
 
-## Manual sync workflow
+## Dolt persistence
 
-### Committing beads changes
-
-When you've made changes to issues via `bd` commands, flush the database to JSONL and stage the files manually from the repo root or focus epic branch:
-
-```bash
-bd hooks run pre-commit   # flush DB→JSONL + stage .beads/*.jsonl files
-git commit -m "chore(issues): <description of changes>"
-```
-
-If you are working in a `.worktrees/` subdirectory, do not commit `.beads/issues.jsonl`.
-The `bd` commands write to the shared SQLite DB correctly from any worktree.
-The orchestrator serializes JSONL after merging worktree branches back.
-
-Example commit messages:
-- `chore(issues): add epic for CI integration`
-- `chore(issues): update story status for authentication module`
-- `chore(issues): close completed infrastructure stories`
-
-### Importing after git operations
-
-After any git operation that changes commits (pull, checkout, merge, rebase), import JSONL changes back to the database:
+After initializing beads and creating the initial issue structure, mutations auto-commit to the dolt database.
+Push to the dolt remote for backup:
 
 ```bash
-bd sync --import-only   # JSONL→DB without staging
+bd dolt push
 ```
-
-This ensures your local beads database stays synchronized with the JSONL files tracked in git.
 
 ## Rationale
 
-Manual sync workflow provides explicit control over when issue tracking state enters git history, allowing you to:
-
-- Batch multiple issue operations into single commits
-- Separate issue updates from code changes
-- Review staged issue changes before committing
-- Avoid automatic staging during experimental work
-
-The merge driver remains enabled to handle merge conflicts in JSONL files during collaborative workflows, but it doesn't auto-stage changes during normal operations.
+Beads uses a dolt database backend for issue persistence.
+Mutations auto-commit when `dolt.auto-commit` is enabled, eliminating manual serialization steps.
+The `bd dolt push` command replicates state to the git remote via `refs/dolt/data` for backup and cross-machine sync.
 
 ## Configuring no-git-ops mode
 
@@ -98,7 +72,7 @@ To suppress git commands in AI agent session protocols:
 bd config set no-git-ops true
 ```
 
-This configures `bd prime` to output stealth mode instructions, ensuring agents only flush to JSONL without attempting git operations.
+This configures `bd prime` to output stealth mode instructions, ensuring agents perform beads operations without attempting git operations.
 Useful when you want manual control over when commits happen.
 
 ## See also
