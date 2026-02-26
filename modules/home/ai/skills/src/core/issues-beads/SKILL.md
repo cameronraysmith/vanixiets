@@ -7,7 +7,7 @@ description: Comprehensive reference for beads issue tracking with bd CLI.
 Symlink location: `~/.claude/skills/issues-beads/SKILL.md`
 Slash command: `/issues:beads`
 
-Beads is a git-friendly issue tracker that stores data in SQLite with a JSONL file for synchronization.
+Beads is a git-friendly issue tracker that stores data in a Dolt database with native versioning and remote sync.
 The `bd` CLI provides comprehensive issue, epic, and dependency management from the command line.
 Data lives in `.beads/` at the repository root, making it portable and version-controllable.
 
@@ -137,56 +137,38 @@ Graph properties influence work selection:
 
 Use `bd dep tree <id> --direction both` to understand dependency context and downstream impact for work prioritization.
 
-## Manual sync workflow
+## Dolt persistence
 
-Beads uses a manual sync model for git integration.
-Changes made with `bd` commands modify `.beads/issues.jsonl`, which must be committed explicitly.
+Beads uses a dolt database backend with native versioning.
+Mutations auto-commit to dolt when `dolt.auto-commit` is enabled (the default after migration).
 
-### Commit beads changes
+### Push to remote
 
-After any batch of `bd` modifications (creates, updates, closes, dependency changes), commit from the repo root or focus epic branch:
-
-```bash
-# Validate and prepare for commit
-bd hooks run pre-commit
-
-# Commit the database
-git add .beads/issues.jsonl
-git commit -m "chore(beads): <description of changes>"
-```
-
-If you are working in a `.worktrees/` subdirectory, do not commit `.beads/issues.jsonl`.
-The `bd` mutation commands write to the shared SQLite DB correctly from any worktree.
-The orchestrator serializes JSONL after merging worktree branches back: `bd sync --flush-only && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`.
-
-Commit frequency recommendations (applicable from the repo root or focus epic branch):
-- **Eager**: After each logical batch (creating an epic with children, wiring dependencies)
-- **Session boundary**: At minimum, commit before ending work via `/session-checkpoint` (or `/issues:beads-checkpoint` in beads-only repos)
-- **Descriptive when relevant**: For significant changes, use specific messages like `chore(beads): close auth epic after implementation`
-
-In worktree contexts (`.worktrees/` subdirectories), `bd` commands still execute and update the shared SQLite DB, but JSONL commit responsibility shifts to the orchestrator after merging branches back.
-
-### After git pull/checkout/merge
-
-When the git repository changes (pull, checkout, merge), import changes from JSONL:
+After a batch of mutations, push to the dolt remote for backup:
 
 ```bash
-bd sync --import-only
+bd dolt push
 ```
 
-This updates the SQLite database from `.beads/issues.jsonl` without triggering export hooks.
-Failing to sync after git operations leaves the database out of sync with the repository.
+### Checkpoint with label
 
-### Avoiding automatic hooks
+For labeled checkpoints (e.g., before session end):
 
-The `beads-init` command initializes beads without installing git hooks for automatic sync.
-This preserves manual control and integrates with existing atomic commit workflows.
-
-If automatic hooks were installed (via `bd init` directly):
 ```bash
-# Remove hooks if present
-rm -f .git/hooks/post-checkout .git/hooks/post-merge .git/hooks/post-rewrite
+bd dolt commit -m "checkpoint: <description>"
+bd dolt push
 ```
+
+### Persistence frequency
+
+- **Eager**: `bd dolt push` after each logical batch (creating an epic with children, wiring dependencies)
+- **Session boundary**: At minimum, push before ending work via `/session-checkpoint`
+
+### Hooks behavior
+
+The `beads-init` command initializes beads without installing git hooks.
+With the dolt backend, hooks are not needed for data persistence since mutations auto-commit to the dolt database.
+The `prepare-commit-msg` hook is the only hook that performs useful work (adding agent identity trailers to git commits).
 
 ## Common commands quick reference
 
@@ -514,16 +496,11 @@ Epic closure eligibility (on-demand only, when user requests):
 bd epic close-eligible --dry-run  # on-demand only, when user requests epic closure review
 ```
 
-Commit beads changes (from the repo root or focus epic branch):
+Push beads state to the dolt remote for backup:
 
 ```bash
-bd hooks run pre-commit
-git add .beads/issues.jsonl
-git commit -m "chore(beads): close <issue-id> and update graph"
+bd dolt push
 ```
-
-In issue worktrees (`.worktrees/` subdirectories), skip the JSONL commit.
-The orchestrator handles serialization after merging worktree branches back.
 
 ### Phase 5: Session wind-down
 
@@ -604,7 +581,7 @@ bd comments add <issue-id> "Implemented in commit $(git rev-parse --short HEAD)"
 bd close <issue-id>
 ```
 
-Commit beads changes alongside code changes to maintain synchronization.
+Push beads state to the dolt remote after completing mutations.
 
 ### With branch workflow
 
@@ -731,8 +708,10 @@ When architectural assumptions change during implementation, use `/issues:beads-
 | Health check | `bd doctor` |
 | Lint issues | `bd lint` |
 | Repair database | `bd repair [--dry-run]` |
-| Run hooks | `bd hooks run pre-commit` |
-| Sync from JSONL | `bd sync --import-only` |
+| Push to remote | `bd dolt push` |
+| Pull from remote | `bd dolt pull` |
+| Checkpoint | `bd dolt commit -m "..."` |
+| Issue history | `bd history <id>` |
 | **Labels** | |
 | Manage labels | `bd label` |
 | **Analysis** | |
