@@ -71,13 +71,13 @@
                     };
 
                     path = [
-                      package.beads
+                      pkgs.beads
                       pkgs.git
                     ];
 
                     serviceConfig = {
                       Type = "simple";
-                      ExecStart = "${package.nodejs_22}/bin/node ${serverEntry} --host ${settings.host} --port ${toString settings.port}";
+                      ExecStart = "${pkgs.nodejs_22}/bin/node ${serverEntry} --host ${settings.host} --port ${toString settings.port}";
                       WorkingDirectory = userHome;
                       Restart = "always";
                       RestartSec = 5;
