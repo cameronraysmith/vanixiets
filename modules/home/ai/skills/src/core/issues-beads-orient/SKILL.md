@@ -52,39 +52,14 @@ bd stale
 bd epic status
 ```
 
-For structured data when needed (redirect to avoid context pollution):
+For additional diagnostics:
 
 ```bash
-# Create repo-specific temp file — bv JSON outputs can be thousands of lines
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
-bv --robot-triage > "$TRIAGE"
+# Top ready-to-work issue
+bd ready | head -1
 
-# Extract specific fields (all nested under .triage)
-jq '.triage.quick_ref' "$TRIAGE"              # summary counts and top picks
-jq '.triage.recommendations[:3]' "$TRIAGE"    # top 3 recommendations
-jq '.triage.project_health.graph_metrics.cycles' "$TRIAGE"  # circular deps
-
-# Clean up when done
-rm "$TRIAGE"
-```
-
-For minimal structured output (safe for direct consumption):
-
-```bash
-# Just the single top pick — small JSON output
-bv --robot-next
-
-# Additional diagnostic tools
-bv --robot-alerts           # drift + proactive alerts
-bv --robot-drift            # detect configuration drift
-```
-
-For drift detection with exit codes (useful for automation):
-
-```bash
-# Exit codes: 0=OK, 1=critical drift, 2=warning
-bv --check-drift
+# Health and drift detection
+bd doctor
 ```
 
 ### Structural integrity check
@@ -137,27 +112,20 @@ Use `bd list --pretty` to identify which issues appear at the top level without 
 Systemic issues (all containment wired as blocks) should be corrected before orientation proceeds.
 Minor issues (1-2 orphans from recent ad-hoc creation) can be noted and deferred.
 
-### Run execution planning commands
+### Identify work entry points
 
-Extract three complementary perspectives on work prioritization:
-
-```bash
-# Parallel entry points (independent roots with no blockers)
-bv --robot-plan | jq '[.plan.tracks[] | select(.reason == "Independent work stream") | .items[]] | map({id, title, unblocks})'
-
-# Critical path (serialization bottleneck)
-bv --robot-capacity | jq '{critical_path, critical_path_length}'
-
-# Top 3 high-impact items (PageRank-based)
-bv --robot-triage | jq '.triage.recommendations[:3] | map({id, title, score, action})'
-```
-
-For additional topological context:
+Determine which issues can be started immediately and what completing them would unlock:
 
 ```bash
-# Full execution order respecting dependencies
-bv --robot-insights | jq '.Stats.TopologicalOrder'
+# All unblocked work, sorted by priority
+bd ready
+
+# For each candidate, check downstream impact
+bd dep tree <candidate-id> --direction both
 ```
+
+Ready issues with high downstream unblock counts make the best starting points.
+Use `bd dep tree` to compare candidates by how many issues completing them would unblock.
 
 ### Interpret results
 
@@ -176,35 +144,19 @@ From `bd stale`:
 - Identifies potentially abandoned in_progress items
 - Highlights forgotten or outdated issues
 
-From `bv --robot-triage` (via jq extraction):
-- `quick_ref` = at-a-glance counts + top 3 picks
-- `recommendations` = ranked actionable items with scores, reasons, unblock info
-- `quick_wins` = low-effort high-impact items
-- `stale_alerts` = issues needing attention
-- `project_health` = status/type/priority distributions, graph metrics, cycles
-
 From `bd epic status`:
 - Progress percentages show which epics are advancing
 - Stalled epics (0%) may indicate blocked critical paths
 
-From execution planning commands:
+From `bd ready`:
+- Priority-sorted list of all unblocked issues
+- Issues at the top are the recommended starting points
+- Cross-reference with `bd dep tree <id> --direction both` to see downstream impact
 
-*Parallel entry points* (from `--robot-plan` Track-B items): issues with no blockers that can start immediately.
-Multiple entry points can be worked in parallel by different sessions or agents.
-The `unblocks` field shows downstream impact of completing each.
-
-*Critical path* (from `--robot-capacity`): the longest chain of dependent issues in the graph.
-Completing critical path items reduces total project duration.
-Items not on critical path have slack, so delays there do not extend the project.
-
-*High-impact items* (from `--robot-triage` recommendations): PageRank-based scoring identifies issues that unlock the most downstream work.
-Score reflects influence in the dependency graph, not urgency or effort.
-Optimizes for "maximum downstream unlock" rather than "what to do first".
-
-These three perspectives answer different questions:
-- "What can I start now?" -> Parallel entry points
-- "What reduces total duration?" -> Critical path
-- "What has the most influence?" -> High-impact items
+These perspectives answer:
+- "What can I start now?" -> `bd ready`
+- "What has the most downstream impact?" -> `bd dep tree <id> --direction up` (count dependents)
+- "What's the overall shape?" -> `bd epic status` (progress by epic)
 
 #### Implementation vs verification readiness
 
@@ -251,19 +203,12 @@ bd status | grep "Open:"
 
 When showing a subset of issues at medium/large scale, apply these selection criteria.
 
-*Parallel entry points*: sorted by unblock count (descending), then by PageRank score as tiebreaker.
-This prioritizes issues that unlock the most downstream work.
+*Ready issues*: from `bd ready`, sorted by priority (P0 first).
+For tiebreaking among same-priority issues, prefer those that unblock the most downstream work.
+Check with `bd dep tree <id> --direction up` to count dependents.
 
-```bash
-# Extract parallel entry points sorted by unblock count
-bv --robot-plan | jq '[.plan.tracks[] | select(.reason == "Independent work stream") | .items[]] | sort_by(-.unblocks | length) | .[:10]'
-```
-
-*High-impact items*: sorted by PageRank score from `--robot-triage` recommendations.
-Score reflects influence in the dependency graph.
-
-*Critical path*: computed by `bv --robot-capacity`, representing the longest dependency chain.
-Items on this path determine minimum project duration.
+*Epic progress*: from `bd epic status`, identifies which epics are advancing vs stalled.
+Stalled epics with ready children deserve attention.
 
 #### Epic-level aggregation
 
@@ -301,7 +246,7 @@ Top pick per epic:
 
 This provides entry points into each workstream.
 Users can then focus on a specific epic without reviewing all 72+ ready issues.
-Selection within each epic uses the same criteria: unblock count descending, PageRank as tiebreaker.
+Selection within each epic uses the same criteria: priority first, then downstream unblock count as tiebreaker.
 
 #### Partially-complete epic analysis
 
@@ -342,21 +287,21 @@ This shows the next few issues in sequence, helping users understand what follow
 Extract track sequences:
 
 ```bash
-# Full track sequences from robot-plan
-bv --robot-plan | jq '.plan.tracks[] | {reason, items: [.items[] | {id, title}]}'
+# Dependency chains from a ready issue
+bd dep tree <ready-id> --direction both
 ```
 
 #### Prioritization perspectives
 
 Provide the user a concise summary with three prioritization perspectives:
 
-*Health overview*: use `quick_ref` counts for open/ready/blocked ratio assessment, epic progress showing which epics are advancing vs stalled, and alerts (stale issues, cycles, or health warnings from `project_health`).
+*Health overview*: use `bd status` counts for open/ready/blocked ratio assessment, epic progress showing which epics are advancing vs stalled, and alerts (stale issues, cycles, or health warnings from `bd doctor`).
 
 *Start here* (parallel entry points): list N issues that have no blockers and can be worked in parallel, show what each unblocks downstream, classify each as verification-ready (pure code, can test now) or verification-blocked (needs environment first), and identify the foundation chain if infrastructure-creating issues exist among roots.
 
-*Critical path* (serialization bottleneck): show the chain that determines minimum project duration, highlight which items on the path are ready vs blocked.
+*Downstream impact*: for each ready issue, `bd dep tree <id> --direction up` shows what completing it unblocks; prioritize issues that unblock the most downstream work.
 
-*High impact* (PageRank recommendations): first 2-3 from `recommendations` with scores and what they unblock, quick wins from `quick_wins` that could be knocked out rapidly, note overlap or divergence with critical path items.
+*Epic progress*: from `bd epic status`, shows which workstreams are advancing; stalled epics with ready children may warrant focus.
 
 #### Example interpretation
 
