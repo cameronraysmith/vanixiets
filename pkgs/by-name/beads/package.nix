@@ -21,12 +21,12 @@
   # };
 
   # pin to commit on main
-  version = "0.56.1-unstable-2026-02-25";
+  version = "0.56.1-unstable-2026-02-26";
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "beads";
-    rev = "a22da6f46fda440ae13fa6564a1716ce662cd4c1";
-    hash = "sha256-IQEJh7xWX0J686yCr8Qz5JHqTENfcyTZRQ01TB7r49A=";
+    rev = "a138db43552bd9dd8f2db7e2dc9ff6bfc4bc5cc6";
+    hash = "sha256-4TsWCNnfTx6VvJsrk/1rNVCc712D97Kqoob22xm55lk=";
   };
 
   vendorHash = "sha256-nhhntZqWUEDExvXyhlC/640uCU0yUN7J7+P02CuI8YI=";
