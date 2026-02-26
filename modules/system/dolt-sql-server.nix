@@ -1,7 +1,7 @@
 # Cross-platform dolt SQL server for beads issue tracking
 # Shared options with platform-specific service management:
 #   darwin: launchd daemon
-#   nixos: systemd service with DynamicUser
+#   nixos: systemd service (DynamicUser or named user)
 { lib, ... }:
 let
   mkServerArgs =
@@ -74,6 +74,16 @@ let
         default = null;
         description = "Port for remotesapi server. Disabled when null.";
       };
+      user = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "User to run the service as. NixOS uses DynamicUser when null. Darwin ignores this (uses system.primaryUser).";
+      };
+      group = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Group to run the service as. NixOS uses DynamicUser when null. Darwin ignores this (uses staff).";
+      };
     };
   };
 in
@@ -130,7 +140,7 @@ in
             message = "dolt-sql-server port 3306 conflicts with MySQL; default is 3307";
           }
           {
-            assertion = lib.hasPrefix "/var/lib/" cfg.dataDir;
+            assertion = cfg.user != null || lib.hasPrefix "/var/lib/" cfg.dataDir;
             message = "dolt-sql-server dataDir must be under /var/lib/ when using DynamicUser + StateDirectory";
           }
         ];
@@ -144,16 +154,27 @@ in
             Type = "simple";
             ExecStart = lib.escapeShellArgs (mkServerArgs cfg);
             WorkingDirectory = cfg.dataDir;
-            Environment = "HOME=${cfg.dataDir}";
-            StateDirectory = lib.removePrefix "/var/lib/" cfg.dataDir;
-            DynamicUser = true;
             Restart = "on-failure";
             RestartSec = 5;
             ProtectSystem = "strict";
-            ProtectHome = true;
             PrivateTmp = true;
             NoNewPrivileges = true;
-          };
+          }
+          // (
+            if cfg.user == null then
+              {
+                DynamicUser = true;
+                Environment = "HOME=${cfg.dataDir}";
+                StateDirectory = lib.removePrefix "/var/lib/" cfg.dataDir;
+                ProtectHome = true;
+              }
+            else
+              {
+                User = cfg.user;
+                Group = cfg.group;
+                ProtectHome = "read-only";
+              }
+          );
         };
       };
     };
