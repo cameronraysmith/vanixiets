@@ -139,6 +139,7 @@ in
           description = "Dolt SQL Server";
           after = [ "network.target" ];
           wantedBy = [ "multi-user.target" ];
+          path = [ pkgs.git ];
           serviceConfig = {
             Type = "simple";
             ExecStart = lib.escapeShellArgs (mkServerArgs cfg);
