@@ -141,6 +141,7 @@ Use `bd dep tree <id> --direction both` to understand dependency context and dow
 
 Beads uses a dolt database backend with native versioning.
 Mutations auto-commit to dolt when `dolt.auto-commit` is enabled (the default after migration).
+The dolt database is transported via `refs/dolt/data` on the same git remote as the repository itself.
 
 ### Push to remote
 
@@ -169,6 +170,56 @@ bd dolt push
 The `beads-init` command initializes beads without installing git hooks.
 With the dolt backend, hooks are not needed for data persistence since mutations auto-commit to the dolt database.
 The `prepare-commit-msg` hook is the only hook that performs useful work (adding agent identity trailers to git commits).
+
+### Bootstrap: existing repo on a new host
+
+When cloning a repo that already has dolt-backed beads (`refs/dolt/data` exists on the git remote), use `DOLT_CLONE` to pull the complete database in one step.
+This avoids schema mismatches that occur with `CREATE DATABASE` + manual remote setup.
+
+```bash
+# 1. Get the database name and remote URL
+db_name=$(jq -r '.dolt_database' .beads/metadata.json)
+remote_url="git+$(git remote get-url origin)"
+
+# 2. Clone the dolt database from the git remote
+dolt --profile beads -p '' sql -q "CALL DOLT_CLONE('${remote_url}', '${db_name}')"
+
+# 3. Create the marker directory that tells bd the dolt backend is active
+mkdir -p .beads/dolt/
+```
+
+Verify with `bd status` and optionally `bd dolt pull` (which should report no changes).
+
+Prerequisites: a running dolt sql-server on `127.0.0.1:3307` and the `beads` dolt CLI profile.
+On nix-managed hosts, both are provided declaratively by vanixiets (dolt-sql-server module and home-manager dolt-config activation).
+
+### Bootstrap: new repo with dolt backend
+
+When setting up beads in a repo for the first time with dolt-native sync, the goal is to seed `refs/dolt/data` on the git remote so other clones can use `DOLT_CLONE`.
+
+```bash
+# 1. Initialize beads (creates the dolt database locally)
+bd init --prefix <prefix>
+
+# 2. Create the marker directory
+mkdir -p .beads/dolt/
+
+# 3. Derive the dolt remote URL from git origin and add it
+remote_url="git+$(git remote get-url origin)"
+dolt --profile beads -p '' sql -q \
+  "USE \`<prefix>\`; CALL DOLT_REMOTE('add', 'origin', '${remote_url}')"
+
+# 4. Push to seed refs/dolt/data on the git remote
+bd dolt push
+
+# 5. Verify the ref exists on the remote
+git ls-remote origin refs/dolt/data
+```
+
+The database name matches the beads prefix (stored in `.beads/metadata.json` as `dolt_database`).
+After this, any clone of the repo can bootstrap with the `DOLT_CLONE` approach above.
+
+For repos migrating from the SQLite backend, use `scripts/migrate-beads-to-dolt.sh` which automates the migration, remote setup, and initial push.
 
 ## Common commands quick reference
 
