@@ -1,6 +1,6 @@
 ---
 name: issues-beads
-description: Comprehensive reference for beads issue tracking with bd CLI and bv viewer.
+description: Comprehensive reference for beads issue tracking with bd CLI.
 ---
 # Issue tracking with beads
 
@@ -135,7 +135,7 @@ Graph properties influence work selection:
 - **Bottlenecks**: High-degree nodes whose completion unblocks many downstream tasks
 - **Orphans**: Issues with no dependencies and no dependents (may indicate missing structure)
 
-The `bv` viewer computes graph metrics like PageRank (global importance), betweenness centrality (bottleneck detection), and critical path analysis to inform work prioritization.
+Use `bd dep tree <id> --direction both` to understand dependency context and downstream impact for work prioritization.
 
 ## Manual sync workflow
 
@@ -391,60 +391,37 @@ Delete an issue (use sparingly, prefer closing):
 bd delete <issue-id>
 ```
 
-### bv viewer for analysis
+### Graph analysis and work prioritization
 
-The `bv` viewer provides graph analysis and work prioritization.
-Always redirect large outputs to temp files to avoid context pollution.
-
-Quick human-readable summary:
+Use bd commands for work prioritization and graph analysis:
 
 ```bash
-bd status              # ~20 lines, context-efficient
-bd epic status         # epic progress summary
+# Top ready-to-work issues (priority-sorted)
+bd ready
+
+# Blocked issues and their blockers
+bd blocked
+
+# Full dependency context for a specific issue
+bd dep tree <id> --direction both
+
+# Epic progress overview
+bd epic status
+
+# Dependency health
+bd dep cycles
+
+# Installation and configuration health
+bd doctor
 ```
 
-Minimal structured output (safe for direct consumption):
+For structured data when scripting:
 
 ```bash
-bv --robot-next   # just the single top pick — small JSON
-```
-
-Full triage analysis (redirect to file):
-
-```bash
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
-bv --robot-triage > "$TRIAGE"
-
-# Extract specific fields as needed
-jq '.quick_ref' "$TRIAGE"              # summary + top 3 picks
-jq '.recommendations[:3]' "$TRIAGE"    # top recommendations
-jq '.quick_wins' "$TRIAGE"             # low-effort high-impact tasks
-jq '.stale_alerts' "$TRIAGE"           # issues needing attention
-jq '.project_health.graph_metrics' "$TRIAGE"  # cycles, bottlenecks
-
-# Clean up
-rm "$TRIAGE"
-```
-
-Priority validation (redirect to file):
-
-```bash
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-PRIORITY=$(mktemp "/tmp/bv-${REPO}-priority.XXXXXX.json")
-bv --robot-priority > "$PRIORITY"
-jq '.recommendations[:5]' "$PRIORITY"  # top priority misalignments
-rm "$PRIORITY"
-```
-
-Deep graph insights (redirect to file, 3000+ lines):
-
-```bash
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-INSIGHTS=$(mktemp "/tmp/bv-${REPO}-insights.XXXXXX.json")
-bv --robot-insights > "$INSIGHTS"   # PageRank, betweenness, critical path
-# Extract fields with jq as needed
-rm "$INSIGHTS"
+# JSON output for machine parsing
+bd list --json
+bd ready --json
+bd blocked --json
 ```
 
 ## Session workflow patterns
@@ -456,17 +433,7 @@ Run diagnostics and synthesize current state:
 ```bash
 bd status              # quick summary
 bd epic status         # epic progress
-bv --robot-next        # top pick for work selection
-```
-
-For structured analysis:
-
-```bash
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
-bv --robot-triage > "$TRIAGE"
-jq '.quick_ref' "$TRIAGE"
-rm "$TRIAGE"
+bd ready | head -1     # top pick for work selection
 ```
 
 ### Phase 2: Work selection
@@ -474,8 +441,8 @@ rm "$TRIAGE"
 Identify the optimal next task:
 
 ```bash
-# Get top pick
-TOP=$(bv --robot-next | jq -r '.recommendation.id')
+# Get top ready issue
+TOP=$(bd ready --json | jq -r '.[0].id')
 
 # Full context: what blocks it AND what completing it unblocks
 bd dep tree "$TOP" --direction both
@@ -768,8 +735,9 @@ When architectural assumptions change during implementation, use `/issues:beads-
 | Sync from JSONL | `bd sync --import-only` |
 | **Labels** | |
 | Manage labels | `bd label` |
-| **Analysis (bv)** | |
-| Top pick | `bv --robot-next` |
-| Triage analysis | `bv --robot-triage > file` |
-| Priority check | `bv --robot-priority > file` |
-| Deep insights | `bv --robot-insights > file` |
+| **Analysis** | |
+| Ready issues | `bd ready` |
+| Blocked issues | `bd blocked` |
+| Dependency context | `bd dep tree <id> --direction both` |
+| Epic progress | `bd epic status` |
+| Graph health | `bd dep cycles` |
