@@ -30,7 +30,7 @@ Execute the following steps in order.
 ### Step 1: load beads-orient diagnostics
 
 Delegate the graph-wide scan to `/issues-beads-orient` phase 1.
-Run `bd status`, `bd activity`, `bd epic status`, and the beads-view triage and plan commands (`bv --robot-triage`, `bv --robot-plan`, `bv --robot-capacity`) to establish the current state of the issue graph.
+Run `bd status`, `bd activity`, `bd epic status`, `bd ready`, and `bd blocked` to establish the current state of the issue graph.
 
 ```bash
 bd sync --import-only
@@ -43,12 +43,8 @@ bd epic status
 For structured data when analyzing larger graphs:
 
 ```bash
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
-bv --robot-triage > "$TRIAGE"
-jq '.triage.quick_ref' "$TRIAGE"
-jq '.triage.recommendations[:3]' "$TRIAGE"
-rm "$TRIAGE"
+bd ready
+bd blocked
 ```
 
 Extract the three prioritization perspectives described in `/issues-beads-orient`: parallel entry points, critical path, and high-impact items.
