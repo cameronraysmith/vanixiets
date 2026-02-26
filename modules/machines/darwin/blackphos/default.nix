@@ -33,6 +33,7 @@ in
         ssh-known-hosts
         dnscrypt-proxy
         zt-dns
+        zt-services-trust
         # Not importing users module (defines testuser at UID 550)
         # blackphos defines its own users (crs58 + raquel)
       ]);
@@ -116,6 +117,8 @@ in
           "quad9"
         ];
       };
+
+      services.zt-services-trust.enable = true;
 
       # crs58: admin (UID 502), raquel: primary (UID 506) - matches existing system
       users.users.crs58 = {

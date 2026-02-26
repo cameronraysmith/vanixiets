@@ -35,6 +35,7 @@ in
         colima
         dnscrypt-proxy
         zt-dns
+        zt-services-trust
         dolt-sql-server
         # Not importing users module (defines testuser at UID 550)
         # stibnite defines its own user (crs58)
@@ -228,6 +229,8 @@ in
 
       # Dolt SQL server for beads issue tracking
       services.dolt-sql-server.enable = true;
+
+      services.zt-services-trust.enable = true;
 
       home-manager = {
         useGlobalPkgs = true;
