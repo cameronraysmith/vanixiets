@@ -21,7 +21,7 @@ All complete in seconds.
 2. `bd epic status` -- epic child counts (detect 0/0 children containment antipattern).
 3. `bd dep cycles` -- cycle count (must be zero for healthy graph).
 4. `bd stale` -- issues with no activity beyond their age threshold.
-5. `bv --robot-triage` (optional) -- structured data including signal table presence per issue, used to estimate signal table coverage.
+5. `bd list --json` or `bd show <id> --json` (optional) -- structured data for estimating signal table coverage by inspecting notes fields per issue.
 
 ## Routing logic
 
@@ -57,7 +57,7 @@ First match wins.
 
 ## Execution protocol
 
-1. Run diagnostic commands in order: `bd status`, `bd epic status`, `bd dep cycles`, `bd stale`, optionally `bv --robot-triage`.
+1. Run diagnostic commands in order: `bd status`, `bd epic status`, `bd dep cycles`, `bd stale`.
 2. Parse outputs and evaluate heuristics in the priority order above.
 3. Present the recommendation:
    - The recommended skill as a slash command.
