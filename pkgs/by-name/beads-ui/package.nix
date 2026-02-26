@@ -51,7 +51,10 @@ buildNpmPackage {
     runHook postInstall
   '';
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    inherit nodejs_22 beads;
+    updateScript = ./update.sh;
+  };
 
   meta = {
     description = "Local UI for Beads issue tracker";
