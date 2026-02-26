@@ -43,7 +43,7 @@ When NOT to use beads-evolve:
 
 The issue graph is a living model of work, not a contract.
 Initial planning captures current understanding; implementation reveals what we couldn't anticipate.
-Beads stores history in git-tracked JSONL, making evolution safe and auditable.
+Beads stores history in a dolt database with native versioning, making evolution safe and auditable.
 
 XP principles that apply:
 - *Embrace change*: Requirements evolve as understanding deepens
@@ -500,26 +500,19 @@ Always create a beads issue to track deferred doc updates so they don't get lost
 5. **Reflect after completing**: Use completion as a trigger to review downstream issues
 6. **Periodic whole-graph review**: Don't let the forest get lost in the trees
 7. **Close the architecture feedback loop**: When implementation reveals design problems, update both graph and documentation
-8. **Commit the database**: After evolving the graph, commit `.beads/issues.jsonl` to preserve changes
+8. **Push to remote**: After evolving the graph, run `bd dolt push` to back up changes
 
-## Manual sync workflow
+## Dolt persistence
 
-After evolving the graph, commit changes to preserve them from the repo root or focus epic branch:
+After evolving the graph, push changes to the dolt remote for backup:
 
 ```bash
-# Run pre-commit hooks to ensure database integrity
-bd hooks run pre-commit
-
-# Commit with descriptive message about what changed
-git commit -m "chore(issues): [describe graph changes]"
+bd dolt push
 ```
 
-If you are working in a `.worktrees/` subdirectory, skip the JSONL commit.
-The `bd` commands already updated the shared SQLite DB.
-The orchestrator serializes JSONL after merging worktree branches back.
+For significant graph evolution, use a labeled checkpoint:
 
-Examples of commit messages:
-- `chore(issues): split auth task into subtasks due to scope expansion`
-- `chore(issues): add database migration blocker discovered during API work`
-- `chore(issues): resequence tasks after architectural feedback`
-- `chore(issues): create arch doc update issues for component dependency changes`
+```bash
+bd dolt commit -m "evolve: <describe graph changes>"
+bd dolt push
+```
