@@ -117,8 +117,7 @@ Each checkpoint replaces the prior content (the signal table carries cumulative 
 <!-- /checkpoint-context -->
 ```
 
-Trajectory data (how surprise evolved, how many handoffs occurred) is available through git history of `.beads/issues.jsonl` via `chore(beads): checkpoint <id>` commits.
-In worktree contexts, trajectory data appears in the orchestrator's post-merge JSONL commits rather than in per-worktree commits.
+Trajectory data (how surprise evolved, how many handoffs occurred) is available through `bd history <id>` which provides native dolt version history per-issue.
 
 ## CUE schema
 
