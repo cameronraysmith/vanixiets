@@ -222,10 +222,9 @@ bd update <epic-id> --description "Revised scope: originally N tasks, expanded t
 After completing work, priorities may need adjustment:
 
 ```bash
-# Get current priority recommendations
-bv --robot-priority
+# Review ready issues — are priorities still appropriate?
+bd ready
 
-# Review if computed importance diverges from assigned priority
 # Update priorities that are now misaligned
 bd update <issue-id> --priority 0  # escalate if now critical path
 bd update <other-id> --priority 2  # demote if less urgent than thought
@@ -250,48 +249,29 @@ bd blocked
 # Cycle check — should always be zero
 bd dep cycles
 
-# For structured analysis (redirect to avoid context pollution)
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
-bv --robot-triage > "$TRIAGE"
-jq '.stale_alerts' "$TRIAGE"
-jq '.project_health' "$TRIAGE"
-rm "$TRIAGE"
+# Health check
+bd doctor
 
-# Priority misalignment (redirect — can be large)
-PRIORITY=$(mktemp "/tmp/bv-${REPO}-priority.XXXXXX.json")
-bv --robot-priority > "$PRIORITY"
-jq '.recommendations[:5]' "$PRIORITY"
-rm "$PRIORITY"
+# Epic progress overview
+bd epic status
 ```
 
 ### Graph structure review
 
-For deep structural analysis (always redirect — 3000+ lines of JSON):
+For structural analysis:
 
 ```bash
-# Create repo-specific temp file to avoid conflicts between concurrent agents
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-INSIGHTS=$(mktemp "/tmp/bv-${REPO}-insights.XXXXXX.json")
-bv --robot-insights > "$INSIGHTS"
+# Dependency health
+bd dep cycles
 
-# Bottlenecks — are these being prioritized?
-jq '.Bottlenecks[:10]' "$INSIGHTS"
+# Epic progress and structure
+bd epic status
 
-# Keystones on critical path — any surprises?
-jq '.Keystones[:10]' "$INSIGHTS"
-
-# Overall density — is coupling increasing?
-jq '.ClusterDensity' "$INSIGHTS"
-
-# Clean up
-rm "$INSIGHTS"
+# Full dependency graph for a specific epic or issue
+bd dep tree <id> --direction both
 ```
 
-If density is increasing over time, consider:
-- Are dependencies being over-specified?
-- Should some epics be split into independent streams?
-- Are there implicit dependencies that should be explicit (and then removed)?
+If coupling seems to be increasing, consider whether dependencies are being over-specified, whether some epics should be split into independent streams, or whether implicit dependencies should be made explicit and then removed.
 
 ### Cleanup operations
 
