@@ -166,16 +166,13 @@ bd sync --dry-run       # Preview sync without changes
 ```bash
 bd status                   # quick human-readable summary (~20 lines)
 bd epic status              # epic progress
-bv --robot-next             # minimal JSON: just the single top pick
+bd ready | head -1          # top ready-to-work issue
 ```
 
 ## Select work
 
 ```bash
-# Top pick (small JSON, safe for direct consumption)
-bv --robot-next
-
-# Show ready-to-work issues (no blockers, open or in_progress)
+# Top ready-to-work issues (priority-sorted, no blockers)
 bd ready
 
 # Show blocked issues
@@ -186,16 +183,6 @@ bd dep tree <id> --direction both
 
 # Issue details
 bd show <id>
-```
-
-For deeper analysis (redirect to file to avoid context pollution):
-
-```bash
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-TRIAGE=$(mktemp "/tmp/bv-${REPO}-triage.XXXXXX.json")
-bv --robot-triage > "$TRIAGE"
-jq '.recommendations[:3]' "$TRIAGE"
-rm "$TRIAGE"
 ```
 
 ## During work
@@ -227,15 +214,9 @@ bd lint                     # check issues for missing template sections
 
 ## Key patterns
 
-- `bv --robot-triage` is the single entry point — unified counts, recommendations, health
-- `bv --robot-next` for minimal context — just top pick with claim command
-- `bd ready` / `bd blocked` for quick work selection without JSON parsing
+- `bd status` for quick summary, `bd ready` for actionable work, `bd blocked` for bottlenecks
 - `bd dep tree <id> --direction both` shows full context (blockers + what completing it unblocks)
 - Always close with `--reason` referencing the implementation
 - Use `--type discovered-from` when creating issues found during other work
 - After `bd` modifications (from repo root or focus epic branch): `git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"`
 - In issue worktrees (`.worktrees/` subdirectories): skip the JSONL commit; the orchestrator handles serialization after merging branches back
-
-Other useful robot flags:
-- `bv --robot-plan` - Dependency-respecting execution plan
-- `bv --robot-insights` - Graph analysis
