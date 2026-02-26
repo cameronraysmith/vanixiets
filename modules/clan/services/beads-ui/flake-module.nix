@@ -16,6 +16,12 @@
           { lib, ... }:
           {
             options = {
+              host = lib.mkOption {
+                type = lib.types.str;
+                default = "0.0.0.0";
+                description = "Address to bind the beads UI server to";
+              };
+
               port = lib.mkOption {
                 type = lib.types.port;
                 default = 3009;
@@ -42,6 +48,7 @@
               }:
               let
                 package = config.services.beads-ui.package;
+                serverEntry = "${package}/lib/node_modules/beads-ui/server/index.js";
                 userHome = config.users.users.${settings.serviceUser}.home;
               in
               {
@@ -60,14 +67,12 @@
                     wantedBy = [ "multi-user.target" ];
 
                     environment = {
-                      PORT = toString settings.port;
-                      HOST = "127.0.0.1";
                       HOME = userHome;
                     };
 
                     serviceConfig = {
                       Type = "simple";
-                      ExecStart = lib.getExe package;
+                      ExecStart = "${package.nodejs}/bin/node ${serverEntry} --host ${settings.host} --port ${toString settings.port}";
                       WorkingDirectory = userHome;
                       Restart = "always";
                       RestartSec = 5;
