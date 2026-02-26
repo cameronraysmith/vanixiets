@@ -425,21 +425,14 @@ bd activity
 bd epic status
 ```
 
-For structured session summary:
+For additional session summary context:
 
 ```bash
-# Create repo-specific temp file
-REPO=$(basename "$(git rev-parse --show-toplevel)")
-SUMMARY=$(mktemp "/tmp/bd-${REPO}-checkpoint.XXXXXX.json")
-bv --robot-triage > "$SUMMARY"
+# What's ready for the next session
+bd ready | head -5
 
-# Session-relevant extractions
-jq '.triage.quick_ref' "$SUMMARY"                    # current counts
-jq '.triage.project_health.graph_metrics' "$SUMMARY"  # health metrics
-jq '.triage.stale_alerts' "$SUMMARY"                  # attention needed
-
-# Clean up when done
-rm "$SUMMARY"
+# Stale issues that may need attention
+bd stale
 ```
 
 ## Scale-aware session summary
@@ -607,14 +600,11 @@ The next session can use this summary plus `/session-orient` (or `/issues:beads-
 Before ending the session, ensure the next agent can pick up cleanly via `/session-orient` (or `/issues:beads-orient` in beads-only repos).
 
 ```bash
-# Quick check of top recommendation
-bv --robot-triage | jq '.triage.quick_ref'
+# Quick check of top ready issues
+bd ready | head -5
 
-# Or minimal: just the top pick
-bv --robot-next
-
-# Review its description
-bd show <top-recommendation-id>
+# Review the top candidate's description
+bd show <top-candidate-id>
 ```
 
 If the description is stale or incomplete based on what was learned this session:
