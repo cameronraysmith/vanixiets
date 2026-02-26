@@ -130,9 +130,16 @@ fi
 # --- GitHub CLI: mutating operations ---
 if [ -z "$REASON" ]; then
   if cmd_match 'gh api\s'; then
-    # Auto-approve read-only GitHub API calls with known safe paths
-    if ! echo "$COMMAND" | grep -qE 'gh api\s+["'"'"']?repos/[^/]+/[^/]+/actions/runs/[0-9]+/logs["'"'"']?'; then
-      REASON="gh api can make arbitrary mutations"
+    # Block gh api mutations that would bypass gated gh subcommands.
+    # Read-only calls (bare endpoint, -X GET) pass through ungated.
+    if echo "$COMMAND" | grep -qiE '(-X|--method)\s+(POST|PUT|PATCH|DELETE)\b'; then
+      REASON="gh api with mutating HTTP method"
+    elif echo "$COMMAND" | grep -qE '\s--input[\s=]'; then
+      REASON="gh api with --input (implies mutation)"
+    elif echo "$COMMAND" | grep -qE '\s(-f|-F|--raw-field)\s'; then
+      if ! echo "$COMMAND" | grep -qiE '(-X|--method)\s+GET\b'; then
+        REASON="gh api with field flags (defaults to POST)"
+      fi
     fi
   fi
 fi
