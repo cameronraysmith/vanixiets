@@ -129,36 +129,29 @@ All merges to main must be fast-forward.
 Rebase the branch onto main before merging to ensure this.
 The repository `merge.ff=only` git config rejects non-fast-forward merges as a safety net.
 
-## Manual sync workflow
+## Dolt persistence
 
-After git operations that modify beads state (pull, checkout, merge, rebase):
+Beads mutations auto-commit to the dolt database when `dolt.auto-commit` is enabled (the default after migration).
+After a batch of mutations, push to the dolt remote for backup:
 
 ```bash
-# Import changes from git into beads database
-bd sync --import-only
+bd dolt push
 ```
 
-Before committing beads changes (from the repo root or focus epic branch):
+For explicit checkpoint labels:
 
 ```bash
-# Run pre-commit validation
-bd hooks run pre-commit
-
-# Commit beads changes
-git add .beads/issues.jsonl
-git commit -m "chore(beads): ..."
+bd dolt commit -m "checkpoint: <description>"
+bd dolt push
 ```
 
-If you are working in a `.worktrees/` subdirectory, do not commit `.beads/issues.jsonl`.
-The `bd` mutation commands write to the shared SQLite DB correctly from any worktree.
-The orchestrator serializes JSONL after merging worktree branches back: `bd sync --flush-only && git add .beads/issues.jsonl && git commit -m "chore(beads): ..."`.
-
-Additional sync flags:
+Additional dolt operations:
 
 ```bash
-bd sync --flush-only    # Only export to JSONL (useful for pre-commit)
-bd sync --check         # Pre-sync integrity check
-bd sync --dry-run       # Preview sync without changes
+bd dolt pull          # Pull from dolt remote
+bd dolt status        # Check dolt server status
+bd history <id>       # View version history for an issue
+bd diff               # Show changes between dolt commits
 ```
 
 ## Orient
@@ -218,5 +211,4 @@ bd lint                     # check issues for missing template sections
 - `bd dep tree <id> --direction both` shows full context (blockers + what completing it unblocks)
 - Always close with `--reason` referencing the implementation
 - Use `--type discovered-from` when creating issues found during other work
-- After `bd` modifications (from repo root or focus epic branch): `git add .beads/issues.jsonl && git commit -m "chore(beads): sync issues"`
-- In issue worktrees (`.worktrees/` subdirectories): skip the JSONL commit; the orchestrator handles serialization after merging branches back
+- After `bd` modifications, push to the dolt remote for backup: `bd dolt push`
