@@ -323,20 +323,15 @@ Next session:
 - Phase recommendation: {/session-plan | implement | /session-orient discovery mode}
 ```
 
-### Step 9: commit beads state
+### Step 9: push beads state
 
 Delegate to `/issues-beads-checkpoint` step 8.
 
-If working in a `.worktrees/` subdirectory, skip the commit.
-The `bd` commands in earlier steps already updated the shared SQLite DB.
-The orchestrator serializes JSONL after merging worktree branches back.
-
-From the repo root or focus epic branch:
+Push beads state to the dolt remote for backup:
 
 ```bash
-bd hooks run pre-commit
-git add .beads/issues.jsonl
-git commit -m "chore(beads): checkpoint <session-summary>"
+bd dolt commit -m "checkpoint: <session-summary>"
+bd dolt push
 ```
 
 The commit message should reference the primary issues checkpointed.
