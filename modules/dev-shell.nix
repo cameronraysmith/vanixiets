@@ -23,7 +23,7 @@
           pkgs.nix-output-monitor
           pkgs.nix-update
           pkgs.nix-prefetch-github
-          self'.packages.beads-viewer
+          # beads-viewer  # disabled: incompatible with dolt backend
           self'.packages.gastown
           # Tools required by Makefile verify target
           pkgs.age
