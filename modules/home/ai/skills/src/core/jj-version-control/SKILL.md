@@ -334,4 +334,4 @@ jj bookmark create {ID}-descriptor
 jj git push --bookmark {ID}-descriptor
 ```
 
-After completing bead work, commit beads changes following the manual sync workflow and update the bookmark before pushing.
+After completing bead work, push beads state with `bd dolt push` and update the bookmark before pushing.
