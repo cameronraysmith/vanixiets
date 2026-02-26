@@ -5,7 +5,6 @@
   nodejs_22,
   beads,
   fetchFromGitHub,
-  nix-update-script,
 }:
 
 buildNpmPackage {
@@ -52,7 +51,7 @@ buildNpmPackage {
     runHook postInstall
   '';
 
-  passthru.updateScript = nix-update-script { };
+  passthru.updateScript = ./update.sh;
 
   meta = {
     description = "Local UI for Beads issue tracker";

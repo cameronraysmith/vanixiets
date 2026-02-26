@@ -20,5 +20,10 @@
         type = "app";
         program = "${config.packages.xsra.updateScript}";
       };
+
+      apps.update-beads-ui = {
+        type = "app";
+        program = "${config.packages.beads-ui.updateScript}";
+      };
     };
 }
