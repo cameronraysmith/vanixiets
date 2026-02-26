@@ -158,26 +158,22 @@ bd doctor --check=pollution --clean          # Delete test issues (with confirma
 bd delete <id>                                # Manually remove test issues
 ```
 
-## Graph visualization
+## Graph review
 
-If the `bv` viewer is available:
+Use bd commands to review graph structure:
 
 ```bash
-# Interactive visual exploration
-bv
+# Full dependency graph for a specific epic
+bd dep tree <epic-id> --direction both
 
-# Machine-readable health data
-bv --robot-triage
+# Health and drift detection
+bd doctor
 
-# Check for drift from baseline
-bv --check-drift
+# Epic structure overview
+bd epic status
 ```
 
-Use visualization to:
-- Identify disconnected subgraphs
-- Spot overly complex dependency chains
-- Verify epic decomposition makes sense
-- Find issues that should be merged
+Use graph review to identify disconnected subgraphs, spot overly complex dependency chains, verify epic decomposition makes sense, and find issues that should be merged.
 
 ## Remediation patterns
 
@@ -261,10 +257,10 @@ Run through this checklist during periodic maintenance:
    - Dependencies reflect true blocking relationships
    - Issue titles and descriptions are current
 
-5. **Visualization check** (if using `bv`):
-   - Graph structure is comprehensible
-   - No obvious visual clutter or complexity
-   - Epics form coherent clusters
+5. **Graph structure check**:
+   - `bd dep tree <epic-id> --direction both` shows comprehensible structure for each active epic
+   - No excessively deep or wide dependency chains
+   - Epics form coherent clusters per `bd epic status`
 
 ## Automation potential
 
