@@ -90,6 +90,8 @@
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.home-manager.follows = "home-manager";
 
+    # TODO: revert to upstream
+    # playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.58.2";
     playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/fix-nodejs-src-symlinkjoin";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
 

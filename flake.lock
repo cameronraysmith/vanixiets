@@ -1081,16 +1081,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1770424747,
-        "narHash": "sha256-dK/r3ieufFTebdrCp2eaphKyglWT+trRtcZAIyOQDSQ=",
-        "owner": "pietdevries94",
+        "lastModified": 1772213116,
+        "narHash": "sha256-MqbTOCTYGMUXfWa1/1FhAzI6cZoBP0EW3FEChZGMerY=",
+        "owner": "cameronraysmith",
         "repo": "playwright-web-flake",
-        "rev": "f6342a859e548b104b3f6024e0c99c667953ad62",
+        "rev": "25e8e077c64101dec9e02cca511b6b1992074aae",
         "type": "github"
       },
       "original": {
-        "owner": "pietdevries94",
-        "ref": "1.58.2",
+        "owner": "cameronraysmith",
+        "ref": "fix-nodejs-src-symlinkjoin",
         "repo": "playwright-web-flake",
         "type": "github"
       }
