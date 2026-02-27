@@ -7,8 +7,7 @@
       caddyCert = ../machines/nixos/cinnabar/pki/caddy-root-ca.crt;
     in
     {
-      options.services.zt-services-trust.enable =
-        lib.mkEnableOption "Caddy internal CA trust for .zt services";
+      options.services.zt-services-trust.enable = lib.mkEnableOption "Caddy internal CA trust for .zt services";
 
       config = lib.mkIf cfg.enable {
         security.pki.certificateFiles = [ caddyCert ];

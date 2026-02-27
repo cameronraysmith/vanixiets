@@ -28,7 +28,6 @@
       };
     in
     {
-      home.file.".beads/registry.json".text =
-        builtins.toJSON (map mkRegistryEntry workspacePaths);
+      home.file.".beads/registry.json".text = builtins.toJSON (map mkRegistryEntry workspacePaths);
     };
 }
