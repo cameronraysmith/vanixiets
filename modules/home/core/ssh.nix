@@ -45,41 +45,49 @@
           "cinnabar.zt" = {
             hostname = "fddb:4344:343b:14b9:399:93db:4344:343b";
             user = "cameron";
+            extraOptions.HostKeyAlias = "cinnabar.zt";
           };
 
           "electrum.zt" = {
             hostname = "fddb:4344:343b:14b9:399:93d1:7e6d:27cc";
             user = "cameron";
+            extraOptions.HostKeyAlias = "electrum.zt";
           };
 
           "blackphos.zt" = {
             hostname = "fddb:4344:343b:14b9:399:930e:e971:d9e0";
             user = "crs58";
+            extraOptions.HostKeyAlias = "blackphos.zt";
           };
 
           "stibnite.zt" = {
             hostname = "fddb:4344:343b:14b9:399:933e:1059:d43a";
             user = "crs58";
+            extraOptions.HostKeyAlias = "stibnite.zt";
           };
 
           "argentum.zt" = {
             hostname = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
             user = "cameron";
+            extraOptions.HostKeyAlias = "argentum.zt";
           };
 
           "rosegold.zt" = {
             hostname = "fddb:4344:343b:14b9:399:9315:3431:ee8";
             user = "cameron";
+            extraOptions.HostKeyAlias = "rosegold.zt";
           };
 
           "galena.zt" = {
             hostname = "fddb:4344:343b:14b9:399:9315:c67a:dec9";
             user = "cameron";
+            extraOptions.HostKeyAlias = "galena.zt";
           };
 
           "scheelite.zt" = {
             hostname = "fddb:4344:343b:14b9:399:9380:46d5:3400";
             user = "cameron";
+            extraOptions.HostKeyAlias = "scheelite.zt";
           };
 
           "pixel7.zt" = {
