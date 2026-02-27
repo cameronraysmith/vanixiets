@@ -8,10 +8,16 @@
 { lib, ... }:
 {
   flake.modules.darwin.ssh-ca-trust =
-    { config, lib, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     {
       clan.core.vars.generators.openssh-ca = {
         share = true;
+        runtimeInputs = [ pkgs.openssh ];
         files.id_ed25519.deploy = false;
         files."id_ed25519.pub" = {
           deploy = false;
