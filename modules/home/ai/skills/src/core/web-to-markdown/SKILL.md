@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # Web to markdown
 
-Convert a URL to clean, readable markdown using nix ephemeral tooling via the comma (`,`) CLI.
+Convert a URL to clean, readable markdown using globally installed CLI tools.
 
 ## Decision tree
 
@@ -18,7 +18,7 @@ Determine the page type and follow the appropriate path.
 Trafilatura can fetch and extract directly:
 
 ```bash
-, trafilatura -u "<URL>" --markdown --formatting --links > "<output>.md"
+trafilatura -u "<URL>" --markdown --formatting --links > "<output>.md"
 ```
 
 ### JS-rendered pages (SPAs, Angular, React)
@@ -26,13 +26,10 @@ Trafilatura can fetch and extract directly:
 Use shot-scraper to capture the rendered DOM first, then extract with trafilatura:
 
 ```bash
-, shot-scraper html "<URL>" > /tmp/web-to-md-source.html
-, trafilatura --markdown --formatting --links < /tmp/web-to-md-source.html > "<output>.md"
+shot-scraper html "<URL>" > /tmp/web-to-md-source.html
+trafilatura --markdown --formatting --links < /tmp/web-to-md-source.html > "<output>.md"
 rm /tmp/web-to-md-source.html
 ```
-
-On first run, shot-scraper may need to install its bundled Chromium via Playwright.
-If prompted, run: `python -m playwright install chromium`
 
 ### Authenticated or login-gated pages
 
@@ -40,7 +37,7 @@ Neither tool can bypass authentication.
 Instruct the user to save the page from their browser using "Web Page, complete" and provide the HTML file path, then extract:
 
 ```bash
-, trafilatura --markdown --formatting --links < "<saved-file>.html" > "<output>.md"
+trafilatura --markdown --formatting --links < "<saved-file>.html" > "<output>.md"
 ```
 
 ## Output path conventions
