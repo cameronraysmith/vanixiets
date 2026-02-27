@@ -1,7 +1,8 @@
 # DNS server for .zt zone on cinnabar's zerotier interface
 #
 # dnsmasq serves authoritative A and AAAA records for .zt hostnames,
-# resolving them to zerotier controller's IPv4 and IPv6 addresses.
+# resolving service names (kanban, beads, etc.) to cinnabar and machine
+# hostnames (stibnite, blackphos, etc.) to their zerotier addresses.
 # Non-.zt queries are forwarded to quad9 for clients that use
 # zerotier-pushed DNS globally.
 # The zerotier controller pushes this DNS server to all network members.
@@ -35,6 +36,17 @@
             "/ntfy.zt/10.147.17.1"
             "/openclaw.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
             "/openclaw.zt/10.147.17.1"
+
+            # Machine hostnames (for non-SSH service discovery via meta.domain = "zt")
+            "/cinnabar.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
+            "/cinnabar.zt/10.147.17.1"
+            "/electrum.zt/fddb:4344:343b:14b9:399:93d1:7e6d:27cc"
+            "/galena.zt/fddb:4344:343b:14b9:399:9315:c67a:dec9"
+            "/scheelite.zt/fddb:4344:343b:14b9:399:9380:46d5:3400"
+            "/stibnite.zt/fddb:4344:343b:14b9:399:933e:1059:d43a"
+            "/blackphos.zt/fddb:4344:343b:14b9:399:930e:e971:d9e0"
+            "/argentum.zt/fddb:4344:343b:14b9:399:93f7:54d5:ad7e"
+            "/rosegold.zt/fddb:4344:343b:14b9:399:9315:3431:ee8"
           ];
         };
       };
