@@ -12,12 +12,15 @@
         imagemagick
         impressive # pkgs/by-name - PDF presentations with OpenGL transitions
         markdown-tree-parser # pkgs/by-name
+        mermaid-cli # provides mmdc
         poppler-utils
         qpdf
         quarto
         repomix
+        resvg
         shot-scraper
         svg2pdf
+        svgo
       ];
     };
 }
