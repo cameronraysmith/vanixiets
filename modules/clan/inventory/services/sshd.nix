@@ -1,18 +1,22 @@
-# Clan SSHD service configuration
-# Manages persistent SSH host keys via clan vars
-# Basic configuration without CA certificates (sufficient for zerotier private network)
+# Clan SSHD service with CA certificate infrastructure
+# Server role: persistent host keys + CA-signed host certificates (NixOS only)
+# Client role: CA trust for TOFU-free host verification (NixOS only)
+# Darwin CA trust is handled separately in modules/darwin/ssh-ca-trust.nix
 {
   clan.inventory.instances = {
-    sshd-basic = {
+    sshd = {
       module = {
         name = "sshd";
         input = "clan-core";
       };
 
-      # Enable server role for all NixOS machines
-      # Note: clan-core sshd service only supports NixOS, not nix-darwin
-      # nix-darwin machines (blackphos) use SSH client only
-      roles.server.tags."all" = { };
+      # Server role generates host keys and CA-signed certificates
+      # Restricted to NixOS (clan sshd service has no darwinModule for server)
+      roles.server.tags."nixos" = { };
+
+      # Client role installs CA public key in known_hosts
+      # Restricted to NixOS (clan sshd service has no darwinModule for client)
+      roles.client.tags."nixos" = { };
     };
   };
 }
