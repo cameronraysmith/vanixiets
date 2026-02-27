@@ -1458,11 +1458,11 @@
         "systems": "systems_11"
       },
       "locked": {
-        "lastModified": 1772084625,
-        "narHash": "sha256-NHVyzvrcMEnRU8pp9ATTfn4+QPQT50leQg5JFbM+pz0=",
+        "lastModified": 1772179377,
+        "narHash": "sha256-aVW+2Dxs9Ipn4DJ6zSrcMe4I8/a8C1xsOJQVqUDFbcY=",
         "owner": "terranix",
         "repo": "terranix",
-        "rev": "56f22d4c477a552d2aa13bfa6251ff34e7c05ce2",
+        "rev": "64904f571d74e36e46d3d0200c19f2b664cd1305",
         "type": "github"
       },
       "original": {
