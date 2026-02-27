@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ ... }:
 {
   flake.nixpkgsOverlays = [
     (final: prev: {
@@ -6,8 +6,7 @@
         makeWrapperArgs = (old.makeWrapperArgs or [ ]) ++ [
           "--set"
           "PLAYWRIGHT_BROWSERS_PATH"
-          "${inputs.playwright-web-flake.packages.${prev.stdenv.hostPlatform.system}.playwright-driver.browsers
-          }"
+          "${prev.playwright-driver.browsers}"
           "--set"
           "PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"
           "true"
