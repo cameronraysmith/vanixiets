@@ -8,6 +8,7 @@ external-references
 .pre-commit-config.yaml
 .*rules*
 node_modules/
+archive/
 
 # TypeScript/npm build artifacts
 dist/
