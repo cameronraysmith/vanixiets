@@ -16,6 +16,7 @@
         qpdf
         quarto
         repomix
+        shot-scraper
         svg2pdf
       ];
     };
