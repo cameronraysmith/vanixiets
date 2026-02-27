@@ -83,6 +83,7 @@
           - typescript/node.js development: ${skillsPath}/preferences-typescript-nodejs-development/SKILL.md
           - react/ui development: ${skillsPath}/preferences-react-tanstack-ui-development/SKILL.md
           - hypermedia/server-driven UI development: ${skillsPath}/preferences-hypermedia-development/SKILL.md
+          - scientific data visualization (figures, tables, diagrams, colormaps): ${skillsPath}/scientific-visualization/SKILL.md
 
           Always remember to fallback to using practical features and architectural
           patterns that emphasize algebraic data types, type-safety, and functional
