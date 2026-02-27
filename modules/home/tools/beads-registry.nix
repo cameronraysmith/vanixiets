@@ -17,6 +17,7 @@
         "sciexp/data"
         "hodosome-workspace/hodosome"
         "hodosome-workspace/Hodosome.jl"
+        "nix-workspace/nixpod-home"
       ];
       mkRegistryEntry = relPath: {
         workspace_path = "${home}/projects/${relPath}";
