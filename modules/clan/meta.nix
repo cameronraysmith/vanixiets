@@ -4,6 +4,9 @@
     meta.name = "test-clan";
     meta.description = "Phase 0: Architectural validation + infrastructure deployment";
 
+    # Internal domain for clan service discovery (resolves via zerotier DNS + SSH config)
+    meta.domain = "zt";
+
     # Pass inputs to all machines via specialArgs
     specialArgs = { inherit inputs; };
 
