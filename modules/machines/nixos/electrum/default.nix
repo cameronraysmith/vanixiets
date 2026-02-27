@@ -55,7 +55,7 @@ in
 
       # Hostname configuration
       networking.hostName = "electrum";
-      networking.domain = null;
+
       networking.search = [ ];
 
       # Override state version for new deployment

@@ -53,7 +53,7 @@ in
 
       # Hostname configuration
       networking.hostName = "cinnabar";
-      networking.domain = null;
+
       networking.search = [ ];
 
       # Override state version for new deployment
