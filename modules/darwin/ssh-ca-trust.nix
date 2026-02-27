@@ -4,9 +4,11 @@
 # so that Darwin machines verify NixOS host certificates without TOFU.
 # The openssh-ca generator definition enables the .value accessor
 # for the shared CA public key (share = true means no regeneration).
+# The mkIf guard allows evaluation before clan vars generate has run.
+{ lib, ... }:
 {
   flake.modules.darwin.ssh-ca-trust =
-    { config, ... }:
+    { config, lib, ... }:
     {
       clan.core.vars.generators.openssh-ca = {
         share = true;
@@ -20,10 +22,12 @@
         '';
       };
 
-      programs.ssh.knownHosts.ssh-ca = {
-        certAuthority = true;
-        extraHostNames = [ "*.${config.clan.core.settings.domain}" ];
-        publicKey = config.clan.core.vars.generators.openssh-ca.files."id_ed25519.pub".value;
-      };
+      programs.ssh.knownHosts.ssh-ca =
+        lib.mkIf config.clan.core.vars.generators.openssh-ca.files."id_ed25519.pub".exists
+          {
+            certAuthority = true;
+            extraHostNames = [ "*.${config.clan.core.settings.domain}" ];
+            publicKey = config.clan.core.vars.generators.openssh-ca.files."id_ed25519.pub".value;
+          };
     };
 }

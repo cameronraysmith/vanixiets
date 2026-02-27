@@ -30,6 +30,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        ssh-ca-trust
         ssh-known-hosts
         zt-dns
         # Not importing users module (defines testuser at UID 550)

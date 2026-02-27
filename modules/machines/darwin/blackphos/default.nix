@@ -30,6 +30,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        ssh-ca-trust
         ssh-known-hosts
         dnscrypt-proxy
         zt-dns

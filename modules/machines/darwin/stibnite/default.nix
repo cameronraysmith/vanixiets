@@ -31,6 +31,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        ssh-ca-trust
         ssh-known-hosts
         colima
         dnscrypt-proxy
