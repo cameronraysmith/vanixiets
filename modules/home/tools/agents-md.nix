@@ -68,6 +68,8 @@
           - functional reactive programming (FRP foundations, arrows, presheaves): ${skillsPath}/preferences-functional-reactive-programming/SKILL.md
           - theoretical foundations (category theory, type theory): ${skillsPath}/preferences-theoretical-foundations/SKILL.md
           - algebraic laws (functor/monad laws, property-based testing): ${skillsPath}/preferences-algebraic-laws/SKILL.md
+          - adaptive planning (control theory, buffer sizing, planning horizons, VSM mapping): ${skillsPath}/preferences-adaptive-planning/SKILL.md
+          - scalable probabilistic modeling (Bayesian workflow, simulation-based inference, stochastic dynamical systems): ${skillsPath}/preferences-scalable-probabilistic-modeling-workflow/SKILL.md
           - smart constructors and validation patterns: see preferences-domain-modeling
           - error handling and workflow composition (Result types, railway-oriented): ${skillsPath}/preferences-railway-oriented-programming/SKILL.md
           - data modeling (database schemas, normalization, ER diagrams): ${skillsPath}/preferences-data-modeling/SKILL.md
