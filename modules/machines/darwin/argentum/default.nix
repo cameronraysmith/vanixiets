@@ -126,9 +126,8 @@ in
       users.users.cameron = {
         uid = 502; # Admin user
         home = "/Users/cameron";
-        shell = pkgs.zsh;
+        # shell and authorizedKeys provided by cameron inventory service
         description = "cameron";
-        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
       };
 
       # Darwin requires explicit knownUsers
