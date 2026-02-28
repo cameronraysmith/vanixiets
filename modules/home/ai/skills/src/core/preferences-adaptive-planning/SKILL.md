@@ -34,7 +34,7 @@ Under standard assumptions — exponential accuracy decay $\alpha(d) = e^{-\lamb
 When agent capacity exceeds optimal plan throughput ($k > R_{\text{plan}}(d^*)$), the effective depth must decrease below $d^*$ to sustain throughput.
 Thus $d^*_{\text{eff}}$ *decreases* as $k$ increases — more agents demand shallower, faster planning cycles.
 
-> TODO: Validate the $R_{\text{plan}}(d)$ formulation, functional form assumptions ($\alpha(d) = e^{-\lambda d}$, $T_{\text{plan}}(d) = c \cdot d^\beta$), and the MPC co-optimization statement (section 1 below) against Grune & Pannek (2017) Ch. 5 performance bounds and Rawlings, Mayne & Diehl (2017) Ch. 1-2 finite-horizon formulation.
+> TODO: Validate the $R_{\text{plan}}(d)$ formulation, functional form assumptions ($\alpha(d) = e^{-\lambda d}$, $T_{\text{plan}}(d) = c \cdot d^\beta$), and the MPC co-optimization statement (section 1 below) against Grüne & Pannek (2017) Ch. 5 performance bounds and Rawlings, Mayne & Diehl (2017) Ch. 1-2 finite-horizon formulation.
 
 ## Theoretical foundations
 
@@ -43,7 +43,7 @@ Thus $d^*_{\text{eff}}$ *decreases* as $k$ increases — more agents demand shal
 - *Core idea*: plan over a finite prediction horizon $N_p$, commit only over a shorter control horizon $N_c \leq N_p$, then re-observe actual state and replan from scratch.
 - *Mapping*: $N_p$ = planning depth (DAG decomposition lookahead), $N_c$ = commitment horizon (work assigned to agents before next replan), state = codebase + remaining spec, model mismatch = planning inaccuracy.
 - *Key result*: optimal prediction horizon is finite and determinable — the point where marginal value of additional planning equals marginal cost of plan inaccuracy.
-- *Co-optimization formulation*: the joint selection of prediction horizon $d$ and process parameters (validation frequency, batch sizing) maps to the MPC design problem: minimize $\sum_{\tau=0}^{d} \ell(x_\tau, u_\tau) + V_f(x_d) + C_{\text{plan}}(d)$ subject to dynamics $x_{\tau+1} = f(x_\tau, u_\tau)$, where $\ell$ is per-step cost, $V_f$ is terminal cost (value of work beyond the horizon), and $C_{\text{plan}}(d)$ captures planning cost at depth $d$. The receding-horizon principle commits only to the first $N_c \leq d$ steps, then replans from observed state. Near-optimality guarantees as a function of horizon length follow from controllability-based performance bounds (Grune & Pannek, 2017, Ch. 5).
+- *Co-optimization formulation*: the joint selection of prediction horizon $d$ and process parameters (validation frequency, batch sizing) maps to the MPC design problem: minimize $\sum_{\tau=0}^{d} \ell(x_\tau, u_\tau) + V_f(x_d) + C_{\text{plan}}(d)$ subject to dynamics $x_{\tau+1} = f(x_\tau, u_\tau)$, where $\ell$ is per-step cost, $V_f$ is terminal cost (value of work beyond the horizon), and $C_{\text{plan}}(d)$ captures planning cost at depth $d$. The receding-horizon principle commits only to the first $N_c \leq d$ steps, then replans from observed state. Near-optimality guarantees as a function of horizon length follow from controllability-based performance bounds (Grüne & Pannek, 2017, Ch. 5).
 - *References*: Camacho & Bordons, *Model Predictive Control*; Rawlings, Mayne & Diehl, *Model Predictive Control: Theory, Computation, and Design*.
 
 ### 2. Organizational cybernetics and the Viable System Model (VSM)
@@ -92,7 +92,7 @@ Thus $d^*_{\text{eff}}$ *decreases* as $k$ increases — more agents demand shal
 - *Core idea*: agents coordinate through shared environmental state (the DAG) rather than direct communication. Local rules (pick highest-priority unblocked work) produce globally near-optimal behavior.
 - *Mapping*: the issue DAG is the pheromone field. `bd ready` / `bd claim` are the local sensing/acting operations. Completion events are environmental modifications that update the field for other agents.
 - *Key result*: stigmergic systems achieve near-optimal throughput under high agent count, limited individual knowledge, and dynamic environments.
-- *References*: Theraulaz & Bonabeau, "A Brief History of Stigmergy" (Artificial Life, 1999); Dorigo & Stutzle, *Ant Colony Optimization*.
+- *References*: Theraulaz & Bonabeau, "A Brief History of Stigmergy" (Artificial Life, 1999); Dorigo & Stützle, *Ant Colony Optimization*.
 
 ### 8. DAGs as algebraic structures
 
@@ -253,7 +253,7 @@ See `preferences-scalable-probabilistic-modeling-workflow` for the operational B
 
 - Camacho, E.F. & Bordons, C. — *Model Predictive Control* (Springer)
 - Rawlings, J.B., Mayne, D.Q. & Diehl, M. — *Model Predictive Control: Theory, Computation, and Design* (2nd ed., 2017)
-- Grune, L. & Pannek, J. — *Nonlinear Model Predictive Control: Theory and Algorithms* (Springer, 2nd ed., 2017)
+- Grüne, L. & Pannek, J. — *Nonlinear Model Predictive Control: Theory and Algorithms* (Springer, 2nd ed., 2017)
 - Mayne, D.Q. — "Model predictive control: Recent developments and future promise" (Automatica, vol. 50, no. 12, 2014)
 
 ### Organizational cybernetics
@@ -288,7 +288,7 @@ See `preferences-scalable-probabilistic-modeling-workflow` for the operational B
 ### Multi-agent coordination
 
 - Theraulaz, G. & Bonabeau, E. — "A Brief History of Stigmergy" (Artificial Life, 1999)
-- Dorigo, M. & Stutzle, T. — *Ant Colony Optimization* (MIT Press, 2004)
+- Dorigo, M. & Stützle, T. — *Ant Colony Optimization* (MIT Press, 2004)
 
 ### DAG-native issue tracking
 

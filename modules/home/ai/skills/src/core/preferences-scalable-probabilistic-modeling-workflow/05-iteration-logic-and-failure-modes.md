@@ -99,6 +99,6 @@ Thorough documentation of the model development and approximator training proces
 - Betancourt, M. (2020). *Towards A Principled Bayesian Workflow*. <https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html>
 - Schad, D. J., Betancourt, M., & Vasishth, S. (2021). Toward a principled Bayesian workflow in cognitive science. *Psychological Methods, 26*(1), 103.
 - Talts, S., Betancourt, M., Simpson, D., Vehtari, A., & Gelman, A. (2018). Validating Bayesian inference algorithms with simulation-based calibration. *arXiv preprint arXiv:1804.06788*.
-- Radev, S. T., Mertens, U. K., Voss, A., Ardizzone, L., & Kothe, U. (2020). BayesFlow: Learning complex stochastic models with invertible neural networks. *IEEE Transactions on Neural Networks and Learning Systems*.
+- Radev, S. T., Mertens, U. K., Voss, A., Ardizzone, L., & Köthe, U. (2020). BayesFlow: Learning complex stochastic models with invertible neural networks. *IEEE Transactions on Neural Networks and Learning Systems*.
 - Cranmer, K., Brehmer, J., & Louppe, G. (2020). The frontier of simulation-based inference. *Proceedings of the National Academy of Sciences, 117*(48), 30055-30062.
 - Li, S., Fearnhead, P., Friel, N., Mira, A., & Robert, C. P. (2026). Amortized Bayesian Workflow. *arXiv preprint*.
