@@ -9,6 +9,7 @@
 let
   # Capture outer config for use in imports
   flakeModules = config.flake.modules.nixos;
+  flakeModulesHome = config.flake.modules.homeManager;
 in
 {
   # Export host module to flake namespace
@@ -94,5 +95,25 @@ in
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       services.openssh.settings.MaxAuthTries = 20;
+
+      # cameron home-manager module imports
+      # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
+      home-manager.users.cameron = {
+        imports = [
+          flakeModulesHome."users/crs58"
+          flakeModulesHome.base-sops
+          flakeModulesHome.ai
+          flakeModulesHome.core
+          flakeModulesHome.development
+          flakeModulesHome.packages
+          flakeModulesHome.shell
+          flakeModulesHome.terminal
+          flakeModulesHome.tools
+          inputs.lazyvim-nix.homeManagerModules.default
+          inputs.nix-index-database.homeModules.nix-index
+          ../../../home/modules/_agents-md.nix
+        ];
+        home.username = "cameron";
+      };
     };
 }
