@@ -387,3 +387,6 @@ After planning completes, the worker proceeds to one of:
 - `/session-checkpoint` -- all-horizon state capture, detects replanning triggers
 - `/session-review` -- convergence-point validation, may trigger replanning
 - `/issues-beads-prime` -- core beads conventions and command quick reference
+
+*Theoretical foundations:*
+- `preferences-adaptive-planning` for the R_plan(d) derivation, buffer sizing theory, and planning depth optimization that this skill operationalizes

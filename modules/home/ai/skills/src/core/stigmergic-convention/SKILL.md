@@ -184,3 +184,14 @@ After checkpoint or close operations, verify structural integrity:
 bd dep cycles    # must be zero
 bd lint          # check for missing template sections
 ```
+
+---
+
+*Theoretical foundations:*
+- `preferences-adaptive-planning` for the stigmergy and Viable System Model theoretical foundations underlying the signal table design and the System 5 escalation interface
+
+*Composed by:*
+- `/session-orient` -- reads signal tables during orientation briefing assembly
+- `/session-plan` -- sets signal tables on newly created issues
+- `/session-review` -- reads signal tables for surprise accumulation at convergence points
+- `/session-checkpoint` -- updates signal tables during session wind-down

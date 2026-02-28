@@ -193,3 +193,6 @@ After review completes, the worker proceeds to one of:
 - `/session-plan` -- tactical-to-operational decomposition, invoked when replanning is triggered
 - `/session-checkpoint` -- all-horizon state capture and handoff
 - `/issues-beads-prime` -- core beads conventions and command quick reference
+
+*Theoretical foundations:*
+- `preferences-adaptive-planning` for the Viable System Model mapping (System 3* audit context), validation gate placement theory, and surprise threshold derivation

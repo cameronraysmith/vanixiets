@@ -41,3 +41,5 @@ These principles pervade all sections and should inform any reasoning about scie
 - `preferences-architectural-patterns` for analogous principles applied to software systems
 - `preferences-domain-modeling` for type-driven modeling that mirrors the commitment to explicit structure
 - `preferences-algebraic-laws` for property-based testing as a form of severity in software
+- `preferences-adaptive-planning` for how the Peircean iterative cycle is operationalized as engineering workflow (session-orient/plan/review/checkpoint), and for the MPC and VSM theoretical foundations that govern planning depth and validation gate placement
+- `preferences-scalable-probabilistic-modeling-workflow` for the operational Bayesian workflow protocol for simulator-based models, extending section 03's general iterative methodology to stochastic dynamical systems with amortized inference

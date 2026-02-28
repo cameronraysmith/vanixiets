@@ -367,3 +367,6 @@ When replanning was triggered (surprise exceeded theta or documentation was demo
 - `/session-plan` -- tactical-to-operational decomposition, invoked when replanning is triggered
 - `/session-review` -- convergence-point validation, uses compatible theta heuristics
 - `/issues-beads-prime` -- core beads conventions and command quick reference
+
+*Theoretical foundations:*
+- `preferences-adaptive-planning` for the surprise threshold derivation, replanning decision rule, documentation impact theory, and the fan-in normalization refinement
