@@ -286,6 +286,7 @@
             bind-key "i" display-popup -E -w 80% -h 80% -d "#{pane_current_path}" "fd --type f --type d --hidden --follow --exclude .git | fzf --preview 'bat --color=always --style=numbers --line-range=:500 {}' | tr -d '\\n' | cb copy"
             bind-key "I" display-popup -E -w 80% -h 80% -d "#{pane_current_path}" "fd --type f --type d --hidden --follow --exclude .git --absolute-path | fzf --preview 'bat --color=always --style=numbers --line-range=:500 {}' | sed 's|^${config.home.homeDirectory}/|~/|' | tr -d '\\n' | cb copy"
             bind-key -T copy-mode-vi v send-keys -X begin-selection
+            bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-no-clear
 
             # Terminal capabilities for truecolor and cursor shapes
             set -ga terminal-overrides ",*256col*:RGB"
