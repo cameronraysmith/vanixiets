@@ -68,6 +68,9 @@
 
                     environment = {
                       HOME = userHome;
+                    }
+                    // lib.optionalAttrs config.services.dolt-sql-server.enable {
+                      BEADS_DOLT_SERVER_PORT = toString config.services.dolt-sql-server.port;
                     };
 
                     path = [
