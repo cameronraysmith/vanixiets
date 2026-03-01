@@ -15,6 +15,7 @@
     }:
     let
       gitCfg = config.programs.git.settings;
+      doltPort = "3307";
       doltConfig = builtins.toJSON {
         profile = builtins.readFile (
           pkgs.runCommand "dolt-profile-base64" { } ''
@@ -25,7 +26,7 @@
                   password = "";
                   has-password = true;
                   host = "127.0.0.1";
-                  port = "3307";
+                  port = doltPort;
                   no-tls = true;
                   data-dir = "";
                   doltcfg-dir = "";
@@ -43,5 +44,6 @@
     in
     {
       home.file.".dolt/config_global.json".text = doltConfig;
+      home.sessionVariables.BEADS_DOLT_SERVER_PORT = doltPort;
     };
 }
