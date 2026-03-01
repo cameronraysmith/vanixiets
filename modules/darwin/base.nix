@@ -40,6 +40,6 @@
       programs.zsh.enable = true;
 
       # Note: zsh completions for nix-installed packages are configured
-      # per-user in home-manager (nix-darwin doesn't support home-manager.sharedModules)
+      # per-user in home-manager
     };
 }
