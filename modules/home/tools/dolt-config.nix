@@ -10,12 +10,13 @@
   flake.modules.homeManager.tools =
     {
       config,
+      lib,
       pkgs,
       ...
     }:
     let
-      gitCfg = config.programs.git.settings;
       doltPort = toString config.services.beads.doltServerPort;
+      gitCfg = config.programs.git.settings;
       doltConfig = builtins.toJSON {
         profile = builtins.readFile (
           pkgs.runCommand "dolt-profile-base64" { } ''
@@ -43,7 +44,15 @@
       };
     in
     {
-      home.file.".dolt/config_global.json".text = doltConfig;
-      home.sessionVariables.BEADS_DOLT_SERVER_PORT = doltPort;
+      options.services.beads.doltServerPort = lib.mkOption {
+        type = lib.types.port;
+        default = 3307;
+        description = "Port of the dolt SQL server for beads CLI connections.";
+      };
+
+      config = {
+        home.file.".dolt/config_global.json".text = doltConfig;
+        home.sessionVariables.BEADS_DOLT_SERVER_PORT = doltPort;
+      };
     };
 }
