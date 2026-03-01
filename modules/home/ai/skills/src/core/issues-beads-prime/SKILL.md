@@ -154,8 +154,8 @@ bd dolt remote add <name> <url>  # Dual-surface remote management
 bd dolt remote list              # Show remotes with surface status
 bd history <id>                  # View version history for an issue
 bd diff                          # Show changes between dolt commits
-bd backup                        # JSONL backup to .beads/backup/
-bd backup restore [path]         # Restore from backup
+bd backup                        # Manual JSONL export (auto-backup disabled)
+bd backup restore [path]         # Restore from JSONL backup
 bd doctor --agent                # AI-agent diagnostics
 ```
 
