@@ -15,7 +15,7 @@
     }:
     let
       gitCfg = config.programs.git.settings;
-      doltPort = "3307";
+      doltPort = toString config.services.beads.doltServerPort;
       doltConfig = builtins.toJSON {
         profile = builtins.readFile (
           pkgs.runCommand "dolt-profile-base64" { } ''
