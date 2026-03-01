@@ -148,11 +148,19 @@ bd dolt push
 Additional dolt operations:
 
 ```bash
-bd dolt pull          # Pull from dolt remote
-bd dolt status        # Check dolt server status
-bd history <id>       # View version history for an issue
-bd diff               # Show changes between dolt commits
+bd dolt pull                     # Pull from dolt remote
+bd dolt status                   # Check dolt server status
+bd dolt remote add <name> <url>  # Dual-surface remote management
+bd dolt remote list              # Show remotes with surface status
+bd history <id>                  # View version history for an issue
+bd diff                          # Show changes between dolt commits
+bd backup                        # JSONL backup to .beads/backup/
+bd backup restore [path]         # Restore from backup
+bd doctor --agent                # AI-agent diagnostics
 ```
+
+Port is set by the `BEADS_DOLT_SERVER_PORT` environment variable, managed via home-manager.
+Do not set `dolt_server_port` in `.beads/metadata.json` as this breaks fork auto-start behavior.
 
 ## Orient
 
