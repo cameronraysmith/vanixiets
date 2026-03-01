@@ -70,13 +70,11 @@ bd dolt push
 
 ## Backup configuration
 
-Enable JSONL backup for offline or non-dolt recovery:
+Auto-backup is disabled by default (`backup.enabled: false` in config.yaml) because `bd dolt push` provides persistence via `refs/dolt/data` on the git remote.
+Auto-backup generates JSONL snapshots every 15 minutes and auto-commits them to git, creating noise commits.
 
-```bash
-bd config set backup.enabled true
-```
-
-Backup is also available via `bd backup` for on-demand snapshots.
+Manual one-off exports remain available via `bd backup`.
+`bd backup restore` can reconstruct a beads database from JSONL files when needed.
 
 ## Rationale
 
