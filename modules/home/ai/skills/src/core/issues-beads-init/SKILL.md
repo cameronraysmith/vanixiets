@@ -30,6 +30,7 @@ bd init --stealth -p <prefix> -q
 
 Stealth mode configures beads to be completely invisible to git:
 - Adds `.beads/` to `.git/info/exclude` (local gitignore, not committed)
+- Sets `no-git-ops: true` in `.beads/config.yaml`, suppressing git operations in agent session protocols
 - Sets up Claude Code integration automatically
 - Perfect for personal issue tracking without team coordination
 
@@ -51,12 +52,31 @@ echo "README.md" >> .beads/.gitignore
 
 ## Dolt persistence
 
-After initializing beads and creating the initial issue structure, mutations auto-commit to the dolt database.
+After initializing beads, mutations auto-commit to the dolt database.
+Port configuration is handled by the `BEADS_DOLT_SERVER_PORT` environment variable, set declaratively by home-manager `dolt-config.nix`.
+Do not hardcode a port in `.beads/metadata.json` as this suppresses auto-start for fork contributors who lack the matching dolt server.
+
+Add a dolt remote for replication (dual-surface: SQL + CLI):
+
+```bash
+bd dolt remote add origin <url>
+```
+
 Push to the dolt remote for backup:
 
 ```bash
 bd dolt push
 ```
+
+## Backup configuration
+
+Enable JSONL backup for offline or non-dolt recovery:
+
+```bash
+bd config set backup.enabled true
+```
+
+Backup is also available via `bd backup` for on-demand snapshots.
 
 ## Rationale
 
