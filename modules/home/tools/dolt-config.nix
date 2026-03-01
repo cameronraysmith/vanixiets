@@ -51,7 +51,10 @@
       };
 
       config = {
-        home.file.".dolt/config_global.json".text = doltConfig;
+        home.file.".dolt/config_global.json" = {
+          text = doltConfig;
+          force = true;
+        };
         home.sessionVariables.BEADS_DOLT_SERVER_PORT = doltPort;
       };
     };
