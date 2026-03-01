@@ -199,7 +199,61 @@ When a component filter is provided, content quality checks are restricted to se
 Artifact presence checks still apply to the top-level required directories.
 If component-scoped evaluation is not feasible (e.g., monolithic documents without per-component sections), treat the gate as evaluating readiness for the full planning pass and rely on incremental seeding to determine which epics to create from validated input.
 
-### Step 2: assess current operational buffer
+### Step 2: docs-to-issues alignment verification
+
+Before decomposing scope into new issues, verify that existing documentation and issues are aligned.
+
+#### Existing issues audit
+
+For each open issue, check whether its source spec (the document it was seeded from, if identifiable from description cross-references) has been modified since the issue was created.
+If so, flag the issue for review: it may need updating to match the revised spec.
+
+```bash
+# Check modification dates of specs referenced in open issues
+bd list --status open --json | jq -r '.[].description' | rg -o 'docs/development/[^ )]+' | sort -u
+```
+
+#### Coverage gaps
+
+Identify specs in `docs/development/` that have no corresponding open or closed beads issues.
+This is a planning gap: the spec exists but no work was planned from it.
+Conversely, identify open issues whose descriptions reference docs that no longer exist (orphaned reference).
+
+#### Buffer hygiene
+
+Before creating new working notes, check the count of existing notes in `docs/notes/`.
+If a subdirectory has 8+ files, suggest consolidation before adding more.
+This prevents docs proliferation.
+
+```bash
+# Count files per notes subdirectory
+fd -e md . docs/notes/ -x echo {//} | sort | uniq -c | sort -rn
+```
+
+#### Issue placement rules
+
+When creating issues, determine whether each issue belongs in the planning repo or the project repo based on the nature of the deliverable, not which files are edited.
+
+Planning repo issues: methodology decisions, cross-project coordination, shared conventions, strategic scope changes, ecosystem-level architecture decisions, orchestration-level sequencing.
+
+Project repo issues: implementation deliverables, project-specific architecture, project-scoped bugs and features, per-project CI/CD configuration, convention implementation into tooling.
+
+When uncertain, prefer the project repo.
+Planning issues should be the minority: they define *what* the convention is, while project repos define *how* it is realized.
+
+#### Paired epic pattern
+
+When work spans both planning and project scope, evaluate whether paired epics are warranted.
+Create paired epics (one in each repo) when all three conditions hold:
+
+1. The work requires both a specification (what to build) and an implementation (building it).
+2. The specification applies beyond the implementing project.
+3. The implementation is substantial enough to warrant its own epic rather than a single issue.
+
+Cross-reference paired epics in their descriptions using the format `see {prefix}-{id} in {repo}`.
+When only conditions 1 and 2 hold but the implementation is small, create a single planning epic with a child issue that references the project repo.
+
+### Step 3: assess current operational buffer
 
 Count ready, unblocked issues in the current scope.
 
@@ -239,7 +293,7 @@ When planning is consistent (low CV_p), a smaller buffer suffices.
 In practice, estimate k from `bd activity` (recent closures per session), estimate p from the number of issues created in recent planning sessions, and estimate CV_p conservatively at 0.5 if insufficient data exists.
 As the project accumulates history, refine these estimates.
 
-### Step 3: decompose scope into atomic issues
+### Step 4: decompose scope into atomic issues
 
 Each issue must have:
 - A description sufficient for a worker to self-direct without additional context beyond what the issue and its dependency closure context provide.
@@ -255,7 +309,7 @@ Cynefin modulates decomposition granularity:
 - *Complex* domain: iterative decomposition producing probe-based experiments as issues.
 - *Chaotic* domain: minimal decomposition; stabilize first, plan later.
 
-### Step 4: wire dependencies
+### Step 5: wire dependencies
 
 Use parent-child relationships for containment (epic contains tasks) and blocks relationships for sequencing (task A must complete before task B can begin).
 The dependency graph must be acyclic.
@@ -264,7 +318,7 @@ Delegate dependency wiring to `/issues-beads-seed` during initial creation (via 
 
 Refer to the containment-versus-sequencing discipline documented in `/issues-beads-seed` and the "Dependency type discipline" convention in `/issues-beads-prime` to avoid the common structural error of expressing containment as sequencing.
 
-### Step 5: set signal tables on new issues
+### Step 6: set signal tables on new issues
 
 Each new issue receives a signal table following the schema from `/stigmergic-convention`.
 
@@ -282,9 +336,9 @@ Each new issue receives a signal table following the schema from `/stigmergic-co
 ```
 
 Write signal tables using the read-modify-write protocol from `/stigmergic-convention`.
-The cynefin and planning-depth values come from the readiness gate's signal derivation (step 1) or from explicit per-issue classification during decomposition (step 3).
+The cynefin and planning-depth values come from the readiness gate's signal derivation (step 1) or from explicit per-issue classification during decomposition (step 4).
 
-### Step 6: verify graph health
+### Step 7: verify graph health
 
 After all issues are created and wired, verify structural integrity.
 
@@ -314,7 +368,7 @@ If cycles are detected, resolve them before proceeding.
 If lint warnings appear, address structural issues.
 These checks are performed inline rather than delegating to `/issues-beads-audit` because they are a single step within the planning protocol rather than a standalone maintenance activity.
 
-### Step 7: produce dependency-ordered execution plan
+### Step 8: produce dependency-ordered execution plan
 
 List issues in an order that respects dependency constraints.
 Highlight the critical path: the longest chain of sequential dependencies determining minimum total completion time.

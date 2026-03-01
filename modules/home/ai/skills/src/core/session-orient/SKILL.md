@@ -58,9 +58,62 @@ Locate documentation by scanning the repository's `docs/` directory structure an
 Architecture decisions (ADRs), specification documents, and context notes provide the domain background needed to calibrate the briefing.
 
 When documentation references exist but the files are absent or outdated, note this as a gap in the synthesis output.
-Missing documentation in a complex-domain issue increases the case for exploration phase directives in step 5.
+Missing documentation in a complex-domain issue increases the case for exploration phase directives in step 6.
 
-### Step 3: parse signal tables on candidate issues
+### Step 3: documentation health check
+
+Before producing the synthesis, scan the repository's documentation tree for staleness, orphans, and supersession issues that affect the quality of the briefing.
+
+#### Staleness scan
+
+Check `docs/notes/` for files not modified in 45+ days that are referenced by open beads issues.
+These are potentially stale notes informing active work.
+For `docs/development/` specifications, use a 90-day threshold.
+
+```bash
+# Find notes older than 45 days
+fd -e md --changed-before 45d . docs/notes/ 2>/dev/null
+# Find specs older than 90 days
+fd -e md --changed-before 90d . docs/development/ 2>/dev/null
+```
+
+Cross-reference flagged files against open issue descriptions and notes to determine whether active work depends on stale documentation.
+
+#### Orphan detection
+
+Identify docs not referenced by CLAUDE.md, any beads issue description, or any other doc in the tree.
+These are candidates for review: they may be valuable but disconnected, or they may be forgotten drafts.
+
+#### Supersession cleanup
+
+Check for files with `superseded-by` frontmatter older than 30 days.
+These should have been deleted or archived; flag for cleanup.
+
+```bash
+rg -l 'superseded-by:' docs/ 2>/dev/null
+```
+
+#### Project re-entry detection
+
+If the most recent checkpoint in the beads graph is older than 45 days, this is a project re-entry scenario.
+Expand the documentation health check to a full sweep and include a triage summary with recommended actions (update, refactor, merge, delete) for each flagged doc.
+
+#### CLAUDE.md currency check
+
+Compare the project's CLAUDE.md "Current priorities" and "Current orientation" sections against the beads graph state.
+If the stated priorities reference closed issues or the orientation describes completed work, flag for update.
+
+#### Planning repo context integrity
+
+In planning repos with `contexts/*.md`, verify symlink integrity: do targets exist?
+Flag context files whose source repos have had significant changes since the context was last updated.
+
+```bash
+# Check for broken symlinks in contexts/
+fd -t l --broken . contexts/ 2>/dev/null
+```
+
+### Step 4: parse signal tables on candidate issues
 
 For each candidate issue, extract the signal table from the issue's notes field using the delimiter-based parsing protocol from `/stigmergic-convention`.
 
@@ -80,14 +133,14 @@ Read the following values:
 
 If *schema-version* is absent, treat the table as version 1.
 If *schema-version* is present and not `1`, warn the worker that the signal table uses an unrecognized schema version and that field semantics may have changed.
-Continue parsing best-effort but surface the warning prominently in the step 6 synthesis.
+Continue parsing best-effort but surface the warning prominently in the step 7 synthesis.
 
 When no signal table exists, apply defaults: cynefin=complicated, surprise=0.0, progress=not-started, escalation=none, planning-depth=standard.
 
 If escalation is `resolved`, extract the resolution from the `<!-- escalation-context -->` section and surface it prominently.
 If escalation is `pending`, inform the worker that an unresolved question exists and assess whether it blocks the candidate.
 
-### Step 4: calibrate briefing depth per planning-depth signal
+### Step 5: calibrate briefing depth per planning-depth signal
 
 Assemble the briefing based on the planning-depth value.
 Planning-depth is derived from the Cynefin classification by default but can be manually overridden.
@@ -107,7 +160,7 @@ At *probe* depth (chaotic domain): emit a minimal commitment directive focusing 
 The worker acts first to stabilize, senses what happened, then checkpoints with observations.
 Long-term planning is explicitly deferred.
 
-### Step 5: produce exploration phase directives for complex and chaotic domains
+### Step 6: produce exploration phase directives for complex and chaotic domains
 
 When planning-depth is *deep* or *probe*, orient shifts from "read the landscape" to "explore the problem space."
 This is discovery mode, activated within orient rather than as a separate command.
@@ -134,9 +187,9 @@ For *probe* depth specifically, frame the exploration as hypothesis testing.
 Define the hypothesis, the smallest intervention that could confirm or refute it, and the feedback mechanism for observing results.
 The worker is expected to act-sense-respond rather than sense-analyze-respond.
 
-### Step 6: present synthesis with prioritization and work plan
+### Step 7: present synthesis with prioritization and work plan
 
-Combine the diagnostics from step 1, documentation context from step 2, signal table state from step 3, and calibrated briefing from steps 4-5 into a single coherent output.
+Combine the diagnostics from step 1, documentation context from step 2, documentation health from step 3, signal table state from step 4, and calibrated briefing from steps 5-6 into a single coherent output.
 
 The synthesis includes:
 
@@ -144,7 +197,7 @@ The synthesis includes:
 
 *Candidate assessment*: for each candidate issue, the Cynefin classification, planning-depth, surprise score, escalation state, and documentation coverage.
 
-*Calibrated briefing*: the depth-appropriate briefing assembled in step 4, with exploration directives from step 5 when applicable.
+*Calibrated briefing*: the depth-appropriate briefing assembled in step 5, with exploration directives from step 6 when applicable.
 
 *Work plan with phase recommendation*:
 - Recommend `/session-plan` if the operational buffer is depleted (few ready issues relative to work capacity) or if decomposition is needed before implementation can begin.

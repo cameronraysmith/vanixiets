@@ -185,6 +185,48 @@ Promotion is an advisory flag, not a gate.
 Promotion happens in a subsequent session if the worker confirms readiness.
 Include flagged candidates in the handoff narrative (step 8).
 
+#### Structural transformation guidance
+
+When a working note is flagged for promotion (it has reached tactical resolution), guide the transformation:
+
+1. Identify target AMDiRE categories (context, architecture, requirements, traceability) by matching content sections to consumer needs.
+2. Extract relevant content from the working note and revoice from exploratory to committed tone.
+3. Verify minimum expectations per AMDiRE category: context requires domain understanding and scope boundaries, architecture requires component decomposition and interface definitions, requirements requires acceptance criteria and verification commands.
+4. Write specification files in `docs/development/{category}/`.
+5. Mark the source working note with `superseded-by:` frontmatter pointing to the new specs, or delete if all content was extracted.
+
+#### Demotion procedure
+
+When surprise exceeds 0.5 and reveals fundamental spec inaccuracy that drops understanding back to strategic resolution:
+
+1. Create a working note in `docs/notes/` capturing the revised understanding and what probes are needed.
+2. Mark the spec with `superseded-by:` frontmatter pointing to the working note.
+3. The superseded spec remains as historical record until a replacement is promoted.
+4. Flag affected beads issues for replanning in the next `/session-plan`.
+
+#### Sunset flagging
+
+For docs in `docs/notes/` that were not referenced or validated during this session, check last modification date.
+If older than 45 days, add to the checkpoint's "documentation maintenance" section with recommended action (validate, refactor, or delete).
+If the doc has `superseded-by` frontmatter older than 30 days, recommend deletion.
+
+#### Closure-reason signaling for cross-repo issues
+
+When closing an issue whose results affect an external repo issue, include the cross-reference in the closure reason.
+Format: "Implemented; results consumed by {prefix}-{id} in {repo}."
+This ensures the next `/session-orient` in the external repo detects the upstream completion via the closure-reason signaling mechanism.
+
+#### Cross-doc consistency check
+
+For docs touched during the session, verify consistency with docs they reference or are referenced by.
+If a doc was updated and it references other docs, check that the referenced docs' assumptions still hold.
+Flag inconsistencies in the checkpoint context for the next session.
+
+#### Last-validated frontmatter
+
+For docs that were reviewed and confirmed accurate during this session (even if not modified), update or add `last-validated: YYYY-MM-DD` frontmatter.
+This feeds the staleness scan in the next `/session-orient` step 3.
+
 ### Step 6: propagate discoveries to downstream issues
 
 For each finding that changes assumptions for downstream work, update those issues' descriptions or notes to reflect the new understanding.

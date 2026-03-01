@@ -174,6 +174,33 @@ The handoff to session-plan should include the rework issues created, the accumu
 
 When deciding between rework and escalation, apply the self-verification gate's principle from `/stigmergic-convention`: if the failure can be fixed and retried, create rework issues; if the failure reveals an ambiguity that the DAG does not contain enough information to resolve, escalate with a precise question.
 
+### Step 6: documentation and convention health at convergence
+
+When verification completes at a convergence point, perform additional checks on the specifications and conventions that motivated the converging work.
+
+#### Spec accuracy at convergence
+
+Check whether the specs that motivated the converging work are still accurate.
+Compare the acceptance criteria in the converging issues against what was actually implemented.
+If implementation diverged from spec, flag the spec for revision.
+
+#### Cross-doc consistency
+
+For docs referenced by the converging issues, check that they are mutually consistent.
+If issue A's work changed an assumption that issue B's spec relies on, flag the inconsistency.
+
+#### Review gate (periodic)
+
+Every 3rd convergence point reviewed in the project (or on explicit user request), run a lightweight meta-evaluation:
+
+- *Advisory coupling*: Is it decreasing? Are workers needing less human intervention to find the right next action from DAG context alone?
+- *Signal table calibration*: Are Cynefin classifications matching observed work complexity? Are planning-depth values producing appropriately scoped briefings?
+- *Checkpoint state transfer*: Can new sessions reconstruct context from the graph alone, without supplemental briefing?
+- *Surprise calibration*: Are surprise values in signal tables reflecting actual deviation from expectations, or reflexively set to 0.0?
+
+Distinguish between "advisory input needed because the DAG could have answered" (convention gap: fix the convention) and "advisory input needed for genuinely complex-domain reasons" (validates the escalation protocol).
+Record observations via `bd update <epic-id> --append-notes "Review gate [N]: ..."` for the relevant epic.
+
 ## Typical next steps
 
 After review completes, the worker proceeds to one of:
