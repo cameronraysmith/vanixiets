@@ -5,6 +5,12 @@ sync:
     # forward compatibility with the planned bootstrap-from-git-remote flow.
     git-remote: https://github.com/cameronraysmith/vanixiets.git
 
+backup:
+    # Auto-backup exports JSONL snapshots to .beads/backup/ and auto-commits
+    # them to git when a git remote exists. Disabled because bd dolt push
+    # already backs up full history via refs/dolt/data on the git remote.
+    enabled: false
+
 dolt:
     # Issue mutations (create/update/close) always auto-commit to dolt
     # unconditionally via inline DOLT_COMMIT in the storage layer,
