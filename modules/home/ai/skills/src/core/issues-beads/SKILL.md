@@ -194,8 +194,10 @@ Fork contributors without the environment variable get automatic port derivation
 
 ### Backup
 
-`bd backup` exports all tables to `.beads/backup/` as JSONL files.
-Enable auto-backup with `bd config set backup.enabled true`, which runs on a 15-minute interval.
+Auto-backup is disabled (`backup.enabled: false` in config.yaml) because `bd dolt push` to the git remote (`refs/dolt/data`) provides persistence with full dolt commit history.
+Auto-backup creates JSONL snapshots in `.beads/backup/` every 15 minutes and auto-commits them to git, generating noise commits.
+
+`bd backup` remains available for manual one-off portable exports.
 `bd backup restore` can bootstrap a beads database from JSONL files when the dolt backend is unavailable or needs reconstruction.
 
 ### Connection circuit breaker
