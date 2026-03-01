@@ -21,15 +21,15 @@
   # };
 
   # pin to commit on main
-  version = "0.56.1-unstable-2026-02-26";
+  version = "0.57.0-unstable-2026-03-01";
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "beads";
-    rev = "a138db43552bd9dd8f2db7e2dc9ff6bfc4bc5cc6";
-    hash = "sha256-4TsWCNnfTx6VvJsrk/1rNVCc712D97Kqoob22xm55lk=";
+    rev = "34c0c8be62fd7c40ab0b37d773fbc8cb7b60c268";
+    hash = "sha256-oBRw/ytS9mzWDtrGFpg5quefZrCBIpe0Hv2wAdUkFzQ=";
   };
 
-  vendorHash = "sha256-nhhntZqWUEDExvXyhlC/640uCU0yUN7J7+P02CuI8YI=";
+  vendorHash = "sha256-uf6ET13OImaGk22I9MJ/wJvX8F0bXaEkf726De/80PY=";
 
   buildInputs = [ icu ];
 
