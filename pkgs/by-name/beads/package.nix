@@ -45,7 +45,7 @@ in
     "-s"
     "-w"
     "-X main.Version=${version}"
-    "-X main.Build=nix"
+    "-X main.Build=${builtins.substring 0 7 rev}"
     "-X main.Commit=${rev}"
   ];
 
