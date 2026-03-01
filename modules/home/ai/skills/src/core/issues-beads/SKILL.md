@@ -802,7 +802,7 @@ When architectural assumptions change during implementation, use `/issues:beads-
 | Add dolt remote | `bd dolt remote add <name> <url>` |
 | List dolt remotes | `bd dolt remote list` |
 | Remove dolt remote | `bd dolt remote remove <name>` |
-| Backup (JSONL) | `bd backup` |
+| Manual backup (JSONL) | `bd backup` |
 | Restore from backup | `bd backup restore [path]` |
 | Export (JSONL) | `bd export` |
 | Agent diagnostics | `bd doctor --agent` |
