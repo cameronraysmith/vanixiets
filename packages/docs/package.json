@@ -49,7 +49,7 @@
     "@semantic-release/github": "^12.0.6",
     "@types/node": "^25.3.3",
     "@vitest/coverage-v8": "^4.0.18",
-    "conventional-changelog-conventionalcommits": "^9.1.0",
+    "conventional-changelog-conventionalcommits": "^9.2.0",
     "playwright": "1.58.2",
     "semantic-release": "^25.0.3",
     "semantic-release-major-tag": "^0.3.2",
