@@ -16,7 +16,6 @@
         poppler-utils
         qpdf
         quarto
-        repomix
         resvg
         shot-scraper
         svg2pdf
