@@ -24,11 +24,14 @@
         socket_path = "";
         database_path = "${home}/projects/${relPath}/.beads";
         pid = 0;
-        version = "0.56.1";
+        version = "0.57.0";
         started_at = "2026-02-25T00:00:00Z";
       };
     in
     {
-      home.file.".beads/registry.json".text = builtins.toJSON (map mkRegistryEntry workspacePaths);
+      home.file.".beads/registry.json" = {
+        text = builtins.toJSON (map mkRegistryEntry workspacePaths);
+        force = true;
+      };
     };
 }
