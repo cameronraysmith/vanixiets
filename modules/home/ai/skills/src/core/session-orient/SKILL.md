@@ -70,12 +70,21 @@ Check `docs/notes/` for files not modified in 45+ days that are referenced by op
 These are potentially stale notes informing active work.
 For `docs/development/` specifications, use a 90-day threshold.
 
+When a document has `last-validated:` frontmatter, use that date for staleness comparison rather than file modification time.
+This distinguishes content validation from incidental edits (typo fixes, formatting).
+Fall back to file modification date when no `last-validated:` field exists.
+
 ```bash
-# Find notes older than 45 days
+# Find notes older than 45 days by mtime (fallback for files without last-validated frontmatter)
 fd -e md --changed-before 45d . docs/notes/ 2>/dev/null
-# Find specs older than 90 days
+# Find specs older than 90 days by mtime
 fd -e md --changed-before 90d . docs/development/ 2>/dev/null
+# Check flagged files for last-validated frontmatter override
+rg -l 'last-validated:' docs/notes/ docs/development/ 2>/dev/null
 ```
+
+For files with `last-validated:` frontmatter, compare that date against the staleness threshold instead of the mtime result.
+A file modified yesterday for formatting but last validated 60 days ago is stale; a file unmodified for 50 days but validated 30 days ago is not.
 
 Cross-reference flagged files against open issue descriptions and notes to determine whether active work depends on stale documentation.
 
