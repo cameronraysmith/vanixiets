@@ -12,12 +12,14 @@ The `bd` CLI provides comprehensive issue, epic, and dependency management from 
 Data lives in `.beads/` at the repository root, making it portable and version-controllable.
 
 Session workflow (default entry points):
+
 - `/session-orient` — session start: orientation with AMDiRE documentation reading, cross-project context, and beads diagnostics
 - `/session-plan` — structured planning after orientation
 - `/session-review` — session review and retrospective
 - `/session-checkpoint` — session wind-down: checkpoint with learnings capture and handoff preparation
 
 Beads-layer commands (for repos without the full workflow):
+
 - `/issues:beads-seed` (`~/.claude/skills/issues-beads-seed/SKILL.md`) — convert architecture docs into beads issues
 - `/issues:beads-orient` (`~/.claude/skills/issues-beads-orient/SKILL.md`) — session start: run diagnostics, synthesize state, select work
 - `/issues:beads-evolve` (`~/.claude/skills/issues-beads-evolve/SKILL.md`) — adaptive refinement: refactor graph structure and feed back to architecture
@@ -89,6 +91,7 @@ Issues are the fundamental unit of work, identified by short alphanumeric IDs li
 Each issue has a type (task, bug, feature, epic, milestone), priority (0-4, 0=highest, default=2), status (open, closed, in_progress), and optional labels.
 
 Status lifecycle:
+
 - **open**: Work not yet started or resumed after being blocked
 - **in_progress**: Actively being worked on (the bd tool does not enforce this, but the team convention requires marking issues in_progress before beginning implementation)
 - **closed**: Completed, abandoned, or merged as duplicate
@@ -165,11 +168,41 @@ bd dolt push
 - **Eager**: `bd dolt push` after each logical batch (creating an epic with children, wiring dependencies)
 - **Session boundary**: At minimum, push before ending work via `/session-checkpoint`
 
+### Additional dolt operations
+
+```bash
+bd dolt remote add <name> <url>   # Add remote (dual-surface: SQL + CLI)
+bd dolt remote list               # Show remotes with surface status
+bd dolt remote remove <name>      # Remove remote from both surfaces
+bd backup                         # Export JSONL backup to .beads/backup/
+bd backup restore [path]          # Restore from JSONL backup
+bd doctor --agent                 # AI-agent-friendly diagnostics
+bd export                         # Standalone JSONL export
+```
+
 ### Hooks behavior
 
 The `beads-init` command initializes beads without installing git hooks.
 With the dolt backend, hooks are not needed for data persistence since mutations auto-commit to the dolt database.
 The `prepare-commit-msg` hook is the only hook that performs useful work (adding agent identity trailers to git commits).
+
+### Port configuration
+
+The `BEADS_DOLT_SERVER_PORT` environment variable directs beads to the nix-managed shared dolt server (set by home-manager `dolt-config.nix`).
+Do not set `dolt_server_port` in `.beads/metadata.json` as this suppresses auto-start, breaking fork contributors who use standalone embedded servers.
+Fork contributors without the environment variable get automatic port derivation (hash of beadsDir) and auto-start.
+
+### Backup
+
+`bd backup` exports all tables to `.beads/backup/` as JSONL files.
+Enable auto-backup with `bd config set backup.enabled true`, which runs on a 15-minute interval.
+`bd backup restore` can bootstrap a beads database from JSONL files when the dolt backend is unavailable or needs reconstruction.
+
+### Connection circuit breaker
+
+After 5 consecutive connection failures, beads fast-fails for 30 seconds instead of blocking on unreachable servers.
+The circuit breaker state file is stored at `/tmp/beads-dolt-circuit-<port>.json`.
+The circuit self-heals when the server recovers via a half-open probe after the 30-second cooldown.
 
 ### Bootstrap: existing repo on a new host
 
@@ -193,6 +226,9 @@ Verify with `bd status` and optionally `bd dolt pull` (which should report no ch
 Prerequisites: a running dolt sql-server on `127.0.0.1:3307` and the `beads` dolt CLI profile.
 On nix-managed hosts, both are provided declaratively by vanixiets (dolt-sql-server module and home-manager dolt-config activation).
 
+If `sync.git-remote` is configured in `.beads/config.yaml`, `bd init` will automatically clone the dolt database from that remote, eliminating the manual `DOLT_CLONE` step above.
+Repos that have this config set allow new-host bootstrap with just `bd init`.
+
 ### Bootstrap: new repo with dolt backend
 
 When setting up beads in a repo for the first time with dolt-native sync, the goal is to seed `refs/dolt/data` on the git remote so other clones can use `DOLT_CLONE`.
@@ -206,8 +242,7 @@ mkdir -p .beads/dolt/
 
 # 3. Derive the dolt remote URL from git origin and add it
 remote_url="git+$(git remote get-url origin)"
-dolt --profile beads -p '' sql -q \
-  "USE \`<prefix>\`; CALL DOLT_REMOTE('add', 'origin', '${remote_url}')"
+bd dolt remote add origin "${remote_url}"
 
 # 4. Push to seed refs/dolt/data on the git remote
 bd dolt push
@@ -762,6 +797,13 @@ When architectural assumptions change during implementation, use `/issues:beads-
 | Push to remote | `bd dolt push` |
 | Pull from remote | `bd dolt pull` |
 | Checkpoint | `bd dolt commit -m "..."` |
+| Add dolt remote | `bd dolt remote add <name> <url>` |
+| List dolt remotes | `bd dolt remote list` |
+| Remove dolt remote | `bd dolt remote remove <name>` |
+| Backup (JSONL) | `bd backup` |
+| Restore from backup | `bd backup restore [path]` |
+| Export (JSONL) | `bd export` |
+| Agent diagnostics | `bd doctor --agent` |
 | Issue history | `bd history <id>` |
 | **Labels** | |
 | Manage labels | `bd label` |
