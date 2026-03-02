@@ -8,8 +8,8 @@
 }:
 
 let
-  version = "0.57.0-unstable-2026-03-01";
-  rev = "34c0c8be62fd7c40ab0b37d773fbc8cb7b60c268";
+  version = "0.57.0-unstable-2026-03-03";
+  rev = "9e093c188a4f6a27e18447074a07af95209de917";
 in
 (buildGoModule.override { go = go_1_26; }) {
   pname = "beads";
@@ -30,10 +30,10 @@ in
     owner = "steveyegge";
     repo = "beads";
     inherit rev;
-    hash = "sha256-oBRw/ytS9mzWDtrGFpg5quefZrCBIpe0Hv2wAdUkFzQ=";
+    hash = "sha256-LeRQu7NMdJNGnDY3alKJ0q4c/dha1KGSeQjBOiCMI0g=";
   };
 
-  vendorHash = "sha256-uf6ET13OImaGk22I9MJ/wJvX8F0bXaEkf726De/80PY=";
+  vendorHash = "sha256-OL6QGf4xSMpEbmU+41pFdO0Rrs3H162T3pdiW9UfWR0=";
 
   buildInputs = [ icu ];
 
