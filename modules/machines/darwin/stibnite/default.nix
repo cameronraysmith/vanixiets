@@ -33,6 +33,7 @@ in
         base
         ssh-ca-trust
         ssh-known-hosts
+        beads-ui
         colima
         dnscrypt-proxy
         zt-dns
@@ -230,6 +231,9 @@ in
 
       # Dolt SQL server for beads issue tracking
       services.dolt-sql-server.enable = true;
+
+      # Beads UI web interface (localhost-only)
+      services.beads-ui.enable = true;
 
       services.zt-services-trust.enable = true;
 
