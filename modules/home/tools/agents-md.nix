@@ -56,6 +56,7 @@
           - session review (progress assessment, gap analysis): ${skillsPath}/session-review/SKILL.md
           - session checkpointing (state capture, resumption): ${skillsPath}/session-checkpoint/SKILL.md
           - architectural patterns: ${skillsPath}/preferences-architectural-patterns/SKILL.md
+          - architecture diagramming (C4, format selection, diagram compendium): ${skillsPath}/preferences-architecture-diagramming/SKILL.md
           - functional domain modeling (DDD, types, aggregates): ${skillsPath}/preferences-domain-modeling/SKILL.md
           - event sourcing (event replay, state reconstruction, CQRS): ${skillsPath}/preferences-event-sourcing/SKILL.md
           - event catalog tooling (EventCatalog, schema documentation): ${skillsPath}/preferences-event-catalog-tooling/SKILL.md
