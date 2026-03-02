@@ -204,6 +204,13 @@ When surprise exceeds 0.5 and reveals fundamental spec inaccuracy that drops und
 3. The superseded spec remains as historical record until a replacement is promoted.
 4. Flag affected beads issues for replanning in the next `/session-plan`.
 
+#### Diagram staleness
+
+Check whether the session's implementation changes affect areas depicted by existing diagrams.
+When code or configuration changes fall within the scope of an existing diagram (deployment topology, component structure, bounded context boundaries), flag that diagram for update.
+Reference diagram categories from `preferences-architecture-diagramming/04-diagram-compendium.md` when identifying which C4 level is affected.
+Include flagged diagrams in the handoff narrative's documentation impact section so the next session can prioritize updates.
+
 #### Sunset flagging
 
 For docs in `docs/notes/` that were not referenced or validated during this session, check last modification date.
@@ -348,6 +355,7 @@ Documentation impact:
 - [revise] <docs/development/path>: <what is inaccurate and which issues revealed it>
 - [demote] <docs/development/path>: <what was invalidated, new working note location>
 - [promote?] <docs/notes/path>: <what reached tactical resolution>
+- [diagram-stale] <diagram-path>: <what changed in its depicted scope>
 
 Replanning: {needed | not needed}
 - {reason if needed}
