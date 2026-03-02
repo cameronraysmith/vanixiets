@@ -112,6 +112,24 @@ Expand the documentation health check to a full sweep and include a triage summa
 Compare the project's CLAUDE.md "Current priorities" and "Current orientation" sections against the beads graph state.
 If the stated priorities reference closed issues or the orientation describes completed work, flag for update.
 
+#### Diagram source staleness
+
+Compare modification times of diagram source files (`.d2`, `.tex`, `.mmd`) against code areas they depict.
+When a diagram's depicted scope has significant code churn since the diagram was last updated, flag it as potentially stale.
+The `preferences-architecture-diagramming` skill defines the diagram categories and their C4 level anchoring; the staleness check here determines whether existing diagrams still reflect reality.
+
+```bash
+# Find diagram source files and their modification times
+fd -e d2 -e tex -e mmd . docs/ 2>/dev/null
+```
+
+Cross-reference flagged diagrams against the compendium categories in `preferences-architecture-diagramming/04-diagram-compendium.md` to assess coverage gaps.
+Report missing C4 levels alongside stale diagrams so the worker can prioritize updates and new diagram creation together.
+
+Staleness thresholds vary by Cynefin domain, consistent with the adaptive planning calibration in `preferences-adaptive-planning`.
+Clear-domain diagrams tolerate longer intervals between updates because the depicted structure changes infrequently.
+Complex-domain diagrams require shorter review cycles because the system they depict is evolving through probes and emergent design.
+
 #### Planning repo context integrity
 
 In planning repos with `contexts/*.md`, verify symlink integrity: do targets exist?
