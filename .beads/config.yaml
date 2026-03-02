@@ -20,3 +20,4 @@ dolt:
     # state that blocks merges. Server mode defaults to off; on is
     # preferred when using dolt remotes for multi-clone sync.
     auto-commit: "on"
+    auto-push: false
