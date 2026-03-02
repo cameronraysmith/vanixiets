@@ -175,6 +175,12 @@ Use `- **Term**: description` bullet format for 2+ definitions.
   up to four digits (e.g. GitHub issue #12 becomes `0012-description.md` in
   `work-items`).
 
+### Architecture decision records
+
+ADRs live in `docs/development/architecture/adrs/` following the AMDiRE structure above.
+Authoring conventions covering section structure, status lifecycle, commanding voice, business justification requirements, and antipatterns are in `references/adr-conventions.md`.
+Load that companion file when writing, reviewing, or evaluating ADRs.
+
 ## Code
 
 - In code, prefer docstrings relevant to a given programming language over code comments
