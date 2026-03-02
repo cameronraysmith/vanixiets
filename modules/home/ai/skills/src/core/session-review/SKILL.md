@@ -189,6 +189,13 @@ If implementation diverged from spec, flag the spec for revision.
 For docs referenced by the converging issues, check that they are mutually consistent.
 If issue A's work changed an assumption that issue B's spec relies on, flag the inconsistency.
 
+#### Diagram coverage at convergence
+
+Check whether the converging work introduced or modified architectural boundaries that the existing diagram set does not cover.
+Compare the C4 levels touched by the converging issues against the diagram categories in `preferences-architecture-diagramming/04-diagram-compendium.md`.
+When a convergence point assembles a new subsystem boundary or changes deployment topology and no corresponding diagram exists, flag the gap.
+When existing diagrams depict structures that the converging implementation changed, flag those diagrams as stale.
+
 #### Review gate (periodic)
 
 Every 3rd convergence point reviewed in the project (or on explicit user request), run a lightweight meta-evaluation:
