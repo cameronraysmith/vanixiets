@@ -27,7 +27,7 @@ in
   # pin to commit on main
   inherit version;
   src = fetchFromGitHub {
-    owner = "cameronraysmith";
+    owner = "steveyegge";
     repo = "beads";
     inherit rev;
     hash = "sha256-6dXFMLuTtjiCfGLWwD8+uyCFLu6BWNHcH6fLYOYsD1c=";
