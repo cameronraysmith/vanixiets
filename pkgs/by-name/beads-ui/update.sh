@@ -1,5 +1,5 @@
 #!/usr/bin/env nix-shell
-#!nix-shell -i bash -p curl jq cacert git nodejs_22 nix-prefetch-scripts
+#!nix-shell -i bash -p curl jq cacert git nodejs_22 nix-prefetch-github
 # shellcheck shell=bash
 
 set -euo pipefail
@@ -22,12 +22,10 @@ fi
 
 echo "Updating beads-ui: ${current_version} -> ${latest_version}"
 
-# Compute new source hash
+# Compute new source hash using nix-prefetch-github to match fetchFromGitHub semantics
 echo "Computing source hash..."
-new_hash="$(nix-prefetch-url --unpack \
-  "https://github.com/mantoni/beads-ui/archive/refs/tags/v${latest_version}.tar.gz" \
-  2>/dev/null)"
-new_sri="$(nix-hash --to-sri --type sha256 "$new_hash")"
+new_sri="$(nix-prefetch-github mantoni beads-ui --rev "v${latest_version}" --json 2>/dev/null \
+  | jq -r '.hash')"
 
 # Regenerate package-lock.json with complete registry metadata
 workdir="$(mktemp -d)"
@@ -39,19 +37,25 @@ curl -fsSL \
   | tar -xz -C "$workdir" --strip-components=1
 
 echo "Regenerating package-lock.json..."
-(cd "$workdir" && npm install --package-lock-only --ignore-scripts 2>/dev/null)
+# Delete upstream lockfile first so npm resolves all registry metadata from scratch.
+# Upstream lockfile omits resolved/integrity fields for some dev dependencies,
+# and npm install --package-lock-only preserves those gaps when updating in-place.
+(cd "$workdir" && rm -f package-lock.json && npm install --package-lock-only --ignore-scripts 2>/dev/null)
 cp "$workdir/package-lock.json" "${PKG_DIR}/package-lock.json"
 
-# Update version and src hash in package.nix
+# Update version, tag, and src hash in package.nix
 sed -i'' -e "s/version = \"${current_version}\"/version = \"${latest_version}\"/" "$PKG_NIX"
+sed -i'' -e "s/tag = \"v${current_version}\"/tag = \"v${latest_version}\"/" "$PKG_NIX"
 sed -i'' -e "s|hash = \"sha256-[A-Za-z0-9+/=]*\"|hash = \"${new_sri}\"|" "$PKG_NIX"
 
 # Compute new npmDepsHash via dummy-hash-and-build
 DUMMY_HASH="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 sed -i'' -e "s|npmDepsHash = \"sha256-[A-Za-z0-9+/=]*\"|npmDepsHash = \"${DUMMY_HASH}\"|" "$PKG_NIX"
 
+# The src hash must be correct before this step so only the npm-deps derivation fails.
 echo "Computing npmDepsHash (this triggers a build that will fail with the correct hash)..."
 correct_hash="$(nix build ".#beads-ui" 2>&1 \
+  | grep 'npm-deps' -A2 \
   | grep -o 'got:.*sha256-[A-Za-z0-9+/=]*' \
   | head -1 \
   | sed 's/got:[[:space:]]*//')" || true
