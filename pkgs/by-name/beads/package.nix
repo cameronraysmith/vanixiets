@@ -8,8 +8,8 @@
 }:
 
 let
-  version = "0.57.0-unstable-2026-03-03";
-  rev = "c89c42570b1a83b87a6e585c2ad073b68df1901a";
+  version = "0.58.0-unstable-2026-03-03";
+  rev = "76aec3cc55e3357122dd4bc42ae6a50e2b190571";
 in
 (buildGoModule.override { go = go_1_26; }) {
   pname = "beads";
@@ -30,7 +30,7 @@ in
     owner = "steveyegge";
     repo = "beads";
     inherit rev;
-    hash = "sha256-6dXFMLuTtjiCfGLWwD8+uyCFLu6BWNHcH6fLYOYsD1c=";
+    hash = "sha256-PsPsxANtgRAoQwRISwwzZTIe4JrBw5K3aWReU7R+RXk=";
   };
 
   vendorHash = "sha256-OL6QGf4xSMpEbmU+41pFdO0Rrs3H162T3pdiW9UfWR0=";
