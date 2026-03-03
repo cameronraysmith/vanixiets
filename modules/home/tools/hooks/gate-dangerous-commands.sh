@@ -26,14 +26,14 @@ Gated patterns (each returns permissionDecision "ask"):
   Privilege escalation
     sudo *
 
-  Git: push and destructive operations
-    git push
-    git reset --hard *
-    git clean *
-    git checkout [--] .
-    git restore [--staged] .
-    git branch -D *
-    git stash drop/clear
+  Git: push and destructive operations (matches through global options like -C, --no-pager)
+    git [-C path] [--global-opts...] push
+    git [-C path] [--global-opts...] reset --hard *
+    git [-C path] [--global-opts...] clean *
+    git [-C path] [--global-opts...] checkout [--] .
+    git [-C path] [--global-opts...] restore [--staged] .
+    git [-C path] [--global-opts...] branch -D *
+    git [-C path] [--global-opts...] stash drop/clear
 
   GitHub CLI: mutating operations
     gh api * (except actions/runs/*/logs)
@@ -75,6 +75,7 @@ Gated patterns (each returns permissionDecision "ask"):
     shred *
 
 Patterns match commands at start-of-line or after shell operators (&&, ||, ;, |, $()).
+Git patterns match through global options (-C, -c, --git-dir, --work-tree, --no-pager, etc.).
 Commands not matching any pattern fall through to blanket Bash allow.
 HELPEOF
   exit 0
@@ -97,34 +98,44 @@ cmd_match() {
   echo "$COMMAND" | grep -qE "(^|[;&|]\s*|&&\s*|\|\|?\s*|\\\$\(\s*)$1"
 }
 
+# Match git subcommand accounting for global options between 'git' and the subcommand.
+# Without this, patterns like 'git push' are bypassed by 'git -C /path push'.
+# Enumerates git global options explicitly because flags with vs without arguments
+# cannot be distinguished by regex without knowing which is which.
+git_cmd_match() {
+  local flag_arg='-[Cc]\s+\S+|--git-dir(=|\s)\S+|--work-tree(=|\s)\S+|--namespace(=|\s)\S+|--exec-path(=|\s)\S+|--config-env(=|\s)\S+'
+  local flag_no_arg='--no-pager|--bare|--paginate|-p|--no-replace-objects|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--no-optional-locks|--no-lazy-fetch'
+  local git_opts="(\s+(${flag_arg}|${flag_no_arg}))*"
+  echo "$COMMAND" | grep -qE "(^|[;&|]\s*|&&\s*|\|\|?\s*|\\\$\(\s*)git${git_opts}\s+$1"
+}
+
 REASON=""
 
 # --- Privilege escalation ---
 cmd_match 'sudo\s' && REASON="sudo requires approval"
 
 # --- Git: push and destructive operations ---
+# Uses git_cmd_match to handle global options (e.g. -C, --no-pager) between 'git' and subcommand.
 if [ -z "$REASON" ]; then
-  cmd_match 'git push(\s|$)' && REASON="git push requires approval"
+  git_cmd_match 'push(\s|$)' && REASON="git push requires approval"
 fi
 if [ -z "$REASON" ]; then
-  cmd_match 'git reset --hard' && REASON="git reset --hard discards commits/changes"
+  git_cmd_match 'reset\s+--hard' && REASON="git reset --hard discards commits/changes"
 fi
 if [ -z "$REASON" ]; then
-  cmd_match 'git clean\s' && REASON="git clean removes untracked files"
+  git_cmd_match 'clean\s' && REASON="git clean removes untracked files"
 fi
 if [ -z "$REASON" ]; then
-  echo "$COMMAND" | grep -qE '(^|[;&|]\s*|&&\s*|\|\|?\s*|\$\(\s*)git checkout( --)? \.' \
-    && REASON="git checkout . discards unstaged changes"
+  git_cmd_match 'checkout( --)? \.' && REASON="git checkout . discards unstaged changes"
 fi
 if [ -z "$REASON" ]; then
-  echo "$COMMAND" | grep -qE '(^|[;&|]\s*|&&\s*|\|\|?\s*|\$\(\s*)git restore( --staged)? \.' \
-    && REASON="git restore . discards or unstages all changes"
+  git_cmd_match 'restore( --staged)? \.' && REASON="git restore . discards or unstages all changes"
 fi
 if [ -z "$REASON" ]; then
-  cmd_match 'git branch -D\s' && REASON="git branch -D force-deletes a branch"
+  git_cmd_match 'branch\s+-D\s' && REASON="git branch -D force-deletes a branch"
 fi
 if [ -z "$REASON" ]; then
-  cmd_match 'git stash (drop|clear)' && REASON="git stash drop/clear permanently loses stashed work"
+  git_cmd_match 'stash\s+(drop|clear)' && REASON="git stash drop/clear permanently loses stashed work"
 fi
 
 # --- GitHub CLI: mutating operations ---
