@@ -57,7 +57,7 @@
     "sharp": "^0.34.5",
     "starlight-katex": "^0.0.4",
     "starlight-links-validator": "^0.19.2",
-    "svgo": "^4.0.0",
+    "svgo": "^4.0.1",
     "vitest": "^4.0.18",
     "wrangler": "^4.70.0"
   },
