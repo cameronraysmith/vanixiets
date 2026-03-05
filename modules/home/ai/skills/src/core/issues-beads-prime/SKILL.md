@@ -94,6 +94,7 @@ git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main
 
 The subagent creates the worktree as its first action before any implementation work begins.
 The `.worktrees/` directory must be listed in `.gitignore`.
+If the repository uses direnv with a nix devshell, run `direnv allow` in the worktree after creation and use `direnv exec . git commit ...` for commits that trigger pre-commit hooks.
 
 For non-bead or quick-fix work, use a plain branch instead: `git checkout -b {ID}-descriptor`.
 
@@ -109,18 +110,24 @@ Worktree lifecycle (create, work, rebase, merge, clean up):
 # 1. Create worktree and branch
 git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main
 
-# 2. Work in the worktree, making atomic commits
+# 2. Initialize direnv (if repo uses nix devshell)
+cd .worktrees/{ID}-descriptor
+direnv allow
+cd ../..
 
-# 3. When work is complete, rebase onto main
+# 3. Work in the worktree, making atomic commits
+# Use `direnv exec .worktrees/{ID}-descriptor git commit ...` for hook-aware commits
+
+# 4. When work is complete, rebase onto main
 cd .worktrees/{ID}-descriptor
 git rebase main
 
-# 4. Fast-forward merge to main (from repo root)
+# 5. Fast-forward merge to main (from repo root)
 cd ../..
 git checkout main
 git merge --ff-only {ID}-descriptor
 
-# 5. Clean up
+# 6. Clean up
 git worktree remove .worktrees/{ID}-descriptor
 git branch -d {ID}-descriptor
 ```
