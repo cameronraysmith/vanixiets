@@ -89,6 +89,25 @@
           - scientific data visualization (figures, tables, diagrams, colormaps): ${skillsPath}/scientific-visualization/SKILL.md
           - text-to-visual iteration (compile-inspect-refine loop, SVG/PNG/PDF pipelines): ${skillsPath}/text-to-visual-iteration/SKILL.md
 
+          # Temporal provenance awareness
+
+          When reading information from multiple files during any task, be alert to potential
+          contradictions between sources. When conflicting or potentially outdated information
+          is detected:
+
+          1. Compare file provenance using git history (not filesystem mtime, which is unreliable
+             after checkout or rebase):
+             - Last commit touching the file: `git log --follow -1 --format='%ai' -- <file>`
+             - Last edit to specific lines: `git blame -L <start>,<end> <file>`
+          2. Assume more recently edited content is more likely to be current. There is no rigid
+             document type hierarchy — a recently edited working note can supersede an older
+             formal spec, and vice versa.
+          3. Flag detected contradictions to the user with provenance evidence (file paths, dates,
+             relevant line ranges) rather than silently choosing one interpretation.
+
+          This applies to all document types: skills, CLAUDE.md sections, docs/development/ specs,
+          docs/notes/ working notes, and inline code comments.
+
           Always remember to fallback to using practical features and architectural
           patterns that emphasize algebraic data types, type-safety, and functional
           programming as is feasible within a given programming language or
