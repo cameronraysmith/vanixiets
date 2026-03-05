@@ -66,19 +66,21 @@ Before producing the synthesis, scan the repository's documentation tree for sta
 
 #### Staleness scan
 
-Check `docs/notes/` for files not modified in 45+ days that are referenced by open beads issues.
+Check `docs/notes/` for files whose last meaningful git commit is 45+ days old that are referenced by open beads issues.
 These are potentially stale notes informing active work.
 For `docs/development/` specifications, use a 90-day threshold.
 
 When a document has `last-validated:` frontmatter, use that date for staleness comparison rather than file modification time.
 This distinguishes content validation from incidental edits (typo fixes, formatting).
-Fall back to file modification date when no `last-validated:` field exists.
+Fall back to the file's last git commit date when no `last-validated:` field exists.
+Do not use filesystem modification time (mtime), which is unreliable after `git checkout`, `git rebase`, and similar operations.
 
 ```bash
-# Find notes older than 45 days by mtime (fallback for files without last-validated frontmatter)
-fd -e md --changed-before 45d . docs/notes/ 2>/dev/null
-# Find specs older than 90 days by mtime
-fd -e md --changed-before 90d . docs/development/ 2>/dev/null
+# Last meaningful commit date for a file (use instead of filesystem mtime)
+git log --follow -1 --format='%ai' -- <file>
+
+# Staleness check: compare git commit date against threshold
+# docs/notes/: 45 days, docs/development/: 90 days
 # Check flagged files for last-validated frontmatter override
 rg -l 'last-validated:' docs/notes/ docs/development/ 2>/dev/null
 ```
@@ -114,7 +116,7 @@ If the stated priorities reference closed issues or the orientation describes co
 
 #### Diagram source staleness
 
-Compare modification times of diagram source files (`.d2`, `.tex`, `.mmd`) against code areas they depict.
+Compare last git commit dates of diagram source files (`.d2`, `.tex`, `.mmd`) against code areas they depict.
 When a diagram's depicted scope has significant code churn since the diagram was last updated, flag it as potentially stale.
 The `preferences-architecture-diagramming` skill defines the diagram categories and their C4 level anchoring; the staleness check here determines whether existing diagrams still reflect reality.
 
