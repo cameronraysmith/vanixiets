@@ -181,6 +181,39 @@ ADRs live in `docs/development/architecture/adrs/` following the AMDiRE structur
 Authoring conventions covering section structure, status lifecycle, commanding voice, business justification requirements, and antipatterns are in `references/adr-conventions.md`.
 Load that companion file when writing, reviewing, or evaluating ADRs.
 
+## Temporal provenance
+
+Documents carry temporal context that informs their reliability.
+Use the following frontmatter fields to make provenance explicit.
+
+### Provenance frontmatter fields
+
+These fields are optional but recommended for any document in `docs/` that persists beyond a single session.
+
+- `created: YYYY-MM-DD` — date the document was first authored.
+- `last-validated: YYYY-MM-DD` — date the document's content was last reviewed and confirmed accurate, independent of incidental edits (typo fixes, formatting). Session-checkpoint updates this field for documents reviewed during a session. Session-orient uses it for staleness scanning: a file modified recently for formatting but last validated months ago is stale; an unmodified file validated recently is not.
+- `superseded-by: <path or description>` — marks a document as replaced by another. Documents with this field older than 30 days should be deleted or archived during session-orient health checks.
+
+### Conflict detection and resolution
+
+No rigid precedence hierarchy exists between document types.
+A recently edited working note can supersede an older formal spec, and vice versa.
+When information from different documents contradicts, recency of the specific conflicting content is the primary signal.
+
+Use git history rather than filesystem modification times to assess recency.
+Filesystem mtime is unreliable — it changes on `git checkout`, `git rebase`, and other operations that do not represent content edits.
+Prefer `git log --follow -1 --format='%ai' -- <file>` for file-level provenance and `git blame -L <range> <file>` for line-level provenance.
+
+When contradictions are detected during any task, flag them to the user with provenance evidence (file paths, dates, relevant line ranges) rather than silently preferring one source.
+The user decides which source is authoritative; the agent's role is to surface the contradiction and the temporal evidence.
+
+### docs/notes/ index
+
+Maintain a `docs/notes/README.md` file as a table of contents for the ephemeral notes directory.
+Each entry should include the subdirectory or file name, a one-line description of its purpose, and the date it was created or last validated.
+This index helps agents and humans quickly assess which notes exist and their approximate currency without reading each file.
+Update the index when creating, deleting, or significantly revising working notes.
+
 ## Code
 
 - In code, prefer docstrings relevant to a given programming language over code comments
