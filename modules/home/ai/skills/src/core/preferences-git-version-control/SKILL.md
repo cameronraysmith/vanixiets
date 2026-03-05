@@ -154,6 +154,25 @@ Without a start-point, git branches from whatever happens to be checked out, whi
 
 Use worktrees for bead-tracked work; use plain branches (`git checkout -b`) for non-bead or quick-fix work.
 
+#### Direnv initialization in worktrees
+
+Worktrees do not inherit the repository root's direnv environment.
+If the repository uses direnv with a nix devshell (indicated by an `.envrc` file), the devshell creates ephemeral files like `.pre-commit-config.yaml` that are not checked into git.
+After creating a worktree, initialize its environment before any git operations that trigger hooks:
+
+```bash
+cd .worktrees/{ID}-descriptor
+direnv allow
+```
+
+For git commits and other hook-triggering operations, use `direnv exec .` to ensure the nix devshell is active:
+
+```bash
+direnv exec . git commit -m "message"
+```
+
+This is not needed for read-only git operations (`git log`, `git status`, `git diff`) which do not trigger hooks.
+
 When the epic is complete and merged to main, clean up:
 
 ```bash
