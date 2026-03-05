@@ -213,7 +213,7 @@ Include flagged diagrams in the handoff narrative's documentation impact section
 
 #### Sunset flagging
 
-For docs in `docs/notes/` that were not referenced or validated during this session, check last modification date.
+For docs in `docs/notes/` that were not referenced or validated during this session, check last git commit date.
 If older than 45 days, add to the checkpoint's "documentation maintenance" section with recommended action (validate, refactor, or delete).
 If the doc has `superseded-by` frontmatter older than 30 days, recommend deletion.
 
