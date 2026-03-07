@@ -262,7 +262,7 @@
         };
 
         home.shellAliases = {
-          ccds = "claude";
+          ccds = "claude --dangerously-skip-permissions";
           ccglm = "claude-glm";
           cccb = "claude-cerebras";
         };
