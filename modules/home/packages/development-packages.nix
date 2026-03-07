@@ -8,7 +8,7 @@
       ...
     }:
     let
-      python = pkgs.python312.withPackages (
+      python = pkgs.python3.withPackages (
         ps: with ps; [
           pip
           huggingface-hub
