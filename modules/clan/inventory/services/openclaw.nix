@@ -13,6 +13,9 @@
         serviceUser = "cameron";
         gatewayMode = "local";
         matrixBotPasswordGenerator = "matrix-password-clawd";
+        configOverrides = {
+          channels.matrix.groupPolicy = "open";
+        };
       };
     };
   };
