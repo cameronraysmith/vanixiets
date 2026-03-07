@@ -53,8 +53,7 @@
         nerd-fonts.monaspace
         inconsolata
         nerd-fonts.inconsolata
-        jetbrains-mono
-        nerd-fonts.jetbrains-mono
+        # jetbrains-mono and nerd-fonts.jetbrains-mono installed via homebrew casks
       ];
     };
 }
