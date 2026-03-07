@@ -18,6 +18,7 @@
         dr = "docker container run --interactive --rm --tty";
         g = "git";
         gemi = "bunx -p @google/gemini-cli gemini";
+        ghd = "gh-dash";
         ghe = "github_email";
         gbc = "git branch --sort=-committerdate | grep -v '^\*\|main' | fzf --multi | xargs git branch -d";
         gls = "PAGER=cat git log --oneline --name-status --pretty=format:'%C(auto)%h %s'";
