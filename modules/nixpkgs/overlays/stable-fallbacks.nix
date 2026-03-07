@@ -55,6 +55,16 @@
           # Added: 2026-02-27
           dvc
 
+          # https://hydra.nixos.org/job/nixpkgs/trunk/google-cloud-sdk.aarch64-darwin
+          # https://hydra.nixos.org/job/nixpkgs/trunk/google-cloud-sdk.x86_64-linux
+          # Error: python3.12-freezegun test_asyncio_sleeping_not_affected_by_freeze_time
+          # flaky timing assertion in transitive test dep of google-cloud-sdk's python312 env
+          # - Linux: separate autoPatchelfHook issue (pyelftools, added 2025-11-19)
+          # - Darwin: freezegun test failure blocks full python3.12 env rebuild
+          # TODO: Remove when freezegun test fixed upstream or google-cloud-sdk bumps python
+          # Added: 2026-03-07
+          google-cloud-sdk
+
           ;
       }
       // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
@@ -72,17 +82,7 @@
       })
       // (prev.lib.optionalAttrs prev.stdenv.isLinux {
         # Linux-wide stable fallbacks
-        inherit (final.stable)
-          # https://hydra.nixos.org/job/nixpkgs/trunk/google-cloud-sdk.x86_64-linux
-          # Error: auto-patchelf missing pyelftools on rosetta-builder
-          # - Component builds (withExtraComponents) fail with ImportError
-          # - Basic google-cloud-sdk works, components use autoPatchelfHook
-          # - auto-patchelf has pyelftools in buildInputs, needs propagatedBuildInputs
-          # - Stable version is cached and proven working
-          # TODO: Remove when auto-patchelf upstream fix lands (nixpkgs PR pending)
-          # Added: 2025-11-19
-          google-cloud-sdk
-          ;
+        # (Add Linux-specific stable fallbacks here as needed)
       })
     )
   ];
