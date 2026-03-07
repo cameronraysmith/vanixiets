@@ -56,6 +56,7 @@
           clipboard-jh
           dvcWithOptionalRemotes
           gh
+          gh-dash
           git-filter-repo
           git-machete
           git-revise
