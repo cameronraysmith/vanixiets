@@ -69,7 +69,23 @@
       }
       // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
         # Darwin-wide stable fallbacks (both aarch64 and x86_64)
-        # (Add Darwin-specific stable fallbacks here as needed)
+        inherit (final.stable)
+          # https://hydra.nixos.org/job/nixpkgs/trunk/colima.aarch64-darwin
+          # colima 0.10.1 and qemu 10.2.1 pass on Hydra but nixpkgs rev is ahead of
+          # cached evaluation — qemu rebuilds from source (~20min)
+          # TODO: Remove when Hydra aarch64-darwin eval catches up to flake.lock nixpkgs rev
+          # Added: 2026-03-07
+          colima
+          lima
+
+          # https://hydra.nixos.org/job/nixpkgs/trunk/uv.aarch64-darwin
+          # Hydra has uv 0.10.6 cached; nixpkgs has 0.10.8 uncached on aarch64-darwin
+          # Rebuilds full Rust toolchain from source
+          # TODO: Remove when Hydra aarch64-darwin builds uv 0.10.8+
+          # Added: 2026-03-07
+          uv
+
+          ;
       })
       // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "x86_64-darwin") {
         # x86_64-darwin specific stable fallbacks
