@@ -97,7 +97,7 @@
             permissions = {
               defaultMode = "acceptEdits";
               # only enforced from managed-settings.json, included here as intent marker
-              disableBypassPermissionsMode = "bestEffort";
+              # disableBypassPermissionsMode = "disable";
               additionalDirectories = [ "~/projects" ];
               allow = [
                 # Blanket Bash allow; dangerous commands gated via deny/ask lists.
