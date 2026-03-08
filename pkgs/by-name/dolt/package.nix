@@ -9,13 +9,13 @@
 
 (buildGoModule.override { go = go_1_26; }) (finalAttrs: {
   pname = "dolt";
-  version = "1.83.3";
+  version = "1.83.4";
 
   src = fetchFromGitHub {
     owner = "dolthub";
     repo = "dolt";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-2y+SZRj4RSzE4URmrzdZ/mdhflP74AglQNiRgRpCmXs=";
+    hash = "sha256-S0kck16TOqKu/aeosiE/UeqRulUsCGQkZIIhcF/sR20=";
   };
 
   modRoot = "./go";
