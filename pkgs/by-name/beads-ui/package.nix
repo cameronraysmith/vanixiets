@@ -9,13 +9,13 @@
 
 buildNpmPackage {
   pname = "beads-ui";
-  version = "0.11.0";
+  version = "0.11.1";
 
   src = fetchFromGitHub {
     owner = "mantoni";
     repo = "beads-ui";
-    tag = "v0.11.0";
-    hash = "sha256-kMUpAh0ynAaz0eR7BALl7/vJAtwuRdPtisaYB/pvyD8=";
+    tag = "v0.11.1";
+    hash = "sha256-RJh+5v4dxQhM/TcEsFkXuDQ3IKPPw3T0DlCIyY6UAyQ=";
   };
 
   nodejs = nodejs_22;
@@ -27,7 +27,7 @@ buildNpmPackage {
     cp ${./package-lock.json} package-lock.json
   '';
 
-  npmDepsHash = "sha256-PcsFk46vJ2H51d79W841sWpCy/SMSpDbyu3iqmYV0OQ=";
+  npmDepsHash = "sha256-ySe3v95W7Bp6FS6ujYIYhgEQXGrF03mjKB4YFbU/nDM=";
 
   makeCacheWritable = true;
 
