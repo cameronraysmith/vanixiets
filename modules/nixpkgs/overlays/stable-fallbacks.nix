@@ -17,18 +17,7 @@
       final: prev:
       {
         # Cross-platform stable fallbacks (all systems)
-        inherit (final.stable)
-          # https://hydra.nixos.org/job/nixpkgs/trunk/google-cloud-sdk.aarch64-darwin
-          # https://hydra.nixos.org/job/nixpkgs/trunk/google-cloud-sdk.x86_64-linux
-          # Error: python3.12-freezegun test_asyncio_sleeping_not_affected_by_freeze_time
-          # flaky timing assertion in transitive test dep of google-cloud-sdk's python312 env
-          # - Linux: separate autoPatchelfHook issue (pyelftools, added 2025-11-19)
-          # - Darwin: freezegun test failure blocks full python3.12 env rebuild
-          # TODO: Remove when freezegun test fixed upstream or google-cloud-sdk bumps python
-          # Added: 2026-03-07
-          google-cloud-sdk
-
-          ;
+        # (Add as needed)
       }
       // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
         # Darwin-wide stable fallbacks (both aarch64 and x86_64)
