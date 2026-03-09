@@ -18,20 +18,6 @@
       {
         # Cross-platform stable fallbacks (all systems)
         inherit (final.stable)
-          # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.aarch64-darwin
-          # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.x86_64-linux
-          # https://hydra.nixos.org/job/nixpkgs/trunk/micromamba.aarch64-linux
-          # Error: fmt library compatibility issue across all platforms
-          # - Formatter<fs::u8path> missing const qualifier on format method
-          # - Darwin: clang 21.x build fails
-          # - Linux: Same underlying fmt library issue affects all platforms
-          # - Breaks in unstable after 2025-09-28 (last successful hydra build)
-          # - Stable version pulls compatible ghc_filesystem
-          # - CI confirmed failure on both Linux and Darwin
-          # TODO: Remove when fmt compatibility fixed upstream
-          # Added: 2025-10-14
-          micromamba
-
           # https://hydra.nixos.org/job/nixpkgs/trunk/argocd.aarch64-darwin
           # https://hydra.nixos.org/job/nixpkgs/trunk/argocd.x86_64-linux
           # https://hydra.nixos.org/job/nixpkgs/trunk/argocd.aarch64-linux
