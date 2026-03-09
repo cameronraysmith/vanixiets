@@ -18,18 +18,6 @@
       {
         # Cross-platform stable fallbacks (all systems)
         inherit (final.stable)
-          # https://hydra.nixos.org/job/nixpkgs/trunk/dvc.aarch64-darwin
-          # https://hydra.nixos.org/job/nixpkgs/trunk/dvc.x86_64-linux
-          # https://hydra.nixos.org/job/nixpkgs/trunk/dvc.aarch64-linux
-          # Error: dvc-s3 3.3.0 postPatch fails - aiobotocore[boto3] pattern
-          # removed from upstream pyproject.toml but nixpkgs patch still expects it
-          # - Pinning entire dvc (not just dvc-s3) because dvc.override binds
-          #   to its own python package set
-          # - Upstream fix pending: nixpkgs PR #493981
-          # TODO: Remove when nixpkgs PR #493981 merges
-          # Added: 2026-02-27
-          dvc
-
           # https://hydra.nixos.org/job/nixpkgs/trunk/google-cloud-sdk.aarch64-darwin
           # https://hydra.nixos.org/job/nixpkgs/trunk/google-cloud-sdk.x86_64-linux
           # Error: python3.12-freezegun test_asyncio_sleeping_not_affected_by_freeze_time
