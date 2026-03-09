@@ -32,15 +32,7 @@
       }
       // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
         # Darwin-wide stable fallbacks (both aarch64 and x86_64)
-        inherit (final.stable)
-          # https://hydra.nixos.org/job/nixpkgs/trunk/uv.aarch64-darwin
-          # Hydra has uv 0.10.6 cached; nixpkgs has 0.10.8 uncached on aarch64-darwin
-          # Rebuilds full Rust toolchain from source
-          # TODO: Remove when Hydra aarch64-darwin builds uv 0.10.8+
-          # Added: 2026-03-07
-          uv
-
-          ;
+        # (Add as needed)
       })
       // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "x86_64-darwin") {
         # x86_64-darwin specific stable fallbacks
