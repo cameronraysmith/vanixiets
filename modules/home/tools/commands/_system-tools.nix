@@ -243,6 +243,41 @@
     '';
   };
 
+  # Send push notification via ntfy.zt
+  # Endpoint security software on Darwin blocks ad-hoc signed (Nix store)
+  # binaries from TCP connections over ZeroTier. Use Apple-signed curl on Darwin.
+  ntfy-send = {
+    text = ''
+      case "''${1:-}" in
+        -h|--help)
+          cat <<'HELP'
+      Send push notification via ntfy.zt
+
+      Usage: ntfy-send MESSAGE [TOPIC]
+
+      Arguments:
+        MESSAGE  Notification body text (required)
+        TOPIC    ntfy topic (default: local hostname)
+
+      On Darwin, uses /usr/bin/curl (Apple-signed) because endpoint security
+      software blocks ad-hoc signed Nix store binaries from TCP connections
+      over ZeroTier.
+
+      Examples:
+        ntfy-send "build complete"
+        ntfy-send "deploy finished" stibnite
+      HELP
+          exit 0
+          ;;
+      esac
+
+      msg="''${1:?usage: ntfy-send MESSAGE [TOPIC]}"
+      topic="''${2:-$(hostname -s)}"
+      ${if pkgs.stdenv.isDarwin then "/usr/bin/curl" else "curl"} \
+        -k -d "$msg" "https://ntfy.zt/$topic"
+    '';
+  };
+
   # DNS cache reset for macOS
   dnsreset = {
     text = ''
