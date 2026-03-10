@@ -101,14 +101,13 @@ old_rank=$(echo "$CYNEFIN_ORDER" | tr ' ' '\n' | grep -n "^${OLD_CYNEFIN}$" | cu
 new_rank=$(echo "$CYNEFIN_ORDER" | tr ' ' '\n' | grep -n "^${NEW_CYNEFIN}$" | cut -d: -f1)
 
 if [ "$new_rank" -gt "$old_rank" ] 2>/dev/null; then
-  NTFY_TOPIC=$(hostname -s)
   REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
-  curl -sfk -m 5 \
+  ntfy-send \
+    "Issue ${ISSUE_ID} reclassified from ${OLD_CYNEFIN} to ${NEW_CYNEFIN} in ${REPO_NAME}. May now require advisory coupling." \
+    "$(hostname -s)" \
     -H "Title: Cynefin shift: ${ISSUE_ID}" \
     -H "Priority: high" \
-    -H "Tags: warning,${REPO_NAME}" \
-    -d "Issue ${ISSUE_ID} reclassified from ${OLD_CYNEFIN} to ${NEW_CYNEFIN} in ${REPO_NAME}. May now require advisory coupling." \
-    "https://ntfy.zt/${NTFY_TOPIC}" 2>/dev/null || true
+    -H "Tags: warning,${REPO_NAME}" 2>/dev/null || true
 fi
 ```
 
@@ -254,12 +253,12 @@ EXCEEDS=$(echo "$TOTAL_SURPRISE > $REPLANNING_THRESHOLD" | bc -l)
 if [ "$EXCEEDS" -eq 1 ]; then
   NTFY_TOPIC=$(hostname -s)
   REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
-  curl -sfk -m 5 \
+  ntfy-send \
+    "Epic ${EPIC_ID} in ${REPO_NAME}: accumulated surprise ${TOTAL_SURPRISE} exceeds threshold ${REPLANNING_THRESHOLD} (${CONTRIBUTING} issues contributing). Consider running /issues:beads-evolve to restructure the plan." \
+    "${NTFY_TOPIC}" \
     -H "Title: Replanning needed: ${EPIC_ID}" \
     -H "Priority: urgent" \
-    -H "Tags: rotating_light,${REPO_NAME}" \
-    -d "Epic ${EPIC_ID} in ${REPO_NAME}: accumulated surprise ${TOTAL_SURPRISE} exceeds threshold ${REPLANNING_THRESHOLD} (${CONTRIBUTING} issues contributing). Consider running /issues:beads-evolve to restructure the plan." \
-    "https://ntfy.zt/${NTFY_TOPIC}" 2>/dev/null || true
+    -H "Tags: rotating_light,${REPO_NAME}" 2>/dev/null || true
 fi
 ```
 
@@ -314,12 +313,12 @@ if [ "$READY_COUNT" -eq 0 ] && [ "$CLOSED_CHILDREN" -lt "$TOTAL_CHILDREN" ]; the
   NTFY_TOPIC=$(hostname -s)
   REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
   UNCLOSED=$((TOTAL_CHILDREN - CLOSED_CHILDREN))
-  curl -sfk -m 5 \
+  ntfy-send \
+    "Epic ${EPIC_ID} in ${REPO_NAME} has ${UNCLOSED} unclosed issues but 0 are ready. All remaining work is blocked. Review dependencies to unblock progress." \
+    "${NTFY_TOPIC}" \
     -H "Title: Buffer depleted: ${EPIC_ID}" \
     -H "Priority: high" \
-    -H "Tags: warning,${REPO_NAME}" \
-    -d "Epic ${EPIC_ID} in ${REPO_NAME} has ${UNCLOSED} unclosed issues but 0 are ready. All remaining work is blocked. Review dependencies to unblock progress." \
-    "https://ntfy.zt/${NTFY_TOPIC}" 2>/dev/null || true
+    -H "Tags: warning,${REPO_NAME}" 2>/dev/null || true
 fi
 ```
 
