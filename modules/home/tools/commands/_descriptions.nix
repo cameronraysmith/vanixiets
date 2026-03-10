@@ -53,6 +53,7 @@
       order = 5;
       commands = {
         dnsreset = "Flush DNS cache and restart mDNSResponder on macOS";
+        ntfy-send = "Send push notification via ntfy.zt (Apple-signed curl on Darwin)";
         rosetta-manage = "Manage nix-rosetta-builder VM (stop/start/restart/gc)";
       };
     }
