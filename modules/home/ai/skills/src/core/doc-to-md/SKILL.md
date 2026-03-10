@@ -393,7 +393,7 @@ All commands in this phase interact with GitHub and will be intercepted by Claud
 The ntfy notification fires first so the user sees a summary of completed local work before the approval prompts arrive.
 
 ```bash
-curl -k -d "doc-to-md: <repo-name> complete" https://ntfy.zt/$(hostname -s)
+ntfy-send "doc-to-md: <repo-name> complete"
 ```
 
 ### Create GitHub repository
