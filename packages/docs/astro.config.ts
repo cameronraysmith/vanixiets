@@ -108,7 +108,7 @@ export default defineConfig({
     }),
   ],
 
-  adapter: process.env.VITEST
+  adapter: process.env.VITEST || process.env.PLAYWRIGHT
     ? undefined
     : cloudflare({
         // Use 'passthrough' to serve images directly without Cloudflare Image Resizing
