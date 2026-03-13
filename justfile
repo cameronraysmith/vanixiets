@@ -483,6 +483,11 @@ docs-test-unit:
 docs-test-e2e:
   cd packages/docs && bun run test:e2e
 
+# Open Playwright HTML report from last E2E test run
+[group('docs')]
+docs-test-e2e-report:
+  cd packages/docs && bunx playwright show-report
+
 # Generate documentation test coverage report
 [group('docs')]
 docs-test-coverage:
