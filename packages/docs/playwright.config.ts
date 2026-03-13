@@ -30,6 +30,11 @@ export default defineConfig({
       ]
     : [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
 
+  // Increase assertion timeout on CI where Vite cold-start compilation is slower
+  expect: {
+    timeout: process.env.CI ? 15000 : 5000,
+  },
+
   // Shared settings for all projects
   use: {
     // Base URL for page.goto() calls
