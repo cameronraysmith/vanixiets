@@ -29,7 +29,8 @@ test.describe("Documentation Pages", () => {
     await page.goto("/guides/getting-started/");
 
     // Verify right sidebar with table of contents exists
-    const toc = page.getByRole("navigation", { name: /on this page/i });
+    // Starlight 0.38 renders both mobile and desktop ToC navs; scope to desktop
+    const toc = page.locator('starlight-toc').getByRole("navigation", { name: /on this page/i });
     await expect(toc).toBeVisible();
   });
 });
