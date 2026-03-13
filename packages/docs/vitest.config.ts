@@ -1,6 +1,11 @@
 /// <reference types="vitest/config" />
 import { getViteConfig } from "astro/config";
 
+// Skip Cloudflare adapter during tests: @cloudflare/vite-plugin (bundled in
+// adapter v13) rejects Vitest's SSR resolve.external for Node built-ins.
+// AstroContainer does not require a deployment adapter.
+process.env.VITEST = "true";
+
 export default getViteConfig({
   test: {
     // Test environment
