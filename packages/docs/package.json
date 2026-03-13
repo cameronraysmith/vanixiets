@@ -37,9 +37,9 @@
     "test-release": "semantic-release --dry-run --no-ci"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "12.6.13",
-    "@astrojs/starlight": "0.37.7",
-    "astro": "5.18.1"
+    "@astrojs/cloudflare": "13.1.1",
+    "@astrojs/starlight": "0.38.1",
+    "astro": "6.0.4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
@@ -56,7 +56,7 @@
     "semantic-release-monorepo": "^8.0.2",
     "sharp": "^0.34.5",
     "starlight-katex": "^0.0.4",
-    "starlight-links-validator": "^0.19.2",
+    "starlight-links-validator": "^0.20.1",
     "svgo": "^4.0.1",
     "vitest": "^4.0.18",
     "wrangler": "^4.72.0"
