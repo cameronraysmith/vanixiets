@@ -108,12 +108,14 @@ export default defineConfig({
     }),
   ],
 
-  adapter: cloudflare({
-    // Use 'passthrough' to serve images directly without Cloudflare Image Resizing
-    // The 'cloudflare' option requires the Image Resizing subscription
-    // Reference: https://docs.astro.build/en/guides/integrations-guide/cloudflare/#imageservice
-    imageService: "passthrough",
-  }),
+  adapter: process.env.VITEST
+    ? undefined
+    : cloudflare({
+        // Use 'passthrough' to serve images directly without Cloudflare Image Resizing
+        // The 'cloudflare' option requires the Image Resizing subscription
+        // Reference: https://docs.astro.build/en/guides/integrations-guide/cloudflare/#imageservice
+        imageService: "passthrough",
+      }),
 
   markdown: {
     syntaxHighlight: {
