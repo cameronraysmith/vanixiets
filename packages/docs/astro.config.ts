@@ -109,12 +109,6 @@ export default defineConfig({
   ],
 
   adapter: cloudflare({
-    platformProxy: {
-      // Disable during tests to prevent hanging Vite server
-      // The platformProxy creates background processes that don't clean up properly
-      enabled: process.env.VITEST !== "true",
-    },
-
     // Use 'passthrough' to serve images directly without Cloudflare Image Resizing
     // The 'cloudflare' option requires the Image Resizing subscription
     // Reference: https://docs.astro.build/en/guides/integrations-guide/cloudflare/#imageservice
