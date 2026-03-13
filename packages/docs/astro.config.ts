@@ -117,6 +117,14 @@ export default defineConfig({
         imageService: "passthrough",
       }),
 
+  vite: {
+    ssr: {
+      optimizeDeps: {
+        exclude: ["virtual:starlight/*"],
+      },
+    },
+  },
+
   markdown: {
     syntaxHighlight: {
       type: "shiki",
