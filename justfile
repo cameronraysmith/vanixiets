@@ -1606,6 +1606,7 @@ cache-darwin-system:
     echo "Pushing system and all dependencies to cachix..."
     echo "(This may take several minutes depending on what's not already cached)"
     nix-store --query --requisites --include-outputs "$SYSTEM_PATH" | \
+        grep -v 'nixos-disk-image' | \
         sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME"
 
     echo ""
