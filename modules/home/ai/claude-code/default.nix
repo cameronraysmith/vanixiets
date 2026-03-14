@@ -43,6 +43,7 @@
               "feature-dev@claude-plugins-official" = true;
               "frontend-design@claude-plugins-official" = true;
             };
+            voiceEnabled = true;
             alwaysThinkingEnabled = true;
 
             env = {
