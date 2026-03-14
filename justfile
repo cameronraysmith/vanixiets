@@ -36,6 +36,28 @@ check-cached package:
         echo "$output"
     fi
 
+# Preview uncached derivations for a machine (auto-detects darwin vs nixos)
+[group('nix')]
+check-uncached-machine hostname:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    darwin_hosts=(argentum blackphos rosegold stibnite)
+    nixos_hosts=(cinnabar electrum galena scheelite)
+    for h in "${darwin_hosts[@]}"; do
+        if [[ "$h" == "{{hostname}}" ]]; then
+            exec just check-uncached "darwinConfigurations.{{hostname}}.system"
+        fi
+    done
+    for h in "${nixos_hosts[@]}"; do
+        if [[ "$h" == "{{hostname}}" ]]; then
+            exec just check-uncached "nixosConfigurations.{{hostname}}.config.system.build.toplevel"
+        fi
+    done
+    echo "unknown hostname: {{hostname}}" >&2
+    echo "darwin: ${darwin_hosts[*]}" >&2
+    echo "nixos: ${nixos_hosts[*]}" >&2
+    exit 1
+
 # List derivations that would be built (not cached) for a system configuration
 [group('nix')]
 check-uncached config:
