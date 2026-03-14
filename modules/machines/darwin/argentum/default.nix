@@ -97,7 +97,7 @@ in
 
         # Simplified for basic user - only zerotier for network connectivity
         # Omitted developer casks: codelayer-nightly, dbeaver-community, docker-desktop,
-        # gpg-suite, inkscape, keycastr, meld, postgres-unofficial
+        # gpg-suite, inkscape, keycastr, meld, postgres-app
         additionalCasks = [
           "zerotier-one"
         ];
