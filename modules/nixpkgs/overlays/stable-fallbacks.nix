@@ -21,7 +21,11 @@
       }
       // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
         # Darwin-wide stable fallbacks (both aarch64 and x86_64)
-        # (Add as needed)
+
+        # TODO: remove when uv builds from cache on Darwin
+        # https://hydra.nixos.org/job/nixpkgs/trunk/uv.aarch64-darwin
+        # https://hydra.nixos.org/job/nixpkgs/trunk/uv.x86_64-darwin
+        uv = final.stable.uv;
       })
       // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "x86_64-darwin") {
         # x86_64-darwin specific stable fallbacks
