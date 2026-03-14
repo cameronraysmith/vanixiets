@@ -58,4 +58,14 @@ test.describe("Homepage", () => {
     // Check for console errors
     expect(errors).toHaveLength(0);
   });
+
+  test("hero image loads successfully", async ({ page }) => {
+    await page.goto("/");
+    const heroImg = page.locator(".hero img");
+    await expect(heroImg).toBeVisible();
+    const naturalWidth = await heroImg.evaluate(
+      (img: HTMLImageElement) => img.naturalWidth,
+    );
+    expect(naturalWidth).toBeGreaterThan(0);
+  });
 });
