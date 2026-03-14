@@ -16,6 +16,7 @@
 
         programs.fish = {
           enable = true;
+          generateCompletions = false;
 
           # TTY fallback - fish misbehaves in Linux console (TERM=linux)
           loginShellInit = ''
