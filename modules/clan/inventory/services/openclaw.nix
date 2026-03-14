@@ -15,6 +15,7 @@
         matrixBotPasswordGenerator = "matrix-password-clawd";
         configOverrides = {
           channels.matrix.groupPolicy = "open";
+          gateway.controlUi.allowedOrigins = [ "https://openclaw.zt" ];
         };
       };
     };
