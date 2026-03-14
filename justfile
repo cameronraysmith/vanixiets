@@ -24,6 +24,11 @@ help:
 
 ## nix
 
+# Check if a package is cached (substitutable) on the current locked nixpkgs rev
+[group('nix')]
+check-cached package:
+    @nix build "path:$(nix eval --raw .#inputs.nixpkgs)#{{package}}" --dry-run 2>&1
+
 ## activation
 # Unified activation commands using nh via flake apps
 # All recipes accept nh flags: --dry (preview), --ask (confirm), --verbose
