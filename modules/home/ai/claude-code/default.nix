@@ -44,6 +44,7 @@
               "frontend-design@claude-plugins-official" = true;
             };
             voiceEnabled = true;
+            remoteControlAtStartup = true;
             alwaysThinkingEnabled = true;
 
             env = {
