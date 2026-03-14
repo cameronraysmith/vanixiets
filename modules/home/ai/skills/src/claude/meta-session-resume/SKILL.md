@@ -1,24 +1,23 @@
 ---
 name: meta-session-resume
 description: Generate annotated resume command and add to atuin history for session continuation.
-argument-hint: [session-uuid] [nohist]
+argument-hint: <session-uuid> [nohist]
 disable-model-invocation: true
 ---
 Generate a resume session command and automatically add it to atuin shell history.
 
 Command format:
 ```bash
-ccds -r [session-uuid] # Session Title YYYYMMDD HH:MM[a/p]
+ccds -r <session-uuid> # Session Title YYYYMMDD HH:MM[a/p]
 ```
 
 Requirements for session UUID:
-- If $1 is "nohist", treat as history flag (see below) and extract UUID from latest
+- $1 is REQUIRED and must be a valid session UUID (do not fall back to debug symlink or placeholders)
+- If $1 is "nohist" or blank, stop and ask the user to provide the session UUID
 - If $1 is provided and not "nohist", use $1 as the session UUID
-- Otherwise (no arguments), extract from `~/.claude/debug/latest` symlink using: `readlink ~/.claude/debug/latest | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'`
-- If extraction fails and no UUID argument provided, use placeholder `<session-uuid>`
 
 Requirements for history addition:
-- If $1 is "nohist" OR $2 is "nohist", skip atuin history addition and just display the command
+- If $2 is "nohist", skip atuin history addition and just display the command
 - Otherwise, attempt to add to atuin history (if available)
 
 Session title requirements:
@@ -36,12 +35,12 @@ Examples of well-formed titles:
 - "Docker Multi-arch Build Setup and CI Pipeline Optimization"
 
 Implementation approach:
-1. Determine if history addition should be skipped:
-   - Check if $1 is "nohist" OR $2 is "nohist"
+1. Validate session UUID:
+   - If $1 is blank or "nohist", stop and ask the user to provide the session UUID
+   - Use $1 as the UUID
+2. Determine if history addition should be skipped:
+   - Check if $2 is "nohist"
    - Store this as a flag for later use
-2. Extract session UUID:
-   - If $1 is "nohist" or blank, extract from `readlink ~/.claude/debug/latest | grep -oE '[pattern]'`
-   - Otherwise, use $1 as the UUID
 3. Get current date/time: `date +"%Y%m%d %I:%M%p" | tr 'APM' 'apm'`
 4. Construct the full command string with session title
 5. Determine if atuin history should be used:
@@ -61,10 +60,8 @@ atuin history end --exit 0 $id
 ```
 
 Step-by-step execution:
-1. Check if $1 is "nohist" or $2 is "nohist" - set a nohist flag if either is true
-2. Extract session UUID:
-   - If $1 is "nohist" or empty, extract from: `readlink ~/.claude/debug/latest | grep -oE '[pattern]'`
-   - Otherwise use $1 as the UUID
+1. Validate $1 is a non-empty session UUID (not "nohist", not blank). If invalid, stop and ask the user.
+2. Check if $2 is "nohist" - set a nohist flag if true
 3. Construct the full command string (e.g., "ccds -r abc123 # My Session 20251010 01:04p")
 4. If nohist flag is NOT set, check if atuin is available with: `command -v atuin >/dev/null 2>&1`
    - If atuin is available, execute the following three commands:
@@ -84,7 +81,9 @@ atuin history end --exit 0 $id
 ```
 
 Output for user:
-- If nohist flag is set ($1 or $2 is "nohist"):
+- If $1 is missing or "nohist":
+  - Stop and ask the user to provide the session UUID
+- If nohist flag is set ($2 is "nohist"):
   - Show a message that history addition was skipped per user request
   - Display the command (the full ccds -r ... line)
 - If nohist flag is NOT set and atuin is available:
@@ -96,9 +95,9 @@ Output for user:
   - Suggest the user can copy and paste it manually
 
 Examples:
-- `/meta:session-resume` - Generates command with current session UUID and adds to atuin history
 - `/meta:session-resume abc123` - Generates command with specified UUID and adds to atuin history
 - `/meta:session-resume abc123 nohist` - Generates command with specified UUID but skips atuin history
-- `/meta:session-resume nohist` - Generates command with current session UUID but skips atuin history
+- `/meta:session-resume` - Error: asks user to provide session UUID
+- `/meta:session-resume nohist` - Error: asks user to provide session UUID
 
 IMPORTANT: Do NOT actually execute `ccds -r` as it would create a recursive Claude session. Use `true` as a placeholder.
