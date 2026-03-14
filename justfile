@@ -36,6 +36,22 @@ check-cached package:
         echo "$output"
     fi
 
+# List derivations that would be built (not cached) for a system configuration
+[group('nix')]
+check-uncached config:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    output=$(nix build ".#{{config}}" --dry-run 2>&1)
+    if ! echo "$output" | grep -q 'will be built'; then
+        echo "all derivations cached"
+    else
+        echo "$output" | grep 'will be built'
+        echo "$output" | grep '\.drv$' | sed 's|.*/[a-z0-9]*-||; s|\.drv$||'
+    fi
+    if echo "$output" | grep -q 'will be fetched'; then
+        echo "$output" | grep 'will be fetched'
+    fi
+
 ## activation
 # Unified activation commands using nh via flake apps
 # All recipes accept nh flags: --dry (preview), --ask (confirm), --verbose
