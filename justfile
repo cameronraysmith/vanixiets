@@ -49,7 +49,9 @@ check-uncached config:
         echo "$output" | grep '\.drv$' | sed 's|.*/[a-z0-9]*-||; s|\.drv$||'
     fi
     if echo "$output" | grep -q 'will be fetched'; then
+        echo ""
         echo "$output" | grep 'will be fetched'
+        echo "$output" | grep -A9999 'will be fetched' | tail -n+2 | sed 's|.*/[a-z0-9]*-||'
     fi
 
 ## activation
