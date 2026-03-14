@@ -27,7 +27,14 @@ help:
 # Check if a package is cached (substitutable) on the current locked nixpkgs rev
 [group('nix')]
 check-cached package:
-    @nix build "path:$(nix eval --raw .#inputs.nixpkgs)#{{package}}" --dry-run 2>&1
+    #!/usr/bin/env bash
+    set -euo pipefail
+    output=$(nix build "path:$(nix eval --raw .#inputs.nixpkgs)#{{package}}" --dry-run 2>&1)
+    if [ -z "$output" ]; then
+        echo "{{package}}: cached"
+    else
+        echo "$output"
+    fi
 
 ## activation
 # Unified activation commands using nh via flake apps
