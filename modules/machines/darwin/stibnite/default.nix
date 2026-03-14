@@ -91,7 +91,7 @@ in
           "inkscape"
           "keycastr"
           "meld"
-          "postgres-unofficial"
+          "postgres-app"
           "steipete/tap/codexbar"
           "zerotier-one"
         ];
