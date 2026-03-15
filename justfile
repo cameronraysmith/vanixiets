@@ -1384,6 +1384,11 @@ ci-debug-job workflow="ci.yaml" job_name="nix (aarch64-darwin)":
     JOB_ID=$(gh run view "$RUN_ID" --json jobs --jq ".jobs[] | select(.name == \"{{job_name}}\") | .databaseId"); \
     gh run view --job "$JOB_ID" --log
 
+# Trigger ad hoc flake input update on main
+[group('CI/CD')]
+update-flake-inputs:
+    gh workflow run update-flake-inputs.yaml --ref main
+
 # Update github secrets for repo from environment variables
 [group('CI/CD')]
 ghsecrets repo="cameronraysmith/vanixiets": # gitleaks:allow
