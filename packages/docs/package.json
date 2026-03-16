@@ -37,9 +37,9 @@
     "test-release": "semantic-release --dry-run --no-ci"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "13.1.1",
+    "@astrojs/cloudflare": "13.1.2",
     "@astrojs/starlight": "0.38.1",
-    "astro": "6.0.4"
+    "astro": "6.0.5"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.7",
