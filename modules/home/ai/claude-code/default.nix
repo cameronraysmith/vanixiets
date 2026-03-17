@@ -57,8 +57,10 @@
               CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1";
               CLAUDE_CODE_SUBAGENT_MODEL = "claude-opus-4-6";
               DISABLE_BUG_COMMAND = "1";
-              DISABLE_ERROR_REPORTING = "1";
-              DISABLE_TELEMETRY = "1";
+              # Disabled: also suppresses feature-flag evaluation (upstream bug).
+              # https://github.com/anthropics/claude-code/issues/33119#issuecomment-4052694908
+              # DISABLE_ERROR_REPORTING = "1";
+              # DISABLE_TELEMETRY = "1";
               MAX_MCP_OUTPUT_TOKENS = "40000";
               TMPDIR = "/tmp/claude";
               TMPPREFIX = "/tmp/claude/zsh";
