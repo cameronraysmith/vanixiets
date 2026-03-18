@@ -34,26 +34,35 @@ declare -A platform_map=(
   ["aarch64-darwin"]="git-xet-macos-aarch64"
 )
 
-# Clear all hashes so nix reports the correct ones via fetchzip
-for archive in "${platform_map[@]}"; do
-  sed -i'' -e "/${archive}/{ n; s|hash = \"sha256-.*\"|hash = \"\"|; }" "$PKG_NIX"
-done
+# Known-wrong but valid SRI hash to trigger fetchzip hash mismatch errors.
+# An empty hash may not produce the "got:" diagnostic we need to parse.
+BOGUS_HASH="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
-# Build each platform's fetchzip with empty hash, parse correct hash from error
+tmplog="$(mktemp)"
+trap 'rm -f "$tmplog"' EXIT
+
 for platform in "${!platform_map[@]}"; do
   archive="${platform_map[$platform]}"
 
+  # Set bogus hash for this platform so fetchzip reports the correct one
+  sed -i'' -e "/${archive}/{ n; s|hash = \"sha256-[^\"]*\"|hash = \"${BOGUS_HASH}\"|; }" "$PKG_NIX"
+
   echo "Computing fetchzip hash for ${platform}..."
-  sri_hash="$(nix build --impure --no-link --expr "
+  # nix build output goes to temp file; show download progress on stderr
+  nix build --impure --no-link --expr "
     (builtins.getFlake \"${REPO_ROOT}\").packages.${platform}.git-xet.passthru.sources.\"${platform}\"
-  " 2>&1 | sed -n 's/.*got: *//p')"
+  " > "$tmplog" 2>&1 || true
+
+  sri_hash="$(sed -n 's/.*got: *//p' "$tmplog" | tr -d '[:space:]')"
 
   if [[ -z "$sri_hash" ]]; then
     echo "error: failed to compute hash for ${platform}" >&2
+    echo "nix output:" >&2
+    cat "$tmplog" >&2
     exit 1
   fi
 
-  sed -i'' -e "/${archive}/{ n; s|hash = \"\"|hash = \"${sri_hash}\"|; }" "$PKG_NIX"
+  sed -i'' -e "/${archive}/{ n; s|hash = \"${BOGUS_HASH}\"|hash = \"${sri_hash}\"|; }" "$PKG_NIX"
 
   echo "  ${platform}: ${sri_hash}"
 done
