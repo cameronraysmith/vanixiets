@@ -25,5 +25,10 @@
         type = "app";
         program = "${config.packages.beads-ui.updateScript}";
       };
+
+      apps.update-git-xet = {
+        type = "app";
+        program = "${config.packages.git-xet.updateScript}";
+      };
     };
 }
