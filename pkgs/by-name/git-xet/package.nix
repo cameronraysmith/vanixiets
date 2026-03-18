@@ -9,10 +9,6 @@
   lib,
   stdenv,
   fetchzip,
-  writeShellApplication,
-  curl,
-  jq,
-  common-updater-scripts,
   # Runtime dependencies for binary patching
   openssl,
   autoPatchelfHook,
@@ -99,29 +95,7 @@ stdenv.mkDerivation (finalAttrs: {
         stripRoot = false;
       };
     };
-    updateScript = lib.getExe (writeShellApplication {
-      name = "update-git-xet";
-      runtimeInputs = [
-        curl
-        jq
-        common-updater-scripts
-      ];
-      text = ''
-        # git-xet uses prefixed tags like "git-xet-v0.2.0"
-        NEW_VERSION=$(curl --silent https://api.github.com/repos/huggingface/xet-core/releases \
-          | jq -r '[.[] | select(.tag_name | startswith("git-xet-v"))] | .[0].tag_name' \
-          | sed 's/^git-xet-v//')
-
-        if [[ "${finalAttrs.version}" = "$NEW_VERSION" ]]; then
-          echo "The new version same as the old version."
-          exit 0
-        fi
-
-        for platform in ${lib.escapeShellArgs finalAttrs.meta.platforms}; do
-          update-source-version "git-xet" "$NEW_VERSION" --ignore-same-version --source-key="sources.$platform"
-        done
-      '';
-    });
+    updateScript = ./update.sh;
   };
 
   meta = {
