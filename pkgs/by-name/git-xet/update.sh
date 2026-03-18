@@ -34,17 +34,26 @@ declare -A platform_map=(
   ["aarch64-darwin"]="git-xet-macos-aarch64"
 )
 
+# Clear all hashes so nix reports the correct ones via fetchzip
+for archive in "${platform_map[@]}"; do
+  sed -i'' -e "/${archive}/{ n; s|hash = \"sha256-.*\"|hash = \"\"|; }" "$PKG_NIX"
+done
+
+# Build each platform's fetchzip with empty hash, parse correct hash from error
 for platform in "${!platform_map[@]}"; do
   archive="${platform_map[$platform]}"
-  url="https://github.com/huggingface/xet-core/releases/download/${latest_tag}/${archive}.zip"
 
-  echo "Prefetching ${platform} (${archive})..."
-  raw_hash="$(nix-prefetch-url --unpack "$url" 2>/dev/null)"
-  sri_hash="$(nix-hash --to-sri --type sha256 "$raw_hash")"
+  echo "Computing fetchzip hash for ${platform}..."
+  sri_hash="$(nix build --impure --no-link --expr "
+    (builtins.getFlake \"${REPO_ROOT}\").packages.${platform}.git-xet.passthru.sources.\"${platform}\"
+  " 2>&1 | sed -n 's/.*got: *//p')"
 
-  # Each platform block has a unique url containing the archive name,
-  # so match the hash line following that url
-  sed -i'' -e "/${archive}/{ n; s|hash = \"sha256-.*\"|hash = \"${sri_hash}\"|; }" "$PKG_NIX"
+  if [[ -z "$sri_hash" ]]; then
+    echo "error: failed to compute hash for ${platform}" >&2
+    exit 1
+  fi
+
+  sed -i'' -e "/${archive}/{ n; s|hash = \"\"|hash = \"${sri_hash}\"|; }" "$PKG_NIX"
 
   echo "  ${platform}: ${sri_hash}"
 done
