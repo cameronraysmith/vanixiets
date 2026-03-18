@@ -17,7 +17,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "git-xet";
-  version = "0.2.0";
+  version = "0.2.1";
 
   src =
     finalAttrs.passthru.sources.${stdenv.hostPlatform.system}
@@ -54,15 +54,6 @@ stdenv.mkDerivation (finalAttrs: {
       /opt/homebrew/opt/openssl@3/lib/libcrypto.3.dylib \
       ${openssl.out}/lib/libcrypto.3.dylib \
       $out/bin/git-xet
-    # Also patch for x86_64 Homebrew path (/usr/local/opt)
-    install_name_tool -change \
-      /usr/local/opt/openssl@3/lib/libssl.3.dylib \
-      ${openssl.out}/lib/libssl.3.dylib \
-      $out/bin/git-xet
-    install_name_tool -change \
-      /usr/local/opt/openssl@3/lib/libcrypto.3.dylib \
-      ${openssl.out}/lib/libcrypto.3.dylib \
-      $out/bin/git-xet
   '';
 
   doInstallCheck = true;
@@ -76,22 +67,17 @@ stdenv.mkDerivation (finalAttrs: {
     sources = {
       "x86_64-linux" = fetchzip {
         url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-linux-x86_64.zip";
-        hash = "sha256-8FxDWkx+s2+0VF9bAuaP0Aiz+6g6noGeN2x7RLMciqg=";
+        hash = "sha256-5kX0SNEDnPD0lRIIkRakSuch4tRkp1O2cpUwttMWMQM=";
         stripRoot = false;
       };
       "aarch64-linux" = fetchzip {
         url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-linux-aarch64.zip";
-        hash = "sha256-B3H2XuhZYBqNmgMl1R/fBlneGhBrfZvE8oESDE7NFvA=";
-        stripRoot = false;
-      };
-      "x86_64-darwin" = fetchzip {
-        url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-macos-x86_64.zip";
-        hash = "sha256-Zhhm1SQ1oypisG+ecaeI6StIzsJCFMXzHC4xmCFQm8k=";
+        hash = "sha256-UOeK/urUqAzQYA0cPg2Ti69Vr1pd600hiujGhaUlaro=";
         stripRoot = false;
       };
       "aarch64-darwin" = fetchzip {
         url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-macos-aarch64.zip";
-        hash = "sha256-LD2ufQ4hnPbdAUjmCPIzxYr/WpuCF7tLbu3MbhiLwn4=";
+        hash = "sha256-LU2CAayNkipalSyCV/6xZmfOlD4acWL4Emk9qAHnJV0=";
         stripRoot = false;
       };
     };
