@@ -30,7 +30,6 @@ sed -i'' -e "s/version = \"${current_version}\"/version = \"${latest_version}\"/
 declare -A platform_map=(
   ["x86_64-linux"]="git-xet-linux-x86_64"
   ["aarch64-linux"]="git-xet-linux-aarch64"
-  ["x86_64-darwin"]="git-xet-macos-x86_64"
   ["aarch64-darwin"]="git-xet-macos-aarch64"
 )
 
