@@ -27,6 +27,7 @@ Diagnostic strategies for detecting out-of-distribution observations include:
 - Running additional simulations near the inferred posterior to verify local approximation quality.
 
 For MCMC, check standard diagnostics ($\hat{R}$, divergences, effective sample size) on the observed-data fit.
+For the complete diagnostic threshold table distinguishing sampling-based from simulation-based diagnostics, and for the ArviZ schema reference for organizing inference artifacts, see section 06.
 
 **[D]** Out-of-distribution detection is especially important for dynamical systems because the prior predictive distribution may not cover all dynamical regimes.
 A system observed in a regime (e.g., oscillatory) that the prior concentrates away from (e.g., toward fixed-point behavior) will produce unreliable posteriors regardless of the approximator's global calibration.
