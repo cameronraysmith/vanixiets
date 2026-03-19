@@ -3,7 +3,9 @@
 # shellcheck shell=bash
 
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")"
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+VERSIONS="${REPO_ROOT}/pkgs/by-name/duckdb/versions.json"
 
 repo=duckdb
 owner=duckdb
@@ -13,11 +15,11 @@ msg() {
 }
 
 json_get() {
-  jq -r "$1" < ./versions.json
+  jq -r "$1" < "${VERSIONS}"
 }
 
 json_set() {
-  jq --arg x "$2" "$1 = \$x" < ./versions.json | sponge 'versions.json'
+  jq --arg x "$2" "$1 = \$x" < "${VERSIONS}" | sponge "${VERSIONS}"
 }
 
 get_latest() {
