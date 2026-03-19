@@ -36,6 +36,7 @@ The epistemological commitments carry over unchanged: every modeling choice is t
 | [03-phase-2-post-model-pre-data.md](03-phase-2-post-model-pre-data.md) | Steps 4-11a: model development, simulator fidelity, ensemble simulation, prior checks, approximation architecture, training, algorithmic calibration, inferential calibration, amortization scope validation |
 | [04-phase-3-post-model-post-data.md](04-phase-3-post-model-post-data.md) | Steps 12-15: fitting observation, posterior fit diagnostics including OOD detection, posterior retrodictive checks, celebration |
 | [05-iteration-logic-and-failure-modes.md](05-iteration-logic-and-failure-modes.md) | Failure mode to return-to-step mapping, model change invalidation rules, iteration strategy |
+| [06-data-contract-and-diagnostic-reference.md](06-data-contract-and-diagnostic-reference.md) | Arrow-native data layer contract, ArviZ conceptual reference, diagnostic threshold delineation by inference paradigm |
 
 ## Core principles
 
