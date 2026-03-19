@@ -13,6 +13,7 @@
           duckdb
           huggingface-hub
           pip
+          trafilatura
         ]
       );
       dvcWithOptionalRemotes = pkgs.dvc.override {

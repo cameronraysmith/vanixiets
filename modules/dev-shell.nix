@@ -17,6 +17,7 @@
         [
           huggingface-hub
           pip
+          trafilatura
         ]
         ++ [
           config.packages.python-duckdb
