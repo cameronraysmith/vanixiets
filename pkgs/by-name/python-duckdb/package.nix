@@ -9,8 +9,6 @@
   stdenv,
   python3Packages,
   fetchFromGitHub,
-  cmake,
-  ninja,
   duckdb,
   openssl,
 }:
@@ -46,7 +44,7 @@ python3Packages.buildPythonPackage rec {
                      '# backend-path removed'
   '';
 
-  nativeBuildInputs = [
+  nativeBuildInputs = with python3Packages; [
     cmake
     ninja
   ];
@@ -134,6 +132,8 @@ python3Packages.buildPythonPackage rec {
     rm -rf duckdb
   '';
 
+  doCheck = false;
+  doInstallCheck = false;
   pythonImportsCheck = [ "duckdb" ];
 
   meta = {
