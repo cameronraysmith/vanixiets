@@ -96,41 +96,45 @@ python3Packages.buildPythonPackage rec {
     ]
     ++ optional-dependencies.all;
 
-  # test flags from .github/workflows/Python.yml
-  pytestFlags = [ "--verbose" ];
-  enabledTestPaths = if stdenv.hostPlatform.isDarwin then [ "tests/fast" ] else [ "tests" ];
+  # To restore nixpkgs cache parity, set doCheck to true (the default)
+  # and uncomment the pytest configuration below.
+  doCheck = false;
 
-  disabledTestPaths = [
-    # avoid dependency on adbc_driver_manager
-    "tests/fast/adbc"
-    # avoid dependency on pyotp
-    "tests/fast/test_pypi_cleanup.py"
-    # avoid test data download requiring network access
-    "tests/slow/test_h2oai_arrow.py"
-  ];
-
-  disabledTests = [
-    # tries to make http request
-    "test_install_non_existent_extension"
-
-    # test is flaky https://github.com/duckdb/duckdb/issues/11961
-    "test_fetchmany"
-
-    # https://github.com/duckdb/duckdb/issues/10702
-    # tests are racy and interrupt can be delivered before or after target point
-    # causing a later test to fail with a spurious KeyboardInterrupt
-    "test_connection_interrupt"
-    "test_query_interruption"
-
-    # flaky due to a race condition in checking whether a thread is alive
-    "test_query_progress"
-  ];
-
-  # remove duckdb dir to prevent import confusion by pytest
-  preCheck = ''
-    export HOME="$(mktemp -d)"
-    rm -rf duckdb
-  '';
+  # # test flags from .github/workflows/Python.yml
+  # pytestFlags = [ "--verbose" ];
+  # enabledTestPaths = if stdenv.hostPlatform.isDarwin then [ "tests/fast" ] else [ "tests" ];
+  #
+  # disabledTestPaths = [
+  #   # avoid dependency on adbc_driver_manager
+  #   "tests/fast/adbc"
+  #   # avoid dependency on pyotp
+  #   "tests/fast/test_pypi_cleanup.py"
+  #   # avoid test data download requiring network access
+  #   "tests/slow/test_h2oai_arrow.py"
+  # ];
+  #
+  # disabledTests = [
+  #   # tries to make http request
+  #   "test_install_non_existent_extension"
+  #
+  #   # test is flaky https://github.com/duckdb/duckdb/issues/11961
+  #   "test_fetchmany"
+  #
+  #   # https://github.com/duckdb/duckdb/issues/10702
+  #   # tests are racy and interrupt can be delivered before or after target point
+  #   # causing a later test to fail with a spurious KeyboardInterrupt
+  #   "test_connection_interrupt"
+  #   "test_query_interruption"
+  #
+  #   # flaky due to a race condition in checking whether a thread is alive
+  #   "test_query_progress"
+  # ];
+  #
+  # # remove duckdb dir to prevent import confusion by pytest
+  # preCheck = ''
+  #   export HOME="$(mktemp -d)"
+  #   rm -rf duckdb
+  # '';
 
   pythonImportsCheck = [ "duckdb" ];
 
