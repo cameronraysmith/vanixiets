@@ -52,6 +52,7 @@ The choice is determined by the inference framework's data loading conventions r
 
 DuckDB over httpfs with predicate pushdown serves diagnostics and results to visualization tools.
 This enables interactive exploration of diagnostic tables, posterior samples, and experimental design sweeps without requiring the full computational environment to be active.
+See `preferences-hypermedia-development` section 08 for the axum and async-duckdb serving architecture that implements this pattern.
 
 ### Cross-references
 
