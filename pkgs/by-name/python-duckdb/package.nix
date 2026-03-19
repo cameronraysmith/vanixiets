@@ -132,8 +132,6 @@ python3Packages.buildPythonPackage rec {
     rm -rf duckdb
   '';
 
-  doCheck = false;
-  doInstallCheck = false;
   pythonImportsCheck = [ "duckdb" ];
 
   meta = {
