@@ -117,6 +117,8 @@ For MCMC: examine $\hat{R}$, divergences, E-BFMI across the ensemble.
 Monitor calibration specifically in these regions.
 Correlate failures with specific simulated $(\tilde{y}, \tilde{\theta})$ to identify pathological posterior geometries.
 
+For quantitative SBC thresholds including the log-gamma statistic, and for how these diagnostics relate to sampling-based alternatives, see section 06.
+
 If failures are found, return to Step 8 (change architecture, increase training budget, improve adapter transforms) or Step 4 (reparameterize, strengthen priors consistent with domain expertise).
 
 ## Step 11: inferential calibration
