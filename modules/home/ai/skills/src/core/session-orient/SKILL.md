@@ -30,11 +30,11 @@ Execute the following steps in order.
 ### Step 1: load beads-orient diagnostics
 
 Delegate the graph-wide scan to `/issues-beads-orient` phase 1.
-Run `bd status`, `bd activity`, `bd epic status`, `bd ready`, and `bd blocked` to establish the current state of the issue graph.
+Run `bd status`, `bd diff HEAD~5 HEAD`, `bd epic status`, `bd ready`, and `bd blocked` to establish the current state of the issue graph.
 
 ```bash
 bd status
-bd activity
+bd diff HEAD~5 HEAD
 bd stale
 bd epic status
 ```
