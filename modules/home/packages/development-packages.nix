@@ -10,8 +10,9 @@
     let
       python = pkgs.python3.withPackages (
         ps: with ps; [
-          pip
+          duckdb
           huggingface-hub
+          pip
         ]
       );
       dvcWithOptionalRemotes = pkgs.dvc.override {
