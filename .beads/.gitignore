@@ -1,6 +1,7 @@
 # Dolt database (managed by Dolt, not git)
 dolt/
 dolt-access.lock
+dolt-server.port
 
 # Runtime files
 bd.sock
