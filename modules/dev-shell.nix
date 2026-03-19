@@ -7,6 +7,22 @@
       self',
       ...
     }:
+    let
+      # Match the home-manager python environment from development-packages.nix.
+      # Uses config.packages.python-duckdb (by-name) since the perSystem pkgs
+      # overlay doesn't include customPackages from compose.nix.
+      python = pkgs.python3.withPackages (
+        ps:
+        with ps;
+        [
+          huggingface-hub
+          pip
+        ]
+        ++ [
+          config.packages.python-duckdb
+        ]
+      );
+    in
     {
       devShells.default = pkgs.mkShell {
         inputsFrom = [
@@ -16,6 +32,7 @@
         ];
 
         packages = [
+          python
           inputs'.clan-core.packages.default
           inputs'.nix2container.packages.skopeo-nix2container
           pkgs.just
