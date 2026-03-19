@@ -2,6 +2,7 @@
 dolt/
 dolt-access.lock
 dolt-server.port
+.beads-credential-key
 
 # Runtime files
 bd.sock
