@@ -32,6 +32,7 @@ This paradigm complements functional domain modeling by maintaining clear effect
 | [05-web-components.md](05-web-components.md) | Thin wrapper pattern for third-party libraries (charts, editors, maps), vanilla vs Lit, morph exclusion, event design, memory cleanup |
 | [06-templating.md](06-templating.md) | Type-safe server-side templating, lazy vs eager evaluation, ID strategy for morphing, security (escaping, sanitization), testing patterns |
 | [07-event-architecture.md](07-event-architecture.md) | Event sourcing with SSE, CQRS pattern for hypermedia, event log as authority, real-time projections |
+| [08-analytics-data-serving.md](08-analytics-data-serving.md) | DuckDB analytics via async-duckdb in axum handlers, query result serialization for SSE, predicate pushdown from UI interactions, httpfs remote data access, cache strategy |
 
 ## When to use hypermedia architecture
 
