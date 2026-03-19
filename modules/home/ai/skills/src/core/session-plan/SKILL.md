@@ -290,7 +290,7 @@ The formula captures the insight that the operational buffer should be large eno
 When planning is highly variable (high CV_p), a larger buffer prevents implementation stalls.
 When planning is consistent (low CV_p), a smaller buffer suffices.
 
-In practice, estimate k from `bd activity` (recent closures per session), estimate p from the number of issues created in recent planning sessions, and estimate CV_p conservatively at 0.5 if insufficient data exists.
+In practice, estimate k from `bd list --status closed --closed-after <date> --all` (recent closures per session), estimate p from the number of issues created in recent planning sessions, and estimate CV_p conservatively at 0.5 if insufficient data exists.
 As the project accumulates history, refine these estimates.
 
 ### Step 4: decompose scope into atomic issues
