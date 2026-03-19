@@ -30,5 +30,10 @@
         type = "app";
         program = "${config.packages.git-xet.updateScript}";
       };
+
+      apps.update-duckdb = {
+        type = "app";
+        program = "${config.packages.duckdb.updateScript}";
+      };
     };
 }
