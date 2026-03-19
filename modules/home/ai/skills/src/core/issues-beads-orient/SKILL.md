@@ -39,8 +39,8 @@ Execute these commands now:
 # Quick human-readable summary (~20 lines)
 bd status
 
-# Recent activity (last 100 events)
-bd activity
+# Recent issue changes (last 5 Dolt commits)
+bd diff HEAD~5 HEAD
 
 # Stale issues that may need attention
 bd stale
@@ -131,10 +131,10 @@ From `bd status`:
 - Recent activity from git history
 - Human-readable, context-efficient
 
-From `bd activity`:
-- Real-time feed of issue mutations (create, update, delete)
-- Event symbols: + (created), -> (in_progress), check (completed), x (failed), null (deleted)
-- Shows workflow progress and recent changes
+From `bd diff HEAD~N HEAD`:
+- Shows issue-level changes between two Dolt refs
+- Includes created, modified, and deleted issues in the range
+- Use `--json` for structured output suitable for automated analysis
 
 From `bd stale`:
 - Issues not updated in last 30 days (configurable with --days)
