@@ -23,6 +23,14 @@
             doCheck = false;
             doInstallCheck = false;
           };
+
+          # Override python duckdb to track the by-name C++ duckdb package.
+          # In machine configs (via compose.nix), final.duckdb is the by-name
+          # version from pkgs/by-name/duckdb/ with versions.json controlling
+          # version and hashes. In perSystem context, final.duckdb is nixpkgs'
+          # version (identical when not updated), making this a no-op.
+          # Update both packages: nix run .#update-duckdb
+          duckdb = pyPrev.duckdb.override { duckdb = final.duckdb; };
         };
       };
       python3Packages = final.python3.pkgs;
