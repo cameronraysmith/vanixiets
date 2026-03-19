@@ -55,7 +55,7 @@ stdenv.mkDerivation (finalAttrs: {
     (lib.cmakeBool "BUILD_UNITTESTS" finalAttrs.doInstallCheck)
   ];
 
-  doInstallCheck = false;
+  doInstallCheck = true;
 
   nativeInstallCheckInputs = [ versionCheckHook ];
 
