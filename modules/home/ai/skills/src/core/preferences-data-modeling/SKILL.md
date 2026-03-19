@@ -173,7 +173,7 @@ DuckDB provides first-class bindings that all produce Arrow record batches throu
 The bindings vary in maturity and ecosystem integration but share the same zero-copy Arrow output path.
 
 - Python: `duckdb` package, the most mature binding with tight pandas and polars integration
-- Julia: `DuckDB.jl` (source at `~/projects/duckdb/tools/juliapkg`), enabling Julia's SciML ecosystem (DiffEq.jl, Lux.jl, KernelAbstractions.jl) to consume lakehouse data directly as Arrow tables
+- Julia: `DuckDB.jl` (source at `~/projects/duckdb/tools/juliapkg`), enabling Julia's SciML ecosystem (DiffEq.jl, Lux.jl, KernelAbstractions.jl) to consume lakehouse data directly as Arrow record batches
 - Rust: `duckdb-rs` (`~/projects/omicslake-workspace/duckdb-rs`) for embedded analytics, and `async-duckdb` (`~/projects/rust-workspace/async-duckdb`) for async web application serving via axum
 
 All three language ecosystems benefit equally from the DuckDB-to-Arrow pipeline.
@@ -300,6 +300,8 @@ Model provenance registries track which artifacts belong to which model version:
 This is the metadata layer that connects simulation outputs, trained approximators, and diagnostic results into a queryable lineage graph.
 
 Experimental design sweep results follow the pattern (design_config, parameter, metric_value), enabling cross-configuration queries to identify which experimental designs yield the best inference performance.
+
+See `preferences-scalable-probabilistic-modeling-workflow` section 06 for diagnostic threshold definitions and paradigm-specific applicability.
 
 ## Current data hosting stack
 
