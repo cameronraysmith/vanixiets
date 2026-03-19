@@ -406,8 +406,8 @@ After completing the per-issue checkpoint steps above, run session-level diagnos
 # Current state (compare to session start)
 bd status
 
-# What changed this session
-bd activity
+# Diff of bead state between session start and current HEAD
+bd diff <session-start-ref> HEAD
 
 # Epic progress change
 bd epic status
@@ -428,8 +428,8 @@ bd stale
 Determine session scope by counting issues touched:
 
 ```bash
-# Count issues modified this session (from activity feed)
-bd activity | grep -E "^[->!+]" | wc -l
+# Count issues modified this session (from date-filtered list)
+bd list --updated-after <session-start-date> --json | jq length
 ```
 
 Tailor summary depth to session scope.
