@@ -122,7 +122,7 @@ The ReadSignals deserialization step also provides a type-checked boundary: sign
 DuckDB within an axum service accesses remote data sources through the httpfs extension, which enables transparent HTTP, HTTPS, and S3 reads from Parquet files, CSV files, and DuckLake catalog databases.
 
 Extension initialization happens at service startup, not per-request.
-The httpfs and ducklake extensions must be installed once (writing to `~/.duckdb/extensions/`) and loaded on every connection in the pool, since DuckDB extensions are per-connection state:
+The httpfs and DuckLake (`ducklake`) extensions must be installed once (writing to `~/.duckdb/extensions/`) and loaded on every connection in the pool, since DuckDB extensions are per-connection state:
 
 ```rust
 pub async fn initialize_extensions(pool: &Pool) -> Result<(), AnalyticsError> {
@@ -202,5 +202,6 @@ Cross-reference section 07 for the event architecture foundation, including the 
 - `02-sse-patterns.md` - SSE streaming mechanics, reconnection
 - `03-datastar.md` - signal system, ReadSignals pattern, PatchElements/PatchSignals
 - `07-event-architecture.md` - event sourcing, projection pipelines, CQRS
-- `~/.claude/skills/preferences-data-modeling/SKILL.md` - DuckDB/DuckLake patterns, materialized views
+- `~/.claude/skills/preferences-data-modeling/SKILL.md` - DuckDB/DuckLake patterns, materialized views, scientific data contracts
 - `~/.claude/skills/preferences-rust-development/SKILL.md` - Rust-specific patterns for axum integration
+- `~/.claude/skills/preferences-scalable-probabilistic-modeling-workflow/SKILL.md` - section 06 defines the diagnostic artifacts (simulation ensembles, posterior samples, calibration tables) that this serving pipeline delivers to visualization tools
