@@ -39,9 +39,24 @@
             cleanupPeriodDays = 1100;
             includeCoAuthoredBy = false;
             enableAllProjectMcpServers = false;
+            extraKnownMarketplaces = {
+              claude-plugins-official = {
+                source = {
+                  source = "github";
+                  repo = "anthropics/claude-plugins-official";
+                };
+              };
+              duckdb-skills = {
+                source = {
+                  source = "github";
+                  repo = "duckdb/duckdb-skills";
+                };
+              };
+            };
             enabledPlugins = {
               "feature-dev@claude-plugins-official" = true;
               "frontend-design@claude-plugins-official" = true;
+              "duckdb-skills@duckdb-skills" = true;
             };
             voiceEnabled = true;
             remoteControlAtStartup = true;
