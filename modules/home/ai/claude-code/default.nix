@@ -10,6 +10,10 @@
         flake,
         ...
       }:
+      let
+        # Toggle: set to false to revert to immutable nix store symlink
+        mutableClaudeSettings = true;
+      in
       {
         programs.claude-code = {
           enable = true;
@@ -309,6 +313,25 @@
             };
           };
         };
+
+        # Mutable settings: copy instead of symlink so Claude Code can write at runtime.
+        # Each home-manager activation overwrites with declared state.
+        home.file.".claude/settings.json".enable = lib.mkIf mutableClaudeSettings (lib.mkForce false);
+
+        home.activation.claudeCodeMutableSettings = lib.mkIf mutableClaudeSettings (
+          let
+            jsonFormat = pkgs.formats.json { };
+            settingsFile = jsonFormat.generate "claude-code-settings.json" (
+              config.programs.claude-code.settings
+              // {
+                "$schema" = "https://json.schemastore.org/claude-code-settings.json";
+              }
+            );
+          in
+          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+            $DRY_RUN_CMD install -Dm644 ${settingsFile} $HOME/.claude/settings.json
+          ''
+        );
 
         home.shellAliases = {
           ccds = "claude --dangerously-skip-permissions";
