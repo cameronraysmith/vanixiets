@@ -92,14 +92,14 @@
               "clinical-trial-protocol@life-sciences" = true;
               "clinical-trials@life-sciences" = true;
             };
-            voiceEnabled = true;
+            voiceEnabled = false;
             remoteControlAtStartup = true;
             alwaysThinkingEnabled = true;
 
             env = {
-              ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-4-6[1m]";
-              ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-4-6[1m]";
-              ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-opus-4-6[1m]";
+              ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-4-6";
+              ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-4-6";
+              ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-opus-4-6";
               ASTRO_TELEMETRY_DISABLED = "1";
               CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR = "0";
               CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY = "1";
