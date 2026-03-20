@@ -52,11 +52,41 @@
                   repo = "duckdb/duckdb-skills";
                 };
               };
+              life-sciences = {
+                source = {
+                  source = "github";
+                  repo = "anthropics/life-sciences";
+                };
+              };
             };
             enabledPlugins = {
+              # claude-plugins-official
+              "agent-sdk-dev@claude-plugins-official" = true;
+              "claude-md-management@claude-plugins-official" = true;
+              "code-review@claude-plugins-official" = true;
+              "code-simplifier@claude-plugins-official" = true;
+              "explanatory-output-style@claude-plugins-official" = true;
               "feature-dev@claude-plugins-official" = true;
+              "figma@claude-plugins-official" = true;
               "frontend-design@claude-plugins-official" = true;
+              "hookify@claude-plugins-official" = true;
+              "huggingface-skills@claude-plugins-official" = true;
+              "learning-output-style@claude-plugins-official" = true;
+              "playground@claude-plugins-official" = true;
+              "plugin-dev@claude-plugins-official" = true;
+              "posthog@claude-plugins-official" = true;
+              "sentry@claude-plugins-official" = true;
+              "skill-creator@claude-plugins-official" = true;
+              "superpowers@claude-plugins-official" = true;
+              # duckdb-skills
               "duckdb-skills@duckdb-skills" = true;
+              # life-sciences
+              "10x-genomics@life-sciences" = true;
+              "biorender@life-sciences" = true;
+              "biorxiv@life-sciences" = true;
+              "chembl@life-sciences" = true;
+              "clinical-trial-protocol@life-sciences" = true;
+              "clinical-trials@life-sciences" = true;
             };
             voiceEnabled = true;
             remoteControlAtStartup = true;
