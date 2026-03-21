@@ -15,18 +15,18 @@
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "gitbutler-cli";
-  version = "0.19.1";
+  version = "0.19.6";
 
   src = fetchFromGitHub {
     owner = "gitbutlerapp";
     repo = "gitbutler";
     tag = "release/${finalAttrs.version}";
-    hash = "sha256-ZCjlN8DF/l1v4AHk2CPB8VcaSuRLVIuOWPUfSn59LiE=";
+    hash = "sha256-5hJmVXIhVEGof+yGUN25nRkFaeiGy0Aya582FPGUldo=";
   };
 
   cargoPatches = [ ./deduplicate-vendor-sources.patch ];
 
-  cargoHash = "sha256-F/x0S5Q+7VJ5mvmoITkAUx5ZYRncbFNpJPb0gKx1Hv8=";
+  cargoHash = "sha256-HkO5Xx7TMSvG/v1YA2y3u/TjhlFEhxBkZayKmjQ2H/s=";
 
   cargoBuildFlags = [ "-p=but" ];
 
