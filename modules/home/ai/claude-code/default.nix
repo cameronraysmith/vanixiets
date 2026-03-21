@@ -92,7 +92,7 @@
               "clinical-trial-protocol@life-sciences" = true;
               "clinical-trials@life-sciences" = false;
             };
-            voiceEnabled = false;
+            voiceEnabled = true;
             remoteControlAtStartup = true;
             alwaysThinkingEnabled = true;
 
