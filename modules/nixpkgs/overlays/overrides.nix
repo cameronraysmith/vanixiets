@@ -45,6 +45,18 @@
         doCheck = false;
       });
 
+      # kyverno-chainsaw: Go 1.25+ compatibility
+      # Go 1.25 added ModulePath() to the testing.testDeps interface.
+      # chainsaw v0.2.14 implements testDeps but lacks this method, causing build failure.
+      # Upstream fix: kyverno/chainsaw commit 5f2001f7ce, PR #2646
+      # TODO: Remove when nixpkgs updates chainsaw past v0.2.14
+      # Date added: 2026-03-21
+      kyverno-chainsaw = prev.kyverno-chainsaw.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [
+          ./patches/kyverno-chainsaw-go125-compat.patch
+        ];
+      });
+
       # Rename graphite-cli binary from `gt` to `gph`
       #
       # Conflict: upstream graphite-cli uses `gt` which collides with gastown.
