@@ -1,0 +1,11 @@
+diff --git a/pkg/runner/internal/test_deps.go b/pkg/runner/internal/test_deps.go
+--- a/pkg/runner/internal/test_deps.go
++++ b/pkg/runner/internal/test_deps.go
+@@ -75,3 +75,7 @@ func (*TestDeps) SnapshotCoverage() {}
+ func (*TestDeps) InitRuntimeCoverage() (string, func(string, string) (string, error), func() float64) {
+ 	return "", nil, nil
+ }
++
++func (*TestDeps) ModulePath() string {
++	return ""
++}
