@@ -24,9 +24,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
     hash = "sha256-5hJmVXIhVEGof+yGUN25nRkFaeiGy0Aya582FPGUldo=";
   };
 
-  cargoPatches = [ ./deduplicate-vendor-sources.patch ];
-
-  cargoHash = "sha256-HkO5Xx7TMSvG/v1YA2y3u/TjhlFEhxBkZayKmjQ2H/s=";
+  cargoHash = "sha256-w8WfPS2qwdO84W/UDXaCmHH3xfO8o1gML3rU+1cL0wE=";
 
   cargoBuildFlags = [ "-p=but" ];
 
