@@ -78,8 +78,8 @@
               "learning-output-style@claude-plugins-official" = true;
               "playground@claude-plugins-official" = true;
               "plugin-dev@claude-plugins-official" = true;
-              "posthog@claude-plugins-official" = true;
-              "sentry@claude-plugins-official" = true;
+              "posthog@claude-plugins-official" = false;
+              "sentry@claude-plugins-official" = false;
               "skill-creator@claude-plugins-official" = true;
               "superpowers@claude-plugins-official" = true;
               # duckdb-skills
@@ -87,10 +87,10 @@
               # life-sciences
               "10x-genomics@life-sciences" = true;
               "biorender@life-sciences" = true;
-              "biorxiv@life-sciences" = true;
-              "chembl@life-sciences" = true;
+              "biorxiv@life-sciences" = false;
+              "chembl@life-sciences" = false;
               "clinical-trial-protocol@life-sciences" = true;
-              "clinical-trials@life-sciences" = true;
+              "clinical-trials@life-sciences" = false;
             };
             voiceEnabled = false;
             remoteControlAtStartup = true;
