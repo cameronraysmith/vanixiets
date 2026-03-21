@@ -69,7 +69,12 @@
             ui_font_size = 14;
             ui_font_family = "Cascadia Code";
             buffer_font_size = 12;
+            buffer_font_family = "Monaspace Neon Nerd Font";
             icon_theme = "Catppuccin Mocha";
+
+            terminal = {
+              font_family = "Monaspace Neon Nerd Font";
+            };
 
             theme = {
               mode = "system";
