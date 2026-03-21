@@ -1,6 +1,6 @@
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -3108,15 +3108,6 @@
+@@ -3254,15 +3254,6 @@
  [[package]]
  name = "file-id"
  version = "0.2.3"
@@ -16,7 +16,7 @@
  source = "git+https://github.com/notify-rs/notify?rev=978fe719b066a8ce76b9a9d346546b1569eecfb6#978fe719b066a8ce76b9a9d346546b1569eecfb6"
  dependencies = [
   "windows-sys 0.60.2",
-@@ -3836,7 +3827,7 @@
+@@ -4009,7 +4000,7 @@
  version = "0.0.0"
  dependencies = [
   "deser-hjson",
@@ -25,25 +25,25 @@
   "gitbutler-notify-debouncer",
   "mock_instant",
   "notify",
-@@ -4691,7 +4682,7 @@
+@@ -4897,7 +4888,7 @@
  checksum = "7cb06c3e4f8eed6e24fd915fa93145e28a511f4ea0e768bae16673e05ed3f366"
  dependencies = [
   "bstr",
-- "gix-trace 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
-+ "gix-trace 0.1.17 (git+https://github.com/GitoxideLabs/gitoxide?branch=main)",
+- "gix-trace 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
++ "gix-trace 0.1.18 (git+https://github.com/GitoxideLabs/gitoxide?branch=main)",
   "gix-validate 0.10.1",
   "thiserror 2.0.18",
  ]
-@@ -4936,12 +4927,6 @@
- 
+@@ -5150,12 +5141,6 @@
+
  [[package]]
  name = "gix-trace"
--version = "0.1.17"
+-version = "0.1.18"
 -source = "registry+https://github.com/rust-lang/crates.io-index"
--checksum = "6e42a4c2583357721ba2d887916e78df504980f22f1182df06997ce197b89504"
+-checksum = "f69a13643b8437d4ca6845e08143e847a36ca82903eed13303475d0ae8b162e0"
 -
 -[[package]]
 -name = "gix-trace"
- version = "0.1.17"
- source = "git+https://github.com/GitoxideLabs/gitoxide?branch=main#a3e7b6eb7330e2d83df492b301ac4975d17c1fd2"
+ version = "0.1.18"
+ source = "git+https://github.com/GitoxideLabs/gitoxide?branch=main#1a72380ac5077fc143a18a59794a35191cd0f39b"
  dependencies = [
