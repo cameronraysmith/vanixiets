@@ -326,12 +326,35 @@ Beads IDs take precedence over the `exp-N-description` experiment naming convent
 Use experiment naming only for exploratory work not tied to a beads issue.
 
 Worktrees are a git-only mechanism; jj uses bookmarks for branch-like semantics.
-When in a jj-managed repo, create a bookmark at the working copy for bead work rather than using `git worktree add`:
+When in a jj-managed repo, create a bookmark for bead work rather than using `git worktree add`:
 
 ```bash
-jj bookmark create {ID}-descriptor
-# work, then push:
-jj git push --bookmark {ID}-descriptor
+jj bookmark create {epic-ID}-descriptor
+# work on issues as changes within the bookmark chain:
+jj new {epic-ID}-descriptor
+jj describe -m "feat: implement issue description"
+# edit files...
+jj new  # freeze and start next issue
+jj git push --bookmark {epic-ID}-descriptor
 ```
 
-After completing bead work, push beads state with `bd dolt push` and update the bookmark before pushing.
+When working across multiple epics simultaneously, create a multi-parent working copy:
+
+```bash
+jj new {epic-a}-descriptor {epic-b}-descriptor
+# edit files in the shared @ working copy
+jj absorb              # auto-route changes by blame
+jj squash --into {epic-b}-descriptor  # manual routing
+```
+
+Subagent dispatch in jj mode: subagents edit files directly in the shared `@` working copy.
+The orchestrator routes changes to the correct epic bookmark after the subagent returns.
+See the "Subagent dispatch in jj mode" subsection in `~/.claude/skills/preferences-git-version-control/SKILL.md` for conventions.
+
+After completing bead work, close the issue, push beads state, and push the bookmark:
+
+```bash
+bd close {issue-ID} --reason "Implemented in $(jj log -r '{epic-ID}-descriptor' --no-graph -T 'commit_id.short(8)')"
+bd dolt push
+jj git push --bookmark {epic-ID}-descriptor
+```
