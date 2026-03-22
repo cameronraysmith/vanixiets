@@ -665,6 +665,13 @@ See `~/.claude/skills/preferences-git-version-control/SKILL.md` for the full cro
 
 For background on multi-parent `jj new` and the design rationale, see Chris Krycho's ["jj init" essay](https://raw.githubusercontent.com/chriskrycho/v5.chriskrycho.com/d3f989498a3828aeb7e5e816e115b9fc0196d8d0/site/essays/jj%20init.md), particularly the section on creating three-parent merges.
 
+Beads integration with multi-parent working copies:
+
+When `.beads/` exists, epic bookmarks compose naturally with the multi-parent model.
+Create a bookmark per active epic (`{epic-ID}-descriptor`), then `jj new epic-a epic-b` to work across them simultaneously.
+The orchestrator routes changes from the multi-parent `@` to the correct epic bookmark via `jj absorb` (blame-based) or `jj squash --into` (explicit) after each subagent completes.
+See the "Epic and issue mapping" subsection in `~/.claude/skills/preferences-git-version-control/SKILL.md` for the complete lifecycle including subagent dispatch conventions.
+
 ## History refinement
 
 Transform experimental development history into clean, reviewable commit sequence.
