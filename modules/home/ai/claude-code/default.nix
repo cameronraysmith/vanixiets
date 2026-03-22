@@ -62,6 +62,12 @@
                   repo = "anthropics/life-sciences";
                 };
               };
+              honcho = {
+                source = {
+                  source = "github";
+                  repo = "plastic-labs/claude-honcho";
+                };
+              };
             };
             enabledPlugins = {
               # claude-plugins-official
@@ -91,6 +97,9 @@
               "chembl@life-sciences" = false;
               "clinical-trial-protocol@life-sciences" = false;
               "clinical-trials@life-sciences" = false;
+              # honcho
+              "honcho@honcho" = true;
+              "honcho-dev@honcho" = false;
             };
             voiceEnabled = true;
             remoteControlAtStartup = true;
@@ -310,6 +319,29 @@
                 # "Bash(truncate *)"
                 # "Bash(shred *)"
               ];
+            };
+          };
+        };
+
+        # Honcho plugin: generate ~/.honcho/config.json with API key from sops
+        sops.templates."honcho-config" = {
+          mode = "0600";
+          path = "${config.home.homeDirectory}/.honcho/config.json";
+          content = builtins.toJSON {
+            apiKey = config.sops.placeholder."honcho-api-key";
+            peerName = "crs58";
+            hosts = {
+              claude_code = {
+                workspace = "claude_code";
+                aiPeer = "claude";
+              };
+            };
+            sessionStrategy = "per-directory";
+            saveMessages = true;
+            enabled = true;
+            logging = true;
+            endpoint = {
+              environment = "production";
             };
           };
         };
