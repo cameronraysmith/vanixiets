@@ -21,7 +21,12 @@
       }
       // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
         # Darwin-wide stable fallbacks (both aarch64 and x86_64)
-        # (Add as needed)
+
+        # lean4: not built by hydra for darwin, compiles from source (~9 min)
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/trunk/lean4.aarch64-darwin
+        # TODO: Remove when hydra provides darwin binaries
+        # Date added: 2026-03-21
+        lean4 = final.stable.lean4;
       })
       // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "x86_64-darwin") {
         # x86_64-darwin specific stable fallbacks
