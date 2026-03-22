@@ -16,7 +16,27 @@ Transform experimental development history into a clean, reviewable commit seque
 
 This prepares branches for PR review by creating a clear narrative of what changed and why.
 
-## principle
+## GitButler mode
+
+When `gitbutler/workspace` is checked out, the `but` CLI provides native history editing commands that replace `git rebase -i`.
+The git-rebase patterns in the rest of this skill apply only to git-native mode.
+
+| Git operation | but equivalent |
+|---|---|
+| `git rebase -i` (reorder) | `but move <commit> <target-commit>` (within branch) or `but move <commit> <branch>` (cross-stack) |
+| `git rebase -i` (squash) | `but squash <source-commit> <target-commit>` |
+| `git rebase -i` (reword) | `but reword <commit> -m "new message"` |
+| `git rebase -i` (edit) | `but uncommit <commit>` then re-commit with changes |
+| `git commit --amend` | `but amend <file-id> <commit-id>` |
+| `git revise` | Same `but` commands above --- `but` subsumes `git revise` functionality |
+| `git rebase --abort` | `but undo` (reverts last operation) |
+
+All `but` mutation commands accept `--status-after` to display the updated workspace state.
+Always use fresh CLI IDs from `but status -fv` before each operation, as IDs change after every mutation.
+
+The git-native patterns below (interactive rebase, `GIT_SEQUENCE_EDITOR`, `git revise`) remain the correct approach when working in repositories not managed by GitButler.
+
+## principle (git-native mode)
 
 Never trigger interactive editors. All operations use `GIT_SEQUENCE_EDITOR` and `GIT_EDITOR` environment variables with non-interactive commands.
 
