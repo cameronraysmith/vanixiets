@@ -163,25 +163,14 @@ bd create "Integrate auth with database for session storage" \
 
 ### 6. Commit configuration and push beads state
 
-After creating the initial beads structure, commit the beads configuration files:
-
-```bash
-git add .beads/config.yaml .beads/metadata.json
-git commit -m "feat: seed beads issues from architecture docs
-
-Translate architecture planning into work items:
-- N epics for major components
-- M stories implementing features
-- Dependencies wired per architectural requirements"
-```
+After creating the initial beads structure, commit the beads configuration files (`.beads/config.yaml`, `.beads/metadata.json`) atomically per git-preferences conventions.
+Include a summary of what was created in the commit message.
 
 Push the issue data to the dolt remote for backup:
 
 ```bash
 bd dolt push
 ```
-
-Include a summary of what was created in the commit message.
 
 ### 7. Verify parent-child integrity
 
@@ -254,8 +243,7 @@ bd dep tree bd-user-mgmt-epic --direction both # Full dependency graph for epic
 bd dep tree bd-content-epic --direction both   # Full dependency graph for epic
 
 # Commit configuration and push beads state
-git add .beads/config.yaml .beads/metadata.json
-git commit -m "feat: seed beads from system-design.md architecture"
+# Commit .beads/config.yaml and .beads/metadata.json per git-preferences conventions
 bd dolt push
 ```
 
