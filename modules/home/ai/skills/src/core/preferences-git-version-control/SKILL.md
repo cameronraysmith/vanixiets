@@ -312,7 +312,9 @@ If a branch has diverged and rebase produces conflicts, resolve them during the 
 
 In GitButler mode, stacked branches are already linear by construction.
 Fast-forward merge of the stack tip integrates all stacked segments at once.
-See the "Stacked PRs with single fast-forward merge" recipe in `~/.claude/skills/gitbutler-but-cli/SKILL.md` for the full workflow.
+Exit GitButler before merging to main: `but teardown`, then `git merge --ff-only`, then `but setup`.
+Do not use `but merge` for this — it always creates merge commits and has no fast-forward mode.
+See the "Stacked PRs with single fast-forward merge" and "Merging multiple independent stacks" recipes in `~/.claude/skills/gitbutler-but-cli/SKILL.md` for the full workflow.
 
 ### Stack management
 
