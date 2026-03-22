@@ -26,9 +26,13 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   cargoHash = "sha256-w8WfPS2qwdO84W/UDXaCmHH3xfO8o1gML3rU+1cL0wE=";
 
-  cargoBuildFlags = [ "-p=but" ];
+  cargoBuildFlags = [
+    "-p=but"
+    "--features=packaged-but-distribution"
+  ];
 
   env = {
+    VERSION = finalAttrs.version;
     RUSTFLAGS = "--cfg tokio_unstable";
     CHANNEL = "release";
   };
