@@ -94,10 +94,13 @@ For quick questions about commands or concepts, this summary may suffice.
 ## Quick command reference
 
 ```bash
-# Start work (atomic commit pattern with git parity)
-jj new <base>                  # New commit on base
+# Atomic commit cycle (one file per change, matching git-preferences conventions)
+# Edit ONE file, then immediately:
 jj describe -m "message"       # Describe current @ (ALWAYS use -m!)
-jj new                         # Freeze @ for git export, create new @ on top
+jj new                         # Freeze @, start new empty @
+# Repeat for next file. Without `jj new`, the next edit accumulates into the same change.
+# If multiple files were edited before freezing, split after the fact:
+jj split <path> -m "msg"       # Extract one file into its own change
 
 # Bookmarks
 jj bookmark create <name>      # Create at @
@@ -273,7 +276,7 @@ jj log -r 'mine() & ~bookmarks()'
 - **Always colocated mode**: We operate with both .git and .jj (can revert to git anytime)
 - **Operation log is safety net**: Delete bookmarks freely, everything in operation log
 - **Start with bookmarks**: Only create workspaces when need simultaneous file access
-- **Describe atomically**: Each `jj describe` should represent one logical change
+- **Describe atomically**: Each `jj describe` + `jj new` cycle should represent one logical change to one file — this is a standing directive matching the git-preferences atomic commit convention. Use `jj split` to fix up if you forgot.
 - **Trust auto-snapshot**: Changes saved before every command, recoverable via operation log
 - **Change IDs track identity**: Commit IDs change on rewrite, change IDs don't
 - **No backup branches**: Use `jj op log` and `jj op restore` instead
