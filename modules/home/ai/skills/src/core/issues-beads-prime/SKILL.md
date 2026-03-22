@@ -80,61 +80,32 @@ If `bd epic status` shows `0/0 children` for an epic known to contain issues, th
   The human will request epic closure when ready, at which point `bd epic close-eligible --dry-run` can confirm readiness.
 - After closing issues, check whether additional follow-up issues are needed. Use `bd close <id> --suggest-next` to see newly unblocked work.
 
-### Worktree and branch workflow
+### Working branch workflow
 
-Bead implementation work uses worktrees for isolation; non-bead work uses plain branches.
+Bead implementation work uses isolated working branches; non-bead work uses plain branches.
 Branch naming follows the `{ID}-descriptor` pattern in lowercase kebab-case, with dots in bead IDs replaced by dashes.
-Default granularity is per-issue; use epic-level worktrees only when the orchestrator explicitly specifies.
+Default granularity is per-issue; use epic-level branches only when the orchestrator explicitly specifies.
 
-Worktree creation command (from repo root):
+Create a working branch for the issue following the branch naming pattern `{ID}-descriptor`.
+See the "Working branch isolation" section of git-preferences for mode-specific commands (git worktree add in git-native mode, or `but branch new` in GitButler mode).
 
-```bash
-git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main
-```
+The subagent creates the working branch as its first action before any implementation work begins.
+For non-bead or quick-fix work, use a plain branch instead of the full isolation workflow.
 
-The subagent creates the worktree as its first action before any implementation work begins.
-The `.worktrees/` directory must be listed in `.gitignore`.
-If the repository uses direnv with a nix devshell, run `direnv allow` in the worktree after creation and use `direnv exec . git commit ...` for commits that trigger pre-commit hooks.
-
-For non-bead or quick-fix work, use a plain branch instead: `git checkout -b {ID}-descriptor`.
+In git-native mode with worktrees, initialize the direnv environment before hook-triggering operations.
+This does not apply in GitButler mode (single working tree).
 
 Dispatch clarity:
-- When dispatching subagent Tasks, the prompt must specify which worktree or branch the subagent works in.
-- Subagents working on the same issue share a worktree.
-- Subagents working on different issues get different worktrees.
-- If a dispatch prompt does not mention a worktree or branch, the subagent should ask rather than assuming.
+- When dispatching subagent Tasks, the prompt must specify the working context path (worktree path or GitButler branch name) the subagent works in.
+- Subagents working on the same issue share a working context.
+- Subagents working on different issues get different working contexts.
+- If a dispatch prompt does not mention a working context, the subagent should ask rather than assuming.
 
-Worktree lifecycle (create, work, rebase, merge, clean up):
-
-```bash
-# 1. Create worktree and branch
-git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main
-
-# 2. Initialize direnv (if repo uses nix devshell)
-cd .worktrees/{ID}-descriptor
-direnv allow
-cd ../..
-
-# 3. Work in the worktree, making atomic commits
-# Use `direnv exec .worktrees/{ID}-descriptor git commit ...` for hook-aware commits
-
-# 4. When work is complete, rebase onto main
-cd .worktrees/{ID}-descriptor
-git rebase main
-
-# 5. Fast-forward merge to main (from repo root)
-cd ../..
-git checkout main
-git merge --ff-only {ID}-descriptor
-
-# 6. Clean up
-git worktree remove .worktrees/{ID}-descriptor
-git branch -d {ID}-descriptor
-```
+When issue work is complete, integrate the working branch back to the parent branch and clean up.
+See git-preferences for the mode-specific integration and cleanup procedure.
 
 All merges to main must be fast-forward.
-Rebase the branch onto main before merging to ensure this.
-The repository `merge.ff=only` git config rejects non-fast-forward merges as a safety net.
+See the "Fast-forward-only merge policy" section of git-preferences for enforcement details.
 
 ## Dolt persistence
 
