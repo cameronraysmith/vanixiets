@@ -346,11 +346,68 @@ This keeps the multi-parent working copy current without manual intervention.
 
 Bookmarks correspond to epics or independent work streams.
 Changes within each bookmark's chain correspond to issues.
+This mapping parallels the git-native worktree model and the GitButler stack model, but without filesystem separation.
 
-When working on a beads epic:
-- Create a bookmark per epic: `{epic-ID}-descriptor`
-- Build changes as a chain descending from each bookmark
-- Route multi-parent working copy edits to the appropriate epic bookmark via `jj squash --into` or `jj absorb`
+Create a bookmark per active epic following the standard naming convention:
+
+```bash
+jj bookmark create {epic-ID}-descriptor
+```
+
+Build changes as a chain descending from each bookmark.
+Each change in the chain corresponds to an issue within the epic:
+
+```bash
+# Start work on an issue within the epic
+jj new {epic-ID}-descriptor
+jj describe -m "feat: implement issue description"
+# edit files...
+jj new  # freeze and start next issue
+```
+
+When working across multiple epics simultaneously, create a multi-parent working copy compositing the active epic bookmarks:
+
+```bash
+jj new {epic-a}-descriptor {epic-b}-descriptor
+```
+
+Route changes from the multi-parent `@` to the appropriate epic bookmark:
+
+```bash
+# Automatic: distribute changes by blame ancestry
+jj absorb
+
+# Manual: route specific changes to a named epic
+jj squash --into {epic-b}-descriptor
+```
+
+##### Subagent dispatch in jj mode
+
+Subagent dispatch differs fundamentally from git-native and GitButler modes.
+In git-native mode, subagents work in isolated worktrees (filesystem separation).
+In GitButler mode, subagents target named branches within the workspace.
+In jj mode, subagents edit files directly in the shared `@` working copy.
+The orchestrator handles change routing to the correct epic bookmark after the subagent completes, using `jj absorb` for blame-based distribution or `jj squash --into` for explicit targeting.
+
+Subagent dispatch prompts should specify which files to edit and the target epic context, but do not need to include jj routing commands.
+The orchestrator manages the routing step as a coordination action after the subagent returns.
+
+##### Completing issues and epics
+
+When an issue is complete, close the bead:
+
+```bash
+bd close {issue-ID} --reason "Implemented in $(jj log -r '{epic-ID}-descriptor' --no-graph -T 'commit_id.short(8)')"
+```
+
+To merge a completed epic to main, advance the main bookmark:
+
+```bash
+jj new
+jj bookmark set main -r @-
+jj git push --bookmark main
+jj bookmark delete {epic-ID}-descriptor
+```
 
 ##### No direnv initialization needed
 
