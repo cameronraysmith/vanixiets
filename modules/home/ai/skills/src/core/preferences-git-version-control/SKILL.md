@@ -41,7 +41,7 @@ Each abstract term maps to concrete equivalents in the four VCS tools used acros
 | Branch stack | Feature branch (single) or graphite stack | Stack (chain of stacked branches sharing one linear history) | Bookmark chain | Topic (group of related changes) |
 | Branch boundary | N/A (one branch = one unit) | Branch name within a stack, inserted via `but branch new -a` | Change boundary (each change is a boundary) | Change boundary |
 | Change set | Commits on a branch between two merge points | Commits within one branch segment of a stack | Single change (jj's atomic unit) | Patchset (version of a change) |
-| Working branch | Checked-out branch (`git checkout`) | Applied branch (multiple coexist in workspace) | Current change (`@`) | Checked-out change |
+| Working branch | Checked-out branch (`git checkout`) | Applied branch (multiple coexist in workspace) | Current change (`@`); multi-parent `@` for multi-parent working copy | Checked-out change |
 | Integrate to main | Fast-forward merge (`git merge --ff-only`) | Fast-forward merge of stack tip | `jj git push` + bookmark advance | Submit (merge to target) |
 | Isolate work | `git worktree add` or `git checkout -b` | `but branch new` (independent stack) or `but branch new -a` (stacked segment) | `jj new` (new change) | New change |
 | Reorder history | `git rebase -i` | `but move` (within stack), `but squash`, `but reword` | `jj rebase`, `jj squash` | Amend patchset |
@@ -101,6 +101,7 @@ To isolate work in a new branch:
 
 - **Git-native mode:** `git checkout -b ID-descriptor` to branch off current HEAD, or `git worktree add` for bead-tracked isolation (see working branch isolation below).
 - **GitButler mode:** `but branch new ID-descriptor` to create a new independent stack, or `but branch new ID-descriptor -a <commit>` to split an existing stack at a branch boundary.
+- **jj mode:** `jj new <base>` to create a new change from a single base, or `jj new bookmark-a bookmark-b` to create a multi-parent working copy with multiple bookmarks merged in one working tree.
 
 Default bias: if in doubt whether work is related, create a new branch — branches are cheap, tangled history is expensive.
 
@@ -291,6 +292,82 @@ Commit IDs come from `but status -fv` or `but show <branch-id>`.
 
 GitButler operates in a single working tree, so the repository root's direnv environment applies to all branches.
 
+#### jj mode
+
+jj provides a multi-parent working copy that achieves the same simultaneous multi-branch editing as GitButler's applied-branches model.
+All bookmarks coexist in a single working tree — no worktrees are needed.
+
+##### Creating a multi-parent working copy
+
+Create a working copy commit with multiple parent bookmarks:
+
+```bash
+jj new bookmark-a bookmark-b bookmark-c
+```
+
+The resulting `@` is a merge commit whose working tree merges all parent bookmarks.
+Edits made in `@` can be routed to any parent bookmark.
+
+##### Change routing
+
+Route changes from the multi-parent `@` to the appropriate parent bookmark:
+
+```bash
+# Manual: squash specific changes into a named parent
+jj squash --into <parent-bookmark>
+
+# Automatic: distribute changes based on blame ancestry
+jj absorb
+```
+
+`jj absorb` analyzes which ancestor last touched each modified line and routes changes automatically.
+Use `jj squash --into` when changes belong to a specific parent that blame cannot determine.
+
+##### Adding and removing parents
+
+Modify the set of parent bookmarks in the multi-parent working copy:
+
+```bash
+# Add a parent bookmark
+jj rebase -r @ -d 'all:(@- | new-bookmark)'
+
+# Remove a parent bookmark
+jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
+```
+
+The `all:` prefix ensures the revset resolves to multiple parents rather than a single ancestor.
+
+##### Auto-rebase behavior
+
+When a parent bookmark advances (via commits on that bookmark from another workspace or collaborator), jj automatically rebases `@` onto the updated parents.
+This keeps the multi-parent working copy current without manual intervention.
+
+##### Epic and issue mapping
+
+Bookmarks correspond to epics or independent work streams.
+Changes within each bookmark's chain correspond to issues.
+
+When working on a beads epic:
+- Create a bookmark per epic: `{epic-ID}-descriptor`
+- Build changes as a chain descending from each bookmark
+- Route multi-parent working copy edits to the appropriate epic bookmark via `jj squash --into` or `jj absorb`
+
+##### No direnv initialization needed
+
+jj multi-parent working copies operate in a single working tree, so the repository root's direnv environment applies to all parent bookmarks.
+
+##### GitButler equivalence mapping
+
+| GitButler | jj multi-parent working copy |
+|---|---|
+| Applied branches | Parent bookmarks of multi-parent `@` |
+| `gitbutler/workspace` commit | Multi-parent `@` commit |
+| `but commit --changes` | `jj squash --into` or `jj absorb` |
+| `but unapply` | Remove parent from merge via `jj rebase -r @ -d 'all:(@- ~ bookmark)'` |
+| `but apply` | Add parent to merge via `jj rebase -r @ -d 'all:(@- | bookmark)'` |
+| Branch stacks | Bookmark chains (linear descendant sequences) |
+| `but move` (cross-stack) | `jj squash --from <src> --into <dst>` |
+
 ### Fast-forward-only merge policy
 
 All merges to main must be fast-forward.
@@ -358,6 +435,7 @@ Before editing any file, check for uncommitted changes:
 
 In git-native mode, run `git status --short [file]` and `git diff [file]`.
 In GitButler mode, `but status -fv` provides richer state including branch assignment and CLI IDs for each changed file.
+In jj mode, `jj status` and `jj diff` show working copy state. There is no staging area — all tracked file changes are the commit.
 
 ## Atomic commit workflow
 
@@ -372,6 +450,12 @@ In git-native mode: edit file, `git add [file]`, verify with `git diff --cached 
 
 In GitButler mode: edit file, run `but status -fv` to get the file's CLI ID, then `but commit <branch> -m "msg" --changes <id> --status-after`.
 The `--changes` flag provides explicit file selection equivalent to staging one file at a time.
+
+In jj mode: edit one file, then immediately `jj describe -m "msg"` followed by `jj new` to freeze the change and start a new empty `@`.
+This is the jj equivalent of `git add [file] && git commit` — the `describe` + `new` cycle is the atomic commit boundary.
+Without `jj new`, the next edit accumulates into the same change, breaking atomicity.
+If multiple files were edited before freezing, use `jj split <path> -m "msg"` to separate them into atomic changes after the fact (as we did in this session).
+For multi-parent working copies, use `jj squash --into <target-parent>` to route changes to the appropriate parent bookmark, or `jj absorb` to auto-distribute changes based on blame.
 
 ## Handling pre-existing mixed changes
 
@@ -392,6 +476,8 @@ If you encounter a file with multiple distinct logical changes already present:
   In GitButler mode: use `--changes <id>` on `but commit` to select specific files by CLI ID.
 - In git-native mode, never use `git add .`, `git add -A`, or interactive staging (`git add -p`, `git add -i`, `git add -e`) — interactive commands hang in AI tool execution (the human may run `git add -p` when delegated; see "Handling pre-existing mixed changes").
   In GitButler mode, this concern does not apply — `but commit` requires explicit `--changes` selection by design.
+  In jj mode, there is no staging area — all working copy changes are the commit.
+  Use `jj split <paths> -m "msg"` to separate concerns within a single change when multiple logical edits accumulate in `@`.
 
 ## History investigation with pickaxe
 
