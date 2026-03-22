@@ -187,13 +187,17 @@ Each PR tests its changes plus everything below it in the stack, so a failure on
    ```
    `-d` creates in draft mode, `-t` uses the default title from commits.
 4. CI runs independently on each PR. Review results per branch.
-5. When the tip PR passes CI, exit GitButler, fast-forward merge, then re-enter:
+5. When the tip PR passes CI, exit GitButler, fast-forward merge, clean up, and re-enter:
    ```bash
+   but push <tip-branch>
    but teardown
    git checkout main
    git merge --ff-only <tip-branch>
    git push
+   git branch -d <tip-branch>
+   git push origin --delete <tip-branch>
    but setup
+   but pull
    ```
 6. GitHub auto-closes all stacked PRs because their commit SHAs are now ancestors of main.
 
@@ -229,6 +233,7 @@ git push origin --delete <stack-b-tip>
 git branch --merged main | grep -v -E 'main|gitbutler/' | xargs git branch -d
 git branch -r --merged origin/main | grep -v -E 'origin/main|origin/HEAD|gitbutler' | sed 's|origin/||' | xargs git push origin --delete
 but setup
+but pull
 ```
 
 Do not use `but stack` to combine independent stacks before merging.
