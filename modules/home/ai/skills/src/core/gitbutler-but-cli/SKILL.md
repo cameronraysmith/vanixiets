@@ -187,17 +187,57 @@ Each PR tests its changes plus everything below it in the stack, so a failure on
    ```
    `-d` creates in draft mode, `-t` uses the default title from commits.
 4. CI runs independently on each PR. Review results per branch.
-5. When the tip PR passes CI, merge the entire stack locally via fast-forward:
+5. When the tip PR passes CI, exit GitButler, fast-forward merge, then re-enter:
    ```bash
+   but teardown
    git checkout main
-   git pull
-   git merge --ff-only app-layer
+   git merge --ff-only <tip-branch>
    git push
+   but setup
    ```
 6. GitHub auto-closes all stacked PRs because their commit SHAs are now ancestors of main.
 
 The PRs serve as CI observation windows, not as independent merge units.
 Do not use GitHub's merge button — that creates merge commits and breaks linear history.
+
+### Merging multiple independent stacks
+
+When you have multiple independent stacks (each forking from main), merge them sequentially in a single teardown/setup cycle.
+Each subsequent stack must be rebased onto the advancing main before it can fast-forward merge.
+
+```bash
+but teardown
+git checkout main
+
+# Stack A: already ff-able
+git merge --ff-only <stack-a-tip>
+git push
+
+# Stack B: rebase onto advanced main, then ff
+git rebase main <stack-b-tip>
+git merge --ff-only <stack-b-tip>
+git push
+
+# Repeat for additional stacks...
+
+but setup
+```
+
+Do not use `but stack` to combine independent stacks before merging.
+`but stack` rearranges GitButler's branch metadata without rebasing the underlying git DAG, so the branches remain on separate forks from main.
+
+Do not use `but merge` for fast-forward merges.
+`but merge` always creates merge commits and only works with the `gb-local` target.
+
+### Cleaning up before `but setup`
+
+Before re-entering GitButler with `but setup`, delete any local branches whose commits are already in main.
+GitButler re-applies all local branches it finds, and stale branches create ghost stacks with duplicate commits.
+
+```bash
+# After merging, before but setup:
+git branch --merged main | grep -v main | xargs git branch -d
+```
 
 ## Git-to-But Map
 
