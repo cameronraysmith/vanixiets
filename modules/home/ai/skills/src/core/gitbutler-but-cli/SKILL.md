@@ -123,6 +123,82 @@ If `but move` causes conflicts (conflicted commits in status):
 
 **Common mistakes:** Do NOT use `but amend` on conflicted commits (it won't work). Do NOT skip step 4 — you must actually edit the files to remove conflict markers before finishing.
 
+### Split a branch at a commit boundary
+
+Use `but branch new <name> -a <commit-sha>` to insert a branch boundary within an existing stack.
+The anchor commit and everything below it (toward the stack base) become the new branch.
+Everything above the anchor stays with the original branch.
+
+Mental model: "draw a line above this commit."
+The anchor is the top of the segment you want to extract downward, not the bottom.
+
+**Common gotcha:** if you want to isolate the bottom 3 commits of a 5-commit branch, anchor at the 3rd commit from the bottom (the top of the segment to extract), not at the 1st.
+
+1. `but status -fv` — identify the commit SHAs in the branch.
+2. Suppose branch `feature` has commits (bottom to top): `aaa`, `bbb`, `ccc`, `ddd`, `eee`.
+3. To split so that `aaa`, `bbb`, `ccc` become a new branch `feature-base`:
+   ```bash
+   but branch new feature-base -a ccc --status-after
+   ```
+4. Result: `feature-base` owns `aaa → bbb → ccc`. `feature` retains `ddd → eee` stacked on top.
+
+### Recovery from accidental git commit on gitbutler/workspace
+
+Symptom: `but status` shows "Detected commits on top of gitbutler/workspace" error.
+This happens when an agent or user runs `git commit` directly instead of `but commit`.
+
+`git reset` is safe here despite the "no git writes" rule because GitButler is locked out by the rogue commit and we are restoring its workspace invariant.
+
+1. Confirm the rogue commit: `git log --oneline -3` — the top commit is the accidental one.
+2. Reset the rogue commit, keeping changes in the working tree:
+   ```bash
+   git reset HEAD~1
+   ```
+3. Note the reflog hash of the dropped commit: `git reflog -1` — the first entry is the commit you just reset.
+4. Verify GitButler is operational again: `but status -fv` — the error should be gone and the changes should appear as unstaged.
+5. Reapply the changes to the correct branch:
+   ```bash
+   but pick <reflog-hash> <branch> --status-after
+   ```
+
+If multiple rogue commits exist, adjust `HEAD~1` to `HEAD~N` where N is the number of accidental commits, or reset them one at a time starting from the most recent.
+
+### Stacked PRs with single fast-forward merge
+
+Use stacked branches as CI observation windows into linear history.
+Each PR tests its changes plus everything below it in the stack, so a failure on PR N with a pass on PR N-1 identifies the failure boundary without local bisection.
+
+1. Create a stack of branches where each branch is a logical change set:
+   ```bash
+   but branch new infra-base
+   # ... commit infrastructure changes ...
+   but branch new app-layer
+   but branch move app-layer infra-base
+   # ... commit application changes ...
+   ```
+2. Push all branches:
+   ```bash
+   but push
+   ```
+3. Create a draft PR for each branch:
+   ```bash
+   but pr new infra-base -d -t
+   but pr new app-layer -d -t
+   ```
+   `-d` creates in draft mode, `-t` uses the default title from commits.
+4. CI runs independently on each PR. Review results per branch.
+5. When the tip PR passes CI, merge the entire stack locally via fast-forward:
+   ```bash
+   git checkout main
+   git pull
+   git merge --ff-only app-layer
+   git push
+   ```
+6. GitHub auto-closes all stacked PRs because their commit SHAs are now ancestors of main.
+
+The PRs serve as CI observation windows, not as independent merge units.
+Do not use GitHub's merge button — that creates merge commits and breaks linear history.
+
 ## Git-to-But Map
 
 | git | but |
