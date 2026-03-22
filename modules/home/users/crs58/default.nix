@@ -35,6 +35,7 @@
           bitwarden-email = { };
           atuin-key = { };
           mcp-agent-mail-bearer-token = { };
+          honcho-api-key = { };
           git-credentials = {
             mode = "0400"; # Read-only: prevent git credential-store from modifying
             path = "${config.home.homeDirectory}/.git-credentials";
