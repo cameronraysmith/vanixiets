@@ -99,7 +99,8 @@ In jj mode, when working across multiple epics simultaneously, the orchestrator 
 See the "Subagent dispatch in jj mode" subsection of git-preferences for the full routing workflow.
 
 Dispatch clarity:
-- When dispatching subagent Tasks, the prompt must specify the working context path (worktree path or GitButler branch name) the subagent works in.
+- When dispatching subagent Tasks, the prompt must specify the working context: worktree path (git-native), GitButler branch name, or jj bookmark name.
+- In jj mode, subagents edit files directly in the shared `@` working copy; the orchestrator routes changes to the correct bookmark post-hoc.
 - Subagents working on the same issue share a working context.
 - Subagents working on different issues get different working contexts.
 - If a dispatch prompt does not mention a working context, the subagent should ask rather than assuming.
