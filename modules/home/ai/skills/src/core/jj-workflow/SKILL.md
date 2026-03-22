@@ -616,6 +616,55 @@ jj squash --from <specific-commit> --into @
 jj describe -m "[exp-4] feat: uses technique from exp-1"
 ```
 
+### Multi-parent working copy
+
+A multi-parent `@` merges multiple bookmarks into a single working tree, providing the same capability as GitButler's applied-branches workspace.
+All parent bookmarks are visible and editable simultaneously without worktrees or filesystem separation.
+
+Creating a multi-parent working copy:
+
+```bash
+# Create @ with three parent bookmarks merged in one working tree
+jj new feature-a feature-b feature-c
+```
+
+The resulting `@` is a merge commit.
+Its working tree contains the combined state of all parent bookmarks.
+
+Routing changes to parent bookmarks:
+
+```bash
+# Manual: squash changes into a specific parent bookmark
+jj squash --into feature-a
+
+# Automatic: distribute changes based on blame ancestry
+jj absorb
+# jj analyzes which parent bookmark last touched each modified line
+# and routes changes to the appropriate ancestor
+```
+
+Adding and removing parents:
+
+```bash
+# Add a parent bookmark to the multi-parent working copy
+jj rebase -r @ -d 'all:(@- | new-bookmark)'
+
+# Remove a parent bookmark from the multi-parent working copy
+jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
+```
+
+The `all:` prefix in the revset ensures multiple parents are preserved rather than collapsing to a single ancestor.
+
+Auto-rebase behavior:
+
+When a parent bookmark advances (via commits from another workspace, collaborator push, or `jj git fetch`), jj automatically rebases `@` onto the updated parents.
+The multi-parent working copy stays current without manual rebase steps.
+
+This pattern maps directly to GitButler's workspace model.
+See `~/.claude/skills/preferences-git-version-control/SKILL.md` for the full cross-tool terminology mapping in the "GitButler equivalence mapping" table under the jj mode subsection.
+
+For background on multi-parent `jj new` and the design rationale, see Chris Krycho's ["jj init" essay](https://raw.githubusercontent.com/chriskrycho/v5.chriskrycho.com/d3f989498a3828aeb7e5e816e115b9fc0196d8d0/site/essays/jj%20init.md), particularly the section on creating three-parent merges.
+
 ## History refinement
 
 Transform experimental development history into clean, reviewable commit sequence.
