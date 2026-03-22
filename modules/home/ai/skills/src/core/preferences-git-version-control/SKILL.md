@@ -77,7 +77,7 @@ Do not commit if:
 ## Branch workflow
 
 File edits on main/master are blocked by the `enforce-branch-before-edit` hook.
-Before attempting to edit any files, create a worktree or feature branch to which you will commit your changes.
+Before attempting to edit any files, create a working branch to which you will commit your changes.
 If you haven't already, invoke `/issues-beads-prime` for beads command reference before proceeding with any editing.
 
 Whenever you are working on a beads issue or epic, check the current branch name first.
@@ -92,22 +92,31 @@ Branch naming follows the pattern `ID-descriptor` in lowercase kebab-case, where
 
 Never use forward slashes in branch names as they break compatibility with URLs, docker image tags, and other tooling that embeds branch names.
 
-Create a new branch when your next commits won't match the current branch's ID-descriptor:
+Create a new working branch when your next commits won't match the current branch's ID-descriptor:
 
 - Example: current branch is `nix-pxj-4-deploy-validate` but you discover issue `nix-di8` needs fixing first → create `nix-di8-fix-dependency`
-- Branch off current HEAD: `git checkout -b ID-descriptor`
-- When the unit of work is complete and tests pass, offer to merge back
+- When the unit of work is complete and tests pass, offer to integrate to main
 
-Default bias: if in doubt whether work is related, create a new branch - branches are cheap, tangled history is expensive.
+To isolate work in a new branch:
 
-### Worktree isolation
+- **Git-native mode:** `git checkout -b ID-descriptor` to branch off current HEAD, or `git worktree add` for bead-tracked isolation (see working branch isolation below).
+- **GitButler mode:** `but branch new ID-descriptor` to create a new independent stack, or `but branch new ID-descriptor -a <commit>` to split an existing stack at a branch boundary.
+
+Default bias: if in doubt whether work is related, create a new branch — branches are cheap, tangled history is expensive.
+
+### Working branch isolation
+
+Implementation work uses isolated working contexts to prevent tangled history.
+The mechanism differs by VCS mode.
+
+#### Git-native mode
 
 Bead implementation work uses worktrees rooted in `.worktrees/` at the repository root.
 This directory must be listed in `.gitignore`.
 
 The worktree model has two tiers: epic worktrees for coordination and issue worktrees for implementation.
 
-#### Epic branches
+##### Epic branches
 
 Each active epic gets its own branch.
 The *focus epic* — the primary epic being actively coordinated — is checked out in the repo root.
@@ -137,7 +146,7 @@ git worktree add .worktrees/nix-pxj-ntfy-server -b nix-pxj-ntfy-server nix-1kj-s
 An epic branch accumulates all commits from its child issue worktrees via fast-forward merges.
 When the epic is complete, it contains the full linearized commit history for review, validation, and merge to main.
 
-#### Switching focus
+##### Switching focus
 
 To promote a secondary epic to focus (and optionally demote the current focus):
 
@@ -154,7 +163,7 @@ git checkout {new-focus-epic}-descriptor
 
 When no epic is active, the repo root returns to the default branch.
 
-#### Issue worktrees
+##### Issue worktrees
 
 Each issue within an epic gets its own worktree, branching from the parent epic's branch.
 The working agent creates the issue worktree as its first action before any implementation begins.
@@ -182,7 +191,7 @@ git worktree remove .worktrees/{issue-ID}-descriptor
 git branch -d {issue-ID}-descriptor
 ```
 
-#### General rules
+##### General rules
 
 Always specify an explicit start-point when creating branches or worktrees.
 Epic branches start from `main` (or from another epic's branch when stacking).
@@ -191,7 +200,7 @@ Without a start-point, git branches from whatever happens to be checked out, whi
 
 Use worktrees for bead-tracked work; use plain branches (`git checkout -b`) for non-bead or quick-fix work.
 
-#### Direnv initialization in worktrees
+##### Direnv initialization in worktrees
 
 Worktrees do not inherit the repository root's direnv environment.
 If the repository uses direnv with a nix devshell (indicated by an `.envrc` file), the devshell creates ephemeral files like `.pre-commit-config.yaml` that are not checked into git.
@@ -219,18 +228,76 @@ git worktree remove .worktrees/{epic-ID}-descriptor
 git branch -d {epic-ID}-descriptor
 ```
 
+#### GitButler mode
+
+All branches coexist in a single workspace — no worktrees are needed.
+Isolation comes from branch boundaries within and across stacks rather than filesystem separation.
+
+##### Branch stacks as epics
+
+Each active epic corresponds to a branch stack.
+Create a new stack for a new epic:
+
+```bash
+but branch new {epic-ID}-descriptor
+```
+
+When one epic depends on another, stack it on the parent epic's branch:
+
+```bash
+but branch move {epic-ID}-descriptor {parent-epic-ID}-descriptor
+```
+
+##### Issue branches within a stack
+
+Each issue within an epic becomes a branch boundary within the epic's stack.
+Insert a branch boundary at the commit where the issue's work begins:
+
+```bash
+but branch new {issue-ID}-descriptor -a <anchor-commit>
+```
+
+The anchor commit and everything below it become the new branch.
+Everything above the anchor stays with the original branch.
+See the "Split a branch at a commit boundary" recipe in `~/.claude/skills/gitbutler-but-cli/SKILL.md` for details.
+
+When issue work is complete, commits are already part of the stack's linear history.
+No rebase or merge step is needed — the stack tip integrates all segments at once when merged to main.
+
+##### Switching focus
+
+To shelve work on a stack and focus on another, use `but unapply` and `but apply`:
+
+```bash
+# Shelve the current stack
+but unapply {branch-name}
+# Apply a different stack
+but apply {other-branch-name}
+```
+
+Unapplied stacks retain their commits and can be reapplied at any time.
+
+##### Cross-stack commit reorganization
+
+Move a commit from one branch to another within or across stacks:
+
+```bash
+but move <source-commit-id> <target-commit-id> --status-after
+```
+
+Commit IDs come from `but status -fv` or `but show <branch-id>`.
+
+##### No direnv initialization needed
+
+GitButler operates in a single working tree, so the repository root's direnv environment applies to all branches.
+
 ### Fast-forward-only merge policy
 
 All merges to main must be fast-forward.
 This preserves linear history, making bisect, revert, and log traversal straightforward.
+The `git config merge.ff only` guardrail rejects non-fast-forward merges automatically in both modes, serving as a safety net.
 
-Set the repository-level guardrail so non-fast-forward merges are rejected:
-
-```bash
-git config merge.ff only
-```
-
-Before merging a branch, rebase it onto main to ensure the merge is a fast-forward:
+In git-native mode, rebase the branch onto main before merging:
 
 ```bash
 git checkout {branch}
@@ -242,18 +309,25 @@ git merge --ff-only {branch}
 
 Never use `git merge` without `--ff-only` on main.
 If a branch has diverged and rebase produces conflicts, resolve them during the rebase rather than creating a merge commit.
-The `merge.ff=only` git config rejects non-fast-forward merges automatically, serving as a safety net even if `--ff-only` is omitted.
 
-### Branch stacks with graphite
+In GitButler mode, stacked branches are already linear by construction.
+Fast-forward merge of the stack tip integrates all stacked segments at once.
+See the "Stacked PRs with single fast-forward merge" recipe in `~/.claude/skills/gitbutler-but-cli/SKILL.md` for the full workflow.
 
-Use the graphite CLI (invoke as `graphite`, not `gt` as shown in official documentation) to manage stacks of dependent branches that mirror beads issue dependencies:
+### Stack management
+
+Branch stacks mirror beads issue dependencies: when issues form a dependency chain (e.g., `nix-pxj.2` blocks `nix-pxj.3`), the corresponding branches should form a stack with matching parent-child relationships.
+If you identify a reason to modify beads dependencies while working, evaluate and present a plan to reorder the branches associated with previously completed work in the stack, handling any conflicts that arise.
+
+In git-native mode, use the graphite CLI (invoke as `graphite`, not `gt` as shown in official documentation) to manage stacks:
 
 - `graphite log` — view branch stack relationships
 - `graphite track` — register an existing branch with graphite, selecting its parent
 - `graphite create -m "message"` — create a new branch stacked on current, with initial commit
 
-When beads issues have dependencies (e.g., `nix-pxj.2` blocks `nix-pxj.3`), the corresponding branches should form a graphite stack with matching parent-child relationships.
-If you identify a reason to modify beads dependencies while working, evaluate and present a plan to use graphite to reorder the branches associated with previously completed work in the stack, handling any git conflicts that arise.
+In GitButler mode, native stack operations replace graphite entirely.
+`but branch new -a`, `but branch move`, and `but move` provide all stack management without an external tool.
+See `~/.claude/skills/gitbutler-but-cli/SKILL.md` for the full command reference.
 
 ## Merge strategy selection
 
@@ -275,16 +349,27 @@ The user can always override in either direction on a per-change basis.
 
 ## File state verification
 
-Before editing any file, run `git status --short [file]` and `git diff [file]` to check for uncommitted changes:
+Before editing any file, check for uncommitted changes:
 
 - Related to current task: commit them first with appropriate message
 - Unrelated or unclear: pause and propose commit message asking user for confirmation
 
+In git-native mode, run `git status --short [file]` and `git diff [file]`.
+In GitButler mode, `but status -fv` provides richer state including branch assignment and CLI IDs for each changed file.
+
 ## Atomic commit workflow
 
-Atomic commits in this workflow mean one commit per file with exactly one logical change. Each commit is the smallest meaningful unit that can be independently reverted, cherry-picked, or bisected. This is not atomic in the database sense of bundling multiple operations together, but atomic as the finest practical granularity for version control.
+Atomic commits in this workflow mean one commit per file with exactly one logical change.
+Each commit is the smallest meaningful unit that can be independently reverted, cherry-picked, or bisected.
+This is not atomic in the database sense of bundling multiple operations together, but atomic as the finest practical granularity for version control.
 
-Make one logical edit per file (even when using MultiEdit to edit multiple files in parallel), then commit each file separately: edit file → `git add [file]` → verify with `git diff --cached [file]` → commit with focused message. This eliminates mixed hunks by construction.
+Make one logical edit per file (even when using MultiEdit to edit multiple files in parallel), then commit each file separately.
+This eliminates mixed hunks by construction.
+
+In git-native mode: edit file, `git add [file]`, verify with `git diff --cached [file]`, then `git commit -m "msg"`.
+
+In GitButler mode: edit file, run `but status -fv` to get the file's CLI ID, then `but commit <branch> -m "msg" --changes <id> --status-after`.
+The `--changes` flag provides explicit file selection equivalent to staging one file at a time.
 
 ## Handling pre-existing mixed changes
 
@@ -300,8 +385,11 @@ If you encounter a file with multiple distinct logical changes already present:
 - Never use emojis or multiple authors in commit messages
 - Never @-mention usernames or reference issues/PRs (#NNN, URLs) in commit messages - causes unwanted notifications and immutable backlinks
 - Fixup commits: prefix with "fixup! " followed by exact subject from commit being revised (use only once, not repeated)
-- Stage one file per commit via `git add [file]` after verifying exactly one logical change
-- Never use `git add .`, `git add -A`, or interactive staging (`git add -p`, `git add -i`, `git add -e`) — interactive commands hang in AI tool execution (the human may run `git add -p` when delegated; see "Handling pre-existing mixed changes")
+- Stage one file per commit after verifying exactly one logical change.
+  In git-native mode: `git add [file]`.
+  In GitButler mode: use `--changes <id>` on `but commit` to select specific files by CLI ID.
+- In git-native mode, never use `git add .`, `git add -A`, or interactive staging (`git add -p`, `git add -i`, `git add -e`) — interactive commands hang in AI tool execution (the human may run `git add -p` when delegated; see "Handling pre-existing mixed changes").
+  In GitButler mode, this concern does not apply — `but commit` requires explicit `--changes` selection by design.
 
 ## History investigation with pickaxe
 
