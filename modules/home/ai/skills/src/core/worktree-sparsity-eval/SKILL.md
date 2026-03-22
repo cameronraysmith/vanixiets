@@ -66,23 +66,16 @@ It reports deltas (e.g., "File count: 98,432 -> 102,891 (+4.5%)").
 The commit goes in the repository containing the *resolved* CLAUDE.md target, not necessarily the evaluated repository.
 The update script prints the resolved target path and repository — use that for `git -C`.
 
-```bash
-git -C <target-repo> add <resolved-claude-md>
-git -C <target-repo> commit -m "chore: update worktree sparsity metrics"
-```
+Commit the updated metrics per git-preferences conventions.
+The commit goes in `<target-repo>` against `<resolved-claude-md>`.
 
 ### 4. Worktree creation
 
 When sparse checkout is recommended, use this command template instead of plain `git worktree add`:
 
-```bash
-git worktree add --no-checkout .worktrees/{ID}-descriptor -b {ID}-descriptor main
-cd .worktrees/{ID}-descriptor
-git sparse-checkout init --cone
-git sparse-checkout set <paths-relevant-to-task>
-git checkout
-```
+Create a working branch per the working branch isolation conventions in git-preferences.
+When sparse checkout is recommended, additionally configure sparse checkout with cone mode and set paths relevant to the task.
 
-When not recommended, use standard `git worktree add .worktrees/{ID}-descriptor -b {ID}-descriptor main`.
+For guidance on choosing paths for sparse checkout, see `references/sparse-checkout-patterns.md`.
 
 For guidance on choosing paths for `git sparse-checkout set`, see `references/sparse-checkout-patterns.md`.
