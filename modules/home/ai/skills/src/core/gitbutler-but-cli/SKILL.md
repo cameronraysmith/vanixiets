@@ -212,14 +212,22 @@ git checkout main
 # Stack A: already ff-able
 git merge --ff-only <stack-a-tip>
 git push
+git branch -d <stack-a-tip>
+git push origin --delete <stack-a-tip>
 
 # Stack B: rebase onto advanced main, then ff
 git rebase main <stack-b-tip>
+git checkout main
 git merge --ff-only <stack-b-tip>
 git push
+git branch -d <stack-b-tip>
+git push origin --delete <stack-b-tip>
 
 # Repeat for additional stacks...
 
+# Final cleanup and re-enter
+git branch --merged main | grep -v -E 'main|gitbutler/' | xargs git branch -d
+git branch -r --merged origin/main | grep -v -E 'origin/main|origin/HEAD|gitbutler' | sed 's|origin/||' | xargs git push origin --delete
 but setup
 ```
 
@@ -231,12 +239,24 @@ Do not use `but merge` for fast-forward merges.
 
 ### Cleaning up before `but setup`
 
-Before re-entering GitButler with `but setup`, delete any local branches whose commits are already in main.
-GitButler re-applies all local branches it finds, and stale branches create ghost stacks with duplicate commits.
+Before re-entering GitButler with `but setup`, delete merged branches both locally and on the remote.
+`but setup` re-creates local branches from remote tracking refs, so remote branches must be deleted first.
+Local-only cleanup is insufficient — a surviving remote ref causes `but setup` to resurrect the branch as a ghost stack, which then causes `but pull` to fail with "new head names do not match current heads."
 
 ```bash
 # After merging, before but setup:
-git branch --merged main | grep -v main | xargs git branch -d
+git branch --merged main | grep -v -E 'main|gitbutler/' | xargs git branch -d
+git branch -r --merged origin/main | grep -v -E 'origin/main|origin/HEAD|gitbutler' | sed 's|origin/||' | xargs git push origin --delete
+```
+
+If you forget to clean up before `but setup` and `but pull` fails with metadata mismatch errors, the recovery is:
+
+```bash
+but teardown
+git branch --merged main | grep -v -E 'main|gitbutler/' | xargs git branch -d
+git branch -r --merged origin/main | grep -v -E 'origin/main|origin/HEAD|gitbutler' | sed 's|origin/||' | xargs git push origin --delete
+but setup
+but pull
 ```
 
 ## Git-to-But Map
