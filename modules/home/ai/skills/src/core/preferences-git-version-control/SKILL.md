@@ -31,6 +31,42 @@ When `.beads/` exists, maintain the issue graph alongside git commits:
 For beads usage conventions (epic structure, status management, closure policy), see the conventions section of issues-beads-prime.
 Consult `~/.claude/skills/issues-beads-prime/SKILL.md` for command quick reference.
 
+## VCS terminology glossary
+
+This glossary defines abstract terms for version control operations that remain stable across tools.
+Each abstract term maps to concrete equivalents in the four VCS tools used across this repository's skill set.
+
+| Abstract term | Git | GitButler | Jujutsu (jj) | Gerrit |
+|---|---|---|---|---|
+| Branch stack | Feature branch (single) or graphite stack | Stack (chain of stacked branches sharing one linear history) | Bookmark chain | Topic (group of related changes) |
+| Branch boundary | N/A (one branch = one unit) | Branch name within a stack, inserted via `but branch new -a` | Change boundary (each change is a boundary) | Change boundary |
+| Change set | Commits on a branch between two merge points | Commits within one branch segment of a stack | Single change (jj's atomic unit) | Patchset (version of a change) |
+| Working branch | Checked-out branch (`git checkout`) | Applied branch (multiple coexist in workspace) | Current change (`@`) | Checked-out change |
+| Integrate to main | Fast-forward merge (`git merge --ff-only`) | Fast-forward merge of stack tip | `jj git push` + bookmark advance | Submit (merge to target) |
+| Isolate work | `git worktree add` or `git checkout -b` | `but branch new` (independent stack) or `but branch new -a` (stacked segment) | `jj new` (new change) | New change |
+| Reorder history | `git rebase -i` | `but move` (within stack), `but squash`, `but reword` | `jj rebase`, `jj squash` | Amend patchset |
+| Shelf/stash | `git stash` | `but unapply` (removes branch from workspace, preserves commits) | `jj new` (just start new work, old change preserved) | N/A |
+
+All skills in this repository use the abstract terms from the left column when describing VCS operations.
+The git-preferences skill translates these to concrete commands based on the active VCS mode: git-native (default), GitButler (when `gitbutler/workspace` is checked out), or jj (when `.jj/` exists).
+Skills that need VCS operations should delegate to git-preferences rather than embedding tool-specific commands.
+This decoupling ensures skills remain correct across all three modes without conditional logic of their own.
+
+### Naming modes for branch stacks
+
+When a beads epic is active (`.beads/` exists and an epic is in progress), branch stacks correspond to epics and branch boundaries correspond to issues:
+
+- Stack name: `{epic-ID}-descriptor` (e.g., `nix-f85-gitbutler-adoption`)
+- Branch name at each boundary: `{issue-ID}-descriptor` (e.g., `nix-f85-1-terminology-glossary`)
+
+When working ad hoc (no beads, or outside an epic), stacks and boundaries are named descriptively:
+
+- Stack name: descriptive (e.g., `gitbutler-skill`)
+- Branch name at each boundary: descriptive (e.g., `fix-gitbutler-version`)
+
+Both modes use identical mechanical operations.
+The difference is purely in naming conventions and whether `bd` lifecycle commands accompany the VCS operations.
+
 ## Escape hatches
 
 Do not commit if:
