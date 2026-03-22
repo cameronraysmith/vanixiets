@@ -673,11 +673,8 @@ Push beads state to the dolt remote after completing mutations.
 
 ### With branch workflow
 
-When creating a feature branch, reference the issue ID:
-
-```bash
-git checkout -b <issue-id>-short-description
-```
+When creating a feature branch, reference the issue ID.
+Create a working branch named `<issue-id>-short-description` per the branch workflow conventions in git-preferences.
 
 When merging:
 
