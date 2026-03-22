@@ -118,6 +118,13 @@ jj describe -r <c> -m "msg"    # Reword commit (ALWAYS use -m!)
 jj workspace add <path> -r <c> # Create workspace
 jj workspace update-stale      # Update stale workspace
 
+# Multi-parent working copy
+jj new bm-a bm-b bm-c         # Merge multiple bookmarks into one working tree
+jj squash --into <parent>      # Route changes to specific parent
+jj absorb                      # Auto-route changes by blame
+jj rebase -r @ -d 'all:(@- | new-bm)'    # Add parent bookmark
+jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove parent bookmark
+
 # Recovery
 jj undo                        # Undo last operation
 jj op log                      # View operation history
@@ -223,6 +230,19 @@ jj squash --from 'main..exp-1' --into @
 jj bookmark set main -r @
 ```
 
+**Multi-parent working copy (simultaneous multi-bookmark editing):**
+```bash
+# Merge multiple bookmarks into one working tree
+jj new feature-a feature-b feature-c
+# Edit files (changes accumulate in multi-parent @)
+# Route changes to appropriate parent:
+jj squash --into feature-a        # Manual routing
+jj absorb                         # Auto-route by blame
+# Add/remove parents dynamically:
+jj rebase -r @ -d 'all:(@- | new-bookmark)'   # Add
+jj rebase -r @ -d 'all:(@- ~ old-bookmark)'   # Remove
+```
+
 ## Revset examples for experiments
 
 ```bash
@@ -267,9 +287,10 @@ jj log -r 'mine() & ~bookmarks()'
 1. Never used jj? → Read "Core philosophy" and "Foundation"
 2. Need parallel experiments? → Read "Parallel experimentation"
 3. Need separate workspace? → Read "Graduating to workspaces"
-4. Cleaning history? → Read "History refinement"
-5. Integrating work? → Read "Advanced patterns"
-6. Just need command? → Check "Quick command reference" above or "Reference" section
+4. Need to work on multiple branches simultaneously? → Read "Multi-parent working copy"
+5. Cleaning history? → Read "History refinement"
+6. Integrating work? → Read "Advanced patterns"
+7. Just need command? → Check "Quick command reference" above or "Reference" section
 
 **Should I create a workspace?**
 - Need simultaneous file access across experiments? → Yes
