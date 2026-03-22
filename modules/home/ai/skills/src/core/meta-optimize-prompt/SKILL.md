@@ -2,7 +2,7 @@
 name: meta-optimize-prompt
 description: Optimize a prompt draft for Claude using Anthropic's best practices and prompt engineering patterns.
 argument-hint: <prompt-draft>
-disable-model-invocation: true
+disable-model-invocation: false
 last-reviewed: 2026-03-22
 ---
 You are an expert prompt and context engineer specializing in Anthropic's Claude optimization best practices.
