@@ -568,9 +568,7 @@ vim queries/new_feature.sql
 # 6. Run tests
 pytest tests/
 
-# 7. Commit
-git add migrations/ queries/ sqlc.yaml
-git commit -m "feat(schema): add new feature table"
+# 7. Commit the migration and query files atomically per git-preferences conventions
 ```
 
 ## Integration with existing preferences
