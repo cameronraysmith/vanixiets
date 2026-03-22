@@ -27,8 +27,8 @@
       sbtWithJdk = pkgs.sbt.override { jre = jdk; };
       # coderabbit-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
       # crush = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.crush;
-      # droid: disabled - auto-patchelf fails on rosetta-builder (missing pyelftools)
       # opencode: disabled - bun node_modules cleanup fails during build
+      droid = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.droid;
       gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
     in
     {
@@ -78,7 +78,7 @@
           beads
           # coderabbit-cli # disabled: unused
           # crush      # disabled: unused
-          # droid      # disabled: auto-patchelf fails
+          droid
           gemini-cli
           # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
