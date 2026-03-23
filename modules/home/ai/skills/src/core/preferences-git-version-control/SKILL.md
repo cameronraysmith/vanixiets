@@ -121,7 +121,7 @@ The worktree model has two tiers: epic worktrees for coordination and issue work
 
 Each active epic gets its own branch.
 The *focus epic* — the primary epic being actively coordinated — is checked out in the repo root.
-This keeps orientation commands (`bd status`, `bd diff`, `bd epic status`) and code-level context aligned with the active work.
+This keeps orientation commands (`bd status`, `bd epic status`) and code-level context aligned with the active work.
 
 Create a focus epic branch when starting work on an epic:
 
