@@ -14,6 +14,7 @@
         check-github-token-scopes = "Check GitHub personal access token scopes";
         rerun-pr-checks = "Re-run GitHub Actions workflow checks for a PR";
         gh-approve-open-prs = "Approve all open PRs with optional exclusions";
+        pr-diff = "Show added/removed lines from a pull request diff";
       };
     }
     {
