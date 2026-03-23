@@ -35,6 +35,9 @@ Gated patterns (each returns permissionDecision "ask"):
     git [-C path] [--global-opts...] branch -D *
     git [-C path] [--global-opts...] stash drop/clear
 
+  Jujutsu: push (matches through global options like -R, --no-pager)
+    jj [-R path] [--global-opts...] git push
+
   GitHub CLI: mutating operations
     gh api * (except actions/runs/*/logs)
     gh pr create/comment/merge/close/edit/review
@@ -76,6 +79,7 @@ Gated patterns (each returns permissionDecision "ask"):
 
 Patterns match commands at start-of-line or after shell operators (&&, ||, ;, |, $()).
 Git patterns match through global options (-C, -c, --git-dir, --work-tree, --no-pager, etc.).
+Jujutsu patterns match through global options (-R, --repository, --at-op, --no-pager, etc.).
 Commands not matching any pattern fall through to blanket Bash allow.
 HELPEOF
   exit 0
@@ -109,6 +113,15 @@ git_cmd_match() {
   echo "$COMMAND" | grep -qE "(^|[;&|]\s*|&&\s*|\|\|?\s*|\\\$\(\s*)git${git_opts}\s+$1"
 }
 
+# Match jj subcommand accounting for global options between 'jj' and the subcommand.
+# Without this, patterns like 'jj git push' are bypassed by 'jj -R /path git push'.
+jj_cmd_match() {
+  local flag_arg='-R\s+\S+|--repository(=|\s)\S+|--at-op(eration)?(=|\s)\S+|--color(=|\s)\S+|--config(=|\s)\S+|--config-file(=|\s)\S+'
+  local flag_no_arg='--no-pager|--quiet|--verbose|--debug|--ignore-working-copy'
+  local jj_opts="(\s+(${flag_arg}|${flag_no_arg}))*"
+  echo "$COMMAND" | grep -qE "(^|[;&|]\s*|&&\s*|\|\|?\s*|\\\$\(\s*)jj${jj_opts}\s+$1"
+}
+
 REASON=""
 
 # --- Privilege escalation ---
@@ -118,6 +131,9 @@ cmd_match 'sudo\s' && REASON="sudo requires approval"
 # Uses git_cmd_match to handle global options (e.g. -C, --no-pager) between 'git' and subcommand.
 if [ -z "$REASON" ]; then
   git_cmd_match 'push(\s|$)' && REASON="git push requires approval"
+fi
+if [ -z "$REASON" ]; then
+  jj_cmd_match 'git\s+push(\s|$)' && REASON="jj git push requires approval"
 fi
 if [ -z "$REASON" ]; then
   git_cmd_match 'reset\s+--hard' && REASON="git reset --hard discards commits/changes"
