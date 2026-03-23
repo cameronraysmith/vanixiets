@@ -44,9 +44,6 @@ An issue counts as "touched" if any of the following occurred:
 - The issue's description or notes were modified as part of pheromone propagation from another issue.
 
 ```bash
-# Review session changes to identify touched issues
-bd diff <session-start-ref> HEAD
-
 # Cross-reference with issues known to have been worked
 bd show <id> --json | jq '.[0] | {id, title, status}'
 ```
