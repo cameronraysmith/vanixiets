@@ -406,9 +406,6 @@ After completing the per-issue checkpoint steps above, run session-level diagnos
 # Current state (compare to session start)
 bd status
 
-# Diff of bead state between session start and current HEAD
-bd diff <session-start-ref> HEAD
-
 # Epic progress change
 bd epic status
 ```
