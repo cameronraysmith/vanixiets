@@ -98,7 +98,7 @@
               "clinical-trial-protocol@life-sciences" = false;
               "clinical-trials@life-sciences" = false;
               # honcho
-              "honcho@honcho" = true;
+              "honcho@honcho" = false;
               "honcho-dev@honcho" = false;
             };
             voiceEnabled = true;
