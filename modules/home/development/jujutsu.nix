@@ -15,6 +15,14 @@
 
           # User-specific values (name, email, signing key) should be set in user modules
           settings = {
+            aliases = {
+              orphans = [
+                "log"
+                "-r"
+                "divergent() | (heads(all()) ~ visible_heads() ~ bookmarks())"
+              ];
+            };
+
             user = {
               name = lib.mkDefault "";
               email = lib.mkDefault "";
