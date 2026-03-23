@@ -122,6 +122,7 @@
               rs = "remote show";
               st = "status";
               stn = "status -uno";
+              prune-merged = "!git branch --merged main | grep -Ev '^[*]|^  main$' | xargs git branch -d";
             };
           };
 
