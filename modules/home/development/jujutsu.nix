@@ -16,10 +16,21 @@
           # User-specific values (name, email, signing key) should be set in user modules
           settings = {
             aliases = {
+              # Diagnostic: show divergent, orphaned, and dangling changes
               orphans = [
                 "log"
                 "-r"
                 "divergent() | (heads(all()) ~ visible_heads() ~ bookmarks())"
+              ];
+              # Cleanup: abandon all mutable changes not in main's ancestry or current @
+              tidy = [
+                "abandon"
+                "mutable() ~ @ ~ ::main"
+              ];
+              # Convenience: run git garbage collection to reclaim disk space
+              gc = [
+                "util"
+                "gc"
               ];
             };
 
