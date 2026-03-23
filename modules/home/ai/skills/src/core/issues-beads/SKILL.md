@@ -379,12 +379,6 @@ Check for stale issues (not updated recently):
 bd stale
 ```
 
-Compare issue state between Dolt refs:
-
-```bash
-bd diff HEAD~5 HEAD  # shows issue changes over last 5 Dolt commits
-```
-
 View epic progress across all children:
 
 ```bash
@@ -786,7 +780,6 @@ When architectural assumptions change during implementation, use `/issues:beads-
 | Blocked issues | `bd blocked [--json]` |
 | Orphaned issues | `bd orphans` |
 | Stale issues | `bd stale` |
-| Issue diff | `bd diff <from-ref> <to-ref>` |
 | Epic status | `bd epic status [--eligible-only]` |
 | Check epic readiness (human-only closure) | `bd epic close-eligible --dry-run` |
 | **Maintenance** | |
