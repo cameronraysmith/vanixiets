@@ -102,8 +102,15 @@ Three tiers govern when bookmarks become necessary:
 
 1. *Single chain, ad hoc work*: no bookmark needed.
    Work on an anonymous chain descending from main.
-   When done, freeze and advance main: `jj new` then `jj bookmark set main -r @-`.
-   Always freeze before advancing — setting main to `@` directly is unsafe because bookmarks follow working-copy rewrites.
+   When done, freeze if needed and advance main.
+   Always freeze before advancing — setting main to `@` directly is unsafe because bookmarks follow working-copy rewrites, so main would drift with every future edit.
+   Check whether `@` is empty before freezing to avoid stacking redundant empty changes (`jj new` is not idempotent — each call creates a new empty change):
+
+   ```bash
+   # Freeze only if @ has content, then advance main
+   jj log -r @ --no-graph -T 'empty' | grep -q true || jj new
+   jj bookmark set main -r @-
+   ```
 
 2. *Second chain initiated*: bookmarks become required for both chains.
    Bookmark the existing chain tip, create a new chain from main, bookmark its tip, then create a multi-parent `@` over both.
