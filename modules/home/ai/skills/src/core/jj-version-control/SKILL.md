@@ -102,7 +102,8 @@ Three tiers govern when bookmarks become necessary:
 
 1. *Single chain, ad hoc work*: no bookmark needed.
    Work on an anonymous chain descending from main.
-   When done, advance main: `jj bookmark set main -r @-`.
+   When done, freeze and advance main: `jj new` then `jj bookmark set main -r @-`.
+   Always freeze before advancing — setting main to `@` directly is unsafe because bookmarks follow working-copy rewrites.
 
 2. *Second chain initiated*: bookmarks become required for both chains.
    Bookmark the existing chain tip, create a new chain from main, bookmark its tip, then create a multi-parent `@` over both.
