@@ -401,7 +401,7 @@ This is the jj equivalent of fast-forward merge — jj does not create merge com
 
 ## `jj revert` usage
 
-In jj v0.25+, `jj backout` was renamed to `jj revert`.
+In jj v0.28.0, `jj backout` was renamed to `jj revert`.
 The command requires explicit placement via `--onto`, `--insert-after`, or `--insert-before`.
 
 Create a revert as a child of the current `@`:
