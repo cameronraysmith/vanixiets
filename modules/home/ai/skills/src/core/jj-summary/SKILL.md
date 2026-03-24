@@ -297,7 +297,7 @@ jj log -r 'mine() & ~bookmarks()'
 7. Just need command? → Check "Quick command reference" above or "Reference" section
 
 **Single-chain vs multi-parent mode?**
-- Ad hoc changes to a single concern → Single-chain mode (no bookmarks, anonymous chain descending from main). Advance main when done: `jj bookmark set main -r @-`.
+- Ad hoc changes to a single concern → Single-chain mode (no bookmarks, anonymous chain descending from main). Freeze and advance main when done: `jj new` then `jj bookmark set main -r @-`.
 - 2+ independent work streams, beads epics with multiple issues, or parallel agent dispatch → Multi-parent composite mode. This is the default for non-trivial sessions.
 
 **Should I create a workspace?**
