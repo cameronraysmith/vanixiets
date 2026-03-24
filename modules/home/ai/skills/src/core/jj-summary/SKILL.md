@@ -283,6 +283,7 @@ jj log -r 'mine() & ~bookmarks()'
 - **Bookmarks stay put**: Explicitly move with `jj bookmark set`, don't assume movement
 - **@ is ephemeral**: Working copy commit constantly rewritten, bookmark @ parent not @
 - **Conflicts are first-class**: Committed and resolved when convenient, never blocking
+- **Detached HEAD is normal**: In a jj-colocated repo, detached HEAD is the expected state. Do not attempt to reattach HEAD or "fix" this.
 
 ## Quick decision tree
 
@@ -290,10 +291,14 @@ jj log -r 'mine() & ~bookmarks()'
 1. Never used jj? → Read "Core philosophy" and "Foundation"
 2. Need parallel experiments? → Read "Parallel experimentation"
 3. Need separate workspace? → Read "Graduating to workspaces"
-4. Need to work on multiple branches simultaneously? → Read "Multi-parent working copy"
+4. Working on 2+ independent chains? → Multi-parent composite `@` is the default. Create bookmarks for each chain, then `jj new chain-1 chain-2 ...`. See `~/.claude/skills/jj-version-control/SKILL.md` for the full workflow.
 5. Cleaning history? → Read "History refinement"
 6. Integrating work? → Read "Advanced patterns"
 7. Just need command? → Check "Quick command reference" above or "Reference" section
+
+**Single-chain vs multi-parent mode?**
+- Ad hoc changes to a single concern → Single-chain mode (no bookmarks, anonymous chain descending from main). Advance main when done: `jj bookmark set main -r @-`.
+- 2+ independent work streams, beads epics with multiple issues, or parallel agent dispatch → Multi-parent composite mode. This is the default for non-trivial sessions.
 
 **Should I create a workspace?**
 - Need simultaneous file access across experiments? → Yes
@@ -308,4 +313,6 @@ jj log -r 'mine() & ~bookmarks()'
 
 ## For full documentation
 
-All details, examples, and comprehensive explanations: ~/.claude/skills/jj-workflow/SKILL.md
+- Full jj workflow reference: `~/.claude/skills/jj-workflow/SKILL.md`
+- Multi-parent composite workflow, beads integration: `~/.claude/skills/jj-version-control/SKILL.md`
+- VCS mode detection, beads conventions: `~/.claude/skills/preferences-git-version-control/SKILL.md`
