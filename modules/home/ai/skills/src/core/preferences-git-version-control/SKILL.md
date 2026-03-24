@@ -80,6 +80,10 @@ File edits on main/master are blocked by the `enforce-branch-before-edit` hook.
 Before attempting to edit any files, create a working branch to which you will commit your changes.
 If you haven't already, invoke `/issues-beads-prime` for beads command reference before proceeding with any editing.
 
+In jj mode, this hook is unnecessary.
+Anonymous chains are first-class and never garbage-collected.
+Create bookmarks when initiating a second chain or when working on beads epics — see the bookmark creation threshold in `~/.claude/skills/jj-version-control/SKILL.md`.
+
 Whenever you are working on a beads issue or epic, check the current branch name first.
 If it does not correspond to the issue you're working on, pause to ask the user whether to create or switch to a matching branch before proceeding.
 
