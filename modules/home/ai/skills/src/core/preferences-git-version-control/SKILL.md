@@ -579,6 +579,8 @@ Practical examples:
 
 After creating commits, provide a git command listing session commits: `git log --oneline <start-hash>..<end-hash>` using the commit hash from gitStatus context as start and `git rev-parse HEAD` as end. Use explicit hashes, not symbolic references, to ensure command remains valid after subsequent commits.
 
+In jj mode: `jj log --no-graph -r 'main@origin..main' -T 'separate(" ", change_id.short(8), description.first_line()) ++ "\n"'`
+
 ## GitHub PR and Issue creation safety
 
 GitHub's immutability policies require careful workflow to avoid permanent unwanted records:
