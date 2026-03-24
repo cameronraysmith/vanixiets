@@ -444,6 +444,45 @@ jj log -r 'mutable() ~ @ ~ ::main' -s
 
 If tidy sweeps too broadly, recover with `jj undo`.
 
+## Post-session cleanup
+
+After advancing the main bookmark to the tip of completed work (whether from a single chain or a linearized multi-parent session), present a cleanup summary for user approval before executing.
+
+Gather diagnostics:
+
+```bash
+# Orphaned/divergent changes (anonymous heads, divergent change IDs)
+jj orphans
+
+# Stale bookmarks (local bookmarks not tracking a remote, excluding main)
+jj bookmark list | grep -v '@'
+
+# Mutable changes outside main and @ (what tidy would sweep)
+jj log -r 'mutable() ~ @ ~ ::main' -s
+
+# Git-side merged branches (colocated mode)
+git branch --merged main | grep -Ev '^[*]|^  main$'
+```
+
+Present a summary to the user structured as:
+
+- Stale bookmarks to delete (and why each is stale — integrated into main, or orphaned)
+- Changes that `jj tidy` would abandon (with descriptions, so the user can verify nothing valuable is swept)
+- Git branches that `git prune-merged` would delete
+- Any caveats specific to the session (e.g., chains that were not fully integrated, divergent changes that may need manual resolution, work-in-progress that should be preserved)
+
+After user approval, execute in order:
+
+```bash
+jj bookmark delete <stale-bookmarks>
+jj tidy
+git prune-merged
+jj gc
+```
+
+Do not execute cleanup automatically.
+Always present the summary and wait for explicit approval.
+
 ## Integration with git repositories
 
 ### Initializing jj in existing git repository
