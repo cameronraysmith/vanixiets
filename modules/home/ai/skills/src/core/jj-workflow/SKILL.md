@@ -657,8 +657,8 @@ The `all:` prefix in the revset ensures multiple parents are preserved rather th
 
 Auto-rebase behavior:
 
-When a parent bookmark advances (via commits from another workspace, collaborator push, or `jj git fetch`), jj automatically rebases `@` onto the updated parents.
-The multi-parent working copy stays current without manual rebase steps.
+When a parent bookmark advances (via `squash --into`, `absorb`, commits from another workspace, collaborator push, or `jj git fetch`), jj automatically rebases `@` onto the updated parents.
+The composite working tree stays current without manual rebase steps.
 
 This pattern maps directly to GitButler's workspace model.
 See `~/.claude/skills/preferences-git-version-control/SKILL.md` for the full cross-tool terminology mapping in the "GitButler equivalence mapping" table under the jj mode subsection.
@@ -671,6 +671,16 @@ When `.beads/` exists, epic bookmarks compose naturally with the multi-parent mo
 Create a bookmark per active epic (`{epic-ID}-descriptor`), then `jj new epic-a epic-b` to work across them simultaneously.
 The orchestrator routes changes from the multi-parent `@` to the correct epic bookmark via `jj absorb` (blame-based) or `jj squash --into` (explicit) after each subagent completes.
 See the "Epic and issue mapping" subsection in `~/.claude/skills/preferences-git-version-control/SKILL.md` for the complete lifecycle including subagent dispatch conventions.
+
+Conflict visibility in composite `@`:
+
+When parent chains have conflicting changes to the same files, `@` contains first-class jj conflicts.
+These manifest as conflict markers in the working tree.
+Conflicts in `@` are informational — they indicate chains will conflict when merged but do not block work on any individual chain.
+Resolve conflicts in `@` when convenient, or continue working with each chain independently.
+
+See `~/.claude/skills/jj-version-control/SKILL.md` for the full multi-parent composite workflow and edit-route cycle.
+See `~/.claude/skills/issues-beads-prime/SKILL.md` for beads integration with jj dispatch.
 
 ## History refinement
 
