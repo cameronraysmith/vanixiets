@@ -65,6 +65,17 @@ File state awareness:
 - Run `jj diff` to review changes in `@` before operations
 - Unlike git, no need to check staging area - working copy state is the commit state
 
+## Session detection
+
+When an agent detects `.jj/` alongside `.git/` in a repository root, jj colocated mode is active.
+Detached HEAD is normal and expected in this configuration — do not attempt to reattach it.
+The combined signal means the agent should adopt the jj workflow described in this skill, with the multi-parent composite model as the default operating mode for sessions with multiple active chains.
+
+For quick command orientation, see `~/.claude/skills/jj-summary/SKILL.md`.
+For comprehensive command reference, see `~/.claude/skills/jj-workflow/SKILL.md`.
+For git-mode equivalents and beads integration, see `~/.claude/skills/preferences-git-version-control/SKILL.md`.
+For beads command quick reference, see `~/.claude/skills/issues-beads-prime/SKILL.md`.
+
 ## Bookmark workflow
 
 Bookmarks are named pointers that don't move automatically with new commits.
@@ -72,7 +83,7 @@ Bookmarks are named pointers that don't move automatically with new commits.
 Bookmark management:
 - Bookmarks stay on their target when you create new commits (unlike git branches)
 - Update bookmarks explicitly: `jj bookmark set <name> -r <commit>`
-- Always work in "detached HEAD" state - this is normal in jj
+- Always work in "detached HEAD" state — this is normal in jj
 - Create bookmarks for important points: `jj bookmark create <name>`
 
 Integration with issue tracking:
@@ -81,6 +92,24 @@ Integration with issue tracking:
 - Example: bookmark is "issue-42-auth" but fixing unrelated bug → `jj bookmark create issue-58-logging`
 
 Default bias: bookmarks are cheap, use them liberally to mark important commits.
+
+### Bookmark creation threshold
+
+Unlike git, where the `enforce-branch-before-edit` hook forces branching before any work, jj anonymous chains are first-class and never garbage-collected.
+The trigger for bookmark creation is chain differentiation, not the first edit.
+
+Three tiers govern when bookmarks become necessary:
+
+1. *Single chain, ad hoc work*: no bookmark needed.
+   Work on an anonymous chain descending from main.
+   When done, advance main: `jj bookmark set main -r @-`.
+
+2. *Second chain initiated*: bookmarks become required for both chains.
+   Bookmark the existing chain tip, create a new chain from main, bookmark its tip, then create a multi-parent `@` over both.
+
+3. *Beads epic session*: create bookmarks at session start following the `{epic-ID}-descriptor` naming convention.
+
+The discipline is "create bookmarks at the moment you need to distinguish chains" — not "always create a bookmark before working."
 
 ## Operation log and recovery
 
