@@ -98,6 +98,17 @@ This does not apply in GitButler mode or jj mode (both operate in a single worki
 In jj mode, when working across multiple epics simultaneously, the orchestrator creates a multi-parent `@` via `jj new epic-a epic-b` and routes changes to the correct epic bookmark via `jj absorb` or `jj squash --into` after subagent completion.
 See the "Subagent dispatch in jj mode" subsection of git-preferences for the full routing workflow.
 
+All agents (including parallel agents) share the same `@` working copy.
+Coordination protocol: atomic one-file changes, periodic `jj log` review, prompt absorb/squash to keep `@` clean.
+`jj absorb` works when modifying files with blame history in a specific chain (it routes changes to the ancestor that last touched each line).
+Fall back to `jj squash --into <chain>` for new files or when blame ancestry is ambiguous (e.g. file touched by multiple chains).
+See the multi-parent composite workflow in `~/.claude/skills/jj-version-control/SKILL.md` for the full edit-route cycle.
+
+In jj mode, bookmarks are created at chain differentiation, not before the first edit.
+A single anonymous chain needs no bookmark.
+Create bookmarks when initiating a second chain or when working on beads epics.
+See bookmark creation threshold in `~/.claude/skills/jj-version-control/SKILL.md`.
+
 Dispatch clarity:
 - When dispatching subagent Tasks, the prompt must specify the working context: worktree path (git-native), GitButler branch name, or jj bookmark name.
 - In jj mode, subagents edit files directly in the shared `@` working copy; the orchestrator routes changes to the correct bookmark post-hoc.
