@@ -385,15 +385,57 @@ jj new <single-bookmark>
 
 This creates a fresh `@` descending from only the specified bookmark.
 
+### Session persistence
+
+Multi-parent `@` state persists across sessions.
+When a new session detects an existing multi-parent `@` (visible via `jj log -r @` showing multiple parents), it should resume the composite workflow rather than starting fresh.
+Run `jj log -r '@-+' -s` to identify the active parent chains and their bookmarks.
+Check `jj status` and `jj log -r 'mutable() ~ @ ~ ::main'` to understand in-progress work before making changes.
+
 ### Integration strategies at completion
 
 When chains are complete, three integration strategies are available:
 
-*Separate PRs*: push each chain's bookmark independently via `jj git push --bookmark <name>`.
-Each chain becomes its own pull request for independent review and merge.
+*Separate PRs*: push each chain's bookmark independently.
+Push all at once: `jj git push --bookmark chain-a --bookmark chain-b --bookmark chain-c`.
+Or push one at a time: `jj git push --bookmark chain-a`.
+Each pushed bookmark becomes a branch on the remote, suitable for PR creation via `gh pr create`.
+When creating PRs, use the bookmark name as the head branch and main as the base:
+
+```bash
+jj git push --bookmark chain-a
+gh pr create -d -a "@me" -B main -H chain-a -t "feat: description" -b ""
+```
+
+Follow the PR creation protocol in `~/.claude/skills/preferences-git-version-control/SKILL.md` for placeholder content and safety conventions.
 
 *Linearize then PR*: rebase chains into a single linear sequence, then push as one bookmark.
-Use `jj rebase -s <chain-b-base> -d <chain-a-tip>` to stack chains sequentially.
+Order matters: dependent chains come first (if chain-b depends on chain-a's changes, chain-a must precede chain-b in the linearized sequence), then independent chains in any order.
+
+For each subsequent chain, find its base (the first change descending from main) and rebase it onto the previous chain's tip.
+The procedure generalizes to N chains:
+
+```bash
+# Determine linearization order (dependent chains first)
+# Chain A: main -> a1 -> a2 -> a3 (tip: chain-a bookmark)
+# Chain B: main -> b1 -> b2 (tip: chain-b bookmark)
+# Chain C: main -> c1 (tip: chain-c bookmark)
+
+# Stack B onto A's tip
+jj rebase -s b1 -d chain-a
+
+# Stack C onto B's new tip
+jj rebase -s c1 -d chain-b
+
+# Result: main -> a1 -> a2 -> a3 -> b1 -> b2 -> c1
+# Advance main and push
+jj bookmark set main -r chain-c
+jj git push --bookmark main
+```
+
+After linearization, exit multi-parent mode since the chains are now one linear sequence.
+Use `jj new main` or `jj new chain-c` to reset `@` to a single parent.
+Individual chain bookmarks can be deleted in the post-session cleanup.
 
 *Direct merge to main*: advance the main bookmark to the chain tip.
 Use `jj bookmark set main -r <chain-tip>` followed by `jj git push --bookmark main`.
