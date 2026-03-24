@@ -387,14 +387,13 @@ jj squash --into {epic-b}-descriptor
 
 ##### Subagent dispatch in jj mode
 
-Subagent dispatch differs fundamentally from git-native and GitButler modes.
-In git-native mode, subagents work in isolated worktrees (filesystem separation).
-In GitButler mode, subagents target named branches within the workspace.
-In jj mode, subagents edit files directly in the shared `@` working copy.
-The orchestrator handles change routing to the correct epic bookmark after the subagent completes, using `jj absorb` for blame-based distribution or `jj squash --into` for explicit targeting.
+In jj mode, subagents do not create bookmarks or worktrees.
+All agents — including parallel agents — edit files directly in the shared `@` working copy.
+The orchestrator routes changes to the correct chain via `jj absorb` or `jj squash --into` after each subagent completes.
 
-Subagent dispatch prompts should specify which files to edit and the target epic context, but do not need to include jj routing commands.
-The orchestrator manages the routing step as a coordination action after the subagent returns.
+Coordination protocol: atomic one-file changes, periodic `jj log` review, prompt routing to keep `@` clean.
+Subagent dispatch prompts specify which files to edit and the target chain context but do not include jj routing commands.
+See the parallel agent coordination protocol in `~/.claude/skills/jj-version-control/SKILL.md` for the full model.
 
 ##### Completing issues and epics
 
