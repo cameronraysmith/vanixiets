@@ -432,6 +432,20 @@ jj op log --limit 20
 # Shows all cleanup operations performed
 ```
 
+## Multi-parent composite mode considerations
+
+When in multi-parent composite mode, history cleanup operations on a parent chain (rebase, squash within the chain) trigger auto-rebase of `@`.
+This is safe — jj handles it automatically.
+However, if cleanup involves abandoning changes that are parents of `@`, exit multi-parent mode first by removing that chain from `@`: `jj rebase -r @ -d 'all:(@- ~ chain-being-cleaned)'`.
+Re-add after cleanup is complete.
+
+### `jj tidy` safety
+
+`jj tidy` (alias for `jj abandon 'mutable() ~ @ ~ ::main'`) sweeps all mutable changes not in main's ancestry or `@`.
+Always advance main to cover work-in-progress before running tidy.
+Preview targets: `jj log -r 'mutable() ~ @ ~ ::main' -s`.
+Recovery: `jj undo`.
+
 ## Key reminders
 
 - No backup branches needed - operation log is your safety net
@@ -442,6 +456,7 @@ jj op log --limit 20
 - Use revsets to operate on multiple commits at once
 - `jj op restore <id>` returns to any prior state
 - Test incrementally instead of at the end
+- `jj revert` (formerly `jj backout`, renamed in v1.3.10) reverses a commit's changes. Requires explicit placement: `--onto`, `--insert-before`, or `--insert-after`.
 - Reference `~/.claude/skills/jj-git-interactive-rebase-to-jj/SKILL.md` for detailed command mappings
 
 ## Advanced patterns
