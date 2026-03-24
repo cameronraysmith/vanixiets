@@ -291,6 +291,159 @@ When sharing work done, combine both:
 
 Use explicit operation IDs from session start if you noted them, otherwise count backwards from `@`.
 
+## Multi-parent composite workflow
+
+The multi-parent composite working copy is the default operating mode for any jj session with two or more active chains.
+Single-chain mode is the exception, reserved for simple ad hoc work on one anonymous chain descending from main.
+
+When multiple chains are active, the working copy commit `@` composites all active chains by descending from multiple parents.
+This provides continuous integration feedback (conflicts between chains surface immediately as first-class conflicts in `@`), shared visibility (every operation sees the full integrated state), modular separation (each chain remains independently inspectable, pushable, and reviewable), and flexible integration (chains can merge to main individually or be linearized into a single chain).
+
+### The edit-route cycle
+
+All edits land in `@`.
+The discipline is to route each completed change out of `@` into the correct parent chain, then verify the routing was correct.
+
+The cycle proceeds as follows:
+
+1. Edit files — changes accumulate in `@`
+2. `jj describe -m "message"` — describe the change
+3. Route the change:
+   - `jj squash --into <chain>` for explicit routing to a named parent chain
+   - `jj absorb` for blame-based auto-routing across all parent chains
+4. `@` auto-rebases onto updated parents after routing
+5. `jj log` — verify changes routed to the correct chain
+6. Repeat
+
+The invariant is that `@` is always empty or contains only in-progress work.
+All completed changes live in their respective parent chains.
+
+In single-chain mode, the cycle is simpler: `jj describe -m "message"` followed by `jj new` freezes the change and advances `@`.
+Do not use `jj new` in multi-parent composite mode — it creates a new change descending from the composite `@` rather than routing to a parent chain.
+
+### Conflict behavior in composite `@`
+
+When parent chains contain conflicting changes, `@` displays first-class jj conflicts.
+These conflicts are informational — they tell you the parent chains will conflict when merged.
+You can resolve them in `@` (the resolution stays in `@` and may need re-resolution when parents change), continue working with conflict markers present, or resolve the underlying conflict in one of the parent chains directly.
+
+Conflicts in `@` do not prevent work.
+They are a continuous integration signal, not a blocking error.
+
+### `jj absorb` scope and limitations
+
+`jj absorb` works for modifications to existing lines by analyzing blame ancestry to determine which parent chain last touched each modified line.
+It routes changes automatically based on this analysis.
+
+`jj absorb` does not work for:
+- New files (no blame history exists)
+- Deleted files (no blame target)
+- Hunks where blame is ambiguous (multiple ancestors modified the same lines)
+
+For any case where `jj absorb` cannot route changes, fall back to `jj squash --into <chain>` for explicit routing.
+
+### Parallel agent coordination
+
+Multiple agents share one filesystem and edit files in the same `@`.
+This is the intended model.
+All agents see the integrated state of all active chains, reducing merge conflict risk.
+Conflicts between concurrent edits are detected immediately as first-class jj conflicts.
+
+Coordination protocol for parallel agents:
+- Atomic one-file changes
+- Periodic `jj log` review to verify routing
+- Prompt `jj absorb` or `jj squash --into` so `@` does not accumulate unrouted changes
+- If two agents edit the same file, resolve the conflict immediately, then describe, split, and absorb
+
+The orchestrator routes changes to the correct chain via `jj absorb` or `jj squash --into` after each subagent completes.
+Subagent prompts specify which files to edit and the target chain context but do not include jj routing commands.
+
+### Adding and removing chains
+
+Add a parent chain to the composite `@`:
+
+```bash
+jj rebase -r @ -d 'all:(@- | new-bookmark)'
+```
+
+Remove a parent chain from the composite `@`:
+
+```bash
+jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
+```
+
+The `all:` prefix is required to ensure the revset resolves to multiple parents rather than collapsing to a single common ancestor.
+Without `all:`, jj would compute the nearest common ancestor of the revset members, producing a single-parent `@` instead of a multi-parent one.
+
+### Teardown
+
+To collapse back to a single-parent `@`, either iteratively remove parents using the removal command above, or reset directly:
+
+```bash
+jj new <single-bookmark>
+```
+
+This creates a fresh `@` descending from only the specified bookmark.
+
+### Integration strategies at completion
+
+When chains are complete, three integration strategies are available:
+
+*Separate PRs*: push each chain's bookmark independently via `jj git push --bookmark <name>`.
+Each chain becomes its own pull request for independent review and merge.
+
+*Linearize then PR*: rebase chains into a single linear sequence, then push as one bookmark.
+Use `jj rebase -s <chain-b-base> -d <chain-a-tip>` to stack chains sequentially.
+
+*Direct merge to main*: advance the main bookmark to the chain tip.
+Use `jj bookmark set main -r <chain-tip>` followed by `jj git push --bookmark main`.
+This is the jj equivalent of fast-forward merge — jj does not create merge commits for bookmark moves.
+
+## `jj revert` usage
+
+In jj v0.25+, `jj backout` was renamed to `jj revert`.
+The command requires explicit placement via `--onto`, `--insert-after`, or `--insert-before`.
+
+Create a revert as a child of the current `@`:
+
+```bash
+jj revert -r <change> --onto @
+```
+
+Insert a revert into a linear chain before `@`:
+
+```bash
+jj revert -r <change> --insert-before @
+```
+
+Insert a revert after the parent of `@` (equivalent to inserting before `@`):
+
+```bash
+jj revert -r <change> --insert-after @-
+```
+
+To test a revert non-destructively, apply it and then undo if the result is undesirable:
+
+```bash
+jj revert -r <change> --onto @
+# inspect the result...
+jj undo  # roll back if not what you wanted
+```
+
+## `jj tidy` safety
+
+The `jj tidy` alias uses the revset `mutable() ~ @ ~ ::main`.
+This abandons all mutable changes not in main's ancestry and not at `@`.
+
+Before running `jj tidy`, always advance main to cover any work-in-progress you want to keep.
+Preview what tidy will affect:
+
+```bash
+jj log -r 'mutable() ~ @ ~ ::main' -s
+```
+
+If tidy sweeps too broadly, recover with `jj undo`.
+
 ## Integration with git repositories
 
 ### Initializing jj in existing git repository
@@ -378,12 +531,21 @@ jj squash --into {epic-b}-descriptor  # manual routing
 
 Subagent dispatch in jj mode: subagents edit files directly in the shared `@` working copy.
 The orchestrator routes changes to the correct epic bookmark after the subagent returns.
-See the "Subagent dispatch in jj mode" subsection in `~/.claude/skills/preferences-git-version-control/SKILL.md` for conventions.
+See the parallel agent coordination protocol in the multi-parent composite workflow section above.
 
-After completing bead work, close the issue, push beads state, and push the bookmark:
+### Completing issues and epics
 
-```bash
-bd close {issue-ID} --reason "Implemented in $(jj log -r '{epic-ID}-descriptor' --no-graph -T 'commit_id.short(8)')"
-bd dolt push
-jj git push --bookmark {epic-ID}-descriptor
-```
+Issue-level completion within a chain:
+
+1. The issue's changes are complete within the epic's bookmark chain.
+2. Close the bead: `bd close {issue-ID} --reason "Implemented in $(jj log -r '{epic-ID}-descriptor' --no-graph -T 'commit_id.short(8)')"`
+3. The epic bookmark already points to the chain tip (bookmarks follow rewrites automatically).
+4. Continue the chain with new changes for the next issue.
+
+Epic-level completion:
+
+1. All issues within the epic are closed.
+2. Advance main to the epic chain tip: `jj bookmark set main -r {epic-ID}-descriptor`
+3. Delete the epic bookmark: `jj bookmark delete {epic-ID}-descriptor`
+4. Push main: `jj git push --bookmark main`
+5. Push beads state: `bd dolt push`
