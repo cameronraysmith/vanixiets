@@ -456,7 +456,7 @@ Recovery: `jj undo`.
 - Use revsets to operate on multiple commits at once
 - `jj op restore <id>` returns to any prior state
 - Test incrementally instead of at the end
-- `jj revert` (formerly `jj backout`, renamed in v1.3.10) reverses a commit's changes. Requires explicit placement: `--onto`, `--insert-before`, or `--insert-after`.
+- `jj revert` (formerly `jj backout`, renamed in v0.28.0) reverses a change. Requires explicit placement: `--onto`, `--insert-before`, or `--insert-after`.
 - Reference `~/.claude/skills/jj-git-interactive-rebase-to-jj/SKILL.md` for detailed command mappings
 
 ## Advanced patterns
