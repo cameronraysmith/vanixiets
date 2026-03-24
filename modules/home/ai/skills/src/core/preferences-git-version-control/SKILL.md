@@ -512,11 +512,14 @@ In git-native mode: edit file, `git add [file]`, verify with `git diff --cached 
 In GitButler mode: edit file, run `but status -fv` to get the file's CLI ID, then `but commit <branch> -m "msg" --changes <id> --status-after`.
 The `--changes` flag provides explicit file selection equivalent to staging one file at a time.
 
-In jj mode: edit one file, then immediately `jj describe -m "msg"` followed by `jj new` to freeze the change and start a new empty `@`.
+In jj single-chain mode: edit one file, then immediately `jj describe -m "msg"` followed by `jj new` to freeze the change and start a new empty `@`.
 This is the jj equivalent of `git add [file] && git commit` — the `describe` + `new` cycle is the atomic commit boundary.
 Without `jj new`, the next edit accumulates into the same change, breaking atomicity.
-If multiple files were edited before freezing, use `jj split <path> -m "msg"` to separate them into atomic changes after the fact (as we did in this session).
-For multi-parent working copies, use `jj squash --into <target-parent>` to route changes to the appropriate parent bookmark, or `jj absorb` to auto-distribute changes based on blame.
+If multiple files were edited before freezing, use `jj split <path> -m "msg"` to separate them into atomic changes after the fact.
+
+In jj multi-parent composite mode: edit one file, then `jj describe -m "msg"` followed by `jj squash --into <target-parent>` to route the change to the correct parent chain, or `jj absorb` to auto-distribute based on blame ancestry.
+Do not use `jj new` in multi-parent mode — it creates a new change descending from the composite `@` rather than routing to a parent chain.
+See the edit-route cycle in `~/.claude/skills/jj-version-control/SKILL.md` for the full workflow.
 
 ## Handling pre-existing mixed changes
 
