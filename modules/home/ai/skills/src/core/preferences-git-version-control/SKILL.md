@@ -453,6 +453,10 @@ Exit GitButler before merging to main: `but teardown`, then `git merge --ff-only
 Do not use `but merge` for this — it always creates merge commits and has no fast-forward mode.
 See the "Stacked PRs with single fast-forward merge" and "Merging multiple independent stacks" recipes in `~/.claude/skills/gitbutler-but-cli/SKILL.md` for the full workflow.
 
+In jj mode, the equivalent of fast-forward merge is bookmark advancement: `jj bookmark set main -r <chain-tip>`.
+This is inherently linear — jj does not create merge commits for bookmark moves.
+See the integration strategies section in `~/.claude/skills/jj-version-control/SKILL.md` for the full completion workflow.
+
 ### Stack management
 
 Branch stacks mirror beads issue dependencies: when issues form a dependency chain (e.g., `nix-pxj.2` blocks `nix-pxj.3`), the corresponding branches should form a stack with matching parent-child relationships.
