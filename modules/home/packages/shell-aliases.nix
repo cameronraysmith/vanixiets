@@ -26,7 +26,7 @@
         gu = "git machete traverse --fetch --start-from=first-root";
         gts = "check_github_token_scopes";
         i = "macchina";
-        j = "just";
+        j = "jjui";
         jg = "jj git";
         k = "kubectl";
         kns = "kubectl config unset contexts.$(kubectl config current-context).namespace";
