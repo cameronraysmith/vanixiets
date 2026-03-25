@@ -39,6 +39,7 @@
             forceLoginMethod = "claudeai";
             theme = "dark";
             autoCompactEnabled = false;
+            autoDreamEnabled = true;
             spinnerTipsEnabled = false;
             cleanupPeriodDays = 1100;
             includeCoAuthoredBy = false;
