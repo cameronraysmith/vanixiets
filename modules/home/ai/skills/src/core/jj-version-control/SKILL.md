@@ -312,21 +312,29 @@ This provides continuous integration feedback (conflicts between chains surface 
 All edits land in `@`.
 The discipline is to route each completed change out of `@` into the correct parent chain, then verify the routing was correct.
 
+The prescribed commit pattern when bookmarks exist (tier 2 or 3 of the bookmark creation threshold) is `jj squash --into <chain> -m "message" <path>`.
+This combines routing, description, and file scoping in a single atomic operation.
+
 The cycle proceeds as follows:
 
-1. Edit files — changes accumulate in `@`
-2. `jj describe -m "message"` — describe the change
-3. Route the change:
-   - `jj squash --into <chain>` for explicit routing to a named parent chain
-   - `jj absorb` for blame-based auto-routing across all parent chains
-4. `@` auto-rebases onto updated parents after routing
-5. `jj log` — verify changes routed to the correct chain
-6. Repeat
+1. Edit a file in `@`
+2. `jj squash --into <chain> -m "feat: description" <path>` — routes the change, sets the description, and scopes to the specified file in one command
+3. `jj log` — verify the change landed in the correct chain and `@` is clean
+4. Repeat
+
+This single-command pattern is better than the two-step describe + squash for three reasons.
+It is atomic: routing and description happen in one operation, with no window where unrouted described changes sit in `@`.
+It is scoped: the explicit path ensures only the intended file moves, even if another agent edited something else in `@` concurrently.
+It is parallel-safe: multiple agents can run this simultaneously on different files targeting different chains without interference.
+
+`jj absorb` remains available as a convenience when blame ancestry can determine the correct chain, and is especially useful for routing multiple files at once after a batch of edits.
+Scoped absorb (`jj absorb <path>`) targets a single file by blame ancestry while leaving everything else in `@` untouched.
 
 The invariant is that `@` is always empty or contains only in-progress work.
 All completed changes live in their respective parent chains.
 
-In single-chain mode, the cycle is simpler: `jj describe -m "message"` followed by `jj new` freezes the change and advances `@`.
+In single-chain mode (tier 1, no bookmarks), the cycle is simpler: `jj describe -m "message"` followed by `jj new` freezes the change and advances `@`.
+There is no routing target, so the single-command pattern does not apply.
 Do not use `jj new` in multi-parent composite mode — it creates a new change descending from the composite `@` rather than routing to a parent chain.
 
 ### Conflict behavior in composite `@`
@@ -343,12 +351,15 @@ They are a continuous integration signal, not a blocking error.
 `jj absorb` works for modifications to existing lines by analyzing blame ancestry to determine which parent chain last touched each modified line.
 It routes changes automatically based on this analysis.
 
+`jj absorb` can be scoped to specific files: `jj absorb <path>` routes only that file's changes by blame ancestry, leaving everything else in `@` untouched.
+This is useful when you want to auto-route changes for one file while continuing to work on others.
+
 `jj absorb` does not work for:
 - New files (no blame history exists)
 - Deleted files (no blame target)
 - Hunks where blame is ambiguous (multiple ancestors modified the same lines)
 
-For any case where `jj absorb` cannot route changes, fall back to `jj squash --into <chain>` for explicit routing.
+For any case where `jj absorb` cannot route changes, fall back to `jj squash --into <chain> -m "message" <path>` for explicit routing.
 
 ### Parallel agent coordination
 
@@ -357,13 +368,16 @@ This is the intended model.
 All agents see the integrated state of all active chains, reducing merge conflict risk.
 Conflicts between concurrent edits are detected immediately as first-class jj conflicts.
 
-Coordination protocol for parallel agents:
-- Atomic one-file changes
-- Periodic `jj log` review to verify routing
-- Prompt `jj absorb` or `jj squash --into` so `@` does not accumulate unrouted changes
-- If two agents edit the same file, resolve the conflict immediately, then describe, split, and absorb
+All agents use `jj squash --into <chain> -m "message" <path>` for every commit.
+This ensures each agent's changes are atomically routed to the correct chain with explicit file scoping, preventing cross-contamination even when multiple agents edit different files simultaneously in `@`.
 
-The orchestrator routes changes to the correct chain via `jj absorb` or `jj squash --into` after each subagent completes.
+Coordination protocol for parallel agents:
+- One file per commit, routed via `jj squash --into <chain> -m "message" <path>`
+- Periodic `jj log` review to verify routing correctness
+- `jj absorb` as a fallback for batch routing when blame ancestry is clear
+- If two agents edit different hunks in the same file, `jj absorb <path>` can separate them by blame ancestry after the fact
+
+The orchestrator routes changes to the correct chain via `jj squash --into` or `jj absorb` after each subagent completes.
 Subagent prompts specify which files to edit and the target chain context but do not include jj routing commands.
 
 ### Adding and removing chains
@@ -613,9 +627,10 @@ When working across multiple epics simultaneously, create a multi-parent working
 
 ```bash
 jj new {epic-a}-descriptor {epic-b}-descriptor
-# edit files in the shared @ working copy
-jj absorb              # auto-route changes by blame
-jj squash --into {epic-b}-descriptor  # manual routing
+# edit a file, then route it atomically:
+jj squash --into {epic-b}-descriptor -m "feat: description" path/to/file
+# or auto-route multiple files by blame ancestry:
+jj absorb
 ```
 
 Subagent dispatch in jj mode: subagents edit files directly in the shared `@` working copy.
