@@ -19,6 +19,24 @@ Workers do not invoke `/session-review` for every issue close; they invoke it wh
 This is the default review command for repositories with the full stigmergic workflow installed.
 For repositories without the full workflow (no session-layer skills, small utility repos, quick fixes), the self-verification gate in `/stigmergic-convention` provides the only review mechanism.
 
+## Theoretical grounding
+
+This skill is one component of a lifecycle that co-optimizes planning time against execution time.
+The underlying model: planning depth has an optimal finite value where marginal yield from one additional planned step equals marginal accuracy loss and planning cost.
+This optimum *decreases* as agent execution capacity increases — more agents demand shallower, faster planning cycles to avoid starving them on stale plans.
+Model Predictive Control provides the structural answer: plan over a finite prediction horizon, commit only to a shorter control horizon of items dispatched to agents, then re-observe actual codebase state and replan from scratch.
+Cynefin domain classification makes planning depth per-item rather than global: clear-domain work (known patterns) is planned far ahead at low cost, while complex-domain work (emergent behavior) is planned only as probes whose outcomes inform the next cycle.
+The Viable System Model maps this to an organizational lifecycle where each session skill implements a specific regulatory function: System 4 (orient), System 3 (plan), System 1 (implement), System 3* (review), System 5 (checkpoint).
+Stigmergic coordination binds it together — agents orient by reading structured signal tables on the issue DAG rather than receiving centralized briefings, achieving near-optimal throughput via local sensing and acting.
+Queue economics calibrates the pipeline: buffer sizing via Little's Law, agent utilization at 70-85% (not 100%, due to queueing instability), and batch sizing via the U-curve between planning overhead and plan staleness.
+
+This skill implements System 3*: the audit and monitoring function that closes the feedback loop.
+It runs at topological convergence points in the DAG where multiple independent implementation chains merge, verifying integration correctness and measuring accumulated surprise against the replanning threshold theta (scaled by Cynefin domain).
+When surprise exceeds theta, the plan has diverged enough from reality to warrant replanning.
+This is the MPC "re-observe actual state" step — without it, the system operates open-loop and plan accuracy degrades unboundedly.
+
+For the full theoretical derivation including the R_plan(d) formulation, buffer sizing heuristic, and validation gate placement theory, see `preferences-adaptive-planning`.
+
 ## Composed skills
 
 This skill orchestrates a higher-level protocol that uses the following skills as components.
