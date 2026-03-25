@@ -327,8 +327,10 @@ It is atomic: routing and description happen in one operation, with no window wh
 It is scoped: the explicit path ensures only the intended file moves, even if another agent edited something else in `@` concurrently.
 It is parallel-safe: multiple agents can run this simultaneously on different files targeting different chains without interference.
 
-`jj absorb` remains available as a convenience when blame ancestry can determine the correct chain, and is especially useful for routing multiple files at once after a batch of edits.
-Scoped absorb (`jj absorb <path>`) targets a single file by blame ancestry while leaving everything else in `@` untouched.
+`jj absorb` remains available as a convenience when blame ancestry can determine the correct chain.
+In parallel environments where multiple agents share `@`, prefer scoped `jj absorb <path>` over bare `jj absorb`.
+Bare absorb touches every changed file in `@`, which can interfere with files another agent is mid-edit on.
+Scoped absorb routes only the specified files by blame ancestry, leaving everything else in `@` untouched — this is the safer option when you lack context about what other agents are actively editing.
 
 The invariant is that `@` is always empty or contains only in-progress work.
 All completed changes live in their respective parent chains.
