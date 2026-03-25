@@ -12,6 +12,23 @@ Prevents misrouting where orient runs against empty or structurally broken graph
 Runs diagnostic commands, evaluates heuristics, presents a recommendation with reasoning.
 Does not invoke the recommended skill itself.
 
+## Theoretical grounding
+
+This skill is one component of a lifecycle that co-optimizes planning time against execution time.
+The underlying model: planning depth has an optimal finite value where marginal yield from one additional planned step equals marginal accuracy loss and planning cost.
+This optimum *decreases* as agent execution capacity increases — more agents demand shallower, faster planning cycles to avoid starving them on stale plans.
+Model Predictive Control provides the structural answer: plan over a finite prediction horizon, commit only to a shorter control horizon of items dispatched to agents, then re-observe actual codebase state and replan from scratch.
+Cynefin domain classification makes planning depth per-item rather than global: clear-domain work (known patterns) is planned far ahead at low cost, while complex-domain work (emergent behavior) is planned only as probes whose outcomes inform the next cycle.
+The Viable System Model maps this to an organizational lifecycle where each session skill implements a specific regulatory function: System 4 (orient), System 3 (plan), System 1 (implement), System 3* (review), System 5 (checkpoint).
+Stigmergic coordination binds it together — agents orient by reading structured signal tables on the issue DAG rather than receiving centralized briefings, achieving near-optimal throughput via local sensing and acting.
+Queue economics calibrates the pipeline: buffer sizing via Little's Law, agent utilization at 70-85% (not 100%, due to queueing instability), and batch sizing via the U-curve between planning overhead and plan staleness.
+
+This skill functions as the algedonic channel — the fast-path signal that bypasses normal hierarchical routing when structural anomalies require immediate attention.
+Its routing heuristics are simplified versions of the replanning decision rule: graph health metrics (cycles, empty epics, abnormal ready ratios) determine which regulatory function should activate next.
+When no anomaly is detected, routing defaults to the normal lifecycle entry point.
+
+For the full theoretical derivation including the R_plan(d) formulation, buffer sizing heuristic, and validation gate placement theory, see `preferences-adaptive-planning`.
+
 ## Decision inputs
 
 Run the following diagnostic commands to gather routing inputs.
