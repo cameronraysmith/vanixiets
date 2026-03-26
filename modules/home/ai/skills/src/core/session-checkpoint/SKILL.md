@@ -28,6 +28,11 @@ This skill operates across all VSM systems simultaneously: capturing operational
 It produces the handoff narrative that enables the next session to self-direct via `/session-orient`, completing the MPC receding-horizon cycle.
 The quality of the handoff directly determines the next session's planning accuracy — a poor checkpoint degrades the entire pipeline.
 
+This lifecycle is subject to its own standards.
+When patterns suggest the framework itself is producing poor outcomes — systematic surprise across multiple issues, recurring ambiguity in acceptance criteria, Cynefin classifications that consistently shift during implementation, validation that stalls because infrastructure doesn't support the prescribed methodology, or requirements that decompose cleanly but don't compose into a working system — the agent's obligation is to pause execution and surface the observation rather than pressing on within a framework it perceives as inadequate.
+The plan is a tool for achieving outcomes; when the tool is counterproductive, the agent's duty is to say so.
+See `preferences-validation-assurance` for the full set of double-loop learning triggers and the reflexive severity framework.
+
 For the full theoretical derivation including the R_plan(d) formulation, buffer sizing heuristic, and validation gate placement theory, see `preferences-adaptive-planning`.
 
 ## Composed skills

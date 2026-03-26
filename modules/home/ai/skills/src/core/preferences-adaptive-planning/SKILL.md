@@ -76,6 +76,20 @@ Thus $d^*_{\text{eff}}$ *decreases* as $k$ increases — more agents demand shal
 - *Key result* (Boehm curve): cost of defect correction grows monotonically (often cited as exponentially) with the distance between injection and detection. Validation frequency should be calibrated to minimize total expected defect cost, not minimized for convenience.
 - *References*: Boehm, *Software Engineering Economics*; IEEE 1012 (V&V standard); VDI 2206 (V-model for systems engineering).
 
+### Confidence as a dimension of net progress rate
+
+The net progress rate formulation counts "validated, releasable product increments."
+The word "validated" carries a specific meaning: the increment is supported by evidence that is severe (would have failed under plausible incorrect implementations), fresh (produced against the current codebase), and sufficient in coverage (addresses the specification properties the increment claims to satisfy).
+An increment that passes tests but whose tests lack severity is not validated — it is merely untested in a way that happens not to fail.
+This distinction is operationalized through the confidence promotion chain: work progresses from `undemonstrated` through `prototype`, `locally-verified`, `integration-verified`, `validated`, to `regression-protected`, with each promotion requiring specific evidence at the target level.
+Demotion to `regressed` occurs when evidence is invalidated by implementation change, specification change, dependency change, or staleness.
+
+The confidence dimension interacts with planning in two ways.
+First, planning should explicitly decompose evidence-producing work alongside implementation work when the scope warrants it: an implementation issue creates the behavior, a validation issue challenges the claim, a regression-protection issue makes the claim durable.
+Second, the review and checkpoint skills should track confidence state to detect when the issue tracker's view of "done" has drifted from the evidence's view of "demonstrated."
+
+See `preferences-validation-assurance` for the full treatment of evidence quality, the severity criterion, refinement and freedom preservation, and the confidence promotion chain.
+
 ### 6. Complex adaptive systems and domain classification
 
 - *Cynefin framework* (Snowden): classify work items by the knowability of cause-effect relationships.

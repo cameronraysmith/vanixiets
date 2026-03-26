@@ -11,6 +11,10 @@ Protocol reference for stigmergic workflow coordination via structured signal ta
 Workers orient by reading the DAG rather than receiving briefings.
 Context flows through the graph as structured signals, not through the orchestrator as prose summaries.
 
+The signal table now carries both coordination state (cynefin, surprise, progress, escalation, planning-depth) and confidence state (confidence, evidence-freshness, regression-guard).
+These serve a unified purpose — telling the next agent everything it needs to know about this issue — but they answer different questions.
+Coordination state answers "what should I do?" while confidence state answers "what has been achieved and how certain are we?"
+
 ## Signal table template
 
 Every issue carries this table in its `notes` field, delimited by HTML comments for machine parsing.
@@ -25,10 +29,13 @@ Every issue carries this table in its `notes` field, delimited by HTML comments 
 | progress | not-started | YYYY-MM-DD |
 | escalation | none | — |
 | planning-depth | standard | YYYY-MM-DD |
+| confidence | undemonstrated | YYYY-MM-DD |
+| evidence-freshness | — | — |
+| regression-guard | none | YYYY-MM-DD |
 <!-- /stigmergic-signals -->
 ```
 
-When no signal table exists, use defaults: cynefin=complicated, surprise=0.0, progress=not-started, escalation=none, planning-depth=standard.
+When no signal table exists, use defaults: cynefin=complicated, surprise=0.0, progress=not-started, escalation=none, planning-depth=standard, confidence=undemonstrated, evidence-freshness=absent, regression-guard=none.
 
 ## Field definitions
 
@@ -40,6 +47,9 @@ When no signal table exists, use defaults: cynefin=complicated, surprise=0.0, pr
 | progress | enum | `not-started`, `exploring`, `implementing`, `verifying`, `blocked` | Lifecycle state within current work session. `exploring` vs `implementing` distinction matters for complex-domain probe phases. |
 | escalation | enum | `none`, `pending`, `resolved` | System 5 (human policy authority) interface state. Orthogonal to progress. |
 | planning-depth | enum | `shallow`, `standard`, `deep`, `probe` | Controls orient briefing assembly depth. Derived from cynefin by default, manually overridable. |
+| confidence | enum | `undemonstrated`, `finding-recorded`, `prototype`, `locally-verified`, `integration-verified`, `validated`, `regression-protected`, `regressed` | Evidence-based confidence level. Promoted only by fresh, severe evidence at the target level. `regressed` is a demotion target, not a promotion step. See `preferences-validation-assurance` for promotion rules and demotion triggers. |
+| evidence-freshness | date | ISO date or `—` | When the current confidence level was last earned by fresh evidence. Not when the issue was last touched — when evidence was last produced. Absent (`—`) when confidence is `undemonstrated`. |
+| regression-guard | enum | `none`, `manual`, `automated`, `runtime` | What mechanism protects the validated claim against regression. `manual` = documented verification procedure. `automated` = CI-enforced tests. `runtime` = monitors or health checks in production. See `preferences-validation-assurance` for tier descriptions. |
 
 ## Cynefin-to-planning-depth default mapping
 
@@ -104,6 +114,21 @@ When the human resolves, they append a resolution subsection and set escalation 
 
 Multiple escalation cycles on the same issue accumulate chronologically within the section, providing a decision audit trail.
 
+## Process-improvement escalation
+
+A second escalation type exists for double-loop learning: observations that the requirements, decomposition, or validation methodology should change.
+Unlike resolution escalation (which expects an answer to a specific question), process-improvement escalation expects a discussion about whether the framework should evolve.
+
+When an agent recognizes a pattern suggesting structural process issues (see the double-loop learning triggers in `preferences-validation-assurance`), it sets escalation to `pending` and writes the observation in the escalation-context section with a `## Process improvement (YYYY-MM-DD)` heading instead of `## Pending (YYYY-MM-DD)`.
+
+The content should describe:
+- The pattern observed (e.g., "surprise consistently > 0.5 across the last 4 issues in this epic")
+- The evidence for the pattern (specific issues, specific signals)
+- A proposed improvement to the process, requirements, or methodology
+- Why the agent believes this cannot be resolved by local correction within the existing framework
+
+Process-improvement escalations follow the same resolution lifecycle as resolution escalations: the human appends a `## Resolved (YYYY-MM-DD)` subsection with their assessment.
+
 ## Checkpoint context format
 
 The `<!-- checkpoint-context -->` section describes current state, not history.
@@ -132,6 +157,8 @@ package stigmergic
 #PlanningDepth: "shallow" | "standard" | "deep" | "probe"
 #Progress: "not-started" | "exploring" | "implementing" | "verifying" | "blocked"
 #EscalationState: "none" | "pending" | "resolved"
+#ConfidenceLevel: "undemonstrated" | "finding-recorded" | "prototype" | "locally-verified" | "integration-verified" | "validated" | "regression-protected" | "regressed"
+#RegressionGuard: "none" | "manual" | "automated" | "runtime"
 
 #CynefinToDepth: {
 	clear:       "shallow"
@@ -147,6 +174,9 @@ package stigmergic
 	progress:       #Progress
 	escalation:     #EscalationState
 	planning_depth: #PlanningDepth
+	confidence:         #ConfidenceLevel
+	evidence_freshness: string  // ISO date or "—"
+	regression_guard:   #RegressionGuard
 }
 ```
 
