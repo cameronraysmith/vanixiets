@@ -51,6 +51,10 @@ When no signal table exists, use defaults: cynefin=complicated, surprise=0.0, pr
 | evidence-freshness | date | ISO date or `—` | When the current confidence level was last earned by fresh evidence. Not when the issue was last touched — when evidence was last produced. Absent (`—`) when confidence is `undemonstrated`. |
 | regression-guard | enum | `none`, `manual`, `automated`, `runtime` | What mechanism protects the validated claim against regression. `manual` = documented verification procedure. `automated` = CI-enforced tests. `runtime` = monitors or health checks in production. See `preferences-validation-assurance` for tier descriptions. |
 
+The `evidence-freshness` date is distinct from the `Updated` column on the `confidence` row.
+`Updated` records when the confidence assessment was last changed (including administrative updates like reviewing the signal without producing new evidence).
+`evidence-freshness` records when evidence supporting the current confidence level was last *produced* — a stricter criterion that only advances when new tests are run, new verification is performed, or new findings are documented.
+
 ## Cynefin-to-planning-depth default mapping
 
 | Cynefin domain | Default planning-depth | Orient behavior |
