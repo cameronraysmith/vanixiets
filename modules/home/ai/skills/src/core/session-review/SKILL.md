@@ -135,6 +135,12 @@ Cynefin modulates the rigor of integration verification:
 - *Complex*: adaptive; evaluate whether the emergent behavior of the assembled subsystems aligns with the original intent, even if the specific implementation diverged from the plan.
 - *Chaotic*: rapid; confirm that the stabilizing intervention achieved its immediate goal before investing in deeper verification.
 
+After running verification, assess severity: would these tests have failed under the most plausible alternative implementations that do not satisfy the requirement?
+A test that always passes regardless of implementation has zero severity and provides no evidence.
+When verification passes but severity is low (the tests check syntax rather than semantics, verify happy paths but miss edge cases, or test mocks rather than real integrations), flag the acceptance criteria as insufficient.
+Either create a rework issue for stronger tests or note the severity gap in the checkpoint handoff for the next session to address.
+See `preferences-validation-assurance` for the full severity criterion and evidence quality dimensions.
+
 ### Step 4: assess accumulated surprise
 
 Sum the surprise scores from all closed dependencies of the convergence node.
@@ -185,6 +191,11 @@ bd close <convergence-id> --reason "Integration verified: [summary of what was a
 The closure reason on a convergence node is a high-value pheromone trail because downstream nodes inherit this integration context.
 Make it specific about what was verified and what the assembled subsystem can now do.
 
+Update the convergence node's confidence signals:
+- Promote `confidence` based on what the verification actually demonstrated. Integration-level verification with severe tests warrants `integration-verified`. End-to-end verification against the specification warrants `validated`. Promotion requires that the evidence is fresh and severe — passing tests that lack severity does not warrant promotion.
+- Set `evidence-freshness` to today's date when fresh evidence was produced.
+- Record `regression-guard` if the verification is automated and will run on future changes (CI-enforced tests warrant `automated`; manual verification procedures warrant `manual`).
+
 #### Verification fails or surprise exceeds threshold
 
 When integration verification fails or accumulated surprise exceeds theta, the existing plan has diverged from reality and corrective action is needed.
@@ -198,6 +209,9 @@ Update signal tables on affected issues via the read-modify-write protocol from 
 
 Flag the need for replanning via `/session-plan`.
 The handoff to session-plan should include the rework issues created, the accumulated surprise score, and the specific integration failures that motivated replanning.
+
+If the convergence node previously had a higher confidence level, demote `confidence` to `regressed` to reflect that a previously supported claim no longer holds.
+Record what evidence failed in the checkpoint context so the next worker understands the regression.
 
 When deciding between rework and escalation, apply the self-verification gate's principle from `/stigmergic-convention`: if the failure can be fixed and retried, create rework issues; if the failure reveals an ambiguity that the DAG does not contain enough information to resolve, escalate with a precise question.
 
@@ -242,6 +256,7 @@ After review completes, the worker proceeds to one of:
 - Implementation if verification passed and the operational buffer still contains ready issues.
 - `/session-plan` if replanning was triggered by high surprise or failed verification.
 - `/session-checkpoint` if the session is ending, to capture the review results in the handoff narrative.
+- `/session-plan` to decompose validation or regression-protection work when review reveals a severity gap — the implementation exists but confidence cannot advance without stronger evidence.
 
 ---
 
@@ -257,3 +272,4 @@ After review completes, the worker proceeds to one of:
 
 *Theoretical foundations:*
 - `preferences-adaptive-planning` for the Viable System Model mapping (System 3* audit context), validation gate placement theory, and surprise threshold derivation
+- `preferences-validation-assurance` for the severity criterion, evidence quality dimensions, and confidence promotion/demotion rules applied during integration verification

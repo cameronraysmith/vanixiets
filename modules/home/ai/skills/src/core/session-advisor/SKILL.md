@@ -43,7 +43,7 @@ All complete in seconds.
 2. `bd epic status` -- epic child counts (detect 0/0 children containment antipattern).
 3. `bd dep cycles` -- cycle count (must be zero for healthy graph).
 4. `bd stale` -- issues with no activity beyond their age threshold.
-5. `bd list --json` or `bd show <id> --json` (optional) -- structured data for estimating signal table coverage by inspecting notes fields per issue.
+5. `bd list --json` or `bd show <id> --json` (optional) -- structured data for estimating signal table coverage and confidence signal coverage by inspecting notes fields per issue.
 
 ## Routing logic
 
@@ -68,14 +68,17 @@ First match wins.
 6. **Zero signal table coverage** (0% signal tables on a graph with 10+ issues): recommend seeding signal tables on priority issues before `/session-orient`.
    Rationale: no signal tables found. Orient calibrates by cynefin and planning-depth signals; without them, orient cannot produce a calibrated briefing.
 
-7. **Convergence point** (blocking dependencies on a node are all closed, or user indicates convergence): recommend `/session-review`.
+7. **Confidence audit needed** (user asks "are we done?", milestone readiness is being assessed, or closed work has weak confidence coverage or absent regression protection): recommend `/session-review` with an explicit directive to assess confidence across the epic scope rather than at a single convergence point.
+   Rationale: the question is no longer what to work on next, but what confidence has actually been earned and where regression protection is absent. Session-review's System 3* audit function handles this when scoped to the epic level.
+
+8. **Convergence point** (blocking dependencies on a node are all closed, or user indicates convergence): recommend `/session-review`.
    Rationale: convergence point detected. Integration verification is warranted before proceeding.
 
-8. **Post-work** (user indicates finishing a session, or context budget approaching limits): recommend `/session-checkpoint`.
+9. **Post-work** (user indicates finishing a session, or context budget approaching limits): recommend `/session-checkpoint`.
    Rationale: session wind-down. Capture state and produce handoff narrative.
 
-9. **Healthy graph with signal tables** (no structural issues, signal tables present): recommend `/session-orient`.
-   Rationale: graph is healthy and has signal table coverage. Normal orient flow.
+10. **Healthy graph with signal tables** (no structural issues, signal tables present): recommend `/session-orient`.
+    Rationale: graph is healthy and has signal table coverage. Normal orient flow.
 
 ## Execution protocol
 

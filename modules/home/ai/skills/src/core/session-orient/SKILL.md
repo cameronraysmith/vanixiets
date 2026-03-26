@@ -187,6 +187,14 @@ Continue parsing best-effort but surface the warning prominently in the step 7 s
 
 When no signal table exists, apply defaults: cynefin=complicated, surprise=0.0, progress=not-started, escalation=none, planning-depth=standard.
 
+Additionally, read the confidence signals from the same signal table:
+
+- *confidence* (`undemonstrated`, `finding-recorded`, `prototype`, `locally-verified`, `integration-verified`, `validated`, `regression-protected`, `regressed`)
+- *evidence-freshness* (ISO date or `—`)
+- *regression-guard* (`none`, `manual`, `automated`, `runtime`)
+
+When confidence signals are absent, apply defaults: confidence=undemonstrated, evidence-freshness=absent, regression-guard=none.
+
 If escalation is `resolved`, extract the resolution from the `<!-- escalation-context -->` section and surface it prominently.
 If escalation is `pending`, inform the worker that an unresolved question exists and assess whether it blocks the candidate.
 
@@ -245,7 +253,7 @@ The synthesis includes:
 
 *Health overview*: open/ready/blocked ratio, epic progress, alerts from stale issues or graph health warnings.
 
-*Candidate assessment*: for each candidate issue, the Cynefin classification, planning-depth, surprise score, escalation state, and documentation coverage.
+*Candidate assessment*: for each candidate issue, the Cynefin classification, planning-depth, surprise score, escalation state, confidence level, evidence-freshness, regression-guard status, and documentation coverage.
 
 *Calibrated briefing*: the depth-appropriate briefing assembled in step 5, with exploration directives from step 6 when applicable.
 
@@ -253,6 +261,8 @@ The synthesis includes:
 - Recommend `/session-plan` if the operational buffer is depleted (few ready issues relative to work capacity) or if decomposition is needed before implementation can begin.
 - Recommend proceeding to implementation if the operational buffer is full and selected issues are ready with clear acceptance criteria.
 - Recommend discovery mode (within this orient session) if planning-depth is deep or probe, before either planning or implementing.
+- Recommend validation or regression-protection work when a candidate's implementation is ahead of its evidence: code exists and tests pass but confidence is still `prototype` or `undemonstrated`, indicating the evidence hasn't been assessed for severity.
+Also flag when closed issues in the epic have weak regression protection (`regression-guard` = `none` on `validated` or higher confidence work).
 
 *Cross-project context* (when available): any cross-repo references discovered during orientation, with confidence levels for each (see the cross-project context loading section below).
 

@@ -92,6 +92,19 @@ Upward complexity shifts trigger the notification protocol defined in `/issues-b
 
 *Planning-depth* update when cynefin changes or when manual override is warranted based on implementation experience.
 
+*Confidence* update based on what evidence the session actually produced.
+Did the session produce fresh, severe evidence warranting promotion?
+A session that implements code but runs no tests leaves confidence at `prototype` at best.
+A session that implements and passes local tests with meaningful severity warrants `locally-verified`.
+Do not promote confidence based on effort or intent — only on evidence actually produced.
+If a previously validated claim was invalidated during the session (a test that passed before now fails, a dependency changed an interface), demote to `regressed`.
+
+*Evidence-freshness* set to today's date when fresh evidence was produced during the session.
+Do not update evidence-freshness for issues that were only read or discussed, only for issues where evidence was generated or verified.
+
+*Regression-guard* update when the session created or verified a regression detection mechanism.
+Set to `automated` when CI-enforced tests were added, `manual` when a verification procedure was documented, `runtime` when a health check or monitor was deployed.
+
 ### Step 3: write checkpoint context to each touched issue
 
 Delegate to `/issues-beads-checkpoint` step 3.
@@ -347,6 +360,10 @@ For demotions, note the Cynefin reclassification that motivated the demotion.
 *Replanning alerts*: conditions that warrant re-invocation of `/session-plan`.
 Include alerts when accumulated surprise exceeds theta (from step 4), when documentation was demoted (from step 5), or when any other replanning trigger fired during the session.
 
+*Confidence status*: for each touched issue, state the current confidence level and whether it advanced during this session.
+Call out where implementation is ahead of evidence (code exists but confidence is `undemonstrated` or `prototype`), where evidence is stale (evidence-freshness is older than the most recent implementation changes), and where regression protection is absent on validated work.
+For each epic, summarize the overall confidence posture: what fraction of child issues have reached their confidence target, and where are the gaps?
+
 *Buffer depletion alerts*: report buffer status from the per-epic check delegated to `/issues-beads-checkpoint` step 6.
 If any epic has unclosed children but zero ready issues, flag it prominently so the next session prioritizes unblocking.
 
@@ -378,6 +395,10 @@ Documentation impact:
 
 Replanning: {needed | not needed}
 - {reason if needed}
+
+Confidence:
+- <issue-id>: <confidence-level> ({advanced | unchanged | regressed}) {regression-guard if present}
+- Epic <epic-id>: <N>/<total> at target confidence
 
 Buffer status:
 - <epic-id>: <ready>/<total> ready ({healthy | depleted})
@@ -439,3 +460,4 @@ When replanning was triggered (surprise exceeded theta or documentation was demo
 
 *Theoretical foundations:*
 - `preferences-adaptive-planning` for the surprise threshold derivation, replanning decision rule, documentation impact theory, and the fan-in normalization refinement
+- `preferences-validation-assurance` for the confidence promotion rules, evidence quality dimensions, and demotion triggers applied during checkpoint state capture
