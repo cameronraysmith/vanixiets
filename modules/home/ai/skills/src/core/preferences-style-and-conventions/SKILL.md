@@ -63,6 +63,9 @@ Determine precisely which files and directories will be modified, created, or re
 Define the grouping and sequence of commits with draft commit messages.
 Specify how each commit or collection of changes will be verified as useful progress: passing new or existing tests, producing observable output, improving conceptual clarity, or satisfying other criteria appropriate to the change.
 This checkpoint converts abstract plans into auditable intentions, reducing rework from misaligned assumptions.
+For each proposed change, identify the confidence level the verification plan is expected to achieve and whether the verification would be severe — would it fail under plausible incorrect implementations?
+See `preferences-validation-assurance` for the severity criterion and confidence promotion chain.
+When working within a beads issue graph, map each proposed file change to the issue it addresses and confirm the change will satisfy that issue's acceptance criteria.
 
 - Always at least consider testing changes with the relevant framework like bash shell commands where you can validate output, `shellcheck` for shell scripts, `cargo test`, `pytest`, `vitest`, `nix eval` or `nix build`, a task runner like `just test` or `make test`, or `gh workflow run` before considering any work to be complete and correct.
 - Be judicious about test execution. If a test might take a very long time, be resource-intensive, or require elevated security privileges but is important, pause to provide the proposed command and reason why it's an important test.
