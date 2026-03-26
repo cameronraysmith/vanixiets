@@ -240,6 +240,24 @@ Identify specs in `docs/development/` that have no corresponding open or closed 
 This is a planning gap: the spec exists but no work was planned from it.
 Conversely, identify open issues whose descriptions reference docs that no longer exist (orphaned reference).
 
+#### Audit remediation intake
+
+Check active epic notes for `<!-- audit-findings -->` blocks produced by `/issues-beads-audit`.
+When present, the audit has already applied mechanical fixes (signal table backfill, structural repairs) and produced a list of content remediation items that require planning judgment.
+
+```bash
+# Check for audit findings in active epic notes
+bd show <epic-id> --json | jq -r '.[0].notes // ""' | grep -q 'audit-findings'
+```
+
+Treat each item in the "Content remediation needed" section as planning scope alongside new work from docs.
+Acceptance criteria rewrites and scope updates go through `/issues-beads-evolve` in step 4.
+Missing regression-protection issues become new issues created via `/issues-beads-seed` in step 4.
+Confidence gaps on closed work are routed to `/session-review` rather than handled during planning.
+
+After consuming the audit findings, clear the `<!-- audit-findings -->` block from the epic notes to prevent re-processing in future planning sessions.
+Record what was consumed in the planning session's handoff narrative so the audit trail is preserved.
+
 #### Buffer hygiene
 
 Before creating new working notes, check the count of existing notes in `docs/notes/`.

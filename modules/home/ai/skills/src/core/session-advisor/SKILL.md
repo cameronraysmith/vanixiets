@@ -63,19 +63,22 @@ First match wins.
 5. **Abnormally high ready ratio** (>70% ready on graphs with 50+ issues): recommend `/issues-beads-audit`.
    Rationale: ready/blocked ratio is abnormally high for a graph of this size. Likely indicates missing dependency wiring.
 
-6. **Zero signal table coverage** (0% signal tables on a graph with 10+ issues): recommend seeding signal tables on priority issues before `/session-orient`.
-   Rationale: no signal tables found. Orient calibrates by cynefin and planning-depth signals; without them, orient cannot produce a calibrated briefing.
+6. **Low signal or confidence coverage** (signal tables present on <50% of open issues, or >30% of closed issues have confidence at `undemonstrated`): recommend `/issues-beads-audit` for content quality assessment and mechanical remediation (signal table backfill), then `/session-orient`.
+   Rationale: signal table or confidence coverage is insufficient for calibrated briefing assembly. The audit will backfill signal tables mechanically and produce a remediation report for content fixes.
 
-7. **Confidence audit needed** (user asks "are we done?", milestone readiness is being assessed, or closed work has weak confidence coverage or absent regression protection): recommend `/session-review` with an explicit directive to assess confidence across the epic scope rather than at a single convergence point.
+7. **Graph content quality remediation needed** (project re-entry after extended hiatus with checkpoint >45 days old, graph predates current signal table or confidence conventions, or audit remediation report exists in epic notes with unresolved content fixes): recommend `/issues-beads-audit` for diagnosis and mechanical remediation, followed by `/session-plan` to schedule content fixes the audit cannot resolve mechanically.
+   Rationale: the graph requires systematic content remediation — acceptance criteria rewrites, scope updates, confidence establishment — that cannot be handled reactively during implementation. Do not recommend `/issues-beads-evolve` alone; evolve is reactive and issue-local, while this condition requires a planned graph-wide pass. The audit produces a structured remediation report that session-plan step 2 consumes as planning scope.
+
+8. **Confidence audit needed** (user asks "are we done?", milestone readiness is being assessed, or closed work has weak confidence coverage or absent regression protection): recommend `/session-review` with an explicit directive to assess confidence across the epic scope rather than at a single convergence point.
    Rationale: the question is no longer what to work on next, but what confidence has actually been earned and where regression protection is absent. Session-review's System 3* audit function handles this when scoped to the epic level.
 
-8. **Convergence point** (blocking dependencies on a node are all closed, or user indicates convergence): recommend `/session-review`.
+9. **Convergence point** (blocking dependencies on a node are all closed, or user indicates convergence): recommend `/session-review`.
    Rationale: convergence point detected. Integration verification is warranted before proceeding.
 
-9. **Post-work** (user indicates finishing a session, or context budget approaching limits): recommend `/session-checkpoint`.
+10. **Post-work** (user indicates finishing a session, or context budget approaching limits): recommend `/session-checkpoint`.
    Rationale: session wind-down. Capture state and produce handoff narrative.
 
-10. **Healthy graph with signal tables** (no structural issues, signal tables present): recommend `/session-orient`.
+11. **Healthy graph with signal tables** (no structural issues, signal tables present): recommend `/session-orient`.
     Rationale: graph is healthy and has signal table coverage. Normal orient flow.
 
 ## Execution protocol
