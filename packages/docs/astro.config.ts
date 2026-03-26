@@ -108,6 +108,10 @@ export default defineConfig({
     }),
   ],
 
+  devToolbar: {
+    enabled: !process.env.PLAYWRIGHT,
+  },
+
   adapter: process.env.VITEST || process.env.PLAYWRIGHT
     ? undefined
     : cloudflare({
