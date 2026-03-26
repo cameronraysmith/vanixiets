@@ -233,6 +233,10 @@ while project.has_remaining_work():
 
 The MPC receding-horizon structure, Cynefin classification, and surprise-driven replanning described in this skill are instances of Peircean self-correcting inquiry: abduction (form hypothesis about what work is needed and how to decompose it), deduction (derive predictions about implementation outcomes from the plan), induction (test predictions against validation results), then repeat from revised state.
 
+The severity criterion also applies reflexively to the planning methodology itself.
+A planning methodology has zero severity if it produces the same plan regardless of whether the underlying assumptions are correct — meaning the methodology provides no information about whether we are on the right track.
+When agents observe systematic patterns suggesting the methodology is miscalibrated (see the double-loop learning triggers in `preferences-validation-assurance`), the correct response is to surface the observation and propose process revision rather than continuing to execute within a framework perceived as inadequate.
+
 This structural isomorphism spans three domains:
 
 - Engineering workflow: plan / implement / validate / replan

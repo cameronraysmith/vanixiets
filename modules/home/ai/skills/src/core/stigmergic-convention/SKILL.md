@@ -219,6 +219,7 @@ bd lint          # check for missing template sections
 
 *Theoretical foundations:*
 - `preferences-adaptive-planning` for the stigmergy and Viable System Model theoretical foundations underlying the signal table design and the System 5 escalation interface
+- `preferences-validation-assurance` for the evidence quality dimensions, confidence promotion chain, and regression harness design underlying the confidence, evidence-freshness, and regression-guard signals
 
 *Composed by:*
 - `/session-orient` -- reads signal tables during orientation briefing assembly
