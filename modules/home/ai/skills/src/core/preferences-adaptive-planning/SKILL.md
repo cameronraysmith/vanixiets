@@ -319,3 +319,4 @@ See `preferences-scalable-probabilistic-modeling-workflow` for the operational B
 - `preferences-scientific-inquiry-methodology` for Peircean pragmatism, severity criterion, and effective theory epistemology that this framework operationalizes for engineering workflow
 - `preferences-scalable-probabilistic-modeling-workflow` for the principled Bayesian workflow for simulator-based models, the statistical instantiation of the same iterative self-correcting structure
 - `preferences-architectural-patterns` for software-specific domain knowledge that informs Cynefin classification of engineering work items
+- `preferences-validation-assurance` for evidence-based confidence, the severity criterion applied to engineering V&V, and the reflexive severity framework for double-loop learning
