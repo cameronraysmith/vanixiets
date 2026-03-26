@@ -24,8 +24,16 @@
         in
         basePkg.overrideAttrs (old: {
           postFixup = (old.postFixup or "") + ''
-            # Inject native Matrix crypto addon where the SDK expects it
-            cp ${matrixCryptoNode} $out/lib/openclaw/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-nodejs@0.4.0/node_modules/@matrix-org/matrix-sdk-crypto-nodejs/matrix-sdk-crypto.linux-x64-gnu.node
+            # Inject native Matrix crypto addon where the SDK expects it.
+            # Use dynamic path resolution instead of hardcoded pnpm store layout
+            # to survive fetchPnpmDeps version changes across nixpkgs updates.
+            cryptoDir=$(find $out/lib/openclaw/node_modules/.pnpm -type d -path "*/@matrix-org/matrix-sdk-crypto-nodejs" | head -1)
+            if [ -n "$cryptoDir" ]; then
+              cp ${matrixCryptoNode} "$cryptoDir/matrix-sdk-crypto.linux-x64-gnu.node"
+            else
+              echo "error: matrix-sdk-crypto-nodejs directory not found in pnpm store — native addon injection failed" >&2
+              exit 1
+            fi
 
             wrapProgram $out/bin/openclaw \
               --set OPENCLAW_BUNDLED_PLUGINS_DIR "$out/lib/openclaw/extensions" \
