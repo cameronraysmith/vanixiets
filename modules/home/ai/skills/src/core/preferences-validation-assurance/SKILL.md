@@ -131,6 +131,10 @@ The chain is monotone in the sense that each level subsumes the evidence require
 `regression-protected` implies `validated` implies `integration-verified`, and so on.
 An implementation cannot be `regression-protected` if no integration test has ever passed, because the CI harness would be guarding a claim that was never established.
 
+The `finding-recorded` level applies specifically to probe issues whose deliverable is documented findings rather than code.
+It is not a prerequisite for `prototype` on implementation issues — an implementation issue progresses directly from `undemonstrated` to `prototype` when working code exists.
+The chain is ordered by evidence strength within each issue type, but the `finding-recorded` to `prototype` transition represents a type switch (epistemic finding to code artifact) rather than a monotone strength increase.
+
 Demotion to `regressed` is triggered by six conditions:
 
 1. A test that previously passed now fails.
