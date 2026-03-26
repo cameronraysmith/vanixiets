@@ -98,6 +98,7 @@ Session-advisor is typically invoked:
 - At the very start of a session, before orient, to determine the right entry point.
 - When the user is unsure which workflow phase they should be in.
 - By the orchestrator when spawning new teammates to determine their first action.
+- When the user is asking a confidence or readiness question rather than a work-selection question.
 
 This skill reads output from `bd` CLI commands.
 It does not compose other skills directly -- it recommends them.

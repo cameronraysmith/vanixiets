@@ -229,6 +229,7 @@ Structure the output to separate known information from open questions:
 - What has been implemented and verified in upstream dependencies
 - What interfaces and constraints exist from prior work
 - What the documentation establishes about the domain
+- What confidence levels upstream dependencies have actually earned and whether their evidence is fresh
 
 *Unknown* (identified from the issue description, documentation gaps, and high surprise scores):
 - Questions the issue description leaves open
@@ -354,3 +355,4 @@ After orientation completes, the worker proceeds to one of:
 - `/session-plan` -- tactical-to-operational decomposition
 - `/session-checkpoint` -- all-horizon state capture and handoff
 - `/issues-beads-prime` -- core beads conventions and command quick reference
+- `preferences-validation-assurance` for the confidence promotion chain and evidence quality dimensions used to interpret candidate issue readiness
