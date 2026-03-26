@@ -6,7 +6,7 @@ disable-model-invocation: true
 # Beads audit
 
 Periodic maintenance and health checks for the beads issue graph.
-This command focuses on structural integrity of the beads graph.
+This skill covers both structural integrity and content quality of the beads graph, including signal table coverage, acceptance criteria adequacy, and confidence state health.
 
 ## When to use
 
@@ -17,6 +17,8 @@ Run beads audit during:
 - Before major planning sessions
 - When the issue graph feels disorganized or inconsistent
 - After batch imports or major graph modifications
+- When bringing a legacy graph up to current signal table and confidence tracking standards
+- After adopting new conventions (signal tables, confidence signals) that pre-existing issues lack
 
 ## Health check commands
 
@@ -158,6 +160,93 @@ bd doctor --check=pollution --clean          # Delete test issues (with confirma
 bd delete <id>                                # Manually remove test issues
 ```
 
+### Missing signal tables
+
+**Symptoms**: Issues created before signal table conventions were adopted, or issues created by workflows that skip signal table seeding.
+
+**Detection**:
+```bash
+# Count issues with and without signal tables
+bd list --json | jq '[.[] | select(.status != "closed")] | length' # total open
+bd list --json | jq '[.[] | select(.status != "closed") | select(.notes // "" | contains("stigmergic-signals"))] | length' # with tables
+```
+
+Compare counts to compute coverage percentage.
+Issues with notes fields that lack `<!-- stigmergic-signals -->` delimiters have no signal table.
+
+**Remediation**:
+
+Signal table backfill is mechanical and automatable.
+For each issue lacking a signal table, seed one with defaults: cynefin=complicated, surprise=0.0, progress matching current status (not-started for open, implementing for in_progress), escalation=none, planning-depth=standard, confidence=undemonstrated, evidence-freshness=absent, regression-guard=none.
+
+```bash
+# For each issue lacking a signal table:
+NOTES=$(bd show <id> --json | jq -r '.[0].notes // ""')
+# Prepend the default signal table template from stigmergic-convention
+# Write back via bd update <id> --notes "$NEW_NOTES"
+```
+
+After backfill, adjust signals that have better-than-default values based on issue history.
+Closed issues with verification in their closure reason may warrant confidence above `undemonstrated`.
+Issues with known Cynefin classification from their epic or description context should have cynefin set accordingly.
+These adjustments require judgment — flag them in the remediation report rather than applying automatically.
+
+### Acceptance criteria gaps
+
+**Symptoms**: Issues with missing, empty, or non-executable acceptance criteria.
+Vague criteria like "should work correctly" or "implement the feature" that provide no testable condition.
+
+**Detection**:
+```bash
+# Issues with empty or missing acceptance_criteria
+bd list --json | jq '[.[] | select(.status != "closed") | select((.acceptance_criteria // "") == "")] | [.[].id]'
+```
+
+Manual inspection is needed to assess whether non-empty criteria are actually testable and severe.
+Look for acceptance criteria that lack executable verification commands, that describe intent rather than observable behavior, or that would pass regardless of implementation correctness (zero severity).
+
+**Remediation**:
+
+Acceptance criteria quality requires judgment — flag affected issues in the remediation report for `/session-plan` to schedule via `beads-evolve`.
+Do not rewrite acceptance criteria during audit; the planner needs specification context to write adequate criteria.
+
+### Confidence-implementation drift
+
+**Symptoms**: Implementation is ahead of evidence — code exists and issues are closed, but confidence tracking shows the claims are unsupported or weakly supported.
+
+**Detection**:
+```bash
+# Closed issues with low confidence
+bd list --json | jq '[.[] | select(.status == "closed") | select(.notes // "" | contains("stigmergic-signals"))] | .[]' | # for each, parse signal table and check confidence
+```
+
+Parse the signal table from each closed issue's notes.
+Flag issues where confidence is `undemonstrated` or `prototype` on closed implementation work.
+Flag issues where confidence is `validated` or higher but `regression-guard` is `none`.
+Flag issues where `evidence-freshness` is absent or older than 30 days on active work.
+
+**Remediation**:
+
+Confidence drift on closed issues requires re-verification — flag in the remediation report for `/session-review` scoped to the affected epic.
+Missing regression guards on validated work should be flagged for `/session-plan` to create regression-protection issues.
+
+### Stale evidence
+
+**Symptoms**: Evidence was produced long ago and the codebase has evolved since, making the evidence unreliable.
+
+**Detection**:
+
+Parse `evidence-freshness` from signal tables.
+Compare against staleness thresholds:
+- Implementation work: 30 days
+- Operational work: 90 days
+- Probe work: no staleness concern (findings are point-in-time by nature)
+
+**Remediation**:
+
+Stale evidence does not automatically demote confidence — it flags a re-verification need.
+Include affected issues in the remediation report with a recommendation to re-run verification and update `evidence-freshness` if the evidence still holds.
+
 ## Graph review
 
 Use bd commands to review graph structure:
@@ -262,6 +351,46 @@ Run through this checklist during periodic maintenance:
    - No excessively deep or wide dependency chains
    - Epics form coherent clusters per `bd epic status`
 
+6. **Content quality and signal coverage**:
+   - Signal table coverage exceeds 80% of open issues (100% for issues in active epics)
+   - No closed implementation issues with confidence at `undemonstrated` or `prototype`
+   - No `validated` or higher confidence issues with `regression-guard` at `none`
+   - No `evidence-freshness` dates older than the staleness threshold for their issue type
+   - Acceptance criteria present and non-empty on all implementation and convergence issues
+   - Acceptance criteria include at least one executable verification command on complicated-domain and clear-domain issues
+
+## Remediation report
+
+When the audit identifies content quality issues that cannot be resolved mechanically, produce a structured remediation report in the relevant epic's notes field.
+This report serves as planning input for `/session-plan` step 2, which checks for audit findings alongside docs-to-issues alignment.
+
+The report uses a dedicated section in the epic's notes:
+
+```
+<!-- audit-findings -->
+## Audit findings (YYYY-MM-DD)
+
+### Mechanical fixes applied
+- [list of signal table backfills, structural repairs, etc. — already done]
+
+### Content remediation needed (for /session-plan)
+- <issue-id>: acceptance criteria missing or non-executable
+- <issue-id>: confidence at undemonstrated despite closed status; needs re-verification
+- <issue-id>: description references superseded architecture; needs re-scoping
+- <issue-id>: validated without regression guard; needs regression-protection issue
+
+### Evidence refresh needed (for /session-review)
+- <issue-id>: evidence-freshness stale (last: YYYY-MM-DD, threshold: N days)
+<!-- /audit-findings -->
+```
+
+The report distinguishes three categories:
+- *Mechanical fixes applied*: already executed by the audit (signal table backfill, structural repairs). Recorded for traceability.
+- *Content remediation needed*: requires judgment and specification context. `/session-plan` consumes these as planning scope and delegates to `beads-evolve`.
+- *Evidence refresh needed*: requires re-running verification. `/session-review` consumes these when scoped to the affected epic.
+
+Write the remediation report via the standard read-modify-write protocol on the epic's notes field, preserving any existing signal table and checkpoint-context sections.
+
 ## Automation potential
 
 Consider scripting common audit tasks:
@@ -311,6 +440,24 @@ echo
 
 echo "## Template Compliance"
 bd lint
+echo
+
+echo "## Signal Table Coverage"
+total=$(bd list --json | jq '[.[] | select(.status != "closed")] | length')
+with_signals=$(bd list --json | jq '[.[] | select(.status != "closed") | select(.notes // "" | contains("stigmergic-signals"))] | length')
+echo "Signal tables: $with_signals / $total open issues"
+if [ "$with_signals" -lt "$((total * 80 / 100))" ]; then
+  echo "WARNING: Signal table coverage below 80%"
+fi
+echo
+
+echo "## Confidence Health"
+closed_undem=$(bd list --json | jq '[.[] | select(.status == "closed") | select(.notes // "" | contains("confidence | undemonstrated"))] | length')
+echo "Closed issues with undemonstrated confidence: $closed_undem"
+if [ "$closed_undem" -gt 0 ]; then
+  echo "WARNING: Confidence-implementation drift detected"
+fi
+echo
 ```
 
 Run this script weekly or before major planning sessions to catch drift early.
@@ -360,3 +507,5 @@ done
 - `beads-evolve.md` - Adaptive refinement during implementation
 - `beads.md` - Comprehensive reference for all beads workflows and commands
 - `beads-orient.md` - Session start diagnostics (beads-layer substrate)
+- `preferences-validation-assurance` — evidence quality dimensions, confidence promotion chain, and regression harness design referenced by the content quality checks
+- `stigmergic-convention` — signal table schema and field definitions for signal table backfill
