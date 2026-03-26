@@ -35,10 +35,8 @@ It runs at topological convergence points in the DAG where multiple independent 
 When surprise exceeds theta, the plan has diverged enough from reality to warrant replanning.
 This is the MPC "re-observe actual state" step — without it, the system operates open-loop and plan accuracy degrades unboundedly.
 
-This lifecycle is subject to its own standards.
-When patterns suggest the framework itself is producing poor outcomes — systematic surprise across multiple issues, recurring ambiguity in acceptance criteria, Cynefin classifications that consistently shift during implementation, validation that stalls because infrastructure doesn't support the prescribed methodology, or requirements that decompose cleanly but don't compose into a working system — the agent's obligation is to pause execution and surface the observation rather than pressing on within a framework it perceives as inadequate.
-The plan is a tool for achieving outcomes; when the tool is counterproductive, the agent's duty is to say so.
-See `preferences-validation-assurance` for the full set of double-loop learning triggers and the reflexive severity framework.
+This skill operates under the reflexive severity mandate: when patterns suggest the framework itself is producing poor outcomes, the agent's obligation is to pause and surface the observation rather than pressing on.
+See the double-loop learning triggers in `preferences-validation-assurance` and the reflexive severity framework in `preferences-adaptive-planning`.
 
 For the full theoretical derivation including the R_plan(d) formulation, buffer sizing heuristic, and validation gate placement theory, see `preferences-adaptive-planning`.
 
