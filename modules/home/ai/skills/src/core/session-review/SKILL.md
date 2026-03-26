@@ -101,10 +101,14 @@ For each closed dependency, extract:
 - The *closure reason* from `close_reason`, which answers "what exists now that did not before?" and "how do I know it works?"
 - The *checkpoint context* from the `<!-- checkpoint-context -->` section in the notes field, which describes state estimates and discoveries made during implementation.
 - The *surprise score* from the signal table in the notes field, which quantifies plan-versus-reality divergence experienced during that issue's implementation.
+- The *confidence level* and *evidence-freshness* from the signal table, which indicate how strong the supporting evidence is and when it was last produced.
 
 Assemble these trails in topological order (respecting the dependency structure) to build a coherent picture of the integration context.
 Pay attention to cases where one dependency's closure reason references interfaces, contracts, or assumptions that another dependency should have satisfied.
 Mismatches between these references are candidates for integration failures.
+
+When closed dependencies show low confidence relative to their role (e.g., `prototype` or `undemonstrated` on implementation work), flag this as a confidence gap in the integration context.
+Integration verification at a convergence point inherits the weakest link: if a dependency's claim is poorly supported, the integration claim built on it is also poorly supported.
 
 ### Step 3: execute integration-level verification
 

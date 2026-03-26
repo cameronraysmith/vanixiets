@@ -322,6 +322,7 @@ Each issue must have:
 - A description sufficient for a worker to self-direct without additional context beyond what the issue and its dependency closure context provide.
 - Acceptance criteria with at least one executable verification command when the requirements specification provides them, or descriptive acceptance criteria when it does not.
 - A Cynefin classification based on the knowability of cause-effect relationships for that specific work item.
+- A confidence target indicating what evidence level the issue should achieve: `finding-recorded` for probes, `locally-verified` for implementation issues, `integration-verified` for convergence issues, `validated` for milestone issues, `regression-protected` for operational issues. The target is derived from the issue's role in the DAG, not assigned independently.
 
 Delegate issue creation to `/issues-beads-seed` for new issues derived from `docs/development/` artifacts.
 When restructuring existing issues (splitting, re-scoping, re-parenting), delegate to `/issues-beads-evolve`.
@@ -331,6 +332,11 @@ Cynefin modulates decomposition granularity:
 - *Complicated* domain: standard decomposition following the R_plan(d) model.
 - *Complex* domain: iterative decomposition producing probe-based experiments as issues.
 - *Chaotic* domain: minimal decomposition; stabilize first, plan later.
+
+When the scope is substantial enough that implementation alone would not establish confidence, decompose the evidence-producing work explicitly alongside the implementation work.
+An implementation issue creates the behavior, a sibling or downstream validation issue challenges the higher-level claim with severe tests, and a regression-protection issue makes the validated claim durable through automated or runtime guards.
+This decomposition is not mandatory for every issue — clear-domain work with straightforward acceptance criteria may achieve `locally-verified` or higher through its own acceptance tests.
+Apply it when the gap between "code exists" and "we have confidence" is large enough to warrant separate tracking.
 
 ### Step 5: wire dependencies
 
@@ -357,6 +363,11 @@ Each new issue receives a signal table following the schema from `/stigmergic-co
 | planning-depth | {derived from cynefin, or explicitly overridden} | YYYY-MM-DD |
 <!-- /stigmergic-signals -->
 ```
+
+Each new issue also receives confidence signals in the same signal table.
+Set `confidence` to `undemonstrated`, `evidence-freshness` to `—`, and `regression-guard` to `none`.
+These are starting values — promotion happens when evidence is produced during implementation and review, not during planning.
+The confidence target from step 4 is not recorded in the signal table (it would duplicate what the issue's role in the DAG already expresses); it serves as planning guidance for the worker who implements the issue.
 
 Write signal tables using the read-modify-write protocol from `/stigmergic-convention`.
 The cynefin and planning-depth values come from the readiness gate's signal derivation (step 1) or from explicit per-issue classification during decomposition (step 4).
