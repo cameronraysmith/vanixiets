@@ -197,7 +197,7 @@ verify: ## Verify nix installation and environment setup
 		exit 1; \
 	fi
 	@printf "\nChecking required tools in devShell: "
-	@if nix develop --command bash -c 'command -v age-keygen && command -v ssh-to-age && command -v sops && command -v just' >/dev/null 2>&1; then \
+	@if nix develop --accept-flake-config --command bash -c 'command -v age-keygen && command -v ssh-to-age && command -v sops && command -v just' >/dev/null 2>&1; then \
 		printf "● age-keygen, ssh-to-age, sops, just available\n"; \
 	else \
 		printf "⊘ some tools missing from devShell\n"; \
@@ -249,7 +249,7 @@ check-secrets: ## Check if you can decrypt shared secrets (requires age key and 
 		printf "⊘ No age key found. Run 'make setup-user' first\n"; \
 		exit 1; \
 	fi
-	@if nix develop --command sops -d secrets/shared.yaml >/dev/null 2>&1; then \
+	@if nix develop --accept-flake-config --command sops -d secrets/shared.yaml >/dev/null 2>&1; then \
 		printf "● Successfully decrypted shared secrets!\n"; \
 		printf "You have proper access to the secrets system\n"; \
 	else \
