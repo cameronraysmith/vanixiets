@@ -177,10 +177,11 @@ jobs:
             justfile
           sparse-checkout-cone-mode: false
 
+      # alternative: extractions/setup-just@v3 (blocked on node20->node24 upgrade via extractions/setup-crate#9)
       - name: Install just
-        uses: extractions/setup-just@f8a3cce218d9f83db3a2ecd90e41ac3de6cdfd9b # v3.1.0
+        uses: taiki-e/install-action@704f92c11daa75bff5b4e01fcb083350c16c47b9 # v2.69.13
         with:
-          just-version: 1.43.1
+          tool: just@1.43.1
 
       - name: Discover packages
         id: discover-packages
