@@ -31,6 +31,10 @@ if [ "$IN_GIT_REPO" = false ] && [ "$HAS_BEADS" = false ]; then
   exit 0
 fi
 
+# === Fix plugin cache permissions ===
+# Upstream bug: plugin-dev/unknown/ cache loses execute bits on .sh files.
+find "$HOME/.claude/plugins/cache" -name "*.sh" ! -perm -u+x -exec chmod +x {} + 2>/dev/null || true
+
 # === Dirty repo warning ===
 if [ "$IN_GIT_REPO" = true ]; then
   DIRTY=$(git status --porcelain 2>/dev/null || echo "")
