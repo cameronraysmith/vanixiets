@@ -80,13 +80,13 @@
                 "claude-md-management@claude-plugins-official" = true;
                 "code-review@claude-plugins-official" = true;
                 "code-simplifier@claude-plugins-official" = true;
-                "explanatory-output-style@claude-plugins-official" = true;
+                "explanatory-output-style@claude-plugins-official" = false;
                 "feature-dev@claude-plugins-official" = false;
                 "figma@claude-plugins-official" = false;
                 "frontend-design@claude-plugins-official" = false;
                 "hookify@claude-plugins-official" = true;
                 "huggingface-skills@claude-plugins-official" = true;
-                "learning-output-style@claude-plugins-official" = true;
+                "learning-output-style@claude-plugins-official" = false;
                 "playground@claude-plugins-official" = false;
                 "plugin-dev@claude-plugins-official" = true;
                 "posthog@claude-plugins-official" = false;
