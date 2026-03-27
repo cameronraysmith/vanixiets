@@ -31,8 +31,7 @@
             if [ -n "$cryptoDir" ]; then
               cp ${matrixCryptoNode} "$cryptoDir/matrix-sdk-crypto.linux-x64-gnu.node"
             else
-              echo "error: matrix-sdk-crypto-nodejs directory not found in pnpm store — native addon injection failed" >&2
-              exit 1
+              echo "note: matrix-sdk-crypto-nodejs not found in pnpm store — skipping native addon injection (expected for openclaw >= 2026.3.24)" >&2
             fi
 
             wrapProgram $out/bin/openclaw \
