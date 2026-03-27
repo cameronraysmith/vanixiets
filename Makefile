@@ -196,12 +196,21 @@ verify: ## Verify nix installation and environment setup
 		printf "⊘ flake has errors\n"; \
 		exit 1; \
 	fi
-	@printf "\nChecking required tools in devShell: "
-	@if nix develop --accept-flake-config --command bash -c 'command -v age-keygen && command -v ssh-to-age && command -v sops && command -v just' >/dev/null 2>&1; then \
-		printf "● age-keygen, ssh-to-age, sops, just available\n"; \
+	@printf "\nChecking devShell: "
+	@if [ -n "$$CI" ]; then \
+		if nix eval --accept-flake-config .#devShells.$$(nix eval --raw --impure --expr builtins.currentSystem).default --apply 'x: "ok"' >/dev/null 2>&1; then \
+			printf "● devShell evaluates (build verified by checks-devshells job)\n"; \
+		else \
+			printf "⊘ devShell evaluation failed\n"; \
+			exit 1; \
+		fi; \
 	else \
-		printf "⊘ some tools missing from devShell\n"; \
-		exit 1; \
+		if nix develop --accept-flake-config --command bash -c 'command -v age-keygen && command -v ssh-to-age && command -v sops && command -v just' >/dev/null 2>&1; then \
+			printf "● age-keygen, ssh-to-age, sops, just available\n"; \
+		else \
+			printf "⊘ some tools missing from devShell\n"; \
+			exit 1; \
+		fi; \
 	fi
 	@printf "\n/etc/nix/nix.conf:\n"
 	@printf "==================\n"
