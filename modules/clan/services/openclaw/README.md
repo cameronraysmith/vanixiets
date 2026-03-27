@@ -10,9 +10,16 @@ The `default` role runs the openclaw gateway on the assigned machine.
 ## Settings
 
 - `homeserver`: matrix homeserver URL (e.g., `https://matrix.zt`)
-- `botUserId`: matrix bot user ID (e.g., `@clawd:matrix.zt`)
+- `botUserName`: bot username used as the matrix localpart and workspace directory name (e.g., `clawd`)
+- `matrixServerName`: matrix server name for constructing the bot user ID (e.g., `matrix.zt`)
 - `port`: gateway listen port (default: `18789`)
 - `bindMode`: network bind mode, one of `loopback`, `lan`, or `auto` (default: `loopback`)
+- `serviceUser`: unix user to run the openclaw gateway as
+- `gatewayMode`: gateway operation mode, one of `local` or `server` (default: `local`)
+- `matrixBotPasswordGenerator`: name of the clan vars generator providing the matrix bot password
+- `configOverrides`: additional config merged on top of the generated `openclaw.json` via `lib.recursiveUpdate` (default: `{}`)
+
+The bot user ID is constructed automatically as `@<botUserName>:<matrixServerName>` from these two settings.
 
 ## Secrets
 
