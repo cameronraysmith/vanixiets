@@ -20,7 +20,7 @@
         # with secret injection; setting a package here would conflict
         package = null;
         settings = {
-          model = "zai-coding-plan/glm-5";
+          model = "zai-coding-plan/glm-5.1";
           share = "disabled";
           autoupdate = false;
           disabled_providers = [
