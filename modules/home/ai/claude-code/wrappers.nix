@@ -11,6 +11,8 @@
         ...
       }:
       let
+        jsonFormat = pkgs.formats.json { };
+
         mkClaudeWrapper =
           {
             name,
@@ -22,6 +24,24 @@
             wrapperName = "claude-${name}";
             configDir = "${config.xdg.configHome}/${wrapperName}";
             envVarPrefix = lib.toUpper (lib.replaceStrings [ "-" ] [ "_" ] name);
+
+            # Derive wrapper settings from base profile, overriding model env vars
+            # for the alternative backend. All other settings are inherited.
+            baseSettings = config.programs.claude-code.settings;
+            wrapperSettings = baseSettings // {
+              env = (baseSettings.env or { }) // {
+                ANTHROPIC_DEFAULT_OPUS_MODEL = models.opus;
+                ANTHROPIC_DEFAULT_SONNET_MODEL = models.sonnet;
+                ANTHROPIC_DEFAULT_HAIKU_MODEL = models.haiku;
+                CLAUDE_CODE_SUBAGENT_MODEL = models.opus;
+              };
+            };
+            settingsFile = jsonFormat.generate "${wrapperName}-settings.json" (
+              wrapperSettings
+              // {
+                "$schema" = "https://json.schemastore.org/claude-code-settings.json";
+              }
+            );
           in
           {
             package = pkgs.writeShellApplication {
@@ -31,14 +51,11 @@
                 export CLAUDE_CONFIG_DIR="${configDir}"
                 mkdir -p "$CLAUDE_CONFIG_DIR"
 
-                # Use sops secret path at runtime (available after activation)
+                # Runtime secrets (read from sops at invocation time)
                 API_KEY="$(cat ${config.sops.secrets.${apiKeySecret}.path})"
                 export ${envVarPrefix}_API_KEY="$API_KEY"
                 export ANTHROPIC_BASE_URL="${apiBase}"
                 export ANTHROPIC_AUTH_TOKEN="$API_KEY"
-                export ANTHROPIC_DEFAULT_OPUS_MODEL="${models.opus}"
-                export ANTHROPIC_DEFAULT_SONNET_MODEL="${models.sonnet}"
-                export ANTHROPIC_DEFAULT_HAIKU_MODEL="${models.haiku}"
 
                 export DISABLE_COST_WARNINGS=1
 
@@ -46,11 +63,14 @@
               '';
             };
 
+            # Mutable settings copy (same pattern as base profile in default.nix)
+            activation = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+              $DRY_RUN_CMD install -Dm644 ${settingsFile} ${configDir}/settings.json
+            '';
+
             configFiles = {
-              # Share settings from default profile
-              "${wrapperName}/settings.json" = {
-                source = config.home.file.".claude/settings.json".source;
-              };
+              # Disable any xdg symlink for settings.json — activation handles it
+              "${wrapperName}/settings.json".enable = false;
 
               # Share commands directory
               "${wrapperName}/commands" = lib.mkIf (config.programs.claude-code.commandsDir != null) {
@@ -95,6 +115,12 @@
         ];
 
         xdg.configFile = glmWrapper.configFiles // cerebrasWrapper.configFiles;
+
+        # Mutable settings: copy instead of symlink so Claude Code can write at runtime
+        home.activation = {
+          claudeGlmMutableSettings = glmWrapper.activation;
+          claudeCerebrasMutableSettings = cerebrasWrapper.activation;
+        };
       };
   };
 }
