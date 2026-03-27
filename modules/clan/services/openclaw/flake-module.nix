@@ -116,8 +116,8 @@
                         api = "openai-completions";
                         models = [
                           {
-                            id = "glm-5";
-                            name = "GLM 5 (Z.AI Coding Plan)";
+                            id = "glm-5.1";
+                            name = "GLM 5.1 (Z.AI Coding Plan)";
                             reasoning = true;
                             input = [ "text" ];
                             cost = {
@@ -137,7 +137,7 @@
                     defaults = {
                       workspace = workspaceDir;
                       model = {
-                        primary = "zai-coding-plan/glm-5";
+                        primary = "zai-coding-plan/glm-5.1";
                         fallbacks = [ "anthropic/claude-opus-4-5" ];
                       };
                     };
