@@ -10,13 +10,16 @@
         flake,
         ...
       }:
-      let
-        # Toggle: set to false to revert to immutable nix store symlink
-        mutableClaudeSettings = true;
-      in
       {
-        programs.claude-code = {
+        options.programs.claude-code.mutableSettings = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Use mutable copies instead of immutable nix store symlinks for settings.json files. Enables Claude Code to edit settings at runtime (e.g. /voice toggle) at the cost of nix-declared state being overwritten between activations.";
+        };
+
+        config.programs.claude-code = {
           enable = true;
+          mutableSettings = true;
           # package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
           package = flake.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
 
@@ -325,7 +328,7 @@
         };
 
         # Honcho plugin: generate ~/.honcho/config.json with API key from sops
-        sops.templates."honcho-config" = {
+        config.sops.templates."honcho-config" = {
           mode = "0600";
           path = "${config.home.homeDirectory}/.honcho/config.json";
           content = builtins.toJSON {
@@ -349,9 +352,9 @@
 
         # Mutable settings: copy instead of symlink so Claude Code can write at runtime.
         # Each home-manager activation overwrites with declared state.
-        home.file.".claude/settings.json".enable = lib.mkIf mutableClaudeSettings (lib.mkForce false);
+        config.home.file.".claude/settings.json".enable = lib.mkIf config.programs.claude-code.mutableSettings (lib.mkForce false);
 
-        home.activation.claudeCodeMutableSettings = lib.mkIf mutableClaudeSettings (
+        config.home.activation.claudeCodeMutableSettings = lib.mkIf config.programs.claude-code.mutableSettings (
           let
             jsonFormat = pkgs.formats.json { };
             settingsFile = jsonFormat.generate "claude-code-settings.json" (
@@ -366,14 +369,14 @@
           ''
         );
 
-        home.shellAliases = {
+        config.home.shellAliases = {
           ccds = "claude --dangerously-skip-permissions";
           ccglm = "claude-glm";
           cccb = "claude-cerebras";
         };
 
         # symlink .local/bin to satisfy claude doctor
-        home.file.".local/bin/claude".source =
+        config.home.file.".local/bin/claude".source =
           config.lib.file.mkOutOfStoreSymlink "${config.programs.claude-code.finalPackage}/bin/claude";
       };
   };

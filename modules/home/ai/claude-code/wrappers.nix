@@ -63,14 +63,12 @@
               '';
             };
 
-            # Mutable settings copy (same pattern as base profile in default.nix)
-            activation = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-              $DRY_RUN_CMD install -Dm644 ${settingsFile} ${configDir}/settings.json
-            '';
-
             configFiles = {
-              # Disable any xdg symlink for settings.json — activation handles it
-              "${wrapperName}/settings.json".enable = false;
+              "${wrapperName}/settings.json" =
+                if config.programs.claude-code.mutableSettings then
+                  { enable = false; }
+                else
+                  { source = settingsFile; };
 
               # Share commands directory
               "${wrapperName}/commands" = lib.mkIf (config.programs.claude-code.commandsDir != null) {
@@ -84,6 +82,11 @@
                 recursive = true;
               };
             };
+          }
+          // lib.optionalAttrs config.programs.claude-code.mutableSettings {
+            activation = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+              $DRY_RUN_CMD install -Dm644 ${settingsFile} ${configDir}/settings.json
+            '';
           };
 
         glmWrapper = mkClaudeWrapper {
@@ -116,8 +119,7 @@
 
         xdg.configFile = glmWrapper.configFiles // cerebrasWrapper.configFiles;
 
-        # Mutable settings: copy instead of symlink so Claude Code can write at runtime
-        home.activation = {
+        home.activation = lib.mkIf config.programs.claude-code.mutableSettings {
           claudeGlmMutableSettings = glmWrapper.activation;
           claudeCerebrasMutableSettings = cerebrasWrapper.activation;
         };
