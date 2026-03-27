@@ -16,7 +16,7 @@
         # https://github.com/openai/codex/blob/main/codex-rs/config.md
         settings = {
           # Model configuration
-          model = "gpt-5.3-codex";
+          model = "gpt-5.4";
           # model_reasoning_effort = "high";
           # model_reasoning_summary = "auto";
 
