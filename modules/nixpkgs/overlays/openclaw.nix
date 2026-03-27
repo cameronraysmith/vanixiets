@@ -3,7 +3,7 @@
 # The llm-agents flake provides an openclaw package that bundles all extensions
 # (including matrix) at $out/lib/openclaw/extensions/, but the upstream
 # build is missing two things this overlay patches:
-#   1. OPENCLAW_BUNDLED_PLUGINS_DIR env var pointing to extensions/
+#   1. OPENCLAW_NIX_MODE env var so openclaw skips runtime downloads
 #   2. The @matrix-org/matrix-sdk-crypto-nodejs native .node addon,
 #      which is normally downloaded at npm install time via download-lib.js
 #      but unavailable in the nix sandbox
@@ -35,7 +35,6 @@
             fi
 
             wrapProgram $out/bin/openclaw \
-              --set OPENCLAW_BUNDLED_PLUGINS_DIR "$out/lib/openclaw/extensions" \
               --set OPENCLAW_NIX_MODE 1
           '';
 

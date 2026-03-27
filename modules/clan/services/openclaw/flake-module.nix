@@ -173,7 +173,6 @@
                   mkdir -p ${stateDir}
                   install -m 0600 /etc/openclaw/openclaw.json ${stateDir}/openclaw.json
                   export OPENCLAW_CONFIG_PATH="${stateDir}/openclaw.json"
-                  export OPENCLAW_NIX_MODE=1
                   export OPENCLAW_GATEWAY_TOKEN="$(cat ${gatewayTokenPath})"
                   export MATRIX_USER_ID="${botUserId}"
                   export MATRIX_PASSWORD="$(cat ${passwordVarPath})"
@@ -188,7 +187,6 @@
                     mkdir -p ${stateDir}
                     install -m 0600 /etc/openclaw/openclaw.json ${stateDir}/openclaw.json
                     export OPENCLAW_CONFIG_PATH="${stateDir}/openclaw.json"
-                    export OPENCLAW_NIX_MODE=1
                     ZAI_API_KEY="$(cat ${zaiApiKeyPath})"
                     export ZAI_API_KEY
                     ANTHROPIC_OAUTH_TOKEN="$(cat ${oauthTokenPath})"
