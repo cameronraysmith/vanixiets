@@ -15,6 +15,7 @@
         matrixBotPasswordGenerator = "matrix-password-clawd";
         configOverrides = {
           channels.matrix.groupPolicy = "open";
+          channels.matrix.allowPrivateNetwork = true;
           gateway.controlUi.allowedOrigins = [ "https://openclaw.zt" ];
           gateway.auth.mode = "trusted-proxy";
           gateway.auth.trustedProxy.userHeader = "x-forwarded-user";
