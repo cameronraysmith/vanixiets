@@ -8,6 +8,7 @@
         pmc = "Pre-merge check for git branches";
         gitjson = "Display git log as JSON";
         gitjsonl = "Display git log lines as JSON";
+        jj-backport-github-pr = "Backport a GitHub PR by cherry-picking its merge commit";
         gfork = "Create a private GitHub fork of current repository";
         stash-staged = "Save staged changes to stash while keeping them staged";
         github-email = "Get GitHub noreply email address for a user";
