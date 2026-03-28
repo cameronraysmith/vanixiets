@@ -56,6 +56,36 @@
                 "util"
                 "gc"
               ];
+              # Advance bookmarks behind @ to latest meaningful commit in @'s ancestry
+              tug = [
+                "bookmark"
+                "move"
+                "--from=heads(::@ & bookmarks())"
+                "--to=heads(::@ ~ description(exact:\"\") ~ (empty() ~ merges()))"
+              ];
+              # Cherry-pick with provenance trailer, inserting before working copy
+              cherry-pick = [
+                "duplicate"
+                "--config=templates.duplicate_description=cherry_pick_description"
+                "--insert-before=@"
+              ];
+              # Batch-sign all unsigned mutable ancestors of working copy
+              fsign = [
+                "sign"
+                "--revisions=mutable()::@ ~ @::"
+              ];
+              # Park current changes by creating new empty commit at parent
+              stash = [
+                "new"
+                "@-"
+              ];
+              # Force rewrite commit metadata to trigger descendant rebases
+              touch = [
+                "metaedit"
+                "--ignore-immutable"
+                "--force-rewrite"
+                "-r"
+              ];
             };
 
             revset-aliases = {
