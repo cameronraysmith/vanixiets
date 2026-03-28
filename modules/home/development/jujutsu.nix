@@ -69,6 +69,46 @@
               sign = "sign(@)";
             };
 
+            templates = {
+              log = "builtin_log_comfortable";
+              op_log = "builtin_op_log_comfortable";
+              evolog = "builtin_evolog_compact ++ \"\n\"";
+              draft_commit_description = ''
+                concat(
+                  coalesce(description, default_commit_description, "\n"),
+                  "\n",
+                  "JJ: Change ID: " ++ format_short_change_id(change_id),
+                  "\n",
+                  surround(
+                    "JJ: This commit contains the following changes:\n", "",
+                    indent("JJ:     ", diff.summary()),
+                  ),
+                  "\nJJ: ignore-rest\n" ++ diff.git(),
+                )
+              '';
+            };
+
+            template-aliases = {
+              cherry_pick_description = "description.trim_end() ++ \"\n\n(cherry picked from commit \" ++ commit_id ++ \")\n\"";
+              "format_short_cryptographic_signature(signature)" = ''
+                if(signature,
+                  label("signature status", concat(
+                    "[",
+                    label(signature.status(), concat(
+                      coalesce(
+                        if(signature.status() == "good", "✓︎"),
+                        if(signature.status() == "unknown", "?"),
+                        "x",
+                      ),
+                      if(signature.display(),
+                        " " ++ stringify(signature.display()).replace(regex:" <(.+)>$", "")),
+                    )),
+                    "]",
+                  ))
+                )
+              '';
+            };
+
             user = {
               name = lib.mkDefault "";
               email = lib.mkDefault "";
