@@ -181,7 +181,7 @@ jobs:
       - name: Install just
         uses: taiki-e/install-action@a164de717a0ee9284c2d9db1c6016a4c339cd333 # v2.69.14
         with:
-          tool: just@1.43.1
+          tool: just@1
 
       - name: Discover packages
         id: discover-packages
