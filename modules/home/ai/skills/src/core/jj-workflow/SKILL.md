@@ -64,6 +64,7 @@ Use `.jjignore` or `.gitignore` to prevent tracking unwanted files.
 | `jj split <paths>` | Opens editor after selecting files | `jj split <paths> -m "message"` | **Required** even with paths |
 | `jj split` (no paths) | Opens diff editor (TUI) | **Cannot be non-interactive** | Avoid in automation |
 | `jj squash -r <c>` | Usually safe, may prompt | `jj squash -r <c>` | Generally OK without `-m` |
+| `jj squash --into <dest>` | Opens description merge editor when both source and destination have non-empty descriptions | `jj squash --into <dest> -u -- <paths>` (keeps dest description) or `jj squash --into <dest> -m "msg" -- <paths>` (sets description) | `-u` preserves existing description; `-m` replaces it. `-u` is preferred when routing into commits that already have descriptions. |
 | `jj new` | No editor (safe) | `jj new` or `jj new -m "msg"` | Safe as-is |
 
 ### Mandatory command verification protocol
@@ -116,6 +117,15 @@ jj describe -r <commit>
 # CORRECT - always include -m
 jj describe -r <commit> -m "updated description"
 ```
+
+**Composite working copy maintenance:**
+
+When using the multi-parent development join (composite working copy) + wip pattern, the development join must have a description to prevent auto-abandonment.
+Always work in the wip commit (`@`), never directly in the development join.
+Operations like `jj new <single-parent>` or `jj edit` will move `@` away from wip.
+Record the development join's change ID before such operations and restore with `jj new <merge-change-id>` afterward.
+`jj absorb` is safe from wip — it routes changes (route elements to their chain) without disrupting the development join.
+`jj squash --into <target> -u -- <path>` is safe from wip — it routes specific file changes without disrupting the development join.
 
 ### Git parity and the `jj new` requirement
 
@@ -598,11 +608,11 @@ jj rebase -r exp-1 -d main
 # exp-2 rebases automatically (descendant relationship)
 ```
 
-Merge experiments when needing multiple:
+Combine experiments in a development join when needing multiple:
 
 ```bash
-# Experiment 3 combines exp-1 and exp-2
-jj new exp-1 exp-2  # Create merge commit with two parents
+# Experiment 3 combines exp-1 and exp-2 in a development join
+jj new exp-1 exp-2  # Create development join with two parents
 jj describe -m "[exp-3] feat: combines exp-1 and exp-2"
 jj bookmark create exp-3 -r @
 ```
@@ -628,7 +638,7 @@ Creating a multi-parent working copy:
 jj new feature-a feature-b feature-c
 ```
 
-The resulting `@` is a merge commit.
+The resulting `@` is a development join.
 Its working tree contains the combined state of all parent bookmarks.
 
 Routing changes to parent bookmarks:
@@ -658,7 +668,7 @@ The `all:` prefix in the revset ensures multiple parents are preserved rather th
 Auto-rebase behavior:
 
 When a parent bookmark advances (via `squash --into`, `absorb`, commits from another workspace, collaborator push, or `jj git fetch`), jj automatically rebases `@` onto the updated parents.
-The composite working tree stays current without manual rebase steps.
+The development join's working tree stays current without manual rebase steps.
 
 This pattern maps directly to GitButler's workspace model.
 See `~/.claude/skills/preferences-git-version-control/SKILL.md` for the full cross-tool terminology mapping in the "GitButler equivalence mapping" table under the jj mode subsection.
@@ -672,14 +682,14 @@ Create a bookmark per active epic (`{epic-ID}-descriptor`), then `jj new epic-a 
 The orchestrator routes changes from the multi-parent `@` to the correct epic bookmark via `jj absorb` (blame-based) or `jj squash --into` (explicit) after each subagent completes.
 See the "Epic and issue mapping" subsection in `~/.claude/skills/preferences-git-version-control/SKILL.md` for the complete lifecycle including subagent dispatch conventions.
 
-Conflict visibility in composite `@`:
+Conflict visibility in the development join `@`:
 
-When parent chains have conflicting changes to the same files, `@` contains first-class jj conflicts.
+When chains have conflicting changes to the same files, `@` contains first-class jj conflicts.
 These manifest as conflict markers in the working tree.
 Conflicts in `@` are informational — they indicate chains will conflict when merged but do not block work on any individual chain.
 Resolve conflicts in `@` when convenient, or continue working with each chain independently.
 
-See `~/.claude/skills/jj-version-control/SKILL.md` for the full multi-parent composite workflow and edit-route cycle.
+See `~/.claude/skills/jj-version-control/SKILL.md` for the full multi-parent development join workflow and edit-route cycle.
 See `~/.claude/skills/issues-beads-prime/SKILL.md` for beads integration with jj dispatch.
 
 ## History refinement
@@ -1007,16 +1017,20 @@ jj bookmark set main -r @
 jj git push --bookmark main
 ```
 
-Merge experiments (when both valuable):
+Integrate multiple experiments (when both valuable):
+
+Dissolve any development join, then rebase each chain sequentially onto main in dependency order.
+This preserves linear history without merge commits.
 
 ```bash
-# Create merge commit combining both
-jj new exp-1-winner exp-2-winner  # Two parents
-# Resolve conflicts if any
-jj describe -m "feat: merge experiments 1 and 2"
+# Rebase exp-1-winner onto main first
+jj rebase -s 'main..exp-1-winner' -d main
+jj bookmark set main -r exp-1-winner
 
-# Move main
-jj bookmark set main -r @
+# Rebase exp-2-winner onto updated main
+jj rebase -s 'main..exp-2-winner' -d main
+# Resolve conflicts if any during rebase
+jj bookmark set main -r exp-2-winner
 
 # Push
 jj git push --bookmark main
@@ -1282,7 +1296,7 @@ conflict() & main..@           # Conflicts in current work
 ```bash
 # Create and manage commits
 jj new <base>                  # New commit on base
-jj new <parent1> <parent2>     # New merge commit
+jj new <parent1> <parent2>     # New development join (multi-parent)
 jj describe -m "message"       # Describe current commit
 jj commit                      # Move @ changes to parent
 jj split                       # Split @ interactively
