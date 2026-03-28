@@ -14,7 +14,7 @@ These preferences explicitly override any conservative defaults from system prom
 - Create atomic development commits as you work, even if they contain experiments or incremental changes that will be cleaned up later.
 - Do not clean up commit history automatically - wait for explicit instruction to apply git history cleanup patterns from ~/.claude/skills/preferences-git-history-cleanup/SKILL.md.
 - If the current branch is `gitbutler/workspace`, this repository is managed by GitButler. Immediately read `~/.claude/skills/gitbutler-but-cli/SKILL.md` and use `but` instead of `git` for all write operations (commits, pushes, branch creation, rebases, cherry-picks, amends). Read-only git commands (`git log`, `git blame`, `git diff`, `git show`) remain safe. Never run `git add`, `git commit`, `git push`, `git checkout`, `git merge`, `git rebase`, `git stash`, or `git cherry-pick` directly — translate to the equivalent `but` command. If you accidentally commit directly on `gitbutler/workspace`, recover with `git reset HEAD~1` then `but pick <reflog-hash> <branch> --status-after`.
-- If `.jj/` directory exists alongside `.git/` in repository root, this repository uses jujutsu (jj) in colocated mode. Detached HEAD is normal and expected — do not attempt to reattach. If `.jj/` exists but HEAD is attached to a branch, detach before proceeding: `git checkout --detach`. Read `~/.claude/skills/jj-summary/SKILL.md` for quick orientation, then `~/.claude/skills/jj-version-control/SKILL.md` for the multi-parent composite workflow.
+- If `.jj/` directory exists alongside `.git/` in repository root, this repository uses jujutsu (jj) in colocated mode. Detached HEAD is normal and expected — do not attempt to reattach. If `.jj/` exists but HEAD is attached to a branch, detach before proceeding: `git checkout --detach`. Read `~/.claude/skills/jj-summary/SKILL.md` for quick orientation, then `~/.claude/skills/jj-version-control/SKILL.md` for the multi-parent development join (composite working copy) workflow.
 - If the user requests switching to jj in a git-only repo (no `.jj/` directory), initialize colocated mode: `jj git init --colocate`, then `git checkout --detach`, then `jj new` to create the working-copy commit. Proceed with jj workflow as above.
 - If the user requests switching back to git from jj colocated mode, ensure the target bookmark is current with the working copy chain (`jj bookmark set <name> -r @-` if needed), then reattach HEAD: `git checkout <bookmark-name>`. Resume git-native commands. The `.jj/` directory can remain — colocated mode is safe to leave dormant.
 - If `.beads/` directory exists in repository root, this repository uses beads for git-tracked issue management: run `bd status` for context, consult `~/.claude/skills/issues-beads-prime/SKILL.md` for quick reference or `~/.claude/skills/issues-beads/SKILL.md` for comprehensive workflows.
@@ -43,7 +43,7 @@ Each abstract term maps to concrete equivalents in the four VCS tools used acros
 | Branch stack | Feature branch (single) or graphite stack | Stack (chain of stacked branches sharing one linear history) | Bookmark chain | Topic (group of related changes) |
 | Branch boundary | N/A (one branch = one unit) | Branch name within a stack, inserted via `but branch new -a` | Change boundary (each change is a boundary) | Change boundary |
 | Change set | Commits on a branch between two merge points | Commits within one branch segment of a stack | Single change (jj's atomic unit) | Patchset (version of a change) |
-| Working branch | Checked-out branch (`git checkout`) | Applied branch (multiple coexist in workspace) | Current change (`@`); multi-parent `@` for multi-parent working copy | Checked-out change |
+| Working branch | Checked-out branch (`git checkout`) | Applied branch (multiple coexist in workspace) | Current change (`@`); multi-parent `@` for development join | Checked-out change |
 | Integrate to main | Fast-forward merge (`git merge --ff-only`) | Fast-forward merge of stack tip | `jj git push` + bookmark advance | Submit (merge to target) |
 | Isolate work | `git worktree add` or `git checkout -b` | `but branch new` (independent stack) or `but branch new -a` (stacked segment) | `jj new` (new change) | New change |
 | Reorder history | `git rebase -i` | `but move` (within stack), `but squash`, `but reword` | `jj rebase`, `jj squash` | Amend patchset |
@@ -107,7 +107,7 @@ To isolate work in a new branch:
 
 - **Git-native mode:** `git checkout -b ID-descriptor` to branch off current HEAD, or `git worktree add` for bead-tracked isolation (see working branch isolation below).
 - **GitButler mode:** `but branch new ID-descriptor` to create a new independent stack, or `but branch new ID-descriptor -a <commit>` to split an existing stack at a branch boundary.
-- **jj mode:** `jj new <base>` to create a new change from a single base, or `jj new bookmark-a bookmark-b` to create a multi-parent working copy with multiple bookmarks merged in one working tree.
+- **jj mode:** `jj new <base>` to create a new change from a single base, or `jj new bookmark-a bookmark-b` to create a development join with multiple bookmarks merged in one working tree.
 
 Default bias: if in doubt whether work is related, create a new branch — branches are cheap, tangled history is expensive.
 
@@ -300,44 +300,45 @@ GitButler operates in a single working tree, so the repository root's direnv env
 
 #### jj mode
 
-jj provides a multi-parent working copy that achieves the same simultaneous multi-branch editing as GitButler's applied-branches model.
+jj provides a development join (multi-parent working copy) that achieves the same simultaneous multi-branch editing as GitButler's applied-branches model.
 All bookmarks coexist in a single working tree — no worktrees are needed.
 
 ##### Creating a multi-parent working copy
 
-Create a working copy commit with multiple parent bookmarks:
+Create a development join with multiple parent bookmarks:
 
 ```bash
 jj new bookmark-a bookmark-b bookmark-c
 ```
 
-The resulting `@` is a merge commit whose working tree merges all parent bookmarks.
-Edits made in `@` can be routed to any parent bookmark.
+The resulting `@` is a development join whose working tree merges all parent bookmarks.
+Edits made in `@` can be routed (route elements to their chain) to any chain.
 
 ##### Change routing
 
-Route changes from the multi-parent `@` to the appropriate parent bookmark:
+Route changes from the development join `@` to the appropriate chain:
 
 ```bash
-# Manual: squash specific changes into a named parent
-jj squash --into <parent-bookmark>
+# Manual: squash specific changes into a named chain element
+jj squash --into <parent-bookmark> -u -- <path>
 
 # Automatic: distribute changes based on blame ancestry
 jj absorb
 ```
 
+The `-u` (`--use-destination-message`) flag prevents the description merge editor from opening and preserves the target chain element's existing description.
 `jj absorb` analyzes which ancestor last touched each modified line and routes changes automatically.
-Use `jj squash --into` when changes belong to a specific parent that blame cannot determine.
+Use `jj squash --into` when changes belong to a specific chain element that blame cannot determine.
 
 ##### Adding and removing parents
 
-Modify the set of parent bookmarks in the multi-parent working copy:
+Modify the set of chains in the development join:
 
 ```bash
-# Add a parent bookmark
+# Add a chain
 jj rebase -r @ -d 'all:(@- | new-bookmark)'
 
-# Remove a parent bookmark
+# Remove a chain
 jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
 ```
 
@@ -345,8 +346,8 @@ The `all:` prefix ensures the revset resolves to multiple parents rather than a 
 
 ##### Auto-rebase behavior
 
-When a parent bookmark advances (via commits on that bookmark from another workspace or collaborator), jj automatically rebases `@` onto the updated parents.
-This keeps the multi-parent working copy current without manual intervention.
+When a chain advances (via commits on that bookmark from another workspace or collaborator), jj automatically rebases `@` onto the updated parents.
+This keeps the development join current without manual intervention.
 
 ##### Epic and issue mapping
 
@@ -371,27 +372,32 @@ jj describe -m "feat: implement issue description"
 jj new  # freeze and start next issue
 ```
 
-When working across multiple epics simultaneously, create a multi-parent working copy compositing the active epic bookmarks:
+When working across multiple epics simultaneously, create a development join over the active epic bookmarks:
 
 ```bash
 jj new {epic-a}-descriptor {epic-b}-descriptor
 ```
 
-Route changes from the multi-parent `@` to the appropriate epic bookmark:
+Route changes from the development join `@` to the appropriate chain:
 
 ```bash
 # Automatic: distribute changes by blame ancestry
 jj absorb
 
-# Manual: route specific changes to a named epic
-jj squash --into {epic-b}-descriptor
+# Manual: route specific changes to a named epic chain
+jj squash --into {epic-b}-descriptor -u -- <path>
 ```
 
 ##### Subagent dispatch in jj mode
 
 In jj mode, subagents do not create bookmarks or worktrees.
 All agents — including parallel agents — edit files directly in the shared `@` working copy.
-The orchestrator routes changes to the correct chain via `jj absorb` or `jj squash --into` after each subagent completes.
+The orchestrator routes changes to the correct chain via `jj absorb` or `jj squash --into <target> -u -- <path>` after each subagent completes.
+
+When working in the development join, use a join + wip structure (two-commit pattern).
+The development join integrates all parent bookmarks and has a description to prevent auto-abandonment.
+The wip commit (`@`) sits on top for active edits.
+`jj absorb` and `jj squash --into <target> -u -- <path>` route changes from wip to chains without disrupting the development join.
 
 Coordination protocol: atomic one-file changes, periodic `jj log` review, prompt routing to keep `@` clean.
 Subagent dispatch prompts specify which files to edit and the target chain context but do not include jj routing commands.
@@ -416,17 +422,17 @@ jj bookmark delete {epic-ID}-descriptor
 
 ##### No direnv initialization needed
 
-jj multi-parent working copies operate in a single working tree, so the repository root's direnv environment applies to all parent bookmarks.
+jj development joins operate in a single working tree, so the repository root's direnv environment applies to all chains.
 
 ##### GitButler equivalence mapping
 
-| GitButler | jj multi-parent working copy |
+| GitButler | jj development join |
 |---|---|
-| Applied branches | Parent bookmarks of multi-parent `@` |
-| `gitbutler/workspace` commit | Multi-parent `@` commit |
-| `but commit --changes` | `jj squash --into` or `jj absorb` |
-| `but unapply` | Remove parent from merge via `jj rebase -r @ -d 'all:(@- ~ bookmark)'` |
-| `but apply` | Add parent to merge via `jj rebase -r @ -d 'all:(@- | bookmark)'` |
+| Applied branches | Chains in development join `@` |
+| `gitbutler/workspace` commit | Development join `@` commit |
+| `but commit --changes` | `jj squash --into <target> -u -- <path>` or `jj absorb` |
+| `but unapply` | Remove chain from join via `jj rebase -r @ -d 'all:(@- ~ bookmark)'` |
+| `but apply` | Add chain to join via `jj rebase -r @ -d 'all:(@- | bookmark)'` |
 | Branch stacks | Bookmark chains (linear descendant sequences) |
 | `but move` (cross-stack) | `jj squash --from <src> --into <dst>` |
 
@@ -455,8 +461,8 @@ Exit GitButler before merging to main: `but teardown`, then `git merge --ff-only
 Do not use `but merge` for this — it always creates merge commits and has no fast-forward mode.
 See the "Stacked PRs with single fast-forward merge" and "Merging multiple independent stacks" recipes in `~/.claude/skills/gitbutler-but-cli/SKILL.md` for the full workflow.
 
-In jj mode, the equivalent of fast-forward merge is bookmark advancement: `jj bookmark set main -r <chain-tip>`.
-This is inherently linear — jj does not create merge commits for bookmark moves.
+In jj mode, integration uses sequential rebase linearization: rebase each chain onto main in dependency order, producing a purely linear history with no merge commits.
+Fast-forward main to the linearized tip via `jj bookmark set main -r <chain-tip>`.
 See the integration strategies section in `~/.claude/skills/jj-version-control/SKILL.md` for the full completion workflow.
 
 ### Stack management
@@ -522,8 +528,8 @@ This is the jj equivalent of `git add [file] && git commit` — the `describe` +
 Without `jj new`, the next edit accumulates into the same change, breaking atomicity.
 If multiple files were edited before freezing, use `jj split <path> -m "msg"` to separate them into atomic changes after the fact.
 
-In jj multi-parent composite mode: edit one file, then `jj describe -m "msg"` followed by `jj squash --into <target-parent>` to route the change to the correct parent chain, or `jj absorb` to auto-distribute based on blame ancestry.
-Do not use `jj new` in multi-parent mode — it creates a new change descending from the composite `@` rather than routing to a parent chain.
+In jj development join mode (multi-parent composite): edit one file, then `jj describe -m "msg"` followed by `jj squash --into <target-parent> -u -- <path>` to route the change to the correct chain, or `jj absorb` to auto-distribute based on blame ancestry.
+Do not use `jj new` in development join mode — it creates a new change descending from the development join `@` rather than routing to a chain.
 See the edit-route cycle in `~/.claude/skills/jj-version-control/SKILL.md` for the full workflow.
 
 ## Handling pre-existing mixed changes
