@@ -163,6 +163,8 @@
             ui = {
               editor = "nvim";
               color = "auto";
+              default-command = [ "log" ];
+              diff-editor = ":builtin";
               diff-formatter = ":git";
               pager = "delta";
 
@@ -173,6 +175,9 @@
             git = {
               # Enable git colocate mode
               colocate = true;
+
+              # Block push of WIP, private, or conflicted commits
+              private-commits = "private()";
 
               # Sign commits before pushing (upstream jujutsu supports revset syntax)
               # Options: true, false, "mine()", "~signed()", "~signed() & mine()", etc.
