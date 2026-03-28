@@ -48,6 +48,7 @@ For quick questions about commands or concepts, this summary may suffice.
 | `jj describe -r <c>` | Opens editor | `jj describe -r <c> -m "message"` |
 | `jj split <paths>` | Opens editor | `jj split <paths> -m "message"` |
 | `jj split` (no paths) | Opens diff editor (TUI) | **Cannot be non-interactive** |
+| `jj squash --into <dest>` | Opens description merge editor | `jj squash --into <dest> -u` (keep dest description) or `-m "msg"` |
 
 **Mandatory verification protocol:**
 1. Not certain a command is non-interactive? → Run `jj [subcommand] --help` FIRST
@@ -121,12 +122,16 @@ jj describe -r <c> -m "msg"    # Reword commit (ALWAYS use -m!)
 jj workspace add <path> -r <c> # Create workspace
 jj workspace update-stale      # Update stale workspace
 
-# Multi-parent working copy
-jj new bm-a bm-b bm-c         # Merge multiple bookmarks into one working tree
-jj squash --into <parent>      # Route changes to specific parent
+# Multi-parent development join (composite working copy)
+jj new bm-a bm-b bm-c         # Join multiple chains into one working tree
+jj describe -m "join: bm-a + bm-b + bm-c"  # Describe the development join
+jj new                         # Create wip commit on top of the join
+# Work in wip, then route changes to the appropriate chain:
+jj squash --into <chain> -u -- <path>     # Manual routing (keeps dest description)
 jj absorb                      # Auto-route changes by blame
-jj rebase -r @ -d 'all:(@- | new-bm)'    # Add parent bookmark
-jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove parent bookmark
+# Add/remove chains dynamically:
+jj rebase -r @ -d 'all:(@- | new-bm)'    # Add chain to the development join
+jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove chain from the development join
 
 # Recovery
 jj undo                        # Undo last operation
@@ -178,7 +183,7 @@ jj git push --bookmark <name>  # Push bookmark
 
 **Section: Advanced patterns** (lines 559-643)
 - Read when: Integrating experiments, handling dependencies
-- Covers: Integration strategies (rebase/squash/merge), sub-experiments
+- Covers: Integration strategies (rebase/squash), sequential linearization, sub-experiments
 - Key concepts: Stacking experiments, feature flags, session patterns
 
 **Section: Git colocated mode** (lines 645-713)
@@ -221,29 +226,39 @@ jj describe -r <commit> -m "proper"    # Reword
 jj undo                                # Undo any mistake
 ```
 
-**Integrate experiment to main:**
+**Integrate experiment to main (linear history only, no merge commits):**
 ```bash
-# Option 1: Rebase (preserve commits)
+# Option 1: Rebase single chain (preserve commits)
 jj rebase -s 'main..exp-1' -d main
 jj bookmark set main -r exp-1
 
-# Option 2: Squash (single commit)
+# Option 2: Squash single chain (single commit)
 jj new main
 jj squash --from 'main..exp-1' --into @
 jj bookmark set main -r @
+
+# Option 3: Sequential linearization of multiple chains from a development join
+# Rebase each chain onto main one at a time, advancing main after each.
+# Order chains by dependency (independent chains first, dependents after).
+jj rebase -s 'roots(main..feature-a)' -d main
+jj bookmark set main -r feature-a
+jj rebase -s 'roots(main..feature-b)' -d main
+jj bookmark set main -r feature-b
+# Repeat for each chain. Never create merge commits for integration to main.
 ```
 
-**Multi-parent working copy (simultaneous multi-bookmark editing):**
+**Development join (simultaneous multi-bookmark editing):**
 ```bash
-# Merge multiple bookmarks into one working tree
+# Join multiple chains into one working tree
 jj new feature-a feature-b feature-c
-# Edit files (changes accumulate in multi-parent @)
-# Route changes to appropriate parent:
-jj squash --into feature-a        # Manual routing
+jj describe -m "join: feature-a + feature-b + feature-c"
+jj new                            # Create wip commit on top of the join
+# Work in wip, then route changes to the appropriate chain:
+jj squash --into feature-a -u -- <path>  # Manual routing (keeps dest description)
 jj absorb                         # Auto-route by blame
-# Add/remove parents dynamically:
-jj rebase -r @ -d 'all:(@- | new-bookmark)'   # Add
-jj rebase -r @ -d 'all:(@- ~ old-bookmark)'   # Remove
+# Add/remove chains dynamically:
+jj rebase -r @ -d 'all:(@- | new-bookmark)'   # Add chain
+jj rebase -r @ -d 'all:(@- ~ old-bookmark)'   # Remove chain
 ```
 
 ## Revset examples for experiments
@@ -270,7 +285,7 @@ jj log -r 'mine() & ~bookmarks()'
 
 ## Critical reminders
 
-- **Non-interactive execution**: ALWAYS use `-m "message"` with `jj describe`, `jj describe -r`, and `jj split <paths>` to avoid editor hangups; verify unfamiliar commands with `jj [subcommand] --help` first
+- **Non-interactive execution**: ALWAYS use `-m "message"` with `jj describe`, `jj describe -r`, and `jj split <paths>` to avoid editor hangups; use `-u` or `-m` with `jj squash --into` to prevent the description merge editor; verify unfamiliar commands with `jj [subcommand] --help` first
 - **Command verification protocol**: Before executing any jj command you're uncertain about, run `jj [subcommand] --help` to check for interactive flags (look for `-m, --message`)
 - **Git parity requirement**: Execute `jj new` immediately after `jj describe -m "msg"` to freeze commits for git export; without `jj new`, described commits exist only in jj and appear as uncommitted changes in git
 - **Always colocated mode**: We operate with both .git and .jj (can revert to git anytime)
@@ -291,14 +306,14 @@ jj log -r 'mine() & ~bookmarks()'
 1. Never used jj? → Read "Core philosophy" and "Foundation"
 2. Need parallel experiments? → Read "Parallel experimentation"
 3. Need separate workspace? → Read "Graduating to workspaces"
-4. Working on 2+ independent chains? → Multi-parent composite `@` is the default. Create bookmarks for each chain, then `jj new chain-1 chain-2 ...`. See `~/.claude/skills/jj-version-control/SKILL.md` for the full workflow.
+4. Working on 2+ independent chains? → Development join `@` is the default. Create bookmarks for each chain, then `jj new chain-1 chain-2 ...`. See `~/.claude/skills/jj-version-control/SKILL.md` for the full workflow.
 5. Cleaning history? → Read "History refinement"
 6. Integrating work? → Read "Advanced patterns"
 7. Just need command? → Check "Quick command reference" above or "Reference" section
 
-**Single-chain vs multi-parent mode?**
+**Single-chain vs development join mode?**
 - Ad hoc changes to a single concern → Single-chain mode (no bookmarks, anonymous chain descending from main). Freeze and advance main when done: `jj new` then `jj bookmark set main -r @-`.
-- 2+ independent work streams, beads epics with multiple issues, or parallel agent dispatch → Multi-parent composite mode. This is the default for non-trivial sessions.
+- 2+ independent work streams, beads epics with multiple issues, or parallel agent dispatch → Development join mode. This is the default for non-trivial sessions.
 
 **Should I create a workspace?**
 - Need simultaneous file access across experiments? → Yes
@@ -314,5 +329,5 @@ jj log -r 'mine() & ~bookmarks()'
 ## For full documentation
 
 - Full jj workflow reference: `~/.claude/skills/jj-workflow/SKILL.md`
-- Multi-parent composite workflow, beads integration: `~/.claude/skills/jj-version-control/SKILL.md`
+- Development join workflow, beads integration: `~/.claude/skills/jj-version-control/SKILL.md`
 - VCS mode detection, beads conventions: `~/.claude/skills/preferences-git-version-control/SKILL.md`
