@@ -1,7 +1,7 @@
 { ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
-    { config, ... }:
+    { config, pkgs, ... }:
     {
       services.caddy = {
         enable = true;
@@ -45,6 +45,38 @@
               tls internal
               reverse_proxy [::1]:2586
             '';
+          };
+          "radicle.zt" = {
+            listenAddresses = [
+              "fddb:4344:343b:14b9:399:93db:4344:343b"
+              "10.147.17.1"
+            ];
+            extraConfig =
+              let
+                explorer = pkgs.radicle-explorer.withConfig {
+                  preferredSeeds = [
+                    {
+                      hostname = "radicle.zt";
+                      port = 443;
+                      scheme = "https";
+                    }
+                  ];
+                };
+              in
+              ''
+                tls internal
+                handle /api/* {
+                  reverse_proxy [::1]:8080
+                }
+                handle /raw/* {
+                  reverse_proxy [::1]:8080
+                }
+                handle {
+                  root * ${explorer}
+                  try_files {path} /index.html
+                  file_server
+                }
+              '';
           };
           "openclaw.zt" = {
             listenAddresses = [
