@@ -30,8 +30,9 @@
           listen = [ ];
         };
 
-        # Default public Radicle seeds for repository discovery and replication
+        # Default Radicle seeds for repository discovery and replication
         preferredSeeds = [
+          "z6MkjAoHXtb7qQdVn1fDhiaQ4UGk1CmGNApYXKPP9dDSy68E@cinnabar.zt:8776"
           "z6MksmpU5b1dS7oaqF2bHXhQi1DWy2hB7Mh9CuN7y1DN6QSz@seed.radicle.xyz:8776"
           "z6MkrLMMsiPWUcNPHcRajuMi9mDfYckSoJyPwwnknocNYPm7@iris.radicle.xyz:8776"
           "z6Mkmqogy2qEM2ummccUthFEaaHvyYmYBYh3dbe9W4ebScxo@rosa.radicle.xyz:8776"
