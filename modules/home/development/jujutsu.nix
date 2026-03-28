@@ -9,6 +9,30 @@
         flake,
         ...
       }:
+      let
+        trunk =
+          lib.pipe
+            {
+              bookmark = [
+                "main"
+                "master"
+                "develop"
+              ];
+              remote = [
+                "rad"
+                "origin"
+                "upstream"
+              ];
+            }
+            [
+              lib.cartesianProduct
+              (lib.concatMapStrings (
+                { bookmark, remote }:
+                "remote_bookmarks(exact:${builtins.toJSON bookmark}, exact:${builtins.toJSON remote}) | "
+              ))
+              (x: "latest(${x}root())")
+            ];
+      in
       {
         programs.jujutsu = {
           enable = true;
@@ -32,6 +56,17 @@
                 "util"
                 "gc"
               ];
+            };
+
+            revset-aliases = {
+              "trunk()" = trunk;
+              "private()" = ''subject(regex:"^(private|wip)(:|$)") | conflicts()'';
+              "merged(x)" = "first_parent(x)..x-";
+              "sign(x)" = "(mutable() ~ signed())::x ~ @::";
+            };
+
+            revsets = {
+              sign = "sign(@)";
             };
 
             user = {
