@@ -179,7 +179,7 @@ jobs:
 
       # alternative: extractions/setup-just@v3 (blocked on node20->node24 upgrade via extractions/setup-crate#9)
       - name: Install just
-        uses: taiki-e/install-action@a164de717a0ee9284c2d9db1c6016a4c339cd333 # v2.69.14
+        uses: taiki-e/install-action@fd0f63e180a477d7434580b6d80817978b9ff2b8 # v2.70.1
         with:
           tool: just@1
 
