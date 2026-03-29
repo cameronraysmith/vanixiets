@@ -9,6 +9,30 @@
         flake,
         ...
       }:
+      let
+        trunk =
+          lib.pipe
+            {
+              bookmark = [
+                "main"
+                "master"
+                "develop"
+              ];
+              remote = [
+                "rad"
+                "origin"
+                "upstream"
+              ];
+            }
+            [
+              lib.cartesianProduct
+              (lib.concatMapStrings (
+                { bookmark, remote }:
+                "remote_bookmarks(exact:${builtins.toJSON bookmark}, exact:${builtins.toJSON remote}) | "
+              ))
+              (x: "latest(${x}root())")
+            ];
+      in
       {
         programs.jujutsu = {
           enable = true;
@@ -32,6 +56,87 @@
                 "util"
                 "gc"
               ];
+              # Advance bookmarks behind @ to latest meaningful commit in @'s ancestry
+              tug = [
+                "bookmark"
+                "move"
+                "--from=heads(::@ & bookmarks())"
+                "--to=heads(::@ ~ description(exact:\"\") ~ (empty() ~ merges()))"
+              ];
+              # Cherry-pick with provenance trailer, inserting before working copy
+              cherry-pick = [
+                "duplicate"
+                "--config=templates.duplicate_description=cherry_pick_description"
+                "--insert-before=@"
+              ];
+              # Batch-sign all unsigned mutable ancestors of working copy
+              fsign = [
+                "sign"
+                "--revisions=mutable()::@ ~ @::"
+              ];
+              # Park current changes by creating new empty commit at parent
+              stash = [
+                "new"
+                "@-"
+              ];
+              # Force rewrite commit metadata to trigger descendant rebases
+              touch = [
+                "metaedit"
+                "--ignore-immutable"
+                "--force-rewrite"
+                "-r"
+              ];
+            };
+
+            revset-aliases = {
+              "trunk()" = trunk;
+              "private()" = ''subject(regex:"^(private|wip)(:|$)") | conflicts()'';
+              "merged(x)" = "first_parent(x)..x-";
+              "sign(x)" = "(mutable() ~ signed())::x ~ @::";
+            };
+
+            revsets = {
+              sign = "sign(@)";
+            };
+
+            templates = {
+              log = "builtin_log_comfortable";
+              op_log = "builtin_op_log_comfortable";
+              evolog = "builtin_evolog_compact ++ \"\n\"";
+              draft_commit_description = ''
+                concat(
+                  coalesce(description, default_commit_description, "\n"),
+                  "\n",
+                  "JJ: Change ID: " ++ format_short_change_id(change_id),
+                  "\n",
+                  surround(
+                    "JJ: This commit contains the following changes:\n", "",
+                    indent("JJ:     ", diff.summary()),
+                  ),
+                  "\nJJ: ignore-rest\n" ++ diff.git(),
+                )
+              '';
+            };
+
+            template-aliases = {
+              cherry_pick_description = "description.trim_end() ++ \"\n\n(cherry picked from commit \" ++ commit_id ++ \")\n\"";
+              "format_short_cryptographic_signature(signature)" = ''
+                if(signature,
+                  label("signature status", concat(
+                    "[",
+                    label(signature.status(), concat(
+                      coalesce(
+                        if(signature.status() == "good", "✓︎"),
+                        if(signature.status() == "unknown", "?"),
+                        "x",
+                      ),
+                      if(signature.display(),
+                        " " ++ stringify(signature.display()).replace(regex:" <(.+)>$", "")),
+                    )),
+                    "]",
+                  ))
+                )
+              '';
             };
 
             user = {
@@ -58,6 +163,8 @@
             ui = {
               editor = "nvim";
               color = "auto";
+              default-command = [ "log" ];
+              diff-editor = ":builtin";
               diff-formatter = ":git";
               pager = "delta";
 
@@ -68,6 +175,9 @@
             git = {
               # Enable git colocate mode
               colocate = true;
+
+              # Block push of WIP, private, or conflicted commits
+              private-commits = "private()";
 
               # Sign commits before pushing (upstream jujutsu supports revset syntax)
               # Options: true, false, "mine()", "~signed()", "~signed() & mine()", etc.

@@ -67,7 +67,30 @@
             typstWithPackages
           ];
 
+          config.autocmds = ''
+            vim.api.nvim_create_autocmd("FileType", {
+              pattern = { "markdown" },
+              callback = function(ev)
+                vim.diagnostic.enable(false, { bufnr = ev.buf })
+              end,
+            })
+          '';
+
           plugins = {
+            snacks = ''
+              return {
+                "folke/snacks.nvim",
+                opts = {
+                  picker = {
+                    sources = {
+                      files = { hidden = true },
+                      grep = { hidden = true },
+                    },
+                  },
+                },
+              }
+            '';
+
             lazyvim = ''
               return {
                 {

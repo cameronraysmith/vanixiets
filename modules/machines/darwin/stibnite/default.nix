@@ -31,6 +31,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        casks
         ssh-ca-trust
         ssh-known-hosts
         beads-ui
@@ -77,6 +78,9 @@ in
       system.primaryUser = "crs58";
 
       custom.profile.isDesktop = true;
+
+      # Nix-managed macOS apps via ditto (modules/darwin/casks.nix)
+      environment.casks = [ pkgs.radicle-desktop ];
 
       # Base casks from modules/darwin/homebrew.nix; machine-specific additions below
       custom.homebrew = {

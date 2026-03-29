@@ -36,6 +36,8 @@
             "/ntfy.zt/10.147.17.1"
             "/openclaw.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
             "/openclaw.zt/10.147.17.1"
+            "/radicle.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
+            "/radicle.zt/10.147.17.1"
 
             # Machine hostnames (for non-SSH service discovery via meta.domain = "zt")
             "/cinnabar.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
@@ -51,7 +53,7 @@
         };
       };
 
-      networking.firewall.interfaces."zt+".allowedTCPPorts = [ 53 ];
+      networking.firewall.interfaces."zt+".allowedTCPPorts = [ 53 8776 ];
       networking.firewall.interfaces."zt+".allowedUDPPorts = [ 53 ];
 
       clan.core.networking.zerotier.settings = {

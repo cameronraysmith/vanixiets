@@ -86,6 +86,14 @@ jj squash -r 'description(glob:"WIP:*")'
 Source commit is emptied after squash and becomes hidden.
 Use `--keep-emptied` if you need to preserve the commit shell.
 
+When using `jj squash --from <src> --into <dest>`, if both source and destination have non-empty descriptions and the source is not fully emptied, jj opens a description merge editor.
+This blocks non-interactive execution.
+To prevent this:
+
+- Use `-u` (`--use-destination-message`) to keep the destination's description unchanged.
+- Use `-m "message"` to explicitly set the resulting description.
+- `-u` is preferred when the destination already has the correct description.
+
 ### Drop commits
 
 Remove commits from history:
@@ -432,11 +440,11 @@ jj op log --limit 20
 # Shows all cleanup operations performed
 ```
 
-## Multi-parent composite mode considerations
+## Development join considerations
 
-When in multi-parent composite mode, history cleanup operations on a parent chain (rebase, squash within the chain) trigger auto-rebase of `@`.
+When in a development join (composite working copy), history cleanup operations on a parent chain (rebase, squash within the chain) trigger auto-rebase of `@`.
 This is safe — jj handles it automatically.
-However, if cleanup involves abandoning changes that are parents of `@`, exit multi-parent mode first by removing that chain from `@`: `jj rebase -r @ -d 'all:(@- ~ chain-being-cleaned)'`.
+However, if cleanup involves abandoning changes that are parents of `@`, exit the development join first by removing that chain from `@`: `jj rebase -r @ -d 'all:(@- ~ chain-being-cleaned)'`.
 Re-add after cleanup is complete.
 
 ### `jj tidy` safety

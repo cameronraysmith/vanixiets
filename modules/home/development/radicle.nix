@@ -10,7 +10,12 @@
       ...
     }:
     {
-      home.packages = [ pkgs.radicle-node ];
+      home.packages = [
+        pkgs.radicle-node
+        pkgs.radicle-tui
+      ];
+
+      sops.secrets.ssh-signing-key.path = "${config.home.homeDirectory}/.radicle/keys/radicle";
 
       # Deploy Radicle configuration to ~/.radicle/config.json
       home.file.".radicle/config.json".source = pkgs.writers.writeJSON "config.json" {
@@ -25,29 +30,18 @@
           listen = [ ];
         };
 
-        # Default public Radicle seeds for repository discovery and replication
+        # Default Radicle seeds for repository discovery and replication
         preferredSeeds = [
+          "z6MkjAoHXtb7qQdVn1fDhiaQ4UGk1CmGNApYXKPP9dDSy68E@cinnabar.zt:8776"
           "z6MksmpU5b1dS7oaqF2bHXhQi1DWy2hB7Mh9CuN7y1DN6QSz@seed.radicle.xyz:8776"
           "z6MkrLMMsiPWUcNPHcRajuMi9mDfYckSoJyPwwnknocNYPm7@iris.radicle.xyz:8776"
           "z6Mkmqogy2qEM2ummccUthFEaaHvyYmYBYh3dbe9W4ebScxo@rosa.radicle.xyz:8776"
         ];
       };
 
-      # Note: Deploy public key and signing key via user modules
-      # User modules should use sops.templates for public key:
-      #   sops.templates."radicle.pub" = {
-      #     mode = "0444";
-      #     path = "${config.home.homeDirectory}/.radicle/keys/radicle.pub";
-      #     content = ''${config.programs.git.settings.user.email} namespaces="git" ''${config.sops.placeholder."ssh-public-key"}'';
-      #   };
-      #
-      # And link ssh-signing-key to radicle signing key:
-      #   home.file.".radicle/keys/radicle".source = config.sops.secrets.ssh-signing-key.path;
-      #
-      # This key serves three purposes:
-      # 1. Radicle node identity (P2P cryptographic identity)
-      # 2. Git commit signing (gpg.ssh backend)
-      # 3. Jujutsu commit signing (ssh backend)
+      # Signing key: sops.secrets.ssh-signing-key decrypts to ~/.radicle/keys/radicle.
+      # Same key serves radicle node identity, git signing, and jj signing.
+      # Public key deployed via user module (e.g. modules/home/users/crs58/).
 
       # TODO: Service management on Darwin
       # radicle-node can be run manually as needed

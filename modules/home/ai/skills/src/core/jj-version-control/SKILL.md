@@ -69,7 +69,7 @@ File state awareness:
 
 When an agent detects `.jj/` alongside `.git/` in a repository root, jj colocated mode is active.
 Detached HEAD is normal and expected in this configuration — do not attempt to reattach it.
-The combined signal means the agent should adopt the jj workflow described in this skill, with the multi-parent composite model as the default operating mode for sessions with multiple active chains.
+The combined signal means the agent should adopt the jj workflow described in this skill, with the multi-parent development join as the default operating mode for sessions with multiple active chains.
 
 For quick command orientation, see `~/.claude/skills/jj-summary/SKILL.md`.
 For comprehensive command reference, see `~/.claude/skills/jj-workflow/SKILL.md`.
@@ -301,19 +301,57 @@ Use explicit operation IDs from session start if you noted them, otherwise count
 
 ## Multi-parent composite workflow
 
-The multi-parent composite working copy is the default operating mode for any jj session with two or more active chains.
+The multi-parent development join (composite working copy) is the default operating mode for any jj session with two or more active chains.
 Single-chain mode is the exception, reserved for simple ad hoc work on one anonymous chain descending from main.
 
-When multiple chains are active, the working copy commit `@` composites all active chains by descending from multiple parents.
-This provides continuous integration feedback (conflicts between chains surface immediately as first-class conflicts in `@`), shared visibility (every operation sees the full integrated state), modular separation (each chain remains independently inspectable, pushable, and reviewable), and flexible integration (chains can merge to main individually or be linearized into a single chain).
+When multiple chains are active, the working copy commit `@` forms an N-way development join (composite working copy) over all active chains by descending from multiple parents.
+The active chains form an antichain (a set of mutually independent chains in the partial order of commits).
+This provides continuous integration feedback (conflicts between antichain elements surface immediately as first-class conflicts in `@`), shared visibility (every operation sees the full integrated state), modular separation (each chain remains independently inspectable, pushable, and reviewable), and flexible integration (chains are linearized onto main via sequential rebase at completion).
+
+### Two-commit structure: merge + wip (join + wip structure)
+
+The development join should use a join + wip structure (two-commit structure): a stable development join commit with a wip commit on top.
+
+```
+[merge] -- [wip](@)
+```
+
+The development join commit (`jj new bookmark-a bookmark-b bookmark-c`) integrates all chain elements (parent chain commits).
+Describe it with a numbered manifest of its parent bookmarks so it is never auto-abandoned and `jj log` is self-documenting:
+
+```
+merge 1: short description of what this group covers
+- bookmark-a
+- bookmark-b
+- bookmark-c
+```
+
+The first line combines a sequential number with a high-level label describing the join group's purpose.
+Update the description whenever a bookmark is added to or removed from the development join.
+If multiple join groups exist, number them sequentially (`merge 2: ...`, etc.).
+Create wip on top (`jj new`) and this becomes `@` where all edits land.
+Squashing from `@` into chain elements auto-rebases both the development join and wip.
+If `@` is disrupted, the development join still exists — recover with `jj new <merge-change-id>`.
+
+Reference: Chris Krycho, "Jujutsu Megamerges and jj absorb" (2024-12-24).
+
+### Composite maintenance invariant (development join invariant)
+
+The join + wip structure requires active maintenance when operations move `@` away from the wip commit.
+
+Before any operation that moves `@` (like `jj new <single-parent>` or `jj edit`), verify and record the development join commit's change ID.
+After any such operation, immediately restore wip: `jj new <merge-change-id>`.
+When adding a new bookmark to the development join, reconstruct the development join (rebuild the merge) with all parents including the new one, then recreate wip on top.
+Subagent prompts must specify whether they operate in the development join wip (edit files, let orchestrator route) or outside it (e.g., working on a single chain directly).
 
 ### The edit-route cycle
 
 All edits land in `@`.
-The discipline is to route each completed change out of `@` into the correct parent chain, then verify the routing was correct.
+The discipline is to route (route elements to their chain) each completed change out of `@` into the correct chain, then verify the routing was correct.
 
 The prescribed commit pattern when bookmarks exist (tier 2 or 3 of the bookmark creation threshold) is `jj squash --into <chain> -m "message" <path>`.
 This combines routing, description, and file scoping in a single atomic operation.
+Each chain is a totally ordered subset of the commit partial order; routing moves a change from `@` into the correct chain element.
 
 The cycle proceeds as follows:
 
@@ -327,30 +365,45 @@ It is atomic: routing and description happen in one operation, with no window wh
 It is scoped: the explicit path ensures only the intended file moves, even if another agent edited something else in `@` concurrently.
 It is parallel-safe: multiple agents can run this simultaneously on different files targeting different chains without interference.
 
+When routing changes from `@` (wip) into a chain element, choose the message flag carefully:
+- Use `-u` (`--use-destination-message`) when the target already has the correct description.
+  This prevents the description merge editor from opening and preserves the existing description.
+- Use `-m "message"` only when setting the description for the first time.
+- Never use `-i` (`--interactive`) in automated or non-interactive contexts — it opens the diff editor which blocks without a terminal.
+
+The description merge editor is triggered when source and destination both have non-empty descriptions and the source is not fully emptied by the squash.
+Using `-u` suppresses this by telling jj to keep the destination's description unconditionally.
+
+The canonical non-interactive routing pattern for an existing target description:
+
+```bash
+jj squash --into <target> -u -- <path>
+```
+
 `jj absorb` remains available as a convenience when blame ancestry can determine the correct chain.
 In parallel environments where multiple agents share `@`, prefer scoped `jj absorb <path>` over bare `jj absorb`.
 Bare absorb touches every changed file in `@`, which can interfere with files another agent is mid-edit on.
 Scoped absorb routes only the specified files by blame ancestry, leaving everything else in `@` untouched — this is the safer option when you lack context about what other agents are actively editing.
 
 The invariant is that `@` is always empty or contains only in-progress work.
-All completed changes live in their respective parent chains.
+All completed changes live in their respective chains.
 
 In single-chain mode (tier 1, no bookmarks), the cycle is simpler: `jj describe -m "message"` followed by `jj new` freezes the change and advances `@`.
 There is no routing target, so the single-command pattern does not apply.
-Do not use `jj new` in multi-parent composite mode — it creates a new change descending from the composite `@` rather than routing to a parent chain.
+Do not use `jj new` in multi-parent development join mode — it creates a new change descending from the development join `@` rather than routing to a chain.
 
 ### Conflict behavior in composite `@`
 
-When parent chains contain conflicting changes, `@` displays first-class jj conflicts.
-These conflicts are informational — they tell you the parent chains will conflict when merged.
-You can resolve them in `@` (the resolution stays in `@` and may need re-resolution when parents change), continue working with conflict markers present, or resolve the underlying conflict in one of the parent chains directly.
+When antichain elements contain conflicting changes, `@` displays first-class jj conflicts.
+These conflicts are informational — they tell you the chains will conflict when merged.
+You can resolve them in `@` (the resolution stays in `@` and may need re-resolution when parents change), continue working with conflict markers present, or resolve the underlying conflict in one of the chains directly.
 
 Conflicts in `@` do not prevent work.
 They are a continuous integration signal, not a blocking error.
 
 ### `jj absorb` scope and limitations
 
-`jj absorb` works for modifications to existing lines by analyzing blame ancestry to determine which parent chain last touched each modified line.
+`jj absorb` works for modifications to existing lines by analyzing blame ancestry to determine which chain element last touched each modified line.
 It routes changes automatically based on this analysis.
 
 `jj absorb` can be scoped to specific files: `jj absorb <path>` routes only that file's changes by blame ancestry, leaving everything else in `@` untouched.
@@ -367,7 +420,7 @@ For any case where `jj absorb` cannot route changes, fall back to `jj squash --i
 
 Multiple agents share one filesystem and edit files in the same `@`.
 This is the intended model.
-All agents see the integrated state of all active chains, reducing merge conflict risk.
+All agents see the integrated state of all antichain elements, reducing conflict risk.
 Conflicts between concurrent edits are detected immediately as first-class jj conflicts.
 
 All agents use `jj squash --into <chain> -m "message" <path>` for every commit.
@@ -384,13 +437,13 @@ Subagent prompts specify which files to edit and the target chain context but do
 
 ### Adding and removing chains
 
-Add a parent chain to the composite `@`:
+Add a chain to the development join `@`:
 
 ```bash
 jj rebase -r @ -d 'all:(@- | new-bookmark)'
 ```
 
-Remove a parent chain from the composite `@`:
+Remove a chain from the development join `@`:
 
 ```bash
 jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
@@ -401,7 +454,7 @@ Without `all:`, jj would compute the nearest common ancestor of the revset membe
 
 ### Teardown
 
-To collapse back to a single-parent `@`, either iteratively remove parents using the removal command above, or reset directly:
+To abandon the development join (dissolve the composite) and collapse back to a single-parent `@`, either iteratively remove parents using the removal command above, or reset directly:
 
 ```bash
 jj new <single-bookmark>
@@ -411,16 +464,65 @@ This creates a fresh `@` descending from only the specified bookmark.
 
 ### Session persistence
 
-Multi-parent `@` state persists across sessions.
-When a new session detects an existing multi-parent `@` (visible via `jj log -r @` showing multiple parents), it should resume the composite workflow rather than starting fresh.
-Run `jj log -r '@-+' -s` to identify the active parent chains and their bookmarks.
+The development join `@` state persists across sessions.
+When a new session detects an existing multi-parent `@` (visible via `jj log -r @` showing multiple parents), it should resume the development join workflow rather than starting fresh.
+Run `jj log -r '@-+' -s` to identify the active chains and their bookmarks.
 Check `jj status` and `jj log -r 'mutable() ~ @ ~ ::main'` to understand in-progress work before making changes.
 
 ### Integration strategies at completion
 
-When chains are complete, three integration strategies are available:
+The development join is ephemeral workspace scaffolding that is dissolved before integration.
+It does not appear in the final history on main.
 
-*Separate PRs*: push each chain's bookmark independently.
+The default integration strategy is sequential rebase linearization: rebase each chain onto main in dependency order, producing a purely linear history with no merge commits.
+
+*Sequential rebase linearization*: rebase chains sequentially onto main, then fast-forward main to the tip.
+Chains that others depend on go first; independent chains follow in any logical order.
+
+For each chain, find its base (the first change descending from main) and rebase it onto main (or onto the previous chain's tip, which is main after each fast-forward).
+The procedure generalizes to N chains:
+
+```bash
+# Determine linearization order (dependent chains first)
+# Chain A: main -> a1 -> a2 -> a3 (tip: chain-a bookmark)
+# Chain B: main -> b1 -> b2 (tip: chain-b bookmark)
+# Chain C: main -> c1 (tip: chain-c bookmark)
+
+# Rebase A onto main (already there if it descends from main)
+# Advance main to A's tip
+jj bookmark set main -r chain-a
+
+# Rebase B onto new main (A's tip)
+jj rebase -s b1 -d main
+
+# Advance main to B's tip
+jj bookmark set main -r chain-b
+
+# Rebase C onto new main (B's tip)
+jj rebase -s c1 -d main
+
+# Advance main to C's tip
+jj bookmark set main -r chain-c
+
+# Result: main -> a1 -> a2 -> a3 -> b1 -> b2 -> c1
+# Push the linearized main
+jj git push --bookmark main
+```
+
+For a single chain, this reduces to advancing main directly to the chain tip:
+
+```bash
+jj bookmark set main -r <chain-tip>
+jj git push --bookmark main
+```
+
+This is the jj equivalent of fast-forward merge — advancing a bookmark creates no merge commits.
+
+After linearization, exit the development join since the chains are now one linear sequence.
+Use `jj new main` to reset `@` to a single parent.
+Individual chain bookmarks can be deleted in the post-session cleanup.
+
+*Separate PRs*: push each chain's bookmark independently for review before linearizing.
 Push all at once: `jj git push --bookmark chain-a --bookmark chain-b --bookmark chain-c`.
 Or push one at a time: `jj git push --bookmark chain-a`.
 Each pushed bookmark becomes a branch on the remote, suitable for PR creation via `gh pr create`.
@@ -432,38 +534,7 @@ gh pr create -d -a "@me" -B main -H chain-a -t "feat: description" -b ""
 ```
 
 Follow the PR creation protocol in `~/.claude/skills/preferences-git-version-control/SKILL.md` for placeholder content and safety conventions.
-
-*Linearize then PR*: rebase chains into a single linear sequence, then push as one bookmark.
-Order matters: dependent chains come first (if chain-b depends on chain-a's changes, chain-a must precede chain-b in the linearized sequence), then independent chains in any order.
-
-For each subsequent chain, find its base (the first change descending from main) and rebase it onto the previous chain's tip.
-The procedure generalizes to N chains:
-
-```bash
-# Determine linearization order (dependent chains first)
-# Chain A: main -> a1 -> a2 -> a3 (tip: chain-a bookmark)
-# Chain B: main -> b1 -> b2 (tip: chain-b bookmark)
-# Chain C: main -> c1 (tip: chain-c bookmark)
-
-# Stack B onto A's tip
-jj rebase -s b1 -d chain-a
-
-# Stack C onto B's new tip
-jj rebase -s c1 -d chain-b
-
-# Result: main -> a1 -> a2 -> a3 -> b1 -> b2 -> c1
-# Advance main and push
-jj bookmark set main -r chain-c
-jj git push --bookmark main
-```
-
-After linearization, exit multi-parent mode since the chains are now one linear sequence.
-Use `jj new main` or `jj new chain-c` to reset `@` to a single parent.
-Individual chain bookmarks can be deleted in the post-session cleanup.
-
-*Direct merge to main*: advance the main bookmark to the chain tip.
-Use `jj bookmark set main -r <chain-tip>` followed by `jj git push --bookmark main`.
-This is the jj equivalent of fast-forward merge — jj does not create merge commits for bookmark moves.
+After PRs are approved, integrate via sequential rebase linearization as described above.
 
 ## `jj revert` usage
 
@@ -625,7 +696,7 @@ jj new  # freeze and start next issue
 jj git push --bookmark {epic-ID}-descriptor
 ```
 
-When working across multiple epics simultaneously, create a multi-parent working copy:
+When working across multiple epics simultaneously, create a development join:
 
 ```bash
 jj new {epic-a}-descriptor {epic-b}-descriptor
