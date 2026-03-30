@@ -130,6 +130,11 @@ Independent chains within the same linearization step can be ordered discretiona
    jj squash --into <chain> -m "feat: description" path/to/file
    # or auto-route by blame ancestry:
    jj absorb
+   # To extend a chain with a new commit rather than amending the tip:
+   jj new -A <chain> --no-edit -m "feat: description"
+   jj squash --from @ --into <new-change-id> -u -- path/to/file
+   jj bookmark set <chain> -r <new-change-id>
+   jj describe -m ""  # clear stale @ description
    ```
 
 ### Phase 3: converge (validate)
