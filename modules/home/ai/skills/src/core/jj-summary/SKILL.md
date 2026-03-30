@@ -129,6 +129,11 @@ jj new                         # Create wip commit on top of the join
 # Work in wip, then route changes to the appropriate chain:
 jj squash --into <chain> -u -- <path>     # Manual routing (keeps dest description)
 jj absorb                      # Auto-route changes by blame
+# Route-and-extend: create a NEW commit on a chain (not amend existing)
+jj new -A <bookmark> --no-edit -m "msg"   # Insert new commit after bookmark
+jj squash --from @ --into <id> -u -- <path>  # Route file content into it
+jj bookmark set <bookmark> -r <id>        # Advance bookmark to new tip
+jj describe -m ""                         # Clear stale @ description
 # Add/remove chains dynamically:
 jj rebase -r @ -d 'all:(@- | new-bm)'    # Add chain to the development join
 jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove chain from the development join
@@ -256,6 +261,12 @@ jj new                            # Create wip commit on top of the join
 # Work in wip, then route changes to the appropriate chain:
 jj squash --into feature-a -u -- <path>  # Manual routing (keeps dest description)
 jj absorb                         # Auto-route by blame
+# IMPORTANT: `jj squash --into` AMENDS the existing chain tip.
+# To CREATE a new commit extending the chain, use route-and-extend:
+# jj new -A <bookmark> --no-edit -m "msg"
+# jj squash --from @ --into <new-id> -u -- <path>
+# jj bookmark set <bookmark> -r <new-id>
+# jj describe -m ""
 # Add/remove chains dynamically:
 jj rebase -r @ -d 'all:(@- | new-bookmark)'   # Add chain
 jj rebase -r @ -d 'all:(@- ~ old-bookmark)'   # Remove chain
