@@ -299,6 +299,20 @@ When sharing work done, combine both:
 
 Use explicit operation IDs from session start if you noted them, otherwise count backwards from `@`.
 
+## Diamond workflow: beads epic to jj chain topology
+
+When `.beads/` exists and an epic is active, the epic's issue dependency graph determines the jj bookmark chain topology.
+Independent issues (no dependency path between them) form an antichain of parallel bookmark chains developed concurrently.
+Dependent issues (blocking relations) produce chain stacking where one bookmark branches from another's tip, reflecting the covering relation in the partial order.
+
+The diamond pattern has four phases: diverge (decompose epic into chains from `bd epic status`), develop (work in the N-way development join with join + wip structure), converge (validate the integrated development join), and serialize (dissolve the development join and rebase chains sequentially onto main as a linear extension of the dependency partial order).
+
+The development join validates the antichain composition during development by surfacing conflicts between independent chains as first-class jj conflicts.
+Integration to main always uses sequential rebase linearization, never merge commits.
+The development join commit and wip commit are ephemeral scaffolding abandoned during the serialize phase.
+
+For the full theoretical foundations (lattice theory, event structures, VSM mapping), beads-to-jj mapping table, and four-phase mechanical recipe, see `diamond-workflow.md` in this directory.
+
 ## Multi-parent composite workflow
 
 The multi-parent development join (composite working copy) is the default operating mode for any jj session with two or more active chains.
@@ -476,8 +490,12 @@ It does not appear in the final history on main.
 
 The default integration strategy is sequential rebase linearization: rebase each chain onto main in dependency order, producing a purely linear history with no merge commits.
 
-*Sequential rebase linearization*: rebase chains sequentially onto main, then fast-forward main to the tip.
-Chains that others depend on go first; independent chains follow in any logical order.
+*Sequential rebase linearization*: rebase chains sequentially onto main (a linear extension of the dependency partial order), then fast-forward main to the tip.
+
+Two cases determine the linearization order.
+When the chains form a true antichain (all issues are mutually independent), the integration order is discretionary: alphabetical, thematic, or by size.
+When issues have cross-chain dependency edges (issue A in chain 1 blocks issue B in chain 2), those edges induce a partial order on the chains themselves and the linearization must respect it: chains whose issues are depended upon by other chains rebase first.
+Independent chains within the same linearization step can be ordered discretionarily.
 
 For each chain, find its base (the first change descending from main) and rebase it onto main (or onto the previous chain's tip, which is main after each fast-forward).
 The procedure generalizes to N chains:
@@ -676,6 +694,8 @@ Pushing to git remotes:
 ## Beads integration
 
 When `.beads/` exists alongside `.jj/` in a colocated repository, beads issue tracking integrates with jj bookmarks.
+The diamond workflow pattern provides the overarching structure for epic-scoped work, connecting the beads issue dependency graph to jj chain topology through four phases: diverge, develop, converge, serialize.
+See the "Diamond workflow" section above and `diamond-workflow.md` in this directory for the full treatment.
 
 Bookmark naming for bead work follows the same `{ID}-descriptor` pattern used in git branch naming, with dots in bead IDs replaced by dashes.
 For example, beads issue `nix-pxj.4` becomes bookmark `nix-pxj-4-deploy-validate`.
