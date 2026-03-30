@@ -6,8 +6,6 @@
 # - nvidiaPersistenced is MANDATORY for headless servers
 # - This module is for COMPUTE ONLY, not desktop/display
 # - DO NOT set nixpkgs.config.cudaSupport = true (causes mass rebuild of ALL packages)
-#
-# Reference: docs/notes/development/nvidia-module-analysis.md
 {
   flake.modules.nixos.nvidia =
     { config, pkgs, ... }:
