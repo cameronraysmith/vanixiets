@@ -402,9 +402,45 @@ Scoped absorb routes only the specified files by blame ancestry, leaving everyth
 The invariant is that `@` is always empty or contains only in-progress work.
 All completed changes live in their respective chains.
 
+**Clearing `@` after routing:** `jj squash --into` moves file content from `@` but does NOT clear `@`'s description. If `@` was described before routing (e.g., via `jj describe -m "msg"` as part of the atomic commit workflow), run `jj describe -m ""` after the squash to restore the invariant. Failure to clear leaves stale descriptions that pollute subsequent operations and confuse other agents sharing the development join.
+
 In single-chain mode (tier 1, no bookmarks), the cycle is simpler: `jj describe -m "message"` followed by `jj new` freezes the change and advances `@`.
 There is no routing target, so the single-command pattern does not apply.
 Do not use `jj new` in multi-parent development join mode — it creates a new change descending from the development join `@` rather than routing to a chain.
+
+### Extending a chain with a new commit (route-and-extend pattern)
+
+When the intent is to create a new commit on a chain rather than amending the existing tip, `jj squash --into` is insufficient because it merges content into the existing commit.
+Use the route-and-extend pattern instead.
+
+The complete mechanical recipe:
+
+```bash
+# 1. Insert a new empty commit after the bookmark (does NOT move @)
+jj new -A <bookmark> --no-edit -m "feat: description of the new change"
+
+# 2. Note the change ID of the newly inserted commit (jj prints it)
+
+# 3. Squash the file(s) from @ into the new commit, preserving its description
+jj squash --from @ --into <new-change-id> -u -- <path>
+
+# 4. Advance the bookmark to the new chain tip
+jj bookmark set <bookmark> -r <new-change-id>
+
+# 5. Clear the stale description on @ (squash moved files but not the description)
+jj describe -m ""
+```
+
+Why each step is necessary:
+
+- Step 1 uses `--no-edit` to avoid moving `@` away from the development join. Using `jj squash --into <bookmark>` instead would amend the existing bookmark commit, not extend the chain.
+- Step 4 is required because `jj new -A` creates a new commit that the bookmark does not automatically track. Without this step, the bookmark remains on the old tip.
+- Step 5 clears `@`'s description because `jj squash --from @ --into` moves file content but does NOT clear the source commit's description. Without this step, `@` retains a stale description that confuses other agents.
+
+When to use which pattern:
+
+- *Amending an existing chain commit:* `jj squash --into <bookmark> -u -- <path>` (the standard edit-route cycle)
+- *Creating a new commit extending the chain:* the route-and-extend recipe above
 
 ### Conflict behavior in composite `@`
 
