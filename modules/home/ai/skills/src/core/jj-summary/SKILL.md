@@ -261,6 +261,28 @@ jj rebase -r @ -d 'all:(@- | new-bookmark)'   # Add chain
 jj rebase -r @ -d 'all:(@- ~ old-bookmark)'   # Remove chain
 ```
 
+**Diamond workflow (epic-scoped, four phases):**
+```bash
+# 1. Diverge: decompose epic into chains
+bd epic status                     # Survey issue dependencies
+jj new main && jj bookmark create chain-a  # One bookmark per independent issue
+
+# 2. Develop: N-way development join + wip
+jj new chain-a chain-b chain-c     # Create development join
+jj describe -m "merge 1: epic desc\n- chain-a\n- chain-b\n- chain-c"
+jj new                             # Create wip on top
+jj squash --into <chain> -m "feat: desc" path/to/file  # Route changes
+
+# 3. Converge: validate integrated state
+# Run tests against the development join; bd close issues as they pass
+
+# 4. Serialize: dissolve join, linearize to main
+jj abandon <merge-id> <wip-id>    # Abandon ephemeral scaffolding
+jj rebase -s <chain-base> -d main # Rebase each chain in dependency order
+jj bookmark set main -r <chain-tip>
+jj git push --bookmark main        # Push for CI validation
+```
+
 ## Revset examples for experiments
 
 ```bash
