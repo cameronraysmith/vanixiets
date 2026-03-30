@@ -471,7 +471,7 @@ Recovery: `jj undo`.
 
 ### Linearize merge commits
 
-Convert merge-heavy history to linear sequence:
+Convert merge-heavy history to linear sequence (computing a linear extension of the commit partial order):
 
 ```bash
 # Identify merge commits
