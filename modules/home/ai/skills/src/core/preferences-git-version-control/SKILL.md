@@ -436,6 +436,21 @@ jj development joins operate in a single working tree, so the repository root's 
 | Branch stacks | Bookmark chains (linear descendant sequences) |
 | `but move` (cross-stack) | `jj squash --from <src> --into <dst>` |
 
+##### Diamond workflow
+
+When `.beads/` exists and an epic is active, the epic's issue dependency graph determines the jj bookmark chain topology.
+Independent issues form an antichain of parallel bookmark chains.
+Dependent issues produce chain stacking (one bookmark branching from another's tip), reflecting the covering relation in the issue partial order.
+
+The diamond pattern proceeds through four phases.
+The diverge phase decomposes the epic into bookmark chains based on `bd epic status`.
+The develop phase creates an N-way development join (composite working copy) over all active chains using the join + wip structure, enabling concurrent development with continuous integration feedback.
+The converge phase validates the integrated development join via testing and QA.
+The serialize phase dissolves the development join and rebases each chain sequentially onto main as a linear extension of the dependency partial order, producing purely linear history with no merge commits.
+
+The pattern generalizes conceptually beyond jj (GitButler's applied-branches model and git-native worktrees achieve analogous isolation), but the mechanical implementation leverages jj's multi-parent working copy.
+For the full treatment including theoretical foundations, beads-to-jj mapping, and mechanical recipe, see `~/.claude/skills/jj-version-control/diamond-workflow.md`.
+
 ### Fast-forward-only merge policy
 
 All merges to main must be fast-forward.
