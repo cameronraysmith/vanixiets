@@ -543,8 +543,20 @@ This is the jj equivalent of `git add [file] && git commit` — the `describe` +
 Without `jj new`, the next edit accumulates into the same change, breaking atomicity.
 If multiple files were edited before freezing, use `jj split <path> -m "msg"` to separate them into atomic changes after the fact.
 
-In jj development join mode (multi-parent composite): edit one file, then `jj describe -m "msg"` followed by `jj squash --into <target-parent> -u -- <path>` to route the change to the correct chain, or `jj absorb` to auto-distribute based on blame ancestry.
-Do not use `jj new` in development join mode — it creates a new change descending from the development join `@` rather than routing to a chain.
+In jj development join mode (multi-parent composite): edit one file, then route it to the correct chain.
+Two routing patterns exist:
+
+- *Amend existing chain commit:* `jj squash --into <target-parent> -u -- <path>` routes the file into the existing commit.
+  Use when the chain commit already exists and the change belongs in it.
+- *Extend chain with new commit:* use the route-and-extend pattern from `~/.claude/skills/jj-version-control/SKILL.md`.
+  Use when the change is a logically separate commit that should extend the chain.
+- *Auto-route by blame:* `jj absorb` distributes changes to appropriate ancestors automatically.
+
+After any routing operation, if `@` was described, clear it: `jj describe -m ""`.
+`jj squash --into` and `jj absorb` move file content but do NOT clear `@`'s description.
+
+Do not use `jj new` (without `-A`) in development join mode — it creates a new change descending from the development join `@` rather than routing to a chain.
+`jj new -A <bookmark> --no-edit` is safe because it inserts after the specified bookmark without moving `@`.
 See the edit-route cycle in `~/.claude/skills/jj-version-control/SKILL.md` for the full workflow.
 
 ## Handling pre-existing mixed changes
