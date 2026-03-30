@@ -53,7 +53,10 @@
         };
       };
 
-      networking.firewall.interfaces."zt+".allowedTCPPorts = [ 53 8776 ];
+      networking.firewall.interfaces."zt+".allowedTCPPorts = [
+        53
+        8776
+      ];
       networking.firewall.interfaces."zt+".allowedUDPPorts = [ 53 ];
 
       clan.core.networking.zerotier.settings = {
