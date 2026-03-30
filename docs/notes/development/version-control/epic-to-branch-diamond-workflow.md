@@ -1,3 +1,8 @@
+---
+status: ratified
+date: 2026-03-28
+---
+
 # Epic-to-branch diamond workflow
 
 Design notes for a workflow bridge connecting beads epic/issue graphs to jj multi-parent version control, grounded in lattice theory, event structures, and the Viable System Model.
@@ -174,3 +179,34 @@ The adaptive planning skill's MPC framework suggests this depends on the volatil
 - Dilworth, R. P. (1950). "A Decomposition Theorem for Partially Ordered Sets."
 - Krycho, C. (2024). "Jujutsu Megamerges and jj absorb."
 - Bird, C. et al. (2009). "Does Distributed Development Affect Software Quality?"
+
+## Implemented in
+
+The diamond workflow content from this design note has been incorporated into the following agent skill files.
+The skills are self-contained and do not reference this design note at runtime.
+This note serves as the ratified design decision record.
+
+Primary:
+
+- Source: `modules/home/ai/skills/src/core/jj-version-control/SKILL.md`
+  Deployed: `~/.claude/skills/jj-version-control/SKILL.md`
+- Source: `modules/home/ai/skills/src/core/jj-version-control/diamond-workflow.md`
+  Deployed: `~/.claude/skills/jj-version-control/diamond-workflow.md`
+- Source: `modules/home/ai/skills/src/core/preferences-git-version-control/SKILL.md`
+  Deployed: `~/.claude/skills/preferences-git-version-control/SKILL.md`
+
+Secondary (compressed references):
+
+- Source: `modules/home/ai/skills/src/core/jj-workflow/SKILL.md`
+  Deployed: `~/.claude/skills/jj-workflow/SKILL.md`
+- Source: `modules/home/ai/skills/src/core/jj-summary/SKILL.md`
+  Deployed: `~/.claude/skills/jj-summary/SKILL.md`
+- Source: `modules/home/ai/skills/src/core/preferences-adaptive-planning/SKILL.md`
+  Deployed: `~/.claude/skills/preferences-adaptive-planning/SKILL.md`
+
+Terminology consistency:
+
+- Source: `modules/home/ai/skills/src/core/jj-history-cleanup/SKILL.md`
+  Deployed: `~/.claude/skills/jj-history-cleanup/SKILL.md`
+- Source: `modules/home/ai/skills/src/core/issues-beads-prime/SKILL.md`
+  Deployed: `~/.claude/skills/issues-beads-prime/SKILL.md`
