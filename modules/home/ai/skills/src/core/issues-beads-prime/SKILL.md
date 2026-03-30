@@ -95,7 +95,7 @@ For non-bead or quick-fix work, use a plain branch instead of the full isolation
 In git-native mode with worktrees, initialize the direnv environment before hook-triggering operations.
 This does not apply in GitButler mode or jj mode (both operate in a single working tree).
 
-In jj mode, when working across multiple epics simultaneously, the orchestrator creates a multi-parent `@` via `jj new epic-a epic-b` and routes changes to the correct epic bookmark via `jj absorb` or `jj squash --into` after subagent completion.
+In jj mode, when working across multiple epics simultaneously, the orchestrator creates a multi-parent `@` (development join) via `jj new epic-a epic-b` and routes changes to the correct epic bookmark via `jj absorb` or `jj squash --into` after subagent completion.
 See the "Subagent dispatch in jj mode" subsection of git-preferences for the full routing workflow.
 
 All agents (including parallel agents) share the same `@` working copy.
