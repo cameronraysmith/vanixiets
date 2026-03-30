@@ -984,6 +984,19 @@ If any step fails, `jj undo` backs out immediately.
 
 ## Advanced patterns
 
+### Diamond workflow (epic-scoped)
+
+The diamond workflow connects beads epic issue graphs to jj chain topology through four phases.
+
+1. **Diverge**: `bd epic status` to survey dependencies; create one bookmark per independent issue chain from main.
+2. **Develop**: `jj new chain-a chain-b ...` to create the N-way development join; `jj describe -m "merge 1: ..."` then `jj new` for the join + wip structure; route changes via `jj squash --into <chain> -m "msg" <path>` or `jj absorb`.
+3. **Converge**: validate the integrated development join via tests and QA; `bd close` issues as they pass.
+4. **Serialize**: abandon the development join and wip; rebase each chain onto main in dependency order (`jj rebase -s <base> -d main; jj bookmark set main -r <tip>`); push for CI.
+
+Two linearization cases: true antichains (independent chains) use discretionary order; cross-chain dependencies induce a partial order that the linear extension must respect.
+
+For the full treatment including theoretical foundations and beads-to-jj mapping, see `~/.claude/skills/jj-version-control/diamond-workflow.md`.
+
 ### Integration strategies
 
 Rebase winner onto main (preserves commit history):
