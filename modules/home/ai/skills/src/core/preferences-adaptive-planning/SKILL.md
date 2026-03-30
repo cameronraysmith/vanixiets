@@ -113,11 +113,12 @@ See `preferences-validation-assurance` for the full treatment of evidence qualit
 - *Core idea*: dependency graphs of work items are algebraic objects (partial orders, lattices) amenable to formal analysis — critical path computation, parallel front identification, incremental replanning.
 - *Key constructs*:
   - Topological sort: determines valid execution orderings.
-  - Anti-chains: maximal sets of mutually independent nodes = parallelizable work fronts.
+  - Antichains: maximal sets of mutually independent nodes = parallelizable work fronts.
   - Critical path: longest weighted path = minimum project duration. Determines where slack exists.
   - Graph homomorphisms: structural mappings between specification DAGs and implementation DAGs = traceability.
   - Incremental recomputation: when a spec node changes, the minimal subgraph requiring replanning is determinable (cf. build systems a la carte — Mokhov, Mitchell, Peyton Jones).
 - *References*: Mokhov, *Algebraic Graphs with Class* (Haskell Symposium, 2017); Mokhov, Mitchell & Peyton Jones, "Build Systems a la Carte" (ICFP, 2018); Davey & Priestley, *Introduction to Lattices and Order*.
+- *See also*: the diamond workflow in `~/.claude/skills/jj-version-control/SKILL.md` applies these algebraic structures to connect beads epic graphs to jj chain topology.
 
 ## Operational framework
 
@@ -176,7 +177,7 @@ Compound integration risk at high-fan-in nodes — the legitimate concern that m
 ### DAG-native issue tracking (Beads)
 
 - *Role*: reified execution plan — the dependency graph is the source of truth for what work exists, what's blocked, what's ready, and what's done.
-- *Key operations*: `bd ready` (anti-chain query), `bd claim` (atomic assignment), `bd tree` (dependency visualization), `bd close` (completion + unblock dependents).
+- *Key operations*: `bd ready` (antichain query), `bd claim` (atomic assignment), `bd tree` (dependency visualization), `bd close` (completion + unblock dependents).
 - *Integration pattern*: specification documents then (planning process) then Beads DAG then (agent execution) then implementation artifacts then (validation) then releasable increment.
 - Beads is a materialized view of the plan, not the plan itself. The authoritative specification lives in design documents, ADRs, or formal specs. Issues are derived from and traced back to these.
 
