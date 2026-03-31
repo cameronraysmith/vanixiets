@@ -23,7 +23,7 @@
         # Configure sops age key location using XDG paths
         # This provides cross-platform support and reuses the same age key
         # used by clan secrets (~/.config/sops/age/keys.txt)
-        sops.age.keyFile = "${config.xdg.configHome}/sops/age/keys.txt";
+        sops.age.keyFile = lib.mkDefault "${config.xdg.configHome}/sops/age/keys.txt";
 
         # Age plugins for hardware token support
         sops.age.plugins = [ pkgs.age-plugin-yubikey ];
