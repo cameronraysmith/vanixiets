@@ -9,7 +9,7 @@
       ];
       machineClass = "nixos";
       description = "Primary VPS, zerotier controller";
-      # deploy.targetHost = "root@cinnabar.zt";
+      deploy.targetHost = "root@cinnabar.zt";
     };
 
     electrum = {
@@ -21,7 +21,7 @@
       ];
       machineClass = "nixos";
       description = "Secondary test VM, zerotier peer";
-      # deploy.targetHost = "root@electrum.zt";
+      deploy.targetHost = "root@electrum.zt";
     };
 
     galena = {
@@ -33,7 +33,7 @@
       ];
       machineClass = "nixos";
       description = "GCP CPU node (e2-standard-8), zerotier peer";
-      # deploy.targetHost = "root@galena.zt";
+      deploy.targetHost = "root@galena.zt";
     };
 
     scheelite = {
@@ -46,7 +46,7 @@
       ];
       machineClass = "nixos";
       description = "GCP GPU node (n1-standard-8, T4), zerotier peer";
-      # deploy.targetHost = "root@scheelite.zt";
+      deploy.targetHost = "root@scheelite.zt";
     };
 
     blackphos = {
