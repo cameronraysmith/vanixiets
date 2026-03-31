@@ -9,8 +9,8 @@
 }:
 
 let
-  version = "0.62.0-unstable-2026-03-25";
-  rev = "6215721fc7be3bf31592e2f9d1486d4a53429c22";
+  version = "0.63.3-unstable-2026-03-30";
+  rev = "3fc9443f3cc05b7eac0eba5ab1983f63aec42382";
 in
 (buildGoModule.override { go = go_1_26; }) {
   pname = "beads";
@@ -31,10 +31,10 @@ in
     owner = "steveyegge";
     repo = "beads";
     inherit rev;
-    hash = "sha256-iOjDMEI7lIrvg8PEltxRWCxHB1ZThh975w+Uo7brMDw=";
+    hash = "sha256-ext3lwNSTIV4+nlqUq1pGwhCgj81Ep45/rlfBjR3g8s=";
   };
 
-  vendorHash = "sha256-yrIlyP2fOesS74NqwaDrBK37KCjh3N1DePiF8w9ubOk=";
+  vendorHash = "sha256-wDTa6E9kW6oV/Vz/CpWH3ZZnOwaw9/qdFHRdZwUY4P8=";
 
   nativeBuildInputs = [ makeWrapper ];
   buildInputs = [ icu ];
