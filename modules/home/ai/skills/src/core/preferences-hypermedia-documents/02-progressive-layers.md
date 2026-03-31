@@ -180,7 +180,7 @@ main::scroll-button(next) {
   content: "\2192";
 }
 
-section {
+main {
   scroll-marker-group: after;
 }
 section::scroll-marker {
