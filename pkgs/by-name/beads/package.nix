@@ -4,6 +4,7 @@
   fetchFromGitHub,
   go_1_26,
   icu,
+  makeWrapper,
   nix-update-script,
 }:
 
@@ -35,6 +36,7 @@ in
 
   vendorHash = "sha256-yrIlyP2fOesS74NqwaDrBK37KCjh3N1DePiF8w9ubOk=";
 
+  nativeBuildInputs = [ makeWrapper ];
   buildInputs = [ icu ];
 
   postPatch = ''
@@ -50,6 +52,11 @@ in
   ];
 
   subPackages = [ "cmd/bd" ];
+
+  postInstall = ''
+    wrapProgram $out/bin/bd \
+      --set BEADS_DOLT_SERVER_MODE 1
+  '';
 
   doCheck = false;
 
