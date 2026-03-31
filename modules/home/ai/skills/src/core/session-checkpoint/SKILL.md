@@ -425,6 +425,11 @@ bd dolt push
 The commit message should reference the primary issues checkpointed.
 For multi-issue sessions, summarize by category rather than listing every issue.
 
+### Step 10: generate session resume command
+
+Invoke `/meta-session-resume` to produce the `ccds -r` command and add it to atuin history.
+No arguments are needed — the skill auto-detects the session UUID via `$PPID`.
+
 ## Cynefin modulation within checkpoint
 
 Cynefin classification modulates how deeply this skill executes, not whether the worker enters the checkpoint phase.
