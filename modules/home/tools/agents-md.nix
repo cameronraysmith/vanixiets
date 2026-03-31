@@ -87,7 +87,9 @@
           - haskell development: ${skillsPath}/preferences-haskell-development/SKILL.md
           - typescript/node.js development: ${skillsPath}/preferences-typescript-nodejs-development/SKILL.md
           - react/ui development: ${skillsPath}/preferences-react-tanstack-ui-development/SKILL.md
+          - web platform foundations (15 properties, capability ladder, paradigm routing): ${skillsPath}/preferences-web-platform-foundations/SKILL.md
           - hypermedia/server-driven UI development: ${skillsPath}/preferences-hypermedia-development/SKILL.md
+          - hypermedia document authoring (presentations, SVG, MathML, standalone experiments): ${skillsPath}/preferences-hypermedia-documents/SKILL.md
           - scientific data visualization (figures, tables, diagrams, colormaps): ${skillsPath}/scientific-visualization/SKILL.md
           - text-to-visual iteration (compile-inspect-refine loop, SVG/PNG/PDF pipelines): ${skillsPath}/text-to-visual-iteration/SKILL.md
 
