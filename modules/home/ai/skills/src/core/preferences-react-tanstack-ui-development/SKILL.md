@@ -5,6 +5,12 @@ description: React and TanStack UI development patterns including component desi
 
 # React / TanStack UI development
 
+## Web platform context
+
+This skill describes the SPA (client-driven) paradigm.
+The SPA approach trades progressive enhancement, layered failure independence, and inspectability for client-side interactivity, offline capability, and complex client state management.
+See `~/.claude/skills/preferences-web-platform-foundations/SKILL.md` for the shared vocabulary of web platform properties and the paradigm routing framework that contextualizes this tradeoff.
+
 ## Architectural patterns alignment
 
 See @~/.claude/skills/preferences-architectural-patterns/SKILL.md for overarching principles.
