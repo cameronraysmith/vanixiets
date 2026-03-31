@@ -20,6 +20,9 @@ This guide covers server-first hypermedia architecture for building web applicat
 - SPA: `Server → JSON → Client framework → Virtual DOM → Render`
 
 This paradigm complements functional domain modeling by maintaining clear effect boundaries: pure domain logic (sync), application orchestration (async/SSE), and infrastructure (I/O).
+Side effects should be explicit in type signatures and isolated at boundaries to preserve compositionality.
+In Rust (Ironstar), the async/sync boundary is the effect boundary: if a function is `async`, it performs I/O; if sync, it is pure.
+The Decider pattern (fmodel-rust) enforces this structurally: `decide` and `evolve` are pure synchronous functions; all I/O occurs at the axum/Zenoh boundary.
 
 ## Contents
 
@@ -42,6 +45,9 @@ This paradigm complements functional domain modeling by maintaining clear effect
 - You want minimal client-side JavaScript and bundle sizes
 - Real-time updates are server-pushed (notifications, live data)
 
+**For standalone documents (no server):**
+When the document is self-contained and does not need server state (experiments, presentations, visualizations), see `~/.claude/skills/preferences-hypermedia-documents/SKILL.md` for the standalone authoring patterns that share the same design system and progressive enhancement approach.
+
 **Reconsider when:**
 - Application requires offline-first functionality
 - Ultra-low-latency interactions are critical (collaborative drawing, real-time gaming)
@@ -63,8 +69,19 @@ This paradigm complements functional domain modeling by maintaining clear effect
 - Python: htpy (type-safe), Jinja2 (ecosystem standard)
 - TypeScript: JSX/TSX with TypeScript
 
+**Reference implementations:**
+
+Ironstar (`~/projects/rust-workspace/ironstar`) is the canonical Rust integration of algebraic DDD with hypermedia architecture.
+It demonstrates the Decider pattern (fmodel-rust) for pure domain logic, embedded infrastructure (SQLite event store, Zenoh pub/sub, DuckDB analytics, moka cache), Open Props + CUBE CSS cascade layer architecture, hypertext lazy templates with datastar-rust SSE events, and Idris2 formal specifications for domain model verification.
+See the repo's CLAUDE.md for the authoritative architectural context.
+
+Stario (`~/projects/lakescope-workspace/stario`) is an illustrative Python 3.14+ framework for Datastar integration.
+It demonstrates the Go-style handler pattern `(Context, Writer) -> None`, declarative HTML element functions, `data`/`at` Datastar attribute helpers, and the Relay in-process pub/sub system for broadcasting events across SSE connections.
+
 ## Related documents
 
+- `~/.claude/skills/preferences-web-platform-foundations/SKILL.md` - shared vocabulary: 15 web platform properties, capability ladder, paradigm routing
+- `~/.claude/skills/preferences-hypermedia-documents/SKILL.md` - standalone document authoring (presentations, experiments, visualizations) without a server backend
 - `~/.claude/skills/preferences-theoretical-foundations/SKILL.md` - algebraic foundations: signals as comonads, web components as coalgebras, event sourcing as free monoids
 - `~/.claude/skills/preferences-architectural-patterns/SKILL.md` - onion/hexagonal architecture, effect boundaries
 - `~/.claude/skills/preferences-domain-modeling/SKILL.md` - functional domain modeling, smart constructors
