@@ -25,6 +25,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        hm-sops-bridge
         ssh-known-hosts
         dolt-sql-server
       ]);
@@ -92,6 +93,9 @@ in
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       services.openssh.settings.MaxAuthTries = 20;
+
+      # Bridge NixOS-level sops to home-manager for user secret key delivery
+      hm-sops-bridge.users.cameron.sopsIdentity = "crs58";
 
       # cameron home-manager module imports
       # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
