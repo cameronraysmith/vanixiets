@@ -35,12 +35,12 @@ Each purpose below identifies the relevant layers from the seven-layer progressi
 | Layer | Name | Key capabilities |
 |-------|------|-----------------|
 | 0 | Semantic HTML | Document structure, accessibility, SEO, zero-dependency baseline |
-| 1 | Basic CSS | Open Props tokens, CUBE CSS methodology, cascade layers |
-| 2 | Modern CSS | Container queries, `has()`, `light-dark()`, subgrid, nesting |
-| 3 | View transitions | Cross-page and same-document animated transitions |
-| 4 | Scroll-driven animations | Timeline-linked animations, scroll-snap navigation |
-| 5 | Minimal JS | `IntersectionObserver`, keyboard handlers, `matchMedia` listeners |
-| 6 | Lit web components | Shadow DOM islands for imperative rendering (canvas, WebGPU, charts) |
+| 1 | CSS scroll-snap | Paged navigation without JS, CSS counters, `:target` linking |
+| 2 | Modern CSS | `:has()`, `@starting-style`, container queries, `scroll-state()` detection |
+| 3 | View transitions | Same-document (baseline) and cross-document animated transitions |
+| 4 | Native carousel UI | `::scroll-marker`, `::scroll-button` (Chrome 142+, progressive) |
+| 5 | Minimal JS | Keyboard navigation, hash persistence, presenter timer |
+| 6 | Lit web components | Light DOM islands for data-driven DOM and imperative contexts (canvas, WebGPU, charts) |
 | 7 | Datastar / SSE | Server-connected reactivity (transitions to application domain) |
 
 ### Experimentation
@@ -71,12 +71,12 @@ Layers activated: 0, 2 (modern CSS), 6 (Lit web components for chart libraries, 
 Structure: modular directory with external SVG files and ES module imports.
 Visualization documents often skip the intermediate layers (1, 3-5) because CSS Grid and web components handle layout and interactivity directly.
 External SVG files are preferred over inline SVG when diagrams are complex enough to warrant separate authoring and version tracking.
-Lit web components wrap imperative rendering libraries (D3, Three.js, TypeGPU) to encapsulate their DOM manipulation within shadow DOM boundaries.
+Lit web components wrap imperative rendering libraries (D3, Three.js, TypeGPU) using Light DOM so that the document's CSS cascade and Open Props tokens flow through.
 
 ### Interactive demo
 
 Purpose: showcasing UI behavior, prototyping interactions, demonstrating web APIs.
-Layers activated: 0-3 (HTML through view transitions), 5-6 (JS and web components).
+Layers activated: 0, 2-3 (HTML, modern CSS, view transitions), 5-6 (JS and web components).
 Structure: modular directory or multi-page for multi-step demos.
 Multi-page demos use the view transitions API for cross-page navigation animations.
 Each page remains a standalone HTML document that functions without JavaScript, with progressive enhancement adding the transition layer.
@@ -93,16 +93,30 @@ Indicators that this boundary has been reached include: the need for authenticat
 
 The following principles govern all document types in this skill.
 
-- The web platform is the application framework. JavaScript is a guest in a hypermedia document.
-- Every layer must be a progressive enhancement: the document functions at every tier, from pure HTML to full interactivity. Removing any layer degrades gracefully rather than breaking the document.
-- CSS handles all presentation-layer reactivity. JS is reserved for the irreducible set (see `preferences-web-platform-foundations`). Scroll-driven animations, container queries, `light-dark()` theming, and view transitions are CSS-first capabilities that do not require JS polyfills in modern browsers.
-- Lit web components encapsulate imperative islands only where the DOM's declarative model ends. Typical imperative contexts include canvas rendering, WebGPU pipelines, and third-party library integration.
-- SVG files are human-readable, external assets imported by the document rather than generated blobs. They use `currentColor` and CSS custom properties to participate in the document's theming system.
-- Design decisions are evaluated against the 15 web platform properties (see `preferences-web-platform-foundations`). Each progressive enhancement layer's impact on these properties is documented in `02-progressive-layers.md`.
-- No build step is required for development. ES module imports via `<script type="module">` and CDN-hosted Open Props provide the module system. Build steps are a distribution concern (bundling, minification) applied only when shipping to production.
-- Signals, if used (via Datastar), live in the server. The frontend is a thin reactive layer. This principle applies only at the hybrid boundary (layer 7) and is detailed in `preferences-hypermedia-development`.
-- Accessibility is structural, not remedial. Semantic HTML (layer 0) provides the accessibility baseline. Subsequent layers must not degrade keyboard navigation, screen reader compatibility, or focus management.
-- Offline capability follows from the architecture. Documents that load Open Props from a vendored local file and use no server connectivity work entirely offline without a service worker.
+- The web platform is the application framework.
+  JavaScript is a guest in a hypermedia document.
+- Every layer must be a progressive enhancement: the document functions at every tier, from pure HTML to full interactivity.
+  Removing any layer degrades gracefully rather than breaking the document.
+- CSS handles all presentation-layer reactivity.
+  JS is reserved for the irreducible set (see `preferences-web-platform-foundations`).
+  Scroll-driven animations, container queries, `light-dark()` theming, and view transitions are CSS-first capabilities that do not require JS polyfills in modern browsers.
+- Lit web components encapsulate imperative islands only where the DOM's declarative model ends.
+  Typical imperative contexts include canvas rendering, WebGPU pipelines, and third-party library integration.
+- SVG files are human-readable, external assets imported by the document rather than generated blobs.
+  They use `currentColor` and CSS custom properties to participate in the document's theming system.
+- Design decisions are evaluated against the 15 web platform properties (see `preferences-web-platform-foundations`).
+  Each progressive enhancement layer's impact on these properties is documented in `02-progressive-layers.md`.
+- No build step is required for development.
+  ES module imports via `<script type="module">` and CDN-hosted Open Props provide the module system.
+  Build steps are a distribution concern (bundling, minification) applied only when shipping to production.
+- Signals, if used (via Datastar), live in the server.
+  The frontend is a thin reactive layer.
+  This principle applies only at the hybrid boundary (layer 7) and is detailed in `preferences-hypermedia-development`.
+- Accessibility is structural, not remedial.
+  Semantic HTML (layer 0) provides the accessibility baseline.
+  Subsequent layers must not degrade keyboard navigation, screen reader compatibility, or focus management.
+- Offline capability follows from the architecture.
+  Documents that load Open Props from a vendored local file and use no server connectivity work entirely offline without a service worker.
 
 ## Technology stack
 
@@ -123,7 +137,7 @@ These primitives use CSS custom properties for configuration, making them compos
 The `light-dark()` CSS function selects values based on the resolved color scheme.
 All custom colors use OKLch for perceptual uniformity across the lightness axis.
 
-*Web components:* Lit handles data-driven DOM updates in shadow-DOM-isolated islands.
+*Web components:* Lit handles data-driven DOM updates in Light DOM islands (see `01-design-system.md` for the Light DOM requirement).
 Bare `HTMLElement` extensions suffice for imperative contexts (canvas, WebGPU) that do not need Lit's reactive property system.
 All web components register with `customElements.define()` and degrade to their light DOM content when JS is unavailable.
 
