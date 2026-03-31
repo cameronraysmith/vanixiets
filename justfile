@@ -1752,6 +1752,53 @@ sops-rotate:
 update-all-keys:
   fd -e yaml -e json . secrets/ -x sops updatekeys -y {}
 
+# Provision a bridge secret for NixOS HM key delivery
+# Usage: just provision-bridge-key <sops-identity> [bw-item-name]
+# Examples:
+#   just provision-bridge-key raquel              -> looks up sops-raquel-user-ssh
+#   just provision-bridge-key crs58 sops-admin-user-ssh  -> uses explicit item name
+[group('sops')]
+provision-bridge-key identity bw_item=("sops-" + identity + "-user-ssh"):
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  if ! command -v bw &>/dev/null; then
+    echo "Error: bw (Bitwarden CLI) not found in PATH" >&2
+    exit 1
+  fi
+
+  if [ -z "${BW_SESSION:-}" ]; then
+    echo "Error: BW_SESSION not set. Run:" >&2
+    echo "  bw login          # if not logged in" >&2
+    echo "  export BW_SESSION=\$(bw unlock --raw)" >&2
+    exit 1
+  fi
+
+  mkdir -p secrets/bridge
+  target="secrets/bridge/{{identity}}-age-key.enc"
+
+  echo "Extracting age private key from Bitwarden item: {{bw_item}}"
+  bw get item "{{bw_item}}" 2>/dev/null \
+    | jq -r '.sshKey.privateKey' \
+    | ssh-to-age -private-key \
+    > "$target"
+
+  echo "Encrypting bridge secret to NixOS machine keys..."
+  sops encrypt --input-type binary --output-type binary --in-place "$target"
+
+  echo "Verifying..."
+  if [ ! -s "$target" ]; then
+    echo "Error: bridge secret is empty" >&2
+    exit 1
+  fi
+
+  echo "Bridge secret written to: $target"
+  echo ""
+  echo "Corresponding age public key:"
+  bw get item "{{bw_item}}" 2>/dev/null \
+    | jq -r '.sshKey.publicKey' \
+    | ssh-to-age
+
 # Load SOPS launchd agent for standalone home-manager (darwin only, one-time setup)
 [group('sops')]
 sops-load-agent:
