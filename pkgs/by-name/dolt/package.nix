@@ -9,18 +9,18 @@
 
 (buildGoModule.override { go = go_1_26; }) (finalAttrs: {
   pname = "dolt";
-  version = "1.84.0";
+  version = "1.84.1";
 
   src = fetchFromGitHub {
     owner = "dolthub";
     repo = "dolt";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-EEPNMR71KTpVSy1Heq5jWMIRAfq7ZxOu9FxD+Fk6G7U=";
+    hash = "sha256-gV5KqBo3Sk+oUER/VOgQVwnCucc4IZF/QmqZRTddI04=";
   };
 
   modRoot = "./go";
   subPackages = [ "cmd/dolt" ];
-  vendorHash = "sha256-KnifekukBs7pqklR/pxdgCiQAl+uHX2rgHEC2Vy9cCY=";
+  vendorHash = "sha256-SRwxzkBNNVnGVDDhi3YR4ZXY1q2O78S2I+kp79Wh+50=";
   proxyVendor = true;
   doCheck = false;
 
