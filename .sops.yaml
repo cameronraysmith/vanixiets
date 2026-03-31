@@ -17,6 +17,12 @@ keys:
   - &blackphos age1ez8lkukzdjn8vqj8ly4k5y9eql5gz00mwyz3h2qhkh5m5tdzmc3swxkmdq   # from sops-blackphos-ssh
   - &orb-nixos age140evke8tz6a8k8h04rqfxvxvzkkz5wc9femda0xthwzlk227dpwqsl7zfc   # from sops-orb-nixos-ssh
 
+  # NixOS machine age keys (clan vars, deployed to /var/lib/sops-nix/key.txt)
+  - &cinnabar age1j3wqa539kjrdtthzm8qep0f2llsycs5wz8g0v7596jrkj60qjdnq4acjaj
+  - &electrum age195r8vrsxqxmljgmxf3reeqyxzj2lh6mldxep8uf7npjs2f2e7q7shxlsfp
+  - &galena age1jlzegwjhm0kkk5l9qm4s8m0z4fcxvngwlfpzxsjfhq0h8yschehsf72cg7
+  - &scheelite age19udvgudt36yapax0uup3yc6qsqsa62x59sg689jlpp8uhsdv89mq90z3ta
+
 creation_rules:
   # Per-user signing keys (minimal encryption - only that user + dev + admin)
   - path_regex: secrets/users/admin-user/signing-key\.yaml$
@@ -77,6 +83,16 @@ creation_rules:
         - *admin
         - *dev
         - *christophersmith-user
+
+  # Bridge secrets (NixOS machine age keys decrypt user age keys for HM)
+  - path_regex: secrets/bridge/.*
+    key_groups:
+      - age:
+        - *admin
+        - *cinnabar
+        - *electrum
+        - *galena
+        - *scheelite
 
   # Host-specific secrets
   - path_regex: secrets/hosts/stibnite/.*\.yaml$
