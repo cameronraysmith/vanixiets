@@ -38,7 +38,7 @@ my-document/
 The main stylesheet uses `@import` with layer assignment to compose the cascade:
 
 ```css
-@layer openprops, normalize, theme, compositions, utilities, blocks, exceptions;
+@layer openprops, normalize, theme, compositions, blocks, utilities, exceptions;
 @import "../../vendor/open-props.min.css" layer(openprops);
 @import "theme.css" layer(theme);
 @import "compositions.css" layer(compositions);
