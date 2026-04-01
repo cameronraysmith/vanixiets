@@ -44,15 +44,18 @@
         # Create symlink from sops secret to atuin's expected location at activation time
         # sops secret path: config.sops.secrets.atuin-key.path (available after activation)
         # atuin expects: ~/.local/share/atuin/key
-        home.activation.deployAtuinKey = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          atuinKeyPath="${config.home.homeDirectory}/.local/share/atuin/key"
-          sopsKeyPath="${config.sops.secrets.atuin-key.path}"
+        # Guard: only deploy when atuin-key secret is declared (not all users have it)
+        home.activation.deployAtuinKey = lib.mkIf (config.sops.secrets ? atuin-key) (
+          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+            atuinKeyPath="${config.home.homeDirectory}/.local/share/atuin/key"
+            sopsKeyPath="${config.sops.secrets.atuin-key.path}"
 
-          $DRY_RUN_CMD mkdir -p "$(dirname "$atuinKeyPath")"
-          if [ -f "$sopsKeyPath" ]; then
-            $DRY_RUN_CMD ln -sf "$sopsKeyPath" "$atuinKeyPath"
-          fi
-        '';
+            $DRY_RUN_CMD mkdir -p "$(dirname "$atuinKeyPath")"
+            if [ -f "$sopsKeyPath" ]; then
+              $DRY_RUN_CMD ln -sf "$sopsKeyPath" "$atuinKeyPath"
+            fi
+          ''
+        );
       };
   };
 }
