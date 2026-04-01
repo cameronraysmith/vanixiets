@@ -129,8 +129,10 @@ in
           flakeModulesHome.tools
           inputs.lazyvim-nix.homeManagerModules.default
           inputs.nix-index-database.homeModules.nix-index
+          ../../../home/modules/_agents-md.nix
         ];
         home.username = "tara";
+        programs.agents-md.enable = false;
       };
     };
 }
