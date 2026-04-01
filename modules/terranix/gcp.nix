@@ -144,7 +144,7 @@
             initialize_params = {
               # Debian 12 image for NixOS installation (same as Hetzner pattern)
               image = "debian-cloud/debian-12";
-              size = 50; # GB, default size
+              size = 100; # GB, default size
             };
           };
 
