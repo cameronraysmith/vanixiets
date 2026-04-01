@@ -29,7 +29,7 @@
       # =========================================
       machines = {
         galena = {
-          enabled = false;
+          enabled = true;
           machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
           zone = "us-central1-b";
           image = "debian-12";
