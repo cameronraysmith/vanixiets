@@ -4,7 +4,7 @@
 { ... }:
 {
   flake.modules.homeManager.tools =
-    { config, ... }:
+    { config, lib, ... }:
     let
       # Base path for skills (without @ prefix)
       # The @ prefix must be added when referencing to enable auto-loading
@@ -16,7 +16,7 @@
       #
       # Auto-loading requires @ prefix on full paths in generated CLAUDE.md
       programs.agents-md = {
-        enable = true;
+        enable = lib.mkDefault true;
         settings.body = ''
           # Session Protocol
 
