@@ -9,7 +9,7 @@ Documents use CSS cascade layers to establish a deterministic specificity order.
 The layer declaration goes at the top of the main stylesheet, before any other rules:
 
 ```css
-@layer openprops, normalize, theme, compositions, utilities, blocks, exceptions;
+@layer openprops, normalize, theme, compositions, blocks, utilities, exceptions;
 ```
 
 Each layer serves a distinct role in the cascade.
@@ -26,15 +26,16 @@ Semantic tokens like `--color-text` and `--color-surface` are defined here, deco
 The `compositions` layer holds layout primitives following the Every Layout patterns.
 These are structural skeletons that control spatial arrangement without opinions about decoration.
 
-The `utilities` layer provides single-property utility classes bound to Open Props tokens.
-Each utility applies exactly one property.
-
 The `blocks` layer styles semantic content types, the meaningful "things" in a document such as slides, code blocks, diagrams, and callouts.
+
+The `utilities` layer provides single-property utility classes bound to Open Props tokens.
+Each utility applies exactly one property, and utilities override block defaults when both apply to the same element.
 
 The `exceptions` layer handles per-context overrides via `data-*` attributes.
 These are state-specific or variant-specific adjustments that need the highest layer priority.
 
-This layer ordering mirrors the CSS architecture used by Ironstar (`~/projects/rust-workspace/ironstar`), ensuring consistency between standalone documents and server-connected applications.
+This layer ordering follows the same priority hierarchy as Ironstar (`~/projects/rust-workspace/ironstar`), which uses `components, utilities, app` for the equivalent positions.
+The document skill uses CUBE CSS terminology (`blocks`, `utilities`, `exceptions`) while preserving the same cascade semantics: utilities override blocks, exceptions override everything.
 
 ## Open Props design tokens
 
