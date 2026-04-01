@@ -30,7 +30,9 @@
           mode = "0400";
           path = "${config.xdg.configHome}/git/allowed_signers";
           content = ''
-            17519396+tarachari3@users.noreply.github.com namespaces="git" ${config.sops.placeholder."ssh-public-key"}
+            17519396+tarachari3@users.noreply.github.com namespaces="git" ${
+              config.sops.placeholder."ssh-public-key"
+            }
           '';
         };
       };
