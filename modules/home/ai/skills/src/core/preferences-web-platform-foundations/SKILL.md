@@ -241,6 +241,7 @@ A reference table of modern CSS features relevant to architectural decisions, wi
 | `@container scroll-state()` | Chrome 133+ only | Active scroll-snap target detection without JS |
 | `::scroll-marker` / `::scroll-button` | Chrome 142+ only | Native carousel navigation |
 | Cross-document view transitions | Chrome/Edge/Safari, no Firefox | Animated MPA page navigation |
+| `color-mix()` | Widely Available | Color blending without preprocessors |
 | Scroll-driven animations | Chrome/Edge/Safari | Scroll-linked visual effects |
 | CSS `if()` function | Chrome 137+ only | Conditional property values |
 
