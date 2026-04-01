@@ -159,8 +159,13 @@ Reference symbols in HTML:
 <svg width="24" height="24"><use href="sprites.svg#icon-check" /></svg>
 ```
 
+**CSS `background-image: url(diagram.svg)`** — decorative, no DOM presence.
+The SVG renders as a background with no semantic meaning, no alt text, and no cascade access.
+Use for decorative patterns, watermarks, or backgrounds where the SVG is purely ornamental and should not appear in the accessibility tree.
+
 For themed diagrams, prefer inline `<svg>` or `<use href>` with `currentColor`.
 For static illustrations, prefer `<img>`.
+For decorative graphics without semantic meaning, prefer CSS `background-image`.
 For modular documents, prefer external SVG imported via `<use href>` and fall back to inline when full cascade access is needed.
 
 ### SVG animation
@@ -228,6 +233,9 @@ In those cases, consider KaTeX (faster, smaller footprint) or MathJax (more comp
 `<mtable>`, `<mtr>`, and `<mtd>` form matrices and aligned equation systems analogous to HTML tables.
 
 `<mspace>` inserts explicit horizontal or vertical space.
+
+`<mphantom>` renders its children invisibly while preserving their layout dimensions.
+This is useful for aligning expressions across lines in multi-line derivations where corresponding terms should occupy the same horizontal position.
 
 ### Inline and display math
 
@@ -356,6 +364,7 @@ The "layer" column references the progressive enhancement layers defined in the 
 | PDF export | `@media print` with `break-after: page` | 1 |
 | Touying pause/meanwhile reducers | `@starting-style` + animation-delay staggering | 2/5 |
 | Outline slides | `<nav>` with anchor links to section IDs | 0 |
+| Slide numbering (`#set slide(numbering:)` / `\setbeamertemplate{frame number}`) | CSS counters (`counter-reset`, `counter-increment`, `content: counter()`) or JS slide counter | 0/5 |
 | Progress bar footer | CSS counter or `::scroll-marker` (layer 4) | 1/4 |
 
 The web approach trades Typst's precise typographic control for progressive enhancement, addressability, and platform-native rendering.
