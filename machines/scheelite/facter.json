@@ -377,16 +377,16 @@
         "resources": [
           {
             "type": "disk_geo",
-            "cylinders": 51200,
-            "heads": 64,
-            "sectors": 32,
+            "cylinders": 13054,
+            "heads": 255,
+            "sectors": 63,
             "size": "0x0",
             "geo_type": "logical"
           },
           {
             "type": "size",
             "unit": "sectors",
-            "value_1": 104857600,
+            "value_1": 209715200,
             "value_2": 512
           }
         ],
@@ -519,7 +519,7 @@
           {
             "type": "mem",
             "base": 0,
-            "range": 31540715520,
+            "range": 31540711424,
             "enabled": true,
             "access": "read_write",
             "prefetch": "unknown"
@@ -590,29 +590,6 @@
     "network_interface": [
       {
         "index": 27,
-        "attached_to": 0,
-        "class_list": [
-          "network_interface"
-        ],
-        "base_class": {
-          "hex": "0107",
-          "name": "Network Interface",
-          "value": 263
-        },
-        "sub_class": {
-          "hex": "0000",
-          "name": "Loopback",
-          "value": 0
-        },
-        "model": "Loopback network interface",
-        "sysfs_id": "/class/net/lo",
-        "unix_device_name": "lo",
-        "unix_device_names": [
-          "lo"
-        ]
-      },
-      {
-        "index": 28,
         "attached_to": 19,
         "class_list": [
           "network_interface"
@@ -651,6 +628,29 @@
         ],
         "driver_modules": [
           "virtio_net"
+        ]
+      },
+      {
+        "index": 28,
+        "attached_to": 0,
+        "class_list": [
+          "network_interface"
+        ],
+        "base_class": {
+          "hex": "0107",
+          "name": "Network Interface",
+          "value": 263
+        },
+        "sub_class": {
+          "hex": "0000",
+          "name": "Loopback",
+          "value": 0
+        },
+        "model": "Loopback network interface",
+        "sysfs_id": "/class/net/lo",
+        "unix_device_name": "lo",
+        "unix_device_names": [
+          "lo"
         ]
       }
     ],
