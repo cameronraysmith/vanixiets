@@ -11,6 +11,7 @@ keys:
   - &raquel-user age12w0rmmskrds6m334w7qrcmpms5lpe3llah6wf8ry5jtatvuxku2sarl8ut  # from sops-raquel-user-ssh (raquel)
   - &janettesmith-user age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec  # derived from SSH key via ssh-to-age
   - &christophersmith-user age1xz7gmqx7m0pn8u2nq8x05efq6dj52ym6c9gat5xj4am6x9sauq6sfzd2fn  # derived from SSH key via ssh-to-age
+  - &tara-user age1krkf4ht5r2uufp0qkj6eu7pj9j04n7lz0tjlazmqzc3lhnjqt99sam42yp  # from sops-tara-user-ssh in Bitwarden
 
   # Host keys (generated in Bitwarden, deployed to /etc/ssh/)
   - &stibnite age1a696klqy0s36a2pzlk6kyckp60k88qxcrsdh829dtk3xtc7sfs4scg05k0     # from sops-stibnite-ssh
@@ -83,6 +84,13 @@ creation_rules:
         - *admin
         - *dev
         - *christophersmith-user
+
+  - path_regex: secrets/home-manager/users/tara/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *dev
+        - *tara-user
 
   # Bridge secrets (NixOS machine age keys decrypt user age keys for HM)
   - path_regex: secrets/bridge/.*
