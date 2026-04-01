@@ -99,6 +99,7 @@ in
 
       # Bridge NixOS-level sops to home-manager for user secret key delivery
       hm-sops-bridge.users.cameron.sopsIdentity = "crs58";
+      hm-sops-bridge.users.tara.sopsIdentity = "tara";
 
       # cameron home-manager module imports
       # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
@@ -118,6 +119,23 @@ in
           ../../../home/modules/_agents-md.nix
         ];
         home.username = "cameron";
+      };
+
+      # tara home-manager module imports (ML researcher, no AI agent tooling)
+      home-manager.users.tara = {
+        imports = [
+          flakeModulesHome."users/tara"
+          flakeModulesHome.base-sops
+          flakeModulesHome.core
+          flakeModulesHome.development
+          flakeModulesHome.packages
+          flakeModulesHome.shell
+          flakeModulesHome.terminal
+          flakeModulesHome.tools
+          inputs.lazyvim-nix.homeManagerModules.default
+          inputs.nix-index-database.homeModules.nix-index
+        ];
+        home.username = "tara";
       };
     };
 }
