@@ -39,6 +39,13 @@
           "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIePSVx5J/JJ5eN4PSryuL7iP8WXow/SsZOIr96qnKP0"
         ];
       };
+
+      # tara: external ML researcher on scheelite/galena
+      tara = {
+        sshKeys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHwVoxa3ZO+DA+Tun3vthf2oiY2itTqSA5t9lm5Ac8vg"
+        ];
+      };
     };
     # mdFormat helper for markdown files with YAML frontmatter
     # Type: submodule with metadata (YAML frontmatter) and body (markdown content)
