@@ -9,13 +9,29 @@
     "enabled": true
   },
   "labels": ["dependencies"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["flake.nix"],
+      "matchStrings": [
+        "playwright-web-flake\\.url\\s*=\\s*\"github:(?<depName>[^/]+/[^/]+)/(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-tags"
+    }
+  ],
   "packageRules": [
+    {
+      "description": "Disable nix manager for playwright-web-flake to avoid conflict with custom regex manager",
+      "matchManagers": ["nix"],
+      "matchPackageNames": ["playwright-web-flake"],
+      "enabled": false
+    },
     {
       "description": "Group playwright across npm and flake.nix into a single PR",
       "matchPackageNames": [
         "playwright",
         "@playwright/test",
-        "playwright-web-flake"
+        "pietdevries94/playwright-web-flake"
       ],
       "groupName": "playwright"
     },
