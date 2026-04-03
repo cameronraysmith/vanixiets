@@ -90,7 +90,7 @@
       # whitelist-controller).
       systemd.services.zerotierone.serviceConfig.ExecStartPost = [
         "+${pkgs.writeShellScript "pin-controller-ipv4" ''
-          NETWORK_ID="${config.clan.core.networking.zerotier.networkId}"
+          NETWORK_ID="${config.clan.core.vars.generators.zerotier-controller.files.zerotier-network-id.value}"
           MEMBER_ID=$(${pkgs.zerotierone}/bin/zerotier-cli info | ${pkgs.gawk}/bin/awk '{print $3}')
           AUTH=$(cat /var/lib/zerotier-one/authtoken.secret)
           IPV6="fddb:4344:343b:14b9:399:93db:4344:343b"
