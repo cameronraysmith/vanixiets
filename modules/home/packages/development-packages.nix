@@ -39,6 +39,7 @@
           cachix
           deadnix
           nil
+          nix-eval-jobs
           nix-info
           nix-output-monitor
           nix-prefetch-scripts
