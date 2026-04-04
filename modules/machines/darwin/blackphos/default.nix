@@ -79,7 +79,7 @@ in
         enable = true;
 
         additionalCasks = [
-          "codelayer-nightly"
+          "riptide-beta"
           "dbeaver-community"
           "docker-desktop"
           "gitbutler"

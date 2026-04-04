@@ -87,7 +87,7 @@ in
         enable = true;
 
         additionalCasks = [
-          "codelayer-nightly"
+          "riptide-beta"
           "dbeaver-community"
           # "docker-desktop" # defer to orbstack and colima/incus
           "gitbutler"
