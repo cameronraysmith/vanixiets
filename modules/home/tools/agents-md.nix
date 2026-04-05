@@ -56,6 +56,7 @@
           - session review (progress assessment, gap analysis): ${skillsPath}/session-review/SKILL.md
           - session checkpointing (state capture, handoff narrative, surprise evaluation): ${skillsPath}/session-checkpoint/SKILL.md
           - session resumption (resume command, atuin history, session continuation): ${skillsPath}/meta-session-resume/SKILL.md
+          - session search (session transcript discovery, keyword intersection): ${skillsPath}/meta-search-sessions/SKILL.md
           - architectural patterns: ${skillsPath}/preferences-architectural-patterns/SKILL.md
           - architecture diagramming (C4, format selection, diagram compendium): ${skillsPath}/preferences-architecture-diagramming/SKILL.md
           - functional domain modeling (DDD, types, aggregates): ${skillsPath}/preferences-domain-modeling/SKILL.md
