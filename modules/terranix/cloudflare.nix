@@ -41,5 +41,15 @@
         location = "enam";
       };
 
+      # DNS CNAME record for niks3 cache endpoint (resolves to magnetite)
+      resource.cloudflare_dns_record.niks3 = {
+        zone_id = config.data.cloudflare_zone.scientistexperience "id";
+        name = "niks3";
+        type = "CNAME";
+        content = "magnetite.scientistexperience.net";
+        ttl = 1; # automatic
+        proxied = false;
+      };
+
     };
 }
