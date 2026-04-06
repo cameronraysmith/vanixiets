@@ -23,6 +23,7 @@ in
         inputs.srvos.nixosModules.hardware-hetzner-cloud
         inputs.srvos.nixosModules.mixins-nginx
         inputs.home-manager.nixosModules.home-manager
+        inputs.niks3.nixosModules.niks3
       ]
       ++ (with flakeModules; [
         base

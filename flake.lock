@@ -709,6 +709,33 @@
         "type": "github"
       }
     },
+    "niks3": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "process-compose": "process-compose",
+        "treefmt-nix": [
+          "treefmt-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1775508048,
+        "narHash": "sha256-aCwY+sgXPC4/Dr/+FQKWLjwk+uWt/TAuoG025fpc+Mk=",
+        "owner": "Mic92",
+        "repo": "niks3",
+        "rev": "2789fcd5fef3c0629f77fa945b8017812a937ae0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Mic92",
+        "repo": "niks3",
+        "type": "github"
+      }
+    },
     "nix-darwin": {
       "inputs": {
         "nixpkgs": [
@@ -1171,6 +1198,21 @@
         "type": "github"
       }
     },
+    "process-compose": {
+      "locked": {
+        "lastModified": 1767863885,
+        "narHash": "sha256-XXekPAxzbv1DmHFo3Elmj/vDnvWc1V0jdDUvM0/Wf7k=",
+        "owner": "Platonic-Systems",
+        "repo": "process-compose-flake",
+        "rev": "99bea96cf269cfd235833ebdf645b567069fd398",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Platonic-Systems",
+        "repo": "process-compose-flake",
+        "type": "github"
+      }
+    },
     "pyproject-build-systems": {
       "inputs": {
         "nixpkgs": [
@@ -1240,6 +1282,7 @@
         "lazyvim-nix": "lazyvim-nix",
         "llm-agents": "llm-agents",
         "mac-app-util": "mac-app-util",
+        "niks3": "niks3",
         "nix-darwin": "nix-darwin",
         "nix-index-database": "nix-index-database",
         "nix-rosetta-builder": "nix-rosetta-builder",
