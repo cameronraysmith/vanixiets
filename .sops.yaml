@@ -94,10 +94,13 @@ creation_rules:
         - *tara-user
 
   # Bridge secrets (NixOS machine age keys decrypt user age keys for HM)
+  # dev + admin-user required for local re-encryption when adding machines
   - path_regex: secrets/bridge/.*
     key_groups:
       - age:
         - *admin
+        - *dev
+        - *admin-user
         - *cinnabar
         - *electrum
         - *galena
