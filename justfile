@@ -358,26 +358,27 @@ update-package package="atuin-format":
 
 ## terraform/terranix
 
-# Run terraform apply (removes stale lockfile first to sync with nix-provided providers)
+# Initialize terraform (shared by plan/apply/destroy)
 [group('terraform')]
-terraform *ARGS:
+terraform-init:
   rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
-  {{nix_cmd}} run .#terraform -- {{ARGS}}
+  {{nix_cmd}} run .#terraform.terraform -- init -input=false
 
-# Run terraform plan only
+# Run terraform apply with argument passthrough
 [group('terraform')]
-terraform-plan *ARGS:
-  rosetta-manage --stop
-  rm -f terraform/.terraform.lock.hcl
-  {{nix_cmd}} run .#terraform.plan -- {{ARGS}}
+terraform *ARGS: terraform-init
+  {{nix_cmd}} run .#terraform.terraform -- apply {{ARGS}}
 
-# Run terraform destroy
+# Run terraform plan with argument passthrough
 [group('terraform')]
-terraform-destroy *ARGS:
-  rosetta-manage --stop
-  rm -f terraform/.terraform.lock.hcl
-  {{nix_cmd}} run .#terraform.destroy -- {{ARGS}}
+terraform-plan *ARGS: terraform-init
+  {{nix_cmd}} run .#terraform.terraform -- plan {{ARGS}}
+
+# Run terraform destroy with argument passthrough
+[group('terraform')]
+terraform-destroy *ARGS: terraform-init
+  {{nix_cmd}} run .#terraform.terraform -- destroy {{ARGS}}
 
 ## clan
 # Commands for clan-based machine management (deferred module composition+clan architecture)
