@@ -90,6 +90,12 @@
             extraOptions.HostKeyAlias = "scheelite.zt";
           };
 
+          "magnetite.zt" = {
+            hostname = "fddb:4344:343b:14b9:399:930f:39db:40d2";
+            user = "cameron";
+            extraOptions.HostKeyAlias = "magnetite.zt";
+          };
+
           "pixel7.zt" = {
             hostname = "fddb:4344:343b:14b9:399:939f:c45d:577c";
             port = 8022; # Termux sshd default

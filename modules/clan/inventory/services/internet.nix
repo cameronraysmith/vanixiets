@@ -11,7 +11,6 @@
     # GCP IPs are ephemeral - update after each enable/deploy cycle
     roles.default.machines.galena.settings.host = "35.206.81.165";
     roles.default.machines.scheelite.settings.host = "35.208.97.48";
-    # Placeholder IP - update after initial provisioning
-    roles.default.machines.magnetite.settings.host = "0.0.0.0";
+    roles.default.machines.magnetite.settings.host = "49.12.12.74";
   };
 }

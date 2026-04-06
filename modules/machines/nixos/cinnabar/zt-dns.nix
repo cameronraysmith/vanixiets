@@ -49,6 +49,7 @@
             "/blackphos.zt/fddb:4344:343b:14b9:399:930e:e971:d9e0"
             "/argentum.zt/fddb:4344:343b:14b9:399:93f7:54d5:ad7e"
             "/rosegold.zt/fddb:4344:343b:14b9:399:9315:3431:ee8"
+            "/magnetite.zt/fddb:4344:343b:14b9:399:930f:39db:40d2"
           ];
         };
       };
