@@ -18,6 +18,7 @@
     roles.default.machines."rosegold" = { };
     roles.default.machines."galena" = { };
     roles.default.machines."scheelite" = { };
+    roles.default.machines."magnetite" = { };
 
     roles.default.settings = {
       user = "cameron";
