@@ -34,14 +34,5 @@
         };
       };
 
-      # DNS A record for magnetite server
-      resource.cloudflare_dns_record.magnetite = {
-        zone_id = config.data.cloudflare_zone.scientistexperience "id";
-        name = "magnetite";
-        type = "A";
-        content = config.resource.hcloud_server.magnetite "ipv4_address";
-        ttl = 1; # automatic
-        proxied = false;
-      };
     };
 }

@@ -67,6 +67,16 @@
         ];
       }) enabledMachines;
 
+      # DNS A records for enabled Hetzner servers
+      resource.cloudflare_dns_record = lib.mapAttrs (name: _cfg: {
+        zone_id = config.data.cloudflare_zone.scientistexperience "id";
+        inherit name;
+        type = "A";
+        content = config.resource.hcloud_server.${name} "ipv4_address";
+        ttl = 1; # automatic
+        proxied = false;
+      }) enabledMachines;
+
       # Provision NixOS via clan machines install (generated from enabled machines)
       resource.null_resource = lib.mapAttrs' (
         name: cfg:
