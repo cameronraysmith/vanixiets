@@ -1169,7 +1169,7 @@
           "range": 16
         },
         "unix_device_names": [
-          "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_115309557",
+          "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_115317415",
           "/dev/disk/by-path/pci-0000:06:00.0-scsi-0:0:0:0",
           "/dev/sda"
         ],
@@ -1511,7 +1511,7 @@
           {
             "type": "mem",
             "base": 0,
-            "range": 32861732864,
+            "range": 32861724672,
             "enabled": true,
             "access": "read_write",
             "prefetch": "unknown"
