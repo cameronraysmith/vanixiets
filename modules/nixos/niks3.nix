@@ -59,5 +59,36 @@
             key convert-secret-to-public < $out/key > $out/key.pub
         '';
       };
+
+      # niks3 service configuration with Cloudflare R2 backend
+      services.niks3 = {
+        enable = true;
+        httpAddr = "127.0.0.1:5752";
+
+        cacheUrl = "https://niks3.scientistexperience.net";
+
+        # Cloudflare R2 configuration (S3-compatible)
+        s3 = {
+          endpoint = "1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com";
+          bucket = "sciexp-nix-cache";
+          region = "auto";
+          useSSL = true;
+          accessKeyFile = config.clan.core.vars.generators.niks3-s3.files."access-key".path;
+          secretKeyFile = config.clan.core.vars.generators.niks3-s3.files."secret-key".path;
+        };
+
+        # PostgreSQL for closure tracking and GC state
+        database.createLocally = true;
+
+        # API authentication token
+        apiTokenFile = config.clan.core.vars.generators.niks3-api-token.files."token".path;
+
+        # Cache signing key
+        signKeyFiles = [ config.clan.core.vars.generators.niks3-signing-key.files."key".path ];
+
+        # nginx reverse proxy with ACME TLS
+        nginx.enable = true;
+        nginx.domain = "niks3.scientistexperience.net";
+      };
     };
 }
