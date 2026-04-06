@@ -17,6 +17,7 @@
         p.hashicorp_tls
         p.hetznercloud_hcloud
         p.hashicorp_google
+        p.cloudflare_cloudflare
       ]);
     in
     {
@@ -27,6 +28,7 @@
             self.modules.terranix.base
             self.modules.terranix.hetzner
             self.modules.terranix.gcp
+            self.modules.terranix.cloudflare
           ];
           terraformWrapper.package = package;
           terraformWrapper.extraRuntimeInputs = [ inputs'.clan-core.packages.default ];
@@ -61,7 +63,7 @@
       packages.terraform = lib.mkForce (
         config.terranix.terranixConfigurations.terraform.result.app.overrideAttrs (old: {
           meta = (old.meta or { }) // {
-            description = "OpenTofu with Hetzner Cloud and GCP providers and encrypted state";
+            description = "OpenTofu with Hetzner Cloud, GCP, and Cloudflare providers and encrypted state";
           };
         })
       );
