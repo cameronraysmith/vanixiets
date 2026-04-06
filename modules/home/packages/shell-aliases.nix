@@ -52,7 +52,8 @@
         nb = "nix build --json --no-link --print-build-logs";
         nix-hash = "get_nix_hash";
         s = "sesh connect \"$(sesh list -i | gum filter --limit 1 --placeholder 'Pick a sesh' --prompt='⚡')\"";
-        s5b2 = "s5cmd --profile b2 --endpoint-url https://s3.us-east-005.backblazeb2.com";
+        s5b2 = "s5cmd --profile b2";
+        s5r2 = "s5cmd --profile r2";
 
         cfn = "cleanfn";
       };
