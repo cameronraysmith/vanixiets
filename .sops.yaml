@@ -23,6 +23,7 @@ keys:
   - &electrum age195r8vrsxqxmljgmxf3reeqyxzj2lh6mldxep8uf7npjs2f2e7q7shxlsfp
   - &galena age1jlzegwjhm0kkk5l9qm4s8m0z4fcxvngwlfpzxsjfhq0h8yschehsf72cg7
   - &scheelite age19udvgudt36yapax0uup3yc6qsqsa62x59sg689jlpp8uhsdv89mq90z3ta
+  - &magnetite age1a7a70qcpjemlvk6q4uaf4k77p9eq7lj7wcal5jdj3xuetznyqdrs3mfnsf
 
 creation_rules:
   # Per-user signing keys (minimal encryption - only that user + dev + admin)
@@ -101,6 +102,7 @@ creation_rules:
         - *electrum
         - *galena
         - *scheelite
+        - *magnetite
 
   # Host-specific secrets
   - path_regex: secrets/hosts/stibnite/.*\.yaml$
