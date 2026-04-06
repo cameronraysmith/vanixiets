@@ -34,5 +34,12 @@
         };
       };
 
+      # R2 bucket for nix binary cache (niks3)
+      resource.cloudflare_r2_bucket.sciexp-nix-cache = {
+        account_id = config.data.cloudflare_zone.scientistexperience "account.id";
+        name = "sciexp-nix-cache";
+        location = "enam";
+      };
+
     };
 }
