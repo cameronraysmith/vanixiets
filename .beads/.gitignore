@@ -8,6 +8,7 @@ dolt-server.port
 bd.sock
 bd.sock.startlock
 sync-state.json
+interactions.jsonl
 last-touched
 
 # Local version tracking (prevents upgrade notification spam after git ops)
