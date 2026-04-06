@@ -17,6 +17,10 @@
       imports = [ config.flake.modules.nixos."machines/nixos/scheelite" ];
     };
 
+    magnetite = {
+      imports = [ config.flake.modules.nixos."machines/nixos/magnetite" ];
+    };
+
     blackphos = {
       imports = [ config.flake.modules.darwin."machines/darwin/blackphos" ];
     };

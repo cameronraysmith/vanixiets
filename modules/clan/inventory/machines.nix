@@ -49,6 +49,18 @@
       deploy.targetHost = "root@scheelite.zt";
     };
 
+    magnetite = {
+      tags = [
+        "nixos"
+        "cloud"
+        "hetzner"
+        "peer"
+      ];
+      machineClass = "nixos";
+      description = "Build infrastructure server (niks3, buildbot, Gitea)";
+      deploy.targetHost = "root@magnetite.zt";
+    };
+
     blackphos = {
       tags = [
         "darwin"
