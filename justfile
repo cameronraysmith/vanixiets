@@ -358,24 +358,31 @@ update-package package="atuin-format":
 
 ## terraform/terranix
 
-# Initialize terraform (shared by plan/apply/destroy)
+# Run terraform via terranix flake app (init + apply, no argument passthrough)
+[group('terraform')]
+terraform *ARGS:
+  rosetta-manage --stop
+  rm -f terraform/.terraform.lock.hcl
+  {{nix_cmd}} run .#terraform -- {{ARGS}}
+
+# Initialize terraform
 [group('terraform')]
 terraform-init:
   rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
   {{nix_cmd}} run .#terraform.terraform -- init -input=false
 
-# Run terraform apply with argument passthrough
-[group('terraform')]
-terraform *ARGS: terraform-init
-  {{nix_cmd}} run .#terraform.terraform -- apply {{ARGS}}
-
-# Run terraform plan with argument passthrough
+# Save terraform plan for review (writes terraform/tfplan)
 [group('terraform')]
 terraform-plan *ARGS: terraform-init
-  {{nix_cmd}} run .#terraform.terraform -- plan {{ARGS}}
+  {{nix_cmd}} run .#terraform.terraform -- plan -out=tfplan {{ARGS}}
 
-# Run terraform destroy with argument passthrough
+# Apply a saved terraform plan (reads terraform/tfplan)
+[group('terraform')]
+terraform-apply *ARGS: terraform-init
+  {{nix_cmd}} run .#terraform.terraform -- apply tfplan {{ARGS}}
+
+# Run terraform destroy
 [group('terraform')]
 terraform-destroy *ARGS: terraform-init
   {{nix_cmd}} run .#terraform.terraform -- destroy {{ARGS}}
