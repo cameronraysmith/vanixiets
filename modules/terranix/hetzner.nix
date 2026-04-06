@@ -21,6 +21,13 @@
           image = "debian-12";
           comment = "4 vCPU, 16GB RAM, 160GB SSD, native UEFI";
         };
+        magnetite = {
+          enabled = true; # Build infrastructure server (CX53: BIOS + GRUB)
+          serverType = "cx53";
+          location = "fsn1";
+          image = "debian-12";
+          comment = "16 vCPU, 32GB RAM, 320GB SSD, legacy BIOS";
+        };
       };
 
       # Filter to only enabled machines
