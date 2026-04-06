@@ -358,12 +358,12 @@ update-package package="atuin-format":
 
 ## terraform/terranix
 
-# Run terraform via terranix flake app (init + apply, no argument passthrough)
+# Run terraform via terranix flake app (init + apply, arguments not supported)
 [group('terraform')]
-terraform *ARGS:
+terraform:
   rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
-  {{nix_cmd}} run .#terraform -- {{ARGS}}
+  {{nix_cmd}} run .#terraform
 
 # Initialize terraform
 [group('terraform')]
