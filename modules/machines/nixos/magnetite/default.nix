@@ -27,6 +27,7 @@ in
       ++ (with flakeModules; [
         base
         hm-sops-bridge
+        niks3
         ssh-known-hosts
       ]);
 
