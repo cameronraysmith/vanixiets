@@ -78,6 +78,15 @@
             edge_ttl = {
               mode = "override_origin";
               default = 86400;
+              status_code_ttl = [
+                {
+                  status_code_range = {
+                    from = 400;
+                    to = 499;
+                  };
+                  value = 60;
+                }
+              ];
             };
             cache = true;
           };
