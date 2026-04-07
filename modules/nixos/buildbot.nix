@@ -118,8 +118,9 @@
         enableACME = true;
       };
 
-      # Worker configuration (enable in nix-7v7.8)
+      # Local worker on magnetite (colocated with master)
       services.buildbot-nix.worker = {
+        enable = true;
         workerPasswordFile = config.clan.core.vars.generators.buildbot-worker.files."password".path;
       };
 
