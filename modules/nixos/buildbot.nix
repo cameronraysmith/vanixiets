@@ -55,7 +55,7 @@
       };
 
       # Worker credentials (auto-generated password + workers.json)
-      # CX53: 8 shared vCPU — verify core count matches actual hardware
+      # CX53: 16 logical CPUs (nproc) — cores must match for correct worker count
       clan.core.vars.generators.buildbot-worker = {
         files."password" = {
           owner = "buildbot";
@@ -71,7 +71,7 @@
           password=$(openssl rand -hex 24)
           echo -n "$password" > $out/password
           jq -n --arg pass "$password" \
-            '[{"name": "magnetite", "pass": $pass, "cores": 8}]' > $out/workers.json
+            '[{"name": "magnetite", "pass": $pass, "cores": 16}]' > $out/workers.json
         '';
       };
 
