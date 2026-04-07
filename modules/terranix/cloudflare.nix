@@ -51,5 +51,38 @@
         proxied = false;
       };
 
+      # R2 custom domain for public cache access (Cloudflare auto-manages DNS CNAME)
+      resource.cloudflare_r2_custom_domain.nix-cache = {
+        account_id = config.data.cloudflare_zone.scientistexperience "account.id";
+        bucket_name = "sciexp-nix-cache";
+        domain = "cache.scientistexperience.net";
+        zone_id = config.data.cloudflare_zone.scientistexperience "id";
+        enabled = true;
+        min_tls = "1.2";
+      };
+
+      # Cache rule: cache all nix binary cache objects at the CDN edge
+      # .narinfo and nix-cache-info are not in Cloudflare's default cached extensions,
+      # so without this rule every narinfo lookup hits R2 directly with no edge caching.
+      resource.cloudflare_ruleset.nix-cache-settings = {
+        zone_id = config.data.cloudflare_zone.scientistexperience "id";
+        name = "Nix binary cache settings";
+        description = "Cache all nix binary cache objects on cache.scientistexperience.net";
+        kind = "zone";
+        phase = "http_request_cache_settings";
+        rules = [{
+          description = "Cache everything for nix binary cache";
+          expression = ''(http.host eq "cache.scientistexperience.net")'';
+          action = "set_cache_settings";
+          action_parameters = {
+            edge_ttl = {
+              mode = "override_origin";
+              default = 86400;
+            };
+            cache = true;
+          };
+        }];
+      };
+
     };
 }
