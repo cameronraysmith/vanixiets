@@ -84,6 +84,33 @@
         "type": "github"
       }
     },
+    "buildbot-nix": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "hercules-ci-effects": "hercules-ci-effects",
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "treefmt-nix": [
+          "treefmt-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1775363961,
+        "narHash": "sha256-BdSvfgE5ryOYqOY7Y9p5wkJjAzF0IJSBvR79AaxYMbI=",
+        "owner": "nix-community",
+        "repo": "buildbot-nix",
+        "rev": "19a89fd4c890433dab7062672ff95efe0128db3c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "buildbot-nix",
+        "type": "github"
+      }
+    },
     "bun2nix": {
       "inputs": {
         "flake-parts": [
@@ -587,6 +614,31 @@
         "owner": "nix-community",
         "ref": "v0.2.2",
         "repo": "haumea",
+        "type": "github"
+      }
+    },
+    "hercules-ci-effects": {
+      "inputs": {
+        "flake-parts": [
+          "buildbot-nix",
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "buildbot-nix",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1773550609,
+        "narHash": "sha256-neu7ixXHjV3LobVjOndkL97u+6UF6Yoh+CUnzX7kUBQ=",
+        "owner": "hercules-ci",
+        "repo": "hercules-ci-effects",
+        "rev": "554f6ed448ca74c00aa2371cde901ae1e73005b9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "hercules-ci-effects",
         "type": "github"
       }
     },
@@ -1268,6 +1320,7 @@
         "agenix": "agenix",
         "argocd-helm-src": "argocd-helm-src",
         "argocd-src": "argocd-src",
+        "buildbot-nix": "buildbot-nix",
         "catppuccin": "catppuccin",
         "cilium-src": "cilium-src",
         "clan-core": "clan-core",

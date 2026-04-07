@@ -124,6 +124,11 @@
     niks3.inputs.nixpkgs.follows = "nixpkgs";
     niks3.inputs.treefmt-nix.follows = "treefmt-nix";
     niks3.inputs.flake-parts.follows = "flake-parts";
+
+    buildbot-nix.url = "github:nix-community/buildbot-nix";
+    buildbot-nix.inputs.nixpkgs.follows = "nixpkgs";
+    buildbot-nix.inputs.flake-parts.follows = "flake-parts";
+    buildbot-nix.inputs.treefmt-nix.follows = "treefmt-nix";
   };
 
   # sync with lib/caches.nix for machine modules
