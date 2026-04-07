@@ -51,6 +51,16 @@
         proxied = false;
       };
 
+      # DNS CNAME record for buildbot CI endpoint (resolves to magnetite)
+      resource.cloudflare_dns_record.buildbot = {
+        zone_id = config.data.cloudflare_zone.scientistexperience "id";
+        name = "buildbot";
+        type = "CNAME";
+        content = "magnetite.scientistexperience.net";
+        ttl = 1; # automatic
+        proxied = false;
+      };
+
       # R2 custom domain for public cache access (Cloudflare auto-manages DNS CNAME)
       resource.cloudflare_r2_custom_domain.nix-cache = {
         account_id = config.data.cloudflare_zone.scientistexperience "account.id";
