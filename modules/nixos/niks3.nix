@@ -65,7 +65,7 @@
         enable = true;
         httpAddr = "127.0.0.1:5752";
 
-        cacheUrl = "https://niks3.scientistexperience.net";
+        cacheUrl = "https://cache.scientistexperience.net";
 
         # Cloudflare R2 configuration (S3-compatible)
         s3 = {
