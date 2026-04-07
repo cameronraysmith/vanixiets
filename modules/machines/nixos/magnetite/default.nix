@@ -24,12 +24,15 @@ in
         inputs.srvos.nixosModules.mixins-nginx
         inputs.home-manager.nixosModules.home-manager
         inputs.niks3.nixosModules.niks3
+        inputs.buildbot-nix.nixosModules.buildbot-master
+        inputs.buildbot-nix.nixosModules.buildbot-worker
       ]
       ++ (with flakeModules; [
         base
         hm-sops-bridge
         niks3
         ssh-known-hosts
+        buildbot
       ]);
 
       # Make flake available to all modules (required by ssh-known-hosts)
