@@ -808,6 +808,43 @@ Facilitating implies enabling teams help stream-aligned teams design their own c
 
 *discovery-process.md* for how strategic and organizational analysis fits into the broader discovery workflow.
 
+## Observability in layered architecture
+
+Observability instrumentation follows the same layered discipline as other cross-cutting concerns in hexagonal/onion architecture.
+Telemetry is a side effect and belongs at the boundaries, not in the domain core.
+
+The domain layer contains pure computation with no telemetry side effects.
+Domain functions take inputs and return outputs, including Result types for errors.
+Observability for domain behavior is achieved by the application layer wrapping domain calls in spans and recording the domain's return values as span attributes.
+The domain itself does not import tracing, logging, or metrics libraries.
+This preserves the domain's testability and composability, the same properties that motivate keeping I/O at the boundaries.
+
+The application layer handles workflow orchestration with span creation.
+Each workflow or use case creates a parent span that encompasses the entire operation.
+Correlation IDs (trace_id) flow through the application layer via context propagation.
+Business-meaningful events such as command acceptance, aggregate state changes, and notification delivery are recorded as span events or structured log entries at this layer.
+Error classification happens here: domain errors become span attributes with appropriate status, while infrastructure errors trigger different observability treatment (see `preferences-railway-oriented-programming`).
+
+The infrastructure layer performs I/O operations with automatic instrumentation.
+Database calls, HTTP requests, message queue operations, and cache interactions emit spans via automatic instrumentation through OpenTelemetry wrappers.
+These spans are children of the application layer's workflow span, creating a hierarchical trace.
+Health endpoints, metrics exposition, and telemetry export configuration live here.
+
+The presentation layer creates request/response spans at the outer boundary.
+HTTP middleware creates the root span for each request, capturing method, path, status code, and duration.
+This is typically auto-instrumented and requires no manual code.
+Health check endpoints covering liveness, readiness, and startup probes are presentation-layer concerns.
+
+The key principle is that observability instrumentation mirrors the dependency rule.
+Inner layers are unaware of telemetry; outer layers add observability context progressively.
+The domain remains a pure function from the perspective of instrumentation.
+
+This layered approach to observability also clarifies where to draw the line on structured logging versus tracing.
+Structured log entries at the application layer carry the trace_id and span_id from the current context, enabling correlation between logs and traces without the domain layer needing awareness of either mechanism.
+Infrastructure-layer spans provide timing and error data that would otherwise require manual log instrumentation, reducing the surface area where developers must remember to add observability code.
+
+Cross-reference `preferences-observability-engineering` for the foundational observability model and `preferences-production-readiness` for operational readiness requirements.
+
 ## Theoretical ideal
 
 In the ideal case, all systems—regardless of language—would integrate as a coherent monad transformer stack in the category of functional effects.
