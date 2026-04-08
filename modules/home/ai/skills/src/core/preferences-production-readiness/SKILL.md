@@ -398,3 +398,11 @@ Hexagonal architecture, for example, places instrumentation at port boundaries, 
 
 `preferences-distributed-systems` covers consistency models, failure modes, and coordination patterns for distributed systems.
 Production readiness for distributed systems involves additional concerns — partition tolerance, consistency guarantees under failure, and the observability needed to distinguish between partial failures and total outages — that build on the foundations described here.
+
+## Canonical references
+
+- Majors, C., Fong-Jones, L. & Miranda, G. -- *Observability Engineering* (O'Reilly, 2022), especially chapters 11 (observability-driven development), 12-13 (SLOs and alerting), and 14 (software supply chain)
+- Forsgren, N., Humble, J. & Kim, G. -- *Accelerate: The Science of Lean Software and DevOps* (IT Revolution, 2018), DORA metrics and speed/quality reinforcement
+- Beyer, B., Jones, C., Petoff, J. & Murphy, N. -- *Site Reliability Engineering* (O'Reilly, 2016), chapters on SLOs, monitoring, and on-call
+- Allspaw, J. -- "Trade-offs Under Pressure" (2020), incident learning and adaptive capacity
+- Hollnagel, E. -- *Safety-II in Practice* (Routledge, 2018), systems operating on a degradation continuum
