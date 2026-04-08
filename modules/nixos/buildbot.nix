@@ -107,15 +107,21 @@
 
         buildSystems = [ "x86_64-linux" ];
 
-        authBackend = "github";
         admins = [ "cameronraysmith" ];
+
+        httpBasicAuthPasswordFile = config.clan.core.vars.generators.buildbot-http-basic-auth-password.files."secret".path;
+
+        accessMode.fullyPrivate = {
+          backend = "github";
+          clientId = "Iv23liFu66NnDcfRGDHs";
+          clientSecretFile = config.clan.core.vars.generators.buildbot-github-oauth-secret.files."secret".path;
+          cookieSecretFile = config.clan.core.vars.generators.buildbot-oauth2-cookie-secret.files."secret".path;
+        };
 
         github = {
           appId = 3305657;
           appSecretKeyFile = config.clan.core.vars.generators.buildbot-github-app-secret-key.files."key.pem".path;
           webhookSecretFile = config.clan.core.vars.generators.buildbot-github-webhook-secret.files."secret".path;
-          oauthId = "Iv23liFu66NnDcfRGDHs";
-          oauthSecretFile = config.clan.core.vars.generators.buildbot-github-oauth-secret.files."secret".path;
           topic = "build-with-buildbot";
         };
 
