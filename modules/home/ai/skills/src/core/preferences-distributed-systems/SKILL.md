@@ -1138,6 +1138,48 @@ Replay:
   2. Use recorded request_id (no random generation)
 ```
 
+## Observability for distributed patterns
+
+Distributed systems patterns described in this skill each have specific observability requirements.
+Without targeted instrumentation, the failure modes these patterns address remain invisible until they produce user-facing incidents.
+
+Circuit breaker state transitions from closed to open to half-open and back to closed should be emitted as metrics with labels for the target service and failure reason.
+The open-circuit rate across the fleet indicates systemic dependency failures.
+Half-open probe success and failure rates indicate recovery progress.
+Alert on sustained open-circuit state because it means a dependency is persistently unavailable and the circuit breaker is doing its job, but the underlying problem needs attention.
+
+Saga and workflow observability requires that each saga step creates a span within the saga's trace.
+Step completion, compensation triggers, and final saga outcome (committed versus compensated) should be recorded.
+For choreography-based sagas, the correlation ID (trace_id) propagated through events is the only mechanism connecting steps across services.
+For orchestration-based sagas, the orchestrator creates the parent span and each step is a child.
+Compensation frequency by step identifies which steps are most fragile and likely to trigger rollback.
+
+Retry attempts should be recorded as span events rather than separate spans to avoid inflating trace cardinality.
+Track retry count per operation, backoff duration distribution, and final outcome distinguishing success after N retries from retry exhaustion.
+High retry rates for a specific dependency indicate degradation before circuit breakers trip.
+
+Queue and event bus observability centers on consumer lag, the difference between latest produced offset and latest consumed offset, as the primary health indicator.
+Track queue depth, publish rate, consume rate, and processing latency per consumer group.
+Dead letter queue depth indicates messages that failed processing and need investigation, not just counting.
+For event-sourced systems, projection lag measuring the time between event persistence and projection update indicates read-model freshness.
+
+Idempotency key collision rate distinguishes retries, which are expected, from duplicate submissions, which indicate potential client bugs.
+Track collision rate by endpoint and client to identify problematic callers.
+
+Outbox drain lag, measuring the time between row insertion and successful publish, indicates the reliability of the outbox relay.
+A growing outbox table size suggests the relay is falling behind or failing.
+Monitor both the outbox processor's poll frequency and its success rate to distinguish between a processor that is not running and one that is running but encountering failures.
+
+Network partition detection manifests as simultaneous connection failures to a subset of nodes.
+Correlated timeout spikes across multiple services talking to the same dependency cluster suggest a partition.
+This requires cross-service trace analysis because single-service metrics are insufficient to distinguish a partition from a single-node failure.
+Distributed tracing with consistent trace_id propagation across all services is the prerequisite for this kind of analysis.
+
+The observability requirements of these patterns compose: a saga step that includes a circuit-breaker-protected call with retry logic should produce a saga step span containing retry span events, with circuit breaker metrics emitted independently.
+Each layer of resilience pattern adds its own observability without interfering with the others.
+
+Cross-reference `preferences-observability-engineering` for the general observability model, `preferences-event-sourcing` for event store-specific observability, and `preferences-production-readiness` for operational practices.
+
 ## Architectural decision record template
 
 Use this checklist before implementing distributed system features.
