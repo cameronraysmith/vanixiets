@@ -1,12 +1,15 @@
 # buildbot-nix CI service for magnetite
 #
 # Provides clan vars generators for buildbot credentials and configures
-# the buildbot-nix master with GitHub forge backend.
+# the buildbot-nix master with GitHub forge backend in fullyPrivate access mode
+# (oauth2-proxy gates all UI access via GitHub OAuth).
 # Generators define the credential slots; values are populated via:
 #   - buildbot-github-app-secret-key: manual `clan vars set` (PEM key from GitHub App)
-#   - buildbot-github-oauth-secret: manual `clan vars set` (OAuth secret from GitHub App)
+#   - buildbot-github-oauth-secret: manual `clan vars set` (OAuth client secret from GitHub App)
 #   - buildbot-github-webhook-secret: auto-generated
 #   - buildbot-worker: auto-generated (worker password + workers.json)
+#   - buildbot-oauth2-cookie-secret: auto-generated (oauth2-proxy cookie encryption)
+#   - buildbot-http-basic-auth-password: auto-generated (oauth2-proxy to buildbot internal auth)
 {
   config,
   inputs,
