@@ -190,6 +190,35 @@ Any legitimate refactoring breaks tests, so refactoring is avoided and the codeb
 The diagnostic question: would this test still pass if the same specification were reimplemented with a different algorithm?
 If not, the test is coupled to implementation, not specification.
 
+## Runtime tier and observability bridge
+
+The runtime tier of the regression harness — health checks, canary deployments, and production monitors — is where validation assurance meets observability engineering.
+This section connects the severity criterion and confidence promotion chain to concrete observability practices described in `preferences-observability-engineering` and `preferences-production-readiness`.
+
+An SLO burn rate alert is a runtime regression signal.
+When the error budget burns faster than expected after a deployment, the deployment has introduced a regression that pre-deployment testing did not catch.
+This is the runtime tier operating at its designed purpose: catching what automated tests cannot.
+The severity of this detection is high by construction — it is based on actual user experience degradation, not a proxy metric.
+
+The confidence promotion chain (from `undemonstrated` through `regression-protected`) has an implicit temporal dimension.
+Evidence ages: a test that passed last week is weaker evidence than a test that passed after the latest commit.
+For runtime evidence, staleness depends on monitoring data recency and the rate of environmental change.
+A health check that passed 30 seconds ago in a stable environment is strong evidence.
+The same health check result in a rapidly changing environment (during deployment, scaling event, or dependency update) is weaker evidence because the environment may have shifted.
+
+The severity criterion asks "would this test have failed if the implementation were wrong?"
+For runtime monitors, the equivalent is: "would this SLI detect the degradation if it occurred?"
+An SLI that measures overall request success rate has moderate severity — it detects outages but may miss partial degradation affecting specific user segments.
+An SLI that measures success rate per user cohort or per feature has higher severity — it discriminates between widespread and localized degradation.
+SLI design should be evaluated through the severity lens: high-severity SLIs discriminate between correct and degraded states with high probability.
+
+Production telemetry provides evidence that no pre-deployment test can: evidence that the system works correctly under real load, with real data, against real dependencies, in the actual network topology.
+This is the strongest tier of the regression harness because it tests against the full complexity of the production environment.
+The trade-off is latency — runtime detection happens after deployment, meaning some users may experience the regression before it is detected.
+Progressive delivery (described in `preferences-production-readiness`) mitigates this by limiting blast radius.
+
+Cross-reference `preferences-observability-engineering` for SLO mechanics and `preferences-production-readiness` for progressive delivery and the four post-deploy questions.
+
 ## Reflexive severity and double-loop learning
 
 Severity applies to the process itself, not just to individual tests.
