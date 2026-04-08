@@ -54,6 +54,28 @@
         '';
       };
 
+      # oauth2-proxy cookie encryption secret (auto-generated, must be 16 or 32 chars)
+      clan.core.vars.generators.buildbot-oauth2-cookie-secret = {
+        files."secret" = {
+          owner = "buildbot";
+        };
+        runtimeInputs = [ pkgs.openssl ];
+        script = ''
+          openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 32 > $out/secret
+        '';
+      };
+
+      # HTTP basic auth password for oauth2-proxy to buildbot internal communication (auto-generated)
+      clan.core.vars.generators.buildbot-http-basic-auth-password = {
+        files."secret" = {
+          owner = "buildbot";
+        };
+        runtimeInputs = [ pkgs.openssl ];
+        script = ''
+          openssl rand -hex 24 > $out/secret
+        '';
+      };
+
       # Worker credentials (auto-generated password + workers.json)
       # CX53: 16 logical CPUs (nproc) — cores must match for correct worker count
       clan.core.vars.generators.buildbot-worker = {
