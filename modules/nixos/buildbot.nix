@@ -122,6 +122,7 @@
         };
 
         github = {
+          enable = true;
           appId = 3305657;
           appSecretKeyFile = config.clan.core.vars.generators.buildbot-github-app-secret-key.files."key.pem".path;
           webhookSecretFile = config.clan.core.vars.generators.buildbot-github-webhook-secret.files."secret".path;
