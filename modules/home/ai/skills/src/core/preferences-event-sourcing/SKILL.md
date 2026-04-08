@@ -817,6 +817,42 @@ The key constraint: projectors cannot communicate with each other.
 Each projection is independently derived from the event log.
 
 
+## Event store operational observability
+
+Event-sourced systems have distinct observability requirements beyond standard service metrics.
+The append-only event store, the projection/read-model layer, and the aggregate reconstruction path each need targeted instrumentation.
+
+Track event append throughput as events per second by aggregate type, append latency distribution, and store size growth rate for event store health.
+Sudden throughput drops or latency spikes indicate storage issues.
+For stores with optimistic concurrency, track conflict and retry rates because high conflict rates suggest aggregate boundaries may be too coarse, meaning too many concurrent commands target the same aggregate stream.
+
+Aggregate reconstruction time should be tracked as a histogram by aggregate type.
+Long reconstruction times indicate the need for snapshotting.
+Monitor snapshot freshness measured as the number of events applied since last snapshot and snapshot creation rate.
+If load times grow monotonically for a given aggregate type, the event stream for that type is growing without snapshotting keeping pace.
+This metric directly connects to the snapshotting implementation discussed earlier in this document.
+
+Projection lag, the time between event persistence and projection update, is the primary indicator of read-model freshness.
+Track lag as a gauge per projection.
+Alert on lag exceeding the projection's freshness SLO because stale read models cause user-visible inconsistency in CQRS architectures.
+For catch-up projections rebuilding from event zero, track progress as percentage complete and estimated time remaining so operators can predict when the projection will be current.
+
+Track command rejection rates by aggregate type and rejection reason.
+Domain validation rejections representing business rule violations are normal and indicate the domain model is working correctly.
+Infrastructure rejections such as concurrency conflicts after retries are exhausted or store unavailability indicate operational problems.
+Distinguish these categories in metrics labels so that dashboards and alerts can treat them differently.
+
+Events that fail projection processing need a dead letter mechanism.
+Track dead letter queue depth and oldest unprocessed event age.
+Poison events, those that consistently fail processing, need alerting because they can block an entire projection if the projector processes events sequentially and cannot skip past the failure.
+
+When replaying events for projection rebuild or migration, track replay throughput and estimated completion time.
+Replay is an expensive operation that can impact the live event store if it shares the same storage backend.
+Instrument both the replay reader and the live write path during replay windows so operators can monitor whether replay is degrading production write latency.
+
+Cross-reference `preferences-observability-engineering` for the general observability model and `preferences-distributed-systems` for broader distributed system observability patterns.
+
+
 ## Composable commands via free monads
 
 Commands can be implemented as a free monad over the event algebra.
