@@ -64,7 +64,7 @@
         };
         runtimeInputs = [ pkgs.openssl ];
         script = ''
-          openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 32 > $out/secret
+          openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 32 > $out/secret
         '';
       };
 
