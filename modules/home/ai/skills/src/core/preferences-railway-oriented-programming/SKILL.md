@@ -1363,6 +1363,29 @@ def test_apply_collects_errors(email: str, name: str, age: str):
             assert int(age) >= 0
 ```
 
+## Error pipeline observability
+
+Railway-oriented pipelines compose error handling at the type level, but operators also need runtime visibility into error flows.
+The type system ensures errors are handled; observability ensures error patterns are detectable and diagnosable.
+
+When a pipeline step switches from the success track to the failure track, this is an observability event.
+Record it as a span event (not a separate span) on the current workflow span, including the step name that produced the error, the error classification (domain validation, infrastructure failure, timeout, etc.), and relevant context from the error value.
+This makes the railway topology visible in traces — operators can see which step failed, what the error was, and how it propagated through the remaining pipeline.
+
+Aggregate error distribution across pipeline steps as metrics.
+A counter per step per error classification reveals which steps fail most frequently and what categories of failure dominate.
+Domain validation errors (e.g., invalid input, business rule violations) are typically expected and informational.
+Infrastructure errors (e.g., database unavailable, external service timeout) are operational signals that may indicate systemic problems.
+The error classification from the Result type maps directly to metric labels.
+
+For pipelines that accumulate errors (applicative validation using `Validation` or similar), the aggregated error set is the span event payload.
+Record the count and categories of accumulated errors, not necessarily every individual error (which could be high-volume).
+
+The key integration point: `preferences-observability-engineering` establishes that errors appearing in both trace context and error tracking is normal and useful.
+Railway-oriented pipelines provide a natural point to emit to both — the failure track transition is where the structured error context is richest.
+
+Cross-reference `preferences-observability-engineering` for the observability model and `preferences-architectural-patterns` for where error classification happens in layered architecture (application layer).
+
 ## Integration with other preferences
 
 See `~/.claude/skills/preferences-algebraic-data-types/SKILL.md` for:
