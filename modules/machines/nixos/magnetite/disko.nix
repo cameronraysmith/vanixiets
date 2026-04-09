@@ -61,6 +61,11 @@
             options.mountpoint = "/nix";
             mountpoint = "/nix";
           };
+          "root/podman" = {
+            type = "zfs_fs";
+            options.mountpoint = "/var/lib/containers";
+            mountpoint = "/var/lib/containers";
+          };
         };
       };
     };
