@@ -18,7 +18,7 @@
       # No local imports needed - all 17 modules available via aggregate merging
 
       # sops-nix configuration for crs58/cameron user
-      # 11 secrets: development + ai + shell aggregates
+      # 15 secrets: development + ai + shell aggregates
       sops = {
         defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
         secrets = {
@@ -43,6 +43,9 @@
           aws-credentials = {
             mode = "0600"; # AWS SDK requires 600 for credentials file
             path = "${config.home.homeDirectory}/.aws/credentials";
+          };
+          niks3-auth-token = {
+            path = "${config.xdg.configHome}/niks3/auth-token";
           };
         };
 
