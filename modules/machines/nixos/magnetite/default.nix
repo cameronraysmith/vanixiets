@@ -33,6 +33,8 @@ in
         niks3
         ssh-known-hosts
         buildbot
+        gitea
+        gitea-actions-runner
       ]);
 
       # Make flake available to all modules (required by ssh-known-hosts)
