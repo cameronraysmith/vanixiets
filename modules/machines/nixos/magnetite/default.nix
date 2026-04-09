@@ -68,10 +68,6 @@ in
       # Override state version for new deployment
       system.stateVersion = "25.05";
 
-      # Compressed in-memory swap (zram) for effective memory extension
-      zramSwap.enable = true;
-      zramSwap.memoryPercent = 100;
-
       # User configuration managed via clan inventory users service
       # See: modules/clan/inventory/services/users/cameron.nix
 
