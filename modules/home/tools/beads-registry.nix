@@ -11,6 +11,7 @@
       home = config.home.homeDirectory;
       workspacePaths = [
         "sciexp/planning"
+        "sciexp/sciexp"
         "nix-workspace/vanixiets"
         "rust-workspace/ironstar"
         "nix-workspace/python-nix-template"
