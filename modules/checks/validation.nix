@@ -10,16 +10,7 @@
     let
       terraformPkg = self.packages.${system}.terraform;
       terraformConfig = terraformPkg.passthru.config;
-
-      # match providers defined in modules/terranix/config.nix
-      tofuWithProviders = pkgs.opentofu.withPlugins (p: [
-        p.hashicorp_external
-        p.hashicorp_local
-        p.hashicorp_null
-        p.hashicorp_tls
-        p.hetznercloud_hcloud
-        p.hashicorp_google
-      ]);
+      tofuWithProviders = terraformPkg.passthru.tofuBundle;
     in
     {
       checks = {

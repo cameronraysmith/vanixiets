@@ -65,6 +65,9 @@
           meta = (old.meta or { }) // {
             description = "OpenTofu with Hetzner Cloud, GCP, and Cloudflare providers and encrypted state";
           };
+          passthru = (old.passthru or { }) // {
+            tofuBundle = package;
+          };
         })
       );
 
