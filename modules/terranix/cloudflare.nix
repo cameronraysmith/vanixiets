@@ -90,27 +90,29 @@
         description = "Cache all nix binary cache objects on cache.scientistexperience.net";
         kind = "zone";
         phase = "http_request_cache_settings";
-        rules = [{
-          description = "Cache everything for nix binary cache";
-          expression = ''(http.host eq "cache.scientistexperience.net")'';
-          action = "set_cache_settings";
-          action_parameters = {
-            edge_ttl = {
-              mode = "override_origin";
-              default = 86400;
-              status_code_ttl = [
-                {
-                  status_code_range = {
-                    from = 400;
-                    to = 499;
-                  };
-                  value = 60;
-                }
-              ];
+        rules = [
+          {
+            description = "Cache everything for nix binary cache";
+            expression = ''(http.host eq "cache.scientistexperience.net")'';
+            action = "set_cache_settings";
+            action_parameters = {
+              edge_ttl = {
+                mode = "override_origin";
+                default = 86400;
+                status_code_ttl = [
+                  {
+                    status_code_range = {
+                      from = 400;
+                      to = 499;
+                    };
+                    value = 60;
+                  }
+                ];
+              };
+              cache = true;
             };
-            cache = true;
-          };
-        }];
+          }
+        ];
       };
 
     };

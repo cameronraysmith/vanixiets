@@ -115,20 +115,25 @@
 
         admins = [ "cameronraysmith" ];
 
-        httpBasicAuthPasswordFile = config.clan.core.vars.generators.buildbot-http-basic-auth-password.files."secret".path;
+        httpBasicAuthPasswordFile =
+          config.clan.core.vars.generators.buildbot-http-basic-auth-password.files."secret".path;
 
         accessMode.fullyPrivate = {
           backend = "github";
           clientId = "Iv23liFu66NnDcfRGDHs";
-          clientSecretFile = config.clan.core.vars.generators.buildbot-github-oauth-secret.files."secret".path;
-          cookieSecretFile = config.clan.core.vars.generators.buildbot-oauth2-cookie-secret.files."secret".path;
+          clientSecretFile =
+            config.clan.core.vars.generators.buildbot-github-oauth-secret.files."secret".path;
+          cookieSecretFile =
+            config.clan.core.vars.generators.buildbot-oauth2-cookie-secret.files."secret".path;
         };
 
         github = {
           enable = true;
           appId = 3305657;
-          appSecretKeyFile = config.clan.core.vars.generators.buildbot-github-app-secret-key.files."key.pem".path;
-          webhookSecretFile = config.clan.core.vars.generators.buildbot-github-webhook-secret.files."secret".path;
+          appSecretKeyFile =
+            config.clan.core.vars.generators.buildbot-github-app-secret-key.files."key.pem".path;
+          webhookSecretFile =
+            config.clan.core.vars.generators.buildbot-github-webhook-secret.files."secret".path;
           topic = "build-with-buildbot";
         };
 
@@ -136,7 +141,8 @@
           enable = true;
           instanceUrl = "https://git.scientistexperience.net";
           tokenFile = config.clan.core.vars.generators.buildbot-gitea-token.files."token".path;
-          webhookSecretFile = config.clan.core.vars.generators.buildbot-gitea-webhook-secret.files."secret".path;
+          webhookSecretFile =
+            config.clan.core.vars.generators.buildbot-gitea-webhook-secret.files."secret".path;
           topic = "build-with-buildbot";
         };
 

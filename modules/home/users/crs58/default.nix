@@ -91,10 +91,13 @@
         email = "cameron.ray.smith@gmail.com";
       };
 
-      home.packages = with pkgs; [
-        gh # GitHub CLI (keep from baseline)
-      ] ++ [
-        flake.inputs.niks3.packages.${pkgs.stdenv.hostPlatform.system}.niks3
-      ];
+      home.packages =
+        with pkgs;
+        [
+          gh # GitHub CLI (keep from baseline)
+        ]
+        ++ [
+          flake.inputs.niks3.packages.${pkgs.stdenv.hostPlatform.system}.niks3
+        ];
     };
 }
