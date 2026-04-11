@@ -77,6 +77,7 @@
             "cinnabar"
             "electrum"
             "galena"
+            "magnetite"
             "rosegold"
             "scheelite"
             "stibnite"
@@ -91,6 +92,7 @@
             "cinnabar"
             "electrum"
             "galena"
+            "magnetite"
             "scheelite"
           ];
         };
