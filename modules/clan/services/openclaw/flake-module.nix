@@ -167,7 +167,7 @@
                   || hasLocal "https://127.0.0.1"
                   || hasLocal "http://[::1]"
                   || hasLocal "https://[::1]";
-                synapseService = lib.optional isLocalHomeserver "matrix-synapse.service";
+                homeserverService = lib.optional isLocalHomeserver "tuwunel.service";
 
                 wrapper = pkgs.writeShellScript "openclaw-gateway-wrapper" ''
                   mkdir -p ${stateDir}
@@ -253,8 +253,8 @@
                   # See nix-clawdbot/nix/modules/home-manager/openclaw.nix (activation phase).
                   systemd.services."openclaw-gateway" = {
                     description = "OpenClaw Matrix Gateway";
-                    after = [ "network.target" ] ++ synapseService;
-                    wants = synapseService;
+                    after = [ "network.target" ] ++ homeserverService;
+                    wants = homeserverService;
                     wantedBy = [ "multi-user.target" ];
                     restartTriggers = [ configFile ];
 
