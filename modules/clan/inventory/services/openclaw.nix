@@ -17,8 +17,6 @@
           channels.matrix.groupPolicy = "open";
           channels.matrix.network.dangerouslyAllowPrivateNetwork = true;
           gateway.controlUi.allowedOrigins = [ "https://openclaw.zt" ];
-          gateway.auth.mode = "trusted-proxy";
-          gateway.auth.trustedProxy.userHeader = "x-forwarded-user";
         };
       };
     };

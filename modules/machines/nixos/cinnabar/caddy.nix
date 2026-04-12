@@ -1,7 +1,7 @@
 { ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
-    { config, pkgs, ... }:
+    { pkgs, ... }:
     {
       services.caddy = {
         enable = true;
@@ -83,16 +83,14 @@
               "fddb:4344:343b:14b9:399:93db:4344:343b"
               "10.147.17.1"
             ];
-            extraConfig =
-              let
-                openclawUser = config.systemd.services.openclaw-gateway.serviceConfig.User;
-              in
-              ''
-                tls internal
-                reverse_proxy [::1]:18789 {
-                  header_up X-Forwarded-User ${openclawUser}
-                }
-              '';
+            extraConfig = ''
+              tls internal
+              reverse_proxy [::1]:18789 {
+                header_up -X-Forwarded-For
+                header_up -X-Forwarded-Proto
+                header_up -X-Forwarded-Host
+              }
+            '';
           };
         };
       };
