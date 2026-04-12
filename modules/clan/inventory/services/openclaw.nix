@@ -16,6 +16,13 @@
         configOverrides = {
           channels.matrix.groupPolicy = "open";
           channels.matrix.network.dangerouslyAllowPrivateNetwork = true;
+          # clawd defaults to autoJoin "off", ignoring DM invites
+          channels.matrix.autoJoin = "always";
+          channels.matrix.dm = {
+            enabled = true;
+            policy = "allowlist";
+            allowFrom = [ "@cameron:matrix.zt" ];
+          };
           gateway.controlUi.allowedOrigins = [ "https://openclaw.zt" ];
         };
       };
