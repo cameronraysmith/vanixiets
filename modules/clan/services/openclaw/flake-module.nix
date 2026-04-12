@@ -258,6 +258,10 @@
                     wantedBy = [ "multi-user.target" ];
                     restartTriggers = [ configFile ];
 
+                    preStart = ''
+                      rm -f ${stateDir}/credentials/matrix/credentials.json
+                    '';
+
                     serviceConfig = {
                       Type = "simple";
                       ExecStart = wrapper;
