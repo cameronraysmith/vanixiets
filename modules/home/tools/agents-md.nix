@@ -85,6 +85,8 @@
           - cloudflare wrangler configuration: ${skillsPath}/preferences-cloudflare-wrangler-reference/SKILL.md
           - secrets management: ${skillsPath}/preferences-secrets/SKILL.md
           - nix development: ${skillsPath}/preferences-nix-development/SKILL.md
+          - nix flake checks architecture (check taxonomy, derivation patterns, VM tests): ${skillsPath}/preferences-nix-checks-architecture/SKILL.md
+          - nix CI/CD integration (nix-fast-build, buildbot-nix, effects, migration): ${skillsPath}/preferences-nix-ci-cd-integration/SKILL.md
           - python development: ${skillsPath}/preferences-python-development/SKILL.md
           - rust development: ${skillsPath}/preferences-rust-development/SKILL.md
           - haskell development: ${skillsPath}/preferences-haskell-development/SKILL.md
