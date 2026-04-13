@@ -15,6 +15,7 @@
         "nix-workspace/vanixiets"
         "rust-workspace/ironstar"
         "nix-workspace/python-nix-template"
+        "nix-workspace/typescript-nix-template"
         "sciexp/data"
         "hodosome-workspace/hodosome"
         "hodosome-workspace/Hodosome.jl"
