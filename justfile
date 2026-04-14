@@ -1360,26 +1360,6 @@ ci-logs-failed workflow="ci.yaml":
     @RUN_ID=$(gh run list --workflow={{workflow}} --limit 1 --json databaseId --jq '.[0].databaseId'); \
     gh run view "$RUN_ID" --log-failed
 
-# List categorized flake outputs using nix eval
-[group('CI/CD')]
-ci-show-outputs system="":
-    @./scripts/ci/ci-show-outputs.sh "{{system}}"
-
-# Build all flake outputs locally with nom (for debugging builds)
-[group('CI/CD')]
-ci-build-local category="" system="":
-    @./scripts/ci/ci-build-local.sh "{{category}}" "{{system}}"
-
-# Build specific category for CI matrix jobs (optimized for disk space distribution)
-[group('CI/CD')]
-ci-build-category system category config="":
-    @./scripts/ci/ci-build-category.sh "{{system}}" "{{category}}" "{{config}}"
-
-# Build and cache specific category with all dependencies pushed to cachix (local testing)
-[group('CI/CD')]
-ci-cache-category system category config="":
-    @./scripts/ci/ci-cache-category.sh "{{system}}" "{{category}}" "{{config}}"
-
 # Validate latest CI run comprehensively
 [group('CI/CD')]
 ci-validate workflow="ci.yaml" run_id="":
@@ -1554,11 +1534,6 @@ check-rosetta-cache:
         exit 1
     fi
 
-# Build a package for Linux architectures and push to cachix
-[group('CI/CD')]
-cache-linux-package package:
-    @./scripts/ci/cache-linux-package.sh "{{package}}"
-
 # Test cachix push/pull with a simple derivation
 [group('CI/CD')]
 test-cachix:
@@ -1578,11 +1553,6 @@ test-cachix:
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
     echo "● Push completed. Verify at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "Store path: $STORE_PATH"
-
-# Build all CI outputs for a system and push to cachix
-[group('CI/CD')]
-cache-ci-outputs system="":
-    @./scripts/ci/cache-all-outputs.sh "{{system}}"
 
 # Build darwin system and push to cachix (run after just verify or just activate)
 [group('CI/CD')]
@@ -1634,11 +1604,6 @@ cache-darwin-system:
     echo "   System: $SYSTEM_PATH"
     echo ""
     echo "Other machines can now pull from cachix instead of rebuilding."
-
-# Build and cache all overlay packages for a specific system
-[group('CI/CD')]
-cache-overlay-packages system:
-    @./scripts/ci/ci-cache-category.sh "{{system}}" packages
 
 # List all packages in packages/ directory
 [group('CI/CD')]
