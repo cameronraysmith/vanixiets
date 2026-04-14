@@ -206,35 +206,15 @@ check:
   echo ""
   {{nix_cmd}} flake check
 
-# Fast checks excluding heavy VM integration tests (~1-2 min vs ~7 min for full)
+# Validate flake checks via nix-fast-build (failure isolation, parallel eval+build, nom output)
+# --eval-workers 4: reduces SQLite eval-cache contention (harmless but noisy at default=ncpus)
 [group('nix')]
-check-fast system="x86_64-linux":
-  #!/usr/bin/env bash
-  set -euo pipefail
-  echo "Running fast checks for {{system}} (excluding VM tests)..."
-  echo ""
-  echo "Note: The following nix-unit warnings are expected and harmless:"
-  echo "  - 'unknown setting allowed-users/trusted-users' (daemon settings don't apply in pure eval)"
-  echo "  - '--gc-roots-dir not specified' (nix-unit doesn't persist GC roots)"
-  echo "  - 'input has an override for non-existent input self' (nix-unit internal mechanism)"
-  echo "  - 'not writing modified lock file' (expected for read-only check)"
-  echo ""
-
-  # Get all checks except vm-* which are heavy integration tests
-  CHECKS=$({{nix_cmd}} eval ".#checks.{{system}}" --apply 'builtins.attrNames' --json | jq -r '.[] | select(startswith("vm-") | not)')
-
-  echo "Checks to run:"
-  echo "$CHECKS" | while read check; do echo "  - $check"; done
-  echo ""
-
-  # Build each check
-  for check in $CHECKS; do
-    echo "::group::$check"
-    {{nix_cmd}} build ".#checks.{{system}}.$check" --print-build-logs
-    echo "::endgroup::"
-  done
-
-  echo "✓ All fast checks passed"
+check-fast:
+  nix-fast-build \
+    --no-link \
+    --option accept-flake-config true \
+    --eval-workers 4 \
+    --flake ".#checks.$(nix eval --impure --raw --expr 'builtins.currentSystem')"
 
 # Verify system configuration builds after updates (run before activate)
 [group('nix')]
