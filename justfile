@@ -117,6 +117,33 @@ flake-info:
   {{nix_cmd}} flake metadata
   {{nix_cmd}} flake show --legacy --all-systems
 
+# Enumerate flake output surface by category for the current system
+[group('nix')]
+nix-flake-io:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  sys=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+  printf "## checks\n"
+  nix eval ".#checks.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'
+  printf "\n## packages\n"
+  nix eval ".#packages.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'
+  printf "\n## devShells\n"
+  nix eval ".#devShells.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'
+  printf "\n## apps\n"
+  nix eval ".#apps.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'
+  printf "\n## overlays\n"
+  nix eval .#overlays --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || true
+  printf "\n## nixosModules\n"
+  nix eval .#nixosModules --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || true
+  printf "\n## nixosConfigurations\n"
+  nix eval .#nixosConfigurations --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || true
+  printf "\n## darwinConfigurations\n"
+  nix eval .#darwinConfigurations --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || true
+  printf "\n## formatter\n"
+  nix eval ".#formatter.${sys}.name" 2>/dev/null
+  printf "\n## inputs\n"
+  nix flake metadata --json 2>/dev/null | jq -r '.locks.nodes | keys[] | select(. != "root")'
+
 # Lint nix files
 [group('nix')]
 lint:
