@@ -114,6 +114,38 @@
     "bun2nix": {
       "inputs": {
         "flake-parts": [
+          "flake-parts"
+        ],
+        "import-tree": [
+          "import-tree"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "systems": [
+          "systems"
+        ],
+        "treefmt-nix": [
+          "treefmt-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1770895533,
+        "narHash": "sha256-v3QaK9ugy9bN9RXDnjw0i2OifKmz2NnKM82agtqm/UY=",
+        "owner": "nix-community",
+        "repo": "bun2nix",
+        "rev": "c843f477b15f51151f8c6bcc886954699440a6e1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "bun2nix",
+        "type": "github"
+      }
+    },
+    "bun2nix_2": {
+      "inputs": {
+        "flake-parts": [
           "llm-agents",
           "flake-parts"
         ],
@@ -716,7 +748,7 @@
     "llm-agents": {
       "inputs": {
         "blueprint": "blueprint",
-        "bun2nix": "bun2nix",
+        "bun2nix": "bun2nix_2",
         "flake-parts": "flake-parts_2",
         "nixpkgs": "nixpkgs_2",
         "systems": "systems_4",
@@ -1347,6 +1379,7 @@
         "argocd-helm-src": "argocd-helm-src",
         "argocd-src": "argocd-src",
         "buildbot-nix": "buildbot-nix",
+        "bun2nix": "bun2nix",
         "catppuccin": "catppuccin",
         "cilium-src": "cilium-src",
         "clan-core": "clan-core",
@@ -1381,6 +1414,7 @@
         "sops-secrets-operator-src": "sops-secrets-operator-src",
         "srvos": "srvos",
         "step-ca-src": "step-ca-src",
+        "systems": "systems_11",
         "terranix": "terranix",
         "treefmt-nix": "treefmt-nix_4"
       }
@@ -1512,6 +1546,17 @@
       }
     },
     "systems_11": {
+      "locked": {
+        "path": "./systems",
+        "type": "path"
+      },
+      "original": {
+        "path": "./systems",
+        "type": "path"
+      },
+      "parent": []
+    },
+    "systems_12": {
       "locked": {
         "lastModified": 1681028828,
         "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
@@ -1654,7 +1699,7 @@
         "nixpkgs": [
           "nixpkgs"
         ],
-        "systems": "systems_11"
+        "systems": "systems_12"
       },
       "locked": {
         "lastModified": 1773700838,

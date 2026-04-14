@@ -57,6 +57,7 @@
           pkgs.rsync # nixidy-sync manifest deployment
           # Tools required by TypeScript packages CI
           pkgs.bun
+          inputs'.bun2nix.packages.default
           pkgs.nodejs_24 # semantic-release >= 24.10.0
           pkgs.fuc # (rm/cp)z
           pkgs.rip2
