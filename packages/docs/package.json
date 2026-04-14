@@ -21,6 +21,7 @@
     "build": "astro build",
     "build:clean": "bun run clean && bun run build",
     "preview": "bun run build && wrangler dev",
+    "preview:ci": "serve dist -l 4321 --no-clipboard",
     "deploy": "bun run build && wrangler deploy",
     "linkcheck": "CHECK_LINKS=true bun run build",
     "cf-typegen": "wrangler types",

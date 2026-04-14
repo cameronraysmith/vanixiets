@@ -74,9 +74,11 @@ export default defineConfig({
         },
       ],
 
-  // Run local dev server before starting tests
+  // Run local dev server before starting tests.
+  // In CI: serve pre-built static output (faster, matches production artifact).
+  // In dev: astro dev server (supports HMR, serves from source).
   webServer: {
-    command: "PLAYWRIGHT=true bun run dev",
+    command: process.env.CI ? "bun run preview:ci" : "PLAYWRIGHT=true bun run dev",
     url: "http://localhost:4321",
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
