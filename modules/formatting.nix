@@ -13,6 +13,9 @@
         programs.nixfmt.enable = true;
       };
 
+      # Keep local hooks but don't inject checks.pre-commit into nix flake check —
+      # treefmt and gitleaks already run as individual checks with better cache granularity.
+      pre-commit.check.enable = false;
       pre-commit.settings = {
         package = pkgs.prek;
         hooks.treefmt.enable = true;
