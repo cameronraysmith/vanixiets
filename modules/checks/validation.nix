@@ -607,6 +607,54 @@
               echo "OK: Machine registry completeness validated"
               touch $out
             '';
+
+        # TC-030: SOPS Roundtrip Integrity
+        # Purpose: Validate that the sops+age encrypt/decrypt toolchain works end-to-end
+        # with ephemeral test keys. Complements TC-026 (tier separation) and TC-028
+        # (encryption integrity) which validate static file structure but never exercise
+        # the crypto pipeline.
+        secrets-sops-roundtrip =
+          pkgs.runCommand "secrets-sops-roundtrip"
+            {
+              nativeBuildInputs = [
+                pkgs.age
+                pkgs.sops
+              ];
+              passthru.meta.description = "Validate sops+age encrypt/decrypt roundtrip with ephemeral keys";
+            }
+            ''
+              echo "TC-030: Validating sops+age roundtrip integrity..."
+
+              mkdir -p test-secrets
+              age-keygen -o test-secrets/test-key.txt 2>/dev/null
+              TEST_AGE_PUBLIC=$(age-keygen -y test-secrets/test-key.txt)
+              echo "Generated ephemeral test age key: $TEST_AGE_PUBLIC"
+
+              cat > test-secrets/.sops.yaml <<SOPSEOF
+              creation_rules:
+                - path_regex: .*\.yaml$
+                  key_groups:
+                    - age:
+                      - $TEST_AGE_PUBLIC
+              SOPSEOF
+
+              cd test-secrets
+              echo "test_secret: test-value-12345" > test.yaml
+              sops -e -i test.yaml
+
+              SOPS_AGE_KEY_FILE=test-key.txt sops -d test.yaml | grep -q "test_secret: test-value-12345"
+              echo "OK: sops+age encrypt/decrypt roundtrip verified"
+
+              if [ -f "${self}/.sops.yaml" ]; then
+                echo "OK: .sops.yaml exists in repository"
+              else
+                echo "ERROR: .sops.yaml not found in repository" >&2
+                exit 1
+              fi
+
+              echo "OK: SOPS roundtrip integrity validated"
+              touch $out
+            '';
       };
     };
 }
