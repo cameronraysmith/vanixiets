@@ -116,6 +116,7 @@ runs:
         install_url: https://releases.nixos.org/nix/nix-${{ inputs.nix-version }}/install
         # build-dir on /nix is workaround for https://github.com/wimpysworld/nothing-but-nix/issues/18
         extra_nix_config: |
+          accept-flake-config = true
           build-dir = /nix/build
           sandbox = ${{ inputs.sandbox }}
           system = ${{ inputs.system }}
