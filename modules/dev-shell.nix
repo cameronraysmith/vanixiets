@@ -39,6 +39,7 @@
           pkgs.just
           pkgs.nh
           pkgs.nix-output-monitor
+          inputs'.nix-fast-build.packages.default
           pkgs.nix-update
           pkgs.nix-prefetch-github
           # beads-viewer  # disabled: incompatible with dolt backend
