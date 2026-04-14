@@ -373,8 +373,7 @@ jobs:
       !cancelled() &&
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
-       inputs.job == 'nix-check' ||
-       inputs.job == 'all')
+       inputs.job == 'nix-check')
     strategy:
       fail-fast: false
       matrix:
