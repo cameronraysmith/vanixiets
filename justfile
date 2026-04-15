@@ -117,30 +117,121 @@ flake-info:
   {{nix_cmd}} flake metadata
   {{nix_cmd}} flake show --legacy --all-systems
 
-# Enumerate flake output surface by category for the current system
+# Enumerate flake output surface by category (all 20 top-level outputs)
 [group('nix')]
 nix-flake-io:
   #!/usr/bin/env bash
   set -euo pipefail
   sys=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+  systems=(aarch64-darwin aarch64-linux x86_64-darwin x86_64-linux)
+
+  # Per-system attrsets (members listed for current system)
   printf "## checks\n"
-  nix eval ".#checks.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'
+  nix eval ".#checks.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
   printf "\n## packages\n"
-  nix eval ".#packages.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'
+  nix eval ".#packages.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
   printf "\n## devShells\n"
-  nix eval ".#devShells.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'
+  nix eval ".#devShells.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
   printf "\n## apps\n"
-  nix eval ".#apps.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'
-  printf "\n## overlays\n"
-  nix eval .#overlays --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || true
-  printf "\n## nixosModules\n"
-  nix eval .#nixosModules --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || true
-  printf "\n## nixosConfigurations\n"
-  nix eval .#nixosConfigurations --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || true
-  printf "\n## darwinConfigurations\n"
-  nix eval .#darwinConfigurations --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || true
+  nix eval ".#apps.${sys}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
   printf "\n## formatter\n"
-  nix eval ".#formatter.${sys}.name" 2>/dev/null
+  nix eval ".#formatter.${sys}.name" 2>/dev/null || echo "(empty)"
+
+  # Top-level attrsets
+  printf "\n## overlays\n"
+  overlays_type=$(nix eval --raw .#overlays --apply 'x: builtins.typeOf x' 2>/dev/null || echo "missing")
+  if [ "$overlays_type" = "set" ]; then
+    nix eval .#overlays --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+  elif [ "$overlays_type" = "list" ]; then
+    overlays_len=$(nix eval --raw .#overlays --apply 'x: toString (builtins.length x)' 2>/dev/null || echo "?")
+    echo "(list of ${overlays_len} items)"
+  else
+    echo "(empty)"
+  fi
+
+  printf "\n## nixpkgsOverlays\n"
+  npo_type=$(nix eval --raw .#nixpkgsOverlays --apply 'x: builtins.typeOf x' 2>/dev/null || echo "missing")
+  if [ "$npo_type" = "list" ]; then
+    npo_len=$(nix eval --raw .#nixpkgsOverlays --apply 'x: toString (builtins.length x)' 2>/dev/null || echo "?")
+    echo "(list of ${npo_len} items)"
+  elif [ "$npo_type" = "set" ]; then
+    nix eval .#nixpkgsOverlays --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+  else
+    echo "(empty)"
+  fi
+
+  printf "\n## nixosModules\n"
+  nix eval .#nixosModules --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+  printf "\n## darwinModules\n"
+  nix eval .#darwinModules --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+  printf "\n## nixosConfigurations\n"
+  nix eval .#nixosConfigurations --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+  printf "\n## darwinConfigurations\n"
+  nix eval .#darwinConfigurations --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+
+  # modules: deferred-module-composition namespace (one level of sub-namespaces)
+  printf "\n## modules\n"
+  if nix eval .#modules --apply builtins.attrNames --json 2>/dev/null >/tmp/.nix-flake-io-modules.$$; then
+    for ns in $(jq -r '.[]' /tmp/.nix-flake-io-modules.$$); do
+      printf "### modules.%s\n" "$ns"
+      nix eval ".#modules.${ns}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+    done
+    rm -f /tmp/.nix-flake-io-modules.$$
+  else
+    echo "(empty)"
+  fi
+
+  # homeConfigurations: per-system × username (vanixiets system-nested shape)
+  printf "\n## homeConfigurations\n"
+  for s in "${systems[@]}"; do
+    if users=$(nix eval ".#homeConfigurations.${s}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'); then
+      if [ -n "$users" ]; then
+        while IFS= read -r u; do
+          printf "%s.%s\n" "$s" "$u"
+        done <<< "$users"
+      fi
+    fi
+  done
+
+  # nixidyEnvs: per-system × env
+  printf "\n## nixidyEnvs\n"
+  for s in "${systems[@]}"; do
+    if envs=$(nix eval ".#nixidyEnvs.${s}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'); then
+      if [ -n "$envs" ]; then
+        while IFS= read -r e; do
+          printf "%s.%s\n" "$s" "$e"
+        done <<< "$envs"
+      fi
+    fi
+  done
+
+  # containerMatrix: top-level keys only (members are derivations/lists, not attrsets)
+  printf "\n## containerMatrix\n"
+  nix eval .#containerMatrix --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+
+  # clan / clanInternals: clan-core composition attrsets; enumerate top-level keys
+  printf "\n## clan\n"
+  nix eval .#clan --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+  printf "\n## clanInternals\n"
+  nix eval .#clanInternals --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]' || echo "(empty)"
+
+  # Large re-exports: emit count only (enumerating members pollutes output)
+  printf "\n## lib\n"
+  lib_count=$(nix eval --raw .#lib --apply 'x: toString (builtins.length (builtins.attrNames x))' 2>/dev/null || echo "0")
+  echo "(nixpkgs.lib re-export, ${lib_count} top-level attrs)"
+
+  printf "\n## legacyPackages\n"
+  for s in "${systems[@]}"; do
+    if count=$(nix eval --raw ".#legacyPackages.${s}" --apply 'x: toString (builtins.length (builtins.attrNames x))' 2>/dev/null); then
+      printf "%s: (nixpkgs re-export, %s top-level attrs)\n" "$s" "$count"
+    fi
+  done
+
+  printf "\n## tests\n"
+  tests_count=$(nix eval --raw .#tests --apply 'x: toString (builtins.length (builtins.attrNames x))' 2>/dev/null || echo "0")
+  echo "(${tests_count} top-level test attrs)"
+
+  # Flake inputs
   printf "\n## inputs\n"
   nix flake metadata --json 2>/dev/null | jq -r '.locks.nodes | keys[] | select(. != "root")'
 
