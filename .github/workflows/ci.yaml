@@ -408,7 +408,9 @@ jobs:
             --no-nom \
             --skip-cached \
             --no-link \
-            --max-jobs 2 \
+            --eval-workers 2 \
+            --eval-max-memory-size 2048 \
+            --max-jobs 1 \
             --option accept-flake-config true \
             --flake ".#checks.${{ matrix.system }}" \
             --cachix-cache ${{ env.CACHIX_BINARY_CACHE }} \
