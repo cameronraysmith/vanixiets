@@ -135,6 +135,10 @@
           webhookSecretFile =
             config.clan.core.vars.generators.buildbot-github-webhook-secret.files."secret".path;
           topic = "build-with-buildbot";
+          userAllowlist = [
+            "sciexp"
+            "cameronraysmith"
+          ];
         };
 
         gitea = {
