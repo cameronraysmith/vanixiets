@@ -364,9 +364,10 @@ jobs:
           key: ${{ steps.cache.outputs.cache-key }}
 
   # nix-check
-  # orchestrates all flake checks via nix-fast-build over .#checks.${system}
-  # replaces per-category matrix builds (flake-validation, nix, typescript,
-  # cache-overlay-packages, secrets-workflow) with a single junit-reporting job
+  # Passthrough stub: nix checks are now delegated to buildbot-nix on magnetite.
+  # buildbot/nix-eval and buildbot/nix-build status checks replace this job.
+  # Job is retained as a no-op so downstream `needs: [nix-check]` references
+  # continue to resolve during the transition period.
   nix-check:
     needs: [set-variables]
     runs-on: ubuntu-latest
@@ -375,65 +376,8 @@ jobs:
       (github.event_name != 'workflow_dispatch' ||
        inputs.job == '' ||
        inputs.job == 'nix-check')
-    strategy:
-      fail-fast: false
-      matrix:
-        system:
-          # - aarch64-darwin  # Re-enable when buildbot-nix has aarch64-darwin worker capacity
-          - x86_64-linux
-          # - aarch64-linux  # Re-enable when buildbot-nix has aarch64-linux worker capacity
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          fetch-depth: 0
-
-      - name: Setup Nix
-        uses: ./.github/actions/setup-nix
-        with:
-          installer: full
-          system: ${{ matrix.system }}
-          enable-cachix: true
-          cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          cachix-skip-push: false
-
-      - name: Validate flake structure
-        run: nix flake show --json --accept-flake-config > /dev/null
-
-      - name: Run flake checks
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: |
-          nix run .#nix-fast-build -- \
-            --no-nom \
-            --skip-cached \
-            --no-link \
-            --eval-workers 2 \
-            --eval-max-memory-size 2048 \
-            --max-jobs 1 \
-            --option accept-flake-config true \
-            --flake ".#checks.${{ matrix.system }}" \
-            --cachix-cache ${{ env.CACHIX_BINARY_CACHE }} \
-            --result-format junit \
-            --result-file nix-checks.xml
-        timeout-minutes: 45
-
-      - name: Publish check report
-        if: always()
-        uses: mikepenz/action-junit-report@bccf2e31636835cf0874589931c4116687171386 # v6.4.0
-        with:
-          report_paths: nix-checks.xml
-          check_name: Nix Checks - ${{ matrix.system }}
-          fail_on_failure: true
-
-      - name: Upload check results
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: nix-checks-${{ matrix.system }}
-          path: nix-checks.xml
-          if-no-files-found: warn
+      - run: 'true'
 
   # job 7: test-cluster
   # validates kubernetes manifests and local cluster integration
