@@ -1,0 +1,6 @@
+# Scope nix-eval-jobs to x86_64-linux workers only.
+# Default "checks" evaluates all systems, and eval failures on unsupported
+# systems (aarch64-linux, aarch64-darwin) poison the build result.
+# See: https://www.github.com/nix-community/buildbot-nix/issues/302 (upstream issue)
+# See: https://www.github.com/nix-community/buildbot-nix/pull/318 (per-repo config support)
+attribute = "checks.x86_64-linux"
