@@ -55,6 +55,7 @@ defaults:
     shell: bash
 
 permissions:
+  checks: write
   contents: read
   deployments: write
 
