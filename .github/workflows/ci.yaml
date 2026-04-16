@@ -55,12 +55,8 @@ defaults:
     shell: bash
 
 permissions:
-  checks: write
   contents: read
   deployments: write
-
-env:
-  CACHIX_BINARY_CACHE: cameronraysmith
 
 jobs:
   # job 1: set-variables
@@ -363,22 +359,6 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # nix-check
-  # Passthrough stub: nix checks are now delegated to buildbot-nix on magnetite.
-  # buildbot/nix-eval and buildbot/nix-build status checks replace this job.
-  # Job is retained as a no-op so downstream `needs: [nix-check]` references
-  # continue to resolve during the transition period.
-  nix-check:
-    needs: [set-variables]
-    runs-on: ubuntu-latest
-    if: |
-      !cancelled() &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'nix-check')
-    steps:
-      - run: 'true'
-
   # job 7: test-cluster
   # validates kubernetes manifests and local cluster integration
   # informational only - does not block production releases
@@ -398,10 +378,9 @@ jobs:
   # Release packages via semantic-release on main/beta branches
   # Semantic-release determines if actual release is needed
   production-release-packages:
-    needs: [set-variables, nix-check]
+    needs: [set-variables]
     if: |
       !cancelled() &&
-      needs.nix-check.result == 'success' &&
       github.repository_owner == 'cameronraysmith' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
