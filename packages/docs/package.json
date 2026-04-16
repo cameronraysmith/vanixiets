@@ -60,7 +60,7 @@
     "starlight-links-validator": "^0.23.0",
     "svgo": "^4.0.1",
     "vitest": "^4.1.4",
-    "wrangler": "^4.81.1"
+    "wrangler": "^4.83.0"
   },
   "release": {
     "extends": "semantic-release-monorepo",
