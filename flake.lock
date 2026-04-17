@@ -258,11 +258,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774970735,
-        "narHash": "sha256-oxTt5sTVfK9wvQ0v4F1zK2a7cYhQcqiCz6y7NzzT3Ec=",
-        "rev": "cdf1e7539a533e8e00f32ed7706fe88fca33542e",
+        "lastModified": 1776456802,
+        "narHash": "sha256-iifBOl+mJG7UFiKcsyu1Q4vNx82MuoTr/l+l4r9NNm0=",
+        "rev": "eea58427de0b450332dbd8c6652ba4cc950f72a8",
         "type": "tarball",
-        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/cdf1e7539a533e8e00f32ed7706fe88fca33542e.tar.gz"
+        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/eea58427de0b450332dbd8c6652ba4cc950f72a8.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -307,11 +307,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774796937,
-        "narHash": "sha256-uDcgnNHK1D2oTHOQKsqQUPdDGMuG94dp3Nv8LsnqkEM=",
-        "rev": "04e10e10c7b4bbf2930f24d139326707a43cbb54",
+        "lastModified": 1776283625,
+        "narHash": "sha256-MvUsO/PDnCxo8ueyhf0ne4NCZoslTDXIMQ31FILMhe4=",
+        "rev": "acb202e9fc05a5a35f3d5604c5b9c2cffabc92fe",
         "type": "tarball",
-        "url": "https://git.clan.lol/api/v1/repos/clan/data-mesher/archive/04e10e10c7b4bbf2930f24d139326707a43cbb54.tar.gz"
+        "url": "https://git.clan.lol/api/v1/repos/clan/data-mesher/archive/acb202e9fc05a5a35f3d5604c5b9c2cffabc92fe.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -1573,15 +1573,16 @@
     },
     "systems_2": {
       "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "lastModified": 1774449309,
+        "narHash": "sha256-brhZ8DmuGtzkCYHJg4HEd602amKm89Y9ytsFZ5uWD1w=",
         "owner": "nix-systems",
         "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "rev": "c29398b59d2048c4ab79345812849c9bd15e9150",
         "type": "github"
       },
       "original": {
         "owner": "nix-systems",
+        "ref": "future-26.11",
         "repo": "default",
         "type": "github"
       }
