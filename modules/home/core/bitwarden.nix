@@ -1,6 +1,6 @@
 # Bitwarden SSH agent configuration
 # Migrated from vanixiets/modules/home/all/core/bitwarden.nix
-{ ... }:
+{ inputs, ... }:
 {
   flake.modules.homeManager.core =
     {
@@ -17,13 +17,11 @@
       # (checking config.home.packages would create infinite recursion)
       bitwardenEnabled = isDarwin;
 
-      # Set socket paths for macOS MAS vs linux system
       # https://bitwarden.com/help/ssh-agent/#tab-macos-6VN1DmoAVFvm7ZWD95curS
-      socketPath =
-        if isDarwin then
-          "${config.home.homeDirectory}/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock"
-        else
-          "${config.home.homeDirectory}/.bitwarden-ssh-agent.sock";
+      socketPath = inputs.self.lib.bitwardenSocketPath {
+        inherit (config.home) homeDirectory;
+        inherit isDarwin;
+      };
     in
     {
       # SSH agent provider: Bitwarden on Darwin, systemd ssh-agent on Linux
