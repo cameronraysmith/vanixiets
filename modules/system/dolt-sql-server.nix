@@ -84,6 +84,17 @@ let
         default = null;
         description = "Group to run the service as. NixOS uses DynamicUser when null. Darwin ignores this (uses staff).";
       };
+      environmentVariables = lib.mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = { };
+        description = ''
+          Extra environment variables to pass to the dolt-sql-server process.
+          Useful for wiring SSH agent sockets (SSH_AUTH_SOCK), git credential
+          helpers, GIT_SSH_COMMAND overrides, or any other env-based config the
+          service needs. Host configurations decide the contents based on their
+          chosen authentication strategy.
+        '';
+      };
     };
   };
 in
@@ -111,6 +122,10 @@ in
         '';
 
         launchd.daemons.dolt-sql-server = {
+          path = [
+            pkgs.git
+            pkgs.openssh
+          ];
           serviceConfig = {
             ProgramArguments = mkServerArgs cfg;
             RunAtLoad = true;
@@ -120,6 +135,7 @@ in
             StandardOutPath = "/tmp/dolt-sql-server.out.log";
             UserName = config.system.primaryUser;
             GroupName = "staff";
+            EnvironmentVariables = cfg.environmentVariables;
           };
         };
       };
@@ -149,7 +165,11 @@ in
           description = "Dolt SQL Server";
           after = [ "network.target" ];
           wantedBy = [ "multi-user.target" ];
-          path = [ pkgs.git ];
+          path = [
+            pkgs.git
+            pkgs.openssh
+          ];
+          environment = cfg.environmentVariables;
           serviceConfig = {
             Type = "simple";
             ExecStart = lib.escapeShellArgs (mkServerArgs cfg);
