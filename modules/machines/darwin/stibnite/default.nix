@@ -234,7 +234,13 @@ in
       '';
 
       # Dolt SQL server for beads issue tracking
-      services.dolt-sql-server.enable = true;
+      services.dolt-sql-server = {
+        enable = true;
+        environmentVariables.SSH_AUTH_SOCK = inputs.self.lib.bitwardenSocketPath {
+          homeDirectory = "/Users/${config.system.primaryUser}";
+          isDarwin = true;
+        };
+      };
 
       # Beads UI web interface (localhost-only)
       services.beads-ui.enable = true;
