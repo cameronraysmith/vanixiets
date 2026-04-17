@@ -1028,11 +1028,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1775788450,
-        "narHash": "sha256-157H2fnsFyQUPnUIlKtkoo/4mEPuFryxJgpcox1IpLM=",
+        "lastModified": 1776393364,
+        "narHash": "sha256-yYd6n4OuSP7+wj1hyV2yAU7x3SnMUX7nVmeDMrK7UH4=",
         "owner": "farcaller",
         "repo": "nixhelm",
-        "rev": "4c31eaf8b1bf9dc47eed71c2d193915340db19a9",
+        "rev": "33b5d67219d609b659d39b96bb7aa79d1661ec4e",
         "type": "github"
       },
       "original": {
