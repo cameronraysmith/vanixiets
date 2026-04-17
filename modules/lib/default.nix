@@ -2,9 +2,22 @@
 # Provides:
 # - mdFormat: type for markdown documents with frontmatter (used by agents-md)
 # - userIdentities: SSH keys for user identities (single source of truth)
+# - bitwardenSocketPath: Bitwarden Desktop SSH agent socket path by platform
 { lib, ... }:
 {
   flake.lib = {
+    # Returns the Bitwarden Desktop SSH agent socket path for the given platform.
+    # Source: https://bitwarden.com/help/ssh-agent/#tab-macos-6VN1DmoAVFvm7ZWD95curS
+    bitwardenSocketPath =
+      {
+        homeDirectory,
+        isDarwin,
+      }:
+      if isDarwin then
+        "${homeDirectory}/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock"
+      else
+        "${homeDirectory}/.bitwarden-ssh-agent.sock";
+
     # User identity SSH keys - single source of truth
     # All machine configs and clan inventory modules reference these keys.
     # Add new keys here; they propagate everywhere automatically.
