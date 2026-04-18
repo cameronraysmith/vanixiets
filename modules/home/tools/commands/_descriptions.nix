@@ -48,6 +48,7 @@
         kindc = "Create kind Kubernetes cluster with ingress support";
         tre = "Tmux resurrect restore with session selection";
         clean-shell-history-secrets = "Clean secrets from shell history using atuin and gitleaks";
+        buildbot-logs = "Fetch buildbot-nix build logs from magnetite via ssh";
       };
     }
     {
