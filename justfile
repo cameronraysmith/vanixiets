@@ -123,7 +123,7 @@ nix-flake-io:
   #!/usr/bin/env bash
   set -euo pipefail
   sys=$(nix eval --impure --raw --expr 'builtins.currentSystem')
-  systems=(aarch64-darwin aarch64-linux x86_64-darwin x86_64-linux)
+  systems=(aarch64-darwin aarch64-linux x86_64-linux)
 
   # Per-system attrsets (members listed for current system)
   printf "## checks\n"
