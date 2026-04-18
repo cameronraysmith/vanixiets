@@ -265,8 +265,10 @@
   };
 
   # fetch buildbot-nix build logs from magnetite via ssh
+  # On Darwin, uses /usr/bin/ssh (Apple-signed, Keychain-integrated agent)
+  # rather than nixpkgs openssh, matching the ntfy-send precedent for
+  # reaching ZeroTier hosts from macOS.
   buildbot-logs = {
-    runtimeInputs = with pkgs; [ openssh ];
     text = ''
       case "''${1:-}" in
         -h|--help)
@@ -332,7 +334,7 @@
 
       echo "Fetching logs for build $builder/$build from $host..." >&2
 
-      ssh -T "$host" \
+      ${if pkgs.stdenv.isDarwin then "/usr/bin/ssh" else "ssh"} -T "$host" \
         "BUILDER=$builder BUILD=$build INCLUDE_HIDDEN=$include_hidden bash -s" \
       <<'REMOTE_SCRIPT'
       set -euo pipefail
