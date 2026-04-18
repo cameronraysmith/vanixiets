@@ -225,8 +225,7 @@ Constraints are organized by category and include rationale, implications, and m
 - User preferences not all configurable
 
 **Architecture support**:
-- aarch64-darwin (Apple Silicon) primary
-- x86_64-darwin (Intel) secondary
+- aarch64-darwin (Apple Silicon) only
 - Some packages unavailable or broken on darwin
 
 ### NixOS system constraints
