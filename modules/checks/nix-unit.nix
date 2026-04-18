@@ -11,6 +11,7 @@
           nixpkgs-darwin-stable
           nixpkgs-linux-stable
           flake-parts
+          systems
           nix-darwin
           home-manager
           sops-nix
