@@ -11,21 +11,8 @@
 { lib, ... }:
 {
   perSystem =
+    { self', ... }:
     {
-      self',
-      system,
-      ...
-    }:
-    let
-      exposedSystems = [
-        "aarch64-darwin"
-        "aarch64-linux"
-        "x86_64-linux"
-      ];
-    in
-    {
-      checks = lib.optionalAttrs (lib.elem system exposedSystems) (
-        lib.mapAttrs' (name: shell: lib.nameValuePair "devshell-${name}" shell) self'.devShells
-      );
+      checks = lib.mapAttrs' (name: shell: lib.nameValuePair "devshell-${name}" shell) self'.devShells;
     };
 }
