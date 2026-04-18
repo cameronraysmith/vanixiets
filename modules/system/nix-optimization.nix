@@ -21,8 +21,8 @@
 
       # Additional nix settings
       nix.settings = {
-        # Platform-specific: darwin can build both aarch64 and x86_64
-        extra-platforms = lib.mkIf pkgs.stdenv.isDarwin "aarch64-darwin x86_64-darwin";
+        # Fleet is aarch64-only; no x86_64-darwin in extra-platforms
+        extra-platforms = lib.mkIf pkgs.stdenv.isDarwin "aarch64-darwin";
 
         # Note: min-free/max-free omitted - clan-core already sets conservative defaults
         # (3GB max-free / 512MB min-free via clan.core.enableRecommendedDefaults)
