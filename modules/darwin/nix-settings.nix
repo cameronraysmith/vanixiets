@@ -58,8 +58,8 @@
               "auto-allocate-uids"
             ];
 
-            # Enable Rosetta builds on Apple Silicon
-            extra-platforms = "aarch64-darwin x86_64-darwin";
+            # Fleet is aarch64-only; no x86_64-darwin in extra-platforms
+            extra-platforms = "aarch64-darwin";
 
             # Disable mutable global flake registry (fetched from GitHub by default)
             # Resolution still works via system registry populated by registry.nixpkgs above
