@@ -87,7 +87,7 @@ Branch naming follows the `{ID}-descriptor` pattern in lowercase kebab-case, wit
 Default granularity is per-issue; use epic-level branches only when the orchestrator explicitly specifies.
 
 Create a working branch for the issue following the branch naming pattern `{ID}-descriptor`.
-See the "Working branch isolation" section of git-preferences for mode-specific commands (git worktree add in git-native mode, `but branch new` in GitButler mode, or `jj bookmark create` in jj mode).
+See the "Working branch isolation" section of `~/.claude/skills/preferences-git-version-control/SKILL.md` for the mode-routing table; mode-specific commands live in `01-git-native-mode.md` (git worktree add), `02-gitbutler-mode.md` (`but branch new`), and `03-jj-mode.md` (`jj bookmark create`).
 
 The subagent creates the working branch as its first action before any implementation work begins.
 For non-bead or quick-fix work, use a plain branch instead of the full isolation workflow.
@@ -96,7 +96,7 @@ In git-native mode with worktrees, initialize the direnv environment before hook
 This does not apply in GitButler mode or jj mode (both operate in a single working tree).
 
 In jj mode, when working across multiple epics simultaneously, the orchestrator creates a multi-parent `@` (development join) via `jj new epic-a epic-b` and routes changes to the correct epic bookmark via `jj absorb` or `jj squash --into` after subagent completion.
-See the "Subagent dispatch in jj mode" subsection of git-preferences for the full routing workflow.
+See the "Subagent dispatch in jj mode" subsection of `~/.claude/skills/preferences-git-version-control/03-jj-mode.md` for the full routing workflow.
 
 All agents (including parallel agents) share the same `@` working copy.
 Coordination protocol: atomic one-file changes, periodic `jj log` review, prompt absorb/squash to keep `@` clean.
