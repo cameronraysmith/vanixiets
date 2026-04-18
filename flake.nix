@@ -39,12 +39,14 @@
     clan-core.inputs.flake-parts.follows = "flake-parts";
     clan-core.inputs.treefmt-nix.follows = "treefmt-nix";
     clan-core.inputs.nix-darwin.follows = "nix-darwin";
+    clan-core.inputs.systems.follows = "systems";
 
     import-tree.url = "github:vic/import-tree";
 
     terranix.url = "github:terranix/terranix";
     terranix.inputs.flake-parts.follows = "flake-parts";
     terranix.inputs.nixpkgs.follows = "nixpkgs";
+    terranix.inputs.systems.follows = "systems";
 
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
