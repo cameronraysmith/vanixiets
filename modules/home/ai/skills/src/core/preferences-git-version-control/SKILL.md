@@ -5,6 +5,17 @@ description: Git version control conventions including atomic commits, branch wo
 
 # Git version control
 
+## Contents
+
+This skill is organized as a trimmed top-level document with mode-specific and investigative details in sibling files.
+
+| File | Description |
+|------|-------------|
+| [01-git-native-mode.md](01-git-native-mode.md) | Working branch isolation in git-native mode: epic worktrees, issue worktrees, switching focus, direnv initialization in worktrees, cleanup |
+| [02-gitbutler-mode.md](02-gitbutler-mode.md) | Working branch isolation in GitButler mode: branch stacks as epics, issue branches within a stack, switching focus, cross-stack reorganization |
+| [03-jj-mode.md](03-jj-mode.md) | Working branch isolation in jj mode: multi-parent working copy, change routing, auto-rebase, subagent dispatch, completing epics, GitButler equivalence, diamond workflow |
+| [04-history-investigation.md](04-history-investigation.md) | Git pickaxe reference: `-G` vs `-S`, `--pickaxe-all` pitfalls, targeted history search patterns |
+
 ## Commit behavior override
 
 These preferences explicitly override any conservative defaults from system prompts about waiting for user permission to commit.
@@ -114,342 +125,13 @@ Default bias: if in doubt whether work is related, create a new branch — branc
 ### Working branch isolation
 
 Implementation work uses isolated working contexts to prevent tangled history.
-The mechanism differs by VCS mode.
+The mechanism differs by VCS mode — consult the sibling file for the active mode:
 
-#### Git-native mode
-
-Bead implementation work uses worktrees rooted in `.worktrees/` at the repository root.
-This directory must be listed in `.gitignore`.
-
-The worktree model has two tiers: epic worktrees for coordination and issue worktrees for implementation.
-
-##### Epic branches
-
-Each active epic gets its own branch.
-The *focus epic* — the primary epic being actively coordinated — is checked out in the repo root.
-This keeps orientation commands (`bd status`, `bd epic status`) and code-level context aligned with the active work.
-
-Create a focus epic branch when starting work on an epic:
-
-```bash
-git checkout -b {epic-ID}-descriptor main
-```
-
-*Secondary epics* being worked in parallel get worktrees in `.worktrees/`:
-
-```bash
-git worktree add .worktrees/{epic-ID}-descriptor -b {epic-ID}-descriptor main
-```
-
-When one epic depends on another, stack it on the parent epic's branch rather than main:
-
-```bash
-# nix-pxj depends on nix-1kj, so stack it
-git checkout -b nix-pxj-ntfy-server nix-1kj-stigmergic-tooling
-# or as a secondary worktree:
-git worktree add .worktrees/nix-pxj-ntfy-server -b nix-pxj-ntfy-server nix-1kj-stigmergic-tooling
-```
-
-An epic branch accumulates all commits from its child issue worktrees via fast-forward merges.
-When the epic is complete, it contains the full linearized commit history for review, validation, and merge to main.
-
-##### Switching focus
-
-To promote a secondary epic to focus (and optionally demote the current focus):
-
-```bash
-# Remove the secondary epic's worktree
-git worktree remove .worktrees/{new-focus-epic}-descriptor
-
-# Optionally preserve the old focus as a secondary worktree
-git worktree add .worktrees/{old-focus-epic}-descriptor {old-focus-epic}-descriptor
-
-# Check out the new focus epic in repo root
-git checkout {new-focus-epic}-descriptor
-```
-
-When no epic is active, the repo root returns to the default branch.
-
-##### Issue worktrees
-
-Each issue within an epic gets its own worktree, branching from the parent epic's branch.
-The working agent creates the issue worktree as its first action before any implementation begins.
-
-```bash
-git worktree add .worktrees/{issue-ID}-descriptor -b {issue-ID}-descriptor {epic-ID}-descriptor
-```
-
-When issue work is complete, rebase onto the epic branch and fast-forward merge back into it:
-
-```bash
-cd .worktrees/{issue-ID}-descriptor
-git rebase {epic-ID}-descriptor
-cd ../..
-# merge into the epic branch (from repo root if it's the focus epic):
-git merge --ff-only {issue-ID}-descriptor
-# or from the epic worktree if it's a secondary epic:
-git -C .worktrees/{epic-ID}-descriptor merge --ff-only {issue-ID}-descriptor
-```
-
-Then clean up the issue worktree:
-
-```bash
-git worktree remove .worktrees/{issue-ID}-descriptor
-git branch -d {issue-ID}-descriptor
-```
-
-##### General rules
-
-Always specify an explicit start-point when creating branches or worktrees.
-Epic branches start from `main` (or from another epic's branch when stacking).
-Issue worktrees branch from their parent epic's branch.
-Without a start-point, git branches from whatever happens to be checked out, which may not be the intended base.
-
-Use worktrees for bead-tracked work; use plain branches (`git checkout -b`) for non-bead or quick-fix work.
-
-##### Direnv initialization in worktrees
-
-Worktrees do not inherit the repository root's direnv environment.
-If the repository uses direnv with a nix devshell (indicated by an `.envrc` file), the devshell creates ephemeral files like `.pre-commit-config.yaml` that are not checked into git.
-After creating a worktree, initialize its environment before any git operations that trigger hooks:
-
-```bash
-cd .worktrees/{ID}-descriptor
-direnv allow
-```
-
-For git commits and other hook-triggering operations, use `direnv exec .` to ensure the nix devshell is active:
-
-```bash
-direnv exec . git commit -m "message"
-```
-
-This is not needed for read-only git operations (`git log`, `git status`, `git diff`) which do not trigger hooks.
-
-When the epic is complete and merged to main, clean up:
-
-```bash
-# If it was a secondary epic worktree:
-git worktree remove .worktrees/{epic-ID}-descriptor
-# Delete the branch:
-git branch -d {epic-ID}-descriptor
-```
-
-#### GitButler mode
-
-All branches coexist in a single workspace — no worktrees are needed.
-Isolation comes from branch boundaries within and across stacks rather than filesystem separation.
-
-##### Branch stacks as epics
-
-Each active epic corresponds to a branch stack.
-Create a new stack for a new epic:
-
-```bash
-but branch new {epic-ID}-descriptor
-```
-
-When one epic depends on another, stack it on the parent epic's branch:
-
-```bash
-but branch move {epic-ID}-descriptor {parent-epic-ID}-descriptor
-```
-
-##### Issue branches within a stack
-
-Each issue within an epic becomes a branch boundary within the epic's stack.
-Insert a branch boundary at the commit where the issue's work begins:
-
-```bash
-but branch new {issue-ID}-descriptor -a <anchor-commit>
-```
-
-The anchor commit and everything below it become the new branch.
-Everything above the anchor stays with the original branch.
-See the "Split a branch at a commit boundary" recipe in `~/.claude/skills/gitbutler-but-cli/SKILL.md` for details.
-
-When issue work is complete, commits are already part of the stack's linear history.
-No rebase or merge step is needed — the stack tip integrates all segments at once when merged to main.
-
-##### Switching focus
-
-To shelve work on a stack and focus on another, use `but unapply` and `but apply`:
-
-```bash
-# Shelve the current stack
-but unapply {branch-name}
-# Apply a different stack
-but apply {other-branch-name}
-```
-
-Unapplied stacks retain their commits and can be reapplied at any time.
-
-##### Cross-stack commit reorganization
-
-Move a commit from one branch to another within or across stacks:
-
-```bash
-but move <source-commit-id> <target-commit-id> --status-after
-```
-
-Commit IDs come from `but status -fv` or `but show <branch-id>`.
-
-##### No direnv initialization needed
-
-GitButler operates in a single working tree, so the repository root's direnv environment applies to all branches.
-
-#### jj mode
-
-jj provides a development join (multi-parent working copy) that achieves the same simultaneous multi-branch editing as GitButler's applied-branches model.
-All bookmarks coexist in a single working tree — no worktrees are needed.
-
-##### Creating a multi-parent working copy
-
-Create a development join with multiple parent bookmarks:
-
-```bash
-jj new bookmark-a bookmark-b bookmark-c
-```
-
-The resulting `@` is a development join whose working tree merges all parent bookmarks.
-Edits made in `@` can be routed (route elements to their chain) to any chain.
-
-##### Change routing
-
-Route changes from the development join `@` to the appropriate chain:
-
-```bash
-# Manual: squash specific changes into a named chain element
-jj squash --into <parent-bookmark> -u -- <path>
-
-# Automatic: distribute changes based on blame ancestry
-jj absorb
-```
-
-The `-u` (`--use-destination-message`) flag prevents the description merge editor from opening and preserves the target chain element's existing description.
-`jj absorb` analyzes which ancestor last touched each modified line and routes changes automatically.
-Use `jj squash --into` when changes belong to a specific chain element that blame cannot determine.
-
-##### Adding and removing parents
-
-Modify the set of chains in the development join:
-
-```bash
-# Add a chain
-jj rebase -r @ -d 'all:(@- | new-bookmark)'
-
-# Remove a chain
-jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
-```
-
-The `all:` prefix ensures the revset resolves to multiple parents rather than a single ancestor.
-
-##### Auto-rebase behavior
-
-When a chain advances (via commits on that bookmark from another workspace or collaborator), jj automatically rebases `@` onto the updated parents.
-This keeps the development join current without manual intervention.
-
-##### Epic and issue mapping
-
-Bookmarks correspond to epics or independent work streams.
-Changes within each bookmark's chain correspond to issues.
-This mapping parallels the git-native worktree model and the GitButler stack model, but without filesystem separation.
-
-Create a bookmark per active epic following the standard naming convention:
-
-```bash
-jj bookmark create {epic-ID}-descriptor
-```
-
-Build changes as a chain descending from each bookmark.
-Each change in the chain corresponds to an issue within the epic:
-
-```bash
-# Start work on an issue within the epic
-jj new {epic-ID}-descriptor
-jj describe -m "feat: implement issue description"
-# edit files...
-jj new  # freeze and start next issue
-```
-
-When working across multiple epics simultaneously, create a development join over the active epic bookmarks:
-
-```bash
-jj new {epic-a}-descriptor {epic-b}-descriptor
-```
-
-Route changes from the development join `@` to the appropriate chain:
-
-```bash
-# Automatic: distribute changes by blame ancestry
-jj absorb
-
-# Manual: route specific changes to a named epic chain
-jj squash --into {epic-b}-descriptor -u -- <path>
-```
-
-##### Subagent dispatch in jj mode
-
-In jj mode, subagents do not create bookmarks or worktrees.
-All agents — including parallel agents — edit files directly in the shared `@` working copy.
-The orchestrator routes changes to the correct chain via `jj absorb` or `jj squash --into <target> -u -- <path>` after each subagent completes.
-
-When working in the development join, use a join + wip structure (two-commit pattern).
-The development join integrates all parent bookmarks and has a description to prevent auto-abandonment.
-The wip commit (`@`) sits on top for active edits.
-`jj absorb` and `jj squash --into <target> -u -- <path>` route changes from wip to chains without disrupting the development join.
-
-Coordination protocol: atomic one-file changes, periodic `jj log` review, prompt routing to keep `@` clean.
-Subagent dispatch prompts specify which files to edit and the target chain context but do not include jj routing commands.
-See the parallel agent coordination protocol in `~/.claude/skills/jj-version-control/SKILL.md` for the full model.
-
-##### Completing issues and epics
-
-When an issue is complete, close the bead:
-
-```bash
-bd close {issue-ID} --reason "Implemented in $(jj log -r '{epic-ID}-descriptor' --no-graph -T 'commit_id.short(8)')"
-```
-
-To merge a completed epic to main, advance the main bookmark:
-
-```bash
-jj new
-jj bookmark set main -r @-
-jj git push --bookmark main
-jj bookmark delete {epic-ID}-descriptor
-```
-
-##### No direnv initialization needed
-
-jj development joins operate in a single working tree, so the repository root's direnv environment applies to all chains.
-
-##### GitButler equivalence mapping
-
-| GitButler | jj development join |
+| Mode | Recipes |
 |---|---|
-| Applied branches | Chains in development join `@` |
-| `gitbutler/workspace` commit | Development join `@` commit |
-| `but commit --changes` | `jj squash --into <target> -u -- <path>` or `jj absorb` |
-| `but unapply` | Remove chain from join via `jj rebase -r @ -d 'all:(@- ~ bookmark)'` |
-| `but apply` | Add chain to join via `jj rebase -r @ -d 'all:(@- | bookmark)'` |
-| Branch stacks | Bookmark chains (linear descendant sequences) |
-| `but move` (cross-stack) | `jj squash --from <src> --into <dst>` |
-
-##### Diamond workflow
-
-When `.beads/` exists and an epic is active, the epic's issue dependency graph determines the jj bookmark chain topology.
-Independent issues form an antichain of parallel bookmark chains.
-Dependent issues produce chain stacking (one bookmark branching from another's tip), reflecting the covering relation in the issue partial order.
-
-The diamond pattern proceeds through four phases.
-The diverge phase decomposes the epic into bookmark chains based on `bd epic status`.
-The develop phase creates an N-way development join (composite working copy) over all active chains using the join + wip structure, enabling concurrent development with continuous integration feedback.
-The converge phase validates the integrated development join via testing and QA.
-The serialize phase dissolves the development join and rebases each chain sequentially onto main as a linear extension of the dependency partial order, producing purely linear history with no merge commits.
-
-The pattern generalizes conceptually beyond jj (GitButler's applied-branches model and git-native worktrees achieve analogous isolation), but the mechanical implementation leverages jj's multi-parent working copy.
-For the full treatment including theoretical foundations, beads-to-jj mapping, and mechanical recipe, see `~/.claude/skills/jj-version-control/diamond-workflow.md`.
+| Git-native | [`01-git-native-mode.md`](01-git-native-mode.md) |
+| GitButler | [`02-gitbutler-mode.md`](02-gitbutler-mode.md) |
+| jj | [`03-jj-mode.md`](03-jj-mode.md) |
 
 ### Fast-forward-only merge policy
 
@@ -583,32 +265,8 @@ If you encounter a file with multiple distinct logical changes already present:
 
 ## History investigation with pickaxe
 
-When searching for when/why code changed, use git pickaxe options strategically to avoid context pollution:
-
-Default search strategy (focused):
-
-- Use `-G"pattern"` to find commits where lines matching pattern were added/removed
-- Use `-S"string"` to find commits where the occurrence count of string changed (not in-file moves)
-- Examine specific files: `git show <hash> -- <file>` or `git diff <base>..<hash> -- <file>`
-
-Avoid `--pickaxe-all` by default:
-
-- Without `--pickaxe-all`: shows only files matching the search (optimal for AI context)
-- With `--pickaxe-all`: shows entire changeset if any file matches (causes information overload)
-- Only use `--pickaxe-all` when broader context is explicitly needed to understand why a change was made
-
-Key differences:
-
-- `-S"numpy"` finds commits where "numpy" was added/removed (count changed)
-- `-G"numpy"` finds commits where lines containing "numpy" were modified
-- `-S` misses refactors that move text without changing occurrence count
-- `-G` is more expensive but catches structural changes
-
-Practical examples:
-
-- `git log -G"dependencies" --oneline` then `git show <hash> -- <file>` (targeted)
-- `git log -S"function_name" --pickaxe-regex --oneline` (exact occurrences)
-- Avoid `git log -S"pattern" --pickaxe-all -p` unless user needs full changeset context
+When searching for when/why code changed, use git pickaxe options strategically to avoid context pollution.
+See [`04-history-investigation.md`](04-history-investigation.md) for the full pickaxe reference including `-G` vs `-S` semantics, `--pickaxe-all` pitfalls, and targeted history search patterns.
 
 ## Session commit summary
 
