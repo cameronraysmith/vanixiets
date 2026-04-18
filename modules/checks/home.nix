@@ -19,20 +19,13 @@
         "crs58"
         "raquel"
       ];
-      exposedSystems = [
-        "aarch64-darwin"
-        "aarch64-linux"
-        "x86_64-linux"
-      ];
     in
     {
-      checks = lib.optionalAttrs (lib.elem system exposedSystems) (
-        lib.listToAttrs (
-          map (user: {
-            name = "vanixiets-home-${user}";
-            value = self.homeConfigurations.${system}.${user}.activationPackage;
-          }) users
-        )
+      checks = lib.listToAttrs (
+        map (user: {
+          name = "vanixiets-home-${user}";
+          value = self.homeConfigurations.${system}.${user}.activationPackage;
+        }) users
       );
     };
 }
