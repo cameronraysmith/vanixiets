@@ -120,7 +120,6 @@ install-nix: ## Install Nix using the NixOS community installer
 		case "$$(uname -s)-$$(uname -m)" in \
 			Linux-x86_64)  PLATFORM="x86_64-linux" ;; \
 			Linux-aarch64) PLATFORM="aarch64-linux" ;; \
-			Darwin-x86_64) PLATFORM="x86_64-darwin" ;; \
 			Darwin-arm64)  PLATFORM="aarch64-darwin" ;; \
 			*) echo "Unsupported platform: $$(uname -s)-$$(uname -m)"; exit 1 ;; \
 		esac; \
