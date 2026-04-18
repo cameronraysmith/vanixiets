@@ -7,7 +7,7 @@
 
   inputs = {
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable-small/nixexprs.tar.xz";
-    systems.url = "path:./systems";
+    systems.url = "github:nix-systems/default/future-26.11";
 
     nixpkgs-darwin-stable.url = "https://channels.nixos.org/nixpkgs-25.11-darwin/nixexprs.tar.xz";
     nixpkgs-linux-stable.url = "https://channels.nixos.org/nixos-25.11/nixexprs.tar.xz";

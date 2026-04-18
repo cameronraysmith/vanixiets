@@ -1534,14 +1534,19 @@
     },
     "systems_10": {
       "locked": {
-        "path": "./systems",
-        "type": "path"
+        "lastModified": 1774449309,
+        "narHash": "sha256-brhZ8DmuGtzkCYHJg4HEd602amKm89Y9ytsFZ5uWD1w=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "c29398b59d2048c4ab79345812849c9bd15e9150",
+        "type": "github"
       },
       "original": {
-        "path": "./systems",
-        "type": "path"
-      },
-      "parent": []
+        "owner": "nix-systems",
+        "ref": "future-26.11",
+        "repo": "default",
+        "type": "github"
+      }
     },
     "systems_2": {
       "locked": {
