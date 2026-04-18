@@ -20,7 +20,7 @@ Requirements reflect the deferred module composition + clan architecture current
 **Inputs**:
 - darwinConfigurations.<hostname> flake output
 - All imported modules and dependencies
-- nixpkgs with platform-appropriate overlays (aarch64-darwin or x86_64-darwin)
+- nixpkgs with platform-appropriate overlays (aarch64-darwin)
 
 **Command**: `nix build .#darwinConfigurations.<hostname>.system`
 
