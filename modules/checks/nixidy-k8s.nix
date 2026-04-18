@@ -18,15 +18,8 @@
       system,
       ...
     }:
-    let
-      exposedSystems = [
-        "aarch64-darwin"
-        "aarch64-linux"
-        "x86_64-linux"
-      ];
-    in
     {
-      checks = lib.optionalAttrs (lib.elem system exposedSystems) {
+      checks = {
         inherit (self'.packages)
           k8s-manifests-local
           k8s-manifests-local-json
