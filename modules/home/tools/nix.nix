@@ -24,7 +24,6 @@
       #       build-users-group = lib.mkDefault "nixbld";
       #       auto-optimise-store = false;
       #       experimental-features = "nix-command flakes auto-allocate-uids";
-      #       extra-platforms = lib.mkIf pkgs.stdenv.isDarwin "aarch64-darwin x86_64-darwin";
       #       flake-registry = builtins.toFile "empty-flake-registry.json" ''{"flakes":[],"version":2}'';
       #       max-jobs = "auto";
       #       trusted-users = [ "root" (if pkgs.stdenv.isDarwin then flake.config.me.username else "@wheel") ];
