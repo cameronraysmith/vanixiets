@@ -8,7 +8,8 @@
     "https://pyproject-nix.cachix.org"
     "https://catppuccin.cachix.org"
     "https://cuda-maintainers.cachix.org"
-    "https://cameronraysmith.cachix.org"
+    "https://cache.scientistexperience.net?priority=45"
+    "https://cameronraysmith.cachix.org?priority=50"
   ];
 
   publicKeys = [
@@ -20,5 +21,6 @@
     "catppuccin.cachix.org-1:noG/4HkbhJb+lUAdKrph6LaozJvAeEEZj4N732IysmU="
     "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
     "cameronraysmith.cachix.org-1:aC8ZcRCVcQql77Qn//Q1jrKkiDGir+pIUjhUunN6aio="
+    "cache.scientistexperience.net-1:N9ZeWasooJLXEwaN+rd4MMyBuGpAtcUAXrEUPBT5cXI="
   ];
 }
