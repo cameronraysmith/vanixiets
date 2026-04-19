@@ -167,9 +167,9 @@ in
       );
     in
     lib.mkIf cfg.enable {
-      # Create namespace using kubernetes.resources (easykubenix pattern)
-      # "none" namespace means cluster-scoped resource
-      kubernetes.resources.none.Namespace.${cfg.namespace} = { };
+      # Namespace is auto-appended by easykubenix's helm.releases when
+      # `namespace != null`, so no explicit kubernetes.objects.none.Namespace
+      # declaration is needed here.
 
       # Deploy SopsSecret CR for private keys (processed by sops-secrets-operator)
       # This creates the Kubernetes Secrets that the helm chart expects
@@ -178,7 +178,7 @@ in
       };
 
       # Create ConfigMaps for certificates and config
-      kubernetes.resources.${cfg.namespace}.ConfigMap = {
+      kubernetes.objects.${cfg.namespace}.ConfigMap = {
         # Certificates ConfigMap (public certs, not sensitive)
         "${fullname}-certs".data = {
           "root_ca.crt" = rootCert;

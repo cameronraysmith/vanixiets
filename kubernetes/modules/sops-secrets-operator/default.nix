@@ -69,9 +69,9 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Create namespace using kubernetes.resources (easykubenix pattern)
-    # "none" namespace means cluster-scoped resource
-    kubernetes.resources.none.Namespace.${cfg.namespace} = { };
+    # Namespace is auto-appended by easykubenix's helm.releases when
+    # `namespace != null`, so no explicit kubernetes.objects.none.Namespace
+    # declaration is needed here.
 
     # Import CRD via importyaml (helm includeCRDs=false by default)
     # This ensures the SopsSecret CRD is deployed before operator starts
@@ -79,20 +79,22 @@ in
       src = crdDrv;
     };
 
-    # Register SopsSecret custom resource type with easykubenix
-    # Required for overrideNamespace and proper resource handling
+    # Register SopsSecret custom resource type with easykubenix.
+    # Scope (namespaced vs cluster-scoped) is carried by the
+    # apiMappingFile-backed scope table used by config.lib.kubernetes.enforceNamespace.
     kubernetes.apiMappings.SopsSecret = "isindir.github.com/v1alpha3";
-    kubernetes.namespacedMappings.SopsSecret = true;
 
     helm.releases.${moduleName} = {
       namespace = cfg.namespace;
       chart = "${sops-secrets-operator-src}/chart/helm3/sops-secrets-operator";
 
-      # Fix namespace for resources - the upstream Helm chart doesn't template
-      # metadata.namespace in Deployment/ServiceAccount, causing them to render
-      # without namespace and fall into "none" (cluster-scoped) in easykubenix.
-      # overrideNamespace applies metadata.namespace to all namespaced resources.
-      overrideNamespace = cfg.namespace;
+      # Patch namespaced resources that the upstream Helm chart renders without
+      # metadata.namespace (notably Deployment and ServiceAccount). The shared
+      # enforceNamespace helper consults the bundled API resource snapshot to
+      # route only namespaced kinds, leaving cluster-scoped objects untouched.
+      overrides = [
+        (config.lib.kubernetes.enforceNamespace cfg.namespace)
+      ];
 
       values = lib.recursiveUpdate {
         # Single replica for simplicity

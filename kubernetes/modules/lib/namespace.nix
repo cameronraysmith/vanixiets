@@ -57,27 +57,9 @@ let
       object;
 in
 {
-  options.lib.kubernetes = {
-    isNamespacedKind = lib.mkOption {
-      type = lib.types.functionTo lib.types.bool;
-      readOnly = true;
-      description = ''
-        Predicate that returns `true` when the given Kubernetes `kind`
-        represents a namespaced resource. Throws on unknown kinds.
-      '';
-    };
-
-    enforceNamespace = lib.mkOption {
-      type = lib.types.functionTo (lib.types.functionTo lib.types.attrs);
-      readOnly = true;
-      description = ''
-        Curried helper `namespace -> object -> object`. When `object` is a
-        namespaced resource lacking `metadata.namespace`, returns a copy
-        with the namespace set; otherwise returns the object unchanged.
-      '';
-    };
-  };
-
+  # easykubenix's `options.lib` is typed as `attrsOf attrs`, a flat two-level
+  # attrset whose leaves are opaque. Individual helpers are therefore contributed
+  # under `config.lib.kubernetes` without declaring nested options.
   config.lib.kubernetes = {
     inherit isNamespacedKind enforceNamespace;
   };

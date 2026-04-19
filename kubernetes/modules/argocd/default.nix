@@ -92,9 +92,9 @@ in
 
   config = lib.mkMerge [
     (lib.mkIf cfg.enable {
-      # Create namespace using kubernetes.resources (easykubenix pattern)
-      # "none" namespace means cluster-scoped resource
-      kubernetes.resources.none.Namespace.${cfg.namespace} = { };
+      # Namespace for argocd is auto-appended by easykubenix's helm.releases
+      # when `namespace != null`, so no explicit kubernetes.objects.none.Namespace
+      # declaration is needed here.
 
       # Import ArgoCD CRDs from source
       # Helm chart includeCRDs=false by default, so we import them separately
@@ -116,9 +116,8 @@ in
         namespace = cfg.namespace;
         chart = chartWithDeps;
 
-        # Fix namespace for resources - some Helm charts don't template
-        # metadata.namespace in all resources
-        overrideNamespace = cfg.namespace;
+        # argo-cd chart templates .Release.Namespace correctly on every
+        # namespaced kind, so no enforceNamespace override is needed here.
 
         values = lib.recursiveUpdate {
           # Global settings
@@ -223,7 +222,7 @@ in
       };
 
       # Namespaced resources for ArgoCD
-      kubernetes.resources.${cfg.namespace} = {
+      kubernetes.objects.${cfg.namespace} = {
         # Redis authentication secret (required when redisSecretInit.enabled = false)
         # For local dev, use a static password. Production should use SopsSecret.
         Secret.argocd-redis = {
@@ -282,11 +281,6 @@ in
         Application = "argoproj.io/v1alpha1";
         AppProject = "argoproj.io/v1alpha1";
         ApplicationSet = "argoproj.io/v1alpha1";
-      };
-      kubernetes.namespacedMappings = {
-        Application = true;
-        AppProject = true;
-        ApplicationSet = true;
       };
     }
   ];
