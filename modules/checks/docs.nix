@@ -5,6 +5,7 @@
     {
       # Passthru tests hoisted to checks (ironstar pattern: modules/checks/docs.nix:6-7).
       checks.vanixiets-docs-unit = config.packages.vanixiets-docs.tests.unit;
+      checks.vanixiets-docs-linkcheck = config.packages.vanixiets-docs.tests.linkcheck;
       checks.vanixiets-docs-e2e = config.packages.vanixiets-docs.tests.e2e;
 
       # Base docs build wired as an effect-input-wire check. The wrangler deploy
