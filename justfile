@@ -516,6 +516,13 @@ bun-repin-playwright:
 bun-lockfile-reconcile:
   bun install --lockfile-only
 
+# Preview outdated deps across all workspaces that bun-update-latest-stable
+# would bump. Excludes playwright per the flake-is-version-ceiling invariant.
+# The "Latest" column maps to what --latest bumps; "Update" to plain bun update.
+[group('bun')]
+bun-outdated:
+  bun outdated --recursive '!playwright' '!@playwright/test'
+
 # Bump all non-playwright deps to latest stable, then reconcile bun.lock and
 # regenerate bun.nix. Playwright stays pinned to the playwright-web-flake version
 # per the flake-is-version-ceiling invariant.
