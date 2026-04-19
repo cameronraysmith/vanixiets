@@ -9,7 +9,14 @@
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable-small/nixexprs.tar.xz";
     systems.url = "github:nix-systems/default/future-26.11";
 
-    nixpkgs-darwin-stable.url = "https://channels.nixos.org/nixpkgs-25.11-darwin/nixexprs.tar.xz";
+    # TEMPORARY: pinned to unstable-small@90c93f32066c snapshot to preserve
+    # atuin 18.13.6 sqlx schema compatibility (migration 20260224000100 was
+    # applied locally) and the dvc build, both broken on the latest unstable
+    # for aarch64-darwin. Revert to the nixpkgs-25.11-darwin channel
+    # (https://channels.nixos.org/nixpkgs-25.11-darwin/nixexprs.tar.xz) when
+    # hydra rebuilds atuin and dvc cleanly on aarch64-darwin unstable.
+    # Date pinned: 2026-04-19
+    nixpkgs-darwin-stable.url = "https://releases.nixos.org/nixos/unstable-small/nixos-26.05pre972603.90c93f32066c/nixexprs.tar.xz";
     nixpkgs-linux-stable.url = "https://channels.nixos.org/nixos-25.11/nixexprs.tar.xz";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
