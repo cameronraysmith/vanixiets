@@ -710,7 +710,7 @@ diagrams-build:
   for svg in public/diagrams/*.svg; do
     [ -f "$svg" ] || continue
     echo "  Optimizing $(basename "$svg")"
-    bunx svgo --quiet "$svg" -o "$svg"
+    svgo --quiet "$svg" -o "$svg"
   done
   echo "Done. Diagrams in packages/docs/public/diagrams/"
 
