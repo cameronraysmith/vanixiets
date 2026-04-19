@@ -36,6 +36,13 @@
         # TODO: Remove when upstream fix lands in unstable
         # Date added: 2026-04-19
         atuin = final.stable.atuin;
+
+        # dvc: pinned to stable while unstable build is broken
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/python313Packages.dvc.aarch64-darwin
+        # Failing build: https://hydra.nixos.org/build/326554391
+        # TODO: Remove when upstream fix lands in unstable
+        # Date added: 2026-04-19
+        dvc = final.stable.dvc;
       })
       // (prev.lib.optionalAttrs prev.stdenv.isLinux {
         # Linux-wide stable fallbacks
