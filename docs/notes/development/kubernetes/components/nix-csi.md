@@ -402,7 +402,7 @@ let
   cfg = config.nix-csi;
 in
 {
-  kubernetes.resources.${cfg.namespace}.Job.example = {
+  kubernetes.objects.${cfg.namespace}.Job.example = {
     spec.template.spec = {
       restartPolicy = "Never";
       containers = lib.mkNamedList {
@@ -435,7 +435,7 @@ let
   armPkgs = import pkgs.path { system = "aarch64-linux"; };
 in
 {
-  kubernetes.resources.${cfg.namespace}.Deployment.example = {
+  kubernetes.objects.${cfg.namespace}.Deployment.example = {
     spec = {
       replicas = 3;
       selector.matchLabels.app = "example";

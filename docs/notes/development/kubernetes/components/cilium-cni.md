@@ -247,7 +247,7 @@ Cilium's native policy CRD enables advanced features like entity selectors (`clu
 
 ```nix
 # From hetzkube: cluster-wide default policies
-kubernetes.resources.none.CiliumClusterwideNetworkPolicy = {
+kubernetes.objects.none.CiliumClusterwideNetworkPolicy = {
   ep-default = {
     spec = {
       endpointSelector = { };  # matches all endpoints

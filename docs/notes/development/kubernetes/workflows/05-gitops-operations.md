@@ -85,7 +85,7 @@ let
 in
 {
   config = lib.mkIf cfg.enable {
-    kubernetes.resources.kube-system.ConfigMap.cilium-config.data = {
+    kubernetes.objects.kube-system.ConfigMap.cilium-config.data = {
       enable-bpf-masquerade = "true";
       ipam = "kubernetes";
     };
@@ -98,11 +98,11 @@ After editing, rebuild manifests and review the diff before deployment.
 ### Adding new Kubernetes resources
 
 Add resources to the appropriate namespace within a module.
-easykubenix uses the pattern `kubernetes.resources.<namespace>.<Kind>.<name>`.
+easykubenix uses the pattern `kubernetes.objects.<namespace>.<Kind>.<name>`.
 
 ```nix
 {
-  kubernetes.resources.my-namespace = {
+  kubernetes.objects.my-namespace = {
     # Create a ConfigMap
     ConfigMap.app-config.data = {
       "config.yaml" = builtins.toJSON {
@@ -138,7 +138,7 @@ Cluster-scoped resources (ClusterRole, ClusterIssuer, etc.) use the reserved nam
 
 ```nix
 {
-  kubernetes.resources.none.ClusterRole.my-cluster-role.rules = [
+  kubernetes.objects.none.ClusterRole.my-cluster-role.rules = [
     {
       apiGroups = [""];
       resources = ["pods"];
@@ -418,7 +418,7 @@ Reference encrypted SopsSecret files in Nix modules.
 ```nix
 {
   # Import pre-encrypted SopsSecret
-  kubernetes.resources.application."isindir.github.com/v1alpha3".SopsSecret.database-credentials =
+  kubernetes.objects.application."isindir.github.com/v1alpha3".SopsSecret.database-credentials =
     builtins.fromJSON (builtins.readFile ./secrets/database-credentials.enc.json);
 }
 ```
@@ -493,7 +493,7 @@ Adjust replica count in the Nix module.
 
 ```nix
 {
-  kubernetes.resources.${clusterName}.MachineDeployment."${clusterName}-workers-x86".spec = {
+  kubernetes.objects.${clusterName}.MachineDeployment."${clusterName}-workers-x86".spec = {
     replicas = 3;  # Increase from default
     # ... rest of spec
   };
@@ -524,7 +524,7 @@ Define new MachineDeployment and HCloudMachineTemplate resources.
 
 ```nix
 {
-  kubernetes.resources.${clusterName} = {
+  kubernetes.objects.${clusterName} = {
     # GPU worker pool
     MachineDeployment."${clusterName}-workers-gpu" = {
       metadata.labels.nodepool = "${clusterName}-workers-gpu";
@@ -652,7 +652,7 @@ Add Certificate resources in Nix modules.
 
 ```nix
 {
-  kubernetes.resources.my-namespace.Certificate.my-service-tls.spec = {
+  kubernetes.objects.my-namespace.Certificate.my-service-tls.spec = {
     secretName = "my-service-tls";
     issuerRef = {
       name = "letsencrypt-prod";
@@ -672,7 +672,7 @@ For Ingress resources, use annotations for automatic certificate provisioning.
 
 ```nix
 {
-  kubernetes.resources.my-namespace.Ingress.my-service = {
+  kubernetes.objects.my-namespace.Ingress.my-service = {
     metadata.annotations = {
       "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
     };

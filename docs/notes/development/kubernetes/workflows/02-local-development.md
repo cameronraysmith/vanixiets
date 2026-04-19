@@ -179,7 +179,7 @@ cert-manager automates certificate provisioning via the step-ca ACME endpoint.
   };
 
   # ClusterIssuer for step-ca
-  kubernetes.resources.none.ClusterIssuer.step-ca-acme = {
+  kubernetes.objects.none.ClusterIssuer.step-ca-acme = {
     spec = {
       acme = {
         server = "https://step-certificates.step-ca.svc.cluster.local:9000/acme/acme/directory";
@@ -331,7 +331,7 @@ let
   nodeIP = "127.0.0.1";
 in
 {
-  kubernetes.resources.default.Ingress.myapp = {
+  kubernetes.objects.default.Ingress.myapp = {
     metadata.annotations = {
       "cert-manager.io/cluster-issuer" = "step-ca-acme";
     };
@@ -385,7 +385,7 @@ Use this for complex routing requirements.
 
 ```nix
 # Gateway resource
-kubernetes.resources.default.Gateway.main-gateway = {
+kubernetes.objects.default.Gateway.main-gateway = {
   spec = {
     gatewayClassName = "cilium";
     listeners = [
@@ -412,7 +412,7 @@ kubernetes.resources.default.Gateway.main-gateway = {
 };
 
 # HTTPRoute for application
-kubernetes.resources.default.HTTPRoute.myapp-route = {
+kubernetes.objects.default.HTTPRoute.myapp-route = {
   spec = {
     parentRefs = [
       { name = "main-gateway"; }
@@ -517,7 +517,7 @@ let
   nodeIP = config.clusterHost or "127.0.0.1";
 in
 {
-  kubernetes.resources.default = {
+  kubernetes.objects.default = {
     Deployment.hello = {
       spec = {
         replicas = 1;
@@ -650,7 +650,7 @@ Enable it selectively for workloads that benefit from declarative Nix dependenci
 # apps/nix-example/default.nix
 { config, lib, pkgs, ... }:
 {
-  kubernetes.resources.default.Job.nix-example = {
+  kubernetes.objects.default.Job.nix-example = {
     spec.template.spec = {
       restartPolicy = "Never";
       containers = lib.mkNamedList {

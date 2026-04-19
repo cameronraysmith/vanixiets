@@ -216,7 +216,7 @@ The hetzkube reference demonstrates this pattern with both staging and productio
 
 ```nix
 {
-  kubernetes.resources.none.ClusterIssuer.le-staging.spec = {
+  kubernetes.objects.none.ClusterIssuer.le-staging.spec = {
     acme = {
       server = "https://acme-staging-v02.api.letsencrypt.org/directory";
       email = "admin@example.com";
@@ -232,7 +232,7 @@ The hetzkube reference demonstrates this pattern with both staging and productio
     };
   };
 
-  kubernetes.resources.none.ClusterIssuer.le-prod.spec = {
+  kubernetes.objects.none.ClusterIssuer.le-prod.spec = {
     acme = {
       server = "https://acme-v02.api.letsencrypt.org/directory";
       email = "admin@example.com";
@@ -392,7 +392,7 @@ The hetzkube reference uses Bitwarden Secrets Manager to inject the Cloudflare t
 
 ```nix
 {
-  kubernetes.resources.cert-manager = {
+  kubernetes.objects.cert-manager = {
     Secret.bw-auth-token.stringData.token = "{{ bwtoken }}";
     BitwardenSecret.cloudflare = {
       spec = {

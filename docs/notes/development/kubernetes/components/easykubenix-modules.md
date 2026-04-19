@@ -170,7 +170,7 @@ Beyond Helm and YAML imports, modules can define Kubernetes resources directly a
 This pattern enables fine-grained control and cross-module resource composition.
 
 ```nix
-kubernetes.resources.${cfg.namespace} = {
+kubernetes.objects.${cfg.namespace} = {
   ServiceAccount.external-dns = { };
   Secret.api-token.stringData.token = "{{ token }}";
   Deployment.external-dns = {
@@ -197,8 +197,8 @@ kubernetes.resources.${cfg.namespace} = {
 };
 ```
 
-The resource path follows the pattern `kubernetes.resources.<namespace>.<Kind>.<name>`.
-For cluster-scoped resources, use `none` as the namespace: `kubernetes.resources.none.ClusterRole.my-role`.
+The resource path follows the pattern `kubernetes.objects.<namespace>.<Kind>.<name>`.
+For cluster-scoped resources, use `none` as the namespace: `kubernetes.objects.none.ClusterRole.my-role`.
 
 ## CRD registration
 
@@ -383,7 +383,7 @@ in
       in
       {
         # Create namespace
-        kubernetes.resources.none.Namespace.${cfg.namespace} = { };
+        kubernetes.objects.none.Namespace.${cfg.namespace} = { };
 
         # Deploy ArgoCD via Helm
         helm.releases.${moduleName} = {
@@ -428,7 +428,7 @@ in
         };
 
         # Default AppProject allowing all sources
-        kubernetes.resources.${cfg.namespace}.AppProject.default.spec = {
+        kubernetes.objects.${cfg.namespace}.AppProject.default.spec = {
           description = "Default project";
           sourceRepos = [ "*" ];
           destinations = [
@@ -446,7 +446,7 @@ in
         };
 
         # Root Application for app-of-apps pattern (nixidy integration point)
-        kubernetes.resources.${cfg.namespace}.Application.root = {
+        kubernetes.objects.${cfg.namespace}.Application.root = {
           metadata.finalizers = [ "resources-finalizer.argocd.argoproj.io" ];
           spec = {
             project = "default";

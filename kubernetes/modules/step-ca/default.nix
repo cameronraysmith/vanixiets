@@ -5,7 +5,7 @@
 #
 # This module uses existingSecrets mode for clean GitOps integration:
 # - CA certificates are provided via caCerts options (public, in git)
-# - Certificates ConfigMap created by this module via kubernetes.resources
+# - Certificates ConfigMap created by this module via kubernetes.objects
 # - Config ConfigMap (ca.json, defaults.json) created by this module
 # - Private keys provided via sopsSecretFile (encrypted SopsSecret CR)
 # - SopsSecret creates Kubernetes Secrets BEFORE helm deployment
