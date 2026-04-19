@@ -30,7 +30,12 @@
       })
       // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "aarch64-darwin") {
         # aarch64-darwin specific stable fallbacks
-        # (Add as needed)
+
+        # atuin: pinned to stable while unstable build/cache is broken
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/trunk/atuin.aarch64-darwin
+        # TODO: Remove when upstream fix lands in unstable
+        # Date added: 2026-04-19
+        atuin = final.stable.atuin;
       })
       // (prev.lib.optionalAttrs prev.stdenv.isLinux {
         # Linux-wide stable fallbacks
