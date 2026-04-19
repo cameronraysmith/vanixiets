@@ -92,10 +92,6 @@ stdenv.mkDerivation (finalAttrs: {
   env = {
     # Skip cloudflare adapter for nix build (produces static output)
     PLAYWRIGHT = "true";
-    # Validate internal links during the build via starlight-links-validator
-    # (gated on this env in packages/docs/astro.config.ts:17). Catches broken
-    # cross-references introduced by dep bumps, content moves, or renames.
-    CHECK_LINKS = "true";
   };
 
   buildPhase = ''
@@ -159,6 +155,16 @@ stdenv.mkDerivation (finalAttrs: {
 
     meta.description = "Vitest unit tests for vanixiets-docs";
   };
+
+  passthru.tests.linkcheck = finalAttrs.finalPackage.overrideAttrs (old: {
+    pname = "${old.pname}-linkcheck";
+    env = old.env // {
+      CHECK_LINKS = "true";
+    };
+    meta = old.meta // {
+      description = "Internal link validation for vanixiets-docs via starlight-links-validator";
+    };
+  });
 
   passthru.tests.e2e = stdenv.mkDerivation {
     pname = "vanixiets-docs-e2e";
