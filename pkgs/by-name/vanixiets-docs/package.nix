@@ -3,6 +3,7 @@
   lib,
   nodejs-slim,
   stdenv,
+  svgo,
   chromium,
   ffmpeg,
   makeWrapper,
@@ -78,6 +79,7 @@ stdenv.mkDerivation (finalAttrs: {
   nativeBuildInputs = [
     bun2nix.hook
     typstWithPackages
+    svgo
   ];
 
   bunDeps = bun2nix.fetchBunDeps {
@@ -114,7 +116,7 @@ stdenv.mkDerivation (finalAttrs: {
     )
     for svg in public/diagrams/*.svg; do
       [ -f "$svg" ] || continue
-      bunx svgo --quiet "$svg" -o "$svg"
+      svgo --quiet "$svg" -o "$svg"
     done
     bun run build
     cd ../..
