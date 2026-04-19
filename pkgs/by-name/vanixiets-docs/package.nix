@@ -189,8 +189,6 @@ stdenv.mkDerivation (finalAttrs: {
       mkdir -p packages/docs/dist
       cp -r ${finalAttrs.finalPackage}/* packages/docs/dist/
 
-      export PATH="$PWD/node_modules/.bin:$PATH"
-
       cd packages/docs
       # Run Playwright via node — bun's child_process.fork() IPC
       # is incompatible with Playwright's worker model.
