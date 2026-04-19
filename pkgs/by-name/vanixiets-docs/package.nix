@@ -90,8 +90,8 @@ stdenv.mkDerivation (finalAttrs: {
   dontUseBunInstall = true;
 
   env = {
-    # Skip cloudflare adapter for nix build (produces static output)
-    PLAYWRIGHT = "true";
+    # Cloudflare adapter requires Workers runtime unavailable in the nix sandbox
+    ASTRO_STATIC_OUTPUT = "true";
   };
 
   buildPhase = ''

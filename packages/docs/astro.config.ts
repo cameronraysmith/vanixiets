@@ -109,10 +109,10 @@ export default defineConfig({
   ],
 
   devToolbar: {
-    enabled: !process.env.PLAYWRIGHT,
+    enabled: !process.env.ASTRO_STATIC_OUTPUT,
   },
 
-  adapter: process.env.VITEST || process.env.PLAYWRIGHT
+  adapter: process.env.VITEST || process.env.ASTRO_STATIC_OUTPUT
     ? undefined
     : cloudflare({
         // Use 'passthrough' to serve images directly without Cloudflare Image Resizing

@@ -78,7 +78,7 @@ export default defineConfig({
   // In CI: serve pre-built static output (faster, matches production artifact).
   // In dev: astro dev server (supports HMR, serves from source).
   webServer: {
-    command: process.env.CI ? "bun run preview:ci" : "PLAYWRIGHT=true bun run dev",
+    command: process.env.CI ? "bun run preview:ci" : "ASTRO_STATIC_OUTPUT=true bun run dev",
     url: "http://localhost:4321",
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
