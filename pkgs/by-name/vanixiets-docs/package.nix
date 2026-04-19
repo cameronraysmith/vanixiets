@@ -8,6 +8,10 @@
   makeWrapper,
   makeFontsConf,
   runCommand,
+  typstWithPackages,
+  inter,
+  lmodern,
+  newcomputermodern,
   ...
 }:
 let
@@ -76,6 +80,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   nativeBuildInputs = [
     bun2nix.hook
+    typstWithPackages
   ];
 
   bunDeps = bun2nix.fetchBunDeps {
@@ -88,13 +93,37 @@ stdenv.mkDerivation (finalAttrs: {
   env = {
     # Skip cloudflare adapter for nix build (produces static output)
     PLAYWRIGHT = "true";
+    # Match devshell font provisioning so nix-built SVGs render identically
+    # to dev-previewed output (modules/dev-shell.nix:71-75).
+    TYPST_FONT_PATHS = lib.concatStringsSep ":" [
+      "${inter}/share/fonts/truetype"
+      "${lmodern}/share/fonts"
+      "${newcomputermodern}/share/fonts"
+    ];
   };
 
   buildPhase = ''
     runHook preBuild
+
+    # Mirror just docs-linkcheck's diagram compilation so the nix-built
+    # artifact matches the deployed site with diagrams present (they are
+    # gitignored; only .typ sources are in git).
     cd packages/docs
+    (
+      cd diagrams
+      for typ in *.typ; do
+        [ -f "$typ" ] || continue
+        name="''${typ%.typ}"
+        typst compile --format svg "$typ" "../public/diagrams/$name.svg"
+      done
+    )
+    for svg in public/diagrams/*.svg; do
+      [ -f "$svg" ] || continue
+      bunx svgo --quiet "$svg" -o "$svg"
+    done
     bun run build
     cd ../..
+
     runHook postBuild
   '';
 
