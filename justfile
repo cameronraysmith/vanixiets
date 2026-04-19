@@ -464,6 +464,87 @@ regenerate-bun-nix:
   bun2nix --lock-file bun.lock --output-file bun.nix
   treefmt bun.nix
 
+# Fail if the npm playwright version drifts from the playwright-web-flake tag.
+# Run standalone as a sanity check or let the composite gate on it.
+[group('bun')]
+bun-drift-check:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  FLAKE_PW=$(jq -r '.nodes."playwright-web-flake".original.ref' flake.lock)
+  NPM_PW=$(jq -r '.devDependencies."playwright"' packages/docs/package.json)
+  NPM_PWT=$(jq -r '.devDependencies."@playwright/test"' packages/docs/package.json)
+  if [[ "$NPM_PW" != "$FLAKE_PW" || "$NPM_PWT" != "$FLAKE_PW" ]]; then
+    echo "ERROR: playwright drift detected." >&2
+    echo "  flake playwright-web-flake: $FLAKE_PW" >&2
+    echo "  npm playwright:             $NPM_PW" >&2
+    echo "  npm @playwright/test:       $NPM_PWT" >&2
+    exit 1
+  fi
+  echo "playwright in sync at $FLAKE_PW"
+
+# Bulk-bump every dep in every workspace to latest stable (playwright included;
+# reverted by bun-repin-playwright in the composite flow). Hits the npm registry.
+[group('bun')]
+bun-bump-all:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  echo "Bumping workspace root..."
+  bun update --latest
+  echo "Bumping packages/docs..."
+  (cd packages/docs && bun update --latest)
+
+# Overwrite playwright + @playwright/test in packages/docs/package.json to the
+# exact version pinned by the playwright-web-flake flake input. Preserves the
+# rangeStrategy=pin invariant that Renovate enforces.
+[group('bun')]
+bun-repin-playwright:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  FLAKE_PW=$(jq -r '.nodes."playwright-web-flake".original.ref' flake.lock)
+  pkg=packages/docs/package.json
+  tmp=$(mktemp)
+  jq --arg v "$FLAKE_PW" '
+    .devDependencies["playwright"] = $v |
+    .devDependencies["@playwright/test"] = $v
+  ' "$pkg" > "$tmp"
+  mv "$tmp" "$pkg"
+  echo "Re-pinned playwright + @playwright/test to $FLAKE_PW in $pkg"
+
+# Reconcile bun.lock with the current package.json(s) without touching node_modules.
+# Re-resolves any dep whose locked version no longer satisfies its package.json range.
+[group('bun')]
+bun-lockfile-reconcile:
+  bun install --lockfile-only
+
+# Bump all non-playwright deps to latest stable, then reconcile bun.lock and
+# regenerate bun.nix. Playwright stays pinned to the playwright-web-flake version
+# per the flake-is-version-ceiling invariant.
+[group('bun')]
+bun-update-latest-stable:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  echo "=== Phase 1: Playwright drift check ==="
+  just bun-drift-check
+
+  echo "=== Phase 2: Bump all deps to latest stable ==="
+  just bun-bump-all
+
+  echo "=== Phase 3: Re-pin playwright to flake version ==="
+  just bun-repin-playwright
+
+  echo "=== Phase 4: Reconcile bun.lock ==="
+  just bun-lockfile-reconcile
+
+  echo "=== Phase 5: Regenerate bun.nix ==="
+  just regenerate-bun-nix
+
+  echo "=== Done ==="
+  git diff --stat -- package.json packages/docs/package.json bun.lock bun.nix
+  echo ""
+  echo "Verify playwright pin preserved:"
+  grep -E '"(playwright|@playwright/test)":' packages/docs/package.json
+
 ## terraform/terranix
 
 # Run terraform via terranix flake app (init + apply, arguments not supported)
