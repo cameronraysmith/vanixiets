@@ -9,9 +9,6 @@
   makeFontsConf,
   runCommand,
   typstWithPackages,
-  inter,
-  lmodern,
-  newcomputermodern,
   ...
 }:
 let
@@ -97,13 +94,6 @@ stdenv.mkDerivation (finalAttrs: {
     # (gated on this env in packages/docs/astro.config.ts:17). Catches broken
     # cross-references introduced by dep bumps, content moves, or renames.
     CHECK_LINKS = "true";
-    # Match devshell font provisioning so nix-built SVGs render identically
-    # to dev-previewed output (modules/dev-shell.nix:71-75).
-    TYPST_FONT_PATHS = lib.concatStringsSep ":" [
-      "${inter}/share/fonts/truetype"
-      "${lmodern}/share/fonts"
-      "${newcomputermodern}/share/fonts"
-    ];
   };
 
   buildPhase = ''
