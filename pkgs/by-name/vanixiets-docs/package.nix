@@ -113,6 +113,7 @@ stdenv.mkDerivation (finalAttrs: {
     # artifact matches the deployed site with diagrams present (they are
     # gitignored; only .typ sources are in git).
     cd packages/docs
+    mkdir -p public/diagrams
     (
       cd diagrams
       for typ in *.typ; do
