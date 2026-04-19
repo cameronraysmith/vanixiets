@@ -65,6 +65,7 @@
           pkgs.github-linguist
           # Document typesetting
           pkgs.typstWithPackages
+          pkgs.svgo
         ];
 
         passthru.meta.description = "Development environment with clan CLI and build tools";
