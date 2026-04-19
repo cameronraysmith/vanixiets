@@ -454,6 +454,14 @@ update-package package="atuin-format":
   $UPDATE_SCRIPT
   echo "Update complete. Review changes with: git diff"
 
+# Regenerate bun.nix from bun.lock using the pinned bun2nix CLI
+# Assumes the devshell (bun2nix + treefmt on PATH); for a non-devshell
+# invocation use `nix run .#regenerate-bun-nix` instead.
+[group('nix')]
+regenerate-bun-nix:
+  bun2nix --lock-file bun.lock --output-file bun.nix
+  treefmt bun.nix
+
 ## terraform/terranix
 
 # Run terraform via terranix flake app (init + apply, arguments not supported)
