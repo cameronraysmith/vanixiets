@@ -35,7 +35,8 @@
     "test:watch": "vitest watch",
     "test:ui": "playwright test --ui",
     "test:coverage": "vitest run --coverage",
-    "test-release": "semantic-release --dry-run --no-ci"
+    "test-release": "semantic-release --dry-run --no-ci",
+    "release": "semantic-release"
   },
   "dependencies": {
     "@astrojs/cloudflare": "13.1.10",
