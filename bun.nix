@@ -929,10 +929,6 @@
     url = "https://registry.npmjs.org/@semantic-release/git/-/git-10.0.1.tgz";
     hash = "sha512-eWrx5KguUcU2wUPaO6sfvZI0wPafUKAMNC18aXY4EnNcrZL86dEmpNVnC9uMpGZkmZJ9EfCVJBQx4pV4EMGT1w==";
   };
-  "@semantic-release/github@12.0.3" = fetchurl {
-    url = "https://registry.npmjs.org/@semantic-release/github/-/github-12.0.3.tgz";
-    hash = "sha512-pod3AVGVVVk2rUczMBL4+gfY7hP7A9YYOwjpxVFSusF+pDbFOYBzFRQcHjv1H3IntQyB/Noxzx8LUZ/iwAQQeQ==";
-  };
   "@semantic-release/github@12.0.6" = fetchurl {
     url = "https://registry.npmjs.org/@semantic-release/github/-/github-12.0.6.tgz";
     hash = "sha512-aYYFkwHW3c6YtHwQF0t0+lAjlU+87NFOZuH2CvWFD0Ylivc7MwhZMiHOJ0FMpIgPpCVib/VUAcOwvrW0KnxQtA==";
@@ -3782,9 +3778,13 @@
     url = "https://registry.npmjs.org/semantic-release-plugin-decorators/-/semantic-release-plugin-decorators-4.0.0.tgz";
     hash = "sha512-5eqaITbgGJu7AWCqY/ZwDh3TCS84Q9i470AImwP9vw3YcFRyR8sEb499Zbnqa076bv02yFUn88GtloQMXQsBrg==";
   };
-  "semantic-release@25.0.3" = fetchurl {
-    url = "https://registry.npmjs.org/semantic-release/-/semantic-release-25.0.3.tgz";
-    hash = "sha512-WRgl5GcypwramYX4HV+eQGzUbD7UUbljVmS+5G1uMwX/wLgYuJAxGeerXJDMO2xshng4+FXqCgyB5QfClV6WjA==";
+  "semantic-release@25.0.2" = fetchurl {
+    url = "https://registry.npmjs.org/semantic-release/-/semantic-release-25.0.2.tgz";
+    hash = "sha512-6qGjWccl5yoyugHt3jTgztJ9Y0JVzyH8/Voc/D8PlLat9pwxQYXz7W1Dpnq5h0/G5GCYGUaDSlYcyk3AMh5A6g==";
+  };
+  "semver-diff@5.0.0" = fetchurl {
+    url = "https://registry.npmjs.org/semver-diff/-/semver-diff-5.0.0.tgz";
+    hash = "sha512-0HbGtOm+S7T6NGQ/pxJSJipJvc4DK3FcRVMRkhsIwJDJ4Jcz5DQC1cPPzB5GhzyHjwttW878HaWQq46CkL3cqg==";
   };
   "semver-regex@4.0.5" = fetchurl {
     url = "https://registry.npmjs.org/semver-regex/-/semver-regex-4.0.5.tgz";
