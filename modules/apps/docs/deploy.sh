@@ -49,21 +49,22 @@ export WRANGLER="$DOCS_NODE_MODULES/.bin/wrangler"
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
-# Materialise a writable copy of the nix payload so wrangler and jq can patch
-# wrangler.jsonc without touching the immutable /nix/store source.
+# Materialise a writable copy of the nix payload. wrangler reads
+# .wrangler/deploy/config.json whose configPath ("../../dist/server/wrangler.json")
+# resolves against the config file's location, and wrangler may write state to
+# .wrangler/ during deploy — both require a writable tree outside /nix/store.
 tmpdir=$(mktemp -d -t deploy-docs.XXXXXX)
 trap 'rm -rf "$tmpdir"' EXIT
 cp -R "$DOCS_PAYLOAD"/. "$tmpdir/"
 chmod -R u+w "$tmpdir"
 
-# Astro's Cloudflare adapter emits dist/{client,server}. Client assets are the
-# static bundle served via the ASSETS binding; rewrite assets.directory to the
-# absolute path of dist/client so wrangler resolves it against cwd rather than
-# the (frozen) /nix/store config dir.
-jq --arg d "$tmpdir/dist/client" '.assets.directory = $d' \
-  "$tmpdir/wrangler.jsonc" > "$tmpdir/wrangler.patched.json"
-
-wrangler_config="$tmpdir/wrangler.patched.json"
+# Astro generates dist/server/wrangler.json with real resolved relative paths
+# (main: "entry.mjs", assets.directory: "../client") during build.
+# .wrangler/deploy/config.json in the payload explicitly references this as the
+# deploy-time config. Use it directly — no jq rewrite needed, and no dependency
+# on node_modules to resolve the @astrojs/cloudflare/entrypoints/server specifier
+# present in the source wrangler.jsonc.
+wrangler_config="$tmpdir/dist/server/wrangler.json"
 
 # Commit metadata shared by preview and production subcommands.
 commit_sha=$(git rev-parse HEAD)
