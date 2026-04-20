@@ -5,7 +5,7 @@
 #   nix run .#release -- packages/docs
 #
 # Hermetic: semantic-release and all plugins are provided by the
-# docs-node-modules derivation and linked into the package directory at runtime.
+# vanixiets-docs-deps derivation and linked into the package directory at runtime.
 # Callers do not need to run `bun install`.
 #
 # Expected caller environment (not loaded from sops; CI-only):
@@ -30,7 +30,7 @@
               pkgs.git
             ];
             runtimeEnv = {
-              DOCS_NODE_MODULES = "${config.packages.docs-node-modules}/packages/docs/node_modules";
+              DOCS_NODE_MODULES = "${config.packages.vanixiets-docs-deps}/packages/docs/node_modules";
             };
             text = builtins.readFile ./release.sh;
           }

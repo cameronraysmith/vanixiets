@@ -8,7 +8,7 @@ let
   bun2nix = inputs.bun2nix.packages.${stdenv.system}.default;
 in
 stdenv.mkDerivation {
-  pname = "docs-node-modules";
+  pname = "vanixiets-docs-deps";
   version = "0.0.0";
 
   src = lib.fileset.toSource {

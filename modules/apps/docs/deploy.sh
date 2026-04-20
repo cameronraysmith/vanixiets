@@ -37,11 +37,11 @@ if [[ ! -f "$SOPS_SECRETS_FILE" ]]; then
   exit 1
 fi
 if [[ -z "${DOCS_NODE_MODULES:-}" ]]; then
-  echo "error: DOCS_NODE_MODULES not set; deploy.nix must expose docs-node-modules" >&2
+  echo "error: DOCS_NODE_MODULES not set; deploy.nix must expose vanixiets-docs-deps" >&2
   exit 1
 fi
 
-# Hermetic wrangler via bun-managed node_modules (docs-node-modules derivation).
+# Hermetic wrangler via bun-managed node_modules (vanixiets-docs-deps derivation).
 # Must be exported so sops exec-env subshells inherit it for single-quoted command strings.
 export WRANGLER="$DOCS_NODE_MODULES/.bin/wrangler"
 

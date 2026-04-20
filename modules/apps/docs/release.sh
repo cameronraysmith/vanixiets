@@ -7,7 +7,7 @@
 #   nix run .#release -- packages/docs
 #
 # Hermetic: DOCS_NODE_MODULES (set by release.nix) points to a read-only
-# node_modules tree produced by the docs-node-modules derivation. This script
+# node_modules tree produced by the vanixiets-docs-deps derivation. This script
 # links it into the target package directory and invokes semantic-release
 # directly via node_modules/.bin, bypassing any need for bun or a prior
 # `bun install`.

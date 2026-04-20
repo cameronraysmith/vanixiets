@@ -12,7 +12,7 @@
 # runs semantic-release in dry-run mode to preview what version would be released.
 #
 # Hermetic: DOCS_NODE_MODULES (set by preview-version.nix) points to a read-only
-# node_modules tree produced by the docs-node-modules derivation. This script
+# node_modules tree produced by the vanixiets-docs-deps derivation. This script
 # links it into the worktree's package directory and invokes semantic-release
 # directly via node_modules/.bin, bypassing any need for bun or a prior
 # `bun install`.
@@ -178,7 +178,7 @@ git worktree add --quiet "$WORKTREE_DIR" "$TARGET_BRANCH"
 # Navigate to worktree
 cd "$WORKTREE_DIR"
 
-# Link the hermetic docs-node-modules tree into the worktree's package dir.
+# Link the hermetic vanixiets-docs-deps tree into the worktree's package dir.
 # (bun install is no longer required here.)
 if [ -n "$PACKAGE_PATH" ]; then
   if [ ! -d "$PACKAGE_PATH" ]; then

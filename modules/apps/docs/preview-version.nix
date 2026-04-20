@@ -6,7 +6,7 @@
 #   nix run .#preview-version -- main packages/docs   # monorepo package preview
 #
 # Hermetic: semantic-release and its plugins are provided by the
-# docs-node-modules derivation (linked into the worktree at runtime); the app
+# vanixiets-docs-deps derivation (linked into the worktree at runtime); the app
 # is self-contained and does not depend on a prior `bun install` or on
 # pkgs.semantic-release.
 { ... }:
@@ -32,7 +32,7 @@
               coreutils
             ];
             runtimeEnv = {
-              DOCS_NODE_MODULES = "${config.packages.docs-node-modules}/packages/docs/node_modules";
+              DOCS_NODE_MODULES = "${config.packages.vanixiets-docs-deps}/packages/docs/node_modules";
             };
             text = builtins.readFile ./preview-version.sh;
           }
