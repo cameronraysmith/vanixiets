@@ -32,7 +32,7 @@
               coreutils
             ];
             runtimeEnv = {
-              DOCS_NODE_MODULES = "${config.packages.docs-node-modules}/node_modules";
+              DOCS_NODE_MODULES = "${config.packages.docs-node-modules}/packages/docs/node_modules";
             };
             text = builtins.readFile ./preview-version.sh;
           }

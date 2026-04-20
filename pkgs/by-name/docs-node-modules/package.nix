@@ -43,8 +43,13 @@ stdenv.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    mkdir -p $out
+    if [ ! -d packages/docs/node_modules ]; then
+      echo "error: packages/docs/node_modules not populated by bun install; aborting" >&2
+      exit 1
+    fi
+    mkdir -p $out/packages/docs
     cp -R node_modules $out/node_modules
+    cp -R packages/docs/node_modules $out/packages/docs/node_modules
     runHook postInstall
   '';
 

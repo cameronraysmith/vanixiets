@@ -30,7 +30,7 @@
               pkgs.git
             ];
             runtimeEnv = {
-              DOCS_NODE_MODULES = "${config.packages.docs-node-modules}/node_modules";
+              DOCS_NODE_MODULES = "${config.packages.docs-node-modules}/packages/docs/node_modules";
             };
             text = ''
               export DOCS_PAYLOAD=${lib.escapeShellArg config.packages.vanixiets-docs}
