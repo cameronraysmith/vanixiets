@@ -6,6 +6,7 @@
   svgo,
   chromium,
   ffmpeg,
+  jq,
   makeWrapper,
   makeFontsConf,
   runCommand,
@@ -78,8 +79,10 @@ stdenv.mkDerivation (finalAttrs: {
 
   nativeBuildInputs = [
     bun2nix.hook
+    nodejs-slim
     typstWithPackages
     svgo
+    jq
   ];
 
   bunDeps = bun2nix.fetchBunDeps {
@@ -89,10 +92,10 @@ stdenv.mkDerivation (finalAttrs: {
   dontUseBunBuild = true;
   dontUseBunInstall = true;
 
-  env = {
-    # Cloudflare adapter requires Workers runtime unavailable in the nix sandbox
-    ASTRO_STATIC_OUTPUT = "true";
-  };
+  # Skip miniflare's external fetch to workers.cloudflare.com/cf.json during
+  # astro build; the placeholder fallback is sufficient for the prerender pass
+  # and avoids a TLS warning in hermetic (no-CA-bundle) sandbox builds.
+  env.CLOUDFLARE_CF_FETCH_ENABLED = "false";
 
   buildPhase = ''
     runHook preBuild
@@ -114,7 +117,10 @@ stdenv.mkDerivation (finalAttrs: {
       [ -f "$svg" ] || continue
       svgo --quiet "$svg" -o "$svg"
     done
-    bun run build
+    # Use node (not bun) to invoke astro: bun's incomplete `ws` shim causes the
+    # @cloudflare/vite-plugin module-init path to hang in the nix build env
+    # (cold cache triggers warning-emitting branch that warm host-cache skips).
+    node ./node_modules/.bin/astro build
     cd ../..
 
     runHook postBuild
@@ -123,7 +129,17 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
     mkdir -p $out
-    cp -R packages/docs/dist/* $out/
+    cp -R packages/docs/dist $out/dist
+    cp -R packages/docs/.wrangler $out/.wrangler
+    cp packages/docs/wrangler.jsonc $out/wrangler.jsonc
+    # Reproducibility: rewrite sandbox-specific absolute paths in the emitted
+    # wrangler.json to stable relative values. These fields are never dereferenced
+    # downstream — wrangler.unstable_readConfig rederives them from the file path
+    # it is handed — but stripping the build-time /nix/var/nix/builds/... strings
+    # makes the derivation output bit-identical across rebuilds.
+    jq '.configPath = "./wrangler.jsonc" | .userConfigPath = "./wrangler.jsonc"' \
+      $out/dist/server/wrangler.json > $out/dist/server/wrangler.json.tmp
+    mv $out/dist/server/wrangler.json.tmp $out/dist/server/wrangler.json
     runHook postInstall
   '';
 
@@ -158,7 +174,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   passthru.tests.linkcheck = finalAttrs.finalPackage.overrideAttrs (old: {
     pname = "${old.pname}-linkcheck";
-    env = old.env // {
+    env = (old.env or { }) // {
       CHECK_LINKS = "true";
     };
     meta = old.meta // {
@@ -191,15 +207,21 @@ stdenv.mkDerivation (finalAttrs: {
 
     buildPhase = ''
       runHook preBuild
-      # Provide pre-built dist for the CI webServer (bun run preview:ci → serve dist).
-      mkdir -p packages/docs/dist
-      cp -r ${finalAttrs.finalPackage}/* packages/docs/dist/
+      # Provide pre-built CF Worker bundle for the CI webServer (astro preview →
+      # miniflare/workerd). finalPackage has a nested layout ({dist/client/,
+      # dist/server/, .wrangler/, wrangler.jsonc}); astro preview reads
+      # .wrangler/deploy/config.json to locate dist/server/wrangler.json via
+      # @cloudflare/vite-plugin's getWorkerConfigs().
+      mkdir -p packages/docs
+      cp -r ${finalAttrs.finalPackage}/dist packages/docs/dist
+      cp -r ${finalAttrs.finalPackage}/.wrangler packages/docs/.wrangler
+      chmod -R u+w packages/docs/dist packages/docs/.wrangler
 
       cd packages/docs
       # Run Playwright via node — bun's child_process.fork() IPC
       # is incompatible with Playwright's worker model.
       # CI=true: chromium-only projects, playwright manages webServer lifecycle via
-      # playwright.config webServer command (bun run preview:ci → serve dist -l 4321).
+      # playwright.config webServer command (bun run preview:ci → astro preview).
       ${nodejs-slim}/bin/node ./node_modules/@playwright/test/cli.js test
       cd ../..
 
