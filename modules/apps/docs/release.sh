@@ -6,20 +6,14 @@
 # Examples:
 #   nix run .#release -- packages/docs
 #
-# Mirrors the body of the `release-package` recipe in the repository's
-# justfile (production branch; dry_run=false), but without the `cd
-# packages/{{package}}` shorthand — the caller supplies a full package path
-# relative to the repository root so this wrapper is usable for any monorepo
-# package, not just those rooted at packages/.
-#
-# Runtime dependencies (bun, nodejs, git) are provided on PATH via the
-# wrapping writeShellApplication; no `nix develop` prefix is required.
+# Hermetic: DOCS_NODE_MODULES (set by release.nix) points to a read-only
+# node_modules tree produced by the docs-node-modules derivation. This script
+# links it into the target package directory and invokes semantic-release
+# directly via node_modules/.bin, bypassing any need for bun or a prior
+# `bun install`.
 #
 # Required environment (pass through from caller; CI-only):
 #   GITHUB_TOKEN - required by @semantic-release/github to publish tags/releases.
-#
-# The caller must have already populated node_modules/ via `bun install`
-# before invoking this app.
 
 package_path="${1:?usage: release <package-path> [extra semantic-release args...]}"
 shift
@@ -35,8 +29,17 @@ fi
 
 cd "$package_path"
 
+# Guard against clobbering a real local node_modules from a developer's
+# bun install; only proceed if the slot is empty or already our symlink.
+if [[ -e node_modules && ! -L node_modules ]]; then
+  echo "error: $package_path/node_modules exists and is not a symlink; refusing to overwrite a local bun install" >&2
+  exit 1
+fi
+trap 'rm -f "$PWD/node_modules"' EXIT
+ln -snf "$DOCS_NODE_MODULES" node_modules
+
 # This is a real release path: semantic-release will create a tag and publish
 # a GitHub release when invoked. Use `preview-version` (dry-run) or
 # `test-release` for previewing.
 echo "running production semantic-release in ${package_path}..."
-exec bun run release "$@"
+exec node ./node_modules/.bin/semantic-release "$@"

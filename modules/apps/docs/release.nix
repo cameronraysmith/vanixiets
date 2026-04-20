@@ -4,20 +4,21 @@
 #   nix run .#release -- <package-path>
 #   nix run .#release -- packages/docs
 #
-# This is a thin nix-wrapped replacement for `just release-package`. It runs
-# `bun run release` in the specified package directory with bun, nodejs, and
-# git provided on PATH via writeShellApplication; no `nix develop` prefix is
-# required.
+# Hermetic: semantic-release and all plugins are provided by the
+# docs-node-modules derivation and linked into the package directory at runtime.
+# Callers do not need to run `bun install`.
 #
 # Expected caller environment (not loaded from sops; CI-only):
 #   GITHUB_TOKEN - GitHub authentication for the @semantic-release/github plugin
-#
-# The caller is responsible for having run `bun install` beforehand so that
-# node_modules/ (including semantic-release@25.0.2) is present.
 { ... }:
 {
   perSystem =
-    { pkgs, lib, ... }:
+    {
+      pkgs,
+      lib,
+      config,
+      ...
+    }:
     {
       apps.release = {
         type = "app";
@@ -25,10 +26,12 @@
           pkgs.writeShellApplication {
             name = "release";
             runtimeInputs = [
-              pkgs.bun
-              pkgs.nodejs_24
+              pkgs.nodejs-slim
               pkgs.git
             ];
+            runtimeEnv = {
+              DOCS_NODE_MODULES = "${config.packages.docs-node-modules}/node_modules";
+            };
             text = builtins.readFile ./release.sh;
           }
         );

@@ -11,9 +11,11 @@
 # This script simulates merging the current branch into the target branch and
 # runs semantic-release in dry-run mode to preview what version would be released.
 #
-# Runtime dependencies (semantic-release, bun, nodejs, git, jq, gnugrep, coreutils)
-# are provided on PATH via the wrapping writeShellApplication; no `nix develop`
-# prefix is required here.
+# Hermetic: DOCS_NODE_MODULES (set by preview-version.nix) points to a read-only
+# node_modules tree produced by the docs-node-modules derivation. This script
+# links it into the worktree's package directory and invokes semantic-release
+# directly via node_modules/.bin, bypassing any need for bun or a prior
+# `bun install`.
 
 # Configuration
 TARGET_BRANCH="${1:-main}"
@@ -26,6 +28,10 @@ WORKTREE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/semantic-release-preview.XXXXXX")
 ORIGINAL_TARGET_HEAD=""
 ORIGINAL_REMOTE_HEAD=""
 
+# Track which node_modules symlink(s) we created so cleanup can remove them.
+WORKTREE_NODE_MODULES_LINK=""
+LOCAL_NODE_MODULES_LINK=""
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -33,9 +39,19 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Cleanup function
+# Cleanup function (invoked via `trap cleanup EXIT INT TERM` below)
+# shellcheck disable=SC2329
 cleanup() {
   local exit_code=$?
+
+  # Remove any node_modules symlinks we created. Only unlink if still a symlink
+  # (guards against manual replacement mid-run).
+  if [ -n "$WORKTREE_NODE_MODULES_LINK" ] && [ -L "$WORKTREE_NODE_MODULES_LINK" ]; then
+    rm -f "$WORKTREE_NODE_MODULES_LINK"
+  fi
+  if [ -n "$LOCAL_NODE_MODULES_LINK" ] && [ -L "$LOCAL_NODE_MODULES_LINK" ]; then
+    rm -f "$LOCAL_NODE_MODULES_LINK"
+  fi
 
   # Always restore target branch to original state if we modified it
   if [ -n "$ORIGINAL_TARGET_HEAD" ]; then
@@ -56,10 +72,24 @@ cleanup() {
     git worktree prune 2>/dev/null || true
   fi
 
-  exit $exit_code
+  exit "$exit_code"
 }
 
 trap cleanup EXIT INT TERM
+
+# link_docs_node_modules <target-dir>: symlink DOCS_NODE_MODULES into the given
+# directory's node_modules slot, guarding against clobbering a real install.
+# Echoes the resulting symlink path so callers can record it for cleanup.
+link_docs_node_modules() {
+  local target_dir="$1"
+  local slot="$target_dir/node_modules"
+  if [[ -e "$slot" && ! -L "$slot" ]]; then
+    echo -e "${RED}error: ${slot} exists and is not a symlink; refusing to overwrite a local bun install${NC}" >&2
+    exit 1
+  fi
+  ln -snf "$DOCS_NODE_MODULES" "$slot"
+  echo "$slot"
+}
 
 # Validation
 if [ "$CURRENT_BRANCH" == "$TARGET_BRANCH" ]; then
@@ -67,8 +97,11 @@ if [ "$CURRENT_BRANCH" == "$TARGET_BRANCH" ]; then
   echo -e "${YELLOW}running test-release instead of preview${NC}\n"
   if [ -n "$PACKAGE_PATH" ]; then
     cd "$REPO_ROOT/$PACKAGE_PATH"
+  else
+    cd "$REPO_ROOT"
   fi
-  exec bun run test-release
+  LOCAL_NODE_MODULES_LINK=$(link_docs_node_modules "$PWD")
+  exec node ./node_modules/.bin/semantic-release --dry-run --no-ci
 fi
 
 # Display what we're doing
@@ -145,17 +178,17 @@ git worktree add --quiet "$WORKTREE_DIR" "$TARGET_BRANCH"
 # Navigate to worktree
 cd "$WORKTREE_DIR"
 
-# Install dependencies in worktree (bun uses global cache, so this is fast)
-echo -e "${BLUE}installing dependencies in worktree...${NC}"
-bun install --silent
-
-# Navigate to package if specified
+# Link the hermetic docs-node-modules tree into the worktree's package dir.
+# (bun install is no longer required here.)
 if [ -n "$PACKAGE_PATH" ]; then
   if [ ! -d "$PACKAGE_PATH" ]; then
     echo -e "${RED}error: package path '${PACKAGE_PATH}' does not exist${NC}" >&2
     exit 1
   fi
+  WORKTREE_NODE_MODULES_LINK=$(link_docs_node_modules "$WORKTREE_DIR/$PACKAGE_PATH")
   cd "$PACKAGE_PATH"
+else
+  WORKTREE_NODE_MODULES_LINK=$(link_docs_node_modules "$WORKTREE_DIR")
 fi
 
 # Run semantic-release in dry-run mode
@@ -166,13 +199,7 @@ echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 # This is safe because dry-run skips publish/success/fail steps anyway
 PLUGINS="@semantic-release/commit-analyzer,@semantic-release/release-notes-generator"
 
-if [ -n "$PACKAGE_PATH" ]; then
-  # For monorepo packages, check if package.json has specific plugins configured
-  OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
-else
-  # For root package
-  OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
-fi
+OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" node ./node_modules/.bin/semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 
 # Display semantic-release summary (filter out verbose plugin repetition)
 echo "$OUTPUT" | grep -v "^$" | grep -vE "(No more plugins|does not provide step)" | \
