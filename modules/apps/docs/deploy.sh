@@ -36,6 +36,14 @@ if [[ ! -f "$SOPS_SECRETS_FILE" ]]; then
   echo "error: SOPS_SECRETS_FILE=$SOPS_SECRETS_FILE does not exist" >&2
   exit 1
 fi
+if [[ -z "${DOCS_NODE_MODULES:-}" ]]; then
+  echo "error: DOCS_NODE_MODULES not set; deploy.nix must expose docs-node-modules" >&2
+  exit 1
+fi
+
+# Hermetic wrangler via bun-managed node_modules (docs-node-modules derivation).
+# Must be exported so sops exec-env subshells inherit it for single-quoted command strings.
+export WRANGLER="$DOCS_NODE_MODULES/.bin/wrangler"
 
 # Resolve repo root so git metadata commands work independently of callsite.
 repo_root=$(git rev-parse --show-toplevel)
@@ -108,8 +116,9 @@ case "$mode" in
     export SAFE_BRANCH="$safe_branch"
     export WRANGLER_CONFIG="$wrangler_config"
 
+    # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
     sops exec-env "$SOPS_SECRETS_FILE" '
-      wrangler --config "$WRANGLER_CONFIG" versions upload \
+      "$WRANGLER" --config "$WRANGLER_CONFIG" versions upload \
         --preview-alias "b-${SAFE_BRANCH}" \
         --tag "$VERSION_TAG" \
         --message "$VERSION_MESSAGE"
@@ -134,8 +143,9 @@ case "$mode" in
     export WRANGLER_CONFIG="$wrangler_config"
 
     # Query for an existing version uploaded from this commit (via preview).
+    # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
     existing_version=$(sops exec-env "$SOPS_SECRETS_FILE" '
-      wrangler --config "$WRANGLER_CONFIG" versions list --json
+      "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json
     ' | jq -r --arg tag "$commit_tag" \
       '.[] | select(.annotations["workers/tag"] == $tag) | .id' | head -1)
 
@@ -147,8 +157,9 @@ case "$mode" in
 
       export DEPLOYMENT_MESSAGE="$deploy_msg"
 
+      # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
       if sops exec-env "$SOPS_SECRETS_FILE" '
-        wrangler --config "$WRANGLER_CONFIG" versions deploy \
+        "$WRANGLER" --config "$WRANGLER_CONFIG" versions deploy \
           "'"$existing_version"'@100%" \
           --yes \
           --message "$DEPLOYMENT_MESSAGE"
@@ -177,8 +188,9 @@ case "$mode" in
 
       export DEPLOYMENT_MESSAGE="$deploy_msg"
 
+      # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
       if sops exec-env "$SOPS_SECRETS_FILE" '
-        wrangler --config "$WRANGLER_CONFIG" deploy --message "$DEPLOYMENT_MESSAGE"
+        "$WRANGLER" --config "$WRANGLER_CONFIG" deploy --message "$DEPLOYMENT_MESSAGE"
       '; then
         echo ""
         echo "deployed nix-built payload directly to production"

@@ -22,13 +22,16 @@
           pkgs.writeShellApplication {
             name = "deploy-docs";
             runtimeInputs = [
-              pkgs.wrangler
+              pkgs.nodejs_24
               pkgs.sops
               pkgs.age
               pkgs.jq
               pkgs.coreutils
               pkgs.git
             ];
+            runtimeEnv = {
+              DOCS_NODE_MODULES = "${config.packages.docs-node-modules}/node_modules";
+            };
             text = ''
               export DOCS_PAYLOAD=${lib.escapeShellArg config.packages.vanixiets-docs}
               export SOPS_SECRETS_FILE=${lib.escapeShellArg "${inputs.self}/secrets/shared.yaml"}
