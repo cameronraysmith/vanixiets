@@ -7,6 +7,7 @@
   chromium,
   ffmpeg,
   jq,
+  autoPatchelfHook,
   makeWrapper,
   makeFontsConf,
   runCommand,
@@ -63,6 +64,20 @@ let
         ''
     else
       playwrightDriver.browsers;
+
+  # Linux nix-build sandbox rejects the prebuilt @cloudflare/workerd-linux-64
+  # glibc ELF (PT_INTERP=/lib64/ld-linux-x86-64.so.2 is absent). Rewrite
+  # PT_INTERP + RUNPATH against stdenv glibc + libstdc++. Both `astro build`
+  # (via @cloudflare/vite-plugin loading miniflare) and `astro preview`
+  # (miniflare's webServer) spawn this binary.
+  patchBundledWorkerd = lib.optionalString stdenv.isLinux ''
+    shopt -s nullglob
+    for binary in node_modules/.bun/@cloudflare+workerd-linux-64@*/node_modules/@cloudflare/workerd-linux-64/bin/workerd; do
+      # bun's isolated linker ships files r-xr-xr-x; patchelf needs u+w.
+      chmod u+w "$binary"
+      autoPatchelf "$binary"
+    done
+  '';
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "vanixiets-docs";
@@ -83,7 +98,13 @@ stdenv.mkDerivation (finalAttrs: {
     typstWithPackages
     svgo
     jq
-  ];
+  ]
+  ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
+
+  buildInputs = lib.optionals stdenv.isLinux [ stdenv.cc.cc.lib ];
+
+  # Patch the bundled workerd binary manually in buildPhase; $out has no ELFs.
+  dontAutoPatchelf = true;
 
   bunDeps = bun2nix.fetchBunDeps {
     bunNix = ../../../bun.nix;
@@ -99,7 +120,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   buildPhase = ''
     runHook preBuild
-
+    ${patchBundledWorkerd}
     # Mirror just docs-linkcheck's diagram compilation so the nix-built
     # artifact matches the deployed site with diagrams present (they are
     # gitignored; only .typ sources are in git).
@@ -190,7 +211,12 @@ stdenv.mkDerivation (finalAttrs: {
     nativeBuildInputs = [
       bun2nix.hook
       nodejs-slim
-    ];
+    ]
+    ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
+
+    buildInputs = lib.optionals stdenv.isLinux [ stdenv.cc.cc.lib ];
+
+    dontAutoPatchelf = true;
 
     bunDeps = finalAttrs.bunDeps;
     dontUseBunBuild = true;
@@ -207,6 +233,7 @@ stdenv.mkDerivation (finalAttrs: {
 
     buildPhase = ''
       runHook preBuild
+      ${patchBundledWorkerd}
       # Provide pre-built CF Worker bundle for the CI webServer (astro preview →
       # miniflare/workerd). finalPackage has a nested layout ({dist/client/,
       # dist/server/, .wrangler/, wrangler.jsonc}); astro preview reads
