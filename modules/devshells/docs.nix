@@ -8,7 +8,6 @@
         packages = [
           pkgs.sops
           pkgs.age
-          pkgs.wrangler
           pkgs.jq
         ];
         passthru.meta.description = "Narrow environment for docs authoring and local experimentation";
