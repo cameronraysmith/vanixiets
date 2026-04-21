@@ -180,7 +180,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ matrix.package.name }}-preview-release
-          hash-sources: 'packages/${{ matrix.package.name }}/**/* .github/actions/setup-nix/action.yml justfile scripts/preview-version.sh'
+          hash-sources: 'packages/${{ matrix.package.name }}/**/* .github/actions/setup-nix/action.yml .github/workflows/cd.yaml flake.nix flake.lock bun.lock modules/apps/docs/**/* pkgs/by-name/vanixiets-docs/**/*'
           # Always run: semantic-release analyzes commit history which changes constantly
           force-run: 'true'
 
@@ -203,19 +203,18 @@ jobs:
           installer: quick
           system: x86_64-linux
 
-      - name: Install dependencies
-        if: steps.cache.outputs.should-run == 'true'
-        run: nix develop --accept-flake-config -c bun install
-
       - name: Setup tmate debug session
         if: steps.cache.outputs.should-run == 'true' && needs.set-variables.outputs.debug == 'true'
         uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
 
       - name: Preview version for ${{ matrix.package.name }}
         if: steps.cache.outputs.should-run == 'true'
+        env:
+          CURRENT_BRANCH: ${{ github.head_ref }}
+          PACKAGE_PATH: ${{ matrix.package.path }}
         run: |
           echo "::group::Preview semantic-release version"
-          OUTPUT=$(nix develop --accept-flake-config -c just preview-version main ${{ matrix.package.path }} 2>&1 | tee /dev/stderr)
+          OUTPUT=$(nix run --accept-flake-config .#preview-version -- main "$PACKAGE_PATH" 2>&1 | tee /dev/stderr)
           echo "::endgroup::"
 
           # Extract and annotate the next version (grep returns 1 on no match, so suppress with || true)
