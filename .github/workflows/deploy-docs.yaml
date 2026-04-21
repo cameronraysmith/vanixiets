@@ -83,7 +83,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: preview-docs-deploy
-          hash-sources: 'packages/docs/**/* .github/actions/setup-nix/action.yml .github/workflows/deploy-docs.yaml justfile scripts/docs/deploy-production.sh'
+          hash-sources: 'flake.lock flake.nix pkgs/by-name/vanixiets-docs/**/* modules/apps/docs/**/* modules/devshells/docs.nix packages/docs/**/* secrets/shared.yaml bun.lock .github/actions/setup-nix/action.yml .github/workflows/deploy-docs.yaml'
           force-run: ${{ inputs.force_run }}
 
       - name: Setup Nix
@@ -95,33 +95,25 @@ jobs:
           installer: quick
           system: x86_64-linux
 
-      - name: Install dependencies
-        if: steps.cache.outputs.should-run == 'true'
-        run: nix develop --accept-flake-config -c just install
-
       - name: Setup tmate debug session
         if: inputs.debug_enabled == 'true' && steps.cache.outputs.should-run == 'true'
         uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
-
-      - name: Validate documentation links
-        if: steps.cache.outputs.should-run == 'true'
-        run: nix develop --accept-flake-config -c just docs-linkcheck
 
       - name: Deploy to Cloudflare Workers
         if: steps.cache.outputs.should-run == 'true'
         id: deployment
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-          GITHUB_ACTIONS: true
+          GITHUB_ACTIONS: "true"
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_WORKFLOW: ${{ github.workflow }}
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+          DEPLOY_BRANCH: ${{ inputs.branch }}
         run: |
-          if [ "${{ inputs.environment }}" = "preview" ]; then
-            echo "Deploying preview for branch: ${{ inputs.branch }}"
-            nix develop --accept-flake-config -c just docs-deploy-preview ${{ inputs.branch }}
+          if [ "$DEPLOY_ENVIRONMENT" = "preview" ]; then
+            nix run .#deploy-docs -- preview "$DEPLOY_BRANCH"
           else
-            echo "Deploying to production (promoting existing version if available)"
-            nix develop --accept-flake-config -c just docs-deploy-production
+            nix run .#deploy-docs -- production
           fi
 
       - name: Create job result marker
