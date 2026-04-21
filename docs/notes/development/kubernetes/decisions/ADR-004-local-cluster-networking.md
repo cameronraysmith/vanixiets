@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Superseded by ADR-005 (2026-01-19; incus + k3s-local retired in favor of k3d + ctlptl)
 
 ## Context
 
@@ -34,14 +34,14 @@ The challenge is avoiding per-cluster NixOS image builds while maintaining deter
 
 The solution separates concerns across three configuration layers:
 
-1. **Single reusable NixOS image** (`k3s-local.nix`)
+1. **Single reusable NixOS image** (formerly `modules/images/k3s-local.nix`, removed)
 2. **Per-cluster incus profiles** (`incus.nix`)
 3. **Parameterized port forwarding** (`colima.nix`)
 
 ### Layer 1: NixOS image with cloud-init
 
-The `k3s-local.nix` image is cloud-init enabled and contains no hardcoded network configuration.
-It uses systemd-networkd with DHCP fallback, allowing cloud-init to override with static configuration.
+The `k3s-local.nix` image was cloud-init enabled and contained no hardcoded network configuration.
+It used systemd-networkd with DHCP fallback, allowing cloud-init to override with static configuration.
 
 Key characteristics:
 - Cloud-init service enabled and configured for NoCloud datasource
@@ -49,7 +49,7 @@ Key characteristics:
 - Hostname derived from cloud-init `user.meta-data`
 - No IP addresses, hostnames, or cluster-specific settings in the image
 
-This enables one image to be instantiated as any cluster by varying the cloud-init configuration.
+This enabled one image to be instantiated as any cluster by varying the cloud-init configuration.
 
 ### Layer 2: Per-cluster incus profiles
 
