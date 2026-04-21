@@ -20,7 +20,6 @@
 # Configuration
 TARGET_BRANCH="${1:-main}"
 PACKAGE_PATH="${2:-}"
-CURRENT_BRANCH=$(git branch --show-current)
 REPO_ROOT=$(git rev-parse --show-toplevel)
 WORKTREE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/semantic-release-preview.XXXXXX")
 
@@ -38,6 +37,46 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Resolve CURRENT_BRANCH with jj-colocated detached-HEAD awareness.
+#
+# Precedence:
+#   1. CURRENT_BRANCH env var override (jj callers export their bookmark name).
+#      When set AND HEAD is detached, we temporarily attach to that branch and
+#      capture the original commit sha so cleanup can restore detached state.
+#   2. Otherwise, `git branch --show-current`.
+#      When that returns empty (detached HEAD), we fail fast with instructions
+#      rather than silently continuing with an empty branch name (which would
+#      break `git merge-tree` and downstream ref operations).
+ORIGINAL_HEAD_SHA=""
+WE_ATTACHED_HEAD=0
+if [ -n "${CURRENT_BRANCH:-}" ]; then
+  # Env-var override path.
+  DETECTED_BRANCH=$(git branch --show-current)
+  if [ -z "$DETECTED_BRANCH" ]; then
+    # HEAD is detached; attach to the provided branch so git operations that
+    # rely on an attached HEAD work, and remember how to restore detached state.
+    ORIGINAL_HEAD_SHA=$(git rev-parse --verify HEAD)
+    echo -e "${BLUE}CURRENT_BRANCH=${CURRENT_BRANCH} override; attaching HEAD for duration of preview${NC}" >&2
+    if ! git checkout --quiet "$CURRENT_BRANCH"; then
+      echo -e "${RED}error: failed to checkout branch '${CURRENT_BRANCH}' (set via CURRENT_BRANCH env var)${NC}" >&2
+      exit 1
+    fi
+    WE_ATTACHED_HEAD=1
+  fi
+  # If HEAD was already attached, we honor CURRENT_BRANCH as-is without
+  # performing any checkout dance (per task spec).
+else
+  CURRENT_BRANCH=$(git branch --show-current)
+  if [ -z "$CURRENT_BRANCH" ]; then
+    echo -e "${RED}error: HEAD is detached and CURRENT_BRANCH env var is not set${NC}" >&2
+    echo -e "${YELLOW}this is common in jj-colocated repositories where git HEAD is detached by default.${NC}" >&2
+    echo -e "${YELLOW}to proceed, either:${NC}" >&2
+    echo -e "${YELLOW}  - export CURRENT_BRANCH=<bookmark-name>  (recommended for jj callers)${NC}" >&2
+    echo -e "${YELLOW}  - git checkout <bookmark-name>           (attach HEAD then re-run)${NC}" >&2
+    exit 1
+  fi
+fi
 
 # Cleanup function (invoked via `trap cleanup EXIT INT TERM` below)
 # shellcheck disable=SC2329
@@ -70,6 +109,15 @@ cleanup() {
     git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
     # Prune any stale worktree references
     git worktree prune 2>/dev/null || true
+  fi
+
+  # Restore detached HEAD if we attached it via the CURRENT_BRANCH override path.
+  # Gated on WE_ATTACHED_HEAD so this is a no-op in the normal attached-HEAD flow.
+  # Must cd to REPO_ROOT first because cleanup may be triggered while cwd is
+  # inside the now-removed worktree, in which case git cannot locate the repo.
+  if [ "${WE_ATTACHED_HEAD:-0}" -eq 1 ] && [ -n "$ORIGINAL_HEAD_SHA" ] && [ -n "$REPO_ROOT" ]; then
+    echo -e "${BLUE}restoring detached HEAD at ${ORIGINAL_HEAD_SHA}...${NC}" >&2
+    ( cd "$REPO_ROOT" && git checkout --quiet --detach "$ORIGINAL_HEAD_SHA" ) || true
   fi
 
   exit "$exit_code"
