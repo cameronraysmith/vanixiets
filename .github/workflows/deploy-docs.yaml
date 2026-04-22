@@ -92,7 +92,7 @@ jobs:
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
         with:
-          installer: quick
+          installer: full
           system: x86_64-linux
 
       - name: Setup tmate debug session
