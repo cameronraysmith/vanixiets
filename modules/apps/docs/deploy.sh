@@ -93,7 +93,10 @@ fi
 
 # Hermetic wrangler via bun-managed node_modules (vanixiets-docs-deps derivation).
 # Must be exported so sops exec-env subshells inherit it for single-quoted command strings.
-export WRANGLER="$DOCS_NODE_MODULES/.bin/wrangler"
+# The `${WRANGLER:-...}` fallback allows test harnesses (e.g. the no-op wrangler stub
+# used to exercise the post-condition error paths for VAL-WRITESHELL-DOCS-010) to
+# override the hermetic binary without rewriting this script.
+export WRANGLER="${WRANGLER:-$DOCS_NODE_MODULES/.bin/wrangler}"
 
 # Resolve repo root so git metadata commands work independently of callsite.
 repo_root=$(git rev-parse --show-toplevel)
@@ -104,7 +107,12 @@ cd "$repo_root"
 # resolves against the config file's location, and wrangler may write state to
 # .wrangler/ during deploy — both require a writable tree outside /nix/store.
 tmpdir=$(mktemp -d -t deploy-docs.XXXXXX)
-trap 'rm -rf "$tmpdir"' EXIT
+if [[ -n "${DEPLOY_DOCS_DEBUG:-}" ]]; then
+  echo "[deploy-docs] DEBUG: preserving tmpdir at $tmpdir" >&2
+  trap 'echo "[deploy-docs] DEBUG: tmpdir preserved at '\''$tmpdir'\''" >&2' EXIT
+else
+  trap 'rm -rf "$tmpdir"' EXIT
+fi
 cp -R "$DOCS_PAYLOAD"/. "$tmpdir/"
 chmod -R u+w "$tmpdir"
 
@@ -167,16 +175,126 @@ case "$mode" in
     export SAFE_BRANCH="$safe_branch"
     export WRANGLER_CONFIG="$wrangler_config"
 
+    # Capture wrangler's machine-readable NDJSON event log via
+    # WRANGLER_OUTPUT_FILE_PATH (supported by wrangler >= 3.x; confirmed on
+    # 4.84.1 by grepping `WRANGLER_OUTPUT_FILE_PATH` + `type: "version-upload"`
+    # in packages/docs/node_modules/wrangler/wrangler-dist/cli.js). The
+    # previous revision of this script used `--json` on `wrangler versions
+    # upload`, but wrangler 4.84.x does NOT accept `--json` on that subcommand
+    # (GHA re-run against cd-via-effects @ 6ce9fca2 exited 1 with "Unknown
+    # argument: json"); `--json` is only supported on the `versions list` and
+    # `deployments list` subcommands. The NDJSON stream is emitted to the file
+    # named by WRANGLER_OUTPUT_FILE_PATH; each line is a JSON object with a
+    # `type` discriminator. For `versions upload` we look for the
+    # `version-upload` event, which carries `version_id`, `worker_tag`,
+    # `preview_url`, and `preview_alias_url`.
+    #
+    # Three post-conditions enforce the no-silent-success invariant
+    # (VAL-WRITESHELL-DOCS-010):
+    #   (a) the NDJSON event log contains a `type == "version-upload"` entry
+    #       with a non-empty `version_id` (primary authoritative source)
+    #   (b) `wrangler versions list --json` contains an entry whose
+    #       annotations["workers/tag"] matches $commit_tag (server-side
+    #       persistence cross-check)
+    #   (c) only then is the user-visible success block echoed, including the
+    #       authoritative Worker Version ID parsed from (a).
+    wrangler_upload_ndjson="$tmpdir/wrangler-versions-upload.ndjson"
+    wrangler_upload_stdout="$tmpdir/wrangler-versions-upload.stdout"
+    : > "$wrangler_upload_ndjson"
+    : > "$wrangler_upload_stdout"
+    export WRANGLER_OUTPUT_FILE_PATH="$wrangler_upload_ndjson"
+
+    # Tee stdout so we can both display wrangler output live AND parse it as a
+    # fallback version_id source (Option B). Observed 2026-04-22: wrangler
+    # 4.84.1 occasionally completes the `/versions` upload (server-side
+    # version is persisted, `Worker Version ID: ...` is logged to stdout) but
+    # then hangs/terminates on the subsequent `/workers/subdomain` GET
+    # request, preventing the `writeOutput({type: "version-upload", ...})`
+    # call from firing. Capturing stdout in parallel lets us recover the
+    # authoritative version_id even in that partial-completion case.
+    #
     # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
     sops exec-env "$SOPS_SECRETS_FILE" '
       "$WRANGLER" --config "$WRANGLER_CONFIG" versions upload \
         --preview-alias "b-${SAFE_BRANCH}" \
         --tag "$VERSION_TAG" \
         --message "$VERSION_MESSAGE"
-    '
+    ' | tee "$wrangler_upload_stdout"
 
+    unset WRANGLER_OUTPUT_FILE_PATH
+
+    # Post-condition (a): extract a non-empty Worker Version ID.
+    #   Primary source:   NDJSON `version-upload` event (Option A)
+    #   Fallback source:  stdout line `Worker Version ID: <uuid>` (Option B)
+    # The cross-check in post-condition (b) below guarantees the version
+    # actually persisted server-side regardless of which source produced it.
+    version_id=""
+    if [[ -s "$wrangler_upload_ndjson" ]]; then
+      version_id=$(
+        jq -rs '
+          map(select(type == "object" and (.type // "") == "version-upload"))
+          | .[0].version_id // empty
+        ' "$wrangler_upload_ndjson" 2>/dev/null || true
+      )
+    fi
+    if [[ -z "$version_id" ]]; then
+      version_id=$(
+        grep -oE 'Worker Version ID: [a-f0-9-]+' "$wrangler_upload_stdout" 2>/dev/null \
+          | awk '{print $NF}' \
+          | head -1 || true
+      )
+    fi
+    if [[ -z "$version_id" ]]; then
+      echo "" >&2
+      echo "error: wrangler exited 0 but produced no Worker Version ID" >&2
+      echo "  post-condition (a) failed: neither WRANGLER_OUTPUT_FILE_PATH NDJSON" >&2
+      echo "                              event log nor wrangler stdout contained" >&2
+      echo "                              a recognizable Worker Version ID" >&2
+      echo "  raw wrangler event log: $wrangler_upload_ndjson" >&2
+      echo "  raw wrangler stdout:   $wrangler_upload_stdout" >&2
+      echo "  hints:" >&2
+      echo "    - confirm CF_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
+      echo "      $SOPS_SECRETS_FILE" >&2
+      echo "    - if running in GHA, wrangler's CI-detection branch may have" >&2
+      echo "      silently exited; rerun with WRANGLER_LOG=debug for stderr trace" >&2
+      echo "    - inspect the raw NDJSON and stdout paths above for any output" >&2
+      exit 1
+    fi
+
+    # Post-condition (b): cross-check via versions list that the upload landed
+    # server-side with the expected commit tag annotation. The `| cat` pipe
+    # ensures wrangler's stdout is delivered through a pipe-shaped fd before
+    # being redirected to disk (observed empirically: `wrangler ... --json >
+    # file` intermittently produces zero bytes whereas `wrangler ... --json |
+    # cat > file` reliably produces the full JSON output, which suggests
+    # wrangler inspects stdout before emitting when the fd points directly at
+    # a file).
+    wrangler_list_json="$tmpdir/wrangler-versions-list.json"
+
+    # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
+    sops exec-env "$SOPS_SECRETS_FILE" '
+      "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json
+    ' | cat > "$wrangler_list_json"
+
+    matched_count=$(jq --arg tag "$commit_tag" \
+      '[.[] | select(.annotations["workers/tag"] == $tag)] | length' \
+      "$wrangler_list_json" 2>/dev/null || echo 0)
+    if [[ "$matched_count" -lt 1 ]]; then
+      echo "" >&2
+      echo "error: uploaded version with tag ${commit_tag} not found in versions list" >&2
+      echo "  post-condition (b) failed: wrangler versions list returned no entries" >&2
+      echo "                              with annotations[\"workers/tag\"] == ${commit_tag}" >&2
+      echo "  raw versions list output: $wrangler_list_json" >&2
+      echo "  hint: wrangler reported a version_id locally but the Cloudflare API did" >&2
+      echo "        not persist it; retry with WRANGLER_LOG=debug or inspect the raw" >&2
+      echo "        versions list for surrounding entries" >&2
+      exit 1
+    fi
+
+    # Post-condition (c): authoritative success echo with parsed Worker Version ID.
     echo ""
     echo "Version uploaded successfully"
+    echo "  Worker Version ID: ${version_id}"
     echo "  Tag: ${commit_tag}"
     echo "  Full SHA: ${commit_sha}"
     echo "  Message: ${version_message}"
@@ -194,11 +312,22 @@ case "$mode" in
     export WRANGLER_CONFIG="$wrangler_config"
 
     # Query for an existing version uploaded from this commit (via preview).
+    # Capture versions list to a tempfile so post-condition verification below
+    # can reuse it (avoids a second API call purely for the existing-version
+    # lookup) and any diagnostic error messages can reference the raw JSON.
+    # `| cat >` is used instead of `>` to route wrangler's stdout through a
+    # pipe-shaped fd; see the preview subcommand's equivalent comment for the
+    # empirical rationale.
+    wrangler_list_json="$tmpdir/wrangler-versions-list.json"
+
     # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-    existing_version=$(sops exec-env "$SOPS_SECRETS_FILE" '
+    sops exec-env "$SOPS_SECRETS_FILE" '
       "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json
-    ' | jq -r --arg tag "$commit_tag" \
-      '.[] | select(.annotations["workers/tag"] == $tag) | .id' | head -1)
+    ' | cat > "$wrangler_list_json"
+
+    existing_version=$(jq -r --arg tag "$commit_tag" \
+      '.[] | select(.annotations["workers/tag"] == $tag) | .id' \
+      "$wrangler_list_json" 2>/dev/null | head -1 || true)
 
     if [[ -n "$existing_version" ]]; then
       echo "found existing version: ${existing_version}"
@@ -207,26 +336,107 @@ case "$mode" in
       echo ""
 
       export DEPLOYMENT_MESSAGE="$deploy_msg"
+      export EXISTING_VERSION="$existing_version"
+
+      # Post-condition verification mirrors the preview path: capture
+      # wrangler's NDJSON event log via WRANGLER_OUTPUT_FILE_PATH, assert a
+      # non-empty deployment_id on the `version-deploy` event, then cross-check
+      # via `wrangler deployments list --json` before declaring success. Like
+      # `versions upload`, `versions deploy` does NOT accept `--json` on
+      # wrangler 4.84.x — the event log is the authoritative machine-readable
+      # output channel. Detects wrangler's silent-exit failure mode
+      # (VAL-WRITESHELL-DOCS-010 + diagnostic session 45961bc9) when the
+      # CI-detection branch exits 0 without actually performing the promotion.
+      deploy_ndjson="$tmpdir/wrangler-versions-deploy.ndjson"
+      deploy_stdout="$tmpdir/wrangler-versions-deploy.stdout"
+      : > "$deploy_ndjson"
+      : > "$deploy_stdout"
+      export WRANGLER_OUTPUT_FILE_PATH="$deploy_ndjson"
 
       # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-      if sops exec-env "$SOPS_SECRETS_FILE" '
+      sops exec-env "$SOPS_SECRETS_FILE" '
         "$WRANGLER" --config "$WRANGLER_CONFIG" versions deploy \
-          "'"$existing_version"'@100%" \
+          "${EXISTING_VERSION}@100%" \
           --yes \
           --message "$DEPLOYMENT_MESSAGE"
-      '; then
-        echo ""
-        echo "successfully promoted version ${existing_version} to production"
-        echo "  tag: ${commit_tag}"
-        echo "  full SHA: ${commit_sha}"
-        echo "  deployed by: ${deploy_msg}"
-        echo "  production URL: https://infra.cameronraysmith.net"
-      else
-        echo ""
-        echo "error: failed to promote version ${existing_version}" >&2
-        echo "  deployment was cancelled or failed" >&2
+      ' | tee "$deploy_stdout"
+
+      unset WRANGLER_OUTPUT_FILE_PATH
+
+      # Post-condition (a): extract a non-empty Deployment ID. Primary source
+      # is the NDJSON `version-deploy` event (Option A); fallback is stdout
+      # parsing for a recognizable deployment identifier (Option B).
+      deployment_id=""
+      if [[ -s "$deploy_ndjson" ]]; then
+        deployment_id=$(
+          jq -rs '
+            map(select(type == "object" and (.type // "") == "version-deploy"))
+            | .[0].deployment_id // empty
+          ' "$deploy_ndjson" 2>/dev/null || true
+        )
+      fi
+      if [[ -z "$deployment_id" ]]; then
+        # stdout fallback: match patterns like "Deployment ID: <uuid>" or
+        # "deployment_id: <uuid>" that wrangler prints on the console.
+        deployment_id=$(
+          grep -oiE '(Deployment ID|deployment_id)[[:space:]]*:[[:space:]]*[a-f0-9-]+' \
+            "$deploy_stdout" 2>/dev/null \
+            | awk '{print $NF}' \
+            | head -1 || true
+        )
+      fi
+      if [[ -z "$deployment_id" ]]; then
+        echo "" >&2
+        echo "error: wrangler exited 0 but produced no Deployment ID" >&2
+        echo "  post-condition (a) failed: neither WRANGLER_OUTPUT_FILE_PATH NDJSON" >&2
+        echo "                              event log nor wrangler stdout contained" >&2
+        echo "                              a recognizable Deployment ID" >&2
+        echo "  raw wrangler event log: $deploy_ndjson" >&2
+        echo "  raw wrangler stdout:   $deploy_stdout" >&2
+        echo "  hints:" >&2
+        echo "    - confirm CF_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
+        echo "      $SOPS_SECRETS_FILE" >&2
+        echo "    - if running in GHA, wrangler's CI-detection branch may have" >&2
+        echo "      silently exited; rerun with WRANGLER_LOG=debug for stderr trace" >&2
         exit 1
       fi
+
+      # Post-condition (b): cross-check via deployments list that the deploy
+      # landed server-side. `| cat >` empirically required — see preview path
+      # comment for the rationale.
+      deployments_list_json="$tmpdir/wrangler-deployments-list.json"
+
+      # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
+      sops exec-env "$SOPS_SECRETS_FILE" '
+        "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json
+      ' | cat > "$deployments_list_json"
+
+      found_count=$(jq --arg did "$deployment_id" --arg vid "$existing_version" \
+        '[.[] | select(
+           .id == $did
+           or .deployment_id == $did
+           or ((.versions // []) | map(.version_id // .id // "") | index($vid) != null)
+         )] | length' \
+        "$deployments_list_json" 2>/dev/null || echo 0)
+      if [[ "$found_count" -lt 1 ]]; then
+        echo "" >&2
+        echo "error: deployment ${deployment_id} (version ${existing_version}) not found in deployments list" >&2
+        echo "  post-condition (b) failed: wrangler deployments list returned no" >&2
+        echo "                              entries matching the just-deployed id/version" >&2
+        echo "  raw deployments list output: $deployments_list_json" >&2
+        echo "  hint: wrangler reported a deployment locally but the Cloudflare API did" >&2
+        echo "        not persist it; retry with WRANGLER_LOG=debug" >&2
+        exit 1
+      fi
+
+      # Post-condition (c): authoritative success echo with parsed Deployment ID.
+      echo ""
+      echo "successfully promoted version ${existing_version} to production"
+      echo "  Deployment ID: ${deployment_id}"
+      echo "  tag: ${commit_tag}"
+      echo "  full SHA: ${commit_sha}"
+      echo "  deployed by: ${deploy_msg}"
+      echo "  production URL: https://infra.cameronraysmith.net"
     else
       echo "warning: no existing version found with tag: ${commit_tag}"
       echo "  this should only happen if:"
@@ -239,18 +449,99 @@ case "$mode" in
 
       export DEPLOYMENT_MESSAGE="$deploy_msg"
 
+      # Fallback direct-deploy: same post-condition pattern, but the relevant
+      # NDJSON event is `type == "deploy"` which carries `version_id` (no
+      # deployment_id field on this event type — see wrangler cli.js
+      # writeOutput block for `deploy`). `wrangler deploy` does NOT accept
+      # `--json` on wrangler 4.84.x; WRANGLER_OUTPUT_FILE_PATH is the
+      # authoritative machine-readable channel.
+      deploy_ndjson="$tmpdir/wrangler-deploy.ndjson"
+      deploy_stdout="$tmpdir/wrangler-deploy.stdout"
+      : > "$deploy_ndjson"
+      : > "$deploy_stdout"
+      export WRANGLER_OUTPUT_FILE_PATH="$deploy_ndjson"
+
       # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-      if sops exec-env "$SOPS_SECRETS_FILE" '
-        "$WRANGLER" --config "$WRANGLER_CONFIG" deploy --message "$DEPLOYMENT_MESSAGE"
-      '; then
-        echo ""
-        echo "deployed nix-built payload directly to production"
-        echo "  warning: this version was not tested in preview first"
-      else
-        echo ""
-        echo "error: failed to deploy" >&2
+      sops exec-env "$SOPS_SECRETS_FILE" '
+        "$WRANGLER" --config "$WRANGLER_CONFIG" deploy \
+          --message "$DEPLOYMENT_MESSAGE"
+      ' | tee "$deploy_stdout"
+
+      unset WRANGLER_OUTPUT_FILE_PATH
+
+      # Post-condition (a): extract the just-deployed version_id. Primary
+      # source: NDJSON `deploy` event (Option A). Fallback: stdout grep
+      # (Option B) for the "Current Version ID: <uuid>" or similar line
+      # wrangler prints on direct deploy.
+      deploy_version_id=""
+      if [[ -s "$deploy_ndjson" ]]; then
+        deploy_version_id=$(
+          jq -rs '
+            map(select(type == "object" and (.type // "") == "deploy"))
+            | .[0].version_id // empty
+          ' "$deploy_ndjson" 2>/dev/null || true
+        )
+      fi
+      if [[ -z "$deploy_version_id" ]]; then
+        deploy_version_id=$(
+          grep -oiE '(Current Version ID|Worker Version ID|version_id)[[:space:]]*:[[:space:]]*[a-f0-9-]+' \
+            "$deploy_stdout" 2>/dev/null \
+            | awk '{print $NF}' \
+            | head -1 || true
+        )
+      fi
+      if [[ -z "$deploy_version_id" ]]; then
+        echo "" >&2
+        echo "error: wrangler exited 0 but produced no Deployment Version ID (fallback direct deploy)" >&2
+        echo "  post-condition (a) failed: neither WRANGLER_OUTPUT_FILE_PATH NDJSON" >&2
+        echo "                              event log nor wrangler stdout contained" >&2
+        echo "                              a recognizable version_id" >&2
+        echo "  raw wrangler event log: $deploy_ndjson" >&2
+        echo "  raw wrangler stdout:   $deploy_stdout" >&2
+        echo "  hints:" >&2
+        echo "    - confirm CF_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
+        echo "      $SOPS_SECRETS_FILE" >&2
+        echo "    - if running in GHA, wrangler's CI-detection branch may have" >&2
+        echo "      silently exited; rerun with WRANGLER_LOG=debug for stderr trace" >&2
         exit 1
       fi
+      # Reuse deployment_id slot below (it now holds the just-deployed version_id
+      # since `wrangler deploy` emits no server-assigned deployment id directly).
+      deployment_id="$deploy_version_id"
+
+      deployments_list_json="$tmpdir/wrangler-deployments-list.json"
+
+      # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
+      sops exec-env "$SOPS_SECRETS_FILE" '
+        "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json
+      ' | cat > "$deployments_list_json"
+
+      found_count=$(jq --arg vid "$deploy_version_id" \
+        '[.[] | select(
+           .id == $vid
+           or .deployment_id == $vid
+           or ((.versions // []) | map(.version_id // .id // "") | index($vid) != null)
+         )] | length' \
+        "$deployments_list_json" 2>/dev/null || echo 0)
+      if [[ "$found_count" -lt 1 ]]; then
+        echo "" >&2
+        echo "error: deployment for version ${deploy_version_id} not found in deployments list (fallback direct deploy)" >&2
+        echo "  post-condition (b) failed: wrangler deployments list returned no" >&2
+        echo "                              entries matching the just-deployed version_id" >&2
+        echo "  raw deployments list output: $deployments_list_json" >&2
+        echo "  hint: wrangler reported a deployment locally but the Cloudflare API did" >&2
+        echo "        not persist it; retry with WRANGLER_LOG=debug" >&2
+        exit 1
+      fi
+
+      echo ""
+      echo "deployed nix-built payload directly to production"
+      echo "  Deployment Version ID: ${deployment_id}"
+      echo "  tag: ${commit_tag}"
+      echo "  full SHA: ${commit_sha}"
+      echo "  deployed by: ${deploy_msg}"
+      echo "  production URL: https://infra.cameronraysmith.net"
+      echo "  warning: this version was not tested in preview first"
     fi
     ;;
 
