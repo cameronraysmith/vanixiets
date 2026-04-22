@@ -898,49 +898,17 @@ k3d-up:
 
 # Bootstrap secrets required before first deployment (idempotent)
 # Supports both CI (SOPS_AGE_KEY env var) and local dev (file-based) workflows
+# Body lives in modules/apps/cluster/k3d-bootstrap-secrets.{nix,sh}.
 [group('k3d')]
-k3d-bootstrap-secrets:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  kubectl create namespace sops-secrets-operator --dry-run=client -o yaml | kubectl apply -f -
-  # Determine age key file: env var (CI) or local file (dev)
-  if [ -n "${SOPS_AGE_KEY:-}" ]; then
-    echo "Using SOPS_AGE_KEY from environment variable"
-    KEYFILE=$(mktemp)
-    echo "${SOPS_AGE_KEY}" > "$KEYFILE"
-    trap "rm -f '$KEYFILE'" EXIT
-  else
-    echo "Using SOPS age key from file: ${HOME}/.config/sops/age/keys.txt"
-    KEYFILE="${HOME}/.config/sops/age/keys.txt"
-  fi
-  kubectl create secret generic sops-age-key \
-    --namespace=sops-secrets-operator \
-    --from-file=age.key="$KEYFILE" \
-    --dry-run=client -o yaml | kubectl apply -f -
+k3d-bootstrap-secrets *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#k3d-bootstrap-secrets -- {{ARGS}}
 
 # Configure CoreDNS to forward sslip.io queries to public DNS resolvers
 # Required because OrbStack's DNS (192.168.107.1) cannot resolve sslip.io wildcards
+# Body lives in modules/apps/cluster/k3d-configure-dns.{nix,sh}.
 [group('k3d')]
-k3d-configure-dns:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  echo "Waiting for CoreDNS to be running..."
-  kubectl wait --for=condition=Ready pod -l k8s-app=kube-dns -n kube-system --timeout=120s
-  echo "Patching CoreDNS ConfigMap to forward sslip.io to public DNS..."
-  CURRENT=$(kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}')
-  if echo "$CURRENT" | grep -q "sslip.io"; then
-    echo "CoreDNS already configured for sslip.io forwarding"
-    exit 0
-  fi
-  SSLIP_BLOCK=$'sslip.io:53 {\n    forward . 1.1.1.1 8.8.8.8\n    cache 30\n}\n'
-  PATCHED="${SSLIP_BLOCK}${CURRENT}"
-  PATCH_JSON=$(jq -n --arg corefile "$PATCHED" '{"data": {"Corefile": $corefile}}')
-  kubectl patch configmap coredns -n kube-system --type=merge -p "$PATCH_JSON"
-  echo "Restarting CoreDNS deployment..."
-  kubectl rollout restart deployment coredns -n kube-system
-  echo "Waiting for CoreDNS to be ready..."
-  kubectl rollout status deployment coredns -n kube-system --timeout=120s
-  echo "CoreDNS configured for sslip.io forwarding"
+k3d-configure-dns *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#k3d-configure-dns -- {{ARGS}}
 
 # Delete local k3d cluster
 [group('k3d')]
@@ -1009,11 +977,12 @@ k3d-deploy-infrastructure:
   {{nix_cmd}} run .#k8s-deploy-local-k3d-infrastructure -- --yes
 
 # Full k3d workflow: create cluster, bootstrap secrets, deploy all layers
+# Body lives in modules/apps/cluster/k3d-full.{nix,sh}; delegates back to
+# the k3d-down, k3d-up, and k3d-deploy recipes above (none of which are
+# flake-app converted in M1).
 [group('k3d')]
-k3d-full:
-  just k3d-down || true
-  just k3d-up
-  just k3d-deploy
+k3d-full *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#k3d-full -- {{ARGS}}
 
 # Run all kubernetes tests (foundation + infrastructure)
 [group('k3d')]
@@ -1032,106 +1001,23 @@ k3d-test-infrastructure:
 
 # Run tests with coverage report showing tested vs deployed resources
 # Respects NO_COLOR env var and auto-detects CI environments
+# Body lives in modules/apps/cluster/k3d-test-coverage.{nix,sh};
+# scripts/k3d-test-coverage.sh retained as a thin backward-compat shim.
 [group('k3d')]
 k3d-test-coverage *ARGS:
-  ./scripts/k3d-test-coverage.sh {{ARGS}}
+  {{nix_cmd}} run --no-warn-dirty .#k3d-test-coverage -- {{ARGS}}
 
 # Wait for kluctl-deployed foundation and infrastructure pods to be ready
+# Body lives in modules/apps/cluster/k3d-wait-ready.{nix,sh}.
 [group('k3d')]
-k3d-wait-ready:
-  #!/usr/bin/env bash
-  set -euo pipefail
-
-  echo "=== Waiting for Foundation (CNI) ==="
-  echo "Waiting for Cilium Agent..."
-  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cilium-agent -n kube-system --timeout=300s
-
-  echo "Waiting for Cilium Operator..."
-  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=300s
-
-  echo ""
-  echo "=== Waiting for Infrastructure ==="
-  echo "Waiting for ArgoCD deployments..."
-  kubectl wait --for=condition=Available deployment --all -n argocd --timeout=300s
-
-  echo "Waiting for ArgoCD Application Controller..."
-  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller -n argocd --timeout=300s
-
-  echo "Waiting for step-ca..."
-  # Use StatefulSet pod label to exclude Helm test-connection pod (which always fails)
-  kubectl wait --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=step-ca-step-certificates-0 -n step-ca --timeout=300s
-
-  echo "Waiting for sops-secrets-operator..."
-  kubectl wait --for=condition=Available deployment --all -n sops-secrets-operator --timeout=300s
-
-  echo ""
-  echo "=== All foundation and infrastructure pods ready ==="
+k3d-wait-ready *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#k3d-wait-ready -- {{ARGS}}
 
 # Wait for all ArgoCD Applications to reach Synced + Healthy status
+# Body lives in modules/apps/cluster/k3d-wait-argocd-sync.{nix,sh}.
 [group('k3d')]
-k3d-wait-argocd-sync:
-  #!/usr/bin/env bash
-  set -euo pipefail
-
-  echo "=== Waiting for ArgoCD Applications ==="
-  echo "Applications managed by nixidy sync waves:"
-  echo "  Wave -1 (adoption): cilium, argocd, sops-secrets-operator, step-ca"
-  echo "  Wave 0: cert-manager"
-  echo "  Wave 1-2: cluster-issuer, gateway, gateway-api"
-  echo "  Wave 3: argocd-route"
-  echo ""
-
-  # All expected applications (app-of-apps creates these asynchronously)
-  EXPECTED_APPS=(
-    apps
-    argocd
-    argocd-route
-    cert-manager
-    cilium
-    cluster-issuer
-    gateway
-    gateway-api
-    sops-secrets-operator
-    step-ca
-  )
-
-  echo "Waiting for all ${#EXPECTED_APPS[@]} applications to exist..."
-  for app in "${EXPECTED_APPS[@]}"; do
-    echo -n "  Waiting for $app... "
-    # kubectl wait fails immediately if resource doesn't exist, so poll instead
-    timeout 300 bash -c "until kubectl get application/$app -n argocd &>/dev/null; do sleep 2; done"
-    echo "exists"
-  done
-
-  echo ""
-  echo "Listing applications..."
-  kubectl get applications -n argocd -o wide || true
-  echo ""
-
-  echo "Waiting for all applications to be Healthy..."
-  for app in "${EXPECTED_APPS[@]}"; do
-    echo -n "  Waiting for $app to be Healthy... "
-    kubectl wait --for=jsonpath='{.status.health.status}'=Healthy application/"$app" -n argocd --timeout=600s >/dev/null
-    echo "done"
-  done
-
-  echo ""
-  echo "Waiting for all applications to be Synced..."
-  for app in "${EXPECTED_APPS[@]}"; do
-    echo -n "  Waiting for $app to be Synced... "
-    kubectl wait --for=jsonpath='{.status.sync.status}'=Synced application/"$app" -n argocd --timeout=300s >/dev/null
-    echo "done"
-  done
-
-  echo ""
-  echo "=== Waiting for Gateway to be programmed ==="
-  # ArgoCD reports Healthy before Cilium fully programs the Gateway
-  # Wait for the actual Gateway condition, not just ArgoCD's view
-  kubectl wait --for=condition=Programmed gateway/main-gateway -n gateway-system --timeout=300s
-
-  echo ""
-  echo "=== All ArgoCD applications synced and healthy ==="
-  kubectl get applications -n argocd -o wide
+k3d-wait-argocd-sync *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#k3d-wait-argocd-sync -- {{ARGS}}
 
 # Full integration test: cluster creation, deployment, GitOps sync, and validation
 [group('k3d')]
@@ -1168,52 +1054,10 @@ k3d-integration:
 # Full CI integration test: local manifests, cluster, GitOps sync, tests
 # Uses file:///manifests instead of remote repo - no GitHub credentials needed
 # The /tmp/k3d-manifests directory is volume-mounted into the cluster at /manifests
+# Body lives in modules/apps/cluster/k3d-integration-ci.{nix,sh}.
 [group('k3d')]
-k3d-integration-ci:
-  #!/usr/bin/env bash
-  set -euo pipefail
-
-  echo "=== Phase 1: Build manifests with local repo URL ==="
-  export ARGOCD_REPO_URL="file:///manifests"
-  just nixidy-build
-
-  echo ""
-  echo "=== Phase 2: Prepare local git repo (before cluster for volume mount) ==="
-  # Ensure writable before cleanup (Nix store copies may be read-only)
-  chmod -R +w /tmp/k3d-manifests 2>/dev/null || true
-  rm -rf /tmp/k3d-manifests
-  mkdir -p /tmp/k3d-manifests
-  rsync -aL --delete --chmod=Du+w,Fu+w result/ /tmp/k3d-manifests/
-  cd /tmp/k3d-manifests
-  git init -b main
-  git config user.email "ci@localhost"
-  git config user.name "CI"
-  git add .
-  git commit -m "CI manifests"
-  cd -
-
-  echo ""
-  echo "=== Phase 3: Create cluster and deploy via kluctl ==="
-  just k3d-full
-
-  echo ""
-  echo "=== Phase 4: Wait for infrastructure ready ==="
-  just k3d-wait-ready
-
-  echo ""
-  echo "=== Phase 5: Bootstrap ArgoCD (syncs from file:///manifests) ==="
-  just nixidy-bootstrap
-
-  echo ""
-  echo "=== Phase 6: Wait for ArgoCD sync ==="
-  just k3d-wait-argocd-sync
-
-  echo ""
-  echo "=== Phase 7: Run integration tests ==="
-  just k3d-test-coverage
-
-  echo ""
-  echo "=== CI integration complete ==="
+k3d-integration-ci *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#k3d-integration-ci -- {{ARGS}}
 
 ## nixidy (Phase 4 GitOps)
 # Per ADR-006: Rendered manifests are pushed to separate private repos per cluster.
@@ -1223,9 +1067,10 @@ k3d-integration-ci:
 local_k3d_repo := env("LOCAL_K3D_REPO", home_directory() / "projects/nix-workspace/local-k3d")
 
 # Build nixidy manifests for local-k3d environment (renders to ./result)
+# Body lives in modules/apps/cluster/nixidy-build.{nix,sh}.
 [group('nixidy')]
-nixidy-build:
-  {{nix_cmd}} run .#nixidy -- build .#local-k3d
+nixidy-build *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#nixidy-build -- {{ARGS}}
 
 # Show nixidy environment info
 [group('nixidy')]
@@ -1234,49 +1079,26 @@ nixidy-info:
 
 # Push rendered manifests to local-k3d private repository
 # Prerequisites: nixidy-build must be run first, local-k3d repo must exist
+# Body lives in modules/apps/cluster/nixidy-push.{nix,sh}.
+# LOCAL_K3D_REPO env var overrides the default target path; justfile-
+# level local_k3d_repo is preserved as a convenience for scripted callers.
 [group('nixidy')]
-nixidy-push:
-  #!/usr/bin/env bash
-  set -euo pipefail
-
-  if [[ ! -d "result" ]]; then
-    echo "Error: result/ directory not found. Run 'just nixidy-build' first."
-    exit 1
-  fi
-
-  if [[ ! -d "{{ local_k3d_repo }}" ]]; then
-    echo "Error: local-k3d repo not found at {{ local_k3d_repo }}"
-    echo "Clone it with: git clone git@github.com:cameronraysmith/local-k3d.git {{ local_k3d_repo }}"
-    exit 1
-  fi
-
-  echo "Syncing rendered manifests to {{ local_k3d_repo }}..."
-  # -L dereferences symlinks (nix store paths) to copy actual content
-  # --checksum compares by content hash (Nix store files have epoch timestamps)
-  # --chmod fixes read-only permissions from nix store
-  rsync -aL --delete --checksum --chmod=Du+w,Fu+w --exclude='.git' result/ "{{ local_k3d_repo }}/"
-
-  echo "Committing and pushing to local-k3d repo..."
-  cd "{{ local_k3d_repo }}"
-  git add -A
-  if git diff --cached --quiet; then
-    echo "No changes to push."
-  else
-    git commit -m "chore: update rendered manifests from vanixiets"
-    git push
-    echo "Manifests pushed to local-k3d repo."
-  fi
+nixidy-push *ARGS:
+  LOCAL_K3D_REPO="{{ local_k3d_repo }}" {{nix_cmd}} run --no-warn-dirty .#nixidy-push -- {{ARGS}}
 
 # Build and push manifests in one step
+# Body lives in modules/apps/cluster/nixidy-sync.{nix,sh}.
 [group('nixidy')]
-nixidy-sync: nixidy-build nixidy-push
+nixidy-sync *ARGS:
+  LOCAL_K3D_REPO="{{ local_k3d_repo }}" {{nix_cmd}} run --no-warn-dirty .#nixidy-sync -- {{ARGS}}
 
 # Bootstrap ArgoCD app-of-apps (transition from Phase 3 to Phase 4)
 # Prerequisites: k3d-full must complete, manifests must be pushed to local-k3d repo
 # Note: ArgoCD needs credentials to access private repo (configure via argocd CLI or UI)
+# Body lives in modules/apps/cluster/nixidy-bootstrap.{nix,sh}.
 [group('nixidy')]
-nixidy-bootstrap:
-  {{nix_cmd}} run .#nixidy -- bootstrap .#local-k3d | kubectl apply -f -
+nixidy-bootstrap *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#nixidy-bootstrap -- {{ARGS}}
 
 # Full GitOps workflow: Phase 3 bootstrap + Phase 4 ArgoCD takeover
 # Note: Requires local-k3d repo to exist and ArgoCD to have access credentials
@@ -1750,18 +1572,10 @@ list-packages:
   @ls -1 packages/
 
 # List packages in JSON format for CI matrix
+# Body lives in modules/apps/cluster/list-packages-json.{nix,sh}.
 [group('CI/CD')]
-list-packages-json:
-  #!/usr/bin/env bash
-  cd packages
-  packages=()
-  for dir in */; do
-    pkg_name="${dir%/}"
-    if [ -f "$dir/package.json" ]; then
-      packages+=("{\"name\":\"$pkg_name\",\"path\":\"packages/$pkg_name\"}")
-    fi
-  done
-  echo "[$(IFS=,; echo "${packages[*]}")]"
+list-packages-json *ARGS:
+  @{{nix_cmd}} run --no-warn-dirty .#list-packages-json -- {{ARGS}}
 
 # Validate package structure
 [group('CI/CD')]
