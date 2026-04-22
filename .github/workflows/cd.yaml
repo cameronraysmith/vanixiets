@@ -133,10 +133,17 @@ jobs:
       - name: Checkout for package discovery
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          sparse-checkout: |
-            packages
-            justfile
-          sparse-checkout-cone-mode: false
+          fetch-depth: 0
+          # sparse-checkout: |
+          #   packages
+          #   justfile
+          # sparse-checkout-cone-mode: false
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        with:
+          installer: quick
+          system: x86_64-linux
 
       # alternative: extractions/setup-just@v3 (blocked on node20->node24 upgrade via extractions/setup-crate#9)
       - name: Install just
@@ -171,18 +178,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ github.head_ref }}  # Checkout actual PR branch, not merge commit
-          fetch-depth: 0  # Full history needed for semantic-release analysis
-          fetch-tags: true  # Explicitly fetch all tags for version detection
+          ref: ${{ github.head_ref }} # Checkout actual PR branch, not merge commit
+          fetch-depth: 0 # Full history needed for semantic-release analysis
+          fetch-tags: true # Explicitly fetch all tags for version detection
 
       - name: Check execution cache
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ matrix.package.name }}-preview-release
-          hash-sources: 'packages/${{ matrix.package.name }}/**/* .github/actions/setup-nix/action.yml .github/workflows/cd.yaml flake.nix flake.lock bun.lock modules/apps/docs/**/* pkgs/by-name/vanixiets-docs/**/*'
+          hash-sources: "packages/${{ matrix.package.name }}/**/* .github/actions/setup-nix/action.yml .github/workflows/cd.yaml flake.nix flake.lock bun.lock modules/apps/docs/**/* pkgs/by-name/vanixiets-docs/**/*"
           # Always run: semantic-release analyzes commit history which changes constantly
-          force-run: 'true'
+          force-run: "true"
 
       - name: Fetch target branch for preview
         if: steps.cache.outputs.should-run == 'true'
@@ -283,14 +290,14 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          fetch-depth: 0  # for git diff in composite action
+          fetch-depth: 0 # for git diff in composite action
 
       - name: Check execution cache
         id: cache
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ github.job }}
-          hash-sources: 'Makefile .envrc .github/actions/setup-nix/action.yml'
+          hash-sources: "Makefile .envrc .github/actions/setup-nix/action.yml"
           force-run: ${{ needs.set-variables.outputs.force-ci }}
 
       - name: run make bootstrap
