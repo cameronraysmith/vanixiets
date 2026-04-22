@@ -176,12 +176,43 @@ fi
 cd "$package_path"
 
 # Guard node_modules slot against clobbering a developer's real install.
+# Production (non-dry-run): strict — refuse to overwrite a real node_modules
+# directory. Only an empty slot or a pre-existing symlink is safe to clobber.
+# Dry-run: proceed safely via two strategies that NEVER mutate the
+# developer's real install in place:
+#   (b) reuse the existing node_modules directly if it already contains a
+#       usable semantic-release binary (common when the dev ran `bun install`
+#       to completion), or
+#   (a) move the existing node_modules aside to a tempdir, symlink
+#       DOCS_NODE_MODULES in its place for the duration of the run, and
+#       atomically restore the original on EXIT (including on error/SIGINT).
+nm_exists_real=0
 if [[ -e node_modules && ! -L node_modules ]]; then
+  nm_exists_real=1
+fi
+
+if [ "$nm_exists_real" -eq 1 ] && [ "$dry_run" -ne 1 ]; then
   echo "error: $package_path/node_modules exists and is not a symlink; refusing to overwrite a local bun install" >&2
   exit 1
 fi
-trap 'rm -f "$PWD/node_modules"' EXIT
-ln -snf "$DOCS_NODE_MODULES" node_modules
+
+if [ "$nm_exists_real" -eq 1 ] && [ -x node_modules/.bin/semantic-release ]; then
+  # Dry-run strategy (b): reuse existing node_modules in place.
+  echo "dry-run: reusing existing node_modules (.bin/semantic-release present)" >&2
+elif [ "$nm_exists_real" -eq 1 ]; then
+  # Dry-run strategy (a): move existing node_modules aside, symlink for the
+  # duration of the run, restore atomically on exit.
+  backup_dir="$(mktemp -d)"
+  echo "dry-run: moving existing node_modules to ${backup_dir} (restored on exit)" >&2
+  mv node_modules "${backup_dir}/node_modules"
+  # shellcheck disable=SC2064
+  trap "rm -f '${PWD}/node_modules'; mv '${backup_dir}/node_modules' '${PWD}/node_modules' 2>/dev/null || true; rmdir '${backup_dir}' 2>/dev/null || true" EXIT
+  ln -snf "$DOCS_NODE_MODULES" node_modules
+else
+  # Slot is empty or already a symlink — safe to (re)link.
+  trap 'rm -f "$PWD/node_modules"' EXIT
+  ln -snf "$DOCS_NODE_MODULES" node_modules
+fi
 
 if [ "$dry_run" -eq 1 ]; then
   # Filter @semantic-release/github so GITHUB_TOKEN is not required for
