@@ -677,6 +677,29 @@
         "type": "github"
       }
     },
+    "hercules-ci-effects_2": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1776603440,
+        "narHash": "sha256-wA+ONiwbvQIy7ERJx/ruhV7y5xku6XKstXCII5bIbdI=",
+        "owner": "hercules-ci",
+        "repo": "hercules-ci-effects",
+        "rev": "e2456ee419f9d75f8382e3d6c5af4690b316a5a8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "hercules-ci-effects",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -1365,6 +1388,7 @@
         "flake-parts": "flake-parts",
         "gateway-api-src": "gateway-api-src",
         "git-hooks": "git-hooks",
+        "hercules-ci-effects": "hercules-ci-effects_2",
         "home-manager": "home-manager",
         "import-tree": "import-tree",
         "lazyvim-nix": "lazyvim-nix",
