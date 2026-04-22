@@ -1595,6 +1595,15 @@ test-package package:
 preview-version target="main" package="":
   nix run --accept-flake-config .#preview-version -- "{{target}}" "{{package}}"
 
+# Run the release flake app with passthrough args (see modules/apps/release/release.{nix,sh})
+# Examples:
+#   just release --help
+#   just release info packages/docs
+#   just release packages/docs --dry-run
+[group('CI/CD')]
+release *args:
+  {{nix_cmd}} run --no-warn-dirty .#release -- {{args}}
+
 # Release a package using semantic-release
 [group('CI/CD')]
 release-package package dry_run="false":

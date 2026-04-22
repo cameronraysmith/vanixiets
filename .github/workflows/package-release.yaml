@@ -110,7 +110,7 @@ jobs:
         uses: ./.github/actions/cached-ci-job
         with:
           check-name: ${{ inputs.package-name }}-release
-          hash-sources: 'packages/${{ inputs.package-name }}/**/* packages/docs/package.json bun.lock flake.lock flake.nix modules/apps/docs/release.nix modules/apps/docs/release.sh justfile .github/actions/setup-nix/action.yml .github/workflows/package-release.yaml'
+          hash-sources: 'packages/${{ inputs.package-name }}/**/* packages/docs/package.json bun.lock flake.lock flake.nix modules/apps/release/release.nix modules/apps/release/release.sh justfile .github/actions/setup-nix/action.yml .github/workflows/package-release.yaml'
           force-run: ${{ inputs.force-run }}
 
       - name: Setup Nix
