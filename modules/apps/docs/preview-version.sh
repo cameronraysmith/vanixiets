@@ -21,6 +21,49 @@
 
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+usage: preview-version [target-branch] [package-path]
+       preview-version --help
+
+Preview the semantic-release version that would be published after merging
+the current branch into <target-branch>. Simulates the merge via
+`git merge-tree --write-tree`, runs semantic-release in --dry-run / --no-ci
+mode against a temporary worktree, and prints the next version (or a
+no-bump / unsupported-branch notice).
+
+Positional arguments:
+  target-branch   Release branch to simulate merging into (default: main).
+  package-path    Monorepo package directory relative to the repo root
+                  (e.g., packages/docs). Defaults to the root package.
+
+Flags:
+  --help, -h      Print this usage and exit 0.
+
+Environment:
+  DOCS_NODE_MODULES   (required) Absolute path to the vanixiets-docs-deps
+                      node_modules tree, provided by preview-version.nix.
+                      Symlinked into the temporary worktree so
+                      semantic-release and its plugins are resolvable.
+  CURRENT_BRANCH      (optional) Bookmark/branch name to attach HEAD to when
+                      invoked from a jj-colocated detached-HEAD setup. When
+                      set while HEAD is detached, the script checks out the
+                      branch for the run and restores detached state on exit.
+
+Examples:
+  nix run .#preview-version                         # root package on main
+  nix run .#preview-version -- main packages/docs   # docs package on main
+  nix run .#preview-version -- beta packages/docs   # docs package on beta
+EOF
+}
+
+case "${1:-}" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+esac
+
 # Configuration
 TARGET_BRANCH="${1:-main}"
 PACKAGE_PATH="${2:-}"
@@ -184,11 +227,16 @@ ORIGINAL_REMOTE_HEAD=$(git rev-parse "origin/$TARGET_BRANCH" 2>/dev/null || echo
 # Create merge tree to test if merge is possible
 echo -e "${BLUE}simulating merge of ${CURRENT_BRANCH} → ${TARGET_BRANCH}...${NC}"
 
-# Perform merge-tree operation to test if merge is possible
-MERGE_OUTPUT=$(git merge-tree --write-tree "$TARGET_BRANCH" "$CURRENT_BRANCH" 2>&1)
-MERGE_EXIT=$?
-
-if [ $MERGE_EXIT -ne 0 ]; then
+# Perform merge-tree operation to test if merge is possible.
+#
+# The `if ! MERGE_OUTPUT=$(...)` form is deliberate: under `set -e`, a
+# failing command substitution in a bare assignment (`VAR=$(cmd)`) does
+# NOT cause the script to exit in every bash version/mode and does not
+# propagate `$?` reliably when combined with `inherit_errexit` — the prior
+# pattern of `VAR=$(cmd); RC=$?` was fragile. Guard the assignment with
+# `if !` so merge-conflict detection is explicit and independent of
+# errexit semantics.
+if ! MERGE_OUTPUT=$(git merge-tree --write-tree "$TARGET_BRANCH" "$CURRENT_BRANCH" 2>&1); then
   echo -e "${RED}error: merge conflicts detected${NC}" >&2
   echo -e "${YELLOW}please resolve conflicts in your branch before previewing${NC}" >&2
   echo -e "\n${YELLOW}conflict details:${NC}" >&2

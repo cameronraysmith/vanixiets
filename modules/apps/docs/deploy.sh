@@ -10,12 +10,62 @@
 # Usage:
 #   deploy-docs preview <branch>
 #   deploy-docs production
+#   deploy-docs --help
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+usage: deploy-docs preview <branch>
+       deploy-docs production
+       deploy-docs --help
+
+Deploy the nix-built vanixiets-docs payload to Cloudflare Workers.
+
+Subcommands:
+  preview <branch>   Upload a Cloudflare Workers preview version tagged with
+                     the current HEAD short SHA, aliased at b-<sanitized-branch>.
+                     <branch> defaults to `git branch --show-current`; explicit
+                     value required when HEAD is detached.
+  production         Promote the existing preview version matching the current
+                     HEAD short SHA to 100% production traffic, or fall back
+                     to a direct deploy of the nix-built payload when no
+                     matching preview exists.
+
+Flags:
+  --help, -h         Print this usage and exit 0.
+
+Environment contract (populated by deploy.nix; required at runtime):
+  DOCS_PAYLOAD       Absolute path to the vanixiets-docs derivation output
+                     ($out/{dist/, .wrangler/, wrangler.jsonc}).
+  SOPS_SECRETS_FILE  Absolute path to secrets/shared.yaml under $inputs.self;
+                     source of Cloudflare credentials via `sops exec-env`.
+  DOCS_NODE_MODULES  Absolute path to the vanixiets-docs-deps node_modules
+                     tree (hosts the hermetic wrangler binary).
+
+Optional environment:
+  GITHUB_ACTIONS / GITHUB_ACTOR / GITHUB_WORKFLOW
+                     When set, the production deploy message is prefixed with
+                     the GitHub Actions context; otherwise whoami and hostname
+                     are used.
+
+Examples:
+  nix run .#deploy-docs -- preview my-feature-branch
+  nix run .#deploy-docs -- production
+EOF
+}
+
 mode="${1:-}"
+case "$mode" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+esac
+
 if [[ -z "$mode" ]]; then
   echo "error: missing subcommand" >&2
   echo "usage: deploy-docs preview <branch> | deploy-docs production" >&2
+  echo "(run with --help for full usage and env-var contract)" >&2
   exit 2
 fi
 shift
@@ -207,6 +257,7 @@ case "$mode" in
   *)
     echo "error: unknown subcommand '$mode'" >&2
     echo "usage: deploy-docs preview <branch> | deploy-docs production" >&2
+    echo "(run with --help for full usage and env-var contract)" >&2
     exit 2
     ;;
 esac
