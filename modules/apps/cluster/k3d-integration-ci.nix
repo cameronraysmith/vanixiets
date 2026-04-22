@@ -3,7 +3,22 @@
 # Usage:
 #   nix run .#k3d-integration-ci
 #
-# Template form: pure readFile (no nix-computed variable injection).
+# Template bifurcation (writeShellApplication): PURE READFILE FORM.
+# `text = builtins.readFile ./k3d-integration-ci.sh` — the sidecar is
+# consumed verbatim, no nix-eval-time string interpolation. This is the
+# cluster-domain representative of the pure form and the canonical
+# starting point when converting a cluster script.
+#
+# Choose PURE form when the sidecar needs no nix-eval-time path injection
+# (all inputs come from env vars, CLI args, or runtimeInputs). Choose
+# INTERPOLATION form (a nix-string text attribute that concatenates an
+# eval-time preamble with builtins.readFile of the sidecar) only when
+# you must inject a nix-computed store path or derivation outPath into
+# the script preamble — for the canonical example see
+# `modules/apps/docs/deploy.nix`, which injects DOCS_PAYLOAD
+# (config.packages.vanixiets-docs) and SOPS_SECRETS_FILE (inputs.self)
+# at eval time.
+#
 # Orchestrates the seven-phase CI integration flow that is currently
 # invoked by `.github/workflows/test-cluster.yaml`. Delegates to the
 # sibling cluster/docs flake apps (nixidy-build, nixidy-bootstrap,
