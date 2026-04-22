@@ -10,6 +10,14 @@
 #
 # Expected caller environment (not loaded from sops; CI-only):
 #   GITHUB_TOKEN - GitHub authentication for the @semantic-release/github plugin
+#
+# Template bifurcation (writeShellApplication): PURE READFILE FORM.
+# `text = builtins.readFile ./release.sh` — the sidecar is consumed verbatim,
+# no nix-eval-time string interpolation. The only nix-injected value is
+# DOCS_NODE_MODULES, which is provided via `runtimeEnv` (an env var set by
+# the writeShellApplication wrapper at invocation time), not via `text`
+# interpolation. Contrast with `deploy.nix`, which uses the interpolation
+# form because it must inject derivation outPaths into the script preamble.
 { ... }:
 {
   perSystem =

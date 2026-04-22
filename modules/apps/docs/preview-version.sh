@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
 # preview-version.sh - Preview semantic-release version after merging to target branch
 #
 # Usage:
@@ -16,6 +18,8 @@
 # links it into the worktree's package directory and invokes semantic-release
 # directly via node_modules/.bin, bypassing any need for bun or a prior
 # `bun install`.
+
+set -euo pipefail
 
 # Configuration
 TARGET_BRANCH="${1:-main}"

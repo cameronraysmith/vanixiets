@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
 # release.sh - Production semantic-release runner for a monorepo package.
 #
 # Usage:
@@ -14,6 +16,8 @@
 #
 # Required environment (pass through from caller; CI-only):
 #   GITHUB_TOKEN - required by @semantic-release/github to publish tags/releases.
+
+set -euo pipefail
 
 package_path="${1:?usage: release <package-path> [extra semantic-release args...]}"
 shift
