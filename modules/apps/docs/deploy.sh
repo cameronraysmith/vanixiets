@@ -98,6 +98,17 @@ fi
 # override the hermetic binary without rewriting this script.
 export WRANGLER="${WRANGLER:-$DOCS_NODE_MODULES/.bin/wrangler}"
 
+# Invoke wrangler via real node, not the .bin/wrangler shebang:
+# bun's .bin wrappers point at bun-with-fake-node/bin/node (bun in node-
+# compat mode), but bun's fetch() on linux-x64 silently hangs on keep-
+# alive connection reuse to api.cloudflare.com — wrangler `versions
+# upload` / `versions deploy` exit 0 with no Worker Version ID produced
+# and no error. Prefixing `node` forces real-node (undici) runtime.
+# Matches pkgs/by-name/vanixiets-docs/package.nix:141 (astro) and :248
+# (playwright) precedent for tools with known bun incompatibilities.
+# Empirical: diagnosed 2026-04-22 via magnetite linux-x64 reproducer;
+# same machine + wrangler runs fine under real node, hangs under bun.
+
 # Resolve repo root so git metadata commands work independently of callsite.
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
@@ -200,26 +211,44 @@ case "$mode" in
     #       authoritative Worker Version ID parsed from (a).
     wrangler_upload_ndjson="$tmpdir/wrangler-versions-upload.ndjson"
     wrangler_upload_stdout="$tmpdir/wrangler-versions-upload.stdout"
+    wrangler_upload_stderr="$tmpdir/wrangler-versions-upload.stderr"
     : > "$wrangler_upload_ndjson"
     : > "$wrangler_upload_stdout"
+    : > "$wrangler_upload_stderr"
     export WRANGLER_OUTPUT_FILE_PATH="$wrangler_upload_ndjson"
+    # Note: WRANGLER_LOG=debug was observed to deterministically terminate
+    # wrangler 4.84.1 mid-fetch (process exits 0 after POST
+    # /assets-upload-session request, before response; on GHA similar early
+    # termination at GET /workers/services/<name>). Upload then never
+    # completes. Do NOT re-enable without gating it to a retry-only code
+    # path. Wrangler's internal log file at ~/.wrangler/logs/wrangler-*.log
+    # is written at default level regardless and is captured on failure.
 
-    # Tee stdout so we can both display wrangler output live AND parse it as a
-    # fallback version_id source (Option B). Observed 2026-04-22: wrangler
-    # 4.84.1 occasionally completes the `/versions` upload (server-side
-    # version is persisted, `Worker Version ID: ...` is logged to stdout) but
-    # then hangs/terminates on the subsequent `/workers/subdomain` GET
-    # request, preventing the `writeOutput({type: "version-upload", ...})`
-    # call from firing. Capturing stdout in parallel lets us recover the
-    # authoritative version_id even in that partial-completion case.
+    # Tee stdout so we both display wrangler output live AND parse it as a
+    # fallback version_id source when the NDJSON event stream from
+    # WRANGLER_OUTPUT_FILE_PATH doesn't produce the expected
+    # `type:"version-upload"` event. Retained as defense-in-depth against
+    # future wrangler silent-success regressions. See top-of-file rationale
+    # (lines ~101-110) for the diagnostic history.
     #
+    # Diagnostic: echo the exact upload command line to stderr so the GHA log
+    # shows what the shell is about to invoke (minus secret env vars which are
+    # expanded by sops-wrapped subshell).
+    printf '>> wrangler upload command: node %s --config %s versions upload --preview-alias %s --tag %s --message %q\n' \
+      "$WRANGLER" "$WRANGLER_CONFIG" "b-${SAFE_BRANCH}" "$VERSION_TAG" "$VERSION_MESSAGE" >&2
+
+    set +e
     # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
     sops exec-env "$SOPS_SECRETS_FILE" '
-      "$WRANGLER" --config "$WRANGLER_CONFIG" versions upload \
+      node "$WRANGLER" --config "$WRANGLER_CONFIG" versions upload \
         --preview-alias "b-${SAFE_BRANCH}" \
         --tag "$VERSION_TAG" \
         --message "$VERSION_MESSAGE"
-    ' | tee "$wrangler_upload_stdout"
+    ' \
+      > >(tee "$wrangler_upload_stdout") \
+      2> >(tee "$wrangler_upload_stderr" >&2)
+    wrangler_upload_rc=$?
+    set -e
 
     unset WRANGLER_OUTPUT_FILE_PATH
 
@@ -245,19 +274,66 @@ case "$mode" in
       )
     fi
     if [[ -z "$version_id" ]]; then
+      # Relax errexit for the entire diagnostic dump block. grep/sed/cat/head
+      # failures here (missing stdout match, empty NDJSON, nonexistent log
+      # file) must not abort before every dump section fires — the script's
+      # fail contract is satisfied by the explicit `exit 1` at the end of
+      # this block, not by intermediate pipeline exit codes.
+      set +e
       echo "" >&2
       echo "error: wrangler exited 0 but produced no Worker Version ID" >&2
       echo "  post-condition (a) failed: neither WRANGLER_OUTPUT_FILE_PATH NDJSON" >&2
       echo "                              event log nor wrangler stdout contained" >&2
       echo "                              a recognizable Worker Version ID" >&2
+      echo "  wrangler exit code:    $wrangler_upload_rc" >&2
       echo "  raw wrangler event log: $wrangler_upload_ndjson" >&2
       echo "  raw wrangler stdout:   $wrangler_upload_stdout" >&2
+      echo "  raw wrangler stderr:   $wrangler_upload_stderr" >&2
       echo "  hints:" >&2
-      echo "    - confirm CF_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
+      echo "    - confirm CLOUDFLARE_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
       echo "      $SOPS_SECRETS_FILE" >&2
-      echo "    - if running in GHA, wrangler's CI-detection branch may have" >&2
-      echo "      silently exited; rerun with WRANGLER_LOG=debug for stderr trace" >&2
-      echo "    - inspect the raw NDJSON and stdout paths above for any output" >&2
+      echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
+      echo "      not bun-fake-node (see top-of-file rationale at lines ~101-110)" >&2
+      echo "    - inspect the wrangler internal log dumped below / raw NDJSON and stdout paths above for any output" >&2
+      echo "" >&2
+      # Locate wrangler's internal log file by glob + newest mtime across
+      # platform-specific candidate locations. Avoids depending on wrangler's
+      # stdout `Writing logs to "..."` announcement (only printed under
+      # WRANGLER_LOG=debug, which we no longer set). The log file contains
+      # full HTTP request/response bodies and any internal stack traces that
+      # are otherwise destroyed with the GHA runner — dump it first as the
+      # most informative diagnostic source when NDJSON/stdout/stderr are
+      # empty or truncated.
+      wrangler_log_path=""
+      for candidate_dir in "$HOME/.wrangler/logs" "$HOME/.config/.wrangler/logs"; do
+        if [[ -d "$candidate_dir" ]]; then
+          # Filename format is `wrangler-YYYY-MM-DD_HH-MM-SS_mmm.log` — the
+          # embedded timestamp is zero-padded and lexicographically sortable,
+          # so `sort | tail -1` selects the newest without needing ls -t.
+          newest=$(find "$candidate_dir" -maxdepth 1 -type f -name 'wrangler-*.log' 2>/dev/null | sort | tail -1 || true)
+          if [[ -n "$newest" ]]; then
+            wrangler_log_path="$newest"
+            break
+          fi
+        fi
+      done
+      if [[ -n "$wrangler_log_path" && -f "$wrangler_log_path" ]]; then
+        echo "--- begin wrangler internal log ($wrangler_log_path) ---" >&2
+        cat "$wrangler_log_path" >&2 || true
+        echo "--- end wrangler internal log ---" >&2
+      else
+        echo "wrangler internal log: no file found under \$HOME/.wrangler/logs or \$HOME/.config/.wrangler/logs" >&2
+      fi
+      echo "--- begin raw wrangler NDJSON ($wrangler_upload_ndjson) ---" >&2
+      cat "$wrangler_upload_ndjson" >&2 || true
+      echo "--- end raw wrangler NDJSON ---" >&2
+      echo "--- begin raw wrangler stdout ($wrangler_upload_stdout) ---" >&2
+      cat "$wrangler_upload_stdout" >&2 || true
+      echo "--- end raw wrangler stdout ---" >&2
+      echo "--- begin raw wrangler stderr ($wrangler_upload_stderr) ---" >&2
+      cat "$wrangler_upload_stderr" >&2 || true
+      echo "--- end raw wrangler stderr ---" >&2
+      set -e
       exit 1
     fi
 
@@ -273,7 +349,7 @@ case "$mode" in
 
     # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
     sops exec-env "$SOPS_SECRETS_FILE" '
-      "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json
+      node "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json
     ' | cat > "$wrangler_list_json"
 
     matched_count=$(jq --arg tag "$commit_tag" \
@@ -286,8 +362,7 @@ case "$mode" in
       echo "                              with annotations[\"workers/tag\"] == ${commit_tag}" >&2
       echo "  raw versions list output: $wrangler_list_json" >&2
       echo "  hint: wrangler reported a version_id locally but the Cloudflare API did" >&2
-      echo "        not persist it; retry with WRANGLER_LOG=debug or inspect the raw" >&2
-      echo "        versions list for surrounding entries" >&2
+      echo "        not persist it; inspect the raw versions list for surrounding entries" >&2
       exit 1
     fi
 
@@ -322,7 +397,7 @@ case "$mode" in
 
     # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
     sops exec-env "$SOPS_SECRETS_FILE" '
-      "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json
+      node "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json
     ' | cat > "$wrangler_list_json"
 
     existing_version=$(jq -r --arg tag "$commit_tag" \
@@ -355,7 +430,7 @@ case "$mode" in
 
       # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
       sops exec-env "$SOPS_SECRETS_FILE" '
-        "$WRANGLER" --config "$WRANGLER_CONFIG" versions deploy \
+        node "$WRANGLER" --config "$WRANGLER_CONFIG" versions deploy \
           "${EXISTING_VERSION}@100%" \
           --yes \
           --message "$DEPLOYMENT_MESSAGE"
@@ -394,10 +469,11 @@ case "$mode" in
         echo "  raw wrangler event log: $deploy_ndjson" >&2
         echo "  raw wrangler stdout:   $deploy_stdout" >&2
         echo "  hints:" >&2
-        echo "    - confirm CF_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
+        echo "    - confirm CLOUDFLARE_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
         echo "      $SOPS_SECRETS_FILE" >&2
-        echo "    - if running in GHA, wrangler's CI-detection branch may have" >&2
-        echo "      silently exited; rerun with WRANGLER_LOG=debug for stderr trace" >&2
+        echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
+        echo "      not bun-fake-node (see top-of-file rationale at lines ~101-110)" >&2
+        echo "    - inspect the wrangler internal log dumped below / raw capture paths above for any output" >&2
         exit 1
       fi
 
@@ -408,7 +484,7 @@ case "$mode" in
 
       # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
       sops exec-env "$SOPS_SECRETS_FILE" '
-        "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json
+        node "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json
       ' | cat > "$deployments_list_json"
 
       found_count=$(jq --arg did "$deployment_id" --arg vid "$existing_version" \
@@ -425,7 +501,7 @@ case "$mode" in
         echo "                              entries matching the just-deployed id/version" >&2
         echo "  raw deployments list output: $deployments_list_json" >&2
         echo "  hint: wrangler reported a deployment locally but the Cloudflare API did" >&2
-        echo "        not persist it; retry with WRANGLER_LOG=debug" >&2
+        echo "        not persist it; inspect the raw deployments list for surrounding entries" >&2
         exit 1
       fi
 
@@ -463,7 +539,7 @@ case "$mode" in
 
       # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
       sops exec-env "$SOPS_SECRETS_FILE" '
-        "$WRANGLER" --config "$WRANGLER_CONFIG" deploy \
+        node "$WRANGLER" --config "$WRANGLER_CONFIG" deploy \
           --message "$DEPLOYMENT_MESSAGE"
       ' | tee "$deploy_stdout"
 
@@ -499,10 +575,11 @@ case "$mode" in
         echo "  raw wrangler event log: $deploy_ndjson" >&2
         echo "  raw wrangler stdout:   $deploy_stdout" >&2
         echo "  hints:" >&2
-        echo "    - confirm CF_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
+        echo "    - confirm CLOUDFLARE_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
         echo "      $SOPS_SECRETS_FILE" >&2
-        echo "    - if running in GHA, wrangler's CI-detection branch may have" >&2
-        echo "      silently exited; rerun with WRANGLER_LOG=debug for stderr trace" >&2
+        echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
+        echo "      not bun-fake-node (see top-of-file rationale at lines ~101-110)" >&2
+        echo "    - inspect the wrangler internal log dumped below / raw capture paths above for any output" >&2
         exit 1
       fi
       # Reuse deployment_id slot below (it now holds the just-deployed version_id
@@ -513,7 +590,7 @@ case "$mode" in
 
       # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
       sops exec-env "$SOPS_SECRETS_FILE" '
-        "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json
+        node "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json
       ' | cat > "$deployments_list_json"
 
       found_count=$(jq --arg vid "$deploy_version_id" \
@@ -530,7 +607,7 @@ case "$mode" in
         echo "                              entries matching the just-deployed version_id" >&2
         echo "  raw deployments list output: $deployments_list_json" >&2
         echo "  hint: wrangler reported a deployment locally but the Cloudflare API did" >&2
-        echo "        not persist it; retry with WRANGLER_LOG=debug" >&2
+        echo "        not persist it; inspect the raw deployments list for surrounding entries" >&2
         exit 1
       fi
 
