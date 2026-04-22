@@ -15,7 +15,7 @@
   "scripts": {
     "reinstall": "rm -rf node_modules packages/docs/node_modules && bun install",
     "test-release": "semantic-release --dry-run --no-ci",
-    "preview-version": "./scripts/preview-version.sh"
+    "preview-version": "nix run --accept-flake-config --no-warn-dirty .#preview-version --"
   },
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
