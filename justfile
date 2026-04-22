@@ -331,6 +331,26 @@ bootstrap-shell:
   "nixpkgs#git" \
   "nixpkgs#just"
 
+# Idempotent post-nix bootstrap: install direnv if missing, report status
+# Body lives in modules/apps/bootstrap/bootstrap.{nix,sh}.
+# Chicken-and-egg: for first-contact nix install, use `make bootstrap`.
+[group('bootstrap')]
+bootstrap *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#bootstrap -- {{ARGS}}
+
+# Verify host nix/flakes/direnv/flake-metadata (mirror of `make verify`)
+# Body lives in modules/apps/bootstrap/verify.{nix,sh}.
+[group('bootstrap')]
+bootstrap-verify *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#verify -- {{ARGS}}
+
+# Generate ~/.config/sops/age/keys.txt (mirror of `make setup-user`)
+# Body lives in modules/apps/bootstrap/setup-user.{nix,sh}.
+# Idempotent: re-print public key and exit 0 if the key already exists.
+[group('bootstrap')]
+bootstrap-setup-user *ARGS:
+  {{nix_cmd}} run --no-warn-dirty .#setup-user -- {{ARGS}}
+
 # nix run home-manager -- build --flake ".#{{ profile }}"
 # Bootstrap build home-manager with flake
 [group('nix-home-manager')]
