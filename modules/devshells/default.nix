@@ -1,6 +1,7 @@
 {
   perSystem =
     {
+      lib,
       pkgs,
       inputs',
       config,
@@ -66,6 +67,12 @@
           # Document typesetting
           pkgs.typstWithPackages
           pkgs.svgo
+        ]
+        # buildbot-effects CLI for local dispatch of hercules-ci-effects
+        # (see buildbot-nix/docs/EFFECTS.md). Linux-only: the package
+        # depends on bwrap and is gated at buildbot-nix/packages/flake-module.nix:29.
+        ++ lib.optionals pkgs.stdenv.isLinux [
+          inputs'.buildbot-nix.packages.buildbot-effects
         ];
 
         passthru.meta.description = "Development environment with clan CLI and build tools";
