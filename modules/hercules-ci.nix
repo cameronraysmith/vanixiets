@@ -52,13 +52,20 @@ in
           name = "smoke";
 
           # buildbot-effects populates these from the push metadata.
-          # `toString` coerces `null` (unset tag/branch) to the empty
-          # string so Nix string interpolation does not throw during
-          # eval of the effect derivation.
+          # `toString` coerces a null tag to the empty string so Nix string
+          # interpolation does not throw during eval of the effect derivation.
+          #
+          # `config.repo.ref` is intentionally not referenced: buildbot-effects
+          # hard-codes `"ref": None` in its JSON payload (see
+          # buildbot_effects/__init__.py:108, `# TODO: support ref`), and
+          # hercules-ci-effects declares `repo.ref` as non-nullable
+          # `types.str` (herculesCI-attribute.nix:18), so reading it would
+          # fail module type-checking at eval time. Upstream's own mkEffect
+          # example in buildbot-nix/nix/herculesCI/flake-module.nix follows
+          # the same pattern (branch/tag/rev only).
           effectScript =
             let
               branch = toString (config.repo.branch or "");
-              ref = toString (config.repo.ref or "");
               rev = toString (config.repo.rev or "");
               shortRev = toString (config.repo.shortRev or "");
               tag = toString (config.repo.tag or "");
@@ -70,7 +77,6 @@ in
 
               # buildbot-effects-passed args (captured at Nix eval time via config.repo).
               echo "branch:   ${lib.escapeShellArg branch}"
-              echo "ref:      ${lib.escapeShellArg ref}"
               echo "rev:      ${lib.escapeShellArg rev}"
               echo "shortRev: ${lib.escapeShellArg shortRev}"
               echo "tag:      ${lib.escapeShellArg tag}"
