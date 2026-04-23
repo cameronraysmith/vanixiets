@@ -66,6 +66,15 @@
             options.mountpoint = "/var/lib/containers";
             mountpoint = "/var/lib/containers";
           };
+          # Dedicated dataset for docker graphroot to use the native ZFS
+          # storage driver (docker's overlay2 does not layer cleanly on ZFS,
+          # and /var/lib/docker must be its own dataset for the zfs driver).
+          # Coexists with zroot/root/podman; disjoint mountpoints.
+          "root/docker" = {
+            type = "zfs_fs";
+            options.mountpoint = "/var/lib/docker";
+            mountpoint = "/var/lib/docker";
+          };
         };
       };
     };
