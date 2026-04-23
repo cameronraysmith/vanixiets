@@ -28,6 +28,7 @@
           nuenv
           llm-agents
           catppuccin
+          hercules-ci-effects
           ;
         inherit self;
       };
