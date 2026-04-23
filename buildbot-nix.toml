@@ -4,3 +4,20 @@
 # See: https://www.github.com/nix-community/buildbot-nix/issues/302 (upstream issue)
 # See: https://www.github.com/nix-community/buildbot-nix/pull/318 (per-repo config support)
 attribute = "checks.x86_64-linux"
+
+# herculesCI effects config
+#
+# Effects declared at `herculesCI.onPush.default.outputs.effects.<name>`
+# share a single fixed attribute path across all branches; which branches
+# actually dispatch effects is controlled by the `effects_branches` key value and
+# read from the default branch of the repo (buildbot-nix/buildbot_nix/nix_eval.py:596-632,
+# which prevents a PR author from self-authorizing).
+#
+# `effects_branches`:
+#   fnmatch glob list of branch names that trigger effect dispatch on
+#   push. `["main"]` restricts dispatch to the default branch only.
+#
+# `effects_on_pull_requests`:
+#   `false` blocks PR-event effect dispatch for fork PRs
+effects_branches = ["*"]
+effects_on_pull_requests = true
