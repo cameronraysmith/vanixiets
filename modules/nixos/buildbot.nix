@@ -150,7 +150,7 @@
           topic = "build-with-buildbot";
         };
 
-        # Conservative eval sizing for CX53 (8 vCPU, 16 GB RAM)
+        # Conservative eval sizing for CX53 (16 vCPU, 32 GB RAM) — current evalWorkerCount=4 × evalMaxMemorySize=2048MB = 8 GB peak, leaving ample headroom on 32 GB host; sizing not increased at this time
         # 4 workers * 2048 MB = 8 GB max, leaving headroom for niks3 + PostgreSQL + nginx
         evalWorkerCount = 4;
         evalMaxMemorySize = 2048;
