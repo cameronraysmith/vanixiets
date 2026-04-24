@@ -35,11 +35,23 @@
             # Per ADR-002 env-var contract: secrets flow via inherited env
             # (never via `sops exec-env` inside the script), so pkgs.sops /
             # pkgs.age are no longer required runtime inputs.
+            #
+            # Hermeticity (m4-deploy-docs-git-env-contract): sed/awk/grep/find
+            # are explicitly declared even though hercules-ci-effects' default
+            # sandbox PATH supplies them implicitly. Closing this latent
+            # coupling makes the writeShellApplication self-sufficient under
+            # ANY caller context (not just the bwrap sandbox), satisfying the
+            # writeShellApplication invariant that PATH is exactly equal to
+            # runtimeInputs at runtime.
             runtimeInputs = [
               pkgs.nodejs_24
               pkgs.jq
               pkgs.coreutils
               pkgs.git
+              pkgs.gnugrep
+              pkgs.gnused
+              pkgs.gawk
+              pkgs.findutils
             ];
             runtimeEnv = {
               DOCS_NODE_MODULES = "${config.packages.vanixiets-docs-deps}/packages/docs/node_modules";

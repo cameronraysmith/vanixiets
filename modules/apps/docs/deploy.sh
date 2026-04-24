@@ -2,26 +2,43 @@
 # shellcheck shell=bash
 # Docs deployment dispatcher invoked via `nix run .#deploy-docs`.
 #
-# Env-var contract (per ADR-002 / env-var-contract-design.md §2.1):
-#   Required (secret, provided by caller):
-#     CLOUDFLARE_API_TOKEN     wrangler auth token
-#     CLOUDFLARE_ACCOUNT_ID    Cloudflare account id (wrangler requires this
-#                              for account-scoped operations such as
-#                              `versions upload` on a Worker attached to an
-#                              account-level resource)
+# Env-var contract (per ADR-002 / env-var-contract-design.md §2.1, extended
+# by the m4-deploy-docs-git-env-contract feature to ALL host-PATH binary
+# dependencies). 12 caller-overridable variables: 4 secret tokens (the
+# closed effects bundle), 6 GIT_*, 2 DEPLOY_*. Symmetric env-first /
+# shelled-fallback shape across all four caller contexts (effect preamble,
+# sops exec-env, direnv, GHA env, local shell).
+#
+#   Required (secret, provided by caller from the closed 4-key effects
+#   bundle — see modules/effects/vanixiets/secrets.nix):
+#     CLOUDFLARE_API_TOKEN     wrangler auth token (CONSUMED by this
+#                              script; required at runtime).
+#     CLOUDFLARE_ACCOUNT_ID    Cloudflare account id (CONSUMED; wrangler
+#                              requires this for account-scoped ops such
+#                              as `versions upload` on a Worker attached
+#                              to an account-level resource).
+#     GITHUB_TOKEN             not consumed by deploy.sh; documented as
+#                              part of the canonical effects bundle for
+#                              homogeneity (consumed by release.sh).
+#     SOPS_AGE_KEY             not consumed by deploy.sh; documented as
+#                              part of the canonical effects bundle for
+#                              homogeneity (consumed by
+#                              k3d-bootstrap-secrets.sh). Per ADR-002,
+#                              this script does NOT shell out to sops.
 #   Required (config, injected by deploy.nix):
 #     DOCS_PAYLOAD             store path of the vanixiets-docs derivation
 #                              ($out/{dist/, .wrangler/, wrangler.jsonc})
 #     DOCS_NODE_MODULES        store path of vanixiets-docs-deps node_modules
 #                              tree (runtimeEnv of deploy.nix)
-#   Optional (git metadata; env-first with git-fallback) — symmetric to the
-#   secrets contract above. Extended in the m4-deploy-docs-git-env-contract
-#   feature to let the script run inside the buildbot-effects bwrap sandbox
-#   which does NOT bind-mount the working tree (upstream-by-design). Every
-#   GIT_* consumer below is expressed as `${GIT_X:-$(git … 2>/dev/null || true)}`
-#   so the three supported caller contexts all work: effect preamble (env
-#   pre-populated, no .git reachable), local shell from a git worktree (env
-#   unset, git fallback), and GHA after checkout (env unset, git fallback).
+#
+#   Optional (git metadata; env-first with git-fallback). Extended in the
+#   m4-deploy-docs-git-env-contract feature to let the script run inside
+#   the buildbot-effects bwrap sandbox which does NOT bind-mount the
+#   working tree (upstream-by-design). Every GIT_* consumer below is
+#   expressed as `${GIT_X:-$(git … 2>/dev/null || true)}` so the three
+#   supported caller contexts all work: effect preamble (env pre-populated,
+#   no .git reachable), local shell from a git worktree (env unset, git
+#   fallback), and GHA after checkout (env unset, git fallback).
 #     GIT_REV                  40-char commit SHA (fallback: git rev-parse HEAD)
 #     GIT_REV_SHORT            7-ish-char short SHA (fallback: git rev-parse --short HEAD)
 #     GIT_REV_SHORT12          12-char short SHA used for wrangler --tag /
@@ -33,33 +50,60 @@
 #                              annotation (fallback: git log -1 --pretty=format:'%s')
 #     GIT_WORKTREE_STATUS      literal "clean" or "dirty" (fallback:
 #                              git diff-index --quiet HEAD -- && echo clean || echo dirty)
-#   Optional:
+#
+#   Optional (deploy-context metadata; env-first with bash-builtin /
+#   shelled-fallback). Generalisation of the same pattern to ALL host-PATH
+#   binary dependencies, fixing the second-bug-class regression where the
+#   bwrap sandbox lacks `hostname`/`whoami` on PATH (only /nix/store
+#   ro-bind + writeShellApplication runtimeInputs are available). The
+#   bash builtin `$HOSTNAME` is populated from gethostname(2) at shell
+#   startup — no external binary required in any context.
+#     DEPLOY_HOST              short hostname for the production deploy
+#                              message. Fallback: ${HOSTNAME%%.*}
+#                              (bash builtin parameter expansion; trims
+#                              the first dot-suffix to mimic `hostname -s`
+#                              without shelling out).
+#     DEPLOY_DEPLOYER          actor identity for deploy/version messages.
+#                              Fallback chain: GITHUB_ACTOR (GHA context)
+#                              → `whoami 2>/dev/null` (local shell with
+#                              /etc/passwd available) → "unknown".
+#
+#   Optional (caller debugging / overrides):
 #     WRANGLER                 override binary path for test harnesses; default
 #                              $DOCS_NODE_MODULES/.bin/wrangler
 #     DEPLOY_DOCS_DEBUG        preserve tmpdir on exit when set
 #     GITHUB_ACTIONS / GITHUB_ACTOR / GITHUB_WORKFLOW
-#                              prefix the deploy message with GHA context
+#                              when GITHUB_ACTIONS is set, the production
+#                              deploy message uses GITHUB_WORKFLOW (default
+#                              "CI") as the deploy context instead of
+#                              DEPLOY_HOST. GITHUB_ACTOR participates in
+#                              the DEPLOY_DEPLOYER fallback chain.
 #
-# Caller mechanisms (satisfy the secret-env contract via one of):
+# Caller mechanisms (satisfy each contract slot via one of):
 #   - Local dev:    caller-side sops wrapper (justfile `docs-deploy-*`
 #                   recipes wrap with `sops` to decrypt secrets/shared.yaml
 #                   and export the Cloudflare env before the nested nix run)
 #                   OR direnv dotenv (.envrc loads .env with the Cloudflare
-#                   env vars already exported).
+#                   env vars already exported). DEPLOY_HOST / DEPLOY_DEPLOYER
+#                   left unset → bash-builtin / whoami fallback.
 #   - GHA env:      deploy-docs.yaml step wraps the nix run with the same
 #                   caller-side sops decrypt inside a nix-develop wrapper;
 #                   the age key is provided via the step `env:` block from
-#                   the repo secrets (see deploy-docs.yaml).
+#                   the repo secrets (see deploy-docs.yaml). GIT_* / DEPLOY_*
+#                   left unset → git/bash-builtin/GITHUB_ACTOR fallback.
 #   - M4 effect:    the deploy-docs dispatcher effect preamble extracts
 #                   CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID from
-#                   $HERCULES_CI_SECRETS_JSON and ALSO exports the six GIT_*
+#                   $HERCULES_CI_SECRETS_JSON, exports the six GIT_*
 #                   variables interpolated from herculesCI.config.repo.*
-#                   (via lib.escapeShellArg + builtins.substring at eval time)
-#                   before invoking the embedded store path
-#                   ${config.apps.deploy-docs.program}. The bwrap sandbox
-#                   does not bind-mount the working tree, so every git
-#                   command in this script is env-first with error-tolerant
-#                   fallback (`git … 2>/dev/null || true`).
+#                   (via lib.escapeShellArg + builtins.substring at eval
+#                   time), AND exports DEPLOY_DEPLOYER=hercules-ci-effects
+#                   and DEPLOY_HOST=magnetite before invoking the embedded
+#                   store path ${config.apps.deploy-docs.program}. The
+#                   bwrap sandbox does not bind-mount the working tree
+#                   and provides no host-PATH binaries beyond /nix/store
+#                   ro-bind + runtimeInputs PATH, so every git/hostname/
+#                   whoami consumer in this script is env-first with
+#                   bash-builtin or error-tolerant shelled fallback.
 #
 # Secret passing rule (per ADR-002): wrangler authentication flows ONLY
 # through inherited env vars; no authentication CLI flags are used.
@@ -94,18 +138,29 @@ Flags:
   --help, -h         Print this usage and exit 0.
 
 Environment contract (see top-of-file header for full details):
-  Required (secret, caller-provided):
-    CLOUDFLARE_API_TOKEN   wrangler auth token
-    CLOUDFLARE_ACCOUNT_ID  Cloudflare account id (account-scoped ops)
+  Required (secret, caller-provided from the closed 4-key effects bundle):
+    CLOUDFLARE_API_TOKEN   wrangler auth token (CONSUMED)
+    CLOUDFLARE_ACCOUNT_ID  Cloudflare account id (CONSUMED; account-scoped ops)
+    GITHUB_TOKEN           bundle homogeneity (not consumed by deploy.sh)
+    SOPS_AGE_KEY           bundle homogeneity (not consumed by deploy.sh)
   Required (config, injected by deploy.nix):
     DOCS_PAYLOAD           path to the vanixiets-docs derivation output
     DOCS_NODE_MODULES      path to vanixiets-docs-deps node_modules tree
-  Optional:
+  Optional (env-first with shelled-fallback):
+    GIT_REV, GIT_REV_SHORT, GIT_REV_SHORT12, GIT_BRANCH,
+    GIT_COMMIT_MSG, GIT_WORKTREE_STATUS
+                     git metadata; supplied by effect preamble when no
+                     .git is reachable; otherwise resolved via `git ...`.
+    DEPLOY_HOST      short hostname; fallback `${HOSTNAME%%.*}` (bash
+                     builtin, no external binary).
+    DEPLOY_DEPLOYER  actor identity; fallback chain GITHUB_ACTOR →
+                     `whoami 2>/dev/null` → "unknown".
+  Optional (caller debugging / overrides):
     WRANGLER, DEPLOY_DOCS_DEBUG
     GITHUB_ACTIONS / GITHUB_ACTOR / GITHUB_WORKFLOW
-                     When set, the production deploy message is prefixed with
-                     the GitHub Actions context; otherwise whoami and hostname
-                     are used.
+                     When GITHUB_ACTIONS is set, the production deploy
+                     message uses the GitHub Actions context (workflow
+                     name) instead of DEPLOY_HOST.
 
 Examples:
   nix run .#deploy-docs -- preview my-feature-branch
@@ -193,14 +248,25 @@ commit_tag="${GIT_REV_SHORT12:-$(git rev-parse --short=12 HEAD 2>/dev/null || tr
 commit_short="${GIT_REV_SHORT:-$(git rev-parse --short HEAD 2>/dev/null || true)}"
 current_branch="${GIT_BRANCH:-$(git branch --show-current 2>/dev/null || true)}"
 
+# Resolve deployer / deploy_host with env-first / bash-builtin / shelled-fallback
+# per the DEPLOY_* env-var contract (see top-of-file header). The bwrap
+# sandbox provides no host-PATH binaries beyond /nix/store ro-bind +
+# runtimeInputs PATH, so unconditional `hostname -s` / `whoami` would fail
+# with `command not found` (exit 127). Bash builtin `$HOSTNAME` is populated
+# from gethostname(2) at shell startup and requires no external binary in
+# any context; `${HOSTNAME%%.*}` mimics `hostname -s` via parameter
+# expansion. `whoami` is retained as a final fallback for local shells where
+# DEPLOY_DEPLOYER and GITHUB_ACTOR are both unset; it is error-tolerant
+# (`2>/dev/null || echo unknown`) so a missing /etc/passwd entry surfaces
+# as "unknown" rather than a non-zero exit.
+deploy_host="${DEPLOY_HOST:-${HOSTNAME%%.*}}"
+deployer="${DEPLOY_DEPLOYER:-${GITHUB_ACTOR:-$(whoami 2>/dev/null || echo unknown)}}"
+
 # Compose deploy message (prefer GitHub Actions context, fall back to local).
 if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-  deployer="${GITHUB_ACTOR:-github-actions}"
   deploy_context="${GITHUB_WORKFLOW:-CI}"
   deploy_msg="Deployed by ${deployer} from ${current_branch} via ${deploy_context}"
 else
-  deployer=$(whoami)
-  deploy_host=$(hostname -s)
   deploy_msg="Deployed by ${deployer} from ${current_branch} on ${deploy_host}"
 fi
 

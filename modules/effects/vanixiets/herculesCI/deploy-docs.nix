@@ -28,17 +28,22 @@
 #     emits this shape). Never extracts SOPS_AGE_KEY (ADR-002
 #     exclusivity) and never references NPM_TOKEN.
 #
-#   Symmetric GIT_* env-var contract (m4-deploy-docs-git-env-contract):
+#   Symmetric env-var contract (GIT_* + DEPLOY_*) (m4-deploy-docs-git-env-contract):
 #     Exports GIT_REV, GIT_REV_SHORT, GIT_REV_SHORT12, GIT_BRANCH,
 #     GIT_COMMIT_MSG, GIT_WORKTREE_STATUS from herculesCI.config.repo.*
-#     at eval time via lib.escapeShellArg + builtins.substring. Required
-#     because the buildbot-effects bwrap sandbox does not bind-mount the
-#     working tree (upstream-by-design across all 3 reference effect
-#     implementations); deploy.sh's git invocations would fail with
-#     `fatal: not a git repository` without these exports. Symmetric to
-#     the secrets env-var contract: the script declares env-first /
-#     git-fallback on every GIT_* consumer, and this preamble supplies
-#     the authoritative values for the sandboxed path.
+#     at eval time via lib.escapeShellArg + builtins.substring AND exports
+#     DEPLOY_DEPLOYER=hercules-ci-effects and DEPLOY_HOST=magnetite (the
+#     execution host on which buildbot-master schedules effect runs).
+#     Required because the buildbot-effects bwrap sandbox does not
+#     bind-mount the working tree AND provides no host-PATH binaries
+#     beyond /nix/store ro-bind + writeShellApplication runtimeInputs PATH
+#     (upstream-by-design across all 3 reference effect implementations);
+#     deploy.sh's git invocations would fail with `fatal: not a git
+#     repository` and its `hostname -s` / `whoami` invocations would fail
+#     with `command not found` (exit 127) without these exports. Symmetric
+#     to the secrets env-var contract: the script declares env-first /
+#     bash-builtin / shelled-fallback on every consumer, and this preamble
+#     supplies the authoritative values for the sandboxed path.
 #
 #   Posture A outer gate:
 #     Fork-PR exposure is blocked by `effects_on_pull_requests = false`
@@ -135,6 +140,18 @@
             export GIT_BRANCH=${lib.escapeShellArg (if branch == null then "" else toString branch)}
             export GIT_COMMIT_MSG=${lib.escapeShellArg "effect deploy from rev ${toString shortRev}"}
             export GIT_WORKTREE_STATUS=clean
+
+            # Deploy-context env-var contract (m4-deploy-docs-git-env-contract):
+            # supply DEPLOY_DEPLOYER and DEPLOY_HOST so deploy.sh's bash-builtin /
+            # shelled-fallback chain never has to invoke `whoami` / `hostname` —
+            # neither binary is on PATH inside the bwrap sandbox (only
+            # /nix/store ro-bind + runtimeInputs). Hard-coded values are
+            # appropriate here because every effect run is dispatched by the
+            # hercules-ci-effects framework on magnetite (the buildbot-nix
+            # worker host); divergent values would indicate a misconfigured
+            # effect runner, not a per-run difference worth surfacing.
+            export DEPLOY_DEPLOYER=hercules-ci-effects
+            export DEPLOY_HOST=magnetite
 
             # Env-var-contract guard: fail fast if the secrets bundle is
             # missing either Cloudflare key. Message excludes the value;
