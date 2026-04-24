@@ -198,21 +198,11 @@
       # any other authoritative option here — only the perRepoSecretFiles
       # attribute keyed on this repo's forge identifier.
       #
-      # `lib.mkDefault` is a transitional priority marker for the
-      # three-step secrets-tree cutover (ADR-002 / AGENTS.md §"Three-step
-      # secrets-tree cutover (M4-01 pattern)"): during the implement
-      # phase (m4-01a) the legacy inline wire at
-      # `modules/nixos/buildbot.nix` coexists with this declaration and
-      # wins via its normal-priority definition, so the production
-      # perRepoSecretFiles entry continues to resolve to the legacy
-      # `buildbot-effects-vanixiets` generator path until the user-driven
-      # retire phase (m4-01c) removes the legacy wire. At that point the
-      # `lib.mkDefault` below becomes the sole definition and resolves to
-      # the new `vanixiets-effects-secrets` generator's composed secrets
-      # file. Once m4-01c lands, the mkDefault wrapper should be dropped
-      # (returning to the skeleton's verbatim assignment form).
+      # This module is the sole authoritative definition of the
+      # `github:cameronraysmith/vanixiets` perRepoSecretFiles entry;
+      # m4-01c retired the legacy inline wire in modules/nixos/buildbot.nix,
+      # so no transitional `lib.mkDefault` priority marker is required.
       services.buildbot-nix.master.effects.perRepoSecretFiles."github:cameronraysmith/vanixiets" =
-        lib.mkDefault
-          config.clan.core.vars.generators.vanixiets-effects-secrets.files.secrets.path;
+        config.clan.core.vars.generators.vanixiets-effects-secrets.files.secrets.path;
     };
 }

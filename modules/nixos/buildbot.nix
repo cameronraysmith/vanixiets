@@ -10,9 +10,10 @@
 #   - buildbot-worker: auto-generated (worker password + workers.json)
 #   - buildbot-oauth2-cookie-secret: auto-generated (oauth2-proxy cookie encryption)
 #   - buildbot-http-basic-auth-password: auto-generated (oauth2-proxy to buildbot internal auth)
-#   - buildbot-effects-vanixiets: prompts-populated `secrets.json` flat JSON dict for
-#     HERCULES_CI_SECRETS_JSON consumption by hercules-ci-effects inside the master's
-#     bwrap sandbox, wired via `services.buildbot-nix.master.effects.perRepoSecretFiles`.
+# The effects-secrets generator and its `perRepoSecretFiles` wire for
+# github:cameronraysmith/vanixiets are authoritatively declared in
+# modules/effects/vanixiets/secrets.nix (flake module
+# `effects-vanixiets-secrets`, opted-in by magnetite's host module).
 # Gitea-specific credentials are declared in gitea.nix:
 #   - buildbot-gitea-token: manual `clan vars set` (API token with write:repository, write:user)
 #   - buildbot-gitea-webhook-secret: auto-generated
@@ -82,36 +83,6 @@
         runtimeInputs = [ pkgs.openssl ];
         script = ''
           openssl rand -hex 24 > $out/secret
-        '';
-      };
-
-      # Effects secrets for github:cameronraysmith/vanixiets
-      # (flat-dict JSON consumed as HERCULES_CI_SECRETS_JSON inside bwrap).
-      # The auto-generated body seeds placeholder values so the full
-      # `perRepoSecretFiles → LoadCredential → bwrap` pipeline can be
-      # smoke-tested end-to-end before any real tokens exist. Rotate to
-      # real tokens in place via:
-      #   clan vars set magnetite buildbot-effects-vanixiets/secrets.json < real-secrets.json
-      # Keys MUST match the names effect scripts `jq -r` out of
-      # $HERCULES_CI_SECRETS_JSON:
-      #   - CLOUDFLARE_API_TOKEN: wrangler-driven docs-deploy effects
-      #   - SOPS_AGE_KEY:         sops-secrets-operator bootstrap inside test-cluster
-      #   - GITHUB_TOKEN:         semantic-release + gh api consumers
-      # Consumed below by
-      # `services.buildbot-nix.master.effects.perRepoSecretFiles`.
-      # Default file mode is 0400 (clan-core invariant) and owner is the
-      # buildbot master user so systemd `LoadCredential` can read it.
-      clan.core.vars.generators.buildbot-effects-vanixiets = {
-        files."secrets.json" = {
-          owner = "buildbot";
-        };
-        runtimeInputs = [ pkgs.jq ];
-        script = ''
-          jq -n '{
-            CLOUDFLARE_API_TOKEN: "placeholder-cloudflare-api-token-rotate-via-clan-vars-set",
-            SOPS_AGE_KEY:         "placeholder-sops-age-key-rotate-via-clan-vars-set",
-            GITHUB_TOKEN:         "placeholder-github-token-rotate-via-clan-vars-set"
-          }' > "$out/secrets.json"
         '';
       };
 
@@ -188,14 +159,9 @@
         evalWorkerCount = 4;
         evalMaxMemorySize = 2048;
 
-        # Per-repo effects secrets (flat-dict JSON → HERCULES_CI_SECRETS_JSON inside bwrap).
-        # Fork-PR posture A (`effects_on_pull_requests = false` in buildbot-nix.toml)
-        # keeps this file off fork-PR effect runs; in-repo pushes on matched
-        # `effects_branches` receive it. Key must be the forge-prefixed
-        # `<forge>:<owner>/<repo>` literal that buildbot-effects uses to look up
-        # the matching secrets file at dispatch time.
-        effects.perRepoSecretFiles."github:cameronraysmith/vanixiets" =
-          config.clan.core.vars.generators.buildbot-effects-vanixiets.files."secrets.json".path;
+        # Per-repo effects secrets for github:cameronraysmith/vanixiets are
+        # wired authoritatively in modules/effects/vanixiets/secrets.nix
+        # (flake module `effects-vanixiets-secrets`).
 
         # niks3 binary cache integration (push built paths after successful builds)
         # Uses public URL to support future remote workers (e.g. cinnabar)
