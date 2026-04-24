@@ -14,6 +14,25 @@
 #                              ($out/{dist/, .wrangler/, wrangler.jsonc})
 #     DOCS_NODE_MODULES        store path of vanixiets-docs-deps node_modules
 #                              tree (runtimeEnv of deploy.nix)
+#   Optional (git metadata; env-first with git-fallback) — symmetric to the
+#   secrets contract above. Extended in the m4-deploy-docs-git-env-contract
+#   feature to let the script run inside the buildbot-effects bwrap sandbox
+#   which does NOT bind-mount the working tree (upstream-by-design). Every
+#   GIT_* consumer below is expressed as `${GIT_X:-$(git … 2>/dev/null || true)}`
+#   so the three supported caller contexts all work: effect preamble (env
+#   pre-populated, no .git reachable), local shell from a git worktree (env
+#   unset, git fallback), and GHA after checkout (env unset, git fallback).
+#     GIT_REV                  40-char commit SHA (fallback: git rev-parse HEAD)
+#     GIT_REV_SHORT            7-ish-char short SHA (fallback: git rev-parse --short HEAD)
+#     GIT_REV_SHORT12          12-char short SHA used for wrangler --tag /
+#                              workers/tag cross-check (fallback:
+#                              git rev-parse --short=12 HEAD). VAL-WRITESHELL-DOCS-010
+#                              commit_tag invariant sources from here.
+#     GIT_BRANCH               current branch name (fallback: git branch --show-current)
+#     GIT_COMMIT_MSG           HEAD subject line used in the version-message
+#                              annotation (fallback: git log -1 --pretty=format:'%s')
+#     GIT_WORKTREE_STATUS      literal "clean" or "dirty" (fallback:
+#                              git diff-index --quiet HEAD -- && echo clean || echo dirty)
 #   Optional:
 #     WRANGLER                 override binary path for test harnesses; default
 #                              $DOCS_NODE_MODULES/.bin/wrangler
@@ -31,11 +50,16 @@
 #                   caller-side sops decrypt inside a nix-develop wrapper;
 #                   the age key is provided via the step `env:` block from
 #                   the repo secrets (see deploy-docs.yaml).
-#   - M4 effect:    preview-docs-deploy / production-docs-deploy effect
-#                   preamble extracts CLOUDFLARE_API_TOKEN and
-#                   CLOUDFLARE_ACCOUNT_ID from $HERCULES_CI_SECRETS_JSON
-#                   and exports before invoking the embedded store path
-#                   ${config.apps.deploy-docs.program}.
+#   - M4 effect:    the deploy-docs dispatcher effect preamble extracts
+#                   CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID from
+#                   $HERCULES_CI_SECRETS_JSON and ALSO exports the six GIT_*
+#                   variables interpolated from herculesCI.config.repo.*
+#                   (via lib.escapeShellArg + builtins.substring at eval time)
+#                   before invoking the embedded store path
+#                   ${config.apps.deploy-docs.program}. The bwrap sandbox
+#                   does not bind-mount the working tree, so every git
+#                   command in this script is env-first with error-tolerant
+#                   fallback (`git … 2>/dev/null || true`).
 #
 # Secret passing rule (per ADR-002): wrangler authentication flows ONLY
 # through inherited env vars; no authentication CLI flags are used.
@@ -130,9 +154,11 @@ export WRANGLER="${WRANGLER:-$DOCS_NODE_MODULES/.bin/wrangler}"
 # Empirical: diagnosed 2026-04-22 via magnetite linux-x64 reproducer;
 # same machine + wrangler runs fine under real node, hangs under bun.
 
-# Resolve repo root so git metadata commands work independently of callsite.
-repo_root=$(git rev-parse --show-toplevel)
-cd "$repo_root"
+# Git metadata is resolved below via env-first / git-fallback (see top-of-
+# file env-var contract for GIT_*). Wrangler is invoked with absolute
+# `--config "$WRANGLER_CONFIG"`, so CWD is immaterial — no `cd` into the
+# worktree is required (and would fail inside the buildbot-effects bwrap
+# sandbox, which does not bind-mount the working tree).
 
 # Materialise a writable copy of the nix payload. wrangler reads
 # .wrangler/deploy/config.json whose configPath ("../../dist/server/wrangler.json")
@@ -156,11 +182,16 @@ chmod -R u+w "$tmpdir"
 # present in the source wrangler.jsonc.
 wrangler_config="$tmpdir/dist/server/wrangler.json"
 
-# Commit metadata shared by preview and production subcommands.
-commit_sha=$(git rev-parse HEAD)
-commit_tag=$(git rev-parse --short=12 HEAD)
-commit_short=$(git rev-parse --short HEAD)
-current_branch=$(git branch --show-current || true)
+# Commit metadata shared by preview and production subcommands. Env-first /
+# git-fallback per the GIT_* env-var contract (see top-of-file header).
+# All `git` invocations are guarded by `2>/dev/null || true` so that a
+# missing .git (e.g. buildbot-effects bwrap sandbox, no bind-mounted worktree)
+# surfaces as empty strings rather than a non-zero exit; the env-first path
+# supplies the authoritative values in that context.
+commit_sha="${GIT_REV:-$(git rev-parse HEAD 2>/dev/null || true)}"
+commit_tag="${GIT_REV_SHORT12:-$(git rev-parse --short=12 HEAD 2>/dev/null || true)}"
+commit_short="${GIT_REV_SHORT:-$(git rev-parse --short HEAD 2>/dev/null || true)}"
+current_branch="${GIT_BRANCH:-$(git branch --show-current 2>/dev/null || true)}"
 
 # Compose deploy message (prefer GitHub Actions context, fall back to local).
 if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
@@ -190,8 +221,21 @@ case "$mode" in
       | sed 's/--*/-/g; s/^-//; s/-$//' \
       | cut -c1-40)
 
-    commit_msg=$(git log -1 --pretty=format:'%s')
-    git_status=$(git diff-index --quiet HEAD -- && echo "clean" || echo "dirty")
+    # Env-first / git-fallback — see top-of-file GIT_* env-var contract.
+    # `git log` / `git diff-index` are error-tolerant so a missing .git
+    # (buildbot-effects bwrap) leaves commit_msg empty; the effect preamble
+    # supplies GIT_COMMIT_MSG and GIT_WORKTREE_STATUS=clean in that case.
+    commit_msg="${GIT_COMMIT_MSG:-$(git log -1 --pretty=format:'%s' 2>/dev/null || true)}"
+    if [[ -n "${GIT_WORKTREE_STATUS:-}" ]]; then
+      git_status="$GIT_WORKTREE_STATUS"
+    elif git diff-index --quiet HEAD -- 2>/dev/null; then
+      git_status="clean"
+    else
+      # Non-zero from `git diff-index` covers both "dirty worktree" and
+      # "not a git repository" — collapse both to "dirty" so downstream
+      # version_message is always well-formed.
+      git_status="dirty"
+    fi
     version_message="[${branch}] ${commit_msg} (${commit_tag}, ${git_status})"
 
     echo "Deploying preview for branch: ${branch}"

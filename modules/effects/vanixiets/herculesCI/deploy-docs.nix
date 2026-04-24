@@ -28,6 +28,18 @@
 #     emits this shape). Never extracts SOPS_AGE_KEY (ADR-002
 #     exclusivity) and never references NPM_TOKEN.
 #
+#   Symmetric GIT_* env-var contract (m4-deploy-docs-git-env-contract):
+#     Exports GIT_REV, GIT_REV_SHORT, GIT_REV_SHORT12, GIT_BRANCH,
+#     GIT_COMMIT_MSG, GIT_WORKTREE_STATUS from herculesCI.config.repo.*
+#     at eval time via lib.escapeShellArg + builtins.substring. Required
+#     because the buildbot-effects bwrap sandbox does not bind-mount the
+#     working tree (upstream-by-design across all 3 reference effect
+#     implementations); deploy.sh's git invocations would fail with
+#     `fatal: not a git repository` without these exports. Symmetric to
+#     the secrets env-var contract: the script declares env-first /
+#     git-fallback on every GIT_* consumer, and this preamble supplies
+#     the authoritative values for the sandboxed path.
+#
 #   Posture A outer gate:
 #     Fork-PR exposure is blocked by `effects_on_pull_requests = false`
 #     + `effects_branches` in `buildbot-nix.toml`, which precedes this
@@ -107,6 +119,22 @@
             # Secrets preamble — Pattern C'-refined (ADR-002):
             # extract CLOUDFLARE_ACCOUNT_ID from $HERCULES_CI_SECRETS_JSON at .data.value envelope.
             export CLOUDFLARE_ACCOUNT_ID="$(jq -r '.CLOUDFLARE_ACCOUNT_ID.data.value' "$HERCULES_CI_SECRETS_JSON")"
+
+            # Git-metadata env-var contract (m4-deploy-docs-git-env-contract):
+            # interpolate the six GIT_* values from herculesCI.config.repo.* at
+            # eval time so deploy.sh's env-first / git-fallback consumers never
+            # need to shell out to `git` inside the bwrap sandbox. GIT_REV_SHORT12
+            # is computed from the full rev via builtins.substring (not a runtime
+            # `git rev-parse --short=12`, which would fail on a missing .git).
+            # GIT_WORKTREE_STATUS is hard-coded "clean" because an effect run
+            # always dispatches from a committed revision (hercules-ci-effects
+            # fetches a pristine checkout).
+            export GIT_REV=${lib.escapeShellArg (toString rev)}
+            export GIT_REV_SHORT=${lib.escapeShellArg (toString shortRev)}
+            export GIT_REV_SHORT12=${lib.escapeShellArg (builtins.substring 0 12 (toString rev))}
+            export GIT_BRANCH=${lib.escapeShellArg (if branch == null then "" else toString branch)}
+            export GIT_COMMIT_MSG=${lib.escapeShellArg "effect deploy from rev ${toString shortRev}"}
+            export GIT_WORKTREE_STATUS=clean
 
             # Env-var-contract guard: fail fast if the secrets bundle is
             # missing either Cloudflare key. Message excludes the value;
