@@ -103,6 +103,9 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         id: deployment
         env:
+          # SOPS_AGE_KEY decrypts secrets/shared.yaml at step time.
+          # Per ADR-002 env-var contract, deploy.sh no longer calls
+          # `sops exec-env` internally — the wrap moves to the caller.
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
           GITHUB_ACTIONS: "true"
           GITHUB_ACTOR: ${{ github.actor }}
@@ -110,10 +113,20 @@ jobs:
           DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
           DEPLOY_BRANCH: ${{ inputs.branch }}
         run: |
+          # Use `nix develop -c` so sops is guaranteed on PATH
+          # (setup-nix composite action provides nix, but not sops on
+          # the bare runner); sops exec-env populates CLOUDFLARE_API_TOKEN
+          # and CLOUDFLARE_ACCOUNT_ID before the nix-run invocation.
+          # `sops exec-env` takes (file, single-shell-command-string) so
+          # the nested nix-run invocation is a single quoted string.
           if [ "$DEPLOY_ENVIRONMENT" = "preview" ]; then
-            nix run .#deploy-docs -- preview "$DEPLOY_BRANCH"
+            nix develop --accept-flake-config -c \
+              sops exec-env secrets/shared.yaml \
+              "nix run --accept-flake-config .#deploy-docs -- preview \"$DEPLOY_BRANCH\""
           else
-            nix run .#deploy-docs -- production
+            nix develop --accept-flake-config -c \
+              sops exec-env secrets/shared.yaml \
+              "nix run --accept-flake-config .#deploy-docs -- production"
           fi
 
       - name: Create job result marker

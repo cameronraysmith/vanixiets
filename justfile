@@ -769,15 +769,26 @@ docs-test-e2e-report:
 docs-test-coverage:
   cd packages/docs && bun run test:coverage
 
-# Deploy documentation to Cloudflare Workers (preview)
+# Deploy documentation to Cloudflare Workers (preview).
+# Wraps with `sops exec-env secrets/shared.yaml '<cmd>'` so
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported per the
+# deploy-docs env-var contract (ADR-002 / env-var-contract-design.md
+# §2.1.3 Call site A). Devs with a local `.env` already exporting the
+# vars can skip the wrap; the sops prefix is idempotent and keeps fresh
+# clones without `.env` working. `sops exec-env` requires exactly two
+# positional args (file + single shell-command string), so the nix-run
+# invocation is quoted as one arg.
 [group('docs')]
 docs-deploy-preview branch=`git branch --show-current`:
-  nix run --accept-flake-config .#deploy-docs -- preview "{{branch}}"
+  sops exec-env secrets/shared.yaml \
+    'nix run --accept-flake-config .#deploy-docs -- preview "{{branch}}"'
 
-# Deploy documentation to Cloudflare Workers (production)
+# Deploy documentation to Cloudflare Workers (production).
+# See docs-deploy-preview header for the sops wrap rationale.
 [group('docs')]
 docs-deploy-production:
-  nix run --accept-flake-config .#deploy-docs -- production
+  sops exec-env secrets/shared.yaml \
+    'nix run --accept-flake-config .#deploy-docs -- production'
 
 # List recent Cloudflare deployments
 [group('docs')]

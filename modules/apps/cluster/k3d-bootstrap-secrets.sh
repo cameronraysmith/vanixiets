@@ -8,9 +8,29 @@
 # Usage:
 #   k3d-bootstrap-secrets [--help]
 #
-# Key sources (first one found wins):
-#   SOPS_AGE_KEY env var       - used directly (CI pathway)
-#   ~/.config/sops/age/keys.txt - file-based (local dev pathway)
+# Env-var contract (per ADR-002 / env-var-contract-design.md §2.4):
+#   One of the following MUST be satisfied (narrow exception; env-first):
+#     SOPS_AGE_KEY                       (env)  single-line AGE-SECRET-KEY-…
+#                                               body (CI / M4 effect preamble)
+#     $HOME/.config/sops/age/keys.txt    (file) local dev pathway
+#
+#   This is the ONLY flake app in modules/apps/ that intentionally consumes
+#   SOPS_AGE_KEY directly. Per ADR-002 ("SOPS_AGE_KEY exposure as a general
+#   pattern is REJECTED"), no other M4 effect or app is permitted to expose
+#   it. Rationale: the k3d bootstrap flow needs an age key INSIDE the
+#   ephemeral cluster for sops-secrets-operator to decrypt SopsSecret CRs
+#   at runtime — this is a load-bearing narrow exception.
+#
+#   Caller mechanisms:
+#     - Local dev:    file-branch via $HOME/.config/sops/age/keys.txt
+#     - GHA env:      GHA `env:` block with SOPS_AGE_KEY from repo secrets
+#     - M4 effect:    effect preamble extracts SOPS_AGE_KEY from
+#                     HERCULES_CI_SECRETS_JSON and exports before invoking
+#                     the transitive caller (k3d-integration-ci)
+#
+# NB: intentionally uses if-else ladder rather than `: "${VAR:?…}"` because
+# the "try env, fall back to file" behaviour is the contract shape; a single
+# `:?` guard cannot express the env-OR-file dual branch.
 set -euo pipefail
 
 case "${1:-}" in
@@ -32,10 +52,11 @@ EOF
     ;;
 esac
 
-kubectl create namespace sops-secrets-operator \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-# Determine age key file: env var (CI) or local file (dev)
+# Env-var contract: validate key source BEFORE any kubectl invocation so
+# the failure surface points at the contract (SOPS_AGE_KEY env OR the
+# keys.txt file) rather than an opaque kubectl/api error. This is the
+# ordering that satisfies VAL-ENVCONTRACT-K3DBOOT-04's "fails fast" intent.
+# Determine age key file: env var (CI / effect preamble) or local file (dev).
 if [ -n "${SOPS_AGE_KEY:-}" ]; then
   echo "Using SOPS_AGE_KEY from environment variable"
   KEYFILE=$(mktemp)
@@ -50,6 +71,9 @@ else
     exit 1
   fi
 fi
+
+kubectl create namespace sops-secrets-operator \
+  --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic sops-age-key \
   --namespace=sops-secrets-operator \

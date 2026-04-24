@@ -16,8 +16,11 @@
 # you must inject a nix-computed store path or derivation outPath into
 # the script preamble — for the canonical example see
 # `modules/apps/docs/deploy.nix`, which injects DOCS_PAYLOAD
-# (config.packages.vanixiets-docs) and SOPS_SECRETS_FILE (inputs.self)
-# at eval time.
+# (config.packages.vanixiets-docs) at eval time. Secret env vars are
+# never injected via the nix preamble (per ADR-002 env-var contract);
+# the caller provides them through sops exec-env, direnv dotenv, GHA
+# env:, or the M4 effect preamble that extracts from
+# HERCULES_CI_SECRETS_JSON.
 #
 # Orchestrates the seven-phase CI integration flow that is currently
 # invoked by `.github/workflows/test-cluster.yaml`. Delegates to the

@@ -2,10 +2,45 @@
 # shellcheck shell=bash
 # Docs deployment dispatcher invoked via `nix run .#deploy-docs`.
 #
-# Environment inputs (set by deploy.nix):
-#   DOCS_PAYLOAD       absolute path to the vanixiets-docs derivation output
-#                      ({dist/,.wrangler/,wrangler.jsonc} layout)
-#   SOPS_SECRETS_FILE  absolute path to secrets/shared.yaml under $inputs.self
+# Env-var contract (per ADR-002 / env-var-contract-design.md §2.1):
+#   Required (secret, provided by caller):
+#     CLOUDFLARE_API_TOKEN     wrangler auth token
+#     CLOUDFLARE_ACCOUNT_ID    Cloudflare account id (wrangler requires this
+#                              for account-scoped operations such as
+#                              `versions upload` on a Worker attached to an
+#                              account-level resource)
+#   Required (config, injected by deploy.nix):
+#     DOCS_PAYLOAD             store path of the vanixiets-docs derivation
+#                              ($out/{dist/, .wrangler/, wrangler.jsonc})
+#     DOCS_NODE_MODULES        store path of vanixiets-docs-deps node_modules
+#                              tree (runtimeEnv of deploy.nix)
+#   Optional:
+#     WRANGLER                 override binary path for test harnesses; default
+#                              $DOCS_NODE_MODULES/.bin/wrangler
+#     DEPLOY_DOCS_DEBUG        preserve tmpdir on exit when set
+#     GITHUB_ACTIONS / GITHUB_ACTOR / GITHUB_WORKFLOW
+#                              prefix the deploy message with GHA context
+#
+# Caller mechanisms (satisfy the secret-env contract via one of):
+#   - Local dev:    caller-side sops wrapper (justfile `docs-deploy-*`
+#                   recipes wrap with `sops` to decrypt secrets/shared.yaml
+#                   and export the Cloudflare env before the nested nix run)
+#                   OR direnv dotenv (.envrc loads .env with the Cloudflare
+#                   env vars already exported).
+#   - GHA env:      deploy-docs.yaml step wraps the nix run with the same
+#                   caller-side sops decrypt inside a nix-develop wrapper;
+#                   the age key is provided via the step `env:` block from
+#                   the repo secrets (see deploy-docs.yaml).
+#   - M4 effect:    preview-docs-deploy / production-docs-deploy effect
+#                   preamble extracts CLOUDFLARE_API_TOKEN and
+#                   CLOUDFLARE_ACCOUNT_ID from $HERCULES_CI_SECRETS_JSON
+#                   and exports before invoking the embedded store path
+#                   ${config.apps.deploy-docs.program}.
+#
+# Secret passing rule (per ADR-002): wrangler authentication flows ONLY
+# through inherited env vars; no authentication CLI flags are used.
+# No caller-side sops wrappers inside this script (the caller wraps if
+# their mechanism is sops-based).
 #
 # Usage:
 #   deploy-docs preview <branch>
@@ -34,16 +69,16 @@ Subcommands:
 Flags:
   --help, -h         Print this usage and exit 0.
 
-Environment contract (populated by deploy.nix; required at runtime):
-  DOCS_PAYLOAD       Absolute path to the vanixiets-docs derivation output
-                     ($out/{dist/, .wrangler/, wrangler.jsonc}).
-  SOPS_SECRETS_FILE  Absolute path to secrets/shared.yaml under $inputs.self;
-                     source of Cloudflare credentials via `sops exec-env`.
-  DOCS_NODE_MODULES  Absolute path to the vanixiets-docs-deps node_modules
-                     tree (hosts the hermetic wrangler binary).
-
-Optional environment:
-  GITHUB_ACTIONS / GITHUB_ACTOR / GITHUB_WORKFLOW
+Environment contract (see top-of-file header for full details):
+  Required (secret, caller-provided):
+    CLOUDFLARE_API_TOKEN   wrangler auth token
+    CLOUDFLARE_ACCOUNT_ID  Cloudflare account id (account-scoped ops)
+  Required (config, injected by deploy.nix):
+    DOCS_PAYLOAD           path to the vanixiets-docs derivation output
+    DOCS_NODE_MODULES      path to vanixiets-docs-deps node_modules tree
+  Optional:
+    WRANGLER, DEPLOY_DOCS_DEBUG
+    GITHUB_ACTIONS / GITHUB_ACTOR / GITHUB_WORKFLOW
                      When set, the production deploy message is prefixed with
                      the GitHub Actions context; otherwise whoami and hostname
                      are used.
@@ -70,29 +105,15 @@ if [[ -z "$mode" ]]; then
 fi
 shift
 
-if [[ -z "${DOCS_PAYLOAD:-}" ]]; then
-  echo "error: DOCS_PAYLOAD not set; deploy.nix must pass the nix-built payload" >&2
-  exit 1
-fi
-if [[ ! -d "$DOCS_PAYLOAD" ]]; then
-  echo "error: DOCS_PAYLOAD=$DOCS_PAYLOAD is not a directory" >&2
-  exit 1
-fi
-if [[ -z "${SOPS_SECRETS_FILE:-}" ]]; then
-  echo "error: SOPS_SECRETS_FILE not set; deploy.nix must interpolate secrets path" >&2
-  exit 1
-fi
-if [[ ! -f "$SOPS_SECRETS_FILE" ]]; then
-  echo "error: SOPS_SECRETS_FILE=$SOPS_SECRETS_FILE does not exist" >&2
-  exit 1
-fi
-if [[ -z "${DOCS_NODE_MODULES:-}" ]]; then
-  echo "error: DOCS_NODE_MODULES not set; deploy.nix must expose vanixiets-docs-deps" >&2
-  exit 1
-fi
+# Env-var contract guards (per ADR-002 / env-var-contract-design.md §2.1.2).
+# Fail fast before any wrangler / filesystem work if the contract is unmet.
+: "${DOCS_PAYLOAD:?DOCS_PAYLOAD not set; deploy.nix must pass the nix-built payload}"
+[[ -d "$DOCS_PAYLOAD" ]] || { echo "error: DOCS_PAYLOAD=$DOCS_PAYLOAD is not a directory" >&2; exit 1; }
+: "${DOCS_NODE_MODULES:?DOCS_NODE_MODULES not set; deploy.nix must expose vanixiets-docs-deps via runtimeEnv}"
+: "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is required (see deploy.sh header for caller mechanisms: effect preamble, direnv, caller-side sops wrapper, or GHA env)}"
+: "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID is required (see deploy.sh header for caller mechanisms: effect preamble, direnv, caller-side sops wrapper, or GHA env)}"
 
 # Hermetic wrangler via bun-managed node_modules (vanixiets-docs-deps derivation).
-# Must be exported so sops exec-env subshells inherit it for single-quoted command strings.
 # The `${WRANGLER:-...}` fallback allows test harnesses (e.g. the no-op wrangler stub
 # used to exercise the post-condition error paths for VAL-WRITESHELL-DOCS-010) to
 # override the hermetic binary without rewriting this script.
@@ -232,19 +253,17 @@ case "$mode" in
     # (lines ~101-110) for the diagnostic history.
     #
     # Diagnostic: echo the exact upload command line to stderr so the GHA log
-    # shows what the shell is about to invoke (minus secret env vars which are
-    # expanded by sops-wrapped subshell).
+    # shows what the shell is about to invoke (CLOUDFLARE_API_TOKEN and
+    # CLOUDFLARE_ACCOUNT_ID are expected in the inherited env per the
+    # env-var contract; never printed on argv).
     printf '>> wrangler upload command: node %s --config %s versions upload --preview-alias %s --tag %s --message %q\n' \
       "$WRANGLER" "$WRANGLER_CONFIG" "b-${SAFE_BRANCH}" "$VERSION_TAG" "$VERSION_MESSAGE" >&2
 
     set +e
-    # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-    sops exec-env "$SOPS_SECRETS_FILE" '
-      node "$WRANGLER" --config "$WRANGLER_CONFIG" versions upload \
+    node "$WRANGLER" --config "$WRANGLER_CONFIG" versions upload \
         --preview-alias "b-${SAFE_BRANCH}" \
         --tag "$VERSION_TAG" \
-        --message "$VERSION_MESSAGE"
-    ' \
+        --message "$VERSION_MESSAGE" \
       > >(tee "$wrangler_upload_stdout") \
       2> >(tee "$wrangler_upload_stderr" >&2)
     wrangler_upload_rc=$?
@@ -290,8 +309,8 @@ case "$mode" in
       echo "  raw wrangler stdout:   $wrangler_upload_stdout" >&2
       echo "  raw wrangler stderr:   $wrangler_upload_stderr" >&2
       echo "  hints:" >&2
-      echo "    - confirm CLOUDFLARE_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
-      echo "      $SOPS_SECRETS_FILE" >&2
+      echo "    - confirm CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported by" >&2
+      echo "      the caller (see deploy.sh env-var contract header for caller mechanisms)" >&2
       echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
       echo "      not bun-fake-node (see top-of-file rationale at lines ~101-110)" >&2
       echo "    - inspect the wrangler internal log dumped below / raw NDJSON and stdout paths above for any output" >&2
@@ -347,10 +366,8 @@ case "$mode" in
     # a file).
     wrangler_list_json="$tmpdir/wrangler-versions-list.json"
 
-    # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-    sops exec-env "$SOPS_SECRETS_FILE" '
-      node "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json
-    ' | cat > "$wrangler_list_json"
+    node "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json \
+      | cat > "$wrangler_list_json"
 
     matched_count=$(jq --arg tag "$commit_tag" \
       '[.[] | select(.annotations["workers/tag"] == $tag)] | length' \
@@ -395,10 +412,8 @@ case "$mode" in
     # empirical rationale.
     wrangler_list_json="$tmpdir/wrangler-versions-list.json"
 
-    # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-    sops exec-env "$SOPS_SECRETS_FILE" '
-      node "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json
-    ' | cat > "$wrangler_list_json"
+    node "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json \
+      | cat > "$wrangler_list_json"
 
     existing_version=$(jq -r --arg tag "$commit_tag" \
       '.[] | select(.annotations["workers/tag"] == $tag) | .id' \
@@ -428,13 +443,11 @@ case "$mode" in
       : > "$deploy_stdout"
       export WRANGLER_OUTPUT_FILE_PATH="$deploy_ndjson"
 
-      # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-      sops exec-env "$SOPS_SECRETS_FILE" '
-        node "$WRANGLER" --config "$WRANGLER_CONFIG" versions deploy \
+      node "$WRANGLER" --config "$WRANGLER_CONFIG" versions deploy \
           "${EXISTING_VERSION}@100%" \
           --yes \
-          --message "$DEPLOYMENT_MESSAGE"
-      ' | tee "$deploy_stdout"
+          --message "$DEPLOYMENT_MESSAGE" \
+        | tee "$deploy_stdout"
 
       unset WRANGLER_OUTPUT_FILE_PATH
 
@@ -469,8 +482,8 @@ case "$mode" in
         echo "  raw wrangler event log: $deploy_ndjson" >&2
         echo "  raw wrangler stdout:   $deploy_stdout" >&2
         echo "  hints:" >&2
-        echo "    - confirm CLOUDFLARE_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
-        echo "      $SOPS_SECRETS_FILE" >&2
+        echo "    - confirm CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported by" >&2
+        echo "      the caller (see deploy.sh env-var contract header for caller mechanisms)" >&2
         echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
         echo "      not bun-fake-node (see top-of-file rationale at lines ~101-110)" >&2
         echo "    - inspect the wrangler internal log dumped below / raw capture paths above for any output" >&2
@@ -482,10 +495,8 @@ case "$mode" in
       # comment for the rationale.
       deployments_list_json="$tmpdir/wrangler-deployments-list.json"
 
-      # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-      sops exec-env "$SOPS_SECRETS_FILE" '
-        node "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json
-      ' | cat > "$deployments_list_json"
+      node "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json \
+        | cat > "$deployments_list_json"
 
       found_count=$(jq --arg did "$deployment_id" --arg vid "$existing_version" \
         '[.[] | select(
@@ -537,11 +548,9 @@ case "$mode" in
       : > "$deploy_stdout"
       export WRANGLER_OUTPUT_FILE_PATH="$deploy_ndjson"
 
-      # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-      sops exec-env "$SOPS_SECRETS_FILE" '
-        node "$WRANGLER" --config "$WRANGLER_CONFIG" deploy \
-          --message "$DEPLOYMENT_MESSAGE"
-      ' | tee "$deploy_stdout"
+      node "$WRANGLER" --config "$WRANGLER_CONFIG" deploy \
+          --message "$DEPLOYMENT_MESSAGE" \
+        | tee "$deploy_stdout"
 
       unset WRANGLER_OUTPUT_FILE_PATH
 
@@ -575,8 +584,8 @@ case "$mode" in
         echo "  raw wrangler event log: $deploy_ndjson" >&2
         echo "  raw wrangler stdout:   $deploy_stdout" >&2
         echo "  hints:" >&2
-        echo "    - confirm CLOUDFLARE_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) are present in" >&2
-        echo "      $SOPS_SECRETS_FILE" >&2
+        echo "    - confirm CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported by" >&2
+        echo "      the caller (see deploy.sh env-var contract header for caller mechanisms)" >&2
         echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
         echo "      not bun-fake-node (see top-of-file rationale at lines ~101-110)" >&2
         echo "    - inspect the wrangler internal log dumped below / raw capture paths above for any output" >&2
@@ -588,10 +597,8 @@ case "$mode" in
 
       deployments_list_json="$tmpdir/wrangler-deployments-list.json"
 
-      # shellcheck disable=SC2016  # single-quoted $VARs are intentional; expanded by sops-wrapped subshell
-      sops exec-env "$SOPS_SECRETS_FILE" '
-        node "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json
-      ' | cat > "$deployments_list_json"
+      node "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json \
+        | cat > "$deployments_list_json"
 
       found_count=$(jq --arg vid "$deploy_version_id" \
         '[.[] | select(

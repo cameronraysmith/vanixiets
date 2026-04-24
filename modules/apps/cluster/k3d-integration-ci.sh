@@ -7,6 +7,33 @@
 #
 # Usage:
 #   k3d-integration-ci [--help]
+#
+# Env-var contract (per ADR-002 / env-var-contract-design.md §2.5):
+#   Transitively required (consumed by k3d-bootstrap-secrets, the leaf):
+#     SOPS_AGE_KEY      age key body for sops-secrets-operator inside the
+#                       ephemeral k3d cluster. Enforcement is deferred to
+#                       the leaf script (k3d-bootstrap-secrets.sh) which
+#                       accepts the env-or-file dual-branch; this wrapper
+#                       does NOT add a top-level `${SOPS_AGE_KEY:?…}` guard
+#                       so that local-dev runs using the file-branch
+#                       ($HOME/.config/sops/age/keys.txt) remain usable.
+#   Optional (config, defaulted inside this script):
+#     ARGOCD_REPO_URL   defaults to file:///manifests; callers may override
+#                       for remote-repo testing.
+#
+#   Caller mechanisms:
+#     - Local dev:      .envrc dotenv or file-branch ($HOME/.config/sops/...)
+#     - GHA env:        job-level `env:` block populates SOPS_AGE_KEY from
+#                       repo secrets (.github/workflows/test-cluster.yaml)
+#     - M4 effect:      test-cluster effect preamble extracts SOPS_AGE_KEY
+#                       from HERCULES_CI_SECRETS_JSON and exports before
+#                       invoking ${config.apps.k3d-integration-ci.program}
+#
+# NB: required-env guard documented here via the `:?` idiom lives in the
+# leaf k3d-bootstrap-secrets.sh; this file intentionally has no top-level
+# `${SOPS_AGE_KEY:?…}` enforcement (the transitive contract is surfaced
+# via k3d-bootstrap-secrets.sh's fail-fast behaviour when neither env nor
+# file is present).
 set -euo pipefail
 
 case "${1:-}" in
@@ -33,7 +60,11 @@ repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
 echo "=== Phase 1: Build manifests with local repo URL ==="
-export ARGOCD_REPO_URL="file:///manifests"
+# ARGOCD_REPO_URL default applied via `:=` bash parameter expansion so
+# callers can override via env for remote-repo testing without editing
+# this script. See env-var contract header for the caller mechanisms.
+: "${ARGOCD_REPO_URL:=file:///manifests}"
+export ARGOCD_REPO_URL
 just nixidy-build
 
 echo ""

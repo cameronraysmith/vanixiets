@@ -25,19 +25,40 @@
 #              needed).
 #   --help     Print this usage and exit 0.
 #
-# Environment:
-#   GITHUB_TOKEN       Required by @semantic-release/github for production
-#                      releases. Not consulted for --dry-run.
-#   SOPS_AGE_KEY       Passthrough for semantic-release hooks that may
-#                      decrypt secrets via sops. Not used directly.
-#   DOCS_NODE_MODULES  Hermetic node_modules tree injected by release.nix.
-#                      Must point at a directory containing a resolved
-#                      node_modules/.bin/semantic-release.
-#   GIT_USER_NAME,     Optional overrides for the git identity used by
-#   GIT_USER_EMAIL     semantic-release commit/tag operations; defaults
-#                      to `semantic-release` / `semantic-release@vanixiets.local`.
+# Env-var contract (per ADR-002 / env-var-contract-design.md §2.3):
+#   Required (secret, production path only — not --dry-run):
+#     GITHUB_TOKEN          @semantic-release/github auth for tag push and
+#                           release publish. Filtered-out plugin list under
+#                           --dry-run means no token is consulted in that mode.
+#   Required (config, injected by release.nix runtimeEnv):
+#     DOCS_NODE_MODULES     vanixiets-docs-deps node_modules tree hosting
+#                           node_modules/.bin/semantic-release.
+#   Optional (all modes):
+#     SOPS_AGE_KEY          reserved passthrough for sops-decrypt hooks
+#                           (no consumer in the current tree; declared but
+#                           NOT enforced via :? guard — see ADR-002, which
+#                           REJECTS SOPS_AGE_KEY as a general pattern).
+#     GIT_USER_NAME         git identity; default: semantic-release
+#     GIT_USER_EMAIL        git identity; default: semantic-release@vanixiets.local
+#
+#   Caller mechanisms:
+#     - Local dev dry-run:  `nix run .#release -- packages/<pkg> --dry-run`
+#                           needs no secret env (plugin filter strips github)
+#     - Local dev prod:     caller-side sops wrapper (decrypt
+#                           secrets/shared.yaml before the nix run) OR
+#                           direnv dotenv (.envrc `dotenv` + .env)
+#     - GHA env:            step `env:` block populates GITHUB_TOKEN from
+#                           the repo secrets (package-release.yaml)
+#     - M4 effect:          production-release-packages effect preamble
+#                           extracts GITHUB_TOKEN from HERCULES_CI_SECRETS_JSON
+#                           and exports before invoking the app program path
+#
+# Secret passing rule (per ADR-002): NO secrets are passed as CLI flags.
+# Authentication flows exclusively through the inherited environment.
 
 set -euo pipefail
+
+: "${DOCS_NODE_MODULES:?DOCS_NODE_MODULES not set; release.nix must expose vanixiets-docs-deps via runtimeEnv}"
 
 usage() {
   cat <<'EOF'
@@ -175,6 +196,15 @@ fi
 
 cd "$package_path"
 
+# Production-path env-var contract guard: fail fast on missing GITHUB_TOKEN
+# BEFORE any node_modules / workspace mutation so the error points at the
+# contract rather than at an opaque state-mutation side effect. Gated on
+# dry_run so the dry-run path (with @semantic-release/github filtered out)
+# continues to work without any secret env.
+if [ "$dry_run" -ne 1 ]; then
+  : "${GITHUB_TOKEN:?GITHUB_TOKEN is required for production semantic-release (see release.sh header for caller mechanisms; not needed for --dry-run)}"
+fi
+
 # Guard node_modules slot against clobbering a developer's real install.
 # Production (non-dry-run): strict — refuse to overwrite a real node_modules
 # directory. Only an empty slot or a pre-existing symlink is safe to clobber.
@@ -229,7 +259,9 @@ if [ "$dry_run" -eq 1 ]; then
     "${extra_args[@]}"
 else
   # Production release path: semantic-release will create a tag and
-  # publish a GitHub release when invoked. GITHUB_TOKEN is required.
+  # publish a GitHub release when invoked. GITHUB_TOKEN is enforced via
+  # the early :? guard above (placed before node_modules setup so failure
+  # modes are contract-first).
   echo "running production semantic-release in ${package_path}..."
   node ./node_modules/.bin/semantic-release "${extra_args[@]}"
 fi

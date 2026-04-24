@@ -15,8 +15,7 @@
 # verbatim, no nix-eval-time string interpolation. The only nix-injected
 # value is DOCS_NODE_MODULES, exposed via `runtimeEnv` at invocation time.
 # Contrast with `deploy.nix`, which uses the interpolation form because it
-# must inject DOCS_PAYLOAD and SOPS_SECRETS_FILE store paths into the
-# script preamble.
+# must inject the DOCS_PAYLOAD store path into the script preamble.
 { ... }:
 {
   perSystem =

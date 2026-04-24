@@ -18,8 +18,25 @@
 # links it into the worktree's package directory and invokes semantic-release
 # directly via node_modules/.bin, bypassing any need for bun or a prior
 # `bun install`.
+#
+# Env-var contract (per ADR-002 / env-var-contract-design.md §2.2):
+#   Required (config, injected by preview-version.nix runtimeEnv):
+#     DOCS_NODE_MODULES   store path of the vanixiets-docs-deps node_modules
+#                         tree (hosts node_modules/.bin/semantic-release).
+#   Optional (caller-provided):
+#     CURRENT_BRANCH      bookmark/branch name to attach HEAD to when invoked
+#                         from a jj-colocated detached-HEAD setup.
+#
+# This script does NOT require secret env vars (CLOUDFLARE_API_TOKEN,
+# CLOUDFLARE_ACCOUNT_ID, GITHUB_TOKEN, SOPS_AGE_KEY). semantic-release is
+# invoked in --dry-run with @semantic-release/github filtered out of the
+# plugin list, so no secret env required for any caller (direnv dotenv,
+# `sops exec-env` wrapper, GHA `env:` block, or M4 effect preamble
+# reading HERCULES_CI_SECRETS_JSON).
 
 set -euo pipefail
+
+: "${DOCS_NODE_MODULES:?DOCS_NODE_MODULES not set; preview-version.nix must expose vanixiets-docs-deps via runtimeEnv}"
 
 usage() {
   cat <<'EOF'
