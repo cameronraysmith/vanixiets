@@ -36,6 +36,7 @@ in
         gitea
         gitea-actions-runner
         docker
+        effects-vanixiets-secrets
       ]);
 
       # Make flake available to all modules (required by ssh-known-hosts)
