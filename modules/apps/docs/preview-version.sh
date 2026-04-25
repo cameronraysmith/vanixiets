@@ -95,6 +95,16 @@ ORIGINAL_REMOTE_HEAD=""
 WORKTREE_NODE_MODULES_LINK=""
 LOCAL_NODE_MODULES_LINK=""
 
+# Local bare clone used to redirect semantic-release verifyAuth's
+# `git push --dry-run HEAD:<target-branch>` away from the GitHub remote
+# (which can short-circuit semantic-release on branch-protection rejection
+# or token-permission mismatch — see m5-01i mission notes).
+# Populated AFTER `git update-ref` so the bare's refs/heads/<target-branch>
+# captures TEMP_COMMIT, allowing the dry-run push to be a no-op fast-forward
+# against a quiescent file:// remote with no auth and no protection.
+PREVIEW_BARE_DIR=""
+PREVIEW_BARE=""
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -173,6 +183,12 @@ cleanup() {
     git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
     # Prune any stale worktree references
     git worktree prune 2>/dev/null || true
+  fi
+
+  # Clean up local bare clone created for semantic-release verifyAuth
+  # redirection (see m5-01i fix).
+  if [ -n "$PREVIEW_BARE_DIR" ] && [ -d "$PREVIEW_BARE_DIR" ]; then
+    rm -rf "$PREVIEW_BARE_DIR"
   fi
 
   # Restore detached HEAD if we attached it via the CURRENT_BRANCH override path.
@@ -288,6 +304,26 @@ git update-ref "refs/heads/$TARGET_BRANCH" "$TEMP_COMMIT"
 # Also update remote-tracking branch to match (so semantic-release sees them as synchronized)
 git update-ref "refs/remotes/origin/$TARGET_BRANCH" "$TEMP_COMMIT"
 
+# Capture the post-update-ref state into a local bare clone so semantic-release's
+# `verifyAuth` can run `git push --dry-run HEAD:<target-branch>` against a
+# quiescent file:// remote instead of the GitHub origin (m5-01i fix).
+#
+# The bare must be cloned from $REPO_ROOT (cwd's local refs at clone time
+# include the just-updated refs/heads/<target-branch> = TEMP_COMMIT). Cloning
+# from $REPO_ROOT — not WORKTREE_DIR which has not been created yet — is what
+# makes verifyAuth's push a trivial no-op fast-forward.
+#
+# Without this redirect, semantic-release v25.0.3's `lib/git.js:205-211`
+# performs a real network round-trip to GitHub, which short-circuits the run
+# whenever branch protection or token-permission mismatches reject the
+# dry-run push (then `lib/git.js:282-290` strict-=== compare against
+# TEMP_COMMIT can never succeed and `index.js:84-100` bails with "behind
+# the remote one"), preventing analyzeCommits from ever firing.
+echo -e "${BLUE}creating local bare clone for semantic-release repository-url override...${NC}"
+PREVIEW_BARE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/preview-bare.XXXXXX")
+PREVIEW_BARE="$PREVIEW_BARE_DIR/preview.git"
+git clone --quiet --bare "$REPO_ROOT" "$PREVIEW_BARE"
+
 # Create worktree at target branch (now pointing to merge commit)
 echo -e "${BLUE}creating temporary worktree at ${TARGET_BRANCH}...${NC}"
 git worktree add --quiet "$WORKTREE_DIR" "$TARGET_BRANCH"
@@ -316,7 +352,12 @@ echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 # This is safe because dry-run skips publish/success/fail steps anyway
 PLUGINS="@semantic-release/commit-analyzer,@semantic-release/release-notes-generator"
 
-OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" node ./node_modules/.bin/semantic-release --dry-run --no-ci --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
+# Forensic banner (m5-01i): confirms the verifyAuth-redirect bare clone is
+# engaged in production logs. Stable banner namespace; kept structurally
+# similar to RELEASE-CLONE-PR-HEAD / RELEASE-CLONE-PR-DISPATCH.
+echo "RELEASE-PREVIEW-BARE: $PREVIEW_BARE"
+
+OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" node ./node_modules/.bin/semantic-release --dry-run --no-ci --repository-url "file://$PREVIEW_BARE" --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 
 # Display semantic-release summary (filter out verbose plugin repetition)
 echo "$OUTPUT" | grep -v "^$" | grep -vE "(No more plugins|does not provide step)" | \
