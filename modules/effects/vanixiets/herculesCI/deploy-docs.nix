@@ -1,64 +1,4 @@
-# effects.deploy-docs — docs deployment branch-dispatcher (M4 feature
-# `m4-deploy-docs`). Consolidates three pre-consolidation jobs
-# (preview-docs-deploy, production-docs-deploy-dryrun,
-# production-docs-deploy-cutover) into a single herculesCI effect that
-# dispatches on `primaryRepo.branch`.
-#
-# Design contract (see mission AGENTS.md "ADR-002 locked decisions" and
-# `.factory/validation-contract.md` VAL-EFFECT-DEPLOYDOCS-*):
-#
-#   Option Gamma store-path embedding:
-#     The effect body invokes the `deploy-docs` flake app via the
-#     nix-eval-time resolved store path
-#     `${config.apps.x86_64-linux.deploy-docs.program}`. The effect
-#     never dispatches via a flake-app shell-out (bwrap does not bind
-#     the working tree, so the .# syntax cannot resolve).
-#
-#   Branch dispatch (exact string equality):
-#     Selection is driven by `primaryRepo.branch == "main"`, surfaced
-#     through `herculesCI.config.repo.branch` which hercules-ci-effects
-#     populates from the primaryRepo record at flake.herculesCI entry.
-#     * primaryRepo.branch == "main"  → production promote path
-#     * any other branch (or null)    → preview upload path
-#
-#   Pattern C'-refined secrets preamble:
-#     Extracts CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID from
-#     $HERCULES_CI_SECRETS_JSON at the `.<KEY>.data.value` envelope
-#     (see modules/effects/vanixiets/secrets.nix for the generator that
-#     emits this shape). Never extracts SOPS_AGE_KEY (ADR-002
-#     exclusivity) and never references NPM_TOKEN.
-#
-#   Symmetric env-var contract (GIT_* + DEPLOY_*) (m4-deploy-docs-git-env-contract):
-#     Exports GIT_REV, GIT_REV_SHORT, GIT_REV_SHORT12, GIT_BRANCH,
-#     GIT_COMMIT_MSG, GIT_WORKTREE_STATUS from herculesCI.config.repo.*
-#     at eval time via lib.escapeShellArg + builtins.substring AND exports
-#     DEPLOY_DEPLOYER=hercules-ci-effects and DEPLOY_HOST=magnetite (the
-#     execution host on which buildbot-master schedules effect runs).
-#     Required because the buildbot-effects bwrap sandbox does not
-#     bind-mount the working tree AND provides no host-PATH binaries
-#     beyond /nix/store ro-bind + writeShellApplication runtimeInputs PATH
-#     (upstream-by-design across all 3 reference effect implementations);
-#     deploy.sh's git invocations would fail with `fatal: not a git
-#     repository` and its `hostname -s` / `whoami` invocations would fail
-#     with `command not found` (exit 127) without these exports. Symmetric
-#     to the secrets env-var contract: the script declares env-first /
-#     bash-builtin / shelled-fallback on every consumer, and this preamble
-#     supplies the authoritative values for the sandboxed path.
-#
-#   Posture A outer gate:
-#     Fork-PR exposure is blocked by `effects_on_pull_requests = false`
-#     + `effects_branches` in `buildbot-nix.toml`, which precedes this
-#     inner branch-dispatch. The dispatcher logic runs only after the
-#     outer gate has passed.
-#
-#   Structured banners (DD-16 log-grep anchors):
-#     * `DEPLOY-DOCS-ACTION: preview-upload|promote|fresh-deploy-and-promote`
-#       emitted exactly once per run, identifying the dispatcher path
-#       taken. `fresh-deploy-and-promote` is emitted post-hoc on the
-#       main path only when deploy.sh reports the fallback branch.
-#     * `DEPLOY-DOCS-PREVIEW-URL: <url>` emitted on the preview path
-#       once the wrangler-produced preview URL is parsed from deploy.sh
-#       stdout, enabling downstream `curl` verification of 200 OK.
+# herculesCI effect: docs deployment branch-dispatcher (preview vs promote).
 {
   config,
   inputs,
@@ -70,16 +10,11 @@
   herculesCI =
     herculesCI:
     let
-      # primaryRepo.branch (exposed as config.repo.branch by
-      # hercules-ci-effects' paramModule, populated from primaryRepo.branch
-      # at flake.herculesCI entry). Type: nullable string — null on tag
-      # pushes where branch is not populated.
+      # Nullable: null on tag pushes (no branch).
       branch = herculesCI.config.repo.branch;
       shortRev = herculesCI.config.repo.shortRev;
       rev = herculesCI.config.repo.rev;
 
-      # Branch dispatch: exact string equality. null == "main" is false
-      # in Nix, so tag pushes naturally fall through to the preview path.
       isMain = branch == "main";
     in
     {
@@ -88,18 +23,10 @@
         let
           hci-effects = inputs.hercules-ci-effects.lib.withPkgs pkgs;
 
-          # Option Gamma: resolved at nix eval time to a /nix/store path
-          # that the bwrap sandbox can execute without a working-tree or
-          # nix-daemon lookup.
           deployDocsProgram = config.apps.deploy-docs.program;
 
-          # Initial action banner — refined post-hoc on the main path if
-          # deploy.sh's fresh-deploy-and-promote fallback triggers.
           actionBanner = if isMain then "promote" else "preview-upload";
 
-          # Preview branch argument: prefer the live branch name; fall
-          # back to the shortRev on detached / null-branch pushes so
-          # deploy.sh preview has a non-empty argument.
           previewBranchArg = if branch != null && branch != "" then branch else shortRev;
         in
         hci-effects.mkEffect {
@@ -114,26 +41,11 @@
             echo "shortRev: ${lib.escapeShellArg (toString shortRev)}"
             echo "isMain:   ${if isMain then "true" else "false"}"
 
-            # Structured banner (DD-16): emitted once per run so log-grep
-            # can distinguish preview-upload | promote | fresh-deploy-and-promote.
             echo "DEPLOY-DOCS-ACTION: ${actionBanner}"
 
-            # Secrets preamble — Pattern C'-refined (ADR-002):
-            # extract CLOUDFLARE_API_TOKEN from $HERCULES_CI_SECRETS_JSON at .data.value envelope.
             export CLOUDFLARE_API_TOKEN="$(jq -r '.CLOUDFLARE_API_TOKEN.data.value' "$HERCULES_CI_SECRETS_JSON")"
-            # Secrets preamble — Pattern C'-refined (ADR-002):
-            # extract CLOUDFLARE_ACCOUNT_ID from $HERCULES_CI_SECRETS_JSON at .data.value envelope.
             export CLOUDFLARE_ACCOUNT_ID="$(jq -r '.CLOUDFLARE_ACCOUNT_ID.data.value' "$HERCULES_CI_SECRETS_JSON")"
 
-            # Git-metadata env-var contract (m4-deploy-docs-git-env-contract):
-            # interpolate the six GIT_* values from herculesCI.config.repo.* at
-            # eval time so deploy.sh's env-first / git-fallback consumers never
-            # need to shell out to `git` inside the bwrap sandbox. GIT_REV_SHORT12
-            # is computed from the full rev via builtins.substring (not a runtime
-            # `git rev-parse --short=12`, which would fail on a missing .git).
-            # GIT_WORKTREE_STATUS is hard-coded "clean" because an effect run
-            # always dispatches from a committed revision (hercules-ci-effects
-            # fetches a pristine checkout).
             export GIT_REV=${lib.escapeShellArg (toString rev)}
             export GIT_REV_SHORT=${lib.escapeShellArg (toString shortRev)}
             export GIT_REV_SHORT12=${lib.escapeShellArg (builtins.substring 0 12 (toString rev))}
@@ -141,21 +53,10 @@
             export GIT_COMMIT_MSG=${lib.escapeShellArg "effect deploy from rev ${toString shortRev}"}
             export GIT_WORKTREE_STATUS=clean
 
-            # Deploy-context env-var contract (m4-deploy-docs-git-env-contract):
-            # supply DEPLOY_DEPLOYER and DEPLOY_HOST so deploy.sh's bash-builtin /
-            # shelled-fallback chain never has to invoke `whoami` / `hostname` —
-            # neither binary is on PATH inside the bwrap sandbox (only
-            # /nix/store ro-bind + runtimeInputs). Hard-coded values are
-            # appropriate here because every effect run is dispatched by the
-            # hercules-ci-effects framework on magnetite (the buildbot-nix
-            # worker host); divergent values would indicate a misconfigured
-            # effect runner, not a per-run difference worth surfacing.
+            # Why: whoami/hostname not on bwrap PATH; supply hard-coded values.
             export DEPLOY_DEPLOYER=hercules-ci-effects
             export DEPLOY_HOST=magnetite
 
-            # Env-var-contract guard: fail fast if the secrets bundle is
-            # missing either Cloudflare key. Message excludes the value;
-            # only key name is echoed (VAL-EFFECT-DEPLOYDOCS-21).
             if [ -z "''${CLOUDFLARE_API_TOKEN:-}" ] || [ "$CLOUDFLARE_API_TOKEN" = "null" ]; then
               echo "error: CLOUDFLARE_API_TOKEN missing from \$HERCULES_CI_SECRETS_JSON" >&2
               exit 1
@@ -165,26 +66,13 @@
               exit 1
             fi
 
-            # Option Gamma store-path dispatch — the `deploy-docs` flake
-            # app's /nix/store path is embedded at eval time via
-            # the perSystem config.apps.deploy-docs.program attribute.
-            # No flake-app shell-out (bwrap would not resolve .#).
+            # Why: bwrap sandbox does not bind working tree; .# cannot resolve. Use eval-time /nix/store path.
             DEPLOY_DOCS=${deployDocsProgram}
 
             ${
               if isMain then
                 ''
-                  # Main branch → promote-by-SHA path.
-                  # deploy.sh's `production` subcommand looks up a Worker
-                  # version whose workers/tag annotation matches the
-                  # current commit short-SHA-12 (uploaded earlier on the
-                  # pre-merge branch push). If found, it promotes via
-                  # `wrangler versions deploy <id>@100%` (no re-upload →
-                  # VAL-EFFECT-DEPLOYDOCS-16). If absent, it falls back
-                  # to a fresh deploy + promote, logged with the literal
-                  # substring "falling back to direct deploy". The
-                  # dispatcher re-emits a DEPLOY-DOCS-ACTION banner to
-                  # disambiguate the two execution paths for log-grep.
+                  # release.sh's production subcommand re-emits "falling back to direct deploy" on the fresh-deploy fallback; the dispatcher grep below depends on that exact substring.
                   deploy_log="$(mktemp -t deploy-docs-prod.XXXXXX.log)"
                   set +e
                   "$DEPLOY_DOCS" production 2>&1 | tee "$deploy_log"
@@ -200,14 +88,6 @@
                 ''
               else
                 ''
-                  # Non-main → preview upload path.
-                  # deploy.sh's `preview <branch>` subcommand uploads a
-                  # new Cloudflare Workers version tagged with the
-                  # commit short-SHA-12, aliased at
-                  # b-<sanitized-branch>-infra-docs.sciexp.workers.dev.
-                  # The script emits a `Preview URL:` line on success
-                  # which we parse + re-emit as a structured banner
-                  # (DEPLOY-DOCS-PREVIEW-URL) for downstream 200-probes.
                   preview_log="$(mktemp -t deploy-docs-preview.XXXXXX.log)"
                   set +e
                   "$DEPLOY_DOCS" preview ${lib.escapeShellArg previewBranchArg} 2>&1 | tee "$preview_log"
