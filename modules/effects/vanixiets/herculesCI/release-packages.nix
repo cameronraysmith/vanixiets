@@ -37,6 +37,23 @@
 #     and MUST NOT reference NPM_TOKEN (not part of the closed 4-key
 #     bundle; npmPublish=false invariant means no npm publish surface).
 #
+#   Symmetric env-var contract (CI + GIT_AUTHOR/COMMITTER + RELEASE_REPO_ROOT)
+#   (m4-release-packages-runtime-deps-contract):
+#     Exports CI=true, GIT_BRANCH (from herculesCI.config.repo.branch at
+#     eval time via lib.escapeShellArg), RELEASE_REPO_ROOT="$PWD" (mkEffect
+#     cwd is the source root), and the GIT_AUTHOR_NAME/EMAIL +
+#     GIT_COMMITTER_NAME/EMAIL identity quartet. Required because the
+#     buildbot-effects bwrap sandbox does not bind-mount the working tree's
+#     .git AND provides no host-PATH binaries beyond /nix/store ro-bind +
+#     writeShellApplication runtimeInputs PATH (upstream-by-design across
+#     all 3 reference effect implementations); release.sh's
+#     `git rev-parse --show-toplevel` would fail with `fatal: not a git
+#     repository`, its `git config user.{name,email} "…"` writes would
+#     fail with `error: could not lock config file .git/config`, and
+#     semantic-release would abort with `running on a CI environment is
+#     required` (env-ci default) without these exports. Symmetric to
+#     the deploy-docs env-var contract (GIT_* + DEPLOY_*) precedent.
+#
 #   Per-package atomicity (NOT fail-fast):
 #     If package A fails, the loop continues to package B. Each
 #     per-package failure is recorded; the dispatcher exits non-zero at
@@ -136,6 +153,28 @@
               echo "error: GITHUB_TOKEN missing from \$HERCULES_CI_SECRETS_JSON" >&2
               exit 1
             fi
+
+            # Symmetric env-var contract (m4-release-packages-runtime-deps-contract):
+            # populate CI / GIT_BRANCH / RELEASE_REPO_ROOT and the
+            # GIT_AUTHOR_*/GIT_COMMITTER_* identity quartet so release.sh
+            # never has to invoke `git rev-parse --show-toplevel` or
+            # `git config user.{name,email} "…"` inside the bwrap sandbox.
+            # CI is set so env-ci recognises the run as non-interactive CI,
+            # bypassing semantic-release's `running on a CI environment is
+            # required` abort. GIT_BRANCH is interpolated at nix eval time
+            # from herculesCI.config.repo.branch (empty string on tag-push
+            # where branch is null). RELEASE_REPO_ROOT="$PWD": mkEffect cwd
+            # is the source root, so $PWD is the canonical repo root inside
+            # the sandbox. GIT_AUTHOR_*/GIT_COMMITTER_*: hard-coded identity
+            # for the semantic-release CHANGELOG commit; git honours these
+            # env vars natively without writing to .git/config.
+            export CI=true
+            export GIT_BRANCH=${lib.escapeShellArg (if branch == null then "" else toString branch)}
+            export RELEASE_REPO_ROOT="$PWD"
+            export GIT_AUTHOR_NAME=semantic-release
+            export GIT_AUTHOR_EMAIL=semantic-release@vanixiets.local
+            export GIT_COMMITTER_NAME=semantic-release
+            export GIT_COMMITTER_EMAIL=semantic-release@vanixiets.local
 
             # Option Gamma store-path dispatch — both flake apps' /nix/store
             # paths are embedded at eval time via the perSystem

@@ -52,6 +52,18 @@
               pkgs.jq
               pkgs.gnugrep
               pkgs.coreutils
+              # Hardening per m4-release-packages-runtime-deps-contract:
+              # explicitly declare every host-PATH binary that release.sh
+              # OR any transitive semantic-release plugin / node_modules
+              # helper might shell out to. The buildbot-effects bwrap
+              # sandbox provides only /nix/store ro-bind + writeShellApplication
+              # runtimeInputs PATH (no host PATH binaries); a missing input
+              # surfaces only at runtime as `command not found`. Symmetric
+              # to the deploy-docs runtimeInputs hardening done in the
+              # m4-deploy-docs-git-env-contract feature.
+              pkgs.gnused
+              pkgs.gawk
+              pkgs.findutils
             ];
             runtimeEnv = {
               DOCS_NODE_MODULES = "${config.packages.vanixiets-docs-deps}/packages/docs/node_modules";

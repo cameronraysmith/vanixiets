@@ -25,7 +25,11 @@
 #              needed).
 #   --help     Print this usage and exit 0.
 #
-# Env-var contract (per ADR-002 / env-var-contract-design.md §2.3):
+# Env-var contract (per ADR-002 / env-var-contract-design.md §2.3, extended
+# by the m4-release-packages-runtime-deps-contract feature to ALL host-PATH
+# binary dependencies and to .git-write avoidance — symmetric to the
+# m4-deploy-docs-git-env-contract precedent on deploy.sh).
+#
 #   Required (secret, production path only — not --dry-run):
 #     GITHUB_TOKEN          @semantic-release/github auth for tag push and
 #                           release publish. Filtered-out plugin list under
@@ -33,25 +37,83 @@
 #   Required (config, injected by release.nix runtimeEnv):
 #     DOCS_NODE_MODULES     vanixiets-docs-deps node_modules tree hosting
 #                           node_modules/.bin/semantic-release.
-#   Optional (all modes):
+#
+#   Optional (CI-mode signalling; required by env-ci on the effect path):
+#     CI                    "true" tells semantic-release / env-ci that the
+#                           run is non-interactive CI. Required when running
+#                           in the buildbot-effects bwrap sandbox: the
+#                           sandbox is not a recognised CI provider, so
+#                           semantic-release would otherwise abort with
+#                           `running on a CI environment is required` (env-ci
+#                           default). Set by the effect preamble; unset on
+#                           local-shell invocations where semantic-release's
+#                           --no-ci flag (under --dry-run) bypasses the check.
+#
+#   Optional (repo-root resolution; env-first with shelled-fallback):
+#     RELEASE_REPO_ROOT     absolute path to the working tree's repo root.
+#                           Required when running inside the buildbot-effects
+#                           bwrap sandbox: the sandbox does not bind-mount
+#                           the working tree, so `git rev-parse
+#                           --show-toplevel` would fail with `fatal: not a
+#                           git repository` and abort the script. Effect
+#                           preamble sets to "$PWD" (mkEffect cwd is the
+#                           pristine source root). Fallback chain:
+#                           git rev-parse --show-toplevel 2>/dev/null || pwd
+#                           — error-tolerant so a missing .git does not
+#                           cause non-zero exit.
+#
+#   Optional (git identity; env-first, NO .git/config writes):
+#     GIT_AUTHOR_NAME       semantic-release commit author name
+#                           (semantic-release writes a CHANGELOG commit
+#                           on the production path). git honours these
+#                           env vars natively without writing to
+#                           .git/config — required because the bwrap
+#                           sandbox mounts /nix/store ro-bind, and
+#                           `git config user.email "…"` would fail with
+#                           `error: could not lock config file .git/config`
+#                           when the working tree's .git is unavailable.
+#                           Default (effect preamble): semantic-release.
+#     GIT_AUTHOR_EMAIL      semantic-release commit author email.
+#                           Default (effect preamble):
+#                           semantic-release@vanixiets.local
+#     GIT_COMMITTER_NAME    semantic-release commit committer name.
+#                           Default (effect preamble): semantic-release
+#     GIT_COMMITTER_EMAIL   semantic-release commit committer email.
+#                           Default (effect preamble):
+#                           semantic-release@vanixiets.local
+#     GIT_USER_NAME         transitional alias — when GIT_AUTHOR_NAME and
+#                           GIT_COMMITTER_NAME are unset, this value is
+#                           used to seed both. Retained for callers that
+#                           have not yet migrated to the GIT_AUTHOR_*/
+#                           GIT_COMMITTER_* convention.
+#     GIT_USER_EMAIL        transitional alias for GIT_AUTHOR_EMAIL +
+#                           GIT_COMMITTER_EMAIL.
+#
+#   Optional (passthrough, not consumed):
 #     SOPS_AGE_KEY          reserved passthrough for sops-decrypt hooks
 #                           (no consumer in the current tree; declared but
 #                           NOT enforced via :? guard — see ADR-002, which
 #                           REJECTS SOPS_AGE_KEY as a general pattern).
-#     GIT_USER_NAME         git identity; default: semantic-release
-#     GIT_USER_EMAIL        git identity; default: semantic-release@vanixiets.local
 #
 #   Caller mechanisms:
 #     - Local dev dry-run:  `nix run .#release -- packages/<pkg> --dry-run`
-#                           needs no secret env (plugin filter strips github)
+#                           needs no secret env (plugin filter strips github);
+#                           git fallback resolves repo-root and identity
+#                           from the local worktree's .git.
 #     - Local dev prod:     caller-side sops wrapper (decrypt
 #                           secrets/shared.yaml before the nix run) OR
 #                           direnv dotenv (.envrc `dotenv` + .env)
 #     - GHA env:            step `env:` block populates GITHUB_TOKEN from
-#                           the repo secrets (package-release.yaml)
-#     - M4 effect:          production-release-packages effect preamble
-#                           extracts GITHUB_TOKEN from HERCULES_CI_SECRETS_JSON
-#                           and exports before invoking the app program path
+#                           the repo secrets (package-release.yaml);
+#                           checkout action provides the .git working tree
+#                           so RELEASE_REPO_ROOT / GIT_AUTHOR_* fallbacks
+#                           are exercised.
+#     - M4 effect:          release-packages effect preamble extracts
+#                           GITHUB_TOKEN from HERCULES_CI_SECRETS_JSON and
+#                           exports it alongside RELEASE_REPO_ROOT="$PWD",
+#                           CI=true, GIT_BRANCH=<eval-time>, and the
+#                           GIT_AUTHOR_*/GIT_COMMITTER_* identity quartet
+#                           before invoking the app program path.
 #
 # Secret passing rule (per ADR-002): NO secrets are passed as CLI flags.
 # Authentication flows exclusively through the inherited environment.
@@ -78,8 +140,9 @@ Flags:
   --help     Print this usage and exit.
 
 Environment:
-  GITHUB_TOKEN, SOPS_AGE_KEY, DOCS_NODE_MODULES, GIT_USER_NAME,
-  GIT_USER_EMAIL (see release.sh header for details).
+  GITHUB_TOKEN, SOPS_AGE_KEY, DOCS_NODE_MODULES, RELEASE_REPO_ROOT, CI,
+  GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL,
+  GIT_USER_NAME, GIT_USER_EMAIL (see release.sh header for details).
 EOF
 }
 
@@ -175,7 +238,14 @@ if [ -z "$package_path" ]; then
   exit 2
 fi
 
-repo_root="$(git rev-parse --show-toplevel)"
+# Repo-root resolution: env-first, then error-tolerant git fallback, then
+# pwd. Required because the buildbot-effects bwrap sandbox does not bind-
+# mount the working tree's .git, so `git rev-parse --show-toplevel` would
+# fail with `fatal: not a git repository` (exit 128) and abort the script.
+# The effect preamble sets RELEASE_REPO_ROOT="$PWD" so this branch resolves
+# without invoking git. Local-shell and GHA paths set RELEASE_REPO_ROOT
+# to empty, exercising the git fallback against the live worktree.
+repo_root="${RELEASE_REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "$repo_root"
 
 if [ ! -d "$package_path" ]; then
@@ -184,15 +254,19 @@ if [ ! -d "$package_path" ]; then
   exit 1
 fi
 
-# Configure a git identity if none is present so semantic-release can
-# create tags/commits without a separate setup step. A pre-configured
-# identity (e.g. from the caller's ~/.gitconfig) is preserved.
-if [ -z "$(git config user.email 2>/dev/null || true)" ]; then
-  git config user.email "${GIT_USER_EMAIL:-semantic-release@vanixiets.local}"
-fi
-if [ -z "$(git config user.name 2>/dev/null || true)" ]; then
-  git config user.name "${GIT_USER_NAME:-semantic-release}"
-fi
+# Git identity: exported via GIT_AUTHOR_* / GIT_COMMITTER_* env vars rather
+# than written to .git/config. Required because the buildbot-effects bwrap
+# sandbox renders .git read-only (mounts /nix/store ro-bind only) and
+# `git config user.email "…"` would fail with `error: could not lock config
+# file .git/config`. git honours these env vars natively without any config
+# write. Transitional aliases GIT_USER_NAME/GIT_USER_EMAIL seed the quartet
+# when the new vars are unset, preserving existing local/GHA caller
+# behaviour. Each export uses parameter-expansion default chaining so a
+# pre-set value (effect preamble or caller env) is preserved unchanged.
+export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-${GIT_USER_NAME:-semantic-release}}"
+export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-${GIT_USER_EMAIL:-semantic-release@vanixiets.local}}"
+export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-${GIT_USER_NAME:-semantic-release}}"
+export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-${GIT_USER_EMAIL:-semantic-release@vanixiets.local}}"
 
 cd "$package_path"
 
