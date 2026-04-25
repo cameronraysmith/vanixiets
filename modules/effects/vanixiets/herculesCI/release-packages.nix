@@ -92,6 +92,55 @@
 #     mutating effects (security-update-pr, dep-bump) should prefer
 #     upstream `hci-effects.git-update`/`flakeUpdate`, NOT a local helper.
 #
+#   Three-way branch-form handling (m5-01g-release-packages-pr-merge-ref-handling):
+#     buildbot-nix dispatches `release-packages` with three structurally
+#     distinct `branch` shapes; the clone preamble distinguishes them
+#     eval-time and emits matched bash for each:
+#
+#       (A) GitHub PR push event — `branch = "refs/pull/<N>/merge"`
+#           (the synthetic GitHub test-merge ref form). Detected
+#           eval-time via `builtins.match "^refs/pull/([0-9]+)/merge$"`.
+#           PR-detection pattern modelled on buildbot-nix's
+#           `buildbot_nix/buildbot_nix/build_canceller.py:16`
+#           (`branch.startswith((\"refs/pull/\", \"refs/merge-requests/\"))`),
+#           narrowed to GitHub form here. Synthetic local branch
+#           `pr-<N>-merge` (no slashes; unambiguous to `git rev-parse`)
+#           replaces the raw ref name for `git checkout -B`. Freshness
+#           check uses a custom refspec
+#           `+refs/pull/<N>/merge:refs/remotes/origin/pr-<N>-merge` so
+#           `git rev-parse origin/pr-<N>-merge` resolves; without this
+#           mapping, `git fetch origin refs/pull/<N>/merge` only
+#           populates FETCH_HEAD and the rev-parse fails with
+#           `fatal: ambiguous argument 'origin/refs/pull/<N>/merge'`
+#           (the production blocker captured on PR #1858, 2026-04-25).
+#           Refspec form modelled on buildbot-nix's
+#           `buildbot_nix/buildbot_nix/nix_eval.py:GitLocalPrMerge.run`
+#           fetch idiom. Emits `RELEASE-CLONE-PR-MERGE: <pr-number> <rev>`
+#           BEFORE the standard `RELEASE-CLONE-START`; emits
+#           `RELEASE-CLONE-STALE-PR` (instead of `RELEASE-CLONE-STALE`)
+#           on stale rev.
+#
+#       (B) regular branch push — `branch` non-empty, non-PR-ref.
+#           Pre-m5-01g flow unchanged: `checkout_branch=$GIT_BRANCH`,
+#           `git fetch origin $GIT_BRANCH`,
+#           `git rev-parse origin/$GIT_BRANCH` for freshness.
+#
+#       (C) tag-push event — `branch = null` (hercules-ci-effects
+#           models tag checkouts this way). Pre-m5-01g flow unchanged:
+#           synthetic local branch `release-packages-detached`,
+#           freshness check skipped (no branch tip; dry-run gate
+#           ensures no production push). See ADR-003 §"Tag-push event
+#           handling".
+#
+#     Local-CLI flows (`nix run .#preview-version`) are unaffected by
+#     this branching — they only ever run from a real working tree
+#     where `branch` is a regular ref. The PR-merge form arises only
+#     inside the buildbot-nix dispatch path.
+#     Full ADR-003 invariant audit (§1–§13) is preserved; the m5-01g
+#     refactor generalises the freshness-check tracking-ref form
+#     (invariant #11) without altering the single-check cadence or any
+#     other invariant.
+#
 #   Symmetric env-var contract (CI + GIT_AUTHOR/COMMITTER + RELEASE_REPO_ROOT)
 #   (m4-release-packages-runtime-deps-contract; extended in m5-01a):
 #     Exports CI=true, GIT_BRANCH (from herculesCI.config.repo.branch at
@@ -156,6 +205,21 @@
       # Branch dispatch: exact string equality. null == "main" is false
       # in Nix, so tag pushes naturally fall through to the dry-run path.
       isMain = branch == "main";
+
+      # GitHub PR-merge ref detection (m5-01g). buildbot-nix dispatches
+      # `release-packages` on PR push events with `--branch` set to the
+      # synthetic GitHub test-merge ref form `refs/pull/<N>/merge` rather
+      # than the PR head branch name. This is the dominant non-main
+      # dispatch path in production. Pattern modelled on buildbot-nix's
+      # `build_canceller.py:16` PR-detection idiom (`branch.startswith
+      # ((\"refs/pull/\", \"refs/merge-requests/\"))`); narrowed to the
+      # GitHub form here because GitLab is not a vanixiets backend.
+      # `builtins.match` returns null on no-match and a list of capture
+      # groups on success, so `prMergeMatch != null` is the canonical
+      # eval-time predicate.
+      prMergeMatch = if branch == null then null else builtins.match "^refs/pull/([0-9]+)/merge$" branch;
+      isPrMerge = prMergeMatch != null;
+      prNumber = if isPrMerge then builtins.head prMergeMatch else null;
 
       # Action banner emitted once per run (RP-05 log-grep anchor).
       actionBanner = if isMain then "release" else "dry-run";
@@ -258,6 +322,17 @@
             # phases share one canonicalized value without re-shelling-out.
             GIT_REV=${lib.escapeShellArg (toString rev)}
             GIT_BRANCH=${lib.escapeShellArg (if branch == null then "" else toString branch)}
+            ${lib.optionalString isPrMerge ''
+              # PR-merge banner (m5-01g, VAL-RELEASE-α-PR-001) emitted
+              # ONLY on PR-merge dispatch BEFORE the standard
+              # CLONE-START banner so log-grep can distinguish the
+              # synthetic-ref dispatch without further parsing. PR
+              # number is parsed eval-time from the synthetic GitHub
+              # test-merge ref via `builtins.match` and embedded as a
+              # literal here so the rendered effectScript carries the
+              # parsed number directly (no bash indirection).
+              echo "RELEASE-CLONE-PR-MERGE: ${toString prNumber} $GIT_REV"
+            ''}
 
             # RELEASE-CLONE-START banner (invariants #9, #10): emitted
             # BEFORE the clone with the sanitized public URL. Token never
@@ -279,35 +354,80 @@
             git -C "$clone_dir" fetch --tags origin
 
             # Exact-rev checkout (ADR-003 §Architecture step 3, invariant
-            # #3). When GIT_BRANCH is empty (tag-push events: hercules-ci-
-            # effects models tag checkouts as `branch = null`), use a
-            # synthetic local branch name. The dry-run gate (isMain ==
-            # false) ensures no production push attempts in that case;
-            # see ADR-003 §"Tag-push event handling".
-            if [ -n "$GIT_BRANCH" ]; then
-              checkout_branch="$GIT_BRANCH"
-            else
-              checkout_branch="release-packages-detached"
-            fi
-            git -C "$clone_dir" checkout -B "$checkout_branch" "$GIT_REV"
-            echo "RELEASE-CLONE-CHECKOUT: $GIT_REV"
+            # #3) + branch-form-aware freshness check (ADR-003 §Architecture
+            # step 4, invariant #11; m5-01g three-way generalization).
+            #
+            # Three eval-time-distinguished cases:
+            #
+            #   Case A (isPrMerge==true): GitHub PR push event with
+            #     `branch = refs/pull/<N>/merge`. Synthetic local branch
+            #     name `pr-<N>-merge` (no slashes; unambiguous to git ref
+            #     resolution). Freshness check uses a custom refspec
+            #     `+refs/pull/<N>/merge:refs/remotes/origin/pr-<N>-merge`
+            #     to materialize the missing remote-tracking ref —
+            #     `git fetch origin refs/pull/<N>/merge` alone updates
+            #     FETCH_HEAD but does NOT auto-create
+            #     `refs/remotes/origin/refs/pull/<N>/merge`, which is the
+            #     production blocker captured on PR #1858 (`fatal:
+            #     ambiguous argument 'origin/refs/pull/1858/merge'`).
+            #     Refspec form modelled on buildbot-nix's
+            #     `nix_eval.py:GitLocalPrMerge.run` fetch idiom.
+            #
+            #   Case B (isPrMerge==false, GIT_BRANCH non-empty): regular
+            #     branch push. Identical to the pre-m5-01g flow.
+            #
+            #   Case C (isPrMerge==false, GIT_BRANCH empty): tag-push
+            #     event (hercules-ci-effects models tag checkouts as
+            #     `branch = null`). Synthetic local branch name
+            #     `release-packages-detached`; no freshness check (no
+            #     branch tip to compare against; the dry-run gate
+            #     `isMain == false` ensures no production push in this
+            #     case). Identical to the pre-m5-01g flow.
+            ${
+              if isPrMerge then
+                ''
+                  checkout_branch="pr-${toString prNumber}-merge"
+                  git -C "$clone_dir" checkout -B "$checkout_branch" "$GIT_REV"
+                  echo "RELEASE-CLONE-CHECKOUT: $GIT_REV"
 
-            # Freshness check (ADR-003 §Architecture step 4, invariant
-            # #11). Single check after checkout, before the package loop.
-            # Per-package re-checks are NOT added (see ADR-003 §11). On
-            # tag-push events (GIT_BRANCH empty) there is no branch tip
-            # to compare against, so the check is structurally
-            # inapplicable; the ADR-003 §"Tag-push event handling" gate
-            # forces dry-run for those runs anyway.
-            if [ -n "$GIT_BRANCH" ]; then
-              git -C "$clone_dir" fetch origin "$GIT_BRANCH"
-              head_rev="$(git -C "$clone_dir" rev-parse HEAD)"
-              remote_rev="$(git -C "$clone_dir" rev-parse "origin/$GIT_BRANCH")"
-              if [ "$head_rev" != "$remote_rev" ]; then
-                echo "RELEASE-CLONE-STALE: expected $head_rev remote $remote_rev" >&2
-                exit 1
-              fi
-            fi
+                  # Custom-refspec freshness check: create the missing
+                  # remote-tracking ref under refs/remotes/origin/pr-<N>-merge
+                  # so `git rev-parse origin/pr-<N>-merge` resolves
+                  # unambiguously. Without this refspec mapping, the
+                  # plain `git fetch origin refs/pull/<N>/merge` only
+                  # updates FETCH_HEAD. Refspec form modelled on
+                  # buildbot-nix's `nix_eval.py:GitLocalPrMerge.run`
+                  # idiom; the PR number is the eval-time-parsed literal.
+                  git -C "$clone_dir" fetch origin \
+                    "+refs/pull/${toString prNumber}/merge:refs/remotes/origin/pr-${toString prNumber}-merge"
+                  head_rev="$(git -C "$clone_dir" rev-parse HEAD)"
+                  remote_rev="$(git -C "$clone_dir" rev-parse "origin/pr-${toString prNumber}-merge")"
+                  if [ "$head_rev" != "$remote_rev" ]; then
+                    echo "RELEASE-CLONE-STALE-PR: expected $head_rev remote $remote_rev" >&2
+                    exit 1
+                  fi
+                ''
+              else
+                ''
+                  if [ -n "$GIT_BRANCH" ]; then
+                    checkout_branch="$GIT_BRANCH"
+                  else
+                    checkout_branch="release-packages-detached"
+                  fi
+                  git -C "$clone_dir" checkout -B "$checkout_branch" "$GIT_REV"
+                  echo "RELEASE-CLONE-CHECKOUT: $GIT_REV"
+
+                  if [ -n "$GIT_BRANCH" ]; then
+                    git -C "$clone_dir" fetch origin "$GIT_BRANCH"
+                    head_rev="$(git -C "$clone_dir" rev-parse HEAD)"
+                    remote_rev="$(git -C "$clone_dir" rev-parse "origin/$GIT_BRANCH")"
+                    if [ "$head_rev" != "$remote_rev" ]; then
+                      echo "RELEASE-CLONE-STALE: expected $head_rev remote $remote_rev" >&2
+                      exit 1
+                    fi
+                  fi
+                ''
+            }
 
             echo "RELEASE-CLONE-READY: $clone_dir"
 
