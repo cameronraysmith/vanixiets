@@ -1,27 +1,23 @@
 # release.nix - Production semantic-release wrapper as a flake app.
 #
-# Usage:
 #   nix run .#release -- <package-path>
 #   nix run .#release -- <package-path> --dry-run
 #   nix run .#release -- info <package-path>
 #   nix run .#release -- --help
 #
-# Absorbs the `production-release-packages` job body from
-# .github/workflows/package-release.yaml: configures git, invokes
-# semantic-release against the target monorepo package, filters
-# `@semantic-release/github` out of the plugin list when `--dry-run`
-# is set (so GITHUB_TOKEN is not required for previews), and provides
-# a `info` subcommand that emits release info (version, tag, released)
-# as JSON.
+# Configures git, invokes semantic-release against the target monorepo
+# package, filters `@semantic-release/github` out of the plugin list when
+# `--dry-run` is set (so GITHUB_TOKEN is not required for previews), and
+# provides an `info` subcommand emitting release info as JSON.
 #
 # Hermetic: semantic-release and all plugins are provided by the
 # vanixiets-docs-deps derivation and linked into the package directory at
 # runtime. Callers do not need to run `bun install`.
 #
-# Expected caller environment (not loaded from sops; CI-only):
-#   GITHUB_TOKEN - required by @semantic-release/github for production releases
-#   SOPS_AGE_KEY - passthrough for semantic-release hooks that may decrypt
-#                  secrets via sops (not consumed by this script directly)
+# Expected caller environment (CI-only):
+#   GITHUB_TOKEN, CI, RELEASE_REPO_ROOT,
+#   GIT_AUTHOR_NAME / GIT_AUTHOR_EMAIL,
+#   GIT_COMMITTER_NAME / GIT_COMMITTER_EMAIL.
 #
 # Template bifurcation (writeShellApplication): PURE READFILE FORM.
 # `text = builtins.readFile ./release.sh` — the sidecar is consumed verbatim,
@@ -52,15 +48,12 @@
               pkgs.jq
               pkgs.gnugrep
               pkgs.coreutils
-              # Hardening per m4-release-packages-runtime-deps-contract:
-              # explicitly declare every host-PATH binary that release.sh
-              # OR any transitive semantic-release plugin / node_modules
-              # helper might shell out to. The buildbot-effects bwrap
-              # sandbox provides only /nix/store ro-bind + writeShellApplication
+              # Explicitly declare every host-PATH binary that release.sh OR
+              # any transitive semantic-release plugin / node_modules helper
+              # might shell out to. The buildbot-effects bwrap sandbox
+              # provides only /nix/store ro-bind + writeShellApplication
               # runtimeInputs PATH (no host PATH binaries); a missing input
-              # surfaces only at runtime as `command not found`. Symmetric
-              # to the deploy-docs runtimeInputs hardening done in the
-              # m4-deploy-docs-git-env-contract feature.
+              # surfaces only at runtime as `command not found`.
               pkgs.gnused
               pkgs.gawk
               pkgs.findutils

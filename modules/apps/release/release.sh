@@ -1,122 +1,40 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # release.sh - Production semantic-release runner for a monorepo package.
+# See `usage()` for caller-facing usage; this header documents the env-var
+# contract only.
 #
-# Usage:
-#   release <package-path> [--dry-run] [-- extra semantic-release args]
-#   release info [<package-path>]
-#   release --help
-#
-# Subcommands:
-#   (default)  Run semantic-release against <package-path>. Tag/publish on
-#              success; when --dry-run is passed, runs a preview without
-#              the @semantic-release/github plugin so GITHUB_TOKEN is not
-#              required.
-#   info       Emit a JSON object describing the most recent release for
-#              <package-path> (or the repo root when omitted). Fields:
-#                { "version": "X.Y.Z", "tag": "pkg-vX.Y.Z", "released": true }
-#              On no prior release: { "version": "unknown", "tag": "",
-#              "released": false }.
-#
-# Flags:
-#   --dry-run  Pass --dry-run and --no-ci to semantic-release and strip the
-#              @semantic-release/github plugin from the invocation plugin
-#              list. Mirrors the preview-version trick (no GITHUB_TOKEN
-#              needed).
-#   --help     Print this usage and exit 0.
-#
-# Env-var contract (per ADR-002 / env-var-contract-design.md §2.3, extended
-# by the m4-release-packages-runtime-deps-contract feature to ALL host-PATH
-# binary dependencies and to .git-write avoidance — symmetric to the
-# m4-deploy-docs-git-env-contract precedent on deploy.sh).
-#
-#   Required (secret, production path only — not --dry-run):
-#     GITHUB_TOKEN          @semantic-release/github auth for tag push and
-#                           release publish. Filtered-out plugin list under
-#                           --dry-run means no token is consulted in that mode.
-#   Required (config, injected by release.nix runtimeEnv):
-#     DOCS_NODE_MODULES     vanixiets-docs-deps node_modules tree hosting
-#                           node_modules/.bin/semantic-release.
-#
-#   Optional (CI-mode signalling; required by env-ci on the effect path):
-#     CI                    "true" tells semantic-release / env-ci that the
-#                           run is non-interactive CI. Required when running
-#                           in the buildbot-effects bwrap sandbox: the
-#                           sandbox is not a recognised CI provider, so
-#                           semantic-release would otherwise abort with
-#                           `running on a CI environment is required` (env-ci
-#                           default). Set by the effect preamble; unset on
-#                           local-shell invocations where semantic-release's
-#                           --no-ci flag (under --dry-run) bypasses the check.
-#
-#   Optional (repo-root resolution; env-first with shelled-fallback):
-#     RELEASE_REPO_ROOT     absolute path to the working tree's repo root.
-#                           Required when running inside the buildbot-effects
-#                           bwrap sandbox: the sandbox does not bind-mount
-#                           the working tree, so `git rev-parse
-#                           --show-toplevel` would fail with `fatal: not a
-#                           git repository` and abort the script. Effect
-#                           preamble sets to "$PWD" (mkEffect cwd is the
-#                           pristine source root). Fallback chain:
-#                           git rev-parse --show-toplevel 2>/dev/null || pwd
-#                           — error-tolerant so a missing .git does not
-#                           cause non-zero exit.
-#
-#   Optional (git identity; env-first, NO .git/config writes):
-#     GIT_AUTHOR_NAME       semantic-release commit author name
-#                           (semantic-release writes a CHANGELOG commit
-#                           on the production path). git honours these
-#                           env vars natively without writing to
-#                           .git/config — required because the bwrap
-#                           sandbox mounts /nix/store ro-bind, and
-#                           `git config user.email "…"` would fail with
-#                           `error: could not lock config file .git/config`
-#                           when the working tree's .git is unavailable.
-#                           Default (effect preamble): semantic-release.
-#     GIT_AUTHOR_EMAIL      semantic-release commit author email.
-#                           Default (effect preamble):
-#                           semantic-release@vanixiets.local
-#     GIT_COMMITTER_NAME    semantic-release commit committer name.
-#                           Default (effect preamble): semantic-release
-#     GIT_COMMITTER_EMAIL   semantic-release commit committer email.
-#                           Default (effect preamble):
-#                           semantic-release@vanixiets.local
-#     GIT_USER_NAME         transitional alias — when GIT_AUTHOR_NAME and
-#                           GIT_COMMITTER_NAME are unset, this value is
-#                           used to seed both. Retained for callers that
-#                           have not yet migrated to the GIT_AUTHOR_*/
-#                           GIT_COMMITTER_* convention.
-#     GIT_USER_EMAIL        transitional alias for GIT_AUTHOR_EMAIL +
-#                           GIT_COMMITTER_EMAIL.
-#
-#   Optional (passthrough, not consumed):
-#     SOPS_AGE_KEY          reserved passthrough for sops-decrypt hooks
-#                           (no consumer in the current tree; declared but
-#                           NOT enforced via :? guard — see ADR-002, which
-#                           REJECTS SOPS_AGE_KEY as a general pattern).
-#
-#   Caller mechanisms:
-#     - Local dev dry-run:  `nix run .#release -- packages/<pkg> --dry-run`
-#                           needs no secret env (plugin filter strips github);
-#                           git fallback resolves repo-root and identity
-#                           from the local worktree's .git.
-#     - Local dev prod:     caller-side sops wrapper (decrypt
-#                           secrets/shared.yaml before the nix run) OR
-#                           direnv dotenv (.envrc `dotenv` + .env)
-#     - GHA env:            step `env:` block populates GITHUB_TOKEN from
-#                           the repo secrets (package-release.yaml);
-#                           checkout action provides the .git working tree
-#                           so RELEASE_REPO_ROOT / GIT_AUTHOR_* fallbacks
-#                           are exercised.
-#     - M4 effect:          release-packages effect preamble extracts
-#                           GITHUB_TOKEN from HERCULES_CI_SECRETS_JSON and
-#                           exports it alongside RELEASE_REPO_ROOT="$PWD",
-#                           CI=true, GIT_BRANCH=<eval-time>, and the
-#                           GIT_AUTHOR_*/GIT_COMMITTER_* identity quartet
-#                           before invoking the app program path.
-#
-# Secret passing rule (per ADR-002): NO secrets are passed as CLI flags.
-# Authentication flows exclusively through the inherited environment.
+# Required (secret, production path only — not --dry-run):
+#   GITHUB_TOKEN         @semantic-release/github auth for tag push and
+#                        release publish. Filtered-out plugin list under
+#                        --dry-run means no token is consulted in that mode.
+# Required (config, injected by release.nix runtimeEnv):
+#   DOCS_NODE_MODULES    vanixiets-docs-deps node_modules tree hosting
+#                        node_modules/.bin/semantic-release.
+# Optional (CI-mode signalling; required by env-ci on the effect path):
+#   CI                   "true" tells semantic-release / env-ci that the
+#                        run is non-interactive CI. Required in the
+#                        buildbot-effects bwrap sandbox (not a recognised
+#                        CI provider; semantic-release would otherwise
+#                        abort `running on a CI environment is required`).
+# Optional (repo-root resolution; env-first with errexit-tolerant fallback):
+#   RELEASE_REPO_ROOT    absolute path to the working tree's repo root.
+#                        Required in the bwrap sandbox (no .git bind-mount;
+#                        `git rev-parse --show-toplevel` would fail).
+#                        Fallback: git rev-parse --show-toplevel || pwd.
+# Optional (git identity; env-first, NO .git/config writes — bwrap mounts
+# /nix/store ro-bind, so `git config user.email …` would fail to lock
+# .git/config). git honours these natively without any config write.
+# Defaults applied by the effect preamble:
+#   GIT_AUTHOR_NAME      / GIT_AUTHOR_EMAIL    (semantic-release@vanixiets.local)
+#   GIT_COMMITTER_NAME   / GIT_COMMITTER_EMAIL (semantic-release@vanixiets.local)
+#   GIT_USER_NAME / GIT_USER_EMAIL — transitional aliases that seed the
+#                        quartet when the GIT_AUTHOR_* / GIT_COMMITTER_*
+#                        forms are unset.
+# Optional (passthrough, not consumed):
+#   SOPS_AGE_KEY         reserved passthrough for sops-decrypt hooks; no
+#                        consumer in the current tree (declared but NOT
+#                        enforced via :? guard).
 
 set -euo pipefail
 
@@ -176,8 +94,6 @@ emit_release_info() {
   fi
 }
 
-# Handle top-level dispatch: --help, info subcommand, or fall through
-# to the default "run semantic-release" mode.
 if [ $# -eq 0 ]; then
   usage >&2
   exit 2
@@ -195,9 +111,6 @@ case "$1" in
     ;;
 esac
 
-# Default mode: semantic-release runner.
-# Parse positional arg + --dry-run flag; forward remaining args through to
-# node ./node_modules/.bin/semantic-release.
 dry_run=0
 package_path=""
 extra_args=()
@@ -270,11 +183,9 @@ export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-${GIT_USER_EMAIL:-semantic-re
 
 cd "$package_path"
 
-# Production-path env-var contract guard: fail fast on missing GITHUB_TOKEN
-# BEFORE any node_modules / workspace mutation so the error points at the
-# contract rather than at an opaque state-mutation side effect. Gated on
-# dry_run so the dry-run path (with @semantic-release/github filtered out)
-# continues to work without any secret env.
+# Production-path contract guard: fail fast on missing GITHUB_TOKEN
+# BEFORE any node_modules mutation so the error points at the contract
+# rather than at an opaque state-mutation side effect. Gated on dry_run.
 if [ "$dry_run" -ne 1 ]; then
   : "${GITHUB_TOKEN:?GITHUB_TOKEN is required for production semantic-release (see release.sh header for caller mechanisms; not needed for --dry-run)}"
 fi
@@ -320,10 +231,9 @@ fi
 
 if [ "$dry_run" -eq 1 ]; then
   # Filter @semantic-release/github so GITHUB_TOKEN is not required for
-  # a preview. Mirrors the plugin list used by preview-version.sh plus
-  # the changelog + major-tag plugins that the package.json "release"
-  # block declares (still safe under --dry-run: prepare/publish steps
-  # are no-ops in dry-run mode).
+  # preview; safe under --dry-run (prepare/publish steps are no-ops).
+  # Mirrors preview-version.sh plus changelog + major-tag plugins from
+  # the package.json "release" block.
   plugins="@semantic-release/commit-analyzer,@semantic-release/release-notes-generator,@semantic-release/changelog,semantic-release-major-tag"
   echo "running semantic-release (dry-run, no GitHub plugin) in ${package_path}..."
   node ./node_modules/.bin/semantic-release \
@@ -332,10 +242,8 @@ if [ "$dry_run" -eq 1 ]; then
     --plugins "$plugins" \
     "${extra_args[@]}"
 else
-  # Production release path: semantic-release will create a tag and
-  # publish a GitHub release when invoked. GITHUB_TOKEN is enforced via
-  # the early :? guard above (placed before node_modules setup so failure
-  # modes are contract-first).
+  # GITHUB_TOKEN is enforced via the early :? guard above (placed before
+  # node_modules setup so failure modes are contract-first).
   echo "running production semantic-release in ${package_path}..."
   node ./node_modules/.bin/semantic-release "${extra_args[@]}"
 fi
