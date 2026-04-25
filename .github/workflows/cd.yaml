@@ -59,9 +59,6 @@ permissions:
   deployments: write
 
 jobs:
-  # job 1: set-variables
-  # determines deployment settings and variables based on event type
-  # Always runs - needed for production job routing and provides outputs
   set-variables:
     runs-on: ubuntu-latest
     if: |
@@ -100,16 +97,12 @@ jobs:
             CHECKOUT_REV="${{ github.sha }}"
           fi
 
-          # Enable deployment on push to main (production)
           if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
             DEPLOY_ENABLED="true"
             DEPLOY_ENVIRONMENT="production"
           fi
 
-          # Sanitize branch name for Cloudflare preview alias (must be valid subdomain component)
-          # - Replace / and other non-alphanumeric chars with -
-          # - Collapse consecutive hyphens, remove leading/trailing hyphens
-          # - Truncate to 40 chars (safe for subdomain label limit of 63)
+          # Sanitize for Cloudflare subdomain label (≤63 chars; truncate to 40 for safety)
           SANITIZED_BRANCH=$(echo "$CHECKOUT_REF" | tr '/' '-' | tr -c 'a-zA-Z0-9-' '-' | sed 's/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
 
           echo "debug=$DEBUG" >> $GITHUB_OUTPUT
@@ -134,10 +127,6 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
-          # sparse-checkout: |
-          #   packages
-          #   justfile
-          # sparse-checkout-cone-mode: false
 
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
@@ -158,8 +147,6 @@ jobs:
           echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
           echo "Discovered packages: $PACKAGES"
 
-  # job 2: preview-release-version
-  # Preview semantic-release version for each package (PR only, fast feedback)
   preview-release-version:
     needs: [set-variables]
     if: |
@@ -257,8 +244,6 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 3: preview-docs-deploy
-  # Deploy docs to preview environment (PR only, fast feedback)
   preview-docs-deploy:
     needs: [set-variables]
     if: |
@@ -276,8 +261,6 @@ jobs:
       force_run: ${{ needs.set-variables.outputs.force-ci }}
     secrets: inherit
 
-  # job 4: bootstrap-verification
-  # validates Makefile bootstrap workflow on clean ubuntu system
   bootstrap-verification:
     needs: [set-variables]
     runs-on: ubuntu-latest
@@ -365,9 +348,7 @@ jobs:
           path: ${{ steps.cache.outputs.cache-path }}
           key: ${{ steps.cache.outputs.cache-key }}
 
-  # job 7: test-cluster
-  # validates kubernetes manifests and local cluster integration
-  # informational only - does not block production releases
+  # Informational only - does not block production releases
   test-cluster:
     needs: [set-variables]
     if: |
@@ -380,9 +361,7 @@ jobs:
       debug_enabled: ${{ needs.set-variables.outputs.debug }}
     secrets: inherit
 
-  # job 11: production-release-packages
-  # Release packages via semantic-release on main/beta branches
-  # Semantic-release determines if actual release is needed
+  # Semantic-release determines internally whether to actually release
   production-release-packages:
     needs: [set-variables]
     if: |
@@ -408,9 +387,7 @@ jobs:
     secrets:
       SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
-  # job 12: production-docs-deploy
-  # Documentation deployment to production (conditional)
-  # Depends on production-release-packages to ensure packages are released first
+  # Depends on production-release-packages so packages release before docs
   production-docs-deploy:
     needs: [set-variables, production-release-packages]
     if: |
