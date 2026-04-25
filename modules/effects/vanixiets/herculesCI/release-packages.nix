@@ -167,6 +167,19 @@
         hci-effects.mkEffect {
           name = "release-packages";
 
+          # Runtime PATH inputs for the effectScript body (m5-01d-release-packages-runtimeinputs-fix).
+          # mkEffect's defaultInputs (cacert + curl + jq + effectSetupHook) plus stdenvNoCC's
+          # bundled coreutils/bash/gnused/gnugrep/gawk/gnutar cover every directly-invoked binary
+          # in the effectScript EXCEPT `git`, which the ADR-003 Option α clone preamble calls
+          # via `git clone`, `git fetch`, `git checkout -B`, and `git rev-parse`. The flake apps
+          # invoked downstream (`${listPackagesProgram}`, `${releaseProgram}`) carry their own
+          # writeShellApplication-baked runtimeInputs PATH so internal tool resolution is
+          # self-contained. Adding `pkgs.git` here closes the m5-01c Phase 1 dry-run regression
+          # where the bwrap sandbox emitted RELEASE-CLONE-START correctly and then failed with
+          # `git: command not found` from stdenv-linux/setup line 1842 (`git clone "$clone_url" …`).
+          # `cacert` is already in defaultInputs, so HTTPS clone CA-trust resolution is unaffected.
+          inputs = [ pkgs.git ];
+
           effectScript = ''
             set -euo pipefail
 
