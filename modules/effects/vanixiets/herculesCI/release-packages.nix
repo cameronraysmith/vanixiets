@@ -16,17 +16,30 @@
 #     dispatches via a flake-app shell-out (`nix run`); bwrap does not
 #     bind the working tree, so the .# syntax cannot resolve.
 #
-#   Branch dispatch (exact string equality):
+#   Branch dispatch (exact string equality; m5-01e Option C delegation):
 #     Selection is driven by `primaryRepo.branch == "main"`, surfaced
 #     through `herculesCI.config.repo.branch` which hercules-ci-effects
 #     populates from the primaryRepo record at flake.herculesCI entry.
 #     * primaryRepo.branch == "main"  → real semantic-release per package
-#         (semantic-release's per-package commit-analyzer decides whether
-#         to cut a release; tag push + GitHub Release published when so;
-#         npmPublish stays false — never overridden).
-#     * any other branch (or null)    → per-package `--dry-run`
-#         (semantic-release prints the next-version preview only; no git
-#         tags pushed, no GitHub Release created, no remote git mutation).
+#         via the `${releaseProgram}` flake app (release.sh production
+#         path; semantic-release's per-package commit-analyzer decides
+#         whether to cut a release; tag push + GitHub Release published
+#         when so; npmPublish stays false — never overridden).
+#     * any other branch (or null)    → per-package merge-preview via
+#         the `${previewVersionProgram}` flake app (preview-version.sh;
+#         m5-01e delegation to the existing flake app, Option C, closes
+#         the m5-01c Phase 1 version-preview gap). preview-version.sh
+#         simulates merging the current branch into `main` via
+#         `git merge-tree --write-tree` + temporary worktree, then runs
+#         semantic-release with `--branches "$TARGET_BRANCH"` and the
+#         commit-analyzer + release-notes-generator plugin pair only
+#         (no `@semantic-release/github`, no tag push, no GitHub
+#         Release, no remote git mutation). The previous non-main path
+#         delegated to `release.sh --dry-run`, which short-circuited on
+#         the in-tree `branches: ["main"]` config before exercising
+#         analyzeCommits/generateNotes; preview-version's
+#         `--branches` override is what makes the version-preview path
+#         actually run for cd-via-effects and other non-main branches.
 #
 #   Pattern C'-refined secrets preamble:
 #     Extracts GITHUB_TOKEN ONLY from $HERCULES_CI_SECRETS_JSON at the
@@ -160,9 +173,14 @@
 
           # Option Gamma: resolved at nix eval time to /nix/store paths
           # that the bwrap sandbox can execute without a working-tree or
-          # nix-daemon lookup.
+          # nix-daemon lookup. preview-version-program added in m5-01e
+          # (Option C) so non-main runs can delegate to the existing
+          # `preview-version` flake app rather than re-using
+          # `release.sh --dry-run` (which short-circuits on
+          # branches:["main"] before exercising the analyzeCommits path).
           listPackagesProgram = config.apps.list-packages-json.program;
           releaseProgram = config.apps.release.program;
+          previewVersionProgram = config.apps.preview-version.program;
         in
         hci-effects.mkEffect {
           name = "release-packages";
@@ -327,12 +345,17 @@
             export GIT_COMMITTER_NAME=semantic-release
             export GIT_COMMITTER_EMAIL=semantic-release@vanixiets.local
 
-            # Option Gamma store-path dispatch — both flake apps' /nix/store
-            # paths are embedded at eval time via the perSystem
+            # Option Gamma store-path dispatch — all three flake apps'
+            # /nix/store paths are embedded at eval time via the perSystem
             # config.apps.<name>.program attributes. No flake-app shell-out
-            # (bwrap would not resolve .#).
+            # (bwrap would not resolve .#). PREVIEW is unused on the main
+            # branch path and RELEASE is unused on the non-main branch
+            # path — both are exported unconditionally for log auditability
+            # so an operator inspecting the rendered effectScript sees the
+            # full set of /nix/store paths the effect was built against.
             LIST_PACKAGES=${listPackagesProgram}
             RELEASE=${releaseProgram}
+            PREVIEW=${previewVersionProgram}
 
             # cd into the clone before invoking list-packages-json: that
             # script calls `git rev-parse --show-toplevel`, which must
@@ -362,8 +385,15 @@
               # Disable -e for the per-package invocation so a single
               # package's failure does not abort the loop. We capture
               # the exit code, log appropriately, and continue.
+              # m5-01e Option C: eval-time branch the dispatch line so
+              # the rendered bash invokes either the production
+              # release.sh path (main) or the merge-preview
+              # preview-version.sh path (non-main). The CLI grammars
+              # differ — `release <package-path> [--dry-run]` vs
+              # `preview-version [target-branch] [package-path]` — so a
+              # single shared variable + shared flag would not work.
               set +e
-              "$RELEASE" "$pkg_path" ${dryRunFlag}
+              ${if isMain then ''"$RELEASE" "$pkg_path"'' else ''"$PREVIEW" main "$pkg_path"''}
               rc=$?
               set -e
 
