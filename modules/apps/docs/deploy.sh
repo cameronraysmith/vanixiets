@@ -1,119 +1,40 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # Docs deployment dispatcher invoked via `nix run .#deploy-docs`.
+# See `usage()` for caller-facing usage; this header documents the
+# env-var contract only.
 #
-# Env-var contract (per ADR-002 / env-var-contract-design.md §2.1, extended
-# by the m4-deploy-docs-git-env-contract feature to ALL host-PATH binary
-# dependencies). 12 caller-overridable variables: 4 secret tokens (the
-# closed effects bundle), 6 GIT_*, 2 DEPLOY_*. Symmetric env-first /
-# shelled-fallback shape across all four caller contexts (effect preamble,
-# sops exec-env, direnv, GHA env, local shell).
-#
-#   Required (secret, provided by caller from the closed 4-key effects
-#   bundle — see modules/effects/vanixiets/secrets.nix):
-#     CLOUDFLARE_API_TOKEN     wrangler auth token (CONSUMED by this
-#                              script; required at runtime).
-#     CLOUDFLARE_ACCOUNT_ID    Cloudflare account id (CONSUMED; wrangler
-#                              requires this for account-scoped ops such
-#                              as `versions upload` on a Worker attached
-#                              to an account-level resource).
-#     GITHUB_TOKEN             not consumed by deploy.sh; documented as
-#                              part of the canonical effects bundle for
-#                              homogeneity (consumed by release.sh).
-#     SOPS_AGE_KEY             not consumed by deploy.sh; documented as
-#                              part of the canonical effects bundle for
-#                              homogeneity (consumed by
-#                              k3d-bootstrap-secrets.sh). Per ADR-002,
-#                              this script does NOT shell out to sops.
-#   Required (config, injected by deploy.nix):
-#     DOCS_PAYLOAD             store path of the vanixiets-docs derivation
-#                              ($out/{dist/, .wrangler/, wrangler.jsonc})
-#     DOCS_NODE_MODULES        store path of vanixiets-docs-deps node_modules
-#                              tree (runtimeEnv of deploy.nix)
-#
-#   Optional (git metadata; env-first with git-fallback). Extended in the
-#   m4-deploy-docs-git-env-contract feature to let the script run inside
-#   the buildbot-effects bwrap sandbox which does NOT bind-mount the
-#   working tree (upstream-by-design). Every GIT_* consumer below is
-#   expressed as `${GIT_X:-$(git … 2>/dev/null || true)}` so the three
-#   supported caller contexts all work: effect preamble (env pre-populated,
-#   no .git reachable), local shell from a git worktree (env unset, git
-#   fallback), and GHA after checkout (env unset, git fallback).
-#     GIT_REV                  40-char commit SHA (fallback: git rev-parse HEAD)
-#     GIT_REV_SHORT            7-ish-char short SHA (fallback: git rev-parse --short HEAD)
-#     GIT_REV_SHORT12          12-char short SHA used for wrangler --tag /
-#                              workers/tag cross-check (fallback:
-#                              git rev-parse --short=12 HEAD). VAL-WRITESHELL-DOCS-010
-#                              commit_tag invariant sources from here.
-#     GIT_BRANCH               current branch name (fallback: git branch --show-current)
-#     GIT_COMMIT_MSG           HEAD subject line used in the version-message
-#                              annotation (fallback: git log -1 --pretty=format:'%s')
-#     GIT_WORKTREE_STATUS      literal "clean" or "dirty" (fallback:
-#                              git diff-index --quiet HEAD -- && echo clean || echo dirty)
-#
-#   Optional (deploy-context metadata; env-first with bash-builtin /
-#   shelled-fallback). Generalisation of the same pattern to ALL host-PATH
-#   binary dependencies, fixing the second-bug-class regression where the
-#   bwrap sandbox lacks `hostname`/`whoami` on PATH (only /nix/store
-#   ro-bind + writeShellApplication runtimeInputs are available). The
-#   bash builtin `$HOSTNAME` is populated from gethostname(2) at shell
-#   startup — no external binary required in any context.
-#     DEPLOY_HOST              short hostname for the production deploy
-#                              message. Fallback: ${HOSTNAME%%.*}
-#                              (bash builtin parameter expansion; trims
-#                              the first dot-suffix to mimic `hostname -s`
-#                              without shelling out).
-#     DEPLOY_DEPLOYER          actor identity for deploy/version messages.
-#                              Fallback chain: GITHUB_ACTOR (GHA context)
-#                              → `whoami 2>/dev/null` (local shell with
-#                              /etc/passwd available) → "unknown".
-#
-#   Optional (caller debugging / overrides):
-#     WRANGLER                 override binary path for test harnesses; default
-#                              $DOCS_NODE_MODULES/.bin/wrangler
-#     DEPLOY_DOCS_DEBUG        preserve tmpdir on exit when set
-#     GITHUB_ACTIONS / GITHUB_ACTOR / GITHUB_WORKFLOW
-#                              when GITHUB_ACTIONS is set, the production
-#                              deploy message uses GITHUB_WORKFLOW (default
-#                              "CI") as the deploy context instead of
-#                              DEPLOY_HOST. GITHUB_ACTOR participates in
-#                              the DEPLOY_DEPLOYER fallback chain.
-#
-# Caller mechanisms (satisfy each contract slot via one of):
-#   - Local dev:    caller-side sops wrapper (justfile `docs-deploy-*`
-#                   recipes wrap with `sops` to decrypt secrets/shared.yaml
-#                   and export the Cloudflare env before the nested nix run)
-#                   OR direnv dotenv (.envrc loads .env with the Cloudflare
-#                   env vars already exported). DEPLOY_HOST / DEPLOY_DEPLOYER
-#                   left unset → bash-builtin / whoami fallback.
-#   - GHA env:      deploy-docs.yaml step wraps the nix run with the same
-#                   caller-side sops decrypt inside a nix-develop wrapper;
-#                   the age key is provided via the step `env:` block from
-#                   the repo secrets (see deploy-docs.yaml). GIT_* / DEPLOY_*
-#                   left unset → git/bash-builtin/GITHUB_ACTOR fallback.
-#   - M4 effect:    the deploy-docs dispatcher effect preamble extracts
-#                   CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID from
-#                   $HERCULES_CI_SECRETS_JSON, exports the six GIT_*
-#                   variables interpolated from herculesCI.config.repo.*
-#                   (via lib.escapeShellArg + builtins.substring at eval
-#                   time), AND exports DEPLOY_DEPLOYER=hercules-ci-effects
-#                   and DEPLOY_HOST=magnetite before invoking the embedded
-#                   store path ${config.apps.deploy-docs.program}. The
-#                   bwrap sandbox does not bind-mount the working tree
-#                   and provides no host-PATH binaries beyond /nix/store
-#                   ro-bind + runtimeInputs PATH, so every git/hostname/
-#                   whoami consumer in this script is env-first with
-#                   bash-builtin or error-tolerant shelled fallback.
-#
-# Secret passing rule (per ADR-002): wrangler authentication flows ONLY
-# through inherited env vars; no authentication CLI flags are used.
-# No caller-side sops wrappers inside this script (the caller wraps if
-# their mechanism is sops-based).
-#
-# Usage:
-#   deploy-docs preview <branch>
-#   deploy-docs production
-#   deploy-docs --help
+# Required (secret, caller-provided from the closed 4-key effects bundle —
+# modules/effects/vanixiets/secrets.nix):
+#   CLOUDFLARE_API_TOKEN     wrangler auth token (CONSUMED).
+#   CLOUDFLARE_ACCOUNT_ID    Cloudflare account id (CONSUMED;
+#                            account-scoped ops require this).
+#   GITHUB_TOKEN             not consumed here; bundle homogeneity
+#                            (consumed by release.sh).
+#   SOPS_AGE_KEY             not consumed here; bundle homogeneity
+#                            (consumed by k3d-bootstrap-secrets.sh).
+# Required (config, injected by deploy.nix):
+#   DOCS_PAYLOAD             vanixiets-docs derivation outPath
+#                            ($out/{dist/, .wrangler/, wrangler.jsonc}).
+#   DOCS_NODE_MODULES        vanixiets-docs-deps node_modules tree.
+# Optional (env-first with git-fallback): every GIT_* consumer is
+# `${GIT_X:-$(git … 2>/dev/null || true)}` so the script runs both
+# inside the buildbot-effects bwrap sandbox (no .git bind-mounted; env
+# pre-populated by the effect preamble) and from a live worktree (env
+# unset; git fallback resolves locally):
+#   GIT_REV, GIT_REV_SHORT, GIT_REV_SHORT12, GIT_BRANCH,
+#   GIT_COMMIT_MSG, GIT_WORKTREE_STATUS.
+# Optional (env-first with bash-builtin / shelled-fallback): the bwrap
+# sandbox lacks `hostname`/`whoami` on PATH, so DEPLOY_HOST falls back to
+# `${HOSTNAME%%.*}` (bash builtin populated from gethostname(2)) and
+# DEPLOY_DEPLOYER falls back to GITHUB_ACTOR → `whoami 2>/dev/null`
+# → "unknown".
+# Optional (caller debugging / overrides):
+#   WRANGLER, DEPLOY_DOCS_DEBUG, GITHUB_ACTIONS / GITHUB_ACTOR /
+#   GITHUB_WORKFLOW (when GITHUB_ACTIONS is set, the production deploy
+#   message uses GITHUB_WORKFLOW (default "CI") as deploy context
+#   instead of DEPLOY_HOST).
+
 set -euo pipefail
 
 usage() {
@@ -184,8 +105,7 @@ if [[ -z "$mode" ]]; then
 fi
 shift
 
-# Env-var contract guards (per ADR-002 / env-var-contract-design.md §2.1.2).
-# Fail fast before any wrangler / filesystem work if the contract is unmet.
+# Env-var contract guards: fail fast before any wrangler / filesystem work.
 : "${DOCS_PAYLOAD:?DOCS_PAYLOAD not set; deploy.nix must pass the nix-built payload}"
 [[ -d "$DOCS_PAYLOAD" ]] || { echo "error: DOCS_PAYLOAD=$DOCS_PAYLOAD is not a directory" >&2; exit 1; }
 : "${DOCS_NODE_MODULES:?DOCS_NODE_MODULES not set; deploy.nix must expose vanixiets-docs-deps via runtimeEnv}"
@@ -194,8 +114,8 @@ shift
 
 # Hermetic wrangler via bun-managed node_modules (vanixiets-docs-deps derivation).
 # The `${WRANGLER:-...}` fallback allows test harnesses (e.g. the no-op wrangler stub
-# used to exercise the post-condition error paths for VAL-WRITESHELL-DOCS-010) to
-# override the hermetic binary without rewriting this script.
+# used to exercise the post-condition error paths) to override the hermetic
+# binary without rewriting this script.
 export WRANGLER="${WRANGLER:-$DOCS_NODE_MODULES/.bin/wrangler}"
 
 # Invoke wrangler via real node, not the .bin/wrangler shebang:
@@ -209,16 +129,13 @@ export WRANGLER="${WRANGLER:-$DOCS_NODE_MODULES/.bin/wrangler}"
 # Empirical: diagnosed 2026-04-22 via magnetite linux-x64 reproducer;
 # same machine + wrangler runs fine under real node, hangs under bun.
 
-# Git metadata is resolved below via env-first / git-fallback (see top-of-
-# file env-var contract for GIT_*). Wrangler is invoked with absolute
-# `--config "$WRANGLER_CONFIG"`, so CWD is immaterial — no `cd` into the
-# worktree is required (and would fail inside the buildbot-effects bwrap
+# Wrangler is invoked with absolute `--config "$WRANGLER_CONFIG"`, so no
+# `cd` into the worktree is required (and would fail inside the bwrap
 # sandbox, which does not bind-mount the working tree).
 
-# Materialise a writable copy of the nix payload. wrangler reads
-# .wrangler/deploy/config.json whose configPath ("../../dist/server/wrangler.json")
-# resolves against the config file's location, and wrangler may write state to
-# .wrangler/ during deploy — both require a writable tree outside /nix/store.
+# Materialise a writable copy of the nix payload: wrangler reads
+# .wrangler/deploy/config.json (configPath resolves against the config
+# file's location) and may write state to .wrangler/ during deploy.
 tmpdir=$(mktemp -d -t deploy-docs.XXXXXX)
 if [[ -n "${DEPLOY_DOCS_DEBUG:-}" ]]; then
   echo "[deploy-docs] DEBUG: preserving tmpdir at $tmpdir" >&2
@@ -237,32 +154,22 @@ chmod -R u+w "$tmpdir"
 # present in the source wrangler.jsonc.
 wrangler_config="$tmpdir/dist/server/wrangler.json"
 
-# Commit metadata shared by preview and production subcommands. Env-first /
-# git-fallback per the GIT_* env-var contract (see top-of-file header).
-# All `git` invocations are guarded by `2>/dev/null || true` so that a
-# missing .git (e.g. buildbot-effects bwrap sandbox, no bind-mounted worktree)
-# surfaces as empty strings rather than a non-zero exit; the env-first path
-# supplies the authoritative values in that context.
+# Commit metadata: env-first with errexit-tolerant git fallback so a
+# missing .git (bwrap sandbox) surfaces as empty strings rather than
+# aborting; the env-first path supplies authoritative values in that case.
 commit_sha="${GIT_REV:-$(git rev-parse HEAD 2>/dev/null || true)}"
 commit_tag="${GIT_REV_SHORT12:-$(git rev-parse --short=12 HEAD 2>/dev/null || true)}"
 commit_short="${GIT_REV_SHORT:-$(git rev-parse --short HEAD 2>/dev/null || true)}"
 current_branch="${GIT_BRANCH:-$(git branch --show-current 2>/dev/null || true)}"
 
-# Resolve deployer / deploy_host with env-first / bash-builtin / shelled-fallback
-# per the DEPLOY_* env-var contract (see top-of-file header). The bwrap
-# sandbox provides no host-PATH binaries beyond /nix/store ro-bind +
-# runtimeInputs PATH, so unconditional `hostname -s` / `whoami` would fail
-# with `command not found` (exit 127). Bash builtin `$HOSTNAME` is populated
-# from gethostname(2) at shell startup and requires no external binary in
-# any context; `${HOSTNAME%%.*}` mimics `hostname -s` via parameter
-# expansion. `whoami` is retained as a final fallback for local shells where
-# DEPLOY_DEPLOYER and GITHUB_ACTOR are both unset; it is error-tolerant
-# (`2>/dev/null || echo unknown`) so a missing /etc/passwd entry surfaces
-# as "unknown" rather than a non-zero exit.
+# Resolve deployer / deploy_host with env-first / bash-builtin /
+# shelled-fallback. Bash builtin `$HOSTNAME` is populated from
+# gethostname(2) at shell startup, so `${HOSTNAME%%.*}` mimics
+# `hostname -s` without shelling out — required because the bwrap
+# sandbox lacks `hostname` on PATH.
 deploy_host="${DEPLOY_HOST:-${HOSTNAME%%.*}}"
 deployer="${DEPLOY_DEPLOYER:-${GITHUB_ACTOR:-$(whoami 2>/dev/null || echo unknown)}}"
 
-# Compose deploy message (prefer GitHub Actions context, fall back to local).
 if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
   deploy_context="${GITHUB_WORKFLOW:-CI}"
   deploy_msg="Deployed by ${deployer} from ${current_branch} via ${deploy_context}"
@@ -279,18 +186,14 @@ case "$mode" in
       exit 2
     fi
 
-    # Sanitize branch name for Cloudflare alias (valid subdomain component):
-    #   replace / with -, collapse runs, strip leading/trailing -, cap at 40 chars.
     safe_branch=$(echo "$branch" \
       | tr '/' '-' \
       | tr -c 'a-zA-Z0-9-' '-' \
       | sed 's/--*/-/g; s/^-//; s/-$//' \
       | cut -c1-40)
 
-    # Env-first / git-fallback — see top-of-file GIT_* env-var contract.
-    # `git log` / `git diff-index` are error-tolerant so a missing .git
-    # (buildbot-effects bwrap) leaves commit_msg empty; the effect preamble
-    # supplies GIT_COMMIT_MSG and GIT_WORKTREE_STATUS=clean in that case.
+    # Env-first / errexit-tolerant git fallback so a missing .git leaves
+    # commit_msg empty; the effect preamble supplies authoritative values.
     commit_msg="${GIT_COMMIT_MSG:-$(git log -1 --pretty=format:'%s' 2>/dev/null || true)}"
     if [[ -n "${GIT_WORKTREE_STATUS:-}" ]]; then
       git_status="$GIT_WORKTREE_STATUS"
@@ -331,8 +234,7 @@ case "$mode" in
     # `version-upload` event, which carries `version_id`, `worker_tag`,
     # `preview_url`, and `preview_alias_url`.
     #
-    # Three post-conditions enforce the no-silent-success invariant
-    # (VAL-WRITESHELL-DOCS-010):
+    # Three post-conditions enforce the no-silent-success invariant:
     #   (a) the NDJSON event log contains a `type == "version-upload"` entry
     #       with a non-empty `version_id` (primary authoritative source)
     #   (b) `wrangler versions list --json` contains an entry whose
@@ -359,13 +261,7 @@ case "$mode" in
     # fallback version_id source when the NDJSON event stream from
     # WRANGLER_OUTPUT_FILE_PATH doesn't produce the expected
     # `type:"version-upload"` event. Retained as defense-in-depth against
-    # future wrangler silent-success regressions. See top-of-file rationale
-    # (lines ~101-110) for the diagnostic history.
-    #
-    # Diagnostic: echo the exact upload command line to stderr so the GHA log
-    # shows what the shell is about to invoke (CLOUDFLARE_API_TOKEN and
-    # CLOUDFLARE_ACCOUNT_ID are expected in the inherited env per the
-    # env-var contract; never printed on argv).
+    # future wrangler silent-success regressions.
     printf '>> wrangler upload command: node %s --config %s versions upload --preview-alias %s --tag %s --message %q\n' \
       "$WRANGLER" "$WRANGLER_CONFIG" "b-${SAFE_BRANCH}" "$VERSION_TAG" "$VERSION_MESSAGE" >&2
 
@@ -382,10 +278,8 @@ case "$mode" in
     unset WRANGLER_OUTPUT_FILE_PATH
 
     # Post-condition (a): extract a non-empty Worker Version ID.
-    #   Primary source:   NDJSON `version-upload` event (Option A)
-    #   Fallback source:  stdout line `Worker Version ID: <uuid>` (Option B)
-    # The cross-check in post-condition (b) below guarantees the version
-    # actually persisted server-side regardless of which source produced it.
+    # Primary: NDJSON `version-upload` event. Fallback: stdout line
+    # `Worker Version ID: <uuid>`. (b) cross-checks server-side persistence.
     version_id=""
     if [[ -s "$wrangler_upload_ndjson" ]]; then
       version_id=$(
@@ -422,23 +316,18 @@ case "$mode" in
       echo "    - confirm CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported by" >&2
       echo "      the caller (see deploy.sh env-var contract header for caller mechanisms)" >&2
       echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
-      echo "      not bun-fake-node (see top-of-file rationale at lines ~101-110)" >&2
+      echo "      not bun-fake-node (see deploy.sh node invocation rationale)" >&2
       echo "    - inspect the wrangler internal log dumped below / raw NDJSON and stdout paths above for any output" >&2
       echo "" >&2
       # Locate wrangler's internal log file by glob + newest mtime across
-      # platform-specific candidate locations. Avoids depending on wrangler's
-      # stdout `Writing logs to "..."` announcement (only printed under
-      # WRANGLER_LOG=debug, which we no longer set). The log file contains
-      # full HTTP request/response bodies and any internal stack traces that
-      # are otherwise destroyed with the GHA runner — dump it first as the
-      # most informative diagnostic source when NDJSON/stdout/stderr are
-      # empty or truncated.
+      # platform-specific candidate locations. The log file contains full
+      # HTTP request/response bodies and any internal stack traces — most
+      # informative diagnostic source when NDJSON/stdout/stderr are empty.
       wrangler_log_path=""
       for candidate_dir in "$HOME/.wrangler/logs" "$HOME/.config/.wrangler/logs"; do
         if [[ -d "$candidate_dir" ]]; then
-          # Filename format is `wrangler-YYYY-MM-DD_HH-MM-SS_mmm.log` — the
-          # embedded timestamp is zero-padded and lexicographically sortable,
-          # so `sort | tail -1` selects the newest without needing ls -t.
+          # Filename `wrangler-YYYY-MM-DD_HH-MM-SS_mmm.log` is
+          # zero-padded and lex-sortable, so `sort | tail -1` picks newest.
           newest=$(find "$candidate_dir" -maxdepth 1 -type f -name 'wrangler-*.log' 2>/dev/null | sort | tail -1 || true)
           if [[ -n "$newest" ]]; then
             wrangler_log_path="$newest"
@@ -493,7 +382,6 @@ case "$mode" in
       exit 1
     fi
 
-    # Post-condition (c): authoritative success echo with parsed Worker Version ID.
     echo ""
     echo "Version uploaded successfully"
     echo "  Worker Version ID: ${version_id}"
@@ -514,12 +402,9 @@ case "$mode" in
     export WRANGLER_CONFIG="$wrangler_config"
 
     # Query for an existing version uploaded from this commit (via preview).
-    # Capture versions list to a tempfile so post-condition verification below
-    # can reuse it (avoids a second API call purely for the existing-version
-    # lookup) and any diagnostic error messages can reference the raw JSON.
-    # `| cat >` is used instead of `>` to route wrangler's stdout through a
-    # pipe-shaped fd; see the preview subcommand's equivalent comment for the
-    # empirical rationale.
+    # Capture versions list to a tempfile so post-condition verification can
+    # reuse it. `| cat >` routes through a pipe-shaped fd — see the preview
+    # subcommand's equivalent comment for the empirical rationale.
     wrangler_list_json="$tmpdir/wrangler-versions-list.json"
 
     node "$WRANGLER" --config "$WRANGLER_CONFIG" versions list --json \
@@ -544,9 +429,8 @@ case "$mode" in
       # via `wrangler deployments list --json` before declaring success. Like
       # `versions upload`, `versions deploy` does NOT accept `--json` on
       # wrangler 4.84.x — the event log is the authoritative machine-readable
-      # output channel. Detects wrangler's silent-exit failure mode
-      # (VAL-WRITESHELL-DOCS-010 + diagnostic session 45961bc9) when the
-      # CI-detection branch exits 0 without actually performing the promotion.
+      # output channel. Detects wrangler's silent-exit failure mode when the
+      # CI-detection branch exits 0 without performing the promotion.
       deploy_ndjson="$tmpdir/wrangler-versions-deploy.ndjson"
       deploy_stdout="$tmpdir/wrangler-versions-deploy.stdout"
       : > "$deploy_ndjson"
@@ -561,9 +445,6 @@ case "$mode" in
 
       unset WRANGLER_OUTPUT_FILE_PATH
 
-      # Post-condition (a): extract a non-empty Deployment ID. Primary source
-      # is the NDJSON `version-deploy` event (Option A); fallback is stdout
-      # parsing for a recognizable deployment identifier (Option B).
       deployment_id=""
       if [[ -s "$deploy_ndjson" ]]; then
         deployment_id=$(
@@ -574,8 +455,7 @@ case "$mode" in
         )
       fi
       if [[ -z "$deployment_id" ]]; then
-        # stdout fallback: match patterns like "Deployment ID: <uuid>" or
-        # "deployment_id: <uuid>" that wrangler prints on the console.
+        # stdout fallback: match `Deployment ID: <uuid>` / `deployment_id: <uuid>`.
         deployment_id=$(
           grep -oiE '(Deployment ID|deployment_id)[[:space:]]*:[[:space:]]*[a-f0-9-]+' \
             "$deploy_stdout" 2>/dev/null \
@@ -595,14 +475,11 @@ case "$mode" in
         echo "    - confirm CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported by" >&2
         echo "      the caller (see deploy.sh env-var contract header for caller mechanisms)" >&2
         echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
-        echo "      not bun-fake-node (see top-of-file rationale at lines ~101-110)" >&2
+        echo "      not bun-fake-node (see deploy.sh node invocation rationale)" >&2
         echo "    - inspect the wrangler internal log dumped below / raw capture paths above for any output" >&2
         exit 1
       fi
 
-      # Post-condition (b): cross-check via deployments list that the deploy
-      # landed server-side. `| cat >` empirically required — see preview path
-      # comment for the rationale.
       deployments_list_json="$tmpdir/wrangler-deployments-list.json"
 
       node "$WRANGLER" --config "$WRANGLER_CONFIG" deployments list --json \
@@ -626,7 +503,6 @@ case "$mode" in
         exit 1
       fi
 
-      # Post-condition (c): authoritative success echo with parsed Deployment ID.
       echo ""
       echo "successfully promoted version ${existing_version} to production"
       echo "  Deployment ID: ${deployment_id}"
@@ -646,12 +522,11 @@ case "$mode" in
 
       export DEPLOYMENT_MESSAGE="$deploy_msg"
 
-      # Fallback direct-deploy: same post-condition pattern, but the relevant
-      # NDJSON event is `type == "deploy"` which carries `version_id` (no
-      # deployment_id field on this event type — see wrangler cli.js
-      # writeOutput block for `deploy`). `wrangler deploy` does NOT accept
-      # `--json` on wrangler 4.84.x; WRANGLER_OUTPUT_FILE_PATH is the
-      # authoritative machine-readable channel.
+      # Fallback direct-deploy: same post-condition pattern, but the
+      # NDJSON event is `type == "deploy"` carrying `version_id` (no
+      # deployment_id field on this event type). `wrangler deploy` does
+      # NOT accept `--json` on wrangler 4.84.x; WRANGLER_OUTPUT_FILE_PATH
+      # is the authoritative machine-readable channel.
       deploy_ndjson="$tmpdir/wrangler-deploy.ndjson"
       deploy_stdout="$tmpdir/wrangler-deploy.stdout"
       : > "$deploy_ndjson"
@@ -664,10 +539,6 @@ case "$mode" in
 
       unset WRANGLER_OUTPUT_FILE_PATH
 
-      # Post-condition (a): extract the just-deployed version_id. Primary
-      # source: NDJSON `deploy` event (Option A). Fallback: stdout grep
-      # (Option B) for the "Current Version ID: <uuid>" or similar line
-      # wrangler prints on direct deploy.
       deploy_version_id=""
       if [[ -s "$deploy_ndjson" ]]; then
         deploy_version_id=$(
@@ -697,7 +568,7 @@ case "$mode" in
         echo "    - confirm CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported by" >&2
         echo "      the caller (see deploy.sh env-var contract header for caller mechanisms)" >&2
         echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
-        echo "      not bun-fake-node (see top-of-file rationale at lines ~101-110)" >&2
+        echo "      not bun-fake-node (see deploy.sh node invocation rationale)" >&2
         echo "    - inspect the wrangler internal log dumped below / raw capture paths above for any output" >&2
         exit 1
       fi

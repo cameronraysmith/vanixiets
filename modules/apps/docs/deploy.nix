@@ -3,12 +3,8 @@
 #   nix run .#deploy-docs -- preview <branch>
 #   nix run .#deploy-docs -- production
 #
-# Consumes the nix-built CF Worker payload from config.packages.vanixiets-docs
-# ($out/{dist/,.wrangler/,wrangler.jsonc}) and dispatches to wrangler against
-# the inherited environment per the ADR-002 env-var contract; the caller
-# supplies CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID via one of
-# {sops exec-env, direnv dotenv, GHA step env, M4 effect preamble reading
-# HERCULES_CI_SECRETS_JSON}. See deploy.sh header for the full contract.
+# Why: consumes the nix-built CF Worker payload from
+# config.packages.vanixiets-docs (DOCS_PAYLOAD).
 #
 # Template bifurcation (writeShellApplication): INTERPOLATION FORM.
 # `text` is a nix string that injects one eval-time-computed path
@@ -32,17 +28,14 @@
         program = lib.getExe (
           pkgs.writeShellApplication {
             name = "deploy-docs";
-            # Per ADR-002 env-var contract: secrets flow via inherited env
-            # (never via `sops exec-env` inside the script), so pkgs.sops /
-            # pkgs.age are no longer required runtime inputs.
+            # Secrets flow via inherited env (never via `sops exec-env`
+            # inside the script), so pkgs.sops / pkgs.age are not required
+            # runtime inputs.
             #
-            # Hermeticity (m4-deploy-docs-git-env-contract): sed/awk/grep/find
-            # are explicitly declared even though hercules-ci-effects' default
-            # sandbox PATH supplies them implicitly. Closing this latent
-            # coupling makes the writeShellApplication self-sufficient under
-            # ANY caller context (not just the bwrap sandbox), satisfying the
-            # writeShellApplication invariant that PATH is exactly equal to
-            # runtimeInputs at runtime.
+            # sed/awk/grep/find are explicitly declared because the
+            # hercules-ci-effects bwrap sandbox PATH does not include them
+            # by default. Required for the writeShellApplication invariant
+            # that PATH equals runtimeInputs at runtime.
             runtimeInputs = [
               pkgs.nodejs_24
               pkgs.jq

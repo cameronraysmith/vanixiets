@@ -1,38 +1,18 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# preview-version.sh - Preview semantic-release version after merging to target branch
+# preview-version.sh - Preview semantic-release version after merging to
+# target branch. See `usage()` for caller-facing usage.
 #
-# Usage:
-#   nix run .#preview-version -- [target-branch] [package-path]
-#
-# Examples:
-#   nix run .#preview-version                         # Preview root version on main
-#   nix run .#preview-version -- main packages/docs   # Preview docs package version on main
-#   nix run .#preview-version -- beta packages/docs   # Preview docs version on beta
-#
-# This script simulates merging the current branch into the target branch and
-# runs semantic-release in dry-run mode to preview what version would be released.
-#
-# Hermetic: DOCS_NODE_MODULES (set by preview-version.nix) points to a read-only
-# node_modules tree produced by the vanixiets-docs-deps derivation. This script
-# links it into the worktree's package directory and invokes semantic-release
-# directly via node_modules/.bin, bypassing any need for bun or a prior
-# `bun install`.
-#
-# Env-var contract (per ADR-002 / env-var-contract-design.md §2.2):
+# Env-var contract:
 #   Required (config, injected by preview-version.nix runtimeEnv):
-#     DOCS_NODE_MODULES   store path of the vanixiets-docs-deps node_modules
-#                         tree (hosts node_modules/.bin/semantic-release).
+#     DOCS_NODE_MODULES   vanixiets-docs-deps node_modules tree (hosts
+#                         node_modules/.bin/semantic-release).
 #   Optional (caller-provided):
-#     CURRENT_BRANCH      bookmark/branch name to attach HEAD to when invoked
-#                         from a jj-colocated detached-HEAD setup.
+#     CURRENT_BRANCH      bookmark/branch name to attach HEAD to when
+#                         invoked from jj-colocated detached HEAD.
 #
-# This script does NOT require secret env vars (CLOUDFLARE_API_TOKEN,
-# CLOUDFLARE_ACCOUNT_ID, GITHUB_TOKEN, SOPS_AGE_KEY). semantic-release is
-# invoked in --dry-run with @semantic-release/github filtered out of the
-# plugin list, so no secret env required for any caller (direnv dotenv,
-# `sops exec-env` wrapper, GHA `env:` block, or M4 effect preamble
-# reading HERCULES_CI_SECRETS_JSON).
+# No secret env vars required: semantic-release runs --dry-run with
+# @semantic-release/github filtered out of the plugin list.
 
 set -euo pipefail
 
@@ -87,25 +67,23 @@ PACKAGE_PATH="${2:-}"
 REPO_ROOT=$(git rev-parse --show-toplevel)
 WORKTREE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/semantic-release-preview.XXXXXX")
 
-# Save original target branch HEAD for restoration
 ORIGINAL_TARGET_HEAD=""
 ORIGINAL_REMOTE_HEAD=""
 
-# Track which node_modules symlink(s) we created so cleanup can remove them.
+# Track node_modules symlink(s) we created for cleanup.
 WORKTREE_NODE_MODULES_LINK=""
 LOCAL_NODE_MODULES_LINK=""
 
 # Local bare clone used to redirect semantic-release verifyAuth's
 # `git push --dry-run HEAD:<target-branch>` away from the GitHub remote
 # (which can short-circuit semantic-release on branch-protection rejection
-# or token-permission mismatch — see m5-01i mission notes).
-# Populated AFTER `git update-ref` so the bare's refs/heads/<target-branch>
-# captures TEMP_COMMIT, allowing the dry-run push to be a no-op fast-forward
-# against a quiescent file:// remote with no auth and no protection.
+# or token-permission mismatch). Populated AFTER `git update-ref` so the
+# bare's refs/heads/<target-branch> captures TEMP_COMMIT, allowing the
+# dry-run push to be a no-op fast-forward against a quiescent file://
+# remote with no auth and no protection.
 PREVIEW_BARE_DIR=""
 PREVIEW_BARE=""
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -125,11 +103,10 @@ NC='\033[0m' # No Color
 ORIGINAL_HEAD_SHA=""
 WE_ATTACHED_HEAD=0
 if [ -n "${CURRENT_BRANCH:-}" ]; then
-  # Env-var override path.
   DETECTED_BRANCH=$(git branch --show-current)
   if [ -z "$DETECTED_BRANCH" ]; then
-    # HEAD is detached; attach to the provided branch so git operations that
-    # rely on an attached HEAD work, and remember how to restore detached state.
+    # HEAD detached: attach to the provided branch and remember how to
+    # restore detached state on cleanup.
     ORIGINAL_HEAD_SHA=$(git rev-parse --verify HEAD)
     echo -e "${BLUE}CURRENT_BRANCH=${CURRENT_BRANCH} override; attaching HEAD for duration of preview${NC}" >&2
     if ! git checkout --quiet "$CURRENT_BRANCH"; then
@@ -138,8 +115,7 @@ if [ -n "${CURRENT_BRANCH:-}" ]; then
     fi
     WE_ATTACHED_HEAD=1
   fi
-  # If HEAD was already attached, we honor CURRENT_BRANCH as-is without
-  # performing any checkout dance (per task spec).
+  # HEAD already attached: honour CURRENT_BRANCH as-is, no checkout.
 else
   CURRENT_BRANCH=$(git branch --show-current)
   if [ -z "$CURRENT_BRANCH" ]; then
@@ -152,13 +128,11 @@ else
   fi
 fi
 
-# Cleanup function (invoked via `trap cleanup EXIT INT TERM` below)
 # shellcheck disable=SC2329
 cleanup() {
   local exit_code=$?
 
-  # Remove any node_modules symlinks we created. Only unlink if still a symlink
-  # (guards against manual replacement mid-run).
+  # Only unlink if still a symlink (guards against manual replacement).
   if [ -n "$WORKTREE_NODE_MODULES_LINK" ] && [ -L "$WORKTREE_NODE_MODULES_LINK" ]; then
     rm -f "$WORKTREE_NODE_MODULES_LINK"
   fi
@@ -166,27 +140,22 @@ cleanup() {
     rm -f "$LOCAL_NODE_MODULES_LINK"
   fi
 
-  # Always restore target branch to original state if we modified it
   if [ -n "$ORIGINAL_TARGET_HEAD" ]; then
     echo -e "\n${BLUE}restoring ${TARGET_BRANCH} to original state...${NC}"
     git update-ref "refs/heads/$TARGET_BRANCH" "$ORIGINAL_TARGET_HEAD" 2>/dev/null || true
   fi
 
-  # Always restore remote-tracking branch to original state if we modified it
   if [ -n "$ORIGINAL_REMOTE_HEAD" ]; then
     git update-ref "refs/remotes/origin/$TARGET_BRANCH" "$ORIGINAL_REMOTE_HEAD" 2>/dev/null || true
   fi
 
-  # Clean up worktree
   if [ -d "$WORKTREE_DIR" ]; then
     echo -e "${BLUE}cleaning up worktree...${NC}"
     git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
-    # Prune any stale worktree references
     git worktree prune 2>/dev/null || true
   fi
 
-  # Clean up local bare clone created for semantic-release verifyAuth
-  # redirection (see m5-01i fix).
+  # Clean up the local bare clone used for verifyAuth redirection.
   if [ -n "$PREVIEW_BARE_DIR" ] && [ -d "$PREVIEW_BARE_DIR" ]; then
     rm -rf "$PREVIEW_BARE_DIR"
   fi
@@ -205,9 +174,9 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-# link_docs_node_modules <target-dir>: symlink DOCS_NODE_MODULES into the given
-# directory's node_modules slot, guarding against clobbering a real install.
-# Echoes the resulting symlink path so callers can record it for cleanup.
+# link_docs_node_modules <target-dir>: symlink DOCS_NODE_MODULES into the
+# directory's node_modules slot, refusing to overwrite a real install.
+# Echoes the symlink path for cleanup tracking.
 link_docs_node_modules() {
   local target_dir="$1"
   local slot="$target_dir/node_modules"
@@ -219,7 +188,6 @@ link_docs_node_modules() {
   echo "$slot"
 }
 
-# Validation
 if [ "$CURRENT_BRANCH" == "$TARGET_BRANCH" ]; then
   echo -e "${YELLOW}already on target branch ${TARGET_BRANCH}${NC}"
   echo -e "${YELLOW}running test-release instead of preview${NC}\n"
@@ -232,7 +200,6 @@ if [ "$CURRENT_BRANCH" == "$TARGET_BRANCH" ]; then
   exec node ./node_modules/.bin/semantic-release --dry-run --no-ci
 fi
 
-# Display what we're doing
 echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${BLUE}semantic-release version preview${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
@@ -245,19 +212,14 @@ else
 fi
 echo -e "${BLUE}───────────────────────────────────────────────────────────────${NC}\n"
 
-# Verify target branch exists
 if ! git show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
   echo -e "${RED}error: target branch '${TARGET_BRANCH}' does not exist${NC}" >&2
   exit 1
 fi
 
-# Save original target branch HEAD before any modifications
 ORIGINAL_TARGET_HEAD=$(git rev-parse "$TARGET_BRANCH")
-
-# Save original remote-tracking branch HEAD before any modifications
 ORIGINAL_REMOTE_HEAD=$(git rev-parse "origin/$TARGET_BRANCH" 2>/dev/null || echo "")
 
-# Create merge tree to test if merge is possible
 echo -e "${BLUE}simulating merge of ${CURRENT_BRANCH} → ${TARGET_BRANCH}...${NC}"
 
 # Perform merge-tree operation to test if merge is possible.
@@ -277,7 +239,6 @@ if ! MERGE_OUTPUT=$(git merge-tree --write-tree "$TARGET_BRANCH" "$CURRENT_BRANC
   exit 1
 fi
 
-# Extract tree hash from merge-tree output (first line)
 MERGE_TREE=$(echo "$MERGE_OUTPUT" | head -1)
 
 if [ -z "$MERGE_TREE" ]; then
@@ -285,7 +246,6 @@ if [ -z "$MERGE_TREE" ]; then
   exit 1
 fi
 
-# Create temporary merge commit
 echo -e "${BLUE}creating temporary merge commit...${NC}"
 TEMP_COMMIT=$(git commit-tree -p "$TARGET_BRANCH" -p "$CURRENT_BRANCH" \
   -m "Temporary merge for semantic-release preview" "$MERGE_TREE")
@@ -295,18 +255,18 @@ if [ -z "$TEMP_COMMIT" ]; then
   exit 1
 fi
 
-# Temporarily update target branch to point to merge commit
-# This allows semantic-release to analyze the correct commit history
-# The cleanup function will ALWAYS restore the original branch HEAD
+# Temporarily point target branch at the merge commit so semantic-release
+# analyzes the correct history; cleanup always restores the original HEAD.
 echo -e "${BLUE}temporarily updating ${TARGET_BRANCH} ref for analysis...${NC}"
 git update-ref "refs/heads/$TARGET_BRANCH" "$TEMP_COMMIT"
 
-# Also update remote-tracking branch to match (so semantic-release sees them as synchronized)
+# Mirror onto remote-tracking so semantic-release sees them synchronized.
 git update-ref "refs/remotes/origin/$TARGET_BRANCH" "$TEMP_COMMIT"
 
-# Capture the post-update-ref state into a local bare clone so semantic-release's
-# `verifyAuth` can run `git push --dry-run HEAD:<target-branch>` against a
-# quiescent file:// remote instead of the GitHub origin (m5-01i fix).
+# Capture the post-update-ref state into a local bare clone so
+# semantic-release's `verifyAuth` runs `git push --dry-run
+# HEAD:<target-branch>` against a quiescent file:// remote instead of the
+# GitHub origin.
 #
 # The bare must be cloned from $REPO_ROOT (cwd's local refs at clone time
 # include the just-updated refs/heads/<target-branch> = TEMP_COMMIT). Cloning
@@ -324,15 +284,12 @@ PREVIEW_BARE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/preview-bare.XXXXXX")
 PREVIEW_BARE="$PREVIEW_BARE_DIR/preview.git"
 git clone --quiet --bare "$REPO_ROOT" "$PREVIEW_BARE"
 
-# Create worktree at target branch (now pointing to merge commit)
 echo -e "${BLUE}creating temporary worktree at ${TARGET_BRANCH}...${NC}"
 git worktree add --quiet "$WORKTREE_DIR" "$TARGET_BRANCH"
 
-# Navigate to worktree
 cd "$WORKTREE_DIR"
 
-# Link the hermetic vanixiets-docs-deps tree into the worktree's package dir.
-# (bun install is no longer required here.)
+# Link hermetic vanixiets-docs-deps into the worktree's package dir.
 if [ -n "$PACKAGE_PATH" ]; then
   if [ ! -d "$PACKAGE_PATH" ]; then
     echo -e "${RED}error: package path '${PACKAGE_PATH}' does not exist${NC}" >&2
@@ -344,28 +301,23 @@ else
   WORKTREE_NODE_MODULES_LINK=$(link_docs_node_modules "$WORKTREE_DIR")
 fi
 
-# Run semantic-release in dry-run mode
 echo -e "\n${BLUE}running semantic-release analysis...${NC}\n"
 
-# Capture output and parse version
-# Exclude @semantic-release/github to avoid GitHub token requirement for preview
-# This is safe because dry-run skips publish/success/fail steps anyway
+# Exclude @semantic-release/github to avoid GitHub token requirement for
+# preview; safe because dry-run skips publish/success/fail steps anyway.
 PLUGINS="@semantic-release/commit-analyzer,@semantic-release/release-notes-generator"
 
-# Forensic banner (m5-01i): confirms the verifyAuth-redirect bare clone is
-# engaged in production logs. Stable banner namespace; kept structurally
-# similar to RELEASE-CLONE-PR-HEAD / RELEASE-CLONE-PR-DISPATCH.
+# Forensic banner: confirms the verifyAuth-redirect bare clone is engaged
+# in production logs (parallels RELEASE-CLONE-PR-HEAD / -DISPATCH).
 echo "RELEASE-PREVIEW-BARE: $PREVIEW_BARE"
 
 OUTPUT=$(GITHUB_REF="refs/heads/$TARGET_BRANCH" node ./node_modules/.bin/semantic-release --dry-run --no-ci --repository-url "file://$PREVIEW_BARE" --branches "$TARGET_BRANCH" --plugins "$PLUGINS" 2>&1 || true)
 
-# Display semantic-release summary (filter out verbose plugin repetition)
 echo "$OUTPUT" | grep -v "^$" | grep -vE "(No more plugins|does not provide step)" | \
   grep -E "(semantic-release|Running|analyzing|Found.*commits|release version|Release note|Features|Bug Fixes|Breaking Changes|Published|\*\s)" || true
 
 echo -e "\n${BLUE}═══════════════════════════════════════════════════════════════${NC}"
 
-# Extract and display the next version
 if echo "$OUTPUT" | grep -q "There are no relevant changes"; then
   echo -e "${YELLOW}no version bump required${NC}"
   echo -e "no semantic commits found since last release"
@@ -386,6 +338,5 @@ fi
 
 echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}\n"
 
-# Preview completed successfully - exit 0 regardless of whether a version bump is pending.
-# "No version bump required" is a valid outcome, not an error.
+# "No version bump required" is a valid outcome, not an error: exit 0.
 exit 0

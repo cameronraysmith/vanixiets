@@ -1,14 +1,12 @@
-# Flake app: preview the semantic-release version that would be published after
-# merging the current branch into a target branch.
+# Flake app: preview the semantic-release version that would be published
+# after merging the current branch into a target branch.
 #
-# Usage:
 #   nix run .#preview-version                         # root package on main
 #   nix run .#preview-version -- main packages/docs   # monorepo package preview
 #
 # Hermetic: semantic-release and its plugins are provided by the
-# vanixiets-docs-deps derivation (linked into the worktree at runtime); the app
-# is self-contained and does not depend on a prior `bun install` or on
-# pkgs.semantic-release.
+# vanixiets-docs-deps derivation linked into the worktree at runtime; no
+# prior `bun install` or pkgs.semantic-release dependency.
 #
 # Template bifurcation (writeShellApplication): PURE READFILE FORM.
 # `text = builtins.readFile ./preview-version.sh` — the sidecar is consumed
