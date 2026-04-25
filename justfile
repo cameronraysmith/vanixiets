@@ -1,18 +1,8 @@
-# This is a jusfile for the vanixiets repository.
-# Sections are separated by ## and recipes are documented with a single #
-# on lines preceding the recipe.
-
-## nix
-## clan
-## k3d
-## secrets
-## sops
-## CI/CD
+# justfile for vanixiets. Sections separated by ##; recipes documented with single # on the preceding line.
 
 nix_cmd := "nix --accept-flake-config"
 
 # Default command when 'just' is run without arguments
-# Run 'just <command>' to execute a command.
 default: help
 
 # Display help
@@ -231,7 +221,6 @@ nix-flake-io:
   tests_count=$(nix eval --raw .#tests --apply 'x: toString (builtins.length (builtins.attrNames x))' 2>/dev/null || echo "0")
   echo "(${tests_count} top-level test attrs)"
 
-  # Flake inputs
   printf "\n## inputs\n"
   nix flake metadata --json 2>/dev/null | jq -r '.locks.nodes | keys[] | select(. != "root")'
 
@@ -351,7 +340,6 @@ bootstrap-verify *ARGS:
 bootstrap-setup-user *ARGS:
   {{nix_cmd}} run --no-warn-dirty .#setup-user -- {{ARGS}}
 
-# nix run home-manager -- build --flake ".#{{ profile }}"
 # Bootstrap build home-manager with flake
 [group('nix-home-manager')]
 home-manager-bootstrap-build profile="aarch64-linux":
@@ -363,7 +351,6 @@ home-manager-bootstrap-build profile="aarch64-linux":
   --show-trace \
   --print-build-logs
 
-# nix run home-manager -- switch --flake ".#{{ profile }}"
 # Bootstrap switch home-manager with flake
 [group('nix-home-manager')]
 home-manager-bootstrap-switch profile="aarch64-linux":
@@ -1009,8 +996,7 @@ k3d-deploy-infrastructure:
 
 # Full k3d workflow: create cluster, bootstrap secrets, deploy all layers
 # Body lives in modules/apps/cluster/k3d-full.{nix,sh}; delegates back to
-# the k3d-down, k3d-up, and k3d-deploy recipes above (none of which are
-# flake-app converted in M1).
+# the k3d-down, k3d-up, and k3d-deploy recipes above.
 [group('k3d')]
 k3d-full *ARGS:
   {{nix_cmd}} run --no-warn-dirty .#k3d-full -- {{ARGS}}
@@ -1212,29 +1198,22 @@ hash-encrypt source_file user="crs58":
   #!/usr/bin/env bash
   set -euo pipefail
 
-  # Generate content-based hash for filename
   HASH=$(nix hash file --type sha256 --base64 "{{source_file}}" | cut -d'-' -f2 | head -c 32)
 
-  # Extract base filename without extension
   BASE_NAME=$(basename "{{source_file}}" .yaml)
   BASE_NAME=$(basename "$BASE_NAME" .yml)
 
-  # Create target path
   TARGET_DIR="secrets/users/{{user}}"
   TARGET_FILE="${TARGET_DIR}/${HASH}-${BASE_NAME}.yaml"
 
-  # Ensure target directory exists
   mkdir -p "$TARGET_DIR"
 
-  # Copy file with hash-based name
   cp "{{source_file}}" "$TARGET_FILE"
   echo "Copied {{source_file}} → $TARGET_FILE"
 
-  # Encrypt in place with sops
   sops encrypt --in-place "$TARGET_FILE"
   echo "Encrypted $TARGET_FILE with sops"
 
-  # Display verification info
   echo "Hash: $HASH"
   echo "Final path: $TARGET_FILE"
 
@@ -1244,21 +1223,16 @@ verify-hash original_file secret_file:
   #!/usr/bin/env bash
   set -euo pipefail
 
-  # Extract hash from secret filename
   SECRET_BASENAME=$(basename "{{secret_file}}")
   EXPECTED_HASH=$(echo "$SECRET_BASENAME" | cut -d'-' -f1)
 
-  # Generate hash of original file
   ACTUAL_HASH=$(nix hash file --type sha256 --base64 "{{original_file}}" | cut -d'-' -f2 | head -c 32)
 
-  # Create temporary file for decrypted content
   TEMP_FILE=$(mktemp)
   trap "rm -f $TEMP_FILE" EXIT
 
-  # Decrypt secret file to temp location
   sops decrypt "{{secret_file}}" > "$TEMP_FILE"
 
-  # Generate hash of decrypted content
   DECRYPTED_HASH=$(nix hash file --type sha256 --base64 "$TEMP_FILE" | cut -d'-' -f2 | head -c 32)
 
   echo "Original file: {{original_file}}"
@@ -1268,7 +1242,6 @@ verify-hash original_file secret_file:
   echo "Decrypted hash: $DECRYPTED_HASH"
   echo
 
-  # Verify original matches filename hash
   if [ "$ACTUAL_HASH" = "$EXPECTED_HASH" ]; then
     echo "Original file hash matches secret filename hash"
   else
@@ -1276,7 +1249,6 @@ verify-hash original_file secret_file:
     exit 1
   fi
 
-  # Verify decrypted content matches original
   if [ "$DECRYPTED_HASH" = "$ACTUAL_HASH" ]; then
     echo "Decrypted content matches original file"
   else
@@ -1326,10 +1298,8 @@ ci-run-watch workflow="ci.yaml":
     echo "triggering workflow: {{workflow}} on branch: $(git branch --show-current)"
     gh workflow run {{workflow}} --ref $(git branch --show-current)
 
-    # wait a moment for run to start
     sleep 5
 
-    # get the latest run ID
     RUN_ID=$(gh run list --workflow={{workflow}} --limit 1 --json databaseId --jq '.[0].databaseId')
 
     echo "watching run: $RUN_ID"
@@ -1407,9 +1377,6 @@ test-flake-workflow:
   --matrix os:ubuntu-latest \
   --container-architecture linux/amd64'
 
-# Command to run sethvargo/ratchet to pin GitHub Actions workflows version tags to commit hashes
-# If not installed, you can use docker to run the command
-# ratchet_base := "docker run -it --rm -v \"${PWD}:${PWD}\" -w \"${PWD}\" ghcr.io/sethvargo/ratchet:0.9.2"
 ratchet_base := "ratchet"
 
 # List of GitHub Actions workflows
@@ -1443,7 +1410,6 @@ cache-rosetta-builder:
 
     echo "Finding nix-rosetta-builder VM image in current system..."
 
-    # Find the rosetta-builder.yaml from current system
     YAML_PATH=$(nix-store --query --requisites /run/current-system | grep 'rosetta-builder.yaml$' || true)
 
     if [ -z "$YAML_PATH" ]; then
@@ -1466,7 +1432,6 @@ cache-rosetta-builder:
     IMAGE_SIZE=$(du -h "$IMAGE_PATH" | cut -f1)
     echo "Size: $IMAGE_SIZE"
 
-    # Push to cachix
     echo ""
     echo "Pushing to Cachix (this may take a few minutes for ~2GB image)..."
     sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $IMAGE_PATH"
@@ -1493,7 +1458,6 @@ check-rosetta-cache:
 
     echo "Checking if nix-rosetta-builder image is cached..."
 
-    # Find the image from current system
     YAML_PATH=$(nix-store --query --requisites /run/current-system | grep 'rosetta-builder.yaml$' || true)
 
     if [ -z "$YAML_PATH" ]; then
@@ -1512,7 +1476,6 @@ check-rosetta-cache:
 
     echo "Checking cache for: $IMAGE_PATH"
 
-    # Check if the image is in cache
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
 
     if {{nix_cmd}} path-info --store "https://$CACHE_NAME.cachix.org" "$IMAGE_PATH" &>/dev/null; then
@@ -1533,15 +1496,12 @@ test-cachix:
     set -euo pipefail
     echo "Testing cachix push/pull..."
 
-    # Build a simple derivation
     STORE_PATH=$({{nix_cmd}} build nixpkgs#hello --no-link --print-out-paths)
     echo "Built: $STORE_PATH"
 
-    # Push to cachix
     echo "Pushing to cachix..."
     sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $STORE_PATH"
 
-    # Verify it's in the cache by trying to pull it from another location
     CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
     echo "● Push completed. Verify at: https://app.cachix.org/cache/$CACHE_NAME"
     echo "Store path: $STORE_PATH"
@@ -1558,7 +1518,6 @@ cache-darwin-system:
     echo "Cache: https://app.cachix.org/cache/$CACHE_NAME"
     echo ""
 
-    # Check if already cached
     FLAKE_OUTPUT=".#darwinConfigurations.$HOSTNAME.system"
     echo "Checking if system is already cached..."
     if {{nix_cmd}} path-info --store "https://$CACHE_NAME.cachix.org" "$FLAKE_OUTPUT" &>/dev/null; then
@@ -1584,7 +1543,6 @@ cache-darwin-system:
     echo "Built: $SYSTEM_PATH"
     echo ""
 
-    # Push the path and all its runtime dependencies
     echo "Pushing system and all dependencies to cachix..."
     echo "(This may take several minutes depending on what's not already cached)"
     nix-store --query --requisites --include-outputs "$SYSTEM_PATH" | \
@@ -1764,7 +1722,6 @@ sops-load-agent:
   #!/usr/bin/env bash
   set -euo pipefail
 
-  # Check if we're on darwin
   if [[ "$OSTYPE" != "darwin"* ]]; then
     echo "⚠️  This command is only needed on macOS (darwin)"
     echo "   Linux uses systemd instead of launchd"
@@ -1773,28 +1730,23 @@ sops-load-agent:
 
   PLIST="$HOME/Library/LaunchAgents/org.nix-community.home.sops-nix.plist"
 
-  # Check if plist exists
   if [ ! -f "$PLIST" ]; then
     echo "⊘ SOPS plist not found: $PLIST"
     echo "   Run 'just activate' first to create the plist"
     exit 1
   fi
 
-  # Check if already loaded
   if launchctl list | grep -q "org.nix-community.home.sops-nix"; then
     echo "✓ SOPS agent already loaded"
     echo "  Secrets directory: ~/.config/sops-nix/secrets/"
     exit 0
   fi
 
-  # Load the agent
   echo "Loading SOPS launchd agent..."
   launchctl load "$PLIST"
 
-  # Brief wait for agent to start
   sleep 1
 
-  # Verify it loaded
   if launchctl list | grep -q "org.nix-community.home.sops-nix"; then
     echo "✓ SOPS agent loaded successfully"
     echo "  Secrets directory: ~/.config/sops-nix/secrets/"
