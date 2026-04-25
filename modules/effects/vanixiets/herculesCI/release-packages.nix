@@ -92,33 +92,78 @@
 #     mutating effects (security-update-pr, dep-bump) should prefer
 #     upstream `hci-effects.git-update`/`flakeUpdate`, NOT a local helper.
 #
-#   Three-way branch-form handling (m5-01g-release-packages-pr-merge-ref-handling):
+#   Three-way branch-form handling (m5-01h-release-packages-pr-head-ref-pivot;
+#   supersedes m5-01g-release-packages-pr-merge-ref-handling, commit 4b66343fe):
 #     buildbot-nix dispatches `release-packages` with three structurally
 #     distinct `branch` shapes; the clone preamble distinguishes them
 #     eval-time and emits matched bash for each:
 #
 #       (A) GitHub PR push event — `branch = "refs/pull/<N>/merge"`
 #           (the synthetic GitHub test-merge ref form). Detected
-#           eval-time via `builtins.match "^refs/pull/([0-9]+)/merge$"`.
-#           PR-detection pattern modelled on buildbot-nix's
-#           `buildbot_nix/buildbot_nix/build_canceller.py:16`
+#           eval-time via `builtins.match "^refs/pull/([0-9]+)/merge$"`
+#           (eval-time predicate kept identical to m5-01g; the dispatch
+#           input form has not changed — only how the effect resolves
+#           the SHA-of-record from it). PR-detection pattern modelled
+#           on buildbot-nix's `buildbot_nix/buildbot_nix/build_canceller.py:16`
 #           (`branch.startswith((\"refs/pull/\", \"refs/merge-requests/\"))`),
-#           narrowed to GitHub form here. Synthetic local branch
-#           `pr-<N>-merge` (no slashes; unambiguous to `git rev-parse`)
-#           replaces the raw ref name for `git checkout -B`. Freshness
-#           check uses a custom refspec
-#           `+refs/pull/<N>/merge:refs/remotes/origin/pr-<N>-merge` so
-#           `git rev-parse origin/pr-<N>-merge` resolves; without this
-#           mapping, `git fetch origin refs/pull/<N>/merge` only
-#           populates FETCH_HEAD and the rev-parse fails with
-#           `fatal: ambiguous argument 'origin/refs/pull/<N>/merge'`
-#           (the production blocker captured on PR #1858, 2026-04-25).
-#           Refspec form modelled on buildbot-nix's
+#           narrowed to GitHub form here.
+#
+#           m5-01h pivot rationale — GitHub's `refs/pull/<N>/merge` is a
+#           SYNTHETIC, EPHEMERAL, NON-STABLE test-merge commit. GitHub
+#           recomputes it whenever the base branch advances, the PR head
+#           is updated, or its internal merge-test scheduler fires.
+#           buildbot-nix snapshots the merge-SHA at nix-eval time (T0) and
+#           passes it as `--rev`, but by effect-runtime (T1) GitHub may
+#           have recomputed the merge under the same ref name. The m5-01g
+#           production log on PR #1858 captured `RELEASE-CLONE-STALE-PR:
+#           expected f750940... remote 030a3498...` — a true-positive
+#           staleness signal exposing that the merge-ref form is
+#           fundamentally the wrong unit of truth for this dispatch path.
+#
+#           m5-01h fetches `+refs/pull/<N>/head:refs/remotes/origin/pr-<N>-head`
+#           instead. `refs/pull/<N>/head` is the developer-pushed PR
+#           source branch tip, stable until the next dev push, and is
+#           what fast-forward-merge dry-run analysis actually wants —
+#           preview-version.sh's `git merge-tree --branches main`
+#           simulation operates from a working tree against main, so
+#           giving it the PR-head working tree is exactly correct. The
+#           SHA actually checked out is resolved at runtime via
+#           `head_sha=$(git rev-parse origin/pr-<N>-head)` post-fetch;
+#           buildbot's `--rev` (the ephemeral merge SHA) is retained
+#           ONLY as a forensic record in the DISPATCH banner.
+#
+#           Synthetic local branch `pr-<N>-head` (no slashes; unambiguous
+#           to `git rev-parse`) replaces the raw ref name for
+#           `git checkout -B`. Refspec form modelled on buildbot-nix's
 #           `buildbot_nix/buildbot_nix/nix_eval.py:GitLocalPrMerge.run`
-#           fetch idiom. Emits `RELEASE-CLONE-PR-MERGE: <pr-number> <rev>`
-#           BEFORE the standard `RELEASE-CLONE-START`; emits
-#           `RELEASE-CLONE-STALE-PR` (instead of `RELEASE-CLONE-STALE`)
-#           on stale rev.
+#           fetch idiom (the `+ref:remote-tracking-ref` mapping form),
+#           reused here for the /head ref instead of the /merge ref.
+#
+#           Emits TWO banners BEFORE the standard `RELEASE-CLONE-START`:
+#             * canonical positional `RELEASE-CLONE-PR-HEAD: <pr-number>
+#               <head-sha>` — the SHA actually checked out and analyzed.
+#             * forensic key=value `RELEASE-CLONE-PR-DISPATCH: <pr-number>
+#               buildbot-rev=<merge-sha> head=<head-sha>` — informational
+#               record of buildbot's `--rev` (the ephemeral T0 merge SHA)
+#               alongside the runtime-resolved head SHA. Drift between
+#               the two values is normal and benign.
+#           m5-01g's `RELEASE-CLONE-PR-MERGE` and `RELEASE-CLONE-STALE-PR`
+#           banners are RETIRED (no apples-to-apples freshness comparison
+#           is meaningful for the /head form: the head SHA is fresh by
+#           construction post-fetch). A trivial head-existence sanity
+#           check `git rev-parse --verify origin/pr-<N>-head` runs after
+#           checkout — non-zero only on a rare force-push race that
+#           removes the head ref between fetch and verify, in which case
+#           set -e aborts the effect. Cadence-equivalent to invariant #11
+#           (single freshness check), generalised to a sanity probe.
+#
+#           Upstream gap (skipping per user direction): `buildbot-effects`
+#           CLI accepts only `--rev/--branch/--repo/--secrets` (cli.py:103
+#           has `# TODO: support ref`), and the bwrap sandbox strips env
+#           to {IN_HERCULES_CI_EFFECT, HERCULES_CI_SECRETS_JSON,
+#           NIX_BUILD_TOP, TMPDIR, NIX_REMOTE} so we cannot smuggle
+#           GitHub env in. Hand-rolled refspec inside the effectScript
+#           is the only path; we own it.
 #
 #       (B) regular branch push — `branch` non-empty, non-PR-ref.
 #           Pre-m5-01g flow unchanged: `checkout_branch=$GIT_BRANCH`,
@@ -136,10 +181,12 @@
 #     this branching — they only ever run from a real working tree
 #     where `branch` is a regular ref. The PR-merge form arises only
 #     inside the buildbot-nix dispatch path.
-#     Full ADR-003 invariant audit (§1–§13) is preserved; the m5-01g
-#     refactor generalises the freshness-check tracking-ref form
-#     (invariant #11) without altering the single-check cadence or any
-#     other invariant.
+#     Full ADR-003 invariant audit (§1–§13) is preserved; m5-01h
+#     generalises invariant #3 (exact-rev source: `head_sha` runtime-
+#     resolved post-fetch is the new exact-rev for case A) and
+#     invariant #11 (freshness-check shape: head-existence sanity
+#     probe for case A) without altering the single-check cadence or
+#     any other invariant.
 #
 #   Symmetric env-var contract (CI + GIT_AUTHOR/COMMITTER + RELEASE_REPO_ROOT)
 #   (m4-release-packages-runtime-deps-contract; extended in m5-01a):
@@ -322,93 +369,81 @@
             # phases share one canonicalized value without re-shelling-out.
             GIT_REV=${lib.escapeShellArg (toString rev)}
             GIT_BRANCH=${lib.escapeShellArg (if branch == null then "" else toString branch)}
-            ${lib.optionalString isPrMerge ''
-              # PR-merge banner (m5-01g, VAL-RELEASE-α-PR-001) emitted
-              # ONLY on PR-merge dispatch BEFORE the standard
-              # CLONE-START banner so log-grep can distinguish the
-              # synthetic-ref dispatch without further parsing. PR
-              # number is parsed eval-time from the synthetic GitHub
-              # test-merge ref via `builtins.match` and embedded as a
-              # literal here so the rendered effectScript carries the
-              # parsed number directly (no bash indirection).
-              echo "RELEASE-CLONE-PR-MERGE: ${toString prNumber} $GIT_REV"
-            ''}
-
-            # RELEASE-CLONE-START banner (invariants #9, #10): emitted
-            # BEFORE the clone with the sanitized public URL. Token never
-            # appears in this output even though GIT_CREDENTIALS is set
-            # later in this effect — the URL string is the canonical one.
-            echo "RELEASE-CLONE-START: $clone_url $GIT_REV $GIT_BRANCH"
-
-            # Full clone (ADR-003 §Architecture step 2, invariant #2):
-            # NO shallow flag, NO since-date flag, NO blob-filter flag.
-            # semantic-release requires `git tag --merged <branch>`
-            # (lib/git.js:24-31), the full unshallowed tag fetch
-            # (lib/git.js:106-132), notes refs (lib/git.js:144-154), and
-            # the full commit log since lastRelease.gitHead
-            # (lib/get-commits.js:7-25); semantic-release-monorepo
-            # additionally needs per-commit changed-file lookups
-            # (src/git-utils.js:16-24). Pack size (~21.5 MiB) does not
-            # warrant shallow optimization at this scale.
-            git clone "$clone_url" "$clone_dir"
-            git -C "$clone_dir" fetch --tags origin
-
-            # Exact-rev checkout (ADR-003 §Architecture step 3, invariant
-            # #3) + branch-form-aware freshness check (ADR-003 §Architecture
-            # step 4, invariant #11; m5-01g three-way generalization).
-            #
-            # Three eval-time-distinguished cases:
-            #
-            #   Case A (isPrMerge==true): GitHub PR push event with
-            #     `branch = refs/pull/<N>/merge`. Synthetic local branch
-            #     name `pr-<N>-merge` (no slashes; unambiguous to git ref
-            #     resolution). Freshness check uses a custom refspec
-            #     `+refs/pull/<N>/merge:refs/remotes/origin/pr-<N>-merge`
-            #     to materialize the missing remote-tracking ref —
-            #     `git fetch origin refs/pull/<N>/merge` alone updates
-            #     FETCH_HEAD but does NOT auto-create
-            #     `refs/remotes/origin/refs/pull/<N>/merge`, which is the
-            #     production blocker captured on PR #1858 (`fatal:
-            #     ambiguous argument 'origin/refs/pull/1858/merge'`).
-            #     Refspec form modelled on buildbot-nix's
-            #     `nix_eval.py:GitLocalPrMerge.run` fetch idiom.
-            #
-            #   Case B (isPrMerge==false, GIT_BRANCH non-empty): regular
-            #     branch push. Identical to the pre-m5-01g flow.
-            #
-            #   Case C (isPrMerge==false, GIT_BRANCH empty): tag-push
-            #     event (hercules-ci-effects models tag checkouts as
-            #     `branch = null`). Synthetic local branch name
-            #     `release-packages-detached`; no freshness check (no
-            #     branch tip to compare against; the dry-run gate
-            #     `isMain == false` ensures no production push in this
-            #     case). Identical to the pre-m5-01g flow.
+            # === Branch-form-aware clone + checkout + freshness/sanity ===
+            # ADR-003 §Architecture steps 2-5 + invariants #1, #2, #3, #9,
+            # #10, #11. Three eval-time-distinguished cases dispatched by
+            # the eval-time conditional below; see the file-header Nix
+            # doc-comment for the full case-by-case rationale and the
+            # m5-01h design pivot.
             ${
               if isPrMerge then
                 ''
-                  checkout_branch="pr-${toString prNumber}-merge"
-                  git -C "$clone_dir" checkout -B "$checkout_branch" "$GIT_REV"
-                  echo "RELEASE-CLONE-CHECKOUT: $GIT_REV"
+                  # m5-01h Case A: clone first so head_sha can be resolved
+                  # before the canonical/forensic banners are emitted.
+                  git clone "$clone_url" "$clone_dir"
+                  git -C "$clone_dir" fetch --tags origin
 
-                  # Custom-refspec freshness check: create the missing
-                  # remote-tracking ref under refs/remotes/origin/pr-<N>-merge
-                  # so `git rev-parse origin/pr-<N>-merge` resolves
-                  # unambiguously. Without this refspec mapping, the
-                  # plain `git fetch origin refs/pull/<N>/merge` only
-                  # updates FETCH_HEAD. Refspec form modelled on
-                  # buildbot-nix's `nix_eval.py:GitLocalPrMerge.run`
-                  # idiom; the PR number is the eval-time-parsed literal.
+                  # Custom-refspec head-fetch (modelled on buildbot-nix's
+                  # `nix_eval.py:GitLocalPrMerge.run` idiom; the PR number
+                  # is the eval-time-parsed literal). Materializes
+                  # `refs/remotes/origin/pr-${toString prNumber}-head` so
+                  # the subsequent `git rev-parse` resolves unambiguously.
+                  # `git fetch origin refs/pull/<N>/head` alone updates
+                  # FETCH_HEAD but does NOT auto-create the remote-
+                  # tracking ref; the explicit `+ref:remote-tracking-ref`
+                  # mapping closes that gap.
                   git -C "$clone_dir" fetch origin \
-                    "+refs/pull/${toString prNumber}/merge:refs/remotes/origin/pr-${toString prNumber}-merge"
-                  head_rev="$(git -C "$clone_dir" rev-parse HEAD)"
-                  remote_rev="$(git -C "$clone_dir" rev-parse "origin/pr-${toString prNumber}-merge")"
-                  if [ "$head_rev" != "$remote_rev" ]; then
-                    echo "RELEASE-CLONE-STALE-PR: expected $head_rev remote $remote_rev" >&2
-                    exit 1
-                  fi
+                    "+refs/pull/${toString prNumber}/head:refs/remotes/origin/pr-${toString prNumber}-head"
+                  head_sha="$(git -C "$clone_dir" rev-parse origin/pr-${toString prNumber}-head)"
+
+                  # Two banners (m5-01h, VAL-RELEASE-α-PR-001) emitted
+                  # BEFORE the standard `RELEASE-CLONE-START` line so
+                  # log-grep can distinguish the PR-head dispatch path
+                  # from regular-branch dispatch without further parsing.
+                  #   * canonical positional: SHA actually checked out
+                  #     and analyzed.
+                  #   * forensic key=value: buildbot's `--rev` (the
+                  #     ephemeral GitHub-computed merge SHA at eval-time
+                  #     T0) alongside the runtime-resolved head SHA.
+                  #     Drift between the two values is normal and benign
+                  #     (GitHub may have recomputed the synthetic merge
+                  #     between T0 and T1; the head SHA is the stable
+                  #     dev-pushed reference).
+                  echo "RELEASE-CLONE-PR-HEAD: ${toString prNumber} $head_sha"
+                  echo "RELEASE-CLONE-PR-DISPATCH: ${toString prNumber} buildbot-rev=$GIT_REV head=$head_sha"
+
+                  # Standard upstream-input record (invariants #9, #10):
+                  # sanitized public URL only — token never appears here
+                  # even though GIT_CREDENTIALS is exported below for
+                  # semantic-release's URL builder.
+                  echo "RELEASE-CLONE-START: $clone_url $GIT_REV $GIT_BRANCH"
+
+                  # Exact-rev checkout (ADR-003 §Architecture step 3,
+                  # invariant #3 — generalised: $head_sha is the new
+                  # exact-rev source for case A; buildbot's $GIT_REV is
+                  # the ephemeral merge SHA and is NOT a valid checkout
+                  # target). Synthetic local branch `pr-<N>-head` (no
+                  # slashes; unambiguous to git ref resolution).
+                  git -C "$clone_dir" checkout -B "pr-${toString prNumber}-head" "$head_sha"
+                  echo "RELEASE-CLONE-CHECKOUT: $head_sha"
+
+                  # Head-existence sanity check (m5-01h; replaces m5-01g's
+                  # STALE-PR failure mode). Trivially true post-fetch
+                  # unless the head ref disappears (rare force-push race),
+                  # in which case the non-zero exit propagates via set -e
+                  # and aborts the effect. Cadence-equivalent to invariant
+                  # #11 (single freshness check), generalised to a sanity
+                  # probe for case A.
+                  git -C "$clone_dir" rev-parse --verify origin/pr-${toString prNumber}-head >/dev/null
                 ''
               else
                 ''
+                  # Cases B and C: unchanged from m5-01g (pre-m5-01h state).
+                  echo "RELEASE-CLONE-START: $clone_url $GIT_REV $GIT_BRANCH"
+
+                  git clone "$clone_url" "$clone_dir"
+                  git -C "$clone_dir" fetch --tags origin
+
                   if [ -n "$GIT_BRANCH" ]; then
                     checkout_branch="$GIT_BRANCH"
                   else
