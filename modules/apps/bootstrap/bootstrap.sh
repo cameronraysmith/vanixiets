@@ -1,14 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Re-run the bootstrap flow (direnv install + status report) on a host
-# that already has nix installed.
-#
-# Chicken-and-egg: `make bootstrap` is the real first-contact installer;
-# it installs nix itself. This flake app runs UNDER nix, so by definition
-# nix is already present. Treat this app as the post-nix half of
-# bootstrap: it ensures direnv is installed and reports status.
-#
-# Idempotent: re-runs produce no new state when direnv is already present.
 set -euo pipefail
 
 usage() {
@@ -36,8 +27,7 @@ esac
 
 printf '=== Bootstrap (nix-present host) ===\n\n'
 
-# Step 1: confirm nix (cannot be missing since we're running under nix,
-# but surface the version for parity with `make verify`).
+# Confirm nix even though running under nix means it must be present.
 if command -v nix >/dev/null 2>&1; then
   printf '● nix found at %s\n' "$(command -v nix)"
   nix --version
@@ -50,9 +40,7 @@ else
 fi
 printf '\n'
 
-# Step 2: install direnv if missing. `nix profile install` is idempotent
-# against the same attribute path; we guard with `command -v` for a
-# cleaner no-op output when direnv is already on PATH.
+# command -v guard yields cleaner no-op output than relying on nix profile install idempotence.
 if command -v direnv >/dev/null 2>&1; then
   printf '● direnv already installed at %s\n' "$(command -v direnv)"
 else

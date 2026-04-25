@@ -1,9 +1,5 @@
 # Flake app: re-run the bootstrap flow from an already-nix-ready host.
 #
-# Usage:
-#   nix run .#bootstrap            # install direnv if missing, confirm nix
-#   nix run .#bootstrap -- --help
-#
 # Chicken-and-egg note: The repo's primary bootstrap entry point is the
 # Makefile (`make bootstrap`), which installs nix itself via the NixOS
 # community installer and only then installs direnv. This flake app, by
@@ -12,12 +8,7 @@
 # have nix but want to (idempotently) finish the direnv half of bootstrap
 # or re-verify that bootstrap has been completed.
 #
-# Idempotent: detects existing nix and direnv via `command -v`; only
-# attempts `nix profile install nixpkgs#direnv` when direnv is missing.
-# Does not mutate /nix or /etc/nix; only touches the user's nix profile.
-#
-# Template bifurcation (writeShellApplication): PURE READFILE FORM.
-# The sidecar needs no nix-eval-time path injection.
+# Idempotent.
 { ... }:
 {
   perSystem =

@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Verify the host's nix installation, flakes support, direnv presence,
-# and flake metadata. Mirrors `make verify` from the repo-root Makefile,
-# minus the devShell build (which is expensive and duplicates what
-# `nix flake check` already covers).
-#
-# Idempotent / pure: does not mutate state.
+# Mirrors `make verify` minus the devShell build because expensive.
 set -euo pipefail
 
 usage() {
@@ -33,7 +28,6 @@ failed=0
 
 printf '\n=== Verifying installation ===\n\n'
 
-# Check 1: nix binary
 printf 'Checking nix installation: '
 if command -v nix >/dev/null 2>&1; then
   printf '● nix found at %s\n' "$(command -v nix)"
@@ -46,7 +40,6 @@ else
 fi
 printf '\n'
 
-# Check 2: flakes support
 printf 'Checking nix flakes support: '
 if nix flake --help >/dev/null 2>&1; then
   printf '● flakes enabled\n'
@@ -56,7 +49,6 @@ else
 fi
 printf '\n'
 
-# Check 3: direnv (optional)
 printf 'Checking direnv installation: '
 if command -v direnv >/dev/null 2>&1; then
   printf '● direnv found at %s\n' "$(command -v direnv)"
@@ -67,7 +59,6 @@ else
 fi
 printf '\n'
 
-# Check 4: flake metadata parseable
 printf 'Checking flake validity: '
 if nix --accept-flake-config flake metadata . >/dev/null 2>&1; then
   printf '● flake is valid\n'
@@ -77,7 +68,7 @@ else
 fi
 printf '\n'
 
-# Check 5: surface /etc/nix/nix.conf for auditability (match make verify)
+# Surface /etc/nix/nix.conf for auditability — parity with make verify.
 printf '/etc/nix/nix.conf:\n'
 printf '==================\n'
 if [ -f /etc/nix/nix.conf ]; then

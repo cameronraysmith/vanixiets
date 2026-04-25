@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Generate the user's age key at ~/.config/sops/age/keys.txt. If the key
-# already exists, print the public key and exit 0 without regenerating.
-#
-# Idempotent: re-running on a host with an existing key file is a no-op
-# aside from stdout (no mutation of the key file or its parent dir).
 set -euo pipefail
 
 usage() {
@@ -45,7 +40,6 @@ if [ -f "$key_file" ]; then
   exit 0
 fi
 
-# First run: create the key file with a locked-down mode.
 mkdir -p "$key_dir"
 age-keygen -o "$key_file"
 chmod 600 "$key_file"
