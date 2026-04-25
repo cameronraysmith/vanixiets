@@ -4,12 +4,10 @@
   ...
 }:
 let
-  # Capture outer config for use in imports
   flakeModules = config.flake.modules.nixos;
   flakeModulesHome = config.flake.modules.homeManager;
 in
 {
-  # Export host module to flake namespace
   flake.modules.nixos."machines/nixos/magnetite" =
     {
       config,
@@ -42,49 +40,36 @@ in
       # Make flake available to all modules (required by ssh-known-hosts)
       _module.args.flake = inputs.self;
 
-      # System platform
       nixpkgs.hostPlatform = "x86_64-linux";
 
-      # Allow unfree packages for nixosConfigurations (clan CLI path)
-      # perSystem.legacyPackages only affects clanInternals.machines (nom build path)
+      # Required for clan CLI path; perSystem.legacyPackages only affects the nom build path.
       nixpkgs.config.allowUnfree = true;
 
-      # Use flake.overlays.default (drupol pattern)
-      # All 5 overlay layers + pkgs-by-name packages exported from modules/nixpkgs.nix
+      # Overlays exported from modules/nixpkgs.nix (drupol pattern).
       nixpkgs.overlays = [ inputs.self.overlays.default ];
 
       # ZFS device node path - more stable for cloud VMs
       boot.zfs.devNodes = "/dev/disk/by-path";
 
-      # Disko disk configuration extracted to disko.nix
-      # Auto-merged via import-tree
-
       # Bootloader: GRUB BIOS mode (CX53 has legacy BIOS only, not UEFI)
       # srvos hardware-hetzner-cloud handles GRUB BIOS configuration
 
-      # Hostname configuration
       networking.hostName = "magnetite";
 
       networking.search = [ ];
 
-      # Override state version for new deployment
       system.stateVersion = "25.05";
 
-      # User configuration managed via clan inventory users service
-      # See: modules/clan/inventory/services/users/cameron.nix
+      # User configuration managed via clan inventory users service (modules/clan/inventory/services/users/cameron.nix).
 
-      # Allow wheel group sudo without password
       security.sudo.wheelNeedsPassword = false;
 
-      # ACME TLS certificate configuration for public-facing services
       security.acme = {
         acceptTerms = true;
         defaults.email = "cameron@scientistexperience.net";
       };
 
-      # Networking configuration
-      # srvos hardware-hetzner-cloud sets useNetworkd=true and useDHCP=false
-      # Configure primary interface with DHCP
+      # srvos hardware-hetzner-cloud sets useNetworkd=true and useDHCP=false; configure primary interface explicitly.
       systemd.network.networks."10-uplink" = {
         matchConfig.Name = "en*";
         networkConfig = {
@@ -98,7 +83,6 @@ in
       # Firewall configuration: dual-zone (public + ZeroTier)
       networking.firewall = {
         enable = true;
-        # Public-facing ports only
         allowedTCPPorts = [
           22
           80
@@ -110,7 +94,6 @@ in
         };
       };
 
-      # SSH daemon configuration
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       services.openssh.settings.MaxAuthTries = 20;
@@ -125,8 +108,7 @@ in
       # Bridge NixOS-level sops to home-manager for user secret key delivery
       hm-sops-bridge.users.cameron.sopsIdentity = "crs58";
 
-      # cameron home-manager module imports
-      # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
+      # cameron home-manager imports; infrastructure settings provided by the cameron inventory service.
       home-manager.users.cameron = {
         imports = [
           flakeModulesHome."users/crs58"

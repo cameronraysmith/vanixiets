@@ -2,7 +2,6 @@
 { ... }:
 {
   flake.modules.nixos."machines/nixos/magnetite" = {
-    # Disko disk configuration for BIOS boot
     disko.devices = {
       disk.main = {
         type = "disk";
@@ -15,7 +14,6 @@
               size = "1M";
               type = "EF02";
             };
-            # Boot partition for GRUB
             grub = {
               size = "1G";
               content = {
@@ -24,7 +22,6 @@
                 mountpoint = "/boot";
               };
             };
-            # ZFS partition
             zfs = {
               size = "100%";
               content = {
