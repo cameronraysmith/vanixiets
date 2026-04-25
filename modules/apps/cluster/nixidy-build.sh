@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Build nixidy-rendered Kubernetes manifests for the local-k3d env into
-# ./result. Equivalent to `nixidy build .#local-k3d`; preserved here so
-# the invocation is packaged as a first-class flake app for CI effects
-# and justfile wrappers.
-#
-# Usage:
-#   nixidy-build [--help]
+# Consumers: CI effects + justfile wrappers.
 set -euo pipefail
 
 case "${1:-}" in

@@ -1,19 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Run chainsaw tests with coverage report showing tested vs deployed resources.
-#
-# Usage: k3d-test-coverage [--help] [--raw] [chainsaw args...]
-#
-# Options:
-#   --help   Show this message and exit 0
-#   --raw    Show raw uncategorized output (original format)
-#
-# Environment:
-#   CI, GITHUB_ACTIONS, NO_COLOR - Disable colors when set
-#
-# Exit codes:
-#   0 - All tests passed
-#   1 - Tests failed or error
 set -euo pipefail
 
 case "${1:-}" in
@@ -36,7 +22,6 @@ EOF
     ;;
 esac
 
-# Global flag for raw output mode
 RAW_MODE=0
 
 # shellcheck disable=SC2034  # Colors are used via variable expansion
@@ -111,7 +96,6 @@ collect_deployed_resources() {
     local -n deployed_ref=$1
     local -n type_counts_ref=$2
 
-    # Workloads (Deployment, StatefulSet, DaemonSet)
     local line ns name kind key
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
@@ -122,7 +106,6 @@ collect_deployed_resources() {
         deployed_ref["$key"]=1
     done < <(kubectl get deploy,sts,ds -A -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,KIND:.kind' --no-headers 2>/dev/null | grep -v '^$')
 
-    # Gateway API resources
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         ns=$(awk '{print $1}' <<< "$line")
@@ -137,7 +120,6 @@ collect_deployed_resources() {
         deployed_ref["HTTPRoute/${ns}/${name}"]=1
     done < <(kubectl get httproute -A -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name' --no-headers 2>/dev/null | grep -v '^$')
 
-    # Certificates
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         ns=$(awk '{print $1}' <<< "$line")
@@ -145,13 +127,11 @@ collect_deployed_resources() {
         deployed_ref["Certificate/${ns}/${name}"]=1
     done < <(kubectl get certificate -A -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name' --no-headers 2>/dev/null | grep -v '^$')
 
-    # ClusterIssuers (cluster-scoped)
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         deployed_ref["ClusterIssuer/-/${line}"]=1
     done < <(kubectl get clusterissuer -o custom-columns='NAME:.metadata.name' --no-headers 2>/dev/null | grep -v '^$')
 
-    # Count by type
     for key in "${!deployed_ref[@]}"; do
         kind="${key%%/*}"
         type_counts_ref["$kind"]=$(( ${type_counts_ref["$kind"]:-0} + 1 ))
@@ -172,7 +152,6 @@ collect_tested_resources() {
         current_ns="-"
 
         while IFS= read -r line; do
-            # New document resets state
             if [[ "$line" == "---" ]]; then
                 if [[ -n "$current_kind" && -n "$current_name" ]]; then
                     key="${current_kind}/${current_ns}/${current_name}"
@@ -184,32 +163,28 @@ collect_tested_resources() {
                 continue
             fi
 
-            # Extract kind
             if [[ "$line" =~ ^kind:\ *(.+)$ ]]; then
                 current_kind="${BASH_REMATCH[1]}"
             fi
 
-            # Extract name (first name field is metadata.name)
+            # First "name:" line is metadata.name (guards against later annotation-name etc).
             if [[ "$line" =~ ^[[:space:]]+name:\ *(.+)$ ]]; then
                 if [[ -z "$current_name" ]]; then
                     current_name="${BASH_REMATCH[1]}"
                 fi
             fi
 
-            # Extract namespace
             if [[ "$line" =~ ^[[:space:]]+namespace:\ *(.+)$ ]]; then
                 current_ns="${BASH_REMATCH[1]}"
             fi
         done < "$file"
 
-        # Last resource in file
         if [[ -n "$current_kind" && -n "$current_name" ]]; then
             key="${current_kind}/${current_ns}/${current_name}"
             tested_ref["$key"]=1
         fi
     done < <(find "$test_dir" -name "*assert*.yaml" -type f)
 
-    # Count by type
     for key in "${!tested_ref[@]}"; do
         kind="${key%%/*}"
         type_counts_ref["$kind"]=$(( ${type_counts_ref["$kind"]:-0} + 1 ))
@@ -231,8 +206,7 @@ print_resource_table() {
     printf "  %-15s %3d\n" "Total" "$total"
 }
 
-# Categorize a resource as application, foundation, or system
-# Returns: "application", "foundation", or "system"
+# Categorize a resource as application, foundation, or system.
 categorize_resource() {
     local key="$1"
     local kind="${key%%/*}"
@@ -272,13 +246,11 @@ categorize_resource() {
         Deployment/kube-system/cilium-operator) echo "foundation"; return ;;
     esac
 
-    # Application resources (our nixidy/ArgoCD managed stack)
-    # Includes: argocd, cert-manager, sops-secrets-operator, step-ca,
-    # gateway-system, plus Gateway API resources
+    # Application resources (nixidy/ArgoCD-managed: argocd, cert-manager,
+    # sops-secrets-operator, step-ca, gateway-system, Gateway API).
     echo "application"
 }
 
-# Get human-readable description for system components
 get_system_description() {
     local key="$1"
 
@@ -325,12 +297,10 @@ print_coverage_report() {
     echo ""
     echo "${BOLD}Coverage Analysis:${RESET}"
 
-    # Categorize resources and calculate coverage
     local matched=0
     local untested=()
     local key category
 
-    # Categorized counts
     local app_total=0 app_tested=0
     local foundation_total=0 foundation_tested=0
     local system_total=0 system_tested=0
@@ -369,13 +339,12 @@ print_coverage_report() {
         esac
     done
 
-    # Calculate raw coverage (all resources)
     local raw_coverage=0
     if [[ $deployed_count -gt 0 ]]; then
         raw_coverage=$(( matched * 100 / deployed_count ))
     fi
 
-    # Calculate managed coverage (excluding system components)
+    # Excluding system components.
     local managed_total=$(( app_total + foundation_total ))
     local managed_tested=$(( app_tested + foundation_tested ))
     local managed_coverage=0
@@ -384,7 +353,6 @@ print_coverage_report() {
     fi
 
     if [[ $RAW_MODE -eq 1 ]]; then
-        # Original raw output format
         local cov_color="$RED"
         if [[ $raw_coverage -ge 80 ]]; then
             cov_color="$GREEN"
@@ -399,7 +367,6 @@ print_coverage_report() {
         if [[ ${#untested[@]} -gt 0 ]] || [[ ${#system_resources[@]} -gt 0 ]]; then
             echo "${BOLD}Untested Resources:${RESET}"
             local rest ns name
-            # Combine untested managed resources with untested system resources
             local all_untested=()
             for key in "${untested[@]}"; do
                 all_untested+=("$key")
@@ -424,7 +391,6 @@ print_coverage_report() {
             echo "  ${GREEN}All deployed resources have test coverage${RESET}"
         fi
     else
-        # Categorized output format
         echo ""
         echo "${BOLD}═══════════════════════════════════════════════════════════════════${RESET}"
         echo "${BOLD}                        COVERAGE BY CATEGORY                        ${RESET}"
@@ -459,7 +425,6 @@ print_coverage_report() {
         [[ $managed_coverage -ge 50 && $managed_coverage -lt 80 ]] && mgd_color="$YELLOW"
         printf "  ${BOLD}Managed Resources Total:  ${mgd_color}%2d/%2d  (%3d%%)${RESET}\n" "$managed_tested" "$managed_total" "$managed_coverage"
 
-        # Untested managed resources
         if [[ ${#untested[@]} -gt 0 ]]; then
             echo ""
             echo "${BOLD}Untested Managed Resources:${RESET}"
@@ -477,7 +442,6 @@ print_coverage_report() {
             done | sort
         fi
 
-        # System components section
         echo ""
         echo "${BOLD}System Components (excluded from coverage):${RESET}"
         local rest ns name desc
@@ -501,7 +465,6 @@ print_coverage_report() {
 main() {
     setup_colors
 
-    # Parse --raw flag
     local args=()
     for arg in "$@"; do
         if [[ "$arg" == "--raw" ]]; then

@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Block until every ArgoCD Application in the local-k3d cluster is both
-# Healthy and Synced, then verify the root Gateway is Programmed by
-# Cilium's Gateway API implementation.
-#
-# Usage:
-#   k3d-wait-argocd-sync [--help]
+# Block until every ArgoCD Application is Healthy and Synced, then verify the root Gateway is Programmed by Cilium.
 set -euo pipefail
 
 case "${1:-}" in

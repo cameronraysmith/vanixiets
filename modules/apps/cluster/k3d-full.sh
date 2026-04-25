@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Full local-k3d lifecycle: tear down any existing cluster, recreate it,
-# and deploy foundation + infrastructure layers. Delegates to the
-# original just recipes (k3d-down, k3d-up, k3d-deploy) which remain the
-# single source of truth for the cluster wiring during the M1 transition
-# window.
-#
-# Usage:
-#   k3d-full [--help]
 set -euo pipefail
 
 case "${1:-}" in

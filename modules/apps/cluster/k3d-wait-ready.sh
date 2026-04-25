@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Wait for the kluctl-deployed foundation (Cilium) and infrastructure
-# (ArgoCD, sops-secrets-operator, step-ca) pods to reach Ready.
-#
-# Usage:
-#   k3d-wait-ready [--help]
 set -euo pipefail
 
 case "${1:-}" in

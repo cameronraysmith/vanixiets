@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# CI integration driver for the local-k3d cluster. Uses the local
-# file:///manifests repo URL (no GitHub credentials required) and
-# orchestrates the full seven-phase flow consumed by
-# .github/workflows/test-cluster.yaml's `integration` job.
+# CI integration driver for the local-k3d cluster, consumed by .github/workflows/test-cluster.yaml's `integration` job.
 #
-# Usage:
-#   k3d-integration-ci [--help]
-#
-# Env-var contract (per ADR-002 / env-var-contract-design.md §2.5):
+# Env-var contract:
 #   Transitively required (consumed by k3d-bootstrap-secrets, the leaf):
 #     SOPS_AGE_KEY      age key body for sops-secrets-operator inside the
 #                       ephemeral k3d cluster. Enforcement is deferred to
@@ -25,12 +19,12 @@
 #     - Local dev:      .envrc dotenv or file-branch ($HOME/.config/sops/...)
 #     - GHA env:        job-level `env:` block populates SOPS_AGE_KEY from
 #                       repo secrets (.github/workflows/test-cluster.yaml)
-#     - M4 effect:      test-cluster effect preamble extracts SOPS_AGE_KEY
+#     - effect:         test-cluster effect preamble extracts SOPS_AGE_KEY
 #                       from HERCULES_CI_SECRETS_JSON and exports before
 #                       invoking ${config.apps.k3d-integration-ci.program}
 #
-# NB: required-env guard documented here via the `:?` idiom lives in the
-# leaf k3d-bootstrap-secrets.sh; this file intentionally has no top-level
+# NB: required-env guard via the `:?` idiom lives in the leaf
+# k3d-bootstrap-secrets.sh; this file intentionally has no top-level
 # `${SOPS_AGE_KEY:?…}` enforcement (the transitive contract is surfaced
 # via k3d-bootstrap-secrets.sh's fail-fast behaviour when neither env nor
 # file is present).

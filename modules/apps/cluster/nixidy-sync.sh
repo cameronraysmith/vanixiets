@@ -1,12 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Build nixidy manifests then push them to the local-k3d private repo.
-# Composition of `nixidy-build` followed by `nixidy-push`; both live on
-# PATH as writeShellApplication-wrapped commands supplied via
-# runtimeInputs in nixidy-sync.nix.
-#
-# Usage:
-#   nixidy-sync [--help]
 set -euo pipefail
 
 case "${1:-}" in

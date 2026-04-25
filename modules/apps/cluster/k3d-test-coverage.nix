@@ -1,15 +1,8 @@
 # k3d-test-coverage.nix - Run chainsaw integration tests and emit coverage report.
 #
-# Usage:
-#   nix run .#k3d-test-coverage -- [--raw] [chainsaw args...]
-#
-# Template form: pure readFile (no nix-computed variable injection).
 # Subsumes scripts/k3d-test-coverage.sh (legacy root-level copy kept as
-# a thin shim in M5 for backward compatibility). The coverage-report
-# logic lives in-tree at modules/apps/cluster/k3d-test-coverage.sh.
-#
-# Resolves kubernetes/tests/local-k3d/ relative to the invoking git
-# worktree via `git rev-parse --show-toplevel`.
+# a thin shim for backward compatibility). The coverage-report logic
+# lives in-tree at modules/apps/cluster/k3d-test-coverage.sh.
 { ... }:
 {
   perSystem =

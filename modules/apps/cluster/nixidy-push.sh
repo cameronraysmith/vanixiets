@@ -1,14 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Sync the ./result/ tree produced by nixidy-build into the private
-# local-k3d manifest repo, then commit and push any diff.
-#
-# Usage:
-#   nixidy-push [--help]
-#
-# Environment:
-#   LOCAL_K3D_REPO   path to the local-k3d manifest repo
-#                    (default: $HOME/projects/nix-workspace/local-k3d)
 set -euo pipefail
 
 case "${1:-}" in

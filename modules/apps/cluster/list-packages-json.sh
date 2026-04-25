@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Emit a JSON matrix entry per packages/<name>/ with a package.json.
-#
-# Usage:
-#   list-packages-json [--help]
-#
-# Output: a single JSON array line of {name, path} objects on stdout.
-# Resolves the repo root via `git rev-parse --show-toplevel`, so callers
-# may invoke from any subdirectory of the vanixiets worktree.
+# Resolves repo root via git rev-parse --show-toplevel.
 set -euo pipefail
 
 case "${1:-}" in

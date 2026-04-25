@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Apply the app-of-apps bootstrap Application CR for the local-k3d
-# environment: renders the manifest with `nixidy bootstrap` and pipes it
-# into kubectl apply -f - against the cluster context in use.
-#
-# Usage:
-#   nixidy-bootstrap [--help]
 set -euo pipefail
 
 case "${1:-}" in

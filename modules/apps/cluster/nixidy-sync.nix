@@ -1,9 +1,5 @@
 # nixidy-sync.nix - Compose nixidy-build then nixidy-push.
 #
-# Usage:
-#   nix run .#nixidy-sync
-#
-# Template form: pure readFile (no nix-computed variable injection).
 # Composes nixidy-build and nixidy-push by invoking them sequentially
 # via their published bin names (both exposed as runtimeInputs). Running
 # the sidecars directly—rather than going through `nix run .#...`—means

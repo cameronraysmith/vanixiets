@@ -1,8 +1,5 @@
 # k3d-integration-ci.nix - CI-variant full integration: file:///manifests + tests.
 #
-# Usage:
-#   nix run .#k3d-integration-ci
-#
 # Template bifurcation (writeShellApplication): PURE READFILE FORM.
 # `text = builtins.readFile ./k3d-integration-ci.sh` — the sidecar is
 # consumed verbatim, no nix-eval-time string interpolation. This is the

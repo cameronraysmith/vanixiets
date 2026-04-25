@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Patch the k3d cluster's CoreDNS to forward sslip.io queries to public
-# DNS resolvers so ArgoCD Application routes using <ip>.sslip.io domains
-# resolve inside the cluster. Idempotent: re-running on an
-# already-configured cluster detects the existing "sslip.io" block and
-# exits 0 without mutation.
-#
-# Usage:
-#   k3d-configure-dns [--help]
+# Idempotent via grep detection of the existing "sslip.io" block in the Corefile.
 set -euo pipefail
 
 case "${1:-}" in
