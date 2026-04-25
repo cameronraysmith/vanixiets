@@ -60,7 +60,7 @@
           pkgs.bun
           inputs'.bun2nix.packages.default
           pkgs.nodejs_24 # semantic-release >= 24.10.0
-          pkgs.fuc # (rm/cp)z
+          pkgs.fuc
           pkgs.rip2
           # Language detection
           pkgs.github-linguist
@@ -69,8 +69,7 @@
           pkgs.svgo
         ]
         # buildbot-effects CLI for local dispatch of hercules-ci-effects
-        # (see buildbot-nix/docs/EFFECTS.md). Linux-only: the package
-        # depends on bwrap and is gated at buildbot-nix/packages/flake-module.nix:29.
+        # (see buildbot-nix/docs/EFFECTS.md). Linux-only: depends on bwrap.
         ++ lib.optionals pkgs.stdenv.isLinux [
           inputs'.buildbot-nix.packages.buildbot-effects
         ];
