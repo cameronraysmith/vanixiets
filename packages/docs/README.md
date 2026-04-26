@@ -57,12 +57,12 @@ packages/docs/
 # Start dev server
 just dev
 # or
-bun run --filter '@typescript-nix-template/docs' dev
+bun run --filter '@vanixiets/docs' dev
 
 # Build
 just build
 # or
-bun run --filter '@typescript-nix-template/docs' build
+bun run --filter '@vanixiets/docs' build
 ```
 
 ### From package directory
