@@ -28,9 +28,6 @@
 # Defaults applied by the effect preamble:
 #   GIT_AUTHOR_NAME      / GIT_AUTHOR_EMAIL    (semantic-release@vanixiets.local)
 #   GIT_COMMITTER_NAME   / GIT_COMMITTER_EMAIL (semantic-release@vanixiets.local)
-#   GIT_USER_NAME / GIT_USER_EMAIL — transitional aliases that seed the
-#                        quartet when the GIT_AUTHOR_* / GIT_COMMITTER_*
-#                        forms are unset.
 
 set -euo pipefail
 
@@ -55,8 +52,8 @@ Flags:
 
 Environment:
   GITHUB_TOKEN, DOCS_NODE_MODULES, RELEASE_REPO_ROOT, CI,
-  GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL,
-  GIT_USER_NAME, GIT_USER_EMAIL (see release.sh header for details).
+  GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL
+  (see release.sh header for details).
 EOF
 }
 
@@ -168,14 +165,12 @@ fi
 # sandbox renders .git read-only (mounts /nix/store ro-bind only) and
 # `git config user.email "…"` would fail with `error: could not lock config
 # file .git/config`. git honours these env vars natively without any config
-# write. Transitional aliases GIT_USER_NAME/GIT_USER_EMAIL seed the quartet
-# when the new vars are unset, preserving existing local/GHA caller
-# behaviour. Each export uses parameter-expansion default chaining so a
-# pre-set value (effect preamble or caller env) is preserved unchanged.
-export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-${GIT_USER_NAME:-semantic-release}}"
-export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-${GIT_USER_EMAIL:-semantic-release@vanixiets.local}}"
-export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-${GIT_USER_NAME:-semantic-release}}"
-export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-${GIT_USER_EMAIL:-semantic-release@vanixiets.local}}"
+# write. Each export uses parameter-expansion default chaining so a pre-set
+# value (effect preamble or caller env) is preserved unchanged.
+export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-semantic-release}"
+export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-semantic-release@vanixiets.local}"
+export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-semantic-release}"
+export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-semantic-release@vanixiets.local}"
 
 cd "$package_path"
 
