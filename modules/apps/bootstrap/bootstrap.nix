@@ -1,6 +1,6 @@
-# Flake app: re-run the bootstrap flow from an already-nix-ready host.
+# Flake app: re-run the bootstrap flow from a host where nix is already installed
 #
-# Chicken-and-egg note: The repo's primary bootstrap entry point is the
+# The repo's primary bootstrap entry point is the
 # Makefile (`make bootstrap`), which installs nix itself via the NixOS
 # community installer and only then installs direnv. This flake app, by
 # contrast, can only run once nix is already present (since `nix run`
