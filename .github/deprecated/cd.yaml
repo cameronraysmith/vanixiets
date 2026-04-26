@@ -1,0 +1,407 @@
+name: CD
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: specific job to run (leave empty to run all)
+        required: false
+        type: string
+      debug_enabled:
+        description: "Run the workflow with tmate.io debugging enabled"
+        required: false
+        type: boolean
+        default: false
+      deploy_enabled:
+        description: "Deploy documentation to Cloudflare Workers"
+        required: false
+        type: boolean
+        default: false
+      force_run:
+        description: "Force execution even if already successful for this commit"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      target_configs:
+        description: comma-separated list of configs to build
+        required: false
+        type: string
+      cache_control:
+        description: cache control (use_cache, skip_cache)
+        required: false
+        type: string
+        default: use_cache
+      job_selection:
+        description: comma-separated list of jobs to run
+        required: false
+        type: string
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths-ignore:
+      - "*.md"
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - "*.md"
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  set-variables:
+    runs-on: ubuntu-latest
+    if: |
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'set-variables')
+    outputs:
+      debug: ${{ steps.set-variables.outputs.debug }}
+      deploy_enabled: ${{ steps.set-variables.outputs.deploy_enabled }}
+      deploy_environment: ${{ steps.set-variables.outputs.deploy_environment }}
+      checkout_ref: ${{ steps.set-variables.outputs.checkout_ref }}
+      checkout_rev: ${{ steps.set-variables.outputs.checkout_rev }}
+      sanitized_branch: ${{ steps.set-variables.outputs.sanitized_branch }}
+      packages: ${{ steps.discover-packages.outputs.packages }}
+      force-ci: ${{ steps.compute-force-ci.outputs.force-ci }}
+
+    steps:
+      - name: Set action variables
+        id: set-variables
+        run: |
+          DEBUG="false"
+          DEPLOY_ENABLED="false"
+          DEPLOY_ENVIRONMENT="preview"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            DEBUG="${{ inputs.debug_enabled }}"
+            DEPLOY_ENABLED="${{ inputs.deploy_enabled }}"
+          fi
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            CHECKOUT_REF="${{ github.event.pull_request.head.ref }}"
+            CHECKOUT_REV="${{ github.event.pull_request.head.sha }}"
+          else
+            CHECKOUT_REF="${{ github.ref_name }}"
+            CHECKOUT_REV="${{ github.sha }}"
+          fi
+
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            DEPLOY_ENABLED="true"
+            DEPLOY_ENVIRONMENT="production"
+          fi
+
+          # Sanitize for Cloudflare subdomain label (≤63 chars; truncate to 40 for safety)
+          SANITIZED_BRANCH=$(echo "$CHECKOUT_REF" | tr '/' '-' | tr -c 'a-zA-Z0-9-' '-' | sed 's/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
+
+          echo "debug=$DEBUG" >> $GITHUB_OUTPUT
+          echo "deploy_enabled=$DEPLOY_ENABLED" >> $GITHUB_OUTPUT
+          echo "deploy_environment=$DEPLOY_ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "checkout_ref=$CHECKOUT_REF" >> $GITHUB_OUTPUT
+          echo "checkout_rev=$CHECKOUT_REV" >> $GITHUB_OUTPUT
+          echo "sanitized_branch=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Compute force-ci flag
+        id: compute-force-ci
+        run: |
+          # Compute once for all jobs: workflow_dispatch force_run input OR force-ci PR label
+          if [[ "${{ inputs.force_run }}" == "true" ]] || \
+             [[ "${{ github.event_name }}" == "pull_request" && "${{ contains(github.event.pull_request.labels.*.name, 'force-ci') }}" == "true" ]]; then
+            echo "force-ci=true" >> $GITHUB_OUTPUT
+          else
+            echo "force-ci=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout for package discovery
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+        with:
+          installer: full
+          system: x86_64-linux
+
+      # alternative: extractions/setup-just@v3 (blocked on node20->node24 upgrade via extractions/setup-crate#9)
+      - name: Install just
+        uses: taiki-e/install-action@5f57d6cb7cd20b14a8a27f522884c4bc8a187458 # v2.75.19
+        with:
+          tool: just@1
+
+      - name: Discover packages
+        id: discover-packages
+        run: |
+          PACKAGES=$(just list-packages-json)
+          echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
+          echo "Discovered packages: $PACKAGES"
+
+  preview-release-version:
+    needs: [set-variables]
+    if: |
+      !cancelled() &&
+      github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.set-variables.outputs.packages) }}
+    runs-on: ubuntu-latest
+    # semantic-release verifyAuth requires push permission even in dry-run mode
+    # https://github.com/semantic-release/semantic-release/blob/v25.0.1/index.js#L87-L98
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.head_ref }} # Checkout actual PR branch, not merge commit
+          fetch-depth: 0 # Full history needed for semantic-release analysis
+          fetch-tags: true # Explicitly fetch all tags for version detection
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: ${{ matrix.package.name }}-preview-release
+          hash-sources: "packages/${{ matrix.package.name }}/**/* .github/actions/setup-nix/action.yml .github/workflows/cd.yaml flake.nix flake.lock bun.lock modules/apps/docs/**/* pkgs/by-name/vanixiets-docs/**/*"
+          # Always run: semantic-release analyzes commit history which changes constantly
+          force-run: "true"
+
+      - name: Fetch target branch for preview
+        if: steps.cache.outputs.should-run == 'true'
+        run: |
+          git fetch origin
+          git branch -f main origin/main
+
+      - name: Configure git identity for temporary commits
+        if: steps.cache.outputs.should-run == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup Nix
+        if: steps.cache.outputs.should-run == 'true'
+        uses: ./.github/actions/setup-nix
+        with:
+          installer: full
+          system: x86_64-linux
+
+      - name: Setup tmate debug session
+        if: steps.cache.outputs.should-run == 'true' && needs.set-variables.outputs.debug == 'true'
+        uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
+
+      - name: Preview version for ${{ matrix.package.name }}
+        if: steps.cache.outputs.should-run == 'true'
+        env:
+          CURRENT_BRANCH: ${{ github.head_ref }}
+          PACKAGE_PATH: ${{ matrix.package.path }}
+        run: |
+          echo "::group::Preview semantic-release version"
+          OUTPUT=$(nix run --accept-flake-config .#preview-version -- main "$PACKAGE_PATH" 2>&1 | tee /dev/stderr)
+          echo "::endgroup::"
+
+          # Extract and annotate the next version (grep returns 1 on no match, so suppress with || true)
+          VERSION=$(echo "$OUTPUT" | grep "next version:" | awk '{print $3}') || true
+          if [ -n "$VERSION" ]; then
+            echo "::notice title=Next Version (${{ matrix.package.name }})::$VERSION"
+          else
+            echo "::notice title=Next Version (${{ matrix.package.name }})::No release pending"
+          fi
+
+      - name: Create job result marker
+        # Only create marker if cache didn't exist (cache-source == 'none')
+        # With force-run: 'true', job runs even on cache hit, but we shouldn't overwrite existing cache
+        if: success() && steps.cache.outputs.should-run == 'true' && steps.cache.outputs.cache-source == 'none'
+        shell: bash
+        run: |
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "package": "${{ matrix.package.name }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true' && steps.cache.outputs.cache-source == 'none'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ steps.cache.outputs.cache-path }}
+          key: ${{ steps.cache.outputs.cache-key }}
+
+  preview-docs-deploy:
+    needs: [set-variables]
+    if: |
+      !cancelled() &&
+      github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      deployments: write
+    uses: ./.github/workflows/deploy-docs.yaml
+    with:
+      branch: ${{ github.head_ref }}
+      sanitized_branch: ${{ needs.set-variables.outputs.sanitized_branch }}
+      environment: preview
+      debug_enabled: ${{ needs.set-variables.outputs.debug }}
+      force_run: ${{ needs.set-variables.outputs.force-ci }}
+    secrets: inherit
+
+  bootstrap-verification:
+    needs: [set-variables]
+    runs-on: ubuntu-latest
+    if: |
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'bootstrap-verification')
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0 # for git diff in composite action
+
+      - name: Check execution cache
+        id: cache
+        uses: ./.github/actions/cached-ci-job
+        with:
+          check-name: ${{ github.job }}
+          hash-sources: "Makefile .envrc .github/actions/setup-nix/action.yml"
+          force-run: ${{ needs.set-variables.outputs.force-ci }}
+
+      - name: run make bootstrap
+        if: steps.cache.outputs.should-run == 'true'
+        run: make bootstrap
+
+      - name: verify nix installed
+        if: steps.cache.outputs.should-run == 'true'
+        run: |
+          if ! command -v nix &> /dev/null; then
+            echo "nix not found in PATH"
+            exit 1
+          fi
+          echo "nix found at: $(command -v nix)"
+          echo "nix store path: $(readlink -f $(which nix))"
+          nix --version
+
+      - name: verify direnv configured
+        if: steps.cache.outputs.should-run == 'true'
+        run: |
+          if ! command -v direnv &> /dev/null; then
+            echo "direnv not found in PATH"
+            exit 1
+          fi
+          echo "direnv found at: $(command -v direnv)"
+
+      - name: run make verify
+        if: steps.cache.outputs.should-run == 'true'
+        run: make verify
+
+      - name: run make setup-user
+        if: steps.cache.outputs.should-run == 'true'
+        run: make setup-user
+
+      - name: verify age key generated
+        if: steps.cache.outputs.should-run == 'true'
+        run: |
+          if [ ! -f ~/.config/sops/age/keys.txt ]; then
+            echo "age key not generated"
+            exit 1
+          fi
+          echo "age key generated successfully"
+          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+          nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt
+
+      - name: Create job result marker
+        if: success() && steps.cache.outputs.should-run == 'true'
+        shell: bash
+        run: |
+          mkdir -p "${{ steps.cache.outputs.cache-path }}"
+          cat > "${{ steps.cache.outputs.cache-path }}/marker" <<EOF
+          {
+            "success": true,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "cache_key": "${{ steps.cache.outputs.cache-key }}",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Save job result to cache
+        if: success() && steps.cache.outputs.should-run == 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ steps.cache.outputs.cache-path }}
+          key: ${{ steps.cache.outputs.cache-key }}
+
+  # Informational only - does not block production releases
+  test-cluster:
+    needs: [set-variables]
+    if: |
+      !cancelled() &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'test-cluster')
+    uses: ./.github/workflows/test-cluster.yaml
+    with:
+      debug_enabled: ${{ needs.set-variables.outputs.debug }}
+    secrets: inherit
+
+  # Semantic-release determines internally whether to actually release
+  production-release-packages:
+    needs: [set-variables]
+    if: |
+      !cancelled() &&
+      github.repository_owner == 'cameronraysmith' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.set-variables.outputs.packages) }}
+    permissions:
+      contents: write
+      id-token: write
+    uses: ./.github/workflows/package-release.yaml
+    with:
+      package-path: ${{ matrix.package.path }}
+      package-name: ${{ matrix.package.name }}
+      release-dry-run: false
+      debug-enabled: ${{ needs.set-variables.outputs.debug == 'true' }}
+      checkout-ref: ${{ needs.set-variables.outputs.checkout_ref }}
+      force-run: ${{ needs.set-variables.outputs.force-ci }}
+    secrets:
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+
+  # Depends on production-release-packages so packages release before docs
+  production-docs-deploy:
+    needs: [set-variables, production-release-packages]
+    if: |
+      !cancelled() &&
+      needs.production-release-packages.result == 'success' &&
+      needs.set-variables.outputs.deploy_enabled == 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.job == '' ||
+       inputs.job == 'docs-deploy')
+    uses: ./.github/workflows/deploy-docs.yaml
+    with:
+      debug_enabled: ${{ needs.set-variables.outputs.debug }}
+      branch: ${{ needs.set-variables.outputs.checkout_ref }}
+      sanitized_branch: ${{ needs.set-variables.outputs.sanitized_branch }}
+      environment: ${{ needs.set-variables.outputs.deploy_environment }}
+      force_run: ${{ needs.set-variables.outputs.force-ci }}
+    secrets: inherit
