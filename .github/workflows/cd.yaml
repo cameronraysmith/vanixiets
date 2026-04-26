@@ -63,89 +63,19 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'set-variables')
+      (inputs.job == '' || inputs.job == 'set-variables')
     outputs:
       debug: ${{ steps.set-variables.outputs.debug }}
-      deploy_enabled: ${{ steps.set-variables.outputs.deploy_enabled }}
-      deploy_environment: ${{ steps.set-variables.outputs.deploy_environment }}
-      checkout_ref: ${{ steps.set-variables.outputs.checkout_ref }}
-      checkout_rev: ${{ steps.set-variables.outputs.checkout_rev }}
-      sanitized_branch: ${{ steps.set-variables.outputs.sanitized_branch }}
-      packages: ${{ steps.discover-packages.outputs.packages }}
       force-ci: ${{ steps.compute-force-ci.outputs.force-ci }}
 
     steps:
       - name: Set action variables
         id: set-variables
-        run: |
-          DEBUG="false"
-          DEPLOY_ENABLED="false"
-          DEPLOY_ENVIRONMENT="preview"
-
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            DEBUG="${{ inputs.debug_enabled }}"
-            DEPLOY_ENABLED="${{ inputs.deploy_enabled }}"
-          fi
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            CHECKOUT_REF="${{ github.event.pull_request.head.ref }}"
-            CHECKOUT_REV="${{ github.event.pull_request.head.sha }}"
-          else
-            CHECKOUT_REF="${{ github.ref_name }}"
-            CHECKOUT_REV="${{ github.sha }}"
-          fi
-
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            DEPLOY_ENABLED="true"
-            DEPLOY_ENVIRONMENT="production"
-          fi
-
-          # Sanitize for Cloudflare subdomain label (≤63 chars; truncate to 40 for safety)
-          SANITIZED_BRANCH=$(echo "$CHECKOUT_REF" | tr '/' '-' | tr -c 'a-zA-Z0-9-' '-' | sed 's/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
-
-          echo "debug=$DEBUG" >> $GITHUB_OUTPUT
-          echo "deploy_enabled=$DEPLOY_ENABLED" >> $GITHUB_OUTPUT
-          echo "deploy_environment=$DEPLOY_ENVIRONMENT" >> $GITHUB_OUTPUT
-          echo "checkout_ref=$CHECKOUT_REF" >> $GITHUB_OUTPUT
-          echo "checkout_rev=$CHECKOUT_REV" >> $GITHUB_OUTPUT
-          echo "sanitized_branch=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
+        run: echo "debug=${{ inputs.debug_enabled }}" >> "$GITHUB_OUTPUT"
 
       - name: Compute force-ci flag
         id: compute-force-ci
-        run: |
-          # Compute once for all jobs: workflow_dispatch force_run input OR force-ci PR label
-          if [[ "${{ inputs.force_run }}" == "true" ]] || \
-             [[ "${{ github.event_name }}" == "pull_request" && "${{ contains(github.event.pull_request.labels.*.name, 'force-ci') }}" == "true" ]]; then
-            echo "force-ci=true" >> $GITHUB_OUTPUT
-          else
-            echo "force-ci=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Checkout for package discovery
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          fetch-depth: 0
-
-      - name: Setup Nix
-        uses: ./.github/actions/setup-nix
-        with:
-          installer: full
-          system: x86_64-linux
-
-      # alternative: extractions/setup-just@v3 (blocked on node20->node24 upgrade via extractions/setup-crate#9)
-      - name: Install just
-        uses: taiki-e/install-action@5f57d6cb7cd20b14a8a27f522884c4bc8a187458 # v2.75.19
-        with:
-          tool: just@1
-
-      - name: Discover packages
-        id: discover-packages
-        run: |
-          PACKAGES=$(just list-packages-json)
-          echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
-          echo "Discovered packages: $PACKAGES"
+        run: echo "force-ci=${{ inputs.force_run }}" >> "$GITHUB_OUTPUT"
 
   bootstrap-verification:
     needs: [set-variables]
