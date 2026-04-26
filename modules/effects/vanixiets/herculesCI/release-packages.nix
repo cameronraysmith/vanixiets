@@ -23,8 +23,6 @@
       prNumber = if isPrMerge then builtins.head prMergeMatch else null;
 
       actionBanner = if isMain then "release" else "dry-run";
-
-      dryRunFlag = if isMain then "" else "--dry-run";
     in
     {
       onPush.default.outputs.effects.release-packages = withSystem "x86_64-linux" (
