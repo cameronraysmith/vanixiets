@@ -11,43 +11,14 @@ on:
         required: false
         type: boolean
         default: false
-      deploy_enabled:
-        description: "Deploy documentation to Cloudflare Workers"
-        required: false
-        type: boolean
-        default: false
       force_run:
         description: "Force execution even if already successful for this commit"
         required: false
         type: boolean
         default: false
-  workflow_call:
-    inputs:
-      target_configs:
-        description: comma-separated list of configs to build
-        required: false
-        type: string
-      cache_control:
-        description: cache control (use_cache, skip_cache)
-        required: false
-        type: string
-        default: use_cache
-      job_selection:
-        description: comma-separated list of jobs to run
-        required: false
-        type: string
-  pull_request:
-    types: [opened, reopened, synchronize]
-    paths-ignore:
-      - "*.md"
-  push:
-    branches:
-      - "main"
-    paths-ignore:
-      - "*.md"
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 defaults:
@@ -56,7 +27,6 @@ defaults:
 
 permissions:
   contents: read
-  deployments: write
 
 jobs:
   set-variables:
@@ -82,9 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'bootstrap-verification')
+      (inputs.job == '' || inputs.job == 'bootstrap-verification')
     steps:
       - name: checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -169,9 +137,7 @@ jobs:
     needs: [set-variables]
     if: |
       !cancelled() &&
-      (github.event_name != 'workflow_dispatch' ||
-       inputs.job == '' ||
-       inputs.job == 'test-cluster')
+      (inputs.job == '' || inputs.job == 'test-cluster')
     uses: ./.github/workflows/test-cluster.yaml
     with:
       debug_enabled: ${{ needs.set-variables.outputs.debug }}
