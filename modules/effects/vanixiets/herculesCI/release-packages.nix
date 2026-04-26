@@ -225,8 +225,5 @@
     in
     {
       onPush.default.outputs.effects.release-packages = mkReleasePackagesEffect { dryRun = false; };
-      onPush.default.outputs.effects.release-packages-dry-run = mkReleasePackagesEffect {
-        dryRun = true;
-      };
     };
 }
