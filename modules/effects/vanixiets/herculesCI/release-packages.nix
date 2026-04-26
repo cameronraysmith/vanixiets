@@ -23,92 +23,59 @@
       prNumber = if isPrMerge then builtins.head prMergeMatch else null;
 
       actionBanner = if isMain then "release" else "dry-run";
-    in
-    {
-      onPush.default.outputs.effects.release-packages = withSystem "x86_64-linux" (
-        { config, pkgs, ... }:
-        let
-          hci-effects = inputs.hercules-ci-effects.lib.withPkgs pkgs;
 
-          # release.sh --dry-run short-circuits on in-tree branches:["main"]; preview-version is the non-main path.
-          listPackagesProgram = config.apps.list-packages-json.program;
-          releaseProgram = config.apps.release.program;
-          previewVersionProgram = config.apps.preview-version.program;
-        in
-        hci-effects.mkEffect {
-          name = "release-packages";
+      # mkReleasePackagesEffect: shared effect body parameterised on dryRun.
+      #
+      # dryRun = false (production):
+      #   isMain → call release.sh (publish path).
+      #   non-main → call preview-version.sh (rehearsal path that filters
+      #   @semantic-release/github and replaces it with a local bare clone).
+      #
+      # dryRun = true (rehearsal attribute):
+      #   ALWAYS calls release.sh with `-- --dry-run` so the production
+      #   plugin set (including @semantic-release/github) is exercised end
+      #   to end, but semantic-release's prepare/publish/success steps are
+      #   no-ops. Stale-rev guard is bypassed because the rehearsal is
+      #   invoked manually with `--branch main` against an arbitrary rev,
+      #   so HEAD will not equal origin/main by design.
+      mkReleasePackagesEffect =
+        { dryRun }:
+        withSystem "x86_64-linux" (
+          { config, pkgs, ... }:
+          let
+            hci-effects = inputs.hercules-ci-effects.lib.withPkgs pkgs;
 
-          # Why: mkEffect's defaultInputs do not include git; clone preamble below requires it.
-          inputs = [ pkgs.git ];
+            listPackagesProgram = config.apps.list-packages-json.program;
+            releaseProgram = config.apps.release.program;
+            previewVersionProgram = config.apps.preview-version.program;
 
-          effectScript = ''
-            set -euo pipefail
+            effectName = if dryRun then "release-packages-dry-run" else "release-packages";
 
-            echo "=== effects.release-packages (semantic-release per-package dispatcher) ==="
-            echo "branch:   ${lib.escapeShellArg (toString branch)}"
-            echo "rev:      ${lib.escapeShellArg (toString rev)}"
-            echo "shortRev: ${lib.escapeShellArg (toString shortRev)}"
-            echo "isMain:   ${if isMain then "true" else "false"}"
+            actionLabel =
+              if dryRun then "rehearsal (production plugins, semantic-release --dry-run)" else actionBanner;
 
-            echo "RELEASE-PACKAGES-ACTION: ${actionBanner}"
+            dispatchLine =
+              if dryRun then
+                ''"$RELEASE" "$pkg_path" -- --dry-run''
+              else if isMain then
+                ''"$RELEASE" "$pkg_path"''
+              else
+                ''"$PREVIEW" main "$pkg_path"'';
 
-            export GITHUB_TOKEN="$(jq -r '.GITHUB_TOKEN.data.value' "$HERCULES_CI_SECRETS_JSON")"
+            # Distinct dispatch marker so rehearsal logs are not mistaken for
+            # production runs in CI output. Under dryRun=false the marker is
+            # empty (suppresses the echo line) for byte-for-byte parity with
+            # the pre-refactor effect.
+            dispatchMarkerLine = if dryRun then ''echo "RELEASE-PACKAGE-DRY-RUN-DISPATCH: $pkg_path"'' else "";
 
-            if [ -z "''${GITHUB_TOKEN:-}" ] || [ "$GITHUB_TOKEN" = "null" ]; then
-              echo "error: GITHUB_TOKEN missing from \$HERCULES_CI_SECRETS_JSON" >&2
-              exit 1
-            fi
-
-            # Why: do not use config.repo.remoteHttpUrl — buildbot-nix bakes
-            # the App installation token into it; would leak via banner echo.
-            clone_url="https://github.com/cameronraysmith/vanixiets.git"
-
-            clone_dir="$(mktemp -d -t release-packages-clone.XXXXXX)"
-
-            trap 'rm -rf "$clone_dir"' EXIT
-
-            GIT_REV=${lib.escapeShellArg (toString rev)}
-            GIT_BRANCH=${lib.escapeShellArg (if branch == null then "" else toString branch)}
-            ${
-              if isPrMerge then
-                ''
-                  git clone "$clone_url" "$clone_dir"
-                  git -C "$clone_dir" fetch --tags origin
-
-                  # `git fetch origin refs/pull/<N>/head` alone updates
-                  # FETCH_HEAD but does NOT auto-create the remote-tracking
-                  # ref; the explicit `+ref:remote-tracking-ref` mapping
-                  # closes that gap.
-                  git -C "$clone_dir" fetch origin \
-                    "+refs/pull/${toString prNumber}/head:refs/remotes/origin/pr-${toString prNumber}-head"
-                  head_sha="$(git -C "$clone_dir" rev-parse origin/pr-${toString prNumber}-head)"
-
-                  echo "RELEASE-CLONE-PR-HEAD: ${toString prNumber} $head_sha"
-                  echo "RELEASE-CLONE-PR-DISPATCH: ${toString prNumber} buildbot-rev=$GIT_REV head=$head_sha"
-
-                  echo "RELEASE-CLONE-START: $clone_url $GIT_REV $GIT_BRANCH"
-
-                  git -C "$clone_dir" checkout -B "pr-${toString prNumber}-head" "$head_sha"
-                  echo "RELEASE-CLONE-CHECKOUT: $head_sha"
-
-                  # Trivially true post-fetch unless force-push race lost the head ref; set -e propagates abort.
-                  git -C "$clone_dir" rev-parse --verify origin/pr-${toString prNumber}-head >/dev/null
-                ''
+            # Stale-rev guard bypassed under dryRun: the rehearsal attribute
+            # is intentionally invoked against non-main revs while declaring
+            # `--branch main`, so HEAD will not equal origin/main.
+            staleRevGuard =
+              if dryRun then
+                ""
               else
                 ''
-                  echo "RELEASE-CLONE-START: $clone_url $GIT_REV $GIT_BRANCH"
-
-                  git clone "$clone_url" "$clone_dir"
-                  git -C "$clone_dir" fetch --tags origin
-
-                  if [ -n "$GIT_BRANCH" ]; then
-                    checkout_branch="$GIT_BRANCH"
-                  else
-                    checkout_branch="release-packages-detached"
-                  fi
-                  git -C "$clone_dir" checkout -B "$checkout_branch" "$GIT_REV"
-                  echo "RELEASE-CLONE-CHECKOUT: $GIT_REV"
-
                   if [ -n "$GIT_BRANCH" ]; then
                     git -C "$clone_dir" fetch origin "$GIT_BRANCH"
                     head_rev="$(git -C "$clone_dir" rev-parse HEAD)"
@@ -118,64 +85,145 @@
                       exit 1
                     fi
                   fi
-                ''
-            }
+                '';
+          in
+          hci-effects.mkEffect {
+            name = effectName;
 
-            echo "RELEASE-CLONE-READY: $clone_dir"
+            # Why: mkEffect's defaultInputs do not include git; clone preamble below requires it.
+            inputs = [ pkgs.git ];
 
-            # semantic-release's get-git-auth-url.js treats GIT_CREDENTIALS as user:password and constructs the authenticated URL in-process. The vanixiets-effects-secrets PAT (Read+Write) is the canonical authority — the buildbot-nix App installation token (Read-only) is NOT reused for release mutation.
-            export GIT_CREDENTIALS="x-access-token:''${GITHUB_TOKEN}"
+            effectScript = ''
+              set -euo pipefail
 
-            # CI=true bypasses semantic-release's env-ci abort. GIT_AUTHOR/COMMITTER are honoured natively without writing .git/config (which the bwrap /nix/store ro-bind would block).
-            export CI=true
-            export GIT_BRANCH
-            export RELEASE_REPO_ROOT="$clone_dir"
-            export GIT_AUTHOR_NAME=semantic-release
-            export GIT_AUTHOR_EMAIL=semantic-release@vanixiets.local
-            export GIT_COMMITTER_NAME=semantic-release
-            export GIT_COMMITTER_EMAIL=semantic-release@vanixiets.local
+              echo "=== effects.${effectName} (semantic-release per-package dispatcher) ==="
+              echo "branch:   ${lib.escapeShellArg (toString branch)}"
+              echo "rev:      ${lib.escapeShellArg (toString rev)}"
+              echo "shortRev: ${lib.escapeShellArg (toString shortRev)}"
+              echo "isMain:   ${if isMain then "true" else "false"}"
 
-            # Why: bwrap sandbox does not bind working tree; .# cannot resolve. Use eval-time /nix/store paths.
-            LIST_PACKAGES=${listPackagesProgram}
-            RELEASE=${releaseProgram}
-            PREVIEW=${previewVersionProgram}
+              echo "RELEASE-PACKAGES-ACTION: ${actionLabel}"
 
-            # list-packages-json calls `git rev-parse --show-toplevel`
-            # which must resolve to $clone_dir (the only real git tree).
-            cd "$clone_dir"
+              export GITHUB_TOKEN="$(jq -r '.GITHUB_TOKEN.data.value' "$HERCULES_CI_SECRETS_JSON")"
 
-            packages_json="$("$LIST_PACKAGES")"
-            echo "packages discovered: $packages_json"
-
-            failed_packages=()
-
-            while IFS= read -r pkg_path; do
-              [ -z "$pkg_path" ] && continue
-
-              echo "RELEASE-PACKAGE-ITERATION: $pkg_path"
-
-              # CLI grammars differ — release <pkg-path> [--dry-run] vs preview-version [target-branch] [pkg-path] — so a single shared dispatch line cannot work.
-              set +e
-              ${if isMain then ''"$RELEASE" "$pkg_path"'' else ''"$PREVIEW" main "$pkg_path"''}
-              rc=$?
-              set -e
-
-              if [ "$rc" -eq 0 ]; then
-                echo "RELEASE-PACKAGE-OK: $pkg_path"
-              else
-                echo "RELEASE-PACKAGE-FAILURE: $pkg_path (exit $rc)"
-                failed_packages+=("$pkg_path")
+              if [ -z "''${GITHUB_TOKEN:-}" ] || [ "$GITHUB_TOKEN" = "null" ]; then
+                echo "error: GITHUB_TOKEN missing from \$HERCULES_CI_SECRETS_JSON" >&2
+                exit 1
               fi
-            done < <(printf '%s\n' "$packages_json" | jq -r '.[].path')
 
-            if [ "''${#failed_packages[@]}" -gt 0 ]; then
-              echo "error: ''${#failed_packages[@]} package(s) failed: ''${failed_packages[*]}" >&2
-              exit 1
-            fi
+              # Why: do not use config.repo.remoteHttpUrl — buildbot-nix bakes
+              # the App installation token into it; would leak via banner echo.
+              clone_url="https://github.com/cameronraysmith/vanixiets.git"
 
-            echo "=== release-packages effect complete (exit 0) ==="
-          '';
-        }
-      );
+              clone_dir="$(mktemp -d -t release-packages-clone.XXXXXX)"
+
+              trap 'rm -rf "$clone_dir"' EXIT
+
+              GIT_REV=${lib.escapeShellArg (toString rev)}
+              GIT_BRANCH=${lib.escapeShellArg (if branch == null then "" else toString branch)}
+              ${
+                if isPrMerge then
+                  ''
+                    git clone "$clone_url" "$clone_dir"
+                    git -C "$clone_dir" fetch --tags origin
+
+                    # `git fetch origin refs/pull/<N>/head` alone updates
+                    # FETCH_HEAD but does NOT auto-create the remote-tracking
+                    # ref; the explicit `+ref:remote-tracking-ref` mapping
+                    # closes that gap.
+                    git -C "$clone_dir" fetch origin \
+                      "+refs/pull/${toString prNumber}/head:refs/remotes/origin/pr-${toString prNumber}-head"
+                    head_sha="$(git -C "$clone_dir" rev-parse origin/pr-${toString prNumber}-head)"
+
+                    echo "RELEASE-CLONE-PR-HEAD: ${toString prNumber} $head_sha"
+                    echo "RELEASE-CLONE-PR-DISPATCH: ${toString prNumber} buildbot-rev=$GIT_REV head=$head_sha"
+
+                    echo "RELEASE-CLONE-START: $clone_url $GIT_REV $GIT_BRANCH"
+
+                    git -C "$clone_dir" checkout -B "pr-${toString prNumber}-head" "$head_sha"
+                    echo "RELEASE-CLONE-CHECKOUT: $head_sha"
+
+                    # Trivially true post-fetch unless force-push race lost the head ref; set -e propagates abort.
+                    git -C "$clone_dir" rev-parse --verify origin/pr-${toString prNumber}-head >/dev/null
+                  ''
+                else
+                  ''
+                    echo "RELEASE-CLONE-START: $clone_url $GIT_REV $GIT_BRANCH"
+
+                    git clone "$clone_url" "$clone_dir"
+                    git -C "$clone_dir" fetch --tags origin
+
+                    if [ -n "$GIT_BRANCH" ]; then
+                      checkout_branch="$GIT_BRANCH"
+                    else
+                      checkout_branch="release-packages-detached"
+                    fi
+                    git -C "$clone_dir" checkout -B "$checkout_branch" "$GIT_REV"
+                    echo "RELEASE-CLONE-CHECKOUT: $GIT_REV"
+
+                    ${staleRevGuard}
+                  ''
+              }
+
+              echo "RELEASE-CLONE-READY: $clone_dir"
+
+              # semantic-release's get-git-auth-url.js treats GIT_CREDENTIALS as user:password and constructs the authenticated URL in-process. The vanixiets-effects-secrets PAT (Read+Write) is the canonical authority — the buildbot-nix App installation token (Read-only) is NOT reused for release mutation.
+              export GIT_CREDENTIALS="x-access-token:''${GITHUB_TOKEN}"
+
+              # CI=true bypasses semantic-release's env-ci abort. GIT_AUTHOR/COMMITTER are honoured natively without writing .git/config (which the bwrap /nix/store ro-bind would block).
+              export CI=true
+              export GIT_BRANCH
+              export RELEASE_REPO_ROOT="$clone_dir"
+              export GIT_AUTHOR_NAME=semantic-release
+              export GIT_AUTHOR_EMAIL=semantic-release@vanixiets.local
+              export GIT_COMMITTER_NAME=semantic-release
+              export GIT_COMMITTER_EMAIL=semantic-release@vanixiets.local
+
+              # Why: bwrap sandbox does not bind working tree; .# cannot resolve. Use eval-time /nix/store paths.
+              LIST_PACKAGES=${listPackagesProgram}
+              RELEASE=${releaseProgram}
+              PREVIEW=${previewVersionProgram}
+
+              # list-packages-json calls `git rev-parse --show-toplevel`
+              # which must resolve to $clone_dir (the only real git tree).
+              cd "$clone_dir"
+
+              packages_json="$("$LIST_PACKAGES")"
+              echo "packages discovered: $packages_json"
+
+              failed_packages=()
+
+              while IFS= read -r pkg_path; do
+                [ -z "$pkg_path" ] && continue
+
+                echo "RELEASE-PACKAGE-ITERATION: $pkg_path"
+                ${dispatchMarkerLine}
+
+                # CLI grammars differ — release <pkg-path> [-- extra-args] vs preview-version [target-branch] [pkg-path] — so a single shared dispatch line cannot work.
+                set +e
+                ${dispatchLine}
+                rc=$?
+                set -e
+
+                if [ "$rc" -eq 0 ]; then
+                  echo "RELEASE-PACKAGE-OK: $pkg_path"
+                else
+                  echo "RELEASE-PACKAGE-FAILURE: $pkg_path (exit $rc)"
+                  failed_packages+=("$pkg_path")
+                fi
+              done < <(printf '%s\n' "$packages_json" | jq -r '.[].path')
+
+              if [ "''${#failed_packages[@]}" -gt 0 ]; then
+                echo "error: ''${#failed_packages[@]} package(s) failed: ''${failed_packages[*]}" >&2
+                exit 1
+              fi
+
+              echo "=== ${effectName} effect complete (exit 0) ==="
+            '';
+          }
+        );
+    in
+    {
+      onPush.default.outputs.effects.release-packages = mkReleasePackagesEffect { dryRun = false; };
     };
 }
