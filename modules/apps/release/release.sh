@@ -149,8 +149,8 @@ fi
 # mount the working tree's .git, so `git rev-parse --show-toplevel` would
 # fail with `fatal: not a git repository` (exit 128) and abort the script.
 # The effect preamble sets RELEASE_REPO_ROOT="$PWD" so this branch resolves
-# without invoking git. Local-shell and GHA paths set RELEASE_REPO_ROOT
-# to empty, exercising the git fallback against the live worktree.
+# without invoking git. Local-shell callers leave RELEASE_REPO_ROOT unset,
+# exercising the git fallback against the live worktree.
 repo_root="${RELEASE_REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "$repo_root"
 
