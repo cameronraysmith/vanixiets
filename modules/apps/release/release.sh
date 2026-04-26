@@ -31,10 +31,6 @@
 #   GIT_USER_NAME / GIT_USER_EMAIL — transitional aliases that seed the
 #                        quartet when the GIT_AUTHOR_* / GIT_COMMITTER_*
 #                        forms are unset.
-# Optional (passthrough, not consumed):
-#   SOPS_AGE_KEY         reserved passthrough for sops-decrypt hooks; no
-#                        consumer in the current tree (declared but NOT
-#                        enforced via :? guard).
 
 set -euo pipefail
 
@@ -58,7 +54,7 @@ Flags:
   --help     Print this usage and exit.
 
 Environment:
-  GITHUB_TOKEN, SOPS_AGE_KEY, DOCS_NODE_MODULES, RELEASE_REPO_ROOT, CI,
+  GITHUB_TOKEN, DOCS_NODE_MODULES, RELEASE_REPO_ROOT, CI,
   GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL,
   GIT_USER_NAME, GIT_USER_EMAIL (see release.sh header for details).
 EOF
