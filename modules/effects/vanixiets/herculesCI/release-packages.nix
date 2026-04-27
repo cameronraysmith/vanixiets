@@ -175,7 +175,8 @@
               echo "RELEASE-CLONE-READY: $clone_dir"
 
               # semantic-release's get-git-auth-url.js treats GIT_CREDENTIALS as user:password and constructs the authenticated URL in-process. The vanixiets-effects-secrets PAT (Read+Write) is the canonical authority — the buildbot-nix App installation token (Read-only) is NOT reused for release mutation.
-              export GIT_CREDENTIALS="x-access-token:''${GITHUB_TOKEN}"
+              # Username MUST NOT be `x-access-token` here: that string is reserved for GitHub App installation tokens (ghs_*) and routes fine-grained PATs (github_pat_*) into the wrong credential validator, surfacing as "Invalid username or token. Password authentication is not supported for Git operations." at git push despite Bearer-auth (API) succeeding. `oauth2` is the conventional username for fine-grained and classic PATs over HTTPS Basic auth.
+              export GIT_CREDENTIALS="oauth2:''${GITHUB_TOKEN}"
 
               # CI=true bypasses semantic-release's env-ci abort. GIT_AUTHOR/COMMITTER are honoured natively without writing .git/config (which the bwrap /nix/store ro-bind would block).
               export CI=true
