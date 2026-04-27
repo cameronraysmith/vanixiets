@@ -35,6 +35,8 @@ jobs:
 
       - name: Setup nix
         uses: ./.github/actions/setup-nix
+        with:
+          system: x86_64-linux
 
       - name: Regenerate bun.nix
         run: nix run .#regenerate-bun-nix
