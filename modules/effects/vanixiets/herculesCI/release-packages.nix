@@ -187,29 +187,6 @@
               export GIT_COMMITTER_NAME=semantic-release
               export GIT_COMMITTER_EMAIL=semantic-release@vanixiets.local
 
-              # --- TEMP DIAG: localise auth failure to {token mangling, sandbox auth path, semantic-release URL formation}.
-              # Remove this block (and the DEBUG/GIT_TRACE exports below) once root-cause is known.
-              # Expected GITHUB_TOKEN sha256 (matches /run/secrets/vars/vanixiets-effects-secrets/secrets):
-              #   7d5a018d39dc9a44f674e674e3d53f6ba792f6d6d02a40bd0591c1051d60210e
-              echo "DIAG GITHUB_TOKEN length:    ''${#GITHUB_TOKEN}"
-              echo "DIAG GITHUB_TOKEN sha256:    $(printf '%s' "$GITHUB_TOKEN" | sha256sum | cut -d' ' -f1)"
-              echo "DIAG GIT_CREDENTIALS length: ''${#GIT_CREDENTIALS}"
-              echo "DIAG GIT_CREDENTIALS sha256: $(printf '%s' "$GIT_CREDENTIALS" | sha256sum | cut -d' ' -f1)"
-              echo "DIAG sandbox in-process push probe (manual auth, no semantic-release):"
-              if git -C "$clone_dir" push --dry-run --no-verify \
-                  "https://oauth2:''${GITHUB_TOKEN}@github.com/cameronraysmith/vanixiets.git" HEAD:main; then
-                echo "DIAG manual-auth probe SUCCEEDED inside sandbox"
-              else
-                rc=$?
-                echo "DIAG manual-auth probe FAILED inside sandbox (rc=$rc)"
-              fi
-              # Per-candidate verifyAuth errors from get-git-auth-url.js are gated on DEBUG; surface them.
-              # GIT_TRACE/GIT_CURL_VERBOSE expose the actual Authorization header git puts on the wire.
-              export DEBUG="semantic-release:get-git-auth-url"
-              export GIT_TRACE=1
-              export GIT_CURL_VERBOSE=2
-              echo "--- END TEMP DIAG ---"
-
               # Why: bwrap sandbox does not bind working tree; .# cannot resolve. Use eval-time /nix/store paths.
               LIST_PACKAGES=${listPackagesProgram}
               RELEASE=${releaseProgram}
