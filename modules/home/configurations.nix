@@ -68,8 +68,6 @@ let
   );
 in
 {
-  # Force module loading order - aggregates processed before homeConfigurations
-  # This ensures config.flake.modules.homeManager.* are merged before access
   # Multi-aggregate organization (drupol-style):
   #   - core: base config (catppuccin, fonts, bitwarden, xdg, session-variables, ssh)
   #   - development: dev environment (git, jujutsu, neovim, wezterm, zed, starship, zsh)
@@ -78,16 +76,8 @@ in
   #   - packages: organized package sets (terminal, development, compute, security, database, publishing)
   #   - terminal: terminal utilities (direnv, fzf, lsd, bat, btop, htop, jq, nix-index, zoxide)
   #   - tools: additional tools (awscli, k9s, pandoc, nix, gpg, macchina, tealdeer, texlive)
-  imports = [
-    ./core
-    ./development
-    ./ai
-    ./shell
-    ./packages
-    ./terminal
-    ./tools
-    ./users
-  ];
+  # Aggregate modules under modules/home/{core,development,ai,shell,packages,terminal,tools,users}
+  # are auto-discovered by import-tree (see flake.nix).
 
   # homeConfigurations organized by system, generated for all systems in config.systems
   # Usage: nix build .#homeConfigurations.${system}.${username}
