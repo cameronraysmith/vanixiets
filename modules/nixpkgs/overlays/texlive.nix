@@ -1,6 +1,6 @@
 { ... }:
 {
-  flake.nixpkgsOverlays = [
+  nixpkgsOverlays = [
     (final: prev: {
       texliveWithPackages = prev.texlive.combine {
         inherit (prev.texlive)

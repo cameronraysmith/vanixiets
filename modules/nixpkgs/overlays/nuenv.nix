@@ -6,7 +6,7 @@
 #
 { inputs, ... }:
 {
-  flake.nixpkgsOverlays = [
+  nixpkgsOverlays = [
     inputs.nuenv.overlays.nuenv
   ];
 }

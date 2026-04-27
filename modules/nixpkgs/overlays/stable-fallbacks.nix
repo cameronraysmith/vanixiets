@@ -12,7 +12,7 @@
 #
 { ... }:
 {
-  flake.nixpkgsOverlays = [
+  nixpkgsOverlays = [
     (
       final: prev:
       {

@@ -1,30 +1,24 @@
-# Declare flake.nixpkgsOverlays as a mergeable list option
+# Declare nixpkgsOverlays as a typed internal accumulator option
 #
-# This enables list concatenation where multiple modules can append to
-# the same list, which is then composed into overlays.
+# Sibling overlay files in modules/nixpkgs/overlays/ contribute via
+# `nixpkgsOverlays = [ (final: prev: { ... }) ];`. The composition step in
+# modules/nixpkgs/compose.nix folds the list into flake.overlays.default.
 #
-# Without this declaration, flake-parts treats multiple assignments to
-# flake.nixpkgsOverlays as conflicts rather than mergeable list items.
-{ lib, flake-parts-lib, ... }:
-let
-  inherit (lib) mkOption types;
-  inherit (flake-parts-lib) mkSubmoduleOptions;
-in
+# This option lives at the top level (not under `flake.*`) and is marked
+# `internal = true` so it does not surface as a flake output. The pattern
+# mirrors the precedent set by flake-parts core for `allSystems`
+# (modules/perSystem.nix lines 141-145 in nix-workspace/flake-parts).
+{ lib, ... }:
 {
-  options = {
-    flake = mkSubmoduleOptions {
-      nixpkgsOverlays = mkOption {
-        type = types.listOf types.unspecified;
-        default = [ ];
-        description = ''
-          List of nixpkgs overlays to be composed together.
-          Each overlay should be a function: final -> prev -> attrset
-
-          Multiple modules can append to this list for overlay
-          composition. The overlays are composed using
-          lib.composeManyExtensions in compose.nix.
-        '';
-      };
-    };
+  options.nixpkgsOverlays = lib.mkOption {
+    type = lib.types.listOf lib.types.unspecified;
+    default = [ ];
+    internal = true;
+    description = ''
+      Internal accumulator for nixpkgs overlays composed into
+      flake.overlays.default by modules/nixpkgs/compose.nix. Sibling overlay
+      files in modules/nixpkgs/overlays/ contribute via
+      `nixpkgsOverlays = [ (final: prev: { ... }) ];`. Not a flake output.
+    '';
   };
 }

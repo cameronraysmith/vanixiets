@@ -1,6 +1,6 @@
 { ... }:
 {
-  flake.nixpkgsOverlays = [
+  nixpkgsOverlays = [
     (final: prev: {
       shot-scraper = prev.shot-scraper.overridePythonAttrs (old: {
         makeWrapperArgs = (old.makeWrapperArgs or [ ]) ++ [

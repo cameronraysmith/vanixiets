@@ -4,7 +4,7 @@
 # derivation or parallel edits at every consumer.
 { inputs, ... }:
 {
-  flake.nixpkgsOverlays = [
+  nixpkgsOverlays = [
     (final: prev: {
       beads = inputs.llm-agents.packages.${prev.stdenv.hostPlatform.system}.beads;
     })

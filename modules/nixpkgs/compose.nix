@@ -1,10 +1,10 @@
 # Overlay composition using list concatenation
 #
-# This module composes all overlays from the auto-discovered flake.nixpkgsOverlays list
+# This module composes all overlays from the auto-discovered nixpkgsOverlays list
 # into a single flake.overlays.default for use in machine configurations.
 #
 # Architecture:
-# - overlays/*.nix each append to flake.nixpkgsOverlays list (NixOS module system feature)
+# - overlays/*.nix each append to nixpkgsOverlays list (NixOS module system feature)
 # - This module composes that list with lib.composeManyExtensions
 # - External overlays and custom packages merged in composition order
 #
@@ -23,7 +23,7 @@
     let
       # Internal overlays auto-collected via list concatenation
       # overlays/*.nix modules append to this list automatically
-      internalOverlays = lib.composeManyExtensions config.flake.nixpkgsOverlays;
+      internalOverlays = lib.composeManyExtensions config.nixpkgsOverlays;
 
       # Custom packages from pkgs-by-name
       # Provides: Project-specific packages (ccstatusline, etc.)

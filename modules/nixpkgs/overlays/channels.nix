@@ -4,7 +4,7 @@
 #
 # Adapted from _overlays/inputs.nix
 #
-# Exports to flake.nixpkgsOverlays list:
+# Exports to nixpkgsOverlays list:
 #   - inputs: Raw flake inputs reference
 #   - nixpkgs: Main nixpkgs (unstable) - for reference
 #   - patched: nixpkgs with patches applied (empty in test-clan)
@@ -17,7 +17,7 @@
 #
 { inputs, ... }:
 {
-  flake.nixpkgsOverlays = [
+  nixpkgsOverlays = [
     (
       final: prev:
       let

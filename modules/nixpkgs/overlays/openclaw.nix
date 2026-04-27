@@ -10,7 +10,7 @@
 #
 { inputs, ... }:
 {
-  flake.nixpkgsOverlays = [
+  nixpkgsOverlays = [
     (final: prev: {
       openclaw-gateway =
         let

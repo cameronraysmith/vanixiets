@@ -2,7 +2,7 @@
 #
 # configures pkgs for flake-parts perSystem (checks, packages, devShells, etc.)
 #
-# Use config.flake.nixpkgsOverlays for overlay composition
+# Use config.nixpkgsOverlays for overlay composition
 # overlays/*.nix modules append to this list automatically via import-tree
 {
   inputs,
@@ -18,9 +18,9 @@
       pkgs = import inputs.nixpkgs {
         inherit system;
         config.allowUnfree = true;
-        # Overlay composition from flake.nixpkgsOverlays list
+        # Overlay composition from nixpkgsOverlays list
         # Auto-populated by overlays/*.nix modules (including nuenv.nix)
-        overlays = config.flake.nixpkgsOverlays;
+        overlays = config.nixpkgsOverlays;
       };
     in
     {

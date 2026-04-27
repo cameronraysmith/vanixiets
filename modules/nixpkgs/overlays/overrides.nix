@@ -10,7 +10,7 @@
 #
 { ... }:
 {
-  flake.nixpkgsOverlays = [
+  nixpkgsOverlays = [
     (final: prev: {
       # pygame: SDL2 surface flag tests fail on Python 3.13
       # Upstream: https://github.com/libsdl-org/SDL/issues/14424

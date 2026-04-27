@@ -2,7 +2,7 @@
 #
 # - Integration (this file) imports submodules
 # - Configuration (per-system.nix) configures perSystem pkgs
-# - Overlays (overlays/*.nix) append to flake.nixpkgsOverlays list
+# - Overlays (overlays/*.nix) append to nixpkgsOverlays list
 # - Composition (compose.nix) merges list into flake.overlays.default
 # - Option declaration (overlays-option.nix) enables list concatenation
 #
