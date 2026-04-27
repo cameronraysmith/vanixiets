@@ -130,7 +130,8 @@
                     # `git fetch origin refs/pull/<N>/head` alone updates
                     # FETCH_HEAD but does NOT auto-create the remote-tracking
                     # ref; the explicit `+ref:remote-tracking-ref` mapping
-                    # closes that gap.
+                    # closes that gap (idiom from buildbot-nix
+                    # buildbot_nix/buildbot_nix/nix_eval.py:GitLocalPrMerge).
                     git -C "$clone_dir" fetch origin \
                       "+refs/pull/${toString prNumber}/head:refs/remotes/origin/pr-${toString prNumber}-head"
                     head_sha="$(git -C "$clone_dir" rev-parse origin/pr-${toString prNumber}-head)"
