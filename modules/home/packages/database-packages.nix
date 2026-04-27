@@ -15,7 +15,11 @@
         # tests (test_style_output{,_with_newlines,_custom_tokens})
         # Re-enable when either cli-helpers is bumped past 2.10.0 with
         # pygments-2.20-compatible test expectations, or a nixpkgs overlay disables
-        # the brittle tests.
+        # the brittle tests. Track upstream nixpkgs:trunk job state:
+        #   https://hydra.nixos.org/job/nixpkgs/trunk/python313Packages.cli-helpers.x86_64-linux/all
+        #   https://hydra.nixos.org/job/nixpkgs/trunk/python313Packages.cli-helpers.aarch64-darwin/all
+        #   https://hydra.nixos.org/job/nixpkgs/trunk/python313Packages.pgcli.x86_64-linux/all
+        #   https://hydra.nixos.org/job/nixpkgs/trunk/python313Packages.pgcli.aarch64-darwin/all
         # pgcli
         postgresql_16
         sqlite
