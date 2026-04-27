@@ -1,0 +1,52 @@
+name: Regenerate bun.nix on Renovate PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - bun.lock
+      - package.json
+      - "packages/**/package.json"
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: regenerate-bun-nix-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  regenerate:
+    if: github.event.pull_request.user.login == 'renovate[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Regenerate bun.nix
+        run: nix run .#regenerate-bun-nix
+
+      - name: Amend PR branch if bun.nix changed
+        run: |
+          if git diff --quiet -- bun.nix; then
+            echo "bun.nix already up-to-date; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.nix
+          git commit -m "chore(deps): regenerate bun.nix"
+          git push
