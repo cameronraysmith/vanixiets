@@ -17,6 +17,8 @@
         files.secrets = {
           secret = true;
           owner = "buildbot";
+          # systemd LoadCredential= snapshots /run/secrets/vars/<gen>/secrets at unit-start time and never re-reads. Without this, regenerating the secret leaves /run/credentials/buildbot-master.service/effects-secret__... stale until manual `systemctl restart buildbot-master.service`. clan-vars plumbs restartUnits through to sops-nix's restartUnits, which keys the unit's restartTriggers on the encrypted blob hash so the next deploy refreshes the credential snapshot.
+          restartUnits = [ "buildbot-master.service" ];
         };
 
         prompts.cloudflare-api-token = {
