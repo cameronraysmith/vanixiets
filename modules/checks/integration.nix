@@ -33,12 +33,18 @@
             # This validates the naming and basic structure without full deployment config
             mkVMNode =
               machineName:
-              { ... }:
+              { lib, ... }:
               {
                 imports = [
                   # Import srvos for SSH and server basics
                   inputs.srvos.nixosModules.server
                 ];
+
+                # TODO: remove together with modules/system/srvos/command-not-found.nix
+                # once upstream fixes land. mkVMNode imports srvos directly without going
+                # through flake.modules.nixos.base, so the workaround must repeat here
+                # to avoid the mkDefault collision on programs.command-not-found.enable.
+                programs.command-not-found.enable = lib.mkForce false;
 
                 # VM environment settings
                 virtualisation.memorySize = 1024;
