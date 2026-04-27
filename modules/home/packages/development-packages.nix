@@ -75,7 +75,7 @@
           # lazyjj
           just
           mkcert
-          # from pkgs/by-name (overrides llm-agents)
+          # from llm-agents via modules/nixpkgs/overlays/beads.nix
           beads
           # coderabbit-cli # disabled: unused
           # crush      # disabled: unused
