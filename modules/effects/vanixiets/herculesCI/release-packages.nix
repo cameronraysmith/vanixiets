@@ -124,6 +124,12 @@
               ${
                 if isPrMerge then
                   ''
+                    # GitHub's refs/pull/<N>/merge is a synthetic test-merge
+                    # ref recomputed on base advance, head update, or
+                    # merge-test scheduler fire; the T0 buildbot-eval SHA
+                    # drifts from T1 runtime content. refs/pull/<N>/head
+                    # is the dev-pushed source-branch tip, stable until
+                    # the next dev push.
                     git clone "$clone_url" "$clone_dir"
                     git -C "$clone_dir" fetch --tags origin
 
