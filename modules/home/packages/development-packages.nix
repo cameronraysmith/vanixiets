@@ -101,7 +101,6 @@
           proto # version manager NOT protobuf-related
           ratchet
           shellcheck
-          # starship-jj # pkgs/by-name
           # step-ca
           tea
           tmate
