@@ -36,14 +36,6 @@ in
       # System platform
       nixpkgs.hostPlatform = "x86_64-linux";
 
-      # Allow unfree packages for nixosConfigurations (clan CLI path)
-      # perSystem.legacyPackages only affects clanInternals.machines (nom build path)
-      nixpkgs.config.allowUnfree = true;
-
-      # Use flake.overlays.default (drupol pattern)
-      # All 5 overlay layers + pkgs-by-name packages exported from modules/nixpkgs.nix
-      nixpkgs.overlays = [ inputs.self.overlays.default ];
-
       # ZFS device node path - more stable for cloud VMs
       boot.zfs.devNodes = "/dev/disk/by-path";
 

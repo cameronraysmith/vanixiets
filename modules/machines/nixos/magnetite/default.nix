@@ -42,12 +42,6 @@ in
 
       nixpkgs.hostPlatform = "x86_64-linux";
 
-      # Required for clan CLI path; perSystem.legacyPackages only affects the nom build path.
-      nixpkgs.config.allowUnfree = true;
-
-      # Overlays exported from modules/nixpkgs.nix (drupol pattern).
-      nixpkgs.overlays = [ inputs.self.overlays.default ];
-
       # ZFS device node path - more stable for cloud VMs
       boot.zfs.devNodes = "/dev/disk/by-path";
 

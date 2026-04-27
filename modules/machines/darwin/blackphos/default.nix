@@ -57,13 +57,6 @@ in
 
       nixpkgs.hostPlatform = "aarch64-darwin";
 
-      # Allow unfree packages (required for copilot-language-server, etc.)
-      nixpkgs.config.allowUnfree = true;
-
-      # Use flake.overlays.default (drupol pattern)
-      # All 5 overlay layers + pkgs-by-name packages exported from modules/nixpkgs.nix
-      nixpkgs.overlays = [ inputs.self.overlays.default ];
-
       # System state version (matching vanixiets configuration)
       # Override base.nix which sets stateVersion = 5
       system.stateVersion = lib.mkForce 4;
