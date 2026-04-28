@@ -5,15 +5,10 @@ shared:
     - -conflict
 
   required_checks: &required_checks
-    # GHA workflow checks
-    - check-success=set-variables
-    - check-success=check-fast-forward
-    - or:
-        - check-success=bootstrap-verification
-        - check-skipped=bootstrap-verification
-    # Buildbot-nix checks (nix eval + build delegated to magnetite)
+    # Buildbot-nix checks
     - check-success=buildbot/nix-eval
     - check-success=buildbot/nix-build
+    - check-success=buildbot/nix-effects
 
   human_author_conditions: &human_author_conditions
     - author!=renovate[bot]
