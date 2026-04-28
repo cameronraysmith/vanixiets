@@ -1,4 +1,4 @@
-name: Regenerate bun.nix on Renovate PRs
+name: Regenerate lock files on Renovate PRs
 
 on:
   pull_request:
