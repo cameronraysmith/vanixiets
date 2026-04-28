@@ -56,6 +56,25 @@
         # derivation matches Hydra's cache.
         # Date added: 2026-04-28
         quarto = final.stable.quarto;
+
+        # lean4: same channel-lag situation. Activation triggers a local
+        # rebuild of lean4-4.29.1 (buildPhase). Stable provides lean4-4.29.0
+        # (one patch behind) which is in cache.nixos.org.
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/lean4.aarch64-darwin
+        # TODO: Remove when the nixpkgs pin advances to a rev whose lean4
+        # derivation matches Hydra's cache.
+        # Date added: 2026-04-28
+        lean4 = final.stable.lean4;
+
+        # bitwarden-cli: same channel-lag situation. Activation triggers a
+        # local rebuild of bitwarden-cli-2026.4.1 (patchPhase). Stable
+        # provides bitwarden-cli-2026.2.0 (a couple of releases behind);
+        # accept the downgrade until the channel advances.
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/bitwarden-cli.aarch64-darwin
+        # TODO: Remove when the nixpkgs pin advances to a rev whose
+        # bitwarden-cli derivation matches Hydra's cache.
+        # Date added: 2026-04-28
+        bitwarden-cli = final.stable.bitwarden-cli;
       })
       // (prev.lib.optionalAttrs prev.stdenv.isLinux {
         # Linux-wide stable fallbacks
