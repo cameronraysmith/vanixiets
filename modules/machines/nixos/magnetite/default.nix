@@ -63,6 +63,11 @@ in
         defaults.email = "cameron@scientistexperience.net";
       };
 
+      # srvos mixins-nginx enables the deprecated security.dhparams module
+      # (removed in NixOS 26.11); DHE cipher suites have no real consumer.
+      services.nginx.sslDhparam = lib.mkForce false;
+      security.dhparams.enable = lib.mkForce false;
+
       # srvos hardware-hetzner-cloud sets useNetworkd=true and useDHCP=false; configure primary interface explicitly.
       systemd.network.networks."10-uplink" = {
         matchConfig.Name = "en*";
