@@ -98,7 +98,7 @@
           #   https://hydra.nixos.org/job/nixpkgs/trunk/swiftPackages.swift.aarch64-darwin
           #   https://hydra.nixos.org/job/nixpkgs/trunk/pre-commit.aarch64-darwin
           # pre-commit
-          proto # version manager NOT protobuf-related
+          # proto # version manager NOT protobuf-related
           ratchet
           shellcheck
           # step-ca
