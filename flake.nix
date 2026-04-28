@@ -108,7 +108,7 @@
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.home-manager.follows = "home-manager";
 
-    playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.58.2";
+    playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.59.1";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
 
     easykubenix.url = "github:cameronraysmith/easykubenix/dev";
