@@ -26,12 +26,16 @@
       // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "aarch64-darwin") {
         # aarch64-darwin specific stable fallbacks
 
-        # dvc: pinned to stable while unstable build is broken
-        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/python313Packages.dvc.aarch64-darwin
-        # Failing build: https://hydra.nixos.org/build/326554391
-        # TODO: Remove when upstream fix lands in unstable
-        # Date added: 2026-04-19
-        dvc = final.stable.dvc;
+        # d2: pinned to stable while the unstable closure pulls libdrm-2.4.131
+        # transitively via mesa-libgbm. libdrm declares meta.platforms
+        # excluding darwin in the locked nixpkgs rev, so d2.drvPath eval-fails
+        # on aarch64-darwin even though Hydra's d2 builds cleanly at trunk
+        # (the cached d2 derivation does not match our locked rev's closure).
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/d2.aarch64-darwin
+        # TODO: Remove when the mesa-libgbm/libdrm closure issue is resolved
+        # upstream and our locked nixpkgs no longer pulls libdrm into d2.
+        # Date added: 2026-04-28
+        d2 = final.stable.d2;
       })
       // (prev.lib.optionalAttrs prev.stdenv.isLinux {
         # Linux-wide stable fallbacks
