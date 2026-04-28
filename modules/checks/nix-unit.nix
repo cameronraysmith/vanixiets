@@ -5,31 +5,14 @@
       ...
     }:
     {
-      nix-unit.inputs = {
-        inherit (inputs)
-          nixpkgs
-          nixpkgs-darwin-stable
-          nixpkgs-linux-stable
-          flake-parts
-          systems
-          nix-darwin
-          home-manager
-          sops-nix
-          clan-core
-          import-tree
-          terranix
-          disko
-          srvos
-          treefmt-nix
-          git-hooks
-          nix-unit
-          lazyvim-nix
-          pkgs-by-name-for-flake-parts
-          nuenv
-          llm-agents
-          catppuccin
-          hercules-ci-effects
-          ;
+      # Pass the full input set (plus self) so nix-unit pre-fetches every
+      # transitive flake input — including channel-style nixpkgs tarballs
+      # pulled in by deeper inputs (buildbot-nix, niks3, hercules-ci-effects,
+      # etc.). An incomplete inherit list left transitive nixpkgs nodes
+      # (e.g. nixpkgs_2) outside the check's build closure, causing the
+      # sandbox to attempt network fetches at build time on workers without
+      # DNS. See logs/buildbot-63-199.log for the original failure mode.
+      nix-unit.inputs = inputs // {
         inherit self;
       };
 
