@@ -10,18 +10,17 @@
     }:
     let
       # Match the home-manager python environment from development-packages.nix.
-      # Uses config.packages.python-duckdb (by-name) since the perSystem pkgs
-      # overlay doesn't include customPackages from compose.nix.
+      # duckdb routes to nixpkgs' python3Packages.duckdb because
+      # pkgs/by-name/python-duckdb is currently disabled (see pkgs/disabled/).
+      # To reenable: replace `duckdb` below with `config.packages.python-duckdb`
+      # via `++ [ config.packages.python-duckdb ]` (the perSystem pkgs overlay
+      # does not include customPackages from compose.nix).
       python = pkgs.python3.withPackages (
-        ps:
-        with ps;
-        [
+        ps: with ps; [
+          duckdb
           huggingface-hub
           pip
           trafilatura
-        ]
-        ++ [
-          config.packages.python-duckdb
         ]
       );
     in

@@ -23,6 +23,9 @@
 #     merged into the overlay scope. In perSystem context it doesn't exist,
 #     so fall back to nixpkgs' version.
 #     Update both packages: nix run .#update-duckdb
+#     Currently disabled: the by-name pair lives at pkgs/disabled/{duckdb,
+#     python-duckdb}/, so the `or pyPrev.duckdb` fallback below routes through
+#     nixpkgs everywhere. Reenable by moving the directories back.
 { ... }:
 {
   nixpkgsOverlays = [
