@@ -33,7 +33,7 @@
             # This validates the naming and basic structure without full deployment config
             mkVMNode =
               machineName:
-              { lib, ... }:
+              { lib, pkgs, ... }:
               {
                 imports = [
                   # Import srvos for SSH and server basics
@@ -45,6 +45,11 @@
                 # through flake.modules.nixos.base, so the workaround must repeat here
                 # to avoid the mkDefault collision on programs.command-not-found.enable.
                 programs.command-not-found.enable = lib.mkForce false;
+
+                # Pin to the LTS kernel line. The mainline kernel default surfaces
+                # latent IO-APIC/timer fragility under QEMU TCG when buildbot workers
+                # lack /dev/kvm, which panics guests at boot non-deterministically.
+                boot.kernelPackages = pkgs.linuxPackages_6_12;
 
                 # VM environment settings
                 virtualisation.memorySize = 1024;
