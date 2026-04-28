@@ -5,6 +5,35 @@
       ...
     }:
     {
+      # Pass the inputs nix-unit needs to override during evaluation, plus
+      # any transitive flake nodes whose locked URL is unreachable from the
+      # buildbot worker sandbox (no DNS in pure-eval mode).
+      #
+      # nix-unit-flake-parts emits each entry as `--override-input <key>
+      # <path>` (lib/modules/flake/system.nix). nix only honors the override
+      # when <key> matches either:
+      #   1. a top-level input of the flake under test, OR
+      #   2. a transitive input expressed as <parent>/<child> (slash syntax).
+      # Synthetic keys that don't match either form are SILENTLY DISCARDED
+      # (nix prints a "non-existent input" warning and proceeds with the
+      # original lockfile entry). Closure-presence of the path does NOT
+      # cause fetchTree to short-circuit; substitution and override are
+      # separate mechanisms.
+      #
+      # Transitive entries (slash-keyed, value is the transitive flake):
+      #   - "clan-core/nixpkgs": clan-core/flake.lock pins nixpkgs to a
+      #     releases.nixos.org/nixpkgs tarball not cached on cache.nixos.org
+      #     and not reachable from the buildbot sandbox. We deliberately do
+      #     NOT set clan-core.inputs.nixpkgs.follows in flake.nix because
+      #     doing so breaks cache.clan.lol substitution of clan-cli in the
+      #     devshell (different derivation hash). The transitive override
+      #     here is scoped to the check only — flake-wide follows is
+      #     unaffected.
+      #
+      # If a future buildbot run fails on a different transitive node
+      # (e.g. nixpkgs_3 from llm-agents, or nixpkgs_7 from
+      # nix-index-database), add a sibling entry of the form
+      #   "<top-level>/<sub>" = inputs.<top-level>.inputs.<sub>;
       nix-unit.inputs = {
         inherit (inputs)
           nixpkgs
@@ -31,6 +60,7 @@
           hercules-ci-effects
           ;
         inherit self;
+        "clan-core/nixpkgs" = inputs.clan-core.inputs.nixpkgs;
       };
 
       nix-unit.tests = {

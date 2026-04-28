@@ -30,9 +30,11 @@
         program = "${config.packages.git-xet.updateScript}";
       };
 
-      apps.update-duckdb = {
-        type = "app";
-        program = "${config.packages.duckdb.updateScript}";
-      };
+      # Disabled while pkgs/by-name/duckdb lives in pkgs/disabled/duckdb/.
+      # Restore alongside the directory move back to pkgs/by-name/.
+      # apps.update-duckdb = {
+      #   type = "app";
+      #   program = "${config.packages.duckdb.updateScript}";
+      # };
     };
 }

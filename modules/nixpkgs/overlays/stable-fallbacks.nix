@@ -26,12 +26,55 @@
       // (prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system == "aarch64-darwin") {
         # aarch64-darwin specific stable fallbacks
 
-        # dvc: pinned to stable while unstable build is broken
-        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/python313Packages.dvc.aarch64-darwin
-        # Failing build: https://hydra.nixos.org/build/326554391
-        # TODO: Remove when upstream fix lands in unstable
-        # Date added: 2026-04-19
-        dvc = final.stable.dvc;
+        # d2: pinned to stable while the unstable closure pulls libdrm-2.4.131
+        # transitively via mesa-libgbm. libdrm declares meta.platforms
+        # excluding darwin in the locked nixpkgs rev, so d2.drvPath eval-fails
+        # on aarch64-darwin even though Hydra's d2 builds cleanly at trunk
+        # (the cached d2 derivation does not match our locked rev's closure).
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/d2.aarch64-darwin
+        # TODO: Remove when the mesa-libgbm/libdrm closure issue is resolved
+        # upstream and our locked nixpkgs no longer pulls libdrm into d2.
+        # Date added: 2026-04-28
+        d2 = final.stable.d2;
+
+        # direnv: pinned to stable while local rebuild on our locked nixpkgs
+        # rev fails. Hydra builds direnv cleanly at trunk, but our pin lags
+        # the channel and the cached derivation does not match our closure,
+        # forcing a local rebuild that fails in this repo's environment.
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/direnv.aarch64-darwin
+        # TODO: Remove when the nixpkgs pin advances to a rev whose direnv
+        # derivation matches Hydra's cache.
+        # Date added: 2026-04-28
+        direnv = final.stable.direnv;
+
+        # quarto: same channel-lag situation as direnv. Hydra builds quarto
+        # cleanly at trunk; our locked rev's derivation closure differs and
+        # is not on cache.nixos.org, so activation falls back to a local
+        # rebuild that fails on aarch64-darwin.
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/quarto.aarch64-darwin
+        # TODO: Remove when the nixpkgs pin advances to a rev whose quarto
+        # derivation matches Hydra's cache.
+        # Date added: 2026-04-28
+        quarto = final.stable.quarto;
+
+        # lean4: same channel-lag situation. Activation triggers a local
+        # rebuild of lean4-4.29.1 (buildPhase). Stable provides lean4-4.29.0
+        # (one patch behind) which is in cache.nixos.org.
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/lean4.aarch64-darwin
+        # TODO: Remove when the nixpkgs pin advances to a rev whose lean4
+        # derivation matches Hydra's cache.
+        # Date added: 2026-04-28
+        lean4 = final.stable.lean4;
+
+        # bitwarden-cli: same channel-lag situation. Activation triggers a
+        # local rebuild of bitwarden-cli-2026.4.1 (patchPhase). Stable
+        # provides bitwarden-cli-2026.2.0 (a couple of releases behind);
+        # accept the downgrade until the channel advances.
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/bitwarden-cli.aarch64-darwin
+        # TODO: Remove when the nixpkgs pin advances to a rev whose
+        # bitwarden-cli derivation matches Hydra's cache.
+        # Date added: 2026-04-28
+        bitwarden-cli = final.stable.bitwarden-cli;
       })
       // (prev.lib.optionalAttrs prev.stdenv.isLinux {
         # Linux-wide stable fallbacks
