@@ -36,6 +36,26 @@
         # upstream and our locked nixpkgs no longer pulls libdrm into d2.
         # Date added: 2026-04-28
         d2 = final.stable.d2;
+
+        # direnv: pinned to stable while local rebuild on our locked nixpkgs
+        # rev fails. Hydra builds direnv cleanly at trunk, but our pin lags
+        # the channel and the cached derivation does not match our closure,
+        # forcing a local rebuild that fails in this repo's environment.
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/direnv.aarch64-darwin
+        # TODO: Remove when the nixpkgs pin advances to a rev whose direnv
+        # derivation matches Hydra's cache.
+        # Date added: 2026-04-28
+        direnv = final.stable.direnv;
+
+        # quarto: same channel-lag situation as direnv. Hydra builds quarto
+        # cleanly at trunk; our locked rev's derivation closure differs and
+        # is not on cache.nixos.org, so activation falls back to a local
+        # rebuild that fails on aarch64-darwin.
+        # Hydra: https://hydra.nixos.org/job/nixpkgs/unstable/quarto.aarch64-darwin
+        # TODO: Remove when the nixpkgs pin advances to a rev whose quarto
+        # derivation matches Hydra's cache.
+        # Date added: 2026-04-28
+        quarto = final.stable.quarto;
       })
       // (prev.lib.optionalAttrs prev.stdenv.isLinux {
         # Linux-wide stable fallbacks
