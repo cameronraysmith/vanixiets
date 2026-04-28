@@ -66,7 +66,7 @@
           git-xet
           gitmux
           graphite-cli
-          lumen
+          # lumen # disabled: moved to pkgs/disabled/lumen
           d2
           graphviz
           jc
@@ -87,7 +87,7 @@
           # beads-viewer  # disabled: incompatible with dolt backend
           dolt
           gastown
-          gitbutler-cli
+          # gitbutler-cli # disabled: moved to pkgs/disabled/gitbutler-cli
           golem-cli
           #------
           plantuml-c4
