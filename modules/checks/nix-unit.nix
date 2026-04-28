@@ -5,15 +5,57 @@
       ...
     }:
     {
-      # Pass the full input set (plus self) so nix-unit pre-fetches every
-      # transitive flake input — including channel-style nixpkgs tarballs
-      # pulled in by deeper inputs (buildbot-nix, niks3, hercules-ci-effects,
-      # etc.). An incomplete inherit list left transitive nixpkgs nodes
-      # (e.g. nixpkgs_2) outside the check's build closure, causing the
-      # sandbox to attempt network fetches at build time on workers without
-      # DNS. See logs/buildbot-63-199.log for the original failure mode.
-      nix-unit.inputs = inputs // {
+      # Pass the inputs nix-unit needs to override during evaluation, plus
+      # any transitive flake nodes whose locked URL is unreachable from the
+      # buildbot worker sandbox (no DNS in pure-eval mode). nix-unit-flake-
+      # parts coerces each value to its outPath, materialising the source
+      # tree into the check derivation's build closure; once a path with the
+      # matching narHash is in /nix/store, nix's fetchTree resolves locally
+      # instead of attempting the URL.
+      #
+      # Transitive entries (synthetic keys, value is the transitive flake):
+      #   - clan-core-nixpkgs: clan-core/flake.lock pins nixpkgs to a
+      #     releases.nixos.org/nixpkgs tarball that is not cached on
+      #     cache.nixos.org and not reachable from the buildbot sandbox.
+      #     We deliberately do NOT set clan-core.inputs.nixpkgs.follows in
+      #     flake.nix because doing so breaks cache.clan.lol substitution
+      #     of clan-cli in the devshell (different derivation hash).
+      #     Pre-realising clan-core's bundled nixpkgs into the check's
+      #     build closure reconciles the two.
+      #
+      # If a future buildbot run fails on a different transitive node
+      # (e.g. nixpkgs_3 from llm-agents, or nixpkgs_7 from
+      # nix-index-database), add a sibling entry of the form
+      #   <synthetic-key> = inputs.<top-level>.inputs.<sub>;
+      # The synthetic key need not match any top-level input — only the
+      # outPath coercion matters.
+      nix-unit.inputs = {
+        inherit (inputs)
+          nixpkgs
+          nixpkgs-darwin-stable
+          nixpkgs-linux-stable
+          flake-parts
+          systems
+          nix-darwin
+          home-manager
+          sops-nix
+          clan-core
+          import-tree
+          terranix
+          disko
+          srvos
+          treefmt-nix
+          git-hooks
+          nix-unit
+          lazyvim-nix
+          pkgs-by-name-for-flake-parts
+          nuenv
+          llm-agents
+          catppuccin
+          hercules-ci-effects
+          ;
         inherit self;
+        clan-core-nixpkgs = inputs.clan-core.inputs.nixpkgs;
       };
 
       nix-unit.tests = {
