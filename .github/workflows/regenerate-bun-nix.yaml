@@ -7,6 +7,7 @@ on:
       - bun.lock
       - package.json
       - "packages/**/package.json"
+      - flake.nix
 
 defaults:
   run:
@@ -37,6 +38,21 @@ jobs:
         uses: ./.github/actions/setup-nix
         with:
           system: x86_64-linux
+
+      - name: Regenerate flake.lock
+        run: nix flake lock
+
+      - name: Amend PR branch if flake.lock changed
+        run: |
+          if git diff --quiet -- flake.lock; then
+            echo "flake.lock already up-to-date; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flake.lock
+          git commit -m "chore(deps): regenerate flake.lock"
+          git push
 
       - name: Regenerate bun.nix
         run: nix run .#regenerate-bun-nix
