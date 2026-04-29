@@ -58,8 +58,7 @@
 
       # Import all command categories and merge
       allCommands =
-        (import ./_git-tools.nix { inherit pkgs lib config; })
-        // (import ./_nix-tools.nix { inherit pkgs lib config; })
+        (import ./_nix-tools.nix { inherit pkgs lib config; })
         // (import ./_file-tools.nix { inherit pkgs lib config; })
         // (import ./_dev-tools.nix { inherit pkgs lib config; })
         // (import ./_system-tools.nix { inherit pkgs lib config; })
