@@ -58,8 +58,7 @@
 
       # Import all command categories and merge
       allCommands =
-        (import ./_system-tools.nix { inherit pkgs lib config; })
-        // {
+        {
           # nsa-ref command with dynamically generated content
           nsa-ref = {
             text = ''
