@@ -9,7 +9,12 @@
 # rather than nix-unit because the assertion target is a pure attribute-name
 # list computed at outer eval time. nix-unit's expression-evaluation harness
 # adds no value over `diff -u` here.
-{ self, lib, ... }:
+{
+  self,
+  lib,
+  config,
+  ...
+}:
 {
   perSystem =
     { pkgs, ... }:
@@ -58,21 +63,18 @@
           ];
         };
 
-        structure-home-configurations = mkCheck {
-          name = "home-configurations";
-          actual = sortedNames self.homeConfigurations;
-          expected = [
-            "cameron@aarch64-darwin"
-            "cameron@aarch64-linux"
-            "cameron@x86_64-linux"
-            "crs58@aarch64-darwin"
-            "crs58@aarch64-linux"
-            "crs58@x86_64-linux"
-            "raquel@aarch64-darwin"
-            "raquel@aarch64-linux"
-            "raquel@x86_64-linux"
-          ];
-        };
+        structure-home-configurations =
+          let
+            enumerableUsers = lib.attrNames (lib.filterAttrs (_: u: u.aggregates != [ ]) config.flake.users);
+            expectedKeys = lib.naturalSort (
+              lib.concatMap (u: map (s: "${u}@${s}") config.systems) enumerableUsers
+            );
+          in
+          mkCheck {
+            name = "home-configurations";
+            actual = sortedNames self.homeConfigurations;
+            expected = expectedKeys;
+          };
       };
     };
 }

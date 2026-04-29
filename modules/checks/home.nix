@@ -6,19 +6,24 @@
 # activates, so binding it as a check following ironstar's package-as-check
 # idiom (modules/rust.nix:249-251) exercises the full home closure per system.
 #
-# Systems: aarch64-darwin, aarch64-linux, x86_64-linux
-# Users: crs58, raquel
+# Iterates every user emitted into `homeConfigurations` for the current system
+# — including aliases (e.g. cameron) materialized by `aliases-fold.nix` — by
+# filtering `flake.users` to those with non-empty `aggregates`. Single source
+# of truth: drift between `configurations.nix`'s emission rule and this check
+# set is impossible.
 #
 # Closes: nix-144.4
-{ self, lib, ... }:
+{
+  self,
+  lib,
+  config,
+  ...
+}:
 {
   perSystem =
     { system, ... }:
     let
-      users = [
-        "crs58"
-        "raquel"
-      ];
+      enumerableUsers = lib.attrNames (lib.filterAttrs (_: u: u.aggregates != [ ]) config.flake.users);
     in
     {
       checks = lib.listToAttrs (
@@ -29,7 +34,7 @@
               description = "Build ${user}'s home-manager activation package for ${system}";
             };
           });
-        }) users
+        }) enumerableUsers
       );
     };
 }

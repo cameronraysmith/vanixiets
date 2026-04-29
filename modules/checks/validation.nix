@@ -15,11 +15,41 @@
     {
       checks = {
         # TC-020: Home Module Exports
-        # Purpose: Validate portable home modules exported to flake module namespace
+        # Purpose: Validate per-user home-manager modules (both `users/<u>` full
+        # content and `portable/<u>` content-only subset) are exported to the
+        # `flake.modules.homeManager` namespace for every typed user.
         home-module-exports =
+          let
+            # Primary users only — aliases (e.g. cameron) inherit their target's
+            # registered modules via configurations.nix composition, they don't
+            # contribute their own `users/<u>` or `portable/<u>` registry keys.
+            userNames = builtins.attrNames (
+              builtins.removeAttrs config.flake.users (builtins.attrNames config.flake.userAliases)
+            );
+            mkAssert = key: ''
+              ${
+                if builtins.hasAttr key config.flake.modules.homeManager then
+                  ''echo "OK: ${key} home module found in namespace"''
+                else
+                  ''echo "ERROR: ${key} home module not found in namespace" >&2 && exit 1''
+              }
+              ${
+                if config.flake.modules.homeManager.${key} != null then
+                  ''echo "OK: ${key} module is defined (not null)"''
+                else
+                  ''echo "ERROR: ${key} module is null" >&2 && exit 1''
+              }
+            '';
+            assertions = builtins.concatStringsSep "\n" (
+              builtins.concatMap (u: [
+                (mkAssert "users/${u}")
+                (mkAssert "portable/${u}")
+              ]) userNames
+            );
+          in
           pkgs.runCommand "home-module-exports"
             {
-              passthru.meta.description = "Validate home modules exported to flake.modules.homeManager namespace";
+              passthru.meta.description = "Validate per-user home modules (users/<u> + portable/<u>) exported to flake.modules.homeManager";
             }
             ''
               echo "Validating home module exports..."
@@ -32,37 +62,9 @@
                   ''echo "ERROR: homeManager namespace not found" >&2 && exit 1''
               }
 
-              # Check that the modules exist in the namespace
-              ${
-                if builtins.hasAttr "users/crs58" config.flake.modules.homeManager then
-                  ''echo "OK: crs58 home module found in namespace"''
-                else
-                  ''echo "ERROR: crs58 home module not found in namespace" >&2 && exit 1''
-              }
+              ${assertions}
 
-              ${
-                if builtins.hasAttr "users/raquel" config.flake.modules.homeManager then
-                  ''echo "OK: raquel home module found in namespace"''
-                else
-                  ''echo "ERROR: raquel home module not found in namespace" >&2 && exit 1''
-              }
-
-              # Check that modules are defined (not null)
-              ${
-                if config.flake.modules.homeManager."users/crs58" != null then
-                  ''echo "OK: crs58 module is defined (not null)"''
-                else
-                  ''echo "ERROR: crs58 module is null" >&2 && exit 1''
-              }
-
-              ${
-                if config.flake.modules.homeManager."users/raquel" != null then
-                  ''echo "OK: raquel module is defined (not null)"''
-                else
-                  ''echo "ERROR: raquel module is null" >&2 && exit 1''
-              }
-
-              echo "Home module exports validated (namespace + definitions)"
+              echo "Home module exports validated for ${toString (builtins.length userNames)} users (users/<u> + portable/<u>)"
               touch $out
             '';
 
