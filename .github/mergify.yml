@@ -86,7 +86,7 @@ merge_queue:
 
 queue_rules:
   # Human PRs: fast-forward merge preserves original commit SHAs end-to-end.
-  # Single-step CI (only merge_conditions, no queue_conditions) is required
+  # Single-step CI (queue_conditions only, no merge_conditions) is required
   # for inplace mode alongside batch_size: 1 and max_parallel_checks: 1.
   - name: default
     merge_method: fast-forward
@@ -94,7 +94,7 @@ queue_rules:
     update_bot_account: cameronraysmith
     batch_size: 1
     checks_timeout: 3600
-    merge_conditions:
+    queue_conditions:
       - -conflict
       - and: *required_checks
 
