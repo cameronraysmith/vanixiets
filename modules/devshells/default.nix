@@ -38,6 +38,7 @@
           inputs'.nix2container.packages.skopeo-nix2container
           pkgs.just
           pkgs.nh
+          pkgs.omnix
           pkgs.nix-output-monitor
           self'.packages.nix-fast-build
           pkgs.nix-update
