@@ -1,21 +1,20 @@
 {
-  # OUTER: Flake-parts module signature
   lib,
   ...
 }:
 {
   flake.modules.homeManager."users/tara" =
     {
-      # INNER: Home-manager module signature
       config,
       pkgs,
       lib,
-      flake, # from extraSpecialArgs
+      flake,
       ...
     }:
     {
-      # Minimal initial secrets: signing key + public key only
-      # Additional secrets (github-token, huggingface-token, etc.) added as tara provides them
+      imports = [ flake.modules.homeManager."portable/tara" ];
+
+      # Minimal initial secrets: signing key + public key only.
       sops = {
         defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/tara/secrets.yaml";
         secrets = {
@@ -25,32 +24,23 @@
           ssh-public-key = { };
         };
 
-        # Generate allowed_signers file for git commit verification
         templates."allowed_signers" = {
           mode = "0400";
           path = "${config.xdg.configHome}/git/allowed_signers";
           content = ''
-            17519396+tarachari3@users.noreply.github.com namespaces="git" ${
-              config.sops.placeholder."ssh-public-key"
-            }
+            ${flake.users.tara.meta.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
           '';
         };
       };
 
-      home.stateVersion = "23.11";
-      home.username = lib.mkDefault "tara";
+      home.username = lib.mkDefault flake.users.tara.meta.username;
       home.homeDirectory = lib.mkDefault (
         if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
       );
 
-      # Git identity for tara
       programs.git.settings = {
-        user.name = "Tara Chari";
-        user.email = "17519396+tarachari3@users.noreply.github.com";
+        user.name = flake.users.tara.meta.fullname;
+        user.email = flake.users.tara.meta.email;
       };
-
-      home.packages = with pkgs; [
-        gh
-      ];
     };
 }
