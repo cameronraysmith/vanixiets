@@ -18,6 +18,7 @@
               runtimeInputs = [
                 pkgs.nh
               ];
+              meta.description = "Activate home-manager configuration for a user on the current system architecture (uses nh)";
               text = ''
                 set -euo pipefail
 

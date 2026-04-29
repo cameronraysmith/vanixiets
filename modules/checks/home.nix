@@ -24,7 +24,11 @@
       checks = lib.listToAttrs (
         map (user: {
           name = "vanixiets-home-${user}";
-          value = self.homeConfigurations."${user}@${system}".activationPackage;
+          value = (self.homeConfigurations."${user}@${system}".activationPackage).overrideAttrs (old: {
+            meta = (old.meta or { }) // {
+              description = "Build ${user}'s home-manager activation package for ${system}";
+            };
+          });
         }) users
       );
     };

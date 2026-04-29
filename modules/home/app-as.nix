@@ -17,6 +17,7 @@
             runtimeInputs = [
               pkgs.nix
             ];
+            meta.description = "Activate target user's home-manager content under operator's $USER and $HOME (same human, different login; mkForce identity override)";
             text = ''
               set -euo pipefail
 

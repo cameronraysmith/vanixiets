@@ -17,6 +17,7 @@
             runtimeInputs = [
               pkgs.nix
             ];
+            meta.description = "Trial-activate target user's portable subset under operator's $USER and $HOME (no secrets, stranger-safe)";
             text = ''
               set -euo pipefail
 

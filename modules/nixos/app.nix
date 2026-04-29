@@ -18,6 +18,7 @@
               runtimeInputs = [
                 pkgs.nh
               ];
+              meta.description = "Build and activate the NixOS configuration for a hostname (uses nh)";
               text = ''
                 set -euo pipefail
 
