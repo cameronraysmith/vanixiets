@@ -266,8 +266,7 @@ in
             inputs.lazyvim-nix.homeManagerModules.default
             # nix-index-database for comma command-not-found
             inputs.nix-index-database.homeModules.nix-index
-            # agents-md option module (requires flake arg from extraSpecialArgs)
-            ../../../home/modules/_agents-md.nix
+            flakeModulesHome.agents-md
             # Mac app integration (Spotlight, Launchpad)
             # Disabled: mac-app-util requires SBCL which has nixpkgs cache compatibility issues
             # inputs.mac-app-util.homeManagerModules.default
