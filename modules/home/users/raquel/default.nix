@@ -14,8 +14,8 @@
       ...
     }:
     {
-      # Aggregates imported via configurations.nix mkHomeConfig
-      # Productivity subset: development + shell (no ai tools)
+      # Compose portable content via registry reference (dendritic).
+      imports = [ flake.modules.homeManager."portable/raquel" ];
 
       # sops-nix configuration for raquel user
       # 5 secrets: development + shell aggregates (NO AI)
@@ -32,35 +32,24 @@
         };
 
         # Generate allowed_signers file using sops.templates
-        # Simpler than activation script - uses same pattern as rbw and mcp-servers
         templates."allowed_signers" = {
           mode = "0400";
           path = "${config.xdg.configHome}/git/allowed_signers";
           content = ''
-            raquel@example.com namespaces="git" ${config.sops.placeholder."ssh-public-key"}
+            ${flake.users.raquel.meta.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
           '';
         };
       };
 
-      home.stateVersion = "23.11";
-      home.username = lib.mkDefault "raquel";
+      home.username = lib.mkDefault flake.users.raquel.meta.username;
       home.homeDirectory = lib.mkDefault (
         if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
       );
 
-      # Override git module defaults with user-specific values
+      # User-specific git identity from typed meta.
       programs.git.settings = {
-        user.name = "Raquel";
-        user.email = "raquel@example.com";
+        user.name = flake.users.raquel.meta.fullname;
+        user.email = flake.users.raquel.meta.email;
       };
-
-      home.packages = with pkgs; [
-        gh # GitHub CLI (keep from baseline)
-        just # Command runner
-        ripgrep # Fast grep alternative
-        fd # Fast find alternative
-        bat # Cat with syntax highlighting
-        eza # Modern ls replacement
-      ];
     };
 }
