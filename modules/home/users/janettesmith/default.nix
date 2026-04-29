@@ -44,9 +44,10 @@
       };
 
       home.stateVersion = "23.11";
-      home.username = "janettesmith";
-      home.homeDirectory =
-        if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}";
+      home.username = lib.mkDefault "janettesmith";
+      home.homeDirectory = lib.mkDefault (
+        if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
+      );
 
       # Override git module defaults with user-specific values
       programs.git.settings = {
