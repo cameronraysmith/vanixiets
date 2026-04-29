@@ -4,14 +4,6 @@
   config,
 }:
 {
-  # npm claude code with dangerously skip permissions
-  npmccds = {
-    runtimeInputs = with pkgs; [ bun ];
-    text = ''
-      exec bunx -p @anthropic-ai/claude-code@next claude --dangerously-skip-permissions "$@"
-    '';
-  };
-
   # tmux resurrect session restore
   tre = {
     runtimeInputs = with pkgs; [
