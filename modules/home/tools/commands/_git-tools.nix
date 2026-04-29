@@ -48,35 +48,6 @@
     '';
   };
 
-  # git log as JSON
-  gitjson = {
-    runtimeInputs = with pkgs; [
-      git
-      jc
-      nushell
-    ];
-    text = ''
-      case "''${1:-}" in
-        -h|--help)
-          cat <<'HELP'
-      Display git log as JSON
-
-      Usage: gitjson
-
-      Converts git log output to JSON format using jc and displays
-      it with nushell for better formatting.
-
-      Example:
-        gitjson    # Show entire git log as JSON
-      HELP
-          exit 0
-          ;;
-      esac
-
-      exec nu -c "git log | jc --git-log | from json"
-    '';
-  };
-
   # git log lines as JSON
   gitjsonl = {
     runtimeInputs = with pkgs; [
