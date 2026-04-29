@@ -1,8 +1,9 @@
 # agents-md option module
 # Defines programs.agents-md option for generating AI agent configuration files
-# Generates 5 config files:
+# Generates 6 config files:
 #   - ~/.claude/CLAUDE.md
 #   - ~/.codex/AGENTS.md
+#   - ~/.factory/AGENTS.md
 #   - ~/.gemini/GEMINI.md
 #   - ~/.config/crush/CRUSH.md
 #   - ~/.config/opencode/AGENTS.md
@@ -38,6 +39,7 @@ in
         home.file = {
           ".claude/CLAUDE.md".text = cfg.settings.text;
           ".codex/AGENTS.md".text = cfg.settings.text;
+          ".factory/AGENTS.md".text = cfg.settings.text;
           ".gemini/GEMINI.md".text = cfg.settings.text;
         };
       };
