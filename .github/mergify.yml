@@ -43,7 +43,6 @@ pull_request_rules:
     actions:
       review:
         type: APPROVE
-        message: Owner self-approval via author-approved label
 
   # Optional: uncomment to auto-approve bot PRs (currently requires manual approval)
   # - name: auto-approve bot PRs
