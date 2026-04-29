@@ -60,7 +60,6 @@
       allCommands =
         (import ./_nix-tools.nix { inherit pkgs lib config; })
         // (import ./_file-tools.nix { inherit pkgs lib config; })
-        // (import ./_dev-tools.nix { inherit pkgs lib config; })
         // (import ./_system-tools.nix { inherit pkgs lib config; })
         // {
           # nsa-ref command with dynamically generated content
