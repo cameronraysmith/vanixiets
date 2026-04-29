@@ -171,17 +171,15 @@ nix-flake-io:
     echo "(empty)"
   fi
 
-  # homeConfigurations: per-system × username (vanixiets system-nested shape)
+  # homeConfigurations: flat <user>@<system> (vanixiets flat-tuple shape)
   printf "\n## homeConfigurations\n"
-  for s in "${systems[@]}"; do
-    if users=$(nix eval ".#homeConfigurations.${s}" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'); then
-      if [ -n "$users" ]; then
-        while IFS= read -r u; do
-          printf "%s.%s\n" "$s" "$u"
-        done <<< "$users"
-      fi
+  if entries=$(nix eval ".#homeConfigurations" --apply builtins.attrNames --json 2>/dev/null | jq -r '.[]'); then
+    if [ -n "$entries" ]; then
+      while IFS= read -r e; do
+        printf "%s\n" "$e"
+      done <<< "$entries"
     fi
-  done
+  fi
 
   # nixidyEnvs: per-system × env
   printf "\n## nixidyEnvs\n"

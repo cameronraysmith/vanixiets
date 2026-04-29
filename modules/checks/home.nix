@@ -1,6 +1,6 @@
 # Home-manager activationPackage build-realization checks.
 #
-# Wires each homeConfigurations.<system>.<user> activationPackage as a flake
+# Wires each homeConfigurations."<user>@<system>" activationPackage as a flake
 # check, closing the silently-no-op build gap reported in bead nix-144.4. The
 # activationPackage is the already-built derivation that `home-manager switch`
 # activates, so binding it as a check following ironstar's package-as-check
@@ -24,7 +24,7 @@
       checks = lib.listToAttrs (
         map (user: {
           name = "vanixiets-home-${user}";
-          value = self.homeConfigurations.${system}.${user}.activationPackage;
+          value = self.homeConfigurations."${user}@${system}".activationPackage;
         }) users
       );
     };

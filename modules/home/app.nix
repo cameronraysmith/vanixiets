@@ -66,8 +66,8 @@
 
                 system="${system}"
                 # Full flake attribute path including activationPackage
-                # Format: flake#homeConfigurations.SYSTEM.USERNAME.activationPackage
-                config_path="homeConfigurations.$system.$username.activationPackage"
+                # Format: flake#homeConfigurations."USERNAME@SYSTEM".activationPackage
+                config_path="homeConfigurations.\"$username@$system\".activationPackage"
 
                 cat <<-EOF
                 	Activating home-manager configuration...

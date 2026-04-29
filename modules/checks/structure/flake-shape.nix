@@ -58,22 +58,19 @@
           ];
         };
 
-        structure-home-configurations-linux = mkCheck {
-          name = "home-configurations-linux";
-          actual = sortedNames self.homeConfigurations.x86_64-linux;
-          expected = [
-            "crs58"
-            "raquel"
-          ];
-        };
-
-        structure-home-configurations-systems = mkCheck {
-          name = "home-configurations-systems";
+        structure-home-configurations = mkCheck {
+          name = "home-configurations";
           actual = sortedNames self.homeConfigurations;
           expected = [
-            "aarch64-darwin"
-            "aarch64-linux"
-            "x86_64-linux"
+            "cameron@aarch64-darwin"
+            "cameron@aarch64-linux"
+            "cameron@x86_64-linux"
+            "crs58@aarch64-darwin"
+            "crs58@aarch64-linux"
+            "crs58@x86_64-linux"
+            "raquel@aarch64-darwin"
+            "raquel@aarch64-linux"
+            "raquel@x86_64-linux"
           ];
         };
       };

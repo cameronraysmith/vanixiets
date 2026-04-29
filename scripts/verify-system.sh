@@ -70,14 +70,14 @@ if [ $FAILED -eq 0 ]; then
         echo "Detected home-manager-only configuration: $USER"
         SYSTEM=$($NIX_CMD eval --impure --raw --expr 'builtins.currentSystem')
         if command -v nom &> /dev/null; then
-            if nom build ".#legacyPackages.$SYSTEM.homeConfigurations.$USER.activationPackage"; then
+            if nom build ".#homeConfigurations.\"$USER@$SYSTEM\".activationPackage"; then
                 echo "✓ Home-manager configuration builds successfully"
             else
                 echo "✗ Home-manager build failed"
                 FAILED=1
             fi
         else
-            if $NIX_CMD build ".#legacyPackages.$SYSTEM.homeConfigurations.$USER.activationPackage"; then
+            if $NIX_CMD build ".#homeConfigurations.\"$USER@$SYSTEM\".activationPackage"; then
                 echo "✓ Home-manager configuration builds successfully"
             else
                 echo "✗ Home-manager build failed"

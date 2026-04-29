@@ -67,61 +67,55 @@
             '';
 
         # TC-021: Home Configurations Exposed
-        # Purpose: Validate nested homeConfigurations exposed in flake outputs
-        # Structure: homeConfigurations.${system}.${username}
+        # Purpose: Validate flat homeConfigurations exposed in flake outputs
+        # Structure: homeConfigurations."<user>@<system>"
         home-configurations-exposed =
           pkgs.runCommand "home-configurations-exposed"
             {
-              passthru.meta.description = "Validate nested homeConfigurations exposed for nh CLI";
+              passthru.meta.description = "Validate flat homeConfigurations exposed for nh CLI and flake-schemas";
             }
             ''
-              echo "Validating homeConfigurations exposure (nested by system)..."
+              echo "Validating homeConfigurations exposure (flat <user>@<system>)..."
 
-              # Check that system-level structure exists
+              # Check that crs58@<system> exists
               ${
-                if builtins.hasAttr system self.homeConfigurations then
-                  ''echo "OK: homeConfigurations.${system} exists"''
+                if builtins.hasAttr "crs58@${system}" self.homeConfigurations then
+                  ''echo "OK: homeConfigurations.\"crs58@${system}\" exposed"''
                 else
-                  ''echo "ERROR: homeConfigurations.${system} not found" >&2 && exit 1''
+                  ''echo "ERROR: homeConfigurations.\"crs58@${system}\" not found" >&2 && exit 1''
               }
 
-              # Check that user configs exist under current system
+              # Check that raquel@<system> exists
               ${
-                if builtins.hasAttr "crs58" self.homeConfigurations.${system} then
-                  ''echo "OK: homeConfigurations.${system}.crs58 exposed"''
+                if builtins.hasAttr "raquel@${system}" self.homeConfigurations then
+                  ''echo "OK: homeConfigurations.\"raquel@${system}\" exposed"''
                 else
-                  ''echo "ERROR: homeConfigurations.${system}.crs58 not found" >&2 && exit 1''
+                  ''echo "ERROR: homeConfigurations.\"raquel@${system}\" not found" >&2 && exit 1''
               }
 
-              ${
-                if builtins.hasAttr "raquel" self.homeConfigurations.${system} then
-                  ''echo "OK: homeConfigurations.${system}.raquel exposed"''
-                else
-                  ''echo "ERROR: homeConfigurations.${system}.raquel not found" >&2 && exit 1''
-              }
-
-              # Check that configs are derivations (buildable)
+              # Check that crs58 entry has activationPackage
               ${
                 if
-                  builtins.isAttrs self.homeConfigurations.${system}.crs58
-                  && builtins.hasAttr "activationPackage" self.homeConfigurations.${system}.crs58
+                  builtins.isAttrs self.homeConfigurations."crs58@${system}"
+                  && builtins.hasAttr "activationPackage" self.homeConfigurations."crs58@${system}"
                 then
-                  ''echo "OK: homeConfigurations.${system}.crs58 is buildable (has activationPackage)"''
+                  ''echo "OK: homeConfigurations.\"crs58@${system}\" is buildable (has activationPackage)"''
                 else
-                  ''echo "ERROR: homeConfigurations.${system}.crs58 missing activationPackage" >&2 && exit 1''
+                  ''echo "ERROR: homeConfigurations.\"crs58@${system}\" missing activationPackage" >&2 && exit 1''
               }
 
+              # Check that raquel entry has activationPackage
               ${
                 if
-                  builtins.isAttrs self.homeConfigurations.${system}.raquel
-                  && builtins.hasAttr "activationPackage" self.homeConfigurations.${system}.raquel
+                  builtins.isAttrs self.homeConfigurations."raquel@${system}"
+                  && builtins.hasAttr "activationPackage" self.homeConfigurations."raquel@${system}"
                 then
-                  ''echo "OK: homeConfigurations.${system}.raquel is buildable (has activationPackage)"''
+                  ''echo "OK: homeConfigurations.\"raquel@${system}\" is buildable (has activationPackage)"''
                 else
-                  ''echo "ERROR: homeConfigurations.${system}.raquel missing activationPackage" >&2 && exit 1''
+                  ''echo "ERROR: homeConfigurations.\"raquel@${system}\" missing activationPackage" >&2 && exit 1''
               }
 
-              echo "OK: Nested homeConfigurations validated for ${system}"
+              echo "OK: Flat homeConfigurations validated for ${system}"
               touch $out
             '';
 

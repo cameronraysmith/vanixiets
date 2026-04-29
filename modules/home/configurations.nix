@@ -1,85 +1,55 @@
 {
-  inputs,
   config,
   lib,
   ...
 }:
 let
-  users = [
-    "crs58"
-    "raquel"
-  ];
+  # Auto-discover users that have opted in by setting a non-empty aggregates list.
+  # Users with `aggregates = [ ]` (today: christophersmith, janettesmith, tara) are
+  # not emitted in homeConfigurations until they opt in.
+  enumerableUsers = lib.filterAttrs (_: u: u.aggregates != [ ]) config.flake.users;
+  enumerableUserNames = lib.attrNames enumerableUsers;
 
-  # Create homeConfiguration for a specific user and system
-  mkHomeConfig =
-    username: system:
-    let
-      # Selective aggregate imports per user
-      # crs58: all aggregates (development, ai, shell)
-      # raquel: development + shell only (no ai tools)
-      aggregateImports =
-        if username == "crs58" then
-          [
-            config.flake.modules.homeManager.core
-            config.flake.modules.homeManager.development
-            config.flake.modules.homeManager.ai
-            config.flake.modules.homeManager.shell
-          ]
-        else if username == "raquel" then
-          [
-            config.flake.modules.homeManager.core
-            config.flake.modules.homeManager.development
-            config.flake.modules.homeManager.shell
-          ]
-        else
-          [ ]; # Default: no aggregates
-    in
-    inputs.home-manager.lib.homeManagerConfiguration {
-      # Create pkgs with all overlays including custom packages
-      # Use flake.overlays.default which includes all 5 layers + custom packages
-      pkgs = import inputs.nixpkgs {
-        inherit system;
-        config.allowUnfree = true;
-        overlays = [
-          config.flake.overlays.default
-        ];
-      };
-      # Pass flake as extraSpecialArgs for module access
-      # Include inputs so home-manager modules can access flake.inputs.*
-      extraSpecialArgs = {
-        flake = config.flake // {
-          inherit inputs;
+  # Direct entries: homeConfigurations."<user>@<system>"
+  userEntries = lib.listToAttrs (
+    lib.concatMap (
+      user:
+      map (system: {
+        name = "${user}@${system}";
+        value = config.flake.lib.mkHome {
+          inherit user system;
         };
-      };
-      modules = aggregateImports ++ [
-        config.flake.modules.homeManager."users/${username}"
-        # Add base sops-nix module for user-level secrets
-        # Imports sops-nix.homeManagerModules.sops and sets age.keyFile
-        config.flake.modules.homeManager.base-sops
-        # Add lazyvim home-manager module for neovim
-        inputs.lazyvim-nix.homeManagerModules.default
-      ];
-    };
+      }) config.systems
+    ) enumerableUserNames
+  );
 
-  # Generate all user configs for all systems
-  # Structure: homeConfigurations.${system}.${username}
-  mkAllConfigs = lib.genAttrs config.systems (
-    system: lib.genAttrs users (username: mkHomeConfig username system)
+  # Alias entries: homeConfigurations."<alias>@<system>" built from the
+  # aliased user's full content with `home.username` overridden to the alias.
+  # Aliases follow the same enumeration rule as direct users — only emitted
+  # when their target user has non-empty aggregates.
+  aliasEntries = lib.listToAttrs (
+    lib.concatMap (
+      { name, value }:
+      let
+        targetUser = value;
+        aliasName = name;
+      in
+      lib.optionals (lib.elem targetUser enumerableUserNames) (
+        map (system: {
+          name = "${aliasName}@${system}";
+          value = config.flake.lib.mkHome {
+            user = targetUser;
+            username = aliasName;
+            inherit system;
+          };
+        }) config.systems
+      )
+    ) (lib.attrsToList config.flake.userAliases)
   );
 in
 {
-  # Multi-aggregate organization (drupol-style):
-  #   - core: base config (catppuccin, fonts, bitwarden, xdg, session-variables, ssh)
-  #   - development: dev environment (git, jujutsu, neovim, wezterm, zed, starship, zsh)
-  #   - ai: AI-assisted tools (claude-code, mcp-servers, glm wrappers, ccstatusline)
-  #   - shell: shell/terminal environment (atuin, yazi, zellij, tmux, bash, nushell)
-  #   - packages: organized package sets (terminal, development, compute, security, database, publishing)
-  #   - terminal: terminal utilities (direnv, fzf, lsd, bat, btop, htop, jq, nix-index, zoxide)
-  #   - tools: additional tools (awscli, k9s, pandoc, nix, gpg, macchina, tealdeer, texlive)
-  # Aggregate modules under modules/home/{core,development,ai,shell,packages,terminal,tools,users}
-  # are auto-discovered by import-tree (see flake.nix).
-
-  # homeConfigurations organized by system, generated for all systems in config.systems
-  # Usage: nix build .#homeConfigurations.${system}.${username}
-  flake.homeConfigurations = mkAllConfigs;
+  # Flat-tuple shape: homeConfigurations."<user>@<system>"
+  # Compatible with flake-schemas (one-level walk) and home-manager CLI's
+  # explicit `--flake .#<user>@<system>` invocation.
+  flake.homeConfigurations = userEntries // aliasEntries;
 }
