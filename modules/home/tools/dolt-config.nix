@@ -40,7 +40,7 @@
           ''
         );
         "user.email" = gitCfg.user.email;
-        "user.name" = gitCfg.github.user;
+        "user.name" = gitCfg.user.name;
       };
     in
     {
