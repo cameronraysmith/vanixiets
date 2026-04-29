@@ -14,8 +14,8 @@
       ...
     }:
     {
-      # All aggregates imported via configurations.nix mkHomeConfig
-      # No local imports needed - all 17 modules available via aggregate merging
+      # Compose portable content via registry reference (dendritic).
+      imports = [ flake.modules.homeManager."portable/crs58" ];
 
       # sops-nix configuration for crs58/cameron user
       # 15 secrets: development + ai + shell aggregates
@@ -55,49 +55,39 @@
           mode = "0400";
           path = "${config.xdg.configHome}/git/allowed_signers";
           content = ''
-            cameron.ray.smith@gmail.com namespaces="git" ${config.sops.placeholder."ssh-public-key"}
+            ${flake.users.crs58.meta.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
           '';
         };
 
         # Note: Radicle keys deployed via home.file below (not sops.templates due to pure eval path issues)
       };
 
-      # Deploy radicle public key (not secret - can be plaintext)
+      # Deploy radicle public key (not secret - can be plaintext, but identity-bound)
       # This is the SSH public key used for Radicle node identity
       home.file.".radicle/keys/radicle.pub".text = ''
-        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+ cameron.ray.smith@gmail.com
+        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+ ${flake.users.crs58.meta.email}
       '';
 
       # Note: Radicle signing key linked via activation script in radicle.nix
       # Cannot use home.file.source with sops.secrets.path due to pure eval mode restrictions
       # TODO: Investigate sops-nix symlink option or activation script approach
 
-      home.stateVersion = "23.11";
-      # Username defaults to crs58 but can be overridden (e.g., for cameron alias)
-      home.username = lib.mkDefault "crs58";
+      # Username defaults to meta.username but can be overridden (e.g., for cameron alias).
+      home.username = lib.mkDefault flake.users.crs58.meta.username;
       home.homeDirectory = lib.mkDefault (
         if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
       );
 
-      # Override git module defaults with user-specific values
+      # User-specific git/jujutsu identity from typed meta.
+      # (Capability aggregates may consume meta directly in a later refactor.)
       programs.git.settings = {
-        user.name = "Cameron Smith";
-        user.email = "cameron.ray.smith@gmail.com";
+        user.name = flake.users.crs58.meta.fullname;
+        user.email = flake.users.crs58.meta.email;
       };
 
-      # Override jujutsu module defaults with user-specific values
       programs.jujutsu.settings.user = {
-        name = "Cameron Smith";
-        email = "cameron.ray.smith@gmail.com";
+        name = flake.users.crs58.meta.fullname;
+        email = flake.users.crs58.meta.email;
       };
-
-      home.packages =
-        with pkgs;
-        [
-          gh # GitHub CLI (keep from baseline)
-        ]
-        ++ [
-          flake.inputs.niks3.packages.${pkgs.stdenv.hostPlatform.system}.niks3
-        ];
     };
 }
