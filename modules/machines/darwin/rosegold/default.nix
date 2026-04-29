@@ -161,8 +161,7 @@ in
           inputs.lazyvim-nix.homeManagerModules.default
           # nix-index-database for comma command-not-found
           inputs.nix-index-database.homeModules.nix-index
-          # agents-md option module (requires flake arg from extraSpecialArgs)
-          ../../../home/modules/_agents-md.nix
+          flakeModulesHome.agents-md
         ];
 
         # cameron (admin user): crs58 identity with cameron username - 7 aggregates + ai
@@ -179,8 +178,7 @@ in
           inputs.lazyvim-nix.homeManagerModules.default
           # nix-index-database for comma command-not-found
           inputs.nix-index-database.homeModules.nix-index
-          # agents-md option module (requires flake arg from extraSpecialArgs)
-          ../../../home/modules/_agents-md.nix
+          flakeModulesHome.agents-md
         ];
 
         # Override cameron's home.username from crs58 to cameron
