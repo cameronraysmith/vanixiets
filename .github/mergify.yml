@@ -78,17 +78,24 @@ pull_request_rules:
       queue:
         name: bot-updates
 
+merge_queue:
+  # Required for inplace fast-forward checks (no batch-PR merge commit).
+  # Constrains all queues to one batch tested at a time, which is fine for
+  # this repository's traffic.
+  max_parallel_checks: 1
+
 queue_rules:
-  # Human PRs: fast-forward merge preserves original commit SHAs end-to-end
+  # Human PRs: fast-forward merge preserves original commit SHAs end-to-end.
+  # Single-step CI (only merge_conditions, no queue_conditions) is required
+  # for inplace mode alongside batch_size: 1 and max_parallel_checks: 1.
   - name: default
     merge_method: fast-forward
     update_method: rebase
     update_bot_account: cameronraysmith
     batch_size: 1
     checks_timeout: 3600
-    queue_conditions:
-      - -conflict
     merge_conditions:
+      - -conflict
       - and: *required_checks
 
   # Bot PRs: squash merge with batching for CI efficiency
