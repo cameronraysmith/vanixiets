@@ -59,7 +59,9 @@
               "store --file ${config.home.homeDirectory}/.git-credentials"
             ]
             ++ lib.optionals pkgs.stdenv.isDarwin [ "osxkeychain" ];
-            github.user = "cameronraysmith";
+            github = lib.mkIf (flake.users.${config.home.username}.meta.githubUser != null) {
+              user = flake.users.${config.home.username}.meta.githubUser;
+            };
             color.ui = true;
             diff.colorMoved = "zebra";
             fetch = {

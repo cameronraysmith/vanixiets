@@ -334,7 +334,7 @@
             path = "${config.home.homeDirectory}/.honcho/config.json";
             content = builtins.toJSON {
               apiKey = config.sops.placeholder."honcho-api-key";
-              peerName = "crs58";
+              peerName = config.home.username;
               hosts = {
                 claude_code = {
                   workspace = "claude_code";
