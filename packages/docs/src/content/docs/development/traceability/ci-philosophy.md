@@ -101,7 +101,7 @@ The flake defines checks in `modules/checks/` that run during `nix flake check`:
 
 **Validation checks** (all platforms):
 - `home-module-exports` — validates home modules exported to flake.modules.homeManager namespace
-- `home-configurations-exposed` — validates nested homeConfigurations exposed for nh CLI
+- `home-configurations-exposed` — validates flat-tuple homeConfigurations (`"<user>@<system>"`) exposed for nh CLI
 - `naming-conventions` — validates consistent kebab-case naming across machines
 - `terraform-validate` — validates generated terraform is syntactically correct
 - `deployment-safety` — verifies terraform configuration safety patterns

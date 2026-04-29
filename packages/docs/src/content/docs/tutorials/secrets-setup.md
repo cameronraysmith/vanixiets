@@ -423,10 +423,10 @@ Check sops-nix configuration:
 
 ```bash
 # Verify the sops configuration is being evaluated
-nix eval .#homeConfigurations.yourusername.config.sops.secrets --json | jq
+nix eval '.#homeConfigurations."yourusername@aarch64-darwin".config.sops.secrets' --json | jq
 
 # Check home-manager logs during activation
-home-manager switch --flake .#yourusername --show-trace 2>&1 | grep -i sops
+home-manager switch --flake '.#"yourusername@aarch64-darwin"' --show-trace 2>&1 | grep -i sops
 ```
 
 ### Permission denied on secret file

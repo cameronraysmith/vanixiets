@@ -288,7 +288,7 @@ resource.google_compute_instance.galena = {
 | `darwinConfigurations.stibnite` | `clan machines update stibnite` |
 | `darwinConfigurations.blackphos` | `clan machines update blackphos` |
 | `nixosConfigurations.cinnabar` | `clan machines update cinnabar` |
-| `homeConfigurations.crs58` | `nh home switch` |
+| `homeConfigurations."crs58@aarch64-darwin"` | `nh home switch` |
 
 ### Packages
 

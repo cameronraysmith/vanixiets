@@ -36,25 +36,29 @@ Users in this infrastructure are configured in one of two ways:
 
 ### User module locations
 
-User configurations follow the [deferred module composition pattern](/concepts/deferred-module-composition):
+User configurations follow the [deferred module composition pattern](/concepts/deferred-module-composition) and split each user into two registry entries:
 
 ```
 modules/
 ├── home/
 │   └── users/
-│       ├── crs58/           # crs58's portable home-manager module
-│       ├── raquel/          # raquel's portable home-manager module
-│       ├── cameron/         # cameron alias module
-│       ├── janettesmith/    # janettesmith's module
-│       └── christophersmith/ # christophersmith's module
+│       ├── crs58/           # exports portable/crs58 (content) and users/crs58 (full)
+│       ├── raquel/          # exports portable/raquel and users/raquel
+│       ├── cameron/         # exports portable/cameron and users/cameron
+│       ├── janettesmith/    # exports portable/janettesmith and users/janettesmith
+│       └── christophersmith/ # exports portable/christophersmith and users/christophersmith
 └── machines/
     └── darwin/
         ├── stibnite.nix     # imports users/crs58
         └── blackphos.nix    # imports users/crs58, users/raquel
 ```
 
-User modules are **portable** - they can be imported by any machine configuration.
-Machine configs select which user modules to include.
+Per-user content is split between two registry entries:
+
+- `flake.modules.homeManager."portable/<user>"` holds the *content* — programs, packages, and dotfiles that compose into any account.
+- `flake.modules.homeManager."users/<user>"` holds the *full* module — the portable content plus identity (`home.username`, `home.homeDirectory`) and secrets, with identity sourced from typed `flake.users.<user>.meta` and profile composition driven by `flake.users.<user>.aggregates`.
+
+Machine configs typically import the full `users/<user>` module; the `home-trial` flake app imports `portable/<user>` instead so a stranger can evaluate the dotfiles without the target's secrets or identity.
 
 ## Integrated user setup
 
@@ -233,7 +237,7 @@ Create a home configuration:
 # modules/machines/home/raquel-standalone.nix
 { config, ... }:
 {
-  flake.homeConfigurations."raquel" = config.lib.mkHomeConfiguration {
+  flake.homeConfigurations."raquel@aarch64-darwin" = config.lib.mkHomeConfiguration {
     pkgs = config.flake.pkgs.aarch64-darwin;
     modules = [
       config.flake.modules.homeManager."users/raquel"
@@ -253,7 +257,7 @@ Build and activate:
 
 ```bash
 # Build the configuration
-nix build .#homeConfigurations.raquel.activationPackage
+nix build '.#homeConfigurations."raquel@aarch64-darwin".activationPackage'
 
 # Activate
 ./result/activate
@@ -262,7 +266,7 @@ nix build .#homeConfigurations.raquel.activationPackage
 Or use the home-manager CLI:
 
 ```bash
-nix run home-manager/master -- switch --flake .#raquel
+nix run home-manager/master -- switch --flake '.#"raquel@aarch64-darwin"'
 ```
 
 ### Step 4: Ongoing updates
@@ -271,7 +275,7 @@ For subsequent updates:
 
 ```bash
 # Rebuild and activate
-home-manager switch --flake .#raquel
+home-manager switch --flake '.#"raquel@aarch64-darwin"'
 ```
 
 ---
@@ -597,7 +601,7 @@ sops -d secrets/users/raquel.sops.yaml
 ls -la ~/.local/state/nix/profiles/home-manager*
 
 # Verify user module builds
-nix build .#homeConfigurations.<user>.activationPackage
+nix build '.#homeConfigurations."<user>@<system>".activationPackage'
 ```
 
 ### Secrets not available

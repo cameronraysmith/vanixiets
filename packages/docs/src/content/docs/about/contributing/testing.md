@@ -106,7 +106,7 @@ Validation checks run shell commands to verify configuration correctness.
 | TC-ID | Check Name | Description |
 |-------|------------|-------------|
 | TC-020 | home-module-exports | Home modules exported to flake namespace |
-| TC-021 | home-configurations-exposed | Nested homeConfigurations exposed for nh CLI |
+| TC-021 | home-configurations-exposed | Flat-tuple homeConfigurations exposed for nh CLI |
 | TC-022 | naming-conventions | Machine names follow kebab-case |
 | TC-023 | terraform-validate | Terraform configuration syntactically valid |
 | TC-024 | terraform-config-structure | Terraform config has expected resources |

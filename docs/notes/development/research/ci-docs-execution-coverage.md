@@ -311,7 +311,7 @@ These documents provide partial traceability that this audit extends and validat
 | Check | Purpose |
 |-------|---------|
 | home-module-exports | Home modules export to flake.modules.homeManager |
-| home-configurations-exposed | Nested homeConfigurations exposed for nh CLI |
+| home-configurations-exposed | Flat-tuple homeConfigurations (`"<user>@<system>"`) exposed for nh CLI |
 | naming-conventions | Consistent kebab-case naming |
 | terraform-validate | Terraform syntax validation |
 | secrets-generation | Clan CLI availability |
