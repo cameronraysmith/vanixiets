@@ -29,11 +29,11 @@
 
                 	Examples:
                 	  # Remote usage (most common - uses default app)
-                	  nix run github:cameronraysmith/test-clan -- $current_user
-                	  nix run github:cameronraysmith/test-clan -- $current_user --dry
+                	  nix run github:cameronraysmith/vanixiets -- $current_user
+                	  nix run github:cameronraysmith/vanixiets -- $current_user --dry
 
                 	  # Explicit app reference (equivalent)
-                	  nix run github:cameronraysmith/test-clan#home -- $current_user
+                	  nix run github:cameronraysmith/vanixiets#home -- $current_user
 
                 	  # Development/local usage (override flake location)
                 	  nix run .#home -- $current_user .
@@ -44,7 +44,7 @@
 
                 	Arguments:
                 	  username  - User to activate home-manager for (required)
-                	  flake     - Flake path (optional, default: github:cameronraysmith/test-clan)
+                	  flake     - Flake path (optional, default: github:cameronraysmith/vanixiets)
                 	  NH_FLAGS  - Flags passed to 'nh home switch' (--dry, --verbose, --ask, etc.)
 
                 	This works even when run as root, as long as the target user exists.
@@ -61,7 +61,7 @@
                   flake="$1"
                   shift
                 else
-                  flake="github:cameronraysmith/test-clan"
+                  flake="github:cameronraysmith/vanixiets"
                 fi
 
                 system="${system}"
@@ -88,7 +88,7 @@
         };
 
         # Make home the default app for ergonomic usage:
-        # nix run github:cameronraysmith/test-clan -- crs58
+        # nix run github:cameronraysmith/vanixiets -- crs58
         default = config.apps.home;
       };
     };

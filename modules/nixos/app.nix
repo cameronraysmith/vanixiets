@@ -28,8 +28,8 @@
 
                 	Examples:
                 	  # Remote usage (most common)
-                	  nix run github:cameronraysmith/test-clan#os -- cinnabar
-                	  nix run github:cameronraysmith/test-clan#os -- cinnabar --dry
+                	  nix run github:cameronraysmith/vanixiets#os -- cinnabar
+                	  nix run github:cameronraysmith/vanixiets#os -- cinnabar --dry
 
                 	  # Development/local usage (override flake location)
                 	  nix run .#os -- cinnabar .
@@ -42,7 +42,7 @@
 
                 	Arguments:
                 	  hostname  - NixOS machine hostname (required)
-                	  flake     - Flake path (optional, default: github:cameronraysmith/test-clan)
+                	  flake     - Flake path (optional, default: github:cameronraysmith/vanixiets)
                 	  NH_FLAGS  - Flags passed to 'nh os switch' (--dry, --verbose, --ask, etc.)
 
                 	Safety:
@@ -63,7 +63,7 @@
                   flake="$1"
                   shift
                 else
-                  flake="github:cameronraysmith/test-clan"
+                  flake="github:cameronraysmith/vanixiets"
                 fi
 
                 cat <<-EOF
