@@ -36,6 +36,15 @@ pull_request_rules:
         add_users:
           - "{{ author }}"
 
+  - name: auto-approve owner-authored PRs with label
+    conditions:
+      - author=cameronraysmith
+      - label=author-approved
+    actions:
+      review:
+        type: APPROVE
+        message: Owner self-approval via author-approved label
+
   # Optional: uncomment to auto-approve bot PRs (currently requires manual approval)
   # - name: auto-approve bot PRs
   #   conditions:
@@ -70,9 +79,9 @@ pull_request_rules:
         name: bot-updates
 
 queue_rules:
-  # Human PRs: rebase merge preserves original commits with linear history
+  # Human PRs: fast-forward merge preserves original commit SHAs end-to-end
   - name: default
-    merge_method: rebase
+    merge_method: fast-forward
     update_method: rebase
     update_bot_account: cameronraysmith
     batch_size: 1
