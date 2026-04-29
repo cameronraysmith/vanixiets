@@ -286,9 +286,18 @@ check:
 
 # Validate flake checks via nix-fast-build (failure isolation, parallel eval+build, nom output)
 # --eval-workers 4: reduces SQLite eval-cache contention (harmless but noisy at default=ncpus)
+# nom=auto|on|off: auto disables nom when stdout is not a TTY (e.g., piped to tee)
 [group('nix')]
-check-fast:
-  nix-fast-build \
+check-fast nom="auto":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  case "{{nom}}" in
+    auto) [ -t 1 ] && flag="" || flag="--no-nom" ;;
+    on)   flag="" ;;
+    off)  flag="--no-nom" ;;
+    *) echo "nom must be auto|on|off" >&2; exit 1 ;;
+  esac
+  nix-fast-build $flag \
     --no-link \
     --option accept-flake-config true \
     --eval-workers 4 \
