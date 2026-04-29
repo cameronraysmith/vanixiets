@@ -1,25 +1,19 @@
 {
-  # OUTER: Flake-parts module signature
   lib,
   ...
 }:
 {
   flake.modules.homeManager."users/christophersmith" =
     {
-      # INNER: Home-manager module signature
       config,
       pkgs,
       lib,
-      flake, # from extraSpecialArgs
+      flake,
       ...
     }:
     {
-      # Aggregates imported via configurations.nix mkHomeConfig
-      # Productivity subset: development + shell (no ai tools)
-      # Basic user like raquel - 6 aggregates (core, development, packages, shell, terminal, tools)
+      imports = [ flake.modules.homeManager."portable/christophersmith" ];
 
-      # sops-nix configuration for christophersmith user
-      # 5 secrets: development + shell aggregates (NO AI)
       sops = {
         defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/christophersmith/secrets.yaml";
         secrets = {
@@ -27,41 +21,30 @@
           ssh-signing-key = {
             mode = "0400";
           };
-          ssh-public-key = { }; # For allowed_signers generation
+          ssh-public-key = { };
           bitwarden-email = { };
           atuin-key = { };
         };
 
-        # Generate allowed_signers file using sops.templates
-        # Simpler than activation script - uses same pattern as rbw and mcp-servers
         templates."allowed_signers" = {
           mode = "0400";
           path = "${config.xdg.configHome}/git/allowed_signers";
           content = ''
-            christophersmith@example.com namespaces="git" ${config.sops.placeholder."ssh-public-key"}
+            ${flake.users.christophersmith.meta.email} namespaces="git" ${
+              config.sops.placeholder."ssh-public-key"
+            }
           '';
         };
       };
 
-      home.stateVersion = "23.11";
-      home.username = lib.mkDefault "christophersmith";
+      home.username = lib.mkDefault flake.users.christophersmith.meta.username;
       home.homeDirectory = lib.mkDefault (
         if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
       );
 
-      # Override git module defaults with user-specific values
       programs.git.settings = {
-        user.name = "Christopher Smith";
-        user.email = "christophersmith@example.com";
+        user.name = flake.users.christophersmith.meta.fullname;
+        user.email = flake.users.christophersmith.meta.email;
       };
-
-      home.packages = with pkgs; [
-        gh # GitHub CLI (keep from baseline)
-        just # Command runner
-        ripgrep # Fast grep alternative
-        fd # Fast find alternative
-        bat # Cat with syntax highlighting
-        eza # Modern ls replacement
-      ];
     };
 }
