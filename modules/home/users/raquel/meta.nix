@@ -8,7 +8,7 @@
       githubUser = null;
       sopsAgeKeyId = null;
     };
-    profiles = with config.flake.lib.profiles.homeManager; [
+    profiles = with config.flake.profiles.homeManager; [
       core
       development
       shell

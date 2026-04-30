@@ -49,8 +49,8 @@
               contributes its `includes` list of deferred home-manager
               modules to the user's home configuration. Reference profiles
               by attribute access against
-              `config.flake.lib.profiles.homeManager`, e.g.
-              `with config.flake.lib.profiles.homeManager; [ core shell ]`.
+              `config.flake.profiles.homeManager`, e.g.
+              `with config.flake.profiles.homeManager; [ core shell ]`.
               An empty list signals that no `homeConfigurations` entry
               should be emitted for this user.
             '';

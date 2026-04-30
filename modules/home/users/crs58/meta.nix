@@ -8,7 +8,7 @@
       githubUser = "cameronraysmith";
       sopsAgeKeyId = "crs58";
     };
-    profiles = with config.flake.lib.profiles.homeManager; [
+    profiles = with config.flake.profiles.homeManager; [
       core
       development
       ai

@@ -38,4 +38,6 @@ in
       attribute access against `config.flake.profiles.<class>`.
     '';
   };
+
+  config.flake.lib.profileType = profileSubmodule;
 }
