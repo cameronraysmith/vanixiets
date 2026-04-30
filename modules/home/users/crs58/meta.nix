@@ -1,4 +1,4 @@
-{ ... }:
+{ config, ... }:
 {
   flake.users.crs58 = {
     meta = {
@@ -8,11 +8,11 @@
       githubUser = "cameronraysmith";
       sopsAgeKeyId = "crs58";
     };
-    aggregates = [
-      "core"
-      "development"
-      "ai"
-      "shell"
+    profiles = with config.flake.lib.profiles.homeManager; [
+      core
+      development
+      ai
+      shell
     ];
   };
 }

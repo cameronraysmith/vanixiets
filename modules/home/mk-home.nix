@@ -16,7 +16,7 @@
     }:
     let
       userMeta = config.flake.users.${user}.meta;
-      aggs = config.flake.users.${user}.aggregates;
+      profiles = config.flake.users.${user}.profiles;
 
       effectiveUsername = if username == null then userMeta.username else username;
       effectiveHomeDirectory =
@@ -29,8 +29,8 @@
 
       contentKey = if includePrivate then "users/${user}" else "portable/${user}";
 
-      aggregateModules = map (k: config.flake.lib.requireRegistryKey "homeManager" k) aggs;
-      contentModule = config.flake.lib.requireRegistryKey "homeManager" contentKey;
+      aggregateModules = lib.concatMap (p: p.includes) profiles;
+      contentModule = config.flake.modules.homeManager.${contentKey};
 
       identityOverride = lib.optional (username != null || homeDirectory != null) {
         home.username = lib.mkForce effectiveUsername;

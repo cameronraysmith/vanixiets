@@ -1,4 +1,4 @@
-{ ... }:
+{ config, ... }:
 {
   flake.users.tara = {
     meta = {
@@ -8,6 +8,6 @@
       githubUser = "tarachari3";
       sopsAgeKeyId = "tara";
     };
-    aggregates = [ ];
+    profiles = with config.flake.lib.profiles.homeManager; [ core ];
   };
 }

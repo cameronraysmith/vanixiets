@@ -4,10 +4,9 @@
   ...
 }:
 let
-  # Auto-discover users that have opted in by setting a non-empty aggregates list.
-  # Users with `aggregates = [ ]` (today: christophersmith, janettesmith, tara) are
-  # not emitted in homeConfigurations until they opt in.
-  enumerableUsers = lib.filterAttrs (_: u: u.aggregates != [ ]) config.flake.users;
+  # Auto-discover users that have opted in by setting a non-empty profiles list.
+  # A user with `profiles = [ ]` is not emitted in homeConfigurations.
+  enumerableUsers = lib.filterAttrs (_: u: u.profiles != [ ]) config.flake.users;
   enumerableUserNames = lib.attrNames enumerableUsers;
 
   # Direct entries: homeConfigurations."<user>@<system>"

@@ -1,4 +1,4 @@
-{ ... }:
+{ config, ... }:
 {
   flake.users.janettesmith = {
     meta = {
@@ -8,6 +8,6 @@
       githubUser = null;
       sopsAgeKeyId = null;
     };
-    aggregates = [ ];
+    profiles = with config.flake.lib.profiles.homeManager; [ core ];
   };
 }

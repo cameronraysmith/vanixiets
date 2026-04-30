@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ config, lib, ... }:
 {
   options.flake.users = lib.mkOption {
     description = ''
@@ -6,9 +6,9 @@
       configurations and capability aggregates.
 
       Each user provides identity metadata under `meta` and a list of
-      capability-aggregate registry keys under `aggregates`. The
-      `homeConfigurations` flake output is emitted only for users whose
-      `aggregates` is non-empty (conservative auto-discovery).
+      typed profile records under `profiles`. The `homeConfigurations`
+      flake output is emitted only for users whose `profiles` is
+      non-empty (conservative auto-discovery).
     '';
     default = { };
     type = lib.types.attrsOf (
@@ -41,14 +41,18 @@
               '';
             };
           };
-          aggregates = lib.mkOption {
-            type = lib.types.listOf lib.types.str;
+          profiles = lib.mkOption {
+            type = lib.types.listOf config.flake.lib.profileType;
             default = [ ];
             description = ''
-              Names of registered home-manager aggregate modules to include
-              for this user (e.g. `[ "core" "development" "shell" ]`). An
-              empty list signals that no `homeConfigurations` entry should
-              be emitted for this user.
+              Typed profile records this user adopts. Each profile
+              contributes its `includes` list of deferred home-manager
+              modules to the user's home configuration. Reference profiles
+              by attribute access against
+              `config.flake.lib.profiles.homeManager`, e.g.
+              `with config.flake.lib.profiles.homeManager; [ core shell ]`.
+              An empty list signals that no `homeConfigurations` entry
+              should be emitted for this user.
             '';
           };
         };

@@ -16,7 +16,7 @@
       meta = config.flake.users.${target}.meta // {
         username = alias;
       };
-      aggregates = config.flake.users.${target}.aggregates;
+      profiles = config.flake.users.${target}.profiles;
     }
   ) config.flake.userAliases;
 }

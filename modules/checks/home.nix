@@ -8,7 +8,7 @@
 #
 # Iterates every user emitted into `homeConfigurations` for the current system
 # — including aliases (e.g. cameron) materialized by `aliases-fold.nix` — by
-# filtering `flake.users` to those with non-empty `aggregates`. Single source
+# filtering `flake.users` to those with non-empty `profiles`. Single source
 # of truth: drift between `configurations.nix`'s emission rule and this check
 # set is impossible.
 #
@@ -23,7 +23,7 @@
   perSystem =
     { system, ... }:
     let
-      enumerableUsers = lib.attrNames (lib.filterAttrs (_: u: u.aggregates != [ ]) config.flake.users);
+      enumerableUsers = lib.attrNames (lib.filterAttrs (_: u: u.profiles != [ ]) config.flake.users);
     in
     {
       checks = lib.listToAttrs (

@@ -65,7 +65,7 @@
 
         structure-home-configurations =
           let
-            enumerableUsers = lib.attrNames (lib.filterAttrs (_: u: u.aggregates != [ ]) config.flake.users);
+            enumerableUsers = lib.attrNames (lib.filterAttrs (_: u: u.profiles != [ ]) config.flake.users);
             expectedKeys = lib.naturalSort (
               lib.concatMap (u: map (s: "${u}@${s}") config.systems) enumerableUsers
             );
