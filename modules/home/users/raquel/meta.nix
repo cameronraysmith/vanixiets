@@ -1,4 +1,4 @@
-{ ... }:
+{ config, ... }:
 {
   flake.users.raquel = {
     meta = {
@@ -8,10 +8,10 @@
       githubUser = null;
       sopsAgeKeyId = null;
     };
-    aggregates = [
-      "core"
-      "development"
-      "shell"
+    aggregates = with config.flake.modules.homeManager; [
+      core
+      development
+      shell
     ];
   };
 }

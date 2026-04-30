@@ -6,7 +6,7 @@
       configurations and capability aggregates.
 
       Each user provides identity metadata under `meta` and a list of
-      capability-aggregate registry keys under `aggregates`. The
+      capability-aggregate home-manager modules under `aggregates`. The
       `homeConfigurations` flake output is emitted only for users whose
       `aggregates` is non-empty (conservative auto-discovery).
     '';
@@ -42,12 +42,13 @@
             };
           };
           aggregates = lib.mkOption {
-            type = lib.types.listOf lib.types.str;
+            type = lib.types.listOf lib.types.deferredModule;
             default = [ ];
             description = ''
-              Names of registered home-manager aggregate modules to include
-              for this user (e.g. `[ "core" "development" "shell" ]`). An
-              empty list signals that no `homeConfigurations` entry should
+              Home-manager aggregate modules to include for this user, given
+              as direct references against `config.flake.modules.homeManager.<name>`
+              (e.g. `with config.flake.modules.homeManager; [ core development shell ]`).
+              An empty list signals that no `homeConfigurations` entry should
               be emitted for this user.
             '';
           };

@@ -29,8 +29,10 @@
 
       contentKey = if includePrivate then "users/${user}" else "portable/${user}";
 
-      aggregateModules = map (k: config.flake.lib.requireRegistryKey "homeManager" k) aggs;
-      contentModule = config.flake.lib.requireRegistryKey "homeManager" contentKey;
+      aggregateModules = aggs;
+      contentModule =
+        config.flake.modules.homeManager.${contentKey}
+          or (throw "vanixiets: no flake.modules.homeManager entry at key '${contentKey}'");
 
       identityOverride = lib.optional (username != null || homeDirectory != null) {
         home.username = lib.mkForce effectiveUsername;
