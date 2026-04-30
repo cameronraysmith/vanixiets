@@ -12,6 +12,7 @@
       core
       development
       shell
+      base-sops
     ];
   };
 }

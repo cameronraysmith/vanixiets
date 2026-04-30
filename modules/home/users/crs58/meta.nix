@@ -13,6 +13,7 @@
       development
       ai
       shell
+      base-sops
     ];
   };
 }

@@ -8,6 +8,9 @@
       githubUser = null;
       sopsAgeKeyId = null;
     };
-    profiles = with config.flake.profiles.homeManager; [ core ];
+    profiles = with config.flake.profiles.homeManager; [
+      core
+      base-sops
+    ];
   };
 }
