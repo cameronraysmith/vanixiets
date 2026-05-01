@@ -52,12 +52,6 @@
           inherit inputs;
         };
       };
-      modules =
-        aggregateModules
-        ++ [ contentModule ]
-        ++ lib.optional includePrivate config.flake.modules.homeManager.base-sops
-        ++ [ inputs.lazyvim-nix.homeManagerModules.default ]
-        ++ identityOverride
-        ++ extraModules;
+      modules = aggregateModules ++ [ contentModule ] ++ identityOverride ++ extraModules;
     };
 }
