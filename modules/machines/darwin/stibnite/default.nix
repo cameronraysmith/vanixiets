@@ -7,7 +7,6 @@
 }:
 let
   flakeModules = config.flake.modules.darwin;
-  flakeModulesHome = config.flake.modules.homeManager;
   flakeUsers = config.flake.users;
   # sops-nix requires flake in extraSpecialArgs
   flakeForHomeManager = config.flake // {

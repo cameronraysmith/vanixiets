@@ -5,7 +5,6 @@
 }:
 let
   flakeModules = config.flake.modules.nixos;
-  flakeModulesHome = config.flake.modules.homeManager;
   flakeUsers = config.flake.users;
 in
 {
