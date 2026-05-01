@@ -6,6 +6,7 @@
 let
   flakeModules = config.flake.modules.nixos;
   flakeModulesHome = config.flake.modules.homeManager;
+  flakeUsers = config.flake.users;
 in
 {
   flake.modules.nixos."machines/nixos/magnetite" =
@@ -109,19 +110,8 @@ in
 
       # cameron home-manager imports; infrastructure settings provided by the cameron inventory service.
       home-manager.users.cameron = {
-        imports = [
+        imports = flakeUsers.cameron.aggregates ++ [
           flakeModulesHome."users/crs58"
-          flakeModulesHome.base-sops
-          flakeModulesHome.ai
-          flakeModulesHome.core
-          flakeModulesHome.development
-          flakeModulesHome.packages
-          flakeModulesHome.shell
-          flakeModulesHome.terminal
-          flakeModulesHome.tools
-          inputs.lazyvim-nix.homeManagerModules.default
-          inputs.nix-index-database.homeModules.nix-index
-          flakeModulesHome.agents-md
         ];
         home.username = "cameron";
       };

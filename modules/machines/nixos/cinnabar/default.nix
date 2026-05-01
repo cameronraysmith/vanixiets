@@ -7,6 +7,7 @@ let
   # Capture outer config for use in imports
   flakeModules = config.flake.modules.nixos;
   flakeModulesHome = config.flake.modules.homeManager;
+  flakeUsers = config.flake.users;
 in
 {
   # Export host module to flake namespace
@@ -92,19 +93,8 @@ in
       # cameron home-manager module imports
       # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
       home-manager.users.cameron = {
-        imports = [
+        imports = flakeUsers.cameron.aggregates ++ [
           flakeModulesHome."users/crs58"
-          flakeModulesHome.base-sops
-          flakeModulesHome.ai
-          flakeModulesHome.core
-          flakeModulesHome.development
-          flakeModulesHome.packages
-          flakeModulesHome.shell
-          flakeModulesHome.terminal
-          flakeModulesHome.tools
-          inputs.lazyvim-nix.homeManagerModules.default
-          inputs.nix-index-database.homeModules.nix-index
-          flakeModulesHome.agents-md
         ];
         home.username = "cameron";
       };
