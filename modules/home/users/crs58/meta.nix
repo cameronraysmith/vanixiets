@@ -9,11 +9,15 @@
       sopsAgeKeyId = "crs58";
     };
     aggregates = with config.flake.modules.homeManager; [
+      base-sops
+      ai
       core
       development
-      ai
+      packages
       shell
-      base-sops
+      terminal
+      tools
+      agents-md
     ];
   };
 }

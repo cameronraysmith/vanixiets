@@ -9,10 +9,14 @@
       sopsAgeKeyId = null;
     };
     aggregates = with config.flake.modules.homeManager; [
+      base-sops
       core
       development
+      packages
       shell
-      base-sops
+      terminal
+      tools
+      agents-md
     ];
   };
 }
