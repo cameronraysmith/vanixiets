@@ -89,20 +89,26 @@ in
       hm-sops-bridge.users.cameron.sopsIdentity = "crs58";
       hm-sops-bridge.users.tara.sopsIdentity = "tara";
 
-      # cameron home-manager module imports
+      # cameron home-manager imports (alias for crs58): all slots materialized
+      # on flake.users.cameron by aliases-fold. Alias-keyed reads here keep
+      # call sites ignorant of alias->target relationships; identityOverride
+      # supplies the mkForce username/homeDirectory pinning.
       # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
       home-manager.users.cameron = {
-        imports = flakeUsers.cameron.aggregates ++ [
-          flakeModulesHome."users/crs58"
-        ];
+        imports =
+          flakeUsers.cameron.aggregates
+          ++ [ flakeUsers.cameron.contentPrivate ]
+          ++ [ flakeUsers.cameron.identityOverride ];
         home.username = "cameron";
       };
 
-      # tara home-manager module imports (ML researcher, no AI agent tooling)
+      # tara home-manager imports (ML researcher, no AI agent tooling):
+      # aggregates + typed contentPrivate + identityOverride.
       home-manager.users.tara = {
-        imports = flakeUsers.tara.aggregates ++ [
-          flakeModulesHome."users/tara"
-        ];
+        imports =
+          flakeUsers.tara.aggregates
+          ++ [ flakeUsers.tara.contentPrivate ]
+          ++ [ flakeUsers.tara.identityOverride ];
         home.username = "tara";
         programs.agents-md.enable = false;
       };

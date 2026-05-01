@@ -92,12 +92,16 @@ in
       # Bridge NixOS-level sops to home-manager for user secret key delivery
       hm-sops-bridge.users.cameron.sopsIdentity = "crs58";
 
-      # cameron home-manager module imports
+      # cameron home-manager imports (alias for crs58): all slots materialized
+      # on flake.users.cameron by aliases-fold. Alias-keyed reads here keep
+      # call sites ignorant of alias->target relationships; identityOverride
+      # supplies the mkForce username/homeDirectory pinning.
       # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
       home-manager.users.cameron = {
-        imports = flakeUsers.cameron.aggregates ++ [
-          flakeModulesHome."users/crs58"
-        ];
+        imports =
+          flakeUsers.cameron.aggregates
+          ++ [ flakeUsers.cameron.contentPrivate ]
+          ++ [ flakeUsers.cameron.identityOverride ];
         home.username = "cameron";
       };
     };
