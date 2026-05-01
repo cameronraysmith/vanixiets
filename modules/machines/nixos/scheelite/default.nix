@@ -112,7 +112,6 @@ in
           flakeUsers.tara.aggregates
           ++ [ flakeUsers.tara.contentPrivate ]
           ++ [ flakeUsers.tara.identityOverride ];
-        home.username = "tara";
         programs.agents-md.enable = false;
       };
     };
