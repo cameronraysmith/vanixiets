@@ -8,6 +8,7 @@
 let
   flakeModules = config.flake.modules.darwin;
   flakeModulesHome = config.flake.modules.homeManager;
+  flakeUsers = config.flake.users;
   # sops-nix requires flake in extraSpecialArgs
   flakeForHomeManager = config.flake // {
     inherit inputs;
@@ -251,25 +252,10 @@ in
           flake = flakeForHomeManager;
         };
 
-        # crs58 (admin + primary): Import portable home modules + base-sops
+        # crs58 (admin + primary): aggregates from typed user record
         users.crs58 = {
-          imports = [
+          imports = flakeUsers.crs58.aggregates ++ [
             flakeModulesHome."users/crs58"
-            flakeModulesHome.base-sops
-            flakeModulesHome.ai
-            flakeModulesHome.core
-            flakeModulesHome.development
-            flakeModulesHome.packages
-            flakeModulesHome.shell
-            flakeModulesHome.terminal
-            flakeModulesHome.tools
-            inputs.lazyvim-nix.homeManagerModules.default
-            # nix-index-database for comma command-not-found
-            inputs.nix-index-database.homeModules.nix-index
-            flakeModulesHome.agents-md
-            # Mac app integration (Spotlight, Launchpad)
-            # Disabled: mac-app-util requires SBCL which has nixpkgs cache compatibility issues
-            # inputs.mac-app-util.homeManagerModules.default
           ];
 
           # Incus k3s profiles (see ADR-004)

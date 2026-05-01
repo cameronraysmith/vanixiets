@@ -8,6 +8,7 @@
 let
   flakeModules = config.flake.modules.darwin;
   flakeModulesHome = config.flake.modules.homeManager;
+  flakeUsers = config.flake.users;
   # sops-nix requires flake in extraSpecialArgs
   flakeForHomeManager = config.flake // {
     inherit inputs;
@@ -148,40 +149,16 @@ in
           flake = flakeForHomeManager;
         };
 
-        # janettesmith (primary user): Basic user like raquel - 6 aggregates (NO ai)
-        users.janettesmith.imports = [
+        # janettesmith (primary user): aggregates from typed user record
+        users.janettesmith.imports = flakeUsers.janettesmith.aggregates ++ [
           flakeModulesHome."users/janettesmith"
-          flakeModulesHome.base-sops
-          flakeModulesHome.core
-          flakeModulesHome.development
-          flakeModulesHome.packages
-          flakeModulesHome.shell
-          flakeModulesHome.terminal
-          flakeModulesHome.tools
-          inputs.lazyvim-nix.homeManagerModules.default
-          # nix-index-database for comma command-not-found
-          inputs.nix-index-database.homeModules.nix-index
-          flakeModulesHome.agents-md
         ];
 
-        # cameron (admin user): crs58 identity with cameron username - 7 aggregates + ai
-        users.cameron.imports = [
+        # cameron (admin user): aggregates materialized from crs58 via aliases-fold;
+        # content from users/crs58; identity overridden to cameron.
+        users.cameron.imports = flakeUsers.cameron.aggregates ++ [
           flakeModulesHome."users/crs58"
-          flakeModulesHome.base-sops
-          flakeModulesHome.ai
-          flakeModulesHome.core
-          flakeModulesHome.development
-          flakeModulesHome.packages
-          flakeModulesHome.shell
-          flakeModulesHome.terminal
-          flakeModulesHome.tools
-          inputs.lazyvim-nix.homeManagerModules.default
-          # nix-index-database for comma command-not-found
-          inputs.nix-index-database.homeModules.nix-index
-          flakeModulesHome.agents-md
         ];
-
-        # Override cameron's home.username from crs58 to cameron
         users.cameron.home.username = "cameron";
       };
     };

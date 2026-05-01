@@ -8,6 +8,7 @@
 let
   flakeModules = config.flake.modules.darwin;
   flakeModulesHome = config.flake.modules.homeManager;
+  flakeUsers = config.flake.users;
   # sops-nix requires flake in extraSpecialArgs
   flakeForHomeManager = config.flake // {
     inherit inputs;
@@ -156,43 +157,14 @@ in
           flake = flakeForHomeManager;
         };
 
-        # crs58 (admin): Import portable home modules + base-sops
-        users.crs58.imports = [
+        # crs58 (admin): aggregates from typed user record
+        users.crs58.imports = flakeUsers.crs58.aggregates ++ [
           flakeModulesHome."users/crs58"
-          flakeModulesHome.base-sops
-          flakeModulesHome.ai
-          flakeModulesHome.core
-          flakeModulesHome.development
-          flakeModulesHome.packages
-          flakeModulesHome.shell
-          flakeModulesHome.terminal
-          flakeModulesHome.tools
-          inputs.lazyvim-nix.homeManagerModules.default
-          # nix-index-database for comma command-not-found
-          inputs.nix-index-database.homeModules.nix-index
-          flakeModulesHome.agents-md
-          # Mac app integration (Spotlight, Launchpad)
-          # Disabled: mac-app-util requires SBCL which has nixpkgs cache compatibility issues
-          # inputs.mac-app-util.homeManagerModules.default
         ];
 
-        # raquel (primary user): Import portable home modules + base-sops (NO ai)
-        users.raquel.imports = [
+        # raquel (primary user): aggregates from typed user record
+        users.raquel.imports = flakeUsers.raquel.aggregates ++ [
           flakeModulesHome."users/raquel"
-          flakeModulesHome.base-sops
-          flakeModulesHome.core
-          flakeModulesHome.development
-          flakeModulesHome.packages
-          flakeModulesHome.shell
-          flakeModulesHome.terminal
-          flakeModulesHome.tools
-          inputs.lazyvim-nix.homeManagerModules.default
-          # nix-index-database for comma command-not-found
-          inputs.nix-index-database.homeModules.nix-index
-          flakeModulesHome.agents-md
-          # Mac app integration (Spotlight, Launchpad)
-          # Disabled: mac-app-util requires SBCL which has nixpkgs cache compatibility issues
-          # inputs.mac-app-util.homeManagerModules.default
         ];
       };
     };
