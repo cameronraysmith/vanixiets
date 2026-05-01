@@ -8,7 +8,6 @@ let
       # INNER: Home-manager module signature
       config,
       pkgs,
-      lib,
       flake, # from extraSpecialArgs
       ...
     }:

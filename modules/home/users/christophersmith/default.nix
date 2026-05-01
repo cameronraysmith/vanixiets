@@ -1,5 +1,4 @@
 {
-  lib,
   ...
 }:
 let
@@ -7,7 +6,6 @@ let
     {
       config,
       pkgs,
-      lib,
       flake,
       ...
     }:

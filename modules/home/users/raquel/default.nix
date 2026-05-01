@@ -1,6 +1,5 @@
 {
   # OUTER: Flake-parts module signature
-  lib,
   ...
 }:
 let
@@ -9,7 +8,6 @@ let
       # INNER: Home-manager module signature
       config,
       pkgs,
-      lib,
       flake, # from extraSpecialArgs
       ...
     }:
