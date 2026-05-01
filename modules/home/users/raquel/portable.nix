@@ -23,6 +23,6 @@ let
     };
 in
 {
-  # Typed-slot writer (nix-0pd.17 A5: registry-key dual-write dropped).
+  # Typed-slot writer.
   flake.users.raquel.contentPortable = content;
 }

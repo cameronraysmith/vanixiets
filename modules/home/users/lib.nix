@@ -83,20 +83,15 @@
               (`<dC|nC>.<host>.config.home-manager.users.<u>`) pathways.
 
               For canonical users (entries declared directly in
-              `flake.users`), the default is the empty deferredModule
-              `{ }` — canonical identity is supplied by each user's own
-              content module (`users/<u>/default.nix`) via
-              `home.username = lib.mkDefault flake.users.<u>.meta.username`
-              and a self-referential `home.homeDirectory` derivation.
+              `flake.users`), this slot is written by
+              `users/<u>/identity.nix` with
+              `home.username = lib.mkDefault "<u>"` and a
+              self-referential `home.homeDirectory` derivation.
 
-              For alias users (materialized from `flake.userAliases` by
-              `aliases-fold.nix`), the alias-fold extension supplies
-              `lib.mkForce` setters that pin the alias name and
-              homeDirectory regardless of the inherited content
-              defaults. The mkForce priority breaks the otherwise-tied
-              `lib.mkDefault` merge between the target user's content
-              module (which sets the target's username) and the alias
-              record's identity expectations.
+              For alias users (materialized from `flake.userAliases`
+              by `aliases-fold.nix`), the alias-fold extension overrides
+              the inherited canonical identity with `lib.mkForce`
+              setters pinning the alias name and homeDirectory.
             '';
           };
         };

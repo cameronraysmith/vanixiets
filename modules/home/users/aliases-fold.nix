@@ -19,17 +19,13 @@
       aggregates = config.flake.users.${target}.aggregates;
       contentPrivate = config.flake.users.${target}.contentPrivate;
       contentPortable = config.flake.users.${target}.contentPortable;
-      # mkForce on `home.username` is required: the target user's content
-      # module sets `home.username = lib.mkDefault target.meta.username`
-      # ("crs58") while identity-fold synthesizes
-      # `home.username = lib.mkDefault meta.username` ("cameron" for the
-      # alias record) — two mkDefaults at priority 1000 with different
-      # values would be a defining-multiple-times error. mkForce
-      # (priority 50) breaks the tie. mkForce on `home.homeDirectory`
-      # is defense-in-depth: under current code the homeDirectory derives
-      # from `config.home.username` self-referentially, so mkForcing the
-      # username already pins the directory; the explicit mkForce here
-      # preserves the invariant against future code changes.
+      # mkForce on identity setters: the target user's `identity`
+      # (from `users/<target>/identity.nix`) sets
+      # `home.username = lib.mkDefault "<target>"` while the alias
+      # record needs the alias name. mkForce overrides the inherited
+      # mkDefault. mkForce on `home.homeDirectory` is the sole setter
+      # for the alias path, since the canonical homeDirectory derives
+      # self-referentially from `config.home.username`.
       identity =
         {
           config,

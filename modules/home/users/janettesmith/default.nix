@@ -10,7 +10,7 @@ let
       ...
     }:
     {
-      # Compose portable content via typed slot (nix-0pd.17 A5).
+      # Compose portable content via typed slot.
       imports = [ flake.users.janettesmith.contentPortable ];
 
       sops = {
@@ -35,9 +35,8 @@ let
       };
 
       # User-specific git identity from typed meta.
-      # (Identity setters home.username/home.homeDirectory now provided by
-      # users/janettesmith/identity.nix via
-      # flake.users.janettesmith.identity — nix-0pd.17 A5.)
+      # Identity setters (home.username/home.homeDirectory) live in
+      # users/janettesmith/identity.nix; alias overrides come from aliases-fold.nix.
       programs.git.settings = {
         user.name = flake.users.janettesmith.meta.fullname;
         user.email = flake.users.janettesmith.meta.email;
@@ -45,6 +44,6 @@ let
     };
 in
 {
-  # Typed-slot writer (nix-0pd.17 A5: registry-key dual-write dropped).
+  # Typed-slot writer.
   flake.users.janettesmith.contentPrivate = content;
 }
