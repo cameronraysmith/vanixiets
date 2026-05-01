@@ -1022,11 +1022,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1777344733,
-        "narHash": "sha256-55fi3dikMaaPI/fq+rlGRtMhowZZ52LmV5dMtVhNsnI=",
+        "lastModified": 1777604550,
+        "narHash": "sha256-1aJ+7Y1Gb71KTofv4zzY/WYnNpdiWH5RrzFvwML6xKo=",
         "owner": "farcaller",
         "repo": "nixhelm",
-        "rev": "88953fd1610d7e4e6cbd17fc4d45e1eeaea94823",
+        "rev": "c36e3ddc73d165945dc399edff27b906d49746ec",
         "type": "github"
       },
       "original": {
