@@ -3,8 +3,8 @@
   lib,
   ...
 }:
-{
-  flake.modules.homeManager."users/raquel" =
+let
+  content =
     {
       # INNER: Home-manager module signature
       config,
@@ -52,4 +52,8 @@
         user.email = flake.users.raquel.meta.email;
       };
     };
+in
+{
+  flake.modules.homeManager."users/raquel" = content;
+  flake.users.raquel.contentPrivate = content;
 }

@@ -1,8 +1,8 @@
 {
   ...
 }:
-{
-  flake.modules.homeManager."portable/janettesmith" =
+let
+  content =
     {
       pkgs,
       ...
@@ -19,4 +19,8 @@
         eza # Modern ls replacement
       ];
     };
+in
+{
+  flake.modules.homeManager."portable/janettesmith" = content;
+  flake.users.janettesmith.contentPortable = content;
 }

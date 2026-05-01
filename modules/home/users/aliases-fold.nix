@@ -17,6 +17,8 @@
         username = alias;
       };
       aggregates = config.flake.users.${target}.aggregates;
+      contentPrivate = config.flake.users.${target}.contentPrivate;
+      contentPortable = config.flake.users.${target}.contentPortable;
     }
   ) config.flake.userAliases;
 }

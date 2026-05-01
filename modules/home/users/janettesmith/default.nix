@@ -2,8 +2,8 @@
   lib,
   ...
 }:
-{
-  flake.modules.homeManager."users/janettesmith" =
+let
+  content =
     {
       config,
       pkgs,
@@ -45,4 +45,8 @@
         user.email = flake.users.janettesmith.meta.email;
       };
     };
+in
+{
+  flake.modules.homeManager."users/janettesmith" = content;
+  flake.users.janettesmith.contentPrivate = content;
 }

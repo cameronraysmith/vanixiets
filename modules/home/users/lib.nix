@@ -52,6 +52,37 @@
               be emitted for this user.
             '';
           };
+          contentPrivate = lib.mkOption {
+            type = lib.types.deferredModule;
+            default = { };
+            description = ''
+              Identity-bound, secret-bearing home-manager content for this
+              user (sops secrets, git/jujutsu user identity, deploy-time
+              keys). Composed by `mk-home` alongside `contentPortable` and
+              the capability aggregates.
+
+              Transitional during nix-0pd.17 dual-write: this slot mirrors
+              the content authored at
+              `flake.modules.homeManager."users/<u>"`. Consumers should
+              prefer this typed slot; the registry key is dropped in a
+              later commit.
+            '';
+          };
+          contentPortable = lib.mkOption {
+            type = lib.types.deferredModule;
+            default = { };
+            description = ''
+              Secret-free, identity-independent home-manager content for
+              this user. Available to `home-trial` alongside the same
+              capability aggregate selection.
+
+              Transitional during nix-0pd.17 dual-write: this slot mirrors
+              the content authored at
+              `flake.modules.homeManager."portable/<u>"`. Consumers should
+              prefer this typed slot; the registry key is dropped in a
+              later commit.
+            '';
+          };
         };
       }
     );

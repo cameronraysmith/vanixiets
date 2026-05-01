@@ -1,8 +1,8 @@
 {
   ...
 }:
-{
-  flake.modules.homeManager."portable/tara" =
+let
+  content =
     {
       pkgs,
       ...
@@ -14,4 +14,8 @@
         gh
       ];
     };
+in
+{
+  flake.modules.homeManager."portable/tara" = content;
+  flake.users.tara.contentPortable = content;
 }

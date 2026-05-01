@@ -3,8 +3,8 @@
   lib,
   ...
 }:
-{
-  flake.modules.homeManager."users/crs58" =
+let
+  content =
     {
       # INNER: Home-manager module signature
       config,
@@ -90,4 +90,11 @@
         email = flake.users.crs58.meta.email;
       };
     };
+in
+{
+  # Transitional dual-write (nix-0pd.17 A1): typed slot + registry key
+  # share the same module body via `content`. The registry key is dropped
+  # in a later commit once all consumers are migrated.
+  flake.modules.homeManager."users/crs58" = content;
+  flake.users.crs58.contentPrivate = content;
 }

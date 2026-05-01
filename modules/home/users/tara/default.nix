@@ -2,8 +2,8 @@
   lib,
   ...
 }:
-{
-  flake.modules.homeManager."users/tara" =
+let
+  content =
     {
       config,
       pkgs,
@@ -43,4 +43,8 @@
         user.email = flake.users.tara.meta.email;
       };
     };
+in
+{
+  flake.modules.homeManager."users/tara" = content;
+  flake.users.tara.contentPrivate = content;
 }

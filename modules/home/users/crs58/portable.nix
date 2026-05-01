@@ -2,8 +2,8 @@
   # OUTER: Flake-parts module
   ...
 }:
-{
-  flake.modules.homeManager."portable/crs58" =
+let
+  content =
     {
       # INNER: Home-manager module
       pkgs,
@@ -25,4 +25,8 @@
           flake.inputs.niks3.packages.${pkgs.stdenv.hostPlatform.system}.niks3
         ];
     };
+in
+{
+  flake.modules.homeManager."portable/crs58" = content;
+  flake.users.crs58.contentPortable = content;
 }
