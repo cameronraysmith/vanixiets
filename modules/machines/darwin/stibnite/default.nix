@@ -252,11 +252,12 @@ in
           flake = flakeForHomeManager;
         };
 
-        # crs58 (admin + primary): aggregates from typed user record
+        # crs58 (admin + primary): aggregates + typed contentPrivate + identityOverride
         users.crs58 = {
-          imports = flakeUsers.crs58.aggregates ++ [
-            flakeModulesHome."users/crs58"
-          ];
+          imports =
+            flakeUsers.crs58.aggregates
+            ++ [ flakeUsers.crs58.contentPrivate ]
+            ++ [ flakeUsers.crs58.identityOverride ];
 
           # Incus k3s profiles (see ADR-004)
           # Provides instance profiles for k3s clusters in Colima

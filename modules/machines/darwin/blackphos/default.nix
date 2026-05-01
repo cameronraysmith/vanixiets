@@ -157,15 +157,17 @@ in
           flake = flakeForHomeManager;
         };
 
-        # crs58 (admin): aggregates from typed user record
-        users.crs58.imports = flakeUsers.crs58.aggregates ++ [
-          flakeModulesHome."users/crs58"
-        ];
+        # crs58 (admin): aggregates + typed contentPrivate + identityOverride
+        users.crs58.imports =
+          flakeUsers.crs58.aggregates
+          ++ [ flakeUsers.crs58.contentPrivate ]
+          ++ [ flakeUsers.crs58.identityOverride ];
 
-        # raquel (primary user): aggregates from typed user record
-        users.raquel.imports = flakeUsers.raquel.aggregates ++ [
-          flakeModulesHome."users/raquel"
-        ];
+        # raquel (primary user): aggregates + typed contentPrivate + identityOverride
+        users.raquel.imports =
+          flakeUsers.raquel.aggregates
+          ++ [ flakeUsers.raquel.contentPrivate ]
+          ++ [ flakeUsers.raquel.identityOverride ];
       };
     };
 }

@@ -149,16 +149,20 @@ in
           flake = flakeForHomeManager;
         };
 
-        # janettesmith (primary user): aggregates from typed user record
-        users.janettesmith.imports = flakeUsers.janettesmith.aggregates ++ [
-          flakeModulesHome."users/janettesmith"
-        ];
+        # janettesmith (primary user): aggregates + typed contentPrivate + identityOverride
+        users.janettesmith.imports =
+          flakeUsers.janettesmith.aggregates
+          ++ [ flakeUsers.janettesmith.contentPrivate ]
+          ++ [ flakeUsers.janettesmith.identityOverride ];
 
-        # cameron (admin user): aggregates materialized from crs58 via aliases-fold;
-        # content from users/crs58; identity overridden to cameron.
-        users.cameron.imports = flakeUsers.cameron.aggregates ++ [
-          flakeModulesHome."users/crs58"
-        ];
+        # cameron (admin user, alias for crs58): all slots materialized on
+        # flake.users.cameron by aliases-fold. Alias-keyed reads here keep
+        # call sites ignorant of alias->target relationships; identityOverride
+        # supplies the mkForce username/homeDirectory pinning.
+        users.cameron.imports =
+          flakeUsers.cameron.aggregates
+          ++ [ flakeUsers.cameron.contentPrivate ]
+          ++ [ flakeUsers.cameron.identityOverride ];
         users.cameron.home.username = "cameron";
       };
     };
