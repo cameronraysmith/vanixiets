@@ -24,9 +24,12 @@ let
   );
 
   # Alias entries: homeConfigurations."<alias>@<system>" built from the
-  # aliased user's full content with `home.username` overridden to the alias.
-  # Aliases follow the same enumeration rule as direct users — only emitted
-  # when their target user has non-empty aggregates.
+  # alias's own materialized user record. Post-nix-0pd.17 A2*, aliases-fold
+  # propagates `meta`/`aggregates`/`contentPrivate`/`contentPortable` from
+  # the target user and synthesizes a `mkForce` `identityOverride` on the
+  # alias record, so mk-home reads alias-keyed slots uniformly without a
+  # target redirection. Aliases follow the same enumeration rule as direct
+  # users — only emitted when their target user has non-empty aggregates.
   aliasEntries = lib.listToAttrs (
     lib.concatMap (
       { name, value }:
@@ -38,8 +41,7 @@ let
         map (system: {
           name = "${aliasName}@${system}";
           value = config.flake.lib.mkHome {
-            user = targetUser;
-            username = aliasName;
+            user = aliasName;
             inherit system;
           };
         }) config.systems

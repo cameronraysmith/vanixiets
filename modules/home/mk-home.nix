@@ -15,8 +15,9 @@
       extraModules ? [ ],
     }:
     let
-      userMeta = config.flake.users.${user}.meta;
-      aggs = config.flake.users.${user}.aggregates;
+      userRecord = config.flake.users.${user};
+      userMeta = userRecord.meta;
+      aggs = userRecord.aggregates;
 
       effectiveUsername = if username == null then userMeta.username else username;
       effectiveHomeDirectory =
@@ -27,14 +28,20 @@
         else
           "/home/${effectiveUsername}";
 
-      contentKey = if includePrivate then "users/${user}" else "portable/${user}";
-
       aggregateModules = aggs;
-      contentModule =
-        config.flake.modules.homeManager.${contentKey}
-          or (throw "vanixiets: no flake.modules.homeManager entry at key '${contentKey}'");
+      contentModule = if includePrivate then userRecord.contentPrivate else userRecord.contentPortable;
 
-      identityOverride = lib.optional (username != null || homeDirectory != null) {
+      # Typed identity-override fragment synthesized for every user record
+      # by identity-fold.nix; alias-fold extends it with mkForce setters.
+      typedIdentityOverride = userRecord.identityOverride;
+
+      # Legacy explicit-caller-arg branch retained for the
+      # `mk-home { user = "..."; username = "..."; }` invocation shape.
+      # Standalone homeConfigurations no longer use it (configurations.nix
+      # post-A2* invokes `mk-home { user = name; system; }` for every
+      # entry, including aliases). Remaining callers are explicit overrides
+      # outside the standard alias path.
+      legacyIdentityOverride = lib.optional (username != null || homeDirectory != null) {
         home.username = lib.mkForce effectiveUsername;
         home.homeDirectory = lib.mkForce effectiveHomeDirectory;
       };
@@ -52,6 +59,11 @@
           inherit inputs;
         };
       };
-      modules = aggregateModules ++ [ contentModule ] ++ identityOverride ++ extraModules;
+      modules =
+        aggregateModules
+        ++ [ contentModule ]
+        ++ [ typedIdentityOverride ]
+        ++ legacyIdentityOverride
+        ++ extraModules;
     };
 }
