@@ -1,6 +1,5 @@
 {
   # OUTER: Flake-parts module signature
-  lib,
   ...
 }:
 let
@@ -14,8 +13,8 @@ let
       ...
     }:
     {
-      # Compose portable content via registry reference (dendritic).
-      imports = [ flake.modules.homeManager."portable/crs58" ];
+      # Compose portable content via typed slot (nix-0pd.17 A5).
+      imports = [ flake.users.crs58.contentPortable ];
 
       # sops-nix configuration for crs58/cameron user
       # 15 secrets: development + ai + shell aggregates
@@ -72,13 +71,10 @@ let
       # Cannot use home.file.source with sops.secrets.path due to pure eval mode restrictions
       # TODO: Investigate sops-nix symlink option or activation script approach
 
-      # Username defaults to meta.username but can be overridden (e.g., for cameron alias).
-      home.username = lib.mkDefault flake.users.crs58.meta.username;
-      home.homeDirectory = lib.mkDefault (
-        if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
-      );
-
       # User-specific git/jujutsu identity from typed meta.
+      # (Identity setters home.username/home.homeDirectory now provided by
+      # users/crs58/identity.nix via flake.users.crs58.identityOverride;
+      # alias overrides ride aliases-fold mkForce — nix-0pd.17 A5.)
       # (Capability aggregates may consume meta directly in a later refactor.)
       programs.git.settings = {
         user.name = flake.users.crs58.meta.fullname;
@@ -92,9 +88,6 @@ let
     };
 in
 {
-  # Transitional dual-write (nix-0pd.17 A1): typed slot + registry key
-  # share the same module body via `content`. The registry key is dropped
-  # in a later commit once all consumers are migrated.
-  flake.modules.homeManager."users/crs58" = content;
+  # Typed-slot writer (nix-0pd.17 A5: registry-key dual-write dropped).
   flake.users.crs58.contentPrivate = content;
 }

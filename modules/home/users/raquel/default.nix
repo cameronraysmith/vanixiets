@@ -14,8 +14,8 @@ let
       ...
     }:
     {
-      # Compose portable content via registry reference (dendritic).
-      imports = [ flake.modules.homeManager."portable/raquel" ];
+      # Compose portable content via typed slot (nix-0pd.17 A5).
+      imports = [ flake.users.raquel.contentPortable ];
 
       # sops-nix configuration for raquel user
       # 5 secrets: development + shell aggregates (NO AI)
@@ -41,12 +41,10 @@ let
         };
       };
 
-      home.username = lib.mkDefault flake.users.raquel.meta.username;
-      home.homeDirectory = lib.mkDefault (
-        if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
-      );
-
       # User-specific git identity from typed meta.
+      # (Identity setters home.username/home.homeDirectory now provided by
+      # users/raquel/identity.nix via flake.users.raquel.identityOverride —
+      # nix-0pd.17 A5.)
       programs.git.settings = {
         user.name = flake.users.raquel.meta.fullname;
         user.email = flake.users.raquel.meta.email;
@@ -54,6 +52,6 @@ let
     };
 in
 {
-  flake.modules.homeManager."users/raquel" = content;
+  # Typed-slot writer (nix-0pd.17 A5: registry-key dual-write dropped).
   flake.users.raquel.contentPrivate = content;
 }

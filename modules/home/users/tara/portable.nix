@@ -16,6 +16,6 @@ let
     };
 in
 {
-  flake.modules.homeManager."portable/tara" = content;
+  # Typed-slot writer (nix-0pd.17 A5: registry-key dual-write dropped).
   flake.users.tara.contentPortable = content;
 }

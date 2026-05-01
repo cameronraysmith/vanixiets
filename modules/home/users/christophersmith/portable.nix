@@ -21,6 +21,6 @@ let
     };
 in
 {
-  flake.modules.homeManager."portable/christophersmith" = content;
+  # Typed-slot writer (nix-0pd.17 A5: registry-key dual-write dropped).
   flake.users.christophersmith.contentPortable = content;
 }

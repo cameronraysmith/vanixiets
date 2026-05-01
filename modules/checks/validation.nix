@@ -14,57 +14,45 @@
     in
     {
       checks = {
-        # TC-020: Home Module Exports
-        # Purpose: Validate per-user home-manager modules (both `users/<u>` full
-        # content and `portable/<u>` content-only subset) are exported to the
-        # `flake.modules.homeManager` namespace for every typed user.
+        # TC-020: Home Content Slots Wired
+        # Purpose: Validate per-user home-manager content slots
+        # (`flake.users.<u>.contentPrivate` and `.contentPortable`) are
+        # populated for every primary user. Post nix-0pd.17 A5, content
+        # registration happens via typed slots on `flake.users.<u>` rather
+        # than the `flake.modules.homeManager."users/<u>"` registry keys.
         home-module-exports =
           let
             # Primary users only — aliases (e.g. cameron) inherit their target's
-            # registered modules via configurations.nix composition, they don't
-            # contribute their own `users/<u>` or `portable/<u>` registry keys.
+            # typed content slots via aliases-fold materialization; they don't
+            # author their own `contentPrivate`/`contentPortable`.
             userNames = builtins.attrNames (
               builtins.removeAttrs config.flake.users (builtins.attrNames config.flake.userAliases)
             );
-            mkAssert = key: ''
+            mkAssert = u: slot: ''
               ${
-                if builtins.hasAttr key config.flake.modules.homeManager then
-                  ''echo "OK: ${key} home module found in namespace"''
+                if builtins.hasAttr u config.flake.users && builtins.hasAttr slot config.flake.users.${u} then
+                  ''echo "OK: flake.users.${u}.${slot} slot present"''
                 else
-                  ''echo "ERROR: ${key} home module not found in namespace" >&2 && exit 1''
-              }
-              ${
-                if config.flake.modules.homeManager.${key} != null then
-                  ''echo "OK: ${key} module is defined (not null)"''
-                else
-                  ''echo "ERROR: ${key} module is null" >&2 && exit 1''
+                  ''echo "ERROR: flake.users.${u}.${slot} slot missing" >&2 && exit 1''
               }
             '';
             assertions = builtins.concatStringsSep "\n" (
               builtins.concatMap (u: [
-                (mkAssert "users/${u}")
-                (mkAssert "portable/${u}")
+                (mkAssert u "contentPrivate")
+                (mkAssert u "contentPortable")
               ]) userNames
             );
           in
           pkgs.runCommand "home-module-exports"
             {
-              passthru.meta.description = "Validate per-user home modules (users/<u> + portable/<u>) exported to flake.modules.homeManager";
+              passthru.meta.description = "Validate per-user typed content slots (contentPrivate + contentPortable) on flake.users.<u>";
             }
             ''
-              echo "Validating home module exports..."
-
-              # Check that the homeManager namespace exists
-              ${
-                if builtins.hasAttr "homeManager" config.flake.modules then
-                  ''echo "OK: homeManager namespace exists in flake.modules"''
-                else
-                  ''echo "ERROR: homeManager namespace not found" >&2 && exit 1''
-              }
+              echo "Validating typed content slots on flake.users.<u>..."
 
               ${assertions}
 
-              echo "Home module exports validated for ${toString (builtins.length userNames)} users (users/<u> + portable/<u>)"
+              echo "Typed content slots validated for ${toString (builtins.length userNames)} users (contentPrivate + contentPortable)"
               touch $out
             '';
 

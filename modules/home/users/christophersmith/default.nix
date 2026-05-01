@@ -12,7 +12,8 @@ let
       ...
     }:
     {
-      imports = [ flake.modules.homeManager."portable/christophersmith" ];
+      # Compose portable content via typed slot (nix-0pd.17 A5).
+      imports = [ flake.users.christophersmith.contentPortable ];
 
       sops = {
         defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/christophersmith/secrets.yaml";
@@ -37,11 +38,10 @@ let
         };
       };
 
-      home.username = lib.mkDefault flake.users.christophersmith.meta.username;
-      home.homeDirectory = lib.mkDefault (
-        if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
-      );
-
+      # User-specific git identity from typed meta.
+      # (Identity setters home.username/home.homeDirectory now provided by
+      # users/christophersmith/identity.nix via
+      # flake.users.christophersmith.identityOverride — nix-0pd.17 A5.)
       programs.git.settings = {
         user.name = flake.users.christophersmith.meta.fullname;
         user.email = flake.users.christophersmith.meta.email;
@@ -49,6 +49,6 @@ let
     };
 in
 {
-  flake.modules.homeManager."users/christophersmith" = content;
+  # Typed-slot writer (nix-0pd.17 A5: registry-key dual-write dropped).
   flake.users.christophersmith.contentPrivate = content;
 }

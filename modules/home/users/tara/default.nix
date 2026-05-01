@@ -12,7 +12,8 @@ let
       ...
     }:
     {
-      imports = [ flake.modules.homeManager."portable/tara" ];
+      # Compose portable content via typed slot (nix-0pd.17 A5).
+      imports = [ flake.users.tara.contentPortable ];
 
       # Minimal initial secrets: signing key + public key only.
       sops = {
@@ -33,11 +34,10 @@ let
         };
       };
 
-      home.username = lib.mkDefault flake.users.tara.meta.username;
-      home.homeDirectory = lib.mkDefault (
-        if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
-      );
-
+      # User-specific git identity from typed meta.
+      # (Identity setters home.username/home.homeDirectory now provided by
+      # users/tara/identity.nix via flake.users.tara.identityOverride —
+      # nix-0pd.17 A5.)
       programs.git.settings = {
         user.name = flake.users.tara.meta.fullname;
         user.email = flake.users.tara.meta.email;
@@ -45,6 +45,6 @@ let
     };
 in
 {
-  flake.modules.homeManager."users/tara" = content;
+  # Typed-slot writer (nix-0pd.17 A5: registry-key dual-write dropped).
   flake.users.tara.contentPrivate = content;
 }
