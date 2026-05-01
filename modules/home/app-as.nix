@@ -73,9 +73,13 @@
                   in
                     (flake.lib.mkHome {
                       user = \"$target_user\";
-                      username = \"$operator_username\";
-                      homeDirectory = \"$operator_home\";
                       system = \"$system\";
+                      extraModules = [
+                        ({ lib, ... }: {
+                          home.username = lib.mkForce \"$operator_username\";
+                          home.homeDirectory = lib.mkForce \"$operator_home\";
+                        })
+                      ];
                     }).activationPackage
                 ")
 
