@@ -73,7 +73,7 @@
               `modules/home/users/<u>/portable.nix`.
             '';
           };
-          identityOverride = lib.mkOption {
+          identity = lib.mkOption {
             type = lib.types.deferredModule;
             default = { };
             description = ''

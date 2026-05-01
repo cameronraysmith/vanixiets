@@ -148,20 +148,20 @@ in
           flake = flakeForHomeManager;
         };
 
-        # janettesmith (primary user): aggregates + typed contentPrivate + identityOverride
+        # janettesmith (primary user): aggregates + typed contentPrivate + identity
         users.janettesmith.imports =
           flakeUsers.janettesmith.aggregates
           ++ [ flakeUsers.janettesmith.contentPrivate ]
-          ++ [ flakeUsers.janettesmith.identityOverride ];
+          ++ [ flakeUsers.janettesmith.identity ];
 
         # cameron (admin user, alias for crs58): all slots materialized on
         # flake.users.cameron by aliases-fold. Alias-keyed reads here keep
-        # call sites ignorant of alias->target relationships; identityOverride
+        # call sites ignorant of alias->target relationships; identity
         # supplies the mkForce username/homeDirectory pinning.
         users.cameron.imports =
           flakeUsers.cameron.aggregates
           ++ [ flakeUsers.cameron.contentPrivate ]
-          ++ [ flakeUsers.cameron.identityOverride ];
+          ++ [ flakeUsers.cameron.identity ];
       };
     };
 }

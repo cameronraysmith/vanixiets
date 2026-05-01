@@ -1,6 +1,6 @@
 { lib, ... }:
 {
-  flake.users.raquel.identityOverride =
+  flake.users.raquel.identity =
     {
       config,
       pkgs,

@@ -41,7 +41,7 @@ let
 
       # User-specific git identity from typed meta.
       # (Identity setters home.username/home.homeDirectory now provided by
-      # users/raquel/identity.nix via flake.users.raquel.identityOverride —
+      # users/raquel/identity.nix via flake.users.raquel.identity —
       # nix-0pd.17 A5.)
       programs.git.settings = {
         user.name = flake.users.raquel.meta.fullname;

@@ -16,9 +16,9 @@
       aggregateModules = userRecord.aggregates;
       contentModule = if includePrivate then userRecord.contentPrivate else userRecord.contentPortable;
 
-      # Typed identity-override fragment synthesized for every user record
-      # by identity-fold.nix; alias-fold extends it with mkForce setters.
-      typedIdentityOverride = userRecord.identityOverride;
+      # Typed identity fragment authored per-user; alias-fold extends it
+      # with mkForce setters to pin alias-keyed username/homeDirectory.
+      identity = userRecord.identity;
     in
     inputs.home-manager.lib.homeManagerConfiguration {
       pkgs = import inputs.nixpkgs {
@@ -33,6 +33,6 @@
           inherit inputs;
         };
       };
-      modules = aggregateModules ++ [ contentModule ] ++ [ typedIdentityOverride ] ++ extraModules;
+      modules = aggregateModules ++ [ contentModule ] ++ [ identity ] ++ extraModules;
     };
 }

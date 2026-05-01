@@ -1,6 +1,6 @@
 { lib, ... }:
 {
-  flake.users.janettesmith.identityOverride =
+  flake.users.janettesmith.identity =
     {
       config,
       pkgs,

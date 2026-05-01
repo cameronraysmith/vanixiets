@@ -72,7 +72,7 @@ let
 
       # User-specific git/jujutsu identity from typed meta.
       # (Identity setters home.username/home.homeDirectory now provided by
-      # users/crs58/identity.nix via flake.users.crs58.identityOverride;
+      # users/crs58/identity.nix via flake.users.crs58.identity;
       # alias overrides ride aliases-fold mkForce — nix-0pd.17 A5.)
       # (Capability aggregates may consume meta directly in a later refactor.)
       programs.git.settings = {

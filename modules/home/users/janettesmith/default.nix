@@ -37,7 +37,7 @@ let
       # User-specific git identity from typed meta.
       # (Identity setters home.username/home.homeDirectory now provided by
       # users/janettesmith/identity.nix via
-      # flake.users.janettesmith.identityOverride — nix-0pd.17 A5.)
+      # flake.users.janettesmith.identity — nix-0pd.17 A5.)
       programs.git.settings = {
         user.name = flake.users.janettesmith.meta.fullname;
         user.email = flake.users.janettesmith.meta.email;

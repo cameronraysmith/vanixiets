@@ -30,7 +30,7 @@
       # from `config.home.username` self-referentially, so mkForcing the
       # username already pins the directory; the explicit mkForce here
       # preserves the invariant against future code changes.
-      identityOverride =
+      identity =
         {
           config,
           pkgs,

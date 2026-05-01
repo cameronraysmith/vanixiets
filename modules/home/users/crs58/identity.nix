@@ -1,6 +1,6 @@
 { lib, ... }:
 {
-  flake.users.crs58.identityOverride =
+  flake.users.crs58.identity =
     {
       config,
       pkgs,

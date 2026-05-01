@@ -34,7 +34,7 @@ let
 
       # User-specific git identity from typed meta.
       # (Identity setters home.username/home.homeDirectory now provided by
-      # users/tara/identity.nix via flake.users.tara.identityOverride —
+      # users/tara/identity.nix via flake.users.tara.identity —
       # nix-0pd.17 A5.)
       programs.git.settings = {
         user.name = flake.users.tara.meta.fullname;

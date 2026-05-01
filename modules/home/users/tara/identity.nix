@@ -1,6 +1,6 @@
 { lib, ... }:
 {
-  flake.users.tara.identityOverride =
+  flake.users.tara.identity =
     {
       config,
       pkgs,

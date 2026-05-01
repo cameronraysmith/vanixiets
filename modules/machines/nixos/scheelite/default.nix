@@ -95,23 +95,21 @@ in
 
       # cameron home-manager imports (alias for crs58): all slots materialized
       # on flake.users.cameron by aliases-fold. Alias-keyed reads here keep
-      # call sites ignorant of alias->target relationships; identityOverride
+      # call sites ignorant of alias->target relationships; identity
       # supplies the mkForce username/homeDirectory pinning.
       # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
       home-manager.users.cameron = {
         imports =
           flakeUsers.cameron.aggregates
           ++ [ flakeUsers.cameron.contentPrivate ]
-          ++ [ flakeUsers.cameron.identityOverride ];
+          ++ [ flakeUsers.cameron.identity ];
       };
 
       # tara home-manager imports (ML researcher, no AI agent tooling):
-      # aggregates + typed contentPrivate + identityOverride.
+      # aggregates + typed contentPrivate + identity.
       home-manager.users.tara = {
         imports =
-          flakeUsers.tara.aggregates
-          ++ [ flakeUsers.tara.contentPrivate ]
-          ++ [ flakeUsers.tara.identityOverride ];
+          flakeUsers.tara.aggregates ++ [ flakeUsers.tara.contentPrivate ] ++ [ flakeUsers.tara.identity ];
         programs.agents-md.enable = false;
       };
     };
