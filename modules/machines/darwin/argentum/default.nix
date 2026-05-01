@@ -163,7 +163,6 @@ in
           flakeUsers.cameron.aggregates
           ++ [ flakeUsers.cameron.contentPrivate ]
           ++ [ flakeUsers.cameron.identityOverride ];
-        users.cameron.home.username = "cameron";
       };
     };
 }

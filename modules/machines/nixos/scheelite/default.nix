@@ -104,7 +104,6 @@ in
           flakeUsers.cameron.aggregates
           ++ [ flakeUsers.cameron.contentPrivate ]
           ++ [ flakeUsers.cameron.identityOverride ];
-        home.username = "cameron";
       };
 
       # tara home-manager imports (ML researcher, no AI agent tooling):
