@@ -101,7 +101,7 @@ in
       users.users.builder = {
         isNormalUser = true;
         description = "Remote nix build user";
-        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
+        openssh.authorizedKeys.keys = inputs.self.users.crs58.meta.sshKeys;
       };
 
       # Bridge NixOS-level sops to home-manager for user secret key delivery

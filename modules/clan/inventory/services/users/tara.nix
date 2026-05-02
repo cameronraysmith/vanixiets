@@ -33,7 +33,7 @@
         {
           users.users.tara.shell = pkgs.zsh;
 
-          users.users.tara.openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.tara.sshKeys;
+          users.users.tara.openssh.authorizedKeys.keys = inputs.self.users.tara.meta.sshKeys;
 
           programs.zsh.enable = true;
 

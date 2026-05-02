@@ -17,7 +17,7 @@
           isNormalUser = true;
           shell = pkgs.zsh;
           extraGroups = [ "wheel" ];
-          openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
+          openssh.authorizedKeys.keys = inputs.self.users.crs58.meta.sshKeys;
         };
 
         # Root inherits SSH keys from all wheel users

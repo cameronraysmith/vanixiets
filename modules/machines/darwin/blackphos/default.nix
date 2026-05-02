@@ -120,7 +120,7 @@ in
         home = "/Users/crs58";
         shell = pkgs.zsh;
         description = "crs58";
-        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
+        openssh.authorizedKeys.keys = inputs.self.users.crs58.meta.sshKeys;
       };
 
       users.users.raquel = {
@@ -128,7 +128,7 @@ in
         home = "/Users/raquel";
         shell = pkgs.zsh;
         description = "raquel";
-        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.raquel.sshKeys;
+        openssh.authorizedKeys.keys = inputs.self.users.raquel.meta.sshKeys;
       };
 
       # Darwin requires explicit knownUsers

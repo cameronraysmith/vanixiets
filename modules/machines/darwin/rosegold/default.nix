@@ -113,7 +113,7 @@ in
         home = "/Users/janettesmith";
         shell = pkgs.zsh;
         description = "janettesmith";
-        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.janettesmith.sshKeys;
+        openssh.authorizedKeys.keys = inputs.self.users.janettesmith.meta.sshKeys;
       };
 
       users.users.cameron = {

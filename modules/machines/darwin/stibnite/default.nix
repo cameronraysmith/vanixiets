@@ -131,7 +131,7 @@ in
         home = "/Users/crs58";
         shell = pkgs.zsh;
         description = "crs58";
-        openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
+        openssh.authorizedKeys.keys = inputs.self.users.crs58.meta.sshKeys;
       };
 
       # Darwin requires explicit knownUsers

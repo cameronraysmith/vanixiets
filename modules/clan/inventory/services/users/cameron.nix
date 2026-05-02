@@ -43,7 +43,7 @@
           # Shell preference (works on both platforms)
           users.users.cameron.shell = pkgs.zsh;
 
-          users.users.cameron.openssh.authorizedKeys.keys = inputs.self.lib.userIdentities.crs58.sshKeys;
+          users.users.cameron.openssh.authorizedKeys.keys = inputs.self.users.cameron.meta.sshKeys;
 
           # Enable zsh system-wide (works on both platforms)
           programs.zsh.enable = true;

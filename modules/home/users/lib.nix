@@ -69,6 +69,15 @@ in
                   `hm-sops-bridge` NixOS module to deploy this user's age key.
                 '';
               };
+              sshKeys = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = ''
+                  SSH public keys authorized for this user across machines
+                  and clan inventory services. Consumed by per-host
+                  `users.users.<u>.openssh.authorizedKeys.keys` setters.
+                '';
+              };
             };
             aggregates = lib.mkOption {
               type = lib.types.listOf lib.types.deferredModule;
