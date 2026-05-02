@@ -1,4 +1,9 @@
-{ self, config, ... }:
+{
+  self,
+  lib,
+  config,
+  ...
+}:
 {
   perSystem =
     {
@@ -11,46 +16,64 @@
       terraformPkg = self.packages.${system}.terraform;
       terraformConfig = terraformPkg.passthru.config;
       tofuWithProviders = terraformPkg.passthru.tofuBundle;
+      mkCheck = self.lib.mkStructuralCheck pkgs;
     in
     {
       checks = {
         # TC-020: Home Content Slots Wired
         # Validate the per-user `flake.users.<u>.contentPrivate`
-        # home-manager content slot is populated for every primary user.
+        # home-manager content slot has a real writer for every primary user.
+        #
+        # `contentPrivate` is declared as `lib.types.deferredModule` with
+        # `default = { }`, so a `hasAttr` test is trivially true regardless of
+        # whether any module actually authored content into the slot. To
+        # produce a falsifiable assertion, evaluate each user's deferred slot
+        # via `lib.evalModules` and check that the resolved configuration is
+        # non-empty (i.e., the slot was authored, not left at its identity
+        # default).
+        #
+        # Negative control: a primary user whose `contentPrivate` is the
+        # default `{ }` yields zero resolved config keys, the per-user
+        # `actual` map records `false`, and the JSON diff against the
+        # all-`true` `expected` map fails the check. Negative-control
+        # verifiable: confirmed at design time by evaluating an empty
+        # deferred module and observing zero post-merge config keys.
         home-module-exports =
           let
-            # Primary users only — aliases inherit their target's typed content
-            # slot via aliases-fold; they don't author their own
+            # Primary users only — aliases inherit their target's typed
+            # content slot via aliases-fold; they don't author their own
             # `contentPrivate`.
-            userNames = builtins.attrNames (
-              builtins.removeAttrs config.flake.users (builtins.attrNames config.flake.userAliases)
+            primaryUsers = builtins.removeAttrs config.flake.users (
+              builtins.attrNames config.flake.userAliases
             );
-            mkAssert = u: slot: ''
-              ${
-                if builtins.hasAttr u config.flake.users && builtins.hasAttr slot config.flake.users.${u} then
-                  ''echo "OK: flake.users.${u}.${slot} slot present"''
-                else
-                  ''echo "ERROR: flake.users.${u}.${slot} slot missing" >&2 && exit 1''
-              }
-            '';
-            assertions = builtins.concatStringsSep "\n" (
-              builtins.concatMap (u: [
-                (mkAssert u "contentPrivate")
-              ]) userNames
-            );
+            # Resolve a deferred module to its post-merge config attrset.
+            # `_module.check = false` and a permissive freeform type let the
+            # eval succeed without re-declaring every option the slot might
+            # set; we only care whether the slot produced any config keys.
+            evalSlot =
+              slot:
+              (lib.evalModules {
+                modules = [
+                  slot
+                  {
+                    _module.check = false;
+                    freeformType = lib.types.lazyAttrsOf lib.types.raw;
+                  }
+                ];
+              }).config;
+            hasContent =
+              user:
+              let
+                resolved = removeAttrs (evalSlot user.contentPrivate) [ "_module" ];
+              in
+              resolved != { };
+            actual = lib.mapAttrs (_: u: hasContent u) primaryUsers;
+            expected = lib.mapAttrs (_: _: true) primaryUsers;
           in
-          pkgs.runCommand "home-module-exports"
-            {
-              passthru.meta.description = "Validate per-user typed contentPrivate slot on flake.users.<u>";
-            }
-            ''
-              echo "Validating typed contentPrivate slot on flake.users.<u>..."
-
-              ${assertions}
-
-              echo "contentPrivate slot validated for ${toString (builtins.length userNames)} users"
-              touch $out
-            '';
+          mkCheck {
+            name = "home-module-exports";
+            inherit actual expected;
+          };
 
         # TC-021: Home Configurations Exposed
         # Purpose: Validate flat homeConfigurations exposed in flake outputs
