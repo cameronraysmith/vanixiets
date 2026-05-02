@@ -15,14 +15,13 @@
     {
       checks = {
         # TC-020: Home Content Slots Wired
-        # Validate per-user home-manager content slots
-        # (`flake.users.<u>.contentPrivate` and `.contentPortable`) are
-        # populated for every primary user.
+        # Validate the per-user `flake.users.<u>.contentPrivate`
+        # home-manager content slot is populated for every primary user.
         home-module-exports =
           let
             # Primary users only — aliases inherit their target's typed content
-            # slots via aliases-fold; they don't author their own
-            # `contentPrivate`/`contentPortable`.
+            # slot via aliases-fold; they don't author their own
+            # `contentPrivate`.
             userNames = builtins.attrNames (
               builtins.removeAttrs config.flake.users (builtins.attrNames config.flake.userAliases)
             );
@@ -37,20 +36,19 @@
             assertions = builtins.concatStringsSep "\n" (
               builtins.concatMap (u: [
                 (mkAssert u "contentPrivate")
-                (mkAssert u "contentPortable")
               ]) userNames
             );
           in
           pkgs.runCommand "home-module-exports"
             {
-              passthru.meta.description = "Validate per-user typed content slots (contentPrivate + contentPortable) on flake.users.<u>";
+              passthru.meta.description = "Validate per-user typed contentPrivate slot on flake.users.<u>";
             }
             ''
-              echo "Validating typed content slots on flake.users.<u>..."
+              echo "Validating typed contentPrivate slot on flake.users.<u>..."
 
               ${assertions}
 
-              echo "Typed content slots validated for ${toString (builtins.length userNames)} users (contentPrivate + contentPortable)"
+              echo "contentPrivate slot validated for ${toString (builtins.length userNames)} users"
               touch $out
             '';
 

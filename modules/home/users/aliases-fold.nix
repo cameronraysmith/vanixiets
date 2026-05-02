@@ -18,7 +18,6 @@
       };
       aggregates = config.flake.users.${target}.aggregates;
       contentPrivate = config.flake.users.${target}.contentPrivate;
-      contentPortable = config.flake.users.${target}.contentPortable;
       # mkForce on identity setters: the target user's `identity`
       # (from `users/<target>/identity.nix`) sets
       # `home.username = lib.mkDefault "<target>"` while the alias

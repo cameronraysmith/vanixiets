@@ -58,19 +58,8 @@
             description = ''
               Identity-bound, secret-bearing home-manager content for this
               user (sops secrets, git/jujutsu user identity, deploy-time
-              keys). Composed by `mk-home` alongside `contentPortable` and
-              the capability aggregates. Authored in
-              `modules/home/users/<u>/default.nix`.
-            '';
-          };
-          contentPortable = lib.mkOption {
-            type = lib.types.deferredModule;
-            default = { };
-            description = ''
-              Secret-free, identity-independent home-manager content for
-              this user. Available to `home-trial` alongside the same
-              capability aggregate selection. Authored in
-              `modules/home/users/<u>/portable.nix`.
+              keys). Composed by `mk-home` alongside the capability
+              aggregates. Authored in `modules/home/users/<u>/default.nix`.
             '';
           };
           identity = lib.mkOption {
