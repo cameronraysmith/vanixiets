@@ -15,8 +15,6 @@ These apps wrap `nh` (nix-helper) commands for ergonomic configuration activatio
 | `darwin` | Activate darwin configuration | `nh darwin switch` | `modules/darwin/app.nix` |
 | `os` | Activate NixOS configuration | `nh os switch` | `modules/nixos/app.nix` |
 | `home` | Activate home-manager configuration | `nh home switch` | `modules/home/app.nix` |
-| `home-as` | Activate another user's home configuration as the current login | `nh home switch` | `modules/home/app.nix` |
-| `home-trial` | Activate a user's portable home subset for trial use (no secrets, no identity overrides) | `nh home switch` | `modules/home/app.nix` |
 | `default` | Alias for `home` | - | `modules/home/app.nix` |
 
 ## Dispatch chain
@@ -154,96 +152,6 @@ nix run .#home -- crs58 .
 ```
 
 **Justfile equivalent:** `just activate-home <username> [FLAGS]`
-
-## home-as
-
-Activates the home-manager configuration of one user (the *target*) under the currently logged-in account (the *runner*).
-Use this when the same human operates the machine under more than one login (for example, an admin account and a personal account share the same human, but each has its own user module and secrets).
-
-The runner provides the active `$HOME` and identity at activation time; the target provides the full content module, including its own secrets and identity overrides.
-The app rewrites `home.username` and `home.homeDirectory` so the configuration activates against the runner's account without colliding with target's own home directory.
-
-**Usage:**
-
-```bash
-# Remote usage (default flake)
-nix run github:cameronraysmith/vanixiets#home-as -- <target-username>
-
-# Local development
-nix run .#home-as -- <target-username> .
-nix run .#home-as -- <target-username> . --dry
-```
-
-**Arguments:**
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `target-username` | Yes | The user whose full home-manager content should be activated (e.g., `crs58`, `cameron`) |
-| `flake` | No | Flake path (default: remote GitHub repo) |
-| `NH_FLAGS` | No | Flags passed to nh: `--dry`, `--verbose`, `--ask` |
-
-**Configuration path:**
-
-The app resolves the target user's full configuration and rebinds it to the runner's login:
-```
-homeConfigurations."<target-username>@<system>".activationPackage
-```
-
-**Examples:**
-
-```bash
-# Activate cameron's full home (with secrets) under whoever is logged in
-nix run .#home-as -- cameron .
-
-# Preview the result without applying
-nix run .#home-as -- cameron . --dry
-```
-
-## home-trial
-
-Activates a *portable* subset of a user's home-manager configuration without their identity overrides or secrets.
-Use this for stranger trials: a user who is not the target but wants to evaluate the target's tooling and dotfiles in a safe, ephemeral way (no decryption keys required, no git identity rewrites, no host-specific signing).
-
-`home-trial` resolves to the registry-referenced `flake.modules.homeManager."portable/<target-username>"` content rather than the full `users/<target-username>` module.
-The portable subset is the part of the user's configuration that composes cleanly into any account.
-
-**Usage:**
-
-```bash
-# Remote usage (default flake)
-nix run github:cameronraysmith/vanixiets#home-trial -- <target-username>
-
-# Local development
-nix run .#home-trial -- <target-username> .
-nix run .#home-trial -- <target-username> . --dry
-```
-
-**Arguments:**
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `target-username` | Yes | The user whose portable home subset should be trialed |
-| `flake` | No | Flake path (default: remote GitHub repo) |
-| `NH_FLAGS` | No | Flags passed to nh: `--dry`, `--verbose`, `--ask` |
-
-**Configuration path:**
-
-The app builds an activation package from the portable content alone:
-```
-homeConfigurations."<target-username>@<system>".activationPackage
-```
-
-The underlying configuration imports `flake.modules.homeManager."portable/<target-username>"` and binds runner identity from the active login, so no target secrets, age keys, or signing material are needed.
-
-**Examples:**
-
-```bash
-# Trial cameron's portable dotfiles under your own login
-nix run .#home-trial -- cameron .
-
-# Preview without applying
-nix run .#home-trial -- cameron . --dry
-```
 
 ## default
 

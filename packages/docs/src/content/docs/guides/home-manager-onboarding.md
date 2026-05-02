@@ -36,29 +36,26 @@ Users in this infrastructure are configured in one of two ways:
 
 ### User module locations
 
-User configurations follow the [deferred module composition pattern](/concepts/deferred-module-composition) and split each user into two registry entries:
+User configurations follow the [deferred module composition pattern](/concepts/deferred-module-composition):
 
 ```
 modules/
 ├── home/
 │   └── users/
-│       ├── crs58/           # exports portable/crs58 (content) and users/crs58 (full)
-│       ├── raquel/          # exports portable/raquel and users/raquel
-│       ├── cameron/         # exports portable/cameron and users/cameron
-│       ├── janettesmith/    # exports portable/janettesmith and users/janettesmith
-│       └── christophersmith/ # exports portable/christophersmith and users/christophersmith
+│       ├── crs58/           # exports users/crs58
+│       ├── raquel/          # exports users/raquel
+│       ├── cameron/         # exports users/cameron
+│       ├── janettesmith/    # exports users/janettesmith
+│       └── christophersmith/ # exports users/christophersmith
 └── machines/
     └── darwin/
         ├── stibnite.nix     # imports users/crs58
         └── blackphos.nix    # imports users/crs58, users/raquel
 ```
 
-Per-user content is split between two registry entries:
-
-- `flake.modules.homeManager."portable/<user>"` holds the *content* — programs, packages, and dotfiles that compose into any account.
-- `flake.modules.homeManager."users/<user>"` holds the *full* module — the portable content plus identity (`home.username`, `home.homeDirectory`) and secrets, with identity sourced from typed `flake.users.<user>.meta` and profile composition driven by `flake.users.<user>.aggregates`.
-
-Machine configs typically import the full `users/<user>` module; the `home-trial` flake app imports `portable/<user>` instead so a stranger can evaluate the dotfiles without the target's secrets or identity.
+Each user is exposed as a single registry entry, `flake.modules.homeManager."users/<user>"`, that holds the full home-manager module: programs, packages, and dotfiles together with identity (`home.username`, `home.homeDirectory`) and secrets.
+Identity is sourced from typed `flake.users.<user>.meta` and profile composition is driven by `flake.users.<user>.aggregates`.
+Machine configs import this `users/<user>` module to activate the user's full home environment.
 
 ## Integrated user setup
 
