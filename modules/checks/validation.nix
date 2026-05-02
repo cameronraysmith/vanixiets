@@ -17,6 +17,30 @@
       terraformConfig = terraformPkg.passthru.config;
       tofuWithProviders = terraformPkg.passthru.tofuBundle;
       mkCheck = self.lib.mkStructuralCheck pkgs;
+
+      # Resolve a deferred module to its post-merge config attrset.
+      # `_module.check = false` and a permissive freeform type let the
+      # eval succeed without re-declaring every option the slot might
+      # set; we only care whether the slot produced any config keys.
+      # Used by both the TC-020 positive check (per-primary-user) and
+      # TC-020-neg (against synthetic phantom users).
+      evalSlot =
+        slot:
+        (lib.evalModules {
+          modules = [
+            slot
+            {
+              _module.check = false;
+              freeformType = lib.types.lazyAttrsOf lib.types.raw;
+            }
+          ];
+        }).config;
+      hasContent =
+        user:
+        let
+          resolved = removeAttrs (evalSlot user.contentPrivate) [ "_module" ];
+        in
+        resolved != { };
     in
     {
       checks = {
@@ -35,9 +59,9 @@
         # Negative control: a primary user whose `contentPrivate` is the
         # default `{ }` yields zero resolved config keys, the per-user
         # `actual` map records `false`, and the JSON diff against the
-        # all-`true` `expected` map fails the check. Negative-control
-        # verifiable: confirmed at design time by evaluating an empty
-        # deferred module and observing zero post-merge config keys.
+        # all-`true` `expected` map fails the check. The negative-control
+        # check `home-module-exports-neg` materializes this falsifiability
+        # claim as a build-time assertion (see below).
         home-module-exports =
           let
             # Primary users only — aliases inherit their target's typed
@@ -46,32 +70,61 @@
             primaryUsers = builtins.removeAttrs config.flake.users (
               builtins.attrNames config.flake.userAliases
             );
-            # Resolve a deferred module to its post-merge config attrset.
-            # `_module.check = false` and a permissive freeform type let the
-            # eval succeed without re-declaring every option the slot might
-            # set; we only care whether the slot produced any config keys.
-            evalSlot =
-              slot:
-              (lib.evalModules {
-                modules = [
-                  slot
-                  {
-                    _module.check = false;
-                    freeformType = lib.types.lazyAttrsOf lib.types.raw;
-                  }
-                ];
-              }).config;
-            hasContent =
-              user:
-              let
-                resolved = removeAttrs (evalSlot user.contentPrivate) [ "_module" ];
-              in
-              resolved != { };
             actual = lib.mapAttrs (_: u: hasContent u) primaryUsers;
             expected = lib.mapAttrs (_: _: true) primaryUsers;
           in
           mkCheck {
             name = "home-module-exports";
+            inherit actual expected;
+          };
+
+        # TC-020-neg: Negative control for `home-module-exports`.
+        #
+        # Falsifiability claim of the positive check: the `hasContent`
+        # predicate classifies a user whose `contentPrivate` is the
+        # `lib.types.deferredModule` default (`{ }`) as empty (`false`),
+        # and a user whose `contentPrivate` is an authored module as
+        # non-empty (`true`). If the predicate did not discriminate
+        # between these cases (e.g., because `freeformType` injected
+        # synthetic keys, or the `_module` strip became incorrect), the
+        # positive check would silently pass for a user whose writer
+        # was deleted — re-introducing the trivially-true regression
+        # that 8c57e390a explicitly removed.
+        #
+        # This check exercises the predicate against two phantom users:
+        # one with the default empty slot, one with a minimally-authored
+        # slot. Both classifications are required to be correct; the
+        # JSON diff against the `expected` map fails on any drift.
+        #
+        # Severity rationale (Mayo): the check passes only if the
+        # predicate's behavior on the empty/authored boundary is
+        # exactly as specified. Mutation: changing `phantomEmpty`'s
+        # `contentPrivate` from `{ }` to a real authored module flips
+        # `actual.empty` to `true`, which fails the JSON diff against
+        # `expected.empty = false`. Verified at authoring time. The
+        # probe is severe in Mayo's sense — it would fail under
+        # plausible incorrect implementations of `hasContent`.
+        home-module-exports-neg =
+          let
+            phantomEmpty = {
+              contentPrivate = { };
+            };
+            phantomAuthored = {
+              contentPrivate = {
+                home.stateVersion = "23.11";
+              };
+            };
+            actual = {
+              empty = hasContent phantomEmpty;
+              authored = hasContent phantomAuthored;
+            };
+            expected = {
+              empty = false;
+              authored = true;
+            };
+          in
+          mkCheck {
+            name = "home-module-exports-neg";
             inherit actual expected;
           };
 
