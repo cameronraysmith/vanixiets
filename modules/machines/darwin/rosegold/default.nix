@@ -148,17 +148,11 @@ in
           flake = flakeForHomeManager;
         };
 
-        users.janettesmith.imports =
-          flakeUsers.janettesmith.aggregates
-          ++ [ flakeUsers.janettesmith.contentPrivate ]
-          ++ [ flakeUsers.janettesmith.identity ];
+        users.janettesmith.imports = flakeUsers.janettesmith.modules;
 
         # cameron is an alias for crs58; alias-keyed reads keep this
         # call site ignorant of the alias->target relationship.
-        users.cameron.imports =
-          flakeUsers.cameron.aggregates
-          ++ [ flakeUsers.cameron.contentPrivate ]
-          ++ [ flakeUsers.cameron.identity ];
+        users.cameron.imports = flakeUsers.cameron.modules;
       };
     };
 }

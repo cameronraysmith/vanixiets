@@ -252,8 +252,7 @@ in
         };
 
         users.crs58 = {
-          imports =
-            flakeUsers.crs58.aggregates ++ [ flakeUsers.crs58.contentPrivate ] ++ [ flakeUsers.crs58.identity ];
+          imports = flakeUsers.crs58.modules;
 
           # Incus k3s profiles (see ADR-004)
           # Provides instance profiles for k3s clusters in Colima

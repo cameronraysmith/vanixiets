@@ -40,7 +40,7 @@ in
     default = { };
     type = lib.types.attrsOf (
       lib.types.submodule (
-        { name, ... }:
+        { name, config, ... }:
         {
           options = {
             meta = {
@@ -120,6 +120,19 @@ in
                 the inherited canonical identity using
                 `flake.lib.mkUserIdentity { user = alias; force = true; }`,
                 pinning the alias name with `lib.mkForce` setters.
+              '';
+            };
+            modules = lib.mkOption {
+              type = lib.types.listOf lib.types.deferredModule;
+              default = config.aggregates ++ [ config.contentPrivate ] ++ [ config.identity ];
+              readOnly = true;
+              description = ''
+                Materialized home-manager module list for this user:
+                `aggregates ++ [ contentPrivate ] ++ [ identity ]` composed
+                in standard order. Consumer-side smart constructor — host
+                modules import this rather than re-computing the recipe,
+                and `mk-home` consumes it for `homeConfigurations.<u>@<sys>`.
+                Read-only: derived from the other submodule fields.
               '';
             };
           };

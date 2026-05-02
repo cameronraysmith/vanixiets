@@ -113,10 +113,7 @@ in
       # call site ignorant of the alias->target relationship.
       # Infrastructure settings provided by the cameron inventory service.
       home-manager.users.cameron = {
-        imports =
-          flakeUsers.cameron.aggregates
-          ++ [ flakeUsers.cameron.contentPrivate ]
-          ++ [ flakeUsers.cameron.identity ];
+        imports = flakeUsers.cameron.modules;
       };
     };
 }

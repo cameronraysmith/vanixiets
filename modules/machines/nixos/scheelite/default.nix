@@ -99,15 +99,11 @@ in
       # call site ignorant of the alias->target relationship.
       # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
       home-manager.users.cameron = {
-        imports =
-          flakeUsers.cameron.aggregates
-          ++ [ flakeUsers.cameron.contentPrivate ]
-          ++ [ flakeUsers.cameron.identity ];
+        imports = flakeUsers.cameron.modules;
       };
 
       home-manager.users.tara = {
-        imports =
-          flakeUsers.tara.aggregates ++ [ flakeUsers.tara.contentPrivate ] ++ [ flakeUsers.tara.identity ];
+        imports = flakeUsers.tara.modules;
         programs.agents-md.enable = false;
       };
     };

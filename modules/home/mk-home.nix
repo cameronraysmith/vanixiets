@@ -9,13 +9,6 @@
       user,
       system ? builtins.currentSystem,
     }:
-    let
-      userRecord = config.flake.users.${user};
-      aggregateModules = userRecord.aggregates;
-      contentModule = userRecord.contentPrivate;
-
-      identity = userRecord.identity;
-    in
     inputs.home-manager.lib.homeManagerConfiguration {
       pkgs = import inputs.nixpkgs {
         inherit system;
@@ -29,6 +22,6 @@
           inherit inputs;
         };
       };
-      modules = aggregateModules ++ [ contentModule ] ++ [ identity ];
+      modules = config.flake.users.${user}.modules;
     };
 }

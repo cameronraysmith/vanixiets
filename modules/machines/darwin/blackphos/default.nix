@@ -156,13 +156,9 @@ in
           flake = flakeForHomeManager;
         };
 
-        users.crs58.imports =
-          flakeUsers.crs58.aggregates ++ [ flakeUsers.crs58.contentPrivate ] ++ [ flakeUsers.crs58.identity ];
+        users.crs58.imports = flakeUsers.crs58.modules;
 
-        users.raquel.imports =
-          flakeUsers.raquel.aggregates
-          ++ [ flakeUsers.raquel.contentPrivate ]
-          ++ [ flakeUsers.raquel.identity ];
+        users.raquel.imports = flakeUsers.raquel.modules;
       };
     };
 }
