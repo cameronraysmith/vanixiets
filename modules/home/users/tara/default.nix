@@ -10,7 +10,6 @@ let
       ...
     }:
     {
-      # Compose portable content via typed slot.
       imports = [ flake.users.tara.contentPortable ];
 
       # Minimal initial secrets: signing key + public key only.
@@ -32,9 +31,6 @@ let
         };
       };
 
-      # User-specific git identity from typed meta.
-      # Identity setters (home.username/home.homeDirectory) live in
-      # users/tara/identity.nix; alias overrides come from aliases-fold.nix.
       programs.git.settings = {
         user.name = flake.users.tara.meta.fullname;
         user.email = flake.users.tara.meta.email;
@@ -42,6 +38,5 @@ let
     };
 in
 {
-  # Typed-slot writer.
   flake.users.tara.contentPrivate = content;
 }

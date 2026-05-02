@@ -16,6 +16,5 @@ let
     };
 in
 {
-  # Typed-slot writer.
   flake.users.tara.contentPortable = content;
 }

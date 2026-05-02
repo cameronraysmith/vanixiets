@@ -12,7 +12,6 @@ let
       ...
     }:
     {
-      # Compose portable content via typed slot.
       imports = [ flake.users.raquel.contentPortable ];
 
       # sops-nix configuration for raquel user
@@ -39,9 +38,6 @@ let
         };
       };
 
-      # User-specific git identity from typed meta.
-      # Identity setters (home.username/home.homeDirectory) live in
-      # users/raquel/identity.nix; alias overrides come from aliases-fold.nix.
       programs.git.settings = {
         user.name = flake.users.raquel.meta.fullname;
         user.email = flake.users.raquel.meta.email;
@@ -49,6 +45,5 @@ let
     };
 in
 {
-  # Typed-slot writer.
   flake.users.raquel.contentPrivate = content;
 }

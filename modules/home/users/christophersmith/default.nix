@@ -10,7 +10,6 @@ let
       ...
     }:
     {
-      # Compose portable content via typed slot.
       imports = [ flake.users.christophersmith.contentPortable ];
 
       sops = {
@@ -36,9 +35,6 @@ let
         };
       };
 
-      # User-specific git identity from typed meta.
-      # Identity setters (home.username/home.homeDirectory) live in
-      # users/christophersmith/identity.nix; alias overrides come from aliases-fold.nix.
       programs.git.settings = {
         user.name = flake.users.christophersmith.meta.fullname;
         user.email = flake.users.christophersmith.meta.email;
@@ -46,6 +42,5 @@ let
     };
 in
 {
-  # Typed-slot writer.
   flake.users.christophersmith.contentPrivate = content;
 }

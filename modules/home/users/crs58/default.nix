@@ -12,7 +12,6 @@ let
       ...
     }:
     {
-      # Compose portable content via typed slot.
       imports = [ flake.users.crs58.contentPortable ];
 
       # sops-nix configuration for crs58/cameron user
@@ -70,9 +69,6 @@ let
       # Cannot use home.file.source with sops.secrets.path due to pure eval mode restrictions
       # TODO: Investigate sops-nix symlink option or activation script approach
 
-      # User-specific git/jujutsu identity from typed meta.
-      # Identity setters (home.username/home.homeDirectory) live in
-      # users/crs58/identity.nix; alias overrides come from aliases-fold.nix.
       programs.git.settings = {
         user.name = flake.users.crs58.meta.fullname;
         user.email = flake.users.crs58.meta.email;
@@ -85,6 +81,5 @@ let
     };
 in
 {
-  # Typed-slot writer.
   flake.users.crs58.contentPrivate = content;
 }

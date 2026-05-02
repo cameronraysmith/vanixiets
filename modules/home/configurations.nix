@@ -24,12 +24,9 @@ let
   );
 
   # Alias entries: homeConfigurations."<alias>@<system>" built from the
-  # alias's own materialized user record. Post-nix-0pd.17 A2*, aliases-fold
-  # propagates `meta`/`aggregates`/`contentPrivate`/`contentPortable` from
-  # the target user and synthesizes a `mkForce` `identity` on the
-  # alias record, so mk-home reads alias-keyed slots uniformly without a
-  # target redirection. Aliases follow the same enumeration rule as direct
-  # users — only emitted when their target user has non-empty aggregates.
+  # alias's own materialized user record (see aliases-fold.nix). Aliases
+  # follow the same enumeration rule as direct users — only emitted when
+  # their target user has non-empty aggregates.
   aliasEntries = lib.listToAttrs (
     lib.concatMap (
       { name, value }:

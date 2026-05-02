@@ -15,16 +15,14 @@
     {
       checks = {
         # TC-020: Home Content Slots Wired
-        # Purpose: Validate per-user home-manager content slots
+        # Validate per-user home-manager content slots
         # (`flake.users.<u>.contentPrivate` and `.contentPortable`) are
-        # populated for every primary user. Post nix-0pd.17 A5, content
-        # registration happens via typed slots on `flake.users.<u>` rather
-        # than the `flake.modules.homeManager."users/<u>"` registry keys.
+        # populated for every primary user.
         home-module-exports =
           let
-            # Primary users only — aliases (e.g. cameron) inherit their target's
-            # typed content slots via aliases-fold materialization; they don't
-            # author their own `contentPrivate`/`contentPortable`.
+            # Primary users only — aliases inherit their target's typed content
+            # slots via aliases-fold; they don't author their own
+            # `contentPrivate`/`contentPortable`.
             userNames = builtins.attrNames (
               builtins.removeAttrs config.flake.users (builtins.attrNames config.flake.userAliases)
             );

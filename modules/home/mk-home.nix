@@ -16,8 +16,6 @@
       aggregateModules = userRecord.aggregates;
       contentModule = if includePrivate then userRecord.contentPrivate else userRecord.contentPortable;
 
-      # Typed identity fragment authored per-user; alias-fold extends it
-      # with mkForce setters to pin alias-keyed username/homeDirectory.
       identity = userRecord.identity;
     in
     inputs.home-manager.lib.homeManagerConfiguration {

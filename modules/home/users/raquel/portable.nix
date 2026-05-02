@@ -23,6 +23,5 @@ let
     };
 in
 {
-  # Typed-slot writer.
   flake.users.raquel.contentPortable = content;
 }

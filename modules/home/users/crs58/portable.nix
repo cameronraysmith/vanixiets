@@ -27,6 +27,5 @@ let
     };
 in
 {
-  # Typed-slot writer.
   flake.users.crs58.contentPortable = content;
 }

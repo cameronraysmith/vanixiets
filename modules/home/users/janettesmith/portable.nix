@@ -21,6 +21,5 @@ let
     };
 in
 {
-  # Typed-slot writer.
   flake.users.janettesmith.contentPortable = content;
 }

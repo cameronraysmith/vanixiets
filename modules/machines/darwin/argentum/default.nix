@@ -148,16 +148,13 @@ in
           flake = flakeForHomeManager;
         };
 
-        # christophersmith (primary user): aggregates + typed contentPrivate + identity
         users.christophersmith.imports =
           flakeUsers.christophersmith.aggregates
           ++ [ flakeUsers.christophersmith.contentPrivate ]
           ++ [ flakeUsers.christophersmith.identity ];
 
-        # cameron (admin user, alias for crs58): all slots materialized on
-        # flake.users.cameron by aliases-fold. Alias-keyed reads here keep
-        # call sites ignorant of alias->target relationships; identity
-        # supplies the mkForce username/homeDirectory pinning.
+        # cameron is an alias for crs58; alias-keyed reads keep this
+        # call site ignorant of the alias->target relationship.
         users.cameron.imports =
           flakeUsers.cameron.aggregates
           ++ [ flakeUsers.cameron.contentPrivate ]

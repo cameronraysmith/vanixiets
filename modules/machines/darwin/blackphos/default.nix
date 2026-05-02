@@ -156,11 +156,9 @@ in
           flake = flakeForHomeManager;
         };
 
-        # crs58 (admin): aggregates + typed contentPrivate + identity
         users.crs58.imports =
           flakeUsers.crs58.aggregates ++ [ flakeUsers.crs58.contentPrivate ] ++ [ flakeUsers.crs58.identity ];
 
-        # raquel (primary user): aggregates + typed contentPrivate + identity
         users.raquel.imports =
           flakeUsers.raquel.aggregates
           ++ [ flakeUsers.raquel.contentPrivate ]
