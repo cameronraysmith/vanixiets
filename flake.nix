@@ -77,14 +77,12 @@
 
     pkgs-by-name-for-flake-parts.url = "github:drupol/pkgs-by-name-for-flake-parts";
 
-    bun2nix = {
-      url = "github:nix-community/bun2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-parts.follows = "flake-parts";
-      inputs.import-tree.follows = "import-tree";
-      inputs.systems.follows = "systems";
-      inputs.treefmt-nix.follows = "treefmt-nix";
-    };
+    bun2nix.url = "github:nix-community/bun2nix";
+    bun2nix.inputs.nixpkgs.follows = "nixpkgs";
+    bun2nix.inputs.flake-parts.follows = "flake-parts";
+    bun2nix.inputs.import-tree.follows = "import-tree";
+    bun2nix.inputs.systems.follows = "systems";
+    bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
 
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";
     nuenv.inputs.nixpkgs.follows = "nixpkgs";
