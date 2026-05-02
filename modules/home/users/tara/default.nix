@@ -10,7 +10,11 @@ let
       ...
     }:
     {
-      imports = [ flake.users.tara.contentPortable ];
+      home.stateVersion = "23.11";
+
+      home.packages = with pkgs; [
+        gh
+      ];
 
       # Minimal initial secrets: signing key + public key only.
       sops = {

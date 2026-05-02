@@ -12,7 +12,16 @@ let
       ...
     }:
     {
-      imports = [ flake.users.raquel.contentPortable ];
+      home.stateVersion = "23.11";
+
+      home.packages = with pkgs; [
+        gh # GitHub CLI (keep from baseline)
+        just # Command runner
+        ripgrep # Fast grep alternative
+        fd # Fast find alternative
+        bat # Cat with syntax highlighting
+        eza # Modern ls replacement
+      ];
 
       # sops-nix configuration for raquel user
       # 5 secrets: development + shell aggregates (NO AI)

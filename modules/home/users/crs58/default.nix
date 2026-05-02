@@ -12,7 +12,16 @@ let
       ...
     }:
     {
-      imports = [ flake.users.crs58.contentPortable ];
+      home.stateVersion = "23.11";
+
+      home.packages =
+        with pkgs;
+        [
+          gh # GitHub CLI (keep from baseline)
+        ]
+        ++ [
+          flake.inputs.niks3.packages.${pkgs.stdenv.hostPlatform.system}.niks3
+        ];
 
       # sops-nix configuration for crs58/cameron user
       # 15 secrets: development + ai + shell aggregates
