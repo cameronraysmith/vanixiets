@@ -89,9 +89,11 @@ in
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       services.openssh.settings.MaxAuthTries = 20;
 
-      # Bridge NixOS-level sops to home-manager for user secret key delivery
-      hm-sops-bridge.users.cameron.sopsIdentity = "crs58";
-      hm-sops-bridge.users.tara.sopsIdentity = "tara";
+      # Bridge NixOS-level sops to home-manager for user secret key delivery.
+      # sopsIdentity defaults to flake.users.<u>.meta.sopsAgeKeyId
+      # (cameron -> "crs58" via alias-fold; tara -> "tara").
+      hm-sops-bridge.users.cameron = { };
+      hm-sops-bridge.users.tara = { };
 
       # cameron is an alias for crs58; alias-keyed reads keep this
       # call site ignorant of the alias->target relationship.

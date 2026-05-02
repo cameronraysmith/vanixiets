@@ -104,8 +104,10 @@ in
         openssh.authorizedKeys.keys = inputs.self.users.crs58.meta.sshKeys;
       };
 
-      # Bridge NixOS-level sops to home-manager for user secret key delivery
-      hm-sops-bridge.users.cameron.sopsIdentity = "crs58";
+      # Bridge NixOS-level sops to home-manager for user secret key delivery.
+      # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
+      # ("crs58" via alias-fold inheritance).
+      hm-sops-bridge.users.cameron = { };
 
       # cameron is an alias for crs58; alias-keyed reads keep this
       # call site ignorant of the alias->target relationship.

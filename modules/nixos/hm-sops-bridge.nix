@@ -10,11 +10,7 @@
 #
 # Darwin hosts are unaffected: they continue using the Bitwarden SSH agent
 # workflow with the XDG-path key file (set via mkDefault in base-sops).
-{
-  config,
-  inputs,
-  ...
-}:
+flakeArgs@{ inputs, ... }:
 {
   flake.modules.nixos.hm-sops-bridge =
     {
@@ -25,12 +21,29 @@
     let
       cfg = config.hm-sops-bridge;
 
-      userOpts = lib.types.submodule {
-        options.sopsIdentity = lib.mkOption {
-          type = lib.types.str;
-          description = "Sops identity name used in the bridge secret filename (e.g. 'crs58' for secrets/bridge/crs58-age-key.enc)";
-        };
-      };
+      flakeUsers = flakeArgs.config.flake.users;
+
+      userOpts = lib.types.submodule (
+        { name, ... }:
+        {
+          options.sopsIdentity = lib.mkOption {
+            type = lib.types.str;
+            default =
+              flakeUsers.${name}.meta.sopsAgeKeyId
+                or (throw "hm-sops-bridge.users.${name}.sopsIdentity has no default: flake.users.${name}.meta.sopsAgeKeyId is unset");
+            defaultText = lib.literalExpression "config.flake.users.\${name}.meta.sopsAgeKeyId";
+            description = ''
+              Sops identity name used in the bridge secret filename (e.g. 'crs58'
+              for secrets/bridge/crs58-age-key.enc).
+
+              Defaults to `flake.users.<name>.meta.sopsAgeKeyId`, which after
+              alias-fold propagates the canonical user's identity to alias
+              entries (e.g. `cameron` inherits `crs58`). Override only when the
+              host-local identity differs from the typed registry.
+            '';
+          };
+        }
+      );
     in
     {
       options.hm-sops-bridge.users = lib.mkOption {
@@ -40,6 +53,20 @@
       };
 
       config = lib.mkIf (cfg.users != { }) {
+        assertions = lib.mapAttrsToList (username: _userCfg: {
+          assertion =
+            (flakeUsers ? ${username}) && (flakeUsers.${username}.meta.sopsAgeKeyId or null) != null;
+          message = ''
+            hm-sops-bridge.users.${username} is enabled but
+            flake.users.${username}.meta.sopsAgeKeyId is null or unset.
+
+            Set sopsAgeKeyId in modules/home/users/${username}/meta.nix (for
+            canonical users) or ensure the alias target has it set (alias-fold
+            inherits meta from the target). Alternatively, override
+            hm-sops-bridge.users.${username}.sopsIdentity at the host level.
+          '';
+        }) cfg.users;
+
         sops.secrets = lib.mapAttrs' (
           username: userCfg:
           lib.nameValuePair "${userCfg.sopsIdentity}-age-key" {
