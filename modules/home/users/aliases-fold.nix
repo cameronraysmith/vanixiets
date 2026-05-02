@@ -18,25 +18,17 @@
       };
       aggregates = config.flake.users.${target}.aggregates;
       contentPrivate = config.flake.users.${target}.contentPrivate;
-      # mkForce on identity setters: the target user's `identity`
-      # (from `users/<target>/identity.nix`) sets
-      # `home.username = lib.mkDefault "<target>"` while the alias
-      # record needs the alias name. mkForce overrides the inherited
-      # mkDefault. mkForce on `home.homeDirectory` is the sole setter
-      # for the alias path, since the canonical homeDirectory derives
-      # self-referentially from `config.home.username`.
-      identity =
-        {
-          config,
-          pkgs,
-          ...
-        }:
-        {
-          home.username = lib.mkForce alias;
-          home.homeDirectory = lib.mkForce (
-            if pkgs.stdenv.isDarwin then "/Users/${alias}" else "/home/${alias}"
-          );
-        };
+      # mkForce on identity setters: the canonical default identity (synthesized
+      # in `users/lib.nix` from the attribute key) sets
+      # `home.username = lib.mkDefault "<target>"` while the alias record
+      # needs the alias name. mkForce overrides the inherited mkDefault.
+      # mkForce on `home.homeDirectory` is the sole setter for the alias
+      # path, since the canonical homeDirectory derives self-referentially
+      # from `config.home.username`.
+      identity = config.flake.lib.mkUserIdentity {
+        user = alias;
+        force = true;
+      };
     }
   ) config.flake.userAliases;
 }
