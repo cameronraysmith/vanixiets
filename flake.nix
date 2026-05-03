@@ -111,10 +111,6 @@
 
     catppuccin.url = "github:catppuccin/nix";
 
-    agenix.url = "github:ryantm/agenix";
-    agenix.inputs.nixpkgs.follows = "nixpkgs";
-    agenix.inputs.home-manager.follows = "home-manager";
-
     nixidy.url = "github:arnarg/nixidy";
     nixidy.inputs.nixpkgs.follows = "nixpkgs";
 
