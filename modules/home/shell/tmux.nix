@@ -331,6 +331,19 @@
           '';
         };
 
+        # Refresh hm-session-vars guards in any running tmux server
+        # Captured guards block re-sourcing across activations, leaving stale store paths in env
+        home.activation.refreshTmuxEnv = {
+          after = [ "writeBoundary" ];
+          before = [ ];
+          data = ''
+            if ${pkgs.tmux}/bin/tmux info >/dev/null 2>&1; then
+              ${pkgs.tmux}/bin/tmux setenv -gu __HM_SESS_VARS_SOURCED 2>/dev/null || true
+              ${pkgs.tmux}/bin/tmux setenv -gu __HM_ZSH_SESS_VARS_SOURCED 2>/dev/null || true
+            fi
+          '';
+        };
+
         home.packages = [
           (pkgs.writeShellApplication {
             name = "pux";
