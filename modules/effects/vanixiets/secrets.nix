@@ -17,7 +17,14 @@
         files.secrets = {
           secret = true;
           owner = "buildbot";
-          # systemd LoadCredential= snapshots /run/secrets/vars/<gen>/secrets at unit-start time and never re-reads. Without this, regenerating the secret leaves /run/credentials/buildbot-master.service/effects-secret__... stale until manual `systemctl restart buildbot-master.service`. clan-vars plumbs restartUnits through to sops-nix's restartUnits, which keys the unit's restartTriggers on the encrypted blob hash so the next deploy refreshes the credential snapshot.
+          # systemd LoadCredential= snapshots /run/secrets/vars/<gen>/secrets
+          # at unit-start time and never re-reads.
+          # Without this, regenerating the secret leaves
+          # /run/credentials/buildbot-master.service/effects-secret__... stale
+          # until manual `systemctl restart buildbot-master.service`.
+          # clan-vars plumbs restartUnits through to sops-nix's restartUnits,
+          # which keys the unit's restartTriggers on the encrypted blob hash
+          # so the next deploy refreshes the credential snapshot.
           restartUnits = [ "buildbot-master.service" ];
         };
 
@@ -94,7 +101,8 @@
           };
         };
 
-        # Raw prompts kept in repo (encrypted-at-rest) for the "Enter to keep" rotation UX, but only the composed secrets file deploys to magnetite.
+        # component secrets kept in repo for rotation management, but only the
+        # composed secrets file deploys to the buildbot-nix host.
         files.cloudflare-api-token.deploy = false;
         files.cloudflare-account-id.deploy = false;
         files.github-token.deploy = false;
