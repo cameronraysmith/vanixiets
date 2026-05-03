@@ -16,6 +16,8 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
 
+    nix-index-database.url = "github:nix-community/nix-index-database";
+
     nix-darwin.url = "github:nix-darwin/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -28,31 +30,9 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
-    direnv-instant.url = "github:Mic92/direnv-instant";
-    direnv-instant.inputs.nixpkgs.follows = "nixpkgs";
-    direnv-instant.inputs.flake-parts.follows = "flake-parts";
-    direnv-instant.inputs.treefmt-nix.follows = "treefmt-nix";
-
-    clan-core.url = "https://git.clan.lol/clan/clan-core/archive/main.tar.gz";
-    clan-core.inputs.sops-nix.follows = "sops-nix";
-    clan-core.inputs.disko.follows = "disko";
-    clan-core.inputs.flake-parts.follows = "flake-parts";
-    clan-core.inputs.treefmt-nix.follows = "treefmt-nix";
-    clan-core.inputs.nix-darwin.follows = "nix-darwin";
-    clan-core.inputs.systems.follows = "systems";
-
     import-tree.url = "github:vic/import-tree";
 
-    terranix.url = "github:terranix/terranix";
-    terranix.inputs.flake-parts.follows = "flake-parts";
-    terranix.inputs.nixpkgs.follows = "nixpkgs";
-    terranix.inputs.systems.follows = "systems";
-
-    disko.url = "github:nix-community/disko";
-    disko.inputs.nixpkgs.follows = "nixpkgs";
-
-    srvos.url = "github:nix-community/srvos";
-    srvos.inputs.nixpkgs.follows = "nixpkgs";
+    pkgs-by-name-for-flake-parts.url = "github:drupol/pkgs-by-name-for-flake-parts";
 
     nixos-generators.url = "github:nix-community/nixos-generators";
     nixos-generators.inputs.nixpkgs.follows = "nixpkgs";
@@ -68,7 +48,51 @@
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
     nix-unit.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    pkgs-by-name-for-flake-parts.url = "github:drupol/pkgs-by-name-for-flake-parts";
+    lazyvim-nix.url = "github:pfassina/lazyvim-nix";
+    lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
+
+    nix2container.url = "github:nlewo/nix2container";
+    nix2container.inputs.nixpkgs.follows = "nixpkgs";
+
+    nix-rosetta-builder.url = "github:cpick/nix-rosetta-builder";
+    nix-rosetta-builder.inputs.nixpkgs.follows = "nixpkgs";
+
+    niks3.url = "github:Mic92/niks3";
+    niks3.inputs.nixpkgs.follows = "nixpkgs";
+    niks3.inputs.treefmt-nix.follows = "treefmt-nix";
+    niks3.inputs.flake-parts.follows = "flake-parts";
+
+    buildbot-nix.url = "github:nix-community/buildbot-nix";
+    buildbot-nix.inputs.nixpkgs.follows = "nixpkgs";
+    buildbot-nix.inputs.treefmt-nix.follows = "treefmt-nix";
+
+    hercules-ci-effects.url = "github:hercules-ci/hercules-ci-effects";
+    hercules-ci-effects.inputs.flake-parts.follows = "flake-parts";
+    hercules-ci-effects.inputs.nixpkgs.follows = "nixpkgs";
+
+    clan-core.url = "https://git.clan.lol/clan/clan-core/archive/main.tar.gz";
+    clan-core.inputs.sops-nix.follows = "sops-nix";
+    clan-core.inputs.disko.follows = "disko";
+    clan-core.inputs.flake-parts.follows = "flake-parts";
+    clan-core.inputs.treefmt-nix.follows = "treefmt-nix";
+    clan-core.inputs.nix-darwin.follows = "nix-darwin";
+    clan-core.inputs.systems.follows = "systems";
+
+    terranix.url = "github:terranix/terranix";
+    terranix.inputs.flake-parts.follows = "flake-parts";
+    terranix.inputs.nixpkgs.follows = "nixpkgs";
+    terranix.inputs.systems.follows = "systems";
+
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
+
+    srvos.url = "github:nix-community/srvos";
+    srvos.inputs.nixpkgs.follows = "nixpkgs";
+
+    direnv-instant.url = "github:Mic92/direnv-instant";
+    direnv-instant.inputs.nixpkgs.follows = "nixpkgs";
+    direnv-instant.inputs.flake-parts.follows = "flake-parts";
+    direnv-instant.inputs.treefmt-nix.follows = "treefmt-nix";
 
     bun2nix.url = "github:nix-community/bun2nix";
     bun2nix.inputs.nixpkgs.follows = "nixpkgs";
@@ -77,6 +101,9 @@
     bun2nix.inputs.systems.follows = "systems";
     bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
 
+    playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.59.1";
+    playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
+
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";
     nuenv.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -84,23 +111,15 @@
 
     catppuccin.url = "github:catppuccin/nix";
 
-    lazyvim-nix.url = "github:pfassina/lazyvim-nix";
-    lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
-
-    nix-index-database.url = "github:nix-community/nix-index-database";
-
-    nix2container.url = "github:nlewo/nix2container";
-    nix2container.inputs.nixpkgs.follows = "nixpkgs";
-
-    nix-rosetta-builder.url = "github:cpick/nix-rosetta-builder";
-    nix-rosetta-builder.inputs.nixpkgs.follows = "nixpkgs";
-
     agenix.url = "github:ryantm/agenix";
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.home-manager.follows = "home-manager";
 
-    playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.59.1";
-    playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
+    nixidy.url = "github:arnarg/nixidy";
+    nixidy.inputs.nixpkgs.follows = "nixpkgs";
+
+    nixhelm.url = "github:farcaller/nixhelm";
+    nixhelm.inputs.nixpkgs.follows = "nixpkgs";
 
     easykubenix.url = "github:cameronraysmith/easykubenix/dev";
     easykubenix.flake = false;
@@ -122,25 +141,6 @@
 
     gateway-api-src.url = "github:kubernetes-sigs/gateway-api/v1.4.1";
     gateway-api-src.flake = false;
-
-    nixidy.url = "github:arnarg/nixidy";
-    nixidy.inputs.nixpkgs.follows = "nixpkgs";
-
-    nixhelm.url = "github:farcaller/nixhelm";
-    nixhelm.inputs.nixpkgs.follows = "nixpkgs";
-
-    niks3.url = "github:Mic92/niks3";
-    niks3.inputs.nixpkgs.follows = "nixpkgs";
-    niks3.inputs.treefmt-nix.follows = "treefmt-nix";
-    niks3.inputs.flake-parts.follows = "flake-parts";
-
-    buildbot-nix.url = "github:nix-community/buildbot-nix";
-    buildbot-nix.inputs.nixpkgs.follows = "nixpkgs";
-    buildbot-nix.inputs.treefmt-nix.follows = "treefmt-nix";
-
-    hercules-ci-effects.url = "github:hercules-ci/hercules-ci-effects";
-    hercules-ci-effects.inputs.flake-parts.follows = "flake-parts";
-    hercules-ci-effects.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   # sync with lib/caches.nix for machine modules
