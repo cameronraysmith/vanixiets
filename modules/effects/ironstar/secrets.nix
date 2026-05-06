@@ -98,5 +98,8 @@
             }' > "$out/secrets"
         '';
       };
+
+      services.buildbot-nix.master.effects.perRepoSecretFiles."github:sciexp/ironstar" =
+        config.clan.core.vars.generators.ironstar-effects-secrets.files.secrets.path;
     };
 }
