@@ -35,6 +35,7 @@ in
         gitea-actions-runner
         docker
         effects-vanixiets-secrets
+        effects-ironstar-secrets
       ]);
 
       # Make flake available to all modules (required by ssh-known-hosts)
