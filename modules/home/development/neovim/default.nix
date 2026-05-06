@@ -21,7 +21,7 @@
             ai.copilot.enable = true;
             coding = {
               blink.enable = true;
-              mini_surround.enable = true;
+              mini-surround.enable = true;
               yanky.enable = true;
             };
             # TODO: Re-enable DAP when vscode-js-debug builds with clang 21.x
