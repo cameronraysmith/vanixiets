@@ -33,7 +33,7 @@
             # - nixpkgs: pkgs/by-name/vs/vscode-js-debug/package.nix
             # - upstream: https://github.com/nodejs/node-addon-api/blob/main/napi.h#L806
             dap.core.enable = false;
-            editor.snacks_picker.enable = true;
+            editor.snacks-picker.enable = true;
             lang = {
               # TODO: Re-enable astro when Mason path lookup can be bypassed
               # Disabled due to "Mason package path not found for astro-language-server"
