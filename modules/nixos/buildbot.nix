@@ -177,5 +177,11 @@
       networking.firewall.interfaces."zt+" = {
         allowedTCPPorts = [ 9989 ];
       };
+
+      # CLI for local dispatch of hercules-ci-effects pipelines against this
+      # buildbot master.
+      environment.systemPackages = [
+        inputs.buildbot-nix.packages.${pkgs.stdenv.hostPlatform.system}.buildbot-effects
+      ];
     };
 }
