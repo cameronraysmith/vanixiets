@@ -205,10 +205,34 @@ in
 
     in
     {
+      # Linux hosts expose container variants under packages.<system>.* so that
+      # `nix flake check`, nix-fast-build, and buildbot-nix discover and (where
+      # appropriate) realize them. These packages target *-linux derivations and
+      # build natively on a matching Linux host.
+      #
+      # Darwin hosts expose the same attributes under legacyPackages.<system>.*
+      # because every container's resolved package set forces aarch64-linux
+      # cross-derivations whose installCheckPhase calls
+      # `stdenv.hostPlatform.emulator buildPackages`, which throws on Darwin
+      # without an aarch64-linux emulator. `nix flake check` walks packages.*
+      # strictly (per `man nix3-flake-check`) but legacyPackages.* lazily, so
+      # routing the Darwin exposure through legacyPackages avoids forcing
+      # installCheckPhase at eval time. Realization is unaffected: Nix's
+      # remote-builder selection keys off derivation.system, so rosetta-builder
+      # serves these aarch64-linux derivations regardless of which output set
+      # the attribute lives in. `nix build .#fdContainer-aarch64` continues to
+      # resolve via the standard installable lookup chain
+      # (packages.<sys>.X -> legacyPackages.<sys>.X -> X), so justfile recipes
+      # need no edits.
+      #
       # Usage: VERSION=1.0.0 nix run --impure .#fdManifest
       packages = lib.mkMerge [
-        (lib.optionalAttrs (isLinux || isDarwin) containerPackages)
-        (lib.optionalAttrs (isLinux || isDarwin) manifestPackages)
+        (lib.optionalAttrs isLinux containerPackages)
+        (lib.optionalAttrs isLinux manifestPackages)
+      ];
+      legacyPackages = lib.mkMerge [
+        (lib.optionalAttrs isDarwin containerPackages)
+        (lib.optionalAttrs isDarwin manifestPackages)
       ];
     };
 
