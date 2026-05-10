@@ -63,9 +63,7 @@ test.describe("Homepage", () => {
     await page.goto("/");
     const heroImg = page.locator(".hero img");
     await expect(heroImg).toBeVisible();
-    const naturalWidth = await heroImg.evaluate(
-      (img: HTMLImageElement) => img.naturalWidth,
-    );
+    const naturalWidth = await heroImg.evaluate((img: HTMLImageElement) => img.naturalWidth);
     expect(naturalWidth).toBeGreaterThan(0);
   });
 });
