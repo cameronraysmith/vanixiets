@@ -18,16 +18,16 @@
 
 buildGoModule (finalAttrs: {
   pname = "gastown";
-  version = "0.5.0";
+  version = "1.1.0";
 
   src = fetchFromGitHub {
     owner = "steveyegge";
     repo = "gastown";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-mtouqawxbaLruvBNuXSyYCwREEg1mi0SFQRLfOdJQxI=";
+    hash = "sha256-AZ36s/YXR271/BCrNkz5SRrWd4GwrHUOr480prZegiU=";
   };
 
-  vendorHash = "sha256-ripY9vrYgVW8bngAyMLh0LkU/Xx1UUaLgmAA7/EmWQU=";
+  vendorHash = "sha256-PQT/Xq9na3vI8Oy9INBYJf3GsiN5IxAVCxrNLhyIpO8=";
 
   subPackages = [ "cmd/gt" ];
 
