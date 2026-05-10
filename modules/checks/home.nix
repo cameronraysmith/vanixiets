@@ -12,6 +12,12 @@
 # of truth: drift between `configurations.nix`'s emission rule and this check
 # set is impossible.
 #
+# Binds the activationPackage directly (no overrideAttrs wrapper). A prior
+# revision wrapped it with overrideAttrs to add a cosmetic meta.description,
+# which changed the derivation hash and broke drvPath equality with what
+# `home-manager switch` actually evaluates: the check built one drv, activation
+# built another, and CI cache fills could not serve activation back.
+#
 # Closes: nix-144.4
 {
   self,
@@ -29,11 +35,7 @@
       checks = lib.listToAttrs (
         map (user: {
           name = "vanixiets-home-${user}";
-          value = (self.homeConfigurations."${user}@${system}".activationPackage).overrideAttrs (old: {
-            meta = (old.meta or { }) // {
-              description = "Build ${user}'s home-manager activation package for ${system}";
-            };
-          });
+          value = self.homeConfigurations."${user}@${system}".activationPackage;
         }) enumerableUsers
       );
     };
