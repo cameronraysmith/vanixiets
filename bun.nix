@@ -1105,9 +1105,9 @@
     url = "https://registry.npmjs.org/@types/node/-/node-24.10.1.tgz";
     hash = "sha512-GNWcUTRBgIRJD5zj+Tq0fKOJ5XZajIiBroOF0yvj2bSU1WvNdYS/dn9UxwsujGW4JX06dnHyjV2y9rRaybH0iQ==";
   };
-  "@types/node@25.6.0" = fetchurl {
-    url = "https://registry.npmjs.org/@types/node/-/node-25.6.0.tgz";
-    hash = "sha512-+qIYRKdNYJwY3vRCZMdJbPLJAtGjQBudzZzdzwQYkEPQd+PJGixUL5QfvCLDaULoLv+RhT3LDkwEfKaAkgSmNQ==";
+  "@types/node@25.6.2" = fetchurl {
+    url = "https://registry.npmjs.org/@types/node/-/node-25.6.2.tgz";
+    hash = "sha512-sokuT28dxf9JT5Kady1fsXOvI4HVpjZa95NKT5y9PNTIrs2AsobR4GFAA90ZG8M+nxVRLysCXsVj6eGC7Vbrlw==";
   };
   "@types/normalize-package-data@2.4.4" = fetchurl {
     url = "https://registry.npmjs.org/@types/normalize-package-data/-/normalize-package-data-2.4.4.tgz";
