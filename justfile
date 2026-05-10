@@ -275,14 +275,7 @@ check:
   #!/usr/bin/env bash
   set -euo pipefail
   echo "Running nix flake check..."
-  echo ""
-  echo "Note: The following nix-unit warnings are expected and harmless:"
-  echo "  - 'unknown setting allowed-users/trusted-users' (daemon settings don't apply in pure eval)"
-  echo "  - '--gc-roots-dir not specified' (nix-unit doesn't persist GC roots)"
-  echo "  - 'input has an override for non-existent input self' (nix-unit internal mechanism)"
-  echo "  - 'not writing modified lock file' (expected for read-only check)"
-  echo ""
-  {{nix_cmd}} flake check
+  {{nix_cmd}} flake check -L --show-trace
 
 # Validate flake checks via nix-fast-build (failure isolation, parallel eval+build, nom output)
 # --eval-workers 4: reduces SQLite eval-cache contention (harmless but noisy at default=ncpus)
