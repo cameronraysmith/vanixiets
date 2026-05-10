@@ -34,7 +34,7 @@
     {
       checks = lib.listToAttrs (
         map (user: {
-          name = "vanixiets-home-${user}";
+          name = "home-manager-${user}";
           value = self.homeConfigurations."${user}@${system}".activationPackage;
         }) enumerableUsers
       );

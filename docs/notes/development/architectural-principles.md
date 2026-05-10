@@ -259,7 +259,7 @@ The cross-cutting clusters where one fix lands many entries:
 ### O14 [P1] [MEDIUM] `modules/checks/machines.nix` hardcodes the 4-machine NixOS list rather than deriving from registered configurations
 
 - Location: `modules/checks/machines.nix:17-22`
-- Current shape: the check binds `vanixiets-nixos-{cinnabar,electrum,galena,magnetite}` as `self.nixosConfigurations.<host>.config.system.build.toplevel`. The host list is a literal four-element repetition; every line restates the same recipe.
+- Current shape: the check binds `nixos-{cinnabar,electrum,galena,magnetite}` as `self.nixosConfigurations.<host>.config.system.build.toplevel`. The host list is a literal four-element repetition; every line restates the same recipe.
 - Why this matters: P1 — recipe at every callsite. Compare against `modules/checks/home.nix:23-34` which derives the analogous list from `config.flake.users` (filtered by aggregates).
 - Approach: iterate `lib.attrNames self.nixosConfigurations`, optionally filtered by an exclusion list (the comment notes scheelite is intentionally deferred). Then drift between the inventory and the check set is impossible.
 

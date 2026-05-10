@@ -695,7 +695,7 @@ docs-check:
 # Validate internal and external links in documentation
 [group('docs')]
 docs-linkcheck:
-  nix build --accept-flake-config .#checks.$(nix eval --raw --impure --expr builtins.currentSystem).vanixiets-docs-linkcheck
+  nix build --accept-flake-config .#checks.$(nix eval --raw --impure --expr builtins.currentSystem).docs-linkcheck
 
 ## diagrams
 

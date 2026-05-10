@@ -15,10 +15,10 @@
     { system, ... }:
     {
       checks = lib.optionalAttrs (system == "x86_64-linux") {
-        vanixiets-nixos-cinnabar = self.nixosConfigurations.cinnabar.config.system.build.toplevel;
-        vanixiets-nixos-electrum = self.nixosConfigurations.electrum.config.system.build.toplevel;
-        vanixiets-nixos-galena = self.nixosConfigurations.galena.config.system.build.toplevel;
-        vanixiets-nixos-magnetite = self.nixosConfigurations.magnetite.config.system.build.toplevel;
+        nixos-cinnabar = self.nixosConfigurations.cinnabar.config.system.build.toplevel;
+        nixos-electrum = self.nixosConfigurations.electrum.config.system.build.toplevel;
+        nixos-galena = self.nixosConfigurations.galena.config.system.build.toplevel;
+        nixos-magnetite = self.nixosConfigurations.magnetite.config.system.build.toplevel;
       };
     };
 }
