@@ -30,9 +30,9 @@
         program = "${config.packages.git-xet.updateScript}";
       };
 
-      apps.update-golem-cli = {
+      apps.update-golem-binary = {
         type = "app";
-        program = "${config.packages.golem-cli.updateScript}";
+        program = "${config.packages.golem-binary.updateScript}";
       };
 
       # Disabled while pkgs/by-name/duckdb lives in pkgs/disabled/duckdb/.
