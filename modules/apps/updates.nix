@@ -30,6 +30,11 @@
         program = "${config.packages.git-xet.updateScript}";
       };
 
+      apps.update-golem-cli = {
+        type = "app";
+        program = "${config.packages.golem-cli.updateScript}";
+      };
+
       # Disabled while pkgs/by-name/duckdb lives in pkgs/disabled/duckdb/.
       # Restore alongside the directory move back to pkgs/by-name/.
       # apps.update-duckdb = {
