@@ -80,7 +80,7 @@
           # from pkgs/by-name
           dolt
           gastown
-          golem-cli
+          golem-binary
           #------
           plantuml-c4
           ratchet
