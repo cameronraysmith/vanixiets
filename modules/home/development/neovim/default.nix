@@ -13,6 +13,15 @@
         programs.lazyvim = {
           enable = true;
 
+          # Suppress per-machine `trace: <plugin>: Using source (...)` lines
+          # emitted by lazyvim-nix's plugin-resolution debug helper. With clan's
+          # multi-machine evaluation each NixOS configuration re-instantiates
+          # the lazyvim module against its own pkgs, firing these traces once
+          # per machine and dominating `nix flake check` output. The upstream
+          # option short-circuits the trace helper to identity, recovering
+          # readable check output without affecting plugin resolution.
+          ignoreBuildNotifications = true;
+
           pluginSource = "nixpkgs";
 
           installCoreDependencies = true;
