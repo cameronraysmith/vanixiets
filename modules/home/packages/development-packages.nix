@@ -84,7 +84,6 @@
           # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
           beads-kanban-ui
-          # beads-viewer  # disabled: incompatible with dolt backend
           dolt
           gastown
           # gitbutler-cli # disabled: moved to pkgs/disabled/gitbutler-cli
