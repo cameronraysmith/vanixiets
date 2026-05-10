@@ -66,41 +66,25 @@
           git-xet
           gitmux
           graphite-cli
-          # lumen # disabled: moved to pkgs/disabled/lumen
           d2
           graphviz
           jc
           jqp
           jjui
-          # lazyjj
           just
           mkcert
           # from llm-agents via modules/nixpkgs/overlays/beads.nix
           beads
-          # coderabbit-cli # disabled: unused
-          # crush      # disabled: unused
           droid
           gemini-cli
-          # opencode   # disabled: bun cleanup fails
           # from pkgs/by-name
-          beads-kanban-ui
           dolt
           gastown
-          # gitbutler-cli # disabled: moved to pkgs/disabled/gitbutler-cli
           golem-cli
           #------
           plantuml-c4
-          # Disabled: pre-commit depends on dotnet-sdk on Darwin which requires Swift.
-          # Swift has not been cached on Hydra for aarch64-darwin since Dec 30, 2025.
-          # Upstream issue: https://github.com/NixOS/nixpkgs/issues/450554
-          # Monitor build status:
-          #   https://hydra.nixos.org/job/nixpkgs/trunk/swiftPackages.swift.aarch64-darwin
-          #   https://hydra.nixos.org/job/nixpkgs/trunk/pre-commit.aarch64-darwin
-          # pre-commit
-          # proto # version manager NOT protobuf-related
           ratchet
           shellcheck
-          # step-ca
           tea
           tmate
           tree-sitter
