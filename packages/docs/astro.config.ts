@@ -22,10 +22,7 @@ export default defineConfig({
             starlightKatex(),
           ]
         : [starlightKatex()],
-      customCss: [
-        './src/fonts/font-face.css',
-        './src/styles/custom.css',
-      ],
+      customCss: ["./src/fonts/font-face.css", "./src/styles/custom.css"],
       social: [
         {
           icon: "github",
@@ -41,21 +38,21 @@ export default defineConfig({
       sidebar: [
         {
           label: "Tutorials",
-          autogenerate: { directory: "tutorials" },
+          items: [{ autogenerate: { directory: "tutorials" } }],
         },
         {
           label: "Guides",
-          autogenerate: { directory: "guides" },
+          items: [{ autogenerate: { directory: "guides" } }],
         },
         {
           label: "Concepts",
           collapsed: true,
-          autogenerate: { directory: "concepts" },
+          items: [{ autogenerate: { directory: "concepts", collapsed: true } }],
         },
         {
           label: "Reference",
           collapsed: true,
-          autogenerate: { directory: "reference" },
+          items: [{ autogenerate: { directory: "reference", collapsed: true } }],
         },
         {
           label: "Development",
@@ -65,12 +62,12 @@ export default defineConfig({
             {
               label: "Context",
               collapsed: true,
-              autogenerate: { directory: "development/context" },
+              items: [{ autogenerate: { directory: "development/context", collapsed: true } }],
             },
             {
               label: "Requirements",
               collapsed: true,
-              autogenerate: { directory: "development/requirements" },
+              items: [{ autogenerate: { directory: "development/requirements", collapsed: true } }],
             },
             {
               label: "Architecture",
@@ -81,14 +78,14 @@ export default defineConfig({
                 {
                   label: "Decision records",
                   collapsed: true,
-                  autogenerate: { directory: "development/architecture/adrs" },
+                  items: [{ autogenerate: { directory: "development/architecture/adrs", collapsed: true } }],
                 },
               ],
             },
             {
               label: "Traceability",
               collapsed: true,
-              autogenerate: { directory: "development/traceability" },
+              items: [{ autogenerate: { directory: "development/traceability", collapsed: true } }],
             },
           ],
         },
@@ -99,7 +96,7 @@ export default defineConfig({
             {
               label: "Contributing",
               collapsed: true,
-              autogenerate: { directory: "about/contributing" },
+              items: [{ autogenerate: { directory: "about/contributing", collapsed: true } }],
             },
             { label: "Credits", link: "/about/credits" },
           ],
