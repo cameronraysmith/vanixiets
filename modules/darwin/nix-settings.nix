@@ -15,7 +15,7 @@
         # Allow unfree packages (copilot, etc.)
         nixpkgs.config = {
           allowBroken = true;
-          allowUnsupportedSystem = true;
+          allowUnsupportedSystem = false;
           allowUnfree = true;
         };
 
