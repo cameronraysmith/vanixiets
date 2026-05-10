@@ -1,24 +1,35 @@
 # Machine toplevel build-realization checks.
 #
-# Wires each nixosConfigurations toplevel as a flake check so CI exercises the
-# full build closure for every registered machine. Follows ironstar's
-# package-as-check inheritance idiom (modules/rust.nix:249-251): bind the
-# already-built derivation directly without a wrapper.
+# Programmatic per-system derivation: iterates self.{nixos,darwin}Configurations,
+# partitions by config.nixpkgs.hostPlatform.system, and emits one check per
+# machine assigned to the current system. Mirrors home.nix's derivation-from-
+# config precedent (enumerableUsers from flake.users) rather than the hardcoded
+# mic92 attrset style.
 #
-# Phase 1 (nix-144.1) covers x86_64-linux nixos machines only. Darwin machines
-# defer to Phase 2 (nix-144.3) when aarch64-darwin runners are available.
-# scheelite defers pending the GPU/CUDA binary cache readiness (see
+# Excludes: scheelite (deferred pending GPU/CUDA cache readiness; see
 # project_scheelite-gpu-deployment memory; coverage-map Q4).
+#
+# Closes: nix-144.3 (Phase 2 - darwin machine coverage).
 { self, lib, ... }:
 {
   perSystem =
     { system, ... }:
+    let
+      deferred = [ "scheelite" ];
+
+      nixosForSystem = lib.filterAttrs (
+        name: cfg: cfg.config.nixpkgs.hostPlatform.system == system && !(builtins.elem name deferred)
+      ) self.nixosConfigurations;
+
+      darwinForSystem = lib.filterAttrs (
+        name: cfg: cfg.config.nixpkgs.hostPlatform.system == system
+      ) self.darwinConfigurations;
+    in
     {
-      checks = lib.optionalAttrs (system == "x86_64-linux") {
-        nixos-cinnabar = self.nixosConfigurations.cinnabar.config.system.build.toplevel;
-        nixos-electrum = self.nixosConfigurations.electrum.config.system.build.toplevel;
-        nixos-galena = self.nixosConfigurations.galena.config.system.build.toplevel;
-        nixos-magnetite = self.nixosConfigurations.magnetite.config.system.build.toplevel;
-      };
+      checks =
+        (lib.mapAttrs' (
+          name: cfg: lib.nameValuePair "nixos-${name}" cfg.config.system.build.toplevel
+        ) nixosForSystem)
+        // (lib.mapAttrs' (name: cfg: lib.nameValuePair "darwin-${name}" cfg.system) darwinForSystem);
     };
 }
