@@ -62,11 +62,6 @@
               # short sha shown is "latest committed work I'm building on top of".
               commandPath = "git rev-parse --short HEAD 2>/dev/null || echo no-git";
             }
-            {
-              id = "1";
-              type = "model";
-              color = "cyan";
-            }
           ]
         ];
 
