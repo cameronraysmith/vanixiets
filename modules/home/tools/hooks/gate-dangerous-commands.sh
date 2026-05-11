@@ -279,14 +279,47 @@ if [ -z "$REASON" ]; then
 fi
 
 # --- Remote access ---
+# ssh/scp/rsync targeting *.zt zerotier-VPN hosts auto-permit with NOTICE.
+# All -J jump hosts (comma-list) must also be .zt. Other destinations escalate.
 if [ -z "$REASON" ]; then
-  cmd_match 'ssh\s' && REASON="remote shell access"
+  if cmd_match 'ssh\s'; then
+    # Match ssh ... [user@]host.zt (destination at end-of-token boundary)
+    if echo "$COMMAND" | grep -qE '(^|[;&|]\s*|&&\s*|\|\|?\s*|\$\(\s*)ssh([[:space:]]+(-[A-Za-z][^[:space:]]*|-[A-Za-z][[:space:]]+[^[:space:]-][^[:space:]]*))*[[:space:]]+([A-Za-z0-9._-]+@)?[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.zt([[:space:]]|$)'; then
+      jump_ok=true
+      if echo "$COMMAND" | grep -qE '(^|[[:space:]])-J[[:space:]]'; then
+        for h in $(echo "$COMMAND" | sed -nE 's/.*[[:space:]]-J[[:space:]]+([^[:space:]]+).*/\1/p' | tr ',' ' '); do
+          [[ "$h" =~ \.zt$ ]] || { jump_ok=false; break; }
+        done
+      fi
+      if $jump_ok; then
+        notify_permitted "ssh to .zt host"
+      else
+        REASON="ssh -J jump host not on .zt domain"
+      fi
+    else
+      REASON="remote shell access"
+    fi
+  fi
 fi
 if [ -z "$REASON" ]; then
-  cmd_match 'scp\s' && REASON="remote file transfer"
+  if cmd_match 'scp\s'; then
+    # scp uses host:path syntax; permit when at least one .zt: destination present
+    if echo "$COMMAND" | grep -qE '(^|[[:space:]])([A-Za-z0-9._-]+@)?[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.zt:'; then
+      notify_permitted "scp to/from .zt host"
+    else
+      REASON="remote file transfer"
+    fi
+  fi
 fi
 if [ -z "$REASON" ]; then
-  cmd_match 'rsync\s' && REASON="remote sync"
+  if cmd_match 'rsync\s'; then
+    # rsync uses host:path syntax (over ssh); permit when at least one .zt: destination present
+    if echo "$COMMAND" | grep -qE '(^|[[:space:]])([A-Za-z0-9._-]+@)?[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.zt:'; then
+      notify_permitted "rsync to/from .zt host"
+    else
+      REASON="remote sync"
+    fi
+  fi
 fi
 
 # --- Container publishing ---
