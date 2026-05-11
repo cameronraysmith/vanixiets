@@ -14,8 +14,6 @@
     let
       blacklist = [
         # already exposed under existing check names
-        "vanixiets-docs"
-        "vanixiets-docs-deps"
         "k8s-manifests-local"
         "k8s-manifests-local-json"
         "k8s-manifests-local-k3d"
