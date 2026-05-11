@@ -340,6 +340,10 @@ This division reflects the reality that darwin builders are developer workstatio
 CI/CD observability bridges to the CI/CD/CV (continuous validation) trichotomy described in `preferences-production-readiness`.
 Three categories of signal provide visibility into pipeline health.
 
+The "continuous validation" term used here and below refers to the narrow Rosenthal–Jones sense — runtime, adversarial, SLO-centered probing of deployed systems against their operating envelopes — and is distinct from the broader Compositional Continuous Verification (CCV) discipline that spans construction, integration, and runtime regulators under one closure operator.
+See `preferences-compositional-continuous-verification` for the broader discipline; the narrow runtime sense is preserved verbatim throughout this section because that is the sense the surrounding prose actually invokes.
+Avoid collapsing either to the bare abbreviation "CV" outside the established CI/CD/CV trichotomy shorthand inherited from `preferences-production-readiness`.
+
 Cache hit rate is a leading indicator of CI efficiency.
 Declining hit rates signal source filtering regressions (a change to the filter function that broadened the input set), cache eviction (free-tier storage limits, retention policy changes), or infrastructure issues (cache endpoint unreachable, authentication failures).
 Tracking hit rate per check category identifies which categories are most affected.
@@ -394,3 +398,8 @@ When build pipeline telemetry is integrated with application observability, the 
 The `secretsMap` pattern in nix-native effects and the `perRepoSecretFiles` configuration in buildbot-nix are the CI-specific instantiations of the general secrets management patterns.
 
 `preferences-web-application-deployment` covers deployment patterns that may be implemented as either platform-native or nix-native effects, depending on the decision guidance in this skill's effect execution strategies section.
+
+`preferences-compositional-continuous-verification` is the theoretical anchor for the broader compositional verification discipline and disambiguates from the narrow Continuous Validation sense used in this skill's pipeline observability section.
+The closure operator that CCV defines is exactly what buildbot-nix executes in CI, so the operational machinery documented here is one realization of that theoretical commitment.
+
+`nix-flake-pr-cycle` is the operational workflow that exercises the closure operator — the `nix flake check` invocation that buildbot-nix runs in CI — and ties the local-validation-then-PR habit to the CI gating described in this skill.
