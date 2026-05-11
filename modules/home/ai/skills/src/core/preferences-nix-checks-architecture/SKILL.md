@@ -244,6 +244,48 @@ When a check requires inputs that are inappropriate for the dev shell (for examp
 The `inputsFrom` pattern pulls `nativeBuildInputs` and `buildInputs`, so be aware of what each check declares.
 
 
+## Meta-checks and CCV framing
+
+The preceding sections document the construction side of flake checks: the eight-category taxonomy, the derivation purity principle, source filtering for cacheability, shared artifact patterns, relational invariants under nix-unit, NixOS VM tests, and module organization under flake-parts.
+This section names the meta-property layer that elevates the resulting check graph from a bag of derivations that happen to pass into a verification apparatus that closes.
+The theoretical anchor for this framing is `preferences-compositional-continuous-verification`, which establishes operating-envelope-plus-regulator pairs composing into a single closure operator over the system's build and runtime graph.
+The operational invocation that exercises this closure operator on the local flake is documented in `nix-flake-pr-cycle`.
+
+Four meta-properties of the check suite sit alongside the per-artifact regulators, each strictly stronger than the prior.
+*Existence* is the trivial property: at least one regulator of a given kind appears in the suite, observable by enumerating `checks.<system>`.
+*Traceability* says that for every artifact in the repository that requires regulation, at least one regulator targets it — the relation from checks to artifacts is total over the artifact set.
+*Adequacy* says that within each fiber of the traceability relation, the regulators jointly saturate the declared coverage model for their target.
+*Integrity* says that the regulator would actually fail under mutation of its target — the vacuity-detection property that distinguishes a check with regulatory power from a check that passes regardless of what its target does.
+These are properly understood as derivation kinds that belong in `checks.<system>` alongside the per-artifact regulators rather than as a separate audit subsystem; the meta-check derivations evaluate the structural relationship between the artifact set and the check set and fail loudly when the relationship is incomplete.
+The exemption-audit derivation is the fifth wheel preventing silent erosion of coverage: real repositories accumulate legitimate exemptions, and the audit derivation enumerates them, validates that each has an owner and an unexpired timestamp, and fails on stale or unowned entries.
+
+Within each artifact's check set, observability-interaction verification is an expected per-artifact discipline rather than a separate check category.
+An artifact whose check set omits verification that emission, sampling, and the receiving side function end-to-end in dev mode — that traces appear in the local collector under synthetic load, that the dashboard renders against real data, that the SLO query returns the expected shape — is an adequacy gap rather than a stylistic choice.
+The check categories in the preceding taxonomy describe the surface area of validation by failure mode; the observability-interaction obligation is orthogonal to that surface area and runs through it.
+See `preferences-observability-engineering` for the regulator pattern that lands in a sibling commit.
+
+The agent-side audit habit is the operational complement to the structural commitment.
+The canonical enumeration command lives in `preferences-compositional-continuous-verification`; this skill restates it for cross-reference.
+
+```bash
+nix eval --json ".#checks.$(nix eval --impure --raw --expr 'builtins.currentSystem')" --apply builtins.attrNames | jaq -r '.[]'
+```
+
+This form enumerates `currentSystem` only and is sufficient for local probing during development.
+Multi-platform coverage across the flake's declared `systems` list requires a different form that operates over the full `.#checks` attrset and emits a per-system view.
+
+```bash
+nix eval --json '.#checks' --apply 'cs: builtins.mapAttrs (system: attrs: builtins.attrNames attrs) cs'
+```
+
+This form maps over every system attribute that flake-parts emitted into `checks` and returns the attribute-name set per system, which is the correct shape for asking "do all declared systems carry the regulators we expect?" rather than the narrower local-system question.
+Buildbot-nix in CI remains the authority for multi-platform coverage of the fleet; this caveat exists so an agent does not conclude "I ran the local enumeration, traceability is closed" when buildbot is the real authority for fleet-wide evaluation.
+
+The meta-check derivations themselves — traceability, adequacy, integrity, and exemption-audit — are not yet present in the vanixiets flake.
+Their introduction is a deferred epic tracked separately when the per-artifact manifest schema, the coverage-model schema, and the mutation-testing sampling strategy land as flake-side machinery.
+This section establishes the discipline and the agent-side enumeration habit so that future work has a coherent target rather than a retrofit.
+
+
 ## Cross-references
 
 The following skills provide complementary context:
@@ -252,3 +294,5 @@ The following skills provide complementary context:
 - `preferences-validation-assurance` provides the theoretical foundations for test design: the severity criterion (would this test fail under plausible incorrect implementations?) and the confidence promotion chain (how evidence accumulates across check categories). The 8 check categories in this skill map to confidence levels in the validation assurance framework: format and lint provide low confidence (style correctness), type-check and unit-test provide medium confidence (behavioral correctness), integration/e2e and nix-infrastructure provide high confidence (system-level correctness), and build/eval provides baseline confidence (the code compiles).
 - `preferences-algebraic-laws` covers property-based testing approaches for generating high-severity evidence, relevant when designing checks that go beyond example-based assertion. Property-based tests can be wrapped as nix check derivations using the same patterns described in `references/derivation-patterns.md`.
 - `preferences-production-readiness` covers CI/CD pipeline integration, progressive delivery, and how checks gate deployment. The composition rules in this skill (flake-check-native, fan-out, effect) align with the production readiness stages: local development uses flake-check-native, CI uses fan-out, and deployment uses effects gated by check success.
+- `preferences-compositional-continuous-verification` — theoretical anchor for the meta-property hierarchy and the closure-operator framing
+- `nix-flake-pr-cycle` — operational workflow that exercises the closure operator and the audit habit
