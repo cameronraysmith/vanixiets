@@ -354,3 +354,4 @@ After orientation completes, the worker proceeds to one of:
 - `/session-checkpoint` -- all-horizon state capture and handoff
 - `/issues-beads-prime` -- core beads conventions and command quick reference
 - `preferences-validation-assurance` for the confidence promotion chain and evidence quality dimensions used to interpret candidate issue readiness
+- `preferences-compositional-continuous-verification` for the theoretical anchor behind the standing traceability-audit habit on `.#checks` and the structural commitment behind the validate-to-merge workflow

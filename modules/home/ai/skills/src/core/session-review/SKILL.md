@@ -271,3 +271,4 @@ After review completes, the worker proceeds to one of:
 *Theoretical foundations:*
 - `preferences-adaptive-planning` for the Viable System Model mapping (System 3* audit context), validation gate placement theory, and surprise threshold derivation
 - `preferences-validation-assurance` for the severity criterion, evidence quality dimensions, and confidence promotion/demotion rules applied during integration verification
+- `preferences-compositional-continuous-verification` for the epic-scale extension of the System 3* audit role — traceability/adequacy/integrity audit of whether the regulator suite closes over every artifact and every declared envelope bin
