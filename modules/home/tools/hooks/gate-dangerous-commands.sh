@@ -231,8 +231,23 @@ if [ -z "$REASON" ]; then
   fi
 fi
 if [ -z "$REASON" ]; then
-  cmd_match 'gh (pr|issue) (create|comment|merge|close|edit|review)\b' \
-    && REASON="mutating gh pr/issue operation"
+  # gh pr create in canonical draft form (-d, -b "" or '', -B main|master) auto-permits
+  # with NOTICE. All other gh pr/issue mutations escalate as before.
+  if cmd_match 'gh pr create\b'; then
+    has_draft=false
+    has_empty_body=false
+    targets_main=false
+    echo "$COMMAND" | grep -qE '(^|[[:space:]])(-d|--draft)([[:space:]]|$)' && has_draft=true
+    echo "$COMMAND" | grep -qE "(^|[[:space:]])(-b|--body)[[:space:]]+(\"\"|'')([[:space:]]|$)" && has_empty_body=true
+    echo "$COMMAND" | grep -qE '(^|[[:space:]])(-B|--base)[[:space:]]+(main|master)([[:space:]]|$)' && targets_main=true
+    if $has_draft && $has_empty_body && $targets_main; then
+      notify_permitted "gh pr create (draft, base=main, empty body)"
+    else
+      REASON="gh pr create (non-canonical form) requires approval"
+    fi
+  elif cmd_match 'gh (pr|issue) (create|comment|merge|close|edit|review)\b'; then
+    REASON="mutating gh pr/issue operation"
+  fi
 fi
 if [ -z "$REASON" ]; then
   cmd_match 'gh repo (create|delete|rename)\b' && REASON="mutating gh repo operation"
