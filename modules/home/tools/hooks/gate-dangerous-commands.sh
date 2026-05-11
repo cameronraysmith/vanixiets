@@ -122,6 +122,50 @@ jj_cmd_match() {
   echo "$COMMAND" | grep -qE "(^|[;&|]\s*|&&\s*|\|\|?\s*|\\\$\(\s*)jj${jj_opts}\s+$1"
 }
 
+# Fire-and-forget NOTICE via ntfy-send when a relaxed gate arm permits an action
+# that previously escalated. Backgrounded with disown so PreToolUse stays sync-fast.
+# Reads $COMMAND from outer scope; first arg is a short category label.
+notify_permitted() {
+  local category="$1"
+  local brief repo_name
+  brief=$(echo "$COMMAND" | head -c 200)
+  repo_name=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+  ntfy-send \
+    "claude-code permitted ${category}: ${brief}" \
+    "" \
+    -H "Title: NOTICE: ${category}" \
+    -H "Priority: low" \
+    -H "Tags: information_source,${repo_name}" \
+    >/dev/null 2>&1 &
+  disown
+}
+
+# Inspect git push args (everything after 'push'); return 0 if safe to auto-permit.
+# Escalates on: bare push, --force/--force-with-lease, --all/--mirror/--tags,
+# delete refspec (:branch), or any token referencing main/master/default ref.
+push_is_safe() {
+  local args="$1"
+  [[ -z "${args// }" ]] && return 1
+  echo "$args" | grep -qE '(^|[[:space:]])(-f\b|--force\b|--force-with-lease\b|--all\b|--mirror\b|--tags\b)' && return 1
+  echo "$args" | grep -qE '(^|[[:space:]]):[^[:space:]]' && return 1
+  local default_ref
+  default_ref=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+  default_ref="${default_ref:-main}"
+  echo "$args" | grep -qE "(^|[[:space:]:/])(${default_ref}|main|master)([[:space:]:/]|\$)" && return 1
+  return 0
+}
+
+# Inspect jj git push args; return 0 if safe to auto-permit.
+# Escalates on: bare push, --all-bookmarks/--deleted, --force*, or bookmark
+# targeting main/master/trunk.
+jj_push_is_safe() {
+  local args="$1"
+  [[ -z "${args// }" ]] && return 1
+  echo "$args" | grep -qE '(^|[[:space:]])(--all-bookmarks\b|--deleted\b|--force-with-lease\b|-f\b|--force\b)' && return 1
+  echo "$args" | grep -qE '(-b|--bookmark)([[:space:]=]+)(main|master|trunk)\b' && return 1
+  return 0
+}
+
 REASON=""
 
 # --- Privilege escalation ---
@@ -129,11 +173,27 @@ cmd_match 'sudo\s' && REASON="sudo requires approval"
 
 # --- Git: push and destructive operations ---
 # Uses git_cmd_match to handle global options (e.g. -C, --no-pager) between 'git' and subcommand.
+# Push to non-default refs auto-permits with a NOTICE; pushes to main/master or with
+# destructive flags continue to escalate.
 if [ -z "$REASON" ]; then
-  git_cmd_match 'push(\s|$)' && REASON="git push requires approval"
+  if git_cmd_match 'push(\s|$)'; then
+    PUSH_ARGS=$(echo "$COMMAND" | sed -nE 's/.*\bgit\b[^|;&>]*\bpush\b[[:space:]]*([^|;&>]*).*/\1/p')
+    if push_is_safe "$PUSH_ARGS"; then
+      notify_permitted "git push (non-default ref)"
+    else
+      REASON="git push requires approval"
+    fi
+  fi
 fi
 if [ -z "$REASON" ]; then
-  jj_cmd_match 'git\s+push(\s|$)' && REASON="jj git push requires approval"
+  if jj_cmd_match 'git\s+push(\s|$)'; then
+    JPUSH_ARGS=$(echo "$COMMAND" | sed -nE 's/.*\bjj\b[^|;&>]*\bgit[[:space:]]+push\b[[:space:]]*([^|;&>]*).*/\1/p')
+    if jj_push_is_safe "$JPUSH_ARGS"; then
+      notify_permitted "jj git push (non-default bookmark)"
+    else
+      REASON="jj git push requires approval"
+    fi
+  fi
 fi
 if [ -z "$REASON" ]; then
   git_cmd_match 'reset\s+--hard' && REASON="git reset --hard discards commits/changes"
