@@ -53,13 +53,14 @@
               commandPath = "jq -r '.session_id // \"no-session\" | split(\"-\")[0]'";
             }
             {
-              id = "623e7826-c7a2-4ab5-949a-85959bd2c0cf";
-              type = "git-worktree";
-            }
-            {
-              id = "5";
-              type = "git-branch";
-              color = "magenta";
+              id = "a7c39e84-5b21-4d17-b3a8-f9c1e6d2b074";
+              type = "custom-command";
+              color = "yellow";
+              # git rev-parse --short HEAD works in both pure git and jj-colocated mode.
+              # In jj-colocated mode .git/HEAD is a detached ref synced to the most-recently-
+              # exported jj commit (typically @- when @ is the empty working copy), so the
+              # short sha shown is "latest committed work I'm building on top of".
+              commandPath = "git rev-parse --short HEAD 2>/dev/null || echo no-git";
             }
             {
               id = "1";
