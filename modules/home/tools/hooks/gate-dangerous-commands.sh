@@ -238,7 +238,11 @@ if [ -z "$REASON" ]; then
     has_empty_body=false
     targets_main=false
     echo "$COMMAND" | grep -qE '(^|[[:space:]])(-d|--draft)([[:space:]]|$)' && has_draft=true
-    echo "$COMMAND" | grep -qE "(^|[[:space:]])(-b|--body)[[:space:]]+(\"\"|'')([[:space:]]|$)" && has_empty_body=true
+    # No trailing anchor: `""` as two adjacent quote characters is unambiguous on
+    # its own. `-b "body"` cannot match because content between the quotes breaks
+    # adjacency. Trailing anchor (now removed) failed when `""` was followed by
+    # `)` from a $(...) wrapper, e.g. PR_URL=$(gh pr create ... -b "").
+    echo "$COMMAND" | grep -qE "(^|[[:space:]])(-b|--body)[[:space:]]+(\"\"|'')" && has_empty_body=true
     echo "$COMMAND" | grep -qE '(^|[[:space:]])(-B|--base)[[:space:]]+(main|master)([[:space:]]|$)' && targets_main=true
     if $has_draft && $has_empty_body && $targets_main; then
       notify_permitted "gh pr create (draft, base=main, empty body)"
