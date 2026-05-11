@@ -344,6 +344,15 @@ This practice aligns with the iterative instrumentation principle from `02-instr
 The result is telemetry that covers the new code path from its first production request.
 The alternative — discovering the instrumentation gap during the first incident involving the new code — wastes both incident response time and the developer's fresh understanding of the code, which fades as they move on to other work.
 
+## Observability checks as first-class CCV regulators
+
+Within Compositional Continuous Verification, observability checks are first-class regulators rather than auxiliary tooling or a separate category of validation.
+Every artifact's check set is expected to include a regulator that verifies the artifact-to-observability interaction works end-to-end in dev mode: emission from the application, sampling and transport through the pipeline, and arrival at the receiving side under a query that the operational tooling will actually issue.
+The canonical realization is the build-time observability-contract regulator pattern: bring up a local OTel collector and trace store under process-compose (or analog), drive synthetic traffic through the application, then assert that the expected spans appear in the backend's query API with the expected attributes and parent-child structure.
+This exercises the full path — instrumentation API, exporter configuration, collector pipeline, backend ingestion, and query shape — rather than testing only that the configuration parses or that the SDK emits something to stdout.
+An artifact whose check set omits this regulator is an adequacy gap in CCV's four-property sense (existence, traceability, adequacy, integrity), not a stylistic choice; see `preferences-compositional-continuous-verification` for the theoretical anchor and the closure-operator framing under which this obligation arises.
+The flake-side machinery for landing these checks alongside unit and integration tests in `checks.<system>` is documented in `preferences-nix-checks-architecture` under "Meta-checks and CCV framing", and the agent-side audit habit — asking "does this artifact's check set include observability-interaction verification?" during the local validation pass — lives in `nix-flake-pr-cycle` Phase 1.
+
 ## Sociotechnical considerations
 
 Observability is not purely a technical discipline.
@@ -379,6 +388,7 @@ Reference files in this skill:
 Related skills:
 
 - `preferences-validation-assurance` establishes the testing side of the testing-observability duality
+- `preferences-compositional-continuous-verification` anchors the framing of observability checks as first-class CCV regulators within the operating-envelope-plus-regulator discipline and its closure operator
 - `preferences-architectural-patterns` addresses where observability infrastructure fits in the system architecture
 - `preferences-distributed-systems` covers distributed system patterns where observability is particularly critical
 - `preferences-production-readiness` covers operational practices that observability enables
