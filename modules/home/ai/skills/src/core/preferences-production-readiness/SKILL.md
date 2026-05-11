@@ -34,6 +34,10 @@ Pre-production testing and production observability form a complementary pair: t
 The testing pyramid and the observability stack are not alternatives — they are two views of the same confidence-building enterprise, operating at different points in the system's lifecycle.
 The CI/CD/CV trichotomy captures this relationship: continuous integration validates correctness against a specification, continuous delivery validates deployment mechanics, and continuous validation ensures the system remains correct under production conditions indefinitely.
 
+The "continuous validation" term as used throughout this skill refers to the narrow Rosenthal–Jones runtime sense — chaos engineering, SLO erosion probing, adversarial production sampling against operational envelopes — and is the originating in-repo usage of the CI/CD/CV trichotomy framing.
+It is distinct from the broader Compositional Continuous Verification (CCV) discipline that spans construction-time, integration-time, and runtime regulators under one closure operator; see `preferences-compositional-continuous-verification` for the broader discipline that subsumes runtime continuous validation alongside earlier regulators.
+This skill's continuous validation framing remains correct in its scope (runtime); the disambiguation is provided so readers do not conflate it with CCV's broader compositional discipline, and the bare abbreviation "CV" should be avoided outside the established CI/CD/CV trichotomy shorthand.
+
 ## The production readiness checklist
 
 The items below are not a gate review to be checked once and forgotten.
@@ -375,6 +379,7 @@ The feedback topology is not a hierarchy but a cycle, and the system's operation
 
 The system is never "done."
 Continuous validation is the ambient regime within which CI/CD episodes are embedded.
+The "ambient regime" framing here remains the narrow runtime sense introduced earlier — the six nested feedback loops above are the runtime, adversarial, SLO-centered corner of the broader Compositional Continuous Verification discipline anchored in `preferences-compositional-continuous-verification`, which positions construction-time and integration-time regulators alongside this runtime regime under a single closure operator.
 This framing is elaborated in `docs/notes/research/continuous-validation-observability-engineering-guide.md`, which develops the relationship between the CI/CD/CV trichotomy and the observability-driven practices described here.
 
 ## Cross-references
@@ -386,6 +391,9 @@ Without the conceptual foundations from that skill, the practices here lack grou
 
 `preferences-validation-assurance` addresses the testing discipline that provides pre-production confidence.
 It covers the severity criterion, refinement as freedom preservation, and test adequacy — the CI side of the CI/CD/CV trichotomy that this skill extends into CD and CV.
+
+`preferences-compositional-continuous-verification` is the theoretical anchor for the broader compositional verification discipline that subsumes the narrow runtime continuous validation framing developed here.
+It positions construction-time, integration-time, and runtime regulators under one closure operator and explicitly disambiguates Compositional Continuous Verification (CCV) from the narrow Rosenthal–Jones Continuous Validation sense that originates in this skill, preserving the CI/CD/CV trichotomy shorthand while clarifying that the bare abbreviation "CV" outside that shorthand is ambiguous.
 
 `preferences-change-management` covers the change control practices that govern how changes move through the pipeline.
 Production readiness intersects with change management at the deployment boundary, where change control policies determine the conditions under which a deployment is authorized.
