@@ -73,6 +73,7 @@
           - algebraic laws (functor/monad laws, property-based testing): ${skillsPath}/preferences-algebraic-laws/SKILL.md
           - adaptive planning (control theory, buffer sizing, planning horizons, VSM mapping): ${skillsPath}/preferences-adaptive-planning/SKILL.md
           - validation assurance (severity, evidence quality, confidence, test adequacy, regression, refinement): ${skillsPath}/preferences-validation-assurance/SKILL.md
+          - compositional continuous verification (CCV — operating-envelope-plus-regulator pairs composing into a closure operator; theoretical anchor for system-level approximate correctness): ${skillsPath}/preferences-compositional-continuous-verification/SKILL.md
           - observability engineering (structured events, traces, SLOs, instrumentation, telemetry architecture): ${skillsPath}/preferences-observability-engineering/SKILL.md
           - production readiness (ODD, progressive delivery, health checks, incident learning, CI/CD observability): ${skillsPath}/preferences-production-readiness/SKILL.md
           - scalable probabilistic modeling (Bayesian workflow, simulation-based inference, stochastic dynamical systems): ${skillsPath}/preferences-scalable-probabilistic-modeling-workflow/SKILL.md
@@ -87,6 +88,7 @@
           - nix development: ${skillsPath}/preferences-nix-development/SKILL.md
           - nix flake checks architecture (check taxonomy, derivation patterns, VM tests): ${skillsPath}/preferences-nix-checks-architecture/SKILL.md
           - nix CI/CD integration (nix-fast-build, buildbot-nix, effects, migration): ${skillsPath}/preferences-nix-ci-cd-integration/SKILL.md
+          - nix flake PR cycle (enumerate checks, probe via nix eval/build, just check-fast, draft PR, buildbot monitor, ready, Mergify): ${skillsPath}/nix-flake-pr-cycle/SKILL.md
           - python development: ${skillsPath}/preferences-python-development/SKILL.md
           - rust development: ${skillsPath}/preferences-rust-development/SKILL.md
           - haskell development: ${skillsPath}/preferences-haskell-development/SKILL.md
