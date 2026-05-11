@@ -32,7 +32,7 @@
               type = "current-working-dir";
               backgroundColor = "bgBrightCyan";
               metadata = {
-                segments = "1";
+                fishStyle = "true";
               };
             }
             {
@@ -80,7 +80,7 @@
               type = "current-working-dir";
               backgroundColor = "bgBrightCyan";
               metadata = {
-                segments = "1";
+                fishStyle = "true";
               };
             }
             {
