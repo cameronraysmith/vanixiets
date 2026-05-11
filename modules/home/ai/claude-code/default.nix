@@ -161,8 +161,13 @@
                 };
               };
 
+              # Suppress the "Enable auto mode?" confirmation dialog on session start.
+              # Set by the CLI when the user clicks "Yes, and make it my default mode";
+              # declaring it here keeps activation idempotent across home-manager rebuilds.
+              skipAutoPermissionPrompt = true;
+
               permissions = {
-                defaultMode = "acceptEdits";
+                defaultMode = "auto";
                 # only enforced from managed-settings.json, included here as intent marker
                 # disableBypassPermissionsMode = "disable";
                 additionalDirectories = [ "~/projects" ];
