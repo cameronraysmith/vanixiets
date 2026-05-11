@@ -269,9 +269,19 @@ When this perspective is internalized rather than proceduralized, the overhead o
 - Kelly, T. & Weaver, R. — "The Goal Structuring Notation" (DSN Workshop, 2004)
 - Leucker, M. & Schallhart, C. — "A Brief Account of Runtime Verification" (J. Logic and Algebraic Programming, 2009)
 
+## Compositional continuous verification as systems-level operationalization
+
+The three threads this skill develops at the per-test level — Mayo's severity criterion, refinement as spec-implementation freedom preservation, and the confidence promotion chain — have a structural counterpart at the regulator-suite level in compositional continuous verification (CCV).
+CCV's four-property hierarchy (existence, traceability, adequacy, integrity, each strictly stronger than the prior) is the systems-level operationalization of those same commitments lifted from individual tests to the whole verification apparatus.
+What severity asks of a single test — would it fail if the implementation were wrong? — integrity asks of the whole regulator suite, operationally checked by mutation testing of regulator targets.
+What refinement asks of a spec-implementation pair — does the implementation stay inside the specification's declared freedom? — adequacy asks of an envelope-regulator pair, requiring that regulators saturate every declared coverage bin within their target's envelope.
+What the confidence promotion chain asks of evidence accumulation along a single claim — each level strictly stronger than the prior, with no skipping the chain — the four-property hierarchy asks of the suite's structural completeness, with traceability presupposing existence and adequacy presupposing traceability and integrity presupposing adequacy.
+See `preferences-compositional-continuous-verification` for the full hierarchy, the closure-operator realization, and the agent-side enumerate-and-audit habit on `.#checks`.
+
 ## See also
 
 - `preferences-adaptive-planning` for the MPC/VSM/Cynefin framework this skill extends with evidence-based confidence
 - `preferences-scientific-inquiry-methodology` for the epistemological foundations (Mayo's severity criterion, Peircean pragmatism) that this skill operationalizes for engineering
 - `preferences-algebraic-laws` for property-based testing as the primary mechanism for high-severity, freedom-preserving evidence
 - `preferences-domain-modeling` for type-level constraints as the first rung of the validation ladder
+- `preferences-compositional-continuous-verification` for the systems-level four-property hierarchy (existence → traceability → adequacy → integrity) that operationalizes severity, refinement, and the confidence promotion chain at the regulator-suite scale
