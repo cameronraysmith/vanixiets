@@ -55,6 +55,17 @@ in
 
       system.stateVersion = "25.05";
 
+      # systemd-nspawn-flavor NixOS tests require uid-range, auto-allocate-uids, and cgroups.
+      # See nixos/doc/manual/development/running-nixos-tests.section.md in nixpkgs.
+      nix.settings = {
+        auto-allocate-uids = true;
+        extra-system-features = [ "uid-range" ];
+        experimental-features = [
+          "auto-allocate-uids"
+          "cgroups"
+        ];
+      };
+
       # User configuration managed via clan inventory users service (modules/clan/inventory/services/users/cameron.nix).
 
       security.sudo.wheelNeedsPassword = false;
