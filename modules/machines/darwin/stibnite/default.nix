@@ -160,6 +160,19 @@ in
         cores = 12;
         memory = "48GiB";
         diskSize = "500GiB";
+
+        # systemd-nspawn-flavor NixOS tests require uid-range, auto-allocate-uids, and cgroups.
+        # See nixos/doc/manual/development/running-nixos-tests.section.md in nixpkgs.
+        potentiallyInsecureExtraNixosModule = {
+          nix.settings = {
+            auto-allocate-uids = true;
+            extra-system-features = [ "uid-range" ];
+            experimental-features = [
+              "auto-allocate-uids"
+              "cgroups"
+            ];
+          };
+        };
       };
 
       # Colima for OCI container management (complementary to nix-rosetta-builder)
