@@ -217,6 +217,55 @@ clan-core extends the framework with shared test runners, container-based altern
 See `references/nixos-vm-tests.md` for the complete framework architecture, driver API, debugging workflow, and clan-core extensions.
 
 
+## Choosing among integration regulators
+
+Within the integration/e2e category, three regulator kinds cover overlapping but distinct envelopes, and a fourth narrower kind (pure derivation checks) sits below them on the cost ladder but is not strictly an integration regulator.
+Selecting among them is a question of operating envelope rather than convenience or familiarity.
+The CCV framing in `preferences-compositional-continuous-verification` treats each regulator as a pair of an operating envelope and a verification rule; the right regulator for an artifact is the one whose envelope matches the artifact's deployment shape.
+
+Process-compose is the regulator kind for the application-composition envelope.
+Services start in dependency order on the developer's host, bind ports, and answer readiness probes, but there is no systemd, no NixOS module evaluation, and no kernel namespace isolation beyond what the host already provides.
+The regulator runs on Darwin and Linux developer machines, requires no special sandbox features, and produces results in seconds.
+
+Nspawn container tests (clan-core's `clan.test.useContainers = true`, which is the default for clan tests) are the regulator kind for the service-on-NixOS envelope.
+The artifacts under test are real systemd units evaluated through the NixOS module system; the test runs them under systemd-nspawn against the host kernel.
+The regulator is Linux-only and requires container sandbox access, but it is markedly cheaper than full QEMU and covers most properties that depend on systemd ordering, NixOS module behavior, or secrets activation under clan-vars or sops-nix.
+
+Full QEMU NixOS tests (`pkgs.testers.runNixOSTest`, or clan's `useContainers = false`) are the regulator kind for the NixOS-module-plus-kernel-plus-multi-machine envelope.
+This is the only regulator that exercises kernel features, network namespace isolation beyond what nspawn provides, multi-machine coordination via VLANs, and the boot sequence.
+It requires `kvm` and `nixos-test` sandbox features and pays for that capability in build time.
+
+Pure derivation checks are the narrower fourth kind: they sample pure-function correctness, CLI output, transformations, and any property that can be asserted in a single-process sandbox.
+They are not integration regulators in the same sense — they do not run a composition of services — but they are the cheapest evidence at the bottom of the escalation ladder.
+
+The decision rules are escalation rules.
+Start at process-compose if the artifact under test is genuinely host-process-shaped or if its deployment shape is not yet decided; the eval-gate variant of process-compose (`checks.X = self'.packages.X`) is a legitimate but limited regulator that asserts configuration well-formedness without exercising runtime behavior.
+Promote to nspawn when the artifact will be deployed as a systemd service on NixOS, when secrets activation under clan-vars or sops-nix is part of the envelope, or when systemd ordering between services is part of what is being asserted.
+Promote to full QEMU when the envelope crosses machine boundaries via VLANs, depends on kernel features, depends on boot-sequence behavior, or requires the network-topology faithfulness that only QEMU and `vde_switch` provide.
+
+The choice is not exclusive across a project.
+A single artifact can appear in process-compose (for the developer loop on every change), in an nspawn container test (for the merge-gate check at PR time), and in a full QEMU test (for the multi-machine integration check that runs less often).
+Each regulator samples a different envelope, and the same artifact passing all three is stronger evidence than passing any one of them.
+The CCV closure operator composes them automatically when each is exposed in `checks.<system>`.
+
+Cost and cacheability profile follows envelope size.
+Process-compose eval-gate checks build in seconds and cache cheaply; executed process-compose tests are harder to make hermetic and accordingly less cache-friendly.
+Nspawn container tests boot in tens of seconds and cache at the granularity of the underlying NixOS module evaluation.
+Full QEMU tests run in tens of seconds to minutes per node, scale linearly with the number of nodes, and require the `kvm` and `nixos-test` sandbox features that not every CI host provides.
+This cost profile is the reason the escalation ladder exists: a project should run the cheapest regulator that faithfully covers the envelope, not the most powerful regulator available.
+
+The severity profile of the regulators follows the same ordering as the envelope size, in the sense of `preferences-validation-assurance`'s severity criterion: would the regulator fail under plausibly incorrect implementations of its target.
+Process-compose passes a class of regressions that fail under nspawn because the systemd layer is absent.
+Nspawn passes a class of regressions that fail under full QEMU because the kernel and multi-machine layers are absent.
+Conversely, the heavier regulators do not subsume the lighter ones in terms of where they live in the development loop: process-compose's developer-host portability is valuable precisely because it runs on Darwin where the heavier regulators cannot.
+The right composition is concentric envelopes with different cadences, not a single chosen regulator.
+
+The PR cycle in `nix-flake-pr-cycle` exercises the closure operator over whichever regulators the project has wired into `checks.<system>`; buildbot's flake-check matrix runs them as fanout, so adding a heavier regulator costs build minutes but not orchestration effort.
+The decision to escalate is therefore principally about whether the additional confidence is worth the build cost, not about whether the CI infrastructure can accommodate it.
+
+See `references/process-compose-checks.md` for the full treatment of the application-composition regulator, `references/nixos-vm-tests.md` for the nspawn and full-QEMU regulators, and `preferences-compositional-continuous-verification` for the operating-envelope-plus-regulator framing.
+
+
 ## Check module organization in flake-parts
 
 Checks are organized as flake-parts modules, one per check category or logical group.
