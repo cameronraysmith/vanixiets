@@ -322,6 +322,10 @@ The *multi-worker* approach provisions buildbot workers for each target system.
 An `aarch64-linux` worker on a Hetzner ARM server and an `x86_64-linux` worker on a standard server together cover both linux architectures.
 Darwin systems require a macOS worker, which is feasible with persistent macOS CI runners (e.g., a Mac Mini connected to the buildbot master).
 
+Worker-capability heterogeneity is a further fan-out constraint orthogonal to system coverage: VM-based integration checks (`nixosTest`) and nspawn-container checks require the `kvm` and `nixos-test` sandbox features enabled on the nix daemon of any worker tasked to evaluate or build them, and workers lacking those features fail at evaluation or build time rather than producing a clean skip.
+Process-compose checks wired as eval-gates (the runner package built but not executed) require no such features and can be assigned to any worker covering the target system.
+Fan-out planning must therefore pair the check-set's regulator-kind composition (see `preferences-nix-checks-architecture` §"Choosing among integration regulators") with each worker's declared sandbox features, not system alone.
+
 The *cross-compilation* approach builds non-native system outputs via cross-compilation on the available worker.
 This works for simple derivations but fails for checks that require native execution (test suites, linters, type checkers).
 Cross-compilation is appropriate for package builds but not for the full check surface.
@@ -383,6 +387,7 @@ This skill sits at the intersection of several other preference skills, each cov
 `preferences-nix-checks-architecture` covers check taxonomy, derivation patterns, source filtering, and flake-parts module organization.
 It answers *what* to build; this skill answers *where* and *how* to run it.
 The two skills are designed to be loaded together when working on CI pipeline design, as the check architecture directly determines the CI pipeline's structure.
+The §"Choosing among integration regulators" three-way framing (process-compose / nspawn container test / full QEMU VM test) is the input to the worker-capability fan-out planning described above.
 
 `preferences-nix-development` covers flake conventions, module structure, and derivation best practices that underpin both check derivation design and the flake outputs that CI tools consume.
 The `perSystem` convention from flake-parts determines the attribute paths that `buildbot-nix.toml`'s `attribute` field references.
