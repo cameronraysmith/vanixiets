@@ -61,7 +61,7 @@ Use `.jjignore` or `.gitignore` to prevent tracking unwanted files.
 |---------|---------------------|------------------------|-------|
 | `jj describe` | Opens editor for description | `jj describe -m "message"` | **Required** |
 | `jj describe -r <c>` | Opens editor for description | `jj describe -r <c> -m "message"` | **Required** |
-| `jj split <paths>` | Opens editor after selecting files | `jj split <paths> -m "message"` | **Required** even with paths |
+| `jj split <paths>` | Opens editor twice: once for the extracted commit, once for the remainder at `@` | Pre-stage `@`'s description first: `jj describe -m "<remainder>"` then `jj split <paths> -m "<extracted>"` | **Two commit boundaries** — a single `-m` covers only the extracted commit; the remainder still opens an editor without pre-staging. See "Common gotchas". |
 | `jj split` (no paths) | Opens diff editor (TUI) | **Cannot be non-interactive** | Avoid in automation |
 | `jj squash -r <c>` | Usually safe, may prompt | `jj squash -r <c>` | Generally OK without `-m` |
 | `jj squash --into <dest>` | Opens description merge editor when both source and destination have non-empty descriptions | `jj squash --into <dest> -u -- <paths>` (keeps dest description) or `jj squash --into <dest> -m "msg" -- <paths>` (sets description) | `-u` preserves existing description; `-m` replaces it. `-u` is preferred when routing into commits that already have descriptions. |
@@ -101,6 +101,23 @@ jj split
 
 # For automation, use path-based splitting instead:
 jj split <specific-paths> -m "description"
+```
+
+**The multi-boundary mental model:**
+
+Every commit boundary needs explicit message handling.
+One `-m` flag covers exactly one boundary.
+Most jj subcommands create a single boundary, but `jj split` is the notable exception: it creates two boundaries (the extracted commit and the remainder at `@`).
+Pre-stage the remainder's description via `jj describe -m "<remainder>"` *before* `jj split <paths> -m "<extracted>"`, otherwise the post-split editor invocation for `@` still hangs the shell.
+This rule generalizes: when a subcommand mutates more than one commit's description, every boundary needs its message provided in advance.
+
+```bash
+# WRONG - extracted commit gets the message, remainder still opens editor
+jj split file.txt -m "refactor: extract file.txt changes"
+
+# CORRECT - pre-stage @'s description, then split
+jj describe -m "wip: remaining changes"
+jj split file.txt -m "refactor: extract file.txt changes"
 ```
 
 **`jj describe` without `-m` always opens editor:**
@@ -185,6 +202,31 @@ If interactive command unavoidable:
 - Provide exact command for user to run
 - Document why automation cannot handle it
 - Never execute commands with `-i` or `--interactive` flags in automation
+
+**`JJ_EDITOR=true` belt-and-suspenders pattern:**
+
+For untrusted call sites or extra paranoia at any commit boundary, prefix the jj invocation with `JJ_EDITOR=true`.
+`true` is a no-op shell builtin that exits 0 immediately, so any unexpected editor invocation completes without hanging.
+The trade-off is that if jj genuinely needs a description and no `-m` is provided, the result is an empty description rather than a hang — which is recoverable, unlike a stuck shell in a subagent context.
+
+```bash
+# Belt-and-suspenders: even if the subcommand surprises us with an editor, we don't hang
+JJ_EDITOR=true jj squash --from <fixup> --into <target> --use-destination-message
+JJ_EDITOR=true jj split file.txt -m "refactor: extract"
+```
+
+Verify post-op state with `jj log` and the relevant commit's description.
+If an empty description landed where one was needed, recover with `jj op restore <pre-op-id>` (identify via `jj op log --limit 8`) and retry with the proper `-m` flag(s).
+
+**In-flight hang recovery (SIGTERM + `jj op restore`):**
+
+When an editor is already hanging in a non-interactive shell, the recovery procedure is:
+
+1. From another shell, identify the editor process: `ps -ef | grep -E "(nvim|vim|nano|hx|emacs)" | grep -v grep`. Look for the process whose argv references a `.jjdescription` temp file path — that's the one jj is waiting on.
+2. SIGTERM the editor PID: `kill <pid>`. Avoid `kill -9` (SIGKILL); the editor's atexit handler may need to clean up its swap file, and SIGKILL skips that.
+3. The stuck bash command returns non-zero; jj typically aborts the operation but may leave a malformed commit if it had begun mutating state.
+4. Inspect operation state: `jj op log --no-graph -T 'separate(" ", id.short(), description.first_line()) ++ "\n"' --limit 8`.
+5. If state is bad, restore: `jj op restore <pre-bad-op-id>`.
 
 ## Foundation: Atomic commit workflow
 

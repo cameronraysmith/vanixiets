@@ -46,7 +46,7 @@ For quick questions about commands or concepts, this summary may suffice.
 |---------|-----------------|------------------------|
 | `jj describe` | Opens editor | `jj describe -m "message"` |
 | `jj describe -r <c>` | Opens editor | `jj describe -r <c> -m "message"` |
-| `jj split <paths>` | Opens editor | `jj split <paths> -m "message"` |
+| `jj split <paths>` | Opens editor twice (extracted + remainder) | `jj describe -m "<remainder>"` first, then `jj split <paths> -m "<extracted>"` — see `jj-workflow` "Common gotchas" for the multi-boundary rule |
 | `jj split` (no paths) | Opens diff editor (TUI) | **Cannot be non-interactive** |
 | `jj squash --into <dest>` | Opens description merge editor | `jj squash --into <dest> -u` (keep dest description) or `-m "msg"` |
 
@@ -54,6 +54,8 @@ For quick questions about commands or concepts, this summary may suffice.
 1. Not certain a command is non-interactive? → Run `jj [subcommand] --help` FIRST
 2. Check help output for `-m, --message <MESSAGE>` flag
 3. If command accepts `-m`, ALWAYS use it to avoid editor launch
+
+For untrusted call sites or in-flight hang recovery, see `jj-workflow` "Escape hatches for interactive operations" — covers the `JJ_EDITOR=true` belt-and-suspenders pattern and the SIGTERM + `jj op restore` recovery procedure.
 
 **Git parity requirement:**
 - jj working copy `@` exists only in `.jj/` until frozen
