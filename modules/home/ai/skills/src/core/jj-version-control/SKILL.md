@@ -305,26 +305,42 @@ When `.beads/` exists and an epic is active, the epic's issue dependency graph d
 Independent issues (no dependency path between them) form an antichain of parallel bookmark chains developed concurrently.
 Dependent issues (blocking relations) produce chain stacking where one bookmark branches from another's tip, reflecting the covering relation in the partial order.
 
-The diamond pattern has four phases: diverge (decompose epic into chains from `bd epic status`), develop (work in the N-way development join with join + wip structure), converge (validate the integrated development join), and serialize (dissolve the development join and rebase chains sequentially onto main as a linear extension of the dependency partial order).
-
-The development join validates the antichain composition during development by surfacing conflicts between independent chains as first-class jj conflicts.
+The diamond pattern has four phases: diverge (decompose epic into chains from `bd epic status`), develop (work in the development join), converge (validate the integrated development join), and serialize (dissolve the development join and rebase chains sequentially onto main as a linear extension of the dependency partial order).
+The development join is the working-copy entity used in the develop and converge phases — see the "Development join" section below for the entity definition.
 Integration to main always uses sequential rebase linearization, never merge commits.
-The development join commit and wip commit are ephemeral scaffolding abandoned during the serialize phase.
 
 For the full theoretical foundations (lattice theory, event structures, VSM mapping), beads-to-jj mapping table, and four-phase mechanical recipe, see `diamond-workflow.md` in this directory.
 
-## Multi-parent composite workflow
+## Development join
 
-The multi-parent development join (composite working copy) is the default operating mode for any jj session with two or more active chains.
-Single-chain mode is the exception, reserved for simple ad hoc work on one anonymous chain descending from main.
+The development join is the canonical entity for parallel multi-chain work in jj mode and the default operating mode for any session with two or more active chains.
+Single-chain mode is the exception, reserved for ad hoc work on one anonymous chain descending from main.
 
-When multiple chains are active, the working copy commit `@` forms an N-way development join (composite working copy) over all active chains by descending from multiple parents.
-The active chains form an antichain (a set of mutually independent chains in the partial order of commits).
-This provides continuous integration feedback (conflicts between antichain elements surface immediately as first-class conflicts in `@`), shared visibility (every operation sees the full integrated state), modular separation (each chain remains independently inspectable, pushable, and reviewable), and flexible integration (chains are linearized onto main via sequential rebase at completion).
+Definition: a multi-parent working-copy commit `@` with cardinality ≥ 2, where each parent is a chain tip (a bookmark or an anonymous chain head).
+The active chain tips form an antichain (a set of mutually independent commits in the partial order).
+The development join itself has two parts — a stable join commit (the multi-parent merge of chain tips) and a wip commit on top where in-flight edits land — forming the join + wip structure documented below.
+
+Structure: the join commit is created by `jj new <bookmark-a> <bookmark-b> [...]` and described with a numbered manifest (`merge N: ...` listing parent bookmarks) so it is never auto-abandoned.
+The wip commit is `@` itself, created by `jj new` on top of the join commit, where the working-copy diff accumulates before being routed to a chain.
+This structure provides continuous integration feedback (conflicts surface immediately as first-class conflicts in `@`), shared visibility, modular separation (each chain remains independently inspectable, pushable, and reviewable), and flexible integration (chains are linearized onto main via sequential rebase at completion).
+
+Conflict behavior: when antichain elements contain conflicting changes, `@` displays first-class jj conflicts as a continuous integration signal — informational, non-blocking.
+See "Conflict behavior in composite `@`" below for resolution options.
+
+Lifecycle: created via `jj new <bookmark-a> <bookmark-b> [...]` when promoting from tier 2 to tier 3 (see `tiered-ceremony.md`); maintained via the edit-route cycle and route-and-extend pattern below; dissolved during the four-phase diamond workflow's serialize phase, where chains are rebased sequentially onto main and fast-forwarded (see `diamond-workflow.md`).
+
+Not to use for: workspace isolation needs.
+The development join is the tier-3 mechanism for parallelizing related chains in one working copy.
+For genuine filesystem isolation (e.g., concurrent unrelated experiments), `jj workspace add` is the explicit-request-only mechanism — see "Workspaces are not a tier" in `tiered-ceremony.md`.
+
+Cross-references:
+- `tiered-ceremony.md` — when to enter tier 3 (the trigger for using a development join at all)
+- `diamond-workflow.md` — the four-phase process (diverge, develop, converge, serialize) in which the development join participates
+- `~/.claude/skills/preferences-git-version-control/03-jj-mode.md` — mode-detection context and equivalences with git-native and GitButler modes
 
 ### Two-commit structure: merge + wip (join + wip structure)
 
-The development join should use a join + wip structure (two-commit structure): a stable development join commit with a wip commit on top.
+The development join uses a join + wip structure (two-commit structure): a stable development join commit with a wip commit on top.
 
 ```
 [merge] -- [wip](@)
@@ -402,7 +418,10 @@ Scoped absorb routes only the specified files by blame ancestry, leaving everyth
 The invariant is that `@` is always empty or contains only in-progress work.
 All completed changes live in their respective chains.
 
-**Clearing `@` after routing:** `jj squash --into` moves file content from `@` but does NOT clear `@`'s description. If `@` was described before routing (e.g., via `jj describe -m "msg"` as part of the atomic commit workflow), run `jj describe -m ""` after the squash to restore the invariant. Failure to clear leaves stale descriptions that pollute subsequent operations and confuse other agents sharing the development join.
+**Restoring `@`'s description after routing:** `jj squash --into` moves file content from `@` but does NOT clear or rewrite `@`'s description.
+When `@` is the wip commit on top of a stable join commit, run `jj describe -m ""` after the squash to restore the empty-wip invariant.
+When `@` is itself the development join (single-commit form, no separate wip), restore the manifest with `jj describe @ -m "merge N: short description\n- bookmark-a\n- bookmark-b"` so subsequent operations see a self-documenting join rather than an opaque ordinary commit.
+Failure to recover the description pollutes subsequent operations and confuses other agents sharing the development join.
 
 In single-chain mode (tier 1, no bookmarks), the cycle is simpler: `jj describe -m "message"` followed by `jj new` freezes the change and advances `@`.
 There is no routing target, so the single-command pattern does not apply.
@@ -427,15 +446,20 @@ jj squash --from @ --into <new-change-id> -u -- <path>
 # 4. Advance the bookmark to the new chain tip
 jj bookmark set <bookmark> -r <new-change-id>
 
-# 5. Clear the stale description on @ (squash moved files but not the description)
+# 5. Restore @'s description (squash moved files but did NOT clear the source description)
+#    - If using the join + wip structure (recommended), @ is the wip commit; clear its description:
 jj describe -m ""
+#    - If @ IS the development join commit (single-commit form), restore the join manifest:
+jj describe @ -m "merge N: short description
+- bookmark-a
+- bookmark-b"
 ```
 
 Why each step is necessary:
 
 - Step 1 uses `--no-edit` to avoid moving `@` away from the development join. Using `jj squash --into <bookmark>` instead would amend the existing bookmark commit, not extend the chain.
 - Step 4 is required because `jj new -A` creates a new commit that the bookmark does not automatically track. Without this step, the bookmark remains on the old tip.
-- Step 5 clears `@`'s description because `jj squash --from @ --into` moves file content but does NOT clear the source commit's description. Without this step, `@` retains a stale description that confuses other agents.
+- Step 5 restores `@`'s description because `jj squash --from @ --into` moves file content but does NOT clear or rewrite the source commit's description. When `@` is the wip commit on top of a stable join commit, clearing to empty is correct. When `@` is itself the development join (single-commit form), the `merge N: ...` manifest must be re-set explicitly so subsequent operations and other agents continue to see a self-documenting join. Failure to recover the manifest leaves the development join indistinguishable from an ordinary commit in `jj log`.
 
 When to use which pattern:
 
@@ -764,7 +788,7 @@ jj absorb
 
 Subagent dispatch in jj mode: subagents edit files directly in the shared `@` working copy.
 The orchestrator routes changes to the correct epic bookmark after the subagent returns.
-See the parallel agent coordination protocol in the multi-parent composite workflow section above.
+See the parallel agent coordination protocol in the "Development join" section above.
 
 ### Completing issues and epics
 
