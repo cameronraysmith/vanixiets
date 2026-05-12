@@ -93,6 +93,9 @@ jj rebase -b <bookmark> -d main
 
 Once all chains are linearized to the trunk and bookmarks are deleted, `@` returns to a single-parent state on the trunk — back to tier 1.
 
+See `diamond-workflow.md` Phase 4 "serialize (integrate)" for the canonical N+1 stacked-base + aggregate PR exit ramp, including the GitHub auto-close-on-default-branch-reachability behavior and the 3-command post-merge recipe.
+The sibling tools `jj-linearize-join` and `jj-stack-submit` automate the local linearization and the forge submission steps respectively.
+
 For the four-phase theoretical treatment and lattice-theoretic foundation, see `diamond-workflow.md`.
 For the operational entity-level reference of the development join, see `SKILL.md`.
 

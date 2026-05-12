@@ -143,6 +143,9 @@ When `.beads/` exists and an epic is active, epic-scoped work uses the diamond w
 The mechanical implementation leverages jj's multi-parent working copy; the pattern generalizes conceptually to GitButler's applied-branches model and git-native worktrees.
 For the canonical operational recipe, theoretical foundations, and beads-to-jj mapping, see `~/.claude/skills/jj-version-control/diamond-workflow.md`.
 
+The sibling tools `jj-linearize-join` and `jj-stack-submit` are the canonical tooling for the diamond → linearized-chain → N+1 PR submission path: the former linearizes a development join into a stacked-base chain, the latter handles forge submission (push + N+1 PR creation via `gh`/`tea`).
+See `~/.claude/skills/jj-version-control/diamond-workflow.md` Phase 4 for the operational recipe.
+
 ## See also
 
 - [`SKILL.md`](SKILL.md) — top-level git version control principles and policy

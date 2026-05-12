@@ -98,6 +98,8 @@ Running `nix flake check` locally before opening a pull request is not a courtes
 The discipline collapses the build-time/CI-time distinction that ad-hoc pipelines maintain: there is one closure operator, evaluated locally during development and remotely during gating, with no separate CI configuration that could drift from the regulators it nominally runs.
 The companion skill `nix-flake-pr-cycle` documents the operational workflow once it lands in a sibling commit.
 
+The `jj-version-control/diamond-workflow.md` Phase 3 (converge/validate) section is the canonical operational example of `@`-position invariance: running `just check-fast` on the wip-`@` of a development join produces the same closure outcome as running it on the post-linearization aggregate tip, because both queries hit identical content-addressed graphs under the same pinned inputs.
+
 The traceability audit habit is the agent-side instantiation of the breadth property, and this skill is the canonical source for the enumeration commands.
 
 ```bash
