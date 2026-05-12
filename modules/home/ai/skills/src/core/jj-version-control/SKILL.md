@@ -523,43 +523,45 @@ The development join is ephemeral workspace scaffolding that is dissolved before
 It does not appear in the final history on main.
 
 The default integration strategy is sequential rebase linearization: rebase each chain onto main in dependency order, producing a purely linear history with no merge commits.
+The canonical recipe is documented in full in `diamond-workflow.md` Phase 4 — that document is authoritative when this section and the diamond-workflow recipe diverge.
+The summary here covers the mechanical steps in single-chain and multi-chain cases.
 
-*Sequential rebase linearization*: rebase chains sequentially onto main (a linear extension of the dependency partial order), then fast-forward main to the tip.
+*Sequential rebase linearization*: dissolve the development join first by abandoning `[wip]` and `[merge]`, then rebase chains sequentially in linearization order, fast-forwarding main to the tip via bookmark advance.
+Dissolution-first is canonical: abandoning the multi-parent structure before rebase ensures each chain rebases against its actual base rather than the join.
 
 Two cases determine the linearization order.
 When the chains form a true antichain (all issues are mutually independent), the integration order is discretionary: alphabetical, thematic, or by size.
 When issues have cross-chain dependency edges (issue A in chain 1 blocks issue B in chain 2), those edges induce a partial order on the chains themselves and the linearization must respect it: chains whose issues are depended upon by other chains rebase first.
 Independent chains within the same linearization step can be ordered discretionarily.
 
-For each chain, find its base (the first change descending from main) and rebase it onto main (or onto the previous chain's tip, which is main after each fast-forward).
+The ergonomic canonical rebase form is `jj rebase -b <bookmark> -d <prev>`, which rebases all commits reachable from the bookmark but not from the destination.
+The `-s <chain-base> -d <dest>` form is equivalent but requires identifying the chain base first; prefer `-b` when the bookmark itself is the natural identifier.
 The procedure generalizes to N chains:
 
 ```bash
+# Dissolve the development join (canonical first step)
+jj abandon <wip-change-id> <merge-change-id>
+
 # Determine linearization order (dependent chains first)
 # Chain A: main -> a1 -> a2 -> a3 (tip: chain-a bookmark)
 # Chain B: main -> b1 -> b2 (tip: chain-b bookmark)
 # Chain C: main -> c1 (tip: chain-c bookmark)
 
 # Rebase A onto main (already there if it descends from main)
-# Advance main to A's tip
-jj bookmark set main -r chain-a
+jj rebase -b chain-a -d main
 
-# Rebase B onto new main (A's tip)
-jj rebase -s b1 -d main
+# Rebase B onto A's tip
+jj rebase -b chain-b -d chain-a
 
-# Advance main to B's tip
-jj bookmark set main -r chain-b
-
-# Rebase C onto new main (B's tip)
-jj rebase -s c1 -d main
-
-# Advance main to C's tip
-jj bookmark set main -r chain-c
+# Rebase C onto B's tip
+jj rebase -b chain-c -d chain-b
 
 # Result: main -> a1 -> a2 -> a3 -> b1 -> b2 -> c1
-# Push the linearized main
-jj git push --bookmark main
+# Create the aggregate bookmark at the linearized tip
+jj bookmark create <aggregate-bookmark> -r chain-c
 ```
+
+The `jj-linearize-join` sibling tool performs the dissolution and sequential rebase steps with `--dry-run`, real-run, and embedded `test` subcommand modes.
 
 For a single chain, this reduces to advancing main directly to the chain tip:
 
@@ -570,15 +572,31 @@ jj git push --bookmark main
 
 This is the jj equivalent of fast-forward merge — advancing a bookmark creates no merge commits.
 
-After linearization, exit the development join since the chains are now one linear sequence.
-Use `jj new main` to reset `@` to a single parent.
-Individual chain bookmarks can be deleted in the post-session cleanup.
+*N+1 stacked-base PR submission (forge-driven exit)*: push N chain bookmarks plus one aggregate bookmark, then create N stacked-base chain PRs plus one aggregate PR targeting main, all initially draft.
+The aggregate PR is the merge gate.
+GitHub auto-closes a PR as MERGED when its head commit becomes reachable from the default branch regardless of the PR's specified base branch; advancing main to the aggregate tip therefore closes all N+1 PRs in one push.
+The `jj-stack-submit` sibling tool performs this submission (push N+1 bookmarks via `jj git push`, create N stacked-base chain PRs + 1 aggregate PR via `gh` or `tea`, post a backlink comment on the aggregate, mark the aggregate ready).
 
-*Separate PRs*: push each chain's bookmark independently for review before linearizing.
+The full post-merge recipe is three commands:
+
+```bash
+jj bookmark set main -r <aggregate-bookmark>
+jj git push --remote origin --bookmark main
+jj git fetch --tracked --remote origin   # auto-deletes local bookmarks for branches GitHub deleted on merge
+```
+
+After integration, exit the development join by resetting `@` to a single parent.
+In forge-driven merge flows where main is not locally advanced ahead of the push, the canonical exit is `jj new <aggregate-bookmark>` rather than `jj new main`, because the local main bookmark may not yet reflect the remote state at the moment of exit.
+The `jj-linearize-join` tool performs this exit step automatically.
+In the secondary case where main was locally advanced before the push, `jj new main` is equivalent.
+Individual chain bookmarks can be deleted in the post-session cleanup (or are auto-deleted by `jj git fetch --tracked` when the corresponding GitHub branches were deleted on merge).
+
+*Separate PRs (legacy)*: push each chain's bookmark independently for review before linearizing.
 Push all at once: `jj git push --bookmark chain-a --bookmark chain-b --bookmark chain-c`.
 Or push one at a time: `jj git push --bookmark chain-a`.
 Each pushed bookmark becomes a branch on the remote, suitable for PR creation via `gh pr create`.
-When creating PRs, use the bookmark name as the head branch and main as the base:
+This pattern remains valid for unrelated chains but is superseded by the N+1 stacked-base pattern above for epic-scoped work where the chains share a logical integration boundary.
+When creating standalone PRs, use the bookmark name as the head branch and main as the base:
 
 ```bash
 jj git push --bookmark chain-a
@@ -586,7 +604,8 @@ gh pr create -d -a "@me" -B main -H chain-a -t "feat: description" -b ""
 ```
 
 Follow the PR creation protocol in `~/.claude/skills/preferences-git-version-control/SKILL.md` for placeholder content and safety conventions.
-After PRs are approved, integrate via sequential rebase linearization as described above.
+
+For GitHub-only repositories, Mergify's Stack-Aware Base feature would handle single-CI-gate behavior natively without an explicit aggregate PR; see the footnote in `diamond-workflow.md` Phase 4 for the trade-off against forge-agnostic compatibility.
 
 ## `jj revert` usage
 
@@ -776,7 +795,16 @@ Issue-level completion within a chain:
 Epic-level completion:
 
 1. All issues within the epic are closed.
-2. Advance main to the epic chain tip: `jj bookmark set main -r {epic-ID}-descriptor`
-3. Delete the epic bookmark: `jj bookmark delete {epic-ID}-descriptor`
-4. Push main: `jj git push --bookmark main`
-5. Push beads state: `bd dolt push`
+2. For single-chain epics, advance main to the epic chain tip and push:
+   ```bash
+   jj bookmark set main -r {epic-ID}-descriptor
+   jj git push --bookmark main
+   ```
+3. For multi-chain epics, use the N+1 stacked-base + aggregate PR pattern documented in `diamond-workflow.md` Phase 4 and the "Integration strategies at completion" section above.
+   The `jj-linearize-join` and `jj-stack-submit` sibling tools automate the transformation and submission.
+4. After main reflects the epic's integrated state, fetch to auto-delete merged remote bookmarks:
+   ```bash
+   jj git fetch --tracked --remote origin
+   ```
+5. Delete any remaining local epic bookmarks not auto-cleaned by the fetch.
+6. Push beads state: `bd dolt push`

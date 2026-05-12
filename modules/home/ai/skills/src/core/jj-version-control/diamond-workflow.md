@@ -156,27 +156,66 @@ The converge phase occurs *at* a planning-DAG convergence point in the sense use
 9. Fix issues by editing in wip and routing fixes to the appropriate chain.
 10. Close beads issues as they pass validation: `bd close {issue-ID} --reason "Implemented in $(jj log -r '{chain-bookmark}' --no-graph -T 'commit_id.short(8)')"`.
 
+The CCV closure operator (see `preferences-compositional-continuous-verification` §"What this means for an agent session") is invariant under the choice of `@`-position in the development join.
+The wip `@` of a development join and the linearized aggregate tip produced by Phase 4 are hash-equal under the content-addressed graph: the same set of file trees, the same set of derivation closures, the same set of check outputs.
+Running `just check-fast` on the wip `@` and running it on the post-linearization aggregate tip exercise the same closure operator against the same inputs and return the same pass-or-fail decision modulo parallel scheduling order.
+Local validation may therefore be performed either before or after the Phase 4 linearization without affecting the closure-operator semantics.
+Buildbot-nix re-runs the closure operator authoritatively at PR-CI time and is the integration-decision authority regardless of where local validation occurred.
+
 ### Phase 4: serialize (integrate)
+
+The serialize phase first abandons the ephemeral scaffolding, then rebases each chain sequentially onto main in linearization order to produce a purely linear history.
+Dissolution-first is canonical: abandoning `[wip]` and `[merge]` removes the multi-parent structure so the subsequent rebases operate on each chain's actual base rather than on the join.
 
 11. Abandon the development join and wip commits (they are ephemeral scaffolding):
     ```bash
     jj abandon <join-change-id> <wip-change-id>
     ```
-12. Rebase each chain onto main in linearization order (see "Linearization order: two cases" above):
+12. Rebase each chain onto main in linearization order (see "Linearization order: two cases" above).
+    The ergonomic canonical form is `jj rebase -b <bookmark> -d <prev>`, which rebases all commits reachable from the bookmark but not from the destination; the `-s <chain-base>` form is equivalent but requires explicitly identifying the chain base first.
     ```bash
     # For each chain, in dependency order:
-    jj rebase -s <chain-base> -d main
-    jj bookmark set main -r <chain-tip>
+    jj rebase -b <chain-bookmark> -d <prev-tip-or-main>
     ```
-13. Push the linearized main for CI validation via PR, then advance main locally after CI passes:
+13. Set an aggregate bookmark at the linearized tip — this is the merge gate for the forge-driven exit:
     ```bash
-    jj git push --bookmark main
+    jj bookmark create <aggregate-bookmark> -r <linearized-tip>
     ```
-14. Delete chain bookmarks and push beads state:
+14. Push the N chain bookmarks plus the aggregate bookmark atomically.
+    Then create N stacked-base chain PRs plus one aggregate PR targeting main, all initially draft.
+    The `jj-stack-submit` sibling tool automates this Phase A submission (push N+1 bookmarks, create N stacked-base PRs + 1 aggregate PR via `gh` or `tea`, optionally backlink and mark ready):
     ```bash
-    jj bookmark delete chain-a chain-b chain-c
+    jj git push --remote origin --bookmark chain-a --bookmark chain-b --bookmark chain-c --bookmark <aggregate-bookmark>
+    # Then via jj-stack-submit, or by hand:
+    gh pr create -d -B main -H chain-a -t "..." -b ""
+    gh pr create -d -B chain-a -H chain-b -t "..." -b ""
+    gh pr create -d -B chain-b -H chain-c -t "..." -b ""
+    gh pr create -d -B main -H <aggregate-bookmark> -t "..." -b ""  # aggregate
+    ```
+    The aggregate PR is the merge gate.
+    Chain PRs use stacked bases (each pointing at the prior chain bookmark) so the forge renders the dependency structure, but the chain PRs are not individually merged.
+15. After buildbot passes on the aggregate, mark it ready and merge it (Mergify fast-forward).
+    GitHub auto-closes a PR as MERGED when its head commit becomes reachable from the default branch, regardless of the PR's specified base branch.
+    Advancing main to the aggregate tip therefore closes all N chain PRs and the aggregate PR in one push.
+    The full post-merge recipe is three commands:
+    ```bash
+    jj bookmark set main -r <aggregate-bookmark>
+    jj git push --remote origin --bookmark main
+    jj git fetch --tracked --remote origin   # auto-deletes local bookmarks for branches GitHub deleted on merge
+    ```
+16. After main is advanced, exit the development join by resetting `@` to a single parent.
+    In the forge-driven flow described here, main is advanced remotely first and the local advance happens via the push above; the canonical exit is therefore `jj new <aggregate-bookmark>` rather than `jj new main`, because the local main bookmark may not yet reflect the remote state at the moment of exit.
+    The `jj-linearize-join` sibling tool performs this `jj new <aggregate>` step automatically.
+17. Push beads state:
+    ```bash
     bd dolt push
     ```
+
+The `jj-linearize-join` sibling tool performs steps 11–13 (the diamond-workflow → linearized-chain transformation) with `--dry-run`, real-run, and embedded `test` subcommand modes.
+The `jj-stack-submit` sibling tool performs step 14 (Phase A submission) — push N+1 bookmarks, create N stacked-base chain PRs + 1 aggregate PR via `gh` or `tea`, post a backlink comment on the aggregate, and mark the aggregate ready.
+
+For GitHub-only repositories, Mergify's Stack-Aware Base feature (see `mergify-docs/src/content/docs/merge-queue/stacks.mdx` §"Stack-Aware Base") would handle single-CI-gate behavior natively without an explicit aggregate PR, eliminating the cosmetic shared-head-SHA warning Mergify emits on stacked PRs.
+Mergify Stacks is GitHub-only and breaks Gitea compatibility, so the forge-agnostic N+1 design is the primary recipe here; Stack-Aware Base is a footnote for repositories that will never run on Gitea.
 
 ## Open questions
 

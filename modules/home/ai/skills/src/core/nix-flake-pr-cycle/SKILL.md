@@ -71,6 +71,10 @@ The `logs/` directory is already gitignored at the repo root, so failure logs pe
 The relationship between `just check-fast` and `nix flake check` is one of execution strategy rather than coverage: both evaluate the same `.#checks.<currentSystem>` attrset against the same pinned inputs and produce the same pass-or-fail decision modulo parallel scheduling order.
 Treat them as interchangeable for the closure-operator semantics and choose between them based on the diagnostic question being asked.
 
+The closure operator is invariant under the position of `@` in the local change graph: the CCV property in `preferences-compositional-continuous-verification` §"What this means for an agent session" rests on hash equality of the content-addressed graph, not on which commit happens to be checked out as `@`.
+`just check-fast` may therefore be run on any commit whose content-addressed closure matches what buildbot will see — the wip `@` of a development join, the linearized aggregate tip after Phase 4 of `diamond-workflow.md`, or any sealed chain commit in between — and the result is the same.
+This is load-bearing for the diamond workflow: local validation on the development join wip-`@` is closure-equal to local validation on the post-linearization aggregate, so the agent may choose either as the local gate before push without affecting the integration-time decision.
+
 ## Phase 3 — bookmark and push
 
 This repository runs colocated jj alongside git; bookmarks are the jj equivalent of git branches and the unit pushed to the GitHub remote.
@@ -115,6 +119,10 @@ gh pr comment <N> --body "<markdown description>"
 
 Title and description in the immutable fields cannot be edited after creation, so the discipline is generic-at-creation, detailed-in-comment.
 The conventional-commits title is the one mutable surface that survives into the merged-commit subject when Mergify uses `fast-forward` merge, so it is worth getting right at creation time even though `gh pr edit --title` remains available until merge.
+
+For multi-chain epic integrations (a development join with two or more active chains), Phase 4 expands into the N+1 stacked-base submission pattern documented in `~/.claude/skills/jj-version-control/diamond-workflow.md` §"Phase 4: serialize (integrate)".
+The `jj-linearize-join` sibling tool performs the diamond-workflow → linearized-chain transformation; the `jj-stack-submit` sibling tool performs the Phase A submission (push N+1 bookmarks, create N stacked-base chain PRs + 1 aggregate PR, optionally backlink and mark ready).
+The aggregate PR is the merge gate, and Phases 5–7 of this skill apply to the aggregate PR; the chain PRs render the dependency structure on the forge and auto-close when GitHub observes their head commits reachable from `main`.
 
 ## Phase 5 — buildbot monitor
 
@@ -223,4 +231,5 @@ Skipping Phase 2 (the full local validation) before push is a defensible shortcu
 - `preferences-nix-ci-cd-integration` — buildbot-nix as the closure-operator executor in CI; effect system; migration patterns
 - `preferences-validation-assurance` — severity, evidence quality, confidence promotion chain
 - `preferences-git-version-control` — GitHub PR creation safety, branch workflow, working branch isolation
+- `jj-version-control/diamond-workflow.md` — multi-chain epic integration via N+1 stacked-base + aggregate PR pattern; `jj-linearize-join` and `jj-stack-submit` sibling tools
 - `session-orient` — session entry; reference for procedural-skill tone
