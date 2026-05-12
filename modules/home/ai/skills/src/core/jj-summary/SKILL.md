@@ -283,7 +283,7 @@ Canonical recipe: `~/.claude/skills/jj-version-control/diamond-workflow.md`.
 ```bash
 # Develop phase: N-way development join + wip (tactical example)
 jj new chain-a chain-b chain-c
-jj describe -m "join 1: epic desc\n- chain-a\n- chain-b\n- chain-c"
+jj describe -m "join N=3: chain-a, chain-b, chain-c"
 jj new                                                   # wip on top
 jj squash --from @ --into <chain> -m "feat: desc"        # route changes
 ```
@@ -341,7 +341,7 @@ jj log -r 'mine() & ~bookmarks()'
 
 3. Multiple independent work streams in flight (multiple beads issues within an epic, parallel agent dispatch, parallel experiments to compose)?
    → Tier 3: diamond workflow via development join over the chains' bookmarks.
-   `jj new <existing-bookmark> <new-bookmark> -m "join 1: <description>"`; route edits via `jj squash --from @ --into <tip> -u` plus `jj bookmark move <name> --to <tip>` and `jj describe @ -m "join N: ..."`.
+   `jj new <existing-bookmark> <new-bookmark> -m "join N=2: <alphabetical bookmarks, comma-separated>"`; route edits via `jj squash --from @ --into <tip> -u` plus `jj bookmark move <name> --to <tip>`, and rewrite the `[merge]` description in full whenever the parent set changes so it always reflects the current `join N=<cardinality>: <alphabetical bookmarks>` state.
 
 4. Did the user explicitly request workspace isolation (utterance naming `worktree`, `workspace`, `isolate`, `separate working copy`, or path forms like `.worktrees/X`)?
    → `jj workspace add <path> -r <change>` mechanics; otherwise stay at tier 3 and parallelize via the development join in a single working copy.

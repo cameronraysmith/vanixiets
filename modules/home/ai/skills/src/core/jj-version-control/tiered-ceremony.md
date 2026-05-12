@@ -70,18 +70,18 @@ Operations to enter (promote from tier 2 by adding a second parent to `@` and la
 
 ```bash
 # If the new bookmark already exists at some change:
-jj new <existing-bookmark> <new-bookmark> -m "join 1: <description>"
+jj new <existing-bookmark> <new-bookmark> -m "join N=2: <alphabetical bookmarks, comma-separated>"
 jj new @ -m "wip"   # layer [wip] on top of [merge]; @ is now [wip]
 
 # If the new bookmark doesn't exist yet, seed it first:
 jj new main -m "wip(<name>): seed chain"
 jj bookmark create <new-bookmark> -r @
 # then promote @ to a development join over both bookmarks, layering [wip] on top:
-jj new <existing-bookmark> <new-bookmark> -m "join 1: <description>"
+jj new <existing-bookmark> <new-bookmark> -m "join N=2: <alphabetical bookmarks, comma-separated>"
 jj new @ -m "wip"
 ```
 
-Describe `[merge]` once with a numbered manifest (`join N: ...`) listing the parent bookmarks, per the join + wip structure documented in `SKILL.md`; do not re-describe `[merge]` after creation.
+Describe `[merge]` once with the state-based convention `join N=<cardinality>: <alphabetical, comma-separated parent chain bookmarks>` (unbookmarked parents render as backtick-wrapped short change_ids), per the join + wip structure documented in `SKILL.md`; do not re-describe `[merge]` after creation, and rewrite the description in full whenever parents change so it always declares the current state.
 
 Operations to dissolve (phase 4 serialize): each chain rebases onto an updated trunk in dependency order.
 
@@ -108,7 +108,7 @@ jj git push --bookmark <name> --allow-new
 Tier 2 → tier 3 (add a second parent to create `[merge]`, then layer `[wip]` on top):
 
 ```bash
-jj new <existing-bookmark> <new-bookmark> -m "join 1: <description>"
+jj new <existing-bookmark> <new-bookmark> -m "join N=2: <alphabetical bookmarks, comma-separated>"
 jj new @ -m "wip"
 ```
 

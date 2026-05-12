@@ -132,7 +132,9 @@ The resulting history is fully linear.
 ### Develop phase
 
 4. Create the N-way composite: `jj new chain-a chain-b chain-c ...`
-5. Describe the join with a numbered manifest: `jj describe -m "join 1: description\n- chain-a\n- chain-b\n..."`
+5. Describe the join with the state-based convention `join N=<cardinality>: <alphabetical, comma-separated parent chain bookmarks>` (for unbookmarked parents, use the short change_id wrapped in backticks), e.g. `jj describe -m "join N=3: chain-a, chain-b, chain-c"`.
+   The description thereby self-declares the current parent set rather than recording the event that produced this join; the history of join modifications is preserved in `jj op log`, and the description remains verifiable as an invariant against `jj log -r @- -T 'parents...'`.
+   This makes the convention robust against `[merge]` orphan abandonment: if `[merge]` is accidentally abandoned, the description tells you exactly what to recreate.
 6. Create wip on top: `jj new`
 7. Develop in wip, routing changes to chains via `jj squash --into <target> -u -- <path>` or `jj absorb`.
 

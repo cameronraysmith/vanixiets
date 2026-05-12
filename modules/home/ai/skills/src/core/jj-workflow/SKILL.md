@@ -1025,7 +1025,7 @@ If any step fails, `jj undo` backs out immediately.
 ### Diamond workflow (epic-scoped)
 
 The diamond workflow connects beads epic issue graphs to jj chain topology through four phases: diverge, develop, converge, serialize.
-Tactical commands at use-sites include `jj new chain-a chain-b ...` for the development join, `jj describe -m "join 1: ..."` then `jj new` for the join + wip structure, and `jj squash --from <src> --into <chain>` for routing changes.
+Tactical commands at use-sites include `jj new chain-a chain-b ...` for the development join, `jj describe -m "join N=<cardinality>: <alphabetical bookmarks, comma-separated>"` then `jj new` for the join + wip structure, and `jj squash --from <src> --into <chain>` for routing changes.
 For the canonical operational recipe, theoretical foundations, and beads-to-jj mapping, see `~/.claude/skills/jj-version-control/diamond-workflow.md`.
 
 ### Integration strategies

@@ -125,13 +125,10 @@ Independent chains within the same linearization step can be ordered discretiona
 
 ### Phase 2: develop
 
-4. Create the N-way development join:
+4. Create the N-way development join, describing `[merge]` with the state-based convention `join N=<cardinality>: <alphabetical, comma-separated parent chain bookmarks>`:
    ```bash
    jj new chain-a chain-b chain-c ...
-   jj describe -m "join 1: epic description
-   - chain-a
-   - chain-b
-   - chain-c"
+   jj describe -m "join N=3: chain-a, chain-b, chain-c"
    ```
 5. Create wip on top:
    ```bash

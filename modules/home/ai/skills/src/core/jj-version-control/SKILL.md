@@ -320,14 +320,14 @@ Definition: a two-commit structure consisting of a multi-parent `[merge]` commit
 The active chain tips form an antichain (a set of mutually independent commits in the partial order).
 `[merge]` is frozen at creation and never edited; `[wip]` is ephemeral scratch space where in-flight edits land — forming the join + wip structure documented below.
 
-Structure: `[merge]` is created by `jj new <bookmark-a> <bookmark-b> [...]` and described once with a numbered manifest (`join N: ...` listing parent bookmarks) so it is never auto-abandoned.
+Structure: `[merge]` is created by `jj new <bookmark-a> <bookmark-b> [...]` and described once with the state-based convention `join N=<cardinality>: <alphabetical, comma-separated parent chain bookmarks>` so it is never auto-abandoned and its description self-declares the current parent set.
 `[wip]` is created by `jj new @` on top of `[merge]`, and `@` always points at `[wip]` while routing operations preserve it via `--keep-emptied`.
 This structure provides continuous integration feedback (conflicts surface immediately as first-class conflicts in `@`), shared visibility, modular separation (each chain remains independently inspectable, pushable, and reviewable), and flexible integration (chains are linearized onto main via sequential rebase at completion).
 
 Conflict behavior: when antichain elements contain conflicting changes, `@` displays first-class jj conflicts as a continuous integration signal — informational, non-blocking.
 See "Conflict behavior in composite `@`" below for resolution options.
 
-Lifecycle: created via `jj new <bookmark-a> <bookmark-b> [...] -m "join N: ..."` followed by `jj new @ -m "wip"` when promoting from tier 2 to tier 3 (see `tiered-ceremony.md`); maintained via the edit-route cycle and route-and-extend pattern below; dissolved during the four-phase diamond workflow's serialize phase, where chains are rebased sequentially onto main and fast-forwarded (see `diamond-workflow.md`).
+Lifecycle: created via `jj new <bookmark-a> <bookmark-b> [...] -m "join N=<cardinality>: <alphabetical bookmarks>"` followed by `jj new @ -m "wip"` when promoting from tier 2 to tier 3 (see `tiered-ceremony.md`); maintained via the edit-route cycle and route-and-extend pattern below, with the `[merge]` description rewritten in full whenever the parent set changes so it always declares the current state; dissolved during the four-phase diamond workflow's serialize phase, where chains are rebased sequentially onto main and fast-forwarded (see `diamond-workflow.md`).
 
 Not to use for: workspace isolation needs.
 The development join is the tier-3 mechanism for parallelizing related chains in one working copy.
@@ -343,7 +343,7 @@ Cross-references:
 The development join always uses a canonical two-commit structure: a frozen multi-parent `[merge]` commit with an ephemeral `[wip]` commit on top, where `@` is `[wip]`.
 
 ```
-parents...  →  [merge] (FROZEN, multi-parent, "join N: ..." description)
+parents...  →  [merge] (FROZEN, multi-parent, "join N=<cardinality>: ..." description)
                   |
                   └→ [wip] (@, working copy, ephemeral description)
 ```
@@ -351,17 +351,16 @@ parents...  →  [merge] (FROZEN, multi-parent, "join N: ..." description)
 Per Krycho's canonical model, `[wip]` sits on top of `[merge]` precisely so that `[merge]` is never edited after creation and `[wip]` serves as scratch space whose description need not be maintained.
 Reference: Chris Krycho, ["Jujutsu Megamerges and jj absorb"](https://raw.githubusercontent.com/chriskrycho/v5.chriskrycho.com/3f330be8861378587da76f33fe272799f5b84d97/site/journal/2024/Jujutsu%20Megamerges%20and%20jj%20absorb.md) (2024-12-24); local cache: `docs/notes/development/version-control/references/krycho-jujutsu-megamerges-and-jj-absorb.md`.
 
-The `[merge]` commit is created by `jj new <bookmark-a> <bookmark-b> [...]` and described once at creation with a numbered manifest of its parent bookmarks so it is never auto-abandoned and `jj log` is self-documenting:
+The `[merge]` commit is created by `jj new <bookmark-a> <bookmark-b> [...]` and described once at creation following the state-based convention `join N=<cardinality>: <alphabetical, comma-separated parent chain bookmarks>` (for unbookmarked parents, use the short change_id wrapped in backticks).
+The description thereby self-declares the current join state from its own text, so the reader knows the full parent set without inspecting the graph:
 
 ```
-join 1: short description of what this group covers
-- bookmark-a
-- bookmark-b
-- bookmark-c
+join N=3: bookmark-a, bookmark-b, bookmark-c
 ```
 
-The first line combines a sequential number with a high-level label describing the join group's purpose.
-If multiple join groups exist, number them sequentially (`join 2: ...`, etc.).
+A join with an unbookmarked parent renders as `join N=3: bookmark-a, bookmark-b, `xqnqupun``.
+The history of join modifications (extensions, parent removals) is preserved in `jj op log`; the description records the current state, not the event that produced it.
+This makes the convention robust against `[merge]` orphan abandonment and verifiable as an invariant against `jj log -r @- -T 'parents...'`.
 After creating `[merge]`, immediately create `[wip]` on top with `jj new @ -m "wip"` (or any ephemeral description); this becomes `@` where all edits land.
 The `[merge]` commit is FROZEN once created — it is never described, edited, or routed into.
 The `[wip]` commit's description is ephemeral and does not need to be recovered after routing operations.
@@ -375,7 +374,7 @@ The join + wip structure requires active maintenance when operations move `@` aw
 
 Before any operation that moves `@` (like `jj new <single-parent>` or `jj edit`), verify and record `[merge]`'s change ID.
 After any such operation, immediately restore `[wip]` on top: `jj new <merge-change-id> -m "wip"`.
-When adding a new bookmark to the development join, reconstruct `[merge]` with all parents including the new one (re-set the `join N: ...` manifest), then recreate `[wip]` on top.
+When adding a new bookmark to the development join, reconstruct `[merge]` with all parents including the new one (re-set the description to the new `join N=<cardinality>: <alphabetical bookmarks>` state), then recreate `[wip]` on top.
 Subagent prompts must specify whether they operate in `[wip]` (edit files, let orchestrator route) or outside it (e.g., working on a single chain directly).
 
 ### The edit-route cycle
