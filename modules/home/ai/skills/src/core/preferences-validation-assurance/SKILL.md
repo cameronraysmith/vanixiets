@@ -135,6 +135,10 @@ The `finding-recorded` level applies specifically to probe issues whose delivera
 It is not a prerequisite for `prototype` on implementation issues — an implementation issue progresses directly from `undemonstrated` to `prototype` when working code exists.
 The chain is ordered by evidence strength within each issue type, but the `finding-recorded` to `prototype` transition represents a type switch (epistemic finding to code artifact) rather than a monotone strength increase.
 
+Within `integration-verified`, the regulator-kind choice is the severity sub-axis: process-compose runners sample the application-composition envelope (process startup, port binding, IPC handshake), nspawn container tests sample the service-on-NixOS envelope (systemd unit activation, declarative configuration interpretation), and full `nixosTest` VMs sample the NixOS-module + kernel + multi-machine envelope (network namespaces, kernel features, cross-machine protocol).
+Each kind would distinguish a strictly wider class of incorrect implementations from correct ones than the prior, so under Mayo's criterion the same `integration-verified` label backed by a VM-test regulator is stronger evidence than the same label backed by a process-compose runner.
+See `preferences-nix-checks-architecture` §"Choosing among integration regulators" for the decision rules that fix which kind is appropriate for a given target's envelope.
+
 Demotion to `regressed` is triggered by six conditions:
 
 1. A test that previously passed now fails.
@@ -285,3 +289,4 @@ See `preferences-compositional-continuous-verification` for the full hierarchy, 
 - `preferences-algebraic-laws` for property-based testing as the primary mechanism for high-severity, freedom-preserving evidence
 - `preferences-domain-modeling` for type-level constraints as the first rung of the validation ladder
 - `preferences-compositional-continuous-verification` for the systems-level four-property hierarchy (existence → traceability → adequacy → integrity) that operationalizes severity, refinement, and the confidence promotion chain at the regulator-suite scale
+- `preferences-nix-checks-architecture` §"Choosing among integration regulators" for the three-way regulator-kind decision (process-compose / nspawn / full VM) that fixes the severity sub-axis within `integration-verified`
