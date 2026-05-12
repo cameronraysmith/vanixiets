@@ -110,7 +110,7 @@ During development, the N-way merge serves as a workspace for concurrent editing
 When the epic is validated, the N-way merge is dissolved and the chains are rebased sequentially onto main, producing a purely linear history with no merge commits.
 
 The integration sequence proceeds as follows.
-First, abandon the development join (the merge commit and wip commit that formed the composite working copy).
+First, abandon the development join (the join commit and wip commit that formed the composite working copy).
 Then rebase each chain onto main in dependency order: chains whose issues are depended upon by other chains rebase first.
 When chains are fully independent, ordering is discretionary (alphabetical, thematic, or by size).
 Each chain's atomic commits land directly on the mainline, preserving the granular development history without merge-commit wrappers.
@@ -132,7 +132,7 @@ The resulting history is fully linear.
 ### Develop phase
 
 4. Create the N-way composite: `jj new chain-a chain-b chain-c ...`
-5. Describe the merge with a numbered manifest: `jj describe -m "merge 1: description\n- chain-a\n- chain-b\n..."`
+5. Describe the join with a numbered manifest: `jj describe -m "join 1: description\n- chain-a\n- chain-b\n..."`
 6. Create wip on top: `jj new`
 7. Develop in wip, routing changes to chains via `jj squash --into <target> -u -- <path>` or `jj absorb`.
 
@@ -177,7 +177,7 @@ The adaptive planning skill's MPC framework suggests this depends on the volatil
 - Lamport, L. (1978). "Time, Clocks, and the Ordering of Events in a Distributed System."
 - Beer, S. (1972). "Brain of the Firm." Allen Lane.
 - Dilworth, R. P. (1950). "A Decomposition Theorem for Partially Ordered Sets."
-- Krycho, C. (2024). "Jujutsu Megamerges and jj absorb."
+- Krycho, C. (2024). ["Jujutsu Megamerges and jj absorb."](https://raw.githubusercontent.com/chriskrycho/v5.chriskrycho.com/3f330be8861378587da76f33fe272799f5b84d97/site/journal/2024/Jujutsu%20Megamerges%20and%20jj%20absorb.md) Pinned to commit 3f330be. Local cache: `docs/notes/development/version-control/references/krycho-jujutsu-megamerges-and-jj-absorb.md`.
 - Bird, C. et al. (2009). "Does Distributed Development Affect Software Quality?"
 
 ## Implemented in

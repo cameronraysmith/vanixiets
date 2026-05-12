@@ -326,11 +326,11 @@ bd dep tree bd-a3f8 --format mermaid     # output as mermaid diagram
 bd dep tree bd-a3f8 --max-depth 3        # limit tree depth
 bd dep tree bd-a3f8 --status open        # filter by status
 bd dep tree bd-a3f8 --type blocks        # filter by dependency type
-bd dep tree bd-a3f8 --show-all-paths     # show all paths in diamond dependencies
+bd dep tree bd-a3f8 --show-all-paths     # show all paths in fan-in/fan-out dependency paths
 ```
 
 The `--direction both` flag is essential for understanding full impact: it shows upstream blockers and downstream dependents in a single view.
-Use `--show-all-paths` when diamond dependencies exist to see all possible traversal routes.
+Use `--show-all-paths` when fan-in/fan-out dependency paths exist (paths in the beads graph that converge and re-diverge) to see all possible traversal routes.
 
 Detect circular dependencies that would create deadlocks:
 

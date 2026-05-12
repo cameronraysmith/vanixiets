@@ -2,9 +2,11 @@
 name: worktree-sparsity-eval
 description: >-
   Evaluate repository size metrics to determine whether worktrees should use sparse checkout.
-  Invoke when starting work in an unfamiliar repository, before creating the first worktree
-  in a repo where no sparsity metrics exist in CLAUDE.md, or for periodic re-evaluation when
-  a repo has grown significantly.
+  **Invoke only in git-native mode (no `.jj/` directory) when creating a worktree, OR in jj
+  mode when the user has explicitly requested workspace isolation.** In jj mode without
+  explicit workspace request, parallel work uses the diamond workflow's development join,
+  not worktrees — see `~/.claude/skills/jj-version-control/tiered-ceremony.md`. Also invoke
+  for periodic re-evaluation when a repo has grown significantly.
 ---
 
 # Worktree sparsity evaluation

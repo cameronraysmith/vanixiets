@@ -320,7 +320,7 @@ Definition: a multi-parent working-copy commit `@` with cardinality ≥ 2, where
 The active chain tips form an antichain (a set of mutually independent commits in the partial order).
 The development join itself has two parts — a stable join commit (the multi-parent merge of chain tips) and a wip commit on top where in-flight edits land — forming the join + wip structure documented below.
 
-Structure: the join commit is created by `jj new <bookmark-a> <bookmark-b> [...]` and described with a numbered manifest (`merge N: ...` listing parent bookmarks) so it is never auto-abandoned.
+Structure: the join commit is created by `jj new <bookmark-a> <bookmark-b> [...]` and described with a numbered manifest (`join N: ...` listing parent bookmarks) so it is never auto-abandoned.
 The wip commit is `@` itself, created by `jj new` on top of the join commit, where the working-copy diff accumulates before being routed to a chain.
 This structure provides continuous integration feedback (conflicts surface immediately as first-class conflicts in `@`), shared visibility, modular separation (each chain remains independently inspectable, pushable, and reviewable), and flexible integration (chains are linearized onto main via sequential rebase at completion).
 
@@ -338,19 +338,19 @@ Cross-references:
 - `diamond-workflow.md` — the four-phase process (diverge, develop, converge, serialize) in which the development join participates
 - `~/.claude/skills/preferences-git-version-control/03-jj-mode.md` — mode-detection context and equivalences with git-native and GitButler modes
 
-### Two-commit structure: merge + wip (join + wip structure)
+### Two-commit structure: join + wip structure
 
 The development join uses a join + wip structure (two-commit structure): a stable development join commit with a wip commit on top.
 
 ```
-[merge] -- [wip](@)
+[join] -- [wip](@)
 ```
 
 The development join commit (`jj new bookmark-a bookmark-b bookmark-c`) integrates all chain elements (parent chain commits).
 Describe it with a numbered manifest of its parent bookmarks so it is never auto-abandoned and `jj log` is self-documenting:
 
 ```
-merge 1: short description of what this group covers
+join 1: short description of what this group covers
 - bookmark-a
 - bookmark-b
 - bookmark-c
@@ -358,20 +358,20 @@ merge 1: short description of what this group covers
 
 The first line combines a sequential number with a high-level label describing the join group's purpose.
 Update the description whenever a bookmark is added to or removed from the development join.
-If multiple join groups exist, number them sequentially (`merge 2: ...`, etc.).
+If multiple join groups exist, number them sequentially (`join 2: ...`, etc.).
 Create wip on top (`jj new`) and this becomes `@` where all edits land.
 Squashing from `@` into chain elements auto-rebases both the development join and wip.
-If `@` is disrupted, the development join still exists — recover with `jj new <merge-change-id>`.
+If `@` is disrupted, the development join still exists — recover with `jj new <join-change-id>`.
 
-Reference: Chris Krycho, "Jujutsu Megamerges and jj absorb" (2024-12-24).
+Reference: Chris Krycho, ["Jujutsu Megamerges and jj absorb"](https://raw.githubusercontent.com/chriskrycho/v5.chriskrycho.com/3f330be8861378587da76f33fe272799f5b84d97/site/journal/2024/Jujutsu%20Megamerges%20and%20jj%20absorb.md) (2024-12-24); local cache: `docs/notes/development/version-control/references/krycho-jujutsu-megamerges-and-jj-absorb.md`.
 
 ### Composite maintenance invariant (development join invariant)
 
 The join + wip structure requires active maintenance when operations move `@` away from the wip commit.
 
 Before any operation that moves `@` (like `jj new <single-parent>` or `jj edit`), verify and record the development join commit's change ID.
-After any such operation, immediately restore wip: `jj new <merge-change-id>`.
-When adding a new bookmark to the development join, reconstruct the development join (rebuild the merge) with all parents including the new one, then recreate wip on top.
+After any such operation, immediately restore wip: `jj new <join-change-id>`.
+When adding a new bookmark to the development join, reconstruct the development join (rebuild the join commit) with all parents including the new one, then recreate wip on top.
 Subagent prompts must specify whether they operate in the development join wip (edit files, let orchestrator route) or outside it (e.g., working on a single chain directly).
 
 ### The edit-route cycle
@@ -420,7 +420,7 @@ All completed changes live in their respective chains.
 
 **Restoring `@`'s description after routing:** `jj squash --into` moves file content from `@` but does NOT clear or rewrite `@`'s description.
 When `@` is the wip commit on top of a stable join commit, run `jj describe -m ""` after the squash to restore the empty-wip invariant.
-When `@` is itself the development join (single-commit form, no separate wip), restore the manifest with `jj describe @ -m "merge N: short description\n- bookmark-a\n- bookmark-b"` so subsequent operations see a self-documenting join rather than an opaque ordinary commit.
+When `@` is itself the development join (single-commit form, no separate wip), restore the manifest with `jj describe @ -m "join N: short description\n- bookmark-a\n- bookmark-b"` so subsequent operations see a self-documenting join rather than an opaque ordinary commit.
 Failure to recover the description pollutes subsequent operations and confuses other agents sharing the development join.
 
 In single-chain mode (tier 1, no bookmarks), the cycle is simpler: `jj describe -m "message"` followed by `jj new` freezes the change and advances `@`.
@@ -450,7 +450,7 @@ jj bookmark set <bookmark> -r <new-change-id>
 #    - If using the join + wip structure (recommended), @ is the wip commit; clear its description:
 jj describe -m ""
 #    - If @ IS the development join commit (single-commit form), restore the join manifest:
-jj describe @ -m "merge N: short description
+jj describe @ -m "join N: short description
 - bookmark-a
 - bookmark-b"
 ```
@@ -459,7 +459,7 @@ Why each step is necessary:
 
 - Step 1 uses `--no-edit` to avoid moving `@` away from the development join. Using `jj squash --into <bookmark>` instead would amend the existing bookmark commit, not extend the chain.
 - Step 4 is required because `jj new -A` creates a new commit that the bookmark does not automatically track. Without this step, the bookmark remains on the old tip.
-- Step 5 restores `@`'s description because `jj squash --from @ --into` moves file content but does NOT clear or rewrite the source commit's description. When `@` is the wip commit on top of a stable join commit, clearing to empty is correct. When `@` is itself the development join (single-commit form), the `merge N: ...` manifest must be re-set explicitly so subsequent operations and other agents continue to see a self-documenting join. Failure to recover the manifest leaves the development join indistinguishable from an ordinary commit in `jj log`.
+- Step 5 restores `@`'s description because `jj squash --from @ --into` moves file content but does NOT clear or rewrite the source commit's description. When `@` is the wip commit on top of a stable join commit, clearing to empty is correct. When `@` is itself the development join (single-commit form), the `join N: ...` manifest must be re-set explicitly so subsequent operations and other agents continue to see a self-documenting join. Failure to recover the manifest leaves the development join indistinguishable from an ordinary commit in `jj log`.
 
 When to use which pattern:
 

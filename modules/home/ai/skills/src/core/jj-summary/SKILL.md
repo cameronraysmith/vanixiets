@@ -283,7 +283,7 @@ Canonical recipe: `~/.claude/skills/jj-version-control/diamond-workflow.md`.
 ```bash
 # Develop phase: N-way development join + wip (tactical example)
 jj new chain-a chain-b chain-c
-jj describe -m "merge 1: epic desc\n- chain-a\n- chain-b\n- chain-c"
+jj describe -m "join 1: epic desc\n- chain-a\n- chain-b\n- chain-c"
 jj new                                                   # wip on top
 jj squash --from @ --into <chain> -m "feat: desc"        # route changes
 ```

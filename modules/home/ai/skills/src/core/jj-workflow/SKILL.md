@@ -140,7 +140,7 @@ jj describe -r <commit> -m "updated description"
 When using the multi-parent development join (composite working copy) + wip pattern, the development join must have a description to prevent auto-abandonment.
 Always work in the wip commit (`@`), never directly in the development join.
 Operations like `jj new <single-parent>` or `jj edit` will move `@` away from wip.
-Record the development join's change ID before such operations and restore with `jj new <merge-change-id>` afterward.
+Record the development join's change ID before such operations and restore with `jj new <join-change-id>` afterward.
 `jj absorb` is safe from wip — it routes changes (route elements to their chain) without disrupting the development join.
 `jj squash --into <target> -u -- <path>` is safe from wip — it routes specific file changes without disrupting the development join.
 
@@ -1025,7 +1025,7 @@ If any step fails, `jj undo` backs out immediately.
 ### Diamond workflow (epic-scoped)
 
 The diamond workflow connects beads epic issue graphs to jj chain topology through four phases: diverge, develop, converge, serialize.
-Tactical commands at use-sites include `jj new chain-a chain-b ...` for the development join, `jj describe -m "merge 1: ..."` then `jj new` for the join + wip structure, and `jj squash --from <src> --into <chain>` for routing changes.
+Tactical commands at use-sites include `jj new chain-a chain-b ...` for the development join, `jj describe -m "join 1: ..."` then `jj new` for the join + wip structure, and `jj squash --from <src> --into <chain>` for routing changes.
 For the canonical operational recipe, theoretical foundations, and beads-to-jj mapping, see `~/.claude/skills/jj-version-control/diamond-workflow.md`.
 
 ### Integration strategies

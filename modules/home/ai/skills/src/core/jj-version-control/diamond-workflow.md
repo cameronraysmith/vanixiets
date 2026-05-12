@@ -128,7 +128,7 @@ Independent chains within the same linearization step can be ordered discretiona
 4. Create the N-way development join:
    ```bash
    jj new chain-a chain-b chain-c ...
-   jj describe -m "merge 1: epic description
+   jj describe -m "join 1: epic description
    - chain-a
    - chain-b
    - chain-c"
@@ -163,7 +163,7 @@ The converge phase occurs *at* a planning-DAG convergence point in the sense use
 
 11. Abandon the development join and wip commits (they are ephemeral scaffolding):
     ```bash
-    jj abandon <merge-change-id> <wip-change-id>
+    jj abandon <join-change-id> <wip-change-id>
     ```
 12. Rebase each chain onto main in linearization order (see "Linearization order: two cases" above):
     ```bash
@@ -199,7 +199,7 @@ The adaptive planning skill's MPC framework suggests this depends on requirement
 - Lamport, L. (1978). "Time, Clocks, and the Ordering of Events in a Distributed System."
 - Beer, S. (1972). "Brain of the Firm." Allen Lane.
 - Dilworth, R. P. (1950). "A Decomposition Theorem for Partially Ordered Sets."
-- Krycho, C. (2024). "Jujutsu Megamerges and jj absorb."
+- Krycho, C. (2024). ["Jujutsu Megamerges and jj absorb."](https://raw.githubusercontent.com/chriskrycho/v5.chriskrycho.com/3f330be8861378587da76f33fe272799f5b84d97/site/journal/2024/Jujutsu%20Megamerges%20and%20jj%20absorb.md) Pinned to commit 3f330be. Local cache: `docs/notes/development/version-control/references/krycho-jujutsu-megamerges-and-jj-absorb.md`.
 
 ### See also
 

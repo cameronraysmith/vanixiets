@@ -31,7 +31,9 @@ Create or intelligently update a comprehensive workspace-level CLAUDE.md file th
 This command is designed for a specific development pattern where workspaces contain:
 
 1. **Primary Development Repository**: Main project under active development
-2. **Adjacent Git Worktrees**: Multiple experimental branches checked out as separate directories for parallel development (e.g., `project-686-feature`, `project-690-bugfix`)
+2. **Adjacent Git Worktrees**: Multiple experimental branches checked out as separate directories for parallel development (e.g., `project-686-feature`, `project-690-bugfix`).
+   In jj-colocated repos (where `.jj/` is present), parallel chains within the primary repo are typically handled via the diamond workflow's development join (see `~/.claude/skills/jj-version-control/tiered-ceremony.md`), not via adjacent worktrees.
+   Adjacent worktrees here refer specifically to git-native-mode adjacent project directories within a multi-repo workspace.
 3. **Dependency Source Code**: Full source repositories of libraries and frameworks used
 4. **Reference Materials**: Documentation, papers, tutorials, and related method implementations
 5. **Development Tools**: Utilities, scripts, and analysis tools

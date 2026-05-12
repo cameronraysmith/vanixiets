@@ -69,6 +69,7 @@ Execute the following steps in order.
 
 A convergence point is a node in the issue DAG whose blocking dependencies are all closed.
 Nodes with high in-degree (many blocking dependencies) are the primary targets for review because they represent integration points where multiple independent work streams merge.
+The jj diamond workflow's *converge* phase (see `~/.claude/skills/jj-version-control/diamond-workflow.md`) is the VCS-level expression of arriving at such a convergence point — the diamond's converge phase and a planning-DAG convergence node refer to the same node-shape from different perspectives.
 
 Identify candidate convergence points:
 

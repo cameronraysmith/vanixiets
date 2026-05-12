@@ -149,6 +149,7 @@ Keep the operational buffer at $B^*$ items — enough to absorb planning variabi
 
 Place validation gates at topological convergence points in the DAG — nodes where multiple independent implementation chains merge.
 These are natural integration boundaries where architectural assumptions face reality.
+The jj diamond workflow's *converge* phase (see `~/.claude/skills/jj-version-control/diamond-workflow.md`) occurs at a planning-DAG convergence point in this sense — they refer to the same node-shape from different perspectives.
 The interval between gates should satisfy:
 
 $$\text{Expected rework cost between gates} < \text{Validation overhead per gate}$$
