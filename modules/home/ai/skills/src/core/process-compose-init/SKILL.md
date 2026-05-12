@@ -36,3 +36,5 @@ Deliverables:
 The two configs should be semantically equivalent - same services, same behavior - differing only in how commands are resolved (Nix store paths vs PATH lookup).
 
 Optional: If unified devShell experience is valuable, consider the process-compose-flake-shell pattern where `nix develop` provides both tools and managed services.
+
+For the check-kind framing: the "test process to generate flake checks" above is one regulator kind among three (process-compose / nspawn / full NixOS VM), and the choice depends on the artifact's operating envelope — see `preferences-nix-checks-architecture` §"Choosing among integration regulators" for the escalation rules, with `preferences-nix-checks-architecture/references/process-compose-checks.md` covering process-compose-as-check-kind in detail.
