@@ -399,44 +399,40 @@ Disadvantages:
 - Cannot run tests in parallel
 - Cannot compare files side-by-side easily
 
-## Graduating to workspaces
+## Workspace creation (explicit user request only)
 
-Create separate workspaces when experiments need simultaneous file access.
+Workspace creation is reserved for cases where the user explicitly requests workspace isolation in-session.
+Parallel related work in jj mode uses the diamond workflow's development join, not workspace creation.
 
-### When to create workspaces
+Cross-references:
+- `~/.claude/skills/jj-version-control/tiered-ceremony.md` — policy authority for when ceremony escalates from anonymous chain to bookmarked chain to workspace.
+- `~/.claude/skills/jj-version-control/diamond-workflow.md` — canonical parallel-work alternative using multi-parent `@`.
+- `~/.claude/skills/jj-version-control/SKILL.md` "Development join" — the multi-parent working-copy entity that replaces workspaces for parallel work.
 
-Create workspace when you need:
-- Long-running builds/tests in each experiment simultaneously
-- Side-by-side file comparison in editors
-- Different sparse patterns per experiment
-- Avoid working-tree thrashing from frequent switches
+### Trigger condition
 
-Keep bookmark-only when:
-- Quick exploration or prototyping
-- Comparing implementations conceptually
-- Don't need files from multiple experiments on disk
+The agent creates a workspace only when the user explicitly requests it in-session.
+Explicit request means an utterance naming `worktree`, `workspace`, `isolate`, or `separate working copy`, or a path form such as `.worktrees/X` or `../myproject-exp-1`.
+In the absence of such an utterance, parallel related work uses the development join described in the diamond workflow, and serial work uses anonymous chains or bookmarks on a single working copy.
 
-### Creating workspaces for experiments
+Examples of why a human might request workspace isolation (long-running builds undisturbed by editing, side-by-side file comparison in editors, divergent sparse-checkout patterns) are informative context for the human's decision, not classification criteria the agent evaluates.
+For example, a user may request a workspace to keep a long-running build process undisturbed by ongoing edits, but the trigger remains the explicit request, not the inferred build duration.
+
+### Creating a workspace when requested
 
 ```bash
-# Graduate experiment 1 from bookmark to workspace
+# Create workspace at user-specified path, starting from the requested commit or bookmark
 jj workspace add ../myproject-exp-1 -r exp-1-nix-flakes
 
-# Workspace created with working-copy commit (exp1@) starting from exp-1-nix-flakes
+# Working-copy commit (exp1@) starts from exp-1-nix-flakes
 cd ../myproject-exp-1
 
-# Now exp1@ is your working copy
-# Files are persistent on disk
+# Files are persistent on disk; describe and extend as usual
 jj describe -m "[exp-1] feat(nix): add flake inputs"
 jj new
 
-# Start long test in workspace
+# Long-running operations can run undisturbed in the workspace
 nix build .# &
-
-# Work on other experiments in parallel
-cd ../myproject
-jj new exp-2-home-manager
-jj describe -m "[exp-2] feat(home): configure programs"
 ```
 
 ### Workspace-specific concepts
