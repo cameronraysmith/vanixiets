@@ -296,7 +296,7 @@ The test framework implementation lives in several key locations within the nixp
 `checks/flake-module.nix` demonstrates the pattern for wiring VM tests into flake checks output.
 
 
-## Choosing between VM tests and pure derivation checks
+## Choosing among integration regulator kinds
 
 VM tests are the right tool when validation requires a running operating system.
 The following properties require VM tests: systemd service activation ordering, firewall and network configuration, multi-machine communication, secrets decryption during system activation, disk layout and mount point configuration, and boot sequence behavior.
@@ -306,8 +306,36 @@ Pure derivation checks are sufficient and preferred for: library function correc
 The cost differential is significant.
 A pure derivation check might take seconds to build and produces a small, cacheable output.
 A VM test takes tens of seconds to minutes, requires KVM acceleration, and produces a larger result directory.
-When designing a test suite, start with pure derivation checks and add VM tests only for properties that genuinely require system-level validation.
+When designing a test suite, start with pure derivation checks and add heavier regulators only for properties that genuinely require system-level validation.
 
-Container-based tests (via clan-core's nspawn driver) occupy a middle ground.
+The full escalation ladder for integration regulators has three rungs above pure derivation checks.
+Process-compose sits at the bottom of the ladder, container (nspawn) tests in the middle, and full QEMU NixOS tests at the top.
+Each rung samples a strictly larger operating envelope than the one below it, and each rung trades portability and cost for that wider envelope.
+
+Process-compose is the regulator kind for the application-composition envelope.
+It runs the configured services as host processes under a single orchestrator, with dependency ordering and readiness probes, and asserts on application-layer behavior.
+There is no systemd, no NixOS module evaluation, and no kernel namespace isolation beyond what the host already provides.
+The regulator is OS-portable across Darwin and Linux, requires no special sandbox features, and produces results in seconds.
+It cannot exercise systemd unit ordering, NixOS module behavior, secrets activation, kernel features, or multi-machine network topology — those properties live in the envelopes of the higher rungs.
+process-compose is the right regulator when the artifact under test is genuinely host-process-shaped, when the developer loop runs on Darwin and the regulator needs to follow, or when the deployment shape is not yet decided.
+
+Container-based tests (via clan-core's nspawn driver, default `clan.test.useContainers = true`) occupy the middle rung.
 They boot faster and use less memory than QEMU-based VM tests, but share the host kernel, which means they cannot test kernel-level behavior.
 Container tests are appropriate for service-level integration testing: verifying that systemd units start, ports bind, and services respond to requests, without needing custom kernel modules or network namespace isolation beyond what nspawn provides.
+Compared to process-compose, the nspawn regulator covers a strictly larger envelope: the artifacts under test are real systemd units evaluated through the NixOS module system, secrets activation under clan-vars or sops-nix runs as it would on a deployed machine, and unit ordering and dependency semantics are sampled faithfully.
+The cost is Linux-only execution and a heavier per-test build.
+
+Full QEMU NixOS tests sit at the top of the ladder.
+They are the only regulator that exercises kernel features, network namespace isolation beyond what nspawn provides, multi-machine coordination via VLANs, and the boot sequence.
+The cost is the largest of the three rungs: tens of seconds to minutes per node, `kvm` and `nixos-test` sandbox features required, and linear scaling with the number of nodes.
+
+The escalation rules are concrete.
+Start at process-compose if the artifact is host-process-shaped.
+Promote to nspawn when the artifact will be deployed as a systemd service on NixOS, when secrets activation under clan-vars or sops-nix is part of the envelope, or when systemd ordering is part of what is being asserted.
+Promote to full QEMU when the envelope crosses machine boundaries via VLANs, depends on kernel features, depends on boot-sequence behavior, or requires network-topology faithfulness that only QEMU and `vde_switch` provide.
+
+The choice is not exclusive across a project.
+A single artifact can appear in process-compose (for the developer loop), in an nspawn test (for the merge-gate check), and in a full QEMU test (for the multi-machine integration check that runs less often).
+Each rung samples a different envelope, and passing all three is stronger evidence than passing any one of them.
+
+See `references/process-compose-checks.md` for the full treatment of the application-composition regulator, including the eval-gate pattern, the executed-test pattern, and the conditions under which a project should escalate to a heavier regulator.
