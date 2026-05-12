@@ -12,7 +12,8 @@ Quick reference and decision guide for jj version control. Full documentation: ~
 Read specific sections of jj-workflow.md when:
 - **First time with jj**: Read "Core philosophy" and "Foundation" sections
 - **Starting parallel experiments**: Read "Parallel experimentation with bookmarks"
-- **Need separate workspace**: Read "Graduating to workspaces"
+- **Multiple parallel work streams**: Read `jj-version-control/tiered-ceremony.md` for the three-tier model and `jj-version-control/SKILL.md` for development-join mechanics
+- **User explicitly requests workspace isolation**: Read `jj-version-control/tiered-ceremony.md` "Workspaces are not a tier" and `jj-workflow/SKILL.md` "Graduating to workspaces"
 - **Managing multiple experiments**: Read "Experiment lifecycle management"
 - **Cleaning up history**: Read "History refinement"
 - **Integration strategies**: Read "Advanced patterns"
@@ -328,23 +329,31 @@ jj log -r 'mine() & ~bookmarks()'
 
 ## Quick decision tree
 
+**Which tier of ceremony does this work warrant?** (See `jj-version-control/tiered-ceremony.md` for the full policy.)
+
+1. Single-chain work with low verification severity (atomic local changes safe to land on the trunk, covered adequately by `just check-fast`)?
+   → Tier 1: anonymous chain on `@`.
+   No bookmark beyond trunk, no PR; advance and push via `jj bookmark move main --to @-` then `jj git push --bookmark main`.
+
+2. Need PR/CI validation via buildbot flake checks (multi-platform fleet matrix, large change benefiting from unified PR review, or fleet-wide gate before trunk)?
+   → Tier 2: single named bookmark created retroactively on the chain.
+   `jj bookmark create <name> -r <change-id>` then `jj git push --bookmark <name> --allow-new`; follow `~/.claude/skills/nix-flake-pr-cycle/SKILL.md`.
+
+3. Multiple independent work streams in flight (multiple beads issues within an epic, parallel agent dispatch, parallel experiments to compose)?
+   → Tier 3: diamond workflow via development join over the chains' bookmarks.
+   `jj new <existing-bookmark> <new-bookmark> -m "join 1: <description>"`; route edits via `jj squash --from @ --into <tip> -u` plus `jj bookmark move <name> --to <tip>` and `jj describe @ -m "join N: ..."`.
+
+4. Did the user explicitly request workspace isolation (utterance naming `worktree`, `workspace`, `isolate`, `separate working copy`, or path forms like `.worktrees/X`)?
+   → `jj workspace add <path> -r <change>` mechanics; otherwise stay at tier 3 and parallelize via the development join in a single working copy.
+
 **Should I read jj-workflow.md?**
 1. Never used jj? → Read "Core philosophy" and "Foundation"
-2. Need parallel experiments? → Read "Parallel experimentation"
-3. Need separate workspace? → Read "Graduating to workspaces"
-4. Working on 2+ independent chains? → Development join `@` is the default. Create bookmarks for each chain, then `jj new chain-1 chain-2 ...`. See `~/.claude/skills/jj-version-control/SKILL.md` for the full workflow.
+2. Need parallel experiments? → Read "Parallel experimentation" and `jj-version-control/tiered-ceremony.md` tier 3
+3. User explicitly requested workspace isolation? → Read "Graduating to workspaces"
+4. Working on 2+ independent chains? → Tier 3 development join over per-chain bookmarks; see `~/.claude/skills/jj-version-control/SKILL.md` for mechanics and `tiered-ceremony.md` for the policy.
 5. Cleaning history? → Read "History refinement"
 6. Integrating work? → Read "Advanced patterns"
 7. Just need command? → Check "Quick command reference" above or "Reference" section
-
-**Single-chain vs development join mode?**
-- Ad hoc changes to a single concern → Single-chain mode (no bookmarks, anonymous chain descending from main). Freeze and advance main when done: `jj new` then `jj bookmark set main -r @-`.
-- 2+ independent work streams, beads epics with multiple issues, or parallel agent dispatch → Development join mode. This is the default for non-trivial sessions.
-
-**Should I create a workspace?**
-- Need simultaneous file access across experiments? → Yes
-- Need parallel builds/tests? → Yes
-- Just comparing approaches conceptually? → No, use bookmarks
 
 **Should I use jj or git for this operation?**
 - History editing (rebase, squash, reorder)? → jj (more powerful, safer)
