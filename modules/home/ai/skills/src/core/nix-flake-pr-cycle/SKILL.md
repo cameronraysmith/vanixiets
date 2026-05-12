@@ -41,6 +41,10 @@ Second, do existing checks include observability-interaction verification for ea
 Enumeration as written covers `currentSystem` only; buildbot-nix in CI exercises the multi-platform `.#checks` attrset and is the authority for fleet coverage.
 Auditing fleet coverage from a single workstation requires either dispatching `nix eval` against each declared system in the flake's `systems` list or reading the buildbot configuration directly; `preferences-nix-checks-architecture` documents the multi-system audit form.
 
+VM-based (`nixosTest`) and nspawn-container check kinds may fail at `nix eval` or `nix build` locally when the workstation's nix daemon lacks the `kvm` and `nixos-test` sandbox features.
+Such failures during Phase 1 probing are worker-capability gaps in the local environment, not check-set gaps in the flake — the same attribute will evaluate and build correctly on properly-configured buildbot workers (see `preferences-nix-ci-cd-integration` §"Pipeline architecture for multi-system repositories" on worker-capability heterogeneity).
+Record the gap as an environmental note rather than a finding against the regulator.
+
 Phase 1 invocations terminate here when the intent is audit-only — no push, no PR, no monitor.
 The output of the audit is typically a beads issue (or update to an existing issue) describing the unchecked artifact and the regulator that needs to exist, rather than an immediate code change.
 Per the no-leak principle in `preferences-compositional-continuous-verification`, an artifact discovered to be unchecked is a structural obligation toward traceability — wire the regulator in the same commit that touches the artifact, or open an issue when wiring is out of scope for the current session.
@@ -215,7 +219,7 @@ Skipping Phase 2 (the full local validation) before push is a defensible shortcu
 ## Cross-references
 
 - `preferences-compositional-continuous-verification` — theoretical anchor; canonical source for the enumeration commands
-- `preferences-nix-checks-architecture` — flake-side check taxonomy and meta-check derivation patterns
+- `preferences-nix-checks-architecture` — flake-side check taxonomy and meta-check derivation patterns; §"Choosing among integration regulators" for the three-way process-compose / nspawn / full VM regulator-kind framing referenced in Phase 1 worker-capability gap diagnosis
 - `preferences-nix-ci-cd-integration` — buildbot-nix as the closure-operator executor in CI; effect system; migration patterns
 - `preferences-validation-assurance` — severity, evidence quality, confidence promotion chain
 - `preferences-git-version-control` — GitHub PR creation safety, branch workflow, working branch isolation
