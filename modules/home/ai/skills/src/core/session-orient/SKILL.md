@@ -207,6 +207,7 @@ Omit dependency context unless a closed dependency changed an interface the work
 
 At *standard* depth (complicated domain): emit full context including the issue description, all closed dependency closure context in topological order, resolved escalations, and complete acceptance criteria with verification commands.
 If the surprise score from a prior worker exceeds 0.3, highlight the divergence and include checkpoint context that explains what was unexpected.
+When the planning-depth signal indicates multiple independent issues that can proceed in parallel, the diamond workflow (`~/.claude/skills/jj-version-control/diamond-workflow.md` and `~/.claude/skills/jj-version-control/tiered-ceremony.md` tier 3) is the default decomposition pattern in jj mode.
 
 At *deep* depth (complex domain): emit everything from standard plus explicit exploration phase directives.
 Separate "what we know" (from dependency context and prior checkpoint context) from "what we need to discover" (from the issue description's open questions or areas where surprise was high).

@@ -426,6 +426,7 @@ Identify which issues can be worked in parallel at each stage of the execution o
 
 The execution plan serves as the handoff to implementation.
 A worker reading this plan should understand what to work on first, what can proceed concurrently, and where the bottlenecks are.
+The diamond workflow (`~/.claude/skills/jj-version-control/diamond-workflow.md`) provides the canonical four-phase mapping from beads issue antichains to parallel jj chains: diverge (decompose), develop (multi-parent `@` development join), converge (validate the integrated state), serialize (sequential rebase to main).
 
 ```bash
 # Identify all unblocked work as parallel execution candidates

@@ -81,6 +81,8 @@ First match wins.
 11. **Healthy graph with signal tables** (no structural issues, signal tables present): recommend `/session-orient`.
     Rationale: graph is healthy and has signal table coverage. Normal orient flow.
 
+For any multi-issue parallel scenario surfaced by the recommendation, include `~/.claude/skills/jj-version-control/diamond-workflow.md` in the suggested loadout as the default decomposition pattern in jj mode.
+
 ## Execution protocol
 
 1. Run diagnostic commands in order: `bd status`, `bd epic status`, `bd dep cycles`, `bd stale`.
