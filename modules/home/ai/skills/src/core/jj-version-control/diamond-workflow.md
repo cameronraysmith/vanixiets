@@ -1,8 +1,19 @@
 # Diamond workflow: beads epic to jj chain topology
 
-This document describes the diamond workflow pattern that connects beads epic issue graphs to jj multi-parent version control.
-It provides the theoretical foundations, beads-to-jj mapping, and mechanical recipe for epic-scoped work.
-For the operational patterns (edit-route cycle, conflict behavior, parallel agent coordination), see SKILL.md in this directory.
+This document is the canonical operational reference for the diamond workflow in this skill tree.
+It describes the diamond workflow pattern that connects beads epic issue graphs to jj multi-parent version control, providing the theoretical foundations, beads-to-jj mapping, and mechanical recipe for epic-scoped work.
+
+The companion design note at `docs/notes/development/version-control/epic-to-branch-diamond-workflow.md` is the theoretical foundation with full citations (Winskel event structures, Dilworth's antichain theorem, Lamport's partial order, Beer's VSM, Krycho's effective theory); when the *why* is in question, read the design note.
+The sibling `tiered-ceremony.md` is the policy authority for *when* the diamond workflow applies — it answers "should I be using the diamond at all?" before this document answers "how do I run a diamond?".
+The sibling `~/.claude/skills/jj-version-control/SKILL.md` is the operational entity-level reference for the development join itself (the multi-parent `@`, conflict behavior, edit-route cycle, route-and-extend recipe); when you need the day-to-day mechanics of working in a join, look there.
+
+## Two-peer ontology: process and entity
+
+The *diamond workflow* names the process — the four phases of diverge, develop, converge, and serialize.
+The *development join* names the entity — the multi-parent `@` working copy used during the develop phase.
+Not every development join is part of a diamond workflow: a two-bookmark experiment without an epic is still a valid development join.
+Every diamond workflow contains exactly one development join.
+This is an ontological pair (object plus process), not redundant aliases — the two terms refer to different aspects of the same coordinated workflow.
 
 ## The diamond pattern
 
@@ -43,6 +54,7 @@ These antichains correspond directly to the sets of bookmark chains that can be 
 
 By Dilworth's theorem, the minimum number of sequential chains needed to cover the partial order equals the maximum antichain width.
 This gives a lower bound on the number of rebase steps needed to linearize the work.
+For the extended lattice-theoretic treatment with full citations, see `docs/notes/development/version-control/epic-to-branch-diamond-workflow.md`.
 
 ### Event structures
 
@@ -55,6 +67,7 @@ The development process moves through the *domain of configurations*, from the e
 The linearized commit sequence on main records a path through this domain.
 
 This framing clarifies why the development join is correct during development (it represents a valid configuration for testing) but the sequential rebase linearization is correct for history (it records a linear extension through the configuration domain).
+For the extended event-structure exposition with Winskel citation context, see `docs/notes/development/version-control/epic-to-branch-diamond-workflow.md`.
 
 ### Concurrency theory
 
@@ -139,6 +152,8 @@ Independent chains within the same linearization step can be ordered discretiona
 
 ### Phase 3: converge (validate)
 
+The converge phase occurs *at* a planning-DAG convergence point in the sense used by `~/.claude/skills/preferences-adaptive-planning/SKILL.md` and `~/.claude/skills/session-review/SKILL.md` — the diamond's converge phase and the planning DAG's topological convergence node refer to the same shape of synchronization point in the workflow.
+
 7. The development join working copy represents the full integration.
 8. Run tests, manual QA, and integration validation against the development join.
 9. Fix issues by editing in wip and routing fixes to the appropriate chain.
@@ -185,3 +200,10 @@ The adaptive planning skill's MPC framework suggests this depends on requirement
 - Beer, S. (1972). "Brain of the Firm." Allen Lane.
 - Dilworth, R. P. (1950). "A Decomposition Theorem for Partially Ordered Sets."
 - Krycho, C. (2024). "Jujutsu Megamerges and jj absorb."
+
+### See also
+
+- `docs/notes/development/version-control/epic-to-branch-diamond-workflow.md` — the ratified design note containing the working-document version of the citations above, with motivation, design history, and open questions in their original context.
+- `tiered-ceremony.md` (sibling) — the policy authority establishing when the diamond workflow applies (tier 3 of the three-tier ceremony model); read this before deciding to run a diamond.
+- `~/.claude/skills/jj-version-control/SKILL.md` (sibling) — the operational entity-level reference for the development join (multi-parent `@`, conflict behavior, edit-route cycle, route-and-extend recipe, composite maintenance invariant).
+- `~/.claude/skills/preferences-adaptive-planning/SKILL.md` and `~/.claude/skills/session-review/SKILL.md` — the planning-DAG convergence-point semantics that align with the diamond's converge phase.
