@@ -175,6 +175,33 @@ in
         };
       };
 
+      # nix-rosetta-builder's emitted nix.buildMachines entry omits "uid-range",
+      # blocking dispatch of systemd-nspawn-flavor NixOS tests. Replace it with
+      # a mirror of the upstream entry that additionally advertises uid-range.
+      # Connection details (sshUser/sshKey/publicHostKey) are null in upstream
+      # too; ssh resolution is handled by /etc/ssh/ssh_config.d/100-rosetta-builder.conf.
+      # Remove once nix-rosetta-builder advertises uid-range upstream.
+      nix.buildMachines = lib.mkForce [
+        {
+          hostName = "rosetta-builder";
+          systems = [
+            "aarch64-linux"
+            "x86_64-linux"
+          ];
+          maxJobs = 12;
+          speedFactor = 1;
+          protocol = "ssh-ng";
+          supportedFeatures = [
+            "benchmark"
+            "big-parallel"
+            "kvm"
+            "nixos-test"
+            "uid-range"
+          ];
+          mandatoryFeatures = [ ];
+        }
+      ];
+
       # Colima for OCI container management (complementary to nix-rosetta-builder)
       services.colima = {
         enable = true;
