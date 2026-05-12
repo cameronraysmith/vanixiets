@@ -135,6 +135,9 @@ Planning-unit decomposition under CCV obligates regulator-aware planning: the pl
 Integration of CCV's no-leak principle into `preferences-adaptive-planning` is a deferred design question for a future session.
 
 Observability checks as first-class CCV regulators is the second open thread; the build-time observability-contract regulator pattern (bring up a local OTel collector and trace store under process-compose, drive synthetic traffic through the application, assert the expected spans appear in the backend's query API) is documented in the CCV reference and will be integrated into `preferences-observability-engineering` after its sibling-commit pass lands.
+The "process-compose (or analog)" phrasing in that pattern intentionally generalizes across peer regulator kinds: process-compose realizes application-composition envelopes, nspawn-based clan tests realize service-on-NixOS envelopes where the deployed system is itself NixOS, and full NixOS VM tests realize NixOS-module-plus-kernel envelopes.
+The choice among these three is an envelope choice — the same observability contract (or any other integration-level assertion) can be discharged by any of the three regulator kinds depending on what the artifact's deployment target actually is.
+See `preferences-nix-checks-architecture` §"Choosing among integration regulators" for the escalation rules.
 
 ## Cross-references
 
