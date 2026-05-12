@@ -316,18 +316,18 @@ For the full theoretical foundations (lattice theory, event structures, VSM mapp
 The development join is the canonical entity for parallel multi-chain work in jj mode and the default operating mode for any session with two or more active chains.
 Single-chain mode is the exception, reserved for ad hoc work on one anonymous chain descending from main.
 
-Definition: a multi-parent working-copy commit `@` with cardinality ≥ 2, where each parent is a chain tip (a bookmark or an anonymous chain head).
+Definition: a two-commit structure consisting of a multi-parent `[merge]` commit (cardinality ≥ 2, each parent a chain tip — a bookmark or an anonymous chain head) and a `[wip]` commit on top where `@` resides.
 The active chain tips form an antichain (a set of mutually independent commits in the partial order).
-The development join itself has two parts — a stable join commit (the multi-parent merge of chain tips) and a wip commit on top where in-flight edits land — forming the join + wip structure documented below.
+`[merge]` is frozen at creation and never edited; `[wip]` is ephemeral scratch space where in-flight edits land — forming the join + wip structure documented below.
 
-Structure: the join commit is created by `jj new <bookmark-a> <bookmark-b> [...]` and described with a numbered manifest (`join N: ...` listing parent bookmarks) so it is never auto-abandoned.
-The wip commit is `@` itself, created by `jj new` on top of the join commit, where the working-copy diff accumulates before being routed to a chain.
+Structure: `[merge]` is created by `jj new <bookmark-a> <bookmark-b> [...]` and described once with a numbered manifest (`join N: ...` listing parent bookmarks) so it is never auto-abandoned.
+`[wip]` is created by `jj new @` on top of `[merge]`, and `@` always points at `[wip]` while routing operations preserve it via `--keep-emptied`.
 This structure provides continuous integration feedback (conflicts surface immediately as first-class conflicts in `@`), shared visibility, modular separation (each chain remains independently inspectable, pushable, and reviewable), and flexible integration (chains are linearized onto main via sequential rebase at completion).
 
 Conflict behavior: when antichain elements contain conflicting changes, `@` displays first-class jj conflicts as a continuous integration signal — informational, non-blocking.
 See "Conflict behavior in composite `@`" below for resolution options.
 
-Lifecycle: created via `jj new <bookmark-a> <bookmark-b> [...]` when promoting from tier 2 to tier 3 (see `tiered-ceremony.md`); maintained via the edit-route cycle and route-and-extend pattern below; dissolved during the four-phase diamond workflow's serialize phase, where chains are rebased sequentially onto main and fast-forwarded (see `diamond-workflow.md`).
+Lifecycle: created via `jj new <bookmark-a> <bookmark-b> [...] -m "join N: ..."` followed by `jj new @ -m "wip"` when promoting from tier 2 to tier 3 (see `tiered-ceremony.md`); maintained via the edit-route cycle and route-and-extend pattern below; dissolved during the four-phase diamond workflow's serialize phase, where chains are rebased sequentially onto main and fast-forwarded (see `diamond-workflow.md`).
 
 Not to use for: workspace isolation needs.
 The development join is the tier-3 mechanism for parallelizing related chains in one working copy.
@@ -340,14 +340,18 @@ Cross-references:
 
 ### Two-commit structure: join + wip structure
 
-The development join uses a join + wip structure (two-commit structure): a stable development join commit with a wip commit on top.
+The development join always uses a canonical two-commit structure: a frozen multi-parent `[merge]` commit with an ephemeral `[wip]` commit on top, where `@` is `[wip]`.
 
 ```
-[join] -- [wip](@)
+parents...  →  [merge] (FROZEN, multi-parent, "join N: ..." description)
+                  |
+                  └→ [wip] (@, working copy, ephemeral description)
 ```
 
-The development join commit (`jj new bookmark-a bookmark-b bookmark-c`) integrates all chain elements (parent chain commits).
-Describe it with a numbered manifest of its parent bookmarks so it is never auto-abandoned and `jj log` is self-documenting:
+Per Krycho's canonical model, `[wip]` sits on top of `[merge]` precisely so that `[merge]` is never edited after creation and `[wip]` serves as scratch space whose description need not be maintained.
+Reference: Chris Krycho, ["Jujutsu Megamerges and jj absorb"](https://raw.githubusercontent.com/chriskrycho/v5.chriskrycho.com/3f330be8861378587da76f33fe272799f5b84d97/site/journal/2024/Jujutsu%20Megamerges%20and%20jj%20absorb.md) (2024-12-24); local cache: `docs/notes/development/version-control/references/krycho-jujutsu-megamerges-and-jj-absorb.md`.
+
+The `[merge]` commit is created by `jj new <bookmark-a> <bookmark-b> [...]` and described once at creation with a numbered manifest of its parent bookmarks so it is never auto-abandoned and `jj log` is self-documenting:
 
 ```
 join 1: short description of what this group covers
@@ -357,114 +361,85 @@ join 1: short description of what this group covers
 ```
 
 The first line combines a sequential number with a high-level label describing the join group's purpose.
-Update the description whenever a bookmark is added to or removed from the development join.
 If multiple join groups exist, number them sequentially (`join 2: ...`, etc.).
-Create wip on top (`jj new`) and this becomes `@` where all edits land.
-Squashing from `@` into chain elements auto-rebases both the development join and wip.
-If `@` is disrupted, the development join still exists — recover with `jj new <join-change-id>`.
+After creating `[merge]`, immediately create `[wip]` on top with `jj new @ -m "wip"` (or any ephemeral description); this becomes `@` where all edits land.
+The `[merge]` commit is FROZEN once created — it is never described, edited, or routed into.
+The `[wip]` commit's description is ephemeral and does not need to be recovered after routing operations.
 
-Reference: Chris Krycho, ["Jujutsu Megamerges and jj absorb"](https://raw.githubusercontent.com/chriskrycho/v5.chriskrycho.com/3f330be8861378587da76f33fe272799f5b84d97/site/journal/2024/Jujutsu%20Megamerges%20and%20jj%20absorb.md) (2024-12-24); local cache: `docs/notes/development/version-control/references/krycho-jujutsu-megamerges-and-jj-absorb.md`.
+Squashing from `@` into chain elements with `--keep-emptied` auto-rebases both `[merge]` and `[wip]` while preserving the two-commit structure.
+If `[wip]` is disrupted, the `[merge]` commit still exists — recover with `jj new <merge-change-id>` to recreate the wip layer.
 
 ### Composite maintenance invariant (development join invariant)
 
-The join + wip structure requires active maintenance when operations move `@` away from the wip commit.
+The join + wip structure requires active maintenance when operations move `@` away from `[wip]`.
 
-Before any operation that moves `@` (like `jj new <single-parent>` or `jj edit`), verify and record the development join commit's change ID.
-After any such operation, immediately restore wip: `jj new <join-change-id>`.
-When adding a new bookmark to the development join, reconstruct the development join (rebuild the join commit) with all parents including the new one, then recreate wip on top.
-Subagent prompts must specify whether they operate in the development join wip (edit files, let orchestrator route) or outside it (e.g., working on a single chain directly).
+Before any operation that moves `@` (like `jj new <single-parent>` or `jj edit`), verify and record `[merge]`'s change ID.
+After any such operation, immediately restore `[wip]` on top: `jj new <merge-change-id> -m "wip"`.
+When adding a new bookmark to the development join, reconstruct `[merge]` with all parents including the new one (re-set the `join N: ...` manifest), then recreate `[wip]` on top.
+Subagent prompts must specify whether they operate in `[wip]` (edit files, let orchestrator route) or outside it (e.g., working on a single chain directly).
 
 ### The edit-route cycle
 
-All edits land in `@`.
-The discipline is to route (route elements to their chain) each completed change out of `@` into the correct chain, then verify the routing was correct.
+All edits land in `@` (which is `[wip]`).
+The discipline is to route each completed change from `@` into the correct chain commit, preserving `[wip]` empty on top of the frozen `[merge]`.
 
-The prescribed commit pattern when bookmarks exist (tier 2 or 3 of the bookmark creation threshold) is `jj squash --into <chain> -m "message" <path>`.
-This combines routing, description, and file scoping in a single atomic operation.
-Each chain is a totally ordered subset of the commit partial order; routing moves a change from `@` into the correct chain element.
+When amending an existing chain commit, the canonical routing operation is `jj squash --from @ --into <chain-tip> --keep-emptied`.
+`--keep-emptied` preserves the empty `[wip]` commit after its diff is squashed into the target, maintaining the canonical two-commit structure.
+`[merge]` is never touched by any routing operation.
+`[wip]`'s description is ephemeral, so no description-recovery step is required after the squash.
 
 The cycle proceeds as follows:
 
-1. Edit a file in `@`
-2. `jj squash --into <chain> -m "feat: description" <path>` — routes the change, sets the description, and scopes to the specified file in one command
-3. `jj log` — verify the change landed in the correct chain and `@` is clean
+1. Edit a file in `@` (the `[wip]` commit)
+2. `jj squash --from @ --into <chain-tip> --keep-emptied` — routes the diff into the chain commit, preserving `[wip]`
+3. `jj log` — verify the change landed in the correct chain and `[wip]` is empty
 4. Repeat
 
-This single-command pattern is better than the two-step describe + squash for three reasons.
-It is atomic: routing and description happen in one operation, with no window where unrouted described changes sit in `@`.
-It is scoped: the explicit path ensures only the intended file moves, even if another agent edited something else in `@` concurrently.
-It is parallel-safe: multiple agents can run this simultaneously on different files targeting different chains without interference.
-
-When routing changes from `@` (wip) into a chain element, choose the message flag carefully:
-- Use `-u` (`--use-destination-message`) when the target already has the correct description.
-  This prevents the description merge editor from opening and preserves the existing description.
-- Use `-m "message"` only when setting the description for the first time.
-- Never use `-i` (`--interactive`) in automated or non-interactive contexts — it opens the diff editor which blocks without a terminal.
-
-The description merge editor is triggered when source and destination both have non-empty descriptions and the source is not fully emptied by the squash.
-Using `-u` suppresses this by telling jj to keep the destination's description unconditionally.
-
-The canonical non-interactive routing pattern for an existing target description:
-
-```bash
-jj squash --into <target> -u -- <path>
-```
-
-`jj absorb` remains available as a convenience when blame ancestry can determine the correct chain.
+`jj absorb` is the auto-routing variant.
+It distributes hunks to the closest mutable ancestor based on blame ancestry and automatically preserves `[wip]` without requiring `--keep-emptied`.
 In parallel environments where multiple agents share `@`, prefer scoped `jj absorb <path>` over bare `jj absorb`.
 Bare absorb touches every changed file in `@`, which can interfere with files another agent is mid-edit on.
-Scoped absorb routes only the specified files by blame ancestry, leaving everything else in `@` untouched — this is the safer option when you lack context about what other agents are actively editing.
+Scoped absorb routes only the specified files by blame ancestry, leaving everything else in `[wip]` untouched.
 
-The invariant is that `@` is always empty or contains only in-progress work.
-All completed changes live in their respective chains.
-
-**Restoring `@`'s description after routing:** `jj squash --into` moves file content from `@` but does NOT clear or rewrite `@`'s description.
-When `@` is the wip commit on top of a stable join commit, run `jj describe -m ""` after the squash to restore the empty-wip invariant.
-When `@` is itself the development join (single-commit form, no separate wip), restore the manifest with `jj describe @ -m "join N: short description\n- bookmark-a\n- bookmark-b"` so subsequent operations see a self-documenting join rather than an opaque ordinary commit.
-Failure to recover the description pollutes subsequent operations and confuses other agents sharing the development join.
+The invariant is that `[wip]` is always empty or contains only in-progress work, and `[merge]` is never edited.
+All completed changes live in their respective chain commits.
 
 In single-chain mode (tier 1, no bookmarks), the cycle is simpler: `jj describe -m "message"` followed by `jj new` freezes the change and advances `@`.
 There is no routing target, so the single-command pattern does not apply.
-Do not use `jj new` in multi-parent development join mode — it creates a new change descending from the development join `@` rather than routing to a chain.
+Do not use `jj new` (without `-A`) in multi-parent development join mode — it creates a new change descending from `[wip]` rather than routing to a chain.
 
 ### Extending a chain with a new commit (route-and-extend pattern)
 
-When the intent is to create a new commit on a chain rather than amending the existing tip, `jj squash --into` is insufficient because it merges content into the existing commit.
+When the intent is to create a new commit on a chain rather than amending the existing tip, `jj squash --into` against the existing tip is insufficient because it merges content into that commit.
 Use the route-and-extend pattern instead.
 
 The complete mechanical recipe:
 
 ```bash
-# 1. Insert a new empty commit after the bookmark (does NOT move @)
-jj new -A <bookmark> --no-edit -m "feat: description of the new change"
+# 1. Insert a new empty commit after the chain tip (does NOT move @)
+jj new -A <chain-tip> --no-edit -m "feat: description of the new change"
 
 # 2. Note the change ID of the newly inserted commit (jj prints it)
 
-# 3. Squash the file(s) from @ into the new commit, preserving its description
-jj squash --from @ --into <new-change-id> -u -- <path>
+# 3. Squash the file(s) from @ into the new commit, preserving [wip] empty on top
+jj squash --from @ --into <new-change-id> --keep-emptied -- <path>
 
 # 4. Advance the bookmark to the new chain tip
-jj bookmark set <bookmark> -r <new-change-id>
-
-# 5. Restore @'s description (squash moved files but did NOT clear the source description)
-#    - If using the join + wip structure (recommended), @ is the wip commit; clear its description:
-jj describe -m ""
-#    - If @ IS the development join commit (single-commit form), restore the join manifest:
-jj describe @ -m "join N: short description
-- bookmark-a
-- bookmark-b"
+jj bookmark move <bookmark> --to <new-change-id>
 ```
 
 Why each step is necessary:
 
-- Step 1 uses `--no-edit` to avoid moving `@` away from the development join. Using `jj squash --into <bookmark>` instead would amend the existing bookmark commit, not extend the chain.
+- Step 1 uses `--no-edit` to avoid moving `@` away from `[wip]`. Using `jj squash --into <chain-tip>` instead would amend the existing chain commit, not extend the chain.
+- Step 3 uses `--keep-emptied` to preserve the empty `[wip]` commit on top of `[merge]` after the diff is moved into the new chain commit. `[merge]` is never touched.
 - Step 4 is required because `jj new -A` creates a new commit that the bookmark does not automatically track. Without this step, the bookmark remains on the old tip.
-- Step 5 restores `@`'s description because `jj squash --from @ --into` moves file content but does NOT clear or rewrite the source commit's description. When `@` is the wip commit on top of a stable join commit, clearing to empty is correct. When `@` is itself the development join (single-commit form), the `join N: ...` manifest must be re-set explicitly so subsequent operations and other agents continue to see a self-documenting join. Failure to recover the manifest leaves the development join indistinguishable from an ordinary commit in `jj log`.
+
+No description-recovery step is needed: `[wip]`'s description is ephemeral and `[merge]` is frozen.
 
 When to use which pattern:
 
-- *Amending an existing chain commit:* `jj squash --into <bookmark> -u -- <path>` (the standard edit-route cycle)
-- *Creating a new commit extending the chain:* the route-and-extend recipe above
+- *Amending an existing chain commit:* `jj squash --from @ --into <chain-tip> --keep-emptied` (the standard edit-route cycle) or `jj absorb` for auto-routing.
+- *Creating a new commit extending the chain:* the route-and-extend recipe above.
 
 ### Conflict behavior in composite `@`
 
@@ -488,25 +463,25 @@ This is useful when you want to auto-route changes for one file while continuing
 - Deleted files (no blame target)
 - Hunks where blame is ambiguous (multiple ancestors modified the same lines)
 
-For any case where `jj absorb` cannot route changes, fall back to `jj squash --into <chain> -m "message" <path>` for explicit routing.
+For any case where `jj absorb` cannot route changes, fall back to `jj squash --from @ --into <chain-tip> --keep-emptied -- <path>` for explicit routing (or the route-and-extend recipe when extending the chain with a new commit).
 
 ### Parallel agent coordination
 
-Multiple agents share one filesystem and edit files in the same `@`.
+Multiple agents share one filesystem and edit files in the same `@` (which is `[wip]`).
 This is the intended model.
 All agents see the integrated state of all antichain elements, reducing conflict risk.
 Conflicts between concurrent edits are detected immediately as first-class jj conflicts.
 
-All agents use `jj squash --into <chain> -m "message" <path>` for every commit.
-This ensures each agent's changes are atomically routed to the correct chain with explicit file scoping, preventing cross-contamination even when multiple agents edit different files simultaneously in `@`.
+All agents route via `jj squash --from @ --into <chain-tip> --keep-emptied -- <path>` (or the route-and-extend recipe to extend a chain).
+`--keep-emptied` preserves `[wip]` after the squash, maintaining the canonical two-commit structure across concurrent routing operations.
 
 Coordination protocol for parallel agents:
-- One file per commit, routed via `jj squash --into <chain> -m "message" <path>`
+- One file per commit, routed via `jj squash --from @ --into <chain-tip> --keep-emptied -- <path>`
 - Periodic `jj log` review to verify routing correctness
-- `jj absorb` as a fallback for batch routing when blame ancestry is clear
+- `jj absorb` as a fallback for batch routing when blame ancestry is clear (auto-preserves `[wip]`)
 - If two agents edit different hunks in the same file, `jj absorb <path>` can separate them by blame ancestry after the fact
 
-The orchestrator routes changes to the correct chain via `jj squash --into` or `jj absorb` after each subagent completes.
+The orchestrator routes changes to the correct chain via `jj squash --from @ --into ... --keep-emptied` or `jj absorb` after each subagent completes.
 Subagent prompts specify which files to edit and the target chain context but do not include jj routing commands.
 
 ### Adding and removing chains

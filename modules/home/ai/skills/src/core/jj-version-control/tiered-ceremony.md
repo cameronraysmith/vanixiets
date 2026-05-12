@@ -53,8 +53,10 @@ After merge, delete the bookmark and return to tier 1 for subsequent work.
 
 ## Tier 3: diamond workflow with development join
 
-What it is: two or more bookmarks active simultaneously, with a multi-parent `@` (the development join) merging all active chain tips into one working copy.
-Edits in `@` are routed to the correct chain via `jj squash --from @ --into <tip> -u` (amend an existing chain commit), route-and-extend (`jj new -A <tip> -m "..." --no-edit` then `jj squash --from @ --into <new>` then `jj bookmark move <name> --to <new>`), or `jj absorb` (auto-route by blame).
+What it is: two or more bookmarks active simultaneously, with a multi-parent `[merge]` commit merging all active chain tips and a `[wip]` commit on top where `@` resides — the canonical two-commit development join.
+Per Krycho's canonical model, `[wip]` sits on top of `[merge]` so that `[merge]` stays frozen and `[wip]` serves as scratch space; see `docs/notes/development/version-control/references/krycho-jujutsu-megamerges-and-jj-absorb.md` for the canonical structure and routing recipe.
+Edits in `@` (which is `[wip]`) are routed to the correct chain via `jj squash --from @ --into <chain-tip> --keep-emptied` (amend an existing chain commit), the route-and-extend recipe (`jj new -A <tip> --no-edit -m "..."` then `jj squash --from @ --into <new-change-id> --keep-emptied` then `jj bookmark move <name> --to <new-change-id>`), or `jj absorb` (auto-route by blame, preserves `[wip]` automatically).
+`[merge]` is never touched by any routing operation, and `[wip]`'s description is ephemeral so no description-recovery step is required after a squash.
 Each chain becomes its own PR via FF merge.
 Integration is sequential rebase linearization in phase 4 (serialize).
 
@@ -64,20 +66,22 @@ A single workstream that happens to span several commits does not trigger tier 3
 
 Cost: routing discipline (every edit must be intentionally routed to the right chain before yielding control), editor-hang avoidance vigilance (every commit-boundary subcommand needs `-m`; see the editor-hang reference in vanixiets memory), careful bookmark and development-join maintenance per the composite maintenance invariant in `SKILL.md`.
 
-Operations to enter (promote from tier 2 by adding a second parent to `@`):
+Operations to enter (promote from tier 2 by adding a second parent to `@` and layering `[wip]` on top):
 
 ```bash
 # If the new bookmark already exists at some change:
 jj new <existing-bookmark> <new-bookmark> -m "join 1: <description>"
+jj new @ -m "wip"   # layer [wip] on top of [merge]; @ is now [wip]
 
 # If the new bookmark doesn't exist yet, seed it first:
 jj new main -m "wip(<name>): seed chain"
 jj bookmark create <new-bookmark> -r @
-# then promote @ to a development join over both bookmarks:
+# then promote @ to a development join over both bookmarks, layering [wip] on top:
 jj new <existing-bookmark> <new-bookmark> -m "join 1: <description>"
+jj new @ -m "wip"
 ```
 
-Describe the development join with a numbered manifest (`join N: ...`) listing the parent bookmarks, per the join + wip structure documented in `SKILL.md`.
+Describe `[merge]` once with a numbered manifest (`join N: ...`) listing the parent bookmarks, per the join + wip structure documented in `SKILL.md`; do not re-describe `[merge]` after creation.
 
 Operations to dissolve (phase 4 serialize): each chain rebases onto an updated trunk in dependency order.
 
@@ -101,10 +105,11 @@ jj bookmark create <name> -r <change-id>   # or -r @- for the chain tip
 jj git push --bookmark <name> --allow-new
 ```
 
-Tier 2 → tier 3 (add a second parent to `@`):
+Tier 2 → tier 3 (add a second parent to create `[merge]`, then layer `[wip]` on top):
 
 ```bash
 jj new <existing-bookmark> <new-bookmark> -m "join 1: <description>"
+jj new @ -m "wip"
 ```
 
 Tier 3 → tier 1 (after the diamond completes and all chains merge to trunk):
