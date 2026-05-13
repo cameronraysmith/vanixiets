@@ -160,37 +160,10 @@
           before committing if quick and safe; otherwise return with a verification proposal.
 
           When dispatching a Task with a BEAD_ID for implementation work, the dispatch protocol depends on the active VCS mode.
-          Detect mode at dispatch time: `.jj/` directory present in the repository root indicates jj mode (the default for this workspace); a checked-out `gitbutler/workspace` branch indicates GitButler mode; otherwise git-native mode.
+          Detect mode at dispatch time: `.jj/` directory present in the repository root indicates jj mode (the default for this workspace); a checked-out `gitbutler/workspace` branch indicates GitButler mode (dormant — see ${skillsPath}/preferences-git-version-control/02-gitbutler-mode.md if encountered); otherwise git-native mode.
 
-          In jj mode, subagents work in the shared `@` working copy.
-          Do not create jj workspaces or git worktrees for subagent dispatch; parallel work is coordinated through the diamond workflow's development join, not through filesystem isolation.
-          The dispatch follows the three-tier ceremony model documented in ${skillsPath}/jj-version-control/tiered-ceremony.md:
-
-          - Tier 1 (default): the subagent edits files on the anonymous `@` chain and commits accumulate as the orchestrator routes them.
-            The orchestrator advances `main` (or another trunk bookmark) when the chain is ready and pushes directly via `jj git push --bookmark main`.
-            Most jj work is tier 1.
-          - Tier 2 (PR/CI gateway): when verification severity requires buildbot's flake-check matrix, the orchestrator creates a bookmark retroactively on the existing chain via `jj bookmark create <name> -r <change-id>`, pushes with `jj git push --bookmark <name> --allow-new`, and follows the canonical draft-PR / buildbot-monitor / ready / Mergify sequence from ${skillsPath}/nix-flake-pr-cycle/SKILL.md.
-          - Tier 3 (parallel streams): when two or more independent work streams must coexist concurrently, the orchestrator initiates a development join as a two-commit structure — a frozen multi-parent `[merge]` commit with an ephemeral `[wip]` commit on top, where `@` is `[wip]`.
-            Tier 3 entry uses two steps: `jj new <existing-bookmark> <new-bookmark> -m "join N=<cardinality>: <alphabetical, comma-separated parent chain bookmarks>"` creates `[merge]` (e.g. `"join N=2: chain-a, chain-b"`; for unbookmarked parents, use the short change_id wrapped in backticks), then `jj new @ -m "wip"` creates `[wip]` on top of `[merge]`.
-            Subagents continue editing in the shared `@` (which is `[wip]`); the orchestrator routes each subagent's working-copy diff to the appropriate chain via `jj squash --from @ --into <tip> --keep-emptied`, which preserves the empty `[wip]` on top of the frozen `[merge]` without any description-recovery step, and advances the bookmark with `jj bookmark move <name> --to <new-tip>`.
-            `[merge]` is never edited after creation; `[wip]`'s description is ephemeral.
-            To extend a chain with a new commit rather than amending its tip, use `jj new -A <chain-tip> -m "<msg>" --no-edit` followed by `jj squash --from @ --into <new-change-id> --keep-emptied` and `jj bookmark move <chain-tip> --to <new-change-id>`.
-            See ${skillsPath}/jj-version-control/SKILL.md "Development join" for the entity-level reference and route-and-extend recipe, ${skillsPath}/jj-version-control/tiered-ceremony.md for the ceremony model, and ${skillsPath}/jj-version-control/diamond-workflow.md for the four-phase theoretical treatment (canonical source: `docs/notes/development/version-control/references/krycho-jujutsu-megamerges-and-jj-absorb.md`).
-
-          Subagent instruction in jj mode: the dispatch prompt names the target chain bookmark (e.g., `nix-pxj-4-deploy-validate`) and the files in scope.
-          The subagent edits files in the shared `@` and does NOT run `jj`, `git`, or `bd` commands itself; the orchestrator routes the working-copy diff after the subagent returns.
-          Example prompt fragment: "Edit only modules/.../<file>.nix; do not run jj/git/bd. Your changes will be routed to the nix-pxj-4-deploy-validate bookmark by the orchestrator after you return."
-
-          Workspaces in jj mode are reserved exclusively for cases the user explicitly requests workspace isolation in-session — utterances naming `worktree`, `workspace`, `isolate`, `separate working copy`, or path forms like `.worktrees/X`.
-          Without an explicit request, all parallel work uses the diamond workflow's development join in a single working copy.
-
-          In git-native mode, issue-level work goes in `.worktrees/{issue-ID}-descriptor`, branching from the parent epic's branch.
-          Secondary (non-focus) epics use `.worktrees/{epic-ID}-descriptor`; the focus epic is checked out in the repo root.
-          The subagent creates the worktree as its first action; the orchestrator specifies the path and the start-point branch.
-          Example prompt fragment: "Work in .worktrees/nix-pxj-4-deploy-validate (create via git worktree add, branching from nix-pxj-ntfy-server)."
-
-          In GitButler mode, the subagent works in the single GitButler workspace; the dispatch prompt names the target branch within the active stack.
-          See ${skillsPath}/preferences-git-version-control/02-gitbutler-mode.md for branch-stack mechanics and `but` command usage.
+          See ${skillsPath}/preferences-git-version-control/SKILL.md for working-branch isolation conventions, subagent dispatch in each mode, and the three-tier ceremony model (jj mode).
+          For multi-stream parallel work in jj mode, the default is the diamond workflow's development join — see ${skillsPath}/jj-version-control/SKILL.md "Development join" for the entity reference and ${skillsPath}/jj-version-control/diamond-workflow.md for the four-phase process recipe.
 
           When the work involves parallel independent work streams, adversarial review,
           multi-perspective analysis, or long-running collaborative phases, consider using
