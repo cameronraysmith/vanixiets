@@ -102,6 +102,10 @@ The wip commit (`@`) sits on top for active edits.
 
 Coordination protocol: atomic one-file changes, periodic `jj log` review, prompt routing to keep `@` clean.
 Subagent dispatch prompts specify which files to edit and the target chain context but do not include jj routing commands.
+The subagent edits files in the shared `@` and does NOT run `jj`, `git`, or `bd` commands itself; the orchestrator routes the working-copy diff to the appropriate chain after the subagent returns.
+
+Example prompt fragment: "Edit only modules/.../<file>.nix; do not run jj/git/bd. Your changes will be routed to the nix-pxj-4-deploy-validate bookmark by the orchestrator after you return."
+
 See the parallel agent coordination protocol in `~/.claude/skills/jj-version-control/SKILL.md` for the full model.
 
 ## Completing issues and epics
