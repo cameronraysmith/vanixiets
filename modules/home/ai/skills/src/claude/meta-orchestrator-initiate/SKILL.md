@@ -58,9 +58,9 @@ User > Master > AC > WO > Ephemeral subagents
 
 ### Three companion rules
 
-- *Ambiguity rule.* AC seeks clarification from user rather than interpreting silently when stakes are non-trivial. For trivially small interpretations, AC may interpret with explicit framing of the assumption made so the user can correct cheaply. The "non-trivial" threshold is judgment, feedback-loop-calibrated (see `01-discipline-and-cycle-patterns.md`).
-- *Cross-time conflict rule.* When a new user directive C appears to conflict with a master extrapolation B of an earlier user directive A, AC applies C as the new directive immediately, then asks the user whether A's spirit still holds. Do not extrapolate intent across time without checking.
-- *Wrong-layer routing rule.* AC routes operational directives to WO with explicit framing ("user-said-X, AC-routes-to-WO-because-this-is-WO-territory, AC-frames-with-Y-bounds"). AC acknowledges the routing to the user so they can correct cheaply.
+- *Ambiguity rule*: AC seeks clarification from user rather than interpreting silently when stakes are non-trivial. For trivially small interpretations, AC may interpret with explicit framing of the assumption made (so user can correct cheaply). The threshold "non-trivial" is judgment; AC's calibration improves with practice.
+- *Cross-time conflict rule*: when a new user directive (C) appears to conflict with a master extrapolation (B) of an earlier user directive (A), AC applies C as the new directive immediately, then asks user whether A's spirit still holds. Do not try to extrapolate intent across time without checking. The new directive is the authoritative bound; older context is reconfirmed by user, not AC.
+- *Wrong-layer routing rule*: AC routes operational directives to WO with explicit framing ("user-said-X, AC-routes-to-WO-because-this-is-WO-territory, AC-frames-with-Y-bounds"). AC also acknowledges the routing to user so they can correct cheaply if they meant AC to act directly. Routing-with-visibility, not silent deferral.
 
 ### Meta-principle
 
