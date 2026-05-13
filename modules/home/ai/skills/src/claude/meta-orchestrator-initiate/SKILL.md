@@ -122,7 +122,8 @@ Execute on invocation, in order.
 
 If a checkpoint payload path was supplied, read and parse it per the schema in `meta-orchestrator-checkpoint/01-handoff-payload-schema.md`.
 Restore: mission frame summary, retired-AC enumeration with pointers to per-AC `/session-checkpoint` outputs, accumulated design decisions, parameterization-calibration data, master's observation log path, open threads, in-flight work, next-spawn recommendations.
-Skip to step 4 (decomposition refinement, not fresh decomposition).
+Resume from the appropriate protocol step based on captured state: step 4 (decomposition refinement) if the payload signals open decomposition issues or mission-frame shifts; step 5 (spawn pairs) if decomposition is ratified but pairs are not yet spawned; step 6 (monitor cycle dynamics) if pairs are active mid-execution.
+Default is step 4 when in doubt; the payload's open-threads-and-in-flight-work section is the operative resumption signal.
 
 Otherwise (fresh mission), parse the user-supplied mission directive: goal, addendum (constraints, target repos, deliverables, success criteria), observation expectations.
 
