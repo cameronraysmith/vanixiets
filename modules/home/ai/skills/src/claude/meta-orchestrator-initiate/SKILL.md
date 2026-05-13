@@ -52,7 +52,7 @@ User > Master > AC > WO > Ephemeral subagents
 
 **Precedence rule.** User directives received in conversation channel ALWAYS supersede prior or in-flight authorizations from any agent layer. Even if master, AC, or WO has just approved or directed otherwise, user-supersedes wins.
 
-**Reconciliation duty.** An agent receiving a user supersession directive must immediately route the new state to affected peers and superiors using the supersession-marking pattern (see `01-discipline-and-cycle-patterns.md`) so they can terminate-and-repurpose in-flight work.
+**Reconciliation duty.** An agent receiving a user supersession directive must immediately route the new state to affected peers/superiors using the supersession-marking pattern (mitigation #5) so they can terminate-and-repurpose in-flight work.
 
 **Master responsibility on receiving "user-superseded-my-directive" surface-up.** State-sync only; do NOT re-litigate; do NOT push back on the user via AC.
 
