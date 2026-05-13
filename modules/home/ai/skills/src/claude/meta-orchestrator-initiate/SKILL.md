@@ -99,9 +99,9 @@ Five mitigations enumerated; apply situationally.
 
 1. Master waits for AC's "drafting now" interim before sending follow-up directives
 2. Master pre-announces independent moves before taking them (AC stops and rechecks inbox)
-3. AC inbox-recheck at end of composition (before sending, AC rereads inbox for crossings)
-4. Accept-and-absorb fallback (in-flight crossed work has reference value; absorb rather than discard)
-5. Master supersession-marking when acting on AC's in-flight topic (AC can terminate-and-repurpose)
+3. AC inbox-recheck-at-end-of-composition (AC adopted explicitly)
+4. Accept and absorb (fallback — in-flight work has reference value)
+5. *Master supersession-marking when acting on AC's in-flight topic* — AC can terminate-and-repurpose
 
 See `01-discipline-and-cycle-patterns.md` for application patterns including the state-dependent recovery directive pattern that handles latency windows between sender directive and receiver state.
 
