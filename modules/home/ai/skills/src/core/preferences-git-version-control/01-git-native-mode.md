@@ -84,6 +84,14 @@ git worktree remove .worktrees/{issue-ID}-descriptor
 git branch -d {issue-ID}-descriptor
 ```
 
+## Subagent dispatch in git-native mode
+
+In git-native mode, issue-level work runs in an issue worktree (see §"Issue worktrees" above for mechanics).
+The orchestrator specifies the worktree path and the start-point branch in the dispatch prompt; the subagent creates the worktree as its first action via `git worktree add`, then performs its edits inside that worktree.
+Secondary (non-focus) epics use `.worktrees/{epic-ID}-descriptor`; the focus epic is checked out in the repo root.
+
+Example prompt fragment: "Work in .worktrees/nix-pxj-4-deploy-validate (create via `git worktree add`, branching from `nix-pxj-ntfy-server`)."
+
 ## General rules
 
 Always specify an explicit start-point when creating branches or worktrees.
