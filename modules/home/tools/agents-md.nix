@@ -162,7 +162,8 @@
           When dispatching a Task with a BEAD_ID for implementation work, the dispatch protocol depends on the active VCS mode.
           Detect mode at dispatch time: `.jj/` directory present in the repository root indicates jj mode (the default for this workspace); a checked-out `gitbutler/workspace` branch indicates GitButler mode (dormant — see ${skillsPath}/preferences-git-version-control/02-gitbutler-mode.md if encountered); otherwise git-native mode.
 
-          See ${skillsPath}/preferences-git-version-control/SKILL.md for working-branch isolation conventions, subagent dispatch in each mode, and the three-tier ceremony model (jj mode).
+          See ${skillsPath}/preferences-git-version-control/SKILL.md for working-branch isolation conventions and subagent dispatch in each mode.
+          For the three-tier ceremony model in jj mode, see ${skillsPath}/jj-version-control/tiered-ceremony.md.
           For multi-stream parallel work in jj mode, the default is the diamond workflow's development join — see ${skillsPath}/jj-version-control/SKILL.md "Development join" for the entity reference and ${skillsPath}/jj-version-control/diamond-workflow.md for the four-phase process recipe.
 
           When the work involves parallel independent work streams, adversarial review,
