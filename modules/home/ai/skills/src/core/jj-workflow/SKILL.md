@@ -1,7 +1,6 @@
 ---
 name: jj-workflow
 description: Jujutsu atomic workflow with full operational reference for jj-based repositories.
-disable-model-invocation: true
 ---
 # Jujutsu atomic workflow
 
