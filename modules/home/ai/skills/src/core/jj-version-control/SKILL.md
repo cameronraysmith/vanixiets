@@ -313,6 +313,9 @@ For the full theoretical foundations (lattice theory, event structures, VSM mapp
 
 ## Development join
 
+This section is the canonical entity-level reference for the development join: the multi-parent `@` structure, conflict semantics, edit-route cycle, route-and-extend pattern, composite-maintenance invariant, and integration strategies at completion.
+For the canonical *process* recipe — the four-phase diamond workflow (diverge, develop, converge, serialize) that connects a beads epic graph to jj chain topology — see `diamond-workflow.md` in this directory.
+
 The development join is the canonical entity for parallel multi-chain work in jj mode and the default operating mode for any session with two or more active chains.
 Single-chain mode is the exception, reserved for ad hoc work on one anonymous chain descending from main.
 
