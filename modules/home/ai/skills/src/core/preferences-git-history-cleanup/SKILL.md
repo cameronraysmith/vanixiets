@@ -5,6 +5,12 @@ description: Git history cleanup patterns for rewriting, squashing, and reorgani
 
 # git history cleanup
 
+## scope
+
+This skill covers history refinement in git-native and GitButler modes (`git rebase -i`, `git revise`, `but move`/`but squash`/`but reword`, `GIT_SEQUENCE_EDITOR` patterns).
+For jj-mode history refinement (`jj rebase`, `jj squash`, `jj split`, `jj abandon`, `jj describe -r`), see `~/.claude/skills/jj-history-cleanup/SKILL.md`.
+Mode detection is described in `~/.claude/skills/preferences-git-version-control/SKILL.md` §"Commit behavior override".
+
 ## purpose
 
 Transform experimental development history into a clean, reviewable commit sequence where:
