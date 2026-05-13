@@ -668,67 +668,14 @@ jj describe -m "[exp-4] feat: uses technique from exp-1"
 
 A multi-parent `@` merges multiple bookmarks into a single working tree, providing the same capability as GitButler's applied-branches workspace.
 All parent bookmarks are visible and editable simultaneously without worktrees or filesystem separation.
-
-Creating a multi-parent working copy:
-
-```bash
-# Create @ with three parent bookmarks merged in one working tree
-jj new feature-a feature-b feature-c
-```
-
 The resulting `@` is a development join.
-Its working tree contains the combined state of all parent bookmarks.
-
-Routing changes to parent bookmarks:
-
-```bash
-# Manual: squash changes into a specific parent bookmark
-jj squash --into feature-a
-
-# Automatic: distribute changes based on blame ancestry
-jj absorb
-# jj analyzes which parent bookmark last touched each modified line
-# and routes changes to the appropriate ancestor
-```
-
-Adding and removing parents:
-
-```bash
-# Add a parent bookmark to the multi-parent working copy
-jj rebase -r @ -d 'all:(@- | new-bookmark)'
-
-# Remove a parent bookmark from the multi-parent working copy
-jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
-```
-
-The `all:` prefix in the revset ensures multiple parents are preserved rather than collapsing to a single ancestor.
-
-Auto-rebase behavior:
 
 When a parent bookmark advances (via `squash --into`, `absorb`, commits from another workspace, collaborator push, or `jj git fetch`), jj automatically rebases `@` onto the updated parents.
 The development join's working tree stays current without manual rebase steps.
 
-This pattern maps directly to GitButler's workspace model.
-See `~/.claude/skills/preferences-git-version-control/03-jj-mode.md` for the full cross-tool terminology mapping in the "GitButler equivalence mapping" table.
-
+For the operational workflow, conflict semantics, edit-route cycle, route-and-extend pattern, composite-maintenance invariant, and beads-integration recipes, see `~/.claude/skills/jj-version-control/SKILL.md` §"Development join".
+For the cross-tool terminology mapping ("GitButler equivalence mapping"), see `~/.claude/skills/preferences-git-version-control/03-jj-mode.md`.
 For background on multi-parent `jj new` and the design rationale, see Chris Krycho's ["jj init" essay](https://raw.githubusercontent.com/chriskrycho/v5.chriskrycho.com/d3f989498a3828aeb7e5e816e115b9fc0196d8d0/site/essays/jj%20init.md), particularly the section on creating three-parent merges.
-
-Beads integration with multi-parent working copies:
-
-When `.beads/` exists, epic bookmarks compose naturally with the multi-parent model.
-Create a bookmark per active epic (`{epic-ID}-descriptor`), then `jj new epic-a epic-b` to work across them simultaneously.
-The orchestrator routes changes from the multi-parent `@` to the correct epic bookmark via `jj absorb` (blame-based) or `jj squash --into` (explicit) after each subagent completes.
-See the "Epic and issue mapping" subsection in `~/.claude/skills/preferences-git-version-control/03-jj-mode.md` for the complete lifecycle including subagent dispatch conventions.
-
-Conflict visibility in the development join `@`:
-
-When chains have conflicting changes to the same files, `@` contains first-class jj conflicts.
-These manifest as conflict markers in the working tree.
-Conflicts in `@` are informational — they indicate chains will conflict when merged but do not block work on any individual chain.
-Resolve conflicts in `@` when convenient, or continue working with each chain independently.
-
-See `~/.claude/skills/jj-version-control/SKILL.md` for the full multi-parent development join workflow and edit-route cycle.
-See `~/.claude/skills/issues-beads-prime/SKILL.md` for beads integration with jj dispatch.
 
 ## History refinement
 
@@ -1063,22 +1010,7 @@ jj git push --bookmark main
 
 Integrate multiple experiments (when both valuable):
 
-Dissolve any development join, then rebase each chain sequentially onto main in dependency order.
-This preserves linear history without merge commits.
-
-```bash
-# Rebase exp-1-winner onto main first
-jj rebase -s 'main..exp-1-winner' -d main
-jj bookmark set main -r exp-1-winner
-
-# Rebase exp-2-winner onto updated main
-jj rebase -s 'main..exp-2-winner' -d main
-# Resolve conflicts if any during rebase
-jj bookmark set main -r exp-2-winner
-
-# Push
-jj git push --bookmark main
-```
+For dissolving a development join and sequential rebase linearization of N chains onto main, see `~/.claude/skills/jj-version-control/SKILL.md` §"Integration strategies at completion" (canonical entity reference) and `~/.claude/skills/jj-version-control/diamond-workflow.md` §"Phase 4: serialize (integrate)" (full recipe including N+1 stacked-base PR submission).
 
 ### Sub-experiments within experiments
 
