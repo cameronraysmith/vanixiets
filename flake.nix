@@ -58,7 +58,6 @@
     niks3.url = "github:Mic92/niks3";
     niks3.inputs.nixpkgs.follows = "nixpkgs";
     niks3.inputs.treefmt-nix.follows = "treefmt-nix";
-    niks3.inputs.flake-parts.follows = "flake-parts";
 
     buildbot-nix.url = "github:nix-community/buildbot-nix";
     buildbot-nix.inputs.nixpkgs.follows = "nixpkgs";
@@ -95,7 +94,6 @@
     bun2nix.url = "github:nix-community/bun2nix";
     bun2nix.inputs.nixpkgs.follows = "nixpkgs";
     bun2nix.inputs.flake-parts.follows = "flake-parts";
-    bun2nix.inputs.import-tree.follows = "import-tree";
     bun2nix.inputs.systems.follows = "systems";
     bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
 
