@@ -169,6 +169,17 @@
         text = builtins.readFile ./gate-worktree-surfaces.sh;
       };
 
+      verify-diamond-before-edit = pkgs.writeShellApplication {
+        name = "verify-diamond-before-edit";
+        runtimeInputs = with pkgs; [
+          jujutsu
+          coreutils
+          gnused
+          gnugrep
+        ];
+        text = builtins.readFile ./verify-diamond-before-edit.sh;
+      };
+
       gate-dangerous-commands = pkgs.writeShellApplication {
         name = "gate-dangerous-commands";
         runtimeInputs = [
@@ -259,6 +270,7 @@
         notify-permission-wait
         gate-mutating-http
         gate-worktree-surfaces
+        verify-diamond-before-edit
         gate-dangerous-commands
         gate-issue-close
         notify-escalation
