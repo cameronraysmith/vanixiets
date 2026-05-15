@@ -147,6 +147,33 @@ Independent chains within the same linearization step can be ordered discretiona
    jj describe -m ""  # clear stale @ description
    ```
 
+#### Gotcha: chain creation mid-diamond
+
+Starting a new chain while the development join already exists (tier 3 is already active) REQUIRES same-operation join re-growth.
+Issuing only `jj new main -m "wip(<name>): seed chain"` to begin a new chain produces three failure modes simultaneously:
+
+- the new chain's seed commit is not in `parents([merge])`, violating invariant (i) (chain ∈ join's parents);
+- the integrated state at `[wip]` does not reflect the new chain, violating invariant (iv) (wip holds integrated working tree);
+- other agents working through `[wip]` silently miss the new chain entirely, treating it as if it does not exist.
+
+The correct sequence creates the seed commit AND grows `[merge]` to include it in one operation pair:
+
+```bash
+# 1. Seed the new chain from main
+jj new main -m "wip(<name>): seed chain"
+
+# 2. Bookmark the seed commit so it is addressable
+jj bookmark create <name> -r @
+
+# 3. Reparent [merge] to include the new chain alongside existing chains
+jj rebase -r <merge-change-id> -d <existing-chain-a> -d <existing-chain-b> -d <name>
+
+# 4. Rewrite [merge]'s description with the new full set
+jj describe <merge-change-id> -m "join N=k+1: <alphabetical bookmarks including <name>>"
+```
+
+After step 4, run the diamond-health diagnostic from `~/.claude/skills/jj-version-control/SKILL.md` to verify all five invariants hold before resuming edits in `[wip]`.
+
 ### Phase 3: converge (validate)
 
 The converge phase occurs *at* a planning-DAG convergence point in the sense used by `~/.claude/skills/preferences-adaptive-planning/SKILL.md` and `~/.claude/skills/session-review/SKILL.md` — the diamond's converge phase and the planning DAG's topological convergence node refer to the same shape of synchronization point in the workflow.

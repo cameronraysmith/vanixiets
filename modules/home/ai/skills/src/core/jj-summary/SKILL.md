@@ -141,6 +141,9 @@ jj describe -m ""                         # Clear stale @ description
 jj rebase -r @ -d 'all:(@- | new-bm)'    # Add chain to the development join
 jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove chain from the development join
 
+# Diamond-health diagnostic (surfaces all five diamond invariants in one view)
+jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'
+
 # Recovery
 jj undo                        # Undo last operation
 jj op log                      # View operation history
@@ -345,6 +348,8 @@ jj log -r 'mine() & ~bookmarks()'
 
 4. Did the user explicitly request workspace isolation (utterance naming `worktree`, `workspace`, `isolate`, `separate working copy`, or path forms like `.worktrees/X`)?
    → `jj workspace add <path> -r <change>` mechanics; otherwise stay at tier 3 and parallelize via the development join in a single working copy.
+   In jj mode, `EnterWorktree`, `ExitWorktree`, and `Task` dispatches with `isolation: "worktree"` are hook-blocked by `gate-worktree-surfaces`; parallel work uses the diamond development join, not worktrees.
+   The explicit-workspace path is `jj workspace add` and applies only when the user names workspace isolation specifically.
 
 **Should I read jj-workflow.md?**
 1. Never used jj? → Read "Core philosophy" and "Foundation"

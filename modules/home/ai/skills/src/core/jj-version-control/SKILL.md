@@ -371,14 +371,50 @@ The `[wip]` commit's description is ephemeral and does not need to be recovered 
 Squashing from `@` into chain elements with `--keep-emptied` auto-rebases both `[merge]` and `[wip]` while preserving the two-commit structure.
 If `[wip]` is disrupted, the `[merge]` commit still exists — recover with `jj new <merge-change-id>` to recreate the wip layer.
 
+### Diamond invariants
+
+The development join is structurally correct iff all five of the following invariants hold simultaneously.
+They are stated as a numbered list so individual invariants can be referenced unambiguously elsewhere in the skill tree.
+
+(i) chain ∈ join's parents — every active chain bookmark is a parent of `[merge]`.
+A bookmark whose tip is not in `parents([merge])` is an orphaned chain: its content is invisible to `[wip]` and absent from any integrated validation run on the development join.
+
+(ii) join parents = current bookmark targets — there is no staleness between `[merge]`'s parent revisions and the current targets of the chain bookmarks named in `[merge]`'s description.
+Auto-rebase normally maintains this invariant in place; manual `jj rebase -r <merge> -d <chains>` after a route-and-extend operation breaks it (see "Staleness gotcha" below).
+
+(iii) `@` atop the join — `@` is at `[wip]` whose sole parent is `[merge]`, or `@` IS `[merge]` during construction.
+This is the maintenance invariant historically named in this section; the other four invariants are now peer to it.
+
+(iv) wip holds integrated working tree — `[wip]` is where edits land; its working tree reflects the union of all chain contents.
+Parallel agents observing `[wip]` see the integrated state of every chain in the join, which is the primary value proposition of the entity.
+
+(v) append-not-squash for chain routing — chains are extended via new commits (the route-and-extend recipe below) rather than by amending existing bookmark commits.
+Conflating extension with amendment collapses the chain's commit-level history and breaks the per-issue review granularity the diamond workflow exists to provide.
+
 ### Composite maintenance invariant (development join invariant)
 
-The join + wip structure requires active maintenance when operations move `@` away from `[wip]`.
+Invariant (iii) above is the maintenance invariant: the join + wip structure requires active maintenance when operations move `@` away from `[wip]`.
 
 Before any operation that moves `@` (like `jj new <single-parent>` or `jj edit`), verify and record `[merge]`'s change ID.
 After any such operation, immediately restore `[wip]` on top: `jj new <merge-change-id> -m "wip"`.
 When adding a new bookmark to the development join, reconstruct `[merge]` with all parents including the new one (re-set the description to the new `join N=<cardinality>: <alphabetical bookmarks>` state), then recreate `[wip]` on top.
 Subagent prompts must specify whether they operate in `[wip]` (edit files, let orchestrator route) or outside it (e.g., working on a single chain directly).
+
+### Diamond-health diagnostic
+
+A single revset surfaces all five invariants in one view, suitable for an initial orientation pass or a mid-session health check:
+
+```bash
+jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'
+```
+
+Reading the output against the invariants:
+
+- `@` shown with a single parent line up to `[wip]` confirms invariant (iii); a divergent `@` away from `[wip]` indicates the maintenance step was skipped after a `@`-moving operation.
+- the multi-parent `[merge]` commit with description `join N=k: <bookmarks>` confirms invariant (i) when the declared bookmarks match the actual parent bookmarks shown in the graph; a mismatch indicates an orphaned chain or a stale description.
+- the chain bookmarks shown at the immediate parents of `[merge]` confirm invariant (ii); a bookmark drawn one or more commits above its corresponding `[merge]` parent indicates parent-set staleness (the bookmark has advanced but `[merge]` has not).
+- inspecting `jj diff @` against the union of chain tips confirms invariant (iv); discrepancies indicate routing operations that bypassed `[wip]` or a disrupted `[wip]` recreation.
+- inspecting each chain via `jj log -r 'main..<bookmark>'` confirms invariant (v) when the chain shows incremental commits rather than a single amended bookmark commit.
 
 ### The edit-route cycle
 
@@ -502,6 +538,17 @@ jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
 
 The `all:` prefix is required to ensure the revset resolves to multiple parents rather than collapsing to a single common ancestor.
 Without `all:`, jj would compute the nearest common ancestor of the revset members, producing a single-parent `@` instead of a multi-parent one.
+
+### Staleness gotcha
+
+The route-and-extend recipe is self-sufficient: jj's auto-rebase updates `[merge]`'s parent set in place when a chain bookmark moves, so the four-step recipe (insert via `jj new -A`, route via `jj squash --from @ --into <new> --keep-emptied`, advance bookmark via `jj bookmark move`) leaves invariant (ii) preserved without manual intervention.
+
+Do NOT add a manual `jj rebase -r <merge> -d <chains>` after route-and-extend.
+The `-r` form of `jj rebase` reparents descendants away from the rebased commit, which detaches `[wip]` from `[merge]`: the rebased `[merge]` ends up parented at the chain tips while the original `[wip]` is left descending from the previous `[merge]` revision.
+The result violates invariant (iii) and silently strands subsequent edits in a `[wip]` that no longer reflects the integrated state.
+
+Recovery if the manual rebase has already been issued: re-attach `[wip]` to the new `[merge]` revision via `jj rebase -r <wip-change-id> -d <merge-change-id>`, then verify with the diamond-health diagnostic above that `@` once again shows a single-parent line into `[wip]`.
+Prefer the recovery path over abandoning and recreating the join — operation-log restore is also available via `jj op restore` if the staleness was introduced in a single operation that can be cleanly reverted.
 
 ### Teardown
 

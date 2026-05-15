@@ -2,17 +2,24 @@
 name: worktree-sparsity-eval
 description: >-
   Evaluate repository size metrics to determine whether worktrees should use sparse checkout.
-  **Invoke only in git-native mode (no `.jj/` directory) when creating a worktree, OR in jj
-  mode when the user has explicitly requested workspace isolation.** In jj mode without
-  explicit workspace request, parallel work uses the diamond workflow's development join,
-  not worktrees — see `~/.claude/skills/jj-version-control/tiered-ceremony.md`. Also invoke
-  for periodic re-evaluation when a repo has grown significantly.
+  **Invoke only in git-native mode (no `.jj/` directory) when creating a `git worktree`, OR
+  in jj mode when the user has explicitly requested workspace isolation by name and only to
+  size a `jj workspace add` invocation.** `git worktree add` is hook-blocked in jj-managed
+  repositories (see the no-worktree-in-jj-mode directive in the global CLAUDE.md); this
+  skill does not apply to that case. In jj mode without an explicit workspace request,
+  parallel work uses the diamond workflow's development join, not worktrees — see
+  `~/.claude/skills/jj-version-control/tiered-ceremony.md`. Also invoke for periodic
+  re-evaluation when a repo has grown significantly.
 ---
 
 # Worktree sparsity evaluation
 
 Collect repository metrics and determine whether worktrees should use sparse checkout.
 Three conditions must all hold for sparse checkout to be recommended.
+
+In jj mode, this skill applies ONLY to `jj workspace add` sizing when the user has explicitly requested workspace isolation by name.
+`git worktree add` is hook-blocked in jj-managed repositories (no-worktree-in-jj-mode directive in the global CLAUDE.md); this skill does not apply to that case.
+In jj mode without an explicit workspace request, parallel work uses the diamond workflow's development join in a single working copy — see `~/.claude/skills/jj-version-control/tiered-ceremony.md`.
 
 ## Thresholds
 
