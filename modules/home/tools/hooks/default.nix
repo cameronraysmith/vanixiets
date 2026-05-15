@@ -160,6 +160,15 @@
         );
       };
 
+      gate-worktree-surfaces = pkgs.writeShellApplication {
+        name = "gate-worktree-surfaces";
+        runtimeInputs = with pkgs; [
+          jq
+          coreutils
+        ];
+        text = builtins.readFile ./gate-worktree-surfaces.sh;
+      };
+
       gate-dangerous-commands = pkgs.writeShellApplication {
         name = "gate-dangerous-commands";
         runtimeInputs = [
@@ -249,6 +258,7 @@
         redirect-rm-to-rip
         notify-permission-wait
         gate-mutating-http
+        gate-worktree-surfaces
         gate-dangerous-commands
         gate-issue-close
         notify-escalation
