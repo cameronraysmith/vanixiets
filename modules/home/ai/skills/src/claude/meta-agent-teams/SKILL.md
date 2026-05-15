@@ -34,3 +34,17 @@ This creates a clean lifecycle: orient, work, checkpoint, shutdown, replace.
 
 The "You are a subagent Task" identity marker and return-with-questions pattern apply to DAG-dispatched tasks.
 For agent team teammates, spawn prompts should include equivalent identity context plus instructions about the orient/checkpoint lifecycle.
+
+## Teammate file-editing protocol
+
+Teammates spawned in agent teams cannot edit files directly.
+The harness gates direct Edit, Write, and MultiEdit calls for teammate-class agents, surfacing this as an EnterWorktree prompt that should never be satisfied by creating a worktree in jj-mode workspaces.
+Instead, teammates dispatch a subagent Task for every file edit.
+The subagent inherits the teammate's working directory and operates against the same jj working copy, so no worktree is needed and no parallel-filesystem state arises.
+
+Dispatched subagent Task input MUST NOT set `isolation: "worktree"`.
+In jj-mode repositories this parameter is hook-blocked at the Agent tool surface, but teammates should omit it unconditionally to keep behavior consistent across modes.
+The subagent edits at `@` (which in tier 3 is the wip commit atop the development join, per `~/.claude/skills/jj-version-control/SKILL.md`'s composite maintenance invariant), and the orchestrator routes the resulting changes to the appropriate chain via the route-and-extend recipe (`jj new -A <chain-tip> --no-edit -m "..."` then `jj squash --from @ --into <new-change-id> --keep-emptied` then `jj bookmark move <name> --to <new-change-id>`).
+
+This is the agent-team specialization of the binding orchestrator-dispatch discipline documented in `~/.claude/CLAUDE.md`.
+The same pattern applies to any orchestrator subject to a harness-level edit-gate (background sessions, future isolation requirements); teammates are simply the most common case in team-coordinated work.
