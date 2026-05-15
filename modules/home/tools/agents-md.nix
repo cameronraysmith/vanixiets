@@ -166,6 +166,17 @@
           For the three-tier ceremony model in jj mode, see ${skillsPath}/jj-version-control/tiered-ceremony.md.
           For multi-stream parallel work in jj mode, the default is the diamond workflow's development join — see ${skillsPath}/jj-version-control/SKILL.md "Development join" for the entity reference and ${skillsPath}/jj-version-control/diamond-workflow.md for the four-phase process recipe.
 
+          In jj mode, the harness's worktree-creating tool surfaces are hook-blocked at the PreToolUse layer.
+          Specifically, EnterWorktree and ExitWorktree calls are denied, and Task dispatches with `isolation: "worktree"` are also denied.
+          Parallel chains of work use the diamond workflow's development join in a single working copy, not git worktrees.
+          See ${skillsPath}/jj-version-control/diamond-workflow.md (Development join section) and ${skillsPath}/jj-summary/SKILL.md for the diamond's mechanics.
+          A tier-aware integrity check (${skillsPath}/jj-version-control/SKILL.md, composite maintenance invariant) runs before file edits whenever a development join is present, surfacing diamond-shape violations as ask-prompts with recovery commands.
+
+          Orchestrators do not edit files inline.
+          This is the binding form of the Session Protocol's orchestrator-mode discipline: when subject to an edit-gate — background sessions, agent-team teammates, or any future harness-level isolation requirement — file edits dispatch to subagent Tasks.
+          The subagent inherits the orchestrator's working directory and operates against the same jj working copy, so the gate is satisfied without creating any worktree.
+          Subagent dispatch input MUST NOT set `isolation: "worktree"` in jj-mode repositories; the diamond development join is the isolation mechanism, and worktree isolation is hook-blocked at the Agent tool surface regardless.
+
           When the work involves parallel independent work streams, adversarial review,
           multi-perspective analysis, or long-running collaborative phases, consider using
           agent teams as a second orchestration mode. Agent teams spawn persistent teammates
