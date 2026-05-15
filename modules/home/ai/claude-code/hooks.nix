@@ -43,11 +43,38 @@
               ];
             }
             {
+              matcher = "Edit|Write|MultiEdit";
+              hooks = [
+                {
+                  type = "command";
+                  command = "verify-diamond-before-edit";
+                }
+              ];
+            }
+            {
               matcher = "Task";
               hooks = [
                 {
                   type = "command";
                   command = "enforce-sequential-dispatch";
+                }
+              ];
+            }
+            {
+              matcher = "Task";
+              hooks = [
+                {
+                  type = "command";
+                  command = "gate-worktree-surfaces";
+                }
+              ];
+            }
+            {
+              matcher = "EnterWorktree|ExitWorktree";
+              hooks = [
+                {
+                  type = "command";
+                  command = "gate-worktree-surfaces";
                 }
               ];
             }
