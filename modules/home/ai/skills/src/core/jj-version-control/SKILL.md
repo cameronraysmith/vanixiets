@@ -317,7 +317,13 @@ This section is the canonical entity-level reference for the development join: t
 For the canonical *process* recipe — the four-phase diamond workflow (diverge, develop, converge, serialize) that connects a beads epic graph to jj chain topology — see `diamond-workflow.md` in this directory.
 
 The development join is the canonical entity for parallel multi-chain work in jj mode and the default operating mode for any session with two or more active chains.
-Single-chain mode is the exception, reserved for ad hoc work on one anonymous chain descending from main.
+This applies to every set of active parallel parent chains, regardless of where the parallelism originated: cross-mission coordination across sessions, cross-agent coordination within a team, and within-mission decomposition of a single epic or task into N independent streams all converge on the same entity.
+Whenever a session has decomposed work into two or more streams that need to integrate, the development join is the operative surface — there is no separate "in-mission" structure that competes with it.
+
+Sibling chains rooted directly off main without a shared join are an antipattern in this mode and require affirmative justification.
+The justifying case is narrow: genuinely unrelated experiments that have no integration intent and whose conflict surface is uninteresting to observe.
+Anything that will eventually merge, share validation, or be reviewed as a unit belongs in a development join from the moment the second chain is created.
+Single-chain mode is the remaining exception, reserved for ad hoc work on one anonymous chain descending from main.
 
 Definition: a two-commit structure consisting of a multi-parent `[merge]` commit (cardinality ≥ 2, each parent a chain tip — a bookmark or an anonymous chain head) and a `[wip]` commit on top where `@` resides.
 The active chain tips form an antichain (a set of mutually independent commits in the partial order).
@@ -373,7 +379,7 @@ If `[wip]` is disrupted, the `[merge]` commit still exists — recover with `jj 
 
 ### Diamond invariants
 
-The development join is structurally correct iff all five of the following invariants hold simultaneously.
+The development join is structurally correct iff all six of the following invariants hold simultaneously.
 They are stated as a numbered list so individual invariants can be referenced unambiguously elsewhere in the skill tree.
 
 (i) chain ∈ join's parents — every active chain bookmark is a parent of `[merge]`.
@@ -391,6 +397,11 @@ Parallel agents observing `[wip]` see the integrated state of every chain in the
 (v) append-not-squash for chain routing — chains are extended via new commits (the route-and-extend recipe below) rather than by amending existing bookmark commits.
 Conflating extension with amendment collapses the chain's commit-level history and breaks the per-issue review granularity the diamond workflow exists to provide.
 
+(vi) `[merge]` has a single `[wip]` on top — there is exactly one ephemeral working-copy commit as immediate descendant of `[merge]`.
+Multiple sibling `[wip]`s as children of `[merge]` violate this invariant: they partition the working surface and break the contract — explicit in the join + wip structure above and in Krycho's canonical model — that edits land in `[wip]` precisely so `[merge]` stays frozen as the canonical join representation.
+Per-stream wips (one `[wip]` per parent chain) are the recurring antipattern: they re-introduce the per-chain working surfaces that the single shared `[wip]` exists to replace, and they hide cross-chain conflicts that the integrated `[wip]` would have surfaced immediately.
+The canonical routing primitives that preserve this invariant are the append-route (`jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied` followed by `jj bookmark move <chain> --to @-`) for landing new atomic commits on a chain, and the amend-route (`jj squash --from @ --into <chain-tip> --keep-emptied`, with `-m` omitted) for fixups against the existing tip; see "Routing to a chain: append vs amend" under §"The edit-route cycle" below.
+
 ### Composite maintenance invariant (development join invariant)
 
 Invariant (iii) above is the maintenance invariant: the join + wip structure requires active maintenance when operations move `@` away from `[wip]`.
@@ -402,7 +413,7 @@ Subagent prompts must specify whether they operate in `[wip]` (edit files, let o
 
 ### Diamond-health diagnostic
 
-A single revset surfaces all five invariants in one view, suitable for an initial orientation pass or a mid-session health check:
+A single revset surfaces all six invariants in one view, suitable for an initial orientation pass or a mid-session health check:
 
 ```bash
 jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'
@@ -415,11 +426,47 @@ Reading the output against the invariants:
 - the chain bookmarks shown at the immediate parents of `[merge]` confirm invariant (ii); a bookmark drawn one or more commits above its corresponding `[merge]` parent indicates parent-set staleness (the bookmark has advanced but `[merge]` has not).
 - inspecting `jj diff @` against the union of chain tips confirms invariant (iv); discrepancies indicate routing operations that bypassed `[wip]` or a disrupted `[wip]` recreation.
 - inspecting each chain via `jj log -r 'main..<bookmark>'` confirms invariant (v) when the chain shows incremental commits rather than a single amended bookmark commit.
+- the immediate-children revset `jj log -r '<merge-change-id>+'` confirms invariant (vi) when it returns exactly one commit (`[wip]`); two or more rows indicate sibling per-stream wips and require collapsing back to a single shared `[wip]` before resuming routing.
 
 ### The edit-route cycle
 
 All edits land in `@` (which is `[wip]`).
 The discipline is to route each completed change from `@` into the correct chain commit, preserving `[wip]` empty on top of the frozen `[merge]`.
+
+#### Routing to a chain: append vs amend
+
+Each route from `[wip]` to a chain X is one of two semantically distinct operations, and the right recipe depends on intent.
+The default for landing new atomic work is the append-route: the edit-set becomes a NEW commit on chain X, the chain grows by one commit, and X's bookmark advances to the new tip.
+The amend-route is reserved for fixups against the SAME commit already at the chain's tip — correcting a typo, adding a missed file, or otherwise refining the existing tip commit in place.
+Conflating the two collapses per-issue history and overwrites descriptions silently; the two recipes are not interchangeable.
+
+Append-route (default for atomic landing):
+
+```bash
+jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied
+jj bookmark move <chain> --to @-
+```
+
+The `--insert-after` (alias `-A`) flag is what makes this an append rather than an amend; per the EXPERIMENTAL FEATURES doc comment at `cli/src/commands/squash.rs:51-84`, `-o`/`-A`/`-B` switch `jj squash` into create-a-new-commit mode rather than merging into an existing target.
+`@` (`[wip]`) returns to empty atop the auto-rebuilt `[merge]`, so the join + wip structure is preserved across the route.
+The bookmark-move is a separate explicit step: jj does not auto-advance a bookmark onto a newly inserted commit, so omitting it leaves the bookmark pointing at the prior tip.
+
+Amend-route (fixups only):
+
+```bash
+jj squash --from @ --into <chain-tip> --keep-emptied
+```
+
+Omit `-m` here so the chain-tip's existing description is preserved; adding `-m` to the amend-route OVERWRITES the chain-tip description in place.
+Use this form only when the intent is genuinely to refine the existing tip commit, never to land a new logical change.
+
+The most common failure mode is running the amend-route N times with N different `-m` strings, expecting N commits to appear on the chain: that sequence instead accumulates N diffs into the same chain-tip commit and overwrites the description N times, yielding one commit with the last message and a conflated diff.
+If N atomic landings are intended, run the append-route N times.
+
+Across both recipes, three flags are load-bearing.
+`--from <source>` is explicit source selection; a bare `--into` is a no-op when `@` is empty, so the flag is required to express intent unambiguously.
+`-m "..."` supplies the commit message inline and is mandatory in agent setups without a TTY (see the top-of-skill note on non-interactive execution) — but in the amend-route it must be omitted to preserve the tip's existing description.
+`--keep-emptied` preserves `@`'s presence as `[wip]` across the route; without it, an empty source is abandoned and the join + wip structure is disrupted.
 
 When amending an existing chain commit, the canonical routing operation is `jj squash --from @ --into <chain-tip> --keep-emptied`.
 `--keep-emptied` preserves the empty `[wip]` commit after its diff is squashed into the target, maintaining the canonical two-commit structure.

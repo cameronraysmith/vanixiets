@@ -134,17 +134,26 @@ Independent chains within the same linearization step can be ordered discretiona
    ```bash
    jj new
    ```
-6. Develop in wip, routing changes to chains via the edit-route cycle:
+6. Develop in wip, routing changes to chains via the edit-route cycle.
+   Each route from `[wip]` to a chain is either an append-route (default: land a new atomic commit on the chain) or an amend-route (fixups against the existing tip).
+   The append-route is the default for landing new work:
    ```bash
-   # edit a file, then route atomically:
-   jj squash --into <chain> -m "feat: description" path/to/file
-   # or auto-route by blame ancestry:
+   # Append-route: land a new atomic commit on <chain>
+   jj squash --from @ --insert-after <chain-tip> -m "feat: description" --keep-emptied
+   jj bookmark move <chain> --to @-
+   ```
+   The `--insert-after` (`-A`) flag is what switches `jj squash` into create-a-new-commit mode (per `cli/src/commands/squash.rs:51-84`); without it, `--into <chain-tip>` amends the existing tip in place.
+   `--keep-emptied` preserves the single shared `[wip]` on top of `[merge]` (invariant (vi)); the bookmark-move is a separate explicit step because jj does not auto-advance a bookmark onto a newly inserted commit.
+   See `~/.claude/skills/jj-version-control/SKILL.md` §"Routing to a chain: append vs amend" for the full rationale and the amend-route fixup recipe.
+
+   Path-restriction (`-- <paths>`) can be added to either recipe when multiple streams' hunks coexist in `[wip]` and only one stream's paths should be routed in this operation.
+
+   Fallback patterns, used only when neither route applies cleanly:
+   ```bash
+   # Auto-route by blame ancestry (fallback when blame is clean and unambiguous):
    jj absorb
-   # To extend a chain with a new commit rather than amending the tip:
-   jj new -A <chain> --no-edit -m "feat: description"
-   jj squash --from @ --into <new-change-id> -u -- path/to/file
-   jj bookmark set <chain> -r <new-change-id>
-   jj describe -m ""  # clear stale @ description
+   # Amend the existing chain tip in place (fixups only — preserves tip description by omitting -m):
+   jj squash --from @ --into <chain-tip> --keep-emptied
    ```
 
 #### Gotcha: chain creation mid-diamond
