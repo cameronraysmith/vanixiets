@@ -604,6 +604,45 @@ scenario_setup_single_chain_diamond() {
   jj new -m "wip" >/dev/null
 }
 
+# Build a 4-chain diamond where c1, c2 are disjoint but c3, c4 each conflict
+# with c2 on a shared file. Used by run_scenario_subset_conflict.
+scenario_setup_subset_conflict_diamond() {
+  local tmpdir
+  tmpdir=$(mktemp -d -t jj-linearize-join-test.XXXXXX)
+  echo "${tmpdir}"
+  cd "${tmpdir}"
+
+  jj git init >/dev/null 2>&1
+  echo "base" > base.txt
+  jj describe -m "init" >/dev/null
+  jj bookmark create main -r @ >/dev/null
+  jj new -m "wip-base" >/dev/null
+
+  # c1: disjoint
+  jj new main -m "c1 commit" >/dev/null
+  echo "c1" > file-c1.txt
+  jj bookmark create c1 -r @ >/dev/null
+
+  # c2: writes shared.txt with content-c2
+  jj new main -m "c2 commit" >/dev/null
+  echo "from-c2" > shared.txt
+  jj bookmark create c2 -r @ >/dev/null
+
+  # c3: also writes shared.txt with conflicting content
+  jj new main -m "c3 commit" >/dev/null
+  echo "from-c3" > shared.txt
+  jj bookmark create c3 -r @ >/dev/null
+
+  # c4: also writes shared.txt with conflicting content
+  jj new main -m "c4 commit" >/dev/null
+  echo "from-c4" > shared.txt
+  jj bookmark create c4 -r @ >/dev/null
+
+  # [merge] + [wip]
+  jj new c1 c2 c3 c4 -m "join 1: subset-conflict diamond" >/dev/null
+  jj new -m "wip" >/dev/null
+}
+
 # Reset globals between scenarios so leftover state cannot leak.
 reset_globals() {
   base="main"
@@ -894,6 +933,52 @@ run_scenario_subset_keep_remaining() {
   echo "${result}"
 }
 
+run_scenario_subset_conflict() {
+  # Resolve to absolute path before subshell cd's away from cwd.
+  local script_path
+  if [[ "${BASH_SOURCE[0]}" = /* ]]; then
+    script_path="${BASH_SOURCE[0]}"
+  else
+    script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  fi
+  local result
+  result=$(
+    set +e
+    tmp=$(scenario_setup_subset_conflict_diamond)
+    trap 'rm -rf "${tmp}"' EXIT
+    cd "${tmp}" || { echo "FAIL subset-conflict: cd to tmpdir failed"; exit 0; }
+    # Invoke top-level real-run via subprocess to exercise the conflict
+    # recovery path printed by the script's main dispatch.
+    local out exit_code
+    out=$(bash "${script_path}" --order c1,c2 --aggregate-bookmark agg --keep-remaining c3,c4 2>&1)
+    exit_code=$?
+    local ok=true
+    if [[ ${exit_code} -ne 3 ]]; then
+      ok=false
+      echo "FAIL subset-conflict: expected exit 3, got ${exit_code}"
+      echo "--- output ---"
+      echo "${out}" | head -40
+      echo "--- end ---"
+    fi
+    if $ok; then
+      if ! grep -q "linearization produced conflicts" <<<"${out}"; then
+        ok=false
+        echo "FAIL subset-conflict: top-level conflict message missing"
+      fi
+    fi
+    if $ok; then
+      if ! grep -q "jj op restore" <<<"${out}"; then
+        ok=false
+        echo "FAIL subset-conflict: recovery hint 'jj op restore' missing"
+      fi
+    fi
+    if $ok; then
+      echo "PASS subset-conflict"
+    fi
+  )
+  echo "${result}"
+}
+
 run_scenario_single_chain() {
   local result
   # shellcheck disable=SC2030
@@ -930,7 +1015,8 @@ run_tests() {
       out+=$(run_scenario_conflict_dry); out+=$'\n'
       out+=$(run_scenario_precond_violations); out+=$'\n'
       out+=$(run_scenario_single_chain); out+=$'\n'
-      out+=$(run_scenario_subset_keep_remaining)
+      out+=$(run_scenario_subset_keep_remaining); out+=$'\n'
+      out+=$(run_scenario_subset_conflict)
       ;;
     clean-dry) out=$(run_scenario_clean_dry) ;;
     clean-real) out=$(run_scenario_clean_real) ;;
@@ -938,9 +1024,10 @@ run_tests() {
     precond-violations) out=$(run_scenario_precond_violations) ;;
     single-chain) out=$(run_scenario_single_chain) ;;
     subset-keep-remaining) out=$(run_scenario_subset_keep_remaining) ;;
+    subset-conflict) out=$(run_scenario_subset_conflict) ;;
     *)
       echo "Error: unknown test scenario '${scenario}'." >&2
-      echo "Valid scenarios: clean-dry, clean-real, conflict-dry, precond-violations, single-chain, subset-keep-remaining" >&2
+      echo "Valid scenarios: clean-dry, clean-real, conflict-dry, precond-violations, single-chain, subset-keep-remaining, subset-conflict" >&2
       return 1
       ;;
   esac
