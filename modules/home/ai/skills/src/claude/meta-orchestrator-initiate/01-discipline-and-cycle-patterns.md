@@ -127,3 +127,18 @@ When user supersession lands during parallel execution (N greater than 1 streams
 
 Unaffected pairs continue their cycles unmolested.
 The N greater than 1 case differs from N equal to 1 only in step 1 (enumeration) and step 4 (dependency map sync); the underlying precedence rule and reconciliation duty are identical.
+
+## Subagent-@-inheritance race during restructure
+
+A subagent inherits the master's working-copy pointer at dispatch time but does not produce its commit until completion, so the commit lands on whatever `@` resolves to at completion-time.
+If the master orchestrates a `[merge]` restructure during the dispatch window, an in-flight return will tangle into the wrong chain and produce cross-namespace commits that violate diamond shape.
+The first discipline is pre-restructure quiescence: before initiating any restructure, master halts in-flight subagents via wrapper directive with the explicit form "do NOT commit any in-flight subagent return until master signals restructure-complete."
+The second discipline is post-restructure inspection: master reads `jj op log --limit N` across the abandons-during-restructure window before declaring state classification, since the empirical failure mode is master misclassifying state (a)-vs-(c) ambiguity from the state-dependent recovery enumeration because the inspection step was skipped.
+The third discipline is routed re-entry: a subagent that returns into the post-restructure window surfaces its diff back to master rather than self-committing, and master routes the diff into the post-restructure correct chain via the append-route (see `jj-version-control/SKILL.md` §"Routing to a chain: append vs amend").
+
+## Diamond-invariant pre-flight on adjudications
+
+Any binding adjudication touching diamond shape — chain creation, chain removal, chain restructure, parent-set change, or wip placement — requires a two-point pre-flight in the propagation chain so the directive cannot land as a shape violation downstream.
+Issue-side: before composing the wrapper that carries the directive, master asks whether the directive, applied as written, would preserve all six diamond invariants (i)-(vi) enumerated in `jj-version-control/SKILL.md` §"Diamond invariants"; if any invariant would fail, the directive is reworked before issuance.
+Receive-side: before AC propagates a master adjudication down to WO's spawn or surface-up follow-up, AC repeats the same check, and failure halts propagation back to master with the violated invariant named explicitly.
+The issue-side pre-flight also folds in recipient-state: master checks whether the recipient has already executed the implicit work before forwarding, because redundant "do X now" directives to a recipient who already did X are a noise-and-confusion pattern the pre-flight is meant to catch.
