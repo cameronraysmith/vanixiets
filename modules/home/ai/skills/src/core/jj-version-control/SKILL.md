@@ -443,9 +443,10 @@ Conflating the two collapses per-issue history and overwrites descriptions silen
 Append-route (default for atomic landing):
 
 ```bash
-jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied
-# capture <new-commit-id> from the "Created new commit <id>" line jj prints above
-jj bookmark move <chain> --to <new-commit-id>
+SQUASH_OUT=$(jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied -- <paths>)
+echo "$SQUASH_OUT"
+NEW_ID=$(echo "$SQUASH_OUT" | sed -n 's/^Created new commit \([a-z][a-z0-9]*\) .*/\1/p')
+jj bookmark move <chain> --to "$NEW_ID"
 ```
 
 The `--insert-after` (alias `-A`) flag is what makes this an append rather than an amend; per the EXPERIMENTAL FEATURES doc comment at `cli/src/commands/squash.rs:51-84`, `-o`/`-A`/`-B` switch `jj squash` into create-a-new-commit mode rather than merging into an existing target.
@@ -455,6 +456,7 @@ The bookmark-move is a separate explicit step: jj does not auto-advance a bookma
 Use the change ID surfaced in the `Created new commit <id>` line that `jj squash --insert-after` prints, not `@-`, as the bookmark-move target.
 In a multi-parent development join, `@-` resolves to `[merge]` after the squash because the new commit becomes one of `[merge]`'s parents (and `[wip]` is rebased onto the rebuilt `[merge]`), not a direct ancestor of `@`.
 Aiming the bookmark-move at `@-` therefore advances `<chain>` onto `[merge]`, requiring a corrective `jj bookmark move <chain> --to <correct-id> --allow-backwards`.
+Revset-based capture also returns the wrong target: `heads(::<chain>)` and `parents(<merge>)` both resolve to the chain's prior tip (the bookmark's previous target), not the newly inserted commit, because the new commit is structurally a sibling-then-rebased-parent of `[merge]` rather than a descendant of the bookmark's prior position. Always parse the stdout line.
 
 Amend-route (fixups only):
 
