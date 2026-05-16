@@ -119,6 +119,12 @@ Post-condition:
   working copy @ is repositioned onto the aggregate bookmark (a fresh empty
   commit descending from it), and the state is ready for
   `jj git push --allow-new --bookmark ...` and forge PR creation.
+
+  With --keep-remaining, the script additionally rebases each remaining
+  chain onto the aggregate tip and reconstructs a smaller development join
+  with parents {aggregate, remaining...} so unsubmitted chains continue on
+  top. See the diamond-workflow skill, "Partial Phase 4" section, for the
+  invariant analysis and post-merge mechanics.
 HELP
 }
 

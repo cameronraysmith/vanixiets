@@ -253,6 +253,37 @@ Dissolution-first is canonical: abandoning `[wip]` and `[merge]` removes the mul
     bd dolt push
     ```
 
+### Partial Phase 4: subset submission with continued development
+
+When an epic produces an integration-ready subset of chains while others are still in active development, the diamond can submit the ready subset and keep the rest as a smaller diamond above the linearized aggregate.
+This is useful when forge review cycles for the ready subset are long enough that holding the entire epic-join until every chain is ready would stall the unsubmitted chains.
+
+The `jj-linearize-join --keep-remaining` flag implements this partial Phase 4.
+After the subset is linearized and the aggregate bookmark is created, each remaining chain is rebased onto the aggregate tip (`jj rebase -b <chain> -d <aggregate>`), then a new `[merge]` is constructed with parents `{aggregate, remaining_chains...}` and a fresh `[wip]` is created on top.
+The reconstructed join's description follows the same `join N=k: <alphabetical bookmarks>` convention; the aggregate participates as a parent bookmark.
+
+Invariant restoration after partial Phase 4:
+- Invariant (i) (chain ∈ join's parents): the aggregate and every remaining chain are parents of the new `[merge]`; the previously submitted chains are not, by design — they exit the diamond via the forge merge.
+- Invariant (ii) (parent set matches description): the new description names exactly the post-rebase parent bookmarks.
+- Invariant (iii) (`@` atop join), (iv) (wip integrated), (vi) (single `[wip]`): restored by the trailing `jj new -m "wip"`.
+- Invariant (v) (append-not-squash): preserved by `jj rebase -b`, which rebases the chain's commit graph rather than collapsing it.
+
+Post-merge mechanics: when the forge merges the aggregate PR, the default branch advances to the aggregate tip.
+Because the remaining chains were already rebased onto the aggregate during partial Phase 4, no further rebase is needed locally; advance `main` to `<aggregate>` and the remaining chains continue developing on top.
+This is the principal reason the reconstructed join uses the aggregate (not the prior `main`) as one of its parents — it eliminates a post-merge rebase that would otherwise be required.
+
+Recipe:
+
+```bash
+jj-linearize-join --order c1,c2 --aggregate-bookmark agg-subset --keep-remaining
+# auto-derives remaining = parents(@-) \ {main, c1, c2}
+# OR
+jj-linearize-join --order c1,c2 --aggregate-bookmark agg-subset --keep-remaining c3,c4
+# explicit remaining set
+```
+
+After submission via `jj-stack-submit --order c1,c2 --aggregate-bookmark agg-subset`, continue developing in the reconstructed `[wip]` while the aggregate PR is in review.
+
 The `jj-linearize-join` sibling tool performs steps 11–13 (the diamond-workflow → linearized-chain transformation) with `--dry-run`, real-run, and embedded `test` subcommand modes.
 The `jj-stack-submit` sibling tool performs step 14 (Phase A submission) — push N+1 bookmarks, create N stacked-base chain PRs + 1 aggregate PR via `gh` or `tea`, post a backlink comment on the aggregate, and mark the aggregate ready.
 
