@@ -394,9 +394,6 @@ precondition_checks() {
 # in dry-run (--ignore-working-copy) or real mode.
 linearize() {
   local wip_id merge_id prev c
-  if [[ ${#remaining[@]} -gt 0 ]]; then
-    echo "note: --keep-remaining set; reconstruction will run after linearize (commit 2 of feature)"
-  fi
   wip_id=$(jj_run log -r @ --no-graph -T 'change_id' --limit 1)
   merge_id=$(jj_run log -r @- --no-graph -T 'change_id' --limit 1)
 
@@ -419,14 +416,56 @@ linearize() {
   echo "creating aggregate bookmark '${aggregate}' at '${prev}'..."
   jj_run bookmark create "${aggregate}" -r "${prev}"
 
-  # Exit the diamond onto the aggregate tip. SKILL.md:574-576 says "jj new
-  # main", but that recipe assumes main has been locally advanced to the
-  # linearized tip. This script deliberately does NOT advance main locally
-  # (forge handles the merge), so the aggregate bookmark is the right exit
-  # target — it points at the linearized tip and is the developer's current
-  # state until merge.
-  echo "exiting development join: jj new ${aggregate}"
-  jj_run new "${aggregate}"
+  if [[ ${#remaining[@]} -eq 0 ]]; then
+    # Exit the diamond onto the aggregate tip. SKILL.md:574-576 says "jj new
+    # main", but that recipe assumes main has been locally advanced to the
+    # linearized tip. This script deliberately does NOT advance main locally
+    # (forge handles the merge), so the aggregate bookmark is the right exit
+    # target — it points at the linearized tip and is the developer's current
+    # state until merge.
+    echo "exiting development join: jj new ${aggregate}"
+    jj_run new "${aggregate}"
+  else
+    # Partial Phase 4 reconstruction: rebase each remaining chain onto the
+    # aggregate tip, then build a new development join with parents
+    # {aggregate, remaining...} and a fresh wip on top. See diamond-workflow
+    # skill, "Partial Phase 4" section.
+    local r
+    for r in "${remaining[@]}"; do
+      echo "rebasing remaining chain '${r}' onto '${aggregate}'..."
+      jj_run rebase -b "${r}" -d "${aggregate}"
+      # Explicit-advance assertion (mirrors the order-loop above).
+      jj_run bookmark set "${r}" -r "${r}"
+    done
+
+    # Build the new [merge] parent list: aggregate + remaining (insertion
+    # order is used to invoke `jj new`; alphabetical order produces the
+    # description).
+    local new_parents=("${aggregate}" "${remaining[@]}")
+    local sorted_parents=()
+    local sp
+    while IFS= read -r sp; do
+      [[ -z "${sp}" ]] && continue
+      sorted_parents+=("${sp}")
+    done < <(printf '%s\n' "${new_parents[@]}" | sort)
+    local new_n=${#sorted_parents[@]}
+    # Comma+space separated description list. (IFS only uses its first char
+    # as separator, so build the string by hand.)
+    local joined=""
+    local jp first=true
+    for jp in "${sorted_parents[@]}"; do
+      if $first; then
+        joined="${jp}"; first=false
+      else
+        joined+=", ${jp}"
+      fi
+    done
+    local new_desc="join N=${new_n}: ${joined}"
+
+    echo "reconstructing development join: ${new_desc}"
+    jj_run new "${new_parents[@]}" -m "${new_desc}"
+    jj_run new -m "wip"
+  fi
 }
 
 # Print the post-linearization summary table. Reads chain tips via short_change_id.
@@ -443,6 +482,34 @@ print_summary() {
   short=$(short_change_id "${aggregate}")
   echo "aggregate bookmark:"
   printf '  %-30s -> %s\n' "${aggregate}" "${short}"
+
+  if [[ ${#remaining[@]} -gt 0 ]]; then
+    echo ""
+    echo "remaining chains (rebased onto ${aggregate}):"
+    local r
+    for r in "${remaining[@]}"; do
+      short=$(short_change_id "${r}")
+      printf '  %-30s -> %s\n' "${r}" "${short}"
+    done
+    # Reconstructed-join description: aggregate + remaining sorted.
+    local new_parents=("${aggregate}" "${remaining[@]}")
+    local sorted_parents=()
+    local sp
+    while IFS= read -r sp; do
+      [[ -z "${sp}" ]] && continue
+      sorted_parents+=("${sp}")
+    done < <(printf '%s\n' "${new_parents[@]}" | sort)
+    local joined="" jp first=true
+    for jp in "${sorted_parents[@]}"; do
+      if $first; then
+        joined="${jp}"; first=false
+      else
+        joined+=", ${jp}"
+      fi
+    done
+    echo "reconstructed join: join N=${#sorted_parents[@]}: ${joined}"
+  fi
+
   echo ""
   echo "undo: jj op restore ${pre_op}"
   local push_args="--bookmark ${chains[0]}"
@@ -452,6 +519,9 @@ print_summary() {
   done
   push_args+=" --bookmark ${aggregate}"
   echo "next: jj git push --allow-new ${push_args}"
+  if [[ ${#remaining[@]} -gt 0 ]]; then
+    echo "verify diamond: jj log -r '@ | @- | parents(@-)'"
+  fi
 }
 
 # -----------------------------------------------------------------------------
@@ -741,6 +811,89 @@ run_scenario_precond_violations() {
   fi
 }
 
+run_scenario_subset_keep_remaining() {
+  local result
+  result=$(
+    set +e
+    tmp=$(scenario_setup_diamond 4 disjoint)
+    trap 'rm -rf "${tmp}"' EXIT
+    cd "${tmp}" || { echo "FAIL subset-keep-remaining: cd to tmpdir failed"; exit 0; }
+    order_csv="c1,c2"
+    aggregate="agg"
+    base="main"
+    dry_run=false
+    chains=()
+    keep_remaining_mode="explicit"
+    remaining_csv="c3,c4"
+    remaining=()
+    precondition_checks
+    linearize >/dev/null 2>&1
+    local ok=true
+
+    # c1, c2, agg bookmarks exist; c3, c4 still exist post-rebase
+    local b
+    for b in c1 c2 c3 c4 agg; do
+      if ! bookmark_exists "${b}"; then
+        ok=false
+        echo "FAIL subset-keep-remaining: bookmark '${b}' missing after linearize"
+        break
+      fi
+    done
+
+    # Verify c3 and c4 are descendants of agg (rebased on top)
+    if $ok; then
+      local agg_in_c3
+      agg_in_c3=$(jj --ignore-working-copy log -r "agg::c3" --no-graph -T 'change_id ++ "\n"' 2>/dev/null | sed '/^$/d' | wc -l | tr -d ' ')
+      if [[ "${agg_in_c3}" -lt 2 ]]; then
+        ok=false
+        echo "FAIL subset-keep-remaining: c3 is not a descendant of agg (path length ${agg_in_c3})"
+      fi
+    fi
+    if $ok; then
+      local agg_in_c4
+      agg_in_c4=$(jj --ignore-working-copy log -r "agg::c4" --no-graph -T 'change_id ++ "\n"' 2>/dev/null | sed '/^$/d' | wc -l | tr -d ' ')
+      if [[ "${agg_in_c4}" -lt 2 ]]; then
+        ok=false
+        echo "FAIL subset-keep-remaining: c4 is not a descendant of agg (path length ${agg_in_c4})"
+      fi
+    fi
+
+    # Verify new [merge] @- has exactly 3 parents (agg, c3, c4)
+    if $ok; then
+      local pcount
+      pcount=$(parents_of_at_minus_count)
+      if [[ "${pcount}" -ne 3 ]]; then
+        ok=false
+        echo "FAIL subset-keep-remaining: @- has ${pcount} parents; expected 3"
+      fi
+    fi
+
+    # Verify description of @- contains expected alphabetical bookmarks
+    if $ok; then
+      local merge_desc
+      merge_desc=$(jj --ignore-working-copy log -r @- --no-graph -T 'description.first_line()' --limit 1 2>/dev/null)
+      local expected="join N=3: agg, c3, c4"
+      if [[ "${merge_desc}" != "${expected}" ]]; then
+        ok=false
+        echo "FAIL subset-keep-remaining: merge description '${merge_desc}' != '${expected}'"
+      fi
+    fi
+
+    # Verify @ is empty (the wip)
+    if $ok; then
+      if ! working_copy_empty; then
+        ok=false
+        echo "FAIL subset-keep-remaining: @ is not empty after reconstruction"
+      fi
+    fi
+
+    if $ok; then
+      echo "PASS subset-keep-remaining"
+    fi
+  )
+  echo "${result}"
+}
+
 run_scenario_single_chain() {
   local result
   # shellcheck disable=SC2030
@@ -776,16 +929,18 @@ run_tests() {
       out+=$(run_scenario_clean_real); out+=$'\n'
       out+=$(run_scenario_conflict_dry); out+=$'\n'
       out+=$(run_scenario_precond_violations); out+=$'\n'
-      out+=$(run_scenario_single_chain)
+      out+=$(run_scenario_single_chain); out+=$'\n'
+      out+=$(run_scenario_subset_keep_remaining)
       ;;
     clean-dry) out=$(run_scenario_clean_dry) ;;
     clean-real) out=$(run_scenario_clean_real) ;;
     conflict-dry) out=$(run_scenario_conflict_dry) ;;
     precond-violations) out=$(run_scenario_precond_violations) ;;
     single-chain) out=$(run_scenario_single_chain) ;;
+    subset-keep-remaining) out=$(run_scenario_subset_keep_remaining) ;;
     *)
       echo "Error: unknown test scenario '${scenario}'." >&2
-      echo "Valid scenarios: clean-dry, clean-real, conflict-dry, precond-violations, single-chain" >&2
+      echo "Valid scenarios: clean-dry, clean-real, conflict-dry, precond-violations, single-chain, subset-keep-remaining" >&2
       return 1
       ;;
   esac
