@@ -400,7 +400,7 @@ Conflating extension with amendment collapses the chain's commit-level history a
 (vi) `[merge]` has a single `[wip]` on top — there is exactly one ephemeral working-copy commit as immediate descendant of `[merge]`.
 Multiple sibling `[wip]`s as children of `[merge]` violate this invariant: they partition the working surface and break the contract — explicit in the join + wip structure above and in Krycho's canonical model — that edits land in `[wip]` precisely so `[merge]` stays frozen as the canonical join representation.
 Per-stream wips (one `[wip]` per parent chain) are the recurring antipattern: they re-introduce the per-chain working surfaces that the single shared `[wip]` exists to replace, and they hide cross-chain conflicts that the integrated `[wip]` would have surfaced immediately.
-The canonical routing primitives that preserve this invariant are the append-route (`jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied` followed by `jj bookmark move <chain> --to @-`) for landing new atomic commits on a chain, and the amend-route (`jj squash --from @ --into <chain-tip> --keep-emptied`, with `-m` omitted) for fixups against the existing tip; see "Routing to a chain: append vs amend" under §"The edit-route cycle" below.
+The canonical routing primitives that preserve this invariant are the append-route (`jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied` followed by `jj bookmark move <chain> --to <new-commit-id>`, where `<new-commit-id>` is the change ID jj prints in its `Created new commit <id>` line) for landing new atomic commits on a chain, and the amend-route (`jj squash --from @ --into <chain-tip> --keep-emptied`, with `-m` omitted) for fixups against the existing tip; see "Routing to a chain: append vs amend" under §"The edit-route cycle" below.
 
 ### Composite maintenance invariant (development join invariant)
 
@@ -444,12 +444,17 @@ Append-route (default for atomic landing):
 
 ```bash
 jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied
-jj bookmark move <chain> --to @-
+# capture <new-commit-id> from the "Created new commit <id>" line jj prints above
+jj bookmark move <chain> --to <new-commit-id>
 ```
 
 The `--insert-after` (alias `-A`) flag is what makes this an append rather than an amend; per the EXPERIMENTAL FEATURES doc comment at `cli/src/commands/squash.rs:51-84`, `-o`/`-A`/`-B` switch `jj squash` into create-a-new-commit mode rather than merging into an existing target.
 `@` (`[wip]`) returns to empty atop the auto-rebuilt `[merge]`, so the join + wip structure is preserved across the route.
 The bookmark-move is a separate explicit step: jj does not auto-advance a bookmark onto a newly inserted commit, so omitting it leaves the bookmark pointing at the prior tip.
+
+Use the change ID surfaced in the `Created new commit <id>` line that `jj squash --insert-after` prints, not `@-`, as the bookmark-move target.
+In a multi-parent development join, `@-` resolves to `[merge]` after the squash because the new commit becomes one of `[merge]`'s parents (and `[wip]` is rebased onto the rebuilt `[merge]`), not a direct ancestor of `@`.
+Aiming the bookmark-move at `@-` therefore advances `<chain>` onto `[merge]`, requiring a corrective `jj bookmark move <chain> --to <correct-id> --allow-backwards`.
 
 Amend-route (fixups only):
 

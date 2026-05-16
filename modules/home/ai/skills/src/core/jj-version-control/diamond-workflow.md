@@ -140,10 +140,12 @@ Independent chains within the same linearization step can be ordered discretiona
    ```bash
    # Append-route: land a new atomic commit on <chain>
    jj squash --from @ --insert-after <chain-tip> -m "feat: description" --keep-emptied
-   jj bookmark move <chain> --to @-
+   # capture <new-commit-id> from the "Created new commit <id>" line jj prints above
+   jj bookmark move <chain> --to <new-commit-id>
    ```
    The `--insert-after` (`-A`) flag is what switches `jj squash` into create-a-new-commit mode (per `cli/src/commands/squash.rs:51-84`); without it, `--into <chain-tip>` amends the existing tip in place.
    `--keep-emptied` preserves the single shared `[wip]` on top of `[merge]` (invariant (vi)); the bookmark-move is a separate explicit step because jj does not auto-advance a bookmark onto a newly inserted commit.
+   Target the new commit's change ID from the `Created new commit <id>` output line, not `@-`: in a multi-parent join, `@-` resolves to the rebuilt `[merge]` (the new commit is one of its parents, not a direct ancestor of `@`), and pointing the bookmark there advances `<chain>` onto `[merge]`.
    See `~/.claude/skills/jj-version-control/SKILL.md` §"Routing to a chain: append vs amend" for the full rationale and the amend-route fixup recipe.
 
    Path-restriction (`-- <paths>`) can be added to either recipe when multiple streams' hunks coexist in `[wip]` and only one stream's paths should be routed in this operation.
