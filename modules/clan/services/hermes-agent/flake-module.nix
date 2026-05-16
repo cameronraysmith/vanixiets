@@ -141,6 +141,12 @@
                         # Additional matrix wiring added by nix-gyy.7.
                       };
                     }
+                    (lib.mkIf (settings.channelsAllowlist != [ ]) {
+                      # Mirrors openclaw's channels.matrix.dm.allowFrom pattern.
+                      # Upstream migration doc (migrate-from-openclaw.md:138-146) confirms
+                      # `channels.<platform>.allowFrom` is the convergent allowlist path.
+                      channels.matrix.allowFrom = settings.channelsAllowlist;
+                    })
                     settings.configOverrides
                   ];
 
