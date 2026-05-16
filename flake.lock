@@ -661,16 +661,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1778390150,
-        "narHash": "sha256-yAXqxpgoHd7rCjAYux2AYmeTVIi31L5pjOxnfiZhoKM=",
-        "owner": "cameronraysmith",
+        "lastModified": 1778894098,
+        "narHash": "sha256-s0JnnN5Sf2EUS+5LZCEnnOo7w1NNBE2VTXQzMmPY5Nk=",
+        "owner": "pfassina",
         "repo": "lazyvim-nix",
-        "rev": "562f9d7b81a0f54060b78916518350e61eb4be33",
+        "rev": "681426e14b1aac9c2df2e26701024d29abf33532",
         "type": "github"
       },
       "original": {
-        "owner": "cameronraysmith",
-        "ref": "no-ifd-scan",
+        "owner": "pfassina",
         "repo": "lazyvim-nix",
         "type": "github"
       }

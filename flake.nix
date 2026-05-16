@@ -44,9 +44,7 @@
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
     nix-unit.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    # TODO: revert to pfassina/lazyvim-nix: fork ref replaces
-    # IFD-based scanUserPlugins with a nix implementation
-    lazyvim-nix.url = "github:cameronraysmith/lazyvim-nix/no-ifd-scan";
+    lazyvim-nix.url = "github:pfassina/lazyvim-nix";
     lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     nix2container.url = "github:nlewo/nix2container";
