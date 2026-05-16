@@ -33,6 +33,8 @@ Minimum prompt length is approximately 150 lines; the structural template alone 
 
 The spawn-prompt template provides explicit placeholders for each section. ACs fill the structural template; master inlines content; the filled prompt is self-contained at spawn time.
 
+Master routing of multi-stream work into the shared development join uses the append-route for new commits and the amend-route for fixups, both documented in jj-version-control/SKILL.md §"Routing to a chain: append vs amend"; the spawn template does not restate the route mechanics inline.
+
 ## Placeholder template
 
 ```
@@ -107,6 +109,9 @@ For N-stream missions:
 - *Task namespacing.* Pair-internal tasks created in the shared task list are subject-prefixed with `[stream-X]` so cross-stream visibility is preserved while pair scope remains identifiable.
 
 Master's cross-stream coordination tasks (dependency-map maintenance, cross-stream artifact handoff tracking, mission-level checkpoint reminders) live in the shared list without a stream prefix.
+
+For N-stream missions, all streams' chains parent into one development join with a single `[wip]` commit on top; sibling chains directly off main are out of scope absent affirmative justification at the decomposition-ratification gate.
+See jj-version-control/SKILL.md §"Development join" for the entity definition.
 
 ## Spawn-timing calibration: keyed on stream-novelty
 

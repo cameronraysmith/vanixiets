@@ -44,6 +44,11 @@ All six must pass for elevation to proceed:
 
 Failing any of the six halts elevation pending remediation. Master surfaces the failing items back to AC for resolution rather than waiving them.
 
+AC-side pre-staging is the optimization for characterization-style streams: the AC pre-stages the six-point rubric as a checklist embedded in its review pass before the stream surfaces to master.
+Pre-staging makes tier-2 escalation near-zero-overhead for master (each point arrives already cited rather than waiting for master to drive citation) and gives the WO a target shape during drafting so the deliverable converges toward the rubric.
+The AC fills each rubric point with file:line citations as it reviews, and the populated rubric travels with the surface-up.
+The pre-staged rubric is part of the AC's strategic-frame artifact, not a master-prescribed structure; master remains the authority that adjudicates each point against the elevation gate.
+
 ## AC five-condition surface protocol
 
 The AC binds itself to a five-condition protocol for surfacing to master.
@@ -73,6 +78,16 @@ Master's decomposition proposal surfaces to user with the following evidence:
 - *Pass criterion*: file-set inventory verified disjoint across all streams
 
 User confirms, revises, or rejects. Master applies user revisions before any spawn. Proactive file-set verification at this gate is the canonical mitigation for the stream-collision failure mode that would otherwise emerge at integration time.
+
+For N-stream missions, the in-scope topology at this gate is one development join: all N streams' chains parent into a single multi-parent merge with one `[wip]` commit on top.
+Sibling chains anchored directly off main, rather than off the shared join, are out of scope at this gate and require affirmative justification (a stream whose work must remain entirely independent of cross-stream visibility, for instance).
+The default presumption is shared-join topology; any deviation surfaces in the decomposition proposal with rationale so the user can ratify the deviation alongside the stream enumeration.
+See jj-version-control/SKILL.md §"Development join" for the entity definition and the scope rationale.
+
+A second distinction at this gate is stream-shape versus deliverable-shape.
+Content axes within a single deliverable — for example, the eight axes of a characterization brief — are deliverable-shape, not decomposition-shape, and do not by themselves justify partitioning across N streams.
+Partitioning one deliverable across N streams by content-axis introduces drift risk (each stream cites different commits as it drafts) and citation overhead (every cross-axis reference becomes a cross-stream hand-off), neither of which the diamond topology eliminates.
+The default for characterization-style streams — a single coherent deliverable with internal axes — is single-WO serial drafting under one pair. Partition only when file-set disjointness is achievable and the deliverable boundary itself is the partition boundary, not when only the internal axes are disjoint.
 
 ## Cross-stream dependency map convention
 
