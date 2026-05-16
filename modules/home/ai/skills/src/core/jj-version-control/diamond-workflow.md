@@ -158,7 +158,7 @@ Independent chains within the same linearization step can be ordered discretiona
    jj squash --from @ --into <chain-tip> --keep-emptied
    ```
 
-#### Gotcha: chain creation mid-diamond
+#### Chain creation mid-diamond
 
 Starting a new chain while the development join already exists (tier 3 is already active) REQUIRES same-operation join re-growth.
 Issuing only `jj new main -m "wip(<name>): seed chain"` to begin a new chain produces three failure modes simultaneously:
@@ -167,7 +167,7 @@ Issuing only `jj new main -m "wip(<name>): seed chain"` to begin a new chain pro
 - the integrated state at `[wip]` does not reflect the new chain, violating invariant (iv) (wip holds integrated working tree);
 - other agents working through `[wip]` silently miss the new chain entirely, treating it as if it does not exist.
 
-The correct sequence creates the seed commit AND grows `[merge]` to include it in one operation pair:
+The correct sequence creates the seed commit AND grows `[merge]` to include it in one operation sequence:
 
 ```bash
 # 1. Seed the new chain from main
@@ -179,11 +179,15 @@ jj bookmark create <name> -r @
 # 3. Reparent [merge] to include the new chain alongside existing chains
 jj rebase -r <merge-change-id> -d <existing-chain-a> -d <existing-chain-b> -d <name>
 
-# 4. Rewrite [merge]'s description with the new full set
+# 4. Re-attach [wip] to the rebased [merge] (required successor of step 3)
+jj rebase -r <wip-change-id> -d <merge-change-id>
+
+# 5. Rewrite [merge]'s description with the new full set
 jj describe <merge-change-id> -m "join N=k+1: <alphabetical bookmarks including <name>>"
 ```
 
-After step 4, run the diamond-health diagnostic from `~/.claude/skills/jj-version-control/SKILL.md` to verify all five invariants hold before resuming edits in `[wip]`.
+Step 4 is the second half of the `jj rebase -r <merge>` tool-pair documented in `SKILL.md` §"Re-attaching `[wip]` after `jj rebase -r <merge>`".
+After step 5, run the diamond-health diagnostic from `~/.claude/skills/jj-version-control/SKILL.md` as a sanity check on the executed recipe.
 
 ### Phase 3: converge (validate)
 

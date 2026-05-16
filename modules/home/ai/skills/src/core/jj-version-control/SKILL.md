@@ -386,7 +386,7 @@ They are stated as a numbered list so individual invariants can be referenced un
 A bookmark whose tip is not in `parents([merge])` is an orphaned chain: its content is invisible to `[wip]` and absent from any integrated validation run on the development join.
 
 (ii) join parents = current bookmark targets — there is no staleness between `[merge]`'s parent revisions and the current targets of the chain bookmarks named in `[merge]`'s description.
-Auto-rebase normally maintains this invariant in place; manual `jj rebase -r <merge> -d <chains>` after a route-and-extend operation breaks it (see "Staleness gotcha" below).
+Auto-rebase normally maintains this invariant in place; when `jj rebase -r <merge>` is used deliberately (e.g., the chain-creation-mid-diamond recipe), the required successor `jj rebase -r <wip> -d <merge>` keeps `[wip]` attached — see "Re-attaching `[wip]` after `jj rebase -r <merge>`" below.
 
 (iii) `@` atop the join — `@` is at `[wip]` whose sole parent is `[merge]`, or `@` IS `[merge]` during construction.
 This is the maintenance invariant historically named in this section; the other four invariants are now peer to it.
@@ -591,16 +591,19 @@ jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
 The `all:` prefix is required to ensure the revset resolves to multiple parents rather than collapsing to a single common ancestor.
 Without `all:`, jj would compute the nearest common ancestor of the revset members, producing a single-parent `@` instead of a multi-parent one.
 
-### Staleness gotcha
+### Re-attaching `[wip]` after `jj rebase -r <merge>`
 
-The route-and-extend recipe is self-sufficient: jj's auto-rebase updates `[merge]`'s parent set in place when a chain bookmark moves, so the four-step recipe (insert via `jj new -A`, route via `jj squash --from @ --into <new> --keep-emptied`, advance bookmark via `jj bookmark move`) leaves invariant (ii) preserved without manual intervention.
+`jj rebase -r <merge>` and `jj rebase -r <wip> -d <merge>` form a required tool-pair.
+The first reparents `[merge]`'s parent set in place; because the `-r` form's semantics are to reparent the named commit's parents while structurally reparenting its descendants away from it, the second is needed to bring `[wip]` back onto the rebuilt `[merge]`.
+Whenever the first verb is issued, the second is its required successor, immediately, in the same operation sequence — this is the canonical pairing, not an exception.
 
-Do NOT add a manual `jj rebase -r <merge> -d <chains>` after route-and-extend.
-The `-r` form of `jj rebase` reparents descendants away from the rebased commit, which detaches `[wip]` from `[merge]`: the rebased `[merge]` ends up parented at the chain tips while the original `[wip]` is left descending from the previous `[merge]` revision.
-The result violates invariant (iii) and silently strands subsequent edits in a `[wip]` that no longer reflects the integrated state.
+The route-and-extend recipe (`SKILL.md` §"Extending a chain with a new commit (route-and-extend pattern)") does not use this verb at all: it composes `jj new -A <chain-tip> --no-edit` with `jj squash --from @ --into <new-id> --keep-emptied`, and jj's auto-rebase updates `[merge]` and re-attaches `[wip]` cleanly without operator intervention.
+Neither half of the pair is needed there.
+The chain-creation-mid-diamond recipe (`diamond-workflow.md` §"Chain creation mid-diamond") deliberately uses `jj rebase -r <merge>` to grow the parent set in place, so both halves of the pair are mandatory and both appear in that recipe.
 
-Recovery if the manual rebase has already been issued: re-attach `[wip]` to the new `[merge]` revision via `jj rebase -r <wip-change-id> -d <merge-change-id>`, then verify with the diamond-health diagnostic above that `@` once again shows a single-parent line into `[wip]`.
-Prefer the recovery path over abandoning and recreating the join — operation-log restore is also available via `jj op restore` if the staleness was introduced in a single operation that can be cleanly reverted.
+If only the first half ran, `[wip]` is left at the old parent set: the diamond-health diagnostic surfaces this as `@` shown with multiple direct parent connectors instead of a single line into `[wip]`.
+Repair by issuing the second half: `jj rebase -r <wip-change-id> -d <merge-change-id>`.
+When the broken-half was the immediately-preceding operation, `jj op restore <id>` is also available to roll back and re-execute the sequence cleanly.
 
 ### Teardown
 
