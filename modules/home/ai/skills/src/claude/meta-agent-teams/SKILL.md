@@ -48,3 +48,5 @@ The subagent edits at `@` (which in tier 3 is the wip commit atop the developmen
 
 This is the agent-team specialization of the binding orchestrator-dispatch discipline documented in `~/.claude/CLAUDE.md`.
 The same pattern applies to any orchestrator subject to a harness-level edit-gate (background sessions, future isolation requirements); teammates are simply the most common case in team-coordinated work.
+
+The implicit assumption that `@` is stable for the dispatch lifetime breaks during master-orchestrated restructures; see `meta-orchestrator-initiate/01-discipline-and-cycle-patterns.md` §"Subagent-@-inheritance race during restructure" for the pre-restructure quiescence, post-restructure inspection, and routed re-entry disciplines that preserve diamond shape under that race.

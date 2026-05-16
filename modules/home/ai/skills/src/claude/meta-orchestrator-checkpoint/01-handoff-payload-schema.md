@@ -96,6 +96,12 @@ Parameterization-calibration data from mission execution:
 | Per-stream merged-PR list | Optional | Required |
 | Deferred follow-up items | Optional | Required |
 
+## Embed vs reference for ephemeral artifacts
+
+Pointers to artifacts under `${CLAUDE_JOB_DIR}` — per-AC `/session-checkpoint` outputs, observation logs, spawn prompts, in-flight surface-up drafts — are best-effort references rather than durable storage, because that directory is ephemeral and silently swept between sessions.
+Canonical content that the next master needs to act on MUST be embedded verbatim in the payload body, not only referenced by path: ratified design decisions, mission-frame summaries and addendum, in-flight surface-up text the resuming master must respond to, and any open-thread artifact whose loss would erase meaning rather than convenience.
+Rule of thumb: if losing the referenced file between checkpoint and resumption would lose meaning the next master needs to reconstruct, embed it; if losing the file would only sacrifice convenience or audit trail, a reference suffices.
+
 ## Worked example (handoff variant, abbreviated)
 
 ```markdown

@@ -92,6 +92,8 @@ Remember that most work needs to be dispatched to carefully prompted subagent ta
 
 **Single-external-position rule.** The closing forcing question and the discipline-reassertion footer MUST be outside the triple-quoted body block. Placing them inside makes them content of the wrapped message rather than protocol-level demands on the receiver, defeating their forcing function. Receiving agents flag and correct duplicated or internal placements.
 
+**Ack-of-ack suppression.** Pure-acknowledgment responses that carry no new content suppress reflexive ack-of-ack; the wrapper protocol terminates cleanly when an acknowledgment carries no new state for the receiver to react to.
+
 ## Turn-ordering crossing mitigations
 
 Crossings (sender and receiver compose simultaneously, messages cross in transit) are a structural property of multi-party async coordination at this granularity, not an exceptional friction.
@@ -126,6 +128,10 @@ Resume from the appropriate protocol step based on captured state: step 4 (decom
 Default is step 4 when in doubt; the payload's open-threads-and-in-flight-work section is the operative resumption signal.
 
 Otherwise (fresh mission), parse the user-supplied mission directive: goal, addendum (constraints, target repos, deliverables, success criteria), observation expectations.
+
+When resuming from a checkpoint payload that references an existing team via `team_name` in the mission frame, the new master must call `TeamCreate` proactively on first spawn rather than assuming prior registration persists.
+Job-dir and team-dir state is silently swept between sessions, so a team registered by an earlier master may not survive the handoff window even though its `team_name` appears verbatim in the payload.
+Proactive re-creation ensures that subsequent `SendMessage` calls into the named team resolve correctly post-cleanup, rather than failing on a stale registry pointer.
 
 ### Step 2: establish observation log
 
