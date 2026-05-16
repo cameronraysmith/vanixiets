@@ -18,13 +18,15 @@
 #  - @ is empty (16)
 #  - @- has >= 2 parents, and every chain in --order is one of those parents
 #    (strict-subset rule; see note in help text) (17)
+#  - when --keep-remaining is given explicitly, every name in it is a parent
+#    of @- and not in --order or --base (18)
 #
 # Exit codes:
 #  0  success (or dry-run clean)
 #  1  usage / unknown flag
 #  2  dry-run produced conflicts
 #  3  real-run produced conflicts (recovery instructions printed)
-#  10..17  pre-condition violations (see above)
+#  10..18  pre-condition violations (see above)
 set -euo pipefail
 
 show_help() {
@@ -54,12 +56,24 @@ Optional options:
   --dry-run                     Execute with --ignore-working-copy, inspect
                                 conflicts(), then restore the operation log.
                                 Exit 0 if clean, exit 2 if conflicts.
+  --keep-remaining [CSV]        Submit a subset of chains while keeping the
+                                rest as a smaller diamond above the linearized
+                                aggregate. Two forms:
+                                  --keep-remaining           (auto: derive from
+                                    parents(@-) \ ({base} ∪ order))
+                                  --keep-remaining c3,c4,... (explicit list)
+                                After linearize, each remaining chain is
+                                rebased onto the aggregate tip and a new
+                                development join is reconstructed with parents
+                                {aggregate, remaining...}. See diamond-workflow
+                                skill, "Partial Phase 4" section.
   -h, --help                    Show this help message.
 
 Subcommand:
   test [SCENARIO]               Run embedded self-tests. SCENARIO is one of:
                                   clean-dry, clean-real, conflict-dry,
-                                  precond-violations, single-chain
+                                  precond-violations, single-chain,
+                                  subset-keep-remaining, subset-conflict
                                 Omit SCENARIO to run all.
 
 Pre-condition rule for --order vs parents(@-):
@@ -71,6 +85,10 @@ Pre-condition rule for --order vs parents(@-):
   exactly where the diamond's base-parent already was. This permits the
   single-chain reduction where @- has parents {main, chain-1} and --order
   is "chain-1".
+
+  When --keep-remaining is given, the script also reconstructs a smaller
+  development join above the linearized aggregate, with parents being the
+  aggregate bookmark plus each remaining-chain bookmark (post-rebase).
 
 Exit codes:
   0    success (or dry-run clean)
@@ -85,6 +103,8 @@ Exit codes:
   15   --base ref does not exist
   16   @ has working-copy changes (not empty)
   17   @- parent set does not satisfy the diamond shape
+  18   remaining chain bookmark in --keep-remaining is not in
+       parents(@-) \ ({base} ∪ order)
 
 Examples:
   jj-linearize-join --order chain-a,chain-b,chain-c --aggregate-bookmark epic-foo
@@ -111,6 +131,14 @@ base="main"
 order_csv=""
 aggregate=""
 dry_run=false
+# `keep_remaining_mode` is "" when --keep-remaining is absent, "auto" when the
+# bare flag is given (remaining list derived at precondition time), or
+# "explicit" when a CSV value is supplied (parsed into `remaining_csv`).
+keep_remaining_mode=""
+remaining_csv=""
+# `remaining` is populated by precondition_checks (auto-derived from
+# parents(@-) \ ({base} ∪ order)) or from remaining_csv (explicit mode).
+remaining=()
 # `test` subcommand defers to run_tests after function definitions are parsed.
 test_mode=false
 test_scenario=""
@@ -130,6 +158,18 @@ while [[ $# -gt 0 ]]; do
     --aggregate-bookmark) aggregate="${2:-}"; shift 2 ;;
     --base) base="${2:-}"; shift 2 ;;
     --dry-run) dry_run=true; shift ;;
+    --keep-remaining)
+      # Optional-value flag: if the next argv starts with `-` or is absent,
+      # treat as bare (auto-derive); otherwise consume the next argv as CSV.
+      shift
+      if [[ $# -eq 0 || "${1:0:1}" == "-" ]]; then
+        keep_remaining_mode="auto"
+      else
+        keep_remaining_mode="explicit"
+        remaining_csv="$1"
+        shift
+      fi
+      ;;
     -*)
       echo "Error: Unknown option: $1" >&2
       echo "Try 'jj-linearize-join --help' for more information." >&2
@@ -288,6 +328,62 @@ precondition_checks() {
       exit 17
     fi
   done
+
+  # 18: --keep-remaining validation and (auto) derivation. `remaining` is the
+  # set of parent bookmarks that are NOT in --order and NOT equal to --base.
+  remaining=()
+  if [[ -n "${keep_remaining_mode}" ]]; then
+    # Build the candidate set: parents(@-) \ ({base} ∪ order).
+    local candidate_set=()
+    local p
+    while IFS= read -r p; do
+      [[ -z "${p}" ]] && continue
+      # Skip if equal to base
+      if [[ "${p}" == "${base}" ]]; then
+        continue
+      fi
+      # Skip if listed in --order
+      local skip=false
+      local oc
+      for oc in "${chains[@]}"; do
+        if [[ "${p}" == "${oc}" ]]; then
+          skip=true; break
+        fi
+      done
+      $skip && continue
+      candidate_set+=("${p}")
+    done <<< "${flat}"
+
+    if [[ "${keep_remaining_mode}" == "explicit" ]]; then
+      local explicit_list=()
+      IFS=',' read -r -a explicit_list <<< "${remaining_csv}"
+      local r
+      for r in "${explicit_list[@]}"; do
+        if [[ -z "${r}" ]]; then
+          echo "Error (precondition 18): --keep-remaining contains an empty bookmark name." >&2
+          exit 18
+        fi
+        local found=false
+        local cs
+        for cs in "${candidate_set[@]}"; do
+          if [[ "${r}" == "${cs}" ]]; then
+            found=true; break
+          fi
+        done
+        if ! $found; then
+          echo "Error (precondition 18): --keep-remaining bookmark '${r}' is not in parents(@-) \\ ({base} ∪ order)." >&2
+          echo "  valid candidates were: ${candidate_set[*]:-<none>}" >&2
+          exit 18
+        fi
+        remaining+=("${r}")
+      done
+    else
+      # auto: take all candidates
+      if [[ ${#candidate_set[@]} -gt 0 ]]; then
+        remaining=("${candidate_set[@]}")
+      fi
+    fi
+  fi
 }
 
 # -----------------------------------------------------------------------------
@@ -298,6 +394,9 @@ precondition_checks() {
 # in dry-run (--ignore-working-copy) or real mode.
 linearize() {
   local wip_id merge_id prev c
+  if [[ ${#remaining[@]} -gt 0 ]]; then
+    echo "note: --keep-remaining set; reconstruction will run after linearize (commit 2 of feature)"
+  fi
   wip_id=$(jj_run log -r @ --no-graph -T 'change_id' --limit 1)
   merge_id=$(jj_run log -r @- --no-graph -T 'change_id' --limit 1)
 
@@ -442,6 +541,9 @@ reset_globals() {
   aggregate=""
   dry_run=false
   chains=()
+  keep_remaining_mode=""
+  remaining_csv=""
+  remaining=()
 }
 
 # Run a scenario in a subshell so cd/trap state doesn't leak.
