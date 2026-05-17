@@ -103,6 +103,10 @@
 
     llm-agents.url = "github:numtide/llm-agents.nix";
 
+    hermes-agent.url = "github:NousResearch/hermes-agent";
+    hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
+    hermes-agent.inputs.flake-parts.follows = "flake-parts";
+
     catppuccin.url = "github:catppuccin/nix";
 
     nixidy.url = "github:arnarg/nixidy";
