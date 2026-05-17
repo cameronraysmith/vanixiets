@@ -152,6 +152,47 @@
                     matrixPasswordEnvPath
                   ];
                 };
+
+                # ─── clan-vars generators (nix-gyy.4) ───────────────────────
+                # Each generator writes `KEY=value\n` env-file format to its
+                # output file. This is the contract enforced by the adapter
+                # (nix-gyy.3): upstream's activation script concatenates each
+                # environmentFiles entry into ${stateDir}/.hermes/.env verbatim,
+                # so raw secret material would corrupt the .env file.
+                #
+                # Generators (catalog emitted to nix-gyy.4 surfacing #4):
+                #   - hermes-openrouter-api-key (interactive, requires human generate)
+                #   - matrix-password-hermes    (auto via xkcdpass)
+                clan.core.vars.generators.${settings.openrouterApiKeyGenerator} = {
+                  files."OPENROUTER_API_KEY" = {
+                    neededFor = "services";
+                    owner = settings.serviceUser;
+                    mode = "0440";
+                  };
+                  prompts.api-key = {
+                    description = "OpenRouter API key for hermes-agent (https://openrouter.ai/keys)";
+                    type = "hidden";
+                  };
+                  runtimeInputs = [ pkgs.coreutils ];
+                  script = ''
+                    printf 'OPENROUTER_API_KEY=%s\n' "$(cat "$prompts/api-key")" > "$out/OPENROUTER_API_KEY"
+                  '';
+                };
+
+                clan.core.vars.generators.${settings.matrixBotPasswordGenerator} = {
+                  files."MATRIX_PASSWORD" = {
+                    neededFor = "services";
+                    owner = settings.serviceUser;
+                    mode = "0440";
+                  };
+                  runtimeInputs = [
+                    pkgs.coreutils
+                    pkgs.xkcdpass
+                  ];
+                  script = ''
+                    printf 'MATRIX_PASSWORD=%s\n' "$(xkcdpass -n 4 -d -)" > "$out/MATRIX_PASSWORD"
+                  '';
+                };
               };
           };
       };
