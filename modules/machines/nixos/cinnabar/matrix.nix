@@ -76,7 +76,10 @@
         description = "Provision Matrix users on tuwunel";
         after = [ "tuwunel.service" ];
         requires = [ "tuwunel.service" ];
-        before = [ "openclaw-gateway.service" ];
+        before = [
+          "openclaw-gateway.service"
+          "hermes-agent.service"
+        ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           Type = "oneshot";
@@ -94,6 +97,13 @@
             cameronPasswordFile =
               config.clan.core.vars.generators.matrix-password-cameron.files."password".path;
             clawdPasswordFile = config.clan.core.vars.generators.matrix-password-clawd.files."password".path;
+            # hermes-agent clan-service instance declares the matrix-password-hermes
+            # generator inside perInstance.nixosModule. When the instance is wired
+            # (nix-gyy.10), this generator is present and hermes is registered as
+            # a sibling user. Until then, the hermes registration line stays inert.
+            hermesGenerator = config.clan.core.vars.generators.matrix-password-hermes or null;
+            hermesPasswordFile =
+              if hermesGenerator != null then hermesGenerator.files."MATRIX_PASSWORD".path else null;
           in
           ''
             set -euo pipefail
@@ -147,8 +157,51 @@
               rm -f "$tmpfile"
             }
 
+            register_env_value() {
+              # Hermes clan-vars stores MATRIX_PASSWORD as `KEY=value\n` env-file
+              # format (contract enforced by the hermes-agent clan service so
+              # upstream's .env activation works). Extract the value before
+              # passing to register/.
+              local user="$1"
+              local env_file="$2"
+              local body tmpfile http_code
+              tmpfile=$(mktemp)
+              body=$(jq -n \
+                --arg u "$user" \
+                --arg p "$(sed -n 's/^MATRIX_PASSWORD=//p' "$env_file")" \
+                --arg t "$TOKEN" \
+                '{auth:{type:"m.login.registration_token",token:$t}, username:$u, password:$p, inhibit_login:true}')
+              http_code=$(curl -sS -o "$tmpfile" -w '%{http_code}' \
+                -X POST http://localhost:${toString matrixPort}/_matrix/client/v3/register \
+                -H 'Content-Type: application/json' \
+                -d "$body")
+              case "$http_code" in
+                200)
+                  echo "registered $user"
+                  ;;
+                400)
+                  if jq -e '.errcode == "M_USER_IN_USE"' "$tmpfile" >/dev/null 2>&1; then
+                    echo "$user already exists, skipping"
+                  else
+                    echo "registration failed for $user: HTTP 400: $(cat "$tmpfile")" >&2
+                    rm -f "$tmpfile"
+                    exit 1
+                  fi
+                  ;;
+                *)
+                  echo "registration failed for $user: HTTP $http_code: $(cat "$tmpfile")" >&2
+                  rm -f "$tmpfile"
+                  exit 1
+                  ;;
+              esac
+              rm -f "$tmpfile"
+            }
+
             register "${adminUser}" "${cameronPasswordFile}"
             register clawd "${clawdPasswordFile}"
+            ${lib.optionalString (hermesPasswordFile != null) ''
+              register_env_value hermes "${hermesPasswordFile}"
+            ''}
           '';
       };
     };
