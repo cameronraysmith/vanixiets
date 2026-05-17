@@ -92,6 +92,29 @@
                 pkgs,
                 ...
               }:
+              let
+                # ─── clan-vars → environmentFiles adapter (nix-gyy.3) ───────
+                # Openclaw's wrapper-cat pattern (export VAR="$(cat path)" at exec)
+                # does NOT translate to hermes-agent: upstream's activation script
+                # cat-appends each environmentFiles entry into
+                # ${stateDir}/.hermes/.env (see nixosModules.nix:826-838) which
+                # load_hermes_dotenv() reads at python startup. systemd
+                # EnvironmentFile= is not consulted.
+                #
+                # Contract for clan-vars generator output (enforced in nix-gyy.4):
+                #   - Each generator's file content MUST be `KEY=value\n` env-file
+                #     format. The contents are concatenated verbatim into .env.
+                #   - Raw secret material (no `KEY=` prefix) would corrupt the file.
+                #
+                # Secret-rotation constraint:
+                #   - Rotating a secret requires `nixos-rebuild switch` because
+                #     activation bakes file contents into stateDir/.hermes/.env.
+                #   - `systemctl restart hermes-agent` alone WILL NOT pick up new
+                #     secret material; the .env file remains the previous content.
+                varsDir = config.clan.core.vars.generators;
+                openrouterEnvPath = varsDir.${settings.openrouterApiKeyGenerator}.files."OPENROUTER_API_KEY".path;
+                matrixPasswordEnvPath = varsDir.${settings.matrixBotPasswordGenerator}.files."MATRIX_PASSWORD".path;
+              in
               {
                 imports = [ inputs.hermes-agent.nixosModules.default ];
 
@@ -101,9 +124,6 @@
                 #   - mkForce hardening tuning (nix-gyy.5)
                 #   - sibling hermes-agent-dashboard systemd unit (nix-gyy.6)
                 #   - matrix wiring & deep settings merge (nix-gyy.7)
-                # This commit lands ONLY the scaffold: settings interface, perInstance.nixosModule
-                # with upstream imports, the bare-minimum services.hermes-agent.* options driven by
-                # settings, and an empty environmentFiles list as a placeholder for nix-gyy.3.
 
                 services.hermes-agent = {
                   enable = true;
@@ -124,9 +144,13 @@
                     settings.configOverrides
                   ];
 
-                  # environmentFiles list populated by nix-gyy.3's clan-vars adapter.
-                  # Placeholder empty list keeps the option resolvable at scaffold time.
-                  environmentFiles = lib.mkDefault [ ];
+                  # environmentFiles wired by the clan-vars adapter (nix-gyy.3).
+                  # Order: openrouter first, then matrix password. mkForce overrides
+                  # the scaffold's prior mkDefault sentinel value.
+                  environmentFiles = lib.mkForce [
+                    openrouterEnvPath
+                    matrixPasswordEnvPath
+                  ];
                 };
               };
           };
