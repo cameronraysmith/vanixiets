@@ -193,6 +193,38 @@
                     printf 'MATRIX_PASSWORD=%s\n' "$(xkcdpass -n 4 -d -)" > "$out/MATRIX_PASSWORD"
                   '';
                 };
+
+                # ─── Systemd hardening tuning for login-user posture (nix-gyy.5) ───
+                # Upstream hermes-agent nixosModule already sets defaults compatible
+                # with our login-user model (see nixosModules.nix:901-910):
+                #   - ProtectHome     = false      (permissive; REQUIRED for /home/cameron access — no override needed)
+                #   - ProtectSystem   = "strict"   (compatible; ReadWritePaths auto-extended to stateDir + workingDirectory)
+                #   - NoNewPrivileges = true       (acceptable)
+                #   - PrivateTmp      = true       (acceptable)
+                #   - UMask           = "0007"     (acceptable; shared-state group-writable)
+                #   - ReadWritePaths  = [ stateDir workingDirectory ]
+                # Upstream does NOT set RestrictNamespaces (Claude CLI may use namespaces; no override).
+                # Upstream does NOT set kernel-hardening directives — we add them defensively below.
+                #
+                # Net effect: NO mkForce override for ProtectHome / ProtectSystem /
+                # RestrictNamespaces is required. Upstream defaults already align
+                # with the posture. The briefing's mkForce trio (ProtectHome/
+                # ProtectSystem/RestrictNamespaces) was approximate; recon shows
+                # the actual override set is narrower (kernel-hardening only).
+                #
+                # PrivateDevices intentionally NOT set — Claude CLI may use /dev/null
+                # and /dev/urandom for entropy/IO; matching openclaw's posture which
+                # also omits PrivateDevices for the same reason.
+                systemd.services.hermes-agent.serviceConfig = {
+                  # Defensive kernel hardening (rationale per directive):
+                  ProtectKernelTunables = true; # block /proc/sys, /sys writes (hermes doesn't tune kernel)
+                  ProtectKernelModules = true; # block module load/unload (hermes is not a kernel modprobe consumer)
+                  ProtectKernelLogs = true; # block dmesg/kmsg access (hermes doesn't read kernel ring buffer)
+                  ProtectControlGroups = true; # cgroupfs read-only (hermes doesn't reconfigure cgroups)
+                  RestrictSUIDSGID = true; # block setuid/setgid file creation (hermes only writes regular files)
+                  RestrictRealtime = true; # block SCHED_FIFO/RR (hermes is not RT-scheduled)
+                  SystemCallArchitectures = "native"; # block non-native syscall ABIs (defensive sandbox)
+                };
               };
           };
       };
