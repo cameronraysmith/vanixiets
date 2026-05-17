@@ -34,6 +34,7 @@ in
         gitea
         gitea-actions-runner
         docker
+        matrix
         effects-vanixiets-secrets
         effects-ironstar-secrets
       ]);
