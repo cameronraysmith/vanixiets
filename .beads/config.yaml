@@ -22,3 +22,5 @@ dolt:
     auto-start: false
     auto-commit: "on"
     auto-push: false
+
+export.auto: false
