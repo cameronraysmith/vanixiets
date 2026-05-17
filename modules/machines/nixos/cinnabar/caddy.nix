@@ -80,6 +80,21 @@
               }
             '';
           };
+          "hermes.zt" = {
+            listenAddresses = meshListenAddrs;
+            # hermes-agent dashboard binds 127.0.0.1 (see clan-service module's
+            # hermes-agent-dashboard unit, commit 810777f2); target loopback IPv4
+            # to match the bind. Port 18790 mirrors the wrapper's dashboardPort
+            # default (loopback-only, reverse-proxied here).
+            extraConfig = ''
+              tls internal
+              reverse_proxy 127.0.0.1:18790 {
+                header_up -X-Forwarded-For
+                header_up -X-Forwarded-Proto
+                header_up -X-Forwarded-Host
+              }
+            '';
+          };
         };
       };
 
