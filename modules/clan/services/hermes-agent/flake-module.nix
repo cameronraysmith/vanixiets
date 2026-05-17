@@ -225,6 +225,59 @@
                   RestrictRealtime = true; # block SCHED_FIFO/RR (hermes is not RT-scheduled)
                   SystemCallArchitectures = "native"; # block non-native syscall ABIs (defensive sandbox)
                 };
+
+                # ─── Sibling hermes-agent-dashboard systemd unit (nix-gyy.6) ───
+                # Upstream nixosModule does NOT expose the dashboard (confirmed by
+                # recon: nixosModules.nix only defines systemd.services.hermes-agent
+                # running `hermes gateway`). Author a sibling unit mirroring
+                # wimpysworld-nix-config/nixos/_mixins/server/hermes/default.nix:882-920,
+                # adapted to our login-user posture and dashboardPort setting.
+                #
+                # Binds 127.0.0.1 (NOT [::1]) — nginx reverse-proxy on hermes.zt
+                # (wired in nix-gyy.8) will target this loopback address.
+                systemd.services.hermes-agent-dashboard = {
+                  description = "Hermes Agent web dashboard";
+                  wantedBy = [ "multi-user.target" ];
+                  wants = [ "network-online.target" ];
+                  after = [
+                    "network-online.target"
+                    "hermes-agent.service"
+                  ];
+
+                  environment = {
+                    HERMES_HOME = "${settings.stateDir}/.hermes";
+                    HERMES_MANAGED = "true";
+                    HOME = settings.stateDir;
+                  };
+
+                  serviceConfig = {
+                    Type = "exec";
+                    User = settings.serviceUser;
+                    Group = "users";
+                    WorkingDirectory = "${settings.stateDir}/workspace";
+                    ExecStart = "${config.services.hermes-agent.package}/bin/hermes dashboard --host 127.0.0.1 --port ${toString settings.dashboardPort} --no-open";
+                    Restart = "always";
+                    RestartSec = 5;
+                    UMask = "0007";
+
+                    # Hardening parallel to main service's tuned posture (login-user-aware).
+                    NoNewPrivileges = true;
+                    ProtectSystem = "strict";
+                    ProtectHome = false;
+                    PrivateTmp = true;
+                    ReadWritePaths = [
+                      "${settings.stateDir}"
+                      "${settings.stateDir}/workspace"
+                    ];
+                    ProtectKernelTunables = true;
+                    ProtectKernelModules = true;
+                    ProtectKernelLogs = true;
+                    ProtectControlGroups = true;
+                    RestrictSUIDSGID = true;
+                    RestrictRealtime = true;
+                    SystemCallArchitectures = "native";
+                  };
+                };
               };
           };
       };
