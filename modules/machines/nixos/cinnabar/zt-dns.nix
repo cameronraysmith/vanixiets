@@ -32,6 +32,8 @@
             "/beads.zt/10.147.17.1"
             "/matrix.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
             "/matrix.zt/10.147.17.1"
+            "/hermes.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
+            "/hermes.zt/10.147.17.1"
             "/ntfy.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
             "/ntfy.zt/10.147.17.1"
             "/openclaw.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
