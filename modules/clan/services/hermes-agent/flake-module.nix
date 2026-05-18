@@ -133,6 +133,10 @@
                   stateDir = settings.stateDir;
 
                   # Deep-merge into config.yaml — populated incrementally by later issues.
+                  # Populates config.yaml channels.matrix.* for policy/allowlist code paths.
+                  # The hermes-agent matrix adapter reads bootstrap vars (HOMESERVER, USER_ID,
+                  # ALLOWED_USERS) only from environment — see services.hermes-agent.environment
+                  # below. Keep both populated so policy and bootstrap stay consistent.
                   settings = lib.mkMerge [
                     {
                       channels.matrix = {
@@ -157,6 +161,19 @@
                     openrouterEnvPath
                     matrixPasswordEnvPath
                   ];
+
+                  # Matrix bootstrap vars: the hermes-agent matrix adapter reads
+                  # MATRIX_HOMESERVER, MATRIX_USER_ID, and MATRIX_ALLOWED_USERS
+                  # exclusively from process environment via os.getenv() (upstream
+                  # gateway/config.py:1391-1414, gateway/platforms/matrix.py:234).
+                  # Upstream's activation script cat-appends cfg.environment entries
+                  # alongside environmentFiles into ${stateDir}/.hermes/.env, the
+                  # file load_hermes_dotenv() reads at python startup.
+                  environment = {
+                    MATRIX_HOMESERVER = "https://${settings.matrixServerName}";
+                    MATRIX_USER_ID = "@${settings.matrixUserName}:${settings.matrixServerName}";
+                    MATRIX_ALLOWED_USERS = lib.concatStringsSep "," settings.channelsAllowlist;
+                  };
                 };
 
                 # ─── clan-vars generators (nix-gyy.4) ───────────────────────
