@@ -144,6 +144,14 @@
 
                 services.hermes-agent = {
                   enable = true;
+                  # Add the hermes binary to environment.systemPackages and
+                  # export HERMES_HOME via environment.variables (upstream
+                  # nixosModules.nix:548-556). Guarantees interactive shell
+                  # `hermes` invocations share .env, config.yaml, workspace,
+                  # sessions, and plugins with the running gateway/dashboard
+                  # by using a byte-identical store-path. Wimpysworld follows
+                  # the same pattern (hermes/default.nix:693).
+                  addToSystemPackages = true;
                   createUser = false;
                   user = settings.serviceUser;
                   group = "users";
