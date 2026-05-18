@@ -362,6 +362,7 @@
           home.file.".claude/settings.json".enable = lib.mkIf config.programs.claude-code.mutableSettings (
             lib.mkForce false
           );
+          home.file.".claude/settings.json".force = lib.mkIf config.programs.claude-code.mutableSettings true;
 
           home.activation.claudeCodeMutableSettings = lib.mkIf config.programs.claude-code.mutableSettings (
             let
