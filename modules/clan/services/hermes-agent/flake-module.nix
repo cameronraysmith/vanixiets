@@ -55,6 +55,23 @@
                 description = "Matrix bot username (localpart of the bot's MXID)";
               };
 
+              matrixHomeserverUrl = lib.mkOption {
+                type = lib.types.str;
+                default = "http://localhost:8008";
+                description = ''
+                  API endpoint the hermes-agent matrix adapter uses to talk to the matrix
+                  homeserver. Set to the matrix server's client-server API URL (typically
+                  http://localhost:8008 for a colocated tuwunel/Synapse on the standard
+                  port, or https://matrix.example.com for a remote homeserver).
+
+                  Note: distinct from the protocol-level server_name (which is encoded in
+                  user_ids via matrixServerName). For colocated deployments where the
+                  bot reaches the homeserver via loopback HTTP, the bot bypasses
+                  public-facing TLS termination (e.g. caddy with tls internal) avoiding
+                  cert-verification failures against the system trust store.
+                '';
+              };
+
               port = lib.mkOption {
                 type = lib.types.port;
                 default = 18791;
@@ -181,7 +198,7 @@
                   # alongside environmentFiles into ${stateDir}/.hermes/.env, the
                   # file load_hermes_dotenv() reads at python startup.
                   environment = {
-                    MATRIX_HOMESERVER = "https://${settings.matrixServerName}";
+                    MATRIX_HOMESERVER = settings.matrixHomeserverUrl;
                     MATRIX_USER_ID = "@${settings.matrixUserName}:${settings.matrixServerName}";
                     MATRIX_ALLOWED_USERS = lib.concatStringsSep "," settings.channelsAllowlist;
                   };
