@@ -162,6 +162,17 @@
                     matrixPasswordEnvPath
                   ];
 
+                  # Include the upstream `matrix` optional dependency group in the
+                  # sealed venv so the mautrix adapter can import mautrix-python.
+                  # Per upstream pyproject.toml:87 the `matrix` group declares
+                  # `mautrix[encryption]==0.21.0` (plus Markdown, aiosqlite,
+                  # asyncpg, aiohttp-socks). Upstream's nixosModule exposes
+                  # extraDependencyGroups as the documented lever to add an
+                  # optional group to the immutable venv (nix-setup.md:659).
+                  # The journal's "Run: pip install mautrix[encryption]" hint is
+                  # unusable here — the Nix venv is sealed at build time.
+                  extraDependencyGroups = [ "matrix" ];
+
                   # Matrix bootstrap vars: the hermes-agent matrix adapter reads
                   # MATRIX_HOMESERVER, MATRIX_USER_ID, and MATRIX_ALLOWED_USERS
                   # exclusively from process environment via os.getenv() (upstream
