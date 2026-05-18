@@ -357,18 +357,24 @@
       };
 
       ############################################################
-      # Part 6: ACME wiring for coturn key access
+      # Part 6: ACME wiring for coturn + nginx key access
       ############################################################
 
       # ACME-issued key material defaults to mode 0640 owned by acme:acme.
       # Granting group=turnserver lets the static coturn user read the
-      # private key. reloadServices ensures coturn re-reads the renewed
-      # cert chain instead of holding the stale one in memory until the
-      # next manual restart (a concrete first-boot blocker if omitted).
+      # private key. nginx also terminates TLS for the matrix vhost and
+      # must read the same cert; adding nginx to the turnserver group
+      # satisfies the mk-cert-ownership-assertion check (nixpkgs requires
+      # every consuming service's user to be a member of cert.group).
+      # reloadServices wires coturn explicitly; nginx.service is
+      # auto-appended by services.nginx for any ACME-managed vhost
+      # (nixpkgs nginx/default.nix acmePairs), so do not re-add it here.
       security.acme.certs.${domain} = {
         group = "turnserver";
         reloadServices = [ "coturn.service" ];
       };
+
+      users.users.nginx.extraGroups = [ "turnserver" ];
 
       ############################################################
       # Part 7: Firewall
