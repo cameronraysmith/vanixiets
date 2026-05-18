@@ -340,7 +340,8 @@
       services.coturn = {
         enable = true;
         use-auth-secret = true;
-        static-auth-secret-file = config.clan.core.vars.generators.coturn-static-auth-secret.files."secret".path;
+        static-auth-secret-file =
+          config.clan.core.vars.generators.coturn-static-auth-secret.files."secret".path;
         realm = domain;
 
         # Relay UDP range 49152-49999 to avoid colliding with LiveKit's
@@ -469,16 +470,14 @@
           RemainAfterExit = true;
           User = "matrix-synapse";
           Group = "matrix-synapse";
-          LoadCredential =
-            [
-              "shared-secret:${
-                config.clan.core.vars.generators.synapse-registration-shared-secret.files."shared-secret.yaml".path
-              }"
-            ]
-            ++ map (
-              u:
-              "${u}-pw:${config.clan.core.vars.generators."matrix-password-${u}".files."password".path}"
-            ) matrixUsers;
+          LoadCredential = [
+            "shared-secret:${
+              config.clan.core.vars.generators.synapse-registration-shared-secret.files."shared-secret.yaml".path
+            }"
+          ]
+          ++ map (
+            u: "${u}-pw:${config.clan.core.vars.generators."matrix-password-${u}".files."password".path}"
+          ) matrixUsers;
         };
         path = [
           pkgs.curl
