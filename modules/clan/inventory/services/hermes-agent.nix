@@ -26,6 +26,18 @@
         configOverrides = {
           # Mirror openclaw's autoJoin posture so the bot accepts DM invites.
           channels.matrix.autoJoin = "always";
+          # Default model for the gateway. Dict form per upstream
+          # hermes_cli/inventory.py:88-97; wimpysworld follows the same shape
+          # at hermes/default.nix:750-753. OPENROUTER_API_KEY is wired via
+          # clan-vars (commit mkuxxzwl). Slug verified in the dashboard model
+          # picker (31 OpenRouter models listed).
+          model = {
+            provider = "openrouter";
+            default = "z-ai/glm-5.1";
+          };
+          # Dashboard theme (lowercase canonical per hermes_cli/config.py:1010-1012;
+          # valid values: default, midnight, ember, mono, cyberpunk, rose).
+          dashboard.theme = "mono";
         };
       };
     };
