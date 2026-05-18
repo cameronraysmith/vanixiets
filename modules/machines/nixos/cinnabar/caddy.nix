@@ -92,6 +92,7 @@
                 header_up -X-Forwarded-For
                 header_up -X-Forwarded-Proto
                 header_up -X-Forwarded-Host
+                header_up Host 127.0.0.1:18790
               }
             '';
           };
