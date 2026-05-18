@@ -359,10 +359,21 @@
 
           # Mutable settings: copy instead of symlink so Claude Code can write at runtime.
           # Each home-manager activation overwrites with declared state.
-          home.file.".claude/settings.json".enable = lib.mkIf config.programs.claude-code.mutableSettings (
-            lib.mkForce false
-          );
-          home.file.".claude/settings.json".force = lib.mkIf config.programs.claude-code.mutableSettings true;
+          #
+          # Override the upstream programs.claude-code module's home.file declaration.
+          # Upstream uses the absolute path key `${cfg.configDir}/settings.json` (where
+          # cfg.configDir defaults to `/home/cameron/.claude` for this user), NOT the
+          # relative `.claude/settings.json`. Targeting the relative path was a no-op
+          # bug that let home-manager continue managing the file as a symlink while
+          # our activation script also tried to install it, producing
+          # checkLinkTargets backup-conflict errors at deploy time.
+          #
+          # With enable=mkForce false on the correct absolute-path key, the upstream
+          # symlink isn't built into home-files; checkLinkTargets doesn't iterate
+          # over settings.json; the activation script below becomes the sole source
+          # of truth, supporting runtime mutation by claude-code itself.
+          home.file."${config.programs.claude-code.configDir}/settings.json".enable =
+            lib.mkIf config.programs.claude-code.mutableSettings (lib.mkForce false);
 
           home.activation.claudeCodeMutableSettings = lib.mkIf config.programs.claude-code.mutableSettings (
             let
