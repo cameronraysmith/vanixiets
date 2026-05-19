@@ -179,6 +179,17 @@
                       stt.enabled = false; # no whisper model bundled on cinnabar
                       kanban.dispatch_in_gateway = false; # kanban dispatcher ticks every 60s; unused on cinnabar
 
+                      # Local SQLite-backed holographic memory provider (memory.provider).
+                      # memory_enabled and user_profile_enabled already default true upstream
+                      # (hermes_cli/config.py:1128-1129); explicit setting would be redundant.
+                      # plugins.hermes-memory-store sub-keys at defaults; override here if needed
+                      # (db_path defaults to ${HERMES_HOME}/memory_store.db).
+                      memory.provider = "holographic";
+                      plugins.hermes-memory-store = {
+                        auto_extract = false; # upstream default; opt-in fact extraction at session end
+                        default_trust = 0.5; # upstream default
+                      };
+
                       channels.matrix = {
                         homeserver = "https://${settings.matrixServerName}";
                         user_id = "@${settings.matrixUserName}:${settings.matrixServerName}";
