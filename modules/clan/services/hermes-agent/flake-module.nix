@@ -25,12 +25,6 @@
                 description = "Unix user to run hermes-agent as (createUser=false posture)";
               };
 
-              stateDir = lib.mkOption {
-                type = lib.types.str;
-                default = "/home/cameron/.hermes";
-                description = "Hermes state directory (HERMES_HOME)";
-              };
-
               openrouterApiKeyGenerator = lib.mkOption {
                 type = lib.types.str;
                 default = "hermes-openrouter-api-key";
@@ -110,6 +104,14 @@
                 ...
               }:
               let
+                # Derive service user's $HOME from the canonical NixOS option.
+                # Upstream's services.hermes-agent.stateDir semantically means "service user's
+                # $HOME" (upstream description: "Contains .hermes/ subdir (HERMES_HOME)"). We
+                # derive instead of hardcoding `/home/<user>` so the value is filesystem-layout-
+                # aware (Linux /home/<user>, Darwin /Users/<user>, custom paths if user record
+                # overrides).
+                userHome = config.users.users.${settings.serviceUser}.home;
+
                 # ─── clan-vars → environmentFiles adapter (nix-gyy.3) ───────
                 # Openclaw's wrapper-cat pattern (export VAR="$(cat path)" at exec)
                 # does NOT translate to hermes-agent: upstream's activation script
@@ -155,7 +157,7 @@
                   createUser = false;
                   user = settings.serviceUser;
                   group = "users";
-                  stateDir = settings.stateDir;
+                  stateDir = userHome;
 
                   # Deep-merge into config.yaml — populated incrementally by later issues.
                   # Populates config.yaml channels.matrix.* for policy/allowlist code paths.
@@ -304,16 +306,16 @@
                   ];
 
                   environment = {
-                    HERMES_HOME = "${settings.stateDir}/.hermes";
+                    HERMES_HOME = "${userHome}/.hermes";
                     HERMES_MANAGED = "true";
-                    HOME = settings.stateDir;
+                    HOME = userHome;
                   };
 
                   serviceConfig = {
                     Type = "exec";
                     User = settings.serviceUser;
                     Group = "users";
-                    WorkingDirectory = "${settings.stateDir}/workspace";
+                    WorkingDirectory = "${userHome}/workspace";
                     ExecStart = "${config.services.hermes-agent.package}/bin/hermes dashboard --host 127.0.0.1 --port ${toString settings.dashboardPort} --no-open";
                     Restart = "always";
                     RestartSec = 5;
@@ -325,8 +327,8 @@
                     ProtectHome = false;
                     PrivateTmp = true;
                     ReadWritePaths = [
-                      "${settings.stateDir}"
-                      "${settings.stateDir}/workspace"
+                      userHome
+                      "${userHome}/workspace"
                     ];
                     ProtectKernelTunables = true;
                     ProtectKernelModules = true;

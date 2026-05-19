@@ -7,7 +7,6 @@
     roles.default.machines."cinnabar" = {
       settings = {
         serviceUser = "cameron";
-        stateDir = "/home/cameron/.hermes";
         openrouterApiKeyGenerator = "hermes-openrouter-api-key";
         matrixBotPasswordGenerator = "matrix-password-hermes";
         matrixServerName = "matrix.zt";
