@@ -8,8 +8,12 @@
 # Agents with programs.*.skills options (claude-code, opencode) use the
 # module-native mechanism. Codex, Droid, and hermes-agent lack recursive
 # symlink support in their modules, so core skills are symlinked directly
-# via home.file. For hermes-agent, the target ~/.hermes/external-skills/
-# is consumed via services.hermes-agent.settings.skills.external_dirs.
+# via home.file. For hermes-agent, skills are delivered into
+# ~/.hermes/skills/ (SKILLS_DIR) directly rather than ~/.hermes/external-skills/
+# to work around an upstream bug in agent/skill_commands.py:_load_skill_payload
+# where the normalize at line 65 fails for paths outside SKILLS_DIR, causing
+# slash-command invocation of external skills to fail with "Failed to load
+# skill" while discovery (via bare names) still works.
 { ... }:
 {
   flake.modules.homeManager.ai =
@@ -56,7 +60,7 @@
         ) coreSkills
         // lib.mapAttrs' (
           name: path:
-          lib.nameValuePair ".hermes/external-skills/${name}" {
+          lib.nameValuePair ".hermes/skills/${name}" {
             source = path;
             recursive = true;
           }
