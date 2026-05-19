@@ -201,6 +201,16 @@
                         }
                       ];
 
+                      # Skills delivered via home-manager into ${userHome}/.hermes/external-skills/.
+                      # external_dirs is first-class for indexing (agent/skill_utils.py:484
+                      # os.walk(followlinks=true)) but excluded from curator scope by construction
+                      # (curator_backup.py:62 _EXCLUDE_TOP_LEVEL excludes only .curator_backups and
+                      # .hub from its rollback target, which is the local skills/ dir — external
+                      # dirs are never touched).
+                      skills.external_dirs = [
+                        "${userHome}/.hermes/external-skills"
+                      ];
+
                       channels.matrix = {
                         homeserver = "https://${settings.matrixServerName}";
                         user_id = "@${settings.matrixUserName}:${settings.matrixServerName}";
