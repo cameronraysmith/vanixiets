@@ -159,11 +159,11 @@
                   group = "users";
                   stateDir = userHome;
 
-                  # Deep-merge into config.yaml — populated incrementally by later issues.
-                  # Populates config.yaml channels.matrix.* for policy/allowlist code paths.
-                  # The hermes-agent matrix adapter reads bootstrap vars (HOMESERVER, USER_ID,
-                  # ALLOWED_USERS) only from environment — see services.hermes-agent.environment
-                  # below. Keep both populated so policy and bootstrap stay consistent.
+                  # Deep-merge into config.yaml. Native matrix.* policy and the
+                  # platforms.matrix.extra.* declarative bootstrap path replace the
+                  # earlier channels.matrix.* block (which has zero upstream consumers).
+                  # MATRIX_ALLOWED_USERS remains env-only — no YAML bridge exists upstream
+                  # for the allow_from gate in the matrix adapter.
                   settings = lib.mkMerge [
                     {
                       # Operationally-critical defaults for headless matrix-bot posture.
@@ -211,18 +211,26 @@
                         "${userHome}/.hermes/external-skills"
                       ];
 
-                      channels.matrix = {
-                        homeserver = "https://${settings.matrixServerName}";
+                      # Native matrix.* policy keys — gateway/config.py:1124-1143 YAML→env bridge.
+                      # All values match upstream defaults for the single-user matrix-DM bot posture
+                      # on cinnabar. Set explicitly so the modification touch-point is obvious; flip
+                      # any of these here if behavior needs to change.
+                      matrix = {
+                        require_mention = true; # @-mention required in shared rooms; bypassed in DMs
+                        free_response_rooms = [ ]; # rooms where mention is NOT required (none)
+                        allowed_rooms = [ ]; # room-level whitelist (empty; security via MATRIX_ALLOWED_USERS user-level gate)
+                        auto_thread = true; # reply in a thread per response (sensible bot UX in shared rooms)
+                        dm_mention_threads = false; # don't thread @-mentions inside DMs (DMs stay linear)
+                      };
+
+                      # Platform-level matrix bootstrap (migrated from MATRIX_HOMESERVER / MATRIX_USER_ID env).
+                      # matrix.py:329, :332 reads config.extra.{homeserver, user_id} preferentially
+                      # over the env var, so this is the canonical declarative location.
+                      platforms.matrix.extra = {
+                        homeserver = settings.matrixHomeserverUrl;
                         user_id = "@${settings.matrixUserName}:${settings.matrixServerName}";
-                        # Additional matrix wiring added by nix-gyy.7.
                       };
                     }
-                    (lib.mkIf (settings.channelsAllowlist != [ ]) {
-                      # Mirrors openclaw's channels.matrix.dm.allowFrom pattern.
-                      # Upstream migration doc (migrate-from-openclaw.md:138-146) confirms
-                      # `channels.<platform>.allowFrom` is the convergent allowlist path.
-                      channels.matrix.allowFrom = settings.channelsAllowlist;
-                    })
                     settings.configOverrides
                   ];
 
@@ -245,16 +253,12 @@
                   # unusable here — the Nix venv is sealed at build time.
                   extraDependencyGroups = [ "matrix" ];
 
-                  # Matrix bootstrap vars: the hermes-agent matrix adapter reads
-                  # MATRIX_HOMESERVER, MATRIX_USER_ID, and MATRIX_ALLOWED_USERS
-                  # exclusively from process environment via os.getenv() (upstream
-                  # gateway/config.py:1391-1414, gateway/platforms/matrix.py:234).
-                  # Upstream's activation script cat-appends cfg.environment entries
-                  # alongside environmentFiles into ${stateDir}/.hermes/.env, the
-                  # file load_hermes_dotenv() reads at python startup.
+                  # Matrix bootstrap vars: HOMESERVER and USER_ID migrated to declarative
+                  # settings.platforms.matrix.extra.* (matrix.py:329, :332 reads config.extra
+                  # preferentially over env). ALLOWED_USERS remains env-only — upstream has
+                  # no YAML bridge for allow_from in matrix adapter (gap relative to
+                  # slack/discord/etc.; matrix.py:453 reads only os.getenv).
                   environment = {
-                    MATRIX_HOMESERVER = settings.matrixHomeserverUrl;
-                    MATRIX_USER_ID = "@${settings.matrixUserName}:${settings.matrixServerName}";
                     MATRIX_ALLOWED_USERS = lib.concatStringsSep "," settings.channelsAllowlist;
                   };
                 };
