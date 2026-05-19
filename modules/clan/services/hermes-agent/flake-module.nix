@@ -213,9 +213,21 @@
                         dm_mention_threads = false; # don't thread @-mentions inside DMs (DMs stay linear)
                       };
 
-                      # Platform-level matrix bootstrap (migrated from MATRIX_HOMESERVER / MATRIX_USER_ID env).
-                      # matrix.py:329, :332 reads config.extra.{homeserver, user_id} preferentially
-                      # over the env var, so this is the canonical declarative location.
+                      # Platform-level matrix bootstrap kept as forward-looking schema documentation.
+                      # Currently INERT at runtime: it survives YAML parsing and the deep-merge at
+                      # gateway/config.py:759-779 but gets clobbered by _apply_env_overrides before
+                      # the adapter constructor's config.extra.get("homeserver") fallback path
+                      # (gateway/platforms/matrix.py:328-329) ever executes. Two upstream gates
+                      # require the env vars (set in `environment` below):
+                      #   - gateway/platforms/matrix.py:234-241 (check_matrix_requirements) reads
+                      #     os.getenv("MATRIX_HOMESERVER", "") directly; empty → adapter never
+                      #     instantiated.
+                      #   - gateway/config.py:1400 unconditionally overwrites extra["homeserver"]
+                      #     with empty env value; symmetric overwrites for user_id/password/
+                      #     device_id at 1401-1411 all have `if X:` guards, only homeserver lacks
+                      #     one.
+                      # Kept here so this block becomes authoritative if upstream adds the missing
+                      # guard at 1400 and a YAML→env bridge symmetric to gateway/config.py:1124-1143.
                       platforms.matrix.extra = {
                         homeserver = settings.matrixHomeserverUrl;
                         user_id = "@${settings.matrixUserName}:${settings.matrixServerName}";
@@ -243,12 +255,29 @@
                   # unusable here — the Nix venv is sealed at build time.
                   extraDependencyGroups = [ "matrix" ];
 
-                  # Matrix bootstrap vars: HOMESERVER and USER_ID migrated to declarative
-                  # settings.platforms.matrix.extra.* (matrix.py:329, :332 reads config.extra
-                  # preferentially over env). ALLOWED_USERS remains env-only — upstream has
-                  # no YAML bridge for allow_from in matrix adapter (gap relative to
-                  # slack/discord/etc.; matrix.py:453 reads only os.getenv).
+                  # MATRIX_HOMESERVER and MATRIX_USER_ID are LOAD-BEARING for upstream's
+                  # pre-adapter gate at gateway/platforms/matrix.py:234-241
+                  # (check_matrix_requirements reads os.getenv("MATRIX_HOMESERVER", "")
+                  # directly; if empty returns False; adapter never created) and for the
+                  # unguarded overwrite at gateway/config.py:1400 (clobbers
+                  # config.platforms[MATRIX].extra["homeserver"] with empty env value;
+                  # symmetric overwrites for user_id/password/device_id at 1401-1411 all
+                  # have if-X-guards; only homeserver lacks one).
+                  #
+                  # The declarative settings.platforms.matrix.extra.* block above is
+                  # currently INERT at runtime — it survives YAML parsing and the deep-
+                  # merge at gateway/config.py:759-779 but gets overwritten by
+                  # _apply_env_overrides before the adapter constructor's
+                  # config.extra.get("homeserver") fallback path (matrix.py:328-329) ever
+                  # executes. We keep it as schema documentation, ready to become
+                  # authoritative if upstream adds the missing guard at line 1400 and a
+                  # YAML→env bridge symmetric to gateway/config.py:1124-1143.
+                  #
+                  # ALLOWED_USERS remains env-only — upstream has no YAML bridge for
+                  # allow_from in matrix adapter (matrix.py:453 reads only os.getenv).
                   environment = {
+                    MATRIX_HOMESERVER = settings.matrixHomeserverUrl;
+                    MATRIX_USER_ID = "@${settings.matrixUserName}:${settings.matrixServerName}";
                     MATRIX_ALLOWED_USERS = lib.concatStringsSep "," settings.channelsAllowlist;
                   };
                 };
