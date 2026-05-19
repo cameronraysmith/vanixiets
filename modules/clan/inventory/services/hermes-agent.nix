@@ -22,6 +22,12 @@
         port = 18791;
         dashboardPort = 18790;
         channelsAllowlist = [ "@cameron:matrix.zt" ];
+        # Matrix home channel — receives cron-job results and cross-platform
+        # messages. The "cron" room (!Tthf05aI9YvVVsCF2d:matrix.zt) has the
+        # hermes user as a member; the bot joined on invite per upstream's
+        # hardcoded _on_invite handler (matrix.py:1979-1988).
+        homeRoom = "!Tthf05aI9YvVVsCF2d:matrix.zt";
+        homeRoomName = "cron";
         configOverrides = {
           # Mirror openclaw's autoJoin posture so the bot accepts DM invites.
           channels.matrix.autoJoin = "always";
