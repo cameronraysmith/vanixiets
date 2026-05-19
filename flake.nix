@@ -103,7 +103,9 @@
 
     llm-agents.url = "github:numtide/llm-agents.nix";
 
-    hermes-agent.url = "github:NousResearch/hermes-agent";
+    # TODO: revert following #27716
+    # hermes-agent.url = "github:NousResearch/hermes-agent";
+    hermes-agent.url = "github:cameronraysmith/hermes-agent/27716-pip-locales-packaging";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     hermes-agent.inputs.flake-parts.follows = "flake-parts";
 

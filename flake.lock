@@ -631,15 +631,16 @@
         "uv2nix": "uv2nix_2"
       },
       "locked": {
-        "lastModified": 1779015855,
-        "narHash": "sha256-yLSysCS6a2pmT4T6WXCO6lVetZMaNr8xyvV6pd9mL4o=",
-        "owner": "NousResearch",
+        "lastModified": 1779212655,
+        "narHash": "sha256-geZvtEoznN43AdyYBlUMa56XbWFFROjcF8sbbwA/c+o=",
+        "owner": "cameronraysmith",
         "repo": "hermes-agent",
-        "rev": "f36c89cd5798da0f313192555739975e57ffdef5",
+        "rev": "e85ca2baa7aa8bc98b5adb97c3cc47528b29dee7",
         "type": "github"
       },
       "original": {
-        "owner": "NousResearch",
+        "owner": "cameronraysmith",
+        "ref": "27716-pip-locales-packaging",
         "repo": "hermes-agent",
         "type": "github"
       }
