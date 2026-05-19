@@ -1,4 +1,4 @@
-# Unified AI agent skills for claude-code, codex, opencode, and droid
+# Unified AI agent skills for claude-code, codex, opencode, droid, and hermes-agent
 #
 # Skills are partitioned into core (shared across all agents), claude
 # (Claude Code-only), and third-party (from flake inputs). Third-party
@@ -6,8 +6,10 @@
 # that check lib.isPath need home.file entries instead of skills options.
 #
 # Agents with programs.*.skills options (claude-code, opencode) use the
-# module-native mechanism. Codex and Droid lack recursive symlink support
-# in their modules, so core skills are symlinked directly via home.file.
+# module-native mechanism. Codex, Droid, and hermes-agent lack recursive
+# symlink support in their modules, so core skills are symlinked directly
+# via home.file. For hermes-agent, the target ~/.hermes/external-skills/
+# is consumed via services.hermes-agent.settings.skills.external_dirs.
 { ... }:
 {
   flake.modules.homeManager.ai =
@@ -48,6 +50,13 @@
         // lib.mapAttrs' (
           name: path:
           lib.nameValuePair ".factory/skills/${name}" {
+            source = path;
+            recursive = true;
+          }
+        ) coreSkills
+        // lib.mapAttrs' (
+          name: path:
+          lib.nameValuePair ".hermes/external-skills/${name}" {
             source = path;
             recursive = true;
           }
