@@ -190,6 +190,17 @@
                         default_trust = 0.5; # upstream default
                       };
 
+                      # Fallback chain triggers on HTTP 429 (post-retry-exhaustion), 5xx (post-retry),
+                      # 401/403/404 (immediate). Turn-scoped (each new user message restarts from
+                      # primary). Re-uses OPENROUTER_API_KEY — no new credential class needed.
+                      # Per fallback-providers.md:32-44 valid shape: list of {provider, model} dicts.
+                      fallback_providers = [
+                        {
+                          provider = "openrouter";
+                          model = "openai/gpt-5.5";
+                        }
+                      ];
+
                       channels.matrix = {
                         homeserver = "https://${settings.matrixServerName}";
                         user_id = "@${settings.matrixUserName}:${settings.matrixServerName}";
