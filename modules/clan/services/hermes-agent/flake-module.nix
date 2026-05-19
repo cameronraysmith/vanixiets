@@ -166,6 +166,19 @@
                   # below. Keep both populated so policy and bootstrap stay consistent.
                   settings = lib.mkMerge [
                     {
+                      # Operationally-critical defaults for headless matrix-bot posture.
+                      # See docs/notes/agents/ for rationale per key (TODO: extend deployment note).
+                      approvals.mode = "smart"; # default "manual" would deadlock; no TTY for prompts
+                      display.skin = "mono"; # CLI parity with dashboard.theme = "mono"
+                      sessions = {
+                        auto_prune = true; # upstream default false; long-lived gateway accumulates state.db
+                        retention_days = 90; # upstream's documented suggested value
+                      };
+                      lsp.install_strategy = "manual"; # upstream default "auto" leaks into sealed nix venv
+                      security.allow_lazy_installs = false; # sealed nix venv — lazy installs fail; disable cleanly
+                      stt.enabled = false; # no whisper model bundled on cinnabar
+                      kanban.dispatch_in_gateway = false; # kanban dispatcher ticks every 60s; unused on cinnabar
+
                       channels.matrix = {
                         homeserver = "https://${settings.matrixServerName}";
                         user_id = "@${settings.matrixUserName}:${settings.matrixServerName}";
