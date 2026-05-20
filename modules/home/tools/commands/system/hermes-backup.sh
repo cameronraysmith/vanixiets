@@ -2,9 +2,10 @@
 # Snapshot hermes-agent state to a prefix-directory tar.zst archive.
 #
 # Invokes `hermes backup -o <tmp>.zip` to produce an intermediate zip,
-# then re-wraps it into <out_dir>/hermes-<UTC-stamp>.tar.zst with every
-# entry prefixed by hermes-<UTC-stamp>/ so extraction does not explode
-# into cwd. Verifies the archive listing before atomic-renaming into
+# then reads its entries (via bsdtar's `@archive` operand) and re-emits
+# them into <out_dir>/hermes-<UTC-stamp>.tar.zst with every entry
+# prefixed by hermes-<UTC-stamp>/ so extraction does not explode into
+# cwd. Verifies the archive listing before atomic-renaming into
 # place; the EXIT trap removes the temp directory (and intermediate zip)
 # on either success or failure.
 set -euo pipefail
@@ -69,8 +70,7 @@ bsdtar \
   --use-compress-program "zstd -T0 --long=27 -19" \
   -cf "$tmp/${name}.tar.zst" \
   -s "|^|${name}/|" \
-  -C "$tmp" \
-  "${name}.zip"
+  "@$tmp/${name}.zip"
 
 bsdtar -tf "$tmp/${name}.tar.zst" >/dev/null
 
