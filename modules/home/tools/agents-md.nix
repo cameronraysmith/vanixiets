@@ -25,8 +25,10 @@
           1. Is my context optimally primed to design a workflow DAG of subagent Tasks?
           2. Are there ambiguities requiring clarification before I proceed?
           3. Would local access to external source code or documentation improve this work?
-             If so, ask the user to fork and clone relevant repositories to `~/projects/`
-             before proceeding, and reference all repos via `~/projects/...` paths.
+             If so, first search for an existing local copy per the "git repository by name"
+             convention in `preferences-style-and-conventions`; ask the user to clone or fork
+             to `~/projects/<topic>-workspace/<repo>/` only on miss. Reference all repos via
+             `~/projects/...` paths.
           4. Should I present my task decomposition for approval before dispatching?
 
           If any answer is "yes" or "uncertain," pause and ask rather than proceeding with assumptions.
