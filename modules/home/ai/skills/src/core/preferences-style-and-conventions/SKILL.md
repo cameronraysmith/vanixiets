@@ -142,9 +142,10 @@ This approach provides a complete, well-organized view of CI results and avoids 
   - Disk usage (directory sizes): use `diskus` instead of `du -sh`
   - Clipboard (copy to system clipboard): use `cb copy` (`clipboard-jh`) instead of platform-specific `pbcopy` (macOS) or `xclip`/`xsel` (Linux)
   - Notification (push alert to user): use `ntfy-send "<message>"` where `<message>` includes the repo name and summarizes the completed task (default topic is the local hostname; override with `ntfy-send "<message>" <topic>`)
-- When given a GitHub file URL (e.g., `https://github.com/org/repo/blob/ref/path/to/file.ext#L119-L131`), check for a local copy before using web tools:
-  1. Search for repo: `fd -t d '^repo$' ~/projects` (repo name may have variants)
-  2. Verify remote: `cd candidate-dir && git remote -v` (confirm origin matches GitHub org/repo)
-  3. Read the file with line range using the Read tool
-  4. Only use WebFetch/WebSearch if no local copy exists
+- When the user mentions a git repository by name (from GitHub or any other forge), or work would benefit from reading its source code, documentation, or history, first check for a local copy under `~/projects/` before reaching for web tools or asking the user for context:
+  1. Search the full tree: `fd -t d -d 4 '^<repo>$' ~/projects` (the canonical layout is `~/projects/<topic>-workspace/<repo>/`, but copies may live elsewhere; repo names can have variants such as `<repo>.jl` or `<repo>-rs`).
+  2. Verify the match: `cd candidate-dir && git remote -v` to confirm the origin matches the expected forge URL. Name collisions are common with single-token repo names, so this step is required, not optional, before treating a candidate as authoritative.
+  3. On hit: treat the local path as the source of truth. Dispatch subagent Tasks to that path for research, reference, or comparison, and use `~/projects/...` paths in subsequent prompts and writeups.
+  4. On miss: surface the failure to the user and ask them to clone or fork the repo to `~/projects/<topic>-workspace/<repo>/` (or to provide the path if it lives elsewhere) before proceeding. Do not silently fall back to `WebFetch`/`WebSearch` for substantive research when a local copy would be more authoritative; web tools remain appropriate only for genuinely web-native content (release notes pages, issue discussions, blog posts).
+- When given a GitHub file URL (e.g., `https://github.com/org/repo/blob/ref/path/to/file.ext#L119-L131`), apply the lookup above for `repo`, then Read the file with the line range. Use `WebFetch` only if no local copy exists and the user has declined to clone.
 - When given a GitHub issue/PR URL (e.g., `https://github.com/org/repo/issues/2491`), use `gh issue view 2491 -R org/repo` or `gh pr view 2491 -R org/repo` to access discussion content and metadata.
