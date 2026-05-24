@@ -33,10 +33,13 @@
     { pkgs, lib, ... }:
     {
       # Automatic garbage collection (nixos uses systemd dates)
+      # Pin to 4am America/New_York year-round (timezone-aware OnCalendar);
+      # bounded 5-minute jitter avoids default ~45min randomized delay.
       nix.gc = {
         automatic = true;
         options = "--delete-older-than 14d";
-        dates = "weekly";
+        dates = "*-*-* 04:00:00 America/New_York";
+        randomizedDelaySec = "5min";
       };
 
       # Automatic store optimization via hardlinking
