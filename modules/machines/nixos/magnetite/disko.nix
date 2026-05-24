@@ -55,7 +55,10 @@
           };
           "root/nix" = {
             type = "zfs_fs";
-            options.mountpoint = "/nix";
+            options = {
+              mountpoint = "/nix";
+              "com.sun:auto-snapshot" = "false";
+            };
             mountpoint = "/nix";
           };
           "root/podman" = {
