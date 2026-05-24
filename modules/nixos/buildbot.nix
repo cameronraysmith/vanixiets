@@ -147,7 +147,9 @@
           topic = "build-with-buildbot";
         };
 
-        # evalWorkerCount × evalMaxMemorySize = 8 GB peak; headroom for niks3 + PostgreSQL + nginx on 32 GB CX53.
+        # Sized for Hetzner AMD CX53 (16 vCPU / 32 GB RAM / 320 GB SSD).
+        # 4 workers × 2 GiB = 8 GiB peak eval allocation, leaving ~24 GiB headroom
+        # for buildbot subprocesses + postgres + matrix + nginx baseline.
         evalWorkerCount = 4;
         evalMaxMemorySize = 2048;
 
