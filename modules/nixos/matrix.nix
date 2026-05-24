@@ -327,6 +327,7 @@
       services.lk-jwt-service = {
         enable = true;
         port = lkJwtPort;
+        livekitUrl = "wss://${domain}/livekit/sfu";
         # SAME path as services.livekit.keyFile above. The single key
         # pair is shared between the SFU and the JWT issuer; do not
         # generate two keys.
@@ -428,6 +429,20 @@
           # Trailing slash on both sides preserves the path remainder.
           "/livekit/jwt/" = {
             proxyPass = "http://127.0.0.1:${toString lkJwtPort}/";
+          };
+
+          # LiveKit SFU WebSocket endpoint. The JS SDK appends /rtc,
+          # /rtc/v1, /rtc/validate, /rtc/v1/validate to the base
+          # livekitUrl (see livekit pkg/service/rtcservice.go:90-93),
+          # so the rewrite strips the /livekit/sfu prefix to deliver
+          # those paths intact to the LiveKit mux.
+          "/livekit/sfu" = {
+            proxyPass = "http://127.0.0.1:${toString config.services.livekit.settings.port}";
+            recommendedProxySettings = true;
+            proxyWebsockets = true;
+            extraConfig = ''
+              rewrite ^/livekit/sfu/(.*)$ /$1 break;
+            '';
           };
 
           # Literal-JSON discovery endpoints. Served by nginx (NOT
