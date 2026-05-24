@@ -234,6 +234,22 @@
           # registration is the systemd-oneshot below via shared secret.
           enable_registration = false;
 
+          # Belt-and-suspenders against upstream-default drift: these declare the
+          # safe values explicitly even when upstream Synapse already defaults to
+          # them, so a future minor-version default change cannot silently flip
+          # the posture for a public-internet homeserver.
+          allow_guest_access = false;
+          enable_registration_without_verification = false;
+
+          # Enforce password policy on new accounts / password changes. Existing
+          # passwords are grandfathered. Length-only (high-entropy passphrase
+          # style) — character-class requirements provide weaker entropy/UX
+          # tradeoff and are deliberately omitted.
+          password_config.policy = {
+            enabled = true;
+            minimum_length = 12;
+          };
+
           database = {
             name = "psycopg2";
             # allow_unsafe_locale must be at settings.database level, NOT
