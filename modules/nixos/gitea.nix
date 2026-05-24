@@ -172,5 +172,13 @@
             fi
           '')
         ];
+
+      # Tolerate slow postgres recovery (2026-05-22 incident: postgres
+      # PANICked on ENOSPC; gitea hit systemd's default 5-restarts-in-10s
+      # cap and was marked permanently failed). Disabling the rate cap
+      # and lengthening RestartSec lets gitea keep retrying while
+      # postgres recovers; gitea is idempotent on restart.
+      systemd.services.gitea.unitConfig.StartLimitIntervalSec = 0;
+      systemd.services.gitea.serviceConfig.RestartSec = lib.mkForce "30s";
     };
 }
