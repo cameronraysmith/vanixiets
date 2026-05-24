@@ -56,6 +56,8 @@ secrets/home-manager.backup-pre-2.4/
 .worktrees/
 
 # Beads / Dolt files (added by bd init)
+.beads/*
+!.beads/.keep
 .dolt/
 *.db
 .beads-credential-key
