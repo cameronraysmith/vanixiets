@@ -173,6 +173,17 @@
         workerPasswordFile = config.clan.core.vars.generators.buildbot-worker.files."password".path;
       };
 
+      # Restart on failure (no default restart policy in upstream buildbot-nix or nixpkgs).
+      # 10s delay avoids tight restart loops while underlying issues are diagnosed.
+      systemd.services.buildbot-master.serviceConfig = {
+        Restart = "always";
+        RestartSec = "10s";
+      };
+      systemd.services.buildbot-worker.serviceConfig = {
+        Restart = "always";
+        RestartSec = "10s";
+      };
+
       # Allow buildbot worker connections via ZeroTier (for remote workers)
       networking.firewall.interfaces."zt+" = {
         allowedTCPPorts = [ 9989 ];
