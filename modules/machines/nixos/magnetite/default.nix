@@ -97,6 +97,15 @@ in
         monthly = lib.mkForce 0;
       };
 
+      # Raise nix daemon free-space thresholds for a build host. clan-core and
+      # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for
+      # buildbot-nix workers materializing large closures on a CX53 with niks3
+      # GC pressure. Trigger GC at 5 GiB free, free until 20 GiB available.
+      nix.settings = {
+        min-free = 5 * 1024 * 1024 * 1024;
+        max-free = 20 * 1024 * 1024 * 1024;
+      };
+
       # srvos hardware-hetzner-cloud sets useNetworkd=true and useDHCP=false; configure primary interface explicitly.
       systemd.network.networks."10-uplink" = {
         matchConfig.Name = "en*";
