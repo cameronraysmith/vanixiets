@@ -82,6 +82,21 @@ in
       services.nginx.sslDhparam = lib.mkForce false;
       security.dhparams.enable = lib.mkForce false;
 
+      # Tune ZFS auto-snapshot retention for a single-disk cloud VPS without
+      # off-site snapshot replication. The nixpkgs defaults (frequent=4,
+      # hourly=24, daily=7, weekly=4, monthly=1 via srvos mkDefault) are
+      # calibrated for workstations with USB backup targets and produce
+      # excessive snapshot churn on a cloud node. `/nix` is opted out via
+      # the disko `com.sun:auto-snapshot=false` property; the remaining
+      # datasets (/nixos, /home, /docker, /podman) retain a short window.
+      services.zfs.autoSnapshot = {
+        frequent = 0;
+        hourly = 4;
+        daily = 3;
+        weekly = 1;
+        monthly = lib.mkForce 0;
+      };
+
       # srvos hardware-hetzner-cloud sets useNetworkd=true and useDHCP=false; configure primary interface explicitly.
       systemd.network.networks."10-uplink" = {
         matchConfig.Name = "en*";
