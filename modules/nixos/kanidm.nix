@@ -149,7 +149,21 @@
           systems.oauth2.synapse = {
             displayName = "Matrix";
             originUrl = "https://matrix.scientistexperience.net/_synapse/client/oidc/callback";
-            originLanding = "https://matrix.scientistexperience.net/";
+            # Direct matrix_users from the kanidm WebUI app tile to Element Web's
+            # hosted login screen. app.element.io has no URL-parameter mechanism
+            # to pre-populate the homeserver upstream (verified against
+            # element-hq/element-web source); users type
+            # matrix.scientistexperience.net once on first visit and Element's
+            # localStorage caches it thereafter. The /#/login fragment skips the
+            # Welcome screen and lands directly on the login form. True one-click
+            # SSO would require self-hosting element-web with default_server_config
+            # pinned to this homeserver — out of scope here.
+            originLanding = "https://app.element.io/#/login";
+            # Element brand icon for the tile: PWA app icon at the unsuffixed
+            # 512.png path. Stable across element-web upgrades because the PWA
+            # manifest references the unsuffixed filename; hash-suffixed siblings
+            # would break on nixpkgs bumps.
+            imageFile = "${pkgs.element-web}/vector-icons/512.png";
             preferShortUsername = true;
             scopeMaps.matrix_users = [
               "openid"
