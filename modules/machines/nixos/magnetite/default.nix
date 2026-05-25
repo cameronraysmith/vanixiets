@@ -97,6 +97,24 @@ in
         monthly = lib.mkForce 0;
       };
 
+      # Disko's `options."com.sun:auto-snapshot" = "false"` on the root/nix dataset
+      # (see disko.nix) is honored only at dataset CREATION time. For already-
+      # provisioned hosts, the property is not re-asserted by `nixos-rebuild switch`
+      # or `clan machines update`. This oneshot makes the declared intent a runtime
+      # invariant by issuing `zfs set` at boot. `zfs set` is a no-op when the
+      # value already matches, so the unit is idempotent and side-effect-free
+      # on repeat boots.
+      systemd.services.zfs-assert-root-nix-noautosnap = {
+        description = "Assert com.sun:auto-snapshot=false on zroot/root/nix";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/nix";
+        };
+      };
+
       # Raise nix daemon free-space thresholds for a build host. clan-core and
       # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for
       # buildbot-nix workers materializing large closures on a CX53 with niks3
