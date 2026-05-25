@@ -81,6 +81,17 @@
         proxied = false;
       };
 
+      # DNS CNAME record for kanidm IdP endpoint (resolves to magnetite)
+      # Uses literal FQDN per ADR-0023 service hostname convention.
+      resource.cloudflare_dns_record.accounts = {
+        zone_id = config.data.cloudflare_zone.scientistexperience "id";
+        name = "accounts.scientistexperience.net";
+        type = "CNAME";
+        content = "magnetite.scientistexperience.net";
+        ttl = 1; # automatic
+        proxied = false;
+      };
+
       # R2 custom domain for public cache access (Cloudflare auto-manages DNS CNAME)
       resource.cloudflare_r2_custom_domain.nix-cache = {
         account_id = config.data.cloudflare_zone.scientistexperience "account.id";
