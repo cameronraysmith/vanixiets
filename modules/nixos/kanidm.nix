@@ -1,10 +1,17 @@
 # kanidm IdP for magnetite — server scaffold + nginx-fronted TLS + OAuth2 synapse client.
 #
-# Shape (per ADR-0022): nginx terminates public TLS via ACME and reverse-proxies to
-# kanidm bound on 127.0.0.1:8443. A single security.acme.certs."accounts..." entry
-# serves both legs — nginx via useACMEHost, kanidm via LoadCredential into
-# /run/credentials/kanidm.service/. Hostname is a literal FQDN per ADR-0023; package
-# is pinned to kanidmWithSecretProvisioning_1_10 per ADR-0027.
+# Shape (per ADR-0022, supersession 2026-05-25): nginx terminates public TLS via ACME
+# (enableACME = true on the kanidm vhost) and reverse-proxies to kanidm bound on
+# 127.0.0.1:8443. kanidm reads the same cert material from the filesystem at
+# ${certs.directory}/{fullchain,key}.pem; access is granted by adding the kanidm
+# service to the cert's ACL group via SupplementaryGroups = [ certs.group ]. This
+# matches the canonical pattern in clan-infra/modules/web02/kanidm.nix and
+# jfly-clan-snow/machines/fflewddur/kanidm/default.nix; it supersedes the earlier
+# LoadCredential preference recorded in ADR-0022 (LoadCredential alone failed two
+# nixpkgs ACME assertions at deploy time, and provides no rotation benefit since
+# kanidm holds the TLS chain in process memory and requires restart for rotation
+# either way). Hostname is a literal FQDN per ADR-0023; package is pinned to
+# kanidmWithSecretProvisioning_1_10 per ADR-0027.
 #
 # Clan-vars secret generators (admin-password, idm-admin-password, oauth2-synapse)
 # declared inline below per nix-4qr.2; admin passwords are wired into
@@ -31,6 +38,7 @@
     }:
     let
       domain = "accounts.scientistexperience.net";
+      certs = config.security.acme.certs."${domain}";
     in
     {
       # Admin password: auto-generated via xkcdpass, consumed at boot by the
@@ -98,10 +106,12 @@
           # See real client IPs through the nginx reverse-proxy hop.
           trust_x_forward_for = true;
 
-          # Cert material delivered via systemd LoadCredential (defelo-nixos pattern,
-          # preferred over filesystem-ACL sharing per ADR-0022 alternatives).
-          tls_chain = "/run/credentials/kanidm.service/tls_chain";
-          tls_key = "/run/credentials/kanidm.service/tls_key";
+          # Cert material read directly from the ACME state directory; access
+          # granted via SupplementaryGroups on the kanidm unit (see below). This
+          # matches clan-infra/web02 and jfly-clan-snow/fflewddur; supersedes the
+          # earlier LoadCredential preference per ADR-0022 supersession.
+          tls_chain = "${certs.directory}/fullchain.pem";
+          tls_key = "${certs.directory}/key.pem";
         };
 
         provision = {
@@ -143,19 +153,15 @@
         postRun = "systemctl restart kanidm.service";
       };
 
-      # Block kanidm startup on ACME cert availability; deliver cert via
-      # LoadCredential into /run/credentials/kanidm.service/.
+      # Order kanidm after the ACME cert unit; grant filesystem access to the
+      # cert material via SupplementaryGroups (clan-infra/web02 pattern).
       systemd.services.kanidm = {
-        requires = [ "acme-${domain}.service" ];
         after = [ "acme-${domain}.service" ];
-        serviceConfig.LoadCredential = [
-          "tls_chain:/var/lib/acme/${domain}/fullchain.pem"
-          "tls_key:/var/lib/acme/${domain}/key.pem"
-        ];
+        serviceConfig.SupplementaryGroups = [ certs.group ];
       };
 
       services.nginx.virtualHosts.${domain} = {
-        useACMEHost = domain;
+        enableACME = true;
         forceSSL = true;
         locations."/" = {
           proxyPass = "https://127.0.0.1:8443";
