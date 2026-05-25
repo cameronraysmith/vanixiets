@@ -72,17 +72,21 @@
         '';
       };
 
-      # Synapse OAuth2 client basic-auth secret: openssl-random hex, owned by
-      # the matrix-synapse user so synapse can LoadCredential it directly into
-      # /run/credentials/matrix-synapse.service/oidc-secret (no group bridge).
+      # Synapse OAuth2 client basic-auth secret: openssl-random hex. Owned by
+      # kanidm:kanidm because kanidm-provision (kanidm.service ExecStartPost)
+      # reads the file directly as the kanidm user to upload the basic_secret
+      # to the OAuth2 resource server. The matrix-synapse OIDC client consumes
+      # the same file via LoadCredential in modules/nixos/matrix.nix;
+      # LoadCredential is staged by systemd as root before privilege drop, so
+      # the source-file ownership does not constrain the client side.
       # restartUnits propagates secret rotation past LoadCredential's snapshot
       # at unit-start (architecture doc §Gotchas #7).
       clan.core.vars.generators.kanidm-oauth2-synapse = {
         files."secret" = {
           secret = true;
-          owner = "matrix-synapse";
-          group = "matrix-synapse";
-          mode = "0440";
+          owner = "kanidm";
+          group = "kanidm";
+          mode = "0400";
           restartUnits = [ "matrix-synapse.service" ];
         };
         runtimeInputs = [ pkgs.openssl ];
