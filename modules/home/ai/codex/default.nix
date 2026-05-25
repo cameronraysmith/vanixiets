@@ -16,17 +16,21 @@
         # https://github.com/openai/codex/blob/main/codex-rs/config.md
         settings = {
           # Model configuration
-          model = "gpt-5.4";
+          model = "gpt-5.5";
           # model_reasoning_effort = "high";
           # model_reasoning_summary = "auto";
 
-          # Web search (replaces deprecated features.web_search_cached)
+          # Top-level web_search gates WebSearchMode (disabled | cached | live).
+          # Distinct from features.web_search_cached, which is an internal
+          # feature flag used for review-session gating.
           web_search = "cached";
 
           # Approval and interaction
           approval_policy = "on-request";
           file_opener = "none";
-          preferred_auth_method = "chatgpt";
+          # preferred_auth_method was removed upstream; ConfigToml accepts but
+          # silently drops unknown keys (no serde deny_unknown_fields). Auth
+          # path is driven by ~/.codex/auth.json after `codex login`.
           check_for_update_on_startup = false;
 
           # Sandbox configuration
