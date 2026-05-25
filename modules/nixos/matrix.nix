@@ -300,12 +300,97 @@
               burst_count = 3;
             };
           };
+
+          # OIDC provider wiring — kanidm IdP per nix-4qr (kanidm-magnetite epic).
+          #
+          # Cross-chain reference: the client_secret_path consumes a credential
+          # populated by LoadCredential below from the kanidm-oauth2-synapse
+          # clan-vars generator declared in modules/nixos/kanidm.nix (on the
+          # kanidm-magnetite-plan chain). The diamond join makes both chains'
+          # content visible during development; at integration time
+          # kanidm-magnetite-plan MUST merge to main before
+          # nix-dk1-matrix-magnetite to avoid breaking this reference.
+          #
+          # `issuer` is the per-client OIDC discovery URL
+          # (https://accounts.../oauth2/openid/<clientId>), NOT the kanidm root
+          # (architecture doc §Interface contracts, Gotcha #1). `client_id` must
+          # match the kanidm OAuth2 client name declared in kanidm.nix.
+          #
+          # `pkce_method = "always"` follows the defelo-nixos reference shape.
+          # `localpart_template = "{{ user.preferred_username }}"` is paired
+          # with `preferShortUsername = true` on the kanidm client (Gotcha #2).
+          #
+          # `allow_existing_users = true` per ADR-0025 enables binding the
+          # OIDC `sub` claim to the existing local @cameron MXID on first SSO
+          # sign-in, preserving rooms, history, and E2EE device sessions.
+          # The flag is inert until a kanidm person with matching account_name
+          # exists and a browser SSO sign-in occurs (collapses nix-4qr.8 to a
+          # purely operational checklist).
+          oidc_providers = [
+            {
+              idp_id = "kanidm";
+              idp_name = "Matrix SSO";
+              issuer = "https://accounts.scientistexperience.net/oauth2/openid/synapse";
+              client_id = "synapse";
+              client_secret_path = "/run/credentials/matrix-synapse.service/oidc-secret";
+              pkce_method = "always";
+              scopes = [
+                "openid"
+                "profile"
+                "email"
+              ];
+              user_mapping_provider.config = {
+                localpart_template = "{{ user.preferred_username }}";
+                display_name_template = "{{ user.name }}";
+                email_template = "{{ user.email }}";
+              };
+              allow_existing_users = true;
+            }
+          ];
+
+          # password_config.enabled is intentionally NOT set here. The synapse
+          # default is `true`; per ADR-0026 (bounded dual-rail) we retain
+          # password auth in parallel with OIDC until the cameron migration is
+          # verified end-to-end (nix-4qr.8), then flip to `false` in a separate
+          # commit (nix-4qr.14). Do not preemptively disable.
         };
 
         # Shared secret YAML overlay (Synapse merges keys from each file).
         extraConfigFiles = [
           config.clan.core.vars.generators.synapse-registration-shared-secret.files."shared-secret.yaml".path
         ];
+      };
+
+      ############################################################
+      # Part 2b: Synapse systemd unit extensions for OIDC
+      ############################################################
+
+      # LoadCredential delivers the OIDC client secret as a one-shot snapshot
+      # at unit-start into /run/credentials/matrix-synapse.service/oidc-secret,
+      # matching the `client_secret_path` set in oidc_providers above.
+      #
+      # The source clan-vars generator (modules/nixos/kanidm.nix) declares
+      # `restartUnits = [ "matrix-synapse.service" ]` so secret rotations
+      # automatically trigger a unit restart, defeating the LoadCredential
+      # snapshot-staleness invariant (memory reference:
+      # reference_loadcredential-snapshot-staleness; architecture doc
+      # §Gotchas #7).
+      #
+      # preStart curl-polls the kanidm root before synapse starts, mitigating
+      # the synapse-boots-before-kanidm startup race (architecture doc §Gotcha
+      # #6). Pattern is the defelo-nixos reference at
+      # ~/projects/nix-workspace/defelo-nixos/hosts/srv/matrix/synapse.nix
+      # lines 97-103, adapted to the magnetite hostname.
+      systemd.services.matrix-synapse = {
+        serviceConfig.LoadCredential = [
+          "oidc-secret:${config.clan.core.vars.generators.kanidm-oauth2-synapse.files."secret".path}"
+        ];
+        preStart = ''
+          while ! ${lib.getExe pkgs.curl} -sL -o/dev/null --fail https://accounts.scientistexperience.net; do
+            echo "waiting for kanidm at https://accounts.scientistexperience.net"
+            sleep 1
+          done
+        '';
       };
 
       ############################################################
