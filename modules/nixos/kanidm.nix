@@ -136,14 +136,19 @@
             config.clan.core.vars.generators.kanidm-idm-admin-password.files."password".path;
 
           groups = {
-            # Persons in matrix_users get synapse OIDC scope grants per scopeMaps below.
-            # Declarative membership is preferred over operational kanidm group add-members
-            # because (a) provision.autoRemove = false preserves cameron's operationally-
-            # created person, but (b) group membership can be re-asserted on each deploy
-            # without affecting the person record. Future onboardings (raquel, etc.) add
-            # to this list. See jfly-clan-snow/fflewddur/kanidm for the declarative-member
-            # pattern reference.
-            matrix_users.members = [ "cameron" ];
+            # Group declared as a stub (members = [ ]) so it exists in entitiesByName for
+            # scopeMaps.matrix_users to reference (nixpkgs kanidm.nix:876 referential check
+            # — see kanidm-magnetite.md gotcha 3). Membership is managed operationally via
+            # `kanidm group add-members matrix_users <user>` because cameron's person record
+            # is operational per ADR-0025 + gotcha 4, and the nixpkgs assertion forbids
+            # declarative members that reference non-declared entities. overwriteMembers = false
+            # preserves operationally-added members across re-provisions. Reference patterns:
+            # clan-infra/modules/web02/kanidm.nix:38-39 ("Don't declare any users here") and
+            # jfly-clan-snow/fflewddur/kanidm:71 (overwriteMembers = false for imperative mgmt).
+            matrix_users = {
+              members = [ ];
+              overwriteMembers = false;
+            };
           };
 
           systems.oauth2.synapse = {
