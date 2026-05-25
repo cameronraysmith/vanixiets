@@ -97,13 +97,13 @@ in
         monthly = lib.mkForce 0;
       };
 
-      # Disko's `options."com.sun:auto-snapshot" = "false"` on the root/nix dataset
-      # (see disko.nix) is honored only at dataset CREATION time. For already-
-      # provisioned hosts, the property is not re-asserted by `nixos-rebuild switch`
-      # or `clan machines update`. This oneshot makes the declared intent a runtime
-      # invariant by issuing `zfs set` at boot. `zfs set` is a no-op when the
-      # value already matches, so the unit is idempotent and side-effect-free
-      # on repeat boots.
+      # Disko's `options."com.sun:auto-snapshot" = "false"` on reproducible-content
+      # datasets (root/nix, root/docker, root/podman; see disko.nix) is honored only
+      # at dataset CREATION time. For already-provisioned hosts, the property is not
+      # re-asserted by `nixos-rebuild switch` or `clan machines update`. These oneshots
+      # make the declared intent a runtime invariant by issuing `zfs set` at boot.
+      # `zfs set` is a no-op when the value already matches, so the units are
+      # idempotent and side-effect-free on repeat boots.
       systemd.services.zfs-assert-root-nix-noautosnap = {
         description = "Assert com.sun:auto-snapshot=false on zroot/root/nix";
         wantedBy = [ "multi-user.target" ];
@@ -112,6 +112,28 @@ in
           Type = "oneshot";
           RemainAfterExit = true;
           ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/nix";
+        };
+      };
+
+      systemd.services.zfs-assert-root-docker-noautosnap = {
+        description = "Assert com.sun:auto-snapshot=false on zroot/root/docker";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/docker";
+        };
+      };
+
+      systemd.services.zfs-assert-root-podman-noautosnap = {
+        description = "Assert com.sun:auto-snapshot=false on zroot/root/podman";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/podman";
         };
       };
 
