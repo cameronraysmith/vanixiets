@@ -39,9 +39,13 @@
 #   - LiveKit and lk-jwt-service share the SAME keyfile path.
 #   - .well-known/matrix/client served by nginx (not Synapse) with
 #     org.matrix.msc4143.rtc_foci pointing at the LiveKit SFU URL.
-#   - Federation closed at the listener level: resources = [ "client" ]
-#     only, federation_domain_whitelist = [ ], enable_registration =
-#     false (Phase-1 registration goes through the systemd-oneshot).
+#   - Federation closed at the nginx layer: the synapse listener mounts
+#     both `client` and `federation` resources on localhost, but nginx
+#     exposes only the exact-match `/_matrix/federation/v1/openid/userinfo`
+#     endpoint (required by lk-jwt-service for Element Call OpenID token
+#     validation). All other `/_matrix/federation/` paths return 404,
+#     federation_domain_whitelist = [ ], enable_registration = false
+#     (Phase-1 registration goes through the systemd-oneshot).
 {
   config,
   inputs,
@@ -215,11 +219,19 @@
               type = "http";
               tls = false;
               x_forwarded = true;
-              # Federation listener is intentionally omitted. The single
-              # `client` resource exposes the Client-Server API only.
+              # Both `client` and `federation` resources are mounted on this
+              # single localhost listener. Public exposure of federation is
+              # gated at the nginx layer: only the OpenID userinfo endpoint
+              # is allowed through, which lk-jwt-service requires to validate
+              # Element Call participants. All other federation paths are
+              # denied at nginx, preserving the federation-closed posture
+              # while unblocking Element Call.
               resources = [
                 {
-                  names = [ "client" ];
+                  names = [
+                    "client"
+                    "federation"
+                  ];
                   compress = false;
                 }
               ];
@@ -521,6 +533,17 @@
           # Synapse Client-Server API.
           "/_matrix" = {
             proxyPass = "http://127.0.0.1:${toString synapsePort}";
+          };
+          # Selectively expose ONLY the federation OpenID userinfo endpoint
+          # (required by lk-jwt-service to validate Element Call OpenID
+          # tokens issued via /openid/request_token). All other federation
+          # paths are denied below. nginx longest-prefix/exact-match rules
+          # ensure the exact-match wins over the deny-prefix.
+          "= /_matrix/federation/v1/openid/userinfo" = {
+            proxyPass = "http://127.0.0.1:${toString synapsePort}";
+          };
+          "/_matrix/federation/" = {
+            extraConfig = "return 404;";
           };
           "/_synapse" = {
             proxyPass = "http://127.0.0.1:${toString synapsePort}";
