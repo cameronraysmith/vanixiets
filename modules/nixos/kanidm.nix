@@ -103,8 +103,13 @@
           # Loopback bind; nginx fronts public TLS per ADR-0022 sub-decision.
           bindaddress = "127.0.0.1:8443";
 
-          # See real client IPs through the nginx reverse-proxy hop.
-          trust_x_forward_for = true;
+          # See real client IPs through the nginx reverse-proxy hop on 127.0.0.1.
+          # V2 schema (nixpkgs forces version = "2"): legacy boolean
+          # trust_x_forward_for was removed; trust is now expressed as a list
+          # of CIDRs from which X-Forwarded-For is honored.
+          http_client_address_info = {
+            x-forward-for = [ "127.0.0.1" ];
+          };
 
           # Cert material read directly from the ACME state directory; access
           # granted via SupplementaryGroups on the kanidm unit (see below). This
