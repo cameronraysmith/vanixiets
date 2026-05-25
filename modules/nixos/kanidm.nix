@@ -6,12 +6,13 @@
 # /run/credentials/kanidm.service/. Hostname is a literal FQDN per ADR-0023; package
 # is pinned to kanidmWithSecretProvisioning_1_10 per ADR-0027.
 #
-# Clan-vars secret generators land in nix-4qr.2 (admin-password, idm-admin-password,
-# kanidm-oauth2-synapse). This scaffold references those generator paths so the .2
-# dispatch can drop in generators and password/secret file wiring without editing
-# this module's structure. basicSecretFile on the synapse OAuth2 client is omitted
-# here (null default → kanidm generates a random secret per provision) and will be
-# bound to the clan-vars path in .2.
+# Clan-vars secret generators (admin-password, idm-admin-password, oauth2-synapse)
+# declared inline below per nix-4qr.2; admin passwords are wired into
+# services.kanidm.provision.{admin,idmAdmin}PasswordFile, and the oauth2 secret
+# is bound to services.kanidm.provision.systems.oauth2.synapse.basicSecretFile.
+# The oauth2-synapse generator declares restartUnits = [ "matrix-synapse.service" ]
+# per the LoadCredential snapshot-staleness invariant (architecture doc
+# §Interface contracts, §Gotchas #7; memory: reference_loadcredential-snapshot-staleness).
 #
 # Cameron's kanidm account is intentionally not declared via provision.persons
 # (gotcha 4 — destructive on re-provision); creation is operational per ADR-0025.
@@ -32,6 +33,56 @@
       domain = "accounts.scientistexperience.net";
     in
     {
+      # Admin password: auto-generated via xkcdpass, consumed at boot by the
+      # kanidm server (not via LoadCredential snapshot — no restartUnits needed).
+      clan.core.vars.generators.kanidm-admin-password = {
+        files."password" = {
+          secret = true;
+          owner = "kanidm";
+          group = "kanidm";
+          mode = "0440";
+        };
+        runtimeInputs = [ pkgs.xkcdpass ];
+        script = ''
+          xkcdpass --numwords 3 --delimiter - > "$out/password"
+        '';
+      };
+
+      # idm_admin password: auto-generated via xkcdpass; idm_admin is the
+      # operator-tier account used by kanidm-provision.service for declarative
+      # entity management (oauth2 systems, groups).
+      clan.core.vars.generators.kanidm-idm-admin-password = {
+        files."password" = {
+          secret = true;
+          owner = "kanidm";
+          group = "kanidm";
+          mode = "0440";
+        };
+        runtimeInputs = [ pkgs.xkcdpass ];
+        script = ''
+          xkcdpass --numwords 3 --delimiter - > "$out/password"
+        '';
+      };
+
+      # Synapse OAuth2 client basic-auth secret: openssl-random hex, owned by
+      # the matrix-synapse user so synapse can LoadCredential it directly into
+      # /run/credentials/matrix-synapse.service/oidc-secret (no group bridge).
+      # restartUnits propagates secret rotation past LoadCredential's snapshot
+      # at unit-start (architecture doc §Gotchas #7).
+      clan.core.vars.generators.kanidm-oauth2-synapse = {
+        files."secret" = {
+          secret = true;
+          owner = "matrix-synapse";
+          group = "matrix-synapse";
+          mode = "0440";
+          restartUnits = [ "matrix-synapse.service" ];
+        };
+        runtimeInputs = [ pkgs.openssl ];
+        script = ''
+          openssl rand -hex 32 > "$out/secret"
+        '';
+      };
+
       services.kanidm = {
         package = pkgs.kanidmWithSecretProvisioning_1_10;
 
@@ -60,6 +111,11 @@
           # account is migrated. See gotcha 4 + ADR-0025.
           autoRemove = false;
 
+          # Admin / idm_admin passwords from clan-vars generators above.
+          adminPasswordFile = config.clan.core.vars.generators.kanidm-admin-password.files."password".path;
+          idmAdminPasswordFile =
+            config.clan.core.vars.generators.kanidm-idm-admin-password.files."password".path;
+
           groups = {
             # No-op declaration required before scopeMaps.matrix_users references.
             matrix_users = { };
@@ -75,8 +131,7 @@
               "profile"
               "email"
             ];
-            # basicSecretFile bound to clan-vars path in nix-4qr.2:
-            #   = config.clan.core.vars.generators.kanidm-oauth2-synapse.files.secret.path;
+            basicSecretFile = config.clan.core.vars.generators.kanidm-oauth2-synapse.files."secret".path;
           };
         };
       };
