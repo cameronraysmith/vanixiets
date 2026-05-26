@@ -1,28 +1,31 @@
 # kanidm IdP for magnetite — server scaffold + nginx-fronted TLS + OAuth2 synapse client.
 #
-# Shape (per ADR-0022, supersession 2026-05-25): nginx terminates public TLS via ACME
-# (enableACME = true on the kanidm vhost) and reverse-proxies to kanidm bound on
-# 127.0.0.1:8443. kanidm reads the same cert material from the filesystem at
-# ${certs.directory}/{fullchain,key}.pem; access is granted by adding the kanidm
-# service to the cert's ACL group via SupplementaryGroups = [ certs.group ]. This
-# matches the canonical pattern in clan-infra/modules/web02/kanidm.nix and
-# jfly-clan-snow/machines/fflewddur/kanidm/default.nix; it supersedes the earlier
-# LoadCredential preference recorded in ADR-0022 (LoadCredential alone failed two
-# nixpkgs ACME assertions at deploy time, and provides no rotation benefit since
-# kanidm holds the TLS chain in process memory and requires restart for rotation
-# either way). Hostname is a literal FQDN per ADR-0023; package is pinned to
-# kanidmWithSecretProvisioning_1_10 per ADR-0027.
+# Shape: nginx terminates public TLS via ACME (enableACME = true on the kanidm
+# vhost) and reverse-proxies to kanidm bound on 127.0.0.1:8443. kanidm reads the
+# same cert material from the filesystem at ${certs.directory}/{fullchain,key}.pem;
+# access is granted by adding the kanidm service to the cert's ACL group via
+# SupplementaryGroups = [ certs.group ]. This matches the canonical pattern in
+# clan-infra/modules/web02/kanidm.nix and
+# jfly-clan-snow/machines/fflewddur/kanidm/default.nix. Reading cert material from
+# the filesystem rather than via LoadCredential avoids two nixpkgs ACME assertions
+# that LoadCredential alone failed at deploy time, and provides no rotation
+# downside since kanidm holds the TLS chain in process memory and requires restart
+# for rotation either way. Hostname is a literal FQDN; package is pinned to
+# kanidmWithSecretProvisioning_1_10.
 #
 # Clan-vars secret generators (admin-password, idm-admin-password, oauth2-synapse)
-# declared inline below per nix-4qr.2; admin passwords are wired into
+# declared inline below; admin passwords are wired into
 # services.kanidm.provision.{admin,idmAdmin}PasswordFile, and the oauth2 secret
 # is bound to services.kanidm.provision.systems.oauth2.synapse.basicSecretFile.
-# The oauth2-synapse generator declares restartUnits = [ "matrix-synapse.service" ]
-# per the LoadCredential snapshot-staleness invariant (architecture doc
-# §Interface contracts, §Gotchas #7; memory: reference_loadcredential-snapshot-staleness).
+# The oauth2-synapse generator declares restartUnits = [ "kanidm.service"
+# "matrix-synapse.service" ] per the LoadCredential snapshot-staleness invariant
+# (memory: reference_loadcredential-snapshot-staleness). Both restarts are
+# required: kanidm re-runs provision to update the OAuth2 RS database,
+# matrix-synapse re-reads the secret via LoadCredential.
 #
 # Cameron's kanidm account is intentionally not declared via provision.persons
-# (gotcha 4 — destructive on re-provision); creation is operational per ADR-0025.
+# (declarative person records are destructive on re-provision); creation is
+# operational.
 {
   config,
   inputs,
@@ -92,15 +95,24 @@ in
       # the same file via LoadCredential in modules/nixos/matrix.nix;
       # LoadCredential is staged by systemd as root before privilege drop, so
       # the source-file ownership does not constrain the client side.
-      # restartUnits propagates secret rotation past LoadCredential's snapshot
-      # at unit-start (architecture doc §Gotchas #7).
+      # restartUnits propagates secret rotation through two channels: kanidm.service
+      # restarts so kanidm-provision (ExecStartPost) re-uploads the new basic_secret
+      # to kanidm's OAuth2 resource server database; matrix-synapse.service restarts
+      # so the synapse OIDC client picks up the new secret via LoadCredential (which
+      # snapshots at unit-start). Without the kanidm.service restart, the rotated
+      # secret reaches matrix-synapse but kanidm's database still holds the old
+      # secret, breaking OAuth2 token exchange with invalid_client. (memory:
+      # reference_loadcredential-snapshot-staleness).
       clan.core.vars.generators.kanidm-oauth2-synapse = {
         files."secret" = {
           secret = true;
           owner = "kanidm";
           group = "kanidm";
           mode = "0400";
-          restartUnits = [ "matrix-synapse.service" ];
+          restartUnits = [
+            "kanidm.service"
+            "matrix-synapse.service"
+          ];
         };
         runtimeInputs = [ pkgs.openssl ];
         script = ''
@@ -117,7 +129,7 @@ in
           inherit domain;
           origin = "https://${domain}";
 
-          # Loopback bind; nginx fronts public TLS per ADR-0022 sub-decision.
+          # Loopback bind; nginx fronts public TLS.
           bindaddress = "127.0.0.1:8443";
 
           # See real client IPs through the nginx reverse-proxy hop on 127.0.0.1.
@@ -130,8 +142,7 @@ in
 
           # Cert material read directly from the ACME state directory; access
           # granted via SupplementaryGroups on the kanidm unit (see below). This
-          # matches clan-infra/web02 and jfly-clan-snow/fflewddur; supersedes the
-          # earlier LoadCredential preference per ADR-0022 supersession.
+          # matches clan-infra/web02 and jfly-clan-snow/fflewddur.
           tls_chain = "${certs.directory}/fullchain.pem";
           tls_key = "${certs.directory}/key.pem";
         };
@@ -140,7 +151,7 @@ in
           enable = true;
 
           # Destructive removal of state-only entities is disabled until cameron's
-          # account is migrated. See gotcha 4 + ADR-0025.
+          # account is migrated.
           autoRemove = false;
 
           # Admin / idm_admin passwords from clan-vars generators above.
@@ -150,12 +161,12 @@ in
 
           groups = {
             # Group declared as a stub (members = [ ]) so it exists in entitiesByName for
-            # scopeMaps.matrix_users to reference (nixpkgs kanidm.nix:876 referential check
-            # — see kanidm-magnetite.md gotcha 3). Membership is managed operationally via
+            # scopeMaps.matrix_users to reference (nixpkgs kanidm.nix:876 referential check).
+            # Membership is managed operationally via
             # `kanidm group add-members matrix_users <user>` because cameron's person record
-            # is operational per ADR-0025 + gotcha 4, and the nixpkgs assertion forbids
-            # declarative members that reference non-declared entities. overwriteMembers = false
-            # preserves operationally-added members across re-provisions. Reference patterns:
+            # is operational, and the nixpkgs assertion forbids declarative members that
+            # reference non-declared entities. overwriteMembers = false preserves
+            # operationally-added members across re-provisions. Reference patterns:
             # clan-infra/modules/web02/kanidm.nix:38-39 ("Don't declare any users here") and
             # jfly-clan-snow/fflewddur/kanidm:71 (overwriteMembers = false for imperative mgmt).
             matrix_users = {
