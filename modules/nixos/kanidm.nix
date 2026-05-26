@@ -44,34 +44,44 @@ in
       certs = config.security.acme.certs."${domain}";
     in
     {
-      # Admin password: auto-generated via xkcdpass, consumed at boot by the
-      # kanidm server (not via LoadCredential snapshot — no restartUnits needed).
+      # Admin password: auto-generated via xkcdpass at >80 bits entropy
+      # (7 words × ~12.82 bits/word ≈ 89.7 bits, well above the 80-bit floor for
+      # passphrases with any online attack surface). restartUnits propagates
+      # secret rotation into a kanidm.service restart, so the postStartScript's
+      # `kanidmd scripting recover-account` re-runs with the new file contents
+      # at deploy time rather than waiting for the next reboot. Without this,
+      # `clan machines update magnetite` would leave the new password on disk
+      # while the running kanidm still has the old password in its database.
       clan.core.vars.generators.kanidm-admin-password = {
         files."password" = {
           secret = true;
           owner = "kanidm";
           group = "kanidm";
           mode = "0440";
+          restartUnits = [ "kanidm.service" ];
         };
         runtimeInputs = [ pkgs.xkcdpass ];
         script = ''
-          xkcdpass --numwords 3 --delimiter - > "$out/password"
+          xkcdpass --numwords 7 --delimiter - > "$out/password"
         '';
       };
 
-      # idm_admin password: auto-generated via xkcdpass; idm_admin is the
-      # operator-tier account used by kanidm-provision.service for declarative
-      # entity management (oauth2 systems, groups).
+      # idm_admin password: auto-generated via xkcdpass at >80 bits entropy
+      # (7 words × ~12.82 bits/word ≈ 89.7 bits). idm_admin is the operator-tier
+      # account used by kanidm-provision (kanidm.service ExecStartPost) for
+      # declarative entity management (oauth2 systems, groups). restartUnits
+      # ensures rotation re-runs provision against the new credential.
       clan.core.vars.generators.kanidm-idm-admin-password = {
         files."password" = {
           secret = true;
           owner = "kanidm";
           group = "kanidm";
           mode = "0440";
+          restartUnits = [ "kanidm.service" ];
         };
         runtimeInputs = [ pkgs.xkcdpass ];
         script = ''
-          xkcdpass --numwords 3 --delimiter - > "$out/password"
+          xkcdpass --numwords 7 --delimiter - > "$out/password"
         '';
       };
 
