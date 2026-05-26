@@ -428,6 +428,41 @@ Reading the output against the invariants:
 - inspecting each chain via `jj log -r 'main..<bookmark>'` confirms invariant (v) when the chain shows incremental commits rather than a single amended bookmark commit.
 - the immediate-children revset `jj log -r '<merge-change-id>+'` confirms invariant (vi) when it returns exactly one commit (`[wip]`); two or more rows indicate sibling per-stream wips and require collapsing back to a single shared `[wip]` before resuming routing.
 
+### Pre-edit cross-chain file-collision reconnaissance
+
+While `[wip]` (the working-copy commit above the development join) presents an integrated view of all chains' modifications, editing a file there commits a new modification that must be routed to one chain — and that choice interacts with whichever other chains have already modified the same file.
+A development join whose parent chain tips form an antichain in the commit poset guarantees that the chains are pairwise mergeable at the commit level; it does NOT guarantee that further modifications routed to one chain will compose cleanly with modifications another chain has already applied to the same file region.
+
+Before any edit to a file in `[wip]`, run a cross-chain file-collision reconnaissance query:
+
+```bash
+PAGER=cat jj log -r 'fork_point(@--)..@- & files("<relative-path>")' \
+    --no-graph -T 'change_id.short() ++ " " ++ bookmarks ++ " " ++ description.first_line() ++ "\n"'
+```
+
+The revset selects commits in the principal filter between the meet (`fork_point(@--)` — the greatest common ancestor of the antichain formed by `[merge]`'s parents) and the join (`@-` — `[merge]`).
+`& files("<path>")` restricts to commits that modified the named file.
+For multi-file queries, prefer the fileset union form inside one call: `files("a | b")` (per upstream's `docs/filesets.md`), over the revset-level union `files("a") | files("b")`.
+
+Output interpretation:
+
+| Result | Meaning | Routing implication |
+|---|---|---|
+| Zero rows | No chain has touched the file | Route to the semantically appropriate chain; choice unconstrained by collision |
+| Rows from exactly one chain | One chain owns prior touchpoints | Route the new change to that chain via append-route, amend-route, or absorb-route (see §"Routing to a chain") |
+| Rows from two or more chains | Cross-chain file collision exists | STOP. Apply one of the three resolution patterns documented in the `reference_jj-diamond-cross-chain-file-collision` memory before proceeding. |
+
+The reconnaissance has constant cost (one `jj log` invocation) regardless of diamond size, and prevents structural conflicts at `[merge]` that would otherwise surface during Phase 4 serialize and require post-hoc resolution.
+
+The same query applies at chain creation: before issuing the chain-creation-mid-diamond recipe (`diamond-workflow.md:161-190`) to introduce a new chain into an active diamond, run the reconnaissance against the new chain's planned file scope.
+If a collision exists, either route the planned work into the existing chain that already owns those touchpoints (no new chain needed) or apply the collision-resolution patterns from `reference_jj-diamond-cross-chain-file-collision` before proceeding with chain creation.
+
+#### Semantic invariant of `[merge]`
+
+The development join's `[merge]` commit IS the join (∨, least upper bound) of its parent antichain in the commit poset.
+This join exists if and only if all parents are pairwise mergeable.
+Cross-chain file-collision reconnaissance is the operational check that this mergeability holds with respect to the specific file under edit before the edit creates a new modification.
+
 ### The edit-route cycle
 
 All edits land in `@` (which is `[wip]`).
@@ -469,6 +504,18 @@ Use this form only when the intent is genuinely to refine the existing tip commi
 
 The most common failure mode is running the amend-route N times with N different `-m` strings, expecting N commits to appear on the chain: that sequence instead accumulates N diffs into the same chain-tip commit and overwrites the description N times, yielding one commit with the last message and a conflated diff.
 If N atomic landings are intended, run the append-route N times.
+
+A third flavor, **absorb-route**, uses `jj absorb` instead of explicit-target `jj squash`.
+Krycho's article *Jujutsu Megamerges and `jj absorb`* (https://v5.chriskrycho.com/journal/jujutsu-megamerges-and-jj-absorb/) establishes absorb as the preferred verb when ownership is unambiguous: absorb examines blame and routes each change in `[wip]` to the closest mutable ancestor that last modified the same lines.
+When the pre-edit reconnaissance has confirmed exactly-one-chain ownership for every file in `[wip]`, absorb is safer than manual squash because it refuses to act when ambiguity would force a choice ("if it is not truly unambiguous… it will choose not to do anything at all").
+
+```bash
+# Absorb-route: auto-distribute changes in @ to their semantic homes by blame ancestry
+PAGER=cat jj absorb
+```
+
+Use absorb-route when: pre-edit recon returned exactly-one-chain rows for every file modified in this `[wip]` cycle, AND blame ancestry will resolve each change unambiguously to a single chain commit.
+Fall back to append-route or amend-route when: any file modified has zero rows (no chain owns it yet — absorb has nowhere to route) or multiple-chain rows (collision — manual decision required).
 
 Across both recipes, three flags are load-bearing.
 `--from <source>` is explicit source selection; a bare `--into` is a no-op when `@` is empty, so the flag is required to express intent unambiguously.
@@ -713,6 +760,23 @@ gh pr create -d -a "@me" -B main -H chain-a -t "feat: description" -b ""
 Follow the PR creation protocol in `~/.claude/skills/preferences-git-version-control/SKILL.md` for placeholder content and safety conventions.
 
 For GitHub-only repositories, Mergify's Stack-Aware Base feature would handle single-CI-gate behavior natively without an explicit aggregate PR; see the footnote in `diamond-workflow.md` Phase 4 for the trade-off against forge-agnostic compatibility.
+
+### Vocabulary cross-reference
+
+The skill uses terminology from three traditions, sometimes naming the same concept differently:
+
+| Concept | This skill | Krycho (community) | Upstream jj | Order / lattice theory |
+|---|---|---|---|---|
+| Multi-parent integration commit | development join | `[merge]` (with `[wip]` on top) | "merge commit at `@`" (pattern unnamed; see `FAQ.md:255-294`) | **join (∨)**, least upper bound |
+| Greatest common ancestor of parallel work | fork point | (uses generic "common ancestor") | `fork_point()` revset (`docs/revsets.md:349-353`) | **meet (∧)**, greatest lower bound |
+| Totally ordered subset of commits | chain | "stream of work" or "branch" | "linear chain" or "anonymous branch" | **chain** (precise term) |
+| Mutually incomparable parallel branches | chain tips of a development join | (unnamed) | (unnamed) | **antichain** (Dilworth) |
+| Maximum of a chain | chain tip | "tip commit" | "tip" | **maximum** of the chain |
+| The integrated structural pattern | diamond workflow | "megamerge" (title-only, undefined) | (unnamed) | a bounded sublattice with antichain interior |
+| Moving a change to its semantic home | route (append-, amend-, absorb-) | "squash into", "absorb" | `jj squash --into`, `jj absorb`, `jj new --insert-*` | (operational; no formal term) |
+
+`[merge]` / `[wip]` bracket notation is Krycho-canonical (from *Jujutsu Megamerges and `jj absorb`*) and used in this skill for visual concreteness when describing the structural pair.
+The full theoretical treatment of the lattice / partial-order foundation — Dilworth's antichain theorem, Lamport's partial order, Winskel event structures — is in `docs/notes/development/version-control/epic-to-branch-diamond-workflow.md`.
 
 ## `jj revert` usage
 
