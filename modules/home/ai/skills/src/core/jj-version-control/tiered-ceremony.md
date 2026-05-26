@@ -65,7 +65,7 @@ Trigger to enter: two or more independent work streams in the same repo concurre
 Examples include multiple beads issues within an epic being worked in parallel, a vocab refactor running alongside a peer agent's separate workstream, or parallel experiments that should compose into a coherent integrated state for validation.
 A single workstream that happens to span several commits does not trigger tier 3 — that is still tier 1 or tier 2 depending on the verification needs.
 
-Cost: routing discipline (every edit must be intentionally routed to the right chain before yielding control), editor-hang avoidance vigilance (every commit-boundary subcommand needs `-m`; see the editor-hang reference in vanixiets memory), careful bookmark and development-join maintenance per the composite maintenance invariant in `SKILL.md`.
+Cost: routing discipline (every edit must be intentionally routed to the right chain before yielding control), editor-hang avoidance vigilance (every commit-boundary subcommand needs `-m`; see the editor-hang reference in vanixiets memory), careful bookmark and development-join maintenance per the composite maintenance invariant in `SKILL.md`, and pre-edit cross-chain file-collision reconnaissance before each file edit in `[wip]` (see `SKILL.md` §"Pre-edit cross-chain file-collision reconnaissance").
 
 Operations to enter (promote from tier 2 by adding a second parent to `@` and layering `[wip]` on top):
 
