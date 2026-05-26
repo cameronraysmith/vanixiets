@@ -154,21 +154,25 @@
           systems.oauth2.synapse = {
             displayName = "Matrix";
             originUrl = "https://matrix.scientistexperience.net/_synapse/client/oidc/callback";
-            # Direct matrix_users from the kanidm WebUI app tile to Element Web's
-            # hosted login screen. app.element.io has no URL-parameter mechanism
-            # to pre-populate the homeserver upstream (verified against
-            # element-hq/element-web source); users type
-            # matrix.scientistexperience.net once on first visit and Element's
-            # localStorage caches it thereafter. The /#/login fragment skips the
-            # Welcome screen and lands directly on the login form. True one-click
-            # SSO would require self-hosting element-web with default_server_config
-            # pinned to this homeserver — out of scope here.
-            originLanding = "https://app.element.io/#/login";
-            # Element brand icon for the tile: PWA app icon at the unsuffixed
-            # 512.png path. Stable across element-web upgrades because the PWA
-            # manifest references the unsuffixed filename; hash-suffixed siblings
-            # would break on nixpkgs bumps.
-            imageFile = "${pkgs.element-web}/vector-icons/512.png";
+            # Direct matrix_users from the kanidm WebUI app tile to Cinny with
+            # this homeserver pre-populated. Cinny documents a /login/<homeserver>
+            # URL convention that selects the homeserver in one click (no manual
+            # entry on first visit); the equivalent convention is not documented
+            # for app.element.io. The client choice (Cinny) is decoupled from the
+            # tile branding (see imageFile below) so the latter remains valid if
+            # the landing target is later changed to a different matrix client.
+            originLanding = "https://app.cinny.in/login/matrix.scientistexperience.net";
+            # Client-agnostic matrix protocol logo for the tile: the tile name is
+            # "Matrix" (the protocol) and the click destination is one specific
+            # matrix client (Cinny today, possibly another later). Using the
+            # protocol logo rather than a client-specific icon decouples the tile
+            # branding from the client choice. Pinned to a recent commit of
+            # matrix-org/matrix.org's own static asset (stable repo path,
+            # permissively published as matrix.org's site branding).
+            imageFile = pkgs.fetchurl {
+              url = "https://raw.githubusercontent.com/matrix-org/matrix.org/683992f213311a672e3d52451ee3a2d70278a92e/static/images/matrix-logo.svg";
+              hash = "sha256-Pt1BGbGmfQWJh8KWJ6/hs0uMgKc5K2JttggHaDQsNoM=";
+            };
             preferShortUsername = true;
             scopeMaps.matrix_users = [
               "openid"
