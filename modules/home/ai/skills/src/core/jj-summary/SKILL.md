@@ -284,6 +284,10 @@ The diamond connects a beads epic graph to jj chain topology via diverge, develo
 Canonical recipe: `~/.claude/skills/jj-version-control/diamond-workflow.md`.
 
 ```bash
+# Pre-edit recon: which chain (if any) already touched this file?
+PAGER=cat jj log -r 'fork_point(@--)..@- & files("<path>")' \
+    --no-graph -T 'change_id.short() ++ " " ++ bookmarks ++ " " ++ description.first_line() ++ "\n"'
+
 # Develop phase: N-way development join + wip (tactical example)
 jj new chain-a chain-b chain-c
 jj describe -m "join N=3: chain-a, chain-b, chain-c"
