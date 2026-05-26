@@ -1,28 +1,35 @@
 # Matrix homeserver for magnetite
 #
 # Composes a full Matrix homeserver stack on the public hostname
-# matrix.scientistexperience.net using direct nixpkgs services (Option A
-# per the Phase-1 research deliverable at
-# docs/notes/matrix/magnetite-public-deployment-research.md):
+# matrix.scientistexperience.net using direct nixpkgs services:
 #
 #   - matrix-synapse: federated-disabled Synapse with rate-limiting and
-#     shared-secret registration (mag-3, mag-6)
+#     OIDC-only authentication via kanidm
 #   - livekit + lk-jwt-service: MatrixRTC backend for Element Call,
-#     sharing a single keyfile (mag-4, mag-8)
-#   - coturn: TURN/STUN relay for NAT-traversal fallback (mag-5, mag-9)
+#     sharing a single keyfile
+#   - coturn: TURN/STUN relay for NAT-traversal fallback
 #   - element-call SPA: Element Call web client served as static assets
-#     with a runtime-substituted config.json (mag-11)
+#     with a runtime-substituted config.json
 #   - nginx vhost: single-vhost composition serving SPA at /, Synapse
 #     APIs at /_matrix and /_synapse, lk-jwt-service at /livekit/jwt,
 #     and literal-JSON .well-known/matrix/{server,client} for client
-#     discovery and MSC4143 rtc_foci advertisement (mag-12)
-#   - register-users systemd-oneshot: idempotent user provisioning via
-#     register_new_matrix_user with the shared registration secret
-#     (mag-13)
+#     discovery and MSC4143 rtc_foci advertisement
+#
+# Password authentication and shared-secret user provisioning have been
+# removed. The legacy rail consisted of:
+#   - clan.core.vars.generators.synapse-registration-shared-secret
+#   - clan.core.vars.generators.matrix-password-<user> (per-user)
+#   - systemd.services.matrix-synapse-register-users (oneshot)
+#   - services.matrix-synapse.extraConfigFiles entry for the shared secret
+# These were retired in a single deploy together with
+# password_config.enabled = false. Admin recovery for SSO breakage now
+# goes via the synapse admin API
+# (POST /_synapse/admin/v1/reset_password/<user>) which does not depend
+# on the retired clan-vars secrets.
 #
 # clan-vars generators are declared inline within this module per the
-# gitea.nix/buildbot.nix four-part dendritic pattern. The Synapse and
-# coturn generators bind owner to the static service user; the LiveKit
+# gitea.nix/buildbot.nix four-part dendritic pattern. The coturn
+# generator binds owner to the static service user; the LiveKit
 # keyfile generator omits owner because both LiveKit and lk-jwt-service
 # run with DynamicUser=true and the upstream modules materialize the
 # secret via LoadCredential internally.
@@ -30,8 +37,6 @@
 # Sharp edges honored:
 #   - allow_unsafe_locale at settings.database level (not args)
 #     per cinnabar c62e9690f.
-#   - register_new_matrix_user --exists-ok required for idempotent
-#     re-runs per cinnabar fcb49967e.
 #   - coturn relay range 49152-49999 to avoid LiveKit's default
 #     50000-51000 RTC range.
 #   - ACME group=turnserver + reloadServices=[coturn.service] so coturn
@@ -44,8 +49,8 @@
 #     exposes only the exact-match `/_matrix/federation/v1/openid/userinfo`
 #     endpoint (required by lk-jwt-service for Element Call OpenID token
 #     validation). All other `/_matrix/federation/` paths return 404,
-#     federation_domain_whitelist = [ ], enable_registration = false
-#     (Phase-1 registration goes through the systemd-oneshot).
+#     federation_domain_whitelist = [ ], enable_registration = false,
+#     password_config.enabled = false (OIDC-only via kanidm).
 {
   config,
   inputs,
@@ -63,11 +68,6 @@
       domain = "matrix.scientistexperience.net";
       synapsePort = 8008;
       lkJwtPort = 8080;
-      # Intended Matrix users — small initial list mirroring cinnabar.
-      # Adding a user requires (a) extending this list, (b) the supervising
-      # operator invoking `clan vars generate magnetite --generator
-      # matrix-password-<user>` to populate the password file.
-      matrixUsers = [ "cameron" ];
 
       # Element Call SPA overlay. Copies the upstream package and writes
       # a config.json pointing the client at this homeserver and the
@@ -121,24 +121,6 @@
       # Part 1: clan-vars generators
       ############################################################
 
-      # Synapse shared registration secret. Synapse expects a YAML file
-      # with key registration_shared_secret loaded via extraConfigFiles;
-      # the register-users oneshot extracts the bare secret via sed.
-      clan.core.vars.generators.synapse-registration-shared-secret = {
-        files."shared-secret.yaml" = {
-          neededFor = "services";
-          owner = "matrix-synapse";
-        };
-        runtimeInputs = [
-          pkgs.coreutils
-          pkgs.pwgen
-        ];
-        script = ''
-          SECRET=$(pwgen -s 32 1)
-          echo "registration_shared_secret: \"$SECRET\"" > $out/shared-secret.yaml
-        '';
-      };
-
       # LiveKit and lk-jwt-service share this keyfile. Both upstream
       # modules run with DynamicUser=true and materialize the file via
       # LoadCredential into /run/credentials/<unit>/livekit-secrets, so
@@ -175,32 +157,6 @@
           openssl rand -hex 32 > $out/secret
         '';
       };
-
-      # Per-user matrix-password-<user> generators. Owned by matrix-synapse
-      # because the register-users oneshot runs as User=matrix-synapse and
-      # reads each password via systemd LoadCredential.
-      imports = [
-        {
-          clan.core.vars.generators = lib.listToAttrs (
-            map (u: {
-              name = "matrix-password-${u}";
-              value = {
-                files."password" = {
-                  neededFor = "services";
-                  owner = "matrix-synapse";
-                };
-                runtimeInputs = [
-                  pkgs.coreutils
-                  pkgs.xkcdpass
-                ];
-                script = ''
-                  xkcdpass -n 4 -d - > $out/password
-                '';
-              };
-            }) matrixUsers
-          );
-        }
-      ];
 
       ############################################################
       # Part 2: Synapse homeserver
@@ -242,8 +198,9 @@
           # surface above). Empty whitelist disables outbound federation.
           federation_domain_whitelist = [ ];
 
-          # Phase-1 registration policy: the only legitimate caller of
-          # registration is the systemd-oneshot below via shared secret.
+          # Registration policy: account creation flows exclusively through
+          # OIDC SSO (kanidm IdP). The shared-secret registration oneshot
+          # has been retired.
           enable_registration = false;
 
           # Belt-and-suspenders against upstream-default drift: these declare the
@@ -253,13 +210,20 @@
           allow_guest_access = false;
           enable_registration_without_verification = false;
 
-          # Enforce password policy on new accounts / password changes. Existing
-          # passwords are grandfathered. Length-only (high-entropy passphrase
-          # style) — character-class requirements provide weaker entropy/UX
-          # tradeoff and are deliberately omitted.
-          password_config.policy = {
-            enabled = true;
-            minimum_length = 12;
+          # Password authentication is disabled. Authentication is OIDC-only
+          # via the kanidm IdP; password rotation and the shared-secret
+          # registration oneshot have been retired. Admin recovery for SSO
+          # breakage goes via POST /_synapse/admin/v1/reset_password/<user>,
+          # which does not depend on the retired clan-vars secrets.
+          password_config = {
+            enabled = false;
+            # Policy block is retained for defense-in-depth: if a future
+            # operator re-enables password auth, these constraints take
+            # effect immediately on new accounts and password changes.
+            policy = {
+              enabled = true;
+              minimum_length = 12;
+            };
           };
 
           database = {
@@ -282,7 +246,7 @@
           # MSC4140 (delayed events) gates upcoming Element Call
           # features. Verify the precise required experimental_features
           # set against Element Call 0.18.0's release notes at deployment
-          # time per the briefing's sharp-edges section.
+          # time.
           experimental_features = {
             msc4140_enabled = true;
           };
@@ -313,31 +277,26 @@
             };
           };
 
-          # OIDC provider wiring — kanidm IdP per nix-4qr (kanidm-magnetite epic).
+          # OIDC provider wiring — kanidm IdP.
           #
-          # Cross-chain reference: the client_secret_path consumes a credential
-          # populated by LoadCredential below from the kanidm-oauth2-synapse
-          # clan-vars generator declared in modules/nixos/kanidm.nix (on the
-          # kanidm-magnetite-plan chain). The diamond join makes both chains'
-          # content visible during development; at integration time
-          # kanidm-magnetite-plan MUST merge to main before
-          # nix-dk1-matrix-magnetite to avoid breaking this reference.
+          # The client_secret_path consumes a credential populated by
+          # LoadCredential below from the kanidm-oauth2-synapse clan-vars
+          # generator declared in modules/nixos/kanidm.nix.
           #
           # `issuer` is the per-client OIDC discovery URL
-          # (https://accounts.../oauth2/openid/<clientId>), NOT the kanidm root
-          # (architecture doc §Interface contracts, Gotcha #1). `client_id` must
-          # match the kanidm OAuth2 client name declared in kanidm.nix.
+          # (https://accounts.../oauth2/openid/<clientId>), NOT the kanidm root.
+          # `client_id` must match the kanidm OAuth2 client name declared in
+          # kanidm.nix.
           #
           # `pkce_method = "always"` follows the defelo-nixos reference shape.
           # `localpart_template = "{{ user.preferred_username }}"` is paired
-          # with `preferShortUsername = true` on the kanidm client (Gotcha #2).
+          # with `preferShortUsername = true` on the kanidm client.
           #
-          # `allow_existing_users = true` per ADR-0025 enables binding the
-          # OIDC `sub` claim to the existing local @cameron MXID on first SSO
-          # sign-in, preserving rooms, history, and E2EE device sessions.
-          # The flag is inert until a kanidm person with matching account_name
-          # exists and a browser SSO sign-in occurs (collapses nix-4qr.8 to a
-          # purely operational checklist).
+          # `allow_existing_users = true` enables binding the OIDC `sub` claim
+          # to the existing local @cameron MXID on first SSO sign-in,
+          # preserving rooms, history, and E2EE device sessions. The flag is
+          # inert until a kanidm person with matching account_name exists and a
+          # browser SSO sign-in occurs.
           oidc_providers = [
             {
               idp_id = "kanidm";
@@ -359,18 +318,7 @@
               allow_existing_users = true;
             }
           ];
-
-          # password_config.enabled is intentionally NOT set here. The synapse
-          # default is `true`; per ADR-0026 (bounded dual-rail) we retain
-          # password auth in parallel with OIDC until the cameron migration is
-          # verified end-to-end (nix-4qr.8), then flip to `false` in a separate
-          # commit (nix-4qr.14). Do not preemptively disable.
         };
-
-        # Shared secret YAML overlay (Synapse merges keys from each file).
-        extraConfigFiles = [
-          config.clan.core.vars.generators.synapse-registration-shared-secret.files."shared-secret.yaml".path
-        ];
       };
 
       ############################################################
@@ -385,12 +333,11 @@
       # `restartUnits = [ "matrix-synapse.service" ]` so secret rotations
       # automatically trigger a unit restart, defeating the LoadCredential
       # snapshot-staleness invariant (memory reference:
-      # reference_loadcredential-snapshot-staleness; architecture doc
-      # §Gotchas #7).
+      # reference_loadcredential-snapshot-staleness).
       #
       # preStart curl-polls the kanidm root before synapse starts, mitigating
-      # the synapse-boots-before-kanidm startup race (architecture doc §Gotcha
-      # #6). Pattern is the defelo-nixos reference at
+      # the synapse-boots-before-kanidm startup race. Pattern is the
+      # defelo-nixos reference at
       # ~/projects/nix-workspace/defelo-nixos/hosts/srv/matrix/synapse.nix
       # lines 97-103, adapted to the magnetite hostname.
       systemd.services.matrix-synapse = {
@@ -589,69 +536,5 @@
         };
       };
 
-      ############################################################
-      # Part 9: register-users systemd-oneshot (mag-13)
-      ############################################################
-
-      # Idempotent user provisioning. The --exists-ok flag (cinnabar
-      # fcb49967e) is required for re-runs: without it the second
-      # invocation fails with "User already exists". The shared secret
-      # arrives as a systemd credential (LoadCredential) so the script
-      # can run as the matrix-synapse user without privileged access to
-      # the clan-vars sops backend.
-      systemd.services.matrix-synapse-register-users = {
-        description = "Provision Matrix Synapse users (idempotent, shared-secret)";
-        after = [ "matrix-synapse.service" ];
-        requires = [ "matrix-synapse.service" ];
-        wantedBy = [ "multi-user.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          User = "matrix-synapse";
-          Group = "matrix-synapse";
-          LoadCredential = [
-            "shared-secret:${
-              config.clan.core.vars.generators.synapse-registration-shared-secret.files."shared-secret.yaml".path
-            }"
-          ]
-          ++ map (
-            u: "${u}-pw:${config.clan.core.vars.generators."matrix-password-${u}".files."password".path}"
-          ) matrixUsers;
-        };
-        path = [
-          pkgs.curl
-          pkgs.coreutils
-          pkgs.gnused
-          config.services.matrix-synapse.package
-        ];
-        script = ''
-          set -euo pipefail
-
-          # Wait for Synapse readiness via the public health endpoint.
-          for i in $(seq 1 60); do
-            if curl -fsS "http://localhost:${toString synapsePort}/_matrix/client/versions" >/dev/null 2>&1; then
-              break
-            fi
-            if [ "$i" -eq 60 ]; then
-              echo "matrix-synapse did not become ready within 120s" >&2
-              exit 1
-            fi
-            sleep 2
-          done
-
-          # Extract the bare secret from the registration_shared_secret YAML.
-          SHARED_SECRET=$(sed -n 's/^registration_shared_secret: "\(.*\)"$/\1/p' "$CREDENTIALS_DIRECTORY/shared-secret")
-
-          ${lib.concatMapStringsSep "\n" (u: ''
-            register_new_matrix_user \
-              --exists-ok \
-              --admin \
-              --user ${u} \
-              --password "$(cat "$CREDENTIALS_DIRECTORY/${u}-pw")" \
-              --shared-secret "$SHARED_SECRET" \
-              "http://localhost:${toString synapsePort}"
-          '') matrixUsers}
-        '';
-      };
     };
 }
