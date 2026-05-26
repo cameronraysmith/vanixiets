@@ -134,7 +134,8 @@ Independent chains within the same linearization step can be ordered discretiona
    ```bash
    jj new
    ```
-6. Develop in wip, routing changes to chains via the edit-route cycle.
+6. Before any file edit in wip, run the pre-edit cross-chain file-collision reconnaissance documented at `SKILL.md` §"Pre-edit cross-chain file-collision reconnaissance" to identify which chain (if any) already owns touchpoints on the file under edit, constraining chain selection so the route does not produce a structural conflict at `[merge]` during Phase 4 serialize.
+   Develop in wip, routing changes to chains via the edit-route cycle.
    Each route from `[wip]` to a chain is either an append-route (default: land a new atomic commit on the chain) or an amend-route (fixups against the existing tip).
    The append-route is the default for landing new work:
    ```bash
