@@ -28,6 +28,9 @@
   inputs,
   ...
 }:
+let
+  brandLogo = config.flake.brand.logo;
+in
 {
   flake.modules.nixos.kanidm =
     {
@@ -196,6 +199,54 @@
       systemd.services.kanidm = {
         after = [ "acme-${domain}.service" ];
         serviceConfig.SupplementaryGroups = [ certs.group ];
+      };
+
+      # Site-level branding (display name + logo) is not exposed by kanidm-provision,
+      # so it's applied imperatively via the admin REST API after kanidm-provision
+      # completes. The unit reads the admin password via systemd LoadCredential and
+      # uses the kanidm CLI's KANIDM_PASSWORD env-var (non-interactive). Display name
+      # is a single space to suppress the default "Kanidm <domain>" header text; the
+      # logo carries the brand alone.
+      systemd.services.kanidm-site-branding = {
+        description = "Apply kanidm site-level branding (display name + logo)";
+        after = [ "kanidm.service" ];
+        wants = [ "kanidm.service" ];
+        wantedBy = [ "multi-user.target" ];
+        path = [
+          pkgs.kanidmWithSecretProvisioning_1_10
+          pkgs.curl
+        ];
+        environment = {
+          KANIDM_URL = "https://${domain}";
+          KANIDM_NAME = "admin";
+          KANIDM_TOKEN_CACHE_PATH = "%t/kanidm-site-branding/tokens";
+          KANIDM_CA_PATH = "${certs.directory}/fullchain.pem";
+        };
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          LoadCredential = "admin-password:${
+            config.clan.core.vars.generators.kanidm-admin-password.files."password".path
+          }";
+          RuntimeDirectory = "kanidm-site-branding";
+          RuntimeDirectoryMode = "0700";
+        };
+        script = ''
+          export KANIDM_PASSWORD
+          KANIDM_PASSWORD="$(< "$CREDENTIALS_DIRECTORY/admin-password")"
+
+          for _ in $(seq 30); do
+            if curl -sSf --max-time 1 --cacert "$KANIDM_CA_PATH" \
+                "https://${domain}/status" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          kanidm login
+          kanidm system domain set-displayname " "
+          kanidm system domain set-image ${brandLogo}
+        '';
       };
 
       services.nginx.virtualHosts.${domain} = {
