@@ -463,6 +463,10 @@ The development join's `[merge]` commit IS the join (∨, least upper bound) of 
 This join exists if and only if all parents are pairwise mergeable.
 Cross-chain file-collision reconnaissance is the operational check that this mergeability holds with respect to the specific file under edit before the edit creates a new modification.
 
+### Pre-dispatch concurrent-agent coordination
+
+When known concurrent agent activity exists on a development join — the user has flagged another session as in-progress, or `jj op log` shows recent ops from an unfamiliar source — verify chain state IMMEDIATELY before each chain-touching dispatch (not just at design time) and serialize ordering with the other agent explicitly. The pre-edit recon above catches different-FILE collisions across chains; this catches concurrent-AGENT mutations against the same chain, where two agents independently issue `jj squash --insert-after <tip>` in overlapping windows and produce divergent `@` and `[merge]` change IDs. Recovery is mechanical (`jj edit <survivor-commit-hash>` to retarget `@`, then `jj abandon <stale-wip-hash> <stale-merge-hash>` using commit hashes to disambiguate across divergence) but pause-and-serialize prevents the failure altogether.
+
 ### The edit-route cycle
 
 All edits land in `@` (which is `[wip]`).
