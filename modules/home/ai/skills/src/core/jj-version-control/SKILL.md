@@ -660,6 +660,33 @@ When the splice region is empty, `fork_point(parents(<join>))` equals `<base>`, 
 When the splice region is non-empty, `fork_point(parents(<join>))` equals the splice tip, so the expression evaluates to `children(<splice-tip>) & ::<join>` — still the chain roots, not the splice root.
 Repeated splice-below-join operations therefore always insert at the top of the splice region, preserving chronological order in the eventual `<base>` history.
 
+**Precondition: relocation file-disjointness.**
+Before invoking the by-relocation arm, verify the relocation set's modified files are disjoint from any chain's modified files.
+Skill files, configuration aggregators, and other shared-edit targets — the "aggregator files" called out in §"Pre-edit cross-chain file-collision reconnaissance" — frequently violate this precondition.
+Probe:
+
+```bash
+PAGER=cat jj diff --name-only -r '<relocation-set>'
+PAGER=cat jj diff --name-only -r 'fork_point(parents(<join>))..<chain-tip>'  # repeat per chain
+# Require empty intersection between the relocation set's files and each chain's files.
+```
+
+Violation produces cascading conflicts on rebase: one conflicted commit per chain that touches a relocation-set file, propagating through descendants to the join.
+On collision, three alternatives apply:
+
+- *Route-and-extend into the colliding chain* (see §"Extending a chain with a new commit (route-and-extend pattern)").
+The relocation set becomes part of that chain's tip; the join's cross-chain merge resolution continues operating against the chain's extended content.
+Best when the colliding chain has domain overlap with the relocation set.
+- *Create a new chain mid-diamond* for the relocation set (see `diamond-workflow.md` §"Phase 2: develop" → "Chain creation mid-diamond").
+The set becomes its own chain; the join expands to N+1 parents.
+Best when the relocation set is semantically independent of every existing chain and the splice would otherwise force domain-incoherent commit history.
+- *Defer to Phase 4 serialize.*
+Leave the relocation set above the join; it lands with the diamond's eventual integration.
+Loses the "main-bound independent advance" property but is conflict-free and requires no diamond reshape.
+
+The by-construction arm bypasses this precondition mechanically — the commit doesn't exist until after the position is chosen — but the author should still check whether the intended files are touched by any chain.
+If so, prefer route-and-extend or new-chain-creation over by-construction.
+
 **By-construction arm** — when authoring a new `<base>`-bound commit:
 
 ```bash

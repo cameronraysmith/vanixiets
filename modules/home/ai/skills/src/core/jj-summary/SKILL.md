@@ -145,6 +145,8 @@ jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove chain from the development joi
 # By-construction: author a new splice commit in position
 jj new --insert-before 'children(fork_point(parents(<join>))) & ::<join>' -m "msg"
 # By-relocation: move an existing above-join commit into the splice region
+# Precondition (by-relocation only): relocation set's files must be disjoint from any chain's files
+# (skill/aggregator files frequently collide; on collision use route-and-extend or new-chain instead)
 jj rebase --revisions <X> --insert-before 'children(fork_point(parents(<join>))) & ::<join>'
 # See ~/.claude/skills/jj-version-control/SKILL.md §"Splice-below-join"
 
