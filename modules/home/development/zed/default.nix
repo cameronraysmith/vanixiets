@@ -88,7 +88,7 @@
             };
             agent = {
               dock = "right";
-              play_sound_when_agent_done = true;
+              play_sound_when_agent_done = "always";
             };
             outline_panel = {
               dock = "right";
