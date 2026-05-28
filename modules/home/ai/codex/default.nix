@@ -92,6 +92,7 @@
             # marketplace — no [marketplaces.*] declaration required; its Skill
             # loads via Feature::Plugins and resolves through mcp_servers.linear)
             plugins."linear@openai-curated".enabled = true;
+            plugins."browser@openai-bundled".enabled = true;
           };
 
           # NOTE: Do NOT set custom-instructions here.
