@@ -291,6 +291,24 @@ The `jj-stack-submit` sibling tool performs step 14 (Phase A submission) — pus
 For GitHub-only repositories, Mergify's Stack-Aware Base feature (see `mergify-docs/src/content/docs/merge-queue/stacks.mdx` §"Stack-Aware Base") would handle single-CI-gate behavior natively without an explicit aggregate PR, eliminating the cosmetic shared-head-SHA warning Mergify emits on stacked PRs.
 Mergify Stacks is GitHub-only and breaks Gitea compatibility, so the forge-agnostic N+1 design is the primary recipe here; Stack-Aware Base is a footnote for repositories that will never run on Gitea.
 
+### Mid-diamond main-bound work and remote-drift integration
+
+Two related operations arise during the develop phase when work surfaces that does not belong to any chain.
+
+**Splice-below-join** handles `<base>`-bound commits — hotfixes, formatting, config tweaks, dependency bumps — that should land on `<base>` before the diamond's chains.
+Two arms: *by-construction* (author the commit directly in the splice position with `jj new --insert-before 'roots(trunk()..<join>)'`) and *by-relocation* (move an existing commit from above the join into the splice region with `jj rebase --revisions <X> --insert-before 'roots(trunk()..<join>)'`).
+The accumulated splice region fast-forwards `<base>` independently of when the diamond's chains land in Phase 4.
+See `~/.claude/skills/jj-version-control/SKILL.md` §"Splice-below-join" for the full recipe, anti-patterns (naked `--insert-after <base>`, single-target `--insert-before <one-root>`, `jj rebase -r <X> -d <base>` destination form), and verification.
+
+**Diamond integration on remote advance** handles the case where `<base>@origin` advances during diamond work — typically because a collaborator merged to remote, or a dependency-update bot pushed.
+The recipe rebases the entire diamond (splice region if any, chain roots, chains, chain tips, join, `@`) onto the new remote tip in one operation, after `jj git fetch`.
+This is distinct from Phase 4 serialize: it preserves the diamond shape rather than linearizing it.
+See `~/.claude/skills/jj-version-control/SKILL.md` §"Diamond integration on remote advance" for the recipe, the breakdown of what `jj git fetch` handles automatically versus the diamond-on-old-base gap requiring explicit rebase, and verification.
+
+Both operations target the same topological location — commits between `<base>` and the antichain `roots(<base>..<join>)`.
+Splice-below-join inserts new commits there during diamond work; diamond integration on remote advance moves the entire diamond above a new `<base>` position, carrying the splice region (if any) with it.
+The patterns compose: a diamond with accumulated splice commits can be integrated onto a fast-forwarded remote in one rebase, after which the splice region is ready to fast-forward `<base>` whenever the user is ready to push.
+
 ## Open questions
 
 How should the PR description format be standardized for linearized epic integrations?
