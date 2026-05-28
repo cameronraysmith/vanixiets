@@ -436,11 +436,11 @@ A development join whose parent chain tips form an antichain in the commit poset
 Before any edit to a file in `[wip]`, run a cross-chain file-collision reconnaissance query:
 
 ```bash
-PAGER=cat jj log -r 'fork_point(@--)..@- & files("<relative-path>")' \
+PAGER=cat jj log -r 'fork_point(parents(@-))..@- & files("<relative-path>")' \
     --no-graph -T 'change_id.short() ++ " " ++ bookmarks ++ " " ++ description.first_line() ++ "\n"'
 ```
 
-The revset selects commits in the principal filter between the meet (`fork_point(@--)` — the greatest common ancestor of the antichain formed by `[merge]`'s parents) and the join (`@-` — `[merge]`).
+The revset selects commits in the half-open interval `meet..join` between the meet (`fork_point(parents(@-))` — the greatest common ancestor of the antichain formed by `[merge]`'s parents; note that `fork_point()` of a single commit is a no-op per upstream `docs/revsets.md:349-353`, so `parents(@-)` must be applied to obtain the N-element antichain before computing the meet) and the join (`@-` — `[merge]` itself).
 `& files("<path>")` restricts to commits that modified the named file.
 For multi-file queries, prefer the fileset union form inside one call: `files("a | b")` (per upstream's `docs/filesets.md`), over the revset-level union `files("a") | files("b")`.
 
@@ -456,6 +456,9 @@ The reconnaissance has constant cost (one `jj log` invocation) regardless of dia
 
 The same query applies at chain creation: before issuing the chain-creation-mid-diamond recipe (`diamond-workflow.md:161-190`) to introduce a new chain into an active diamond, run the reconnaissance against the new chain's planned file scope.
 If a collision exists, either route the planned work into the existing chain that already owns those touchpoints (no new chain needed) or apply the collision-resolution patterns from `reference_jj-diamond-cross-chain-file-collision` before proceeding with chain creation.
+
+The same file-collision check appears as a precondition of the splice-below-join by-relocation arm — see §"Splice-below-join" → Precondition: relocation file-disjointness — where the check is applied to a *relocation set* rather than a *forthcoming edit*.
+Both consumers operate on the same underlying question ("which chains touch which files?") and the same revset machinery; the splice-below-join consumer adds the alternative-on-collision options (route-and-extend, new-chain creation, defer to Phase 4 serialize) when the check fails.
 
 #### Semantic invariant of `[merge]`
 
