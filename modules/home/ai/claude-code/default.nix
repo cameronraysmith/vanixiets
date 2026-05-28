@@ -87,6 +87,7 @@
                 "hookify@claude-plugins-official" = true;
                 "huggingface-skills@claude-plugins-official" = true;
                 "learning-output-style@claude-plugins-official" = false;
+                "linear@claude-plugins-official" = true;
                 "playground@claude-plugins-official" = false;
                 "plugin-dev@claude-plugins-official" = true;
                 "posthog@claude-plugins-official" = false;
