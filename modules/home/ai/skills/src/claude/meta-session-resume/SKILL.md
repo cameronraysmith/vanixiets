@@ -39,55 +39,26 @@ Examples of well-formed titles:
 - "Python Type System Refactor with Pydantic v2 Integration"
 - "Docker Multi-arch Build Setup and CI Pipeline Optimization"
 
-Implementation approach:
+Execution (single command):
 
-1. Resolve session UUID:
-   - If $1 is provided and is not "nohist", use $1 as the UUID
-   - Otherwise, auto-detect: `jaq -r '.sessionId' ~/.claude/sessions/$PPID.json`
-   - If auto-detection fails, stop and ask the user to provide the session UUID
-2. Determine if history addition should be skipped:
-   - Check if $1 is "nohist" or $2 is "nohist"
-   - Store this as a flag for later use
-3. Get current date/time: `date +"%Y%m%d %I:%M%p" | tr 'APM' 'apm'`
-4. Construct the full command string with session title
-5. Determine if atuin history should be used:
-   - If nohist flag is set, skip atuin history (go to step 7 for display only)
-   - Otherwise, check if atuin is available: `command -v atuin >/dev/null 2>&1`
-     - If atuin is NOT available, skip to step 7 (display only)
-     - If atuin IS available, proceed to step 6
-6. Add to atuin history using this EXACT pattern:
-
-CRITICAL: The command MUST be wrapped in SINGLE QUOTES after the `--` to preserve the `#` comment character.
-
-Execute these three bash commands sequentially (can use && or separate Bash tool calls):
+The agent runs exactly one bash command, not a sequence of separate tool calls.
+The session title is the only value the model supplies.
+The session uuid, the timestamp, atuin availability, and the nohist flag are all derived inside the shell.
+The `ccds -r` command itself is never executed; it is only recorded or displayed.
 
 ```bash
-id=$(atuin history start -- 'ccds -r <uuid> # <title> <date> <time>')
-true
-atuin history end --exit 0 $id
-```
-
-Step-by-step execution:
-
-1. Resolve session UUID (auto-detect if not provided, see above)
-2. Check for nohist flag ($1 or $2 is "nohist")
-3. Construct the full command string (e.g., "ccds -r abc123 # My Session 20251010 01:04p")
-4. If nohist flag is NOT set, check if atuin is available with: `command -v atuin >/dev/null 2>&1`
-   - If atuin is available, execute the following three commands:
-     a. Execute: `id=$(atuin history start -- '<full-command-string>')`
-        - Note: Single quotes around the ENTIRE command after `--` are REQUIRED
-        - The single quotes prevent the shell from treating `#` as a comment
-     b. Execute: `true` (just returns exit code 0, do NOT run the actual ccds command)
-     c. Execute: `atuin history end --exit 0 $id`
-   - If atuin is NOT available OR nohist flag is set, skip the atuin commands
-5. Display the command to the user with appropriate message
-
-Example execution:
-
-```bash
-id=$(atuin history start -- 'ccds -r 4f44d71c-ab43-46f0-aed6-8fbe0d457a6a # Tmux Floax Debug and GitHub Browse Command 20251010 01:04p')
-true
-atuin history end --exit 0 $id
+title='<SESSION TITLE — no single quote, $, backtick, or backslash>'   # the only model-supplied value
+case "$1 $2" in *nohist*) nohist=1 ;; *) nohist= ;; esac
+uuid="$1"; [ "$uuid" = nohist ] && uuid=
+[ -n "$uuid" ] || uuid=$(jaq -r '.sessionId' ~/.claude/sessions/$PPID.json 2>/dev/null)
+[ -n "$uuid" ] && [ "$uuid" != null ] || { echo "AUTODETECT_FAILED"; exit 1; }
+dt=$(date +"%Y%m%d %I:%M%p" | tr 'APM' 'apm')
+cmd="ccds -r $uuid # $title $dt"
+if [ -n "$nohist" ] || ! command -v atuin >/dev/null 2>&1; then
+  echo "DISPLAY_ONLY: $cmd"
+else
+  id=$(atuin history start -- "$cmd") && atuin history end --exit 0 "$id" >/dev/null && echo "ADDED: $cmd"
+fi
 ```
 
 Output for user:
