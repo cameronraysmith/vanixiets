@@ -14,14 +14,13 @@ ccds -r <session-uuid> # Session Title YYYYMMDD HH:MM[a/p]
 
 Requirements for session UUID:
 
-- If $1 is provided and is a valid UUID, use $1 as the session UUID
-- If $1 is "nohist" or blank, auto-detect the UUID via: `jaq -r '.sessionId' ~/.claude/sessions/$PPID.json`
-- If auto-detection fails (file missing or jaq unavailable), stop and ask the user to provide the session UUID
+- The shell uses `$1` as the uuid when it is provided and is not "nohist", otherwise it auto-detects via `jaq -r '.sessionId' ~/.claude/sessions/$PPID.json`
+- When auto-detection yields nothing, the command emits `AUTODETECT_FAILED`; stop and ask the user for the session UUID
 
 Requirements for history addition:
 
-- If $1 is "nohist" or $2 is "nohist", skip atuin history addition and just display the command
-- Otherwise, attempt to add to atuin history (if available)
+- When "nohist" is passed as `$1` or `$2`, or atuin is unavailable, the command displays without recording (`DISPLAY_ONLY`)
+- Otherwise it records the command in atuin history (`ADDED`)
 
 Session title requirements:
 
@@ -31,6 +30,7 @@ Session title requirements:
 - Title should match the style of `claude -r` output: noun-focused, action-oriented, covering major topics
 - Include all significant topics discussed, prioritizing outcomes over process
 - If session covered multiple distinct areas, use "and" to join them concisely
+- Avoid single quotes, `$`, backtick, and backslash in the title, since it is interpolated into the double-quoted shell variable `"$cmd"`
 
 Examples of well-formed titles:
 
@@ -61,20 +61,18 @@ else
 fi
 ```
 
+Quoting:
+
+Passing the command as a double-quoted variable `"$cmd"` keeps the `#` literal, because the shell does not re-scan the contents of an expanded variable for comments.
+This is why the old "wrap in single quotes" rule is no longer needed and has been removed.
+
 Output for user:
 
-- If auto-detection fails and no UUID provided:
-  - Stop and ask the user to provide the session UUID
-- If nohist flag is set:
-  - Show a message that history addition was skipped per user request
-  - Display the command (the full ccds -r ... line)
-- If nohist flag is NOT set and atuin is available:
-  - Show a brief message confirming the command was added to atuin history
-  - Display the command that was added (the full ccds -r ... line)
-- If nohist flag is NOT set and atuin is NOT available:
-  - Show a message that atuin is not available
-  - Display the command (the full ccds -r ... line) that would have been added
-  - Suggest the user can copy and paste it manually
+The command prints exactly one line; map its sentinel to an action.
+
+- `ADDED: <cmd>` — confirm the command was added to atuin history and show `<cmd>`
+- `DISPLAY_ONLY: <cmd>` — history was skipped (nohist was passed or atuin is absent); show `<cmd>` so the user can copy it
+- `AUTODETECT_FAILED` — stop and ask the user for the session UUID
 
 Examples:
 
@@ -84,4 +82,4 @@ Examples:
 - `/meta-session-resume abc123 nohist` - Uses provided UUID, generates command, skips atuin history
 - "Prepare this session for resumption" - Natural language trigger, same as `/meta-session-resume`
 
-IMPORTANT: Do NOT actually execute `ccds -r` as it would create a recursive Claude session. Use `true` as a placeholder.
+IMPORTANT: never run `ccds -r` yourself — the command only records or displays the resume string; executing it would spawn a recursive Claude session.
