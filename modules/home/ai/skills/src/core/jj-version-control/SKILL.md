@@ -650,16 +650,21 @@ When mid-diamond work surfaces a `<base>`-bound commit — hotfix, formatting, c
 The accumulated splice region fast-forwards `<base>` independently of when the diamond's chains land.
 
 A diamond's interior is `<base>..<join>` — the half-open interval between the base bookmark and the development join.
-The bottom of this interior is the antichain `roots(<base>..<join>)` — the minimal commits, each branching off `<base>` (or the splice region tip when one exists).
-These are the *chain roots*.
-The splice-below-join operation inserts new commit(s) between `<base>` and this antichain.
+The bottom of the chains is the antichain of *chain roots* — the direct children of the splice tip (or `<base>` when the splice region is empty) that ancestor `<join>`.
+The canonical revset is `children(fork_point(parents(<join>))) & ::<join>`.
+The splice-below-join operation inserts new commit(s) between this antichain and whatever sits immediately below it (splice tip or `<base>`).
 The diamond shape is preserved: every chain bookmark stays at its tip, the join's parent set is unchanged, `@` (`[wip]`) remains atop the join.
+
+The `fork_point` form is invariant under splice-region state.
+When the splice region is empty, `fork_point(parents(<join>))` equals `<base>`, so the expression reduces to `children(<base>) & ::<join>` — equivalent to `roots(<base>..<join>)` in that special case.
+When the splice region is non-empty, `fork_point(parents(<join>))` equals the splice tip, so the expression evaluates to `children(<splice-tip>) & ::<join>` — still the chain roots, not the splice root.
+Repeated splice-below-join operations therefore always insert at the top of the splice region, preserving chronological order in the eventual `<base>` history.
 
 **By-construction arm** — when authoring a new `<base>`-bound commit:
 
 ```bash
-jj new --insert-before 'roots(trunk()..<join>)' -m "fix(scope): description"
-# @ is now splice-positioned; edit files (auto-snapshotted into the splice commit)
+jj new --insert-before 'children(fork_point(parents(<join>))) & ::<join>' -m "fix(scope): description"
+# @ is now splice-positioned, at the top of the splice region; edit files (auto-snapshotted into the splice commit)
 jj new  # return @ to [wip] atop the diamond, or remain in the splice commit to extend it
 ```
 
@@ -668,11 +673,11 @@ jj new  # return @ to [wip] atop the diamond, or remain in the splice commit to 
 ```bash
 # Checkpoint and survey the antichain target
 PAGER=cat jj op log -n 1  # note <OP0> for rollback
-PAGER=cat jj log -r 'roots(trunk()..<join>)' --no-graph \
+PAGER=cat jj log -r 'children(fork_point(parents(<join>))) & ::<join>' --no-graph \
     -T 'change_id.shortest(8) ++ " bm=[" ++ bookmarks ++ "] " ++ description.first_line() ++ "\n"'
 # Expect N rows — one per chain in the diamond
 
-jj rebase --revisions <commit> --insert-before 'roots(trunk()..<join>)'
+jj rebase --revisions <commit> --insert-before 'children(fork_point(parents(<join>))) & ::<join>'
 
 # Verify diamond invariants post-splice
 PAGER=cat jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'
@@ -680,8 +685,8 @@ PAGER=cat jj bookmark list -r 'parents(@-) ~ trunk()'  # expect N chain bookmark
 # Rollback if any verification fails: jj op restore <OP0>
 ```
 
-The revset `roots(<base>..<join>)` is the order-theoretically precise name for the splice target: the antichain of minimal elements of the open interval (`<base>`, `<join>`].
-It generalizes across diamond cardinality (2-way, N-way), is invariant under remote bookmark drift (origin-advance commits descend from `<base>` but do not reach `<join>`, so they are excluded), and resolves correctly whether the splice region is empty (giving the chain roots) or non-empty (giving its current top edge).
+The revset `children(fork_point(parents(<join>))) & ::<join>` is the order-theoretically precise name for the chain-roots antichain.
+It generalizes across diamond cardinality (2-way, N-way), is invariant under remote bookmark drift (origin-advance commits descend from `<base>` but do not reach `<join>`, so they are excluded), and resolves to the chain roots regardless of splice region state (empty or non-empty) — preserving chronological order in the splice region across repeated operations.
 
 **Anti-patterns**:
 
@@ -691,7 +696,7 @@ It generalizes across diamond cardinality (2-way, N-way), is invariant under rem
   Use `--insert-before` against the antichain instead, which touches only the chain-root edges.
 - *Single-target `--insert-before <one-chain-root>`* reparents only one chain.
   The join then merges N parents with inconsistent bases (one below the new commit, N-1 still directly above `<base>`), silently desynchronizing the diamond.
-  Always use a revset spanning all chain roots: `roots(<base>..<join>)`.
+  Always use a revset spanning all chain roots: `children(fork_point(parents(<join>))) & ::<join>`.
 - *`jj rebase -r <X> -d <base>`* (destination form) leaves the source as a sibling of the chain roots, not above them.
   The chain roots remain children of `<base>`; the source has no relationship to the diamond.
   Wrong topology.

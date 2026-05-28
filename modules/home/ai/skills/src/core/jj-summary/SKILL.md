@@ -143,9 +143,9 @@ jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove chain from the development joi
 
 # Splice-below-join: insert a <base>-bound commit between <base> and chain roots
 # By-construction: author a new splice commit in position
-jj new --insert-before 'roots(trunk()..<join>)' -m "msg"
+jj new --insert-before 'children(fork_point(parents(<join>))) & ::<join>' -m "msg"
 # By-relocation: move an existing above-join commit into the splice region
-jj rebase --revisions <X> --insert-before 'roots(trunk()..<join>)'
+jj rebase --revisions <X> --insert-before 'children(fork_point(parents(<join>))) & ::<join>'
 # See ~/.claude/skills/jj-version-control/SKILL.md §"Splice-below-join"
 
 # Diamond integration on remote advance: rebase diamond onto fast-forwarded remote
