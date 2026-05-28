@@ -27,6 +27,7 @@
       sbtWithJdk = pkgs.sbt.override { jre = jdk; };
       # coderabbit-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
       # crush = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.crush;
+      cursor-agent = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.cursor-agent;
       # opencode: disabled - bun node_modules cleanup fails during build
       droid = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.droid;
       gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
@@ -75,6 +76,7 @@
           mkcert
           # from llm-agents via modules/nixpkgs/overlays/beads.nix
           beads
+          cursor-agent
           droid
           gemini-cli
           # from pkgs/by-name
