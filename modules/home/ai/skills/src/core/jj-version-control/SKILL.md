@@ -584,6 +584,30 @@ When to use which pattern:
 - *Amending an existing chain commit:* `jj squash --from @ --into <chain-tip> --keep-emptied` (the standard edit-route cycle) or `jj absorb` for auto-routing.
 - *Creating a new commit extending the chain:* the route-and-extend recipe above.
 
+**Multi-commit-range form.**
+When relocating an existing linear segment of N commits into a chain (rather than authoring a single new commit), use the range form:
+
+```bash
+# Checkpoint and survey
+PAGER=cat jj op log -n 1  # capture <OP0>
+PAGER=cat jj log -r '<range-start>::<range-end>' --no-graph \
+    -T 'change_id.shortest(8) ++ " " ++ description.first_line() ++ "\n"'
+# Expect N rows in linear order
+
+# Rebase the entire range atomically after the chain tip
+jj rebase --revisions '<range-start>::<range-end>' --insert-after <chain-tip>
+
+# Advance the chain bookmark to the new tip (the range's last commit)
+jj bookmark set <chain-bookmark> -r <range-end>
+```
+
+The `--insert-after <chain-tip>` semantics reparent the chain tip's other current children — the join's edge from this chain — onto the inserted range's tail, so the join automatically follows the extension.
+The range's old descendants (typically `@` if the range sat above the join) get reparented onto the range's old parent (the join itself), restoring `@` to a direct child of the join.
+Result: the chain extends by N commits in one atomic op-log entry; the other chains, the join's parent set elsewhere, and the working-copy `[wip]` position are not otherwise affected.
+
+This form is the natural multi-commit generalization of the single-commit pattern above.
+The same precondition applies as for splice-below-join's by-relocation arm — see §"Splice-below-join" → Precondition: relocation file-disjointness — though file-level overlap between the relocation range and the chain's existing modifications is tolerable when the modifications occupy disjoint regions, since they compose linearly within the chain rather than via cross-chain merge resolution at the join.
+
 ### Conflict behavior in composite `@`
 
 When antichain elements contain conflicting changes, `@` displays first-class jj conflicts.

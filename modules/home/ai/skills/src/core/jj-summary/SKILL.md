@@ -137,6 +137,10 @@ jj new -A <bookmark> --no-edit -m "msg"   # Insert new commit after bookmark
 jj squash --from @ --into <id> -u -- <path>  # Route file content into it
 jj bookmark set <bookmark> -r <id>        # Advance bookmark to new tip
 jj describe -m ""                         # Clear stale @ description
+# Route-and-extend multi-commit-range form: relocate an N-commit linear segment into a chain
+jj rebase --revisions '<range-start>::<range-end>' --insert-after <chain-tip>
+jj bookmark set <chain-bookmark> -r <range-end>
+# See ~/.claude/skills/jj-version-control/SKILL.md §"Extending a chain with a new commit (route-and-extend pattern)" → Multi-commit-range form
 # Add/remove chains dynamically:
 jj rebase -r @ -d 'all:(@- | new-bm)'    # Add chain to the development join
 jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove chain from the development join
