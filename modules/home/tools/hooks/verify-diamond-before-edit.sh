@@ -8,7 +8,16 @@
 # Tier 3 (development join present) runs the diamond-health invariant checklist:
 #   (i)   chain ∈ join's parents (declared bookmarks match parent set)
 #   (ii)  join's parents = current bookmark targets (no staleness)
-#   (iii) @ atop the join (or @ IS the join)
+#   (iii) @ is in one of four valid positions relative to the join:
+#           (A) @ IS the join (construction-time)
+#           (B) @ is a direct child of the join (idle wip)
+#           (C) @ is in a linear non-merge stack above the join
+#               (splice-below-join authoring in-progress, or docs stack
+#                awaiting splice/route)
+#           (D) @ is in a chain — descendant of a chain tip, not at-or-above
+#               the join (route-and-extend in-progress, in-chain editing)
+# Checks (i)/(ii) run only in cases (A)/(B); cases (C)/(D) are mid-operation
+# transients in which bookmark advancement lags the join's parent set by design.
 # Emits permissionDecision=ask on violation (never deny — violations are recoverable).
 # PreToolUse:Edit|Write|MultiEdit (sync) -- reads JSON context from stdin.
 
@@ -49,11 +58,54 @@ AT_PARENTS=$(jj log -r '@' --no-graph \
                -T 'parents.map(|c| c.change_id()).join(" ")' 2>/dev/null)
 AT_CHANGE=$(jj log -r '@' --no-graph -T 'change_id' 2>/dev/null)
 
-# --- Check (iii): @ atop join, or @ IS join ---
-if [ "$AT_CHANGE" != "$JOIN_CHANGE" ] && [ "$AT_PARENTS" != "$JOIN_CHANGE" ]; then
+# --- Refined check (iii): classify @ into one of four valid positions ---
+# (A) @ IS the join                                       — construction-time
+# (B) @ is a direct child of the join                     — idle wip
+# (C) @ is in a linear non-merge stack above the join     — splice-by-construction in-progress
+# (D) @ is in a chain (descendant of a chain tip, not at-or-above the join)
+#                                                         — route-and-extend in-progress
+CASE=""
+if [ "$AT_CHANGE" = "$JOIN_CHANGE" ]; then
+  CASE="A"
+elif [ "$AT_PARENTS" = "$JOIN_CHANGE" ]; then
+  CASE="B"
+else
+  # Test case (C): @ above join via a linear non-merge path
+  ABOVE_JOIN=$(jj log -r "@ & ${JOIN_CHANGE}::" --no-graph -T 'change_id' 2>/dev/null || true)
+  if [ -n "$ABOVE_JOIN" ]; then
+    MERGES_BETWEEN=$(jj log -r "(${JOIN_CHANGE}..@) & merges()" --no-graph \
+                       -T 'change_id ++ " "' 2>/dev/null || true)
+    if [ -z "$MERGES_BETWEEN" ]; then
+      CASE="C"
+    fi
+  fi
+
+  # Test case (D): @ in some chain (descendant of a chain tip, not at-or-above join)
+  if [ -z "$CASE" ]; then
+    for parent in $JOIN_PARENTS; do
+      IN_CHAIN=$(jj log -r "@ & (${parent}:: ~ ${JOIN_CHANGE}::)" --no-graph \
+                   -T 'change_id' 2>/dev/null || true)
+      if [ -n "$IN_CHAIN" ]; then
+        CASE="D"
+        break
+      fi
+    done
+  fi
+fi
+
+if [ -z "$CASE" ]; then
   cat << EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"Diamond integrity violation (iii): @ is not atop the development join. The working copy should sit at a wip commit whose sole parent is the join, OR @ itself should be the join during construction. Recovery: jj new $JOIN_CHANGE -m 'wip'. See ~/.claude/skills/jj-version-control/SKILL.md (composite maintenance invariant)."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"Diamond integrity violation (iii): @ is not in any of the four valid positions for tier-3 work. Valid positions: (A) @ is the join itself, (B) @ is a direct child of the join (idle wip state), (C) @ is in a linear non-merge stack above the join (splice-below-join by-construction in-progress), or (D) @ is in a chain — descendant of a chain tip, not at-or-above the join (route-and-extend in-progress, or in-chain editing). Recovery depends on intent: jj new $JOIN_CHANGE -m 'wip' to return @ to the idle position, or jj edit <chain-tip-change-id> to resume in-chain work. See ~/.claude/skills/jj-version-control/SKILL.md (composite maintenance invariant)."}}
 EOF
+  exit 0
+fi
+
+# --- Checks (i)/(ii) gated on idle states (A) or (B) ---
+# Cases (C) and (D) are mid-operation transients during which bookmark advancement
+# lags the join's parent set by design. Comparing declared vs. actual bookmarks in
+# those states produces false positives; the in-progress operation will reconcile
+# the diamond when it advances the relevant bookmark.
+if [ "$CASE" != "A" ] && [ "$CASE" != "B" ]; then
   exit 0
 fi
 

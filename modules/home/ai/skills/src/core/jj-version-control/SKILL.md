@@ -411,6 +411,31 @@ After any such operation, immediately restore `[wip]` on top: `jj new <merge-cha
 When adding a new bookmark to the development join, reconstruct `[merge]` with all parents including the new one (re-set the description to the new `join N=<cardinality>: <alphabetical bookmarks>` state), then recreate `[wip]` on top.
 Subagent prompts must specify whether they operate in `[wip]` (edit files, let orchestrator route) or outside it (e.g., working on a single chain directly).
 
+#### Idle vs mid-operation states
+
+The invariants above describe the diamond's *idle* state — when `@` is empty `[wip]` directly above the join and no chain extension or splice authoring is in progress.
+During mid-operation states the strict invariants are transiently relaxed:
+
+- *In-chain editing* (via `jj new --insert-after <chain-tip>`, the route-and-extend single- or multi-commit-range form): `@` sits in a chain, as a descendant of a chain tip that is not at-or-above the join.
+The chain bookmark has not yet been advanced to the new chain tip, so the join's parent set briefly disagrees with the bookmark set declared in the join's description.
+- *Splice-below-join by-construction* (via `jj new --insert-before 'children(fork_point(parents(<join>))) & ::<join>'`): `@` sits in a linear non-merge stack above the join during authoring.
+- *Stack above the join awaiting splice or route* (an intermediate state in which docs commits are stacked linearly above the join before the splice or route-and-extend is executed): same topology as splice-by-construction.
+
+The `verify-diamond-before-edit` PreToolUse hook recognizes four valid `@` positions corresponding to these states:
+
+| Case | Position | Workflow state |
+|---|---|---|
+| (A) | `@` IS the join | construction-time, before adding `[wip]` |
+| (B) | `@` is a direct child of the join | idle wip |
+| (C) | `@` is in a linear non-merge stack above the join | splice-by-construction in-progress; stack-above-join awaiting splice/route |
+| (D) | `@` is in a chain (descendant of a chain tip, not at-or-above the join) | route-and-extend in-progress; in-chain editing |
+
+Checks (i)/(ii) — bookmark-vs-parent consistency — run only in cases (A) and (B), since cases (C) and (D) by construction produce a transient bookmark/parent mismatch that the in-progress operation reconciles when it advances the relevant bookmark.
+
+The hook fires `ask` (never `deny`) when `@` is in none of these four positions — typically when work has been routed onto an unrelated branch, when an unintended merge has been introduced, or when the working copy has drifted off the diamond entirely.
+The recovery hint depends on intent: return to idle via `jj new <join-change-id> -m "wip"`, or resume in-chain work via `jj edit <chain-tip-change-id>`.
+See `modules/home/tools/hooks/verify-diamond-before-edit.sh` for the enforcement implementation.
+
 ### Diamond-health diagnostic
 
 A single revset surfaces all six invariants in one view, suitable for an initial orientation pass or a mid-session health check:
