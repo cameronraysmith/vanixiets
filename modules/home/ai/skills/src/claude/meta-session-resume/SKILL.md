@@ -2,25 +2,29 @@
 name: meta-session-resume
 description: Generate annotated resume command and add to atuin history for session continuation. Triggered by requests to prepare, save, or checkpoint a session for resumption, or "prepare this session for resumption".
 argument-hint: [session-uuid] [nohist]
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 Generate a resume session command and automatically add it to atuin shell history.
 
 Command format:
+
 ```bash
 ccds -r <session-uuid> # Session Title YYYYMMDD HH:MM[a/p]
 ```
 
 Requirements for session UUID:
+
 - If $1 is provided and is a valid UUID, use $1 as the session UUID
 - If $1 is "nohist" or blank, auto-detect the UUID via: `jaq -r '.sessionId' ~/.claude/sessions/$PPID.json`
 - If auto-detection fails (file missing or jaq unavailable), stop and ask the user to provide the session UUID
 
 Requirements for history addition:
+
 - If $1 is "nohist" or $2 is "nohist", skip atuin history addition and just display the command
 - Otherwise, attempt to add to atuin history (if available)
 
 Session title requirements:
+
 - Create concise title (max 80 chars) summarizing the session's key topics and outcomes
 - Use current date in YYYYMMDD format (today's date)
 - Use 12-hour time format with 'a' or 'p' suffix (e.g., "09:37a", "02:15p")
@@ -29,12 +33,14 @@ Session title requirements:
 - If session covered multiple distinct areas, use "and" to join them concisely
 
 Examples of well-formed titles:
+
 - "Performant CLI Tools Evaluation and Git Commit Workflow Improvements"
 - "Nix Package Configuration and TypeScript Migration Strategy"
 - "Python Type System Refactor with Pydantic v2 Integration"
 - "Docker Multi-arch Build Setup and CI Pipeline Optimization"
 
 Implementation approach:
+
 1. Resolve session UUID:
    - If $1 is provided and is not "nohist", use $1 as the UUID
    - Otherwise, auto-detect: `jaq -r '.sessionId' ~/.claude/sessions/$PPID.json`
@@ -54,6 +60,7 @@ Implementation approach:
 CRITICAL: The command MUST be wrapped in SINGLE QUOTES after the `--` to preserve the `#` comment character.
 
 Execute these three bash commands sequentially (can use && or separate Bash tool calls):
+
 ```bash
 id=$(atuin history start -- 'ccds -r <uuid> # <title> <date> <time>')
 true
@@ -61,6 +68,7 @@ atuin history end --exit 0 $id
 ```
 
 Step-by-step execution:
+
 1. Resolve session UUID (auto-detect if not provided, see above)
 2. Check for nohist flag ($1 or $2 is "nohist")
 3. Construct the full command string (e.g., "ccds -r abc123 # My Session 20251010 01:04p")
@@ -75,6 +83,7 @@ Step-by-step execution:
 5. Display the command to the user with appropriate message
 
 Example execution:
+
 ```bash
 id=$(atuin history start -- 'ccds -r 4f44d71c-ab43-46f0-aed6-8fbe0d457a6a # Tmux Floax Debug and GitHub Browse Command 20251010 01:04p')
 true
@@ -82,6 +91,7 @@ atuin history end --exit 0 $id
 ```
 
 Output for user:
+
 - If auto-detection fails and no UUID provided:
   - Stop and ask the user to provide the session UUID
 - If nohist flag is set:
@@ -96,6 +106,7 @@ Output for user:
   - Suggest the user can copy and paste it manually
 
 Examples:
+
 - `/meta-session-resume` - Auto-detects UUID, generates command, adds to atuin history
 - `/meta-session-resume abc123` - Uses provided UUID, generates command, adds to atuin history
 - `/meta-session-resume nohist` - Auto-detects UUID, generates command, skips atuin history
