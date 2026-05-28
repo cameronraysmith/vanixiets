@@ -14,8 +14,11 @@
 #           (C) @ is in a linear non-merge stack above the join
 #               (splice-below-join authoring in-progress, or docs stack
 #                awaiting splice/route)
-#           (D) @ is in a chain — descendant of a chain tip, not at-or-above
-#               the join (route-and-extend in-progress, in-chain editing)
+#           (D) @ is anywhere in the mutable diamond interior — any mutable
+#               ancestor of the join, excluding the join itself. Covers any
+#               chain commit at any depth (tip, mid-chain, root) and any
+#               splice-region commit (route-and-extend in-progress, in-chain
+#               editing via jj edit, splice-region editing via jj edit).
 # Checks (i)/(ii) run only in cases (A)/(B); cases (C)/(D) are mid-operation
 # transients in which bookmark advancement lags the join's parent set by design.
 # Emits permissionDecision=ask on violation (never deny — violations are recoverable).
@@ -62,8 +65,12 @@ AT_CHANGE=$(jj log -r '@' --no-graph -T 'change_id' 2>/dev/null)
 # (A) @ IS the join                                       — construction-time
 # (B) @ is a direct child of the join                     — idle wip
 # (C) @ is in a linear non-merge stack above the join     — splice-by-construction in-progress
-# (D) @ is in a chain (descendant of a chain tip, not at-or-above the join)
-#                                                         — route-and-extend in-progress
+# (D) @ is anywhere in the mutable diamond interior
+#     (any mutable ancestor of the join, excluding the join itself).
+#     Covers: jj edit on any chain commit (tip, mid-chain, root) AND on any
+#     splice-region commit. Uniform handling because the topological notion
+#     "@ is working in the interior of the diamond" is the same regardless
+#     of how @ got there (jj new --insert-after, jj edit, etc.).
 CASE=""
 if [ "$AT_CHANGE" = "$JOIN_CHANGE" ]; then
   CASE="A"
@@ -80,22 +87,24 @@ else
     fi
   fi
 
-  # Test case (D): @ in some chain (descendant of a chain tip, not at-or-above join)
+  # Test case (D): @ anywhere in the mutable diamond interior
+  # (any mutable ancestor of the join, excluding the join itself).
+  # Covers: jj edit on any chain commit (tip, mid-chain, root) AND on any
+  # splice-region commit. Uniform handling because the topological notion
+  # "@ is working in the interior of the diamond" is the same regardless
+  # of how @ got there (jj new --insert-after, jj edit, etc.).
   if [ -z "$CASE" ]; then
-    for parent in $JOIN_PARENTS; do
-      IN_CHAIN=$(jj log -r "@ & (${parent}:: ~ ${JOIN_CHANGE}::)" --no-graph \
-                   -T 'change_id' 2>/dev/null || true)
-      if [ -n "$IN_CHAIN" ]; then
-        CASE="D"
-        break
-      fi
-    done
+    IN_INTERIOR=$(jj log -r "@ & mutable() & ::${JOIN_CHANGE} & ~${JOIN_CHANGE}" \
+                    --no-graph -T 'change_id' 2>/dev/null || true)
+    if [ -n "$IN_INTERIOR" ]; then
+      CASE="D"
+    fi
   fi
 fi
 
 if [ -z "$CASE" ]; then
   cat << EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"Diamond integrity violation (iii): @ is not in any of the four valid positions for tier-3 work. Valid positions: (A) @ is the join itself, (B) @ is a direct child of the join (idle wip state), (C) @ is in a linear non-merge stack above the join (splice-below-join by-construction in-progress), or (D) @ is in a chain — descendant of a chain tip, not at-or-above the join (route-and-extend in-progress, or in-chain editing). Recovery depends on intent: jj new $JOIN_CHANGE -m 'wip' to return @ to the idle position, or jj edit <chain-tip-change-id> to resume in-chain work. See ~/.claude/skills/jj-version-control/SKILL.md (composite maintenance invariant)."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"Diamond integrity violation (iii): @ is not in any of the four valid positions for tier-3 work. Valid positions: (A) @ is the join itself, (B) @ is a direct child of the join (idle wip state), (C) @ is in a linear non-merge stack above the join (splice-below-join by-construction in-progress), or (D) @ is anywhere in the mutable diamond interior — any mutable ancestor of the join, including any chain commit at any depth (tip, mid-chain, root) or any splice-region commit (in-chain editing, splice-region editing, route-and-extend in-progress). Recovery depends on intent: jj new $JOIN_CHANGE -m 'wip' to return @ to the idle position, or jj edit <chain-tip-change-id> to resume in-chain work. See ~/.claude/skills/jj-version-control/SKILL.md (composite maintenance invariant)."}}
 EOF
   exit 0
 fi

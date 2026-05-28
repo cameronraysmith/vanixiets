@@ -416,8 +416,8 @@ Subagent prompts must specify whether they operate in `[wip]` (edit files, let o
 The invariants above describe the diamond's *idle* state — when `@` is empty `[wip]` directly above the join and no chain extension or splice authoring is in progress.
 During mid-operation states the strict invariants are transiently relaxed:
 
-- *In-chain editing* (via `jj new --insert-after <chain-tip>`, the route-and-extend single- or multi-commit-range form): `@` sits in a chain, as a descendant of a chain tip that is not at-or-above the join.
-The chain bookmark has not yet been advanced to the new chain tip, so the join's parent set briefly disagrees with the bookmark set declared in the join's description.
+- *In-chain editing* (via `jj new --insert-after <chain-tip>` for the route-and-extend single- or multi-commit-range form, or via `jj edit <chain-commit>` for in-place amendment of an earlier chain commit at any depth): `@` sits anywhere in the mutable diamond interior — any mutable ancestor of the join excluding the join itself, covering chain tips, mid-chain commits, chain roots, and splice-region commits.
+The chain bookmark has not yet been advanced (in the append case) or the chain's history is mid-rewrite (in the edit case), so the join's parent set briefly disagrees with the bookmark set declared in the join's description.
 - *Splice-below-join by-construction* (via `jj new --insert-before 'children(fork_point(parents(<join>))) & ::<join>'`): `@` sits in a linear non-merge stack above the join during authoring.
 - *Stack above the join awaiting splice or route* (an intermediate state in which docs commits are stacked linearly above the join before the splice or route-and-extend is executed): same topology as splice-by-construction.
 
@@ -428,7 +428,11 @@ The `verify-diamond-before-edit` PreToolUse hook recognizes four valid `@` posit
 | (A) | `@` IS the join | construction-time, before adding `[wip]` |
 | (B) | `@` is a direct child of the join | idle wip |
 | (C) | `@` is in a linear non-merge stack above the join | splice-by-construction in-progress; stack-above-join awaiting splice/route |
-| (D) | `@` is in a chain (descendant of a chain tip, not at-or-above the join) | route-and-extend in-progress; in-chain editing |
+| (D) | `@` is anywhere in the mutable diamond interior — any chain commit at any depth (tip, mid-chain, root) or any splice-region commit | Covers: route-and-extend in-progress (case D was previously narrowly defined); `jj edit <chain-commit>` for in-place edits at any depth; `jj edit <splice-region-commit>` for splice-region fixups. |
+
+The unified case (D) formulation supersedes a previous narrower definition restricted to descendants of a chain tip.
+The earlier definition missed two important sub-scenarios: mid-chain or chain-root editing via `jj edit <chain-commit>` (to amend an earlier chain commit in place rather than appending a new one), and splice-region editing via `jj edit <splice-region-commit>` (to fix up a commit inside an in-progress splice-below-join stack).
+The unified formulation handles all three sub-scenarios uniformly because the topological notion — "`@` is working in the interior of the diamond, i.e. it is a mutable ancestor of the join that is not the join itself" — is the same regardless of whether `@` reached that position via `jj new --insert-after`, `jj edit`, or any other `@`-moving operation.
 
 Checks (i)/(ii) — bookmark-vs-parent consistency — run only in cases (A) and (B), since cases (C) and (D) by construction produce a transient bookmark/parent mismatch that the in-progress operation reconciles when it advances the relevant bookmark.
 
