@@ -39,7 +39,7 @@
               };
 
               model = "opus";
-              effortLevel = "high";
+              effortLevel = "xhigh";
               forceLoginMethod = "claudeai";
               theme = "dark";
               autoCompactEnabled = false;
