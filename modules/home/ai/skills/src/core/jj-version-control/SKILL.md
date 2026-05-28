@@ -644,6 +644,64 @@ jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
 The `all:` prefix is required to ensure the revset resolves to multiple parents rather than collapsing to a single common ancestor.
 Without `all:`, jj would compute the nearest common ancestor of the revset members, producing a single-parent `@` instead of a multi-parent one.
 
+### Splice-below-join
+
+When mid-diamond work surfaces a `<base>`-bound commit — hotfix, formatting, config tweak, dependency bump — that belongs on `<base>` below all chains, splice it into the base-to-join interval.
+The accumulated splice region fast-forwards `<base>` independently of when the diamond's chains land.
+
+A diamond's interior is `<base>..<join>` — the half-open interval between the base bookmark and the development join.
+The bottom of this interior is the antichain `roots(<base>..<join>)` — the minimal commits, each branching off `<base>` (or the splice region tip when one exists).
+These are the *chain roots*.
+The splice-below-join operation inserts new commit(s) between `<base>` and this antichain.
+The diamond shape is preserved: every chain bookmark stays at its tip, the join's parent set is unchanged, `@` (`[wip]`) remains atop the join.
+
+**By-construction arm** — when authoring a new `<base>`-bound commit:
+
+```bash
+jj new --insert-before 'roots(trunk()..<join>)' -m "fix(scope): description"
+# @ is now splice-positioned; edit files (auto-snapshotted into the splice commit)
+jj new  # return @ to [wip] atop the diamond, or remain in the splice commit to extend it
+```
+
+**By-relocation arm** — when a `<base>`-bound commit already exists above the join (commonly because `@` was the working position when the commit was sealed):
+
+```bash
+# Checkpoint and survey the antichain target
+PAGER=cat jj op log -n 1  # note <OP0> for rollback
+PAGER=cat jj log -r 'roots(trunk()..<join>)' --no-graph \
+    -T 'change_id.shortest(8) ++ " bm=[" ++ bookmarks ++ "] " ++ description.first_line() ++ "\n"'
+# Expect N rows — one per chain in the diamond
+
+jj rebase --revisions <commit> --insert-before 'roots(trunk()..<join>)'
+
+# Verify diamond invariants post-splice
+PAGER=cat jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'
+PAGER=cat jj bookmark list -r 'parents(@-) ~ trunk()'  # expect N chain bookmarks unchanged
+# Rollback if any verification fails: jj op restore <OP0>
+```
+
+The revset `roots(<base>..<join>)` is the order-theoretically precise name for the splice target: the antichain of minimal elements of the open interval (`<base>`, `<join>`].
+It generalizes across diamond cardinality (2-way, N-way), is invariant under remote bookmark drift (origin-advance commits descend from `<base>` but do not reach `<join>`, so they are excluded), and resolves correctly whether the splice region is empty (giving the chain roots) or non-empty (giving its current top edge).
+
+**Anti-patterns**:
+
+- *Naked `--insert-after <base>`* fails when `<base>@origin` is ahead of local `<base>`.
+  The `--insert-after` semantics reparent every current child of `<base>` onto the source — including the immutable origin-advance lineage.
+  jj refuses with `Commit <id> is immutable`.
+  Use `--insert-before` against the antichain instead, which touches only the chain-root edges.
+- *Single-target `--insert-before <one-chain-root>`* reparents only one chain.
+  The join then merges N parents with inconsistent bases (one below the new commit, N-1 still directly above `<base>`), silently desynchronizing the diamond.
+  Always use a revset spanning all chain roots: `roots(<base>..<join>)`.
+- *`jj rebase -r <X> -d <base>`* (destination form) leaves the source as a sibling of the chain roots, not above them.
+  The chain roots remain children of `<base>`; the source has no relationship to the diamond.
+  Wrong topology.
+
+**Invariants preserved**.
+Every chain bookmark resolves to the same chain tip (commit ids unchanged in by-construction arm; chain roots and descendants rewritten in by-relocation arm via standard auto-rebase).
+`<join>` retains its N-parent shape.
+`@` retains its `[wip]` empty status.
+The base bookmark is not advanced — fast-forwarding `<base>` to incorporate the splice region is a separate, deliberate step (see `§Diamond integration on remote advance` for the related operation when the remote has moved).
+
 ### Re-attaching `[wip]` after `jj rebase -r <merge>`
 
 `jj rebase -r <merge>` and `jj rebase -r <wip> -d <merge>` form a required tool-pair.
@@ -667,6 +725,46 @@ jj new <single-bookmark>
 ```
 
 This creates a fresh `@` descending from only the specified bookmark.
+
+### Diamond integration on remote advance
+
+When `<base>@origin` has advanced past local `<base>` while diamond work is in progress, integrate the new remote commits into the diamond before continuing.
+This is distinct from `§Integration strategies at completion` (Phase 4 serialize): the operation here rebases an *in-progress* diamond onto a moved remote, not the completion-time linearization of chains for submission.
+
+**What `jj git fetch` does automatically** (per `lib/src/git.rs` in upstream `jj-vcs/jj`):
+
+1. *Tracked-bookmark advance* — when local `<base>` tracks `<base>@origin`, a 3-way merge auto-advances local `<base>` to the new remote tip.
+2. *Abandon-and-rebase for unreachable commits* — commits that became unreachable on remote (force-push removed) are abandoned, and their descendants auto-rebased onto the new tips.
+3. *Synthetic predecessor recording* — abandoned commits whose change IDs match newly-imported commits trigger `set_rewritten_commit`, propagating standard rewrite-tracking auto-rebase to descendants.
+
+**What fetch does not handle in the diamond-on-old-base case**.
+The diamond's chain roots are parented to the old `<base>` position.
+After fetch, that position is still reachable (pinned by the chain roots), so it is not abandoned.
+The new remote-advance commits have change IDs jj has never seen, so no rewrite mapping is established.
+Local `<base>` advances; chain roots do not move.
+An explicit rebase is required.
+
+**Recipe**:
+
+```bash
+jj git fetch
+
+# Move the entire diamond (splice region if any, chain roots, chains, chain tips, join, @)
+# from old <base> position onto new remote tip. Source = antichain at the bottom of
+# <base>@origin..@; destination = <base>@origin literally, which is invariant under
+# whether auto-advance fired.
+jj rebase --source 'roots(<base>@origin..@)' --destination '<base>@origin'
+
+# Ensure local <base> matches remote (idempotent — no-op if fetch auto-advanced).
+jj bookmark set <base> -r '<base>@origin'
+
+# Verify
+PAGER=cat jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'
+PAGER=cat jj bookmark list -r 'parents(@-) ~ trunk()'
+```
+
+Applies whether the splice region is empty or non-empty: `roots(<base>@origin..@)` resolves to the splice root when splice commits exist, or to the chain-root antichain when they do not.
+The diamond's interior moves as one connected component; chain bookmarks point at the rewritten tips post-rebase.
 
 ### Session persistence
 
@@ -778,6 +876,7 @@ The skill uses terminology from three traditions, sometimes naming the same conc
 | Maximum of a chain | chain tip | "tip commit" | "tip" | **maximum** of the chain |
 | The integrated structural pattern | diamond workflow | "megamerge" (title-only, undefined) | (unnamed) | a bounded sublattice with antichain interior |
 | Moving a change to its semantic home | route (append-, amend-, absorb-) | "squash into", "absorb" | `jj squash --into`, `jj absorb`, `jj new --insert-*` | (operational; no formal term) |
+| Splice operation below chain roots | splice-below-join (by-construction / by-relocation) | (unnamed) | `jj rebase --revisions <X> --insert-before <revset>` / `jj new --insert-before <revset>` | antichain target; operational route below the diamond interior |
 
 `[merge]` / `[wip]` bracket notation is Krycho-canonical (from *Jujutsu Megamerges and `jj absorb`*) and used in this skill for visual concreteness when describing the structural pair.
 The full theoretical treatment of the lattice / partial-order foundation — Dilworth's antichain theorem, Lamport's partial order, Winskel event structures — is in `docs/notes/development/version-control/epic-to-branch-diamond-workflow.md`.
