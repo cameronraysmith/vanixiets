@@ -141,6 +141,19 @@ jj describe -m ""                         # Clear stale @ description
 jj rebase -r @ -d 'all:(@- | new-bm)'    # Add chain to the development join
 jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove chain from the development join
 
+# Splice-below-join: insert a <base>-bound commit between <base> and chain roots
+# By-construction: author a new splice commit in position
+jj new --insert-before 'roots(trunk()..<join>)' -m "msg"
+# By-relocation: move an existing above-join commit into the splice region
+jj rebase --revisions <X> --insert-before 'roots(trunk()..<join>)'
+# See ~/.claude/skills/jj-version-control/SKILL.md §"Splice-below-join"
+
+# Diamond integration on remote advance: rebase diamond onto fast-forwarded remote
+jj git fetch
+jj rebase --source 'roots(<base>@origin..@)' --destination '<base>@origin'
+jj bookmark set <base> -r '<base>@origin'
+# See ~/.claude/skills/jj-version-control/SKILL.md §"Diamond integration on remote advance"
+
 # Diamond-health diagnostic (surfaces all five diamond invariants in one view)
 jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'
 
@@ -349,6 +362,8 @@ jj log -r 'mine() & ~bookmarks()'
 3. Multiple independent work streams in flight (multiple beads issues within an epic, parallel agent dispatch, parallel experiments to compose)?
    → Tier 3: diamond workflow via development join over the chains' bookmarks.
    `jj new <existing-bookmark> <new-bookmark> -m "join N=2: <alphabetical bookmarks, comma-separated>"`; route edits via `jj squash --from @ --into <tip> -u` plus `jj bookmark move <name> --to <tip>`, and rewrite the `[merge]` description in full whenever the parent set changes so it always reflects the current `join N=<cardinality>: <alphabetical bookmarks>` state.
+   - Mid-diamond commit belongs on `<base>` below all chains → splice-below-join (see `~/.claude/skills/jj-version-control/SKILL.md` §"Splice-below-join")
+   - Remote `<base>` advanced during diamond work → diamond integration on remote advance (see `~/.claude/skills/jj-version-control/SKILL.md` §"Diamond integration on remote advance")
 
 4. Did the user explicitly request workspace isolation (utterance naming `worktree`, `workspace`, `isolate`, `separate working copy`, or path forms like `.worktrees/X`)?
    → `jj workspace add <path> -r <change>` mechanics; otherwise stay at tier 3 and parallelize via the development join in a single working copy.
