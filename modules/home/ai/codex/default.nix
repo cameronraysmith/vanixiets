@@ -77,12 +77,21 @@
             # Experimental features
             # https://github.com/openai/codex/blob/main/codex-rs/core/src/features.rs
             features = {
+              apps = false;
               apply_patch_freeform = true;
               collaboration_modes = true;
               shell_snapshot = true;
               steer = true;
               unified_exec = true;
             };
+
+            # MCP servers
+            mcp_servers.linear.url = "https://mcp.linear.app/mcp";
+
+            # Plugins (linear@openai-curated uses the built-in ChatGPT-auth
+            # marketplace — no [marketplaces.*] declaration required; its Skill
+            # loads via Feature::Plugins and resolves through mcp_servers.linear)
+            plugins."linear@openai-curated".enabled = true;
           };
 
           # NOTE: Do NOT set custom-instructions here.
