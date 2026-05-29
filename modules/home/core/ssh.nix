@@ -30,12 +30,20 @@
           "${config.home.homeDirectory}/.orbstack/ssh/config"
         ];
 
-        matchBlocks = {
-          # Security keys (FIDO/U2F) should NOT be auto-added to agent
-          # Match block must come before wildcard "*" block
-          "*_sk" = {
-            match = ''exec "sh -c 'test -e ${config.home.homeDirectory}/.ssh/id_*_sk 2>/dev/null'"'';
-            addKeysToAgent = "no";
+        # programs.ssh.settings replaces the deprecated programs.ssh.matchBlocks
+        # (home-manager RFC 42 SSH refactor). Each block is keyed by host or match
+        # pattern; directive bodies use upstream OpenSSH PascalCase directive names.
+        # The "*" block is special-cased by home-manager to always render last, so
+        # its values act as the lowest-priority defaults.
+        settings = {
+          # Security keys (FIDO/U2F) must NOT be auto-added to the agent.
+          # Expressed as a Match-exec block via the `header` option, which carries
+          # the match expression (including the interpolated home directory).
+          # Because "*" always renders last, this AddKeysToAgent override wins over
+          # the global default below.
+          "sk-keys" = {
+            header = ''Match exec "sh -c 'test -e ${config.home.homeDirectory}/.ssh/id_*_sk 2>/dev/null'"'';
+            AddKeysToAgent = "no";
           };
 
           # ====================
@@ -43,76 +51,76 @@
           # ====================
 
           "cinnabar.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:93db:4344:343b";
-            user = "cameron";
-            extraOptions.HostKeyAlias = "cinnabar.zt";
+            HostName = "fddb:4344:343b:14b9:399:93db:4344:343b";
+            User = "cameron";
+            HostKeyAlias = "cinnabar.zt";
           };
 
           "electrum.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:93d1:7e6d:27cc";
-            user = "cameron";
-            extraOptions.HostKeyAlias = "electrum.zt";
+            HostName = "fddb:4344:343b:14b9:399:93d1:7e6d:27cc";
+            User = "cameron";
+            HostKeyAlias = "electrum.zt";
           };
 
           "blackphos.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:930e:e971:d9e0";
-            user = "crs58";
-            extraOptions.HostKeyAlias = "blackphos.zt";
+            HostName = "fddb:4344:343b:14b9:399:930e:e971:d9e0";
+            User = "crs58";
+            HostKeyAlias = "blackphos.zt";
           };
 
           "stibnite.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:933e:1059:d43a";
-            user = "crs58";
-            extraOptions.HostKeyAlias = "stibnite.zt";
+            HostName = "fddb:4344:343b:14b9:399:933e:1059:d43a";
+            User = "crs58";
+            HostKeyAlias = "stibnite.zt";
           };
 
           "argentum.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
-            user = "cameron";
-            extraOptions.HostKeyAlias = "argentum.zt";
+            HostName = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
+            User = "cameron";
+            HostKeyAlias = "argentum.zt";
           };
 
           "rosegold.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:9315:3431:ee8";
-            user = "cameron";
-            extraOptions.HostKeyAlias = "rosegold.zt";
+            HostName = "fddb:4344:343b:14b9:399:9315:3431:ee8";
+            User = "cameron";
+            HostKeyAlias = "rosegold.zt";
           };
 
           "galena.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:9315:c67a:dec9";
-            user = "cameron";
-            extraOptions.HostKeyAlias = "galena.zt";
+            HostName = "fddb:4344:343b:14b9:399:9315:c67a:dec9";
+            User = "cameron";
+            HostKeyAlias = "galena.zt";
           };
 
           "scheelite.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:9380:46d5:3400";
-            user = "cameron";
-            extraOptions.HostKeyAlias = "scheelite.zt";
+            HostName = "fddb:4344:343b:14b9:399:9380:46d5:3400";
+            User = "cameron";
+            HostKeyAlias = "scheelite.zt";
           };
 
           "magnetite.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:930f:39db:40d2";
-            user = "cameron";
-            extraOptions.HostKeyAlias = "magnetite.zt";
+            HostName = "fddb:4344:343b:14b9:399:930f:39db:40d2";
+            User = "cameron";
+            HostKeyAlias = "magnetite.zt";
           };
 
           "pixel7.zt" = {
-            hostname = "fddb:4344:343b:14b9:399:939f:c45d:577c";
-            port = 8022; # Termux sshd default
-            user = "termux"; # Termux accepts any username
+            HostName = "fddb:4344:343b:14b9:399:939f:c45d:577c";
+            Port = 8022; # Termux sshd default
+            User = "termux"; # Termux accepts any username
           };
 
           # Wildcard for all zerotier hosts
           "*.zt" = {
             # Enable compression for zerotier (encrypted tunnel over encrypted tunnel)
-            compression = true;
+            Compression = true;
             # Keepalive for NAT traversal
-            serverAliveInterval = 60;
-            serverAliveCountMax = 3;
+            ServerAliveInterval = 60;
+            ServerAliveCountMax = 3;
           };
 
           # ====================
-          # Global Defaults
+          # Global Defaults (always rendered last)
           # ====================
 
           "*" = {
@@ -120,38 +128,37 @@
             # note: SSH_AUTH_SOCK is set by modules/home/core/bitwarden.nix
             # - Darwin: uses bitwarden desktop app SSH agent + keychain fallback
             # - Linux: uses bitwarden desktop app SSH agent (if enabled in bitwarden.nix)
-            addKeysToAgent =
+            AddKeysToAgent =
               if pkgs.stdenv.isDarwin then
                 "yes" # add to both bitwarden agent and macOS keychain
               else
                 "confirm"; # prompt before adding to agent on linux
 
-            # Identity files auto-discovered from SSH agent (via SSH_AUTH_SOCK)
-            # No explicit identityFile needed - prevents "no such identity" errors
-            # when file doesn't exist on headless servers
-
-            # macOS-specific options
-            # Note: UseKeychain removed - only works with Apple's SSH, not Nix OpenSSH
-            # We use Bitwarden SSH agent via SSH_AUTH_SOCK instead
-            extraOptions = lib.optionalAttrs pkgs.stdenv.isDarwin {
-              # XAuthLocation for X11 forwarding (XQuartz)
-              XAuthLocation = "/opt/X11/bin/xauth";
-            };
+            # Identity files auto-discovered from SSH agent (via SSH_AUTH_SOCK).
+            # No explicit IdentityFile needed - prevents "no such identity" errors
+            # when the file doesn't exist on headless servers.
 
             # security defaults
-            forwardAgent = false; # override per-host as needed
-            compression = false; # override for zerotier hosts
-            hashKnownHosts = false;
-            userKnownHostsFile = "~/.ssh/known_hosts";
+            ForwardAgent = false; # override per-host as needed
+            Compression = false; # override for zerotier hosts
+            HashKnownHosts = false;
+            UserKnownHostsFile = "~/.ssh/known_hosts";
 
             # connection persistence defaults
-            controlMaster = "no";
-            controlPath = "~/.ssh/master-%r@%n:%p";
-            controlPersist = "no";
+            ControlMaster = "no";
+            ControlPath = "~/.ssh/master-%r@%n:%p";
+            ControlPersist = "no";
 
             # keepalive (disabled by default, enable per-host)
-            serverAliveInterval = 0;
-            serverAliveCountMax = 3;
+            ServerAliveInterval = 0;
+            ServerAliveCountMax = 3;
+          }
+          # macOS-specific options.
+          # Note: UseKeychain removed - only works with Apple's SSH, not Nix OpenSSH;
+          # we use the Bitwarden SSH agent via SSH_AUTH_SOCK instead.
+          // lib.optionalAttrs pkgs.stdenv.isDarwin {
+            # XAuthLocation for X11 forwarding (XQuartz)
+            XAuthLocation = "/opt/X11/bin/xauth";
           };
         };
       };
