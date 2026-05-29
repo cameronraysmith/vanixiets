@@ -105,8 +105,9 @@
         # claude-code pattern at modules/home/ai/claude-code/default.nix:374-376;
         # targeting a relative key would be a silent no-op (see the
         # homemanager-upstream-key-paths memory entry).
-        home.file.${settingsKey}.enable =
-          lib.mkIf config.programs.codex.mutableSettings (lib.mkForce false);
+        home.file.${settingsKey}.enable = lib.mkIf config.programs.codex.mutableSettings (
+          lib.mkForce false
+        );
 
         home.activation.codexMutableSettings = lib.mkIf config.programs.codex.mutableSettings (
           let
