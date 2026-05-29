@@ -167,6 +167,13 @@
               # declaring it here keeps activation idempotent across home-manager rebuilds.
               skipAutoPermissionPrompt = true;
 
+              # Disable the bg-session worktree-isolation guard fleet-wide.
+              # Claude Code reads worktree.bgIsolation from the merged settings hierarchy
+              # (user < project < local < managed), so the user-global ~/.claude/settings.json
+              # value applies across all repos; a per-repo .claude/settings.json may re-enable
+              # it with worktree.bgIsolation = "worktree".
+              worktree.bgIsolation = "none";
+
               permissions = {
                 defaultMode = "auto";
                 # only enforced from managed-settings.json, included here as intent marker
