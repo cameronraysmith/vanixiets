@@ -1656,11 +1656,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1773700838,
-        "narHash": "sha256-6KFxpxyXjcqhOexc7ZeaXVWdDtGb6zO8HtjBEci9DfU=",
+        "lastModified": 1779965098,
+        "narHash": "sha256-Jh0Zk+g0pEbNopADEtqvrnhrl83rlNFHpn3Zhz4s+VM=",
         "owner": "terranix",
         "repo": "terranix",
-        "rev": "306ce146bf0324dc3b3c45c095036b6f0e26bf35",
+        "rev": "36ed5bdee452978d0e9c4450de872483ab541006",
         "type": "github"
       },
       "original": {
