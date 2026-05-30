@@ -23,6 +23,11 @@ let
           flake.inputs.niks3.packages.${pkgs.stdenv.hostPlatform.system}.niks3
         ];
 
+      # Inject linear-cli's bundled skills (38 linear-*/SKILL.md subdirs) into all
+      # agent destinations, scoped to this user. .src is the fetchFromGitHub store
+      # path; its top-level skills/ dir is read by readSkillsFrom in the ai module.
+      aiSkills.extraSkillDirs = [ "${pkgs.linear-cli.src}/skills" ];
+
       # sops-nix configuration for crs58/cameron user
       # 15 secrets: development + ai + shell aggregates
       sops = {
