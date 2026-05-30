@@ -37,6 +37,8 @@ let
           firecrawl-api-key = { };
           huggingface-token = { };
           cerebras-api-key = { };
+          linear-api-key-personal = { };
+          linear-api-key-work = { };
           context7-api-key = { };
           bitwarden-email = { };
           atuin-key = { };
@@ -62,6 +64,28 @@ let
           path = "${config.xdg.configHome}/git/allowed_signers";
           content = ''
             ${flake.users.crs58.meta.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
+          '';
+        };
+
+        # linear-cli native multi-workspace config, rendered immutably from sops.
+        # Read-only (0400): switch profiles via `--profile` / LINEAR_CLI_PROFILE, never via
+        # mutating commands (workspace-switch / auth / config set-key would clobber this file).
+        # The `dirs` crate ignores XDG on macOS and reads Application Support; XDG only on Linux.
+        templates."linear-cli-config.toml" = {
+          mode = "0400";
+          path =
+            if pkgs.stdenv.hostPlatform.isDarwin then
+              "${config.home.homeDirectory}/Library/Application Support/linear-cli/config.toml"
+            else
+              "${config.xdg.configHome}/linear-cli/config.toml";
+          content = ''
+            current = "personal"
+
+            [workspaces.personal]
+            api_key = "${config.sops.placeholder."linear-api-key-personal"}"
+
+            [workspaces.work]
+            api_key = "${config.sops.placeholder."linear-api-key-work"}"
           '';
         };
 
