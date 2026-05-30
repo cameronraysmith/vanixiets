@@ -8,7 +8,7 @@
 # The zerotier controller pushes this DNS server to all network members.
 # systemd-resolved routes .zt queries to dnsmasq via split DNS on the
 # zerotier interface.
-{ lib, ... }:
+{ ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
     { config, pkgs, ... }:
@@ -62,38 +62,41 @@
       ];
       networking.firewall.interfaces."zt+".allowedUDPPorts = [ 53 ];
 
-      clan.core.networking.zerotier.settings = {
-        dns = {
-          domain = "zt";
-          servers = [
-            "fddb:4344:343b:14b9:399:93db:4344:343b"
-            "10.147.17.1"
-          ];
-        };
-
-        # Enable IPv4 assignment for dual-stack (Android browsers need A records)
-        v4AssignMode.zt = lib.mkForce true;
-        ipAssignmentPools = [
-          {
-            ipRangeStart = "10.147.17.1";
-            ipRangeEnd = "10.147.17.254";
-          }
-        ];
-        routes = [
-          {
-            target = "10.147.17.0/24";
-            via = null;
-          }
-        ];
-      };
-
       # Pin cinnabar's own zerotier member to 10.147.17.1 so dnsmasq and
       # Caddy bind addresses are deterministic across rebuilds.
       # Appends to clan-core's ExecStartPost list (configure-interface,
       # whitelist-controller).
       systemd.services.zerotierone.serviceConfig.ExecStartPost = [
+        # Push DNS/IPv4 network config to the local controller HTTP API after
+        # the daemon starts. The clanService symlinks a read-only net.json with
+        # empty dns/pools/routes, so the controller must be POSTed the DNS
+        # servers and IPv4 assignment plane on every boot. Runs before
+        # pin-controller-ipv4 so the IPv4 pool exists before the member pin.
+        "+${pkgs.writeShellScript "push-controller-network-config" ''
+          while ! ${pkgs.netcat}/bin/nc -z localhost 9993; do sleep 0.1; done
+          NETWORK_ID="${config.clan.core.vars.generators."zerotier-network-zerotier".files.network-id.value}"
+          AUTH=$(cat /var/lib/zerotier-one/authtoken.secret)
+          ${pkgs.curl}/bin/curl -sf \
+            -X POST \
+            -H "X-ZT1-Auth: $AUTH" \
+            -d '{
+              "dns": {
+                "domain": "zt",
+                "servers": ["fddb:4344:343b:14b9:399:93db:4344:343b", "10.147.17.1"]
+              },
+              "v4AssignMode": { "zt": true },
+              "ipAssignmentPools": [
+                { "ipRangeStart": "10.147.17.1", "ipRangeEnd": "10.147.17.254" }
+              ],
+              "routes": [
+                { "target": "10.147.17.0/24", "via": null }
+              ]
+            }' \
+            "http://localhost:9993/controller/network/$NETWORK_ID" \
+            > /dev/null
+        ''}"
         "+${pkgs.writeShellScript "pin-controller-ipv4" ''
-          NETWORK_ID="${config.clan.core.vars.generators.zerotier-controller.files.zerotier-network-id.value}"
+          NETWORK_ID="${config.clan.core.vars.generators."zerotier-network-zerotier".files.network-id.value}"
           MEMBER_ID=$(${pkgs.zerotierone}/bin/zerotier-cli info | ${pkgs.gawk}/bin/awk '{print $3}')
           AUTH=$(cat /var/lib/zerotier-one/authtoken.secret)
           IPV6="fddb:4344:343b:14b9:399:93db:4344:343b"
