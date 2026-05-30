@@ -83,6 +83,7 @@
           dolt
           gastown
           golem-binary
+          linear-cli
           #------
           plantuml-c4
           ratchet
