@@ -18,6 +18,7 @@
 {
   flake.modules.homeManager.ai =
     {
+      config,
       lib,
       flake,
       ...
@@ -33,37 +34,59 @@
       coreSkills = readSkillsFrom ./src/core;
       claudeSkills = readSkillsFrom ./src/claude;
 
+      # Third-party skill directories supplied via aiSkills.extraSkillDirs.
+      # Each entry is a directory (often a nix store path string) holding
+      # <name>/SKILL.md subdirs; readSkillsFrom maps it the same way as core.
+      extraSkills = lib.foldl' (acc: dir: acc // readSkillsFrom dir) { } config.aiSkills.extraSkillDirs;
+
+      # Coerce a skill source to a value home.file.source accepts. Store-path
+      # strings (from flake inputs / pkgs.*.src) are valid sources, but the
+      # safe, type-stable form is an outPath-bearing path produced by
+      # builtins.path, which works uniformly for in-repo Nix paths and for
+      # store-path strings.
+      toFileSource = path: builtins.path { inherit path; };
+
+      # Core skills plus any third-party skills, for the home.file-based agents.
+      fileSkills = coreSkills // extraSkills;
     in
     {
-      programs.claude-code.skills = coreSkills // claudeSkills;
-      # Bypass programs.codex.skills: upstream codex module omits recursive = true
-      # on home.file entries, causing .before-home-manager churn on every generation
-      # change. Lock to empty to prevent conflicts if upstream changes the default.
-      programs.codex.skills = { };
-      programs.opencode.skills = coreSkills;
+      options.aiSkills.extraSkillDirs = lib.mkOption {
+        type = lib.types.listOf (lib.types.either lib.types.path lib.types.str);
+        default = [ ];
+        description = "Additional directories, each containing `<name>/SKILL.md` subdirs, whose skills are injected into all agent destinations alongside core skills. Accepts nix store paths.";
+      };
 
-      # Codex and Droid: direct home.file with recursive = true for stable symlinks
-      home.file =
-        lib.mapAttrs' (
-          name: path:
-          lib.nameValuePair ".agents/skills/${name}" {
-            source = path;
-            recursive = true;
-          }
-        ) coreSkills
-        // lib.mapAttrs' (
-          name: path:
-          lib.nameValuePair ".factory/skills/${name}" {
-            source = path;
-            recursive = true;
-          }
-        ) coreSkills
-        // lib.mapAttrs' (
-          name: path:
-          lib.nameValuePair ".hermes/skills/${name}" {
-            source = path;
-            recursive = true;
-          }
-        ) coreSkills;
+      config = {
+        programs.claude-code.skills = coreSkills // extraSkills // claudeSkills;
+        # Bypass programs.codex.skills: upstream codex module omits recursive = true
+        # on home.file entries, causing .before-home-manager churn on every generation
+        # change. Lock to empty to prevent conflicts if upstream changes the default.
+        programs.codex.skills = { };
+        programs.opencode.skills = coreSkills // extraSkills;
+
+        # Codex and Droid: direct home.file with recursive = true for stable symlinks
+        home.file =
+          lib.mapAttrs' (
+            name: path:
+            lib.nameValuePair ".agents/skills/${name}" {
+              source = toFileSource path;
+              recursive = true;
+            }
+          ) fileSkills
+          // lib.mapAttrs' (
+            name: path:
+            lib.nameValuePair ".factory/skills/${name}" {
+              source = toFileSource path;
+              recursive = true;
+            }
+          ) fileSkills
+          // lib.mapAttrs' (
+            name: path:
+            lib.nameValuePair ".hermes/skills/${name}" {
+              source = toFileSource path;
+              recursive = true;
+            }
+          ) fileSkills;
+      };
     };
 }
