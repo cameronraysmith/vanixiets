@@ -23,10 +23,20 @@ let
           flake.inputs.niks3.packages.${pkgs.stdenv.hostPlatform.system}.niks3
         ];
 
-      # Inject linear-cli's bundled skills (38 linear-*/SKILL.md subdirs) into all
-      # agent destinations, scoped to this user. .src is the fetchFromGitHub store
-      # path; its top-level skills/ dir is read by readSkillsFrom in the ai module.
-      aiSkills.extraSkillDirs = [ "${pkgs.linear-cli.src}/skills" ];
+      # Inject linear-cli's bundled skills (38 linear-*/SKILL.md subdirs) and the
+      # vendored OpenSpec 1.3.1 skills (4 openspec-*/SKILL.md subdirs) into all
+      # agent destinations, scoped to this user. linear-cli .src is the
+      # fetchFromGitHub store path; its top-level skills/ dir is read by
+      # readSkillsFrom in the ai module. The openspec assets are committed
+      # generated output regenerated via modules/home/ai/openspec/regen.sh.
+      aiSkills.extraSkillDirs = [
+        "${pkgs.linear-cli.src}/skills"
+        (flake.inputs.self + "/modules/home/ai/openspec/assets/skills")
+      ];
+
+      # Symlink the vendored OpenSpec opsx slash commands into ~/.claude/commands/opsx/.
+      # The assets dir holds commands/opsx/{explore,propose,apply,archive}.md.
+      programs.claude-code.commandsDir = flake.inputs.self + "/modules/home/ai/openspec/assets/commands";
 
       # sops-nix configuration for crs58/cameron user
       # 15 secrets: development + ai + shell aggregates
