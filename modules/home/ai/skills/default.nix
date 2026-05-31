@@ -20,6 +20,7 @@
     {
       config,
       lib,
+      pkgs,
       flake,
       ...
     }:
@@ -48,6 +49,23 @@
 
       # Core skills plus any third-party skills, for the home.file-based agents.
       fileSkills = coreSkills // extraSkills;
+
+      # Aggregated real-file skills tree for agents that cannot discover skills
+      # behind symlinked SKILL.md leaves. home.file with recursive = true uses
+      # lndir, which produces real directories but symlinked file leaves into the
+      # nix store; codex (v0.135.0) skips symlinked file leaves in its loader and
+      # therefore sees no skills. Materializing the tree as real files via a
+      # home.activation copy (below) avoids the symlink leaves. -L dereferences
+      # any symlinks so the result is real files; --no-preserve=mode makes the
+      # copies writable (store files are read-only).
+      agentsSkillsTree = pkgs.runCommandLocal "agents-skills" { } (
+        lib.concatStringsSep "\n" (
+          lib.mapAttrsToList (name: path: ''
+            mkdir -p "$out/${name}"
+            cp -RL --no-preserve=mode ${toFileSource path}/. "$out/${name}/"
+          '') fileSkills
+        )
+      );
     in
     {
       options.aiSkills.extraSkillDirs = lib.mkOption {
@@ -64,16 +82,13 @@
         programs.codex.skills = { };
         programs.opencode.skills = coreSkills // extraSkills;
 
-        # Codex and Droid: direct home.file with recursive = true for stable symlinks
+        # ~/.agents/skills delivered as real files via home.activation below
+        # (not home.file) because codex skips symlinked SKILL.md leaves.
+        #
+        # Droid (.factory) and hermes (.hermes): direct home.file with
+        # recursive = true for stable symlinks.
         home.file =
           lib.mapAttrs' (
-            name: path:
-            lib.nameValuePair ".agents/skills/${name}" {
-              source = toFileSource path;
-              recursive = true;
-            }
-          ) fileSkills
-          // lib.mapAttrs' (
             name: path:
             lib.nameValuePair ".factory/skills/${name}" {
               source = toFileSource path;
@@ -87,6 +102,15 @@
               recursive = true;
             }
           ) fileSkills;
+
+        # Deliver ~/.agents/skills as real files (see agentsSkillsTree above).
+        # Prune and repopulate for idempotency, taking full ownership of the
+        # directory so removed skills don't linger.
+        home.activation.agentsSkillsRealFiles = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          $DRY_RUN_CMD rm -rf "$HOME/.agents/skills"
+          $DRY_RUN_CMD install -d "$HOME/.agents/skills"
+          $DRY_RUN_CMD cp -RL --no-preserve=mode ${agentsSkillsTree}/. "$HOME/.agents/skills/"
+        '';
       };
     };
 }
