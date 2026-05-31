@@ -87,7 +87,10 @@
                 "hookify@claude-plugins-official" = true;
                 "huggingface-skills@claude-plugins-official" = true;
                 "learning-output-style@claude-plugins-official" = false;
-                "linear@claude-plugins-official" = true;
+                # Linear plugin disabled in favor of the `linear-cli` binary + linear-* skills.
+                # It bundles an MCP server exposed as mcp__plugin_linear_linear__* tools.
+                # Re-enable the Linear MCP plugin by flipping false -> true.
+                "linear@claude-plugins-official" = false;
                 "playground@claude-plugins-official" = false;
                 "plugin-dev@claude-plugins-official" = true;
                 "posthog@claude-plugins-official" = false;
