@@ -38,6 +38,18 @@ let
       # The assets dir holds commands/opsx/{explore,propose,apply,archive}.md.
       programs.claude-code.commandsDir = flake.inputs.self + "/modules/home/ai/openspec/assets/commands";
 
+      # Deliver the vendored superpowers-bridge OpenSpec schema bundle user-global so
+      # `openspec schemas` lists it and `openspec new --schema superpowers-bridge` resolves it.
+      # recursive = true is REQUIRED: OpenSpec's schema discovery skips directory SYMLINKS
+      # (listSchemas gates on dirent.isDirectory(), false for a symlinked dir), so we use
+      # home-manager's lndir (recursive) to materialize a real dir with symlinked file leaves,
+      # which discovery enumerates and reads through fine. A bare `.source` symlink is invisible
+      # to `openspec new --schema ...` ("Unknown schema"). See assets/schemas/README.md.
+      home.file.".local/share/openspec/schemas/superpowers-bridge" = {
+        source = flake.inputs.self + "/modules/home/ai/openspec/assets/schemas/superpowers-bridge";
+        recursive = true;
+      };
+
       # sops-nix configuration for crs58/cameron user
       # 15 secrets: development + ai + shell aggregates
       sops = {
