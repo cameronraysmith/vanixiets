@@ -559,6 +559,14 @@ bun-update-latest-stable:
   echo "Verify playwright pin preserved:"
   grep -E '"(playwright|@playwright/test)":' packages/docs/package.json
 
+## agents
+
+# Regenerate the vendored openspec claude assets from the pinned llm-agents input.
+# Runs openspec init in a sandboxed temp dir; rerun after an llm-agents bump.
+[group('agents')]
+openspec-regen:
+  bash modules/home/ai/openspec/regen.sh
+
 ## terraform/terranix
 
 # Run terraform via terranix flake app (init + apply, arguments not supported)
