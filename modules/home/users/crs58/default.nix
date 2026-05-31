@@ -44,6 +44,8 @@ let
           cerebras-api-key = { };
           linear-api-key-personal = { };
           linear-api-key-work = { };
+          linear-workspace-personal = { };
+          linear-workspace-work = { };
           context7-api-key = { };
           bitwarden-email = { };
           atuin-key = { };
@@ -72,25 +74,21 @@ let
           '';
         };
 
-        # linear-cli native multi-workspace config, rendered immutably from sops.
-        # Read-only (0400): switch profiles via `--profile` / LINEAR_CLI_PROFILE, never via
-        # mutating commands (workspace-switch / auth / config set-key would clobber this file).
-        # The `dirs` crate ignores XDG on macOS and reads Application Support; XDG only on Linux.
-        templates."linear-cli-config.toml" = {
+        # schpet/linear-cli inline-format credentials, rendered immutably from sops.
+        # Inline format: flat `<workspace> = "<api-key>"` keys plus a top-level
+        # `default = "<workspace>"` (see schpet credentials.ts hasInlineKeys /
+        # parseInlineCredentials). schpet uses XDG on darwin too (Deno reads
+        # XDG_CONFIG_HOME, else ~/.config), so no per-platform path conditional.
+        # Read-only (0400): switch profiles via `--workspace` / a `default` change,
+        # never via mutating `linear auth` commands which would clobber this file.
+        templates."linear-credentials.toml" = {
           mode = "0400";
-          path =
-            if pkgs.stdenv.hostPlatform.isDarwin then
-              "${config.home.homeDirectory}/Library/Application Support/linear-cli/config.toml"
-            else
-              "${config.xdg.configHome}/linear-cli/config.toml";
+          path = "${config.xdg.configHome}/linear/credentials.toml";
           content = ''
-            current = "personal"
+            default = "${config.sops.placeholder."linear-workspace-personal"}"
 
-            [workspaces.personal]
-            api_key = "${config.sops.placeholder."linear-api-key-personal"}"
-
-            [workspaces.work]
-            api_key = "${config.sops.placeholder."linear-api-key-work"}"
+            ${config.sops.placeholder."linear-workspace-personal"} = "${config.sops.placeholder."linear-api-key-personal"}"
+            ${config.sops.placeholder."linear-workspace-work"} = "${config.sops.placeholder."linear-api-key-work"}"
           '';
         };
 
