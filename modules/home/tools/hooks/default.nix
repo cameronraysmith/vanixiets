@@ -169,6 +169,38 @@
         text = builtins.readFile ./gate-worktree-surfaces.sh;
       };
 
+      jj-worktree-create = pkgs.writeShellApplication {
+        name = "jj-worktree-create";
+        runtimeInputs = with pkgs; [
+          jq
+          jujutsu
+          git
+          coreutils
+        ];
+        text = builtins.readFile ./jj-worktree-create.sh;
+      };
+
+      jj-worktree-remove = pkgs.writeShellApplication {
+        name = "jj-worktree-remove";
+        runtimeInputs = with pkgs; [
+          jq
+          jujutsu
+          git
+          coreutils
+        ];
+        text = builtins.readFile ./jj-worktree-remove.sh;
+      };
+
+      gate-git-worktree = pkgs.writeShellApplication {
+        name = "gate-git-worktree";
+        runtimeInputs = with pkgs; [
+          jq
+          gnugrep
+          coreutils
+        ];
+        text = builtins.readFile ./gate-git-worktree.sh;
+      };
+
       verify-diamond-before-edit = pkgs.writeShellApplication {
         name = "verify-diamond-before-edit";
         runtimeInputs = with pkgs; [
@@ -270,6 +302,9 @@
         notify-permission-wait
         gate-mutating-http
         gate-worktree-surfaces
+        jj-worktree-create
+        jj-worktree-remove
+        gate-git-worktree
         verify-diamond-before-edit
         gate-dangerous-commands
         gate-issue-close

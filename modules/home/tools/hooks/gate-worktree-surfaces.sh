@@ -35,6 +35,14 @@ if [ -z "$JJ_ROOT" ]; then
   exit 0
 fi
 
+# Escape hatch: when CLAUDE_JJ_WORKSPACE_ISOLATION=1, allow the harness
+# isolation surfaces to proceed so they reach the WorktreeCreate hook, which
+# redirects creation to a jj workspace (never a git worktree). Kept
+# byte-identical to the same gate in jj-worktree-create.sh.
+if [ "${CLAUDE_JJ_WORKSPACE_ISOLATION:-0}" = "1" ]; then
+  exit 0
+fi
+
 REDIRECT_MSG="Worktrees are blocked in jj mode. Parallel chains of work use the diamond workflow's development join, not git worktrees. See ~/.claude/skills/jj-version-control/diamond-workflow.md (Development join section) and ~/.claude/skills/jj-summary/SKILL.md."
 
 case "$TOOL_NAME" in
