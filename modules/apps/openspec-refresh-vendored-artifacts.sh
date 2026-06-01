@@ -19,21 +19,17 @@
 #
 set -euo pipefail
 
-# resolve this script's directory so the script works from any cwd.
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/../../../.." && pwd)"
-assets_dir="$script_dir/assets"
+# locate the repo via git so the script is location-independent: it can be
+# embedded into a nix store path (the openspec-refresh-vendored-artifacts flake
+# app) and still rewrite the committed assets in the user's worktree.
+repo_root="$(git rev-parse --show-toplevel)"
+assets_dir="${repo_root}/modules/home/ai/openspec/assets"
 
-# derive the pinned openspec version from the flake rather than hardcoding, so
-# this stays in sync with the llm-agents input on every regeneration.
-#
-# use the git+file:// flake form rather than a bare path: flake. a path: flake
-# copies the entire working tree including .git, which fails on the fsmonitor
-# socket (.git/fsmonitor--daemon.ipc, "unsupported type"). git+file:// excludes
-# .git entirely, evaluating cleanly while still reading the pinned input.
-ver="$(nix eval --raw --impure --expr \
-  "let f = builtins.getFlake \"git+file://${repo_root}\"; in f.inputs.llm-agents.packages.\${builtins.currentSystem}.openspec.version")"
-echo "openspec version (from flake): ${ver}"
+# the pinned openspec version is injected by the flake app via runtimeEnv; when
+# running this script standalone, set it explicitly, e.g.
+#   OPENSPEC_VERSION=1.3.1 bash modules/apps/openspec-refresh-vendored-artifacts.sh
+ver="${OPENSPEC_VERSION:?set OPENSPEC_VERSION (injected by the flake app)}"
+echo "openspec version: ${ver}"
 
 # generate into a sandboxed temp dir; HOME is redirected so nothing escapes.
 work="$(mktemp -d "${TMPDIR:-/tmp}/openspec-gen.XXXXXX")"
