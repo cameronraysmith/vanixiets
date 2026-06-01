@@ -178,6 +178,12 @@
               # it with worktree.bgIsolation = "worktree".
               worktree.bgIsolation = "none";
 
+              # Branch isolation worktrees from the current local HEAD rather than
+              # from origin/<default-branch>. In jj-managed repos the WorktreeCreate
+              # hook (jj-worktree-create) intercepts creation regardless, so this
+              # governs only the pure-git fallback path.
+              worktree.baseRef = "head";
+
               permissions = {
                 defaultMode = "auto";
                 # only enforced from managed-settings.json, included here as intent marker

@@ -31,6 +31,10 @@
                   type = "command";
                   command = "gate-issue-close";
                 }
+                {
+                  type = "command";
+                  command = "gate-git-worktree";
+                }
               ];
             }
             {
@@ -75,6 +79,28 @@
                 {
                   type = "command";
                   command = "gate-worktree-surfaces";
+                }
+              ];
+            }
+          ];
+
+          WorktreeCreate = [
+            {
+              hooks = [
+                {
+                  type = "command";
+                  command = "jj-worktree-create";
+                }
+              ];
+            }
+          ];
+
+          WorktreeRemove = [
+            {
+              hooks = [
+                {
+                  type = "command";
+                  command = "jj-worktree-remove";
                 }
               ];
             }
