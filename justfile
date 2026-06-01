@@ -565,7 +565,7 @@ bun-update-latest-stable:
 # Runs openspec init in a sandboxed temp dir; rerun after an llm-agents bump.
 [group('agents')]
 openspec-regen:
-  bash modules/home/ai/openspec/regen.sh
+  {{nix_cmd}} run .#openspec-refresh-vendored-artifacts
 
 ## terraform/terranix
 
