@@ -50,6 +50,44 @@ let
         recursive = true;
       };
 
+      # Declaratively manage OpenSpec's global user config so the runtime CLI uses the
+      # custom profile with all 11 workflows, matching the vendored full-workflow assets.
+      # OpenSpec reads $XDG_CONFIG_HOME/openspec/config.json (else ~/.config/openspec/config.json),
+      # validated by GlobalConfigSchema (a .passthrough() zod object). The workflows ARRAY can
+      # only be written by the interactive `openspec config profile` TUI; `openspec config set`
+      # cannot set it. So we deliver the JSON directly rather than seeding via the CLI.
+      #
+      # Delivery: xdg.configFile = a pure, read-only symlink into the nix store. This is safe
+      # because the only code path that writes config.json on ordinary (read) commands is the
+      # telemetry preAction hook, which writes solely to add a missing telemetry.noticeSeen or
+      # telemetry.anonymousId, and only when telemetry is enabled. Both writers are wrapped in
+      # try/catch, so a failed write on a read-only file is swallowed and the command still
+      # succeeds (empirically verified with @fission-ai/openspec@1.3.1). We pre-set both
+      # telemetry fields here (fixed anonymousId) so no write is ever even attempted. profile,
+      # delivery, and the workflows array are the user-facing settings and are read directly.
+      xdg.configFile."openspec/config.json".text = builtins.toJSON {
+        featureFlags = { };
+        profile = "custom";
+        delivery = "both";
+        workflows = [
+          "propose"
+          "explore"
+          "new"
+          "continue"
+          "apply"
+          "ff"
+          "sync"
+          "archive"
+          "bulk-archive"
+          "verify"
+          "onboard"
+        ];
+        telemetry = {
+          noticeSeen = true;
+          anonymousId = "00000000-0000-0000-0000-000000000000";
+        };
+      };
+
       # sops-nix configuration for crs58/cameron user
       # 15 secrets: development + ai + shell aggregates
       sops = {
