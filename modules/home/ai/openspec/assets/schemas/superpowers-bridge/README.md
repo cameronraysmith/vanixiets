@@ -1,7 +1,5 @@
 # superpowers-bridge Schema
 
-[English](./README.md) · [繁體中文](./README.zh-TW.md)
-
 [![Schema Structure](https://github.com/JiangWay/openspec-schemas/actions/workflows/validate-schemas.yml/badge.svg?branch=main)](https://github.com/JiangWay/openspec-schemas/actions/workflows/validate-schemas.yml)
 [![Upstream Drift](https://img.shields.io/github/issues-search/JiangWay/openspec-schemas?query=is%3Aopen%20label%3Aupstream-version-check&label=Upstream%20Drift&color=yellow)](https://github.com/JiangWay/openspec-schemas/issues?q=is%3Aopen+label%3Aupstream-version-check)
 [![OpenSpec baseline](https://img.shields.io/badge/OpenSpec_baseline-1.3.1-0277bd)](#compatibility)
@@ -27,7 +25,7 @@ Install the superpowers-bridge schema for OpenSpec into this project:
 3. Copy the `superpowers-bridge/` subdirectory to `openspec/schemas/superpowers-bridge/`.
 4. Run `openspec schema validate superpowers-bridge` to verify.
 5. Run `openspec schemas` and confirm `superpowers-bridge` is listed.
-6. If a CLAUDE.md exists at the project root, ask me whether to insert the workflow-routing fragment from `openspec/schemas/superpowers-bridge/templates/adopters/CLAUDE.md.fragment.<locale>.md` (auto-detect locale from existing CLAUDE.md content; default zh-TW for Traditional Chinese, no suffix for English). If I say yes, append the fragment as a new section. If no CLAUDE.md exists, skip.
+6. If a CLAUDE.md exists at the project root, ask me whether to insert the workflow-routing fragment from `openspec/schemas/superpowers-bridge/templates/adopters/CLAUDE.md.fragment.md`. If I say yes, append the fragment as a new section. If no CLAUDE.md exists, skip.
 7. Clean up the temp directory.
 8. Verify Superpowers plugin is installed by running `claude plugin list`.
    If not listed, run `claude plugin install superpowers@claude-plugins-official`.
@@ -41,8 +39,7 @@ git clone https://github.com/JiangWay/openspec-schemas /tmp/oss
 cp -R /tmp/oss/superpowers-bridge ~/your-project/openspec/schemas/superpowers-bridge
 
 # Optional: insert workflow-routing fragment into CLAUDE.md
-# cat /tmp/oss/superpowers-bridge/templates/adopters/CLAUDE.md.fragment.md       # English
-# cat /tmp/oss/superpowers-bridge/templates/adopters/CLAUDE.md.fragment.zh-TW.md # zh-TW
+# cat /tmp/oss/superpowers-bridge/templates/adopters/CLAUDE.md.fragment.md
 
 rm -rf /tmp/oss
 cd ~/your-project
@@ -70,14 +67,12 @@ Upgrade the superpowers-bridge schema in this project:
 5. Run `openspec schema validate superpowers-bridge` to verify.
 6. Check whether this project has `CLAUDE.md` at the repo root.
    - If yes: scan it for an existing workflow-routing section referencing superpowers-bridge.
-     - If found: show me the diff between that section and `superpowers-bridge/templates/adopters/CLAUDE.md.fragment.<locale>.md`. Wait for my ack before replacing.
-     - If not found: ask whether to insert the new fragment from `templates/adopters/CLAUDE.md.fragment.<locale>.md`.
+     - If found: show me the diff between that section and `superpowers-bridge/templates/adopters/CLAUDE.md.fragment.md`. Wait for my ack before replacing.
+     - If not found: ask whether to insert the new fragment from `templates/adopters/CLAUDE.md.fragment.md`.
    - If no CLAUDE.md exists: skip.
 7. Clean up the temp directory.
 8. Show me the final state.
 ```
-
-> `<locale>` defaults to `zh-TW` if your CLAUDE.md is in Traditional Chinese, or no suffix (English). Claude detects from existing CLAUDE.md content.
 
 ### Upgrade Method 2: Manual bash
 
@@ -108,7 +103,7 @@ rm -rf /tmp/oss-upgrade
 | Path | Action | Manual step? |
 |---|---|---|
 | `openspec/schemas/superpowers-bridge/` | Auto-overwritten — entire directory replaced from upstream (`rm -rf` + `cp -R` in Method 2; equivalent in Method 1) | None |
-| `CLAUDE.md` (project root) | The schema dir ships `templates/adopters/CLAUDE.md.fragment.<locale>.md`; the upgrade procedure diffs your existing CLAUDE.md against this fragment and waits for your ack before inserting / replacing | Yes — review diff, choose insert / replace / keep |
+| `CLAUDE.md` (project root) | The schema dir ships `templates/adopters/CLAUDE.md.fragment.md`; the upgrade procedure diffs your existing CLAUDE.md against this fragment and waits for your ack before inserting / replacing | Yes — review diff, choose insert / replace / keep |
 
 > The bridge directory is monolithic — you take the whole new version or stay on the old one. There is no per-file opt-in. CLAUDE.md is the only project-root file the upgrade ever touches, and never without your ack.
 
@@ -153,15 +148,15 @@ Not every change needs a `change` directory. The following scenarios should skip
 
 | Scenario | Need a change? | What to do |
 |---|---|---|
-| New feature / new capability | ✅ Yes | `/opsx:new <name> --schema superpowers-bridge` |
-| Breaking change | ✅ Yes | Same |
-| Architecture change | ✅ Yes | Same |
-| Bug fix (restoring intended behavior, no contract change) | ❌ No | Direct PR |
-| Test backfill / coverage | ❌ No | Direct PR |
-| Build tooling tweak (linter rule, coverage threshold) | ❌ No | Direct PR |
-| Non-breaking dependency upgrade | ❌ No | Direct PR |
-| Documentation update / typo fix | ❌ No | Direct PR |
-| Config value tweak (no structural change) | ❌ No | Direct PR |
+| New feature / new capability | (yes) Yes | `/opsx:new <name> --schema superpowers-bridge` |
+| Breaking change | (yes) Yes | Same |
+| Architecture change | (yes) Yes | Same |
+| Bug fix (restoring intended behavior, no contract change) | (no) No | Direct PR |
+| Test backfill / coverage | (no) No | Direct PR |
+| Build tooling tweak (linter rule, coverage threshold) | (no) No | Direct PR |
+| Non-breaking dependency upgrade | (no) No | Direct PR |
+| Documentation update / typo fix | (no) No | Direct PR |
+| Config value tweak (no structural change) | (no) No | Direct PR |
 
 > Principle: **process ceremony should scale with risk**. External contracts, cross-system integration, DB schema changes, compliance boundaries → run a change. Typos, bug fixes, timeout adjustments → direct PR. For ambiguous cases, use the 5-condition checklist below.
 
@@ -453,7 +448,7 @@ This schema requires a subagent-capable platform (Claude Code, Codex, etc.). The
 Each timing-sensitive artifact runs concrete shell evidence checks at the start of its instruction:
 
 - **verify**: `git log <base>..HEAD | wc -l > 0` AND `grep -c '^- \[x\]' tasks.md > 0`
-- **retrospective**: `test -f verify.md` AND `! grep -q '^- \[x\] ❌ FAIL' verify.md`
+- **retrospective**: `test -f verify.md` AND `! grep -q '^- \[x\] (fail) FAIL' verify.md`
 
 The LLM does not need to interpret timing prose — it runs commands and reads results. This is layer 2 of concern #1 / mitigation for concern #2.
 
@@ -537,7 +532,6 @@ If a Superpowers skill is unavailable:
 
 - [schema.yaml](./schema.yaml) — machine-readable schema definition
 - [templates/](./templates/) — markdown templates per artifact
-- [README.zh-TW.md](./README.zh-TW.md) — 繁體中文版
 - [obra/superpowers](https://github.com/obra/superpowers) — Superpowers skill source
 - [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) — OpenSpec
 - [OpenSpec PR #970](https://github.com/Fission-AI/OpenSpec/pull/970) — original review thread that drove this design

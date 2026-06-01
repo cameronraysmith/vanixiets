@@ -19,8 +19,8 @@ This repo uses [`superpowers-bridge`](https://github.com/JiangWay/openspec-schem
 
 | Scenario | Direct PR? |
 |---|---|
-| New feature / new capability / architectural change / breaking change | ❌ Use opsx |
-| Bug fix (no contract change) / test backfill / linter tweak / non-breaking upgrade / typo / docs / config value tweak | ✅ Direct PR |
+| New feature / new capability / architectural change / breaking change | (no) Use opsx |
+| Bug fix (no contract change) / test backfill / linter tweak / non-breaking upgrade / typo / docs / config value tweak | (yes) Direct PR |
 
 Principle: **process ceremony scales with risk**. External contracts / schema / cross-system integration / compliance → opsx. Otherwise → direct PR.
 

@@ -238,8 +238,8 @@ artifacts:
          `openspec/changes/<name>/specs/`, compare against the
          corresponding `openspec/specs/<capability>/spec.md` and
          record one of:
-         - ✓ Already synced
-         - ✗ Needs sync (list the capabilities)
+         - Already synced
+         - Needs sync (list the capabilities)
          - N/A (no delta specs produced)
 
       4. **Design/specs coherence**: Spot-check that design.md
@@ -315,9 +315,9 @@ artifacts:
 
       2. verify.md's Overall Decision is NOT marked as FAIL.
          The verify.md template has 3 mutually-exclusive checkboxes
-         in its "Overall Decision" section: "✅ PASS", "⚠️ PASS WITH
-         WARNINGS", "❌ FAIL". Only "❌ FAIL" being checked is blocking:
-         ! grep -q '^- \[x\] ❌ FAIL' openspec/changes/<change-name>/verify.md
+         in its "Overall Decision" section: "(pass) PASS", "(warn) PASS WITH
+         WARNINGS", "(fail) FAIL". Only "(fail) FAIL" being checked is blocking:
+         ! grep -q '^- \[x\] (fail) FAIL' openspec/changes/<change-name>/verify.md
 
       Only after both succeed, proceed.
 
@@ -359,15 +359,15 @@ artifacts:
          §1) **Wins** — what worked well, with evidence
 
          §2) **Misses** — what didn't, marked by severity:
-             - 🔴 blocking
-             - 🟡 painful
-             - 📌 nit
+             - [high] blocking
+             - [med] painful
+             - [low] nit
 
          §3) **Plan deviations** — tasks whose scope changed, and why
 
          §4) **Skill / workflow compliance** — list each skill in
              this schema's apply phase; mark whether it was
-             actually used. For any ✗, fill the
+             actually used. For any "no", fill the
              `### Deliberately Skipped Skills` subsection per the
              rules below.
 
@@ -377,7 +377,7 @@ artifacts:
              a `- [ ]` checklist (not a flat table). Each
              candidate:
 
-             - Title with severity emoji (🔴/🟡/📌) + one-
+             - Title with severity marker ([high]/[med]/[low]) + one-
                sentence learning
              - `→ **Promote to** <destination>` (memory /
                CLAUDE.md / schema / skill / one-off)
@@ -396,9 +396,9 @@ artifacts:
          The schema was designed with the explicit intent that
          no apply-phase skill should be skipped — each skill is
          in the flow for a reason. Default expectation: §4 has
-         every row marked ✓.
+         every row marked yes.
 
-         For any skill marked ✗, DO NOT just write a one-line
+         For any skill marked no, DO NOT just write a one-line
          reason. Instead, the `### Deliberately Skipped Skills`
          subsection must answer three questions per skipped
          skill:

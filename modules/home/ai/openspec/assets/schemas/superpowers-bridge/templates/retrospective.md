@@ -8,13 +8,13 @@
 
 ## 0. Evidence
 
-> 量化前置數據 — 後續 Wins / Misses bullets 直接引用,避免每行重複 [evidence: ...]。
-> 冷寫場景(retro 寫於 cycle 結束之後一段時間),只用 `git log` + `tasks.md` +
-> commit messages 也應能重建本節。
+> Up-front quantified data — later Wins / Misses bullets reference it directly, avoiding a repeated [evidence: ...] on every line.
+> In a cold-write scenario (the retro is written some time after the cycle ends), this section should be reconstructable using only `git log` + `tasks.md` +
+> commit messages.
 
 - **Commit range**: `<base-sha>..<head-sha>` (<n> commits)
 - **Diff size**: <+X / -Y lines across N files>
-- **Tasks done**: <x>/<y> (`grep -cE '^\s*- \[x\]' tasks.md` → x;regex 容許 sub-task 縮排)
+- **Tasks done**: <x>/<y> (`grep -cE '^\s*- \[x\]' tasks.md` → x; the regex tolerates sub-task indentation)
 - **Active hours**: <estimate>
 - **Subagent dispatches**: <count or "n/a">
 - **New external dependencies**: <list, with license + version, or "none">
@@ -22,7 +22,7 @@
 - **OpenSpec validate state at archive**: <pass / fail / not-run>
 - **Test coverage signal**: <e.g. jacoco %, pytest count, vitest count, or "n/a">
 
-Commit chain (時序):
+Commit chain (chronological):
 
 ```
 <base-sha> <one-line summary>
@@ -38,9 +38,9 @@ Commit chain (時序):
 
 ## 2. Misses
 
-- 🔴 [blocking | evidence: ...] <description>
-- 🟡 [painful  | evidence: ...] <description>
-- 📌 [nit      | evidence: ...] <description>
+- [high] [blocking | evidence: ...] <description>
+- [med]  [painful  | evidence: ...] <description>
+- [low]  [nit      | evidence: ...] <description>
 
 ## 3. Plan deviations
 
@@ -60,27 +60,27 @@ Commit chain (時序):
 | (transitive) superpowers:requesting-code-review  |      |
 | superpowers:finishing-a-development-branch       |      |
 
-> **Default expectation**: 全部 ✓。每個 skill 都是 schema 設計的一部分,
-> 跳過屬於異常情境。任一項 ✗ 都必須在下方
-> `### Deliberately Skipped Skills` subsection 提出原因與預防方案。
+> **Default expectation**: all yes. Every skill is part of the schema design,
+> so skipping is an exceptional situation. Any no must give its reason and a prevention plan in the
+> `### Deliberately Skipped Skills` subsection below.
 
 ### Deliberately Skipped Skills
 
-> 跳過 skill 是設計的 escape hatch,不是常規路徑。每個 ✗ 必須回答以下三題;
-> 整節空白(全綠)是預期狀態。
+> Skipping a skill is a designed escape hatch, not the normal path. Each no must answer the three questions below;
+> an entirely empty section (all yes) is the expected state.
 
 - **`<skill name>`**
-  - **What was skipped**: <具體跳過了整個 skill,還是某個 sub-step>
-  - **Why this cycle**: <具體 cycle 條件 — 不可寫「不需要」/「太小」/「沒時間」/「被外部 dep 擋住」/「skill 輸出看起來不對」之類含糊理由;要寫實際 trigger(具體 commit / log line / 觀察到的行為)>
-  - **How to prevent recurrence**: 下一個 cycle 在同類條件下怎麼不再跳?選一:
-    - `schema graph fix` — 寫具體要改 schema.yaml 的哪一段
-    - `skill description tightening` — 寫具體要改哪個 skill 的 frontmatter / instruction
-    - `CLAUDE.md trigger` — 寫具體要在 adopter CLAUDE.md.fragment 加哪段判讀規則
-    - `scope-judgment rule` — 寫具體 cycle 的 scope 應該被怎麼判讀
-    - `one-off — schema boundary case, no prevention possible` — 但需明寫為何 boundary(不接受含糊保留)
+  - **What was skipped**: <was the whole skill skipped, or a particular sub-step>
+  - **Why this cycle**: <the specific cycle condition — do not write vague reasons such as "not needed" / "too small" / "no time" / "blocked by an external dep" / "the skill's output looked wrong"; write the actual trigger (a specific commit / log line / observed behavior)>
+  - **How to prevent recurrence**: how will the next cycle avoid skipping under the same kind of condition? Choose one:
+    - `schema graph fix` — write specifically which part of schema.yaml to change
+    - `skill description tightening` — write specifically which skill's frontmatter / instruction to change
+    - `CLAUDE.md trigger` — write specifically which interpretation rule to add to the adopter CLAUDE.md.fragment
+    - `scope-judgment rule` — write specifically how the cycle's scope should be interpreted
+    - `one-off — schema boundary case, no prevention possible` — but you must state explicitly why it is a boundary case (no vague hedging accepted)
 
-> **與 §6 Promote candidates 的關係**:多個 cycle 同 skill 同 `How to prevent`
-> 答案 → 該模式應 promote 到 §6,直接觸發 schema / skill PR,不可累積成「常態」。
+> **Relationship to §6 Promote candidates**: when multiple cycles share the same skill and the same `How to prevent`
+> answer → that pattern should be promoted to §6, directly triggering a schema / skill PR, and must not accumulate into a "norm".
 
 ## 5. Surprises
 
@@ -88,31 +88,31 @@ Commit chain (時序):
 
 ## 6. Promote candidates → long-term learning
 
-每條 candidate 用 `- [ ]` checklist:
+Write each candidate as a `- [ ]` checklist item:
 
-- 標題:嚴重程度 emoji(🔴/🟡/📌)+ 一句話 learning
-- `→ **Promote to** <destination>`(memory / CLAUDE.md / schema / skill / one-off)
-- 兩行 body(對應 superpowers feedback memory body schema):
+- Title: severity marker ([high]/[med]/[low]) + a one-sentence learning
+- `→ **Promote to** <destination>` (memory / CLAUDE.md / schema / skill / one-off)
+- A two-line body (matching the superpowers feedback memory body schema):
   - `> **Why**: <reason; often a past incident or strong preference>`
   - `> **How to apply**: <when/where this guidance kicks in>`
 
-未勾選的 `- [ ]` 表示 candidate 尚未 promote — 可帶到下一個 cycle 的 retro 重評估,
-或保留作為跨 cycle 的觀察點。
+An unchecked `- [ ]` means the candidate has not yet been promoted — it can be carried to the next cycle's retro for re-evaluation,
+or kept as a cross-cycle observation point.
 
-> **Carry-forward 機制**:下個 cycle 寫 retro 時,可
-> `grep -A 5 '^- \[ \]' openspec/changes/archive/*/retrospective.md` 取出
-> 既往 unchecked candidates,逐筆判斷要 carry-forward 到本 cycle §6、就地
-> promote、或標 stale 不再追蹤。
+> **Carry-forward mechanism**: when writing the retro for the next cycle, you can run
+> `grep -A 5 '^- \[ \]' openspec/changes/archive/*/retrospective.md` to pull out
+> previous unchecked candidates, then decide case by case whether to carry each forward into this cycle's §6, promote it
+> in place, or mark it stale and stop tracking.
 
-範例:
+Examples:
 
-- [ ] 🔴 **<short rule>** → **Promote to memory** (type: feedback)
+- [ ] [high] **<short rule>** → **Promote to memory** (type: feedback)
   > **Why**: <past incident or strong preference that motivated this rule>
   > **How to apply**: <which file / cycle phase / decision moment this kicks in>
 
-- [ ] 🟡 **<another candidate>** → **Promote to project CLAUDE.md** (`<path/to/CLAUDE.md>` 段)
+- [ ] [med] **<another candidate>** → **Promote to project CLAUDE.md** (`<path/to/CLAUDE.md>` section)
   > **Why**: ...
   > **How to apply**: ...
 
-- [ ] 📌 **<third candidate>** → **One-off** (記錄即可,不 promote)
+- [ ] [low] **<third candidate>** → **One-off** (just record it, do not promote)
   > **Why**: <why it doesn't generalize>
