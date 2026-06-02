@@ -1,0 +1,76 @@
+stateDiagram-v2
+    %% The unified seven Linear-canonical states: five active, two inert terminals.
+    %% Five active states pass in order; Canceled and Duplicate are inert terminals
+    %% reachable from any active state, exactly like Backlog.
+
+    %% Display name carries the spaces of the Linear-canonical "In Progress" state
+    %% while the identifier stays space-free for valid transition syntax;
+    %% "In Review" gets its display name on the composite declaration below.
+    state "In Progress" as InProgress
+
+    [*] --> Backlog
+
+    %% --- The four file-anchored forward transitions ---
+    %% readiness gate: proposal.md committed (brainstorm.md alone keeps the unit in Backlog).
+    Backlog --> Todo: readiness gate / proposal.md committed
+
+    %% apply gate fires at the Todo to In Progress boundary, which is also where the
+    %% human picks the per-issue execution mode. The mode fork is the same apply gate
+    %% regardless of mode; all three modes converge on In Review.
+    state mode_fork <<choice>>
+    Todo --> mode_fork: apply gate / first tasks.md "- [x]"
+    note right of mode_fork
+        Execution-mode fork (human picks per-issue,
+        no automatic Linear-label selection):
+        AFK / HIL / Manual all converge on In Review.
+    end note
+    mode_fork --> InProgress: AFK
+    mode_fork --> InProgress: HIL
+    mode_fork --> InProgress: Manual
+
+    %% In-Review gate: verify.md created for the in-progress change.
+    InProgress --> InReview: In-Review gate / verify.md created
+
+    %% In Review decomposes into two ordered human-steered sub-gates;
+    %% joint approval precedes the archive gate. Done is never reached before archive.
+    state "In Review" as InReview {
+        [*] --> roborev
+        roborev --> documenter: approved
+        documenter --> [*]: passes
+        note right of roborev
+            Two ordered human-steered sub-gates:
+            roborev (code review) runs first,
+            then documenter (docs/handbook review).
+            Joint approval precedes archive.
+        end note
+    }
+
+    %% archive gate: openspec archive succeeds (the sole anchor that fires Done).
+    InReview --> Done: archive gate / openspec archive succeeds
+
+    %% --- The shared re-queue ---
+    %% A roborev or documenter rejection, or a verify.md "(fail) FAIL" Overall Decision,
+    %% re-queues into In Progress above the mode fork so the unit re-selects its mode.
+    InReview --> InProgress: re-queue / sub-gate rejection or verify.md "(fail) FAIL"
+    note left of InProgress
+        Bounded-retries policy (recommended default 3):
+        a review-round counter increments once per re-queue
+        and resets on archive; on exhaustion the board escalates
+        to the human PM layer and stops firing automatic re-queues.
+    end note
+
+    Done --> [*]
+
+    %% --- Inert terminals, reachable from any active state ---
+    Backlog --> Canceled: abandoned (directory removed without archive)
+    Todo --> Canceled: abandoned
+    InProgress --> Canceled: abandoned
+    InReview --> Canceled: abandoned
+
+    Backlog --> Duplicate: superseded by another change
+    Todo --> Duplicate: superseded
+    InProgress --> Duplicate: superseded
+    InReview --> Duplicate: superseded
+
+    Canceled --> [*]
+    Duplicate --> [*]
