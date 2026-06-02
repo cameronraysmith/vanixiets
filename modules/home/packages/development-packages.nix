@@ -31,7 +31,6 @@
       # opencode: disabled - bun node_modules cleanup fails during build
       droid = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.droid;
       gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
-      openspec = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.openspec;
     in
     {
       home.packages =
@@ -80,7 +79,6 @@
           cursor-agent
           droid
           gemini-cli
-          openspec
           # from pkgs/by-name
           dolt
           gastown
