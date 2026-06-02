@@ -23,10 +23,11 @@ let
           flake.inputs.niks3.packages.${pkgs.stdenv.hostPlatform.system}.niks3
         ];
 
-      # Inject linear-cli's bundled skills (38 linear-*/SKILL.md subdirs) into all
-      # agent destinations, scoped to this user. linear-cli .src is the
-      # fetchFromGitHub store path; its top-level skills/ dir is read by
-      # readSkillsFrom in the ai module.
+      # Inject linear-cli's bundled skill (a single linear-cli/ dir with one
+      # SKILL.md and 16 reference subfiles under references/) into all agent
+      # destinations, scoped to this user. linear-cli .src is the fetchFromGitHub
+      # store path; its top-level skills/ dir is read by readSkillsFrom in the ai
+      # module, which finds the single subdir linear-cli/.
       aiSkills.extraSkillDirs = [
         "${pkgs.linear-cli.src}/skills"
       ];
