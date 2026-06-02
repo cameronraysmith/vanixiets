@@ -951,11 +951,11 @@
         "uv2nix": "uv2nix_3"
       },
       "locked": {
-        "lastModified": 1780024260,
-        "narHash": "sha256-/A378efUPTHd+EXv8+VgFiwQyHe3gcI2YsKno/CoQ6k=",
+        "lastModified": 1780372352,
+        "narHash": "sha256-vGKXpy3/Hz5Em9N5VGFDG0TawsAXIkJuoUKmMh06HYI=",
         "owner": "farcaller",
         "repo": "nixhelm",
-        "rev": "65db806fe090ffc5555c3759dcb6a927ba35ced1",
+        "rev": "642243fcc26780579cd14c9e0f87aaf7590f3f2d",
         "type": "github"
       },
       "original": {
