@@ -6,6 +6,7 @@
   makeWrapper,
   deno,
   jq,
+  coreutils,
   xz,
   versionCheckHook,
 }:
@@ -177,12 +178,22 @@ stdenv.mkDerivation (finalAttrs: {
       jq '.vendor = true | .nodeModulesDir = "none"' "$out/lib/deno.json" > "$out/lib/deno.json.tmp"
       mv "$out/lib/deno.json.tmp" "$out/lib/deno.json"
 
-      # `--quiet` mutes deno's "Ignored build scripts" lifecycle-script
-      # diagnostic for dev-only deps (e.g. npm:lefthook) that are absent from
-      # the `linear` runtime path; we deliberately run without a node_modules
-      # dir, so the diagnostic is noise on every invocation.
+      # The vendored npm packages live in the read-only store, but deno also
+      # wants to WRITE its dep/node/v8 analysis caches to DENO_DIR at runtime.
+      # Pointing DENO_DIR at the store makes those writes fail ("Failed to open
+      # cache file ... performance may be degraded") on every real subcommand.
+      # So at runtime we use a writable per-user DENO_DIR and symlink the store's
+      # npm cache into it: deno reads npm through the symlink and persists its
+      # perf caches in the writable dir.
+      #
+      # The setup must be self-contained: versionCheckHook (and hardened runtime
+      # contexts like systemd units) invoke the program via `env
+      # --ignore-environment`, i.e. with no PATH and no HOME. Hence absolute
+      # coreutils paths and a HOME-less fallback (a fresh temp dir) for the
+      # cache root. `--quiet` mutes deno's "Ignored build scripts"
+      # lifecycle-script diagnostic for dev-only deps (e.g. npm:lefthook).
       makeWrapper ${lib.getExe deno} "$out/bin/linear" \
-        --set DENO_DIR "${denoDeps}/deno_dir" \
+        --run 'deno_dir="''${XDG_CACHE_HOME:-''${HOME:-$(${coreutils}/bin/mktemp -d)}/.cache}/linear-cli/deno"; ${coreutils}/bin/mkdir -p "$deno_dir"; ${coreutils}/bin/ln -sfn ${denoDeps}/deno_dir/npm "$deno_dir/npm"; export DENO_DIR="$deno_dir"' \
         --set DENO_NO_UPDATE_CHECK "1" \
         --add-flags "run --quiet --cached-only --no-check -A $out/lib/src/main.ts"
 
