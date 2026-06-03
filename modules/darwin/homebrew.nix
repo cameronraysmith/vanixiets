@@ -114,6 +114,8 @@
               upgrade = true;
               # https://nix-darwin.github.io/nix-darwin/manual/#opt-homebrew.onActivation.cleanup
               cleanup = "uninstall";
+              # homebrew >=5.1.15 requires --force-cleanup for brew bundle --cleanup (nix-darwin#1787)
+              extraFlags = [ "--force-cleanup" ];
             };
 
             # apply --no-quarantine to all casks
