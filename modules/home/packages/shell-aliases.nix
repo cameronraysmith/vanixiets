@@ -12,6 +12,7 @@
         npmbw = "bunx -p @bitwarden/cli bw";
         c = "claude";
         ccd = "claude";
+        cnb = "claude-name-background";
         cod = "codex";
         e = "nvim";
         dl = "aria2c -x 16 -s 16 -k 1M";
