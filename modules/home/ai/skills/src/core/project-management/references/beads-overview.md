@@ -27,7 +27,7 @@ In Manual mode, which has no proposal.md frontmatter to hold the binding, the Li
 
 For the beads drill-down case, the binding between the local issue and the work can be carried by the branch name, keyed to the beads id (the repo's branch-naming convention is `ID-descriptor`).
 This is the CCPM branch-name-as-binding convention adapted to beads ids; the Linear parent is then derived from the beads epic.
-It applies only when a beads drill-down is actually in use; the primary cross-reference for HIL and AFK changes is the Linear-story-to-OpenSpec-change binding stored in proposal.md frontmatter and openspec/linear.yaml, which openspec-linear-sync owns.
+It applies only when a beads drill-down is actually in use; the primary cross-reference for HIL and AFK changes is the per-change Linear-story-to-OpenSpec-change binding (story id and url, `linear_team`, and `linear_project`) stored in that change's proposal.md frontmatter, which openspec-linear-sync owns, while openspec/linear.yaml is the registry the team and project keys resolve against.
 
 ## Routing
 

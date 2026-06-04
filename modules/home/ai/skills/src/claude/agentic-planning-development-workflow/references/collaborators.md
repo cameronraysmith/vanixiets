@@ -16,7 +16,7 @@ The openspec plus superpowers-bridge flow is the spec-first change lifecycle tha
 It runs through the opsx:* and openspec-*-change skills plus superpowers:*, and it owns the eight bridge artifacts and the OpenSpec tasks.md authoritative ledger.
 
 openspec-linear-sync is the linear-cli-driven Linear-to-OpenSpec lifecycle sync overlay.
-It binds one Linear story to one OpenSpec change and mirrors each lifecycle phase to a Linear state through the four forward transitions and the archive-time document upsert.
+It binds one Linear story per OpenSpec change (supporting N concurrent changes across different teams and projects) and mirrors each lifecycle phase to a Linear state through the four forward transitions and the archive-time document upsert.
 
 ## Ownership by layer
 
