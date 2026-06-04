@@ -1,11 +1,15 @@
 # Config and frontmatter: the two-location binding
 
-This reference defines where the Linear-story-to-OpenSpec-change binding lives, the openspec/linear.yaml schema (including the local sync ledger fields), the Manual-mode binding location, the optional beads traceability map, and the ownership-boundary doctrine.
+This reference defines where the Linear-story-to-OpenSpec-change binding lives, the openspec/linear.yaml monorepo registry schema, the per-change D10 sync ledger that now lives in proposal.md frontmatter, the Manual-mode binding location, the optional beads traceability map, and the ownership-boundary doctrine.
 
 ## The two-location binding with write-before-read ordering
 
-The overlay is the write-owner of the primary cross-reference binding from a Linear story to an OpenSpec change, persisted in two locations: openspec/linear.yaml and the proposal.md `linear_story_*` frontmatter.
-At the Backlog to Todo bind, the overlay writes `linear_story_*` into proposal.md frontmatter and writes or updates openspec/linear.yaml at the same bind; the documents map is written at archive.
+The overlay is the write-owner of the primary cross-reference binding from a Linear story to an OpenSpec change, persisted across two locations at two altitudes.
+openspec/linear.yaml is the monorepo-level registry: the workspace, a normalized teams registry, a normalized projects registry (with each project's archive documents), and shared defaults.
+The proposal.md frontmatter is the per-change altitude: it carries the `linear_story_*` binding plus the per-change D10 local sync ledger.
+A single repository's OpenSpec changes routinely bind to issues across many Linear teams and projects, and several changes run in parallel, so the per-issue ledger cannot live in a single flat top-level block in linear.yaml; it lives per change in that change's proposal.md frontmatter.
+
+At the Backlog to Todo bind, the overlay writes the `linear_story_*` binding and initializes the D10 ledger into proposal.md frontmatter, and writes or updates the registry entries in openspec/linear.yaml for the chosen team and project at the same bind; each project's archive-documents entries are written at archive.
 
 The proposal.md frontmatter carries these keys, written at the bind:
 
@@ -16,53 +20,74 @@ linear_story_identifier:
 linear_story_title:
 linear_story_url:
 linear_story_state:
-linear_team:
-linear_project:
+linear_team:            # references teams.<TEAM-KEY> in openspec/linear.yaml
+linear_project:         # references projects.<project-slug> in openspec/linear.yaml
+# D10 local sync ledger (per change; the authoritative current-phase signal home):
+last_synced_state:      # resolved in the context of linear_team (Linear workflow states are team-scoped)
+last_synced_at:
+review_round: 0         # bounded-retries counter; default max from linear.yaml defaults.max_review_rounds
+max_review_rounds:      # optional per-change override of the linear.yaml default
+attempt_log:
+  - { at: "<iso-8601>", transition: "<from>-><to>", outcome: "dropped|failed|posted", note: "<short>" }
 ---
 ```
 
-apply READS the `linear_story_*` frontmatter, so the write-before-read ordering is load-bearing: the overlay's bind step must precede any apply read.
+apply READS the `linear_story_*` binding and the D10 ledger from this frontmatter, so the write-before-read ordering is load-bearing: the overlay's bind step must precede any apply read.
 When apply reads the frontmatter, the bind step has already written it.
+`last_synced_state` and every transition target are resolved against the change's `linear_team`, because Linear workflow states are defined per team.
 
-## openspec/linear.yaml schema
+The `review_round` counter increments once per In Review to In Progress crossing, resets to zero on archive, and on exhaustion against `max_review_rounds` triggers the single escalation comment (see references/lifecycle.md); its default ceiling is `defaults.max_review_rounds` in openspec/linear.yaml, which a change may override via its own frontmatter `max_review_rounds`.
+The `attempt_log` records dropped best-effort writes so a never-attempted transition is distinguishable from a failed one, and it is per change in this frontmatter.
 
-openspec/linear.yaml holds the team and project context, an optional label filter, the archive-time documents map, and the D10 local sync ledger fields.
+## openspec/linear.yaml schema: the monorepo registry
+
+openspec/linear.yaml is the monorepo-level registry: the workspace identity that drives the safety gate, shared defaults, a normalized teams registry, and a normalized projects registry where each project owns its archive documents.
+It holds only what is invariant across the repository's changes; the per-issue binding and the per-change D10 ledger live in each change's proposal.md frontmatter (above).
+The registry grows over time as new teams and projects are referenced; it is open for extension but models exactly what the overlay reads and writes — workspace, teams, projects, and per-project documents — and deliberately omits initiatives, cycles, milestones, labels-as-objects, sub-issues, and assignees.
 
 ```yaml
-team:
-  id: "<linear-team-id>"
-  key: "<team-key>"
-  name: "<team-name>"
-project:
-  id: "<linear-project-id>"
-  name: "<project-name>"
-issue_label_filter:
-  name: "<optional-label-name>"   # narrows Backlog candidates only; explicit no-label option at setup
-archive_documents:
-  enabled: true
-  title_prefix: "OpenSpec:"
-  documents:
-    "<capability-name>":
-      id: "<linear-document-id-or-slug>"
-      url: "<linear-document-url>"
-      title: "OpenSpec: <capability-name>"
-# D10 local sync ledger fields (the authoritative current-phase signal home):
-last_synced_state: "<linear-state-name>"   # for example "In Review"
-last_synced_at: "<iso-8601-timestamp>"
-review_round: 0                            # bounded-retries counter; default max 3, configurable
-max_review_rounds: 3                       # documented configurability note
-attempt_log:
-  - { at: "<iso-8601>", transition: "<from>-><to>", outcome: "dropped|failed|posted", note: "<short>" }
+workspace:
+  slug: "<workspace-slug>"          # drives `linear --workspace` and the safety gate
+  id: "<optional-workspace-id>"
+defaults:
+  archive_documents:
+    enabled: true
+    title_prefix: "OpenSpec:"
+  max_review_rounds: 3              # default; a change may override in its frontmatter
+  issue_label_filter:
+    name: "<optional-default-label>"   # narrows Backlog candidates only; explicit no-label option at setup
+teams:                              # normalized registry; keyed by Linear team key; grows over time
+  "<TEAM-KEY>":
+    id: "<linear-team-id>"
+    name: "<team-name>"
+projects:                          # normalized registry; keyed by a stable local slug; grows over time
+  "<project-slug>":
+    id: "<linear-project-id>"
+    name: "<project-name>"
+    teams: ["<TEAM-KEY>"]          # Linear projects can be shared across teams (many-to-many)
+    archive_documents:             # documents belong to the project (Linear-faithful)
+      "<capability-name>":
+        id: "<linear-document-id-or-slug>"
+        url: "<linear-document-url>"
+        title: "OpenSpec: <capability-name>"
 ```
 
-The `review_round` counter increments once per In Review to In Progress crossing, resets to zero on archive, and on exhaustion against `max_review_rounds` triggers the single escalation comment (see references/lifecycle.md).
-The `attempt_log` records dropped best-effort writes so a never-attempted transition is distinguishable from a failed one.
-The `documents` map is keyed by capability name and stores one entry per capability the change produces, because a single change routinely produces multiple capability specs that each become their own Linear document under the same project.
-Each per-capability entry's `id` is the stored-id home that the archive-time UPSERT prefers over a title-match lookup; the UPSERT iterates every capability, reads its stored id first, and on create writes the returned id back into that capability's entry (see references/linear-cli-mapping.md).
+Teams and projects are sibling registries.
+A project references its teams by key via `teams: [..]`, honoring Linear's many-to-many relationship between projects and teams; team identity is never nested under a project.
+The `defaults.archive_documents` block carries only `enabled` and `title_prefix`; the per-capability document entries belong under each project's own `archive_documents`, because a Linear project owns its documents.
+Each per-capability entry's `id` is the stored-id home that the archive-time UPSERT prefers over a title-match lookup; the UPSERT resolves the change's project from `linear_project`, iterates every capability, reads its stored id first, and on create writes the returned id back under that project's capability entry (see references/linear-cli-mapping.md).
+A single change routinely produces multiple capability specs that each become their own Linear document under the same project, so each project's `archive_documents` map holds one entry per capability the change produces.
+
+## Backward compatibility and migration
+
+A legacy single-team/single-project openspec/linear.yaml — with top-level `team:` and `project:` blocks plus the flat top-level ledger fields (`last_synced_state`, `last_synced_at`, `review_round`, `max_review_rounds`, `attempt_log`) and a top-level `archive_documents.documents` map — is read as a one-entry registry.
+The top-level `team:` becomes a single `teams` entry, the top-level `project:` becomes a single `projects` entry with `teams: [<that team>]` and the old `archive_documents` nested under it, and `defaults.max_review_rounds` and `defaults.issue_label_filter` adopt the legacy top-level values.
+The flat top-level ledger fields belong to the single active change and migrate into that change's proposal.md frontmatter as its D10 ledger.
 
 ## Manual-mode binding location
 
 Manual mode has no proposal.md and therefore no place to hold `linear_story_*` frontmatter, so its Linear binding lives in a beads issue field instead.
+If team or project context is needed in Manual mode, it is recorded in that same beads field; the registry still resolves the team and project ids.
 The two-location frontmatter-plus-openspec/linear.yaml mechanism is HIL/AFK-only; in Manual mode the beads issue field is the single binding location.
 
 ## Optional beads-id traceability map
