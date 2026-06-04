@@ -11,6 +11,10 @@ A single repository's OpenSpec changes routinely bind to issues across many Line
 
 At the Backlog to Todo bind, the overlay writes the `linear_story_*` binding and initializes the D10 ledger into proposal.md frontmatter, and writes or updates the registry entries in openspec/linear.yaml for the chosen team and project at the same bind; each project's archive-documents entries are written at archive.
 
+An issue always has a team but a project is optional, mirroring Linear's own cardinality, so `linear_team` is required in the binding and `linear_project` is optional and omitted entirely when the issue has no Linear project.
+A project-less change is a fully supported terminal state, not a gap to close: it runs the full Backlog-to-Done lifecycle on the team board (states are team-scoped to `linear_team`) and archives cleanly, with only the archive-time Project Document mirror skipped because Linear Project Documents live under a project.
+The registry `projects` map holds entries only for changes that have a project, so no placeholder project is ever fabricated; absence is represented as absence, and a project later assigned in Linear can set `linear_project`, add the project to the registry, and let the next archive populate its documents.
+
 The proposal.md frontmatter carries these keys, written at the bind:
 
 ```yaml
@@ -20,8 +24,8 @@ linear_story_identifier:
 linear_story_title:
 linear_story_url:
 linear_story_state:
-linear_team:            # references teams.<TEAM-KEY> in openspec/linear.yaml
-linear_project:         # references projects.<project-slug> in openspec/linear.yaml
+linear_team:            # required; references teams.<TEAM-KEY> in openspec/linear.yaml
+linear_project:         # optional (Option<slug>); omit entirely when the issue has no Linear project — references projects.<project-slug> in openspec/linear.yaml
 # D10 local sync ledger (per change; the authoritative current-phase signal home):
 last_synced_state:      # resolved in the context of linear_team (Linear workflow states are team-scoped)
 last_synced_at:

@@ -26,6 +26,7 @@ When linear-cli is not on PATH, no `credentials.toml` default is configured, or 
 ## Setup and selection invariants
 
 Setup asks a single question that selects the team and project context and offers an explicit no-label option, never inferring or auto-selecting a team, project, or label from names, ordering, or seemingly obvious matches.
+The team is required but the project is optional: an issue with no Linear project binds team-only, runs the full lifecycle on the team board, and has only the archive-time Project Document mirror skipped (logged in the attempt log), never blocking the lifecycle.
 The overlay never auto-selects a Backlog candidate: a candidate that could be inferred is still deferred to the human.
 Spec content is mirrored to Linear only at archive time; no design.md or tasks.md content is ever copied to Linear.
 

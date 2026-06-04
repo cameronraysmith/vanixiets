@@ -9,6 +9,7 @@ The overlay binds the eight-artifact superpowers-bridge lifecycle to Linear's ca
 Each forward transition is anchored on an observable local file milestone and fires a short, best-effort, non-blocking Linear comment of at most two sentences.
 
 The first transition, Backlog to Todo, fires when proposal.md is created; it is the bind point at which the overlay writes the story-to-change binding into both locations (see references/config-and-frontmatter.md).
+When the selected issue has no Linear project, the bind notes that archive spec-mirroring will be skipped and the overlay offers the human the choice to bind a project, never auto-assigning or fabricating one.
 A change with brainstorm.md but no proposal.md is still Backlog and no transition fires, so the brainstorm-exists-proposal-pending window is explicit.
 The second transition, Todo to In Progress, fires on the first checked tasks.md checkbox (`- [x]`); this anchor is grep-detectable and survives the jj worktree substitution, so the using-git-worktrees or jj-diamond act are fallback heuristics only.
 The third transition, In Progress to In Review, fires when verify.md is created; it is the best-grounded of the four because verify.md is one of the two signals machine-enforced in the bridge PRECHECKs.
@@ -28,6 +29,7 @@ Like Backlog, they carry no active work.
 The issue is never moved to Done before archive; status, validate, sync, and edit operations never move the issue to Done.
 Comments stay at most two sentences.
 The archive ordering is fixed: readiness checks, then sync deltas, then archive, then mirror (the document UPSERT), then Done.
+The mirror step is gated on `linear_project` presence: when the change has no `linear_project`, the document UPSERT is skipped and recorded as a dropped best-effort write in the attempt log (for example `{ at: "<iso>", transition: "archive->mirror", outcome: "dropped", note: "no linear_project bound; spec mirror skipped" }`), the same graceful-degradation path as a team lacking an In Review state or Linear being unavailable; the change still archives cleanly and moves to Done.
 
 ## State resolved by name, never by type
 

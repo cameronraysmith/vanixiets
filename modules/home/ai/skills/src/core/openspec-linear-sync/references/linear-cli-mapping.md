@@ -18,6 +18,9 @@ Setup confirms the workspace via `linear auth whoami` and records `workspace.slu
 The registry grows over time: a later change may bind to a different team or project, in which case its Backlog candidate scan targets and selects among the registered teams and projects, registering a new entry if the chosen team or project is not yet present.
 Selection is always human-gated and never auto-inferred from names, ordering, or seemingly obvious matches, and every read in the scan still passes `--workspace <slug>` so the workspace safety gate holds across all registered teams and projects.
 
+A project is optional: an issue always has a team but may be bound team-only, so candidate scanning is by team (plus an optional label or project narrowing), and a project-less issue is bound without any `projects` entry.
+The human may optionally choose to bind a project, but a project is never fabricated for a team-only issue; absence is left as absence.
+
 ## Per-operation verb mapping
 
 Each row replaces one former MCP call.
@@ -46,7 +49,8 @@ The state transition always passes the team's Linear state NAME via `--state`, n
 ## Document UPSERT recipe
 
 The archive-time document UPSERT runs entirely via the CLI so the document is always created already-parented.
-First resolve the target project from the change's `linear_project` (proposal.md frontmatter), which keys the `projects.<project-slug>` registry entry in openspec/linear.yaml; its `id` is the project the documents are parented to.
+The entire UPSERT is gated on `linear_project` presence: when the change has no `linear_project` there is no project to parent documents to, so the whole per-capability loop is skipped and the skip is recorded in the attempt log (`{ outcome: "dropped", note: "no linear_project bound; spec mirror skipped" }`); the change still archives cleanly.
+Otherwise, first resolve the target project from the change's `linear_project` (proposal.md frontmatter), which keys the `projects.<project-slug>` registry entry in openspec/linear.yaml; its `id` is the project the documents are parented to.
 A single change routinely produces multiple capability specs (this very change produced three: agentic-workflow-routing, project-management-hub, openspec-linear-sync), so the UPSERT iterates over every capability the change touches, each getting its own document titled `OpenSpec: <capability>`, all parented to that project and keyed by a per-capability entry under that project's `archive_documents` map.
 
 For each capability the change produces:
@@ -120,6 +124,12 @@ The mirror step is the document UPSERT:
 # Mirror: UPSERT every capability spec the change produced, each already-parented to the project.
 # <pslug> is the change's linear_project; <p> is projects."<pslug>".id (the Linear project id).
 # <caps> is the list of capabilities this change touched (here: agentic-workflow-routing project-management-hub openspec-linear-sync).
+# Gate the whole mirror on linear_project presence: with no project there is nothing to parent documents to.
+if [ -z "<pslug>" ]; then
+  # Record the skip in the attempt log; the change still archives cleanly.
+  # { transition: "archive->mirror", outcome: "dropped", note: "no linear_project bound; spec mirror skipped" }
+  :
+else
 for cap in <caps>; do
   # Primary lookup: the stored per-capability document id under this project in openspec/linear.yaml.
   DOC_ID=$(yq -r ".projects.\"<pslug>\".archive_documents.\"$cap\".id // \"\"" openspec/linear.yaml)
@@ -141,6 +151,7 @@ for cap in <caps>; do
     yq -i ".projects.\"<pslug>\".archive_documents.\"$cap\".id = \"$NEW_ID\"" openspec/linear.yaml
   fi
 done
+fi
 # Then, and only then, fire Done.
 linear issue update <id> --state "Done" --workspace <slug>
 printf 'The OpenSpec change is archived and its canonical specs are mirrored to the project documents.\n' > /tmp/c.md
