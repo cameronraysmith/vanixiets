@@ -116,6 +116,11 @@ The registry holds no per-issue binding and no flat documents map; per-project a
 apply READS the frontmatter, so write-before-read ordering is load-bearing and the sync skill's bind step must precede any apply read.
 The beads-id binding applies only when a beads drill-down is actually used or in Manual mode.
 
+`linear_project` is `Option<slug>`: `linear_team` is required (an issue always has a team) but a project is optional, mirroring Linear.
+A project-less change is a fully supported terminal state, not a degraded one: the full Backlog → Done lifecycle runs on the team board (states are team-scoped, so the lifecycle is project-independent), and the change archives cleanly with no project ever bound.
+When no project is bound the `linear_project` key is omitted from frontmatter and no `projects` registry entry is created; a placeholder project or registry entry is explicitly rejected so the registry never carries fabricated structure.
+The archive-time spec-document mirror is gated on `linear_project` presence: when absent, the UPSERT is skipped and recorded as a dropped best-effort write in the attempt_log (the same graceful-degradation path as Linear being unavailable), and the canonical `openspec/specs/` stay the source of truth.
+
 Rationale: a stable, agent-readable frontmatter link survives across the lifecycle and lets apply read the bound story without re-querying Linear, while the registry stays a normalized monorepo index that many concurrent changes across different teams and projects resolve against.
 Alternatives considered: a branch-name-as-binding convention keyed to beads ids (CCPM prior art; rejected as the primary binding because Linear and OpenSpec own the work, though it remains available for the beads drill-down case).
 

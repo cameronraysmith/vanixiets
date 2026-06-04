@@ -65,14 +65,19 @@ The overlay SHALL fire each transition only when the resolved Linear state is st
 
 ### Requirement: Single-location frontmatter binding that resolves against the registry
 
-The sync overlay SHALL be the write-owner of the primary cross-reference binding from Linear story to OpenSpec change, persisted in a single location: the proposal.md frontmatter, which carries linear_story_* plus linear_team and linear_project.
-At the Backlog to Todo bind it SHALL write linear_story_*, linear_team, and linear_project into proposal.md frontmatter and SHALL resolve the chosen team and project against the openspec/linear.yaml registry rather than writing the binding into the registry; the binding lives only in frontmatter.
-At archive it SHALL UPSERT the per-project archive document into projects.<slug>.archive_documents.<capability>, resolving <slug> from the change's linear_project; there is no flat documents map.
+The sync overlay SHALL be the write-owner of the primary cross-reference binding from Linear story to OpenSpec change, persisted in a single location: the proposal.md frontmatter, which carries linear_story_* plus a required linear_team and an optional linear_project.
+linear_team SHALL be required and linear_project SHALL be optional (Option<slug>), mirroring Linear where an issue always has a team but a project is optional; when no project is bound the linear_project key SHALL be omitted and no placeholder project or registry entry SHALL be fabricated.
+At the Backlog to Todo bind it SHALL write linear_story_* and linear_team into proposal.md frontmatter, write linear_project only when a project is bound, and SHALL resolve the chosen team and (when present) project against the openspec/linear.yaml registry rather than writing the binding into the registry; the binding lives only in frontmatter.
+At archive it SHALL UPSERT the per-project archive document into projects.<slug>.archive_documents.<capability>, resolving <slug> from the change's linear_project, only when linear_project is present; there is no flat documents map.
 Because apply reads the frontmatter, the write-before-read ordering is load-bearing and the bind step SHALL precede any apply read; in Manual mode, where there is no proposal.md, the Linear binding SHALL live in a beads issue field instead.
 
 #### Scenario: bind writes frontmatter and resolves the registry
 - **WHEN** the Backlog to Todo bind occurs
 - **THEN** linear_story_*, linear_team, and linear_project are written into proposal.md frontmatter only, and the chosen team and project are resolved against the openspec/linear.yaml registry rather than the binding being written into it
+
+#### Scenario: project-less bind omits linear_project and adds no registry entry
+- **WHEN** the Backlog to Todo bind occurs for a change with a team but no project
+- **THEN** linear_story_* and linear_team are written into proposal.md frontmatter, the linear_project key is omitted rather than set to a placeholder, and no projects registry entry is added to openspec/linear.yaml
 
 #### Scenario: bind precedes apply read
 - **WHEN** apply reads the linear_story_* frontmatter
@@ -84,13 +89,18 @@ Because apply reads the frontmatter, the write-before-read ordering is load-bear
 
 ### Requirement: Archive-time document UPSERT with mirroring
 
-The sync overlay SHALL run an archive-time document UPSERT entirely via the CLI: it SHALL resolve <project> from the change's linear_project frontmatter (whose slug keys projects.<slug>.archive_documents.<capability> in the registry), then run linear document list --project <p> --json to find the document by the deterministic title OpenSpec: <capability>, then linear document update <id> --title <t> --content-file <f> if matched, else linear document create --project <p> --title <t> --content-file <f> so the document is always created already-parented, writing the returned id back to projects.<slug>.archive_documents.<capability>.id.
+The sync overlay SHALL run an archive-time document UPSERT entirely via the CLI, gated on the presence of linear_project: it SHALL resolve <project> from the change's linear_project frontmatter (whose slug keys projects.<slug>.archive_documents.<capability> in the registry), then run linear document list --project <p> --json to find the document by the deterministic title OpenSpec: <capability>, then linear document update <id> --title <t> --content-file <f> if matched, else linear document create --project <p> --title <t> --content-file <f> so the document is always created already-parented, writing the returned id back to projects.<slug>.archive_documents.<capability>.id.
+When linear_project is absent the UPSERT SHALL be skipped and recorded as a dropped best-effort write in the attempt_log (outcome: "dropped", note: "no linear_project bound; spec mirror skipped"), the same graceful-degradation path as Linear being unavailable, and the change SHALL archive cleanly with the canonical openspec/specs/ remaining the source of truth.
 The document body SHALL be a disposable mirror fully replaced on each archive so re-archives update rather than duplicate, and archive-time SHALL be the only time spec content is mirrored to Linear.
 The overlay SHALL never copy design.md or tasks.md to Linear.
 
 #### Scenario: UPSERT matches by deterministic title
-- **WHEN** the archive-time UPSERT runs
+- **WHEN** the archive-time UPSERT runs with linear_project present
 - **THEN** it resolves the project from the change's linear_project, lists documents by that project, matches the title OpenSpec: <capability>, updates the matched document or creates a new already-parented one, and writes the resulting id back to projects.<slug>.archive_documents.<capability>.id
+
+#### Scenario: Archive with no project bound
+- **WHEN** the archive-time UPSERT runs for a change whose proposal.md frontmatter omits linear_project
+- **THEN** the mirror is skipped, a dropped best-effort write is recorded in the attempt_log with outcome "dropped" and a note that no linear_project was bound, and the change archives cleanly with the canonical openspec/specs/ remaining authoritative
 
 #### Scenario: re-archive updates rather than duplicates
 - **WHEN** a change is re-archived
