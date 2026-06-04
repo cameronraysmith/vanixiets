@@ -9,8 +9,14 @@ The Linear MCP is recommended against and never invoked here.
 Prefer file-based content flags over inline content to avoid escaping artifacts; this is the one content-handling policy this file owns.
 Which verbs expose `--json`, a content-file flag, or `--no-interactive` is mechanics with an authoritative home: see `~/.claude/skills/linear-cli/references/issue.md` and `~/.claude/skills/linear-cli/references/document.md` for per-verb flag availability, and the `## Best Practices for Markdown Content` section of `~/.claude/skills/linear-cli/SKILL.md` for why file-based flags are preferred.
 
-Every linear-cli invocation in this overlay, reads as well as mutations, passes an explicit `--workspace <slug>`.
+Every linear-cli invocation in this overlay, reads as well as mutations, passes an explicit `--workspace <slug>`, resolved from `workspace.slug` in the openspec/linear.yaml registry.
 A command that omits `--workspace` resolves to the credentials default, which is the personal workspace in this deployment, so an unscoped read silently queries the wrong workspace exactly as an unscoped mutation would write to it.
+
+## Setup and selection populate the registry
+
+Setup confirms the workspace via `linear auth whoami` and records `workspace.slug` in openspec/linear.yaml, then registers at least one team and one project: `linear team list` and `linear project list` enumerate candidates, and the human-confirmed choice is written as a `teams.<TEAM-KEY>` entry and a `projects.<project-slug>` entry (the project carrying `teams: [<TEAM-KEY>]`).
+The registry grows over time: a later change may bind to a different team or project, in which case its Backlog candidate scan targets and selects among the registered teams and projects, registering a new entry if the chosen team or project is not yet present.
+Selection is always human-gated and never auto-inferred from names, ordering, or seemingly obvious matches, and every read in the scan still passes `--workspace <slug>` so the workspace safety gate holds across all registered teams and projects.
 
 ## Per-operation verb mapping
 
@@ -40,16 +46,17 @@ The state transition always passes the team's Linear state NAME via `--state`, n
 ## Document UPSERT recipe
 
 The archive-time document UPSERT runs entirely via the CLI so the document is always created already-parented.
-A single change routinely produces multiple capability specs (this very change produced three: agentic-workflow-routing, project-management-hub, openspec-linear-sync), so the UPSERT iterates over every capability the change touches, each getting its own document titled `OpenSpec: <capability>`, all parented to the same project and keyed by a per-capability entry in the openspec/linear.yaml `documents` map.
+First resolve the target project from the change's `linear_project` (proposal.md frontmatter), which keys the `projects.<project-slug>` registry entry in openspec/linear.yaml; its `id` is the project the documents are parented to.
+A single change routinely produces multiple capability specs (this very change produced three: agentic-workflow-routing, project-management-hub, openspec-linear-sync), so the UPSERT iterates over every capability the change touches, each getting its own document titled `OpenSpec: <capability>`, all parented to that project and keyed by a per-capability entry under that project's `archive_documents` map.
 
 For each capability the change produces:
 
-1. Look up the stored document id first: read the per-capability `documents."<capability>".id` from openspec/linear.yaml.
+1. Look up the stored document id first: read `projects."<project-slug>".archive_documents."<capability>".id` from openspec/linear.yaml, where `<project-slug>` is the change's `linear_project`.
 2. If a stored id exists, update in place: `linear document update <stored-id> --title "OpenSpec: <capability>" --content-file <spec-file> --workspace <slug>`.
 3. Only if no stored id exists, fall back to a title scan: `linear document list --project <p> --json --workspace <slug>` and match the deterministic title `OpenSpec: <capability>` over the `.nodes[]` array of the returned connection object.
    The `--json` output is a connection with `nodes` and `pageInfo`, not a bare array, so the match must walk `.nodes[]`; introspect the exact shape via `linear schema -o <file>` and confirm against `~/.claude/skills/linear-cli/references/api.md` and `~/.claude/skills/linear-cli/references/schema.md`.
 4. If the title scan finds a match, update that id as in step 2.
-5. If no stored id and no title match, create: `linear document create --project <p> --title "OpenSpec: <capability>" --content-file <spec-file> --workspace <slug>`, which creates it already parented to the project, and store the returned id back into openspec/linear.yaml under `documents."<capability>".id` so the next archive takes the stored-id path.
+5. If no stored id and no title match, create: `linear document create --project <p> --title "OpenSpec: <capability>" --content-file <spec-file> --workspace <slug>`, which creates it already parented to the project, and store the returned id back into openspec/linear.yaml under `projects."<project-slug>".archive_documents."<capability>".id` so the next archive takes the stored-id path.
 
 The document body is a disposable mirror fully replaced on each archive, so a re-archive updates the matched document rather than creating a duplicate.
 The body mirrors only the canonical `openspec/specs/<capability>/spec.md` content; design.md and tasks.md are never copied to Linear.
@@ -64,8 +71,9 @@ The CLI surface for the escalation — `linear api` for raw GraphQL requests and
 ## End-to-end worked example: one HIL issue Backlog to Done
 
 This traces a single HIL issue through all five Linear states with literal commands.
-`<slug>` is the confirmed workspace slug, `<id>` the issue identifier (for example ENG-123), `<p>` the project slug, and `<caps>` the list of capabilities the change touched (a change routinely touches more than one).
-Every step is guarded by the strictly-behind rule (see references/lifecycle.md): a transition fires only when the resolved Linear state is strictly behind the local milestone.
+`<slug>` is the confirmed workspace slug from `workspace.slug` in openspec/linear.yaml, `<id>` the issue identifier (for example ENG-123), `<pslug>` the change's `linear_project` (the registry key under `projects`), `<p>` the resolved Linear project id `projects."<pslug>".id`, and `<caps>` the list of capabilities the change touched (a change routinely touches more than one).
+Every step is guarded by the strictly-behind rule (see references/lifecycle.md): a transition fires only when the resolved Linear state is strictly behind the local milestone, where the state name is resolved in the context of the change's `linear_team`.
+The ledger updates that accompany each transition (`last_synced_state`, `last_synced_at`, `review_round`, `attempt_log`) are written to this change's proposal.md frontmatter, not to openspec/linear.yaml.
 
 This trace is a policy-level walkthrough: the ordering, the guards, the archive sequence, and the per-crossing comment discipline are the load-bearing parts.
 The concrete flags and the two `.nodes[]` jq filters below are illustrative at linear-cli v2.0.0; they are authoritative in `~/.claude/skills/linear-cli/references/issue.md`, `~/.claude/skills/linear-cli/references/document.md`, `~/.claude/skills/linear-cli/references/api.md`, and `~/.claude/skills/linear-cli/references/schema.md`, and in `~/.claude/skills/linear-cli/references/auth.md` for the `whoami` gate.
@@ -110,10 +118,11 @@ The mirror step is the document UPSERT:
 
 ```bash
 # Mirror: UPSERT every capability spec the change produced, each already-parented to the project.
+# <pslug> is the change's linear_project; <p> is projects."<pslug>".id (the Linear project id).
 # <caps> is the list of capabilities this change touched (here: agentic-workflow-routing project-management-hub openspec-linear-sync).
 for cap in <caps>; do
-  # Primary lookup: the stored per-capability document id in openspec/linear.yaml.
-  DOC_ID=$(yq -r ".archive_documents.documents.\"$cap\".id // \"\"" openspec/linear.yaml)
+  # Primary lookup: the stored per-capability document id under this project in openspec/linear.yaml.
+  DOC_ID=$(yq -r ".projects.\"<pslug>\".archive_documents.\"$cap\".id // \"\"" openspec/linear.yaml)
   if [ -z "$DOC_ID" ]; then
     # Fallback: scan the connection's .nodes[] array for the deterministic title.
     DOC_ID=$(linear document list --project <p> --json --workspace <slug> \
@@ -129,7 +138,7 @@ for cap in <caps>; do
     linear document create --project <p> --title "OpenSpec: $cap" --content-file "openspec/specs/$cap/spec.md" --workspace <slug>
     NEW_ID=$(linear document list --project <p> --json --workspace <slug> \
       | jq -r --arg t "OpenSpec: $cap" '.nodes[] | select(.title == $t) | .id')
-    yq -i ".archive_documents.documents.\"$cap\".id = \"$NEW_ID\"" openspec/linear.yaml
+    yq -i ".projects.\"<pslug>\".archive_documents.\"$cap\".id = \"$NEW_ID\"" openspec/linear.yaml
   fi
 done
 # Then, and only then, fire Done.
