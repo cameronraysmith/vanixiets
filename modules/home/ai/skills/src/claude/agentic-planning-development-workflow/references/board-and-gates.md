@@ -1,6 +1,7 @@
 # Board and gates
 
 The board is forge-agnostic in concept but re-cast onto Linear's canonical states so every board state maps one-to-one onto a Linear state with none skipped.
+The board is a per-change spine projected onto the change's own `linear_team` board, so state names resolve against `linear_team` and the one-to-one mapping holds within that team's state set (state names are team-scoped).
 This one-to-one mapping is what makes the whole binding automatable.
 The unit of work is the forge-agnostic board unit and the terminal artifact is the archived OpenSpec change; a pull request into the monorepo, including docs and handbook, is one realization of that terminal artifact, consistent with the repo's fast-forward-merge-by-default, PR-when-warranted policy.
 
@@ -86,6 +87,7 @@ The re-queue fires on either a verify.md Overall Decision of checked-FAIL (machi
 
 Termination toward Done is not guaranteed by the board structure; it holds only under a fairness assumption or a bounded-retries policy.
 A bounded-retries policy supplies the documented termination guarantee: a maximum review-round counter (recommended default 3) that increments once per re-queue and resets when the change archives.
+The `review_round` counter is per-change, persisted in that change's proposal.md frontmatter, with the default ceiling sourced from linear.yaml `defaults.max_review_rounds` (a change may override it in its frontmatter).
 On exhaustion the board escalates to the human PM layer and stops firing automatic re-queues, parking the unit for human decision.
 
 ## Router walkthrough
