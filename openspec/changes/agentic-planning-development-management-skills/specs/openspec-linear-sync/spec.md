@@ -87,6 +87,22 @@ Because apply reads the frontmatter, the write-before-read ordering is load-bear
 - **WHEN** the issue is in Manual mode and has no proposal.md
 - **THEN** the Linear binding lives in a beads issue field rather than in proposal.md frontmatter
 
+### Requirement: Mirror the Linear issue description from proposal.md business content
+
+The overlay SHALL mirror the bound Linear issue's description from the business-facing content of the change's proposal.md, distinct from the archive-time project-document UPSERT (which mirrors openspec/specs/ into a Linear project document, a different object). At the Backlog to Todo bind it SHALL seed the issue description by distilling a stakeholder-facing TL;DR, deliverables, scope, and acceptance from proposal.md's Why, What Changes, and Capabilities and writing it via linear issue update --description-file (the file-based content flag preferred for markdown), best-effort and non-blocking. It SHALL refresh the description idempotently from the same source on the later sync and edit operations, re-pushing only when the distilled body differs, and SHALL record a dropped write in the attempt_log when Linear is unavailable. The mirror SHALL be down-only: proposal.md remains the source of truth and the overlay SHALL NOT reconcile human edits to the issue description back into proposal.md. Detailed technical design SHALL stay out of the issue description; it remains in design.md.
+
+#### Scenario: bind seeds the issue description from proposal.md
+- **WHEN** the Backlog to Todo bind occurs
+- **THEN** the overlay distills a stakeholder-facing TL;DR, deliverables, scope, and acceptance from proposal.md's Why, What Changes, and Capabilities and writes it to the Linear issue description via linear issue update --description-file, best-effort and non-blocking, recording a dropped write in the attempt_log if Linear is unavailable
+
+#### Scenario: sync and edit refresh the description idempotently
+- **WHEN** the sync or edit operation runs after proposal.md's business-facing content has changed
+- **THEN** the overlay re-distills and re-pushes the issue description down-only, re-pushing only when the distilled body differs from what Linear holds, and never reconciling human edits to the issue description back into proposal.md
+
+#### Scenario: technical design stays out of the issue description
+- **WHEN** the issue description is composed
+- **THEN** it carries the business "what" only and never the detailed technical design, which remains in design.md
+
 ### Requirement: Archive-time document UPSERT with mirroring
 
 The sync overlay SHALL run an archive-time document UPSERT entirely via the CLI, gated on the presence of linear_project: it SHALL resolve <project> from the change's linear_project frontmatter (whose slug keys projects.<slug>.archive_documents.<capability> in the registry), then run linear document list --project <p> --json to find the document by the deterministic title OpenSpec: <capability>, then linear document update <id> --title <t> --content-file <f> if matched, else linear document create --project <p> --title <t> --content-file <f> so the document is always created already-parented, writing the returned id back to projects.<slug>.archive_documents.<capability>.id.
