@@ -9,6 +9,10 @@ The overlay binds the eight-artifact superpowers-bridge lifecycle to Linear's ca
 Each forward transition is anchored on an observable local file milestone and fires a short, best-effort, non-blocking Linear comment of at most two sentences.
 
 The first transition, Backlog to Todo, fires when proposal.md is created; it is the bind point at which the overlay writes the story-to-change binding into both locations (see references/config-and-frontmatter.md).
+At this bind the overlay also seeds the Linear issue description from the business-facing content in proposal.md, distilling a stakeholder-facing TL;DR, deliverables, scope, and acceptance from its Why, What Changes, and Capabilities.
+This description write is a distinct effect from the at-most-two-sentence comment: it is best-effort, non-blocking, and idempotent — re-pushed only when the distilled body differs from what Linear already holds — and a dropped write is recorded in the attempt log like the other Linear writes.
+Detailed technical design stays out of the issue body; it lives in design.md.
+When proposal.md's business-facing content later changes, the description is re-synced idempotently by the sync and edit operations: the mirror is down-only, from proposal.md into Linear, and never reconciles human edits to the issue body back into proposal.md.
 When the selected issue has no Linear project, the bind notes that archive spec-mirroring will be skipped and the overlay offers the human the choice to bind a project, never auto-assigning or fabricating one.
 A change with brainstorm.md but no proposal.md is still Backlog and no transition fires, so the brainstorm-exists-proposal-pending window is explicit.
 The second transition, Todo to In Progress, fires on the first checked tasks.md checkbox (`- [x]`); this anchor is grep-detectable and survives the jj worktree substitution, so the using-git-worktrees or jj-diamond act are fallback heuristics only.

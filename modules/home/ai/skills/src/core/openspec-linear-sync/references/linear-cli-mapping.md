@@ -35,12 +35,13 @@ Every command, read or mutation, passes an explicit `--workspace <slug>` after t
 | Backlog candidate selection | `list_issues` | `linear issue query` (never before openspec/linear.yaml exists) |
 | Read story context | `list_comments` | `linear issue view`; `linear issue comment list` |
 | Transition state | `save_issue` (id + state) | `linear issue update` (by state name) |
+| Sync issue description | `save_issue` (id + description) | `linear issue update` (`--description-file`, preferred for markdown) |
 | Post a milestone comment | `save_comment` | `linear issue comment add` |
 | Document lookup | `list_documents` | `linear document list` |
 | Document create | `save_document` (create) | `linear document create` |
 | Document update | `save_document` (update) | `linear document update` |
 
-Which verb maps to which operation is the policy this table owns, and the `--workspace <slug>` rule above applies to every row; the exact flags for each verb live in the bundled skill: issue verbs in `~/.claude/skills/linear-cli/references/issue.md`, document verbs in `~/.claude/skills/linear-cli/references/document.md`, and the setup reads in `~/.claude/skills/linear-cli/references/team.md`, `~/.claude/skills/linear-cli/references/project.md`, and `~/.claude/skills/linear-cli/references/label.md`.
+Which verb maps to which operation is the policy this table owns, and the `--workspace <slug>` rule above applies to every row; the exact flags for each verb live in the bundled skill: issue verbs in `~/.claude/skills/linear-cli/references/issue.md` (including the `linear issue update --description-file <path>` flag, documented there as preferred for markdown content, which the issue-description sync uses), document verbs in `~/.claude/skills/linear-cli/references/document.md`, and the setup reads in `~/.claude/skills/linear-cli/references/team.md`, `~/.claude/skills/linear-cli/references/project.md`, and `~/.claude/skills/linear-cli/references/label.md`.
 
 Read backlog candidates with `issue query`, not `issue list`; the alias relationship and the `--state`/`--json` reasoning that forces this choice live in `~/.claude/skills/linear-cli/references/issue.md`.
 
@@ -93,6 +94,12 @@ Backlog to Todo, fired when proposal.md is created (this step also writes the bi
 ```bash
 # Guard: proceed only if the resolved Linear state is strictly behind Todo.
 linear issue update <id> --state "Todo" --workspace <slug>
+# Seed the Linear issue description (the business "what") distilled from proposal.md Why / What Changes / Capabilities
+# into a stakeholder-facing TL;DR / deliverables / scope / acceptance; technical design stays in design.md.
+# Best-effort and non-blocking; --description-file is preferred for markdown (see issue.md). Record a dropped
+# attempt in the proposal.md attempt_log if Linear is unavailable.
+<distill proposal.md business sections into /tmp/body.md>
+linear issue update <id> --description-file /tmp/body.md --workspace <slug>
 printf 'OpenSpec proposal created and the change is bound to this story. Discovery has started.\n' > /tmp/c.md
 linear issue comment add <id> --body-file /tmp/c.md --workspace <slug>
 ```

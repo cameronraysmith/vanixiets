@@ -22,7 +22,7 @@ For the collaborator map naming who owns what, see references/collaborators.md.
 
 Run the workspace safety gate first, before any Linear call.
 Assert both `LINEAR_API_KEY` and `LINEAR_WORKSPACE` are unset, then `linear auth whoami --workspace <slug>` to confirm the reported workspace is the intended personal-versus-work one, and pass an explicit `--workspace <slug>` on every later call including reads; the gate mechanics live in project-management/references/linear-workspace-safety-gate.md.
-As a one-time act, create or extend the openspec/linear.yaml registry with the teams and projects entries for the chosen team and project; then, per change at the Backlog-to-Todo bind, write `linear_story_*` plus `linear_team` and `linear_project` and initialize the D10 sync ledger into that change's proposal.md frontmatter only, referencing the registry's teams and projects entries rather than writing the binding into the registry; the config schema, the one-question setup, and the write-before-read frontmatter binding live in openspec-linear-sync/references/config-and-frontmatter.md.
+As a one-time act, create or extend the openspec/linear.yaml registry with the teams and projects entries for the chosen team and project; then, per change at the Backlog-to-Todo bind, write `linear_story_*` plus `linear_team` and `linear_project` and initialize the D10 sync ledger into that change's proposal.md frontmatter only, and seed the Linear issue description from the change's proposal.md business-facing content, referencing the registry's teams and projects entries rather than writing the binding into the registry; the config schema, the one-question setup, and the write-before-read frontmatter binding live in openspec-linear-sync/references/config-and-frontmatter.md.
 Orient beads for the Manual-mode drill-down via /session-orient (session-advisor reads the graph metrics and signal table), with the comprehensive command reference in the issues-beads skill.
 
 ### Quick flow (HIL)
@@ -31,7 +31,7 @@ The spec-first default path; the router frames, the bridge drives, and openspec-
 
 ```text
 /agentic-planning-development-workflow   # front door: place the unit on the board; the human picks HIL at the Todo to In Progress fork
-/opsx:ff --schema superpowers-bridge     # all 8 bridge artifacts; proposal.md creation => T1 Backlog to Todo: openspec-linear-sync binds linear_story_* and sets Todo
+/opsx:ff --schema superpowers-bridge     # all 8 bridge artifacts; proposal.md creation => T1 Backlog to Todo: openspec-linear-sync binds linear_story_*, seeds the issue description, and sets Todo
 /opsx:apply                              # implement tasks.md; the first - [x] => T2 Todo to In Progress
 /opsx:verify                             # writes verify.md => T3 In Progress to In Review; then roborev then documenter, both human-steered
 /opsx:continue                           # the retrospective artifact, inside the In Review window

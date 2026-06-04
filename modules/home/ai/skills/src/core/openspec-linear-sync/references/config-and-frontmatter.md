@@ -110,6 +110,8 @@ CCPM's branch-name-as-binding convention may key this drill-down case to beads i
 ## Ownership-boundary doctrine
 
 Linear owns the business "what": the business goal, use cases, personas and workflows, scope, acceptance criteria, and stakeholder-facing status, kept synchronized from the business-facing content in proposal.md.
+This synchronization is operationalized at the Backlog to Todo bind, where the overlay seeds the Linear issue description with a stakeholder-facing TL;DR, deliverables, scope, and acceptance distilled from proposal.md's Why and What Changes, and is refreshed idempotently by the later sync and edit operations (see references/lifecycle.md and references/linear-cli-mapping.md).
+The issue description therefore carries the business "what" only; the detailed technical design stays out of the issue body, per the keep-out boundary below.
 The repo owns the technical "how": OpenSpec design decisions, tasks, implementation detail, migrations, tests, and code.
 Canonical specs under `openspec/specs/` are the single source of truth; the Linear project documents written by the archive-time UPSERT are disposable mirrors, not the canonical source, and are fully replaced from repo canonical spec content at archive time.
 Detailed technical design stays out of Linear issue descriptions and comments, and business context stays out of repo design and tasks except where needed to make a technical decision traceable.

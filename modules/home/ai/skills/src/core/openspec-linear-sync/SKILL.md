@@ -43,6 +43,6 @@ The Linear workspace safety gate is the hardest constraint and is owned by the p
 ## Phase summary
 
 The overlay binds the eight-artifact superpowers-bridge lifecycle to Linear's canonical states via four forward transitions, a shared re-queue, and two terminal exits, covering every Linear state with none skipped.
-proposal.md creation drives Backlog to Todo and writes the binding; the first checked tasks.md checkbox drives Todo to In Progress; verify.md creation drives In Progress to In Review; the successful archive step drives In Review to Done and runs the document UPSERT.
+proposal.md creation drives Backlog to Todo, writes the binding, and seeds the Linear issue description from proposal.md's business-facing content; the first checked tasks.md checkbox drives Todo to In Progress; verify.md creation drives In Progress to In Review; the successful archive step drives In Review to Done and runs the document UPSERT.
 The In Review to In Progress re-queue fires on a verify.md checked-FAIL Overall Decision or a human sub-gate rejection, governed by a bounded-retries policy that escalates to the human PM layer on exhaustion; Canceled and Duplicate are inert terminals reachable from any active state.
 The full transition table, gate firing conditions, ordering, and invariants live in references/lifecycle.md.

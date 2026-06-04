@@ -26,6 +26,7 @@ Each forward transition is named by its transition rather than by an ordinal and
 The four anchors are all observable file milestones, which is why the whole binding is automatable.
 
 The readiness gate fires Backlog to Todo when a change directory acquires a committed proposal.md.
+That firing also seeds the Linear issue description from the committed proposal.md's business-facing content, as a best-effort bind effect.
 The proposal.md anchor is more substantive than brainstorm.md: a transition firing before the change has a committed proposal is weaker visibility for little gain.
 
 The apply gate fires Todo to In Progress on the first tasks.md `- [x]` checkbox marked complete.
@@ -99,6 +100,7 @@ No forward transition fires; the unit stays in Backlog (the brainstorm-exists-pr
 
 The human authors and commits proposal.md.
 The readiness gate fires Backlog to Todo.
+The bind also seeds the Linear issue description from proposal.md.
 
 The unit reaches the Todo to In Progress boundary.
 The human picks HIL at the mode fork (no Linear label mechanizes this), fixing tasks.md as the authoritative ledger.
