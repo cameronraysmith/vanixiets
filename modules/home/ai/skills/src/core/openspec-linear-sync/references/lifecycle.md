@@ -35,15 +35,19 @@ Every transition resolves and passes the team's Linear state NAME (for example "
 In Progress and In Review both carry the workflow-state type "started" in the live workspace, so keying on type would conflate the two; passing the exact state name is what disambiguates them.
 That `--state` accepts a name or a type is a linear-cli fact documented in `~/.claude/skills/linear-cli/references/issue.md`.
 
+State-name resolution is team-scoped: the ledger's `last_synced_state` and every transition target are resolved against the change's `linear_team`, because Linear workflow states are defined per team.
+The same state name can name different states on different teams, so resolving in the wrong team's context would compare against the wrong board; the change's `linear_team` (from proposal.md frontmatter) is the resolution context.
+
 The overlay degrades gracefully for a team that lacks an In Review state.
 The transition is attempted and its NotFoundError is caught as a dropped best-effort write recorded in the attempt log, leaving the issue In Progress until Done; the NotFoundError error-class on an unresolvable `--state` is a linear-cli behavior documented in `~/.claude/skills/linear-cli/references/issue.md`, and the literal command appears once in references/linear-cli-mapping.md rather than being restated here.
 No Linear state is fabricated, and the dropped write is observable in the ledger rather than silently absorbed.
 
 ## The local sync ledger (D10)
 
-The overlay maintains a minimal local sync ledger adjacent to the bridge, persisted as fields in openspec/linear.yaml (the schema is in references/config-and-frontmatter.md).
+The overlay maintains a minimal local sync ledger per change, persisted as fields in that change's proposal.md frontmatter (the schema is in references/config-and-frontmatter.md).
 The ledger records `last_synced_state`, `last_synced_at`, a review-round counter, and a short attempt log.
-This single mechanism closes detection, idempotency, the bounded-retries counter, and observability.
+It is per change rather than in openspec/linear.yaml because a single repository runs several changes in parallel, each bound to a different Linear issue across possibly different teams and projects, so a single flat top-level ledger could represent only one change's sync state.
+This single mechanism closes detection, idempotency, the bounded-retries counter, and observability, and `last_synced_state` is resolved against the change's `linear_team` because Linear workflow states are team-scoped.
 
 Local milestone-file existence is the authoritative current-phase signal: proposal.md, the first tasks.md `- [x]`, verify.md, and the archived change directory together determine the local phase.
 The Linear state is treated as a best-effort projection that a catch-up reconciliation step corrects rather than trusting.
@@ -57,8 +61,8 @@ apply and verify are routinely re-invoked, so this is what prevents re-runs from
 
 ### Bounded-retries counter
 
-The review-round counter lives in openspec/linear.yaml because Linear writes are best-effort and a counter stored in Linear could be dropped, which would make the termination guarantee unsound.
-It defaults to a small max (recommended default 3, with a documented configurability note in the schema), increments once per re-queue (one per In Review to In Progress crossing), and resets when the change archives (forward progress past In Review).
+The review-round counter lives in the change's proposal.md frontmatter because Linear writes are best-effort and a counter stored in Linear could be dropped, which would make the termination guarantee unsound; persisting it locally per change keeps the termination guarantee sound under dropped writes and keeps each parallel change's counter independent.
+It defaults to a small max (`defaults.max_review_rounds` in openspec/linear.yaml, recommended default 3, overridable per change via the frontmatter `max_review_rounds`), increments once per re-queue (one per In Review to In Progress crossing), and resets when the change archives (forward progress past In Review).
 On exhaustion the mechanical escalation action is to post a single escalation comment to the human PM layer and stop firing automatic re-queues, leaving the issue parked for a human decision; this gives the board a documented termination guarantee that its structure alone does not provide.
 
 ### Attempt log
