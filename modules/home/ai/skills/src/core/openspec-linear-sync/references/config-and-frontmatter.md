@@ -44,6 +44,7 @@ The `attempt_log` records dropped best-effort writes so a never-attempted transi
 openspec/linear.yaml is the monorepo-level registry: the workspace identity that drives the safety gate, shared defaults, a normalized teams registry, and a normalized projects registry where each project owns its archive documents.
 It holds only what is invariant across the repository's changes; the per-issue binding and the per-change D10 ledger live in each change's proposal.md frontmatter (above).
 The registry grows over time as new teams and projects are referenced; it is open for extension but models exactly what the overlay reads and writes — workspace, teams, projects, and per-project documents — and deliberately omits initiatives, cycles, milestones, labels-as-objects, sub-issues, and assignees.
+The registry also assumes a single openspec/ root per repository; like the omitted object types, this is an extension point rather than a hard limit.
 
 ```yaml
 workspace:
@@ -74,6 +75,7 @@ projects:                          # normalized registry; keyed by a stable loca
 
 Teams and projects are sibling registries.
 A project references its teams by key via `teams: [..]`, honoring Linear's many-to-many relationship between projects and teams; team identity is never nested under a project.
+The project slug and team key are stable local identifiers, assigned once and never renamed, and are decoupled from Linear's mutable project and team display names because the registry value carries the immutable Linear id; a per-change `linear_project` or `linear_team` reference therefore stays valid even if the Linear project or team is renamed.
 The `defaults.archive_documents` block carries only `enabled` and `title_prefix`; the per-capability document entries belong under each project's own `archive_documents`, because a Linear project owns its documents.
 Each per-capability entry's `id` is the stored-id home that the archive-time UPSERT prefers over a title-match lookup; the UPSERT resolves the change's project from `linear_project`, iterates every capability, reads its stored id first, and on create writes the returned id back under that project's capability entry (see references/linear-cli-mapping.md).
 A single change routinely produces multiple capability specs that each become their own Linear document under the same project, so each project's `archive_documents` map holds one entry per capability the change produces.
@@ -89,6 +91,10 @@ The flat top-level ledger fields belong to the single active change and migrate 
 Manual mode has no proposal.md and therefore no place to hold `linear_story_*` frontmatter, so its Linear binding lives in a beads issue field instead.
 If team or project context is needed in Manual mode, it is recorded in that same beads field; the registry still resolves the team and project ids.
 The two-location frontmatter-plus-openspec/linear.yaml mechanism is HIL/AFK-only; in Manual mode the beads issue field is the single binding location.
+
+The D10 sync ledger is HIL/AFK-only as well: Manual mode carries no D10 ledger, because it has no proposal.md to hold one and the bounded-retries automation does not run in Manual mode.
+The human is the regulator there, and lifecycle status is managed directly via the beads loop — the authoritative task ledger in Manual mode — and Linear.
+Only the binding, plus optional team and project context, lives in the beads field; there is no `review_round` counter and no `attempt_log` in Manual mode.
 
 ## Optional beads-id traceability map
 
