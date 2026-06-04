@@ -1,11 +1,12 @@
 ---
 name: openspec-linear-sync
-description: "linear-cli-driven Linear-to-OpenSpec lifecycle sync overlay that binds one Linear story to one OpenSpec change, mirrors lifecycle phase to Linear state, and runs the archive-time document upsert. Load when binding a Linear story to an OpenSpec change, mirroring lifecycle phase to Linear state, or running the archive-time document upsert."
+description: "linear-cli-driven Linear-to-OpenSpec lifecycle sync overlay that binds one Linear story per OpenSpec change, supports concurrent changes across multiple Linear teams and projects in one monorepo via the openspec/linear.yaml registry, mirrors lifecycle phase to Linear state, and runs the archive-time document upsert. Load when binding a Linear story to an OpenSpec change, mirroring lifecycle phase to Linear state, or running the archive-time document upsert."
 ---
 
 # OpenSpec-Linear sync overlay
 
-This overlay binds a single Linear story to a single OpenSpec change and projects the change's lifecycle phase onto the team-visible Linear board.
+This overlay binds one Linear story per OpenSpec change and projects each change's lifecycle phase onto the team-visible Linear board.
+A single monorepo runs N concurrent changes whose stories span different Linear teams and projects, enumerated by the openspec/linear.yaml registry (workspace, teams, projects, and per-project documents); each change's per-issue binding and D10 sync ledger live in its own proposal.md frontmatter.
 It is a thin link-and-sync policy layer over the OpenSpec change lifecycle: OpenSpec and the superpowers-bridge own the spec-first "how", Linear owns the business "what" and the stakeholder status surface, and `openspec/specs/` is the single source of truth.
 The overlay never replaces any OpenSpec skill; layer it around the base `openspec-*` and `opsx:*` skills for normal artifact generation, task execution, and archive mechanics.
 
@@ -34,9 +35,9 @@ The Linear workspace safety gate is the hardest constraint and is owned by the p
 
 | Reference | Read it for |
 |---|---|
-| references/lifecycle.md | The four forward transitions, the In Review re-queue, the Canceled/Duplicate terminals, the invariants, the local sync ledger (idempotency, the strictly-behind rule, state-by-name resolution, graceful degradation, the bounded-retries counter, the attempt log), and the re-queue resume reconciliation. |
-| references/linear-cli-mapping.md | The per-operation linear-cli verb mapping that replaces every MCP call, the archive-time document UPSERT recipe, the narrow `linear api` GraphQL fallback, and a full end-to-end worked example tracing one HIL issue Backlog to Done with literal commands. |
-| references/config-and-frontmatter.md | The two-location story-to-change binding (openspec/linear.yaml store plus proposal.md `linear_story_*` frontmatter) with write-before-read ordering, the openspec/linear.yaml schema, the Manual-mode beads-field binding, the optional beads-id traceability map, and the ownership-boundary doctrine. |
+| references/lifecycle.md | The four forward transitions, the In Review re-queue, the Canceled/Duplicate terminals, the invariants, the per-change D10 sync ledger in proposal.md frontmatter (idempotency, the strictly-behind rule, team-scoped state-by-name resolution, graceful degradation, the bounded-retries counter, the attempt log), and the re-queue resume reconciliation. |
+| references/linear-cli-mapping.md | The per-operation linear-cli verb mapping that replaces every MCP call, registry-populating setup and multi-team/multi-project selection, the archive-time document UPSERT recipe resolved against the change's project, the narrow `linear api` GraphQL fallback, and a full end-to-end worked example tracing one HIL issue Backlog to Done with literal commands. |
+| references/config-and-frontmatter.md | The two-location story-to-change binding (the openspec/linear.yaml monorepo registry of workspace, teams, projects, and per-project documents plus the per-change proposal.md frontmatter binding and D10 ledger) with write-before-read ordering, the registry schema, a legacy-to-registry migration note, the Manual-mode beads-field binding, the optional beads-id traceability map, and the ownership-boundary doctrine. |
 
 ## Phase summary
 
