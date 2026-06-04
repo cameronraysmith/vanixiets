@@ -42,9 +42,10 @@ The overlay SHALL hold the invariants that the issue is never moved to Done befo
 
 ### Requirement: Local sync ledger as authoritative current-phase signal
 
-The sync overlay SHALL maintain a minimal local sync ledger adjacent to the bridge, persisted as fields in openspec/linear.yaml, recording last_synced_state, last_synced_at, a review-round counter, and a short attempt log.
+The sync overlay SHALL maintain a minimal per-change sync ledger, persisted as fields in the change's proposal.md frontmatter, recording last_synced_state, last_synced_at, a review_round counter, and a short attempt_log, with an optional per-change max_review_rounds override; openspec/linear.yaml is reserved for the monorepo registry (workspace, defaults, teams, projects) and holds no per-issue binding and no ledger.
+This ledger is HIL/AFK-only: Manual mode has no proposal.md and therefore carries no D10 ledger, its lifecycle status being human-managed via the beads loop and Linear, with only the binding in a beads field.
 Local milestone-file existence (proposal.md, the first tasks.md checked checkbox, verify.md, the archived change directory) SHALL be the authoritative current-phase signal, with the Linear state treated as a best-effort projection that a catch-up reconciliation step corrects rather than trusting.
-The overlay SHALL fire each transition only when the resolved Linear state is strictly behind the local milestone (a no-op if already at or past the target), post each milestone comment at most once per crossing, increment the review-round counter once per re-queue and reset it on archive, and record dropped best-effort writes in the attempt log so a never-attempted transition is distinguishable from a failed one.
+The overlay SHALL fire each transition only when the resolved Linear state is strictly behind the local milestone (a no-op if already at or past the target), post each milestone comment at most once per crossing, increment the review_round counter once per re-queue and reset it on archive, and record dropped best-effort writes in the attempt_log so a never-attempted transition is distinguishable from a failed one.
 
 #### Scenario: local milestone files are authoritative
 - **WHEN** the local phase and the Linear state disagree
@@ -56,21 +57,22 @@ The overlay SHALL fire each transition only when the resolved Linear state is st
 
 #### Scenario: bounded-retries counter lives locally
 - **WHEN** a re-queue occurs
-- **THEN** the review-round counter in openspec/linear.yaml increments once per In Review to In Progress crossing, resets when the change archives, and on exhaustion posts a single escalation comment to the human PM layer and stops firing automatic re-queues
+- **THEN** the review_round counter in the change's proposal.md frontmatter increments once per In Review to In Progress crossing, resets when the change archives, and on exhaustion against its ceiling (the per-change max_review_rounds override or, by default, linear.yaml defaults.max_review_rounds) posts a single escalation comment to the human PM layer and stops firing automatic re-queues
 
 #### Scenario: attempt log distinguishes dropped from failed writes
 - **WHEN** a best-effort Linear write is dropped
 - **THEN** the attempt log records it so a human can see Linear is stale and tell a never-attempted transition from a failed one
 
-### Requirement: Two-location story-to-change binding with write-before-read ordering
+### Requirement: Single-location frontmatter binding that resolves against the registry
 
-The sync overlay SHALL be the write-owner of the primary cross-reference binding from Linear story to OpenSpec change, persisted in two locations: openspec/linear.yaml and the proposal.md linear_story_* frontmatter.
-At the Backlog to Todo bind it SHALL write linear_story_* into proposal.md frontmatter and write or update openspec/linear.yaml at the same bind, and SHALL write the documents map at archive.
+The sync overlay SHALL be the write-owner of the primary cross-reference binding from Linear story to OpenSpec change, persisted in a single location: the proposal.md frontmatter, which carries linear_story_* plus linear_team and linear_project.
+At the Backlog to Todo bind it SHALL write linear_story_*, linear_team, and linear_project into proposal.md frontmatter and SHALL resolve the chosen team and project against the openspec/linear.yaml registry rather than writing the binding into the registry; the binding lives only in frontmatter.
+At archive it SHALL UPSERT the per-project archive document into projects.<slug>.archive_documents.<capability>, resolving <slug> from the change's linear_project; there is no flat documents map.
 Because apply reads the frontmatter, the write-before-read ordering is load-bearing and the bind step SHALL precede any apply read; in Manual mode, where there is no proposal.md, the Linear binding SHALL live in a beads issue field instead.
 
-#### Scenario: bind writes both locations
+#### Scenario: bind writes frontmatter and resolves the registry
 - **WHEN** the Backlog to Todo bind occurs
-- **THEN** linear_story_* is written into proposal.md frontmatter and openspec/linear.yaml is written or updated at the same bind
+- **THEN** linear_story_*, linear_team, and linear_project are written into proposal.md frontmatter only, and the chosen team and project are resolved against the openspec/linear.yaml registry rather than the binding being written into it
 
 #### Scenario: bind precedes apply read
 - **WHEN** apply reads the linear_story_* frontmatter
@@ -78,17 +80,17 @@ Because apply reads the frontmatter, the write-before-read ordering is load-bear
 
 #### Scenario: Manual mode binds via a beads field
 - **WHEN** the issue is in Manual mode and has no proposal.md
-- **THEN** the Linear binding lives in a beads issue field rather than in proposal.md frontmatter or openspec/linear.yaml
+- **THEN** the Linear binding lives in a beads issue field rather than in proposal.md frontmatter
 
 ### Requirement: Archive-time document UPSERT with mirroring
 
-The sync overlay SHALL run an archive-time document UPSERT entirely via the CLI: linear document list --project <p> --json to find the document by the deterministic title OpenSpec: <capability>, then linear document update <id> --title <t> --content-file <f> if matched, else linear document create --project <p> --title <t> --content-file <f> so the document is always created already-parented.
+The sync overlay SHALL run an archive-time document UPSERT entirely via the CLI: it SHALL resolve <project> from the change's linear_project frontmatter (whose slug keys projects.<slug>.archive_documents.<capability> in the registry), then run linear document list --project <p> --json to find the document by the deterministic title OpenSpec: <capability>, then linear document update <id> --title <t> --content-file <f> if matched, else linear document create --project <p> --title <t> --content-file <f> so the document is always created already-parented, writing the returned id back to projects.<slug>.archive_documents.<capability>.id.
 The document body SHALL be a disposable mirror fully replaced on each archive so re-archives update rather than duplicate, and archive-time SHALL be the only time spec content is mirrored to Linear.
 The overlay SHALL never copy design.md or tasks.md to Linear.
 
 #### Scenario: UPSERT matches by deterministic title
 - **WHEN** the archive-time UPSERT runs
-- **THEN** it lists documents by project, matches the title OpenSpec: <capability>, and updates the matched document or creates a new already-parented one
+- **THEN** it resolves the project from the change's linear_project, lists documents by that project, matches the title OpenSpec: <capability>, updates the matched document or creates a new already-parented one, and writes the resulting id back to projects.<slug>.archive_documents.<capability>.id
 
 #### Scenario: re-archive updates rather than duplicates
 - **WHEN** a change is re-archived

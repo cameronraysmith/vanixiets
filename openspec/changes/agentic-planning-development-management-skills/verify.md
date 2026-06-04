@@ -73,7 +73,7 @@ Scenarios of `specs/*.md`:
 | Compose-by-delegation (D4) | router never re-implements orient/plan/review/checkpoint; Manual pass-through to /session-orient; session-advisor referenced not duplicated | agentic-workflow-routing "Compose by delegation, never re-implement" | none |
 | Re-queue + bounded retries (D11) | shared re-queue, default-to-original-mode, bounded-retries termination | agentic-workflow-routing "Shared re-queue with bounded-retries termination guarantee" | none |
 | linear-cli-exclusive + UPSERT | drive Linear via linear-cli; archive-time document UPSERT | openspec-linear-sync "Drive Linear exclusively through linear-cli" + "Archive-time document UPSERT with mirroring" | none |
-| Local sync ledger (D10) | openspec/linear.yaml last_synced_state/_at + review-round counter + attempt log | openspec-linear-sync "Local sync ledger as authoritative current-phase signal" | none |
+| Local sync ledger (D10) | per-change proposal.md frontmatter last_synced_state/_at + review_round counter + attempt_log (HIL/AFK-only), with openspec/linear.yaml reserved for the monorepo registry (workspace, defaults, teams, projects) | openspec-linear-sync "Local sync ledger as authoritative current-phase signal" | none |
 | Workspace safety gate | `linear auth whoami` keyed on confirmed credentials + explicit `--workspace`, never LINEAR_WORKSPACE | project-management-hub "Linear workspace safety gate keyed on confirmed credentials" | none |
 | Flat four reference areas | linear/github/beads/method one-level prefixes, no two-level nesting | project-management-hub "Four flat one-level reference areas" | none |
 

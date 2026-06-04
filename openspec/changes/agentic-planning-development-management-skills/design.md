@@ -16,8 +16,8 @@ This change is itself built in HIL mode through the superpowers-bridge as a dogf
 **Goals:**
 
 Establish three skills that compose existing surfaces by delegation: a Claude-Code-only state-machine router, an agent-general project-management hub, and an agent-general linear-cli-driven Linear↔OpenSpec sync overlay.
-Make the Linear-story↔OpenSpec-change binding the primary cross-reference, stored in two locations (openspec/linear.yaml and proposal.md frontmatter), and bind technical status roll-up to four forward lifecycle transitions plus a re-queue and two terminal exits.
-Specify a minimal local sync ledger adjacent to the bridge as the authoritative current-phase signal and the home of idempotency, the bounded-retries counter, and a best-effort-write attempt log.
+Make the Linear-story↔OpenSpec-change binding the primary cross-reference, stored in the change's proposal.md frontmatter (linear_story_*, linear_team, linear_project) and resolved against the openspec/linear.yaml monorepo registry, and bind technical status roll-up to four forward lifecycle transitions plus a re-queue and two terminal exits.
+Specify a minimal per-change sync ledger in proposal.md frontmatter (HIL/AFK-only) as the authoritative current-phase signal and the home of idempotency, the bounded-retries counter, and a best-effort-write attempt log.
 Encode the Linear workspace safety gate as the hardest constraint, keyed on confirmed credentials rather than on LINEAR_WORKSPACE.
 Give the Linear-canonical board a documented termination guarantee via a bounded-retries policy escalating to the human PM layer.
 
@@ -69,7 +69,7 @@ src/core/openspec-linear-sync/
   references/
     lifecycle.md                    (four forward transitions + re-queue + terminal exits, gates, invariants, archive ordering)
     linear-cli-mapping.md           (per-phase verb mapping; document UPSERT recipe; api fallback; end-to-end worked example)
-    config-and-frontmatter.md       (openspec/linear.yaml sync ledger; proposal.md linear_story_* frontmatter)
+    config-and-frontmatter.md       (openspec/linear.yaml monorepo registry; proposal.md linear_story_*/linear_team/linear_project + per-change D10 sync ledger)
 ```
 
 Each SKILL.md is committed to the lean-index plus Contents-table form mirroring preferences-git-version-control, kept under roughly 350 lines, with operational detail pushed to the references leaves.
@@ -99,23 +99,24 @@ A concrete per-mode cross-reference mapping pins the binding locations:
 
 | Execution mode | Linear story id | OpenSpec change id | beads issue/epic id | superpowers plan path |
 |---|---|---|---|---|
-| HIL | proposal.md `linear_story_*` frontmatter + openspec/linear.yaml | the change dir name | optional traceability map in beads field | n/a (tasks.md is the ledger) |
-| AFK | proposal.md `linear_story_*` frontmatter + openspec/linear.yaml | the change dir name | optional traceability map in beads field | the workflow/superpowers plan file (checkboxes authoritative) |
+| HIL | proposal.md `linear_story_*`/`linear_team`/`linear_project` frontmatter (resolved against the linear.yaml registry) | the change dir name | optional traceability map in beads field | n/a (tasks.md is the ledger) |
+| AFK | proposal.md `linear_story_*`/`linear_team`/`linear_project` frontmatter (resolved against the linear.yaml registry) | the change dir name | optional traceability map in beads field | the workflow/superpowers plan file (checkboxes authoritative) |
 | Manual | a beads issue field (no proposal.md to hold frontmatter) | n/a (no OpenSpec change) | the beads issue/epic (authoritative ledger) | n/a |
 
-Manual mode has no proposal.md and therefore no place to hold `linear_story_*` frontmatter, so its Linear binding lives in a beads issue field; the two-location frontmatter/linear.yaml mechanism is HIL/AFK-only.
+Manual mode has no proposal.md and therefore no place to hold `linear_story_*` frontmatter, so its Linear binding lives in a beads issue field; the frontmatter binding plus the per-change D10 ledger are HIL/AFK-only, while the linear.yaml registry stays a shared monorepo index resolved across all modes.
 
 Rationale: resolves the issue/task duplication hazard by ownership rather than by mirroring any layer into another.
 Alternatives considered: beads as the single atomic-task owner with Linear holding only coarse status (the research note's beads-centric recommendation, explicitly superseded by the ownership model); bidirectional Linear↔local sync (rejected — Linear writes are best-effort and non-blocking, local stays authoritative for the "how").
 
-### D3: primary binding is Linear story ↔ OpenSpec change, stored in two locations
+### D3: primary binding is Linear story ↔ OpenSpec change, in proposal.md frontmatter resolved against the registry
 
-Choice: the primary cross-reference binding is Linear-story to OpenSpec-change, persisted in openspec/linear.yaml and in the proposal.md linear_story_* frontmatter (the binding key read by apply).
-The sync skill is the write-owner of both locations: at the Backlog → Todo bind it writes `linear_story_*` into proposal.md frontmatter and writes/updates openspec/linear.yaml at the same bind; the documents map is written at archive.
+Choice: the primary cross-reference binding is Linear-story to OpenSpec-change, persisted in the proposal.md frontmatter as `linear_story_*` plus `linear_team` and `linear_project` (the binding keys read by apply).
+The sync skill is the write-owner of this binding: at the Backlog → Todo bind it writes `linear_story_*`, `linear_team`, and `linear_project` into proposal.md frontmatter and resolves the chosen team and project against the openspec/linear.yaml monorepo registry (workspace, defaults, teams, projects) rather than writing the binding into it.
+The registry holds no per-issue binding and no flat documents map; per-project archive documents are UPSERTed into projects.<slug>.archive_documents.<capability> at archive, with <slug> resolved from `linear_project`.
 apply READS the frontmatter, so write-before-read ordering is load-bearing and the sync skill's bind step must precede any apply read.
 The beads-id binding applies only when a beads drill-down is actually used or in Manual mode.
 
-Rationale: a stable, agent-readable two-location link survives across the lifecycle and lets apply read the bound story without re-querying Linear.
+Rationale: a stable, agent-readable frontmatter link survives across the lifecycle and lets apply read the bound story without re-querying Linear, while the registry stays a normalized monorepo index that many concurrent changes across different teams and projects resolve against.
 Alternatives considered: a branch-name-as-binding convention keyed to beads ids (CCPM prior art; rejected as the primary binding because Linear and OpenSpec own the work, though it remains available for the beads drill-down case).
 
 ### D4: router composes by delegation, never re-implements
@@ -231,8 +232,10 @@ Alternatives considered: adopting CCPM's .claude/prds + .claude/epics filesystem
 
 ### D10: the local sync ledger as authoritative current-phase signal and idempotency home
 
-Choice: specify a minimal local sync ledger adjacent to the bridge, persisted as fields in openspec/linear.yaml, recording `last_synced_state`, `last_synced_at`, a review-round counter, and a short attempt log.
+Choice: specify a minimal per-change sync ledger, persisted as fields in the change's proposal.md frontmatter, recording `last_synced_state`, `last_synced_at`, a `review_round` counter, and a short `attempt_log`, with an optional per-change `max_review_rounds` override.
 This single mechanism closes detection, idempotency, the bounded-retries counter, and observability.
+The ledger is HIL/AFK-only: Manual mode has no proposal.md and therefore carries no D10 ledger — its lifecycle status is human-managed via the beads loop and Linear, with only the binding in a beads field.
+openspec/linear.yaml is reserved for the monorepo registry (workspace, defaults, teams, projects, per-project archive documents) and holds no per-issue binding and no ledger, because a single repository's changes bind to issues across many Linear teams and projects with several changes running in parallel, so the ledger cannot live in one flat top-level block.
 
 Authoritative current-phase signal: local milestone-file existence (proposal.md / first tasks.md `- [x]` / verify.md / the archived change directory) is the authoritative current-phase signal.
 The Linear state is a best-effort projection; a catch-up reconciliation step computes local phase from the milestone files, reads the Linear state, and if they disagree fires the catch-up transition rather than assuming Linear is current.
@@ -240,7 +243,7 @@ The Linear state is a best-effort projection; a catch-up reconciliation step com
 Idempotency: each transition fires only when the resolved Linear state is strictly behind the local milestone (a no-op if already at or past the target), and each milestone comment posts at most once per crossing.
 apply is routinely re-invoked (the workflow re-runs apply and verify), so idempotency is what prevents re-runs from re-firing transitions and spamming the team-visible comment surface; the openspec-linearized guarded form ("if the issue is in Todo, transition it to In Progress") is the primitive this generalizes.
 
-Bounded-retries counter: stored in openspec/linear.yaml (Linear writes are best-effort, so the counter must live locally), defaulting to a small max (recommended default 3) with a documented configurability note.
+Bounded-retries counter: stored as `review_round` in the change's proposal.md frontmatter (Linear writes are best-effort, so the counter must live locally), with its default ceiling in openspec/linear.yaml `defaults.max_review_rounds` (recommended default 3) which a change may override via its own frontmatter `max_review_rounds`.
 It increments once per re-queue (one per In Review → In Progress crossing), resets when the change archives (forward progress past In Review), and on exhaustion the mechanical escalation action is to post a single escalation comment to the human PM layer and stop firing automatic re-queues, leaving the issue parked for human decision.
 
 Attempt log: the ledger records dropped best-effort writes so the system can distinguish a never-attempted transition from a failed one, and a human can see that Linear is stale; the only other transition record is the Linear comment, which is exactly the surface that fails under the best-effort write model.
