@@ -198,6 +198,17 @@ artifacts:
     description: Post-implementation verification against specs, design, and tasks
     template: verify.md
     instruction: |
+      PRECHECK — planning scope guard:
+      Run `openspec status --change "<change-name>" --json` and read
+      `.actionContext.mode`. If it is "workspace-planning", explain that
+      full workspace implementation verification is not supported by this
+      governance slice and STOP. Treat linked repos / folders as read-only
+      context; do not infer repo-local implementation ownership or edit
+      linked repos. Only proceed when the mode is "repo-local".
+
+        mode=$(openspec status --change "<change-name>" --json | jq -r '.actionContext.mode')
+        [ "$mode" = "repo-local" ] || { echo "workspace-planning: verify not supported in this slice"; }
+
       PRECHECK — implementation evidence:
       Before producing verify.md, run BOTH commands. If either
       returns 0, STOP and tell the user that apply phase has not
@@ -206,8 +217,10 @@ artifacts:
       1. Commit evidence (must return > 0):
          git log --oneline $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD origin/master 2>/dev/null)..HEAD | wc -l
 
-      2. Task progress (must return > 0):
-         grep -c '^- \[x\]' openspec/changes/<change-name>/tasks.md
+      2. Task progress (must return > 0). Resolve the tasks file from the
+         CLI (do not hardcode the repo-local change path):
+         tasks_file=$(openspec status --change "<change-name>" --json | jq -r '.artifactPaths.tasks.existingOutputPaths[0] // empty')
+         [ -n "$tasks_file" ] && grep -c '^- \[x\]' "$tasks_file"
 
       Only after BOTH return positive numbers, proceed to invoke
       the verification skill below.
@@ -234,10 +247,14 @@ artifacts:
          (e.g. manual / out-of-scope / blocked) and whether it blocks
          archive.
 
-      3. **Delta spec sync state**: For each directory under
-         `openspec/changes/<name>/specs/`, compare against the
-         corresponding `openspec/specs/<capability>/spec.md` and
-         record one of:
+      3. **Delta spec sync state**: Resolve the delta spec files from
+         the CLI rather than hardcoding the repo-local change path:
+           openspec status --change "<change-name>" --json | jq -r '.artifactPaths.specs.existingOutputPaths[]'
+         (`artifactPaths.specs.existingOutputPaths` is the single-call
+         source; `contextFiles.specs` exists only on
+         `openspec instructions apply --json`, so prefer status here.)
+         For each delta spec file, compare against the corresponding
+         capability entry in the main specs and record one of:
          - Already synced
          - Needs sync (list the capabilities)
          - N/A (no delta specs produced)
@@ -255,16 +272,19 @@ artifacts:
          For projects using superpowers-bridge, design output
          should never land in `docs/superpowers/specs/` — the
          brainstorm artifact's output redirection (see this
-         schema's brainstorm.instruction) routes it to
-         `openspec/changes/<name>/brainstorm.md`. Run:
+         schema's brainstorm.instruction) routes it to the change's
+         resolved brainstorm.md (the `brainstorm` entry in
+         `artifactPaths` from `openspec status --change "<change-name>"
+         --json`, under the CLI-resolved `changeRoot`). Run:
 
            ls docs/superpowers/specs/*.md 2>/dev/null
 
          If any files exist, record a WARNING: "Front-door routing
          leak — design output found at docs/superpowers/specs/...;
-         these belong in openspec/changes/<name>/brainstorm.md or
-         design.md. Move/delete after confirming content is captured
-         in the change directory."
+         these belong in the change's brainstorm.md (resolved via
+         `artifactPaths.brainstorm`) or design.md. Move/delete after
+         confirming content is captured in the change directory
+         (`changeRoot` from the status JSON)."
 
          Non-blocking — adopters may have legitimate non-schema use
          of that directory predating schema install. Surfaces the
@@ -306,18 +326,32 @@ artifacts:
     description: Evidence-first retrospective of completed change
     template: retrospective.md
     instruction: |
+      PRECHECK — planning scope guard:
+      Run `openspec status --change "<change-name>" --json` and read
+      `.actionContext.mode`. If it is "workspace-planning", explain that
+      this governance slice is repo-local only and STOP — treat linked
+      repos / folders as read-only context and do not edit them. Only
+      proceed when the mode is "repo-local".
+
+        mode=$(openspec status --change "<change-name>" --json | jq -r '.actionContext.mode')
+        [ "$mode" = "repo-local" ] || { echo "workspace-planning: retrospective not supported in this slice"; }
+
       PRECHECK — verify completion evidence:
       Before producing retrospective.md, run these commands. If
       either fails, STOP and tell the user verify must pass first.
+      Resolve the verify.md path from the CLI (do not hardcode the
+      repo-local change path):
+
+         verify_file=$(openspec status --change "<change-name>" --json | jq -r '.artifactPaths.verify.existingOutputPaths[0] // empty')
 
       1. verify.md exists:
-         test -f openspec/changes/<change-name>/verify.md
+         test -n "$verify_file" && test -f "$verify_file"
 
       2. verify.md's Overall Decision is NOT marked as FAIL.
          The verify.md template has 3 mutually-exclusive checkboxes
          in its "Overall Decision" section: "(pass) PASS", "(warn) PASS WITH
          WARNINGS", "(fail) FAIL". Only "(fail) FAIL" being checked is blocking:
-         ! grep -q '^- \[x\] (fail) FAIL' openspec/changes/<change-name>/verify.md
+         test -n "$verify_file" && ! grep -q '^- \[x\] (fail) FAIL' "$verify_file"
 
       Only after both succeed, proceed.
 
@@ -463,6 +497,19 @@ apply:
   instruction: |
     Before implementing, set up an isolated workspace and executor:
 
+    PRECHECK — planning scope guard (run first):
+    Run `openspec status --change "<change-name>" --json` and read
+    `.actionContext.mode` and `.actionContext.allowedEditRoots`. If the
+    mode is "workspace-planning" and `allowedEditRoots` is empty, this
+    governance slice does not support full workspace apply: treat linked
+    repos and folders as read-only context, ask the user to select an
+    affected area through an explicit implementation workflow, and STOP
+    before editing files, creating worktrees, or archiving. Only proceed
+    when the mode is "repo-local".
+
+      mode=$(openspec status --change "<change-name>" --json | jq -r '.actionContext.mode')
+      [ "$mode" = "repo-local" ] || { echo "workspace-planning: apply not supported in this slice"; }
+
     0. **Pre-flight — verify required Superpowers skills**:
 
        This schema's apply phase requires the following skills.
@@ -544,11 +591,14 @@ apply:
     5. **Archive (sync spec delta + move folder)**:
 
        After retrospective.md is written, run `openspec archive -y`
-       (or invoke `/opsx:archive`). This:
-       - syncs delta specs from `openspec/changes/<name>/specs/`
-         into `openspec/specs/<capability>/spec.md`
-       - moves the change folder to
-         `openspec/changes/archive/YYYY-MM-DD-<name>/`
+       (or invoke `/opsx:archive`). The CLI resolves all paths itself;
+       in repo-local mode this:
+       - syncs the delta specs (the files reported by
+         `artifactPaths.specs.existingOutputPaths`) into the
+         corresponding main capability specs
+       - moves the change folder (`changeRoot`) under the archive
+         directory derived from `planningHome.changesDir`
+         (`<planningHome.changesDir>/archive/YYYY-MM-DD-<name>/`)
 
        The PR diff after archive contains the COMPLETE cycle state:
        all 8 artifacts done, spec synced into main specs, change

@@ -1,4 +1,4 @@
-# User-level install of the vendored OpenSpec 1.3.1 Claude assets:
+# User-level install of the vendored OpenSpec 1.4.1 Claude assets:
 #   - 11 skills (assets/skills/openspec-*/SKILL.md) into all agent destinations
 #   - 11 opsx slash commands (assets/commands/opsx/*.md) for claude-code
 #   - the superpowers-bridge schema bundle, delivered user-global
@@ -140,7 +140,7 @@
             which writes solely to add a missing telemetry.noticeSeen/anonymousId and
             only when telemetry is enabled; both writes are wrapped in try/catch, so a
             failed write on a read-only file is swallowed and the command still
-            succeeds (verified with @fission-ai/openspec@1.3.1). Both telemetry fields
+            succeeds (verified with @fission-ai/openspec@1.4.1). Both telemetry fields
             are pre-set so no write is ever attempted.
           '';
         };

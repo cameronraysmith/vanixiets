@@ -2,7 +2,7 @@
 
 [![Schema Structure](https://github.com/JiangWay/openspec-schemas/actions/workflows/validate-schemas.yml/badge.svg?branch=main)](https://github.com/JiangWay/openspec-schemas/actions/workflows/validate-schemas.yml)
 [![Upstream Drift](https://img.shields.io/github/issues-search/JiangWay/openspec-schemas?query=is%3Aopen%20label%3Aupstream-version-check&label=Upstream%20Drift&color=yellow)](https://github.com/JiangWay/openspec-schemas/issues?q=is%3Aopen+label%3Aupstream-version-check)
-[![OpenSpec baseline](https://img.shields.io/badge/OpenSpec_baseline-1.3.1-0277bd)](#compatibility)
+[![OpenSpec baseline](https://img.shields.io/badge/OpenSpec_baseline-1.4.1-0277bd)](#compatibility)
 [![Superpowers baseline](https://img.shields.io/badge/Superpowers_baseline-v5.1.0-0277bd)](#compatibility)
 
 > Bridges [OpenSpec](https://github.com/Fission-AI/OpenSpec)'s artifact governance (the **what**) with [obra/superpowers](https://github.com/obra/superpowers) execution skills (the **how**) into a single workflow. Adds an evidence-first `retrospective` artifact filling a gap Superpowers does not natively cover.
@@ -445,12 +445,12 @@ This schema requires a subagent-capable platform (Claude Code, Codex, etc.). The
 
 ### 5. Evidence-based PRECHECK for verify and retrospective (Layer 2 capability detection)
 
-Each timing-sensitive artifact runs concrete shell evidence checks at the start of its instruction:
+Each timing-sensitive artifact runs concrete shell evidence checks at the start of its instruction. As of the OpenSpec 1.4.1 migration, the artifact file paths are resolved from the CLI (`openspec status --change "<name>" --json` → `artifactPaths.<id>.existingOutputPaths`) rather than hardcoded under `openspec/changes/<name>/`:
 
-- **verify**: `git log <base>..HEAD | wc -l > 0` AND `grep -c '^- \[x\]' tasks.md > 0`
-- **retrospective**: `test -f verify.md` AND `! grep -q '^- \[x\] (fail) FAIL' verify.md`
+- **verify**: `git log <base>..HEAD | wc -l > 0` AND `grep -c '^- \[x\]' "$tasks_file" > 0` (where `tasks_file` = `.artifactPaths.tasks.existingOutputPaths[0]`)
+- **retrospective**: `test -f "$verify_file"` AND `! grep -q '^- \[x\] (fail) FAIL' "$verify_file"` (where `verify_file` = `.artifactPaths.verify.existingOutputPaths[0]`)
 
-The LLM does not need to interpret timing prose — it runs commands and reads results. This is layer 2 of concern #1 / mitigation for concern #2.
+Each of apply / verify / retrospective also runs a `actionContext.mode == "workspace-planning"` scope guard first (STOP and treat linked repos as read-only — this governance slice is repo-local only). The LLM does not need to interpret timing prose — it runs commands and reads results. This is layer 2 of concern #1 / mitigation for concern #2.
 
 ### 6. verify and retrospective are time-mismatched artifacts (known limitation)
 
@@ -479,7 +479,16 @@ Current bundle release: **`1.0.0`** (git tag `v1.0.0`; see [VERSION](./VERSION))
 
 | superpowers-bridge | OpenSpec CLI | Superpowers plugin | Baseline as of |
 |---|---|---|---|
+| v1 | `1.4.1` | `v5.1.0` | 2026-06-05 |
 | v1 | `1.3.1` | `v5.1.0` | 2026-05-11 |
+
+> **1.4.1 migration note**: the bundle's executed-shell PRECHECKs were migrated off the
+> pre-1.4.1 hardcoded `openspec/changes/<name>/...` repo-local path convention to OpenSpec
+> 1.4.1's CLI-resolved paths (`openspec status --change "<name>" --json` → `artifactPaths.<id>.existingOutputPaths`,
+> `planningHome.changesDir`, `changeRoot`), and a `actionContext.mode == "workspace-planning"`
+> scope guard was added to the apply / verify / retrospective entry points (treat linked repos
+> as read-only; this governance slice is repo-local only). The `(fail) FAIL` decision-checkbox
+> vocabulary is unchanged.
 
 ### How this is checked
 

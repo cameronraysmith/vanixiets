@@ -27,7 +27,7 @@ assets_dir="${repo_root}/modules/home/ai/openspec/assets"
 
 # the pinned openspec version is injected by the flake app via runtimeEnv; when
 # running this script standalone, set it explicitly, e.g.
-#   OPENSPEC_VERSION=1.3.1 bash modules/apps/openspec-refresh-vendored-artifacts.sh
+#   OPENSPEC_VERSION=1.4.1 bash modules/apps/openspec-refresh-vendored-artifacts.sh
 ver="${OPENSPEC_VERSION:?set OPENSPEC_VERSION (injected by the flake app)}"
 echo "openspec version: ${ver}"
 

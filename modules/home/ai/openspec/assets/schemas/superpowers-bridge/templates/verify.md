@@ -42,8 +42,9 @@ If any items fail, list their id and issues:
 
 ## 3. Delta Spec Sync State
 
-For each capability directory under `openspec/changes/<name>/specs/`, compare against
-`openspec/specs/<capability>/spec.md`:
+For each delta spec file reported by the CLI
+(`openspec status --change "<change-name>" --json | jq -r '.artifactPaths.specs.existingOutputPaths[]'`),
+compare against the corresponding main capability spec:
 
 | Capability | Sync status | Notes |
 |---|---|---|
@@ -78,7 +79,8 @@ Scenarios of `specs/*.md`:
 ## 6. Front-Door Routing Leak Detector (warning, non-blocking)
 
 Design output should not land in `docs/superpowers/specs/` (the brainstorm artifact's
-output redirection routes it to `openspec/changes/<name>/brainstorm.md`).
+output redirection routes it to the change's resolved brainstorm.md — the `brainstorm`
+entry in `artifactPaths` from `openspec status --change "<change-name>" --json`).
 
 Detect:
 
@@ -95,7 +97,8 @@ ls docs/superpowers/specs/*.md 2>/dev/null
 | — | — | — |
 
 > Does not block archive. Leaks produced by a new schema-installed cycle should be moved into
-> `openspec/changes/<name>/brainstorm.md` or `design.md`, then the original file deleted.
+> the change's brainstorm.md (resolved via `artifactPaths.brainstorm`) or `design.md`, then the
+> original file deleted.
 
 ---
 

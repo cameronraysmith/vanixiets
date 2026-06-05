@@ -99,8 +99,10 @@ Write each candidate as a `- [ ]` checklist item:
 An unchecked `- [ ]` means the candidate has not yet been promoted — it can be carried to the next cycle's retro for re-evaluation,
 or kept as a cross-cycle observation point.
 
-> **Carry-forward mechanism**: when writing the retro for the next cycle, you can run
-> `grep -A 5 '^- \[ \]' openspec/changes/archive/*/retrospective.md` to pull out
+> **Carry-forward mechanism**: when writing the retro for the next cycle, resolve the archive
+> directory from the CLI rather than hardcoding the repo-local change path:
+> `changes_dir=$(openspec status --change "<change-name>" --json | jq -r '.planningHome.changesDir')`,
+> then run `grep -A 5 '^- \[ \]' "$changes_dir"/archive/*/retrospective.md` to pull out
 > previous unchecked candidates, then decide case by case whether to carry each forward into this cycle's §6, promote it
 > in place, or mark it stale and stop tracking.
 

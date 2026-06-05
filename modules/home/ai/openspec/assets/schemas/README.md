@@ -7,7 +7,7 @@ Each bundle is a self-contained schema directory that the OpenSpec CLI selects p
 
 The `superpowers-bridge` bundle is vendored from github.com/JiangWay/openspec-schemas (the `superpowers-bridge/` bundle within that repository).
 It is pinned to commit 0366ed5; no git tag is pushed upstream despite the bundle's `VERSION` file reading 1.0.0.
-The bundle is baselined against OpenSpec 1.3.1 and the superpowers plugin v5.1.0, which matches this repository's environment.
+The bundle is baselined against OpenSpec 1.4.1 and the superpowers plugin v5.1.0, which matches this repository's environment.
 
 The two `*.zh-TW.md` Traditional-Chinese localization files (`README.zh-TW.md` and `templates/adopters/CLAUDE.md.fragment.zh-TW.md`) were excluded from the vendored copy.
 They are not consumed by the OpenSpec CLI, which reads only `schema.yaml` and `templates/*.md`.

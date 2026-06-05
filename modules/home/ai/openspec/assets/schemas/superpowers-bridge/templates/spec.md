@@ -3,8 +3,10 @@ Delta spec template for a change.
 
 This template demonstrates the four delta section types; use whichever the change actually needs:
 - ADDED / MODIFIED / REMOVED / RENAMED
-File name and location: openspec/changes/<change-name>/specs/<capability>/spec.md
-(`<capability>` matches the openspec/specs/<capability>/ directory name)
+File name and location: resolve via
+`openspec instructions specs --change "<change-name>" --json | jq -r '.resolvedOutputPath'`
+(defaults to `<changeRoot>/specs/<capability>/spec.md` under a repo-mode planning home;
+`<capability>` matches the corresponding main capability spec directory name).
 
 Hard formatting rules (OpenSpec will validate these):
 - The Requirement sentence MUST contain `SHALL` or `MUST`
