@@ -252,8 +252,10 @@
                   "Read"
                   "Grep"
                   "Glob"
-                  # mcps
-                  "mcp__*"
+                  # MCP tools are governed by defaultMode = "auto" (classifier-
+                  # gated). A blanket `mcp__*` allow is no longer valid: allow
+                  # rules permit a glob only in the tool position after a
+                  # literal mcp__<server>__ prefix (deny/ask allow it anywhere).
                 ];
                 deny = [
                   # rm is handled by redirect-rm-to-rip PreToolUse hook
