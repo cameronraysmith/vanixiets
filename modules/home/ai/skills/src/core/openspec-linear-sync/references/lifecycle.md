@@ -33,7 +33,9 @@ Like Backlog, they carry no active work.
 The issue is never moved to Done before archive; status, validate, sync, and edit operations never move the issue to Done.
 Comments stay at most two sentences.
 The archive ordering is fixed: readiness checks, then sync deltas, then archive, then mirror (the document UPSERT), then Done.
+The readiness step also captures the CLI-resolved canonical main-spec root (and, if the capability list is not otherwise known, that list) from `openspec status --change <change> --json` while the change is still active, because that status call no longer resolves the change once archive moves it into the archive; the mirror then reuses the captured root to locate each `<root>/openspec/specs/<capability>/spec.md` (see references/linear-cli-mapping.md for the single-field `jq` capture).
 The mirror step is gated on `linear_project` presence: when the change has no `linear_project`, the document UPSERT is skipped and recorded as a dropped best-effort write in the attempt log (for example `{ at: "<iso>", transition: "archive->mirror", outcome: "dropped", note: "no linear_project bound; spec mirror skipped" }`), the same graceful-degradation path as a team lacking an In Review state or Linear being unavailable; the change still archives cleanly and moves to Done.
+The same non-blocking degradation also covers workspace mode: when `openspec status` reports `planningHome.kind != "repo"` there is no single main specs dir, so the spec-mirror is skipped and logged (`note: "workspace-mode planningHome; no repo main specs dir; spec mirror skipped"`) rather than guessing a path, consistent with the overlay's single-openspec-root-per-repo assumption.
 
 ## State resolved by name, never by type
 

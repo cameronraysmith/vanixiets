@@ -54,6 +54,10 @@ The entire UPSERT is gated on `linear_project` presence: when the change has no 
 Otherwise, first resolve the target project from the change's `linear_project` (proposal.md frontmatter), which keys the `projects.<project-slug>` registry entry in openspec/linear.yaml; its `id` is the project the documents are parented to.
 A single change routinely produces multiple capability specs (this very change produced three: agentic-workflow-routing, project-management-hub, openspec-linear-sync), so the UPSERT iterates over every capability the change touches, each getting its own document titled `OpenSpec: <capability>`, all parented to that project and keyed by a per-capability entry under that project's `archive_documents` map.
 
+The `<spec-file>` in the commands below is the CLI-resolved canonical main-spec path, not an assumed repo-relative one: OpenSpec 1.4.1 no longer guarantees an `openspec/specs/` layout, so the planning root is resolved from `openspec status --change <change> --json` and the main spec is `<root>/openspec/specs/<capability>/spec.md`.
+`openspec status --change <change>` only resolves while the change is still active, so the planning root (and, if needed, the capability list from `artifactPaths.specs.existingOutputPaths[]`) is captured in the readiness step before `openspec archive` moves the change into the archive; the worked example below shows the exact single-field `jq` capture, which extracts only the field needed rather than dumping the full status payload.
+The capture guards on repo mode (`select(.planningHome.kind=="repo")`): in workspace mode there is no single main specs dir, the select yields empty, and the spec-mirror is skipped and logged rather than guessed — the same non-blocking, single-openspec-root-per-repo degradation as a missing `linear_project`.
+
 For each capability the change produces:
 
 1. Look up the stored document id first: read `projects."<project-slug>".archive_documents."<capability>".id` from openspec/linear.yaml, where `<project-slug>` is the change's `linear_project`.
@@ -64,7 +68,7 @@ For each capability the change produces:
 5. If no stored id and no title match, create: `linear document create --project <p> --title "OpenSpec: <capability>" --content-file <spec-file> --workspace <slug>`, which creates it already parented to the project, and store the returned id back into openspec/linear.yaml under `projects."<project-slug>".archive_documents."<capability>".id` so the next archive takes the stored-id path.
 
 The document body is a disposable mirror fully replaced on each archive, so a re-archive updates the matched document rather than creating a duplicate.
-The body mirrors only the canonical `openspec/specs/<capability>/spec.md` content; design.md and tasks.md are never copied to Linear.
+The body mirrors only the canonical folded main-spec content at `<planning-root>/openspec/specs/<capability>/spec.md` (the CLI-resolved `<spec-file>` above); design.md and tasks.md are never copied to Linear.
 
 ## The narrow `linear api` GraphQL fallback
 
@@ -125,19 +129,42 @@ linear issue comment add <id> --body-file /tmp/c.md --workspace <slug>
 ```
 
 In Review to Done, fired only after `openspec archive` succeeds, in the fixed archive order readiness, sync deltas, archive, mirror, Done.
-The mirror step is the document UPSERT:
+The mirror step is the document UPSERT.
+The canonical main-spec path must be resolved from the CLI rather than assumed, because OpenSpec 1.4.1 no longer guarantees a repo-relative `openspec/specs/` layout; `openspec status --change <change> --json` exposes `planningHome.root` (the repo-mode planning root under which the folded main specs live at the hardcoded constant `<root>/openspec/specs/<capability>/spec.md`).
+This capture must run while the bound change is still active, before `openspec archive` moves the change directory into the archive — once archived, `openspec status --change <change>` no longer resolves the change, though the updated main spec at `<root>/openspec/specs/<cap>/spec.md` persists.
+So the readiness step captures `planning_root` (and, where `<caps>` is not otherwise known, the capability list) from `status --change`, the sync-and-archive steps run, and the post-archive mirror reuses the captured root:
 
 ```bash
+# Readiness (pre-archive): capture the CLI-resolved canonical main-spec root while the change is still active.
+# A single jq field is extracted; never dump the full ~150-line status payload.
+# select(.planningHome.kind=="repo") yields empty in workspace mode, where there is no single main specs dir.
+# <change> is the OpenSpec change slug bound to this issue (proposal.md frontmatter / openspec/linear.yaml binding).
+planning_root=$(openspec status --change "<change>" --json \
+  | jq -r 'select(.planningHome.kind=="repo") | .planningHome.root')
+# If <caps> is not already known, enumerate the change's delta-spec capabilities from the same pre-archive status
+# (each path is <changeRoot>/specs/<cap>/spec.md; the capability is the parent dir name):
+caps=$(openspec status --change "<change>" --json \
+  | jq -r '.artifactPaths.specs.existingOutputPaths[] | split("/")[-2]')
+
+# ... readiness checks, then sync deltas, then `openspec archive <change>` run here (base archive mechanics) ...
+
 # Mirror: UPSERT every capability spec the change produced, each already-parented to the project.
 # <pslug> is the change's linear_project; <p> is projects."<pslug>".id (the Linear project id).
-# <caps> is the list of capabilities this change touched (here: agentic-workflow-routing project-management-hub openspec-linear-sync).
+# <caps> is the list of capabilities this change touched (here: agentic-workflow-routing project-management-hub openspec-linear-sync),
+# captured pre-archive into $caps above.
 # Gate the whole mirror on linear_project presence: with no project there is nothing to parent documents to.
 if [ -z "<pslug>" ]; then
   # Record the skip in the attempt log; the change still archives cleanly.
   # { transition: "archive->mirror", outcome: "dropped", note: "no linear_project bound; spec mirror skipped" }
   :
+elif [ -z "$planning_root" ]; then
+  # Workspace mode (planningHome.kind != "repo"): no single main specs dir to mirror from.
+  # Skip the spec-mirror and log a skip note rather than guessing a path; consistent with the
+  # overlay's non-blocking, single-openspec-root-per-repo design. The change still archives cleanly.
+  # { transition: "archive->mirror", outcome: "dropped", note: "workspace-mode planningHome; no repo main specs dir; spec mirror skipped" }
+  :
 else
-for cap in <caps>; do
+for cap in $caps; do
   # Primary lookup: the stored per-capability document id under this project in openspec/linear.yaml.
   DOC_ID=$(yq -r ".projects.\"<pslug>\".archive_documents.\"$cap\".id // \"\"" openspec/linear.yaml)
   if [ -z "$DOC_ID" ]; then
@@ -146,13 +173,13 @@ for cap in <caps>; do
       | jq -r --arg t "OpenSpec: $cap" '.nodes[] | select(.title == $t) | .id')
   fi
   if [ -n "$DOC_ID" ]; then
-    linear document update "$DOC_ID" --title "OpenSpec: $cap" --content-file "openspec/specs/$cap/spec.md" --workspace <slug>
+    linear document update "$DOC_ID" --title "OpenSpec: $cap" --content-file "$planning_root/openspec/specs/$cap/spec.md" --workspace <slug>
   else
     # Create already-parented to the project; document create has no --json, so read the id back
     # rather than piping create stdout into a list+jq lookup. Re-scan the connection by deterministic
     # title (linear api is the alternative when the title scan is ambiguous);
     # the connection shape is the .nodes[] walk noted in the UPSERT recipe above.
-    linear document create --project <p> --title "OpenSpec: $cap" --content-file "openspec/specs/$cap/spec.md" --workspace <slug>
+    linear document create --project <p> --title "OpenSpec: $cap" --content-file "$planning_root/openspec/specs/$cap/spec.md" --workspace <slug>
     NEW_ID=$(linear document list --project <p> --json --workspace <slug> \
       | jq -r --arg t "OpenSpec: $cap" '.nodes[] | select(.title == $t) | .id')
     yq -i ".projects.\"<pslug>\".archive_documents.\"$cap\".id = \"$NEW_ID\"" openspec/linear.yaml
