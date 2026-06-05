@@ -7,6 +7,13 @@
     {
       home.sessionVariables = {
         EDITOR = "nvim";
+        # Suppress the optional .git/index stat-cache writeback that git status-class
+        # pollers (ccstatusline, Zed, shell prompts) perform and that can race jj's
+        # colocated index export. Performance-only (git recomputes when stat info is
+        # stale); complementary to the gitmux GIT_INDEX_FILE wrapper (git diff ignores
+        # this flag) and inert for jj's own git2/gitoxide index handling. There is no
+        # core.optionalLocks git-config key, so this must be delivered as an env var.
+        GIT_OPTIONAL_LOCKS = "0";
         LANG = "en_US.UTF-8";
         LC_ALL = "en_US.UTF-8";
         LC_CTYPE = "en_US.UTF-8";
