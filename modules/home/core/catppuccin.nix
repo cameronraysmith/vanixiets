@@ -11,6 +11,7 @@
       # Individual programs (tmux, bat, etc.) will use this theme automatically
       catppuccin = {
         enable = true;
+        autoEnable = true;
         flavor = "mocha";
       };
     };
