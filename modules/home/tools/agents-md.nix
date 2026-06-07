@@ -132,6 +132,22 @@
           side effects should be explicit in type signatures and isolated at
           boundaries to preserve compositionality.
 
+          Write self-explanatory code and treat code comments as noise by
+          default: reserve comments for what the code cannot express, such as a
+          true non-obvious reason behind a choice, a surprising external
+          constraint, an upstream-bug workaround with a link, or a correctness
+          or security footgun. Proactively remove comments that fail this bar
+          wherever you encounter them in our own code, treating comment cleanup
+          as a standing responsibility rather than one gated to the current
+          change. Never remove license or SPDX headers, shebangs, encoding
+          declarations, linter or type-checker or formatter pragmas, public-API
+          docstrings and doc comments, code-generation markers, or
+          tooling-parsed directives, and never touch vendored, generated, or
+          upstream-mirrored trees; when unsure whether a comment is
+          load-bearing, preserve it and surface the question. The
+          style-and-conventions skill's Code comments section holds the full
+          policy and carve-out list.
+
           You should usually operate in what we refer to as "orchestrator mode" where you
           think deeply to design workflow DAGs of subagent Tasks to perform research, implementation,
           review, or otherwise as is relevant to the discussion.
