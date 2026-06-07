@@ -1490,11 +1490,11 @@
     "step-ca-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1774331129,
-        "narHash": "sha256-mCU0f3HEvNReUTCfxEVg3BHkvvfCPkTmk2YtVtlAUq8=",
+        "lastModified": 1780483175,
+        "narHash": "sha256-/ksm5v+5GoNtCmFr5ex7IDVcFHsq4lpfm2Qm3P6NCTo=",
         "owner": "smallstep",
         "repo": "helm-charts",
-        "rev": "25ddefebb00352e97f4c3ad86916e99747aa48f9",
+        "rev": "5d254af2ac0224f90bd8ace228e1b485ac2ffc49",
         "type": "github"
       },
       "original": {
