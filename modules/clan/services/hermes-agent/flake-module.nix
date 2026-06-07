@@ -380,6 +380,11 @@
                 # and /dev/urandom for entropy/IO; matching openclaw's posture which
                 # also omits PrivateDevices for the same reason.
                 systemd.services.hermes-agent.serviceConfig = {
+                  # v0.16.0 gateway drains up to restart_drain_timeout (180s) on stop/restart;
+                  # systemd's default TimeoutStopSec=90s would SIGKILL it mid-drain. The gateway
+                  # startup self-check expects TimeoutStopSec >= drain + 30s.
+                  TimeoutStopSec = 210;
+
                   # Defensive kernel hardening (rationale per directive):
                   ProtectKernelTunables = true; # block /proc/sys, /sys writes (hermes doesn't tune kernel)
                   ProtectKernelModules = true; # block module load/unload (hermes is not a kernel modprobe consumer)
@@ -419,7 +424,13 @@
                     User = settings.serviceUser;
                     Group = "users";
                     WorkingDirectory = "${userHome}/workspace";
-                    ExecStart = "${config.services.hermes-agent.package}/bin/hermes dashboard --host 127.0.0.1 --port ${toString settings.dashboardPort} --no-open";
+                    # Bind 0.0.0.0 + --insecure so the dashboard PTY websocket accepts the
+                    # Caddy-reverse-proxied https://hermes.zt origin: the WS origin guard compares
+                    # the request Origin against the bound host, and a loopback bind rejects the
+                    # mesh hostname. The listener is reachable only over the ZeroTier mesh behind
+                    # Caddy (the firewall opens 443 on zt+ only; the raw dashboard port is never in
+                    # allowedTCPPorts), which bounds the legacy token-auth fallback --insecure enables.
+                    ExecStart = "${config.services.hermes-agent.package}/bin/hermes dashboard --host 0.0.0.0 --insecure --port ${toString settings.dashboardPort} --no-open";
                     Restart = "always";
                     RestartSec = 5;
                     UMask = "0007";

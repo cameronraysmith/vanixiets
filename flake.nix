@@ -105,7 +105,7 @@
 
     # TODO: revert following #27716
     # hermes-agent.url = "github:NousResearch/hermes-agent";
-    hermes-agent.url = "github:cameronraysmith/hermes-agent/27716-pip-locales-packaging";
+    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.6.5";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     hermes-agent.inputs.flake-parts.follows = "flake-parts";
 
