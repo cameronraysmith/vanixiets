@@ -107,6 +107,10 @@ The choice between them is an apply-gate open point and input to a separate jj-p
 Integration is jj-native and user-gated, with no autonomous PR.
 The isolation guidance, the apply-gate confirmation, and orchestrator-routed commits onto the chain are in references/hil-isolation.md.
 
+In a development join every editor edits the same empty `@`=`[wip]`, which is the shared coordination surface that keeps concurrent editors safe, and routes completed content downward into the owning chain.
+Never `jj describe @` into content and never relocate `@` with a positional `jj rebase -r @`; either dissolves the surface the others are concurrently writing.
+Defer the full canon to jj-version-control/SKILL.md invariant (iii-b)/(vi).
+
 ## Contents
 
 | Reference | Purpose |
