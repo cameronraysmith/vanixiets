@@ -7,6 +7,15 @@ disable-model-invocation: true
 
 A comprehensive guide for Git users transitioning to Jujutsu, mapping all interactive rebase operations to their jj equivalents and beyond.
 
+> Diamond / development-join applicability.
+> The single-chain examples below treat `@` as a freely-mutable content commit.
+> That model does not apply inside a development join (the diamond workflow).
+> Inside a join, `@` is a shared, always-empty `[wip]` commit sitting directly on a multi-parent join, and that `[wip]` is the stable coordination surface that makes N concurrent editors safe by construction.
+> In this repo a pushed `wip` deploy bookmark additionally tracks `@`, so machines rebuild from it.
+> Inside a join never `jj describe @`, never `jj rebase -r @` / `--revisions @`, and never bare `jj squash -r @` (the form at the squashing example below advances `@` through a chain and consumes the `[wip]`).
+> Route changes downward while leaving `@` empty in place with `jj squash --from @ --insert-after <target> -m "..." --keep-emptied [-- <paths>]` (or `--insert-before`), `jj absorb` (documented below as the blame-routed down-route), or `jj split` keeping the wip.
+> Canonical rule, the single-shared-`[wip]` invariant, and rationale live in `~/.claude/skills/jj-version-control/diamond-workflow.md`; join mechanics in `~/.claude/skills/jj-version-control/SKILL.md`; non-interactive command execution in `~/.claude/skills/jj-workflow/SKILL.md`.
+
 ## Table of Contents
 
 1. [Core Concept: The Paradigm Shift](#core-concept-the-paradigm-shift)
@@ -91,7 +100,7 @@ In Jujutsu, there is **no special mode**:
 | Operation | Git Interactive Rebase | Jujutsu Command | Notes |
 |-----------|----------------------|-----------------|-------|
 | **Reorder commits** | Reorder lines in todo list | `jj rebase -r <commit> -A <target>` or `-B <target>` | `-A` = insert after; `-B` = insert before; descendants follow |
-| **Split commit** | Mark "edit", reset, stage, commit | `jj split -r <commit>` | Opens TUI to select changes for first commit; remainder becomes second |
+| **Split commit** | Mark "edit", reset, stage, commit | `jj split -r <commit> -- <paths> -m "msg"` | Non-interactive: pass explicit paths and `-m`. Bare `jj split` (no paths) opens a diff TUI and hangs non-interactive Bash; `jj split <paths>` opens the editor twice (extracted commit plus remainder), so pre-stage the remainder via `jj describe -r <commit> -m "<remainder>"` first. See jj-workflow "Non-interactive command execution". |
 | **Partial squash** | Stage subset, commit --amend | `jj squash -i -r <commit>` | Interactive diff editor to select hunks to move |
 | **Move to specific ancestor** | fixup + reorder + exec | `jj squash --from <commit> --into <ancestor>` | Can target any ancestor, not just parent |
 | **Move between any commits** | *(not possible)* | `jj squash --from <src> --into <dest>` | Works on any two commits in history |
@@ -171,6 +180,11 @@ jj squash -r @      # D squashed into C, @ now points to C
 # Result: A - B - C (@)
 ```
 
+> Single-chain cleanup only.
+> In a development join `@` is the shared empty `[wip]` sitting on the multi-parent join, so `jj squash -r @` would consume that `[wip]` into its parent and re-point `@` — emptying the editing surface concurrent actors write to and, in this repo, dragging the pushed `wip` deploy bookmark.
+> There, route changes downward with `jj squash --from @ --insert-before <target> --keep-emptied -m "..."` (or `--insert-after <target>`), which leaves `@` empty and in place, or `jj absorb`.
+> See `~/.claude/skills/jj-version-control/diamond-workflow.md`.
+
 Or more directly:
 ```bash
 # From E, squash everything into C
@@ -231,10 +245,14 @@ jj describe -r A -m "Fix typo in A"
 jj describe -r B -m "Fix typo in B"
 jj describe -r C -m "Fix typo in C"
 
-# Split multiple commits
-jj split -r X
-jj split -r Y
-jj split -r Z
+# Split multiple commits (non-interactive: pre-stage the remainder, then split by paths)
+jj describe -r X -m "<remainder>"
+jj split -r X -- <paths> -m "<extracted>"
+jj describe -r Y -m "<remainder>"
+jj split -r Y -- <paths> -m "<extracted>"
+
+# Note: `-i` and parameterless `jj split` open an interactive TUI and hang non-interactive shells.
+# Diamond note: splitting while keeping the empty `[wip]` at `@` is a valid down-route, but never `jj describe @` and never `jj rebase -r @`.
 
 # All operations execute immediately and independently
 ```
@@ -359,8 +377,9 @@ jj squash -r <fixup-commit2>
 # Reorder if needed
 jj rebase -r X -B Y
 
-# Split a commit
-jj split -r <large-commit>
+# Split a commit (non-interactive: pre-stage the remainder, then split by paths)
+jj describe -r <large-commit> -m "<remainder>"
+jj split -r <large-commit> -- <paths> -m "<extracted>"
 
 # All done! Each command executes immediately
 # Use jj undo at any point if you make a mistake
@@ -473,14 +492,12 @@ git rebase --continue
 
 **Jujutsu approach:**
 ```bash
-# By path specification:
-jj split -r <commit> file1.txt
-# file1.txt goes to first commit
-# file2.txt stays in second commit
+# By path specification (non-interactive: pre-stage the remainder, then split by paths):
+jj describe -r <commit> -m "Part 2"
+jj split -r <commit> -- file1.txt -m "Part 1"
+# file1.txt goes to the first commit; file2.txt stays in the second commit
 
-# Or interactively:
-jj split -i -r <commit>
-# TUI to select changes
+# Note: `-i` and parameterless `jj split` open an interactive TUI and hang non-interactive shells; always split by explicit paths with `-m`, pre-staging the remainder description.
 ```
 
 ---
@@ -513,7 +530,7 @@ jj split -i -r <commit>
 
 | Task | Jujutsu Command |
 |------|----------------|
-| Split commit interactively | `jj split -r <commit>` |
+| Split commit (non-interactive) | `jj split -r <commit> -- <paths> -m "msg"` (pre-stage remainder with `jj describe -r <commit> -m`; bare `jj split` / `-i` open a TUI and hang non-interactive shells) |
 | Split by paths | `jj split -r <commit> <paths>` |
 | Create new commit on top | `jj new <commit>` |
 | Move working copy changes to new commit | `jj commit` |
@@ -528,6 +545,7 @@ jj split -i -r <commit>
 | Edit commit without checkout | `jj diffedit -r <commit>` |
 | Duplicate commit | `jj duplicate <commit>` |
 | Duplicate to specific location | `jj duplicate <commit> -d <dest>` |
+| Inside a development join: keep `@` as the empty `[wip]` | Do not `describe @` / `rebase -r @` / bare `squash -r @`; route down with `jj squash --from @ --insert-after <target> -m "..." --keep-emptied`, `jj absorb`, or `jj split` (keep wip). See `~/.claude/skills/jj-version-control/diamond-workflow.md`. |
 
 #### Commit Reordering & Moving
 
@@ -576,10 +594,13 @@ jj edit X              # Checkout X, changes amend it
 jj squash --into X
 ```
 
-#### "I want to split commit X by hunks"
+#### "I want to split commit X by paths"
 
 ```bash
-jj split -i -r X
+# Non-interactive: pre-stage the remainder, then split by paths.
+jj describe -r X -m "<remainder>"
+jj split -r X -- <paths> -m "<extracted>"
+# `-i` and parameterless `jj split` open an interactive TUI and hang non-interactive shells.
 ```
 
 #### "I want to combine commits A, B, and C"

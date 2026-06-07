@@ -7,6 +7,8 @@ description: Jujutsu version control conventions and workflow patterns.
 
 **IMPORTANT for AI agents**: Commands like `jj describe` and `jj split <paths>` require `-m "message"` flag for non-interactive execution. See `~/.claude/skills/jj-workflow/SKILL.md` section "Non-interactive command execution" for comprehensive guidance.
 
+**Development-join invariant (multi-chain mode)**: when a development join is present, `@` is ALWAYS the empty `[wip]` commit directly atop the frozen multi-parent `[merge]`. Route all content DOWNWARD into a chain (`jj squash --from @ … --keep-emptied`, `jj absorb`, `jj split`) — NEVER `jj describe @` into content and NEVER relocate `@` via the positional rebase forms `jj rebase -r @ --insert-before/--insert-after <target>` or `jj rebase --revisions @ --insert-before/--insert-after <target>`, which drift `@` off `[wip]`. In every splice/relocation recipe the relocated `<commit>`/`<X>`/`<range>` is a SEPARATE, already-sealed non-wip commit, never `@`. The one sanctioned `jj rebase` naming `@` is the destination form `jj rebase -r @ -d 'all:(…)'` that re-anchors `[wip]` onto a rebuilt join. See Diamond invariants (iii-b) below, the composite maintenance invariant, and the edit-route cycle.
+
 ## Core philosophy
 
 Jujutsu eliminates special modes and staging areas.
@@ -391,6 +393,95 @@ Auto-rebase normally maintains this invariant in place; when `jj rebase -r <merg
 (iii) `@` atop the join — `@` is at `[wip]` whose sole parent is `[merge]`, or `@` IS `[merge]` during construction.
 This is the maintenance invariant historically named in this section; the other four invariants are now peer to it.
 
+(iii-b) `@` is never drifted off `[wip]` by an `@`-mutating verb.
+In development-join mode `@` is ALWAYS the empty `[wip]` commit directly atop the frozen multi-parent `[merge]`, and every editor — human or LLM agent — edits THAT SAME shared `[wip]`, then routes each change DOWNWARD into the correct chain.
+The shared `[wip]` is the stable coordination point that makes N concurrent editors safe by construction.
+If `@` drifts (e.g. is relocated below the join), the shared editing surface other actors are concurrently writing vanishes; in this repo it also DRAGS the pushed `wip` deploy bookmark (machines rebuild from it) and breaks the one-child join invariant (vi).
+
+Two `@`-mutating verbs are therefore PROHIBITED while a development join is present:
+
+- Do NOT `jj describe @` into a content commit — this consumes the empty `[wip]`.
+- Do NOT relocate `@` below the join via the positional rebase forms `jj rebase -r @ --insert-before <target>` / `--insert-after <target>` (nor the `-A`/`-B` aliases), nor `jj rebase --revisions @ --insert-before/--insert-after <target>` — these drop `@` into the chain/splice interior.
+
+All content leaves `@` by routing DOWNWARD with `@` left in place and empty, via these editor-safe verbs:
+
+- `jj absorb` (auto-distribute by blame; scoped `jj absorb <path>` under concurrency);
+- `jj squash --from @ --into <chain-tip> --keep-emptied` (amend-route; omit `-m` to preserve the tip description);
+- `jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied [-- <paths>]` (append-route; advance the bookmark to the printed `Created new commit <id>`);
+- `jj squash --from @ --insert-before 'children(fork_point(parents(<join>))) & ::<join>' -m "msg" --keep-emptied -- <paths>` (splice-below-join from live `@`);
+- `jj split` keeping the wip remainder.
+
+The ONLY sanctioned `jj rebase` touching `@` is the DESTINATION form that re-anchors `[wip]` onto a rebuilt multi-parent join when adding or removing a chain — `jj rebase -r @ -d 'all:(@- | new-bookmark)'` / `jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'` (see §"Adding and removing chains").
+That form keeps `@` an empty direct child of the join and so does not drift it; it is distinct from the prohibited positional `--insert-before/--insert-after` forms above.
+
+In every splice/relocation recipe the relocated `<commit>`/`<X>`/`<range>` is a SEPARATE, already-sealed NON-wip commit, never `@`/`[wip]` itself.
+To relocate content that is still live in `@`, never `jj describe @` then `jj rebase --revisions @ --insert-before <target>` (that opens a window with NO `[wip]` on the join, catastrophic under concurrency); use the `jj squash --from @ --insert-before … --keep-emptied -- <paths>` route above, which never moves `@`.
+
+#### Editor-safe routing-down command templates
+
+Every commit-boundary verb below carries an explicit `-m` (or is description-merge-free), so none opens an interactive editor.
+None moves `@`; they supersede any rebase-of-`@`.
+All assume `@` is the empty `[wip]` directly atop the multi-parent `[merge]`.
+
+Amend-route (fixup into the existing chain tip; `-m` OMITTED to preserve the tip description; non-interactive-safe because the empty wip carries no description so the description-merge editor never fires):
+
+```bash
+jj squash --from @ --into <chain-tip> --keep-emptied [-- <paths>]
+```
+
+Append-route (land a NEW atomic commit on a chain; advance the bookmark to the printed `Created new commit` id):
+
+```bash
+SQUASH_OUT=$(jj squash --from @ --insert-after <chain-tip> -m "feat(scope): description" --keep-emptied -- <paths>)
+NEW_ID=$(echo "$SQUASH_OUT" | sed -n 's/^Created new commit \([a-z][a-z0-9]*\) .*/\1/p')
+jj bookmark move <chain> --to "$NEW_ID"
+```
+
+Splice-below-join from live `@` (route a `<base>`-bound change DOWN into the splice region without ever moving `@`; this is the correct mechanic for the `@`-origin case, replacing any by-relocation rebase-of-`@`):
+
+```bash
+PAGER=cat jj op log -n 1   # note <OP0> for rollback
+jj squash --from @ --insert-before 'children(fork_point(parents(<join>))) & ::<join>' \
+    -m "fix(scope): description" --keep-emptied -- <paths>
+PAGER=cat jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'   # verify @ stays empty [wip] atop the join
+# Rollback on failure: jj op restore <OP0>
+```
+
+Absorb-route (auto-distribute `@`'s diff to blame-closest ancestors; preserves `[wip]` without `--keep-emptied`; prefer the scoped form under concurrency):
+
+```bash
+PAGER=cat jj absorb [<path>]
+```
+
+Split keeping the wip (extract a subset into a new commit, leaving an empty `[wip]` remainder at `@`; pass explicit paths + `-m` to avoid the interactive TUI hang; do NOT pre-stage by describing `@` in a join):
+
+```bash
+jj split -r <chain-commit> -- <paths> -m "msg"
+```
+
+By-relocation (ONLY for a SEPARATE, already-sealed NON-wip commit that already exists above the join; `<commit>` MUST NOT be `@`/`[wip]`; never `jj describe @` then relocate):
+
+```bash
+jj rebase --revisions <separate-sealed-non-wip-commit> --insert-before 'children(fork_point(parents(<join>))) & ::<join>'
+```
+
+Sanctioned destination-form rebase touching `@` (add/remove a chain; re-anchors the empty `@` onto the rebuilt multi-parent join; the `all:` prefix forces multi-parent; this is the ONLY `jj rebase` that may name `@` and it does NOT drift `@`):
+
+```bash
+jj rebase -r @ -d 'all:(@- | new-bookmark)'        # add chain
+jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'    # remove chain
+# the two-commit [merge]+[wip] model instead operates on the frozen [merge] then re-attaches:
+jj rebase -r <merge> -d 'all:(<existing-parents> | new-bookmark)' && jj rebase -r <wip> -d <merge>
+```
+
+PROHIBITED (drifts `@` off `[wip]`; the catastrophic defect class):
+
+```bash
+jj describe @ ...                                          # consumes the wip into content
+jj rebase -r @ --insert-before/--insert-after <target>    # positional relocation below/into the join
+jj rebase --revisions @ --insert-before/--insert-after <target>
+```
+
 (iv) wip holds integrated working tree — `[wip]` is where edits land; its working tree reflects the union of all chain contents.
 Parallel agents observing `[wip]` see the integrated state of every chain in the join, which is the primary value proposition of the entity.
 
@@ -438,6 +529,8 @@ Checks (i)/(ii) — bookmark-vs-parent consistency — run only in cases (A) and
 
 The hook fires `ask` (never `deny`) when `@` is in none of these four positions — typically when work has been routed onto an unrelated branch, when an unintended merge has been introduced, or when the working copy has drifted off the diamond entirely.
 The recovery hint depends on intent: return to idle via `jj new <join-change-id> -m "wip"`, or resume in-chain work via `jj edit <chain-tip-change-id>`.
+In particular, `@` relocated BELOW the join is outside all four cases and is exactly the drift that `jj describe @` + a positional `jj rebase --revisions @ --insert-before/--insert-after` produces — see invariant (iii-b).
+Recover via `jj op restore <pre-op>` rather than trying to re-derive position.
 See `modules/home/tools/hooks/verify-diamond-before-edit.sh` for the enforcement implementation.
 
 ### Diamond-health diagnostic
@@ -619,6 +712,10 @@ When to use which pattern:
 **Multi-commit-range form.**
 When relocating an existing linear segment of N commits into a chain (rather than authoring a single new commit), use the range form:
 
+Precondition: `<range-start>::<range-end>` must be a stack of already-sealed non-wip commits and must NOT include `@`/`[wip]`.
+The recipe relies on `@` being a DESCENDANT of the range so auto-rebase restores `@` to a direct child of the join; selecting `<range-end>` = `@` would instead relocate `@` off `[wip]` into the chain — the same `@`-drift class as the single-commit by-relocation arm.
+If the content is still in `@`, route it down via the route-and-extend recipe (`jj new -A <chain-tip> --no-edit -m "…"` then `jj squash --from @ --into <new-id> --keep-emptied`) or the append-route (`jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied -- <paths>`) instead — both keep `@` empty as `[wip]`.
+
 ```bash
 # Checkpoint and survey
 PAGER=cat jj op log -n 1  # capture <OP0>
@@ -673,6 +770,8 @@ Conflicts between concurrent edits are detected immediately as first-class jj co
 
 All agents route via `jj squash --from @ --into <chain-tip> --keep-emptied -- <path>` (or the route-and-extend recipe to extend a chain).
 `--keep-emptied` preserves `[wip]` after the squash, maintaining the canonical two-commit structure across concurrent routing operations.
+Because `@`=`[wip]` is the shared coordination point, NO agent may `jj describe @`, positionally `jj rebase -r @`/`jj rebase --revisions @`, or otherwise relocate `@` below the join: doing so deletes the surface every other agent is concurrently writing and (in this repo) drags the pushed `wip` deploy bookmark.
+Content only ever leaves `@` by downward routing with `--keep-emptied` (see invariant (iii-b)).
 
 Coordination protocol for parallel agents:
 - One file per commit, routed via `jj squash --from @ --into <chain-tip> --keep-emptied -- <path>`
@@ -699,6 +798,16 @@ jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
 
 The `all:` prefix is required to ensure the revset resolves to multiple parents rather than collapsing to a single common ancestor.
 Without `all:`, jj would compute the nearest common ancestor of the revset members, producing a single-parent `@` instead of a multi-parent one.
+
+This destination form is the ONE sanctioned `jj rebase` that names `@`: it re-anchors the empty `@` onto a rebuilt multi-parent join, keeping `@` a direct child of the join, so it does not drift `@` below the join.
+It is distinct from — and must not be confused with — the prohibited positional forms `jj rebase -r @ --insert-before/--insert-after <target>` and `jj rebase --revisions @ --insert-before/--insert-after <target>`, which drop `@` into the chain/splice interior (see invariant (iii-b)).
+For repos on the two-commit `[merge]`+`[wip]` model, prefer reconstructing the frozen `[merge]` with the new parent set and then recreating `[wip]` (per §"Composite maintenance invariant") rather than rebasing `@`:
+
+```bash
+# Add a chain: reconstruct [merge] with the expanded parent set, then recreate [wip].
+jj new <existing-parent-bookmarks...> new-bookmark -m "join N=<k+1>: <alphabetical bookmarks>"
+jj new @ -m "wip"
+```
 
 ### Splice-below-join
 
@@ -753,6 +862,11 @@ jj new  # return @ to [wip] atop the diamond, or remain in the splice commit to 
 
 **By-relocation arm** — when a `<base>`-bound commit already exists above the join (commonly because `@` was the working position when the commit was sealed):
 
+Precondition — `<commit>` MUST be a separate, already-sealed non-wip commit stacked above the join; NEVER `@`/`[wip]` itself.
+The by-relocation arm uses `jj rebase --revisions <commit>`, which MOVES the named commit.
+If `<commit>` were `@`, this drifts `@` off `[wip]`, opens a window with NO `[wip]` on the join (catastrophic under concurrent editors), and drags the pushed `wip` deploy bookmark (machines rebuild from it).
+If the base-bound change is still in `@` (authored in `[wip]`, not yet routed), DO NOT seal-then-relocate (`jj describe @` then `jj rebase --revisions @ …` is the prohibited drift) — use the by-route-from-wip arm below instead.
+
 ```bash
 # Checkpoint and survey the antichain target
 PAGER=cat jj op log -n 1  # note <OP0> for rollback
@@ -767,6 +881,21 @@ PAGER=cat jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'
 PAGER=cat jj bookmark list -r 'parents(@-) ~ trunk()'  # expect N chain bookmarks unchanged
 # Rollback if any verification fails: jj op restore <OP0>
 ```
+
+**By-route-from-wip arm** — when the base-bound change is currently still in `@`/`[wip]` (authored but not yet routed).
+Routes the diff DOWN into the splice region without ever moving `@`:
+
+```bash
+PAGER=cat jj op log -n 1  # note <OP0> for rollback
+jj squash --from @ --insert-before 'children(fork_point(parents(<join>))) & ::<join>' \
+    -m "fix(scope): description" --keep-emptied -- <paths>
+# @ stays at [wip] (empty) atop the join; the diff lands as a new commit in the splice region.
+# Explicit -m avoids any interactive $EDITOR (non-interactive-safe).
+# Verify: PAGER=cat jj log -r 'present(@) | ancestors(immutable_heads().., 2) | trunk()'
+# Rollback on failure: jj op restore <OP0>
+```
+
+Use this arm, not by-relocation, whenever the change originates in `@`.
 
 The revset `children(fork_point(parents(<join>))) & ::<join>` is the order-theoretically precise name for the chain-roots antichain.
 It generalizes across diamond cardinality (2-way, N-way), is invariant under remote bookmark drift (origin-advance commits descend from `<base>` but do not reach `<join>`, so they are excluded), and resolves to the chain roots regardless of splice region state (empty or non-empty) — preserving chronological order in the splice region across repeated operations.
@@ -1134,12 +1263,19 @@ jj git push --bookmark {epic-ID}-descriptor
 When working across multiple epics simultaneously, create a development join:
 
 ```bash
-jj new {epic-a}-descriptor {epic-b}-descriptor
-# edit a file, then route it atomically:
-jj squash --into {epic-b}-descriptor -m "feat: description" path/to/file
-# or auto-route multiple files by blame ancestry:
-jj absorb
+# 1. Create the multi-parent [merge] commit
+jj new {epic-a}-descriptor {epic-b}-descriptor -m "join N=2: {epic-a}-descriptor, {epic-b}-descriptor"
+# 2. Create the ephemeral [wip] layer on top; @ is now empty [wip] atop [merge]
+jj new @ -m "wip"
+# edit a file in @ ([wip]), then route it atomically to a chain, preserving [wip]:
+SQUASH_OUT=$(jj squash --from @ --insert-after {epic-b}-descriptor -m "feat: description" --keep-emptied -- path/to/file)
+jj bookmark move {epic-b}-descriptor --to "$(echo "$SQUASH_OUT" | sed -n 's/^Created new commit \([a-z][a-z0-9]*\) .*/\1/p')"
+# or auto-route multiple files by blame ancestry (auto-preserves [wip]):
+PAGER=cat jj absorb
 ```
+
+Never omit `--keep-emptied` when routing from `@` in development-join mode, and never edit on a bare `[merge]` (always create the `[wip]` layer first with `jj new @`); without these the shared `[wip]` editing surface is lost.
+This block is a simplified pointer — see the canonical append-route vs amend-route distinction in §"Routing to a chain: append vs amend" and invariant (iii-b) before routing.
 
 Subagent dispatch in jj mode: subagents edit files directly in the shared `@` working copy.
 The orchestrator routes changes to the correct epic bookmark after the subagent returns.

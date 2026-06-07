@@ -15,6 +15,9 @@ Before editing any file, check for uncommitted changes:
 In git-native mode, run `git status --short [file]` and `git diff [file]`.
 In GitButler mode, `but status -fv` provides richer state including branch assignment and CLI IDs for each changed file.
 In jj mode, `jj status` and `jj diff` show working copy state. There is no staging area — all tracked file changes are the commit.
+In development-join mode the expected state is an empty `@` (the `[wip]` commit) directly atop the multi-parent join; any content `jj diff` shows for `@` is unrouted work to send DOWNWARD into a chain (via `jj absorb` or `jj squash --from @ ... --keep-emptied`), not committed by describing `@`.
+Describing or rebasing `@` drifts it off `[wip]`, vanishing the shared editing surface other actors depend on and (in this repo) dragging the pushed `wip` deploy bookmark below the join.
+The "commit them first" rule above therefore means route-downward, not `jj describe @`, when a development join is present.
 
 ## Atomic commit workflow
 
@@ -32,20 +35,31 @@ The `--changes` flag provides explicit file selection equivalent to staging one 
 
 In jj single-chain mode: edit one file, then immediately `jj describe -m "msg"` followed by `jj new` to freeze the change and start a new empty `@`.
 This is the jj equivalent of `git add [file] && git commit` — the `describe` + `new` cycle is the atomic commit boundary.
+This `describe @` + `new` boundary is single-chain ONLY; in development-join mode `@` is never described (see below).
 Without `jj new`, the next edit accumulates into the same change, breaking atomicity.
 If multiple files were edited before freezing, use `jj split <path> -m "msg"` to separate them into atomic changes after the fact.
 
 In jj development join mode (multi-parent composite): edit one file, then route it to the correct chain.
+In this mode `@` is always the empty `[wip]` commit sitting directly on the multi-parent development join; every editor edits that same shared `[wip]` and routes each change DOWNWARD into a chain, leaving `@` empty in place.
+Never `jj describe @` into content and never relocate `@` via the positional rebase forms `jj rebase -r @ --insert-before/--insert-after <target>` (nor `jj rebase --revisions @ --insert-before/--insert-after <target>`).
+Doing so drifts `@` off `[wip]`, destroys the shared editing surface concurrent actors are writing, and — in this repo — drags the pushed `wip` deploy bookmark below the join and breaks the join's single-`[wip]`-child invariant; recover any drift with `jj op restore`.
+The one sanctioned `jj rebase` that may name `@` is the destination add/remove-chain form `jj rebase -r @ -d 'all:(…)'`, which re-anchors the empty `@` onto a rebuilt join without drifting it.
+See `~/.claude/skills/jj-version-control/SKILL.md` §"Development join" for the canonical invariant, splice/by-relocation recipes, and the full concurrency rationale — this section is a routing summary, not the source of truth.
 Two routing patterns exist:
 
-- *Amend existing chain commit:* `jj squash --into <target-parent> -u -- <path>` routes the file into the existing commit.
+- *Amend existing chain commit:* `jj squash --from @ --into <target-parent> --keep-emptied -- <path>` routes the file into the existing commit while leaving `@` the empty `[wip]` on the join.
+  Always pass `--from @` (a bare `--into` is a no-op when `@` is empty) and `--keep-emptied` (otherwise the emptied source is abandoned and the join + wip structure is disrupted).
+  Omit `-m` so the target chain commit's existing description is preserved; the empty `[wip]` carries no description, so the description-merge editor never opens.
   Use when the chain commit already exists and the change belongs in it.
 - *Extend chain with new commit:* use the route-and-extend pattern from `~/.claude/skills/jj-version-control/SKILL.md`.
   Use when the change is a logically separate commit that should extend the chain.
 - *Auto-route by blame:* `jj absorb` distributes changes to appropriate ancestors automatically.
 
-After any routing operation, if `@` was described, clear it: `jj describe -m ""`.
-`jj squash --into` and `jj absorb` move file content but do NOT clear `@`'s description.
+Routing in development-join mode NEVER describes `@`.
+`@` is always the empty `[wip]` directly on the join; every routing verb (`jj squash --from @ --insert-after/--into <target> --keep-emptied [-- <paths>]`, `jj absorb`, or `jj split` keeping the wip) moves content DOWNWARD into a chain commit while leaving `@` in place and empty.
+`[wip]`'s description is ephemeral and is never maintained, so there is nothing to clear after a route.
+This is the whole point: the shared `[wip]` is the stable coordination surface that makes N concurrent editors safe by construction, and in this repo `@`/wip also backs the pushed `wip` deploy bookmark (machines rebuild from it) and is the join's required single child.
+If `@` somehow acquired a description or drifted off the join, treat it as an error to recover via `jj op restore`, not a routine cleanup.
 
 Do not use `jj new` (without `-A`) in development join mode — it creates a new change descending from the development join `@` rather than routing to a chain.
 `jj new -A <bookmark> --no-edit` is safe because it inserts after the specified bookmark without moving `@`.

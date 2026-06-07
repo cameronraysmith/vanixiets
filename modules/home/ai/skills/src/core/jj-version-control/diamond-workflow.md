@@ -136,6 +136,10 @@ Independent chains within the same linearization step can be ordered discretiona
    ```
 6. Before any file edit in wip, run the pre-edit cross-chain file-collision reconnaissance documented at `SKILL.md` §"Pre-edit cross-chain file-collision reconnaissance" to identify which chain (if any) already owns touchpoints on the file under edit, constraining chain selection so the route does not produce a structural conflict at `[merge]` during Phase 4 serialize.
    Develop in wip, routing changes to chains via the edit-route cycle.
+   Throughout the develop phase `@` stays the single empty `[wip]` directly atop `[merge]` (invariant (iii)/(vi)); this shared `[wip]` is the stable coordination point that lets multiple concurrent editors write the same integrated surface safely.
+   Route every change DOWN from `@` using only `@`-preserving verbs — `jj squash --from @ … --keep-emptied`, `jj absorb`, or `jj split` keeping the wip — and never `jj describe @` into content nor make `@` the subject of `jj rebase` / `--revisions @`, which drift `@` off `[wip]`, remove the surface other actors are concurrently writing, and (in this repo) drag the pushed `wip` deploy bookmark that machines rebuild from.
+   The one sanctioned `jj rebase` touching `@` is the destination add/remove-chain form `jj rebase -r @ -d 'all:(…)'`, which keeps `@` an empty child of the rebuilt join; the positional `--insert-before` / `--insert-after` (and the `-A` / `-B` aliases) forms are the prohibited ones.
+   See `~/.claude/skills/jj-version-control/SKILL.md` invariant (iii-b) for the canonical statement.
    Each route from `[wip]` to a chain is either an append-route (default: land a new atomic commit on the chain) or an amend-route (fixups against the existing tip).
    The append-route is the default for landing new work:
    ```bash
@@ -295,8 +299,16 @@ Mergify Stacks is GitHub-only and breaks Gitea compatibility, so the forge-agnos
 
 Two related operations arise during the develop phase when work surfaces that does not belong to any chain.
 
+Invariant for every operation in this section: `@` is and stays the empty `[wip]` directly above the join.
+Never `jj describe @` into a content commit and never make `@` the subject of `jj rebase` / `--revisions @` (nor the positional `--insert-before` / `--insert-after` / `-A` / `-B` forms); the by-relocation arm below relocates a SEPARATE, already-sealed non-wip commit, and `<X>` is never `@`/`[wip]`.
+Drifting `@` below the join removes the shared `[wip]` that concurrent editors write to — the stable coordination point that makes N concurrent editors safe by construction — and, in this repo, drags the pushed `wip` deploy bookmark below the join, from which machines rebuild.
+Route content that is still live in `@` DOWN with `jj squash --from @ … --keep-emptied`, which leaves `@` empty atop the join; only relocate already-sealed separate commits.
+See `~/.claude/skills/jj-version-control/SKILL.md` invariant (iii-b) for the canonical statement.
+
 **Splice-below-join** handles `<base>`-bound commits — hotfixes, formatting, config tweaks, dependency bumps — that should land on `<base>` before the diamond's chains.
-Two arms: *by-construction* (author the commit directly in the splice position with `jj new --insert-before 'children(fork_point(parents(<join>))) & ::<join>'`) and *by-relocation* (move an existing commit from above the join into the splice region with `jj rebase --revisions <X> --insert-before 'children(fork_point(parents(<join>))) & ::<join>'`).
+Two arms: *by-construction* (author the commit directly in the splice position with `jj new --insert-before 'children(fork_point(parents(<join>))) & ::<join>'`) and *by-relocation* (move an EXISTING, SEPARATE, already-sealed NON-wip commit `<X>` — `<X>` MUST NOT be `@`/`[wip]` — from above the join into the splice region with `jj rebase --revisions <X> --insert-before 'children(fork_point(parents(<join>))) & ::<join>'`).
+Never `jj describe @` then `jj rebase --revisions @ --insert-before <splice-target>`: that drifts `@` off `[wip]`, opens a transient window with NO `[wip]` on the join (catastrophic under concurrency), and (in this repo) drags the pushed `wip` deploy bookmark below the join.
+When the change is still live in `@`, route it down with `jj squash --from @ --insert-before 'children(fork_point(parents(<join>))) & ::<join>' -m "fix(scope): description" --keep-emptied -- <paths>` instead, which leaves `@` empty atop the join.
 The accumulated splice region fast-forwards `<base>` independently of when the diamond's chains land in Phase 4.
 See `~/.claude/skills/jj-version-control/SKILL.md` §"Splice-below-join" for the full recipe, anti-patterns (naked `--insert-after <base>`, single-target `--insert-before <one-root>`, `jj rebase -r <X> -d <base>` destination form), and verification.
 

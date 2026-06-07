@@ -44,6 +44,10 @@ All six must pass for elevation to proceed:
 
 Failing any of the six halts elevation pending remediation. Master surfaces the failing items back to AC for resolution rather than waiving them.
 
+The "`@` is empty" condition in point 6 is load-bearing because the empty `[wip]` at `@` is the shared coordination surface every editor writes while a development join is present.
+Keep `@` that empty `[wip]` and route completed content downward into the owning chain with editor-safe verbs (`jj absorb`, `jj squash --from @ … --keep-emptied`, `jj split` keeping the remainder); never `jj describe @` into content and never relocate `@` with a positional `jj rebase -r @ --insert-before/--insert-after`, either of which dissolves the surface other actors are concurrently writing.
+See jj-version-control/SKILL.md invariant (iii) (the composite maintenance invariant) for the canonical statement and the editor-safe routing-down command templates.
+
 AC-side pre-staging is the optimization for characterization-style streams: the AC pre-stages the six-point rubric as a checklist embedded in its review pass before the stream surfaces to master.
 Pre-staging makes tier-2 escalation near-zero-overhead for master (each point arrives already cited rather than waiting for master to drive citation) and gives the WO a target shape during drafting so the deliverable converges toward the rubric.
 The AC fills each rubric point with file:line citations as it reviews, and the populated rubric travels with the surface-up.

@@ -291,6 +291,24 @@ Resolve when convenient or undo and reorganize.
 
 ### Verify atomicity
 
+The per-commit test loops below repeatedly move `@` with `jj new $commit` and assume a single linear chain.
+If a development join (composite working copy) is active, do NOT run them as written — for the duration of the loop the join would have no `[wip]` child sitting on it, vanishing the shared editing surface that concurrent editors rely on (and, if `@`/wip is bookmarked for deploy, dragging that bookmark).
+Instead test each commit from a throwaway side change you abandon after, never moving the join's `[wip]`:
+
+```bash
+orig=$(jj log -r @ --no-graph -T 'commit_id')   # the [wip] on the join
+for commit in $(jj log -r 'main..@ ~ @' --no-graph -T 'commit_id ++ "\n"'); do
+  jj new $commit         # side change for testing only
+  cargo build && cargo test || echo "failed: $commit"
+  jj abandon @           # discard the side change
+done
+jj edit $orig            # return to the original [wip]
+# confirm: jj log -r @ shows an empty change whose parent is the merge
+```
+
+Note that `jj new @-` does NOT restore the join — after the loop `@-` is the last-tested commit, not the join.
+Restore explicitly with `jj edit <original-@>` or `jj op restore <pre-loop-op>`.
+
 Test each commit independently:
 
 ```bash
@@ -446,6 +464,17 @@ When in a development join (composite working copy), history cleanup operations 
 This is safe — jj handles it automatically.
 However, if cleanup involves abandoning changes that are parents of `@`, exit the development join first by removing that chain from `@`: `jj rebase -r @ -d 'all:(@- ~ chain-being-cleaned)'`.
 Re-add after cleanup is complete.
+
+Inside a development join `@` is always the empty `[wip]` commit sitting directly on the multi-parent join, and that shared `[wip]` is the coordination point that makes N concurrent editors safe by construction (in this repo it also backs the pushed `wip` deploy bookmark machines rebuild from).
+Auto-rebase of `@` triggered by editing its ancestors is safe and jj-managed, and re-anchoring `@`'s parent set with the destination forms `jj rebase -r @ -d 'all:(@- ~ chain)'` or `jj rebase -r @ -d 'all:(@- | chain)'` is the sanctioned apply/unapply primitive that keeps `@` an empty working copy on the join.
+What you must never do is make `@` itself a content commit or relocate it off the join: do not `jj describe @` (consumes the wip into a content commit) and do not relocate it via the positional forms `jj rebase -r @ --insert-before/--insert-after <target>` or `jj rebase --revisions @ --insert-before/--insert-after <target>` (drops the wip into a chain interval).
+Either removes the shared editing surface other actors are concurrently writing and breaks the diamond invariants.
+To route a change down a chain while leaving `@` empty, use `jj absorb` (above) — the preferred routing-down verb in a development join, which distributes the working-copy diff into the commits that last touched each path while leaving `@` in place and empty — or `jj squash --from @ --into <chain-tip> --keep-emptied [-- <paths>]` (amend, `-m` omitted to preserve the tip description) and `jj squash --from @ --insert-after/--insert-before <target> -m "msg" --keep-emptied [-- <paths>]` (append/splice), each carrying explicit `-m` for non-interactive safety.
+The six diamond invariants and the never-rewrite-`@` discipline are canonical in `~/.claude/skills/jj-version-control/SKILL.md` and `jj-version-control/diamond-workflow.md`; defer to them for the join-safe routing and splice recipes before applying any cleanup idiom from this skill.
+
+The linear-chain idioms throughout this skill assume a single chain rooted at `main` with `@` at its tip, and several of them move or reuse `@` (the per-commit `jj new $commit` test loop under "Verify atomicity", `jj bookmark set ... -r @`, `jj squash -r <c>  # into current @`).
+In a multi-parent development join `@` is the shared empty `[wip]` sitting on the join: never `jj describe @` and never positional `jj rebase -r @`/`--revisions @ --insert-before/--insert-after`, since either drifts the wip off the join, breaks concurrent editing, and drags the pushed `wip` deploy bookmark below the join.
+Route changes downward with `jj squash --from @ ... --keep-emptied` or `jj absorb`, and consult `jj-version-control/diamond-workflow.md` before applying any cleanup idiom here.
 
 ### `jj tidy` safety
 

@@ -31,19 +31,28 @@ The `-u` (`--use-destination-message`) flag prevents the description merge edito
 `jj absorb` analyzes which ancestor last touched each modified line and routes changes automatically.
 Use `jj squash --into` when changes belong to a specific chain element that blame cannot determine.
 
-## Adding and removing parents
+## Adding and removing chains
 
-Modify the set of chains in the development join:
+Modify the set of chains in the development join.
+These recipes re-parent the join commit, never the wip working copy.
+In the two-commit `[merge]`+`[wip]` structure, rebase the frozen `[merge]` (`@-`), then re-attach the empty `[wip]` onto it — the two `jj rebase` calls form a required tool-pair:
 
 ```bash
-# Add a chain
-jj rebase -r @ -d 'all:(@- | new-bookmark)'
+# Add a chain: grow the join's parent set in place, then re-attach the wip
+jj rebase -r <merge-change-id> -d 'all:(<existing-parents> | new-bookmark)'
+jj rebase -r <wip-change-id> -d <merge-change-id>
 
 # Remove a chain
-jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'
+jj rebase -r <merge-change-id> -d 'all:(<existing-parents> ~ removed-bookmark)'
+jj rebase -r <wip-change-id> -d <merge-change-id>
 ```
 
-The `all:` prefix ensures the revset resolves to multiple parents rather than a single ancestor.
+The `all:` prefix forces a multi-parent result rather than collapsing to the nearest common ancestor.
+
+Do NOT make the empty `[wip]` the subject of a positional rebase — `jj rebase -r @ --insert-before <target>` / `--insert-after <target>` (and the `jj rebase --revisions @ --insert-before/--insert-after <target>` aliases) relocate `@` below or into the join, dropping the shared editing surface concurrent actors are writing and dragging the pushed `wip` deploy bookmark (the catastrophic concurrency failure).
+In the simpler single-commit join — where `@` IS the join with no separate `[wip]` — the sanctioned destination form `jj rebase -r @ -d 'all:(@- | new-bookmark)'` (or `'all:(@- ~ removed-bookmark)'` to remove) re-parents in place and keeps `@` an empty direct child of the join; the two-commit `[merge]`+`[wip]` pair above is canonical for diamond work.
+This destination form is the ONLY `jj rebase` that may name `@`; it is distinct from the prohibited positional `--insert-before/--insert-after` forms.
+See `~/.claude/skills/jj-version-control/SKILL.md` invariant (iii) and §"Adding and removing chains" for the full canon.
 
 ## Auto-rebase behavior
 
@@ -73,6 +82,9 @@ jj describe -m "feat: implement issue description"
 jj new  # freeze and start next issue
 ```
 
+This linear-chain pattern describes `@` because `@` is a single-base content commit here.
+In a multi-parent development join, by contrast, `@` is the empty `[wip]` and must NEVER be `jj describe`'d — route downward into a chain instead.
+
 When working across multiple epics simultaneously, create a development join over the active epic bookmarks:
 
 ```bash
@@ -99,6 +111,14 @@ When working in the development join, use a join + wip structure (two-commit pat
 The development join integrates all parent bookmarks and has a description to prevent auto-abandonment.
 The wip commit (`@`) sits on top for active edits.
 `jj absorb` and `jj squash --into <target> -u -- <path>` route changes from wip to chains without disrupting the development join.
+
+Invariant: `@` is ALWAYS the empty `[wip]` commit directly on the development join.
+Every editor — human or agent — edits this same shared `[wip]`, then routes each change DOWNWARD into the correct chain, returning `[wip]` to empty between routings.
+The shared `[wip]` is the stable coordination point that makes N concurrent editors safe by construction, and in this repo it additionally anchors the pushed `wip` deploy bookmark.
+Never `jj describe @` into a content commit (that consumes the empty wip), and never make `@` the subject of `jj rebase` as a routing move — `jj rebase -r @` / `jj rebase --revisions @` with the positional `--insert-before/--insert-after` forms drifts `@` off the join, removes the shared editing surface concurrent agents write to, and drags the pushed `wip` deploy bookmark.
+Routing verbs leave `@` in place and empty: `jj absorb` (auto-distribute by blame; scoped `jj absorb <path>` under concurrency), `jj squash --from @ --into <chain-tip> --keep-emptied [-- <paths>]` (amend-route), `jj squash --from @ --insert-after <chain-tip> -m "msg" --keep-emptied -- <paths>` (append-route), and `jj split` keeping the wip remainder.
+To place a change BELOW the join, route it down from the live `@` with `jj squash --from @ --insert-before <target> -m "msg" --keep-emptied -- <paths>`; any by-relocation `<target>`/`<commit>` is a SEPARATE already-sealed non-wip commit, never `@` itself.
+The canonical invariants and the `--keep-emptied` routing primitives are normative in `~/.claude/skills/jj-version-control/SKILL.md` invariant (iii).
 
 Coordination protocol: atomic one-file changes, periodic `jj log` review, prompt routing to keep `@` clean.
 Subagent dispatch prompts specify which files to edit and the target chain context but do not include jj routing commands.
@@ -136,8 +156,8 @@ jj development joins operate in a single working tree, so the repository root's 
 | Applied branches | Chains in development join `@` |
 | `gitbutler/workspace` commit | Development join `@` commit |
 | `but commit --changes` | `jj squash --into <target> -u -- <path>` or `jj absorb` |
-| `but unapply` | Remove chain from join via `jj rebase -r @ -d 'all:(@- ~ bookmark)'` |
-| `but apply` | Add chain to join via `jj rebase -r @ -d 'all:(@- | bookmark)'` |
+| `but unapply` | Remove chain: `jj rebase -r <merge> -d 'all:(<existing-parents> ~ bookmark)'` then `jj rebase -r <wip> -d <merge>` (single-commit join: `jj rebase -r @ -d 'all:(@- ~ bookmark)'`) |
+| `but apply` | Add chain: `jj rebase -r <merge> -d 'all:(<existing-parents> | bookmark)'` then `jj rebase -r <wip> -d <merge>` (single-commit join: `jj rebase -r @ -d 'all:(@- | bookmark)'`) |
 | Branch stacks | Bookmark chains (linear descendant sequences) |
 | `but move` (cross-stack) | `jj squash --from <src> --into <dst>` |
 

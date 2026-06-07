@@ -45,6 +45,9 @@ The subagent inherits the teammate's working directory and operates against the 
 Dispatched subagent Task input MUST NOT set `isolation: "worktree"`.
 In jj-mode repositories this parameter is hook-blocked at the Agent tool surface, but teammates should omit it unconditionally to keep behavior consistent across modes.
 The subagent edits at `@` (which in tier 3 is the wip commit atop the development join, per `~/.claude/skills/jj-version-control/SKILL.md`'s composite maintenance invariant), and the orchestrator routes the resulting changes to the appropriate chain via the route-and-extend recipe (`jj new -A <chain-tip> --no-edit -m "..."` then `jj squash --from @ --into <new-change-id> --keep-emptied` then `jj bookmark move <name> --to <new-change-id>`).
+All teammates edit that same `@`=`[wip]`, which is the shared coordination surface that makes N concurrent editors safe by construction; routing the diff downward with `--keep-emptied` is load-bearing because it leaves `@` an empty `[wip]` in place for the others still writing it.
+Never `jj describe @` into content and never relocate `@` below the join via positional `jj rebase -r @ --insert-before/--insert-after` (nor the `--revisions @` form); both drift the shared surface off `[wip]`.
+Full canon — including the sanctioned destination-form `jj rebase -r @ -d 'all:(…)'` and the complete editor-safe routing-down templates — lives in `~/.claude/skills/jj-version-control/SKILL.md` invariant (iii-b)/(vi).
 
 This is the agent-team specialization of the binding orchestrator-dispatch discipline documented in `~/.claude/CLAUDE.md`.
 The same pattern applies to any orchestrator subject to a harness-level edit-gate (background sessions, future isolation requirements); teammates are simply the most common case in team-coordinated work.

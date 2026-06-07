@@ -113,6 +113,10 @@ Master's cross-stream coordination tasks (dependency-map maintenance, cross-stre
 For N-stream missions, all streams' chains parent into one development join with a single `[wip]` commit on top; sibling chains directly off main are out of scope absent affirmative justification at the decomposition-ratification gate.
 See jj-version-control/SKILL.md §"Development join" for the entity definition.
 
+Every editor on that join — each WO, each dispatched subagent — writes the same empty `[wip]` at `@`, which is the shared coordination surface that makes the concurrent streams safe by construction.
+Keep `@` empty and route completed content downward into the owning chain; never `jj describe @` into content and never relocate `@` with a positional `jj rebase -r @`, either of which dissolves the surface the other streams are concurrently writing.
+See jj-version-control/SKILL.md invariant (iii-b)/(vi) for the canonical statement and the editor-safe routing-down command templates.
+
 ## Spawn-timing calibration: keyed on stream-novelty
 
 Stream-novelty is the load-bearing axis for spawn-timing choice, not speed.

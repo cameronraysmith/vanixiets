@@ -138,10 +138,27 @@ jj describe -r <commit> -m "updated description"
 
 When using the multi-parent development join (composite working copy) + wip pattern, the development join must have a description to prevent auto-abandonment.
 Always work in the wip commit (`@`), never directly in the development join.
-Operations like `jj new <single-parent>` or `jj edit` will move `@` away from wip.
-Record the development join's change ID before such operations and restore with `jj new <join-change-id>` afterward.
-`jj absorb` is safe from wip — it routes changes (route elements to their chain) without disrupting the development join.
-`jj squash --into <target> -u -- <path>` is safe from wip — it routes specific file changes without disrupting the development join.
+The shared empty `[wip]` at `@` is the stable coordination point that makes N concurrent editors safe by construction: every editor — human or LLM agent — edits that same `[wip]`, whose working tree reflects the integrated union of all chain contents, then routes each completed change downward into the owning chain.
+In this repo `@`/`[wip]` is additionally tracked by the pushed `wip` deploy bookmark, and machines rebuild from it, so `@` must never drift off `[wip]`.
+
+Operations that drift `@` away from wip, and are therefore forbidden while a development join is present:
+- `jj new <single-parent>` and `jj edit <other>` move `@` away from the join (record the join's change ID before such operations and restore with `jj new <join-change-id>` afterward).
+- `jj describe @ ...` consumes the empty wip into a content commit.
+- `jj rebase -r @ --insert-before <target>` / `--insert-after <target>` and `jj rebase --revisions @ --insert-before/--insert-after <target>` relocate the wip below or into the join interior.
+
+Never describe `@` into content and never positionally rebase `@`.
+The one sanctioned `jj rebase` touching `@` is the destination add/remove-chain form `jj rebase -r @ -d 'all:(@- | new-bookmark)'` (add a chain) or `jj rebase -r @ -d 'all:(@- ~ removed-bookmark)'` (remove a chain); the `all:` prefix forces a multi-parent merge so `@` stays an empty direct child of the rebuilt join and is not drifted.
+
+All content leaves `@` by routing downward with `@` left in place and empty, via these editor-safe verbs:
+- `jj absorb` (auto-distribute by blame; prefer the scoped `jj absorb <path>` form under concurrency) — safe from wip without `--keep-emptied`.
+- `jj squash --from @ --into <chain-tip> --keep-emptied [-- <paths>]` (amend-route; omit `-m` to preserve the tip description — the empty wip carries no description, so the description-merge editor never fires).
+- `jj squash --from @ --insert-after <chain-tip> -m "feat(scope): description" --keep-emptied [-- <paths>]` (append-route; then advance the bookmark to the `Created new commit <id>` line jj prints, via `jj bookmark move <chain> --to <id>`).
+- `jj squash --from @ --insert-before <target> -m "fix(scope): description" --keep-emptied -- <paths>` (splice-below-join from live `@`; this is the correct mechanic for routing a base-bound fix into the splice region — it never moves `@`).
+- `jj split` keeping the wip remainder (do not pre-stage by describing `@` in a join — that consumes the wip; pass explicit paths and `-m` per the split guidance above).
+
+The splice-below-join must use the `--keep-emptied` squash form, never `jj describe @` followed by `jj rebase --revisions @ --insert-before <target>`: that two-step opens a transient window with no `[wip]` on the join, which is catastrophic under concurrency, and in this repo drags the pushed `wip` deploy bookmark below the join.
+In every splice/relocation recipe the relocated `<commit>`/`<X>`/`<range>` is a separate, already-sealed non-wip commit, never `@`/`[wip]` itself.
+For the canonical invariant statement (iii-b), command templates, and rationale, see `~/.claude/skills/jj-version-control/SKILL.md` §"Development join".
 
 ### Git parity and the `jj new` requirement
 
@@ -719,6 +736,10 @@ Each step executes immediately. Use `jj undo` to back out of any step.
 
 ### Core operations
 
+These rebase-by-revision recipes assume `<commit>` is a stacked, non-wip commit in a single chain.
+When a multi-parent development join is present (see "Composite working copy maintenance" above and §"Diamond workflow"), never pass `@` (the empty `[wip]`) as the rebased revision: relocating `@` below the join destroys the shared editing surface concurrent actors write to and drags the pushed `wip` deploy bookmark.
+To splice a fix below the join from the working copy, use `jj squash --from @ --insert-before <target> -m "msg" --keep-emptied -- <paths>`, which leaves `@` in place and empty; see the splice-below-join recipe in `~/.claude/skills/jj-version-control/SKILL.md` §"Development join".
+
 Reorder commits:
 
 ```bash
@@ -1285,6 +1306,12 @@ jj squash -i                   # Interactive squash (choose hunks)
 jj absorb                      # Auto-distribute @ to ancestors
 
 # Rewrite history
+# In a multi-parent development join, NEVER target @ with rebase or describe:
+#   jj rebase -r @ / --revisions @ relocates the shared [wip] off the join (drains its working copy under
+#   concurrency, drags the pushed wip deploy bookmark, breaks the one-child invariant); jj describe @ consumes
+#   the wip into content. Route down instead via jj absorb or
+#   jj squash --from @ --into/--insert-after <target> --keep-emptied.
+#   See "Composite working copy maintenance" and ~/.claude/skills/jj-version-control/SKILL.md §"Development join".
 jj rebase -r <commit> -d <dest>       # Move commit to new parent
 jj rebase -s <commit> -d <dest>       # Move commit and descendants
 jj rebase -r <commit> -A <after>      # Insert after commit
@@ -1350,7 +1377,8 @@ Use explicit operation IDs from session start for precise ranges.
 - **Command verification protocol**: When uncertain if a command is non-interactive, run `--help` first and check for `-m, --message` flag or interactive keywords
 - Operation log is history (commits are snapshots, operations are timeline)
 - Bookmarks don't move automatically (only on commit rewrites)
-- Working copy commit `@` is ephemeral (constantly rewritten)
+- Working copy commit `@` is ephemeral in solo work (constantly rewritten); in a multi-parent development join it is held STABLE as the empty `[wip]` coordination point — do not treat it as freely rewritable (see "Composite working copy maintenance")
+- `@` is the stable `[wip]` in a development join: when a multi-parent join is active, `@` is the empty `[wip]` shared by all concurrent editors and tracked by the pushed `wip` deploy bookmark (machines rebuild from it); route changes DOWN with `jj absorb` or `jj squash --from @ --insert-before/--insert-after <target> -m "msg" --keep-emptied [-- <paths>]`, and never `jj describe @` into content nor `jj rebase -r @` / `jj rebase --revisions @` — either drifts `@` off the join, destroys the shared editing surface, and drags the deploy bookmark (see `~/.claude/skills/jj-version-control/SKILL.md` §"Development join")
 - Change IDs provide stability (commit IDs change, change IDs don't)
 - No staging area (working copy state is commit state)
 - Conflicts are first-class (committed, resolved when convenient)

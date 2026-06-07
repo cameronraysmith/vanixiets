@@ -50,6 +50,7 @@ For quick questions about commands or concepts, this summary may suffice.
 | `jj split <paths>` | Opens editor twice (extracted + remainder) | `jj describe -m "<remainder>"` first, then `jj split <paths> -m "<extracted>"` — see `jj-workflow` "Common gotchas" for the multi-boundary rule |
 | `jj split` (no paths) | Opens diff editor (TUI) | **Cannot be non-interactive** |
 | `jj squash --into <dest>` | Opens description merge editor | `jj squash --into <dest> -u` (keep dest description) or `-m "msg"` |
+| `jj squash --from @ --insert-after <tip>` / `--insert-before <revset>` (create mode) | Opens editor for the new commit's description when neither `-m` nor `-u` is supplied | always pass `-m "msg"` (and `--keep-emptied` so `@` returns to empty `[wip]`) |
 
 **Mandatory verification protocol:**
 1. Not certain a command is non-interactive? → Run `jj [subcommand] --help` FIRST
@@ -125,6 +126,10 @@ jj describe -r <c> -m "msg"    # Reword commit (ALWAYS use -m!)
 jj workspace add <path> -r <c> # Create workspace
 jj workspace update-stale      # Update stale workspace
 
+# Note: the `jj describe @` + `jj new` cycle above is for SINGLE-CHAIN (tier 1) work, where `@` becomes content.
+# In a development join (tier 3), `@` is the shared empty [wip] directly atop the join — do NOT `jj describe @`
+# into content and do NOT `jj rebase -r @` positionally; route DOWN via `jj squash --from @ ... --keep-emptied`,
+# `jj absorb`, or `jj split` (keeping the wip), which leave `@` in place and empty.
 # Multi-parent development join (composite working copy)
 jj new bm-a bm-b bm-c         # Join multiple chains into one working tree
 jj describe -m "join: bm-a + bm-b + bm-c"  # Describe the development join
@@ -132,11 +137,11 @@ jj new                         # Create wip commit on top of the join
 # Work in wip, then route changes to the appropriate chain:
 jj squash --into <chain> -u -- <path>     # Manual routing (keeps dest description)
 jj absorb                      # Auto-route changes by blame
-# Route-and-extend: create a NEW commit on a chain (not amend existing)
-jj new -A <bookmark> --no-edit -m "msg"   # Insert new commit after bookmark
-jj squash --from @ --into <id> -u -- <path>  # Route file content into it
-jj bookmark set <bookmark> -r <id>        # Advance bookmark to new tip
-jj describe -m ""                         # Clear stale @ description
+# Route-and-extend: create a NEW commit on a chain (not amend existing); @/[wip] never drifts below the join
+jj new -A <bookmark> --no-edit -m "feat: msg"   # Insert empty commit after bookmark; --no-edit keeps @ on [wip]
+jj squash --from @ --into <id> --keep-emptied -- <path>  # Route file content into it; --keep-emptied preserves @ in place (NOT -u alone: -u only sets the dest description)
+jj bookmark set <bookmark> -r <id>        # Advance bookmark to new tip (use the printed Created-new-commit id, not @-)
+# `@` stays an empty [wip] on the join. `jj describe -m ""` (empty message ONLY) may clear a stale wip description; never `jj describe @ -m "<content>"`.
 # Route-and-extend multi-commit-range form: relocate an N-commit linear segment into a chain
 jj rebase --revisions '<range-start>::<range-end>' --insert-after <chain-tip>
 jj bookmark set <chain-bookmark> -r <range-end>
@@ -148,10 +153,14 @@ jj rebase -r @ -d 'all:(@- ~ old-bm)'    # Remove chain from the development joi
 # Splice-below-join: insert a <base>-bound commit between <base> and chain roots
 # By-construction: author a new splice commit in position
 jj new --insert-before 'children(fork_point(parents(<join>))) & ::<join>' -m "msg"
-# By-relocation: move an existing above-join commit into the splice region
+# To route content currently in @/[wip] below the join, use the @-PRESERVING form (never moves @):
+jj squash --from @ --insert-before 'children(fork_point(parents(<join>))) & ::<join>' \
+  -m "fix(scope): description" --keep-emptied -- <paths>
+# By-relocation: ONLY for a SEPARATE, already-sealed NON-wip commit that already exists above the join.
+# `<separate-sealed-non-wip-commit>` MUST NOT be `@`/[wip]; NEVER `jj describe @` then relocate it — that destroys the shared [wip].
 # Precondition (by-relocation only): relocation set's files must be disjoint from any chain's files
 # (skill/aggregator files frequently collide; on collision use route-and-extend or new-chain instead)
-jj rebase --revisions <X> --insert-before 'children(fork_point(parents(<join>))) & ::<join>'
+jj rebase --revisions <separate-sealed-non-wip-commit> --insert-before 'children(fork_point(parents(<join>))) & ::<join>'
 # See ~/.claude/skills/jj-version-control/SKILL.md §"Splice-below-join"
 
 # Diamond integration on remote advance: rebase diamond onto fast-forwarded remote
@@ -278,6 +287,9 @@ jj bookmark set main -r feature-b
 ```
 
 **Development join (simultaneous multi-bookmark editing):**
+
+In a development join, `@` is the shared empty `[wip]` directly atop the join and the SHARED editing surface for all concurrent editors; do NOT `jj describe @` into content and do NOT `jj rebase -r @`, route DOWN via `jj squash --from @ ... --keep-emptied`, `jj absorb`, or `jj split` (keeping the wip). The describe+new cycle taught earlier is for SINGLE-CHAIN (tier 1) work only.
+
 ```bash
 # Join multiple chains into one working tree
 jj new feature-a feature-b feature-c
@@ -287,11 +299,13 @@ jj new                            # Create wip commit on top of the join
 jj squash --into feature-a -u -- <path>  # Manual routing (keeps dest description)
 jj absorb                         # Auto-route by blame
 # IMPORTANT: `jj squash --into` AMENDS the existing chain tip.
-# To CREATE a new commit extending the chain, use route-and-extend:
-# jj new -A <bookmark> --no-edit -m "msg"
-# jj squash --from @ --into <new-id> -u -- <path>
-# jj bookmark set <bookmark> -r <new-id>
-# jj describe -m ""
+# To CREATE a new commit extending the chain (route-and-extend), `@`/[wip] stays the empty wip throughout —
+# never `jj describe @` into content, never `jj rebase -r @`:
+# jj new -A <bookmark> --no-edit -m "msg"          # insert new empty commit after tip; --no-edit keeps @ on [wip]
+# jj squash --from @ --into <new-id> --keep-emptied -- <path>  # route content; --keep-emptied preserves empty [wip]
+# jj bookmark set <bookmark> -r <new-id>           # advance bookmark to new tip
+# No description-recovery step is needed; [wip] is ephemeral.
+# See jj-version-control/SKILL.md §"Extending a chain with a new commit (route-and-extend pattern)".
 # Add/remove chains dynamically:
 jj rebase -r @ -d 'all:(@- | new-bookmark)'   # Add chain
 jj rebase -r @ -d 'all:(@- ~ old-bookmark)'   # Remove chain
@@ -338,7 +352,7 @@ jj log -r 'mine() & ~bookmarks()'
 
 ## Critical reminders
 
-- **Non-interactive execution**: ALWAYS use `-m "message"` with `jj describe`, `jj describe -r`, and `jj split <paths>` to avoid editor hangups; use `-u` or `-m` with `jj squash --into` to prevent the description merge editor; verify unfamiliar commands with `jj [subcommand] --help` first
+- **Non-interactive execution**: ALWAYS use `-m "message"` with `jj describe`, `jj describe -r`, and `jj split <paths>` to avoid editor hangups; use `-u` or `-m` with `jj squash --into` to prevent the description merge editor; the development-join append-route `jj squash --from @ --insert-after/--insert-before` is create-a-new-commit mode and opens an editor without `-m`/`-u`, so always pass `-m` and `--keep-emptied` so `@` stays an empty `[wip]`; verify unfamiliar commands with `jj [subcommand] --help` first
 - **Command verification protocol**: Before executing any jj command you're uncertain about, run `jj [subcommand] --help` to check for interactive flags (look for `-m, --message`)
 - **Git parity requirement**: Execute `jj new` immediately after `jj describe -m "msg"` to freeze commits for git export; without `jj new`, described commits exist only in jj and appear as uncommitted changes in git
 - **Always colocated mode**: We operate with both .git and .jj (can revert to git anytime)
@@ -350,6 +364,7 @@ jj log -r 'mine() & ~bookmarks()'
 - **No backup branches**: Use `jj op log` and `jj op restore` instead
 - **Bookmarks stay put**: Explicitly move with `jj bookmark set`, don't assume movement
 - **@ is ephemeral**: Working copy commit constantly rewritten, bookmark @ parent not @
+- **@ stays empty `[wip]` in a development join**: when a multi-parent join exists, `@` is the empty `[wip]` directly atop `[merge]` and the SHARED editing surface for all concurrent editors. Never `jj describe @` into a content commit and never `jj rebase -r @` / `jj rebase --revisions @` — both drift `@` off `[wip]`, vanish the shared coordination point, break the join's one-child invariant (vi), and (in this repo) drag the pushed `wip` deploy bookmark. Route DOWN into the owning chain via `jj squash --from @ … --keep-emptied`, `jj absorb`, or `jj split` (keeping the wip). Canon: `~/.claude/skills/jj-version-control/SKILL.md` §development join / invariants (iii-b)/(vi), and `diamond-workflow.md`.
 - **Conflicts are first-class**: Committed and resolved when convenient, never blocking
 - **Detached HEAD is normal**: In a jj-colocated repo, detached HEAD is the expected state. Do not attempt to reattach HEAD or "fix" this.
 
