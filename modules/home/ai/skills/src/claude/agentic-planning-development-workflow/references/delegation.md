@@ -38,10 +38,12 @@ roborev and documenter are mode-agnostic gate tasks the router presents downstre
 They are abstract gates, not built agents: no fourth agent is introduced for the In-Review sub-gates.
 
 roborev is the code-review point linking out from the superpowers-bridge apply and verify stage.
+The concrete reviewer the abstract roborev gate uses is the inline codex code-review runbook in references/codex-review.md, which produces a cross-model verdict and findings as advisory evidence layered under the human-steered gate rather than replacing it.
 documenter is documentation authoring plus review linking out from the verify and retrospective stage; its review surface is repo-dependent (apps/handbook/src/content/docs/ for the sciexp monorepo, docs/notes/ plus affected skill and module docs for vanixiets-internal).
 
 Both sub-gates are currently human-steered: a human operating the workflow orchestrator supplies the verdict and the router routes on it.
 A future extension point is recorded in references/board-and-gates.md: automation hooks may later trigger code-review or doc-generation tools at the sub-gates, composing into the existing roborev and documenter gates without introducing a fourth agent.
+references/codex-review.md is that automation hook for roborev: it binds the gate to an inline codex review whose verdict stays advisory in all modes, so it composes under the human-steered clause rather than converting the gate to auto-gating.
 They live here, mode-agnostic, while the per-mode criteria live in references/execution-modes.md, because the sub-gates are presented identically downstream of every mode.
 
 ## The router re-implements none of orient, plan, review, or checkpoint

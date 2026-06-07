@@ -23,6 +23,8 @@ The fourth transition, In Review to Done, fires only when `openspec archive` suc
 
 A single shared re-queue node receives both In Review sub-gate rejections and re-queues into In Progress above the execution-mode fork, so a bounced issue re-selects its mode.
 The re-queue In Review to In Progress fires on either a verify.md Overall Decision of checked "(fail) FAIL" (machine-detected) or a human rejection at either In Review sub-gate (roborev for code review, then documenter for docs/handbook review).
+A codex roborev changes-needed verdict drives the same In Review to In Progress re-queue: the triage decision to re-queue is recorded by checking the existing verify.md Overall Decision checkbox to `- [x] (fail) FAIL`, which is the machine-detected fail above, so it flows through the same review_round counter and inherits the bounded-retries termination guarantee rather than introducing a new artifact or board state.
+The codex findings themselves post as a best-effort Linear comment subject to the existing at-most-two-sentence comment invariant, summarized to two sentences with the full detail kept in-repo (for example the out.json artifact in the change directory), and obey the drop-and-log graceful-degradation contract: if posting fails, the comment is dropped, the drop is logged in the attempt log, and local progress is not blocked.
 It is governed by the bounded-retries policy below, which escalates to the human PM layer on exhaustion.
 
 Canceled and Duplicate are inert terminals reachable from any active state and are best-effort and human-driven: Canceled corresponds to a change directory removed without archive, and Duplicate to a change superseded by another.

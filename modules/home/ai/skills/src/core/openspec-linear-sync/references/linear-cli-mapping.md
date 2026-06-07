@@ -37,6 +37,7 @@ Every command, read or mutation, passes an explicit `--workspace <slug>` after t
 | Transition state | `save_issue` (id + state) | `linear issue update` (by state name) |
 | Sync issue description | `save_issue` (id + description) | `linear issue update` (`--description-file`, preferred for markdown) |
 | Post a milestone comment | `save_comment` | `linear issue comment add` |
+| Post a codex roborev findings summary (optional, best-effort) | `save_comment` | `linear issue comment add` |
 | Document lookup | `list_documents` | `linear document list` |
 | Document create | `save_document` (create) | `linear document create` |
 | Document update | `save_document` (update) | `linear document update` |
@@ -125,6 +126,14 @@ The transition is attempted; `linear issue update --state "In Review"` throws No
 # Attempt; a NotFoundError (no "In Review" state on this team) is caught and logged, leaving the issue In Progress.
 linear issue update <id> --state "In Review" --workspace <slug>
 printf 'Verification artifact written; the change is ready for roborev and documenter review.\n' > /tmp/c.md
+linear issue comment add <id> --body-file /tmp/c.md --workspace <slug>
+# Optional codex roborev findings summary at the roborev sub-gate, posted within In Review (no new state).
+# Best-effort and non-blocking: the operator summarizes THIS run's actual verdict into at most two sentences,
+# never a fixed/hard-coded string. Under panel mode that summary is the majority verdict plus the recurring
+# (recommended-blocking) findings; the single-round case summarizes the one verdict. Full detail stays in-repo
+# (the out.json artifact in the change directory), and a failed post is dropped-and-logged in the attempt log.
+# The line below is an ILLUSTRATIVE example only, not a literal to copy:
+printf 'EXAMPLE: Codex roborev verdict was incorrect, with 1 priority-0/1 finding flagged for triage; full findings retained in the change directory out.json.\n' > /tmp/c.md
 linear issue comment add <id> --body-file /tmp/c.md --workspace <slug>
 ```
 

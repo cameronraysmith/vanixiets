@@ -119,6 +119,7 @@ Defer the full canon to jj-version-control/SKILL.md invariant (iii-b)/(vi).
 | references/board-and-gates.md | The seven Linear-canonical states, the four forward transitions, the In-Review sub-gates, the shared re-queue, the bounded-retries policy, and the router walkthrough |
 | references/hil-isolation.md | The jj diamond development join as the worktree substitute and the CLAUDE_JJ_WORKSPACE_ISOLATION hatch, confirmed at the apply gate |
 | references/delegation.md | The compose-by-delegation contract, the abstract In-Review gates, and the statement that the router re-implements none of orient/plan/review/checkpoint |
+| references/codex-review.md | The codex code-review gate runbook binding the abstract roborev sub-gate to a concrete, diamond-safe, advisory inline codex review |
 | references/collaborators.md | The four-collaborator map naming the PM hub, this router, the openspec plus superpowers-bridge flow, and openspec-linear-sync, with the ownership-by-layer one-liner and a pointer back to the front-door quickstart |
 
 ## Boundary assertions

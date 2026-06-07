@@ -70,7 +70,10 @@ The current execution model for both is human-steered: a human operating the wor
 
 The roborev sub-gate runs first.
 roborev is the code-review point linking out from the superpowers-bridge apply and verify stage.
-On an approved verdict the router advances to the documenter sub-gate; on a changes-needed verdict it routes into the shared re-queue.
+Its concrete code-review automation is the inline codex review documented in references/codex-review.md, which composes into this abstract gate without introducing a fourth agent or a new board state; it augments rather than replaces superpowers:requesting-code-review, whose apply-phase review continues alongside.
+The codex binding is advisory in all three execution modes: codex emits a verdict and findings as evidence, and the orchestrating session or a human always makes the advance-versus-re-queue decision, so the currently-human-steered framing above is preserved and codex layers under it as the evidence generator (even AFK pauses here for human adjudication and does not auto-advance on a codex pass).
+The findings are a triage surface rather than an autonomous block: all findings are presented grouped by priority with the recommended-blocking set (priority `<= 1`, plus an overall `incorrect` signal) flagged as the default must-address set, and the session or human chooses the subset to address; that triage decision, not the raw threshold, drives the transition.
+An accept decision advances the router to the documenter sub-gate; a re-queue decision routes into the shared re-queue, recorded by checking the existing verify.md Overall Decision checkbox from `- [ ] (fail) FAIL` to `- [x] (fail) FAIL` so it reuses the existing machine-detected re-queue path described below, incrementing `review_round` under the bounded-retries policy.
 
 The documenter sub-gate runs second.
 documenter is documentation authoring plus review linking out from the verify and retrospective stage.
@@ -121,5 +124,9 @@ Three exhausted rounds would escalate to the human PM layer and park the unit.
 
 ## Future automation extension point
 
-A future extension point is recorded: automation hooks may later trigger the right tools at each sub-gate (code-review automation for roborev; doc-generation and review automation for documenter).
-Such hooks compose into the existing roborev and documenter abstract gates without introducing a fourth agent; the board structure, the two sub-gates, and the shared re-queue are unchanged.
+Automation hooks may trigger the right tools at each sub-gate (code-review automation for roborev; doc-generation and review automation for documenter), composing into the existing abstract gates without introducing a fourth agent; the board structure, the two sub-gates, and the shared re-queue are unchanged.
+
+The roborev hook is realized: references/codex-review.md binds it to the inline codex review.
+The review defaults to a single advisory round, with optional panel-mode escalation that takes the majority of K identical runs for contested or high-criticality verdicts, detailed in references/codex-review.md.
+codex plugs in strictly upstream of the existing In Progress to In Review to Done transitions, stays advisory in all three modes, and adds no new board state or Linear state; its accept decision advances to documenter and its re-queue decision drives the shared re-queue by checking the verify.md `- [x] (fail) FAIL` box, reusing the existing machine-detected path.
+The documenter hook remains an abstract extension point: a future doc-generation-and-review binding would compose into the documenter sub-gate the same way, leaving the structure unchanged.
