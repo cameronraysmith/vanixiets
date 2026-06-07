@@ -83,6 +83,7 @@
           claude-monitor
           clipboard-jh
           dvcWithOptionalRemotes
+          forgejo-cli
           gh
           gh-dash
           git-filter-repo
