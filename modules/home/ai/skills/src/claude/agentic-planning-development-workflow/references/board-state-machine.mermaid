@@ -51,7 +51,7 @@ stateDiagram-v2
     %% --- The shared re-queue ---
     %% A roborev or documenter rejection, or a verify.md "(fail) FAIL" Overall Decision,
     %% re-queues into In Progress above the mode fork so the unit re-selects its mode.
-    InReview --> InProgress: re-queue / sub-gate rejection or verify.md "(fail) FAIL"
+    InReview --> mode_fork: re-queue / sub-gate rejection or verify.md "(fail) FAIL"
     note left of InProgress
         Bounded-retries policy (recommended default 3):
         a review-round counter increments once per re-queue

@@ -6,6 +6,7 @@
 - [x] 1.4 Create `references/hil-isolation.md` covering the jj diamond development join as the worktree substitute and the CLAUDE_JJ_WORKSPACE_ISOLATION hatch, recording the reconciliation as an apply-gate open point and not baking in `git worktree add`
 - [x] 1.5 Create `references/delegation.md` covering roborev and documenter as mode-agnostic human-steered abstract gates linking to the bridge apply/verify and verify/retrospective stages, the future-automation extension point (later code-review/doc-gen hooks compose into the existing roborev and documenter gates without introducing a fourth agent, per design D5), the AFK handoff act, and the composition-by-delegation contract (never re-implement orient/plan/review/checkpoint; Manual pass-through to /session-orient; reference session-advisor without duplicating it)
 - [x] 1.6 Confirm the router SKILL.md is one level deep in its references and asserts that the router does not read beads graph metrics or the stigmergic signal table
+- [x] 1.7 Enumerate the three router references added after the initial four (`board-state-machine.mermaid` and `collaborators.md` in the founding router commit; `references/codex-review.md` binding the roborev sub-gate to the inline codex review) so the router reference set is the seven shipped files, all one level deep
 
 ## 2. Project-management hub skill (project-management-hub)
 

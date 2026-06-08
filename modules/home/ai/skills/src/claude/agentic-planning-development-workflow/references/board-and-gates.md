@@ -18,7 +18,7 @@ See references/board-state-machine.mermaid.
 Five states are active and two are inert terminals.
 
 Backlog, Todo, In Progress, In Review, and Done are the five active states a unit of work passes through in order.
-Canceled and Duplicate are inert terminals carrying no active work, reachable from any active state exactly like Backlog.
+Canceled and Duplicate are inert terminals carrying no active work, reachable from any non-terminal active state (every active state except Done) exactly like Backlog.
 
 ## The four forward transitions
 

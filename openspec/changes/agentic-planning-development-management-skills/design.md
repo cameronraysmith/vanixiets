@@ -53,6 +53,9 @@ src/claude/agentic-planning-development-workflow/
     board-and-gates.md              (Linear-canonical states, one gate per forward transition, In-Review sub-gates, re-queue, bounded-retries, router walkthrough)
     hil-isolation.md                (jj diamond development join as worktree substitute; CLAUDE_JJ_WORKSPACE_ISOLATION hatch)
     delegation.md                   (roborev/documenter abstract gates, mode-agnostic; AFK handoff act)
+    board-state-machine.mermaid     (stateDiagram-v2 rendering of the board, transitions, mode fork, sub-gates, re-queue, inert terminals)
+    codex-review.md                 (the roborev sub-gate binding: inline codex review runbook, diamond-safe range, advisory verdict, panel mode)
+    collaborators.md                (the four-collaborator ownership map: PM hub, this router, the opsx+superpowers-bridge flow, openspec-linear-sync)
 
 src/core/project-management/
   SKILL.md                          (human-facing PM hub; lean index + Contents table grouped by prefix)

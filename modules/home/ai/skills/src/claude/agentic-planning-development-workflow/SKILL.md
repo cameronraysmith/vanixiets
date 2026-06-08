@@ -58,7 +58,7 @@ The board is re-cast onto Linear's canonical states so every board state maps on
 Five states are active and two are inert terminals:
 
 Backlog then Todo then In Progress then In Review then Done are the five active states.
-Canceled and Duplicate are inert terminals carrying no active work, reachable from any active state exactly like Backlog.
+Canceled and Duplicate are inert terminals carrying no active work, reachable from any non-terminal active state (every active state except Done) exactly like Backlog.
 
 Four forward transitions advance a unit of work, each named by its transition rather than by an ordinal and each firing on exactly one file-anchored condition:
 
@@ -119,6 +119,7 @@ Defer the full canon to jj-version-control/SKILL.md invariant (iii-b)/(vi).
 |---|---|
 | references/execution-modes.md | AFK/HIL/Manual entry criteria, the per-mode authoritative ledger, and the re-queue-defaults-to-original-mode rule |
 | references/board-and-gates.md | The seven Linear-canonical states, the four forward transitions, the In-Review sub-gates, the shared re-queue, the bounded-retries policy, and the router walkthrough |
+| references/board-state-machine.mermaid | The stateDiagram-v2 rendering of the seven-state board, its four file-anchored forward transitions, the execution-mode fork, the two ordered In-Review sub-gates, the shared re-queue, and the inert terminals |
 | references/hil-isolation.md | The jj diamond development join as the worktree substitute and the CLAUDE_JJ_WORKSPACE_ISOLATION hatch, confirmed at the apply gate |
 | references/delegation.md | The compose-by-delegation contract, the abstract In-Review gates, and the statement that the router re-implements none of orient/plan/review/checkpoint |
 | references/codex-review.md | The codex code-review gate runbook binding the abstract roborev sub-gate to a concrete, diamond-safe, advisory inline codex review |
