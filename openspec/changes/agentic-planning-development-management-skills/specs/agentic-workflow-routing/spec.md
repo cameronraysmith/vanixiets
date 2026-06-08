@@ -25,9 +25,9 @@ The board SHALL define exactly one transition-firing condition per forward trans
 - **WHEN** the change is archived (openspec archive succeeds)
 - **THEN** the archive gate fires the In Review to Done forward transition and Done is reached only after archive
 
-#### Scenario: Canceled and Duplicate are inert terminals reachable from any active state
+#### Scenario: Canceled and Duplicate are inert terminals reachable from any non-terminal active state
 - **WHEN** a change directory is removed without archive, or a change is superseded by another change
-- **THEN** the board moves the issue to Canceled or Duplicate respectively, treating both as inert terminals carrying no active work, reachable from any active state exactly like Backlog
+- **THEN** the board moves the issue to Canceled or Duplicate respectively, treating both as inert terminals carrying no active work, reachable from any non-terminal active state (every active state except Done, which is reached only after archive) exactly like Backlog
 
 ### Requirement: In Review decomposes into two ordered human-steered sub-gates
 
@@ -55,7 +55,8 @@ roborev SHALL be the code-review point linking out from the superpowers-bridge a
 
 The board SHALL provide a single shared re-queue node that receives both sub-gate rejections and re-queues into In Progress above the execution-mode fork, so a bounced issue re-selects its execution mode.
 The re-queue SHALL fire on either a verify.md Overall Decision of checked-FAIL (machine-detected) or a human rejection at either sub-gate.
-A bounded-retries policy SHALL give the board a documented termination guarantee that its structure alone does not provide: a maximum review-round counter that escalates to the human PM layer on exhaustion.
+A bounded-retries policy SHALL give the board a counter-backed termination guarantee in the execution modes whose ledger carries the review-round counter (HIL, and AFK where the plan file backs it): a maximum review-round counter that escalates to the human PM layer on exhaustion.
+In Manual mode the human is the regulator and termination is human-judged at session-checkpoint, the fairness-assumption path rather than the counter-backed guarantee.
 
 #### Scenario: re-queue lands above the mode fork
 - **WHEN** the shared re-queue node receives a rejection
@@ -68,6 +69,10 @@ A bounded-retries policy SHALL give the board a documented termination guarantee
 #### Scenario: bounded retries escalate on exhaustion
 - **WHEN** the review-round counter reaches its maximum
 - **THEN** the board escalates to the human PM layer and stops firing automatic re-queues, parking the issue for human decision
+
+#### Scenario: Manual-mode resume is recognized from beads status
+- **WHEN** a bounced Manual-mode issue re-enters the board
+- **THEN** its resume is recognized from the beads issue status at the last session-checkpoint and is human-judged, because Manual mode has no verify.md and no attempt_log to key the deterministic HIL/AFK resume detection on
 
 ### Requirement: AFK, HIL, and Manual execution-mode fork at the Todo to In Progress boundary
 

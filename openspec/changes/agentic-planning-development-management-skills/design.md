@@ -17,7 +17,7 @@ This change is itself built in HIL mode through the superpowers-bridge as a dogf
 
 Establish three skills that compose existing surfaces by delegation: a Claude-Code-only state-machine router, an agent-general project-management hub, and an agent-general linear-cli-driven Linear↔OpenSpec sync overlay.
 Make the Linear-story↔OpenSpec-change binding the primary cross-reference, stored in the change's proposal.md frontmatter (linear_story_*, linear_team, linear_project) and resolved against the openspec/linear.yaml monorepo registry, and bind technical status roll-up to four forward lifecycle transitions plus a re-queue and two terminal exits.
-Specify a minimal per-change sync ledger in proposal.md frontmatter (HIL/AFK-only) as the authoritative current-phase signal and the home of idempotency, the bounded-retries counter, and a best-effort-write attempt log.
+Specify a minimal per-change sync ledger in proposal.md frontmatter (HIL-only; AFK keeps counter and attempt-log equivalents in its plan file, Manual carries none) as the authoritative current-phase signal and the home of idempotency, the bounded-retries counter, and a best-effort-write attempt log.
 Encode the Linear workspace safety gate as the hardest constraint, keyed on confirmed credentials rather than on LINEAR_WORKSPACE.
 Give the Linear-canonical board a documented termination guarantee via a bounded-retries policy escalating to the human PM layer.
 
@@ -103,7 +103,7 @@ A concrete per-mode cross-reference mapping pins the binding locations:
 | AFK | proposal.md `linear_story_*`/`linear_team`/`linear_project` frontmatter (resolved against the linear.yaml registry) | the change dir name | optional traceability map in beads field | the workflow/superpowers plan file (checkboxes authoritative) |
 | Manual | a beads issue field (no proposal.md to hold frontmatter) | n/a (no OpenSpec change) | the beads issue/epic (authoritative ledger) | n/a |
 
-Manual mode has no proposal.md and therefore no place to hold `linear_story_*` frontmatter, so its Linear binding lives in a beads issue field; the frontmatter binding plus the per-change D10 ledger are HIL/AFK-only, while the linear.yaml registry stays a shared monorepo index resolved across all modes.
+Manual mode has no proposal.md and therefore no place to hold `linear_story_*` frontmatter, so its Linear binding lives in a beads issue field; the proposal.md-frontmatter binding plus the per-change D10 ledger are HIL-only because only HIL authors a proposal.md to hold them — AFK's binding and counter equivalents live in its plan file's metadata, and Manual's binding lives in the beads issue field — while the linear.yaml registry stays a shared monorepo index resolved across all modes.
 
 Rationale: resolves the issue/task duplication hazard by ownership rather than by mirroring any layer into another.
 Alternatives considered: beads as the single atomic-task owner with Linear holding only coarse status (the research note's beads-centric recommendation, explicitly superseded by the ownership model); bidirectional Linear↔local sync (rejected — Linear writes are best-effort and non-blocking, local stays authoritative for the "how").
@@ -157,6 +157,7 @@ A future extension point is recorded: automation hooks to trigger the right tool
 A single shared re-queue node receives both sub-gate rejections and re-queues into In Progress above the mode fork (In Review → In Progress), so a bounced issue re-selects its execution mode.
 The re-queue fires on either a verify.md Overall Decision of "(fail) FAIL" (machine-detected) or a human rejection at either sub-gate.
 A bounded-retries policy (a max review-round counter with escalation to the human PM layer on exhaustion, specified in D10) gives the board a documented termination guarantee that its structure alone does not provide.
+This counter-backed guarantee holds for the modes whose ledger carries the counter (HIL, and AFK where the plan file backs it); in Manual mode the human is the regulator and termination is human-judged at session-checkpoint, the fairness-assumption path named in the Rationale below rather than the counter-backed one.
 Canceled and Duplicate are inert terminals reachable from any active state (a change directory removed without archive, or a change superseded by another), carrying no active work, exactly like Backlog.
 
 The model stated once: four forward transitions, each with one transition-firing condition, with In Review internally decomposed into two ordered sub-gates whose joint approval is the precondition for archive (which fires Done).
@@ -239,7 +240,7 @@ Alternatives considered: adopting CCPM's .claude/prds + .claude/epics filesystem
 
 Choice: specify a minimal per-change sync ledger, persisted as fields in the change's proposal.md frontmatter, recording `last_synced_state`, `last_synced_at`, a `review_round` counter, and a short `attempt_log`, with an optional per-change `max_review_rounds` override.
 This single mechanism closes detection, idempotency, the bounded-retries counter, and observability.
-The ledger is HIL/AFK-only: Manual mode has no proposal.md and therefore carries no D10 ledger — its lifecycle status is human-managed via the beads loop and Linear, with only the binding in a beads field.
+The proposal.md-frontmatter ledger is HIL-only: only HIL authors a proposal.md to hold it, AFK tracks its bounded-retries-counter and attempt-log equivalents in its plan file's metadata, and Manual mode carries no such ledger — its lifecycle status is human-managed via the beads loop and Linear, with only the binding in a beads field.
 openspec/linear.yaml is reserved for the monorepo registry (workspace, defaults, teams, projects, per-project archive documents) and holds no per-issue binding and no ledger, because a single repository's changes bind to issues across many Linear teams and projects with several changes running in parallel, so the ledger cannot live in one flat top-level block.
 
 Authoritative current-phase signal: local milestone-file existence (proposal.md / first tasks.md `- [x]` / verify.md / the archived change directory) is the authoritative current-phase signal.
