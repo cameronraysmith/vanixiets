@@ -17,7 +17,7 @@ If `openspec/linear.yaml` is missing outside proposal setup, the Linear hook no-
 ## Dependencies and degradation
 
 This overlay depends on the bundled linear-cli skill (the single `linear-cli/` skill directory with its reference subfiles) for every Linear verb.
-The linear-cli skill is contributed user-scoped for crs58 only; this overlay lands in `src/core` and so reaches all agents, but a non-crs58 agent that loads it would reference a linear-cli skill that is not present, which is accepted because crs58 is the only operator.
+The linear-cli skill may be delivered only to a subset of users or agents; this overlay lands in `src/core` and so reaches all agents, and an agent that loads it without the linear-cli skill present simply no-ops, degrading gracefully as described below.
 
 The overlay recommends against the Linear MCP and never invokes it, because the MCP is disabled in this environment.
 Every Linear write after setup is best-effort and non-blocking: a failed or skipped write never blocks local progress, and the dropped write is recorded in the attempt log (see references/lifecycle.md).
