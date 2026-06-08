@@ -55,7 +55,7 @@ No Linear state is fabricated, and the dropped write is observable in the ledger
 ## The local sync ledger (D10)
 
 The overlay maintains a minimal local sync ledger per change, persisted as fields in that change's proposal.md frontmatter (the schema is in references/config-and-frontmatter.md).
-The ledger applies to HIL and AFK modes only; Manual mode carries no D10 ledger, because the human drives the transitions and the bounded-retries counter does not run there.
+The proposal.md-frontmatter ledger applies to HIL only, because only HIL authors a proposal.md to hold it; AFK tracks any bounded-retries counter and attempt-log equivalents in its plan file's metadata, and Manual mode carries no such ledger, because the human drives the transitions and the bounded-retries counter does not run there.
 The ledger records `last_synced_state`, `last_synced_at`, a review-round counter, and a short attempt log.
 It is per change rather than in openspec/linear.yaml because a single repository runs several changes in parallel, each bound to a different Linear issue across possibly different teams and projects, so a single flat top-level ledger could represent only one change's sync state.
 This single mechanism closes detection, idempotency, the bounded-retries counter, and observability, and `last_synced_state` is resolved against the change's `linear_team` because Linear workflow states are team-scoped.

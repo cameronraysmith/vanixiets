@@ -49,6 +49,7 @@ Use the fast-forward for the one-shot lean and the stepped form when a human che
 ### AFK and Manual variants
 
 AFK hands the unit off to the Claude Code Workflows feature, which drives to In Review without per-step prompting; see references/execution-modes.md and references/delegation.md.
+AFK is not yet end-to-end drivable: its dispatch target and verify-equivalent firing signal are confirmed at the apply gate, so select AFK expecting that confirmation step, not a turnkey runnable path.
 Manual passes through `/session-orient` then `/session-plan` then `/session-review` then `/session-checkpoint`, with the beads issue status driving the four transitions; see references/execution-modes.md and references/delegation.md.
 
 ## The board spine
@@ -68,7 +69,8 @@ The archive gate fires In Review to Done when the change is archived.
 
 In Review internally decomposes into two ordered human-steered sub-gates, roborev (code review) first and documenter (docs and handbook review) second, whose joint approval is the precondition for the archive gate that fires Done.
 A single shared re-queue node receives both sub-gate rejections and a verify.md checked-FAIL, re-queuing into In Progress above the mode fork so a bounced unit re-selects its execution mode.
-A bounded-retries policy escalates to the human PM layer on exhaustion, giving the board a documented termination guarantee its structure alone does not provide.
+A bounded-retries policy escalates to the human PM layer on exhaustion, giving the board a documented counter-backed termination guarantee in the modes whose ledger carries the review-round counter (HIL, and AFK where the plan file backs it).
+In Manual mode the human is the regulator and termination is human-judged at session-checkpoint rather than by the counter.
 The full state machine, its gates, the sub-gates, the re-queue, the bounded-retries policy, the brainstorm-exists-proposal-pending Backlog window, and a concrete router walkthrough are in references/board-and-gates.md.
 
 ## The execution-mode fork

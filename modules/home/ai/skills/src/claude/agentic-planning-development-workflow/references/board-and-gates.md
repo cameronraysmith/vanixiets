@@ -74,6 +74,7 @@ Its concrete code-review automation is the inline codex review documented in ref
 The codex binding is advisory in all three execution modes: codex emits a verdict and findings as evidence, and the orchestrating session or a human always makes the advance-versus-re-queue decision, so the currently-human-steered framing above is preserved and codex layers under it as the evidence generator (even AFK pauses here for human adjudication and does not auto-advance on a codex pass).
 The findings are a triage surface rather than an autonomous block: all findings are presented grouped by priority with the recommended-blocking set (priority `<= 1`, plus an overall `incorrect` signal) flagged as the default must-address set, and the session or human chooses the subset to address; that triage decision, not the raw threshold, drives the transition.
 An accept decision advances the router to the documenter sub-gate; a re-queue decision routes into the shared re-queue, recorded by checking the existing verify.md Overall Decision checkbox from `- [ ] (fail) FAIL` to `- [x] (fail) FAIL` so it reuses the existing machine-detected re-queue path described below, incrementing `review_round` under the bounded-retries policy.
+The verify.md-checkbox recording and the review_round increment are the HIL realization of the re-queue; in AFK the equivalent is the plan completion record and in Manual it is the human-rejection re-queue path at a session-checkpoint, while the advisory codex verdict itself is generated identically in all three modes.
 
 The documenter sub-gate runs second.
 documenter is documentation authoring plus review linking out from the verify and retrospective stage.
@@ -91,6 +92,8 @@ The re-queue fires on either a verify.md Overall Decision of checked-FAIL (machi
 
 Termination toward Done is not guaranteed by the board structure; it holds only under a fairness assumption or a bounded-retries policy.
 A bounded-retries policy supplies the documented termination guarantee: a maximum review-round counter (recommended default 3) that increments once per re-queue and resets when the change archives.
+The counter-backed guarantee holds for the modes whose ledger carries the review-round counter (HIL, and AFK where the plan file backs it).
+Manual mode carries no review-round counter; there the human is the regulator and termination is human-judged at session-checkpoint, the fairness-assumption path named above rather than the counter-backed one.
 The `review_round` counter is per-change, persisted in that change's proposal.md frontmatter, with the default ceiling sourced from linear.yaml `defaults.max_review_rounds` (a change may override it in its frontmatter).
 On exhaustion the board escalates to the human PM layer and stops firing automatic re-queues, parking the unit for human decision.
 

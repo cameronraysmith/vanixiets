@@ -202,6 +202,7 @@ codex plugs in strictly upstream of the existing In Progress to In Review to Don
 
 A re-queue decision routes through the shared re-queue node into In Progress above the mode fork (In Review to In Progress), carrying the chosen findings as fix tasks, exactly as board-and-gates.md describes for a sub-gate rejection.
 A re-queue increments `review_round` in the change's proposal.md frontmatter; the ceiling is linear.yaml `defaults.max_review_rounds` (default 3, overridable per change in frontmatter).
+This verify.md-checkbox recording plus the review_round increment is the HIL realization of the re-queue; the codex advisory verdict is generated identically in all three modes, but in AFK the re-queue is recorded against the plan completion record and in Manual via the human-rejection re-queue path at a session-checkpoint, neither of which carries a verify.md or a review_round counter.
 On exhaustion, escalate to the human PM layer and stop auto-re-queue, parking the unit, per the bounded-retries policy.
 
 To drive the existing machine-detected re-queue rather than inventing a new artifact or board state, a re-queue decision checks the existing verify.md decision checkbox.

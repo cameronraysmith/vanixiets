@@ -21,6 +21,7 @@ At most, map the beads issue id to the superpowers plan path for traceability; t
 Entry criteria: the unit of work is well-scoped enough to run unattended, the human accepts that step-by-step intervention is deferred to the In-Review gates, and a workflow or plan with checkboxes exists or will be produced by the handoff.
 
 The concrete AFK dispatch target is a bounded open point recorded in references/delegation.md: whether the router hands off to the Claude Code Workflows feature directly or to a named cc-dynamic-workflow (cross-referencing the ouroboros-loop cc-dynamic-workflow skill) is left for confirmation at the apply gate.
+AFK is therefore not yet end-to-end drivable: both the dispatch target and the verify-equivalent firing signal that fires the In-Review gate are confirmed at the apply gate, so an operator selecting AFK confirms those at the gate rather than expecting a turnkey runnable path.
 
 ## HIL
 
@@ -54,3 +55,4 @@ Defaulting to the original mode keeps a single authoritative ledger per unit acr
 
 If the human does override the mode on re-queue, the cost is an explicit ledger hand-off the human accepts, recorded in the attempt log as the new authoritative ledger for the unit going forward.
 A bounced unit is recognized as resuming rather than starting fresh by the combination of In Progress state with a verify.md checked-FAIL or a recorded sub-gate rejection in the attempt log, so the router resumes deterministically rather than re-running from scratch.
+That deterministic resume-detection is the HIL and AFK realization (verify.md or the attempt log); Manual mode has neither, so a bounced Manual unit's resume is recognized from the beads issue status at the last session-checkpoint and is human-judged.

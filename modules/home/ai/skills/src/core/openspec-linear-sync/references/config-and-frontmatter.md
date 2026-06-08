@@ -94,9 +94,10 @@ The flat top-level ledger fields belong to the single active change and migrate 
 
 Manual mode has no proposal.md and therefore no place to hold `linear_story_*` frontmatter, so its Linear binding lives in a beads issue field instead.
 If team or project context is needed in Manual mode, it is recorded in that same beads field; the registry still resolves the team and project ids.
-The two-location frontmatter-plus-openspec/linear.yaml mechanism is HIL/AFK-only; in Manual mode the beads issue field is the single binding location.
+The two-location frontmatter-plus-openspec/linear.yaml mechanism is HIL-only, because only HIL authors an OpenSpec proposal.md to hold linear_story_* frontmatter; in AFK the binding home is the AFK plan file's own metadata (the Workflows or superpowers plan file is the proposal-equivalent), and in Manual mode the beads issue field is the single binding location.
 
-The D10 sync ledger is HIL/AFK-only as well: Manual mode carries no D10 ledger, because it has no proposal.md to hold one and the bounded-retries automation does not run in Manual mode.
+The D10 sync ledger is HIL-only as well: only HIL has a proposal.md to hold it, so AFK and Manual carry no proposal.md-frontmatter ledger.
+AFK's bounded-retries counter and attempt-log equivalents, where the AFK arm tracks them at all, live in the AFK plan file's metadata rather than in proposal.md frontmatter; wiring that AFK ledger home end-to-end is a separate future change.
 The human is the regulator there, and lifecycle status is managed directly via the beads loop — the authoritative task ledger in Manual mode — and Linear.
 Only the binding, plus optional team and project context, lives in the beads field; there is no `review_round` counter and no `attempt_log` in Manual mode.
 
