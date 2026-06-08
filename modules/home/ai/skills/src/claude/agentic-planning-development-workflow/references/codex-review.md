@@ -63,6 +63,7 @@ printf '%s' "$WRAPPER_PROMPT" \
 ```
 
 The flags are top-level `codex exec` options confirmed against codex-cli 0.137.0 and the openai/codex source, and precede the piped prompt: `-C, --cd` sets the working root, `-s, --sandbox read-only` is sufficient because codex runs `git diff` itself and performs no writes, `-m, --model` pins gpt-5.5, `--output-schema <FILE>` points at the JSON Schema file, and `-o, --output-last-message <FILE>` writes the agent's final message to `OUT_JSON_PATH`.
+These flags and the `-m gpt-5.5` pin are verified against codex-cli 0.137.0; re-verify on a codex bump, since the model slug rotates and `-m` is optional (omitting it defers to codex's own default and degrades gracefully on a model deprecation).
 
 The reasoning effort is set through the `-c, --config key=value` override; there is no dedicated reasoning-effort flag.
 The verified key is `model_reasoning_effort`, whose `ReasoningEffort` enum in the codex config schema is `none | minimal | low | medium | high | xhigh`, so all four calibration levels below are valid values.
@@ -174,7 +175,8 @@ Panel mode operationalizes that observation for the verdicts where it matters; i
 The default is the single round already documented above; panel mode runs that identical round K times and aggregates.
 Each panel sample reuses the exact single-round invocation unchanged: the same frozen wrapper prompt, the same output schema, the same `gpt-5.5` model, and the same `model_reasoning_effort` level, with the same BASE and TIP range resolved once and held across the K runs.
 The aggregate verdict is the majority of the K `overall_correctness` values.
-The recommended-blocking set is the findings that recur in at least `ceil(K/2)` runs (at least 2 of 3), matched by `code_location` together with title or topic; a finding appearing in fewer than `ceil(K/2)` runs is demoted to advisory-only, surfaced to the orchestrating session but not flagged as recommended-blocking.
+For an even K with a tied `overall_correctness` split, the aggregate resolves to the conservative verdict (treat as incorrect and re-queue), since the gate is advisory and biased toward surfacing problems.
+The recommended-blocking set is the findings that recur in at least a strict majority `floor(K/2)+1` runs (at least 2 of 3, and at least 2 of 2 at K=2), matched by `code_location` together with title or topic; a finding appearing in fewer than `floor(K/2)+1` runs is demoted to advisory-only, surfaced to the orchestrating session but not flagged as recommended-blocking.
 Default K is 3 when panel mode is invoked, and K is overridable.
 
 There are two entry paths into panel mode.
@@ -207,7 +209,7 @@ On exhaustion, escalate to the human PM layer and stop auto-re-queue, parking th
 
 To drive the existing machine-detected re-queue rather than inventing a new artifact or board state, a re-queue decision checks the existing verify.md decision checkbox.
 Change the Overall Decision line from `- [ ] (fail) FAIL` to `- [x] (fail) FAIL`.
-Both the re-queue logic in openspec-linear-sync and the superpowers-bridge retrospective PRECHECK grep the anchored, checked form (regex `^- \[x\] \(fail\) FAIL`); writing the bare string without checking the box is inert.
+Both the re-queue logic in openspec-linear-sync and the superpowers-bridge retrospective PRECHECK grep the anchored, checked form (the rg/ERE pattern `^- \[x\] \(fail\) FAIL`, equivalently the BRE-literal `^- \[x\] (fail) FAIL` the schema PRECHECK uses; the escaped parens match under rg or grep -E but a plain BRE grep needs the literal-paren form); writing the bare string without checking the box is inert.
 Preserve this exact vocabulary.
 
 Linear receives the codex findings as a best-effort comment summarized to at most two sentences, honoring the openspec-linear-sync comment invariant, with the full detail kept in-repo (for example the out.json artifact retained in the change directory).

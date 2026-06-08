@@ -56,6 +56,7 @@ Otherwise, first resolve the target project from the change's `linear_project` (
 A single change routinely produces multiple capability specs (this very change produced three: agentic-workflow-routing, project-management-hub, openspec-linear-sync), so the UPSERT iterates over every capability the change touches, each getting its own document titled `OpenSpec: <capability>`, all parented to that project and keyed by a per-capability entry under that project's `archive_documents` map.
 
 The `<spec-file>` in the commands below is the CLI-resolved canonical main-spec path, not an assumed repo-relative one: OpenSpec 1.4.1 no longer guarantees an `openspec/specs/` layout, so the planning root is resolved from `openspec status --change <change> --json` and the main spec is `<root>/openspec/specs/<capability>/spec.md`.
+The `planningHome`/`artifactPaths` status-JSON shape is verified against openspec 1.4.1; re-verify it on an openspec bump, since it is an internal status shape with no stability guarantee.
 `openspec status --change <change>` only resolves while the change is still active, so the planning root (and, if needed, the capability list from `artifactPaths.specs.existingOutputPaths[]`) is captured in the readiness step before `openspec archive` moves the change into the archive; the worked example below shows the exact single-field `jq` capture, which extracts only the field needed rather than dumping the full status payload.
 The capture guards on repo mode (`select(.planningHome.kind=="repo")`): in workspace mode there is no single main specs dir, the select yields empty, and the spec-mirror is skipped and logged rather than guessed — the same non-blocking, single-openspec-root-per-repo degradation as a missing `linear_project`.
 
@@ -191,7 +192,9 @@ for cap in $caps; do
     linear document create --project <p> --title "OpenSpec: $cap" --content-file "$planning_root/openspec/specs/$cap/spec.md" --workspace <slug>
     NEW_ID=$(linear document list --project <p> --json --workspace <slug> \
       | jq -r --arg t "OpenSpec: $cap" '.nodes[] | select(.title == $t) | .id')
-    yq -i ".projects.\"<pslug>\".archive_documents.\"$cap\".id = \"$NEW_ID\"" openspec/linear.yaml
+    # This deployment's PATH yq is kislyuk/yq (a jq wrapper), for which -i requires a YAML output flag,
+    # so -y is mandatory with -i; the read form above (yq -r ... // "") needs no -y. (mikefarah/yq -i needs no companion flag.)
+    yq -y -i ".projects.\"<pslug>\".archive_documents.\"$cap\".id = \"$NEW_ID\"" openspec/linear.yaml
   fi
 done
 fi

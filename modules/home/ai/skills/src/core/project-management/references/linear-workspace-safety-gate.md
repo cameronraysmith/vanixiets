@@ -48,10 +48,13 @@ Before running the `linear auth whoami` gate, assert that both `LINEAR_API_KEY` 
 `LINEAR_API_KEY` is tier 1 and silently outranks the gate: if it is set, the resolved workspace is whatever that key authenticates against regardless of what `whoami` is scoped to, so refuse to proceed while it is present.
 Furthermore, linear-cli throws when both `LINEAR_API_KEY` and a `--workspace` flag are set (verified in upstream `src/utils/graphql.ts` at `~/projects/planning-workspace/linear-cli`, v2.0.0; re-verify on a version bump), so an ambient `LINEAR_API_KEY` would also break the mandatory `--workspace` on every command.
 `LINEAR_WORKSPACE` is tier 4 and env-overridable, so it too must be unset to keep the resolution path deterministic and keyed on the confirmed credentials default.
+The shell-env assertion is necessary but not sufficient: linear-cli's own loadEnvFiles reads a `./.env` or git-root `.env` and injects `LINEAR_*` keys into its process (resolving at tiers 1 and 4), invisible to a shell check, so the assertion below also rejects such a `.env`.
 
 ```bash
 [ -z "${LINEAR_API_KEY:-}" ] || { echo "refuse: LINEAR_API_KEY is set and outranks the gate; unset it first" >&2; exit 1; }
 [ -z "${LINEAR_WORKSPACE:-}" ] || { echo "refuse: LINEAR_WORKSPACE is set; unset it before the gate" >&2; exit 1; }
+git_root=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
+for envfile in ./.env "$git_root/.env"; do [ -f "$envfile" ] && grep -Eq '^[[:space:]]*(LINEAR_API_KEY|LINEAR_WORKSPACE)=' "$envfile" && { echo "refuse: $envfile defines LINEAR_API_KEY/LINEAR_WORKSPACE; linear-cli reads it into its own process" >&2; exit 1; }; done
 ```
 
 ## Checklist before any mutation
