@@ -61,6 +61,7 @@ It is per change rather than in openspec/linear.yaml because a single repository
 This single mechanism closes detection, idempotency, the bounded-retries counter, and observability, and `last_synced_state` is resolved against the change's `linear_team` because Linear workflow states are team-scoped.
 
 Local milestone-file existence is the authoritative current-phase signal: proposal.md, the first tasks.md `- [x]`, verify.md, and the archived change directory together determine the local phase.
+Anchor detection is a working-copy filesystem read (`rg`/`test -f` against the working tree), not a git-plumbing read, so it observes a freshly created proposal.md or verify.md before jj seals it and is immune to the jj+git pre-seal empty-blob window that affects git-plumbing and nix-eval reads (see the jj-version-control skill).
 The Linear state is treated as a best-effort projection that a catch-up reconciliation step corrects rather than trusting.
 When the local phase and the Linear state disagree, the catch-up reconciliation computes the local phase from the milestone files, reads the Linear state, and fires the catch-up transition rather than assuming Linear is current.
 

@@ -24,10 +24,12 @@ Where the superpowers worktree skill would create an isolated worktree per task,
 An env-gated hatch exists as an alternative to the diamond.
 With CLAUDE_JJ_WORKSPACE_ISOLATION set, the worktree-create hook early-exits to allow before the deny branch, making the parent directory and adding an in-tree jj workspace rather than a git worktree.
 This is the jj-workspace escape for a unit of work that genuinely warrants its own checkout, a tangling-writers situation, a long build, or an independent stream, where the diamond join is the wrong tool.
+For the multi-writer auto-snapshot tangling case specifically, the preventive mechanic (pre-dispatch concurrent-agent coordination, orchestrator-routed `jj squash --from @`, scoped `jj absorb`) is the parallel-agent coordination protocol in the jj-version-control skill; reach for it before the hatch when the writers can be serialized through the orchestrator.
 The diamond join and the jj workspace nest: the workspace is for an isolated checkout, the diamond is for integrating chains.
 
 ## The reconciliation is an apply-gate open point
 
+The usable default is mechanical: the diamond development join for the common case of a sequential, orchestrator-routed apply, and the CLAUDE_JJ_WORKSPACE_ISOLATION jj-workspace hatch when more than one writer will concurrently touch the shared working copy (the tangling-writers case named above) or a unit genuinely warrants its own checkout.
 The choice between the diamond development join and the CLAUDE_JJ_WORKSPACE_ISOLATION jj-workspace hatch is not decided in this skill.
 It is confirmed at the apply gate per the change's Risks and Open Questions, and it is input to a separate jj-policy follow-up.
 The router bakes in no git worktree add and asserts no single isolation mechanism; it names both candidates and directs the apply executor to confirm the choice at the apply gate.
