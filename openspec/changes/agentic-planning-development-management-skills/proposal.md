@@ -37,5 +37,5 @@ This dogfood change is not itself synced to a Linear story; the Linear sync is t
 
 New skill directories under `modules/home/ai/skills/src/claude/agentic-planning-development-workflow/` (router), `modules/home/ai/skills/src/core/project-management/` (hub), and `modules/home/ai/skills/src/core/openspec-linear-sync/` (sync overlay).
 The skills tree is auto-discovered by `modules/home/ai/skills/default.nix` (`readSkillsFrom`), so no manual nix registration is required; src/core flows to all agents and src/claude is appended only to Claude Code.
-Composes the bundled `linear-cli` skill and the vendored superpowers-bridge OpenSpec schema; depends on linear-cli credentials in the OS keyring and `openspec/linear.yaml` plus proposal frontmatter for the story↔change link.
+Composes the bundled `linear-cli` skill and the vendored superpowers-bridge OpenSpec schema; depends on linear-cli credentials rendered immutable into a read-only (0400) inline credentials.toml (an OS-keyring mode is supported but not in use) and `openspec/linear.yaml` plus proposal frontmatter for the story↔change link.
 No code paths, APIs, deployed services, or the contexts/*.md → CLAUDE.md symlink are touched.

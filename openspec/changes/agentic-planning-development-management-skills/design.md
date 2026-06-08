@@ -8,7 +8,7 @@ Linear holds the business "what" and the team-visible status surface (Initiative
 OpenSpec plus the superpowers-bridge hold the spec-first change lifecycle, the human-interpretable requirements document, and the within-change task decomposition in tasks.md; OpenSpec is the primary technical owner of the decomposition.
 beads is invoked by local agent execution only when a complex task needs finer-grained tracking than the spec should carry, so the spec stays human-interpretable, and it remains load-bearing in Manual mode via the /session-orient → /session-checkpoint loop.
 
-The environment is jj-mode (colocated jujutsu), where worktree-creating tool surfaces are hook-blocked, the Linear MCP is disabled, and linear-cli credentials are nix-managed and immutable in the OS keyring.
+The environment is jj-mode (colocated jujutsu), where worktree-creating tool surfaces are hook-blocked, the Linear MCP is disabled, and linear-cli credentials are nix-managed and immutable, rendered into a read-only (0400) inline credentials.toml (an OS-keyring mode is supported but not in use).
 This change is itself built in HIL mode through the superpowers-bridge as a dogfooded correctness test, so any friction discovered while authoring these artifacts is itself evidence about the lifecycle.
 
 ## Goals / Non-Goals
@@ -224,7 +224,7 @@ Do not key the gate on LINEAR_WORKSPACE, and never run mutating `linear auth` co
 Rationale: the linear-cli credential precedence has five tiers — `LINEAR_API_KEY`/`api_key` (tier 1) > project-config `api_key` (tier 2) > `--workspace` flag → credentials lookup (tier 3) > `LINEAR_WORKSPACE` via `getOption("workspace")` → credentials lookup (tier 4) > `credentials.toml` default (tier 5).
 LINEAR_WORKSPACE resolves at tier 4, above the credentials default but below `--workspace` and `LINEAR_API_KEY`; it is the wrong lever because it is env-overridable and silently outranked by `--workspace`/`api_key`, not because it is below the default.
 The safe gate keys on `linear auth whoami` plus an explicit `--workspace`.
-Credentials are nix-managed and immutable in the OS keyring, so a mutating `linear auth` would be both ineffective and dangerous.
+Credentials are nix-managed and immutable, rendered into a read-only (0400) inline credentials.toml (an OS-keyring mode is supported but not in use), so a mutating `linear auth` would be both ineffective and dangerous.
 Alternatives considered: keying on LINEAR_WORKSPACE or on a project `.linear.toml` workspace config (rejected — both are env-overridable and silently outranked by `--workspace`/`LINEAR_API_KEY`).
 
 ### D9: synthesize Linear Method and CCPM; do not copy

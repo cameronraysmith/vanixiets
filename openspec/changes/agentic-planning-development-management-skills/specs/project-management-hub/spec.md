@@ -44,7 +44,7 @@ The beads sub-area SHALL document beads as an optional local drill-down sublayer
 
 The PM hub SHALL encode the Linear workspace safety gate as the hardest constraint: never propose a Linear mutation until the correct personal-versus-work workspace is confirmed via linear auth whoami (optionally linear auth whoami --workspace <slug>).
 Every mutation SHALL pass an explicit --workspace <slug> or rely on the confirmed credentials.toml default key.
-The gate SHALL NOT be keyed on LINEAR_WORKSPACE, and the hub SHALL NOT run mutating linear auth commands because credentials are nix-managed and immutable in the OS keyring.
+The gate SHALL NOT be keyed on LINEAR_WORKSPACE, and the hub SHALL NOT run mutating linear auth commands because credentials are nix-managed and immutable, rendered into a read-only (0400) inline credentials.toml (an OS-keyring mode is supported but not in use).
 
 #### Scenario: mutation blocked before whoami confirmation
 - **WHEN** a Linear mutation is proposed before linear auth whoami confirms the workspace

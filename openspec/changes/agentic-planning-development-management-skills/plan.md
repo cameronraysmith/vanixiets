@@ -109,7 +109,7 @@ Initiative greater than Project greater than Milestone greater than Issue, with 
 
 - [ ] **Step 2: Write linear-workspace-safety-gate.md**
 
-The hardest constraint: the `linear auth whoami` (optionally `--workspace <slug>`) gate keyed on confirmed credentials; every mutation passes explicit `--workspace` or relies on the confirmed credentials.toml default; never key on LINEAR_WORKSPACE; never run mutating `linear auth` (credentials are nix-managed and immutable in the OS keyring).
+The hardest constraint: the `linear auth whoami` (optionally `--workspace <slug>`) gate keyed on confirmed credentials; every mutation passes explicit `--workspace` or relies on the confirmed credentials.toml default; never key on LINEAR_WORKSPACE; never run mutating `linear auth` (credentials are nix-managed and immutable, rendered into a read-only (0400) inline credentials.toml (an OS-keyring mode is supported but not in use)).
 
 - [ ] **Step 3: Write linear-conventions.md**
 
