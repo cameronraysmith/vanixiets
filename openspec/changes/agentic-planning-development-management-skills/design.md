@@ -156,6 +156,7 @@ Inside In Review the roborev sub-gate runs first (approved → documenter sub-ga
 The current execution model for both sub-gates is human-steered: a human operating the workflow orchestrator drives code review (roborev) and doc authoring/review (documenter) at each gate and supplies the verdict; the router presents the gate and routes on that verdict, it does not auto-execute review.
 roborev is the code-review point linking out from the superpowers-bridge apply/verify stage; documenter is documentation authoring plus review linking out from the verify/retrospective stage.
 A future extension point is recorded: automation hooks to trigger the right tools at each gate (code-review automation for roborev; doc-gen/review automation for documenter), without introducing a fourth agent.
+Addendum (post-verify): the roborev half of this extension point is realized by references/codex-review.md, which binds the abstract roborev sub-gate to an inline cross-model codex review that stays advisory in all three modes, adds no fourth agent and no new board or Linear state, and composes under the existing human-steered clause; the documenter half remains an abstract extension point.
 
 A single shared re-queue node receives both sub-gate rejections and re-queues into In Progress above the mode fork (In Review → In Progress), so a bounced issue re-selects its execution mode.
 The re-queue fires on either a verify.md Overall Decision of "(fail) FAIL" (machine-detected) or a human rejection at either sub-gate.

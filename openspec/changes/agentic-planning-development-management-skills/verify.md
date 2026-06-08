@@ -5,8 +5,8 @@
 > corresponding artifact for correction before re-running verify.
 
 **Change**: `agentic-planning-development-management-skills`
-**Verified at**: `2026-06-02 15:24`
-**Verifier**: `Claude Code subagent (opsx:verify on superpowers-bridge schema)`
+**Verified at**: `2026-06-08 00:00`
+**Verifier**: `Claude Code subagent (opsx:verify re-run over the reconciled change on superpowers-bridge schema)`
 
 ---
 
@@ -22,6 +22,9 @@ items: 1, passed: 1, failed: 0
 byType: change passed 1/1; spec 0/0
 ```
 
+Re-run over the reconciled tree (the original change commits plus the reconciliation commits) still reports valid=true; the C2-added Manual-resume scenario and the non-terminal reachability rewording keep a valid spec shape.
+`openspec status --change agentic-planning-development-management-skills --json` resolves `planningHome.kind=repo` and lists the three delta spec files, consistent with check 3 below.
+
 If any items fail, list their id and issues:
 
 | Item | Type | Issues |
@@ -34,7 +37,8 @@ If any items fail, list their id and issues:
 
 - [x] All `- [ ]` have been changed to `- [x]`
 
-29 of 29 checkboxes are `- [x]`; `grep -c '^- \[ \]'` returns 0 and no `[ ]` appears anywhere in tasks.md.
+30 of 30 checkboxes are `- [x]`; `grep -c '^- \[x\]'` returns 30 and `grep -c '^- \[ \]'` returns 0, and no `[ ]` appears anywhere in tasks.md.
+The count rose from 29 to 30 because the reconciliation added task 1.7, enumerating the three router references added after the initial four so the router reference set is the seven shipped files.
 The task-4.1 trigger-comparison verdict is recorded inline in tasks.md so a reviewer sees the comparison was performed.
 
 **Incomplete tasks** (if any):
@@ -73,13 +77,18 @@ Scenarios of `specs/*.md`:
 | Compose-by-delegation (D4) | router never re-implements orient/plan/review/checkpoint; Manual pass-through to /session-orient; session-advisor referenced not duplicated | agentic-workflow-routing "Compose by delegation, never re-implement" | none |
 | Re-queue + bounded retries (D11) | shared re-queue, default-to-original-mode, bounded-retries termination | agentic-workflow-routing "Shared re-queue with bounded-retries termination guarantee" | none |
 | linear-cli-exclusive + UPSERT | drive Linear via linear-cli; archive-time document UPSERT | openspec-linear-sync "Drive Linear exclusively through linear-cli" + "Archive-time document UPSERT with mirroring" | none |
-| Local sync ledger (D10) | per-change proposal.md frontmatter last_synced_state/_at + review_round counter + attempt_log (HIL/AFK-only), with openspec/linear.yaml reserved for the monorepo registry (workspace, defaults, teams, projects) | openspec-linear-sync "Local sync ledger as authoritative current-phase signal" | none |
+| Local sync ledger (D10) | per-change proposal.md frontmatter last_synced_state/_at + review_round counter + attempt_log (HIL-only; AFK keeps counter/attempt-log equivalents in its plan file, Manual carries none), with openspec/linear.yaml reserved for the monorepo registry (workspace, defaults, teams, projects) | openspec-linear-sync "Local sync ledger as authoritative current-phase signal" | none |
 | Workspace safety gate | `linear auth whoami` keyed on confirmed credentials + explicit `--workspace`, never LINEAR_WORKSPACE | project-management-hub "Linear workspace safety gate keyed on confirmed credentials" | none |
 | Flat four reference areas | linear/github/beads/method one-level prefixes, no two-level nesting | project-management-hub "Four flat one-level reference areas" | none |
+| Single-location frontmatter binding | the binding lives only in proposal.md frontmatter (linear_story_* + required linear_team + optional linear_project), resolved against the openspec/linear.yaml registry rather than written into it | openspec-linear-sync "Single-location frontmatter binding that resolves against the registry" | none |
+| Mirror the Linear issue description from proposal.md | down-only mirror of the issue description seeded and idempotently refreshed from proposal.md business content via `linear issue update --description-file`, distinct from the archive-time project-document UPSERT | openspec-linear-sync "Mirror the Linear issue description from proposal.md business content" | none |
+| roborev realized by inline codex review | D5 addendum: the roborev half of the extension point is realized by references/codex-review.md as an advisory cross-model verdict, adding no fourth agent and no new board or Linear state | agentic-workflow-routing "future automation is an extension point, not a fourth agent" | none |
+| Mode-scoped termination/ledger/resume | HIL counter-backed termination; AFK plan-file-backed; Manual human-judged at session-checkpoint, with the ledger and linear_story_* reclassified HIL-home and the AFK home named | agentic-workflow-routing "Shared re-queue with bounded-retries termination guarantee" (C2 spec edits) | none |
 
 **Drift warnings** (non-blocking):
 
-- none
+- The 2026-06-02 verify predated two later openspec-linear-sync requirements (single-location frontmatter binding resolved against the registry; the issue-description mirror); both are now covered in the table above with no gap.
+- The previously-identified drifts are reconciled by this change: the execution-mode mechanisms are scoped to the modes their ledger backs (HIL counter-backed, AFK plan-file-backed, Manual human-judged); the credential at-rest model is corrected to an inline 0400 credentials.toml (vs an OS-keyring mode); the router reference enumeration is refreshed to seven; the mermaid re-queue edge is re-targeted into the mode-fork; and the codex roborev hook is recorded as a realized advisory extension.
 
 ---
 
@@ -88,19 +97,12 @@ Scenarios of `specs/*.md`:
 - [x] No unstaged implementation files in the worktree
 - [ ] All related commits have been pushed
 
-The four implementation commits are committed on the change's jj chain (bookmark
-`agentic-planning-development-management-skills`). The only working-copy modifications are the
-verify-phase artifacts (`tasks.md` ticking + this `verify.md`), which are expected to be sealed by the
-orchestrator. This repo is a jj diamond, so `git log main..HEAD` would span all five active chains;
-the range below is scoped to this change's chain only.
+The change is committed on its jj chain (bookmark `agentic-planning-development-management-skills`).
+The chain now spans the original change commits plus the reconciliation commits: the four founding skill/spec/design commits, the post-design router-reference commits, and the reconciliation series that scoped the execution-mode mechanisms by mode, corrected the credential at-rest model, refreshed the router reference enumeration to seven, re-targeted the mermaid re-queue edge into the mode-fork, and bound the roborev sub-gate to inline codex review.
+The only working-copy modifications at re-verify time are the audit-trail artifacts (this `verify.md`, the `design.md` D5 addendum, and the `retrospective.md` deferred-record-1 update), which are expected to be sealed by the orchestrator.
+This repo is a jj diamond, so `git log main..HEAD` would span all active chains; the range below is scoped to this change's chain only.
 
-**Commit range** (if known): `main..agentic-planning-development-management-skills`
-
-Four implementation commits on the chain (newest first):
-- `fix(home/crs58): correct stale linear-cli bundled-skills comment (38 -> 1 dir/16 refs)` (jj `mwtprysu`)
-- `feat(skills/openspec-linear-sync): linear-cli Linear/OpenSpec sync overlay skill` (jj `kplmxlnl`)
-- `feat(skills/project-management): human-facing PM hub skill` (jj `vsruslvs`)
-- `feat(skills/agentic-planning-development-workflow): state-machine router skill` (jj `yvwlwokx`)
+**Commit range** (if known): `main..agentic-planning-development-management-skills` (covers the original change commits and the reconciliation commits; jj change-ids are not enumerated here because they are not visible to this re-verify step)
 
 Pushed checkbox left unchecked: push is owned by the orchestrator and is not a verify precondition; non-blocking.
 
@@ -152,7 +154,7 @@ equivalent automated test coverage item by item.
 ## Overall Decision
 
 - [ ] (pass) PASS — may proceed to finishing-a-development-branch and archive
-- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: `three delta-spec capabilities (agentic-workflow-routing, openspec-linear-sync, project-management-hub) report "pending sync" — this is the expected pre-archive state and the lifecycle syncs deltas at archive time (non-blocking); the two plan.md [~] deferred-dogfood rows are deferred-but-covered with named automated/static-assertion equivalents (non-blocking); push of the chain is orchestrator-owned and outside verify scope.`
+- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: `re-run over the reconciled change: structural validation is valid=true, task completion is 30 of 30, and check-4 coherence now covers the two later openspec-linear-sync requirements and records the reconciled drifts with no gap; the three delta-spec capabilities (agentic-workflow-routing, openspec-linear-sync, project-management-hub) still report "pending sync" — the expected pre-archive state synced by the lifecycle at archive time (non-blocking); the two plan.md [~] deferred-dogfood rows are deferred-but-covered with named automated/static-assertion equivalents (the live-workspace-path steps remain deferred by design) (non-blocking); push of the chain is orchestrator-owned and outside verify scope.`
 - [ ] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
 
 **Next step**:
