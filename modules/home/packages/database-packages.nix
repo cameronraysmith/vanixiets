@@ -6,6 +6,7 @@
       home.packages = with pkgs; [
         # db
         dbt-fusion
+        datafusion-cli
         duckdb
         turso
         # TODO: re-enable pgcli once nixpkgs ships a cli-helpers (or pygments)
