@@ -45,12 +45,18 @@
           };
           "root/nixos" = {
             type = "zfs_fs";
-            options.mountpoint = "/";
+            options = {
+              mountpoint = "/";
+              reservation = "10G";
+            };
             mountpoint = "/";
           };
           "root/home" = {
             type = "zfs_fs";
-            options.mountpoint = "/home";
+            options = {
+              mountpoint = "/home";
+              reservation = "4G";
+            };
             mountpoint = "/home";
           };
           "root/nix" = {
@@ -58,6 +64,7 @@
             options = {
               mountpoint = "/nix";
               "com.sun:auto-snapshot" = "false";
+              quota = "250G";
             };
             mountpoint = "/nix";
           };

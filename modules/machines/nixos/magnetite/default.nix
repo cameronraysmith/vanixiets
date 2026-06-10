@@ -137,6 +137,45 @@ in
         };
       };
 
+      # Pool-starvation guardrails (2026-06-10 incident: /nix consumed the
+      # entire 304G pool and wedged every dataset). The quota caps /nix below
+      # pool capacity; the reservations guarantee / and /home writable
+      # headroom even when /nix hits its quota. Mirrored create-time in
+      # disko.nix; these oneshots enforce the values on the already-
+      # provisioned host because disko options apply at dataset creation only.
+      systemd.services.zfs-set-root-nix-quota = {
+        description = "Assert quota=250G on zroot/root/nix";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set quota=250G zroot/root/nix";
+        };
+      };
+
+      systemd.services.zfs-set-root-nixos-reservation = {
+        description = "Assert reservation=10G on zroot/root/nixos";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=10G zroot/root/nixos";
+        };
+      };
+
+      systemd.services.zfs-set-root-home-reservation = {
+        description = "Assert reservation=4G on zroot/root/home";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=4G zroot/root/home";
+        };
+      };
+
       # Raise nix daemon free-space thresholds for a build host. clan-core and
       # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for
       # buildbot-nix workers materializing large closures on a CX53 with niks3
