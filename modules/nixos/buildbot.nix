@@ -186,6 +186,22 @@
         RestartSec = "10s";
       };
 
+      # buildbot-nix registers two gcroot families under
+      # /nix/var/nix/gcroots/per-user/buildbot-worker/<owner>/<repo>/:
+      # per-build drv roots in drvs/ and per-attr output roots as direct
+      # symlinks. Upstream's cleanup rule (master.nix) globs */drvs, one
+      # path component short of the nested <owner>/<repo> layout produced
+      # by unslugified GitHub full_name project names, so it never matches
+      # and drv roots accumulate unbounded (938 roots pinned the store in
+      # the 2026-06-10 incident). Output roots have no upstream expiry at
+      # all (FIXME in buildbot_nix/nix_gcroot.py). Depth-corrected reaping:
+      # drv roots at 7d (matching upstream intent), output roots at 30d
+      # (each rebuild rewrites the symlink, so active attrs stay fresh).
+      systemd.tmpfiles.rules = [
+        "e /nix/var/nix/gcroots/per-user/buildbot-worker/*/*/drvs - - - 7d -"
+        "e /nix/var/nix/gcroots/per-user/buildbot-worker/*/* - - - 30d -"
+      ];
+
       # Allow buildbot worker connections via ZeroTier (for remote workers)
       networking.firewall.interfaces."zt+" = {
         allowedTCPPorts = [ 9989 ];
