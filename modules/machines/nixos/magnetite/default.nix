@@ -179,11 +179,28 @@ in
       # Raise nix daemon free-space thresholds for a build host. clan-core and
       # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for
       # buildbot-nix workers materializing large closures on a CX53 with niks3
-      # GC pressure. Trigger GC at 5 GiB free, free until 20 GiB available.
+      # GC pressure. Trigger GC at 30 GiB free, free until 80 GiB available.
       nix.settings = {
-        min-free = 5 * 1024 * 1024 * 1024;
-        max-free = 20 * 1024 * 1024 * 1024;
+        min-free = 30 * 1024 * 1024 * 1024;
+        max-free = 80 * 1024 * 1024 * 1024;
       };
+
+      # base sets nix.gc.options fleet-wide as a plain string (modules/system/
+      # nix-optimization.nix), so this host-level tightening requires mkForce.
+      # Build outputs persist in the niks3 R2 cache; short local retention is
+      # safe on the build host.
+      nix.gc.options = lib.mkForce "--delete-older-than 7d";
+
+      # Nix >= 2.30 keeps build sandboxes in /nix/var/nix/builds; the only
+      # reaper is the Nix package's tmpfiles rule (nix-daemon.conf, age 7d).
+      # A 7d window let a nix-daemon ENOSPC crash-loop orphan 201 sandboxes
+      # (232 GiB) on 2026-06-10. This entry renders into 00-nixos.conf, which
+      # sorts before nix-daemon.conf, so per tmpfiles.d(5) precedence the 1d
+      # age wins for this path. Active sandboxes (<= 3h buildbot hard
+      # timeout) never enter the 1d window.
+      systemd.tmpfiles.rules = [
+        "d /nix/var/nix/builds 0755 root root 1d -"
+      ];
 
       # srvos hardware-hetzner-cloud sets useNetworkd=true and useDHCP=false; configure primary interface explicitly.
       systemd.network.networks."10-uplink" = {
