@@ -10,11 +10,12 @@
     }:
     let
       # Match the home-manager python environment from development-packages.nix.
-      # duckdb routes to nixpkgs' python3Packages.duckdb because
-      # pkgs/by-name/python-duckdb is currently disabled (see pkgs/disabled/).
-      # To reenable: replace `duckdb` below with `config.packages.python-duckdb`
-      # via `++ [ config.packages.python-duckdb ]` (the perSystem pkgs overlay
-      # does not include customPackages from compose.nix).
+      # duckdb routes to nixpkgs' python3Packages.duckdb here because the
+      # perSystem pkgs overlay does not include customPackages from compose.nix.
+      # The local duckdb/python-duckdb pair lives in pkgs/by-name/ with the
+      # machine-shadowing toggle in modules/nixpkgs/duckdb-local.nix; this
+      # devshell intentionally still resolves python duckdb from nixpkgs.
+      # To use the local build here instead: append `config.packages.python-duckdb`.
       python = pkgs.python3.withPackages (
         ps: with ps; [
           duckdb

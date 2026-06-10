@@ -34,6 +34,7 @@
     in
     # Compose all (order matters!)
     # 1. Internal overlays (channels, stable-fallbacks, overrides, nvim-treesitter, nuenv) via composeManyExtensions
-    # 2. Custom packages (standalone derivations)
-    (internalOverlays final prev) // customPackages;
+    # 2. Custom packages (standalone derivations), minus any withheld via
+    #    config.customPackageExcludes so upstream nixpkgs provides them instead
+    (internalOverlays final prev) // (removeAttrs customPackages config.customPackageExcludes);
 }

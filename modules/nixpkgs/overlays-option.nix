@@ -21,4 +21,15 @@
       `nixpkgsOverlays = [ (final: prev: { ... }) ];`. Not a flake output.
     '';
   };
+
+  options.customPackageExcludes = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    internal = true;
+    description = ''
+      Names of pkgs/by-name packages withheld from the composed default
+      overlay (modules/nixpkgs/compose.nix) so that upstream nixpkgs provides
+      them instead on machines. Not a flake output.
+    '';
+  };
 }
