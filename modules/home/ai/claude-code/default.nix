@@ -50,34 +50,49 @@
               includeCoAuthoredBy = false;
               enableAllProjectMcpServers = false;
               extraKnownMarketplaces = {
+                # reserved Anthropic marketplace name: github source mandated; upstream has no tags so no pin anchor exists (CC marketplace refs are branch/tag only, not shas)
                 claude-plugins-official = {
                   source = {
                     source = "github";
                     repo = "anthropics/claude-plugins-official";
                   };
                 };
-                duckdb-skills = {
+                cloudflare = {
                   source = {
-                    source = "github";
-                    repo = "duckdb/duckdb-skills";
+                    source = "directory";
+                    path = "${pkgs.agent-plugins-cloudflare}";
                   };
                 };
+                duckdb-skills = {
+                  source = {
+                    source = "directory";
+                    path = "${pkgs.agent-plugins-duckdb-skills}";
+                  };
+                };
+                huggingface-skills = {
+                  source = {
+                    source = "directory";
+                    path = "${pkgs.agent-plugins-huggingface-skills}";
+                  };
+                };
+                # reserved Anthropic marketplace name: github source mandated; pinned to latest upstream tag (CC marketplace refs are branch/tag only, not shas)
                 life-sciences = {
                   source = {
                     source = "github";
                     repo = "anthropics/life-sciences";
-                  };
-                };
-                honcho = {
-                  source = {
-                    source = "github";
-                    repo = "plastic-labs/claude-honcho";
+                    ref = "v1.1.1";
                   };
                 };
                 ouroboros = {
                   source = {
-                    source = "github";
-                    repo = "Q00/ouroboros";
+                    source = "directory";
+                    path = "${pkgs.agent-plugins-ouroboros}";
+                  };
+                };
+                superpowers-dev = {
+                  source = {
+                    source = "directory";
+                    path = "${pkgs.agent-plugins-superpowers}";
                   };
                 };
               };
@@ -92,7 +107,7 @@
                 "figma@claude-plugins-official" = false;
                 "frontend-design@claude-plugins-official" = false;
                 "hookify@claude-plugins-official" = true;
-                "huggingface-skills@claude-plugins-official" = true;
+                "huggingface-skills@claude-plugins-official" = false; # monolithic bundle replaced by fine-grained huggingface-skills pins; remote MCP already registered via sops template mcp-huggingface
                 "learning-output-style@claude-plugins-official" = false;
                 # Linear plugin disabled in favor of the `linear-cli` binary + linear-* skills.
                 # It bundles an MCP server exposed as mcp__plugin_linear_linear__* tools.
@@ -103,9 +118,14 @@
                 "posthog@claude-plugins-official" = false;
                 "sentry@claude-plugins-official" = false;
                 "skill-creator@claude-plugins-official" = true;
-                "superpowers@claude-plugins-official" = true;
+                "superpowers@claude-plugins-official" = false; # migrated to pinned superpowers-dev marketplace (obra/superpowers @ v5.1.0)
+                # cloudflare
+                "cloudflare@cloudflare" = true;
                 # duckdb-skills
                 "duckdb-skills@duckdb-skills" = true;
+                # huggingface-skills
+                "hf-cli@huggingface-skills" = true;
+                "huggingface-datasets@huggingface-skills" = true;
                 # life-sciences
                 "10x-genomics@life-sciences" = false;
                 "biorender@life-sciences" = false;
@@ -113,11 +133,10 @@
                 "chembl@life-sciences" = false;
                 "clinical-trial-protocol@life-sciences" = false;
                 "clinical-trials@life-sciences" = false;
-                # honcho
-                "honcho@honcho" = false;
-                "honcho-dev@honcho" = false;
                 # ouroboros
                 "ouroboros@ouroboros" = true;
+                # superpowers-dev
+                "superpowers@superpowers-dev" = true;
               };
               voiceEnabled = true;
               remoteControlAtStartup = true;
@@ -357,29 +376,6 @@
                   # "Bash(truncate *)"
                   # "Bash(shred *)"
                 ];
-              };
-            };
-          };
-
-          # Honcho plugin: generate ~/.honcho/config.json with API key from sops
-          sops.templates."honcho-config" = {
-            mode = "0600";
-            path = "${config.home.homeDirectory}/.honcho/config.json";
-            content = builtins.toJSON {
-              apiKey = config.sops.placeholder."honcho-api-key";
-              peerName = config.home.username;
-              hosts = {
-                claude_code = {
-                  workspace = "claude_code";
-                  aiPeer = "claude";
-                };
-              };
-              sessionStrategy = "per-directory";
-              saveMessages = true;
-              enabled = true;
-              logging = true;
-              endpoint = {
-                environment = "production";
               };
             };
           };
