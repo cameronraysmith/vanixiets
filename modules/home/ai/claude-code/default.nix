@@ -74,6 +74,12 @@
                     repo = "plastic-labs/claude-honcho";
                   };
                 };
+                ouroboros = {
+                  source = {
+                    source = "github";
+                    repo = "Q00/ouroboros";
+                  };
+                };
               };
               enabledPlugins = {
                 # claude-plugins-official
@@ -110,6 +116,8 @@
                 # honcho
                 "honcho@honcho" = false;
                 "honcho-dev@honcho" = false;
+                # ouroboros
+                "ouroboros@ouroboros" = true;
               };
               voiceEnabled = true;
               remoteControlAtStartup = true;

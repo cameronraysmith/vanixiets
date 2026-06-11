@@ -181,6 +181,22 @@
           };
         };
 
+        # Ouroboros: Specification-first agentic loop via uvx (version pinned to pkgs.ouroboros)
+        home.file.".mcp/ouroboros.json".text = builtins.toJSON {
+          mcpServers = {
+            ouroboros = {
+              command = "uvx";
+              args = [
+                "--from"
+                "ouroboros-ai[mcp,claude]==${pkgs.ouroboros.version}"
+                "ouroboros"
+                "mcp"
+                "serve"
+              ];
+            };
+          };
+        };
+
         # Playwright: Browser automation
         home.file.".mcp/playwright.json".text = builtins.toJSON {
           mcpServers = {

@@ -109,6 +109,7 @@
           gastown
           golem-binary
           linear-cli
+          ouroboros
           #------
           plantuml-c4
           ratchet
