@@ -72,7 +72,6 @@ in
         enable = true;
 
         additionalCasks = [
-          "riptide-beta"
           "dbeaver-community"
           "docker-desktop"
           "gitbutler"

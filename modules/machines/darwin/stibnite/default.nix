@@ -80,7 +80,6 @@ in
         enable = true;
 
         additionalCasks = [
-          "riptide-beta"
           "dbeaver-community"
           # "docker-desktop" # defer to orbstack and colima/incus
           "gitbutler"

@@ -89,7 +89,7 @@ in
         enable = true;
 
         # Simplified for basic user - only zerotier for network connectivity
-        # Omitted developer casks: riptide-beta, dbeaver-community, docker-desktop,
+        # Omitted developer casks: dbeaver-community, docker-desktop,
         # gpg-suite, inkscape, keycastr, meld, postgres-app
         additionalCasks = [
           "zerotier-one"
