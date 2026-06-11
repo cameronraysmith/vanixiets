@@ -49,5 +49,6 @@
       # Custom packages via pkgs-by-name auto-discovery
       # Integrates custom derivations without depending on other overlay layers
       pkgsDirectory = ../../pkgs/by-name;
+      pkgsNameSeparator = "-";
     };
 }
