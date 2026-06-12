@@ -17,13 +17,13 @@
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "xsra";
-  version = "0.2.27";
+  version = "0.2.29";
 
   src = fetchFromGitHub {
     owner = "ArcInstitute";
     repo = "xsra";
     tag = "xsra-${finalAttrs.version}";
-    hash = "sha256-2E2a9rxOvcR3zr4vIjvFG9zSFy0BeoM3mWuwJEzR9kc=";
+    hash = "sha256-I3qOZtRmfEm88rgUs8StBofDFF1A6SsnH6a+pTwldkk=";
   };
 
   cargoLock.lockFile = ./Cargo.lock;
