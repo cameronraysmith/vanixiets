@@ -95,7 +95,7 @@
     bun2nix.inputs.systems.follows = "systems";
     bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.59.1";
+    playwright-web-flake.url = "github:pietdevries94/playwright-web-flake/1.60.0";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
 
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";
