@@ -63,6 +63,12 @@
                     path = "${pkgs.agent-plugins-cloudflare}";
                   };
                 };
+                dagster-skills = {
+                  source = {
+                    source = "directory";
+                    path = "${pkgs.agent-plugins-dagster-skills}";
+                  };
+                };
                 duckdb-skills = {
                   source = {
                     source = "directory";
@@ -121,6 +127,9 @@
                 "superpowers@claude-plugins-official" = false; # migrated to pinned superpowers-dev marketplace (obra/superpowers @ v5.1.0)
                 # cloudflare
                 "cloudflare@cloudflare" = true;
+                # dagster-skills
+                "dagster-expert@dagster-skills" = true;
+                "dignified-python@dagster-skills" = false;
                 # duckdb-skills
                 "duckdb-skills@duckdb-skills" = true;
                 # huggingface-skills
