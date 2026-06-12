@@ -111,10 +111,6 @@ The flake defines checks in `modules/checks/` that run during `nix flake check`:
 - `secrets-encryption-integrity` — validates all secrets are SOPS-encrypted
 - `machine-registry-completeness` — validates all machine modules are registered in clan
 
-**Integration checks** (Linux only):
-- `vm-test-framework` — VM test framework smoke test
-- `vm-boot-all-machines` — VM boot validation for NixOS machines
-
 **Other checks**:
 - `nix-unit` — unit tests for flake structure and module exports
 - `treefmt` — formatting validation

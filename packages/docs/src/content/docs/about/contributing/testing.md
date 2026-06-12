@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-This guide covers the complete testing strategy for the infra repository, including infrastructure validation (nix-unit, validation checks, VM tests) and documentation testing (Vitest, Playwright).
+This guide covers the complete testing strategy for the infra repository, including infrastructure validation (nix-unit, validation checks) and documentation testing (Vitest, Playwright).
 
 ## Test philosophy
 
@@ -43,7 +43,7 @@ Run comprehensive validation (`just check` or `nix flake check`) before:
 - When adding new machines or users
 - After significant flake.lock updates
 
-For routine development iteration, `just check-fast` provides faster feedback by skipping VM integration tests.
+For routine development iteration, `just check-fast` runs the same checks with faster feedback by evaluating and building them in parallel against a content-addressed cache.
 
 ## Infrastructure testing
 
@@ -55,7 +55,6 @@ Infrastructure tests validate the nix flake structure, machine configurations, a
 |----------|------|-------|---------|
 | nix-unit | `modules/checks/nix-unit.nix` | 16 | Unit tests for flake structure and invariants |
 | validation | `modules/checks/validation.nix` | 10 | Configuration validation and naming conventions |
-| integration | `modules/checks/integration.nix` | 2 | VM boot tests for NixOS machines |
 | performance | `modules/checks/performance.nix` | 0 (planned: 4) | Performance benchmarks and optimization (planned) |
 | treefmt | (flake-parts) | 1 | Code formatting validation |
 | pre-commit | (flake-parts) | 1 | Pre-commit hook validation |
@@ -63,10 +62,10 @@ Infrastructure tests validate the nix flake structure, machine configurations, a
 ### Running infrastructure tests
 
 ```bash
-# Run all checks (includes VM tests, ~5-7 minutes)
+# Run all checks sequentially with verbose output (~5-7 minutes)
 just check
 
-# Run fast checks only (excludes VM tests, ~1-2 minutes)
+# Run the same checks in parallel against a content-addressed cache (~1-2 minutes)
 just check-fast
 
 # Run specific check
@@ -115,18 +114,6 @@ Validation checks run shell commands to verify configuration correctness.
 | TC-027 | clan-inventory-consistency | Inventory references only valid machines |
 | TC-028 | secrets-encryption-integrity | All secret files are SOPS-encrypted |
 | TC-029 | machine-registry-completeness | All machine modules registered in clan |
-
-### Integration tests (Linux only)
-
-VM integration tests require QEMU/KVM and only run on Linux systems.
-
-| TC-ID | Check Name | Description |
-|-------|------------|-------------|
-| TC-040 | vm-test-framework | VM test framework smoke test |
-| TC-041 | vm-boot-all-machines | VM boot validation for NixOS machines |
-
-These tests are automatically skipped on Darwin.
-Use `just check-fast` to skip them locally on Linux when iterating quickly.
 
 ### Performance tests (planned)
 
@@ -258,15 +245,13 @@ Changed CI workflow?
 
 ### `just check` vs `just check-fast`
 
-| Command | Runtime | VM tests | Use when |
+| Command | Runtime | Strategy | Use when |
 |---------|---------|----------|----------|
-| `just check` | ~5-7 min | Included | Before PR, after rebase, full validation |
-| `just check-fast` | ~1-2 min | Excluded | Development iteration, config-only changes |
+| `just check` | ~5-7 min | Sequential, verbose (`nix flake check -L --show-trace`) | Before PR, after rebase, full validation |
+| `just check-fast` | ~1-2 min | Parallel, content-addressed cache (`nix-fast-build --eval-workers 4`) | Development iteration, config-only changes |
 
-The difference is VM integration tests, which:
-- Require QEMU/KVM (Linux only)
-- Boot NixOS VMs to validate machine configurations
-- Are automatically skipped on Darwin
+Both commands run the same set of checks.
+The difference is execution strategy: `just check` evaluates and builds checks sequentially with verbose tracing, while `just check-fast` fans them out in parallel against a content-addressed cache for faster feedback.
 
 ## Troubleshooting
 
@@ -291,14 +276,6 @@ warning: unknown setting 'allowed-users'
 nix-unit runs in pure evaluation mode where daemon settings don't apply.
 
 ### Cross-platform issues
-
-**Symptom:** VM tests fail on Darwin
-
-**Context:** VM integration tests require QEMU/KVM and only work on Linux.
-They're automatically skipped on Darwin via `lib.optionalAttrs isLinux`.
-
-**Solution:** Use `just check-fast` on Darwin.
-CI runs VM tests on Linux runners.
 
 **Symptom:** Different derivation hashes between systems
 
@@ -331,7 +308,7 @@ nix build .#checks.aarch64-darwin.nix-unit
 # List all available checks
 nix flake show --json | jq '.checks'
 
-# Skip VM tests (fast mode)
+# Run all checks in parallel against the content-addressed cache
 just check-fast x86_64-linux
 ```
 
@@ -395,9 +372,6 @@ nix build .#checks.aarch64-darwin.nix-unit
 # Validation checks only
 nix build .#checks.aarch64-darwin.naming-conventions
 nix build .#checks.aarch64-darwin.terraform-validate
-
-# Integration tests (Linux only)
-nix build .#checks.x86_64-linux.vm-boot-all-machines
 ```
 
 ## See also
