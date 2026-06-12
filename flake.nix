@@ -9,8 +9,8 @@
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable-small/nixexprs.tar.xz";
     systems.url = "github:nix-systems/default/future-26.11";
 
-    nixpkgs-darwin-stable.url = "https://channels.nixos.org/nixpkgs-25.11-darwin/nixexprs.tar.xz";
-    nixpkgs-linux-stable.url = "https://channels.nixos.org/nixos-25.11/nixexprs.tar.xz";
+    nixpkgs-darwin-stable.url = "https://channels.nixos.org/nixpkgs-26.05-darwin/nixexprs.tar.xz";
+    nixpkgs-linux-stable.url = "https://channels.nixos.org/nixos-26.05/nixexprs.tar.xz";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
