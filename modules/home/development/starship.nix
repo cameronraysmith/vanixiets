@@ -17,6 +17,7 @@
           # catppuccin.enable = true;  # Optional: uncomment if using catppuccin theme
           settings = {
             command_timeout = 2000;
+            scan_timeout = 50;
             aws.disabled = true;
             gcloud.disabled = true;
 
