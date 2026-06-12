@@ -103,8 +103,6 @@
 
     llm-agents.url = "github:numtide/llm-agents.nix";
 
-    # TODO: revert following #27716
-    # hermes-agent.url = "github:NousResearch/hermes-agent";
     hermes-agent.url = "github:NousResearch/hermes-agent/v2026.6.5";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     hermes-agent.inputs.flake-parts.follows = "flake-parts";
