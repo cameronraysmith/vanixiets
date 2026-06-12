@@ -1,7 +1,7 @@
 { ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
-    { pkgs, lib, ... }:
+    { pkgs, ... }:
     let
       meshListenAddrs = [
         "fddb:4344:343b:14b9:399:93db:4344:343b"
@@ -99,28 +99,17 @@
         };
       };
 
-      # Caddy binds ZeroTier-assigned addresses (meshListenAddrs above). zerotierone.service
-      # becomes "active" before its daemon finishes assigning addresses to zt+ interfaces, so
-      # caddy can lose the bind race at boot and exit with status 1 (which the upstream module's
-      # RestartPreventExitStatus=1 deliberately excludes from auto-restart). Wait until every
-      # configured address is present locally before letting caddy start.
-      systemd.services.caddy = {
-        after = [ "zerotierone.service" ];
-        wants = [ "zerotierone.service" ];
-        serviceConfig.ExecStartPre = pkgs.writeShellScript "wait-for-mesh-addrs" ''
-          set -eu
-          addrs="${lib.concatStringsSep " " meshListenAddrs}"
-          for _ in $(seq 1 60); do
-            missing=0
-            for addr in $addrs; do
-              ${pkgs.iproute2}/bin/ip addr show | ${pkgs.gnugrep}/bin/grep -qF "$addr" || missing=1
-            done
-            [ "$missing" = "0" ] && exit 0
-            sleep 0.5
-          done
-          echo "Mesh addresses never appeared: $addrs" >&2
-          exit 1
-        '';
+      # Caddy binds the ZeroTier-assigned mesh addresses (meshListenAddrs),
+      # which zerotierone configures asynchronously and which are briefly
+      # tentative during IPv6 Duplicate Address Detection (present in
+      # `ip addr show` yet unbindable, so bind() returns EADDRNOTAVAIL).
+      # Permit binding addresses that are not yet present/ready rather than
+      # racing their lifecycle; the zt+ firewall below remains the access
+      # boundary. This is the canonical pattern for binding addresses managed
+      # by a separate daemon (cf. keepalived/HAProxy floating IPs).
+      boot.kernel.sysctl = {
+        "net.ipv6.ip_nonlocal_bind" = 1;
+        "net.ipv4.ip_nonlocal_bind" = 1;
       };
 
       # only allow https on zerotier interfaces
