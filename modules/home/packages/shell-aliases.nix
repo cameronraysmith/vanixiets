@@ -49,7 +49,6 @@
         tat = "tmux attach -t";
         tks = "tmux kill-session -t";
         tmh = "tmux list-keys | less";
-        mm = "micromamba";
         nb = "nix build --json --no-link --print-build-logs";
         nix-hash = "get_nix_hash";
         s = "sesh connect \"$(sesh list -i | gum filter --limit 1 --placeholder 'Pick a sesh' --prompt='⚡')\"";

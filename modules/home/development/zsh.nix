@@ -28,9 +28,6 @@
           '';
 
           initContent = ''
-            # Initialize micromamba for zsh
-            eval "$(micromamba shell hook --shell zsh)"
-
             # Special handling for nnn's cd-on-quit functionality
             # This needs to be a shell function to change the current shell's directory
             n() {

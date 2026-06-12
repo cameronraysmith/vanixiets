@@ -148,7 +148,6 @@
           #   https://hydra.nixos.org/job/nixpkgs/trunk/swiftPackages.swift.aarch64-darwin
           #   https://hydra.nixos.org/job/nixpkgs/trunk/dotnet-sdk.aarch64-darwin
           # dotnet-sdk_8 # for fable transpiler
-          micromamba
           pixi
           poethepoet
           pydeps
