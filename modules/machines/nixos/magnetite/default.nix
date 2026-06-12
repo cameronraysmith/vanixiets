@@ -77,11 +77,6 @@ in
         defaults.email = "cameron@scientistexperience.net";
       };
 
-      # srvos mixins-nginx enables the deprecated security.dhparams module
-      # (removed in NixOS 26.11); DHE cipher suites have no real consumer.
-      services.nginx.sslDhparam = lib.mkForce false;
-      security.dhparams.enable = lib.mkForce false;
-
       # Tune ZFS auto-snapshot retention for a single-disk cloud VPS without
       # off-site snapshot replication. The nixpkgs defaults (frequent=4,
       # hourly=24, daily=7, weekly=4, monthly=1 via srvos mkDefault) are
