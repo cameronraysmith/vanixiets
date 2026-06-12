@@ -1045,10 +1045,6 @@
     url = "https://registry.npmjs.org/@semantic-release/git/-/git-10.0.1.tgz";
     hash = "sha512-eWrx5KguUcU2wUPaO6sfvZI0wPafUKAMNC18aXY4EnNcrZL86dEmpNVnC9uMpGZkmZJ9EfCVJBQx4pV4EMGT1w==";
   };
-  "@semantic-release/github@12.0.6" = fetchurl {
-    url = "https://registry.npmjs.org/@semantic-release/github/-/github-12.0.6.tgz";
-    hash = "sha512-aYYFkwHW3c6YtHwQF0t0+lAjlU+87NFOZuH2CvWFD0Ylivc7MwhZMiHOJ0FMpIgPpCVib/VUAcOwvrW0KnxQtA==";
-  };
   "@semantic-release/github@12.0.8" = fetchurl {
     url = "https://registry.npmjs.org/@semantic-release/github/-/github-12.0.8.tgz";
     hash = "sha512-tej5AAgK5X9wHRoDmYhecMXEHEkFeGOY1XsEblKxu8pIQwahzf1STYyr7iPU6Lpbg6C5I3N2w/ocXrBo+L7jhw==";
@@ -3914,9 +3910,9 @@
     url = "https://registry.npmjs.org/semantic-release-plugin-decorators/-/semantic-release-plugin-decorators-4.0.0.tgz";
     hash = "sha512-5eqaITbgGJu7AWCqY/ZwDh3TCS84Q9i470AImwP9vw3YcFRyR8sEb499Zbnqa076bv02yFUn88GtloQMXQsBrg==";
   };
-  "semantic-release@25.0.3" = fetchurl {
-    url = "https://registry.npmjs.org/semantic-release/-/semantic-release-25.0.3.tgz";
-    hash = "sha512-WRgl5GcypwramYX4HV+eQGzUbD7UUbljVmS+5G1uMwX/wLgYuJAxGeerXJDMO2xshng4+FXqCgyB5QfClV6WjA==";
+  "semantic-release@25.0.5" = fetchurl {
+    url = "https://registry.npmjs.org/semantic-release/-/semantic-release-25.0.5.tgz";
+    hash = "sha512-mn61SUJwtM8ThrWn2WmgLVpwVJeG/hPSupua1psdMoufmwRIPyvRLkRkL0JDXkP67OntlLWUYnBnfVc8EDO3/g==";
   };
   "semver-regex@4.0.5" = fetchurl {
     url = "https://registry.npmjs.org/semver-regex/-/semver-regex-4.0.5.tgz";
@@ -4361,10 +4357,6 @@
   "undici@5.29.0" = fetchurl {
     url = "https://registry.npmjs.org/undici/-/undici-5.29.0.tgz";
     hash = "sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg==";
-  };
-  "undici@7.18.2" = fetchurl {
-    url = "https://registry.npmjs.org/undici/-/undici-7.18.2.tgz";
-    hash = "sha512-y+8YjDFzWdQlSE9N5nzKMT3g4a5UBX1HKowfdXh0uvAnTaqqwqB92Jt4UXBAeKekDs5IaDKyJFR4X1gYVCgXcw==";
   };
   "undici@7.24.8" = fetchurl {
     url = "https://registry.npmjs.org/undici/-/undici-7.24.8.tgz";
