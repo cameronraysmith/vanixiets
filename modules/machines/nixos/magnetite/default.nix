@@ -24,6 +24,7 @@ in
         inputs.niks3.nixosModules.niks3
         inputs.buildbot-nix.nixosModules.buildbot-master
         inputs.buildbot-nix.nixosModules.buildbot-worker
+        inputs.cognee-nix.nixosModules.cognee
       ]
       ++ (with flakeModules; [
         base
@@ -32,6 +33,7 @@ in
         ssh-known-hosts
         buildbot
         gitea
+        cognee
         gitea-actions-runner
         docker
         kanidm

@@ -73,6 +73,11 @@
             options.mountpoint = "/var/lib/containers";
             mountpoint = "/var/lib/containers";
           };
+          "root/cognee" = {
+            type = "zfs_fs";
+            options.mountpoint = "/var/lib/cognee";
+            mountpoint = "/var/lib/cognee";
+          };
           # Dedicated dataset for docker graphroot to use the native ZFS
           # storage driver (docker's overlay2 does not layer cleanly on ZFS,
           # and /var/lib/docker must be its own dataset for the zfs driver).
