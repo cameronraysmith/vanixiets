@@ -40,6 +40,7 @@ in
         zt-dns
         zt-services-trust
         dolt-sql-server
+        magnetite-builder
         # Not importing users module (defines testuser at UID 550)
         # stibnite defines its own user (crs58)
       ]);
@@ -180,26 +181,32 @@ in
       # Connection details (sshUser/sshKey/publicHostKey) are null in upstream
       # too; ssh resolution is handled by /etc/ssh/ssh_config.d/100-rosetta-builder.conf.
       # Remove once nix-rosetta-builder advertises uid-range upstream.
-      nix.buildMachines = lib.mkForce [
-        {
-          hostName = "rosetta-builder";
-          systems = [
-            "aarch64-linux"
-            "x86_64-linux"
-          ];
-          maxJobs = 12;
-          speedFactor = 1;
-          protocol = "ssh-ng";
-          supportedFeatures = [
-            "benchmark"
-            "big-parallel"
-            "kvm"
-            "nixos-test"
-            "uid-range"
-          ];
-          mandatoryFeatures = [ ];
-        }
-      ];
+      nix.buildMachines = lib.mkForce (
+        [
+          {
+            hostName = "rosetta-builder";
+            systems = [
+              "aarch64-linux"
+              "x86_64-linux"
+            ];
+            maxJobs = 12;
+            speedFactor = 1;
+            protocol = "ssh-ng";
+            supportedFeatures = [
+              "benchmark"
+              "big-parallel"
+              "kvm"
+              "nixos-test"
+              "uid-range"
+            ];
+            mandatoryFeatures = [ ];
+          }
+        ]
+        ++ config.services.magnetite-builder.buildMachines
+      );
+
+      # Offload native x86_64-linux builds to magnetite over ZeroTier.
+      services.magnetite-builder.enable = true;
 
       # Colima for OCI container management (complementary to nix-rosetta-builder)
       services.colima = {
