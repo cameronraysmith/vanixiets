@@ -35,7 +35,7 @@
       # (DB_PASSWORD=... line, delivered to cognee via EnvironmentFile).
       clan.core.vars.generators.cognee-db-password = {
         files."password" = {
-          owner = "cognee";
+          owner = "postgres";
           restartUnits = [
             "cognee.service"
             "postgresql.service"
