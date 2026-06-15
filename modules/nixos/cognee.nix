@@ -29,6 +29,33 @@
         '';
       };
 
+      # PostgreSQL role password for the cognee role over loopback TCP
+      # (auto-generated). Emitted twice from one value: `password` (plaintext,
+      # consumed by the postgresql-setup ALTER ROLE below) and `env`
+      # (DB_PASSWORD=... line, delivered to cognee via EnvironmentFile).
+      clan.core.vars.generators.cognee-db-password = {
+        files."password" = {
+          owner = "cognee";
+          restartUnits = [
+            "cognee.service"
+            "postgresql.service"
+          ];
+        };
+        files."env" = {
+          owner = "cognee";
+          restartUnits = [
+            "cognee.service"
+            "postgresql.service"
+          ];
+        };
+        runtimeInputs = [ pkgs.openssl ];
+        script = ''
+          password=$(openssl rand -hex 32)
+          echo -n "$password" > $out/password
+          echo -n "DB_PASSWORD=$password" > $out/env
+        '';
+      };
+
       # Bootstrap default superuser password (auto-generated)
       clan.core.vars.generators.cognee-default-user-password = {
         files."password" = {
@@ -58,6 +85,10 @@
 
         database.createLocally = true;
         database.enablePgvector = true;
+        # Loopback TCP (not the /run/postgresql socket): a TCP host has no
+        # leading "/", so cognee's alembic URL render-to-string round-trips
+        # correctly and the pgvector engine's DB_PASSWORD gate is satisfiable.
+        database.host = "127.0.0.1";
 
         vectorStore.backend = "pgvector";
         graphStore.backend = "ladybug";
@@ -97,7 +128,39 @@
           config.clan.core.vars.generators.cognee-default-user-password.files."password".path;
         llm.apiKeyFile = config.clan.core.vars.generators.cognee-openai-api-key.files."api-key".path;
         llm.embeddingApiKeyFile = config.clan.core.vars.generators.cognee-openai-api-key.files."api-key".path;
+        environmentFile = config.clan.core.vars.generators.cognee-db-password.files."env".path;
       };
+
+      # Loopback TCP for the local postgres provisioned by createLocally, with
+      # scram-password auth for the cognee role (merges additively with the
+      # upstream createLocally block).
+      services.postgresql = {
+        # Loopback only: magnetite is multi-homed (public + ZeroTier), so 5432
+        # must never leave 127.0.0.1. enableTCPIP would set listen_addresses="*".
+        settings.listen_addresses = lib.mkForce "127.0.0.1";
+        settings.password_encryption = "scram-sha-256";
+        # First-match-wins: this scram rule for the cognee role must precede the
+        # broad `host all all 127.0.0.1/32 md5` default (added via mkAfter).
+        authentication = lib.mkBefore ''
+          host cognee cognee 127.0.0.1/32 scram-sha-256
+          host cognee cognee ::1/128      scram-sha-256
+        '';
+      };
+
+      # Set the cognee role password idempotently after postgresql-setup creates
+      # the role (ALTER ROLE is idempotent). Reads the plaintext from the
+      # clan-vars file and feeds the SQL via stdin heredoc so the secret never
+      # appears in psql's argv. Runs in the postgresql-setup context as the
+      # postgres superuser over the local socket.
+      systemd.services.postgresql-setup.serviceConfig.ExecStartPost = lib.mkAfter [
+        (pkgs.writeShellScript "cognee-set-role-password" ''
+          set -eu
+          password="$(cat ${config.clan.core.vars.generators.cognee-db-password.files."password".path})"
+          ${lib.getExe' config.services.postgresql.package "psql"} -d postgres -v ON_ERROR_STOP=1 <<EOF
+          ALTER ROLE cognee PASSWORD '$password';
+          EOF
+        '')
+      ];
 
       # Resource caps for a colocated build host (merges additively with the
       # serviceConfig the cognee module already sets; no key collisions).
