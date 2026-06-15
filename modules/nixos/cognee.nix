@@ -70,17 +70,20 @@
         # Provisional bootstrap account; confirm the canonical operator email.
         auth.defaultUserEmail = "cameron@scientistexperience.net";
 
-        mcp.enable = false;
+        mcp.enable = true;
+        mcp.transport = "http";
+        mcp.port = 9271;
+        mcp.listenAddress = "fddb:4344:343b:14b9:399:930f:39db:40d2";
         frontend.enable = false;
         openFirewall = false;
         workers = 1;
 
-        # Binds magnetite's deterministic ZeroTier IPv6. The cognee-nix gunicorn
-        # `--bind ${listenAddress}:${port}` does not bracket an IPv6 literal, so a
-        # correct runtime bind requires the in-flight IPv6-bracket fix on the
-        # cognee-v112 fork; until that fork is re-pinned the rendered --bind is
-        # malformed at runtime only (nix eval/build are unaffected).
-        listenAddress = "fddb:4344:343b:14b9:399:930f:39db:40d2";
+        # The API binds loopback only; the server-side MCP (mcp.* above) is the
+        # mesh-facing surface, bound to magnetite's deterministic ZeroTier IPv6.
+        # The cognee-nix IPv6-bracket fix in the gunicorn `--bind` is retained for
+        # the future public/nginx path but is unused here (loopback is bracket-free).
+        listenAddress = "127.0.0.1";
+        port = 9270;
 
         settings = {
           KUZU_BUFFER_POOL_SIZE = 2147483648;
@@ -106,15 +109,30 @@
         Nice = 10;
       };
 
-      # Permit binding the ZeroTier-assigned address before zerotierone settles
-      # on cold boot (mirrors modules/machines/nixos/cinnabar/caddy.nix). The zt+
-      # firewall below remains the access boundary.
+      # Permit the MCP server to bind magnetite's ZeroTier-assigned IPv6 before
+      # zerotierone settles on cold boot (mirrors
+      # modules/machines/nixos/cinnabar/caddy.nix). The zt+ firewall below
+      # remains the access boundary.
       boot.kernel.sysctl = {
         "net.ipv6.ip_nonlocal_bind" = 1;
         "net.ipv4.ip_nonlocal_bind" = 1;
       };
 
-      # Expose the cognee API port on the ZeroTier mesh only.
-      networking.firewall.interfaces."zt+".allowedTCPPorts = [ 8000 ];
+      # v1 is ZeroTier-only (the mesh is the security boundary); the MCP SDK's
+      # Host-header rebinding guard is disabled for the mesh deploy and will be
+      # re-enabled behind nginx for the future public path.
+      systemd.services.cognee-mcp.environment.MCP_DISABLE_DNS_REBINDING_PROTECTION = "true";
+
+      # Light caps; the MCP is a lightweight proxy that must also yield to buildbot.
+      systemd.services.cognee-mcp.serviceConfig = {
+        MemoryMax = "512M";
+        MemoryHigh = "384M";
+        CPUWeight = 20;
+        IOWeight = 20;
+        Nice = 10;
+      };
+
+      # Expose the cognee MCP port on the ZeroTier mesh only (the API is loopback).
+      networking.firewall.interfaces."zt+".allowedTCPPorts = [ 9271 ];
     };
 }
