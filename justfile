@@ -280,8 +280,11 @@ check:
 # Validate flake checks via nix-fast-build (failure isolation, parallel eval+build, nom output)
 # --eval-workers 4: reduces SQLite eval-cache contention (harmless but noisy at default=ncpus)
 # nom=auto|on|off: auto disables nom when stdout is not a TTY (e.g., piped to tee)
+# push=off|on: on uploads built paths to the niks3 PUSH server (auth token resolved by the
+#   niks3 client from ~/.config/niks3/auth-token); the PULL substituter cache.scientistexperience.net
+#   is configured separately. Params are positional, so usage is: just check-fast auto on
 [group('nix')]
-check-fast nom="auto":
+check-fast nom="auto" push="off":
   #!/usr/bin/env bash
   set -euo pipefail
   case "{{nom}}" in
@@ -290,7 +293,8 @@ check-fast nom="auto":
     off)  flag="--no-nom" ;;
     *) echo "nom must be auto|on|off" >&2; exit 1 ;;
   esac
-  nix-fast-build $flag \
+  pushflag=""; [ "{{push}}" = "on" ] && pushflag="--niks3-server https://niks3.scientistexperience.net"
+  nix-fast-build $flag $pushflag \
     --no-link \
     --option accept-flake-config true \
     --eval-workers 4 \
