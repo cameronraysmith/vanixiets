@@ -127,7 +127,8 @@
         auth.defaultUserPasswordFile =
           config.clan.core.vars.generators.cognee-default-user-password.files."password".path;
         llm.apiKeyFile = config.clan.core.vars.generators.cognee-openai-api-key.files."api-key".path;
-        llm.embeddingApiKeyFile = config.clan.core.vars.generators.cognee-openai-api-key.files."api-key".path;
+        llm.embeddingApiKeyFile =
+          config.clan.core.vars.generators.cognee-openai-api-key.files."api-key".path;
         environmentFile = config.clan.core.vars.generators.cognee-db-password.files."env".path;
       };
 

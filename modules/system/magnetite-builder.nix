@@ -93,15 +93,14 @@ let
     };
   };
 
-  mkSshBlock =
-    cfg: ''
-      Host ${cfg.hostAlias}
-        HostName ${cfg.address}
-        User ${cfg.sshUser}
-        IdentityFile ${cfg.sshKeyPath}
-        IdentitiesOnly yes
-        HostKeyAlias magnetite.zt
-    '';
+  mkSshBlock = cfg: ''
+    Host ${cfg.hostAlias}
+      HostName ${cfg.address}
+      User ${cfg.sshUser}
+      IdentityFile ${cfg.sshKeyPath}
+      IdentitiesOnly yes
+      HostKeyAlias magnetite.zt
+  '';
 in
 {
   flake.modules.darwin.magnetite-builder =
@@ -116,7 +115,9 @@ in
         (mkGenerator pkgs)
         // {
           nix.distributedBuilds = true;
-          environment.etc."ssh/ssh_config.d/120-magnetite.conf".text = mkSshBlock (cfg // { inherit sshKeyPath; });
+          environment.etc."ssh/ssh_config.d/120-magnetite.conf".text = mkSshBlock (
+            cfg // { inherit sshKeyPath; }
+          );
         }
       );
     };
