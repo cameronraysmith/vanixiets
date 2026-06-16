@@ -25,6 +25,11 @@ A non-input asset corresponds to `Just` a task, a `SourceAsset` (`source_asset.p
 There is no coherence condition Dagster fails to enforce here: the resolved `AssetGraph` is acyclic (a declared cycle fails to topologically sort, via the `toposort` import from `dagster._core.utils`, and is rejected), the keys are global, and `toposorted_asset_keys` is the witness that the free diagram admits a linear extension.
 The one subtlety worth stating is that the dependency edge carries identity, not data — the framework matches by parameter-name-to-`AssetKey`, so the diagram is strongly typed in *identity* and only opt-in typed in *data* (see entry 3 and entry 7), but that does not weaken the diagram structure itself.
 
+A refinement of this tight reading that real codebases force: the free term is often not authored directly but *computed* by an asset factory.
+Production code rarely writes `@asset` by hand; it writes an effectful, cached, resource-dependent factory that constructs and returns the asset, check, and job definitions from configuration.
+That construction is effectful, but the generated object is still exactly the free term of this entry — the free diagram is unchanged, and only its construction is impure.
+The factory's response is itself combined monoidally across factories, which is where this refinement connects to the combine/fold discipline of *03-fp-discipline-and-enforcement.md*.
+
 ## 2. Static versus dynamic is applicative versus monad — the most load-bearing mapping
 
 The exact API spans two layers because the distinction does too.

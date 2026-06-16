@@ -26,7 +26,9 @@ This is the compositional continuous verification (CCV) stance, summarized here 
 The load-bearing primitive is the *operating-envelope-plus-regulator pair*.
 An operating envelope is the declared set of conditions under which an artifact is committed to behaving correctly, made first-class as a structured artifact rather than assertions buried in test code, and it declares the coverage bins the regulators must saturate.
 A regulator is an automated process that samples the artifact's actual behavior and compares it against the envelope; per the Conant–Ashby theorem (every good regulator must contain a model of the system it regulates) that model must be explicit.
-The closure operator is the single composed evaluation of every regulator over the whole repository graph against pinned, content-addressed inputs, realized canonically as `nix flake check` against a pinned flake input, whose deterministic pass or fail operationalizes the question "is the system approximately correct?".
+The closure operator is abstractly one deterministic command that evaluates every regulator over the whole repository graph against pinned, content-addressed inputs, whose deterministic pass or fail operationalizes the question "is the system approximately correct?".
+The load-bearing properties are single-command, deterministic, pinned-inputs, and all-regulators, not nix specifically.
+Its canonical realization and the fleet default is `nix flake check` against a pinned `flake.lock`; in a non-nix repository the same abstraction is realized as the project's single deterministic check command (for example `just check` or `make test`) against its pinned lockfile (for example `uv.lock`).
 
 Approximate is precise, not vague: Rice's theorem and Ashby's law of requisite variety make perfect coverage structurally impossible, so the target is that the gap between intended and exercised behavior is visible, bounded, and decreasing.
 The pairs compose into one closure operator through a four-property hierarchy, each property strictly stronger than the last.
@@ -231,8 +233,36 @@ def features_round_trips(context: dg.AssetCheckExecutionContext) -> dg.AssetChec
 `AssetCheckResult` carries `passed: bool`, `severity: AssetCheckSeverity` (`WARN` or `ERROR`), `metadata`, and `description`; `blocking=True` with `ERROR` severity stops downstream assets when the law fails.
 This check is the envelope's regulator for the round-trip law on a live asset, where the Hypothesis test is its regulator over the type's whole input space.
 
-To close the CCV loop, wrap the property tests and `dagster definitions validate` as derivations under `checks.<system>` so `nix flake check` evaluates them against the pinned `flake.lock`.
-The asset check becomes the runtime regulator inside a Dagster run, and the nix-wrapped property test becomes the build-time regulator inside the closure operator; both ship in the same commit as `LanceIOManager` per the no-leak principle, and the traceability meta-regulator fails the closure operator if the IO manager changes without its regulator.
+To close the CCV loop, wire the property tests and `dagster definitions validate` into the closure operator — the one deterministic command that evaluates every regulator against pinned inputs.
+The canonical realization wraps them as derivations under `checks.<system>` so `nix flake check` evaluates them against the pinned `flake.lock`; in a non-nix consumer (for example a `uv` + `just`-only repository with no `flake.nix`) the same wiring is the project's single deterministic check command against its pinned `uv.lock`.
+The asset check becomes the runtime regulator inside a Dagster run, and the build-time regulator runs inside the closure operator; both ship in the same commit as `LanceIOManager` per the no-leak principle, and the traceability meta-regulator fails the closure operator if the IO manager changes without its regulator.
+
+## Auditing a real IO manager against the law
+
+The worked `LanceIOManager` is the right answer; auditing a real one is the more common task, and the rubric below converts the law into checkable obligations against an existing implementation.
+
+| Constraint | What to check | Pass condition |
+|---|---|---|
+| Address purity and injectivity | `address` reads only `(AssetKey, PartitionKey)`; no run id, wall-clock time, or mutable state | a pure function whose output is determined by the key, injective so distinct keys or partitions yield distinct addresses |
+| Round-trip identity `load ∘ store = id` | one canonical transport on both sides; no silent type coercion on load | `load` returns the stored value with no lossy or `Any`-shaped drift |
+| Typed boundary | the `obj` parameter and the load return annotate a domain type, not `Any` | a domain model under `@beartype`, so the round trip is checkable statically and at the serialization edge |
+| Thin store algebra | `handle_output`/`load_input` read and write only | no business logic embedded in the transport |
+| Partition fibering | the address includes the partition; append vs merge vs overwrite is stated | partition appears in the address and the write semantics are declared, not implicit |
+| Parse-don't-validate plus schema | external bytes become a validated domain type once, the schema is enforced, and the regulators ship together | a smart constructor on load, an asserted/pinned schema, and the property test plus `@asset_check` plus closure-operator wiring in the same commit |
+
+When an audit fails a row, the canonical remediation is a short patch-list: type the boundary with a domain model; pick one canonical transport and pin or assert its schema; extract a pure injective `address()` reading only the key and partition; reconcile any reported metadata with the real write address; declare the partition semantics; parse-don't-validate on load; and ship the property test, the `@asset_check`, and the closure-operator wiring in the same commit.
+
+Three generic anti-patterns recur and each fails a specific row.
+An Arrow-in / pandas-out transport mismatch fails the round trip by type, because `load` does not return what `store` was given.
+A run id mixed into the address fails address purity, because the same key resolves to a different location across runs.
+A separator-collision from naive path-flattening — joining a multi-segment `AssetKey` and a partition with a shared delimiter — fails injectivity, because two distinct keys can flatten to one address.
+
+### File and directory-payload variant
+
+The centerpiece is a *value* store: a Lance dataset round-tripped through a Pydantic model.
+A file or directory-payload IO manager is different — a `UPathIOManager`-style manager whose materialized artifact is a path or directory, not an in-memory value — and the law specializes accordingly.
+State `load ∘ store = id` over filesystem *contents* via content-hash or manifest equality (for example a `blake3` manifest over the materialized tree), not a value round trip, because there is no in-memory value to compare and the artifact is the bytes on disk.
+A polymorphic load return — path versus URI versus handle, selected by an input mode — must be a discriminated sum returning branded types (a `Literal`-discriminated union of `NewType` brands), never unsafe dispatch on the downstream input's type annotation, so the consumed mode is type-visible and exhaustively matchable rather than inferred from a coercion target.
 
 ## Monoid and fold laws for incremental and partitioned re-materialization
 
@@ -268,6 +298,10 @@ def test_merge_commutative(a, b) -> None:
 
 A passing associativity and identity pair is rule 6's regulator; an integrity mutation that breaks `merge`'s associativity must be killed by this test.
 See *algebraic-laws.md* for the full law catalogue and the parametricity argument that some of these laws are guaranteed by the signature and need no test.
+
+The same rule-6 monoid obligation governs the asset-factory response named in *01-dagster-categorical-mapping.md* entry 1.
+When a project ships a factory framework that builds definitions and combines them across factories, that combine is a monoid: the identity is the empty response, and the combine concatenates the contributed asset, check, and job definitions.
+A factory framework therefore owes the same Hypothesis associativity and identity property tests as `merge` above, over the response carrier rather than the partition-merge carrier; the construction being effectful and cached does not exempt the combine from its laws.
 
 ## Cross-references
 
