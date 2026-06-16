@@ -109,6 +109,7 @@ in
         providers = [
           "quad9"
         ];
+        userHome = "/private/var/lib/dnscrypt-proxy";
       };
 
       services.zt-services-trust.enable = true;
