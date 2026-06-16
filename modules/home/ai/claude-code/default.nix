@@ -57,6 +57,12 @@
                     repo = "anthropics/claude-plugins-official";
                   };
                 };
+                cognee = {
+                  source = {
+                    source = "directory";
+                    path = "${pkgs.agent-plugins-cognee}";
+                  };
+                };
                 cloudflare = {
                   source = {
                     source = "directory";
@@ -125,6 +131,8 @@
                 "sentry@claude-plugins-official" = false;
                 "skill-creator@claude-plugins-official" = true;
                 "superpowers@claude-plugins-official" = false; # migrated to pinned superpowers-dev marketplace (obra/superpowers @ v5.1.0)
+                # cognee
+                "cognee-memory@cognee" = true;
                 # cloudflare
                 "cloudflare@cloudflare" = true;
                 # dagster-skills
