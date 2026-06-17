@@ -69,7 +69,7 @@
                     path = "${pkgs.agent-plugins-cloudflare}";
                   };
                 };
-                dagster-skills = {
+                dagster = {
                   source = {
                     source = "directory";
                     path = "${pkgs.agent-plugins-dagster-skills}";
@@ -135,9 +135,9 @@
                 "cognee-memory@cognee" = true;
                 # cloudflare
                 "cloudflare@cloudflare" = true;
-                # dagster-skills
-                "dagster-expert@dagster-skills" = true;
-                "dignified-python@dagster-skills" = false;
+                # dagster
+                "dagster-expert@dagster" = true;
+                "dignified-python@dagster" = false;
                 # duckdb-skills
                 "duckdb-skills@duckdb-skills" = true;
                 # huggingface-skills
