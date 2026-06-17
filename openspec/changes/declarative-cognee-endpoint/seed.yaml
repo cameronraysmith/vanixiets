@@ -1,0 +1,127 @@
+goal: Make cognee the fleet's universal knowledge base reached through the cognee-memory
+  plugin and a new global cognee-cli wrapper (not via MCP), all resolved from a single
+  declarative nix source of truth pointing at one central cognee REST API on magnetite
+  over ZeroTier, plus a kanidm-gated public browser UI, while keeping every cognee
+  listener non-public.
+task_type: code
+brownfield_context:
+  project_type: brownfield
+constraints:
+- One comprehensive OpenSpec change, no phase split, no buildbot prerequisite change
+- 'Brownfield: nix-darwin + NixOS via clan, dendritic flake-parts; cognee-nix is our editable fork'
+- Magnetite ZeroTier IPv6 literal sourced only from flake.lib.hosts.<host>.zt registry, never duplicated
+- flake.lib.hosts.<host>.zt registry and derived flake.lib.cognee record each in a single file (lazyAttrsOf raw constraint)
+- REST API binds ZT-only [magnetite-ZT-IPv6]:9270 (fail-closed, single types.str listenAddress, no dual-bind patch); 9270 firewalled to zt+
+- cognee frontend binds loopback 127.0.0.1:3000; postgres loopback 127.0.0.1:5432; nginx 443 is the only public surface
+- cognee MCP removed entirely on client and server (no 9271 listener)
+- Plugin always-on global via COGNEE_SERVICE_URL=ZT REST URL in home.sessionVariables (managed mode, no API key in v1)
+- cognee app-auth stays OFF (auth.multiTenant=false); oauth2-proxy + kanidm is the sole access-control layer; single-user cameron@scientistexperience.net
+- Frontend rebuilt with NEXT_PUBLIC_LOCAL_API_URL="" (same-origin, build-time inlined); drop inert NEXT_PUBLIC_BACKEND_API_URL injection
+- Public UI served by bespoke host nginx vhost (/ -> loopback frontend, /api/ -> ZT REST), not the module's built-in services.cognee.nginx
+- Allowlist by kanidm group membership cognee_access (stub group, overwriteMembers=false, autoRemove=false, cameron added operationally)
+- oauth2 client provision.systems.oauth2.cognee mirrors synapse with scopeMaps + claimMaps.groups
+- cognee oauth2-proxy is a dedicated containerized kanidm instance (jfly oauth2-proxies-nginx pattern, unix socket, host nginx auth_request); buildbot's GitHub singleton untouched
+- Single clan-vars generator kanidm-oauth2-cognee emits files.secret (bare, owner kanidm) and files.cookie (bare), with restartUnits on kanidm.service and the oauth2-proxy unit
+- files.secret feeds both kanidm-provision basicSecretFile and oauth2-proxy clientSecretFile; files.cookie feeds cookie.secretFile; no env-file shaping
+- No separate network/ZeroTier work; laptops already config-level ZT members reaching magnetite
+- Each gated service owns its own kanidm client + group + secret generator in its own module; kanidm.nix stays pure IdP scaffold
+acceptance_criteria:
+- cognee endpoints resolve from one declarative two-layer nix value (flake.lib.hosts.<host>.zt registry + derived flake.lib.cognee record) with no duplicated ZT literal and no MCP URL
+- The cognee-memory plugin and the new global cognee-cli wrapper transparently reach the central magnetite cognee over ZeroTier on every fleet laptop, eliminating the local per-laptop fallback
+- The cognee MCP surface is fully removed on both client and server, and the central REST API is the only programmatic surface, bound ZT-only and firewalled to zt+ so it can never face the public interface
+- A functional public browser UI is reachable at kb.scientistexperience.net behind kanidm-OIDC group-gated (cognee_access) access, with the frontend and all cognee processes bound non-public and nginx 443 the only public surface, and buildbot's existing oauth2-proxy singleton and auth configuration left fully untouched
+ontology_schema:
+  name: DeclarativeCogneeEndpoint
+  description: The declarative configuration model for a single centrally-hosted cognee knowledge base accessed by fleet clients over ZeroTier and by a kanidm-gated public browser UI, including its listeners, identity/access plumbing, and secret topology.
+  fields:
+  - name: hostZtRegistry
+    type: object
+    description: flake.lib.hosts.<host>.zt single-source registry of per-host ZeroTier addresses
+  - name: cogneeRecord
+    type: object
+    description: derived flake.lib.cognee record (meshApiUrl, apiPort, publicFqdn) with no MCP URL
+  - name: restListener
+    type: object
+    description: 'cognee REST API bind (magnetite ZT IPv6 : 9270, ZT-only, firewalled to zt+)'
+  - name: frontendListener
+    type: object
+    description: 'cognee Next.js frontend bind (loopback 127.0.0.1 : 3000, same-origin rebuild)'
+  - name: postgresListener
+    type: object
+    description: 'cognee postgres bind (loopback 127.0.0.1:5432, never public)'
+  - name: mcpRemoval
+    type: boolean
+    description: cognee MCP fully removed on client and server (no 9271 listener)
+  - name: clientServiceUrl
+    type: string
+    description: COGNEE_SERVICE_URL resolved to ZT REST URL for plugin/CLI/SDK
+  - name: cogneeMemoryPlugin
+    type: object
+    description: claude-code cognee-memory plugin consuming COGNEE_SERVICE_URL, always-on via home.sessionVariables (distinct from cogneeCli and clientServiceUrl)
+  - name: cogneeCli
+    type: object
+    description: global writeShellApplication over pkgs.cognee baking --api-url
+  - name: publicVhost
+    type: object
+    description: bespoke nginx 443 vhost gating / -> frontend and /api/ -> ZT REST
+  - name: kanidmClient
+    type: object
+    description: provision.systems.oauth2.cognee client with scopeMaps and claimMaps.groups
+  - name: accessGroup
+    type: object
+    description: kanidm cognee_access stub group, members added operationally
+  - name: oauth2Proxy
+    type: object
+    description: dedicated containerized kanidm oauth2-proxy (unix socket, auth_request) gating cognee_access
+  - name: secretGenerator
+    type: object
+    description: single clan-vars kanidm-oauth2-cognee generator emitting files.secret and files.cookie with restartUnits
+  - name: noPublicBindInvariant
+    type: boolean
+    description: every cognee listener bound only to loopback or ZeroTier, never public
+evaluation_principles:
+- name: no_public_bind_structural
+  description: Every cognee listener (REST, frontend, postgres) binds only to loopback or ZeroTier so exposure is impossible at the bind layer, not merely firewall-dependent
+  weight: 1.0
+- name: single_source_of_truth
+  description: All endpoint values derive from flake.lib.hosts.<host>.zt and flake.lib.cognee with no duplicated ZT literal or stray MCP URL
+  weight: 0.9
+- name: universal_kb_reachability
+  description: Plugin and cognee-cli on every laptop resolve to the central cognee over ZT with the local fallback eliminated
+  weight: 0.9
+- name: sole_access_control_correctness
+  description: oauth2-proxy + kanidm group membership is the verified sole gate given cognee app-auth is off and the SPA fails open
+  weight: 0.9
+- name: secret_single_source_dual_consumer
+  description: One generator's bare-value files satisfy both kanidm-provision and oauth2-proxy with correct owners and restartUnits
+  weight: 0.8
+- name: buildbot_isolation
+  description: Buildbot's auth/access mode and its oauth2-proxy singleton remain untouched with no shared blast radius
+  weight: 0.7
+- name: repo_pattern_consistency
+  description: Follows established synapse client, stub-group, cross-owner secret, and jfly containerized oauth2-proxy precedents
+  weight: 0.7
+exit_conditions:
+- name: endpoint_unified
+  description: All consumers resolve the central cognee from the declarative nix value
+  criteria: CLI, plugin, and SDK dial http://[magnetite-ZT-IPv6]:9270 from the registry with no duplicated literal and no MCP path
+- name: mcp_decommissioned
+  description: cognee MCP removed end-to-end
+  criteria: no mcp-servers.nix entry, no ~/.mcp/cognee.json, services.cognee.mcp.enable=false, no 9271 listener or zt+ opening
+- name: non_public_bind_verified
+  description: Listener inventory confirmed non-public
+  criteria: REST ZT-only:9270, frontend loopback:3000, postgres loopback:5432, nginx 443 sole public surface
+- name: public_ui_gated
+  description: kb.scientistexperience.net serves the functional UI behind kanidm group gating
+  criteria: interactive OIDC, allowed_groups cognee_access, frontend renders under single default user
+- name: secret_and_proxy_provisioned
+  description: Identity and secret plumbing in place
+  criteria: kanidm-oauth2-cognee generator emits files.secret/files.cookie with restartUnits, containerized oauth2-proxy gates via auth_request, buildbot unchanged
+metadata:
+  seed_id: seed_abc9665cbf65
+  version: 1.0.0
+  ambiguity_score: 0.0845
+  interview_id: interview_20260616_224358
+  qa_passed_score: 0.91
+  qa_iteration: 2
+  source: ouroboros generate_seed + main-session QA refinement loop

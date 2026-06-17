@@ -15,7 +15,7 @@ the two are complementary but do not overlap.
 
 ## How this record was produced
 
-This brainstorm consolidates a prior investigation of the cognee access surfaces (the Claude Code MCP client, the cognee plugin, the cognee-cli, and the cognee SDK) together with runtime-confirmed facts about magnetite's cognee deploy, kanidm, and the plugin/CLI wiring.
+This brainstorm consolidates a prior investigation of the cognee access surfaces (the Claude Code MCP client, the cognee plugin, the cognee-cli, and the cognee SDK) together with runtime-confirmed facts about magnetite's cognee deploy, kanidm, buildbot's oauth2-proxy singleton, and the plugin/CLI wiring.
 The user chose to keep everything together as one comprehensive change rather than a phased split.
 The decision substance is settled; this artifact records the conclusions, including several naive premises that were corrected so they are not silently reintroduced.
 
@@ -31,11 +31,16 @@ The cognee plugin cannot reach magnetite (the REST API is loopback-only) and fal
 
 ## Confirmed magnetite facts (load-bearing, verified, not open questions)
 
-- cognee REST API: port 9270, currently bound `127.0.0.1` (loopback ONLY), firewall closed (`modules/nixos/cognee.nix:116-117`, `openFirewall = false` at `:109`).
-- cognee MCP: port 9271, bound to magnetite's ZeroTier IPv6, the ONLY mesh-facing surface today; proxies to the loopback REST API. `zt+` firewall opens 9271 only (`:200`).
+- cognee REST API: port 9270, currently bound `127.0.0.1` (loopback ONLY), firewall closed; the listen address is a single `types.str` option with no dual-bind support.
+- cognee MCP: port 9271, bound to magnetite's ZeroTier IPv6, the ONLY mesh-facing surface today; proxies to the loopback REST API. `zt+` firewall opens 9271 only.
 - REST auth is DISABLED: `auth.multiTenant = false` -> `ENABLE_BACKEND_ACCESS_CONTROL = false`, `REQUIRE_AUTHENTICATION` unset -> the API auth dependency is optional. The ZeroTier mesh is the v1 security boundary.
 - No client-presented credential exists or is needed in v1. Existing clan-vars generators: `cognee-jwt-secret`, `cognee-db-password`, `cognee-default-user-password`, `cognee-openai-api-key` (manual). None is a remote-client API key.
 - No nginx fronts cognee today; `frontend.enable = false`. `JWT_LIFETIME_SECONDS` ~10y. `auth.defaultUserEmail = cameron@scientistexperience.net`.
+
+## Frontend / SPA facts (verified)
+
+- cognee is a Next.js SPA whose `LocalProvider` only redirects to `/local-login` on an HTTP 401 or 403 from `/api/v1/users/me`. With app-auth off that endpoint returns 200 as the default user, so the SPA FAILS OPEN: the UI renders without ever prompting for credentials. cognee enforces no access control of its own, so a perimeter gate is genuinely required and is the sole gate.
+- The frontend reads its backend URL from `NEXT_PUBLIC_LOCAL_API_URL` (build-time inlined). The module injects `NEXT_PUBLIC_BACKEND_API_URL`, but upstream reads the `LOCAL` variable, so that injection is inert; without a rebuild the browser calls `localhost:8000` and the UI is broken. The frontend must be rebuilt in the cognee-nix fork with `NEXT_PUBLIC_LOCAL_API_URL=""` so it calls same-origin `/api/`.
 
 ## Wiring facts (verified)
 
@@ -44,15 +49,29 @@ The cognee plugin cannot reach magnetite (the REST API is loopback-only) and fal
 - CLI: `--api-url` is REQUIRED to enter HTTP-delegate mode and has NO env fallback (the wrapper must pass it explicitly). `--api-key` -> `X-Api-Key` (preferred), `--api-token` -> `Authorization: Bearer` (only if no api-key). For consistency with the plugin, use `--api-key` / `X-Api-Key`, NEVER `--api-token`.
 
 kanidm is live at `https://accounts.scientistexperience.net` (`modules/nixos/kanidm.nix`, imported on magnetite, already gating matrix-synapse OIDC in `modules/nixos/matrix.nix`).
-The reusable client-registration pattern is `services.kanidm.provision.systems.oauth2.<name>` with a `basicSecretFile` from a clan-vars generator (synapse uses generator `kanidm-oauth2-synapse`).
+The reusable client-registration pattern is `services.kanidm.provision.systems.oauth2.<name>` with a `basicSecretFile` from a clan-vars generator (synapse uses generator `kanidm-oauth2-synapse`), a `scopeMaps` group-to-scope mapping, and `claimMaps.groups`.
+buildbot already runs `accessMode.fullyPrivate`, which owns the host's single nixpkgs `services.oauth2-proxy` instance (GitHub-backed); that singleton is one-per-host, so a cognee proxy cannot reuse it.
+The jfly `oauth2-proxies-nginx` pattern (`~/projects/nix-workspace/jfly-clan-snow/nixos-modules/oauth2-proxies-nginx.nix`) runs each protected vhost's oauth2-proxy in its own NixOS container on a unix socket under `/run/oauth2-proxies/`, with host nginx doing `auth_request` and `allowed_groups`.
 
 ## Corrected premises (these override naive assumptions)
 
 The MCP is dropped, not de-hardcoded.
 The earlier framing kept the MCP active per-session and merely de-hardcoded its URL; the decided architecture removes the cognee MCP entirely (client entry plus `~/.mcp/cognee.json`, and `services.cognee.mcp.enable = false` plus the 9271 firewall opening).
 
-Exposing REST over the mesh does NOT widen the attack surface.
-The now-removed MCP already proxied full REST capability unauthenticated over the same mesh; binding REST to the ZeroTier address is the same capability by a more direct path.
+Exposing REST over the mesh does NOT widen the attack surface, and the bind is ZeroTier-only (fail-closed).
+The now-removed MCP already proxied full REST capability unauthenticated over the same mesh; binding the single-string REST listen address to the ZeroTier address is the same capability by a more direct path, reachable only over the mesh, never on the public interface.
+
+The oauth2-proxy is a DEDICATED CONTAINERIZED kanidm instance, NOT the nixpkgs host singleton.
+buildbot's `accessMode.fullyPrivate` already owns the host's one `services.oauth2-proxy` singleton; the cognee proxy must be containerized (jfly pattern) and independent, and buildbot is left entirely untouched with no buildbot change and no buildbot prerequisite. An earlier draft that assumed the native singleton or a buildbot change is wrong.
+
+The allowlist is kanidm GROUP membership `cognee_access`, not an email-claim allowlist.
+A stub group (`members = []`, `overwriteMembers = false`, `autoRemove = false`) with cameron added operationally, plus `scopeMaps.cognee_access` and `claimMaps.groups` on the client, is the durable allowlist mechanism and follows the synapse group-gating precedent.
+
+There is one clan-vars generator (`kanidm-oauth2-cognee`), not two.
+It emits two bare-value files: `files.secret` (owner kanidm) feeding BOTH the kanidm-provision `basicSecretFile` and the oauth2-proxy `clientSecretFile`, and `files.cookie` feeding the oauth2-proxy `cookie.secretFile`, with `restartUnits` on `kanidm.service` and the oauth2-proxy unit. This supersedes the earlier "two generators" wording.
+
+The public UI is served by a BESPOKE host nginx vhost, not the module's built-in `services.cognee.nginx`.
+The built-in nginx is too rigid to interpose the oauth2-proxy `auth_request`; the bespoke vhost routes `/` to the loopback frontend and `/api/` to the ZeroTier REST.
 
 The plugin's `~/.cognee-plugin/config.json` is not a viable declarative target for the endpoint: the plugin's `save_config` strips it; the authoritative lever is the process environment (`COGNEE_SERVICE_URL`), delivered via `home.sessionVariables`.
 
@@ -63,9 +82,9 @@ This change is comprehensive; only cognee app-level auth, the mesh `X-Api-Key` c
 
 ### Q1: where does the canonical cognee endpoint live?
 
-A typed two-layer nix value, each layer in a single file.
+A typed two-layer nix value, each layer in its own single file.
 `flake.lib.hosts.<host>.zt` is a per-host ZeroTier-address registry; `magnetite.zt = "fddb:4344:343b:14b9:399:930f:39db:40d2"`.
-`flake.lib.cognee` is a derived record: `meshApiUrl = "http://[${magnetite.zt}]:9270"`, `apiPort = 9270`, `publicFqdn = "kb.scientistexperience.net"`, and any other derived fields — with NO MCP URL (the MCP is dropped).
+`flake.lib.cognee` is a derived record: `meshApiUrl = "http://[${magnetite.zt}]:9270"`, `apiPort = 9270`, `publicFqdn = "kb.scientistexperience.net"` — with NO MCP URL (the MCP is dropped).
 Each must be a single-file consolidation because `flake.lib` is `lazyAttrsOf raw`, which forbids nested option declarations and multi-file writes at the same nested path.
 These feed the cognee server bind, the plugin env, the CLI wrapper, and the public-UI FQDN.
 
@@ -78,38 +97,47 @@ Nothing consumes the server-side MCP after the client is dropped (codex/opencode
 
 ### Q3: how do the plugin and CLI reach central magnetite?
 
-Expose the cognee REST API (9270) over ZeroTier in `modules/nixos/cognee.nix`: bind the listen address to `flake.lib.hosts.magnetite.zt` and open 9270 on `zt+`.
+Bind the cognee REST API (9270) ZeroTier-only in `modules/nixos/cognee.nix`: set the single `types.str` listen address to `flake.lib.hosts.magnetite.zt` and open 9270 on `zt+` only (fail-closed).
 Plugin (always-on global): set `COGNEE_SERVICE_URL = flake.lib.cognee.meshApiUrl` via `home.sessionVariables`, so every session connects to magnetite in managed mode (no local fallback). No `COGNEE_API_KEY` in v1 (auth disabled). The plugin remains the passive-memory engine (auto-capture, auto-recall, end-of-session graph bridge).
 CLI (manual/explicit + debugging dropback): a global `writeShellApplication` wrapper over `pkgs.cognee` (cognee-nix overlay) that bakes `--api-url ${flake.lib.cognee.meshApiUrl}` into every invocation (the CLI has no env fallback for `--api-url`); a first-class nix package decoupled from the plugin's venv, ~1.5 GiB closure per host (accepted).
 Accepted trade-off: when magnetite is unreachable the always-on plugin degrades (connects-only, no local fallback), so cognee is unavailable that session.
 
 ### Q4: how is the public browser UI gated?
 
-Enable the cognee frontend and front it with nginx (`forceSSL` + ACME) delegating to a kanidm-OIDC-backed oauth2-proxy that proxies to cognee on loopback.
-Register a new kanidm OAuth2 client via `services.kanidm.provision.systems.oauth2.<name>` + a clan-vars `basicSecretFile`, mirroring synapse; add a clan-vars oauth2-proxy cookie secret.
-Restrict the oauth2-proxy allowlist to cameron's identity (email or kanidm group); behind the proxy cognee runs its single default user (`cameron@scientistexperience.net`) with app-auth off — acceptable for single-user.
+The frontend is rebuilt in the cognee-nix fork with `NEXT_PUBLIC_LOCAL_API_URL=""` (same-origin `/api/`), the inert `NEXT_PUBLIC_BACKEND_API_URL` injection is dropped, and the frontend is bound to loopback `127.0.0.1:3000`.
+A dedicated containerized kanidm oauth2-proxy (jfly `oauth2-proxies-nginx` pattern) runs in its own NixOS container with its own `services.oauth2-proxy` (`provider = "oidc"`, PKCE) on a unix socket; it is NOT the nixpkgs host singleton (buildbot owns that, and buildbot is untouched).
+Register a new kanidm OAuth2 client via `services.kanidm.provision.systems.oauth2.cognee`, mirroring synapse, with `scopeMaps.cognee_access = ["openid" "email" "groups"]` and `claimMaps.groups`.
+The allowlist is kanidm group membership `cognee_access`: a stub group (`members = []`, `overwriteMembers = false`, `autoRemove = false`) with cameron added operationally.
+cognee app-auth stays OFF (`auth.multiTenant = false`), so the oauth2-proxy plus group is the SOLE access-control layer (the SPA fails open); behind the proxy cognee runs its single default user (`cameron@scientistexperience.net`).
+A single clan-vars generator `kanidm-oauth2-cognee` emits `files.secret` (owner kanidm) feeding both `basicSecretFile` and `clientSecretFile`, and `files.cookie` feeding `cookie.secretFile`, with `restartUnits` on `kanidm.service` and the oauth2-proxy unit; no env-file shaping.
+The cognee client, group, and generator live in the cognee module; `kanidm.nix` stays a pure IdP scaffold.
 True per-user SSO into cognee (cognee gaining native OIDC) is out of scope.
 
 ### Q5: how is the public vhost and DNS provisioned?
 
-An nginx vhost (`forceSSL` + ACME), mirroring the buildbot/gitea/niks3 public-vhost pattern; `cognee.nix` already has `services.cognee.nginx.enable` + `nginx.domain` scaffolding.
-Cloudflare DNS via terranix: add a `kb` record in `modules/terranix/cloudflare.nix` (CNAME `kb` -> `magnetite.scientistexperience.net`, `ttl = 1`, `proxied = false` so ACME works), cloned from the existing niks3/buildbot/git records, applied via `just terraform*` (never `nix run .#terraform` directly).
+A BESPOKE host nginx 443 vhost (`forceSSL` + ACME) for `kb.scientistexperience.net`, NOT the module's built-in `services.cognee.nginx` (too rigid to interpose `auth_request`), routing `location /` to the loopback frontend `127.0.0.1:3000` and `location /api/` to the ZeroTier REST `[${magnetite.zt}]:9270`, gated by `auth_request` against the containerized oauth2-proxy with `allowed_groups=cognee_access`.
+Cloudflare DNS via terranix: add a `kb` record in `modules/terranix/cloudflare.nix` reading `flake.lib.cognee.publicFqdn` as the source of truth where the terranix eval can reach `flake.lib` (CNAME `kb` -> `magnetite.scientistexperience.net`, `ttl = 1`, `proxied = false` so ACME works), cloned from the existing niks3/buildbot/git records, applied via `just terraform*` (never `nix run .#terraform` directly). Restating the literal is a fallback only if the `flake.lib` read is verified impossible.
 
 ### Q6: what is the auth posture and the critical invariant?
 
-v1: cognee app-level auth is OFF everywhere. The gates are ZeroTier membership (mesh/machine clients) and the oauth2-proxy/kanidm perimeter (public/browser).
-INVARIANT: cognee's REST API and frontend are bound ONLY to loopback (for the proxy) and to the ZeroTier address (for machine clients), NEVER to a public interface. The public reaches cognee ONLY through nginx -> oauth2-proxy. This is what makes app-auth-off safe on the public path.
+v1: cognee app-level auth is OFF everywhere. The gates are ZeroTier membership (mesh/machine clients) and the containerized oauth2-proxy/kanidm perimeter (public/browser).
+INVARIANT: every cognee listener binds ONLY to loopback or the ZeroTier address, NEVER to a public interface — REST ZeroTier-only `[${magnetite.zt}]:9270`, frontend loopback `127.0.0.1:3000`, postgres loopback `127.0.0.1:5432`; nginx 443 is the only public surface. The public reaches cognee ONLY through nginx -> oauth2-proxy. This is what makes app-auth-off safe on the public path given the SPA fails open.
 DECOUPLING: turning on cognee app-level auth (`REQUIRE_AUTHENTICATION`) is NOT coupled to the kanidm UI; it is a separate FUTURE switch driven by multi-user identity or defense-in-depth. The real hard coupling to record: enabling app-auth REQUIRES simultaneously provisioning + wiring the mesh clients' `X-Api-Key` credential (clan-vars -> `home.sessionVariables` + the CLI wrapper), or the always-on plugin breaks fleet-wide.
 
 ## Key constraints recorded for design
 
-`flake.lib` is `lazyAttrsOf raw`, so the host registry and the cognee record must be single-file consolidations or eval breaks.
-terranix is a separate eval from the NixOS and home-manager modules, so the FQDN may be restated there (an acceptable minor drift).
+`flake.lib` is `lazyAttrsOf raw`, so the host registry and the cognee record must each be single-file consolidations or eval breaks.
+buildbot owns the host's one nixpkgs `services.oauth2-proxy` singleton, so the cognee proxy must be containerized and buildbot must be untouched.
+the cognee SPA fails open with app-auth off, so the perimeter gate is the sole access-control layer.
+the frontend must be rebuilt with `NEXT_PUBLIC_LOCAL_API_URL=""` (the module's injected `NEXT_PUBLIC_BACKEND_API_URL` is inert) or the UI is broken.
+terranix is a separate eval, so the `kb` record reads `flake.lib.cognee.publicFqdn` where reachable; restating the literal is a fallback only if verified necessary.
 ACME for `kb` needs `proxied = false` (DNS-only); `proxied = true` fails ACME silently.
-The cognee-cli wrapper carries the full cognee closure (~1.5 GiB per host) because the CLI entry point lives in the heavy package; accepted.
+the cognee-cli wrapper carries the full cognee closure (~1.5 GiB per host) because the CLI entry point lives in the heavy package; accepted.
+a regenerated `kanidm-oauth2-cognee` secret is stale until the consuming units restart, so the generator sets `restartUnits`.
 
 ## Explicitly out of scope (deferred future work)
 
 cognee app-level auth (`REQUIRE_AUTHENTICATION`) + the mesh `X-Api-Key` credential (a future multi-user/hardening change; enabling auth must co-provision and wire the credential or the always-on plugin breaks fleet-wide).
 multi-user public access / cognee native OIDC.
 a public machine path (public CLI access with a bearer) — moot for now since machines use the mesh.
+any buildbot change — buildbot's oauth2-proxy singleton and auth are untouched, with no buildbot prerequisite.
