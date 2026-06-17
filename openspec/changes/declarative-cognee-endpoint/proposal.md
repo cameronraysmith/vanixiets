@@ -1,3 +1,19 @@
+---
+linear_story_id: 46d87b5c-3408-4534-9230-d85a58a7f112
+linear_story_identifier: CAM-18
+linear_story_title: "Utilize cognee server on magnetite host exclusively as backend for other agents"
+linear_story_url: "https://linear.app/cameronraysmith/issue/CAM-18/utilize-cognee-server-on-magnetite-host-exclusively-as-backend-for"
+linear_story_state: Todo
+linear_team: CAM
+linear_project: cognee-memory-layer
+last_synced_state: Todo
+last_synced_at: "2026-06-17T19:51:45Z"
+review_round: 0
+max_review_rounds: 3
+attempt_log:
+  - { at: "2026-06-17T19:51:45Z", transition: "Backlog->Todo", outcome: "posted", note: "bind CAM-18; seed issue description from proposal; set Todo" }
+---
+
 ## Why
 
 Cognee should be the universal knowledge base for the fleet, accessed through the cognee-cli and the `cognee-memory` plugin, all pointed at one central magnetite cognee via a single declarative nix source of truth, plus a public kanidm-gated browser UI.
@@ -53,4 +69,3 @@ There is no Phase-1/Phase-2 split and no buildbot prerequisite change; only cogn
 Consumers and files updated: a single new file for the `flake.lib.hosts.<host>.zt` registry and a single new file for the derived `flake.lib.cognee` record (each one file per the `lazyAttrsOf raw` constraint), `modules/home/ai/claude-code/mcp-servers.nix` (remove the cognee entry, stop generating `~/.mcp/cognee.json`), a new home-manager module exporting `COGNEE_SERVICE_URL` via `home.sessionVariables`, a new home-manager module installing the cognee-cli wrapper, the cognee-nix fork (rebuild the frontend with `NEXT_PUBLIC_LOCAL_API_URL=""`), `modules/nixos/cognee.nix` (bind REST to ZeroTier and open 9270 on `zt+`, set `mcp.enable = false`, remove the 9271 opening, enable the frontend on loopback, drop the inert `NEXT_PUBLIC_BACKEND_API_URL` injection, leave the module's built-in `services.cognee.nginx` unused), a new cognee module owning its dedicated containerized kanidm oauth2-proxy plus the `provision.systems.oauth2.cognee` client and the `cognee_access` group, the bespoke host nginx vhost for `kb.scientistexperience.net`, `modules/terranix/cloudflare.nix` (the `kb` DNS record reading `flake.lib.cognee.publicFqdn` where reachable), `modules/machines/nixos/magnetite/default.nix` (import any new `flake.modules.nixos.<svc>`), and a single clan-vars generator `kanidm-oauth2-cognee` emitting `files.secret` and `files.cookie`.
 Buildbot's `accessMode.fullyPrivate` GitHub-backed oauth2-proxy singleton and its auth configuration are left entirely untouched; no buildbot change and no buildbot prerequisite exist.
 Out of scope (deferred future work): cognee app-level auth plus the mesh `X-Api-Key` credential; multi-user public access or cognee native OIDC; a public machine path (public CLI access with a bearer), moot for now since machines use the mesh.
-This change is Linear-skipped: it authors no `linear_*` frontmatter and does not touch `openspec/linear.yaml`.
