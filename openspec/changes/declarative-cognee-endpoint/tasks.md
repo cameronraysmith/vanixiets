@@ -1,57 +1,93 @@
 ## 1. Source-of-truth nix values (deliverable A)
 
 - [ ] 1.1 Create a single new file declaring `flake.lib.hosts.<host>.zt` with `magnetite.zt = "fddb:4344:343b:14b9:399:930f:39db:40d2"`, as a single-file consolidation per the `lazyAttrsOf raw` constraint
-- [ ] 1.2 Add the derived `flake.lib.cognee` record in its own single file: `meshApiUrl = "http://[${magnetite.zt}]:9270"`, `apiPort = 9270`, `publicFqdn = "kb.scientistexperience.net"` — with NO `mcpUrl`/`meshMcpUrl`/`publicMcpUrl` (the MCP is dropped)
+- [ ] 1.2 Add the derived `flake.lib.cognee` record in its own single file: `meshApiUrl = "http://[${magnetite.zt}]:9270"`, `apiPort = 9270`, `publicFqdn = "kb.scientistexperience.net"`, `userEmail = "cameron@scientistexperience.net"` — with NO `mcpUrl`/`meshMcpUrl`/`publicMcpUrl` (the MCP is dropped)
 - [ ] 1.3 Confirm both additions evaluate without breaking `flake.lib` (`lazyAttrsOf raw`)
 
-## 2. Frontend rebuild (deliverable A-frontend)
+## 2. Cross-repo cognee-nix fork prerequisite (deliverable A-frontend, D11)
 
-- [ ] 2.1 Rebuild the cognee frontend in the cognee-nix fork with `NEXT_PUBLIC_LOCAL_API_URL=""` (build-time inlined) so the browser calls same-origin `/api/` rather than `localhost:8000`
-- [ ] 2.2 Drop the module's injected `NEXT_PUBLIC_BACKEND_API_URL` (upstream reads `NEXT_PUBLIC_LOCAL_API_URL`, so the injection is inert)
+This whole section is a sequenced PREREQUISITE that touches a separate repository and a flake-input bump; it MUST land before the in-repo frontend-enable config (§4.2) can reference the rebuilt bundle.
 
-## 3. Server: bind REST ZeroTier-only, enable loopback frontend, disable server MCP, drop 9271 firewall (deliverables C and B-server)
+- [ ] 2.1 In the cognee-nix fork, edit `packages/cognee-frontend/default.nix` `buildPhase` to export `NEXT_PUBLIC_LOCAL_API_URL=""` (it currently exports none), so the bundle calls same-origin `/api/` rather than a literal `localhost` backend URL
+- [ ] 2.2 Recompute the FOD hashes for the rebuilt frontend derivation
+- [ ] 2.3 Push the `cognee-v112` branch with the `buildPhase` edit
+- [ ] 2.4 Bump the cognee-nix input in vanixiets `flake.nix`/`flake.lock` to the pushed `cognee-v112` revision
+- [ ] 2.5 Confirm the built frontend bundle contains no literal `localhost` backend URL (falsifiable check)
 
-- [ ] 3.1 In `modules/nixos/cognee.nix`, set the single `types.str` REST listen address to `flake.lib.hosts.magnetite.zt` (instead of `127.0.0.1`, fail-closed, no dual-bind patch) and open port 9270 on the `zt+` interface only (this is the same capability the now-removed MCP proxied unauthenticated over the mesh, by a more direct path)
-- [ ] 3.2 Enable the rebuilt frontend bound to loopback `127.0.0.1:3000`, and confirm postgres stays loopback `127.0.0.1:5432`
-- [ ] 3.3 Set `services.cognee.mcp.enable = false` in `modules/nixos/cognee.nix`
-- [ ] 3.4 Remove the 9271 `zt+` firewall opening (no remaining consumer; codex/opencode declare no cognee MCP)
-- [ ] 3.5 Leave the module's built-in `services.cognee.nginx` unused (the bespoke host vhost in §6 fronts the UI)
+## 3. cli existence precondition (deliverable E precondition, PL8)
 
-## 4. Client: drop MCP client config, point the plugin at central magnetite (deliverables B-client and D)
+- [ ] 3.1 Build `pkgs.cognee` (the cognee-nix overlay package) and confirm `bin/cognee-cli --help` lists `--api-url` and `--api-key` BEFORE the wrapper module (§7) is authored
 
-- [ ] 4.1 Remove the cognee entry from `modules/home/ai/claude-code/mcp-servers.nix` so `~/.mcp/cognee.json` is no longer generated, and confirm the hardcoded ZeroTier IPv6 MCP literal no longer appears
-- [ ] 4.2 Add a home-manager module exporting `COGNEE_SERVICE_URL = flake.lib.cognee.meshApiUrl` via `home.sessionVariables` (always-on global, managed mode, no local fallback); do NOT set `COGNEE_API_KEY` in v1 (cognee app-auth is disabled)
-- [ ] 4.3 Confirm the URL is NOT written into `~/.cognee-plugin/config.json` (the plugin's `save_config` strips it); `home.sessionVariables` is the authoritative lever, and the plugin degrades (connects-only, no local fallback) when magnetite is unreachable
+## 4. Server: REQUIRE_AUTHENTICATION, REST ZeroTier bind, no-public-bind assertion, MCP teardown, loopback frontend (deliverables C, B-server; POSTURE-A, PL2, PL4, PL6, PL7)
 
-## 5. cognee-cli wrapper module (deliverable E)
+- [ ] 4.1 In `modules/nixos/cognee.nix`, set `services.cognee.settings.REQUIRE_AUTHENTICATION = "true"` (rendered last into the unit env, overriding base env, zero fork change), keeping `auth.multiTenant = false` so `ENABLE_BACKEND_ACCESS_CONTROL` resolves `false` [POSTURE-A]
+- [ ] 4.2 Set the single `types.str` REST listen address to `flake.lib.hosts.magnetite.zt` (fail-closed, no dual-bind patch) and open port 9270 on the `zt+` interface only; the full REST surface on the mesh DOES widen the surface vs the 12-tool MCP, mitigated by REQUIRE_AUTHENTICATION (every caller needs a key) [PL2]
+- [ ] 4.3 Add a NixOS `assertion` failing the build if `cfg.listenAddress`, the frontend `listenAddress`, or the postgres listen address resolves to anything other than loopback (`127.0.0.1`/`::1`) or the ZeroTier prefix (`fddb:4344:343b:14b9::/64`); required because the retained `ip_nonlocal_bind=1` makes a wrong bind silent [PL4]
+- [ ] 4.4 Enable the rebuilt frontend bound to loopback `127.0.0.1:3000`, drop the inert `NEXT_PUBLIC_BACKEND_API_URL` injection (upstream reads `NEXT_PUBLIC_LOCAL_API_URL`), and confirm postgres stays loopback `127.0.0.1:5432` [PL7 in-repo half]
+- [ ] 4.5 Set `services.cognee.mcp.enable = false`
+- [ ] 4.6 Remove the 9271 `zt+` firewall opening (no remaining consumer; codex/opencode declare no cognee MCP)
+- [ ] 4.7 Remove the orphaned `cognee-mcp` systemd stanzas (`MCP_DISABLE_DNS_REBINDING_PROTECTION` and the per-service `serviceConfig` capability tightening), but RETAIN the `ip_nonlocal_bind` sysctl and rewrite its comment to describe the REST ZeroTier bind (now load-bearing for the REST bind, not the MCP) — do NOT delete this sysctl [PL6]
+- [ ] 4.8 Leave the module's built-in `services.cognee.nginx` unused (the bespoke host vhost in §8 fronts the UI)
 
-- [ ] 5.1 Add a home-manager module installing a global cognee-cli wrapper as a `writeShellApplication` over `pkgs.cognee` (the cognee-nix overlay package wired in `modules/nixpkgs/overlays/cognee.nix`) that bakes `--api-url ${flake.lib.cognee.meshApiUrl}` into every invocation (the CLI has no env fallback for `--api-url`)
-- [ ] 5.2 Confirm the wrapper is decoupled from the plugin's bundled venv and accept the ~1.5 GiB per-host closure footprint; when a credential is eventually introduced use `--api-key` / `X-Api-Key`, never `--api-token` (Bearer) — in v1 pass no key
+## 5. Client: drop MCP client, non-secret plugin env + per-host namespacing, secure key delivery (deliverables B-client, D; POSTURE-B, PL1, PL9)
 
-## 6. Public UI: secret generator, kanidm client + group, containerized oauth2-proxy, bespoke nginx vhost (deliverable F)
+- [ ] 5.1 Remove the cognee entry from `modules/home/ai/claude-code/mcp-servers.nix` so `~/.mcp/cognee.json` is no longer generated, and confirm the hardcoded ZeroTier IPv6 MCP literal no longer appears
+- [ ] 5.2 Add a home-manager module exporting the non-secret plugin env via `home.sessionVariables`: `COGNEE_SERVICE_URL = flake.lib.cognee.meshApiUrl` (HTTP mode so per-host identity is real), per-host `COGNEE_PLUGIN_DATASET` and `COGNEE_AGENT_NAME` (overriding the hardcoded `claude_sessions`/node_set defaults — do NOT claim "no hardcoded dataset names"), and `COGNEE_USER_EMAIL = cameron@scientistexperience.net` (the plugin default `default_user@example.com` would not match the server) [PL9]
+- [ ] 5.3 Deliver the per-host `X-Api-Key` via a sops-nix home-manager secret consumed as `COGNEE_API_KEY` (NOT plaintext `home.sessionVariables`, which is world-readable); the same secret is consumed by the cognee-cli wrapper (§7) [POSTURE-B, PL1]
+- [ ] 5.4 Confirm the URL and key are NOT written into `~/.cognee-plugin/config.json` (the plugin strips those keys); `home.sessionVariables` plus the sops-nix secret are the authoritative levers, and the plugin degrades (connects-only, no local fallback) when magnetite is unreachable
 
-- [ ] 6.1 Add the single clan-vars generator `kanidm-oauth2-cognee` emitting two bare-value files: `files.secret` (owner kanidm) and `files.cookie`, with `restartUnits` on `kanidm.service` and the oauth2-proxy unit; no KEY=VALUE env-file shaping
-- [ ] 6.2 Register a new kanidm OAuth2 client via `services.kanidm.provision.systems.oauth2.cognee` with `basicSecretFile` reading `files.secret`, mirroring the synapse client, with `scopeMaps.cognee_access = ["openid" "email" "groups"]` and `claimMaps.groups`
-- [ ] 6.3 Define the kanidm stub group `provision.groups.cognee_access = { members = []; overwriteMembers = false; }` with `provision.autoRemove = false`; cameron is added operationally, not declaratively
-- [ ] 6.4 Add a dedicated containerized kanidm oauth2-proxy (jfly `oauth2-proxies-nginx` pattern): a NixOS container running its own `services.oauth2-proxy` (`provider = "oidc"`, PKCE) listening on a unix socket, with `clientSecretFile` reading `files.secret` and `cookie.secretFile` reading `files.cookie`; do NOT reuse the nixpkgs host `services.oauth2-proxy` singleton
-- [ ] 6.5 Add a bespoke host nginx 443 vhost (`forceSSL` + ACME) for `kb.scientistexperience.net` (NOT `services.cognee.nginx`) routing `location /` to the loopback frontend `127.0.0.1:3000` and `location /api/` to the ZeroTier REST `[${magnetite.zt}]:9270`, gated by `auth_request` against the containerized oauth2-proxy with `allowed_groups=cognee_access`
-- [ ] 6.6 Keep the cognee client, group, and generator in the cognee module; `modules/nixos/kanidm.nix` stays a pure IdP scaffold (no edits)
-- [ ] 6.7 Confirm buildbot is left entirely untouched: its `accessMode.fullyPrivate` GitHub-backed oauth2-proxy singleton and auth configuration are unchanged
+## 6. One-time per-host X-Api-Key mint bootstrap (POSTURE-B, PL1) — USER-RUN
 
-## 7. terranix kb DNS record (deliverable F-DNS)
+- [ ] 6.1 USER-RUN: once the server (§4) is deployed and reachable, log in as the cognee default/owner user `cameron@scientistexperience.net` with the existing clan-vars `cognee-default-user-password`, then `POST /api/v1/auth/api-keys` once per fleet client to mint one scoped per-host key (documented manual/clan-vars bootstrap; the mint requires a live authenticated server session, so it is not an automatic generator output)
+- [ ] 6.2 USER-RUN: store each minted scoped key per host in clan-vars (`clan vars` set), so §5.3's sops-nix delivery has a value to deliver
 
-- [ ] 7.1 Add the `kb` Cloudflare DNS record in `modules/terranix/cloudflare.nix` reading `flake.lib.cognee.publicFqdn` as the source of truth where the terranix eval can reach `flake.lib` (CNAME `kb` -> `magnetite.scientistexperience.net`, `ttl = 1`, `proxied = false`), cloned from the niks3/buildbot/git records; restate the literal ONLY if the `flake.lib` read is verified impossible; apply via `just terraform*` (never `nix run .#terraform` directly)
+## 7. cognee-cli wrapper module (deliverable E, PL3) — after §3 precondition
 
-## 8. magnetite import wiring
+- [ ] 7.1 Add a home-manager module installing a global cognee-cli wrapper as a `writeShellApplication` whose binary is named exactly `cognee-cli` and which execs `${pkgs.cognee}/bin/cognee-cli` directly (NOT `lib.getExe`, which fails because `pkgs.cognee` has no `meta.mainProgram`), baking `--api-url ${flake.lib.cognee.meshApiUrl}` (the CLI has no env fallback for `--api-url`) and passing `--api-key` (sent as `X-Api-Key`, NEVER `--api-token`/Bearer) from the secure sops-nix secret, then forwarding `"$@"` [PL3]
+- [ ] 7.2 Confirm the wrapper is decoupled from the plugin's bundled venv and accept the ~1.5 GiB per-host closure footprint; the plugin skills/agent hardcode the `cognee-cli` name on `PATH`, which this wrapper satisfies
 
-- [ ] 8.1 Import any new `flake.modules.nixos.<svc>` on magnetite (`modules/machines/nixos/magnetite/default.nix`)
-- [ ] 8.2 Evaluate the magnetite NixOS configuration and the relevant home-manager activation to confirm all consumers resolve the canonical values and the configuration builds
-- [ ] 8.3 Grep the repointed consumers to confirm the hardcoded IPv6 literal and the cognee MCP literal no longer appear
+## 8. Public UI: kanidm plumbing in kanidm.nix, dual-context secret, containerized oauth2-proxy, bespoke nginx vhost (deliverable F; D9, D12, PL5, PL11, PL12, PL15)
 
-## 9. Deploy and verify
+The kanidm group stub MUST be declared before its scopeMap; DNS+ACME (§9) must land before nginx `forceSSL` resolves.
 
-- [ ] 9.1 Deploy and confirm a laptop session's always-on plugin (via `home.sessionVariables`) reaches central magnetite over the mesh, and the cognee-cli wrapper reaches magnetite without an explicit `--api-url`, with the local per-laptop fallback eliminated (acceptance criterion: universal KB reachability)
-- [ ] 9.2 Confirm `kb.scientistexperience.net` serves the FUNCTIONAL same-origin browser UI behind the kanidm `cognee_access` gate (interactive OIDC SSO) with a valid ACME cert, and that buildbot's oauth2-proxy singleton and auth are left fully untouched (acceptance criterion: public UI gated + buildbot untouched)
-- [ ] 9.3 ACCEPTANCE INVARIANT (listener inventory): confirm cognee's REST API binds ZeroTier-only `[${magnetite.zt}]:9270`, the frontend loopback `127.0.0.1:3000`, postgres loopback `127.0.0.1:5432`, and nginx 443 is the only public surface; the public reaches cognee only through nginx then the containerized oauth2-proxy (acceptance criterion: non-public bind verified)
-- [ ] 9.4 Confirm the cognee MCP is gone on both sides (no `~/.mcp/cognee.json`, `services.cognee.mcp.enable = false`, no 9271 `zt+` opening), so the central REST API is the only programmatic surface (acceptance criterion: MCP decommissioned)
-- [ ] 9.5 Confirm the `kanidm-oauth2-cognee` generator emitted `files.secret`/`files.cookie` with `restartUnits`, and the containerized oauth2-proxy gates via `auth_request` (exit condition: secret and proxy provisioned)
+- [ ] 8.1 In `modules/nixos/kanidm.nix` (alongside the live synapse precedent), declare the `provision.groups.cognee_access = { members = []; overwriteMembers = false; }` stub with `provision.autoRemove = false` BEFORE any scopeMap references it (satisfying the `kanidm.nix:876` referential-integrity assertion); cameron is added operationally, not declaratively [PL11]
+- [ ] 8.2 In `modules/nixos/kanidm.nix`, register `provision.systems.oauth2.cognee` with `basicSecretFile` reading `files.secret`, `scopeMaps.cognee_access = ["openid" "email" "groups"]`, and `claimMaps.groups` (a NEW requirement — synapse uses no `claimMaps` — needed so oauth2-proxy's `allowed_groups` can read group membership from the token) [PL11]
+- [ ] 8.3 In `modules/nixos/kanidm.nix`, add the single `kanidm-oauth2-cognee` clan-vars generator emitting two ownership-correct client-secret files — `files.secret` (owner `kanidm`, for kanidm-provision's `basicSecretFile`) and `files.secret-proxy` (owner the oauth2-proxy container's runtime uid, bind-mounted as `clientSecretFile`) — plus a cookie secret of exactly 16/24/32 bytes (mirror `openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 32`); every emitted file `mode = "0400"` and `secret = true`; `restartUnits = [ "kanidm.service" "container@oauth2-proxy-cognee.service" ]` [PL5, PL12, PL15]
+- [ ] 8.4 Document the exact bind-mount path and the container uid mapping for `files.secret-proxy` against the NixOS-container's runtime user, confirmed at implementation time [PL5]
+- [ ] 8.5 Add a dedicated containerized kanidm oauth2-proxy (jfly `oauth2-proxies-nginx` pattern): a NixOS container running its own `services.oauth2-proxy` (`provider = "oidc"`, PKCE via `code-challenge-method = "S256"`) listening on a unix socket under `/run/oauth2-proxies/`, with `clientSecretFile` reading the bind-mounted `files.secret-proxy` and `cookie.secretFile` reading the cookie secret, `allowed_groups = cognee_access`; do NOT reuse the nixpkgs host `services.oauth2-proxy` singleton (buildbot owns it)
+- [ ] 8.6 Add a bespoke host nginx 443 vhost (`forceSSL` + ACME) for `kb.scientistexperience.net` (NOT `services.cognee.nginx`) routing `location /` to the loopback frontend `127.0.0.1:3000` and `location /api/` to the ZeroTier REST `[${magnetite.zt}]:9270`, gated by `auth_request` against the containerized oauth2-proxy; behind the gate cognee enforces `REQUIRE_AUTHENTICATION` as the default/owner user, so perimeter + app-auth are defense-in-depth
+- [ ] 8.7 Confirm buildbot is left entirely untouched: its `accessMode.fullyPrivate` GitHub-backed oauth2-proxy singleton and auth configuration are unchanged
+- [ ] 8.8 (Optional, NOT required) record the ZeroTier-bound nginx path-allowlist reverse proxy (expose only `remember`/`recall`/`search`/`cognify`/`add`; deny `users`/`permissions`/`settings`/`delete`/`sync`) as defense-in-depth, not a v1 deliverable [PL2]
+
+## 9. terranix kb DNS record + ACME (deliverable F-DNS, PL13) — USER-RUN apply
+
+DNS + ACME must land before §8.6's nginx `forceSSL` can obtain a cert.
+
+- [ ] 9.1 Thread `config.flake.lib.cognee.publicFqdn` into the terranix cloudflare module via the module's existing `config.nix` `let`-binding (the eval that constructs the terranix config from flake-level values), so the `kb` record reads the source of truth rather than restating the literal [PL13]
+- [ ] 9.2 Add the `kb` Cloudflare DNS record in `modules/terranix/cloudflare.nix` (CNAME `kb` -> `magnetite.scientistexperience.net`, `ttl = 1`, `proxied = false` so ACME works), cloned from the niks3/buildbot/git records
+- [ ] 9.3 USER-RUN: apply via `just terraform*` (never `nix run .#terraform` directly) and verify ACME issuance for `kb.scientistexperience.net`
+
+## 10. magnetite import wiring
+
+- [ ] 10.1 Import any new `flake.modules.nixos.<svc>` on magnetite (`modules/machines/nixos/magnetite/default.nix`)
+- [ ] 10.2 Evaluate the magnetite NixOS configuration and the relevant home-manager activation to confirm all consumers resolve the canonical values and the configuration builds (including the no-public-bind assertion passing)
+- [ ] 10.3 Grep the repointed consumers to confirm the hardcoded IPv6 literal and the cognee MCP literal no longer appear
+
+## 11. clan vars generate/check (POSTURE-B, PL5) — USER-RUN
+
+- [ ] 11.1 USER-RUN: run `clan vars generate` so the `kanidm-oauth2-cognee` generator emits `files.secret`/`files.secret-proxy`/the cookie secret, and confirm the secret owner (`kanidm` for `files.secret`) matches the consuming unit's `User=`; the user runs the command and hands the orchestrator the generated commits to route
+- [ ] 11.2 USER-RUN: run `clan vars check` to confirm all generators (including the per-host key from §6) are satisfied
+
+## 12. Deploy from the single chain tip (D13, PL10) — USER-RUN deploy
+
+- [ ] 12.1 Re-map the diamond before the deploy phase (N can increase between phases) and pin the build+deploy to the single `declarative-cognee-endpoint` chain tip, NEVER the multi-parent `@` `[wip]` (cite the diamond-wip-deploy-pulls-all-chains hazard: a `[wip]` deploy builds the integrated tree of all active chains) [PL10]
+- [ ] 12.2 USER-RUN: build and deploy magnetite from the pinned chain tip
+
+## 13. Verify
+
+- [ ] 13.1 Confirm a laptop session's always-on plugin connects to central magnetite over the mesh as its per-host agent (presenting `COGNEE_AGENT_NAME`, authenticated with the per-host `X-Api-Key` and `COGNEE_USER_EMAIL`) rather than failing the default-user login, and unions recall across the single human's datasets [PL1]
+- [ ] 13.2 Run an offline-session smoke check confirming the always-on plugin degrades gracefully (connects-only, no local-server boot) when magnetite is unreachable [PL16]
+- [ ] 13.3 Confirm the cognee-cli wrapper (named `cognee-cli`) reaches magnetite with the baked `--api-url` and the per-host `--api-key`
+- [ ] 13.4 Confirm `kb.scientistexperience.net` serves the FUNCTIONAL same-origin browser UI behind the kanidm `cognee_access` gate with a valid ACME cert and `REQUIRE_AUTHENTICATION` enforced behind it, and that buildbot's oauth2-proxy singleton and auth are left fully untouched
+- [ ] 13.5 ACCEPTANCE INVARIANT (listener inventory): confirm the build asserts cognee's REST API binds ZeroTier-only `[${magnetite.zt}]:9270`, the frontend loopback `127.0.0.1:3000`, postgres loopback `127.0.0.1:5432`, and nginx 443 is the only public surface, reaching cognee only through nginx then the containerized oauth2-proxy [PL4]
+- [ ] 13.6 Confirm the cognee MCP is gone on both sides (no `~/.mcp/cognee.json`, `services.cognee.mcp.enable = false`, no 9271 `zt+` opening, no orphaned `cognee-mcp` stanzas) while the `ip_nonlocal_bind` sysctl is retained for the REST bind [PL6]
