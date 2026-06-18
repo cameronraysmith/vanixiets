@@ -61,6 +61,12 @@ let
           linear-workspace-personal = { };
           linear-workspace-work = { };
           context7-api-key = { };
+          # Per-host scoped cognee X-Api-Key for the always-on cognee-memory
+          # plugin and the cognee-cli wrapper. Declared here; its ciphertext is
+          # added to secrets.yaml after the one-time owner-authenticated mint
+          # against the live magnetite server (a user-run bootstrap gate), so
+          # home-manager activation requires the minted value to be present.
+          cognee-api-key = { };
           bitwarden-email = { };
           atuin-key = { };
           mcp-agent-mail-bearer-token = { };

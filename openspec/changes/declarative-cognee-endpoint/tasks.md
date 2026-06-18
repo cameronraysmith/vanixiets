@@ -31,10 +31,10 @@ This whole section is a sequenced PREREQUISITE that touches a separate repositor
 
 ## 5. Client: drop MCP client, non-secret plugin env + per-host namespacing, secure key delivery (deliverables B-client, D; POSTURE-B, PL1, PL9)
 
-- [ ] 5.1 Remove the cognee entry from `modules/home/ai/claude-code/mcp-servers.nix` so `~/.mcp/cognee.json` is no longer generated, and confirm the hardcoded ZeroTier IPv6 MCP literal no longer appears
-- [ ] 5.2 Add a home-manager module exporting the non-secret plugin env via `home.sessionVariables`: `COGNEE_SERVICE_URL = flake.lib.cognee.meshApiUrl` (HTTP mode so per-host identity is real), per-host `COGNEE_PLUGIN_DATASET` and `COGNEE_AGENT_NAME` (overriding the hardcoded `claude_sessions`/node_set defaults — do NOT claim "no hardcoded dataset names"), and `COGNEE_USER_EMAIL = cameron@scientistexperience.net` (the plugin default `default_user@example.com` would not match the server) [PL9]
-- [ ] 5.3 Deliver the per-host `X-Api-Key` via a sops-nix home-manager secret consumed as `COGNEE_API_KEY` (NOT plaintext `home.sessionVariables`, which is world-readable); the same secret is consumed by the cognee-cli wrapper (§7) [POSTURE-B, PL1]
-- [ ] 5.4 Confirm the URL and key are NOT written into `~/.cognee-plugin/config.json` (the plugin strips those keys); `home.sessionVariables` plus the sops-nix secret are the authoritative levers, and the plugin degrades (connects-only, no local fallback) when magnetite is unreachable
+- [x] 5.1 Remove the cognee entry from `modules/home/ai/claude-code/mcp-servers.nix` so `~/.mcp/cognee.json` is no longer generated, and confirm the hardcoded ZeroTier IPv6 MCP literal no longer appears
+- [x] 5.2 Add a home-manager module exporting the non-secret plugin env via `home.sessionVariables`: `COGNEE_SERVICE_URL = flake.lib.cognee.meshApiUrl` (HTTP mode so per-host identity is real), per-host `COGNEE_PLUGIN_DATASET` and `COGNEE_AGENT_NAME` (overriding the hardcoded `claude_sessions`/node_set defaults — do NOT claim "no hardcoded dataset names"), and `COGNEE_USER_EMAIL = cameron@scientistexperience.net` (the plugin default `default_user@example.com` would not match the server) [PL9]
+- [x] 5.3 Deliver the per-host `X-Api-Key` via a sops-nix home-manager secret consumed as `COGNEE_API_KEY` (NOT plaintext `home.sessionVariables`, which is world-readable); the same secret is consumed by the cognee-cli wrapper (§7) [POSTURE-B, PL1]
+- [x] 5.4 Confirm the URL and key are NOT written into `~/.cognee-plugin/config.json` (the plugin strips those keys); `home.sessionVariables` plus the sops-nix secret are the authoritative levers, and the plugin degrades (connects-only, no local fallback) when magnetite is unreachable
 
 ## 6. One-time per-host X-Api-Key mint bootstrap (POSTURE-B, PL1) — USER-RUN
 

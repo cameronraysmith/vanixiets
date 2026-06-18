@@ -197,17 +197,6 @@
           };
         };
 
-        # Cognee: Remote knowledge-graph MCP on magnetite's ZeroTier IPv6 (token-less
-        # in v1; the API/MCP are unenforced behind the ZeroTier mesh boundary).
-        home.file.".mcp/cognee.json".text = builtins.toJSON {
-          mcpServers = {
-            cognee = {
-              type = "http";
-              url = "http://[fddb:4344:343b:14b9:399:930f:39db:40d2]:9271/mcp";
-            };
-          };
-        };
-
         # Playwright: Browser automation
         home.file.".mcp/playwright.json".text = builtins.toJSON {
           mcpServers = {
