@@ -12,6 +12,6 @@ teams:
 projects:
   "cognee-memory-layer":
     id: "40537fb1-dadc-4405-ad3c-e5ed5dd7b66d"
-    name: "Deploy self-managed pluggable memory layer and knowledge graph"
+    name: "Use knowledge graph for agent memory layer"
     teams: ["CAM"]
     archive_documents: {}

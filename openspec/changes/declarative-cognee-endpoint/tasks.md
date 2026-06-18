@@ -2,7 +2,7 @@
 
 - [x] 1.1 Create a single new file declaring `flake.lib.hosts.<host>.zt` with `magnetite.zt = "fddb:4344:343b:14b9:399:930f:39db:40d2"`, as a single-file consolidation per the `lazyAttrsOf raw` constraint
 - [x] 1.2 Add the derived `flake.lib.cognee` record in its own single file: `meshApiUrl = "http://[${magnetite.zt}]:9270"`, `apiPort = 9270`, `publicFqdn = "kb.scientistexperience.net"`, `userEmail = "cameron@scientistexperience.net"` — with NO `mcpUrl`/`meshMcpUrl`/`publicMcpUrl` (the MCP is dropped)
-- [ ] 1.3 Confirm both additions evaluate without breaking `flake.lib` (`lazyAttrsOf raw`)
+- [x] 1.3 Confirm both additions evaluate without breaking `flake.lib` (`lazyAttrsOf raw`)
 
 ## 2. Cross-repo cognee-nix fork prerequisite (deliverable A-frontend, D11)
 
