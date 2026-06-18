@@ -8,6 +8,9 @@
   config,
   ...
 }:
+let
+  inherit (config.flake.lib.hosts) magnetite;
+in
 {
   flake.modules.nixos.cognee =
     {
@@ -16,6 +19,15 @@
       lib,
       ...
     }:
+    let
+      # The /64 ZeroTier prefix of magnetite's mesh address; the no-public-bind
+      # assertion admits any address inside this prefix.
+      ztPrefix = "fddb:4344:343b:14b9:";
+      isLoopbackOrMesh = addr: addr == "127.0.0.1" || addr == "::1" || lib.hasPrefix ztPrefix addr;
+      restBind = config.services.cognee.listenAddress;
+      frontendBind = config.services.cognee.frontend.listenAddress;
+      postgresBind = config.services.postgresql.settings.listen_addresses;
+    in
     {
       # FastAPI Users JWT signing secret (auto-generated)
       clan.core.vars.generators.cognee-jwt-secret = {
@@ -101,19 +113,26 @@
         # Provisional bootstrap account; confirm the canonical operator email.
         auth.defaultUserEmail = "cameron@scientistexperience.net";
 
-        mcp.enable = true;
-        mcp.transport = "http";
-        mcp.port = 9271;
-        mcp.listenAddress = "fddb:4344:343b:14b9:399:930f:39db:40d2";
+        # The cognee MCP is abandoned entirely (client and server): the plugin
+        # and cognee-cli talk REST directly, and codex/opencode declare no cognee
+        # MCP, so nothing consumes the server-side MCP.
+        mcp.enable = false;
+        # Deferred to §8/§2: at the current cognee-nix pin, cognee-frontend is only
+        # a flake packages.<system> output (not a top-level pkgs.cognee-frontend), so
+        # frontend.package defaults to null and frontend.enable=true fails its
+        # types.package check. Re-enable in the §8 kanidm-gated public UI once §2
+        # provides a same-origin frontend package + nginx vhost.
         frontend.enable = false;
         openFirewall = false;
         workers = 1;
 
-        # The API binds loopback only; the server-side MCP (mcp.* above) is the
-        # mesh-facing surface, bound to magnetite's deterministic ZeroTier IPv6.
-        # The cognee-nix IPv6-bracket fix in the gunicorn `--bind` is retained for
-        # the future public/nginx path but is unused here (loopback is bracket-free).
-        listenAddress = "127.0.0.1";
+        # Bind the REST API to magnetite's deterministic ZeroTier IPv6 so the
+        # always-on plugin and the cognee-cli wrapper reach the central graph
+        # over the mesh, fail-closed (single types.str, no dual-bind): reachable
+        # only over ZeroTier, never on the public interface. The public path
+        # reaches REST exclusively through the kb nginx /api/ location behind the
+        # oauth2-proxy gate.
+        listenAddress = magnetite.zt;
         port = 9270;
 
         settings = {
@@ -121,6 +140,13 @@
           KUZU_MAX_DB_SIZE = 34359738368;
           KUZU_NUM_THREADS = 2;
           JWT_LIFETIME_SECONDS = 315360000;
+          # Demand a logged-in user on every request (else HTTP 401, no
+          # default-user fallback), mitigating the surface widening from binding
+          # the full REST surface to the mesh. Rendered last into the unit env,
+          # overriding the base env, with zero fork change. Multi-tenancy stays
+          # off (auth.multiTenant = false keeps ENABLE_BACKEND_ACCESS_CONTROL
+          # false), so all data remains in one global graph and vector store.
+          REQUIRE_AUTHENTICATION = "true";
         };
 
         auth.jwtSecretFile = config.clan.core.vars.generators.cognee-jwt-secret.files."secret".path;
@@ -131,6 +157,27 @@
           config.clan.core.vars.generators.cognee-openai-api-key.files."api-key".path;
         environmentFile = config.clan.core.vars.generators.cognee-db-password.files."env".path;
       };
+
+      # The retained ip_nonlocal_bind sysctl below makes a wrong public bind
+      # silent, so promote the no-public-bind invariant to a build-time gate: the
+      # REST API, the frontend, and postgres must each bind loopback or the
+      # ZeroTier prefix. nginx 443 is the only public surface, reaching cognee
+      # only through the oauth2-proxy.
+      assertions = [
+        {
+          assertion =
+            isLoopbackOrMesh restBind && isLoopbackOrMesh frontendBind && isLoopbackOrMesh postgresBind;
+          message = ''
+            cognee no-public-bind invariant violated: every cognee listener must
+            bind loopback (127.0.0.1/::1) or the ZeroTier prefix ${ztPrefix}*/64.
+            Resolved binds:
+              REST listenAddress = ${restBind}
+              frontend listenAddress = ${frontendBind}
+              postgres listen_addresses = ${postgresBind}
+            A public bind would be silent under the retained ip_nonlocal_bind=1.
+          '';
+        }
+      ];
 
       # Loopback TCP for the local postgres provisioned by createLocally, with
       # scram-password auth for the cognee role (merges additively with the
@@ -173,30 +220,18 @@
         Nice = 10;
       };
 
-      # Permit the MCP server to bind magnetite's ZeroTier-assigned IPv6 before
-      # zerotierone settles on cold boot (mirrors
-      # modules/machines/nixos/cinnabar/caddy.nix). The zt+ firewall below
-      # remains the access boundary.
+      # Permit cognee to bind magnetite's ZeroTier-assigned IPv6 REST address
+      # before zerotierone settles on cold boot (mirrors
+      # modules/machines/nixos/cinnabar/caddy.nix). Load-bearing for the REST
+      # ZeroTier bind, not the (now-removed) MCP. The zt+ firewall below remains
+      # the access boundary, and the no-public-bind assertion above is the
+      # build-time gate that a non-local bind would otherwise pass silently.
       boot.kernel.sysctl = {
         "net.ipv6.ip_nonlocal_bind" = 1;
         "net.ipv4.ip_nonlocal_bind" = 1;
       };
 
-      # v1 is ZeroTier-only (the mesh is the security boundary); the MCP SDK's
-      # Host-header rebinding guard is disabled for the mesh deploy and will be
-      # re-enabled behind nginx for the future public path.
-      systemd.services.cognee-mcp.environment.MCP_DISABLE_DNS_REBINDING_PROTECTION = "true";
-
-      # Light caps; the MCP is a lightweight proxy that must also yield to buildbot.
-      systemd.services.cognee-mcp.serviceConfig = {
-        MemoryMax = "512M";
-        MemoryHigh = "384M";
-        CPUWeight = 20;
-        IOWeight = 20;
-        Nice = 10;
-      };
-
-      # Expose the cognee MCP port on the ZeroTier mesh only (the API is loopback).
-      networking.firewall.interfaces."zt+".allowedTCPPorts = [ 9271 ];
+      # Expose the cognee REST API on the ZeroTier mesh only.
+      networking.firewall.interfaces."zt+".allowedTCPPorts = [ 9270 ];
     };
 }

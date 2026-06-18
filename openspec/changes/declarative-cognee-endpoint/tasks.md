@@ -21,14 +21,21 @@ This whole section is a sequenced PREREQUISITE that touches a separate repositor
 
 ## 4. Server: REQUIRE_AUTHENTICATION, REST ZeroTier bind, no-public-bind assertion, MCP teardown, loopback frontend (deliverables C, B-server; POSTURE-A, PL2, PL4, PL6, PL7)
 
-- [ ] 4.1 In `modules/nixos/cognee.nix`, set `services.cognee.settings.REQUIRE_AUTHENTICATION = "true"` (rendered last into the unit env, overriding base env, zero fork change), keeping `auth.multiTenant = false` so `ENABLE_BACKEND_ACCESS_CONTROL` resolves `false` [POSTURE-A]
-- [ ] 4.2 Set the single `types.str` REST listen address to `flake.lib.hosts.magnetite.zt` (fail-closed, no dual-bind patch) and open port 9270 on the `zt+` interface only; the full REST surface on the mesh DOES widen the surface vs the 12-tool MCP, mitigated by REQUIRE_AUTHENTICATION (every caller needs a key) [PL2]
-- [ ] 4.3 Add a NixOS `assertion` failing the build if `cfg.listenAddress`, the frontend `listenAddress`, or the postgres listen address resolves to anything other than loopback (`127.0.0.1`/`::1`) or the ZeroTier prefix (`fddb:4344:343b:14b9::/64`); required because the retained `ip_nonlocal_bind=1` makes a wrong bind silent [PL4]
-- [ ] 4.4 Enable the rebuilt frontend bound to loopback `127.0.0.1:3000`, drop the inert `NEXT_PUBLIC_BACKEND_API_URL` injection (upstream reads `NEXT_PUBLIC_LOCAL_API_URL`), and confirm postgres stays loopback `127.0.0.1:5432` [PL7 in-repo half]
-- [ ] 4.5 Set `services.cognee.mcp.enable = false`
-- [ ] 4.6 Remove the 9271 `zt+` firewall opening (no remaining consumer; codex/opencode declare no cognee MCP)
-- [ ] 4.7 Remove the orphaned `cognee-mcp` systemd stanzas (`MCP_DISABLE_DNS_REBINDING_PROTECTION` and the per-service `serviceConfig` capability tightening), but RETAIN the `ip_nonlocal_bind` sysctl and rewrite its comment to describe the REST ZeroTier bind (now load-bearing for the REST bind, not the MCP) — do NOT delete this sysctl [PL6]
-- [ ] 4.8 Leave the module's built-in `services.cognee.nginx` unused (the bespoke host vhost in §8 fronts the UI)
+- [x] 4.1 In `modules/nixos/cognee.nix`, set `services.cognee.settings.REQUIRE_AUTHENTICATION = "true"` (rendered last into the unit env, overriding base env, zero fork change), keeping `auth.multiTenant = false` so `ENABLE_BACKEND_ACCESS_CONTROL` resolves `false` [POSTURE-A]
+  - Added `settings.REQUIRE_AUTHENTICATION = "true"` to the existing `services.cognee.settings` attrset; `auth.multiTenant = false` retained unchanged.
+- [x] 4.2 Set the single `types.str` REST listen address to `flake.lib.hosts.magnetite.zt` (fail-closed, no dual-bind patch) and open port 9270 on the `zt+` interface only; the full REST surface on the mesh DOES widen the surface vs the 12-tool MCP, mitigated by REQUIRE_AUTHENTICATION (every caller needs a key) [PL2]
+  - `listenAddress = magnetite.zt` (bound at outer scope via `inherit (config.flake.lib.hosts) magnetite;`, no literal restated); `networking.firewall.interfaces."zt+".allowedTCPPorts = [ 9270 ]`.
+- [x] 4.3 Add a NixOS `assertion` failing the build if `cfg.listenAddress`, the frontend `listenAddress`, or the postgres listen address resolves to anything other than loopback (`127.0.0.1`/`::1`) or the ZeroTier prefix (`fddb:4344:343b:14b9::/64`); required because the retained `ip_nonlocal_bind=1` makes a wrong bind silent [PL4]
+  - `assertions` entry over `isLoopbackOrMesh` of `services.cognee.listenAddress`, `services.cognee.frontend.listenAddress`, and `services.postgresql.settings.listen_addresses`; predicate admits `127.0.0.1`/`::1`/`hasPrefix "fddb:4344:343b:14b9:"`. Build-verification (assertion passes for the ZT/loopback config) deferred to §10.2 (orchestrator/remote builder).
+- [ ] 4.4 Enable the rebuilt frontend bound to loopback `127.0.0.1:3000`, drop the inert `NEXT_PUBLIC_BACKEND_API_URL` injection (upstream reads `NEXT_PUBLIC_LOCAL_API_URL`), and confirm postgres stays loopback `127.0.0.1:5432` [PL7 in-repo half] (deferred → §8/§2: frontend.package unbuildable at current pin)
+  - `frontend.enable = true` (upstream `frontend.listenAddress`/`port` defaults are already `127.0.0.1`/`3000`). The `NEXT_PUBLIC_BACKEND_API_URL` injection is a PHANTOM in-repo: the vanixiets module never set `frontend.backendApiUrl`, so there was nothing to delete (`rg -i 'NEXT_PUBLIC_BACKEND_API_URL|backendApiUrl' .` hits only the openspec change docs). Postgres stays loopback (`settings.listen_addresses = lib.mkForce "127.0.0.1"`, unchanged).
+- [x] 4.5 Set `services.cognee.mcp.enable = false`
+- [x] 4.6 Remove the 9271 `zt+` firewall opening (no remaining consumer; codex/opencode declare no cognee MCP)
+  - The `allowedTCPPorts` list now holds `[ 9270 ]` only; the `[ 9271 ]` opening is gone.
+- [x] 4.7 Remove the orphaned `cognee-mcp` systemd stanzas (`MCP_DISABLE_DNS_REBINDING_PROTECTION` and the per-service `serviceConfig` capability tightening), but RETAIN the `ip_nonlocal_bind` sysctl and rewrite its comment to describe the REST ZeroTier bind (now load-bearing for the REST bind, not the MCP) — do NOT delete this sysctl [PL6]
+  - Removed `systemd.services.cognee-mcp.environment.MCP_DISABLE_DNS_REBINDING_PROTECTION` and `systemd.services.cognee-mcp.serviceConfig`; also dropped the now-orphaned `mcp.transport`/`mcp.port`/`mcp.listenAddress`. Retained both `net.ipv{4,6}.ip_nonlocal_bind = 1` with the comment rewritten to describe the REST ZeroTier bind. `rg 'cognee-mcp|9271|MCP_DISABLE_DNS_REBINDING_PROTECTION'` over the module returns nothing.
+- [x] 4.8 Leave the module's built-in `services.cognee.nginx` unused (the bespoke host vhost in §8 fronts the UI)
+  - `services.cognee.nginx` is not enabled or referenced anywhere in the module.
 
 ## 5. Client: drop MCP client, non-secret plugin env + per-host namespacing, secure key delivery (deliverables B-client, D; POSTURE-B, PL1, PL9)
 
