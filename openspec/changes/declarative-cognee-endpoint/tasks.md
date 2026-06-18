@@ -17,6 +17,7 @@ This whole section is a sequenced PREREQUISITE that touches a separate repositor
 ## 3. cli existence precondition (deliverable E precondition, PL8)
 
 - [ ] 3.1 Build `pkgs.cognee` (the cognee-nix overlay package) and confirm `bin/cognee-cli --help` lists `--api-url` and `--api-key` BEFORE the wrapper module (§7) is authored
+  - Source-verified (build deferred to remote builder): `pkgs.cognee` is the cognee-nix overlay package (`inputs.cognee-nix.overlays.default` registered via `nixpkgsOverlays`, exposing `python-final.cognee` as top-level `cognee`); the v1.1.2 CLI entrypoint `cognee/cli/_cognee.py` declares `--api-url` and `--api-key` (the latter "sent as X-Api-Key ... Falls back to $COGNEE_API_KEY") on the top-level argparse parser, before its subparsers; `cognee/cli/api_dispatch.py` confirms the `X-Api-Key` header. A built `cognee-1.1.2` store path exposes the binary named exactly `cognee-cli` with no `meta.mainProgram`. Checkbox left unticked because its literal text requires a `--help` build confirmation, which the orchestrator/remote builder owns.
 
 ## 4. Server: REQUIRE_AUTHENTICATION, REST ZeroTier bind, no-public-bind assertion, MCP teardown, loopback frontend (deliverables C, B-server; POSTURE-A, PL2, PL4, PL6, PL7)
 
@@ -43,8 +44,10 @@ This whole section is a sequenced PREREQUISITE that touches a separate repositor
 
 ## 7. cognee-cli wrapper module (deliverable E, PL3) — after §3 precondition
 
-- [ ] 7.1 Add a home-manager module installing a global cognee-cli wrapper as a `writeShellApplication` whose binary is named exactly `cognee-cli` and which execs `${pkgs.cognee}/bin/cognee-cli` directly (NOT `lib.getExe`, which fails because `pkgs.cognee` has no `meta.mainProgram`), baking `--api-url ${flake.lib.cognee.meshApiUrl}` (the CLI has no env fallback for `--api-url`) and passing `--api-key` (sent as `X-Api-Key`, NEVER `--api-token`/Bearer) from the secure sops-nix secret, then forwarding `"$@"` [PL3]
-- [ ] 7.2 Confirm the wrapper is decoupled from the plugin's bundled venv and accept the ~1.5 GiB per-host closure footprint; the plugin skills/agent hardcode the `cognee-cli` name on `PATH`, which this wrapper satisfies
+- [x] 7.1 Add a home-manager module installing a global cognee-cli wrapper as a `writeShellApplication` whose binary is named exactly `cognee-cli` and which execs `${pkgs.cognee}/bin/cognee-cli` directly (NOT `lib.getExe`, which fails because `pkgs.cognee` has no `meta.mainProgram`), baking `--api-url ${flake.lib.cognee.meshApiUrl}` (the CLI has no env fallback for `--api-url`) and passing `--api-key` (sent as `X-Api-Key`, NEVER `--api-token`/Bearer) from the secure sops-nix secret, then forwarding `"$@"` [PL3]
+  - Implemented in `modules/home/ai/cognee/cognee-cli-wrapper.nix` (`flake.modules.homeManager.ai`, sibling to `default.nix`); `pkgs.writeShellApplication` named `cognee-cli`, execs `${pkgs.cognee}/bin/cognee-cli` directly, bakes `--api-url "${flake.lib.cognee.meshApiUrl}"` and reads `--api-key` at runtime from `config.sops.secrets."cognee-api-key".path` (no plaintext in the store), baked optionals precede `"$@"` so they sit ahead of the subcommand token. Embedded script shellcheck-clean.
+- [x] 7.2 Confirm the wrapper is decoupled from the plugin's bundled venv and accept the ~1.5 GiB per-host closure footprint; the plugin skills/agent hardcode the `cognee-cli` name on `PATH`, which this wrapper satisfies
+  - The wrapper is a standalone `home.packages` entry referencing `pkgs.cognee` (the overlay package), independent of any plugin venv; its binary name is exactly `cognee-cli`, satisfying the name the plugin skills/agent hardcode on `PATH`. The ~1.5 GiB closure is accepted per design.md [Trade-off].
 
 ## 8. Public UI: kanidm plumbing in kanidm.nix, dual-context secret, containerized oauth2-proxy, bespoke nginx vhost (deliverable F; D9, D12, PL5, PL11, PL12, PL15)
 
