@@ -3,15 +3,16 @@ linear_story_id: 46d87b5c-3408-4534-9230-d85a58a7f112
 linear_story_identifier: CAM-18
 linear_story_title: "Utilize cognee server on magnetite host exclusively as backend for other agents"
 linear_story_url: "https://linear.app/cameronraysmith/issue/CAM-18/utilize-cognee-server-on-magnetite-host-exclusively-as-backend-for"
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: cognee-memory-layer
-last_synced_state: Todo
-last_synced_at: "2026-06-17T19:51:45Z"
+last_synced_state: In Progress
+last_synced_at: "2026-06-18T05:17:26Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-06-17T19:51:45Z", transition: "Backlog->Todo", outcome: "posted", note: "bind CAM-18; seed issue description from proposal; set Todo" }
+  - { at: "2026-06-18T05:17:26Z", transition: "Todo->In Progress", outcome: "posted", note: "apply gate: first tasks.md checkbox (section 1 source of truth)" }
 ---
 
 ## Why
