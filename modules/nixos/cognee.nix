@@ -6,6 +6,7 @@
 #   - cognee-openai-api-key: manual `clan vars set` (OpenAI API key for LLM + embeddings)
 {
   config,
+  inputs,
   ...
 }:
 let
@@ -117,12 +118,17 @@ in
         # and cognee-cli talk REST directly, and codex/opencode declare no cognee
         # MCP, so nothing consumes the server-side MCP.
         mcp.enable = false;
-        # Deferred to §8/§2: at the current cognee-nix pin, cognee-frontend is only
-        # a flake packages.<system> output (not a top-level pkgs.cognee-frontend), so
-        # frontend.package defaults to null and frontend.enable=true fails its
-        # types.package check. Re-enable in the §8 kanidm-gated public UI once §2
-        # provides a same-origin frontend package + nginx vhost.
-        frontend.enable = false;
+        # The same-origin browser UI (D7/D10/§4.4). cognee-frontend is exposed
+        # only as a flake `packages.<system>` output (the cognee-nix overlay puts
+        # cognee in pythonPackagesExtensions but not the frontend), so
+        # `pkgs.cognee-frontend` is null and the package must be taken from the
+        # input directly. Bound loopback `127.0.0.1:3000` (listenAddress is the
+        # hostname; the port stays at its 3000 default); the sso-gateway proxies
+        # `/` to it. The runtime backend URL the frontend's server-side route
+        # handlers read is wired below.
+        frontend.enable = true;
+        frontend.package = inputs.cognee-nix.packages.${config.nixpkgs.hostPlatform.system}.cognee-frontend;
+        frontend.listenAddress = "127.0.0.1";
         openFirewall = false;
         workers = 1;
 
@@ -219,6 +225,15 @@ in
         IOWeight = 20;
         Nice = 10;
       };
+
+      # The frontend's two server-side Node route handlers read
+      # NEXT_PUBLIC_LOCAL_API_URL at runtime (Turbopack preserves the process.env
+      # read for server code), so they reach the backend over the mesh REST URL.
+      # The browser client already has same-origin "" baked in at build time
+      # (D11) and ignores this runtime value. Merges additively with the
+      # environment the cognee-frontend service already sets.
+      systemd.services.cognee-frontend.environment.NEXT_PUBLIC_LOCAL_API_URL =
+        "http://[${magnetite.zt}]:9270";
 
       # Permit cognee to bind magnetite's ZeroTier-assigned IPv6 REST address
       # before zerotierone settles on cold boot (mirrors
