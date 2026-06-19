@@ -1,3 +1,10 @@
+{ config, ... }:
+let
+  # The terranix cloudflare eval does not receive flake.lib in its inner config
+  # scope (that is the terranix config namespace), so thread the single source of
+  # truth for the cognee public UI FQDN in from the flake-level config here (D7).
+  cogneePublicFqdn = config.flake.lib.cognee.publicFqdn;
+in
 {
   flake.modules.terranix.cloudflare =
     {
@@ -86,6 +93,29 @@
       resource.cloudflare_dns_record.accounts = {
         zone_id = config.data.cloudflare_zone.scientistexperience "id";
         name = "accounts.scientistexperience.net";
+        type = "CNAME";
+        content = "magnetite.scientistexperience.net";
+        ttl = 1; # automatic
+        proxied = false;
+      };
+
+      # DNS CNAME record for the cognee public knowledge-base UI (resolves to
+      # magnetite). Reads flake.lib.cognee.publicFqdn as the single source of
+      # truth for the FQDN (D7). proxied = false so ACME issuance works.
+      resource.cloudflare_dns_record.kb = {
+        zone_id = config.data.cloudflare_zone.scientistexperience "id";
+        name = cogneePublicFqdn;
+        type = "CNAME";
+        content = "magnetite.scientistexperience.net";
+        ttl = 1; # automatic
+        proxied = false;
+      };
+
+      # DNS CNAME record for the shared sso-gateway central auth subdomain
+      # (resolves to magnetite). proxied = false so ACME issuance works.
+      resource.cloudflare_dns_record.auth = {
+        zone_id = config.data.cloudflare_zone.scientistexperience "id";
+        name = "auth.scientistexperience.net";
         type = "CNAME";
         content = "magnetite.scientistexperience.net";
         ttl = 1; # automatic
