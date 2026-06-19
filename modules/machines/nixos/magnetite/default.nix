@@ -6,6 +6,8 @@
 let
   flakeModules = config.flake.modules.nixos;
   flakeUsers = config.flake.users;
+  cogneeLib = config.flake.lib.cognee;
+  inherit (config.flake.lib.hosts) magnetite;
 in
 {
   flake.modules.nixos."machines/nixos/magnetite" =
@@ -34,6 +36,7 @@ in
         buildbot
         gitea
         cognee
+        sso-gateway
         gitea-actions-runner
         docker
         kanidm
@@ -77,6 +80,50 @@ in
       security.acme = {
         acceptTerms = true;
         defaults.email = "cameron@scientistexperience.net";
+      };
+
+      # Shared kanidm-OIDC SSO gateway. cognee registers as consumer #1 (D10):
+      # the gateway emits the kb.scientistexperience.net forceSSL+ACME vhost,
+      # proxies `/` to the loopback frontend and `/api/` to the ZeroTier REST
+      # API, gates on cognee_access membership, and applies the browser-vs-API
+      # 401 split. The gateway owns the oauth2-proxy-kanidm unit, the sso-gateway
+      # kanidm client, and the auth.scientistexperience.net subdomain.
+      sso.enable = true;
+
+      # Redirect the auth subdomain root (`auth.scientistexperience.net/`) to the
+      # kanidm apps portal instead of the stock nginx welcome page. The shared
+      # "SSO" apps-portal card launches the auth-root landing, so without this it
+      # lands on a dead nginx page; pointing `/` at the kanidm portal turns that
+      # tile into a useful entry point. `/oauth2/*` is unaffected.
+      sso.rootRedirectUrl = "https://accounts.scientistexperience.net/";
+
+      # Shared-client apps-portal card image (generic SSO/OIDC tile). The shared
+      # client reverts to the default "SSO" label and auth-root landing; this
+      # gives it a branded icon. The oauth2-proxy project icon (MIT, in-repo,
+      # commit-pinned) brands the tile to the gateway implementation we run.
+      sso.clientImageFile = pkgs.fetchurl {
+        url = "https://raw.githubusercontent.com/oauth2-proxy/oauth2-proxy/899c743afc71e695964165deb11f50b9a0703c97/docs/static/img/logos/OAuth2_Proxy_icon.svg";
+        hash = "sha256-7d14/2OgFEcZxC0DKJdvwgmfynv5BTj8wOBhYwpcAWU=";
+      };
+
+      sso.services.cognee = {
+        domain = cogneeLib.publicFqdn;
+        allowedGroups = [ "cognee_access" ];
+        upstream = {
+          "/" = "http://127.0.0.1:3000";
+          "/api/" = "http://[${magnetite.zt}]:9270";
+        };
+        # Dedicated apps-portal tile launching the cognee UI, scoped (via the
+        # gateway) to cognee_access — the same group in allowedGroups, so tile
+        # visibility matches gateway admission.
+        portalCard = {
+          displayName = "Cognee";
+          landingUrl = "https://${cogneeLib.publicFqdn}";
+          imageFile = pkgs.fetchurl {
+            url = "https://raw.githubusercontent.com/topoteretes/cognee/b7fcc7faa51acffc28386392f0250521c1536679/cognee-frontend/src/app/icon.svg";
+            hash = "sha256-5o5gLrjcuFhKxjEtTNfalPcs2VrBhdRRonedH6CmmnA=";
+          };
+        };
       };
 
       # Tune ZFS auto-snapshot retention for a single-disk cloud VPS without
