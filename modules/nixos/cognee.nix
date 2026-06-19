@@ -206,12 +206,20 @@ in
       # clan-vars file and feeds the SQL via stdin heredoc so the secret never
       # appears in psql's argv. Runs in the postgresql-setup context as the
       # postgres superuser over the local socket.
+      #
+      # The role-level idle_in_transaction_session_timeout is defense-in-depth
+      # against idle-in-transaction connection leaks: any cognee session that
+      # opens a transaction and then stalls is terminated after 30s, releasing
+      # the backend and its locks regardless of client-side pool behavior. Set at
+      # the role (not via asyncpg DATABASE_CONNECT_ARGS) so it applies to every
+      # connection that authenticates as cognee.
       systemd.services.postgresql-setup.serviceConfig.ExecStartPost = lib.mkAfter [
         (pkgs.writeShellScript "cognee-set-role-password" ''
           set -eu
           password="$(cat ${config.clan.core.vars.generators.cognee-db-password.files."password".path})"
           ${lib.getExe' config.services.postgresql.package "psql"} -d postgres -v ON_ERROR_STOP=1 <<EOF
           ALTER ROLE cognee PASSWORD '$password';
+          ALTER ROLE cognee SET idle_in_transaction_session_timeout = '30s';
           EOF
         '')
       ];
