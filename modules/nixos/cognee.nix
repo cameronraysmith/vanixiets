@@ -107,7 +107,7 @@ in
         graphStore.backend = "ladybug";
 
         llm.provider = "openai";
-        llm.model = "openai/gpt-5-mini";
+        llm.model = "openai/gpt-5-nano";
         llm.embeddingModel = "openai/text-embedding-3-large";
 
         auth.multiTenant = false;
