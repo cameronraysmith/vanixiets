@@ -159,99 +159,95 @@ Building `pkgs.cognee` and confirming `bin/cognee-cli --help` lists `--api-url` 
 - **WHEN** `pkgs.cognee` is built as a precondition
 - **THEN** `bin/cognee-cli --help` lists `--api-url` and `--api-key`, confirming the wrapper's baked flags are valid before the wrapper module is written
 
-### Requirement: The cognee frontend is rebuilt cross-repo for same-origin and bound to loopback
+### Requirement: The cognee frontend is rebuilt cross-repo for same-origin by patching the backend-URL fallback per file class
 
 The cognee frontend SHALL be rebuilt in the cognee-nix fork so the browser calls same-origin `/api/` rather than a literal `localhost` backend URL, and this rebuild SHALL be sequenced as an explicit cross-repo prerequisite, not in-repo config.
-The fork's `packages/cognee-frontend/default.nix` `buildPhase` SHALL export `NEXT_PUBLIC_LOCAL_API_URL=""` (it currently exports none), the FOD hashes SHALL be recomputed, the `cognee-v112` branch SHALL be pushed, and the cognee-nix input SHALL be bumped in vanixiets `flake.nix`/`flake.lock`.
-The module's injected `NEXT_PUBLIC_BACKEND_API_URL` SHALL be dropped because upstream reads `NEXT_PUBLIC_LOCAL_API_URL` and that injection is inert.
+The fork's `packages/cognee-frontend/default.nix` `configurePhase` SHALL `substituteInPlace` the backend-URL fallback expression `|| "http://localhost:8000"` per file class, the FOD hashes SHALL be recomputed, the `cognee-v112` branch SHALL be pushed, and the cognee-nix input SHALL be bumped in vanixiets `flake.nix`/`flake.lock`.
+Setting `NEXT_PUBLIC_LOCAL_API_URL=""` at build time SHALL NOT be relied upon, because the code reads `process.env.NEXT_PUBLIC_LOCAL_API_URL || "http://localhost:8000"` and an empty string is falsy, so the `localhost` fallback wins (verified: the empty-env bundle contained `http://localhost:8000` five times); the fallback literal itself SHALL be patched instead.
+The per-file-class substitution SHALL set the fallback to `""` in the 6 client/shared files (so the browser issues same-origin `/api/v1/...`), to an absolute loopback URL in the 2 server-side Node route handlers (`src/app/api/local-signout/route.ts`, `src/app/api/visualize/route.ts`, which need absolute URLs for Node `fetch`), and to the public FQDN `https://kb.scientistexperience.net` in the 2 copyable-URL display components (`ApiKeysPage`, `ConnectionModal`).
+The module's injected `NEXT_PUBLIC_BACKEND_API_URL` SHALL be dropped because the code never reads it and `NEXT_PUBLIC_*` bakes at build time, making the injection inert; any genuinely build-time value SHALL instead be supplied to the variable the code reads (`NEXT_PUBLIC_LOCAL_API_URL`).
 The rebuilt frontend SHALL be enabled and bound to loopback `127.0.0.1:3000`, never to a public interface.
 
 #### Scenario: the cross-repo fork edit and flake bump precede the frontend deliverable
 
 - **WHEN** the same-origin frontend is delivered
-- **THEN** the cognee-nix fork's `packages/cognee-frontend/default.nix` `buildPhase` exports `NEXT_PUBLIC_LOCAL_API_URL=""`, the FOD hashes are recomputed, the `cognee-v112` branch is pushed, and the cognee-nix input is bumped in `flake.nix`/`flake.lock` before the in-repo frontend-enable config references the rebuilt bundle
+- **THEN** the cognee-nix fork's `packages/cognee-frontend/default.nix` `configurePhase` substitutes the `|| "http://localhost:8000"` fallback per file class, the FOD hashes are recomputed, the `cognee-v112` branch is pushed, and the cognee-nix input is bumped in `flake.nix`/`flake.lock` before the in-repo frontend-enable config references the rebuilt bundle
+
+#### Scenario: the empty-env mechanism is rejected because an empty string is falsy
+
+- **WHEN** the same-origin mechanism is chosen
+- **THEN** setting `NEXT_PUBLIC_LOCAL_API_URL=""` is rejected because `process.env.NEXT_PUBLIC_LOCAL_API_URL || "http://localhost:8000"` treats the empty string as falsy and the `localhost` fallback wins (the empty-env bundle contained `http://localhost:8000` five times), so the fallback literal itself is patched per file class instead
 
 #### Scenario: the built bundle contains no literal localhost backend URL
 
-- **WHEN** the rebuilt frontend bundle is inspected
-- **THEN** it contains no literal `localhost` backend URL (because `NEXT_PUBLIC_LOCAL_API_URL` is `""` at build time, the browser calls same-origin `/api/`), and the inert `NEXT_PUBLIC_BACKEND_API_URL` injection is absent
+- **WHEN** the rebuilt frontend bundle's live `.next/static` chunks are inspected
+- **THEN** they contain no literal `localhost` backend URL (because the client/shared fallback is patched to `""`, the browser calls same-origin `/api/`), and the inert `NEXT_PUBLIC_BACKEND_API_URL` injection is absent
 
 #### Scenario: the frontend binds loopback only
 
 - **WHEN** the magnetite cognee configuration is evaluated
-- **THEN** the frontend listens only on `127.0.0.1:3000` and is reachable publicly only through the nginx vhost
+- **THEN** the frontend listens only on `127.0.0.1:3000` and is reachable publicly only through the gateway-emitted `kb` nginx vhost
 
-### Requirement: kanidm-gated public browser UI via a dedicated containerized oauth2-proxy
+### Requirement: kanidm-gated public browser UI by registering cognee as the shared sso-gateway's consumer #1
 
-The public browser UI SHALL be served at `kb.scientistexperience.net` by a bespoke host nginx 443 vhost (`forceSSL` plus ACME), NOT the module's built-in `services.cognee.nginx`, routing `location /` to the loopback frontend `127.0.0.1:3000` and `location /api/` to the ZeroTier REST API `[fddb:4344:343b:14b9:399:930f:39db:40d2]:9270`, with `auth_request` against a dedicated containerized kanidm oauth2-proxy.
-The oauth2-proxy SHALL be a dedicated NixOS container running its own `services.oauth2-proxy` (`provider = "oidc"`, PKCE via `code-challenge-method = "S256"`) against kanidm, listening on a unix socket under `/run/oauth2-proxies/` (the jfly `oauth2-proxies-nginx` pattern), and SHALL NOT reuse the nixpkgs host `services.oauth2-proxy` singleton.
-Buildbot's existing `accessMode.fullyPrivate` GitHub-backed oauth2-proxy singleton and its auth configuration SHALL be left entirely untouched, with no buildbot change and no buildbot prerequisite.
-The allowlist SHALL be kanidm group membership `cognee_access`, passed to oauth2-proxy as `allowed_groups`; behind the proxy cognee SHALL run as its single default/owner user (`cameron@scientistexperience.net`) with `REQUIRE_AUTHENTICATION` additionally enforced, so the perimeter gate and app-auth are defense-in-depth.
-The `kb` Cloudflare DNS record SHALL be provisioned via terranix reading `config.flake.lib.cognee.publicFqdn` as the source of truth (threaded into the terranix module), as a CNAME to `magnetite.scientistexperience.net` with `ttl = 1` and `proxied = false` so ACME succeeds, cloned from the existing niks3/buildbot/git records and applied via `just terraform*` (never `nix run .#terraform`).
+The public browser UI SHALL be served at `kb.scientistexperience.net` by the shared `sso-gateway` (delivered by the `sso-gateway` change, on which this change depends), with cognee registering as consumer #1 via `sso.services.cognee = { domain = "kb.scientistexperience.net"; allowedGroups = [ "cognee_access" ]; upstream = { "/" = "http://127.0.0.1:3000"; "/api/" = "http://[fddb:4344:343b:14b9:399:930f:39db:40d2]:9270"; }; }`, supplying the loopback frontend as the `/` upstream and the ZeroTier REST API as the `/api/` upstream.
+cognee SHALL NOT define its own oauth2-proxy (container or otherwise), its own bespoke nginx vhost, its own kanidm OAuth2 client, its own `cognee_access` group stub, or its own client-secret/cookie-secret generator; the shared gateway owns the `oauth2-proxy-kanidm` unit, the shared `sso-gateway` kanidm client, the `auth.scientistexperience.net` subdomain, the perimeter secret generators, and the auto-derivation of `cognee_access` and the client's `scopeMaps`/`claimMaps.groups` from cognee's registration.
+The gateway-emitted `kb` vhost (`forceSSL` plus ACME) SHALL run `auth_request` against the shared `oauth2-proxy-kanidm`, authorize on `cognee_access` via the query-param `allowed_groups`, and apply the browser-vs-API 401 split: `location /` (the browser UI) redirects a 401 to the sign-in flow, while `location /api/` (API clients) uses `error_page 401 =401` to fail fast.
+Buildbot's existing `accessMode.fullyPrivate` GitHub-backed oauth2-proxy singleton and its auth configuration SHALL be left entirely untouched, with no buildbot change and no buildbot prerequisite (the shared gateway is a distinct second instance with a distinct cookie name).
+Behind the gate cognee SHALL run as its single default/owner user (`cameron@scientistexperience.net`) with `REQUIRE_AUTHENTICATION` additionally enforced, so the perimeter gate and app-auth are defense-in-depth.
+The `kb` Cloudflare DNS record SHALL be provisioned via terranix reading `config.flake.lib.cognee.publicFqdn` as the source of truth (threaded into the terranix module), as a CNAME to `magnetite.scientistexperience.net` with `ttl = 1` and `proxied = false` so ACME succeeds, cloned from the existing niks3/buildbot/git records and applied via `just terraform*` (never `nix run .#terraform`); the central `auth.scientistexperience.net` record belongs to the `sso-gateway` change, NOT this one.
+
+#### Scenario: cognee registers as the gateway's consumer #1 and owns no perimeter internals
+
+- **WHEN** the cognee public UI is delivered
+- **THEN** cognee sets `sso.services.cognee` (`domain = "kb.scientistexperience.net"`, `allowedGroups = [ "cognee_access" ]`, `upstream` mapping `/` to the loopback frontend and `/api/` to the ZeroTier REST), and declares no oauth2-proxy, no bespoke nginx vhost, no kanidm client, no `cognee_access` group stub, and no perimeter secret generator — all of which the shared gateway owns
 
 #### Scenario: only members of cognee_access reach the UI
 
 - **WHEN** a request hits `kb.scientistexperience.net`
-- **THEN** the host nginx vhost runs `auth_request` against the dedicated containerized kanidm oauth2-proxy (unix socket under `/run/oauth2-proxies/`), which admits only kanidm `cognee_access` group members via `allowed_groups` before nginx routes `/` to the loopback frontend and `/api/` to the ZeroTier REST API
+- **THEN** the gateway-emitted vhost runs `auth_request /oauth2/auth?allowed_groups=cognee_access` against the shared `oauth2-proxy-kanidm`, which admits only kanidm `cognee_access` group members before nginx routes `/` to the loopback frontend and `/api/` to the ZeroTier REST API
+
+#### Scenario: browser and API paths handle 401 differently
+
+- **WHEN** an unauthenticated request hits the `kb` vhost
+- **THEN** `location /` (the browser UI) redirects the 401 to the sign-in flow while `location /api/` (API clients) uses `error_page 401 =401` to return a clean fast 401 rather than an HTML redirect
 
 #### Scenario: buildbot's oauth2-proxy singleton is untouched
 
-- **WHEN** the cognee oauth2-proxy is provisioned as a dedicated NixOS container
-- **THEN** buildbot's `accessMode.fullyPrivate` GitHub-backed host `services.oauth2-proxy` singleton and its auth configuration are unchanged, with no shared blast radius
+- **WHEN** cognee is gated through the shared `oauth2-proxy-kanidm` instance
+- **THEN** buildbot's `accessMode.fullyPrivate` GitHub-backed host `services.oauth2-proxy` singleton and its auth configuration are unchanged, with no shared blast radius (a different provider, a different instance, and a distinct cookie name)
 
 #### Scenario: the perimeter and app-auth are defense-in-depth
 
-- **WHEN** a `cognee_access` member is admitted through the proxy and the rebuilt same-origin frontend loads
+- **WHEN** a `cognee_access` member is admitted through the gateway and the rebuilt same-origin frontend loads
 - **THEN** cognee behind the gate enforces `REQUIRE_AUTHENTICATION` as the default/owner user (`cameron@scientistexperience.net`), so the perimeter gates public browser access on `cognee_access` membership and the app additionally requires a logged-in user, with no per-user SSO into cognee in this phase
 
 #### Scenario: ACME issuance succeeds for the kb record reading the threaded FQDN
 
 - **WHEN** the `kb` Cloudflare DNS record is created via terranix and applied with `just terraform*`
-- **THEN** it reads `config.flake.lib.cognee.publicFqdn` threaded into the terranix module via the `config.nix` `let`-binding, is a CNAME to `magnetite.scientistexperience.net` with `ttl = 1` and `proxied = false`, allowing ACME to issue TLS for the `forceSSL` nginx vhost
+- **THEN** it reads `config.flake.lib.cognee.publicFqdn` threaded into the terranix module via the `config.nix` `let`-binding, is a CNAME to `magnetite.scientistexperience.net` with `ttl = 1` and `proxied = false`, allowing ACME to issue TLS for the gateway-emitted `forceSSL` `kb` vhost, while the central `auth` record is provisioned by the `sso-gateway` change
 
-### Requirement: cognee's kanidm plumbing lives in kanidm.nix alongside synapse
+### Requirement: cognee's kanidm and perimeter plumbing is owned by the shared sso-gateway
 
-cognee's kanidm OAuth2 client (`provision.systems.oauth2.cognee`), the `cognee_access` group stub, and the `kanidm-oauth2-cognee` secret generator SHALL live inside `modules/nixos/kanidm.nix`, alongside the existing synapse client, group, and generator, matching the live precedent where `modules/nixos/kanidm.nix` itself declares the synapse client and group and `modules/nixos/matrix.nix` only reads the secret.
-The consuming cognee module SHALL only read the resulting secret; `modules/nixos/kanidm.nix` SHALL NOT be treated as a pure IdP scaffold that the cognee plumbing avoids.
-The `cognee_access` group stub SHALL be declared in `entitiesByName` before any `scopeMap` references it (satisfying the `kanidm.nix:876` referential-integrity assertion), defined as `provision.groups.cognee_access = { members = []; overwriteMembers = false; }` with `provision.autoRemove = false`, with cameron added operationally rather than declaratively.
-The client SHALL declare `claimMaps.groups`, framed as a new requirement (synapse uses `scopeMaps` but no `claimMaps`) because oauth2-proxy's `allowed_groups` needs group membership projected into the token, which synapse never needed.
+cognee SHALL NOT declare any kanidm OAuth2 client (`provision.systems.oauth2.cognee`), any `cognee_access` group stub, or any client-secret/cookie-secret generator of its own.
+All of that plumbing is owned by the shared `sso-gateway` change: cognee contributes `cognee_access` to the gateway's derivation purely by setting `sso.services.cognee.allowedGroups = [ "cognee_access" ]`, and the gateway auto-derives the `cognee_access` group stub (`{ members = []; overwriteMembers = false; }`, declared in `entitiesByName` before its `scopeMap` so the `kanidm.nix:876` referential-integrity assertion holds), the shared `sso-gateway` client's per-group `scopeMaps`, and `claimMaps.groups.valuesByGroup.cognee_access` from the union of registered services' `allowedGroups`.
+`claimMaps.groups` (a new requirement relative to synapse, which uses no `claimMaps`) is set on the shared client by the gateway so oauth2-proxy's `allowed_groups` reads literal group names from the token; cognee never declares it.
+cameron SHALL be added to `cognee_access` operationally rather than declaratively.
 
-#### Scenario: the cognee client, group, and generator live in kanidm.nix
+#### Scenario: cognee declares no kanidm client, group, or generator
 
-- **WHEN** `modules/nixos/kanidm.nix` is evaluated
-- **THEN** it declares the `provision.systems.oauth2.cognee` client, the `cognee_access` group stub, and the `kanidm-oauth2-cognee` generator alongside the synapse plumbing, while the consuming cognee module only reads the resulting secret
+- **WHEN** the cognee-side modules are evaluated
+- **THEN** they declare no `provision.systems.oauth2.cognee` client, no `provision.groups.cognee_access` stub, and no `kanidm-oauth2-cognee` (or any other perimeter-secret) generator; the shared gateway owns and derives all of it
 
-#### Scenario: the group stub is declared before its scopeMap reference
+#### Scenario: the gateway auto-derives cognee_access from the registration
 
-- **WHEN** the cognee `scopeMap` references the `cognee_access` group
-- **THEN** the `provision.groups.cognee_access` stub (`members = []`, `overwriteMembers = false`, with `provision.autoRemove = false`) is already declared in `entitiesByName`, satisfying the `kanidm.nix:876` referential-integrity assertion
+- **WHEN** cognee sets `sso.services.cognee.allowedGroups = [ "cognee_access" ]`
+- **THEN** the shared gateway emits the `cognee_access` group stub (`members = []`, `overwriteMembers = false`) before its `scopeMap` (satisfying the `kanidm.nix:876` assertion), and adds `scopeMaps.cognee_access` and `claimMaps.groups.valuesByGroup.cognee_access = ["cognee_access"]` to the shared `sso-gateway` client, all without cognee declaring any of it
 
-#### Scenario: claimMaps.groups is a new requirement, not a synapse mirror
+#### Scenario: cognee carries no perimeter secret topology
 
-- **WHEN** the cognee OAuth2 client is declared
-- **THEN** it adds `claimMaps.groups` so oauth2-proxy's `allowed_groups` can read group membership from the token, framed as a new requirement because synapse uses no `claimMaps`, so the addition is deliberate rather than mirrored from synapse
-
-### Requirement: One kanidm-oauth2-cognee generator emitting dual-context client-secret files and a length-correct cookie secret
-
-A single clan-vars generator `kanidm-oauth2-cognee` (in `modules/nixos/kanidm.nix`) SHALL emit the OAuth2 client secret as two ownership-correct files plus a length-correct cookie secret, every emitted file set `mode = "0400"` and `secret = true`.
-The client secret is consumed in two different security contexts — host-side kanidm-provision (owner `kanidm`) and a containerized oauth2-proxy that runs the proxy under its own runtime uid via a bind-mount — so the generator SHALL emit `files.secret` owned by `kanidm` (for kanidm-provision's `basicSecretFile`) and `files.secret-proxy` owned by the oauth2-proxy container's runtime uid (bind-mounted into the container as `clientSecretFile`), and the exact bind-mount path and container uid mapping SHALL be documented in the implementation.
-The cookie-secret file SHALL emit exactly 16, 24, or 32 bytes in an acceptable encoding, mirroring the buildbot cookie-secret generator's `openssl` recipe (`openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 32`), because oauth2-proxy rejects a cookie secret that is not one of those lengths.
-`restartUnits` SHALL name the real consuming units `kanidm.service` and the actual containerized oauth2-proxy host unit `container@oauth2-proxy-cognee.service` (not a generic "the oauth2-proxy unit"), because both consume the secret via a `LoadCredential`-style snapshot taken at unit start, so a regenerated secret stays stale until the named units restart.
-
-#### Scenario: one generator emits two ownership-correct client-secret files
-
-- **WHEN** the `kanidm-oauth2-cognee` generator is evaluated
-- **THEN** it emits `files.secret` owned by `kanidm` (feeding kanidm-provision's `basicSecretFile`) and `files.secret-proxy` owned by the oauth2-proxy container's runtime uid (bind-mounted as `clientSecretFile`), each `mode = "0400"` and `secret = true`, resolving the dual-context uid mismatch without weakening the mode
-
-#### Scenario: the cookie secret is a length oauth2-proxy accepts
-
-- **WHEN** the cookie-secret file is generated
-- **THEN** it is exactly 16, 24, or 32 bytes in an acceptable encoding (mirroring `openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 32`), so oauth2-proxy does not reject it
-
-#### Scenario: regenerated secrets restart the named consuming units
-
-- **WHEN** the `kanidm-oauth2-cognee` secret is regenerated
-- **THEN** the generator's `restartUnits` restarts `kanidm.service` and `container@oauth2-proxy-cognee.service` by name, so the new value is not left stale behind a unit-start credential snapshot
+- **WHEN** the cognee public UI's secret needs are evaluated
+- **THEN** cognee carries no client-secret or cookie-secret generator, no dual-context two-file split, and no container-uid mapping; the gateway's `DynamicUser` `oauth2-proxy-kanidm` unit consumes the gateway-owned secrets via `LoadCredential`, so the dual-context uid problem does not arise for cognee
 
 ### Requirement: A mechanical no-public-bind assertion
 
@@ -283,14 +279,14 @@ A clan deploy from a multi-parent `[wip]` builds the integrated tree of all acti
 ### Requirement: Rollback completeness
 
 Rollback SHALL cover, in coherent order, every piece of state the naive "remove the modules" rollback leaves behind.
-It SHALL remove the in-repo modules and the `flake.lib` additions, remove the `kb` Cloudflare DNS record via `just terraform*`, remove the `kanidm-oauth2-cognee` clan-vars generator AND explicitly delete its already-emitted secret files (generator removal does not delete emitted files), and revert the cognee-nix input bump in `flake.nix`/`flake.lock`.
-It SHALL explicitly delete the orphaned kanidm OAuth2 client left in kanidm's database, because `provision.autoRemove = false` does not delete it, so removing the declaration leaves the client registered.
+It SHALL remove the in-repo modules and the `flake.lib` additions, remove the `kb` Cloudflare DNS record via `just terraform*` (the central `auth` record is the `sso-gateway` change's), remove the `sso.services.cognee` registration so the shared gateway stops emitting the `kb` vhost and drops `cognee_access` from its derived kanidm union, and revert the cognee-nix input bump in `flake.nix`/`flake.lock`.
+The shared gateway's own residual state — its perimeter secret files and its orphaned `sso-gateway` kanidm client (which `provision.autoRemove = false` preserves) — is owned and rolled back by the `sso-gateway` change, NOT this one; cognee declares none of it.
 It SHALL restore mesh-client reachability coherently by re-adding the MCP client and removing `COGNEE_SERVICE_URL` in the same step, because the two are coupled: removing the service URL without re-adding the MCP client leaves the plugin with no path to cognee.
 
 #### Scenario: rollback removes all residual state
 
 - **WHEN** the change is rolled back
-- **THEN** the in-repo modules and `flake.lib` additions are removed, the `kb` DNS record is removed via `just terraform*`, the `kanidm-oauth2-cognee` generator and its already-emitted secret files are removed, the cognee-nix input bump is reverted, and the orphaned kanidm OAuth2 client (which `autoRemove = false` preserves) is explicitly deleted from kanidm
+- **THEN** the in-repo modules and `flake.lib` additions are removed, the `kb` DNS record is removed via `just terraform*`, the `sso.services.cognee` registration is removed (so the gateway stops emitting the `kb` vhost and drops `cognee_access` from its derived union), and the cognee-nix input bump is reverted, while the gateway's own secret files and orphaned `sso-gateway` client are the `sso-gateway` change's rollback concern
 
 #### Scenario: the coupled MCP-client-re-add and service-URL-removal restore reachability
 
