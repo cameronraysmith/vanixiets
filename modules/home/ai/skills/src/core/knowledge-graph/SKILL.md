@@ -12,6 +12,7 @@ You ingest chosen reference documents into named datasets, build a knowledge gra
 The 1.0 API verbs are named for memory (remember, recall, improve, forget), but here they index and query a reference corpus, not session state.
 Despite the names, remember ingests reference docs and builds the graph, recall queries it for grounding, improve enriches it, and forget deletes data.
 The discipline lives in what you ingest (curated references) and why you query (grounding), not in avoiding the verb names.
+The dataset is the boundary of connected reasoning: documents within one dataset link into a single connected graph, while separate datasets are (under the default access-control mode) isolated graphs that multi-dataset search only unions, so co-locate material you want reasoned over together — see [references/datasets.md](references/datasets.md).
 This engine has zero relation to AI-agent session memory: it does not store conversations, reasoning traces, or chat history.
 Throughout this skill and its references, retrieved context is evidence indexed from source documents, and load-bearing claims must be verified against the originals.
 

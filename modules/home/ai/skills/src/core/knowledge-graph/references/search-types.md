@@ -27,6 +27,8 @@ Verify load-bearing claims against the originals before they go into the manuscr
 For a typical writing-or-review loop over prose references, start with GRAPH_COMPLETION to orient and synthesize, then switch to CHUNKS to pull the exact passages behind any claim you intend to cite.
 SUMMARIES is the lightweight first pass when you do not yet know a collection well enough to ask a sharp question.
 
+Whatever mode you pick, passing multiple `-d` datasets applies that mode per dataset and unions the results; under access control there is no cross-dataset traversal, so keep material you need reasoned over together in one dataset (see references/datasets.md).
+
 ## explicit type for deterministic grounding
 
 `recall` auto-routes when `-t` is omitted, choosing a mode for you.

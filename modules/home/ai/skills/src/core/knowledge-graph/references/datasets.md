@@ -27,12 +27,41 @@ Always pass an explicit subject name rather than accepting the default.
 
 ## create vs reuse
 
-The heuristic mirrors the git-branch rule: when in doubt, create a new dataset.
-New datasets are cheap, and a clean boundary between two bodies of reference material is worth far more than the minor convenience of having fewer of them; a tangled graph spanning unrelated corpora is expensive to query well and awkward to prune.
+The default is co-location: when you want connected reasoning across documents, put them in the same dataset.
+The reason is mechanical rather than stylistic.
+Within a dataset, cognee builds one connected cross-document graph in which the same entity mentioned in different documents collapses into a single shared node accumulating edges from every document, and that cross-document linking is the core value over plain retrieval.
+Across datasets, that linkage is typically severed: under the default access-control mode each dataset lives in a physically separate graph, so no edge can span datasets and multi-dataset recall only unions per-dataset results rather than reasoning across them (see the next section for the full conditioning on mode).
+So a new dataset is not a free clean boundary; it is a hard wall that forecloses cross-corpus grounding.
 
-Create a new dataset when the material is a distinct body that you will query in isolation — a different subject, a different manuscript's sources, a corpus you want to scope recall to on its own.
-Reuse an existing dataset when you are extending the same coherent collection: add more reference documents to it and re-run the build or enrichment pass so the new material joins the existing graph.
-The test is whether a future query would want these documents considered together as one body of evidence; if yes, they belong in the same dataset, and if you are unsure, the bias toward a new dataset keeps boundaries clean.
+Reuse or co-locate when you want a future query to consider the documents together as one connected body of evidence: add the material to the same dataset and re-run the build or enrichment pass so it joins the existing graph.
+Create a separate dataset when you want genuine isolation rather than connection — independent retrieval scoping, distinct permissioning, or two genuinely unrelated bodies of material.
+Separating unrelated domains also avoids spurious entity collisions, since two corpora that happen to share an entity name would otherwise merge those mentions into one node (see the resolution caveat below).
+When you are unsure whether two bodies should reason together, prefer co-locating them: a shared graph still lets you scope retrieval to a slice with `node_set`, whereas separate datasets cannot be relinked after the fact.
+
+## sharing within and across datasets
+
+A dataset is the boundary of connected reasoning, so it pays to understand exactly what links and what does not.
+
+Within one dataset the documents form a single connected graph.
+Entity nodes are keyed by a deterministic identifier derived from the normalized entity name and written so that the same name resolves to one shared node, which means an entity mentioned across several co-located documents accumulates edges from all of them.
+Resolution is exact normalized-name matching by default — lowercasing, spaces to underscores, apostrophes stripped — with no fuzzy or semantic merge unless you configure an ontology.
+Consistent terminology across documents therefore improves linking directly: near-synonyms and inconsistent spellings stay as separate nodes, and an ontology strengthens linking by mapping variants onto shared concepts.
+See [architecture.md](architecture.md) for the underlying node-identity and merge mechanism.
+
+Across datasets, behavior depends on the access-control mode (`ENABLE_BACKEND_ACCESS_CONTROL`), which defaults on whenever the backend supports it, and both the default LanceDB vector store and Ladybug graph store qualify.
+With access control on, each owner-and-dataset pair gets a physically separate graph and vector database: no edge can span datasets, cross-dataset entity resolution is impossible, and a multi-dataset recall (passing `-d` more than once) runs each dataset in its own isolated store and concatenates the results with no cross-dataset traversal or re-ranking.
+With access control off, all datasets resolve to one shared global graph where entities and edges from different datasets merge and link freely, but the dataset label then stops scoping retrieval, because the retriever reads the whole shared graph regardless of which dataset you name.
+
+The practical upshot is that separate datasets queried together give you unioned per-corpus evidence, not connected cross-corpus reasoning; to get cross-domain graph linking you must co-locate the material in one dataset.
+When you want to subdivide within a co-located dataset without paying that wall, use `node_set`: it tags a slice of one dataset's graph and lets retrieval scope to that slice, so you keep the connected graph while still narrowing recall.
+`node_set` is a Python-API intra-dataset tag rather than a first-class CLI flag; see the "Dataset partitioning and entity resolution" section of [architecture.md](architecture.md) for how it scopes a slice of one dataset's graph.
+
+Worked example: the `engineering-references` and `modeling-references` corpora.
+Co-locate them in one dataset if you want connected reasoning that grounds engineering claims in modeling material and vice versa, accepting that the two domains share one graph and that same-named entities will merge.
+Keep them as two datasets if they are independent libraries you query on their own, accepting that any cross-querying is union-only and that an entity appearing in both will not be linked across them.
+
+The live SaaS platform's access-control mode is not determinable from our deployment configuration and is almost certainly on for tenant isolation, so do not assume cross-dataset linking before verifying it.
+A concrete check is to ingest a shared entity into two datasets and run a multi-dataset recall: if the result links the two mentions, access control is off and datasets share a graph; if it merely returns both in parallel, access control is on and the datasets are isolated.
 
 ## lifecycle
 

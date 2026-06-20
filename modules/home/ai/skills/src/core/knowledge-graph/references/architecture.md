@@ -57,6 +57,35 @@ The vector store holds embeddings for semantic retrieval; the default is LanceDB
 The relational store holds dataset and data metadata and pipeline state; the default is SQLite, with PostgreSQL as the alternative.
 For the wrapped SaaS surface these backends are managed server-side; the relevance here is conceptual, since a recall draws on both graph traversal and vector similarity over the same ingested corpus.
 
+## Dataset partitioning and entity resolution
+
+This subsection is the mechanism behind the dataset guidance in references/datasets.md: why one coherent corpus belongs in one dataset, and what a dataset boundary actually is at the engine level.
+
+Within a dataset, the graph connects across documents by construction.
+Each extracted entity's node id is a deterministic hash (a uuid5) of its normalized name, and the graph adapter upserts every node with a merge keyed on that id.
+So two documents that mention the same entity resolve to the same node id and collapse into a single node carrying both documents' edges, rather than two disconnected duplicates.
+The practical consequence is that ingesting a coherent body of material into one dataset yields one connected cross-document graph that a traversal can walk end to end — which is exactly why the grounding quality of GRAPH_COMPLETION depends on keeping related material together.
+
+The resolution is name-exact, not semantic.
+Normalization lowercases the name, turns spaces into underscores, and strips apostrophes, and that is the whole of the default matching: entities whose normalized names differ — synonyms, abbreviations, alternate spellings — stay separate nodes even when they denote the same thing.
+Grounding the extraction in an ontology is the supported way to merge across surface forms; absent one, expect exact-name collapse and nothing more, and phrase corpora accordingly.
+
+A dataset boundary is a runtime storage decision, not a property of the schema.
+It is governed by the access-control mode, which defaults on when the configured providers support it (the LanceDB and pgvector vector backends, the Ladybug, Kuzu, FalkorDB, and Postgres graph backends).
+With access control on, each (owner, dataset) pair gets its own physically separate graph and vector database, and no edge ever spans two datasets — the cross-document merge above operates strictly within one dataset's store.
+With access control off, every dataset shares one global graph and datasets degrade to labels on nodes within it.
+Either way the dataset is the unit a query is scoped to; the mode only decides whether that scoping is enforced by physical isolation or by filtering one shared graph.
+
+Retrievers are dataset-unaware.
+A retriever projects whatever single graph and vector database the async context has bound it to, with no dataset filter of its own — it sees one store and walks it.
+Multi-dataset query under access control therefore is not a single traversal over a merged graph: the search layer runs the chosen retriever once per dataset, each in its own isolated database context, and concatenates the per-dataset results into one union.
+There is no cross-dataset edge traversal and no cross-dataset re-ranking, and this holds uniformly across GRAPH_COMPLETION, RAG_COMPLETION, CHUNKS, and SUMMARIES.
+The design implication is direct: connected cross-corpus reasoning requires the material to live in one dataset, because spreading it across datasets gives you a union of separate answers rather than a graph that reasons over the whole.
+
+Within a single dataset, node_set is a finer-grained tag rather than a boundary.
+It marks a slice of one dataset's graph so a query can be scoped to that subgroup, and it is set through the Python API rather than the CLI verbs documented here.
+It is not a separate database and not a cross-dataset mechanism; it subdivides one dataset's graph, where dataset partitioning separates whole graphs.
+
 ## Grounding discipline
 
 The graph is an index over source documents, not an authority in its own right.

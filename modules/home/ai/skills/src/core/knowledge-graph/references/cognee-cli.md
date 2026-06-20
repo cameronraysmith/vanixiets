@@ -15,6 +15,7 @@ The `cognee` command on PATH is a thin shell wrapper around upstream `cognee-cli
 It bakes the hosted SaaS `--api-url` (the CLI has no environment fallback for it) and supplies `--api-key` by reading a sops-nix secret at runtime, so no plaintext key enters the nix store.
 Both baked flags precede `"$@"` because the CLI declares them on the top-level parser, ahead of the subcommand token.
 The wrapper also sets `LOG_LEVEL=ERROR` and `COGNEE_LOG_FILE=false` to keep output quiet, and forwards every subcommand with no allowlist.
+You can override the quiet default per-invocation by prefixing the command with a higher log level to surface more of cognee's logging when troubleshooting a particular task, for example `LOG_LEVEL=INFO cognee --help` (the prefix applies to any subcommand, such as `LOG_LEVEL=INFO cognee recall ...`).
 You invoke it bare: `cognee remember ...`, `cognee recall ...`, and so on.
 
 The raw, unwrapped `cognee-cli` is also on PATH as an escape hatch for ad-hoc work.
@@ -46,6 +47,10 @@ cognee recall "summarize the modeling conventions" -d modeling-references -t SUM
 ```
 
 Flags: `-t/--query-type` (default `GRAPH_COMPLETION`; see references/search-types.md for choices), `-d/--datasets` (multiple), `-k/--top-k` (default 10, max 100), `-f/--output-format {json,pretty,simple}` (default `pretty`), `--system-prompt`, and `-s/--session-id`.
+
+Passing several `-d` datasets unions their results: the query runs once per dataset and the answers are concatenated.
+Under access control (the likely default) the per-dataset graphs are physically separate, so there is no cross-dataset graph traversal — material that must be reasoned over as one connected corpus has to live in a single dataset, not be split across several.
+See references/datasets.md for the dataset-design consequence and references/architecture.md for the mechanism.
 
 Omit `-s` for reference grounding.
 Passing `-s <session-id>` routes the query against session conversation cache (the Q&A memory surface) rather than treating the corpus as a clean reference index, which is precisely the session-memory use this skill rejects.
