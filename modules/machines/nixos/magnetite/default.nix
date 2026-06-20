@@ -26,7 +26,6 @@ in
         inputs.niks3.nixosModules.niks3
         inputs.buildbot-nix.nixosModules.buildbot-master
         inputs.buildbot-nix.nixosModules.buildbot-worker
-        inputs.cognee-nix.nixosModules.cognee
       ]
       ++ (with flakeModules; [
         base
@@ -35,7 +34,6 @@ in
         ssh-known-hosts
         buildbot
         gitea
-        cognee
         sso-gateway
         gitea-actions-runner
         docker
@@ -88,7 +86,7 @@ in
       # API, gates on cognee_access membership, and applies the browser-vs-API
       # 401 split. The gateway owns the oauth2-proxy-kanidm unit, the sso-gateway
       # kanidm client, and the auth.scientistexperience.net subdomain.
-      sso.enable = true;
+      sso.enable = false;
 
       # Redirect the auth subdomain root (`auth.scientistexperience.net/`) to the
       # kanidm apps portal instead of the stock nginx welcome page. The shared
