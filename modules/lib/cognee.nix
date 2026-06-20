@@ -11,6 +11,7 @@ in
   flake.lib.cognee = {
     inherit apiPort;
     meshApiUrl = "http://[${magnetite.zt}]:${toString apiPort}";
+    saasApiUrl = "https://tenant-ba173c9d-cced-4154-af3c-5bae587d6034.aws.cognee.ai";
     publicFqdn = "kb.scientistexperience.net";
     userEmail = "cameron@scientistexperience.net";
   };
