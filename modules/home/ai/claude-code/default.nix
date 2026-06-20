@@ -132,7 +132,7 @@
                 "skill-creator@claude-plugins-official" = true;
                 "superpowers@claude-plugins-official" = false; # migrated to pinned superpowers-dev marketplace (obra/superpowers @ v5.1.0)
                 # cognee
-                "cognee-memory@cognee" = true;
+                "cognee-memory@cognee" = false;
                 # cloudflare
                 "cloudflare@cloudflare" = true;
                 # dagster
