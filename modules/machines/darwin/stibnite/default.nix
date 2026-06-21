@@ -300,6 +300,12 @@ in
         users.crs58 = {
           imports = flakeUsers.crs58.modules;
 
+          home.packages = [
+            pkgs.aeneas
+            (lib.hiPrio pkgs.charon)
+            pkgs.elan
+          ];
+
           # Incus k3s profiles (see ADR-004)
           # Provides instance profiles for k3s clusters in Colima
           incus.k3sProfiles = {

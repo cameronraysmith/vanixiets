@@ -173,7 +173,6 @@
           # dependently typed / proof assistants
           idris2
           idris2Packages.idris2Lsp
-          lean4
           rocq-core
         ]
         # backlog-md disabled: auto-patchelf fails on rosetta-builder (elftools issue)
