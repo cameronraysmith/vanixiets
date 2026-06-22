@@ -57,29 +57,15 @@
         '';
       };
 
-      clan.core.vars.generators.matrix-password-clawd = {
-        files."password" = {
-          neededFor = "services";
-          owner = config.users.users.cameron.name;
-        };
-        runtimeInputs = [
-          pkgs.coreutils
-          pkgs.xkcdpass
-        ];
-        script = ''
-          xkcdpass -n 4 -d - > "$out"/password
-        '';
-      };
-
       # First registered user gets server admin via grant_admin_to_first_user
       systemd.services.tuwunel-register-users = {
         description = "Provision Matrix users on tuwunel";
         after = [ "tuwunel.service" ];
         requires = [ "tuwunel.service" ];
-        before = [
-          "openclaw-gateway.service"
-          "hermes-agent.service"
-        ];
+        # hermes-agent declares no after=tuwunel.service of its own, so this
+        # before edge plus the hermes register_env_value line below are the sole
+        # guarantee @hermes is registered before hermes-agent.service starts.
+        before = [ "hermes-agent.service" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           Type = "oneshot";
@@ -96,7 +82,6 @@
             tokenFile = config.clan.core.vars.generators.tuwunel-registration-token.files."token".path;
             cameronPasswordFile =
               config.clan.core.vars.generators.matrix-password-cameron.files."password".path;
-            clawdPasswordFile = config.clan.core.vars.generators.matrix-password-clawd.files."password".path;
             # hermes-agent clan-service instance declares the matrix-password-hermes
             # generator inside perInstance.nixosModule. When the instance is wired
             # (nix-gyy.10), this generator is present and hermes is registered as
@@ -198,7 +183,6 @@
             }
 
             register "${adminUser}" "${cameronPasswordFile}"
-            register clawd "${clawdPasswordFile}"
             ${lib.optionalString (hermesPasswordFile != null) ''
               register_env_value hermes "${hermesPasswordFile}"
             ''}

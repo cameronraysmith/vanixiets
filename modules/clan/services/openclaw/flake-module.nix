@@ -16,6 +16,21 @@
           { lib, ... }:
           {
             options = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = true;
+                description = ''
+                  Deprecation toggle for the openclaw gateway footprint on a machine.
+
+                  Set to false to disable openclaw (gateway service, config etc
+                  file, interactive wrapper, all clawdbot-* and clawd-registration
+                  generators, the reverse-proxy vhost, and the .zt DNS records)
+                  while retaining the inventory instance for later removal. Defaults
+                  to true so an in-place rebuild does not silently disable a live
+                  deployment.
+                '';
+              };
+
               homeserver = lib.mkOption {
                 type = lib.types.str;
                 description = "Matrix homeserver URL";
@@ -45,6 +60,24 @@
                 ];
                 default = "loopback";
                 description = "Network bind mode for the gateway";
+              };
+
+              listenAddresses = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = ''
+                  Mesh addresses the reverse-proxy vhost binds and that the
+                  openclaw.zt DNS records resolve to. Passed explicitly by the
+                  inventory so the host's VPN listen addresses are an explicit
+                  coupling rather than a hidden host dependency. When empty, the
+                  relocated Caddy vhost and dnsmasq records are omitted.
+                '';
+              };
+
+              hostName = lib.mkOption {
+                type = lib.types.str;
+                default = "openclaw.zt";
+                description = "Reverse-proxy virtual host and DNS name for the gateway";
               };
 
               serviceUser = lib.mkOption {
@@ -89,6 +122,8 @@
                 botUserId = "@${settings.botUserName}:${settings.matrixServerName}";
                 userHome = config.users.users.${settings.serviceUser}.home;
                 workspaceDir = "${userHome}/${settings.botUserName}";
+
+                matrixHost = settings.homeserver;
 
                 baseConfig = {
                   gateway = {
@@ -203,7 +238,7 @@
                   description = "The openclaw gateway package with bundled plugins";
                 };
 
-                config = {
+                config = lib.mkIf settings.enable {
                   environment.etc."openclaw/openclaw.json".source = configFile;
                   environment.systemPackages = [ interactiveWrapper ];
 
@@ -292,6 +327,105 @@
                       # RestrictNamespaces = true;
                     };
                   };
+
+                  clan.core.vars.generators."matrix-password-clawd" = {
+                    files."password" = {
+                      neededFor = "services";
+                      owner = settings.serviceUser;
+                    };
+                    runtimeInputs = [
+                      pkgs.coreutils
+                      pkgs.xkcdpass
+                    ];
+                    script = ''
+                      xkcdpass -n 4 -d - > "$out"/password
+                    '';
+                  };
+
+                  systemd.services."openclaw-register-clawd" = {
+                    description = "Register the openclaw bot user on tuwunel";
+                    after = [ "tuwunel.service" ];
+                    requires = [ "tuwunel.service" ];
+                    before = [ "openclaw-gateway.service" ];
+                    wantedBy = [ "multi-user.target" ];
+                    serviceConfig = {
+                      Type = "oneshot";
+                      RemainAfterExit = true;
+                    };
+                    path = [
+                      pkgs.curl
+                      pkgs.jq
+                      pkgs.coreutils
+                    ];
+                    script =
+                      let
+                        tokenFile = config.clan.core.vars.generators."tuwunel-registration-token".files."token".path;
+                        clawdPasswordFile = config.clan.core.vars.generators."matrix-password-clawd".files."password".path;
+                      in
+                      ''
+                        set -euo pipefail
+
+                        TOKEN=$(cat ${tokenFile})
+
+                        for i in $(seq 1 30); do
+                          if curl -fsS ${matrixHost}/_matrix/client/versions >/dev/null 2>&1; then
+                            break
+                          fi
+                          if [ "$i" -eq 30 ]; then
+                            echo "tuwunel did not become ready within 30s" >&2
+                            exit 1
+                          fi
+                          sleep 1
+                        done
+
+                        body=$(jq -n \
+                          --arg u "${settings.botUserName}" \
+                          --arg p "$(cat ${clawdPasswordFile})" \
+                          --arg t "$TOKEN" \
+                          '{auth:{type:"m.login.registration_token",token:$t}, username:$u, password:$p, inhibit_login:true}')
+                        tmpfile=$(mktemp)
+                        http_code=$(curl -sS -o "$tmpfile" -w '%{http_code}' \
+                          -X POST ${matrixHost}/_matrix/client/v3/register \
+                          -H 'Content-Type: application/json' \
+                          -d "$body")
+                        case "$http_code" in
+                          200)
+                            echo "registered ${settings.botUserName}"
+                            ;;
+                          400)
+                            if jq -e '.errcode == "M_USER_IN_USE"' "$tmpfile" >/dev/null 2>&1; then
+                              echo "${settings.botUserName} already exists, skipping"
+                            else
+                              echo "registration failed for ${settings.botUserName}: HTTP 400: $(cat "$tmpfile")" >&2
+                              rm -f "$tmpfile"
+                              exit 1
+                            fi
+                            ;;
+                          *)
+                            echo "registration failed for ${settings.botUserName}: HTTP $http_code: $(cat "$tmpfile")" >&2
+                            rm -f "$tmpfile"
+                            exit 1
+                            ;;
+                        esac
+                        rm -f "$tmpfile"
+                      '';
+                  };
+
+                  services.caddy.virtualHosts.${settings.hostName} = lib.mkIf (settings.listenAddresses != [ ]) {
+                    listenAddresses = lib.mkDefault settings.listenAddresses;
+                    extraConfig = ''
+                      tls internal
+                      reverse_proxy [::1]:${toString settings.port} {
+                        header_up -X-Forwarded-For
+                        header_up -X-Forwarded-Proto
+                        header_up -X-Forwarded-Host
+                      }
+                    '';
+                  };
+
+                  services.dnsmasq.settings.address = lib.mkIf (settings.listenAddresses != [ ]) (
+                    map (addr: "/${settings.hostName}/${addr}") settings.listenAddresses
+                  );
                 };
               };
           };

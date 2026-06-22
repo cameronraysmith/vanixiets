@@ -69,17 +69,6 @@
                 }
               '';
           };
-          "openclaw.zt" = {
-            listenAddresses = meshListenAddrs;
-            extraConfig = ''
-              tls internal
-              reverse_proxy [::1]:18789 {
-                header_up -X-Forwarded-For
-                header_up -X-Forwarded-Proto
-                header_up -X-Forwarded-Host
-              }
-            '';
-          };
           "hermes.zt" = {
             listenAddresses = meshListenAddrs;
             # hermes-agent dashboard binds 127.0.0.1 (see clan-service module's
