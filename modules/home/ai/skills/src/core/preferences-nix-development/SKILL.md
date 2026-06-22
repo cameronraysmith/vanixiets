@@ -20,6 +20,22 @@ description: >
 - Use nixos-unified for system configurations and autoWire for module discovery
   - system: modules/{home,darwin,nixos,flake-parts}/
 
+## Dendritic module composition (import-tree)
+
+Structure flakes with the dendritic pattern: a thin `flake.nix` whose `outputs` delegate to `flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules)`, so every `.nix` file under the import-tree root is auto-discovered as a flake-parts module and merged into one module-system fixpoint.
+This is the composition model used across vanixiets, ironstar, and python-nix-template.
+
+Treat the import-tree root as a modules-only zone.
+import-tree imports every `*.nix` under the root (excluding any path containing `/_`) and feeds each, content-blind and unconditional, to the module system, so a file that is not a valid flake-parts module crashes evaluation.
+Keep non-modules outside the root: plain functions and data in `lib/`, package derivations in `pkgs/by-name/<name>/package.nix`, parked code as `*.nix.txt` or under a `/_`-prefixed path; pull them back in from a module inside the root (`import ../lib/foo.nix`, `pkgs.callPackage`, `pkgsDirectory`).
+
+Distinguish discovery from merge.
+Merge is location-independent: any module the fixpoint imports merges identically regardless of where it lives on disk.
+Discovery is location-bound: `import-tree ./modules` only finds files under that root, so a `flake-module.nix` elsewhere is wired only if you add its directory as another root (`import-tree [ ./modules ./other ]`), filter by filename (`import-tree.filter (lib.hasSuffix "/flake-module.nix") [ ... ]`), or import it explicitly from a discovered module.
+
+Litmus test for a file under the root: it must import to an attrset module or a function module; every config value it defines must target a declared option (or a freeform type such as `flake.*`); and a function form must end in `...` with formals drawn only from flake-level args (`pkgs`/`stdenv` are perSystem-only).
+See `references/dendritic-module-composition.md` for the exact module-validity rules for both forms, the import-tree discovery API, and the common crash causes with fixes.
+
 ## Best practices
 - Follow nixpkgs naming conventions and style
 - Use `inputs.*.follows = "nixpkgs"` to minimize flake input duplication
