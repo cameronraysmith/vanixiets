@@ -44,10 +44,11 @@ The forward direction is a human writing Rust that realizes a Lean 4 specificati
 The realized commands at this step are entirely Lean-side: write the spec, then build it.
 
 ```bash
-cd lean-spec && lake build
+cd lean-spec && lake build <TARGET>
 ```
 
-`lake build` elaborates and type-checks the hand-authored Lean specification; for a `lean_lib` default target this replays any proofs the spec already asserts.
+`lake build <TARGET>` elaborates and type-checks the hand-authored Lean specification, naming the spec's `lean_lib` target rather than running a bare `lake build` that would build every target in a multi-target tree; for that target this replays any proofs the spec already asserts.
+First-time setup of the Lean substrate — installing `elan` and pinning the toolchain — precedes this build; see `references/toolchain-setup.md`.
 Optionally a Lean metaprogram can emit an artifact at this step via `lake exe <name>`, but no such metaprogram generates Rust.
 
 The intent of the loop is one CLI call per step, and that framing applies to Steps 2, 3, and 4.
@@ -69,8 +70,11 @@ charon cargo --preset=aeneas --dest-file my_crate.llbc
 For a single Rust file without cargo:
 
 ```bash
-charon rustc --preset=aeneas --dest-file my_crate.llbc -- my_crate.rs --crate-name=my_crate
+charon rustc --preset=aeneas --dest-file my_crate.llbc -- my_crate.rs --crate-name=my_crate --crate-type=rlib --edition=2021
 ```
+
+For the single-file form, `--crate-type=rlib` is load-bearing: a bare `.rs` is a binary crate, so without it rustc fails with E0601 ('no main') before Charon runs, and `--edition=2021` supplies the edition the manifest would otherwise set; the `charon cargo` form needs neither because the manifest provides them.
+`--allow=unused --allow=non_snake_case` are commonly appended to quiet lints on lowered code.
 
 With no `--dest-file`, the default destination is `<crate_name>.llbc` in the current directory; the LLBC extension is `.llbc` for structured LLBC and `.ullbc` for the unstructured variant selected by `--ullbc`.
 The default output is structured LLBC, which is what Aeneas wants.
@@ -107,10 +111,11 @@ The check step establishes that the Aeneas-lifted model matches the hand-authore
 Operationally it is a Lean build of the project that imports the Aeneas backend library, the lifted model, and the bridging theorems.
 
 ```bash
-cd lean-proj && lake build
+cd lean-proj && lake build <TARGET>
 ```
 
-Building the `lean_lib` default targets elaborates and type-checks every theorem, which replays all the proofs.
+Building the project's `lean_lib` target elaborates and type-checks every theorem, which replays all the proofs; scope the build to that target rather than running a bare `lake build`, which would build every library in a multi-target tree.
+This step presupposes the one-time setup — pinning the toolchain to the Aeneas backend's string, requiring the Aeneas library, running `lake update`, and fetching the mathlib cache with `lake exe cache get` — described in `references/toolchain-setup.md`; the steady-state check is still one CLI call.
 The lifted model is established as a refinement of the spec, or as functionally equivalent to it, by Lean theorems written in the weakest-precondition / Hoare-triple style and discharged with the tactics Aeneas ships.
 
 Two scope rules for this step are non-negotiable.

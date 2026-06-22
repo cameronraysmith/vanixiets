@@ -191,6 +191,9 @@ The practical checklist for a runnable spec:
 
 Plausible is the QuickCheck-style property-testing engine for Lean 4, the `leanprover-community/plausible` package and successor to mathlib3's `SlimCheck`.
 It is neither in lean4 core nor in batteries; mathlib4 pins it as a top-level dependency, and nixpkgs packages it independently, so it is a separate `require` in the spec's lakefile.
+Two lakefile facts attach here.
+The spec's lakefile must pin its `lean-toolchain` to the exact string in the Aeneas backend's `backends/lean/lean-toolchain`, because the check leg builds the spec and the lifted model under one toolchain; the full one-time setup — the toolchain pin, dependency resolution, and the mathlib object cache — lives in `references/toolchain-setup.md`.
+The Aeneas Lean library is itself a `require` only in the round-trip and differential-testing context, where you compare the spec against the lifted model inside Lean; a standalone Lean spec needs only its own dependencies (mathlib and Plausible) and not the Aeneas library, and that standalone case — a Lean spec kept beside a non-Rust implementation such as Python — is owned by `preferences-theoretical-foundations`.
 Property testing is the fast-falsification half of the development loop: state the spec-versus-model correspondence as a `∀`-quantified decidable proposition, throw random inputs at it to find a counter-example quickly, then prove it (or `decide` / `native_decide` the finite instances) for the final check.
 
 The package is the standalone Lake package `plausible`, imported with `import Plausible`; mathlib4 re-exposes it transitively through `Mathlib.Tactic.Common` (`~/projects/functional-programming-workspace/plausible`, `Mathlib/Tactic/Common.lean:12`).

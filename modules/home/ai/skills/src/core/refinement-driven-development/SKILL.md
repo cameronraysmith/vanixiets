@@ -46,6 +46,8 @@ Reach for it, too, when you want to generate and diff type-system diagrams of th
 Do not reach for it when the domain need not be lifted or verified at all, where the ceremony of the round trip buys nothing.
 Do not reach for it when the goal is simply to transpile Rust to C: that is Eurydice's job, not this skill's, and the lift-and-check round trip would be wasted effort.
 
+Before the first refine → lift → check cycle on a new machine, confirm each tool is present and version-matched and stand up the Lean backend the check leg needs; `references/toolchain-setup.md` covers that one-time setup and a tier-0 smoke test.
+
 ## Mechanical proof is the ideal, not a requirement
 
 The precise ideal is an on-the-nose mechanical proof that the lifted model refines or equals the spec, but its absence is not a failure of the method.
@@ -62,6 +64,7 @@ This honesty principle is developed in `references/mathematics.md` (the adjuncti
 | [`references/lean-spec-patterns.md`](references/lean-spec-patterns.md) | Dependently-typed domain modeling in Lean 4, the executable/decidable fragment, and Plausible |
 | [`references/refine-and-lower.md`](references/refine-and-lower.md) | Forward Lean → Rust, the Aeneas/Charon-safe Rust subset, and ownership-intent annotations |
 | [`references/lift-charon-aeneas.md`](references/lift-charon-aeneas.md) | Charon then Aeneas, symbolic execution, backward functions, and Nix-flake invocation |
+| [`references/toolchain-setup.md`](references/toolchain-setup.md) | Confirming the toolchain works before starting, the tier-0 translation-validation smoke test, and the Lean backend (lake/elan/cache) setup |
 | [`references/check-translation-validation.md`](references/check-translation-validation.md) | The three check tiers, refinement vs equivalence, and the ideal-not-requirement stance |
 | [`references/diagramming.md`](references/diagramming.md) | The type-graph.json schema spec, the three emitters as specification, Mermaid v1, SVG fallback, and future work |
 | [`references/prior-art-idris2.md`](references/prior-art-idris2.md) | Lessons mined from ironstar and the later Idris2 → Lean 4 test exercise |
@@ -69,7 +72,7 @@ This honesty principle is developed in `references/mathematics.md` (the adjuncti
 ## See also
 
 - `preferences-domain-modeling` — DDD aggregate design, smart constructors, and making illegal states unrepresentable, the source discipline for the Lean spec leg.
-- `preferences-theoretical-foundations` — category and type theory, the home of the adjunction framing this skill leans on.
+- `preferences-theoretical-foundations` — category and type theory and the home of the adjunction framing this skill leans on; it owns the general "keep a type-checkable Lean spec beside the implementation" stance, including the Lean-spec-beside-a-non-Rust-implementation (for example Python) case, while this skill owns the verified Lean-to-Rust round trip the two share.
 - `preferences-algebraic-laws` — functor/monad laws and property-based testing, the backbone of the differential-testing check tier.
 - `preferences-validation-assurance` — severity, evidence quality, and the confidence promotion chain that calibrates which check tier suffices.
 - `preferences-architecture-diagramming` — format selection and diagram compendium conventions that the type-system diagramming leg specializes.

@@ -37,10 +37,13 @@ The structural difference shows up cleanly in the OCaml AST: a ULLBC body is a v
 Charon is a clap application with subcommands.
 The two that matter for the lift are `charon cargo` (run on a cargo project, much as you would run `cargo build`) and `charon rustc` (run on a single Rust file, with trailing rustc options after `--`).
 Run it from *within* the crate of interest.
+Charon's own version is queried with the `version` subcommand (`charon version`), and `charon toolchain-version` prints the pinned rustc toolchain it embeds; the GNU-style `charon --version` is not accepted and errors.
 
 The destination is controlled by `--dest-file <path>`, which overrides the default `<crate_name>.llbc` placement and ignores the deprecated `--dest` directory flag.
 Do not write `-o my_output.llbc`; that form does not exist on this CLI.
 The load-bearing flag for this pipeline is `--preset=aeneas`: it enables the option bundle Aeneas expects (associated-type lifting, treating `Box` as builtin, reconstructing fallible operations and asserts, hiding marker traits and the allocator, and related micro-passes), and Aeneas-compatible LLBC is not produced without it.
+For the single-file `charon rustc` form a second flag is equally load-bearing: `--crate-type=rlib`.
+A bare `.rs` file is a binary crate, so without it rustc aborts before Charon runs with E0601 ('no main'); the `charon cargo` form never needs it because the manifest supplies the crate type.
 
 The canonical crate invocation, taken from the Aeneas test runner and the tutorial driver, is:
 
@@ -49,7 +52,7 @@ cd rust
 charon cargo --preset=aeneas --dest-file my_crate.llbc
 ```
 
-The single-file form, from the Aeneas test runner, threads crate metadata through trailing rustc arguments:
+The single-file form, from the Aeneas test runner, threads the load-bearing `--crate-type=rlib` and the edition through trailing rustc arguments:
 
 ```bash
 charon rustc --dest-file my_crate.llbc --preset=aeneas \
@@ -59,6 +62,9 @@ charon rustc --dest-file my_crate.llbc --preset=aeneas \
 The output extension follows the format and structure: LLBC JSON is `.llbc`, ULLBC JSON is `.ullbc`, and the compact postcard binary variants append `.postcard`.
 For debugging without writing a file, `charon rustc --no-serialize --print-llbc -- foo.rs` pretty-prints the structured IR; this exact form is the flake's own end-to-end smoke check.
 `charon pretty-print <file> --format json|postcard` re-renders an already-serialized LLBC file.
+
+One determinism note matters when reproducing a committed golden: Charon records the source file's path and line numbers, and Aeneas threads them into the generated Lean `Source:` comment, so the relative cwd from which you invoke Charon controls part of the output byte-for-byte.
+Run Charon from the crate or clone root with a cwd-relative source path when you intend to diff against a committed golden; an absolute or differently-rooted invocation perturbs only that `Source:` comment, which `references/toolchain-setup.md` treats as a benign diff in the tier-0 smoke test.
 
 Internally `charon cargo` uses the rustc-wrapper trick: it sets `RUSTC_WRAPPER` to point at the separate `charon-driver` binary so cargo invokes the driver instead of plain rustc per crate, sets `RUSTC_WORKSPACE_WRAPPER` to a random fingerprint to defeat cargo's caching, and passes its own options through a `CHARON_ARGS` environment variable.
 The user-facing binaries are therefore `charon` and `charon-driver`, both of which the nix builds install.
@@ -82,6 +88,8 @@ Passing `--no-dedup-serialized-ast` emits everything inline for human inspection
 charon-ml is the OCaml library that deserializes and prints this AST, living under `charon-ml/` in the Charon repo.
 Its consumer-facing entry point is `OfJson.crate_of_json_file : string -> (crate, string) result`, which sniffs the format, version-checks, and returns a `crate` record whose five decl maps are id-keyed OCaml `Map.t` values.
 The version check is an *equality* check: charon-ml carries a single `supported_charon_version` string and rejects any file whose version differs.
+The same exact-string gate is not unique to charon-ml: Aeneas itself checks the `charon_version` recorded in the LLBC against the Charon it expects, and on pin skew aborts the lift with 'Incompatible version of charon' rather than producing Lean.
+This is a likely first-encounter operational failure whenever Charon and Aeneas are pinned independently; the conservative default of depending only on Aeneas and relying on its transitively pinned, version-matched Charon avoids it.
 A large part of charon-ml is auto-generated from the Rust AST by a `generate-ml` binary, and a flake check enforces that the committed generated OCaml matches what regeneration produces, so the OCaml deserializers are guaranteed faithful to the Rust types.
 A typical consumer iterates `crate.type_decls`, matches each declaration's `kind`, and resolves an ADT reference by looking the target `type_decl_id` back up in the same map.
 
@@ -111,6 +119,7 @@ aeneas -backend lean my_crate.llbc -dest proofs -subdir /MyCrate/Code -split-fil
 With `-split-files` the generated tree is `Types.lean`, `Funs.lean`, and per-category `*External_Template.lean` files for declarations whose models must be supplied externally; the `*External_Template.lean` files are copied to `*External.lean` and hand-maintained, never overwritten.
 Lean-only flags include `-lean-default-lakefile` to generate a default `lakefile.lean` and `-emit-json` to emit a `translation.json` alongside the Lean files.
 The backend selector accepts `fstar`, `coq`, `rocq`, `lean`, and `hol4` (`coq` and `rocq` are aliases for the same backend); when no backend is given Aeneas defaults internally to Lean for its borrow-check-only mode.
+One general flag is worth singling out operationally: `-checks` turns on Aeneas' internal consistency checks at roughly a 100x slowdown, so omit it unless you need exact parity with the upstream test runner — and if a lift is inexplicably slow, check whether `-checks` is set.
 
 ### Functional translation by symbolic execution
 
@@ -210,6 +219,10 @@ This skill uses the Lean backend throughout, but the same LLBC input and the sam
 
 ## Nix-flake invocation
 
+The clone-independent way to run either tool is the upstream flake's ready-to-run entry points: `nix run github:AeneasVerif/aeneas#charon -L` runs Charon, and `nix run github:AeneasVerif/aeneas -L -- -backend <backend> your.llbc` runs Aeneas over an existing LLBC file.
+These need no local checkout and resolve a version-matched pair on the spot, which makes them the default for a quick lift; the devShell and import wiring below are the alternative when you want a pinned, version-matched local environment to develop against.
+The check-tier setup that pairs with either path is in `references/toolchain-setup.md`.
+
 Charon and Aeneas each expose a plain `flake-utils.lib.eachDefaultSystem` flake (neither is flake-parts).
 
 Charon's `packages.<system>` set offers `charon` (the wrapped default, installing both `bin/charon` and `bin/charon-driver`), `charon-unwrapped`, `charon-portable`, the `charon-ml` OCaml library, and the pinned `rustToolchain` as a re-exported package.
@@ -217,12 +230,14 @@ There is no `apps` output; instead Charon exports a bare top-level function `ext
 
 Aeneas's `packages.<system>` set offers `aeneas` (the default OCaml dune build), `aeneas-static`, `aeneas-release` / `aeneas-static-release` bundle trees, and re-exported `charon` and `charon-ml`.
 A useful property: Aeneas's `postInstall` symlinks Charon into its own `bin/`, so `${aeneas}/bin/` carries *both* `aeneas` and `charon` — a single package drives both lift sub-steps.
-Aeneas's devShell already provisions `elan`, the Lean toolchain manager that resolves a project's `lean-toolchain` to drive `lake`/`lean` for the spec and check steps.
+Aeneas's devShell already provisions `elan`, the Lean toolchain manager, and elan is required rather than merely convenient: the Lean backend pins a release-candidate toolchain that whatever default Lean is on PATH will not satisfy, and elan reads the nearest `lean-toolchain` file to auto-install and select that exact toolchain per-directory, which is what drives `lake`/`lean` for the spec and check steps.
+The full check-tier setup that pairs with the lift is in `references/toolchain-setup.md`.
 
 The pin-parity discipline is load-bearing.
 Aeneas pins an *exact* Charon commit in a `charon-pin` file and enforces, via a `check-charon-pin` flake check, that the lockfile's Charon revision equals it.
 The Lean backend pins `leanprover/lean4:v4.30.0-rc2` with a matching mathlib.
 The implication for any consumer that adds both Charon and Aeneas as separate inputs is that it must keep them at the matched revision (typically via `aeneas.inputs.charon.follows = "charon"`), or the parity invariant breaks.
+When they drift, the `charon_version` equality gate described above fires and Aeneas aborts the lift with 'Incompatible version of charon'.
 The conservative default is to add *only* Aeneas as an input and rely on its transitively pinned, version-matched Charon.
 
 The intended vanixiets import follows the established repository pattern and is not yet wired; this is future work, documented as intent.
