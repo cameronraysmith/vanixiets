@@ -6,10 +6,11 @@
     };
     roles.default.machines."cinnabar" = {
       settings = {
-        # Deprecation toggle: flip to false to disable openclaw on cinnabar
-        # (gateway, config, generators, vhost, and DNS) while retaining this
-        # inventory instance for a later removal phase.
-        enable = true;
+        # Deprecation toggle: openclaw is DISABLED on cinnabar — the gateway,
+        # config, generators, vhost, and DNS produce zero footprint. Flip back
+        # to true to re-enable; the inventory instance is retained for a later
+        # removal phase.
+        enable = false;
         homeserver = "http://localhost:8008";
         botUserName = "clawd";
         matrixServerName = "matrix.zt";
