@@ -93,6 +93,8 @@
                 header_up -X-Forwarded-Proto
                 header_up -X-Forwarded-Host
                 header_up Host 127.0.0.1:18790
+                # Dashboard WS guard (web_server.py) checks Origin against the loopback bind; rewrite it so /api/events + /api/pty WS upgrades from hermes.zt aren't refused as origin_mismatch.
+                header_up Origin http://127.0.0.1:18790
               }
             '';
           };
