@@ -740,7 +740,7 @@ type ContextMapping f g = forall a. f a -> g a
 
 This ensures the mapping behaves uniformly across all types in the source context.
 
-See `theoretical-foundations.md` for the formal definitions of functors and natural transformations.
+See preferences-theoretical-foundations, its internal-language reference, for the formal definitions of functors and natural transformations.
 See `domain-modeling.md#module-algebra-for-domain-services` for how modules implement these categorical structures.
 
 ## See also

@@ -4,7 +4,7 @@ This section establishes a capability-secure mental model for concurrent Rust pr
 The goal is not merely to avoid data races, but to reason about concurrency in terms of what capabilities you *deny* to the rest of the system, aligning Rust's ownership model with the theoretical foundations of capability-secure concurrency.
 
 For pattern descriptions, see domain-modeling.md.
-For theoretical foundations, see theoretical-foundations.md.
+For theoretical foundations, see preferences-theoretical-foundations.
 
 ## Scope: Local concurrency
 

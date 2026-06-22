@@ -243,7 +243,7 @@ When in doubt, follow this decision tree:
 | Combine independent validations | Applicative | `apply`, `mapN` | Parallel execution, error accumulation |
 | Chain dependent operations | Monad | `bind`, `and_then` | Sequential dependency, fail-fast |
 
-See `~/.claude/skills/preferences-theoretical-foundations/SKILL.md#functor-applicative-monad-hierarchy` for the mathematical laws each abstraction must satisfy.
+See preferences-algebraic-laws for the mathematical laws each abstraction must satisfy, and preferences-theoretical-foundations for the categorical setting they live in.
 
 ## bind: Monadic composition
 
@@ -851,7 +851,7 @@ This allows async operations to complete before error handling, matching the nat
 
 ### Combining multiple effects with monad transformers
 
-When stacking more than two effects, libraries provide transformer types:
+When stacking more than two effects, libraries provide transformer types; a transformer stack is one interpreter of a capability interface, not the interface itself (see preferences-theoretical-foundations):
 
 ```haskell
 -- Haskell: ReaderT + ExceptT + IO
@@ -904,7 +904,7 @@ async function processOrder(config: Config): Promise<Result<Order, AppError>> {
 4. **Use language idioms**: async/await with Result is more idiomatic than custom transformers in most languages
 5. **Consider effect libraries**: fp-ts (TypeScript), cats-effect (Scala), polysemy (Haskell) when transformer stacks become complex
 
-See `~/.claude/skills/preferences-theoretical-foundations/SKILL.md#monad-transformers` for the mathematical foundation and `~/.claude/skills/preferences-theoretical-foundations/SKILL.md#indexed-monad-transformer-stacks-in-practice` for practical considerations when stacking effects.
+See preferences-theoretical-foundations, and in particular its effects-and-handlers material, for why a capability interface discharged by handlers, not a transformer tower, is the primitive: a transformer stack is one leaky interpreter of that interface, so keep any stack shallow and hidden behind a type alias rather than treating it as the integration ideal.
 
 ## The two-track model
 
@@ -1400,4 +1400,7 @@ See `~/.claude/skills/preferences-schema-versioning/SKILL.md` for:
 See `~/.claude/skills/preferences-data-modeling/SKILL.md` for:
 - How ROP fits into data pipeline architecture
 - Effect isolation at boundaries
-- Monad transformer stack vision
+- Capability-interface discharge for effect composition at boundaries
+
+The transformer-stack technique above combines Result with async, reader, and state effects, and is correct as language-specific engineering; a stack is one interpreter of a capability interface, not the interface itself and not the integration ideal.
+See preferences-theoretical-foundations, and in particular its effects-and-handlers material, for why a capability interface discharged by handlers, not a transformer tower, is the primitive, and for the conjectural internal language the design converges on.

@@ -7,14 +7,14 @@ description: TypeScript and Node.js development conventions including strict typ
 
 ## Architectural patterns alignment
 
-See @~/.claude/skills/preferences-architectural-patterns/SKILL.md for overarching principles.
+See preferences-architectural-patterns for overarching principles.
 
-For React UI development with TanStack ecosystem, see @~/.claude/skills/preferences-react-tanstack-ui-development/SKILL.md.
+For React UI development with TanStack ecosystem, see preferences-react-tanstack-ui-development.
 
 TypeScript with Effect-TS provides excellent support for functional programming and effect management in the JavaScript ecosystem.
 
 ### Recommended libraries for functional programming
-- **Effect system**: Effect-TS for composable, type-safe effects and monad transformers
+- **Effect system**: Effect-TS for composable, type-safe effects via capability interfaces and handlers (its `Layer`/`Context` is exactly handler-style discharge)
 - **Error handling**: Use Effect-TS's `Either`, `Option`, and `Effect` types instead of try/catch
 - **Immutability**: Effect-TS's built-in immutable data structures or `immer` for updates
 - **Validation**: `@effect/schema` for runtime validation and type derivation
@@ -26,11 +26,12 @@ TypeScript with Effect-TS provides excellent support for functional programming 
 - Compose effects with `flatMap`/`map`/`zip` instead of async/await when using Effect-TS
 - Thread dependencies through `Context` (Reader pattern) instead of global variables
 - Use `Either<E, A>` and `Option<A>` for error handling instead of null/undefined/exceptions
-- Layer your application as effect transformers (similar to monad transformer stacks)
+- Structure your application around capability interfaces discharged by handlers (Effect-TS `Layer`s); a transformer stack is one interpreter of that structure, not the structure itself
 
-For detailed patterns on Result types, error composition, and ADT modeling in TypeScript:
-- **~/.claude/skills/preferences-railway-oriented-programming/SKILL.md** - Result type implementation, bind/apply, effect composition
-- **~/.claude/skills/preferences-algebraic-data-types/SKILL.md** - Discriminated unions, branded types (newtypes), domain modeling
+An Effect service tag plus its `Layer` is the capability interface and its handler: the program names the capability through `Context`, and the meaning is supplied separately by whichever `Layer` discharges it.
+See preferences-theoretical-foundations (and its references/effects-handlers.md) for why a capability interface, not a transformer tower, is the primitive.
+
+For detailed patterns on Result types, error composition, and ADT modeling in TypeScript, see preferences-railway-oriented-programming (Result type implementation, bind/apply, effect composition) and preferences-algebraic-data-types (discriminated unions, branded types, domain modeling).
 
 ### TypeScript-specific practices
 - Enable strict mode in tsconfig.json (`strict: true`)
@@ -41,8 +42,8 @@ For detailed patterns on Result types, error composition, and ADT modeling in Ty
 ## Functional domain modeling in TypeScript
 
 This section demonstrates how to implement functional domain modeling patterns in TypeScript with Effect-TS.
-For pattern descriptions, see domain-modeling.md.
-For theoretical foundations, see theoretical-foundations.md.
+For pattern descriptions, see preferences-domain-modeling.
+For why a capability interface discharged by handlers, not a transformer tower, is the primitive, see preferences-theoretical-foundations (and its references/effects-handlers.md).
 
 ### Pattern 1: Smart constructors with branded types
 

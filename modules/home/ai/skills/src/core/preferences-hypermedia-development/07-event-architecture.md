@@ -1,7 +1,7 @@
 # Event architecture for hypermedia applications
 
 Event sourcing provides a natural architectural foundation for server-driven hypermedia applications, where the server's event log serves as the single source of truth and SSE streams act as projection channels delivering targeted DOM updates to clients.
-This document bridges the theoretical foundations of event sourcing (see `theoretical-foundations.md` section "Event sourcing as algebraic duality") with the practical patterns of SSE-based hypermedia systems.
+This document bridges the theoretical foundations of event sourcing (see preferences-theoretical-foundations, its decide-evolve-lens reference) with the practical patterns of SSE-based hypermedia systems.
 
 The Tao of Datastar emphasizes that the server is the source of truth, and event sourcing makes this principle explicit: the event log is the canonical state, and all views—including the DOM—are derived projections.
 SSE streams become functors mapping domain events to presentation updates (PatchElements and PatchSignals), maintaining causal consistency between server state and browser representation.
@@ -667,7 +667,7 @@ If you need to audit what users saw, store snapshots separately (not in the even
 ## Related documents
 
 **Theoretical foundations**:
-- `theoretical-foundations.md` - section "Event sourcing as algebraic duality" for mathematical grounding of events as free monoids and projections as catamorphisms
+- preferences-theoretical-foundations - its decide-evolve-lens reference for mathematical grounding of events as a free monoid and read-model construction as catamorphism, and its observability-as-theorem reference for projections as monoid homomorphisms
 
 **Distributed systems patterns**:
 - `distributed-systems.md` - event log authority, causal consistency, ordering guarantees in distributed event-sourced systems

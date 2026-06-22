@@ -376,7 +376,7 @@ This completes the arithmetic correspondence:
 - `×` = Product types
 - `^` = Function types
 
-See `theoretical-foundations.md#algebraic-data-types-as-initial-algebras` for the categorical perspective.
+See preferences-theoretical-foundations references/internal-language.md#universal-properties-the-initialfinal-duality for the categorical perspective on these constructions as universal properties.
 
 ### Recursive types and initial algebras
 
@@ -391,7 +391,7 @@ data ListF a r = Nil | Cons a r
 data NatF r = Zero | Succ r
 ```
 
-For the full categorical treatment of ADTs as initial algebras, including catamorphisms and anamorphisms, see `theoretical-foundations.md#f-algebras-and-catamorphisms`.
+For the full categorical treatment of ADTs as initial algebras, including catamorphisms, see preferences-theoretical-foundations references/decide-evolve-lens.md#f-algebras-and-catamorphisms-briefly, where `evolve` is read as an F-algebra and state reconstruction as the catamorphism that folds it.
 
 ## Newtype pattern
 
@@ -1135,7 +1135,7 @@ The `decide` function validates commands against current state and produces even
 The `evolve` function applies events to state, producing new state.
 Together they form an algebra where commands flow through validation to produce facts, and facts accumulate into state.
 
-See `event-sourcing.md#the-decider-pattern` for operational patterns and `theoretical-foundations.md#coalgebra-algebra-duality` for the categorical foundation.
+See `event-sourcing.md#the-decider-pattern` for operational patterns and preferences-theoretical-foundations references/decide-evolve-lens.md#the-algebra-lives-in-evolve-not-decide for the categorical foundation, where the algebra structure is located in `evolve` and `decide` is the readout leg.
 
 ## Integration with schema versioning
 

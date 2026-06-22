@@ -30,7 +30,7 @@ Signals can be nested using dot-notation: `$user.profile.name` creates a structu
 
 **Theoretical foundation**: Signals exhibit comonadic structure—they hold current values (extract) and support derived computations (extend).
 This is the categorical dual of the monadic event channel delivering updates from the server.
-See `theoretical-foundations.md` section "Reactive systems and comonads" for the formal model of signals as comonads and signal graphs as free categories.
+See preferences-theoretical-foundations, its decide-evolve-lens reference, for the formal model of signals as comonads and signal graphs.
 
 Local signals use underscore prefix `$_local` and are never sent to backend.
 Use local signals for pure UI state like dropdown open/closed, current tab selection, or animation states.

@@ -185,7 +185,7 @@ Read models and materialized views in analytics architectures form a Galois conn
 The projection from events to views is information-lossy but composable; views are quotients of the source data under an equivalence relation.
 Query caching is memoization over the query profunctor, with cache invalidation governed by naturality conditions.
 DuckLake's time-travel capability implements temporal versioning as indexed types, connecting to the bitemporal semantics described in event sourcing.
-See `theoretical-foundations.md` section "Materialized views as Galois connections" for the formal algebraic model.
+See preferences-theoretical-foundations references/abstraction-as-adjunction.md for the order-theoretic model in which a best abstraction, when one exists, is the left adjoint of a Galois connection.
 
 ### Metadata management
 
@@ -347,6 +347,7 @@ When modeling data, prioritize:
 8. Separation of concerns — logical models separate from physical storage
 9. Arrow interchange — zero-copy columnar format as the universal data handoff between languages and processes
 
-Remember that in the ideal case, data pipelines should behave as a monad transformer stack where side effects are explicit in signatures and isolated at boundaries to preserve compositionality.
+Remember that data pipelines should make side effects explicit in their signatures and isolate them at boundaries to preserve compositionality, discharging those effects through capability interfaces and handlers rather than committing to any single carrier such as a monad transformer stack.
+See preferences-theoretical-foundations (and its references/effects-handlers.md) for why a capability interface, not a transformer tower, is the primitive.
 
 For concrete implementation patterns see ~/.claude/skills/preferences-railway-oriented-programming/SKILL.md (Result types, bind/apply, effect signatures) and ~/.claude/skills/preferences-algebraic-data-types/SKILL.md (domain modeling with sum/product types).

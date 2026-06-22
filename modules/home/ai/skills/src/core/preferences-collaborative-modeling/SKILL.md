@@ -894,4 +894,4 @@ The patterns become visible retrospectively rather than imposed prospectively.
 
 *algebraic-data-types.md* formalizes the sum types, product types, and refinement types that encode the events, commands, and invariants discovered during collaborative modeling.
 
-*theoretical-foundations.md* provides the categorical underpinnings of the algebraic interpretations described throughout this document, connecting domain artifacts to concepts like free monoids, functors, and Kleisli categories.
+See preferences-theoretical-foundations for the categorical underpinnings of the algebraic interpretations described throughout this document, connecting domain artifacts to concepts like free monoids, functors, and Kleisli categories.

@@ -7,10 +7,12 @@ description: Haskell development conventions covering type classes, monadic comp
 
 ## Architectural patterns alignment
 
-See @~/.claude/skills/preferences-architectural-patterns/SKILL.md for overarching principles.
+See preferences-architectural-patterns for overarching principles.
 
-Haskell embodies the theoretical ideal of functional programming with native support for monad transformers, lawful abstractions, and referential transparency.
-It serves as the reference model that other languages approximate with their respective libraries (Effect-TS, ZIO, etc.).
+Haskell offers exceptionally direct support for lawful abstractions, referential transparency, and effect composition, including monad transformers as one well-supported way to discharge a capability interface.
+It serves as a reference model for lawful, type-tracked effect composition that other languages approximate with their respective libraries (Effect-TS, ZIO, etc.).
+The capability interface (the effect signature) is the stable primitive; a transformer stack is one interpreter of it, never the interface or the integration ideal itself.
+See preferences-theoretical-foundations, and in particular its effects-and-handlers material, for why a capability interface discharged by handlers, not a transformer tower, is the primitive.
 
 ### Core patterns and libraries
 - **Effect composition**: Use monad transformers from `transformers` and `mtl` for composing effects
@@ -21,7 +23,11 @@ It serves as the reference model that other languages approximate with their res
 - **Type-level programming**: Leverage type classes, GADTs, and type families for compile-time guarantees
 
 ### Monad transformer stacks
-- Structure applications as monad transformer stacks (e.g., `ReaderT Config (StateT AppState (ExceptT Error IO))`)
+
+A transformer stack is one interpreter of a capability interface, and a leaky one: the layers do not commute, and deep `lift` chains cost more as the stack grows.
+Keep any stack shallow and hidden behind a newtype or type alias, and treat the mtl capability constraint (`MonadReader`, `MonadState`, `MonadError`) as the stable primitive rather than the carrier.
+
+- Structure applications behind mtl capability constraints, with a transformer stack such as `ReaderT Config (StateT AppState (ExceptT Error IO))` as one interpreter of those capabilities; see preferences-theoretical-foundations for why the capability interface, not the stack, is the primitive
 - Ensure all monad instances are lawful (identity, associativity for bind)
 - Use `lift` and `liftIO` to traverse effect transformer stacks
 - Apply newtype wrappers for domain-specific effect stacks

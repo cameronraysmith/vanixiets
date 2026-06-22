@@ -44,7 +44,7 @@ Side effects are isolated in lifecycle methods with explicit cleanup.
 
 **Theoretical foundation**: Web components are coalgebras (specifically Moore machines) where state determines output and input triggers transitions.
 This coalgebraic structure explains why morphing boundaries work: bisimilar states produce equivalent DOM output and transition behavior.
-See `theoretical-foundations.md` section "Web components as coalgebras" for the formal model and section "Composing reactive systems" for how comonadic signal extraction feeds into coalgebraic observation.
+See preferences-theoretical-foundations, its decide-evolve-lens reference, for the formal model of web components as coalgebras and for how comonadic signal extraction feeds into coalgebraic observation.
 
 ## Vanilla web component pattern
 

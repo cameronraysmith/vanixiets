@@ -21,7 +21,8 @@ This hierarchy complements FDM's emphasis on explicit, type-safe dependencies.
 - *Type-driven design*: Both approaches emphasize making invalid states unrepresentable.
 Smart constructors, state machines, and strong types eliminate bug categories.
 
-**Role in multi-language architectures:** Rust often serves as the base IO/Result layer in multi-language monad transformer stacks, providing memory-safe, high-performance foundations for effect composition.
+**Role in multi-language architectures:** Rust often serves as the base IO/Result layer discharging the lowest capability interface in a multi-language architecture, providing memory-safe, high-performance foundations for effect composition.
+A transformer stack is only one (leaky) interpreter of such an interface, never the interface itself; see preferences-theoretical-foundations, its effects-handlers reference, for why a capability interface discharged by handlers, not a transformer tower, is the primitive.
 
 ## Contents
 
@@ -56,5 +57,5 @@ This document integrates guidance from:
 ### Related documents
 
 - `~/.claude/skills/preferences-distributed-systems/SKILL.md` - universal distributed systems decision framework
-- `~/.claude/skills/preferences-theoretical-foundations/SKILL.md` - category-theoretic underpinnings
+- preferences-theoretical-foundations - category-theoretic underpinnings
 - `~/.claude/skills/preferences-algebraic-data-types/SKILL.md` - sum/product type patterns

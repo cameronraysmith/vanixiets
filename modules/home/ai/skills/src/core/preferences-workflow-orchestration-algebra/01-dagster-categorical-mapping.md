@@ -170,6 +170,6 @@ This file says what-maps-to-what; *03-fp-discipline-and-enforcement.md* establis
 
 - *02-asset-vs-task-spectrum.md* — the three-point Airflow → Flyte v2 → Dagster spectrum on the static-versus-dynamic constraint axis.
 - *03-fp-discipline-and-enforcement.md* — the enforcement toolchain and the fully worked lawful IO-manager example discharging the entry-3 proof obligation.
-- theoretical-foundations.md — free constructions, functors, natural transformations, and the categorical vocabulary underpinning the free-term-versus-interpreter split.
-- algebraic-laws.md — the functor, applicative, and monad laws the static-versus-dynamic mapping (entry 2) and the trace replay (entry 5) rest on.
+- preferences-theoretical-foundations, its internal-language reference — free constructions, functors, natural transformations, and the categorical vocabulary underpinning the free-term-versus-interpreter split.
+- preferences-algebraic-laws — the functor, applicative, and monad laws the static-versus-dynamic mapping (entry 2) and the trace replay (entry 5) rest on.
 - Mokhov, Mitchell, Peyton Jones, "Build Systems à la Carte", ICFP 2018, `~/projects/planning-workspace/engineering-references/mokhov-2018-build-systems-a-la-carte/` — the `Tasks c k v` abstraction, the `scheduler ∘ rebuilder` factoring, the constraint hierarchy, and the trace taxonomy. The local copy predates Selective functors (2019 / JFP 2020).

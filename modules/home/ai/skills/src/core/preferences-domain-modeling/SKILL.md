@@ -24,7 +24,7 @@ Model problem domains using types that:
 
 - **Implementation techniques**: See algebraic-data-types.md for sum/product types and railway-oriented-programming.md for error handling
 - **Application structure**: See architectural-patterns.md for how to organize domain logic in a larger system
-- **Theoretical foundations**: See theoretical-foundations.md for categorical and type-theoretic underpinnings
+- **Theoretical foundations**: See preferences-theoretical-foundations (and its references/) for the categorical and type-theoretic underpinnings, including why a capability interface discharged by handlers, not a transformer stack, is the primitive
 - **Language-specific examples**: See python-development.md, typescript-nodejs-development.md, rust-development/00-index.md for concrete implementations
 
 ## Pre-implementation discovery
@@ -842,10 +842,10 @@ Lens laws ensure these operations are well-behaved: getting and then setting wit
 -- PutPut: set a' (set a s) = set a' s
 ```
 
-**See also**: `theoretical-foundations.md#lenses-for-nested-data-access` for categorical interpretation and formal lens laws.
+See preferences-theoretical-foundations references/decide-evolve-lens.md#aggregates-and-optics-foundations-only for the categorical interpretation and the formal lens laws, and references/decide-evolve-lens.md#moore-machine-shape-and-the-lens-bridge for the Moore-machine/lens framing.
 
 **See also**:
-- `theoretical-foundations.md#aggregates-and-optics`
+- preferences-theoretical-foundations references/decide-evolve-lens.md#aggregates-and-optics-foundations-only for aggregates and optics
 - `event-sourcing.md` for full treatment of state reconstruction, event algebra, and the fold/applyEvent pattern
 - `collaborative-modeling.md` for EventStorming facilitation and how yellow stickies map to aggregate implementation structure
 
@@ -985,7 +985,7 @@ fn test_load_and_process() {
 }
 ```
 
-**See also**: `railway-oriented-programming.md` for Reader pattern details and effect composition, `theoretical-foundations.md` for Reader monad categorical interpretation.
+**See also**: `railway-oriented-programming.md` for Reader pattern details and effect composition; see preferences-theoretical-foundations references/effects-handlers.md for the categorical reading of the Reader as one capability interpreter rather than the interface itself.
 
 ### Pattern 7: Domain errors vs infrastructure errors
 
@@ -1376,7 +1376,7 @@ This compositional structure scales to complex domain models.
 Payment services compose with account services; portfolio management composes with both; risk analysis composes with all three.
 Each layer remains testable in isolation by substituting appropriate algebras.
 
-**See also**: `theoretical-foundations.md` for the categorical interpretation of module algebras as F-algebras, and `architectural-patterns.md` for organizing module algebras in application architecture.
+**See also**: see preferences-theoretical-foundations references/effects-handlers.md for the categorical interpretation of module algebras as signatures, algebras, and interpreters of a capability interface, and `architectural-patterns.md` for organizing module algebras in application architecture.
 
 ## Anti-patterns to avoid
 
@@ -1550,7 +1550,7 @@ For concrete code examples in each language:
 
 ## Further reading
 
-- **Theoretical foundations**: See theoretical-foundations.md for category-theoretic underpinnings
+- **Theoretical foundations**: See preferences-theoretical-foundations (and its references/) for the category-theoretic underpinnings and the conjectural internal language the design converges on
 - **Error handling composition**: See railway-oriented-programming.md
 - **Type system techniques**: See algebraic-data-types.md
 - **Application architecture**: See architectural-patterns.md

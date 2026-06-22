@@ -15,7 +15,7 @@ Event sourcing stores all state changes as an immutable append-only log of domai
 Current state is derived by replaying (folding over) events from the beginning.
 This approach preserves the complete history of state transitions, enabling time-travel queries, audit trails, and analytical projections.
 
-For theoretical foundations underlying this document, see `theoretical-foundations.md`.
+For theoretical foundations underlying this document, see preferences-theoretical-foundations (its thin SKILL.md and the references/ set, especially references/decide-evolve-lens.md and references/internal-language.md).
 For aggregate design and workflow patterns, see `domain-modeling.md`.
 For distributed system coordination, see `distributed-systems.md`.
 
@@ -346,7 +346,9 @@ initialProduct = (initial1, initial2)
 This structure enables composing deciders while preserving the monoidal optimization.
 Each component can be folded in parallel, and the final product state is constructed from the component results.
 
-See `theoretical-foundations.md` for the coalgebra-algebra interpretation of `decide` (coalgebra: state → commands → events) and `evolve` (algebra: events → state → state).
+See preferences-theoretical-foundations references/decide-evolve-lens.md for the algebraic reading of the Decider.
+The solid identification lives in `evolve`: with an initial state it makes `State` an F-algebra for `F X = 1 + Event × X`, so state reconstruction is the catamorphism (fold), while `decide` is the readout leg.
+The pair is best read as Moore-machine shaped (`evolve` the update, `decide` the output) rather than as a symmetric coalgebra-and-algebra split.
 
 See `domain-modeling.md` Pattern 5 for aggregate design principles that complement the Decider pattern.
 
@@ -972,7 +974,7 @@ This separation enables:
 
 The pattern unifies command handling with the general principle of effect isolation.
 See `domain-modeling.md` section on module algebras for the broader interpreter pattern across domain services.
-See `theoretical-foundations.md` section on free monads and F-algebras for the categorical foundations.
+See preferences-theoretical-foundations references/internal-language.md for the free constructions and the initial/final duality, and references/decide-evolve-lens.md for the F-algebra and catamorphism reading.
 
 ### Connection to aggregate command handlers
 
@@ -1263,7 +1265,7 @@ See `distributed-systems.md` for reactive system patterns.
 ## See also
 
 - `domain-modeling.md` - Aggregate design, state machines, workflow patterns (Wlaschin's FDM)
-- `theoretical-foundations.md` - Algebraic duality, catamorphisms, free monoids
+- preferences-theoretical-foundations - algebraic duality, catamorphisms, free monoids, and the capability-interface primitive (see its references/decide-evolve-lens.md and references/internal-language.md)
 - `distributed-systems.md` - CQRS, saga patterns, authority models
 - `railway-oriented-programming.md` - Result types, error handling in command validation
 - `architectural-patterns.md` - Hexagonal architecture, effect isolation

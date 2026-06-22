@@ -2,7 +2,7 @@
 
 This section demonstrates implementing FDM patterns in Rust.
 For pattern descriptions, see domain-modeling.md.
-For theoretical foundations, see theoretical-foundations.md.
+For theoretical foundations, see preferences-theoretical-foundations.
 
 ## Pattern 1: Smart constructors with newtype pattern
 
@@ -1292,7 +1292,7 @@ The `decide` function corresponds to the algebra's signature, `evolve` to the al
 
 **See also**:
 - event-sourcing.md for event sourcing patterns and the Decider's role in CQRS/ES architectures
-- theoretical-foundations.md for coalgebra-algebra interpretation and categorical foundations
+- preferences-theoretical-foundations, its decide-evolve-lens reference, for the coalgebra-algebra interpretation and categorical foundations
 - [12-distributed-systems.md](12-distributed-systems.md) for distributed aggregate coordination and saga patterns
 - domain-modeling.md#pattern-5-aggregates-as-consistency-boundaries for general aggregate design
 

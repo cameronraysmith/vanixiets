@@ -278,7 +278,7 @@ impl GCounter {
 Op-based CRDTs (CmRDTs) require operations to be commutative.
 The algebraic requirement shifts from state merge to operation application.
 
-See `theoretical-foundations.md` for the foundational laws these structures must satisfy (monoid axioms, semilattice properties, and free algebraic constructions).
+See preferences-theoretical-foundations for the foundational laws these structures must satisfy (monoid axioms, semilattice properties, and free algebraic constructions).
 
 ## Reactive streams for distributed messaging
 
@@ -396,7 +396,7 @@ The log is the system of record.
 
 **Example**: Banking system where account balance is derived from transaction events.
 
-**See also**: `event-sourcing.md` for comprehensive event sourcing patterns, `theoretical-foundations.md` for the algebraic foundation (free monoid of events, state as catamorphism).
+**See also**: `event-sourcing.md` for comprehensive event sourcing patterns, preferences-theoretical-foundations, its decide-evolve-lens reference, for the algebraic foundation (free monoid of events, state as catamorphism).
 
 ### Position 2: Service as authority
 
@@ -493,7 +493,7 @@ This matrix shows what you sacrifice and what you gain.
 | **Two-phase commit** | Availability, performance | ACID across services (at high cost) |
 
 **Note**: The CQRS pattern separates read and write models using profunctor-like structure, where commands flow one direction (write) and queries another (read).
-See theoretical-foundations.md for the formal profunctor interpretation.
+See preferences-theoretical-foundations, its observability-as-theorem reference, for the formal profunctor interpretation.
 
 ### Anti-patterns to avoid
 
@@ -665,7 +665,7 @@ An operation is idempotent if executing it multiple times has the same effect as
 **Mathematical definition**: `f(f(x)) = f(x)`
 
 This corresponds to monoid identity laws: applying an operation multiple times has the same effect as applying it once.
-See theoretical-foundations.md for the algebraic foundation of idempotency in distributed systems.
+See preferences-theoretical-foundations for the algebraic foundation of idempotency in distributed systems.
 
 **Examples**:
 - Idempotent: SET balance = 100 (same result regardless of repetition)
@@ -987,7 +987,7 @@ Deterministic replay rebuilds system state by re-executing operations from a log
 Critical for durability, debugging, and compliance.
 
 **Theoretical foundation**: State reconstruction from event log is a catamorphism (fold) over the event sequence.
-See theoretical-foundations.md for the category-theoretic interpretation of event replay as structural recursion.
+See preferences-theoretical-foundations, its decide-evolve-lens reference, for the category-theoretic interpretation of event replay as structural recursion.
 
 ### When to design for it
 
@@ -1318,5 +1318,5 @@ Use this checklist before implementing distributed system features.
 - `domain-modeling.md` (aggregates as consistency boundaries)
 - `architectural-patterns.md` (effect isolation, onion architecture)
 - `railway-oriented-programming.md` (Result types for distributed error handling)
-- `theoretical-foundations.md` (algebraic foundations: event sourcing as free monoid, catamorphisms, profunctors)
+- preferences-theoretical-foundations (algebraic foundations: event sourcing as free monoid and catamorphisms in its decide-evolve-lens reference, profunctors in its observability-as-theorem reference)
 - `hypermedia-development/07-event-architecture.md` (SSE streaming as event projection, CQRS in hypermedia context)

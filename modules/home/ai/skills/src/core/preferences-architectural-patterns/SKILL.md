@@ -16,8 +16,8 @@ Topics covered:
 - Commands and events as workflow boundaries
 - Effect composition and signature
 
-For domain modeling patterns, see domain-modeling.md.
-For theoretical foundations, see theoretical-foundations.md.
+For domain modeling patterns, see preferences-domain-modeling.
+For theoretical foundations, see preferences-theoretical-foundations.
 
 ## Onion/hexagonal architecture
 
@@ -198,7 +198,7 @@ async fn process_account(
 }
 ```
 
-**See also**: domain-modeling.md#module-algebra-for-domain-services for the full signature/algebra/interpreter pattern.
+See preferences-domain-modeling for the full signature/algebra/interpreter pattern of module algebra for domain services.
 
 ## Workflow pipeline architecture
 
@@ -289,7 +289,7 @@ def process_observations(
     )
 ```
 
-**See also**: railway-oriented-programming.md for Result composition details
+See preferences-railway-oriented-programming for Result composition details.
 
 ## Dependency injection via function parameters
 
@@ -404,7 +404,7 @@ def process_observations_reader(
     return Reader(lambda deps: process_observations(deps, raw))
 ```
 
-**See also**: theoretical-foundations.md#monad-transformers
+See preferences-theoretical-foundations references/effects-handlers.md (heading "A transformer stack is one interpreter, not the interface") for why the Reader capability is the primitive and a transformer stack is only one interpreter of it.
 
 ### Dependency injection via Kleisli arrows
 
@@ -442,7 +442,7 @@ This pattern:
 - Enables pure composition before execution
 - Simplifies testing with mock contexts
 
-**See also**: railway-oriented-programming.md#combining-result-with-other-effects for monad transformer patterns.
+See preferences-railway-oriented-programming for combining Result with other effects.
 
 ## Commands and events as workflow boundaries
 
@@ -557,9 +557,7 @@ async def handle_command(command_json: dict) -> Response:
 4. **Testing**: Easy to create command instances for testing
 5. **Audit trail**: Commands + events provide complete history
 
-**See also**:
-- `domain-modeling.md#workflows-as-type-safe-pipelines`
-- `event-sourcing.md` for full event sourcing patterns where events become the authoritative source of truth
+See preferences-domain-modeling for workflows as type-safe pipelines, and preferences-event-sourcing for full event sourcing patterns where events become the authoritative source of truth.
 
 ## Effect composition and signatures
 
@@ -639,7 +637,7 @@ Effect signatures serve as documentation:
 
 This connects to the module algebra pattern where signatures declare capabilities.
 
-**See also**: domain-modeling.md#module-algebra-for-domain-services for signature/algebra/interpreter patterns.
+See preferences-domain-modeling for the module-algebra signature/algebra/interpreter patterns for domain services.
 
 ### Effect composition guidelines
 
@@ -671,9 +669,9 @@ def workflow(
     ...
 ```
 
-**See also**:
-- railway-oriented-programming.md for Result composition
-- theoretical-foundations.md#effect-systems-as-indexed-monads
+See preferences-railway-oriented-programming for Result composition.
+
+See preferences-theoretical-foundations references/effects-handlers.md (heading "Indexed monads: one tool for typestate, not the organizing principle") for why an effect signature is a capability interface discharged by handlers, with indexed monads reserved for typestate rather than treated as the organizing principle.
 
 ## Cross-language integration
 
@@ -759,7 +757,7 @@ Generate code:
 ## Strategic architecture
 
 Architectural decisions should align with the strategic importance of different domains rather than applying uniform approaches across the entire system.
-The Core/Supporting/Generic domain classification described in *strategic-domain-analysis.md* directly influences architectural choices about integration patterns, deployment topology, and team boundaries.
+The Core/Supporting/Generic domain classification described in preferences-strategic-domain-analysis directly influences architectural choices about integration patterns, deployment topology, and team boundaries.
 
 ### Domain classification shapes architecture
 
@@ -777,7 +775,7 @@ The dependency injection patterns enable swapping providers without modifying do
 
 ### Context boundaries as architectural units
 
-Bounded contexts, detailed in *bounded-context-design.md*, serve as the fundamental architectural unit in domain-driven systems.
+Bounded contexts, detailed in preferences-bounded-context-design, serve as the fundamental architectural unit in domain-driven systems.
 Each context represents a deployment unit, an ownership boundary, and an integration interface.
 
 The context relationship patterns (Partnership, Customer-Supplier, Anti-Corruption Layer) directly influence architectural decisions about synchronous versus asynchronous communication, data replication versus service calls, and tight versus loose coupling.
@@ -802,11 +800,11 @@ Facilitating implies enabling teams help stream-aligned teams design their own c
 
 ### See also
 
-*strategic-domain-analysis.md* for detailed Core/Supporting/Generic classification frameworks and investment prioritization.
+See preferences-strategic-domain-analysis for detailed Core/Supporting/Generic classification frameworks and investment prioritization.
 
-*bounded-context-design.md* for context relationship patterns, the Bounded Context Canvas, and the algebraic interpretation of Anti-Corruption Layers as functors between type algebras.
+See preferences-bounded-context-design for context relationship patterns, the Bounded Context Canvas, and the algebraic interpretation of Anti-Corruption Layers as functors between type algebras.
 
-*discovery-process.md* for how strategic and organizational analysis fits into the broader discovery workflow.
+See preferences-discovery-process for how strategic and organizational analysis fits into the broader discovery workflow.
 
 ## Observability in layered architecture
 
@@ -847,7 +845,11 @@ Cross-reference `preferences-observability-engineering` for the foundational obs
 
 ## Theoretical ideal
 
-In the ideal case, all systems—regardless of language—would integrate as a coherent monad transformer stack in the category of functional effects.
+In the ideal case, all systems—regardless of language—converge asymptotically on a single typed calculus: the conjectural internal language of compositional software architecture.
+There is no single canonical "category of effects" standing in for that calculus, and no canonical monad-transformer stack realizing it.
+The practical primitive that approaches the ideal is a capability interface discharged by handlers — an effect signature whose meaning is supplied by an interpreter chosen separately from the program text.
+A monad-transformer stack is one leaky interpreter of such an interface, never the interface itself and never the ideal.
+See preferences-theoretical-foundations for the conjectural internal language the design converges on, and its references/effects-handlers.md for why a capability interface, not a transformer tower, is the primitive.
 
 **Ideal properties**:
 
@@ -857,13 +859,13 @@ In the ideal case, all systems—regardless of language—would integrate as a c
 - Design cross-language integrations to preserve functional composition, monadic structure, and explicit effect handling at API/FFI boundaries
 - Encode all effects explicitly in type signatures at language boundaries to avoid hidden side effects or runtime surprises
 - Ensure `bind`/`flatMap` operations satisfy monad laws across language boundaries when composing multi-language systems
-- Implement lift operations to allow values to traverse effect transformer stacks between language layers (`liftIO`, `liftState`, etc.)
-- Structure multi-language systems as monad transformer stacks where each language implements a specific effect transformer over the layers below it (e.g., Rust base `IO`/`Result`, TypeScript middle `StateT s (EitherT e IO)`, Python top `ReaderT config (StateT s (EitherT e IO))`)
+- Where a transformer stack is the chosen interpreter, lift operations allow values to traverse its layers (`liftIO`, `liftState`, etc.); this is a property of that one interpreter, not of the ideal, and the deep `lift` chains it forces are part of why the stack is leaky
+- A transformer stack is one way to realize the capability interface across languages, with each language implementing a specific effect transformer over the layers below it (e.g., Rust base `IO`/`Result`, TypeScript middle `StateT s (EitherT e IO)`, Python top `ReaderT config (StateT s (EitherT e IO))`); these per-language stack shapes are illustrative of that one interpreter, not the prescribed target — the prescribed target is the capability interface the stack happens to discharge here
 - Use `Result`/`Either`/`Option` types for error handling that composes vertically through all layers rather than runtime exceptions
 - Thread state explicitly through function parameters or state monads rather than hiding it in global mutable variables
 - Isolate IO and unsafe effects to specific layers or boundaries rather than scattering them throughout the codebase
 - Compose async/concurrency via effect systems or monad transformers rather than ad-hoc callbacks or unstructured promises
-- Maintain the ideal that multi-language system integration should behave as a coherent monad transformer stack in the category of functional effects, preserving referential transparency end-to-end
+- Maintain the ideal that multi-language system integration converges on the conjectural internal language of compositional software architecture, realized today through capability interfaces discharged by handlers that preserve referential transparency end-to-end; the transformer-stack shapes above are one interpreter of those interfaces, not the calculus itself
 
 **Practical path to ideal**:
 
@@ -874,9 +876,11 @@ Start with:
 4. Dependency injection via parameters
 
 Progress toward:
-5. Effect systems (Effect-TS, ZIO) where available
-6. Monad transformers for 2-3 effects
-7. Indexed monads for critical safety properties
-8. Full monad transformer stack for complete effect tracking
+5. Capability interfaces discharged by handlers — the correct-by-construction primitive the ladder culminates in: an effect signature whose meaning a separately-chosen interpreter supplies
+6. Algebraic effects and handlers (Effect-TS, ZIO, Polysemy, OCaml runtime effect handlers) as the modern discharge of those interfaces, where available
+7. A shallow monad-transformer stack (2-3 effects, hidden behind a type alias) as one optional interpreter of a capability interface when an effects library is unavailable — never the goal state, and the layer-ordering it bakes in is a semantic commitment
+8. Indexed monads as one optional tool for typestate and protocol safety, reserved for the critical properties that warrant their cost, not as a rung toward a transformer-stack apex
 
-**See also**: theoretical-foundations.md#indexed-monad-transformer-stacks-in-practice
+The apex is a capability interface discharged by handlers, not a full transformer stack; the stack and indexed monads above are optional interpreters and tools, demoted accordingly.
+
+See preferences-theoretical-foundations references/effects-handlers.md (heading "A transformer stack is one interpreter, not the interface") for why a capability interface, not a transformer tower, is the primitive, and its heading "Indexed monads: one tool for typestate, not the organizing principle" for the typestate scoping.

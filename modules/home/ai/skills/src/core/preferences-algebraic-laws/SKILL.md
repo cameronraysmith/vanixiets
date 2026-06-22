@@ -10,7 +10,7 @@ Algebraic laws are equations that domain operations must satisfy to ensure corre
 These laws are not mathematical curiosities but executable specifications that verify your abstractions behave correctly.
 When types satisfy algebraic laws, you gain theorems for free: properties guaranteed by parametricity that reduce the testing burden and enable safe refactoring through equational reasoning.
 
-This document bridges the categorical foundations in theoretical-foundations.md to testable specifications using property-based testing frameworks.
+This document bridges the categorical foundations in preferences-theoretical-foundations to testable specifications using property-based testing frameworks.
 Laws become test properties that validate domain abstractions across thousands of generated examples.
 
 ## Why algebraic laws matter
@@ -31,10 +31,10 @@ Refactoring becomes mechanical: if it type-checks and passes law tests, it prese
 
 ## Relationship to other documents
 
-- See theoretical-foundations.md for categorical foundations of these laws
-- See domain-modeling.md for applying law-governed abstractions to domain design
-- See railway-oriented-programming.md for Result and Either laws in error handling contexts
-- See rust-development/05-testing.md, python-development.md, typescript-nodejs-development.md for language-specific property testing examples
+- See preferences-theoretical-foundations for categorical foundations of these laws
+- See preferences-domain-modeling for applying law-governed abstractions to domain design
+- See preferences-railway-oriented-programming for Result and Either laws in error handling contexts
+- See preferences-rust-development/05-testing.md, preferences-python-development, preferences-typescript-nodejs-development for language-specific property testing examples
 
 ## Monoid and semigroup laws
 
@@ -237,7 +237,7 @@ proptest! {
 ```
 
 These laws connect to the monoidal structure of events (see monoid laws above) and enable correctness guarantees for event-sourced state machines.
-See event-sourcing.md#state-reconstruction for domain context and patterns, and theoretical-foundations.md#the-decider-pattern for the categorical interpretation of `evolve` as an F-algebra and state reconstruction as catamorphism.
+See preferences-event-sourcing for domain context and patterns, and see preferences-theoretical-foundations references/decide-evolve-lens.md#state-reconstruction-as-catamorphism for the interpretation of `evolve` as an F-algebra and state reconstruction as the catamorphism over the event list.
 
 ## Functor laws
 
@@ -934,8 +934,8 @@ For domain types, implement `__eq__` and `__hash__` properly to enable shrinking
 ## References
 
 - Scott Wlaschin, "Domain Modeling Made Functional" (2018), Chapter 4 (monoids in domain modeling), Chapter 9 (property-based testing), Chapter 10 (composition)
-- See theoretical-foundations.md for categorical foundations of these laws and their origins in category theory
-- See domain-modeling.md for applying law-governed abstractions to domain design, especially Pattern 4 (workflows as pipelines)
-- See railway-oriented-programming.md for Result and Either monad laws in error handling contexts
+- See preferences-theoretical-foundations for categorical foundations of these laws and their origins in category theory
+- See preferences-domain-modeling for applying law-governed abstractions to domain design, especially Pattern 4 (workflows as pipelines)
+- See preferences-railway-oriented-programming for Result and Either monad laws in error handling contexts
 - Philip Wadler, "Theorems for Free!" (1989), functional programming conference
-- Language-specific testing guides in rust-development/05-testing.md, python-development.md, typescript-nodejs-development.md
+- Language-specific testing guides in preferences-rust-development/05-testing.md, preferences-python-development, preferences-typescript-nodejs-development

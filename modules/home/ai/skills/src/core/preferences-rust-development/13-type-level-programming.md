@@ -465,4 +465,4 @@ This incremental approach maintains working code at each step while progressivel
 - [01-functional-domain-modeling.md](./01-functional-domain-modeling.md): Native patterns for smart constructors, typestate, phantom types
 - [11-concurrency.md](./11-concurrency.md): Emergent typestate from affine + nominal + phantom types
 - [02-error-handling.md](./02-error-handling.md): Result composition and railway-oriented programming
-- [theoretical-foundations.md](../theoretical-foundations.md): Category-theoretic underpinnings
+- preferences-theoretical-foundations: Category-theoretic underpinnings

@@ -323,4 +323,4 @@ Burden of proof is on the author to demonstrate safety.
 **See also**:
 - ./01-functional-domain-modeling.md - Type-safe domain modeling patterns
 - architectural-patterns.md - Isolating effects and unsafe code at boundaries
-- theoretical-foundations.md - Category-theoretic foundations for safety reasoning
+- preferences-theoretical-foundations - Category-theoretic foundations for safety reasoning

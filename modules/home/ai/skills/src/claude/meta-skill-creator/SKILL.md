@@ -200,6 +200,14 @@ Claude reads REDLINING.md or OOXML.md only when the user needs those features.
 - **Avoid deeply nested references** - Keep references one level deep from SKILL.md. All reference files should link directly from SKILL.md.
 - **Structure longer reference files** - For files longer than 100 lines, include a table of contents at the top so Claude can see the full scope when previewing.
 
+### Cross-Reference Conventions
+
+Distinguish references to a skill's own bundled files from references to other skills.
+
+A reference to a file bundled inside the same skill (a reference file or other resource in the same skill directory) keeps a one-level relative link, exactly as shown in the progressive-disclosure patterns above. That relative link is the resolved disclosure mechanism, so leave it intact.
+
+A reference to a separate skill instead names that skill by its bare frontmatter `name` as a prose pointer, for example "see preferences-theoretical-foundations". Do not use a path (relative or absolute), an anchor, a markdown link, or a `<topic>.md` filename for a cross-skill reference. No agent harness resolves links between separate skills; each harness addresses a skill by its name and loads its whole SKILL.md. A bare name is the only portable form across the harnesses that consume the same skill source (Claude Code, codex, opencode, droid, hermes, gemini), and a `<topic>.md` filename is non-portable because it is not the skill's real name.
+
 ## Skill Creation Process
 
 Skill creation involves these steps:

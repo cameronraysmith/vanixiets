@@ -115,6 +115,6 @@ None of the three orchestrators here sits cleanly at the `Selective` point, so t
 
 - *01-dagster-categorical-mapping.md* — the per-primitive Dagster-to-BSàlC mapping (asset graph as `Tasks` term, IO manager as interpreter, partitions as indexed family); referenced rather than restated here.
 - *03-fp-discipline-and-enforcement.md* — the lawful IO-manager example and the proof obligation that materialization is a pure function of `(AssetKey, PartitionKey)`, which makes Dagster's interpreter side honest.
-- *theoretical-foundations.md* — free structures, functors, indexed/fibered families, and the categorical vocabulary the spectrum leans on.
-- *algebraic-laws.md* — the law-as-specification stance behind "almost / aspirational" versus "lawful"; the indexed-monad reading of Flyte v2 is the former, not the latter.
+- preferences-theoretical-foundations, its internal-language reference — free structures, functors, indexed/fibered families, and the categorical vocabulary the spectrum leans on.
+- preferences-algebraic-laws — the law-as-specification stance behind "almost / aspirational" versus "lawful"; the indexed-monad reading of Flyte v2 is the former, not the latter.
 - Mokhov, Mitchell, Peyton Jones, "Build Systems à la Carte" (ICFP 2018), `~/projects/planning-workspace/engineering-references/mokhov-2018-build-systems-a-la-carte/sections/`.

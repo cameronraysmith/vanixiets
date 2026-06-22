@@ -12,7 +12,7 @@
 
 **declarative, reproducible, type-safe infrastructure with nix flake modules**
 
-> And all this to realize compositional algebras of graded effects, structured as indexed monad transformer stacks over effectful computations, from heterogeneous components to support experimentation, discovery, and understanding of the past in the present for the future.
+> And all this to realize compositional algebras of graded effects discharged through capability interfaces and their handlers, converging asymptotically on the conjectural internal language of compositional software architecture, from heterogeneous components to support experimentation, discovery, and understanding of the past in the present for the future.
 
 [Documentation][docs-link] • [Getting Started](https://infra.cameronraysmith.net/guides/getting-started) • [Architecture](https://infra.cameronraysmith.net/concepts/architecture-overview) • [Discussions](https://github.com/cameronraysmith/vanixiets/discussions)
 

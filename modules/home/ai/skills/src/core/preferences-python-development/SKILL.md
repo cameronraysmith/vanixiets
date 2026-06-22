@@ -33,7 +33,7 @@ For detailed patterns on Result types, error composition, and ADT modeling in Py
 
 This section demonstrates how to implement functional domain modeling patterns in Python.
 For pattern descriptions, see domain-modeling.md.
-For theoretical foundations, see theoretical-foundations.md.
+For theoretical foundations, see preferences-theoretical-foundations.
 
 ### Pattern 1: Smart constructors with Pydantic
 

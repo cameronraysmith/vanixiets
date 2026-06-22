@@ -82,7 +82,7 @@ It demonstrates the Go-style handler pattern `(Context, Writer) -> None`, declar
 
 - `~/.claude/skills/preferences-web-platform-foundations/SKILL.md` - shared vocabulary: 15 web platform properties, capability ladder, paradigm routing
 - `~/.claude/skills/preferences-hypermedia-documents/SKILL.md` - standalone document authoring (presentations, experiments, visualizations) without a server backend
-- `~/.claude/skills/preferences-theoretical-foundations/SKILL.md` - algebraic foundations: signals as comonads, web components as coalgebras, event sourcing as free monoids
+- preferences-theoretical-foundations - algebraic foundations: signals as comonads, web components as coalgebras, event sourcing as free monoids (see its decide-evolve-lens reference)
 - `~/.claude/skills/preferences-architectural-patterns/SKILL.md` - onion/hexagonal architecture, effect boundaries
 - `~/.claude/skills/preferences-domain-modeling/SKILL.md` - functional domain modeling, smart constructors
 - `~/.claude/skills/preferences-railway-oriented-programming/SKILL.md` - Result-based error handling

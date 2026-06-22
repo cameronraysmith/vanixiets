@@ -772,7 +772,7 @@ Like pure functions that produce the same output for the same input, primitives 
 
 These properties emerge from the CSS techniques used (flexbox/grid intrinsic sizing) rather than being explicitly enforced, but they're reliable enough to treat compositions as a layout algebra.
 
-See `theoretical-foundations.md` for formal algebraic foundations including signals as comonads and web components as coalgebras.
+See preferences-theoretical-foundations, its decide-evolve-lens reference, for formal algebraic foundations including signals as comonads and web components as coalgebras.
 
 ## PostCSS configuration
 

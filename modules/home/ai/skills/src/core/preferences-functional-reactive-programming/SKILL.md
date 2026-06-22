@@ -13,13 +13,13 @@ The shared insight across all these patterns is a fundamental inversion: privile
 This document addresses the "why" that unifies patterns documented elsewhere.
 It provides the conceptual framework showing that these patterns are not design choices but mathematical necessities once you commit to modeling interactive systems that unfold over time.
 
-For the detailed categorical structures (F-algebras, coalgebras, comonads, profunctors) and their formal definitions, see `theoretical-foundations.md`.
+For the detailed categorical structures (F-algebras, coalgebras, comonads, profunctors) and their formal definitions, see preferences-theoretical-foundations, particularly its decide-evolve-lens reference.
 For practical event sourcing implementation, see `event-sourcing.md`.
 For the Decider pattern and aggregate design, see `domain-modeling.md`.
 For SSE-based reactive hypermedia, see `hypermedia-development/07-event-architecture.md`.
 For distributed reactive streams and backpressure, see `distributed-systems.md`.
 
-The relationship between this document and `theoretical-foundations.md` is that of perspective to mechanism: this document explains why certain structures are forced by the problem domain of interactive systems, while `theoretical-foundations.md` details what those structures are and how they compose.
+The relationship between this document and preferences-theoretical-foundations is that of perspective to mechanism: this document explains why certain structures are forced by the problem domain of interactive systems, while preferences-theoretical-foundations details what those structures are and how they compose.
 
 ## The fundamental problem
 
@@ -701,7 +701,7 @@ This document provides the paradigmatic foundation connecting patterns detailed 
 For specific topics, consult:
 
 *Categorical structures and formal definitions*:
-See `theoretical-foundations.md` for detailed treatment of F-algebras, coalgebras, comonads, profunctors, and their laws.
+See preferences-theoretical-foundations, particularly its decide-evolve-lens reference, for detailed treatment of F-algebras, coalgebras, comonads, profunctors, and their laws.
 The present document establishes why these structures matter for reactive systems; that document details what they are.
 
 *Event sourcing implementation*:
