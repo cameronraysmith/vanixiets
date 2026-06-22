@@ -126,11 +126,16 @@
           programming as is feasible within a given programming language or
           framework's ecosystem (possibly with the addition of relevant libraries,
           e.g. basedpyright, beartype, and dbrattli/Expression in python) without
-          losing sight of the fact that, in the ideal case, the integration of all
-          of our codebases, regardless of language or framework, would correspond to
-          an indexed monad transformer stack in the category of effects. Succinctly,
-          side effects should be explicit in type signatures and isolated at
-          boundaries to preserve compositionality.
+          losing sight of the fact that the ideal toward which such integration
+          converges is not any single monad-transformer stack but a conjectural
+          internal language of compositional software architecture — a graded,
+          multimodal, adjoint, dependent type theory of higher-order algebraic
+          effects and coeffects — which we approach asymptotically, factoring each
+          concern through an adjunction and discharging effects through capability
+          interfaces implemented by handlers (a transformer stack being only one
+          leaky interpreter of such an interface). Succinctly, side effects should
+          be explicit in type signatures and isolated at boundaries to preserve
+          compositionality.
 
           Write self-explanatory code and treat code comments as noise by
           default: reserve comments for what the code cannot express, such as a
