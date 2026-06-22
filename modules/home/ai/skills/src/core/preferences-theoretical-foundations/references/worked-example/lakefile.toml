@@ -1,0 +1,5 @@
+name = "worked_example"
+defaultTargets = ["Limit"]
+
+[[lean_lib]]
+name = "Limit"
