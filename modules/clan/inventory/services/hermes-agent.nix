@@ -38,7 +38,7 @@
           # picker (31 OpenRouter models listed).
           model = {
             provider = "openrouter";
-            default = "z-ai/glm-5.1";
+            default = "z-ai/glm-5.2";
           };
           # Dashboard theme (lowercase canonical per hermes_cli/config.py:1010-1012;
           # valid values: default, midnight, ember, mono, cyberpunk, rose).
