@@ -108,7 +108,7 @@
 
     aeneas.url = "github:AeneasVerif/aeneas";
 
-    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.6.5";
+    hermes-agent.url = "github:NousResearch/hermes-agent/main";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     hermes-agent.inputs.flake-parts.follows = "flake-parts";
 
