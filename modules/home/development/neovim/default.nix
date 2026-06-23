@@ -26,6 +26,16 @@
 
           installCoreDependencies = true;
 
+          # git_config and fish are added to LazyVim's runtime ensure_installed
+          # by the util.dot extra (enabled below) via imperative table.insert;
+          # lazyvim-nix's offline parser extractor scans only lang.* extras'
+          # declarative ensure_installed, so it never provides them. Pin them
+          # explicitly (option type is listOf package).
+          treesitterParsers = with pkgs.vimPlugins.nvim-treesitter.grammarPlugins; [
+            git_config
+            fish
+          ];
+
           extras = {
             ai.copilot.enable = true;
             coding = {
