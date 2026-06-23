@@ -281,7 +281,16 @@
                   # optional group to the immutable venv (nix-setup.md:659).
                   # The journal's "Run: pip install mautrix[encryption]" hint is
                   # unusable here — the Nix venv is sealed at build time.
-                  extraDependencyGroups = [ "matrix" ];
+                  # firecrawl + fal: even via the Nous Tool Gateway
+                  # (use_gateway=true) hermes builds the LOCAL backend client and
+                  # re-points it at the gateway, so the client lib must be sealed
+                  # in too. `firecrawl` (firecrawl-py==4.17.0) backs
+                  # web.backend=firecrawl; `fal` (fal-client==0.13.1) backs both
+                  # image_gen and video_gen provider=fal. openai tts/stt and the
+                  # browser-use cloud client are core-satisfied (no group). With
+                  # allow_lazy_installs=false anything not listed here fails at
+                  # runtime instead of pip-installing.
+                  extraDependencyGroups = [ "matrix" "firecrawl" "fal" ];
 
                   # MATRIX_HOMESERVER and MATRIX_USER_ID are LOAD-BEARING for upstream's
                   # pre-adapter gate at gateway/platforms/matrix.py:234-241
