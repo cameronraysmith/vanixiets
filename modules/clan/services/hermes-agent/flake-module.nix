@@ -290,7 +290,12 @@
                   # browser-use cloud client are core-satisfied (no group). With
                   # allow_lazy_installs=false anything not listed here fails at
                   # runtime instead of pip-installing.
-                  extraDependencyGroups = [ "matrix" "firecrawl" "fal" ];
+                  extraDependencyGroups = [
+                    "matrix"
+                    "firecrawl"
+                    "fal"
+                    "voice"
+                  ];
 
                   # MATRIX_HOMESERVER and MATRIX_USER_ID are LOAD-BEARING for upstream's
                   # pre-adapter gate at gateway/platforms/matrix.py:234-241
@@ -403,6 +408,17 @@
                   RestrictRealtime = true; # block SCHED_FIFO/RR (hermes is not RT-scheduled)
                   SystemCallArchitectures = "native"; # block non-native syscall ABIs (defensive sandbox)
                 };
+
+                # Voice extra (faster-whisper STT + sounddevice) native runtime
+                # deps, scoped to the service (NOT modules/home/packages): this is
+                # a SYSTEM unit and does not inherit the user's home-manager
+                # profile. ffmpeg-headless backs faster-whisper's audio-decode
+                # subprocess (headless = same codecs, no X11/SDL). portaudio is a
+                # shared lib that sounddevice dlopens at import, so it needs
+                # LD_LIBRARY_PATH (path/systemPackages cannot expose a lib to the
+                # python loader).
+                systemd.services.hermes-agent.path = [ pkgs.ffmpeg-headless ];
+                systemd.services.hermes-agent.environment.LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.portaudio ];
 
                 # ─── Sibling hermes-agent-dashboard systemd unit (nix-gyy.6) ───
                 # Upstream nixosModule does NOT expose the dashboard (confirmed by
