@@ -16,7 +16,7 @@
   perSystem =
     { system, ... }:
     let
-      deferred = [ ];
+      deferred = [ "scheelite" ];
 
       nixosForSystem = lib.filterAttrs (
         name: cfg: cfg.config.nixpkgs.hostPlatform.system == system && !(builtins.elem name deferred)
