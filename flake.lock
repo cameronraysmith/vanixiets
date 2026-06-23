@@ -1726,11 +1726,11 @@
     "step-ca-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1780483175,
-        "narHash": "sha256-/ksm5v+5GoNtCmFr5ex7IDVcFHsq4lpfm2Qm3P6NCTo=",
+        "lastModified": 1782225454,
+        "narHash": "sha256-Q2dODjcR0mEzL78xDKsJnxXTNcW8fEpzFGD8SOWi7Dw=",
         "owner": "smallstep",
         "repo": "helm-charts",
-        "rev": "5d254af2ac0224f90bd8ace228e1b485ac2ffc49",
+        "rev": "da597c14c169a661570678255679951e2e8adcae",
         "type": "github"
       },
       "original": {
