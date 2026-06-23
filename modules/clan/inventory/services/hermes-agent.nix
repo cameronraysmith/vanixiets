@@ -38,9 +38,9 @@
           # auto/custom providers, so for openrouter this only cleans the
           # stale leaf. OPENROUTER_API_KEY is wired via clan-vars.
           model = {
-            provider = "openrouter";
-            default = "z-ai/glm-5.2";
-            base_url = "https://openrouter.ai/api/v1";
+            provider = "openai-codex";
+            default = "gpt-5.5";
+            # base_url = "https://openrouter.ai/api/v1";
           };
 
           # Full ordered fallback chain. The settings merge replaces lists
