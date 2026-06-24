@@ -1,17 +1,17 @@
 {
-  "version": "2.1.186",
+  "version": "2.1.196",
   "platforms": {
     "darwin-arm64": {
-      "checksum": "463a79cc34a9787cff1b3361b4ec9e2dff928c18b077f41f0bb412e4cda78637"
+      "checksum": "6fc6e61ab7582c2bf241225ff90d9f79e91d69380cb9589fc9dedd3a30070f5a"
     },
     "darwin-x64": {
-      "checksum": "9e17e23d451cbbc64cf4b9536c1d25efd86808512617c855091fa608f77c9899"
+      "checksum": "32c74d66e27b9ca77aea638fc46cb11c90470bd0d294b2a981065da8896d1ee0"
     },
     "linux-arm64": {
-      "checksum": "817e5ff483568b78c49171be317b9b9190cade77248a5776e912789312961cb6"
+      "checksum": "05aa9189d335d1e921ca9608acd699193e661559aff56704456ce5bda6fd4dd8"
     },
     "linux-x64": {
-      "checksum": "6a6d5d23486597c93138941c9b68caa0fbcd2dcedbf49e29a9c8d83e3a1cb329"
+      "checksum": "eb933c6dd5534db89b83ba09009d5c0932bd1395f7e3bb0f34ba37eec37bbade"
     }
   }
 }
