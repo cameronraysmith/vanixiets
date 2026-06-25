@@ -92,6 +92,7 @@
           git-xet
           gitmux
           graphite-cli
+          ttyd
           d2
           graphviz
           jc
