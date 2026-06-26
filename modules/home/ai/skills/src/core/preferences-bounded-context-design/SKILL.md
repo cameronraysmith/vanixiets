@@ -235,6 +235,10 @@ It serves as a neutral integration layer that multiple parties can implement ind
 From an algebraic perspective, published language appears as shared schema definitions—Protobuf schemas, AsyncAPI specifications, JSON Schema documents—that generate types in multiple contexts.
 Each context implements its own adapter between the published language and its internal model, but the schema itself serves as the source of truth for integration contracts.
 
+Schema-first data-contract languages belong in this family: LinkML serves as a single published schema from which pydantic, SQL DDL, JSON Schema, protobuf, and TypeScript bindings are generated on demand, and data-contract specs such as ODCS and ODPS publish a context's port and product contracts.
+These are the schema-factored leg of the *lowering-path bifurcation* defined in full in preferences-data-modeling—product-oriented columnar, table, and record schemas factor through a schema-first multi-target codegen rather than lowering domain-direct—so the handle and its mechanism live at that hub and are not restated here.
+See nucleus-platform for the spec-anchored instance of this leg, and preferences-data-modeling for the contract and interchange techniques.
+
 Published Language reduces coupling by eliminating direct dependencies on any single context's internal model.
 Contexts communicate through the shared language, translating to and from their internal representations at the boundary.
 This allows each context to evolve internally without affecting others, as long as the published language mappings remain intact.

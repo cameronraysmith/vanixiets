@@ -191,6 +191,9 @@ If a property is guaranteed by the nix module system's type checking, an invaria
 If it depends on conventions that the type system cannot enforce, an invariant catches drift.
 A practical heuristic: if two developers can independently add outputs that should be related (a package and its test, a machine config and its inventory entry), an invariant ensures the relationship holds.
 
+A recurring instance of this drift-catching role guards schema-driven codegen of any kind — LinkML, sqlc, protobuf, or openapi — through two general checks: a codegen drift check that regenerates the bindings from their source schema and diffs against the committed output, and a schema-conformance property test asserting that the generated schema round-trips the producer's own serializations.
+Both guard the schema-factored leg of the lowering-path bifurcation defined in `preferences-data-modeling`, whose spec-anchored instantiation is `nucleus-platform`; the schema-language-specific machinery lives there and does not enter the eight-category taxonomy.
+
 See `references/nix-unit-invariants.md` for the full test case template and guidance on when invariants add value.
 
 

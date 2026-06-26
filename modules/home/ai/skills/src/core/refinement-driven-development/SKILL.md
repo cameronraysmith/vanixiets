@@ -45,6 +45,8 @@ Reach for it, too, when you want to generate and diff type-system diagrams of th
 
 Do not reach for it when the domain need not be lifted or verified at all, where the ceremony of the round trip buys nothing.
 Do not reach for it when the goal is simply to transpile Rust to C: that is Eurydice's job, not this skill's, and the lift-and-check round trip would be wasted effort.
+Do not reach for it for the schema-factored subset of a Lean spec, the product-oriented columnar, table, and record data-schema types that lower through LinkML multi-target codegen rather than the Charon/Aeneas round trip.
+This is the lowering-path bifurcation defined in full by preferences-data-modeling: this skill owns only the domain-direct algebra round trip, while the schema-factored leg belongs to that hub, with the spec-anchored Lean → LinkML → bindings instance being nucleus-platform.
 
 Before the first refine → lift → check cycle on a new machine, confirm each tool is present and version-matched and stand up the Lean backend the check leg needs; `references/toolchain-setup.md` covers that one-time setup and a tier-0 smoke test.
 
@@ -77,3 +79,4 @@ This honesty principle is developed in `references/mathematics.md` (the adjuncti
 - `preferences-validation-assurance` — severity, evidence quality, and the confidence promotion chain that calibrates which check tier suffices.
 - `preferences-architecture-diagramming` — format selection and diagram compendium conventions that the type-system diagramming leg specializes.
 - `preferences-rust-development` — the Rust conventions the refine/lower leg must respect within the Aeneas/Charon-safe subset.
+- `preferences-data-modeling` — the hub that defines the lowering-path bifurcation in full; it owns the schema-factored leg, where product-oriented table schemas lower via LinkML multi-target codegen, complementing this skill's domain-direct algebra round trip.

@@ -100,6 +100,7 @@ Hypothesis provides property-based law testing through `@given`, `strategies as 
 
 The IO manager is the one component *01-dagster-categorical-mapping.md* rates *almost* a store algebra and the one you must write yourself, so it is where the categorical reading earns its keep.
 This worked example is Lance-flavored but generalizes to any content-addressed store: substitute the Lance dataset write and scan for any pure put and get against an address.
+In a spec-anchored repository the `FeatureFrame` Pydantic model and the pinned schema this manager round-trips are *schema-factored* bindings on the schema side of the *lowering-path bifurcation* (defined in full by *data-modeling.md*, with *nucleus-platform.md* as the worked instance): prefer binding the IO manager to the generated schema oracle the LinkML projection emits over the hand-authored model shown here, which is illustrative.
 
 ### The law, stated precisely
 
@@ -311,5 +312,6 @@ A factory framework therefore owes the same Hypothesis associativity and identit
 - *python-development.md* — the basedpyright/beartype/Expression toolchain, decorator-stacking order, and telemetry-at-boundaries discipline.
 - *compositional-continuous-verification.md* — the operating-envelope-plus-regulator pair, the existence/traceability/adequacy/integrity hierarchy, the no-leak principle, and the `.#checks` enumerate-and-audit habit.
 - *event-sourcing.md* — the fold/replay reconstruction laws that license incremental and partitioned re-materialization.
+- *data-modeling.md* — the schema-factored side of the lowering-path bifurcation: the generated bindings and LinkML-to-oracle path a spec-anchored IO manager should bind to rather than a hand-authored model, with *nucleus-platform.md* as the worked instance.
 - *01-dagster-categorical-mapping.md* — the categorical mapping whose *almost* gaps this file closes.
 - *02-asset-vs-task-spectrum.md* — the orchestrator spectrum this discipline applies within.

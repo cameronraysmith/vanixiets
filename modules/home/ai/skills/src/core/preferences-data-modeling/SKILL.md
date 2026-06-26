@@ -105,6 +105,17 @@ Key principles from ADT design:
 - Use Result<T, E> for operations that can fail
 - Distinguish bind (sequential, short-circuit) from apply (parallel, collect errors)
 
+### Schema-first binding generation
+
+Within a sufficiently expressive specification language (Lean 4 or Idris 2, the QMADTT-expressive tier, whose type-theoretic grounding is owned by preferences-theoretical-foundations and whose tier placement is set by preferences-computational-system-taxonomy) types split by how they lower to each target, a split worth naming the lowering-path bifurcation.
+Domain-direct types are the sum-rich domain and implementation algebra that the transforms pattern-match on; they lower directly to each target language (Rust enums, Python Expression tagged unions) with no intermediate schema language, and are owned by preferences-domain-modeling, whose verified Lean-to-Rust leg is refinement-driven-development.
+Schema-factored types are the product-oriented columnar, table, and record data-schema types (data we ingest or derive through transformation), and these factor through a schema-first multi-target binding generator, LinkML, where one YAML schema mechanically emits pydantic, SQL DDL, JSON Schema, protobuf, and TypeScript bindings on demand, plus an ontology overlay (SHACL, OWL, and RDF emission, with ontology binding via class_uri, slot_uri, and CURIE-bound enums).
+LinkML belongs to the same codegen-from-one-schema family as sqlc; see preferences-schema-versioning for that toolchain.
+The two arms exist because of a sum-versus-product expressiveness gap: frame-based and relational schemas cannot faithfully carry exhaustiveness-checked discriminated sums (A + B + C), so sums stay domain-direct and only product-oriented schemas factor through LinkML.
+The legs are also epistemically asymmetric, in that a schema-to-bindings lowering is mechanical and drift-checkable, whereas an upstream-spec-to-schema projection (when one exists) is not necessarily a witnessed functor.
+That asymmetry yields the projection caveat: when an upstream structural source of truth exists, a data or table schema is a projection of it, not the root.
+The spec-anchored instance of this bifurcation, with Lean as the structural source of truth projecting to a LinkML skeleton and on to a single Arrow oracle, is the Nucleus pattern; see nucleus-platform for that instance rather than restating its mechanism here.
+
 ## Incremental processing patterns
 
 ### Time-partitioned models
@@ -132,6 +143,9 @@ For modeling pipeline execution states (Pending, Running, Completed, Failed), co
 This applies to job status tracking, data quality checks, and orchestration workflows.
 
 ## Semantic layer patterns
+
+In this section *semantic layer* means the BI and metrics sense: business logic (metrics, dimensions) separated from physical storage.
+This is a distinct sense from the ontology and CURIE-binding overlay (SHACL, OWL, RDF) that LinkML emits for the schema-factored arm of the lowering-path bifurcation above; both senses are legitimate, and the term should be read from context.
 
 ### Logical vs physical separation
 

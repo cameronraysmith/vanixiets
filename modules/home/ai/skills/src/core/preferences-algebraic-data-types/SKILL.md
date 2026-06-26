@@ -1144,6 +1144,9 @@ See `~/.claude/skills/preferences-schema-versioning/SKILL.md` for:
 - Cross-database compatibility (PostgreSQL ENUMs → DuckDB CHECK)
 - Migration patterns for evolving ADTs
 
+Beyond sqlc's SQL-as-source generation, a single schema can drive multi-target binding generation: the LinkML family co-generates SQL DDL alongside language bindings (pydantic, JSON Schema, protobuf, TypeScript) from one schema, in the same codegen-from-one-schema family as sqlc.
+This is the lowering-path bifurcation — see preferences-data-modeling for the full mechanism and nucleus-platform for the spec-anchored instance — under which product-oriented schema types factor through schema-first codegen while sum-rich domain types lower domain-direct, precisely because frame-based and relational schemas cannot natively carry exhaustiveness-checked discriminated sums (the ENUM and JSONB-plus-CHECK workarounds above are exactly that gap showing through).
+
 See `~/.claude/skills/preferences-railway-oriented-programming/SKILL.md` for:
 - How to use ADTs with Result types for error handling
 - Composing operations on sum types with bind/apply

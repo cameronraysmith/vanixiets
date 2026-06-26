@@ -25,6 +25,7 @@ Model problem domains using types that:
 - **Implementation techniques**: See algebraic-data-types.md for sum/product types and railway-oriented-programming.md for error handling
 - **Application structure**: See architectural-patterns.md for how to organize domain logic in a larger system
 - **Theoretical foundations**: See preferences-theoretical-foundations (and its references/) for the categorical and type-theoretic underpinnings, including why a capability interface discharged by handlers, not a transformer stack, is the primitive
+- **Persistent data schemas**: The patterns here model the in-memory domain algebra — the domain-direct leg of the *lowering-path bifurcation* — whereas persistent columnar, table, and record schemas are a distinct, schema-factored concern owned by preferences-data-modeling, where the handle is defined in full (Lean → LinkML → bindings per nucleus-platform in a spec-anchored repo)
 - **Language-specific examples**: See python-development.md, typescript-nodejs-development.md, rust-development/00-index.md for concrete implementations
 
 ## Pre-implementation discovery

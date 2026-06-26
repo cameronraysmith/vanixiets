@@ -26,7 +26,7 @@ For theoretical foundations, see preferences-theoretical-foundations.
 Structure applications in concentric layers with domain logic at the center and infrastructure at the edges.
 
 ```
-┌─────────────────────────────────────┐
+┌────────────────────────────────────┐
 │  Infrastructure (I/O, external)     │
 │  ┌───────────────────────────────┐  │
 │  │  Application (workflows)      │  │
@@ -753,6 +753,10 @@ Generate code:
 - Python: dataclasses with Pydantic validators
 - TypeScript: type definitions
 - Rust: structs with serde
+
+Which schema mechanism fits depends on a lowering-path bifurcation.
+For product-oriented data like the `calibration.schema.json` above, prefer a single LinkML schema as the multi-target source for the pydantic, TypeScript, SQL DDL, JSON Schema, and protobuf bindings; sum-rich discriminated-union domain types take the other arm, lowering direct to each target language.
+See preferences-data-modeling for the full statement of the lowering-path bifurcation, and nucleus-platform for its spec-anchored instance.
 
 ## Strategic architecture
 

@@ -100,6 +100,7 @@ For distributed systems, see preferences-distributed-systems: the event log as a
 For reactive and hypermedia read-side delivery, see preferences-functional-reactive-programming and preferences-hypermedia-development: an SSE projection channel is a functor from the event log to a stream, temporal consistency is an ordered monoid preserving causality, a signal system is comonadic context consumption, and a thin web-component wrapper is a coalgebra or Moore machine.
 
 For data modeling, see preferences-data-modeling: read models as derived views stand in a Galois connection with the event log, query caching is memoization with naturality-based invalidation, temporal versioning (DuckLake time travel) is indexing by version, and views as quotients are equivalent event sequences under projection.
+By the *lowering-path bifurcation*, the schema-factored (product-oriented table-schema) subset of a QMADTT-expressive Lean spec lowers via LinkML multi-target schema codegen rather than mirroring directly into each language — which conditionalizes the implementation-is-a-mirror framing above for that generated subset — with preferences-data-modeling owning the bifurcation in full and nucleus-platform the spec-anchored instance.
 
 ## Further reading
 

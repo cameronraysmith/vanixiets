@@ -9,6 +9,7 @@ description: Schema versioning strategies for evolving data schemas without brea
 
 Database schemas are code and should be treated as such.
 The migration files are the single source of truth for schema definitions.
+In a spec-anchored repository this single-source-of-truth claim is relative rather than absolute: the migration and schema files are themselves a projection of an upstream structural source of truth (a Lean 4 specification), which is the projection caveat of the lowering-path bifurcation defined in full by preferences-data-modeling and instantiated in nucleus-platform.
 Type-safe code generation enforces contracts between application and database.
 Cross-database compatibility is achieved through dialect-aware transpilation.
 Schema evolution must be explicit, versioned, and reversible.
@@ -33,6 +34,7 @@ Reads PostgreSQL DDL from migration files.
 Generates language-specific types and query functions.
 Supports Python (Pydantic models), TypeScript, Go, Kotlin.
 Validates queries at compile time against schema.
+LinkML is a sibling schema-first multi-target codegen tool of the same family as sqlc, generating pydantic, JSON Schema, protobuf, and TypeScript bindings from one schema while additionally emitting SQL DDL plus an ontology and RDF binding overlay; it is the schema-factored leg of the lowering-path bifurcation defined in full by preferences-data-modeling and instantiated spec-anchored in nucleus-platform.
 
 ### SQLMesh
 
