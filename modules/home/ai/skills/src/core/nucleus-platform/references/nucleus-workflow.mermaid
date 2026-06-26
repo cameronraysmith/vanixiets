@@ -1,0 +1,155 @@
+%% Nucleus operator diagram — maturity-honest cut (canonicality-corrected)
+%% Lean 4 holds the structural source of truth OUTRIGHT. LinkML is NOT on the
+%% structural spine: it is an orthogonal semantic / provenance overlay joined in
+%% at the data-model (table-schema) layer. The structural round trip stays on the
+%% Lean axis. Arrow (TypedTable.to_arrow_schema()) is the single PHYSICAL oracle.
+%% stroke convention: solid = realized/near-term · dashed = to build / overlay join · dotted/muted = deferred/optional/future
+flowchart TD
+  subgraph PROOF["1 · Structural source of truth — Proof / Spec tier (Lean 4)"]
+    LEAN["Lean 4 — STRUCTURAL source of truth (outright; nothing co-claims it)<br/>ADTs incl. exhaustiveness-checked discriminated sums (A+B+C)<br/>effect-typed pipeline signatures; elaborator checks sum totality + refinements<br/>(LinkML's frame metamodel cannot: designates_type / exactly_one_of are by-convention, unchecked)"]
+    ROLES["[concept] QMADTT roles — a reading, not a compiler<br/>quantitative=erasure(+Rust affine) · coeffects=contract demands<br/>effects=I/O signature · modal/adjoint=structural round trip ◯=R∘L (NOT a codegen functor)"]
+  end
+
+  subgraph ERAS["2 · Erasure (QTT)"]
+    ERASE["Erasure boundary (QTT) — quantitative"]
+  end
+
+  subgraph DOMAIN["2b · Domain model — Lean-DIRECT, sum-rich in-memory algebra"]
+    PYI["Python domain model: Expression tagged unions<br/>(+ beartype + ty/basedpyright) — what the transforms pattern-match on"]
+    RSI["Rust domain model: enums + Result + affine ownership"]
+  end
+
+  subgraph ART["3 · Data / table artifact tier — columnar, product-oriented (Arrow = physical oracle)"]
+    TT["TypedTable (vendored LanceModel) — table schema<br/>DATA model is product-oriented regardless (Arrow union support is awkward;<br/>a sum lands as a discriminated column layout either way) → may stay a LinkML skeleton + overlay"]
+    ARROWS["Arrow schema = TypedTable.to_arrow_schema()<br/>SINGLE physical oracle"]
+    TSI["TypeScript interfaces"]
+    RUSTT["serde + arrow-rs structs (validated vs Arrow oracle)"]
+    ODCS["ODCS v3.1.0 contracts (per output port)"]
+    ODPS["ODPS v1.0.0 data products — LIVE<br/>output ports → modeling jobs (compute) · lakescope (human) · agents (future)<br/>wraps one bounded context's output; promote at 2+ consumer classes"]
+  end
+
+  subgraph SEM["S · LinkML semantic / provenance overlay — ORTHOGONAL to the Lean structural axis"]
+    LINKML["LinkML — ONE framework, semantic axis at full strength<br/>frame-based metamodel: classes / slots / inheritance / mixins<br/>ontology binding: class_uri / slot_uri / CURIE-bound enums<br/>curator / biologist-editable surface (Lean never will be)<br/>earns this axis on the mature OBO→OWL/SHACL generators + readable surface, NOT expressiveness"]
+    OWL["OWL / RDF emission"]
+    SHACL["SHACL + Pandera — dataset refinements (RDF-shape emission)"]
+  end
+
+  subgraph PLANE["4 · Compute and data plane"]
+    DAG["Dagster (single instance)"]
+    DFI["DataFusion ingest (datafusion-python)"]
+    LANCE["Lance DirectoryNamespace on R2"]
+    MPY["Modal: Python / JAX jobs"]
+  end
+
+  subgraph SERVE["5 · Serving (apps/lakescope)"]
+    AXUM["Axum + DataFusion / Ballista — serves Arrow IPC"]
+    DASH["WASM/wgpu plots · Lit · Datastar control plane"]
+  end
+
+  subgraph GATE["Reconstruction + validation (R), realized today"]
+    CI["Conformance gates = approximate R — STRUCTURAL, on the Lean axis<br/>generated-artifact drift · datacontract-cli (ODCS/ODPS)<br/>SHACL/Pandera asset checks · Arrow-oracle match"]
+  end
+
+  subgraph NOTES["binding corrections (ratified)"]
+    NORTH["ORTHOGONALITY: Lean (structural + refinement) ⟂ LinkML (semantic binding + external provenance).<br/>Semantic identity ('this slot's range is CL:0000540') is data ABSENT from any type system —<br/>new data JOINED IN at the LinkML layer, not a projection of anything in Lean."]
+    NRT["ROUND TRIP (circle) = R ∘ L is PURELY STRUCTURAL (acts on the Lean axis).<br/>Holonomy is a structural metric; it does NOT validate semantic bindings —<br/>those get their own property-based conformance test (see join), separate from the circle."]
+    NOPEN["OPEN decision — settle against the FIRST real instance: sum-fidelity vs codegen-cost.<br/>Demoting structure to Lean is a TRADE, not a free subtraction: it forfeits LinkML's mature<br/>multi-target codegen and implies a net-new [build] Lean→TypedTable / Pydantic / TS / Arrow<br/>generator that does NOT exist and may be MORE work than the Lean→LinkML projection it replaces.<br/>Not prescribed, not scaffolded here."]
+  end
+
+  subgraph DEFER["Deferred / optional / future — NOT in the live path"]
+    SUB["Substrait plan IR<br/>latent capability; real only if you pin plans or go multi-engine"]
+    AEN["Charon/Aeneas — strict R<br/>future · selective · non-concurrent Rust subset only"]
+    CUE["CUE — IN RESERVE: the answer IF a polyglot structural contract need ever appears<br/>not a current component; mostly redundant given Arrow physical oracle + Lean upstream"]
+  end
+
+  subgraph LEGEND["legend"]
+    Lr["realized / near-term"]
+    Lb["to build (bespoke)"]
+    Ld["deferred / optional / future"]
+    Lc["[concept] not enforced"]
+    Ls["semantic / provenance overlay (orthogonal)"]
+    Ln["binding correction (ratified note)"]
+  end
+
+  %% --- structural spine: Lean axis (LinkML is NOT on it) ---
+  ROLES -.frames.-> LEAN
+  LEAN -->|instantiate L| ERASE
+  ERASE -->|domain algebra · Lean-DIRECT| PYI
+  ERASE -->|domain algebra · Lean-DIRECT| RSI
+  TT --> ARROWS
+  ARROWS --> RUSTT
+  TT --> MPY
+  ARROWS --> LANCE
+  ARROWS --> DFI
+  RUSTT --> AXUM
+  RUSTT --> DFI
+  TT --> ODCS --> ODPS
+  PYI -.idioms.-> MPY
+  RSI -.idioms.-> AXUM
+
+  %% --- semantic overlay joined INTO the spine at the table-schema layer ---
+  LEAN -.build · LLM-maintained skeleton projection<br/>table schemas only · NOT a witnessed deterministic functor.-> LINKML
+  LINKML --> OWL
+  LINKML --> SHACL
+  LINKML -.overlay · ontology bindings as a mixin<br/>property-based conformance test:<br/>schema accepts exactly what the algebra emits + round-trips.-> TT
+  LINKML -.overlay codegen · data-model only.-> TSI
+
+  %% --- gates / data plane ---
+  ODCS --> CI
+  ODPS --> CI
+  SHACL --> CI
+  ODPS -.port.-> MPY
+  ODPS -.port.-> AXUM
+
+  DAG --> DFI --> LANCE
+  DAG --> MPY --> LANCE
+  LANCE --> AXUM
+  TSI --> DASH
+  AXUM --> DASH
+
+  CI -.gates.-> DAG
+  LANCE -.conformance.-> CI
+  CI -.reconstruct + validate R · structural Lean axis.-> LEAN
+  DASH -.respec.-> LEAN
+
+  %% --- deferred / reserve ---
+  AXUM -.optional: snapshot/pin plans.-> SUB
+  RUSTT -.future.-> AEN
+  AEN -.strict R: re-derive spec.-> LEAN
+  ODCS -.if a polyglot structural contract is ever needed.-> CUE
+
+  %% --- binding-correction annotations (framing only; not edges in the round trip) ---
+  NOPEN -.frames.-> TT
+  NRT -.frames.-> CI
+  NORTH -.frames.-> LINKML
+
+  classDef proof fill:#ede7ff,stroke:#6c4cd6,color:#1c1340;
+  classDef concept fill:#f3effd,stroke:#6c4cd6,color:#1c1340,stroke-dasharray:2 3;
+  classDef eras fill:#fff0e0,stroke:#d98a2b,color:#3a2400;
+  classDef build fill:#fff6ea,stroke:#d98a2b,color:#3a2400,stroke-dasharray:6 4;
+  classDef art fill:#e3f3ff,stroke:#2b86d9,color:#062138;
+  classDef impl fill:#eef7e6,stroke:#7aa53b,color:#23300a;
+  classDef semantic fill:#e0f7f4,stroke:#2bb3a3,color:#06302a;
+  classDef plane fill:#e6f7ec,stroke:#2faa5e,color:#06311a;
+  classDef serve fill:#fde7f1,stroke:#cc4f8f,color:#3a0a23;
+  classDef gate fill:#f0f0f0,stroke:#888888,color:#222222;
+  classDef deferred fill:#f5f5f5,stroke:#aaaaaa,color:#666666,stroke-dasharray:2 4;
+  classDef note fill:#fafafa,stroke:#bbbbbb,color:#444444,stroke-dasharray:1 3;
+
+  class LEAN proof;
+  class ROLES concept;
+  class ERASE eras;
+  class PYI,RSI impl;
+  class TT,ARROWS,TSI,RUSTT,ODCS,ODPS art;
+  class LINKML,OWL,SHACL semantic;
+  class DAG,DFI,LANCE,MPY plane;
+  class AXUM,DASH serve;
+  class CI gate;
+  class SUB,AEN,CUE deferred;
+  class NORTH,NRT,NOPEN note;
+  class Lr gate;
+  class Lb build;
+  class Ld deferred;
+  class Lc concept;
+  class Ls semantic;
+  class Ln note;
