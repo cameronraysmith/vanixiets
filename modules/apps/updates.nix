@@ -54,5 +54,10 @@
         type = "app";
         program = "${config.packages.duckdb.updateScript}";
       };
+
+      apps.update-quarto = {
+        type = "app";
+        program = "${config.packages.quarto-bin.updateScript}";
+      };
     };
 }

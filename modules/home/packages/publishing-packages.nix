@@ -15,7 +15,7 @@
         mermaid-cli # provides mmdc
         poppler-utils
         qpdf
-        quarto
+        quarto-bin # pkgs/by-name
         resvg
         shot-scraper
         svg2pdf

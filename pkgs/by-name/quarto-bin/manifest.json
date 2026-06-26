@@ -1,0 +1,9 @@
+{
+  "version": "1.9.37",
+  "platforms": {
+    "x86_64-linux":   { "asset": "linux-amd64", "hash": "sha256-ePzZDpg+Pn2+Pw0ZIcwQJTweynuSwg3UvCo8G8oKmvU=" },
+    "aarch64-linux":  { "asset": "linux-arm64", "hash": "sha256-uz+PCIePXZF6JNB25e84uKgcLW/PQuSpAl3HdKCB7kQ=" },
+    "aarch64-darwin": { "asset": "macos", "hash": "sha256-IX9WEFh0s4WKQlAdhMFdVaiFND2j9oUEYEbRtkWkH4Y=" },
+    "x86_64-darwin":  { "asset": "macos", "hash": "sha256-IX9WEFh0s4WKQlAdhMFdVaiFND2j9oUEYEbRtkWkH4Y=" }
+  }
+}
