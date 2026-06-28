@@ -51,6 +51,7 @@
       };
       # coderabbit-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.coderabbit-cli;
       # crush = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.crush;
+      apm = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.apm;
       cursor-agent = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.cursor-agent;
       # opencode: disabled - bun node_modules cleanup fails during build
       droid = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.droid;
@@ -101,6 +102,7 @@
           just
           mkcert
           # from llm-agents via modules/nixpkgs/overlays/beads.nix
+          apm
           beads
           cursor-agent
           droid
