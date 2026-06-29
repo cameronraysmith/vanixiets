@@ -1,9 +1,9 @@
 ## 1. Phase 1 — De-risk spike
 
-- [ ] 1.1 Create one throwaway first-party package `modules/home/ai/plugins/apm-spike/` with a brand-new skill name (no `src/core` collision)
-- [ ] 1.2 Add a nix compose derivation that generates a root consumer `apm.yml` listing the spike package + `${pkgs.agent-plugins-superpowers}` as local-path deps and runs `apm install --root $out -t agent-skills,claude` offline (HOME and `APM_CACHE_DIR` isolated, `APM_E2E_TESTS=1`, strip `apm.lock` `generated_at`)
-- [ ] 1.3 Gitignore `apm_modules/` and `build/`
-- [ ] 1.4 `nix build` and inspect `$out`; confirm it contains flat `.claude/skills/<spike-skill>/SKILL.md` AND superpowers' skills, the build is offline + deterministic, and live `~/.claude` is untouched (optional isolated `CLAUDE_CONFIG_DIR` live-load)
+- [x] 1.1 Create one throwaway first-party package `modules/home/ai/plugins/apm-spike/` with a brand-new skill name (no `src/core` collision)
+- [x] 1.2 Add a nix compose derivation that generates a root consumer `apm.yml` listing the spike package + `${pkgs.agent-plugins-superpowers}` as local-path deps and runs `apm install --root $out -t agent-skills,claude` offline (HOME and `APM_CACHE_DIR` isolated, `APM_E2E_TESTS=1`, strip `apm.lock` `generated_at`)
+- [x] 1.3 Gitignore `apm_modules/` and `build/`
+- [x] 1.4 `nix build` and inspect `$out`; confirm it contains flat `.claude/skills/<spike-skill>/SKILL.md` AND superpowers' skills, the build is offline + deterministic, and live `~/.claude` is untouched (optional isolated `CLAUDE_CONFIG_DIR` live-load)
 
 ## 2. Phase 2 — Taxonomy + bulk restructure
 

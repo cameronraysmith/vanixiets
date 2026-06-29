@@ -12,6 +12,8 @@ archive/
 
 # TypeScript/npm build artifacts
 dist/
+apm_modules/
+build/
 .astro/
 coverage/
 test-results/

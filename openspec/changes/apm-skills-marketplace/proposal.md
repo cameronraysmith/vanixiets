@@ -3,14 +3,15 @@ linear_story_id: CAM-30
 linear_story_identifier: CAM-30
 linear_story_title: "Self-sovereign apm skill marketplace + reproducible nix distribution"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-30/self-sovereign-apm-skill-marketplace-reproducible-nix-distribution
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
-last_synced_state: Todo
-last_synced_at: 2026-06-29T16:29:00Z
+last_synced_state: In Progress
+last_synced_at: 2026-06-29T18:29:04Z
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-06-29T16:29:00Z", transition: "Backlog->Todo", outcome: "posted", note: "T1 bind" }
+  - { at: "2026-06-29T18:29:04Z", transition: "Todo->In Progress", outcome: "posted", note: "T2 apply gate (first tasks.md [x]); Phase 1 spike built+verified" }
 ---
 
 ## Why

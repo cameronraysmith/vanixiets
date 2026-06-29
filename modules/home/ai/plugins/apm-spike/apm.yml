@@ -1,0 +1,4 @@
+name: spike-apm-marketplace-probe
+version: 0.0.0
+type: skill
+description: Throwaway de-risk probe for the apm-skills-marketplace nix compose. Safe to delete after Phase 1.
