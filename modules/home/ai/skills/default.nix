@@ -1,13 +1,16 @@
 # Unified AI agent skills for claude-code, codex, opencode, droid, and hermes-agent
 #
-# Skills are partitioned into core (shared across all agents), claude
-# (Claude Code-only), and third-party (from flake inputs). Third-party
-# flake inputs coerce to store path strings (not Nix paths), so modules
-# that check lib.isPath need home.file entries instead of skills options.
+# First-party skills are sourced from apm (Agent Package Manager) packages under
+# ../plugins/<package>/.apm/skills/<skill>. Each skill deploys under its flat leaf
+# name (the package name never appears in the deployed path), and every skill is
+# all-agent: the historical src/core vs src/claude split is dissolved, so all
+# harnesses receive the same set uniformly. Third-party skills (from flake inputs
+# via aiSkills.extraSkillDirs) coerce to store path strings (not Nix paths), so
+# modules that check lib.isPath need home.file entries instead of skills options.
 #
 # Agents with programs.*.skills options (claude-code, opencode) use the
 # module-native mechanism. Codex, Droid, and hermes-agent lack recursive
-# symlink support in their modules, so core skills are symlinked directly
+# symlink support in their modules, so skills are symlinked directly
 # via home.file. For hermes-agent, skills are delivered into
 # ~/.hermes/skills/ (SKILLS_DIR) directly rather than ~/.hermes/external-skills/
 # to work around an upstream bug in agent/skill_commands.py:_load_skill_payload
@@ -32,12 +35,25 @@
           lib.filterAttrs (_: type: type == "directory") (builtins.readDir dir)
         );
 
-      coreSkills = readSkillsFrom ./src/core;
-      claudeSkills = readSkillsFrom ./src/claude;
+      # First-party skills now live as apm packages under ../plugins/<package>/.apm/skills.
+      # Glob every package's .apm/skills dir (one level deep) into a flat
+      # { <skill> = path; } set keyed by the skill leaf name. Packages without an
+      # .apm/skills subdir (the throwaway apm-spike fixtures) contribute nothing.
+      pluginsRoot = ../plugins;
+      packageNames = lib.attrNames (
+        lib.filterAttrs (_: type: type == "directory") (builtins.readDir pluginsRoot)
+      );
+      skillsForPackage =
+        pkg:
+        let
+          skillsDir = pluginsRoot + "/${pkg}/.apm/skills";
+        in
+        if builtins.pathExists skillsDir then readSkillsFrom skillsDir else { };
+      allSkills = lib.foldl' (acc: pkg: acc // skillsForPackage pkg) { } packageNames;
 
       # Third-party skill directories supplied via aiSkills.extraSkillDirs.
       # Each entry is a directory (often a nix store path string) holding
-      # <name>/SKILL.md subdirs; readSkillsFrom maps it the same way as core.
+      # <name>/SKILL.md subdirs; readSkillsFrom maps it the same way as the packages.
       extraSkills = lib.foldl' (acc: dir: acc // readSkillsFrom dir) { } config.aiSkills.extraSkillDirs;
 
       # Coerce a skill source to a value home.file.source accepts. Store-path
@@ -47,8 +63,8 @@
       # store-path strings.
       toFileSource = path: builtins.path { inherit path; };
 
-      # Core skills plus any third-party skills, for the home.file-based agents.
-      fileSkills = coreSkills // extraSkills;
+      # All first-party skills plus any third-party skills, for the home.file-based agents.
+      fileSkills = allSkills // extraSkills;
 
       # Aggregated real-file skills tree for agents that cannot discover skills
       # behind symlinked SKILL.md leaves. home.file with recursive = true uses
@@ -71,16 +87,16 @@
       options.aiSkills.extraSkillDirs = lib.mkOption {
         type = lib.types.listOf (lib.types.either lib.types.path lib.types.str);
         default = [ ];
-        description = "Additional directories, each containing `<name>/SKILL.md` subdirs, whose skills are injected into all agent destinations alongside core skills. Accepts nix store paths.";
+        description = "Additional directories, each containing `<name>/SKILL.md` subdirs, whose skills are injected into all agent destinations alongside first-party skills. Accepts nix store paths.";
       };
 
       config = {
-        programs.claude-code.skills = coreSkills // extraSkills // claudeSkills;
+        programs.claude-code.skills = allSkills // extraSkills;
         # Bypass programs.codex.skills: upstream codex module omits recursive = true
         # on home.file entries, causing .before-home-manager churn on every generation
         # change. Lock to empty to prevent conflicts if upstream changes the default.
         programs.codex.skills = { };
-        programs.opencode.skills = coreSkills // extraSkills;
+        programs.opencode.skills = allSkills // extraSkills;
 
         # ~/.agents/skills delivered as real files via home.activation below
         # (not home.file) because codex skips symlinked SKILL.md leaves.

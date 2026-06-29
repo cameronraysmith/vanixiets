@@ -1,0 +1,61 @@
+name: vanixiets-skills-marketplace
+version: 0.0.0
+description: First-party AI-agent skills marketplace for vanixiets (17 packages, 104 skills).
+marketplace:
+  owner:
+    name: cameronraysmith
+    url: https://github.com/cameronraysmith
+  outputs:
+    claude: {}
+  packages:
+    - name: preferences-functional-programming-theory
+      source: ./modules/home/ai/plugins/preferences-functional-programming-theory
+      version: 0.0.0
+    - name: preferences-programming-languages
+      source: ./modules/home/ai/plugins/preferences-programming-languages
+      version: 0.0.0
+    - name: preferences-nix-and-secrets
+      source: ./modules/home/ai/plugins/preferences-nix-and-secrets
+      version: 0.0.0
+    - name: preferences-domain-driven-architecture
+      source: ./modules/home/ai/plugins/preferences-domain-driven-architecture
+      version: 0.0.0
+    - name: preferences-event-driven-systems
+      source: ./modules/home/ai/plugins/preferences-event-driven-systems
+      version: 0.0.0
+    - name: preferences-web-platform-and-deployment
+      source: ./modules/home/ai/plugins/preferences-web-platform-and-deployment
+      version: 0.0.0
+    - name: preferences-operations-and-reliability
+      source: ./modules/home/ai/plugins/preferences-operations-and-reliability
+      version: 0.0.0
+    - name: preferences-code-and-collaboration-conventions
+      source: ./modules/home/ai/plugins/preferences-code-and-collaboration-conventions
+      version: 0.0.0
+    - name: preferences-data-and-scientific-computing
+      source: ./modules/home/ai/plugins/preferences-data-and-scientific-computing
+      version: 0.0.0
+    - name: beads-issue-tracking-and-session-workflow
+      source: ./modules/home/ai/plugins/beads-issue-tracking-and-session-workflow
+      version: 0.0.0
+    - name: formal-specification-and-refinement
+      source: ./modules/home/ai/plugins/formal-specification-and-refinement
+      version: 0.0.0
+    - name: planning-and-development
+      source: ./modules/home/ai/plugins/planning-and-development
+      version: 0.0.0
+    - name: agent-orchestration-and-meta-tooling
+      source: ./modules/home/ai/plugins/agent-orchestration-and-meta-tooling
+      version: 0.0.0
+    - name: version-control-and-forge
+      source: ./modules/home/ai/plugins/version-control-and-forge
+      version: 0.0.0
+    - name: document-authoring-and-visualization
+      source: ./modules/home/ai/plugins/document-authoring-and-visualization
+      version: 0.0.0
+    - name: event-modeling-workflow
+      source: ./modules/home/ai/plugins/event-modeling-workflow
+      version: 0.0.0
+    - name: nix-build-operations
+      source: ./modules/home/ai/plugins/nix-build-operations
+      version: 0.0.0

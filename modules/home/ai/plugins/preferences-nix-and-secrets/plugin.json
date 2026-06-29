@@ -1,0 +1,5 @@
+{
+  "name": "preferences-nix-and-secrets",
+  "version": "0.0.0",
+  "description": "Nix development, flake-check architecture, CI/CD integration, and secrets-management preferences."
+}
