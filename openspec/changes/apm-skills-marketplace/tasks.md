@@ -5,6 +5,12 @@
 - [x] 1.3 Gitignore `apm_modules/` and `build/`
 - [x] 1.4 `nix build` and inspect `$out`; confirm it contains flat `.claude/skills/<spike-skill>/SKILL.md` AND superpowers' skills, the build is offline + deterministic, and live `~/.claude` is untouched (optional isolated `CLAUDE_CONFIG_DIR` live-load)
 
+## 1b. Phase 1b — Canonical-shape de-risk
+
+- [x] 1b.1 Author a throwaway canonical-shape fixture under `modules/home/ai/plugins/apm-spike-canonical/`: a marketplace root (`apm.yml` with a `marketplace:` block + `packages[].source: ./plugins/<pkg>`) and one canonical plugin (`plugin.json` + `apm.yml` + `.apm/skills/<skill>/SKILL.md`), with a deliberately-nonexistent plugin `devDependencies` ref as the non-root-devDep-skip probe
+- [x] 1b.2 Add a two-path compose derivation `pkgs/by-name/apm-spike-canonical-compose/`: producer (`apm pack` → assert `.claude-plugin/marketplace.json` carries `plugins:`) and consumer (`apm install --root $out -t agent-skills,claude` → flat `.apm/skills` promotion + offline superpowers co-ship)
+- [x] 1b.3 `nix build` + inspect: confirm `plugin.json` → MARKETPLACE_PLUGIN classification deploys `.apm/skills/<skill>` flat to `.claude/skills/<skill>` and `.agents/skills/<skill>`; superpowers co-ships; producer `marketplace.json` is valid; the bogus non-root `devDependency` is never resolved (offline build proves the skip); `nix build --rebuild` is deterministic
+
 ## 2. Phase 2 — Taxonomy + bulk restructure
 
 - [ ] 2.1 Define the package grouping for the ~104 skills

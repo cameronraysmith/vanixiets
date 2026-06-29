@@ -1,0 +1,6 @@
+name: spike-canonical-probe
+version: 0.0.0
+description: Throwaway canonical-shape probe (plugin.json + .apm/skills). Safe to delete after Phase 1b.
+devDependencies:
+  apm:
+    - cameronraysmith/apm-derisk-bogus-ref-DO-NOT-CREATE

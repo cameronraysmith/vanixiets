@@ -1,0 +1,13 @@
+name: apm-spike-canonical-marketplace
+version: 0.0.0
+description: Phase-1b throwaway canonical-shape de-risk marketplace. Safe to delete.
+marketplace:
+  owner:
+    name: cameronraysmith
+    url: https://github.com/cameronraysmith
+  outputs:
+    claude: {}
+  packages:
+    - name: spike-canonical-probe
+      source: ./plugins/spike-canonical-probe
+      version: 0.0.0

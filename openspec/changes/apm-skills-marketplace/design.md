@@ -53,13 +53,15 @@ The selected direction (captured in brainstorm.md) is to adopt apm (Agent Packag
 
 - **Choice**: a nix build derivation `fetchFromGitHub`-pins upstream deps and generates a ROOT *consumer* `apm.yml` (distinct from the producer marketplace `apm.yml`) whose `dependencies.apm` lists the first-party package dirs AND the upstream store paths as LOCAL absolute paths. The derivation runs `apm install --root $out -t agent-skills,claude,codex,hermes` with HOME isolated to a temp dir, `APM_CACHE_DIR` isolated, and `APM_E2E_TESTS=1` (suppresses a non-fatal github update probe). Nix store-pins `$out` and HM symlinks it per harness, preserving the codex real-file-copy.
 - **Rationale**: local-path deps skip apm's git-fetch code path, so the whole resolve+compose is OFFLINE and deterministic (no git tag required). The only nondeterminism is `apm.lock`'s `generated_at` timestamp, which is stripped / not harvested.
-- **Constraint (verified from apm source)**: only the ROOT manifest may declare local-path deps — a remotely-fetched parent's local-path dep is rejected — so the compose must happen at the root.
+- **Constraint (verified from apm source + Phase 1b build)**: a *remote* parent may not declare local-path deps (rejected); the root and any *local* parent may. The hermetic compose declares upstream local-path deps at the generated root consumer manifest; first-party local plugins may additionally declare their own local-path child deps (e.g. intra-monorepo siblings).
 
 ### D6: upstream "extension" is additive co-ship, not patch/override
 
 - **Choice**: superpowers (`obra/superpowers`) is consumed as a direct dependency (auto-detected by apm as a `MARKETPLACE_PLUGIN` via its `.claude-plugin/`, NO fork needed). "Extending" it means co-shipping additive skills that deploy alongside it; same-name collisions resolve by precedence / `--force`.
 - **Rationale**: apm has no patch/override mechanism, so declarative layering is unavailable; additive co-ship is the only composition primitive.
 - **Bridge fork**: the `openspec-schemas-superpowers-bridge` fork is NOT apm-installable as-is (schema.yaml + templates/, no `SKILL.md`/`.claude-plugin/`/`apm.yml`); the fork must add ONE packaging signal (a `SKILL.md` or `apm.yml`). A first-party `agentic-planning-development-workflow` package then declares deps on superpowers + the bridge fork.
+
+**Dual-manifest wiring (verified from apm source + Phase 1b build)**: each first-party plugin's own `apm.yml` declares upstream (superpowers, the bridge) under **`devDependencies.apm`** as remote refs, for publishability. Non-root `devDependencies` are NOT walked by the hermetic transitive resolver (it walks only each sub-package's regular `dependencies.apm`), so they impose no network during the nix build. The nix-generated ROOT consumer `apm.yml` declares the same upstream under `dependencies.apm` as LOCAL store-path deps, which supply the actual co-shipped content offline. A remote ref placed in a per-plugin *regular* `dependencies.apm` WOULD be transitively fetched and break the offline build, and there is no resolver-level override to remap it to a local path; a local store-path dep and a remote ref for the same upstream do not dedup (distinct unique keys), so declare each upstream exactly one way. The deployed flat skill name is the `.apm/skills/<subdir>` name (NOT the plugin name), so each skill subdir must keep its current flat name to preserve the ~70 `@`-autoload references.
 
 ### D7: lock semantics
 
@@ -70,6 +72,7 @@ The selected direction (captured in brainstorm.md) is to adopt apm (Agent Packag
 - [Risk] apm hard-errors on symlinked/out-of-`$HOME` skill destinations → Mitigation: never run apm at activation; compose at build time into `$out`, then HM symlinks (D1).
 - [Risk] non-determinism from `apm.lock` `generated_at` timestamp → Mitigation: strip / do not harvest the timestamp from the derivation output (D5).
 - [Risk] remote parent local-path dep rejection → Mitigation: declare all local-path deps only at the ROOT consumer manifest (D5 constraint).
+- [Risk] `apm install` of an upstream plugin that ships a `hooks/` dir (e.g. superpowers) integrates those hooks into a composed `.claude/settings.json` (plus `apm-hooks.json` and `hooks/`) → Mitigation: the Phase-3 consume step symlinks only the per-harness `skills/` subtree from `$out`, never the composed `settings.json`/`hooks/`; hooks remain owned by the agent-specific home-manager modules (this change stays skills-only).
 - [Trade-off] no runtime `plugin:skill` namespacing → accepted: flat names avoid reworking ~70 `@`-autoload references; namespacing deferred (D2).
 - [Trade-off] no patch/override of upstream plugins → accepted: extension is additive co-ship only (D6).
 - [Trade-off] droid/factory is not an apm target → accepted: apm's generic agent-skills target writes `~/.agents/skills`, so either map droid to consume `~/.agents/skills` or keep nix fan-out for `~/.factory/skills`.
