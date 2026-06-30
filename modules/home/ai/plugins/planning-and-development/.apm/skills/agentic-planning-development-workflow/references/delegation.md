@@ -13,8 +13,8 @@ Each execution mode dispatches to its own surface, and the router carries the mo
 AFK hands off to the Claude Code Workflows feature.
 The handoff act is the router relinquishing step-by-step control to the Workflows feature, which then drives the unit of work to In Review tracking via its plan checkboxes.
 
-HIL delegates to the opsx and superpowers skills via the superpowers-bridge.
-The router does not drive the spec-first lifecycle itself; it dispatches to opsx:* and the superpowers bridge skills and routes on their milestones.
+HIL delegates to the openspec-* and superpowers skills via the superpowers-bridge.
+The router does not drive the spec-first lifecycle itself; it dispatches to the openspec-* and the superpowers bridge skills and routes on their milestones.
 
 Manual is a pass-through to the session-* loop: /session-orient then /session-plan then /session-review then /session-checkpoint.
 The router invokes /session-orient and steps aside; the session-* skills are an in-place Viable System Model state machine the router selects among, not one it duplicates.

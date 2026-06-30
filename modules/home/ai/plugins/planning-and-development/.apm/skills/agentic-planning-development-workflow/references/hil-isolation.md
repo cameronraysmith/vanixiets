@@ -1,6 +1,6 @@
 # HIL apply-phase isolation under jj mode
 
-The HIL mode delegates to opsx and superpowers via the superpowers-bridge.
+The HIL mode delegates to the openspec-* and superpowers skills via the superpowers-bridge.
 The bridge apply node reaches superpowers:using-git-worktrees, which resolves to a raw git worktree add.
 In this jj-mode environment that surface is hook-blocked, so the router carries isolation guidance rather than assuming git worktree add succeeds.
 

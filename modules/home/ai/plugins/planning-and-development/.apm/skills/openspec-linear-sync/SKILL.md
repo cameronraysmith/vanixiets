@@ -8,7 +8,7 @@ description: "linear-cli-driven Linear-to-OpenSpec lifecycle sync overlay that b
 This overlay binds one Linear story per OpenSpec change and projects each change's lifecycle phase onto the team-visible Linear board.
 A single monorepo runs N concurrent changes whose stories span different Linear teams and projects, enumerated by the openspec/linear.yaml registry (workspace, teams, projects, and per-project documents); each change's per-issue binding and D10 sync ledger live in its own proposal.md frontmatter.
 It is a thin link-and-sync policy layer over the OpenSpec change lifecycle: OpenSpec and the superpowers-bridge own the spec-first "how", Linear owns the business "what" and the stakeholder status surface, and `openspec/specs/` is the single source of truth.
-The overlay never replaces any OpenSpec skill; layer it around the base `openspec-*` and `opsx:*` skills for normal artifact generation, task execution, and archive mechanics.
+The overlay never replaces any OpenSpec skill; layer it around the base `openspec-*` skills for normal artifact generation, task execution, and archive mechanics.
 
 The overlay drives every Linear operation through the linear-cli binary and composes the bundled linear-cli skill for the verbs.
 It recommends against the Linear MCP, which is disabled in this environment, and gracefully no-ops when linear-cli or its credentials are absent.

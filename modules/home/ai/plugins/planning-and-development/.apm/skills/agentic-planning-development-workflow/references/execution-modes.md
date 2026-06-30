@@ -25,7 +25,7 @@ AFK is therefore not yet end-to-end drivable: both the dispatch target and the v
 
 ## HIL
 
-Delegate to the opsx and superpowers skills via the superpowers-bridge for human-in-the-loop spec-first development.
+Delegate to the openspec-* and superpowers skills via the superpowers-bridge for human-in-the-loop spec-first development.
 The human stays in the loop across the bridge lifecycle, supplying decisions at brainstorm, proposal, and apply boundaries.
 
 Authoritative ledger: the OpenSpec tasks.md.

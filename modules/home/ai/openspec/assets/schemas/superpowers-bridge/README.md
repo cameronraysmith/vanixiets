@@ -107,7 +107,7 @@ rm -rf /tmp/oss-upgrade
 
 > The bridge directory is monolithic — you take the whole new version or stay on the old one. There is no per-file opt-in. CLAUDE.md is the only project-root file the upgrade ever touches, and never without your ack.
 
-> In-flight changes (any phase: brainstorm / design / specs / ...) remain valid because the schema graph (`requires:` edges, PRECHECKs, artifact dependencies) hasn't changed in v1.x. Existing `verify.md` / `retrospective.md` from before the upgrade are still readable; if you re-run `/opsx:verify` or `/opsx:continue → retrospective` on them, the new template structure applies on overwrite.
+> In-flight changes (any phase: brainstorm / design / specs / ...) remain valid because the schema graph (`requires:` edges, PRECHECKs, artifact dependencies) hasn't changed in v1.x. Existing `verify.md` / `retrospective.md` from before the upgrade are still readable; if you re-run the `openspec-verify-change` skill or the `openspec-continue-change` skill (→ retrospective) on them, the new template structure applies on overwrite.
 
 > If a future upgrade modifies the schema graph structurally (artifact add/remove, `requires:` edge changes, PRECHECK changes), the README will gain a version field and a migration guide. v1 → v1.x prose-only changes are safe and do not need migration.
 
@@ -126,29 +126,29 @@ OpenSpec governs **what to do** (artifact lifecycle: proposal / specs / tasks / 
 Two alternatives were considered and rejected:
 
 - **Adding custom fields to `config.yaml`** (e.g., `skill_bindings`): the OpenSpec CLI does not recognize them — no validation, no discoverability, requires editing multiple SKILL.md files.
-- **Editing the opsx skill files directly**: invasive (affects every change) and fragile (overwritten on SKILL.md upgrade).
+- **Editing the `openspec-*` skill files directly**: invasive (affects every change) and fragile (overwritten on SKILL.md upgrade).
 
-A custom schema uses OpenSpec's **native project-level schema mechanism**: the CLI validates structure, `openspec schemas` lists it automatically, each change picks its schema independently (`--schema spec-driven` or `--schema superpowers-bridge`), and no existing SKILL.md or command file is modified.
+A custom schema uses OpenSpec's **native project-level schema mechanism**: the CLI validates structure, `openspec schemas` lists it automatically, each change picks its schema independently (the `openspec-new-change` skill honors `--schema spec-driven` or `--schema superpowers-bridge` at creation, after which the schema is sticky), and no existing SKILL.md is modified.
 
 ---
 
 ## Entry & exit gates
 
-This schema's instructions only fire when invoked through `/opsx:*` commands. If you trigger Superpowers skills via narrative — for example, by saying "let's discuss the architecture" — the default behavior bypasses the schema. Brainstorming will still write to `docs/superpowers/specs/`, defeating the integration's redirection.
+This schema's instructions only fire when the change lifecycle is driven through the `openspec-*` skills. If you trigger Superpowers skills via narrative — for example, by saying "let's discuss the architecture" — the default behavior bypasses the schema. Brainstorming will still write to `docs/superpowers/specs/`, defeating the integration's redirection.
 
 This section covers three things:
 
 1. When you don't need to enter the schema at all (just open a PR)
-2. When verbal brainstorming should be promoted to an opsx change
+2. When verbal brainstorming should be promoted to an OpenSpec change
 3. Front-door anti-patterns to avoid once the schema is installed
 
 ### When NOT to enter the schema (direct PR)
 
-Not every change needs a `change` directory. The following scenarios should skip opsx entirely:
+Not every change needs a `change` directory. The following scenarios should skip the change workflow entirely:
 
 | Scenario | Need a change? | What to do |
 |---|---|---|
-| New feature / new capability | (yes) Yes | `/opsx:new <name> --schema superpowers-bridge` |
+| New feature / new capability | (yes) Yes | invoke the `openspec-new-change` skill with schema `superpowers-bridge` |
 | Breaking change | (yes) Yes | Same |
 | Architecture change | (yes) Yes | Same |
 | Bug fix (restoring intended behavior, no contract change) | (no) No | Direct PR |
@@ -164,7 +164,7 @@ Not every change needs a `change` directory. The following scenarios should skip
 
 If `superpowers:brainstorming` was triggered via narrative ("let's brainstorm the architecture") in a project that uses this schema, the brainstorming output **MUST NOT** land in `docs/superpowers/specs/` — that bypasses the schema's output redirection and creates orphan artifacts.
 
-The correct flow: keep brainstorming verbally until all 5 conditions below hold, then promote to `/opsx:propose` or `/opsx:new` so the agreed design lands in `openspec/changes/<name>/brainstorm.md`.
+The correct flow: keep brainstorming verbally until all 5 conditions below hold, then promote by invoking the `openspec-propose` or `openspec-new-change` skill so the agreed design lands in `openspec/changes/<name>/brainstorm.md`.
 
 1. **Scope locked** — one sentence describes what's in / out, and the scope doesn't keep growing each turn
 2. **Major design forks resolved** — alternatives have been weighed and one chosen; remaining unknowns are **explicit TBDs** (with owner and impact-scope statement), not "haven't thought about it yet"
@@ -173,8 +173,8 @@ The correct flow: keep brainstorming verbally until all 5 conditions below hold,
 5. **Conversation converging** — the last 1-2 turns are confirmations, not new "what about..." forks
 
 If any condition is missing, keep brainstorming. When all five hold:
-- The model **should proactively suggest** "this looks ready for `/opsx:propose` — want to open a change?"
-- The user **may also explicitly say** "open this as an opsx change"
+- The model **should proactively suggest** "this looks ready for the `openspec-propose` skill — want to open a change?"
+- The user **may also explicitly say** "open this as an OpenSpec change"
 - Either way, **promotion requires a deliberate human ack** — never automatic
 
 ### Front-door anti-patterns
@@ -183,7 +183,7 @@ If any condition is missing, keep brainstorming. When all five hold:
 |---|---|
 | Letting brainstorming write to `docs/superpowers/specs/` after the schema is installed | Bypasses redirection at [schema.yaml](./schema.yaml) lines 35-39; produces orphan artifacts |
 | Letting writing-plans write to `docs/superpowers/plans/` | Same reason (schema.yaml lines 169-171) |
-| Promoting to opsx with unresolved blocking TBDs | Those TBDs will block apply phase too — promotion just defers the same problem |
+| Promoting to a change with unresolved blocking TBDs | Those TBDs will block apply phase too — promotion just defers the same problem |
 | Opening a change for bug fix / typo / config tweak | Process ceremony exceeds actual risk; slows delivery without value |
 
 ---
@@ -215,7 +215,7 @@ The Artifact DAG above shows **file-existence** dependencies. The runtime lifecy
 
 ```mermaid
 flowchart TD
-    Start([/opsx:propose · /opsx:new])
+    Start(["openspec-propose · openspec-new-change"])
 
     subgraph Plan ["📝 PLANNING — 7 artifacts"]
         direction TB
@@ -318,42 +318,39 @@ Implemented purely via context injection at invocation time, not by modifying sk
 ## Usage
 
 ### Quick flow (recommended)
-```bash
-/opsx:ff my-feature    # one-shot: scaffold + brainstorm + proposal + design + specs + tasks + plan
-/opsx:apply            # worktree + subagent-driven-development (with TDD + code-review)
-/opsx:verify           # produces verify.md (7 checks)
-/opsx:continue         # → retrospective (produces retrospective.md, §0 + 6 sections)
-/opsx:archive          # archive
-```
+
+Each step is a Skill-tool invocation:
+
+1. `openspec-ff-change` — one-shot: scaffold + brainstorm + proposal + design + specs + tasks + plan.
+2. `openspec-apply-change` — worktree + subagent-driven-development (with TDD + code-review).
+3. `openspec-verify-change` — produces verify.md (7 checks).
+4. `openspec-continue-change` — → retrospective (produces retrospective.md, §0 + 6 sections).
+5. `openspec-archive-change` — archive.
 
 ### Step-by-step flow
-```bash
-/opsx:new my-feature --schema superpowers-bridge
-/opsx:continue         # → brainstorm (interactive dialogue)
-/opsx:continue         # → proposal
-/opsx:continue         # → design (reorganize brainstorm into structured decisions)
-/opsx:continue         # → specs
-/opsx:continue         # → tasks
-/opsx:continue         # → plan
-/opsx:apply            # → implementation + worktree + subagent-driven-development
-/opsx:verify           # → verify.md (post-apply, runs the 7 checks)
-/opsx:continue         # → retrospective.md (post-verify, evidence-first §0 + 6 sections)
-/opsx:archive
-```
+
+1. `openspec-new-change` with `--schema superpowers-bridge`.
+2. `openspec-continue-change` — → brainstorm (interactive dialogue).
+3. `openspec-continue-change` — → proposal.
+4. `openspec-continue-change` — → design (reorganize brainstorm into structured decisions).
+5. `openspec-continue-change` — → specs.
+6. `openspec-continue-change` — → tasks.
+7. `openspec-continue-change` — → plan.
+8. `openspec-apply-change` — → implementation + worktree + subagent-driven-development.
+9. `openspec-verify-change` — → verify.md (post-apply, runs the 7 checks).
+10. `openspec-continue-change` — → retrospective.md (post-verify, evidence-first §0 + 6 sections).
+11. `openspec-archive-change`.
 
 ### Switching back to spec-driven
-```bash
-# Use a different schema for one change
-/opsx:new my-simple-fix --schema spec-driven
 
-# Or change project default in openspec/config.yaml: schema: spec-driven
-```
+To use a different schema for one change, invoke the `openspec-new-change` skill with `--schema spec-driven`.
+Or change the project default in `openspec/config.yaml`: `schema: spec-driven`.
 
 ---
 
 ## Apply phase walkthrough
 
-`/opsx:apply` triggers the steps inside [schema.yaml](./schema.yaml)'s `apply.instruction`:
+Invoking the `openspec-apply-change` skill triggers the steps inside [schema.yaml](./schema.yaml)'s `apply.instruction`:
 
 #### 0. Pre-flight — verify required Superpowers skills
 
@@ -396,7 +393,7 @@ Evidence-first reflection: §0 Evidence (quantitative front-matter — commit co
 
 Written **before** opening the PR so retro lands in the same PR diff.
 
-#### 5. Archive — `openspec archive -y` (or `/opsx:archive`)
+#### 5. Archive — `openspec archive -y` (or the `openspec-archive-change` skill)
 
 Syncs delta specs into `openspec/specs/<capability>/spec.md` and moves the change folder to `openspec/changes/archive/YYYY-MM-DD-<name>/`. Run **before** the PR opens so the diff reflects the complete archived cycle (all artifacts done, spec synced, folder under archive/).
 
@@ -408,16 +405,16 @@ Confirms tests are green, presents merge / PR / keep-branch / discard options, c
 
 ## CLI cheat sheet
 
-| Scenario | Command |
+| Scenario | Skill or command |
 |---|---|
 | First clone of a project | `bash scripts/install-git-hooks.sh` |
-| New change (interactive) | `/opsx:new <name> --schema superpowers-bridge` then `/opsx:continue` |
-| New change (one-shot) | `/opsx:ff <name>` |
-| Resume an interrupted change | `/opsx:continue <name>` |
-| Enter implementation | `/opsx:apply <name>` |
-| Manual verify | `/opsx:verify <name>` |
-| Archive | `/opsx:archive <name>` |
-| Use built-in (skip brainstorm) | `/opsx:new <name> --schema spec-driven` |
+| New change (interactive) | `openspec-new-change` (`--schema superpowers-bridge`) then `openspec-continue-change` |
+| New change (one-shot) | `openspec-ff-change` |
+| Resume an interrupted change | `openspec-continue-change` |
+| Enter implementation | `openspec-apply-change` |
+| Manual verify | `openspec-verify-change` |
+| Archive | `openspec-archive-change` |
+| Use built-in (skip brainstorm) | `openspec-new-change` (`--schema spec-driven`) |
 | List all schemas in the project | `openspec schemas` |
 | Inspect a change's progress | `openspec status --change <name> --json` |
 | List active changes | `openspec list` |

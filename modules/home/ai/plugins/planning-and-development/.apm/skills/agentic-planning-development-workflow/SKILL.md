@@ -28,22 +28,22 @@ Orient beads for the Manual-mode drill-down via /session-orient (session-advisor
 ### Quick flow (HIL)
 
 The spec-first default path; the router frames, the bridge drives, and openspec-linear-sync mirrors phase to Linear state.
+Each step is a Skill-tool invocation, with the board transition it fires called out inline.
 
-```text
-/agentic-planning-development-workflow   # front door: place the unit on the board; the human picks HIL at the Todo to In Progress fork
-/opsx:ff --schema superpowers-bridge     # all 8 bridge artifacts; proposal.md creation => T1 Backlog to Todo: openspec-linear-sync binds linear_story_*, seeds the issue description, and sets Todo
-/opsx:apply                              # implement tasks.md; the first - [x] => T2 Todo to In Progress
-/opsx:verify                             # writes verify.md => T3 In Progress to In Review; then roborev then documenter, both human-steered
-/opsx:continue                           # the retrospective artifact, inside the In Review window
-/opsx:archive                            # readiness then sync then archive then mirror UPSERT => T4 In Review to Done; Done binds to archive
-```
+1. Invoke the `agentic-planning-development-workflow` skill as the front door: place the unit on the board; the human picks HIL at the Todo to In Progress fork.
+2. Invoke the `openspec-ff-change` skill for all 8 bridge artifacts; the schema is the project default `superpowers-bridge` (set in `openspec/config.yaml`), so no per-invocation flag is needed; proposal.md creation => T1 Backlog to Todo: openspec-linear-sync binds linear_story_*, seeds the issue description, and sets Todo.
+3. Invoke the `openspec-apply-change` skill to implement tasks.md; the first `- [x]` => T2 Todo to In Progress.
+4. Invoke the `openspec-verify-change` skill, which writes verify.md => T3 In Progress to In Review; then roborev then documenter, both human-steered.
+5. Invoke the `openspec-continue-change` skill for the retrospective artifact, inside the In Review window.
+6. Invoke the `openspec-archive-change` skill: readiness then sync then archive then mirror UPSERT => T4 In Review to Done; Done binds to archive.
 
 The shared re-queue receives a verify.md checked-FAIL `(fail) FAIL` or a rejection at either In-Review sub-gate and routes In Review back to In Progress above the mode fork, under a bounded-retries default of 3; the re-queue and bounded-retries mechanics live in references/board-and-gates.md and the transition mechanics in openspec-linear-sync/references/lifecycle.md.
 Catch-up reconciliation fires a single transition straight to the local phase when the local phase and the resolved Linear state disagree by more than one step, rather than walking the intermediate crossings; it is owned by openspec-linear-sync/references/lifecycle.md, with the board side in references/board-and-gates.md.
 
 ### Step-by-step note
 
-`/opsx:ff --schema superpowers-bridge` is interchangeable with `/opsx:new --schema superpowers-bridge` then `/opsx:continue` six times.
+`openspec-ff-change` (one-shot) ≡ `openspec-new-change` (schema = the project default `superpowers-bridge`) then `openspec-continue-change` ×6.
+The schema is selected once at change creation via the project default; there is no `ff` CLI flag carrying `--schema`.
 Use the fast-forward for the one-shot lean and the stepped form when a human checkpoint between artifacts is wanted; the per-mode delegation that makes this an HIL-path choice lives in references/execution-modes.md.
 
 ### AFK and Manual variants
@@ -80,7 +80,7 @@ A human picks the mode per-issue with no automatic Linear-label selection, and a
 The chosen mode fixes the authoritative task ledger for that unit of work for the duration:
 
 AFK hands off to the Claude Code Workflows feature and tracks via its plan checkboxes.
-HIL delegates to the opsx and superpowers skills via the superpowers-bridge, where the OpenSpec tasks.md is the authoritative ledger.
+HIL delegates to the openspec-* and superpowers skills via the superpowers-bridge, where the OpenSpec tasks.md is the authoritative ledger.
 Manual is a pass-through to the session-* loop, where the beads /session-orient to /session-checkpoint cycle is the ledger.
 
 A re-queued unit defaults to its original mode unless the human explicitly overrides at the fork, which keeps a single authoritative ledger per unit across re-queues.
@@ -94,7 +94,7 @@ It dispatches each mode to its execution surface and presents the mode-agnostic 
 | Mode | Delegation target |
 |---|---|
 | AFK | the Claude Code Workflows feature (handoff act; concrete dispatch target a bounded open point) |
-| HIL | opsx:* plus superpowers via the superpowers-bridge |
+| HIL | the openspec-* skills plus superpowers via the superpowers-bridge |
 | Manual | /session-orient then /session-plan then /session-review then /session-checkpoint |
 
 session-advisor is referenced as the Manual-path diagnostic engine, not duplicated; the session-advisor-to-router routing overlap is a deferred follow-up.
