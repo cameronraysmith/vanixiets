@@ -1,13 +1,14 @@
 name: planning-and-development
 version: 0.0.0
-description: Planning and development skills — agentic planning-and-development workflow, OpenSpec/Linear sync, project management.
-devDependencies:
+description: Planning and development skills — agentic planning-and-development workflow, the bundled OpenSpec change-lifecycle workflow skills, OpenSpec/Linear sync, and project management.
+dependencies:
   apm:
-    # Upstream publishability annotation (design.md D6). Remote refs under
-    # devDependencies are NOT walked by apm's offline resolver, so this imposes
-    # no fetch at `apm pack` or hermetic-compose time; it co-ships superpowers
-    # alongside the agentic planning workflow at install time.
-    - obra/superpowers
+    # superpowers as a regular (walked) remote dep pinned to the full 40-char SHA
+    # (design.md D11). The nix compose resolves this offline by pre-seeding apm's
+    # git checkout cache from the flake-pinned tree before `apm install`, so it
+    # records a remote-style resolved_commit lock with zero network. The full SHA
+    # is required; a short ref forces a network fetch.
+    - obra/superpowers#f2cbfbefebbfef77321e4c9abc9e949826bea9d7
 # Soft coupling (agentic planning Manual execution mode): this package pairs with
 # beads-issue-tracking-and-session-workflow@vanixiets. It is
 # deliberately a comment, not a hard dependency — Manual mode must not force beads

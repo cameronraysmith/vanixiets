@@ -34,13 +34,20 @@
               };
             }
           );
-          default = [
-            {
-              name = "superpowers-src";
-              src = pkgs.agent-plugins-superpowers;
-            }
-          ];
-          description = "Upstream apm dependencies (e.g. superpowers; later the agentic-planning bridge fork) additively co-shipped alongside first-party skills. Same-name collisions resolve by apm precedence (design D6).";
+          default = [ ];
+          description = "Upstream apm dependencies additively co-shipped alongside first-party skills. Empty now that superpowers is a regular remote apm dep resolved offline via the compose's git-cache pre-warm (design D11); retained for a future additive co-ship. Same-name collisions resolve by apm precedence (design D6).";
+        };
+
+        superpowersSrc = lib.mkOption {
+          type = lib.types.package;
+          default = pkgs.agent-plugins-superpowers;
+          description = "Flake-pinned superpowers tree feeding apm's git checkout cache so the regular remote superpowers dep resolves offline (design D11).";
+        };
+
+        superpowersRev = lib.mkOption {
+          type = lib.types.str;
+          default = pkgs.agent-plugins-superpowers.rev;
+          description = "Full 40-char superpowers commit SHA; the single source of truth reconciled against the planning-and-development/apm.yml pin by the compose drift guard (design D11).";
         };
 
         apmTargets = lib.mkOption {
@@ -62,6 +69,8 @@
       config.aiSkills.composed = pkgs.apm-skills-compose.override {
         firstPartyPackages = config.aiSkills.packages;
         upstreamDeps = config.aiSkills.upstreamDeps;
+        superpowersSrc = config.aiSkills.superpowersSrc;
+        superpowersRev = config.aiSkills.superpowersRev;
         targets = config.aiSkills.apmTargets;
       };
     };

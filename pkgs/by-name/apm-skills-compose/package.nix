@@ -18,13 +18,17 @@
       )
     ),
 
-  # Upstream additive co-ship deps; Phase 4 appends the bridge fork.
-  upstreamDeps ? [
-    {
-      name = "superpowers-src";
-      src = inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-superpowers;
-    }
-  ],
+  # Upstream additive co-ship deps. Empty now that superpowers is a regular remote
+  # apm dep declared in planning-and-development/apm.yml and resolved offline via
+  # the git-cache pre-warm below (design.md D11).
+  upstreamDeps ? [ ],
+
+  # Flake-pinned superpowers tree feeding apm's git checkout cache so the remote
+  # dep resolves with zero network. superpowersRev is the single SHA source of
+  # truth (the fetchFromGitHub rev), reconciled against the apm.yml pin by the
+  # drift guard in the build script.
+  superpowersSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-superpowers,
+  superpowersRev ? superpowersSrc.rev,
 
   targets ? [
     "agent-skills"
@@ -63,7 +67,7 @@ runCommandLocal "apm-skills-compose"
   {
     nativeBuildInputs = [ apm ];
     meta = {
-      description = "Consumer apm compose over all auto-discovered first-party plugin packages plus upstream deps (superpowers), emitting flat .claude/skills and .agents/skills trees for the vanixiets marketplace.";
+      description = "Consumer apm compose over all auto-discovered first-party plugin packages, emitting flat .claude/skills and .agents/skills trees for the vanixiets marketplace; superpowers resolves as a regular remote apm dep offline via a pre-warmed git checkout cache.";
     };
   }
   ''
@@ -80,6 +84,26 @@ runCommandLocal "apm-skills-compose"
 
     ${copyUpstreamDeps}
 
+    # Pre-seed apm's git checkout cache from the flake-pinned superpowers tree so
+    # the regular remote dep in planning-and-development/apm.yml resolves with zero
+    # network (design.md D11). Shard = first 16 hex of sha256 of the repo URL; the
+    # stub .git/HEAD pins the full 40-hex SHA apm matches against the declared ref.
+    SP_SHA=${superpowersRev}
+    SHARD=$(printf '%s' 'https://github.com/obra/superpowers' | sha256sum | cut -c1-16)
+    CK="$APM_CACHE_DIR/git/checkouts_v1/$SHARD/$SP_SHA/full"
+    mkdir -p "$CK"
+    cp -RL ${superpowersSrc}/. "$CK"/
+    chmod -R u+w "$CK"
+    mkdir -p "$CK/.git"
+    printf '%s\n' "$SP_SHA" > "$CK/.git/HEAD"
+
+    # A drifted apm.yml pin would silently fall back to a network fetch of the
+    # declared SHA, breaking the hermetic offline compose; fail loudly instead.
+    if ! grep -q "$SP_SHA" ./planning-and-development/apm.yml; then
+      echo "apm-skills-compose: superpowers SHA drift — planning-and-development/apm.yml does not pin $SP_SHA" >&2
+      exit 1
+    fi
+
     cp ${rootConsumerManifest} ./apm.yml
     # agent-skills,claude only: the codex/hermes/opencode/droid harnesses are
     # fanned out nix-side from this composed $out in a later task, not by apm.
@@ -95,6 +119,7 @@ runCommandLocal "apm-skills-compose"
       "$out/.claude/skills/nix-flake-pr-cycle/SKILL.md" \
       "$out/.agents/skills/nix-flake-pr-cycle/SKILL.md" \
       "$out/.claude/skills/systematic-debugging/SKILL.md" \
+      "$out/.claude/skills/brainstorming/SKILL.md" \
       "$out/.agents/skills/brainstorming/SKILL.md"; do
       if [ ! -f "$expected" ]; then
         echo "apm-skills-compose assertion failed: missing $expected" >&2
