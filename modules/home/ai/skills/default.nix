@@ -1,12 +1,15 @@
 # Unified AI agent skills for claude-code, codex, opencode, droid, and hermes-agent
 #
-# First-party skills are sourced from apm (Agent Package Manager) packages under
-# ../plugins/<package>/.apm/skills/<skill>. Each skill deploys under its flat leaf
-# name (the package name never appears in the deployed path), and every skill is
-# all-agent: the historical src/core vs src/claude split is dissolved, so all
-# harnesses receive the same set uniformly. Third-party skills (from flake inputs
-# via aiSkills.extraSkillDirs) coerce to store path strings (not Nix paths), so
-# modules that check lib.isPath need home.file entries instead of skills options.
+# First-party skills (apm packages under ../plugins/<package>/.apm/skills) plus
+# additively co-shipped upstream skills (superpowers, later the bridge) are
+# composed offline into a single flat marketplace tree by aiSkills.composed (see
+# compose.nix). This module re-globs that derivation's .claude/skills/ subtree, so
+# each skill deploys under its flat leaf name (the package name never appears in
+# the deployed path) and every skill is all-agent: the historical src/core vs
+# src/claude split is dissolved, so all harnesses receive the same set uniformly.
+# Additional third-party skills (from flake inputs via aiSkills.extraSkillDirs)
+# coerce to store path strings (not Nix paths), so modules that check lib.isPath
+# need home.file entries instead of skills options.
 #
 # Agents with programs.*.skills options (claude-code, opencode) use the
 # module-native mechanism. Codex, Droid, and hermes-agent lack recursive
@@ -35,21 +38,16 @@
           lib.filterAttrs (_: type: type == "directory") (builtins.readDir dir)
         );
 
-      # First-party skills now live as apm packages under ../plugins/<package>/.apm/skills.
-      # Glob every package's .apm/skills dir (one level deep) into a flat
-      # { <skill> = path; } set keyed by the skill leaf name. Packages without an
-      # .apm/skills subdir (the throwaway apm-spike fixtures) contribute nothing.
-      pluginsRoot = ../plugins;
-      packageNames = lib.attrNames (
-        lib.filterAttrs (_: type: type == "directory") (builtins.readDir pluginsRoot)
-      );
-      skillsForPackage =
-        pkg:
-        let
-          skillsDir = pluginsRoot + "/${pkg}/.apm/skills";
-        in
-        if builtins.pathExists skillsDir then readSkillsFrom skillsDir else { };
-      allSkills = lib.foldl' (acc: pkg: acc // skillsForPackage pkg) { } packageNames;
+      # First-party skills plus additively co-shipped upstream skills (superpowers,
+      # later the bridge) are composed offline by aiSkills.composed (apm-skills-compose),
+      # which emits a flat ${out}/.claude/skills/<skill>/SKILL.md tree. Re-glob ONLY
+      # that skills/ subtree back into the { <skill> = path; } shape the sinks expect.
+      # We deliberately never reference ${composed}/.claude/settings.json or any hooks/
+      # that superpowers contributes (design.md D6 / hooks risk note).
+      #
+      # readDir over a derivation output is import-from-derivation: evaluating the
+      # skills attrset realizes aiSkills.composed.
+      allSkills = readSkillsFrom "${config.aiSkills.composed}/.claude/skills";
 
       # Third-party skill directories supplied via aiSkills.extraSkillDirs.
       # Each entry is a directory (often a nix store path string) holding
