@@ -1,8 +1,9 @@
 # Unified AI agent skills for claude-code, codex, opencode, droid, and hermes-agent
 #
-# First-party skills (apm packages under ../plugins/<package>/.apm/skills) plus
-# additively co-shipped upstream skills (superpowers, later the bridge) are
-# composed offline into a single flat marketplace tree by aiSkills.composed (see
+# First-party skills (apm packages under ../plugins/<package>/.apm/skills, e.g. the
+# 11 openspec-* skills shipped inside planning-and-development) plus superpowers — a
+# regular remote apm dependency resolved offline via the git-cache pre-warm (D11) —
+# are composed offline into a single flat marketplace tree by aiSkills.composed (see
 # compose.nix). This module re-globs that derivation's .claude/skills/ subtree, so
 # each skill deploys under its flat leaf name (the package name never appears in
 # the deployed path) and every skill is all-agent: the historical src/core vs
@@ -38,8 +39,8 @@
           lib.filterAttrs (_: type: type == "directory") (builtins.readDir dir)
         );
 
-      # First-party skills plus additively co-shipped upstream skills (superpowers,
-      # later the bridge) are composed offline by aiSkills.composed (apm-skills-compose),
+      # First-party skills plus superpowers (a regular remote apm dependency resolved
+      # offline via the git-cache pre-warm, D11) are composed offline by aiSkills.composed (apm-skills-compose),
       # which emits a flat ${out}/.claude/skills/<skill>/SKILL.md tree. Re-glob ONLY
       # that skills/ subtree back into the { <skill> = path; } shape the sinks expect.
       # We deliberately never reference ${composed}/.claude/settings.json or any hooks/

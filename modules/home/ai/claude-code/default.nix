@@ -101,12 +101,6 @@
                     path = "${pkgs.agent-plugins-ouroboros}";
                   };
                 };
-                superpowers-dev = {
-                  source = {
-                    source = "directory";
-                    path = "${pkgs.agent-plugins-superpowers}";
-                  };
-                };
               };
               enabledPlugins = {
                 # claude-plugins-official
@@ -130,7 +124,8 @@
                 "posthog@claude-plugins-official" = false;
                 "sentry@claude-plugins-official" = false;
                 "skill-creator@claude-plugins-official" = true;
-                "superpowers@claude-plugins-official" = false; # migrated to pinned superpowers-dev marketplace (obra/superpowers @ v5.1.0)
+                # superpowers skills ship via the apm package dependency (the flat composed copy in modules/home/ai/skills), so the duplicate Claude-plugin delivery is disabled; pkgs.agent-plugins-superpowers is retained as the apm cache-warm feed.
+                "superpowers@claude-plugins-official" = false;
                 # cognee
                 "cognee-memory@cognee" = false;
                 # cloudflare
@@ -152,8 +147,6 @@
                 "clinical-trials@life-sciences" = false;
                 # ouroboros
                 "ouroboros@ouroboros" = true;
-                # superpowers-dev
-                "superpowers@superpowers-dev" = true;
               };
               voiceEnabled = true;
               remoteControlAtStartup = true;
