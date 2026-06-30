@@ -63,7 +63,7 @@ runCommandLocal "apm-skills-compose"
   {
     nativeBuildInputs = [ apm ];
     meta = {
-      description = "Consumer apm compose over all 17 first-party plugin packages plus superpowers, emitting flat .claude/skills and .agents/skills trees. Generalizes the Phase-1 apm-spike-compose proof across the full marketplace.";
+      description = "Consumer apm compose over all auto-discovered first-party plugin packages plus upstream deps (superpowers), emitting flat .claude/skills and .agents/skills trees for the vanixiets marketplace.";
     };
   }
   ''

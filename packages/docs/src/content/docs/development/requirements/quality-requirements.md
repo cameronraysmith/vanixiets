@@ -447,6 +447,11 @@ hash2=$(nix path-info .#darwinConfigurations.<hostname>.system)
 nix flake check --no-allow-import-from-derivation
 ```
 
+The `--no-allow-import-from-derivation` form scopes this purity measurement to the flake's IFD-free evaluation surface, with one accepted, documented exception.
+`modules/home/ai/skills/default.nix` deliberately consumes the `apm-skills-compose` derivation output via `builtins.readDir` (import-from-derivation), so evaluating the home configurations realizes that derivation.
+This single IFD boundary is intentional, and the IFD-free purity measurement above is understood to exclude it.
+The actual CI and buildbot evaluation path permits IFD — no `allow-import-from-derivation = false` is set anywhere in the flake, justfile, GitHub workflows, buildbot configuration, or machine `nix.settings` — so the boundary does not affect fleet builds.
+
 ### Type safety metrics
 
 ```bash

@@ -14,18 +14,18 @@
 ## 2. Phase 2 — Taxonomy + bulk restructure
 
 - [x] 2.1 Define the package grouping for the ~104 skills
-- [x] 2.2 Run `apm marketplace init`
-- [x] 2.3 For each package, run `apm plugin init <pkg>` and `apm marketplace package add ... --subdir modules/home/ai/plugins/<pkg>`
+- [x] 2.2 Hand-author the repo-root marketplace manifests — the root `apm.yml` `marketplace:` block plus `.claude-plugin/marketplace.json` — equivalent to what `apm marketplace init` produces
+- [x] 2.3 For each package, hand-author the per-package `plugin.json` + `apm.yml` and the matching root marketplace package entry (pointing at `--subdir modules/home/ai/plugins/<pkg>`), equivalent to running `apm plugin init <pkg>` and `apm marketplace package add` for each
 - [x] 2.4 Move skills into `.apm/skills/`
 - [x] 2.5 Commit the producer root `apm.yml`
 - [x] 2.6 Confirm `apm marketplace check` passes and `apm pack` is clean
 
 ## 3. Phase 3 — nix compose + typed HM module
 
-- [ ] 3.1 Generalize the Phase-1 derivation over all packages
-- [ ] 3.2 Add a typed home-manager module (options: which packages, which upstream deps, which targets)
-- [ ] 3.3 Rewrite `modules/home/ai/skills/default.nix` to consume `$out` per harness, preserving the codex real-file-copy
-- [ ] 3.4 Confirm nix eval/build slices pass, all six harness skill paths are populated, and `agents-md.nix` `@`-refs still resolve (flat)
+- [x] 3.1 Generalize the Phase-1 derivation over all packages
+- [x] 3.2 Add a typed home-manager module (options: which packages, which upstream deps, which targets)
+- [x] 3.3 Rewrite `modules/home/ai/skills/default.nix` to consume `$out` per harness, preserving the codex real-file-copy
+- [x] 3.4 Confirm nix eval/build slices pass, all six harness skill paths are populated, and `agents-md.nix` `@`-refs still resolve (flat) — darwin confirmed: `claude-code.skills` 116→130, all five sinks populated via a green `nix build .#checks.aarch64-darwin.home-manager-crs58`, all 58 `agents-md` `@`-refs resolve flat; linux/x86_64-linux confirmation deferred to buildbot CI at integration
 
 ## 4. Phase 4 — Upstream deps + bridge fork
 

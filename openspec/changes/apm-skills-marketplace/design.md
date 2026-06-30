@@ -55,6 +55,11 @@ The selected direction (captured in brainstorm.md) is to adopt apm (Agent Packag
 - **Rationale**: local-path deps skip apm's git-fetch code path, so the whole resolve+compose is OFFLINE and deterministic (no git tag required). The only nondeterminism is `apm.lock`'s `generated_at` timestamp, which is stripped / not harvested.
 - **Constraint (verified from apm source + Phase 1b build)**: a *remote* parent may not declare local-path deps (rejected); the root and any *local* parent may. The hermetic compose declares upstream local-path deps at the generated root consumer manifest; first-party local plugins may additionally declare their own local-path child deps (e.g. intra-monorepo siblings).
 
+**Clarification (targets, verified Phase 3 build)**: the hermetic compose runs `apm install -t agent-skills,claude`, the spike-proven native targets, superseding the earlier `agent-skills,claude,codex,hermes` form (codex is a GA target and may be added).
+`hermes` is not a native apm-install target in apm 0.22; it is experimental and flag-gated (default off), so apm silently drops it unless `apm experimental enable hermes` runs first.
+The hermes, droid (`.factory`), and opencode skill trees are therefore fanned out nix-side from the composed `$out` by `modules/home/ai/skills/default.nix`, not produced by apm `-t` targets.
+Only the composed tree's `.claude/skills/` subtree is consumed; the `.claude/settings.json` superpowers-hooks side-effect is never consumed.
+
 ### D6: upstream "extension" is additive co-ship, not patch/override
 
 - **Choice**: superpowers (`obra/superpowers`) is consumed as a direct dependency (auto-detected by apm as a `MARKETPLACE_PLUGIN` via its `.claude-plugin/`, NO fork needed). "Extending" it means co-shipping additive skills that deploy alongside it; same-name collisions resolve by precedence / `--force`.
@@ -62,6 +67,11 @@ The selected direction (captured in brainstorm.md) is to adopt apm (Agent Packag
 - **Bridge fork**: the `openspec-schemas-superpowers-bridge` fork is NOT apm-installable as-is (schema.yaml + templates/, no `SKILL.md`/`.claude-plugin/`/`apm.yml`); the fork must add ONE packaging signal (a `SKILL.md` or `apm.yml`). A first-party `agentic-planning-development-workflow` package then declares deps on superpowers + the bridge fork.
 
 **Dual-manifest wiring (verified from apm source + Phase 1b build)**: each first-party plugin's own `apm.yml` declares upstream (superpowers, the bridge) under **`devDependencies.apm`** as remote refs, for publishability. Non-root `devDependencies` are NOT walked by the hermetic transitive resolver (it walks only each sub-package's regular `dependencies.apm`), so they impose no network during the nix build. The nix-generated ROOT consumer `apm.yml` declares the same upstream under `dependencies.apm` as LOCAL store-path deps, which supply the actual co-shipped content offline. A remote ref placed in a per-plugin *regular* `dependencies.apm` WOULD be transitively fetched and break the offline build, and there is no resolver-level override to remap it to a local path; a local store-path dep and a remote ref for the same upstream do not dedup (distinct unique keys), so declare each upstream exactly one way. The deployed flat skill name is the `.apm/skills/<subdir>` name (NOT the plugin name), so each skill subdir must keep its current flat name to preserve the ~70 `@`-autoload references.
+
+**Correction (devDependency marketplace-refs, build-confirmed 2026-06-30)**: the earlier premise that a `NAME@MARKETPLACE` marketplace-ref under a per-package `devDependencies.apm` is install-safe — on the grounds that `apm pack` does not walk it — is false for `apm install`.
+apm install validates every transitive `apm.yml` and fatally rejects the `@alias` shorthand (`Shorthand '@alias' is not supported; use object form with git:/path:/alias:`).
+This went unobserved earlier because no spike composed the one package (`formal-specification-and-refinement`) that carried such an active entry.
+A per-package intra-marketplace edge must therefore be an inert comment (as `planning-and-development/apm.yml` does) or use apm's object form — never an active `@alias` devDependency; `formal-specification-and-refinement`'s active edge was neutralized to a comment accordingly.
 
 ### D7: lock semantics
 
