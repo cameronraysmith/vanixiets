@@ -4,8 +4,11 @@ description: Formal specification and refinement skills — Nucleus platform, re
 devDependencies:
   apm:
     # Intra-marketplace edge: refinement-driven-development builds on the
-    # functional-programming-theory preferences. Expressed as a marketplace-ref
-    # (NAME@MARKETPLACE) under devDependencies, which apm classifies as a
-    # marketplace dependency (not a git-clone bypass) and does NOT walk during the
-    # offline `apm pack` build, so it records the edge without forcing resolution.
-    - preferences-functional-programming-theory@vanixiets-skills-marketplace
+    # functional-programming-theory preferences. Recorded as an inert comment,
+    # not an active dependency: the hard intra-marketplace edge is deliberately
+    # not exercised, and `apm install` validates every transitive apm.yml and
+    # rejects the NAME@MARKETPLACE shorthand ("Shorthand '@alias' is not
+    # supported"), so an active entry breaks the hermetic compose. Both packages
+    # are co-installed via the nix-generated root consumer manifest. Matches the
+    # comment-only convention in planning-and-development/apm.yml.
+    # - preferences-functional-programming-theory@vanixiets
