@@ -1,0 +1,13 @@
+lockfile_version: '1'
+generated_at: '2026-06-30T20:51:35.586317+00:00'
+apm_version: 0.23.0
+dependencies:
+- repo_url: obra/superpowers
+  name: superpowers
+  host: github.com
+  resolved_commit: f2cbfbefebbfef77321e4c9abc9e949826bea9d7
+  resolved_ref: f2cbfbefebbfef77321e4c9abc9e949826bea9d7
+  version: 5.1.0
+  package_type: marketplace_plugin
+  content_hash: sha256:fb4f87bfef928a6d68f5d5aaa29e3eba011961c5f03bbf171c3c348d8d161abb
+  declared_license: MIT
