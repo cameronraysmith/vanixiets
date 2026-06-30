@@ -1,5 +1,5 @@
-# Regenerate the vendored OpenSpec Claude assets (skills + opsx commands) by
-# running the flake-pinned openspec CLI in a sandbox. Mirrors regenerate-bun-nix.
+# Regenerate the vendored OpenSpec Claude skill assets by running the
+# flake-pinned openspec CLI in a sandbox. Mirrors regenerate-bun-nix.
 #
 # nix run .#openspec-refresh-vendored-artifacts
 { ... }:

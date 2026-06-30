@@ -2,12 +2,14 @@
 #
 # regenerate the vendored openspec claude assets under assets/.
 #
-# openspec stores its skill and slash-command bodies as compiled javascript,
-# not as static files, so the markdown payloads must be produced by running
-# `openspec init`. this script captures that generated output so it can be
-# committed and injected at the user level without a per-project init.
+# openspec stores its skill bodies as compiled javascript, not as static files,
+# so the markdown payloads must be produced by running `openspec init`. this
+# script captures that generated output so it can be committed and injected at
+# the user level without a per-project init. delivery=skills emits only the 11
+# openspec-* skills and no commands/ tree (the /opsx:* commands were 1:1 skill
+# duplicates).
 #
-# the generated skills and commands are version-portable: no working directory
+# the generated skills are version-portable: no working directory
 # or absolute path is embedded. the only dynamic field is the `generatedBy`
 # frontmatter line on each SKILL.md, which records the openspec version.
 #
@@ -49,7 +51,7 @@ cat > "${xdg}/openspec/config.json" <<'JSON'
 {
   "featureFlags": {},
   "profile": "custom",
-  "delivery": "both",
+  "delivery": "skills",
   "workflows": ["propose","explore","new","continue","apply","ff","sync","archive","bulk-archive","verify","onboard"]
 }
 JSON
@@ -62,26 +64,23 @@ JSON
 
 # verify the expected layout before clobbering the committed assets.
 generated_skills="${proj}/.claude/skills"
-generated_commands="${proj}/.claude/commands/opsx"
-if [[ ! -d "${generated_skills}" || ! -d "${generated_commands}" ]]; then
-  echo "error: expected .claude/skills and .claude/commands/opsx in generated output" >&2
+if [[ ! -d "${generated_skills}" ]]; then
+  echo "error: expected .claude/skills in generated output" >&2
   exit 1
 fi
 
 # assert the full custom-profile set was generated, so a silent core-profile
 # fallback (4 workflows) or partial generation fails loudly here.
 skill_count=$(fd -t d -d 1 . "${generated_skills}" | wc -l | tr -d ' ')
-cmd_count=$(fd -t f -e md . "${generated_commands}" | wc -l | tr -d ' ')
-if [[ "${skill_count}" -ne 11 || "${cmd_count}" -ne 11 ]]; then
-  echo "error: expected 11 skills and 11 commands, got ${skill_count} skills / ${cmd_count} commands" >&2
+if [[ "${skill_count}" -ne 11 ]]; then
+  echo "error: expected 11 skills, got ${skill_count} skills" >&2
   exit 1
 fi
 
-# replace the committed asset trees.
-rm -rf "${assets_dir}/skills" "${assets_dir}/commands"
-mkdir -p "${assets_dir}/skills" "${assets_dir}/commands"
+# replace the committed asset tree.
+rm -rf "${assets_dir}/skills"
+mkdir -p "${assets_dir}/skills"
 cp -R "${generated_skills}/." "${assets_dir}/skills/"
-cp -R "${generated_commands}" "${assets_dir}/commands/opsx"
 
 # portability guard: fail if any sandbox path leaked into the assets.
 if rg -q -e "${proj}" -e "/tmp/openspec-gen" "${assets_dir}"; then

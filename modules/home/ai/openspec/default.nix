@@ -1,6 +1,5 @@
 # User-level install of the vendored OpenSpec 1.4.1 Claude assets:
 #   - 11 skills (assets/skills/openspec-*/SKILL.md) into all agent destinations
-#   - 11 opsx slash commands (assets/commands/opsx/*.md) for claude-code
 #   - the superpowers-bridge schema bundle, delivered user-global
 #   - the global openspec config.json pinned to the 11-workflow custom profile
 #   - the OpenSpec CLI itself (programs.openspec.package)
@@ -26,7 +25,7 @@
     in
     {
       options.programs.openspec = {
-        enable = lib.mkEnableOption "the vendored OpenSpec user-level Claude assets (CLI, skills, opsx commands, schema bundle, and global config.json)";
+        enable = lib.mkEnableOption "the vendored OpenSpec user-level Claude assets (CLI, skills, schema bundle, and global config.json)";
 
         package = lib.mkOption {
           type = lib.types.nullOr lib.types.package;
@@ -60,9 +59,15 @@
             "skills"
             "commands"
           ];
-          default = "both";
+          default = "skills";
           example = "both";
-          description = "How OpenSpec delivers workflow artifacts: as Claude skills, as slash commands, or both.";
+          description = ''
+            How OpenSpec delivers workflow artifacts: as Claude skills, as slash
+            commands, or both. Defaults to `skills`: the `/opsx:*` slash commands
+            are 1:1 duplicates of the `openspec-*` skills, and the non-Claude
+            harnesses (codex, opencode, droid, hermes) consume skills, not
+            commands, so the command tree is redundant.
+          '';
         };
 
         workflows = lib.mkOption {
@@ -155,9 +160,6 @@
         # with other aiSkills.extraSkillDirs contributors (e.g. crs58's linear-cli
         # skills) via the list-merge in modules/home/ai/skills/default.nix.
         aiSkills.extraSkillDirs = [ (assetsDir + "/skills") ];
-
-        # Symlink the vendored opsx slash commands into ~/.claude/commands/opsx/.
-        programs.claude-code.commandsDir = assetsDir + "/commands";
 
         # Deliver the schema bundle user-global. recursive = true is REQUIRED:
         # OpenSpec's schema discovery skips directory SYMLINKS (listSchemas gates on

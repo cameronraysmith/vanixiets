@@ -143,7 +143,7 @@ Phased and reversible; the current flat-nix system keeps working until the Phase
 1. De-risk spike: one throwaway package + a nix compose derivation proving the offline hermetic apm-install-in-nix compose; `nix build` and inspect `$out`; live `~/.claude` untouched.
 2. Taxonomy + bulk restructure: define the package grouping for ~104 skills, scaffold packages, move skills into `.apm/skills/`, commit the producer root `apm.yml`.
 3. nix compose + typed HM module: generalize the derivation over all packages; rewrite `modules/home/ai/skills/default.nix` to consume `$out` per harness (preserve codex real-file-copy).
-4. Upstream deps + bridge fork: pin superpowers; fork the bridge and add a packaging signal; declare `agentic-planning-development-workflow`.
+4. Phase 4 — delivery=skills, vendor the 11 `openspec-*` skills into the `planning-and-development` apm package, superpowers as a regular remote dep resolved offline via git-cache pre-warm, and the `/opsx:*` command-drop ripple (see decisions D8–D13).
 5. Integrate + deploy: `darwin-rebuild switch` on stibnite; confirm flat skills + merged superpowers content across harnesses; `apm.lock` present; immutability intact.
 
 Rollback: the spike and restructure are additive; reverting to the prior `modules/home/ai/skills/default.nix` flat-tree consumption restores the current system at any point before cutover.

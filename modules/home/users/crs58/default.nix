@@ -38,8 +38,8 @@ let
         "${pkgs.linear-cli.src}/skills"
       ];
 
-      # User-level OpenSpec install (skills, opsx commands, schema bundle, and the
-      # global config.json) is provided by the opt-in programs.openspec module in
+      # User-level OpenSpec install (skills, schema bundle, and the global
+      # config.json) is provided by the opt-in programs.openspec module in
       # modules/home/ai/openspec/default.nix.
       programs.openspec.enable = true;
 
