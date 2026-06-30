@@ -6,8 +6,7 @@ marketplace:
   owner:
     name: cameronraysmith
     url: https://github.com/cameronraysmith
-  outputs:
-    claude: {}
+  output: .github/plugin/marketplace.json
   packages:
     - name: preferences-functional-programming-theory
       source: ./modules/home/ai/plugins/preferences-functional-programming-theory
