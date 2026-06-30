@@ -9,6 +9,7 @@
   fetchurl,
   autoPatchelfHook,
   zlib,
+  openssl,
 }:
 
 let
@@ -37,6 +38,7 @@ stdenv.mkDerivation (finalAttrs: {
   buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
     stdenv.cc.cc.lib
     zlib
+    (lib.getLib openssl)
   ];
 
   installPhase = ''
