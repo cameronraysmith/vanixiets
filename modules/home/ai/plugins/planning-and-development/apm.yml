@@ -9,6 +9,6 @@ devDependencies:
     # alongside the agentic planning workflow at install time.
     - obra/superpowers
 # Soft coupling (agentic planning Manual execution mode): this package pairs with
-# beads-issue-tracking-and-session-workflow@vanixiets-skills-marketplace. It is
+# beads-issue-tracking-and-session-workflow@vanixiets. It is
 # deliberately a comment, not a hard dependency — Manual mode must not force beads
 # co-presence on consumers that do not want the beads issue tracker.
