@@ -8,7 +8,7 @@ dependencies:
     # git checkout cache from the flake-pinned tree before `apm install`, so it
     # records a remote-style resolved_commit lock with zero network. The full SHA
     # is required; a short ref forces a network fetch.
-    - obra/superpowers#f2cbfbefebbfef77321e4c9abc9e949826bea9d7
+    - obra/superpowers#f268f7c953744036f0fa7e9d4b73535c04e57cb8
 # Soft coupling (agentic planning Manual execution mode): this package pairs with
 # beads-issue-tracking-and-session-workflow@vanixiets. It is
 # deliberately a comment, not a hard dependency — Manual mode must not force beads
