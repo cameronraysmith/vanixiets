@@ -94,4 +94,53 @@ Rollback: the spike and restructure are additive; reverting to the prior `module
 ## Open Questions
 
 - droid/factory mapping: consume `~/.agents/skills` directly, or retain nix fan-out for `~/.factory/skills`? (resolve during Phase 3).
-- Final package grouping taxonomy for the ~104 skills (resolved during Phase 2).
+- Final package grouping taxonomy for the ~104 skills (resolved during Phase 2; see "Phase 2 taxonomy" below).
+
+## Phase 2 taxonomy
+
+This section records the resolved Phase-2 partition of the 104 first-party skills into 17 apm packages.
+The partition is exhaustive (104 skills) and disjoint (each skill belongs to exactly one package).
+No skill leaf is renamed: each skill `X` moved from `src/{core,claude}/X/` to `modules/home/ai/plugins/<package>/.apm/skills/X/` with `X` byte-identical, so the package name never appears in the deployed path and the ~70 `@`-autoload references stay valid.
+
+### Naming convention
+
+Package names are semantic and verbose (for example `preferences-functional-programming-theory`, `agent-orchestration-and-meta-tooling`), describing the cluster's domain rather than its mechanism.
+No package carries an `apm-pkg-` or similar prefix; the marketplace structure is conveyed by the `modules/home/ai/plugins/<package>/` location, not by a name decoration.
+
+### Key decisions
+
+The historical `src/core` versus `src/claude` split is dissolved: every package is all-agent and deploys to every harness, so no package is Claude-only.
+The agentic-planning Manual execution mode retires together with beads; the beads issue tracker and the session-workflow skills are grouped into a single toggle-off `beads-issue-tracking-and-session-workflow` package, and the planning workflow's coupling to it is a soft (comment-only) annotation rather than a hard dependency.
+`nucleus-platform` is grouped with `refinement-driven-development` in the `formal-specification-and-refinement` package, reflecting their shared spec-anchored, approximately-verifiable axis.
+The `preferences-*` skills are sub-clustered into 9 thematic packages (functional-programming theory, programming languages, nix and secrets, domain-driven architecture, event-driven systems, web platform and deployment, operations and reliability, code and collaboration conventions, data and scientific computing) rather than a single monolithic preferences package.
+
+### Roster (17 packages, 104 skills, all all-agent)
+
+The nine `preferences-*` packages (48 skills, stable tier):
+
+| Package | Skills |
+|---|---|
+| preferences-functional-programming-theory (6) | preferences-theoretical-foundations, preferences-algebraic-data-types, preferences-algebraic-laws, preferences-functional-reactive-programming, preferences-railway-oriented-programming, preferences-computational-system-taxonomy |
+| preferences-programming-languages (4) | preferences-python-development, preferences-haskell-development, preferences-rust-development, preferences-typescript-nodejs-development |
+| preferences-nix-and-secrets (4) | preferences-nix-development, preferences-nix-checks-architecture, preferences-nix-ci-cd-integration, preferences-secrets |
+| preferences-domain-driven-architecture (7) | preferences-domain-modeling, preferences-bounded-context-design, preferences-strategic-domain-analysis, preferences-collaborative-modeling, preferences-discovery-process, preferences-architectural-patterns, preferences-architecture-diagramming |
+| preferences-event-driven-systems (5) | preferences-event-modeling, preferences-event-sourcing, preferences-event-catalog-tooling, preferences-event-catalog-qlerify, preferences-schema-versioning |
+| preferences-web-platform-and-deployment (6) | preferences-web-platform-foundations, preferences-hypermedia-development, preferences-hypermedia-documents, preferences-react-tanstack-ui-development, preferences-web-application-deployment, preferences-cloudflare-wrangler-reference |
+| preferences-operations-and-reliability (6) | preferences-observability-engineering, preferences-production-readiness, preferences-distributed-systems, preferences-validation-assurance, preferences-compositional-continuous-verification, preferences-adaptive-planning |
+| preferences-code-and-collaboration-conventions (5) | preferences-style-and-conventions, preferences-documentation, preferences-git-version-control, preferences-git-history-cleanup, preferences-change-management |
+| preferences-data-and-scientific-computing (5) | preferences-data-modeling, preferences-json-querying, preferences-scalable-probabilistic-modeling-workflow, preferences-scientific-inquiry-methodology, preferences-workflow-orchestration-algebra |
+
+The eight non-`preferences` packages (56 skills):
+
+| Package | Tier | Skills |
+|---|---|---|
+| beads-issue-tracking-and-session-workflow (14) | toggle-off | issues-beads, issues-beads-audit, issues-beads-checkpoint, issues-beads-evolve, issues-beads-init, issues-beads-orient, issues-beads-prime, issues-beads-seed, session-advisor, session-orient, session-plan, session-review, session-checkpoint, stigmergic-convention |
+| formal-specification-and-refinement (2) | fresh-retain | nucleus-platform, refinement-driven-development |
+| planning-and-development (3) | fresh-retain | agentic-planning-development-workflow, openspec-linear-sync, project-management |
+| agent-orchestration-and-meta-tooling (15) | stable | meta-agent-teams, meta-list-all-agents, meta-list-all-tools, meta-load-cc-docs, meta-orchestrate-dispatch, meta-orchestrator-checkpoint, meta-orchestrator-initiate, meta-search-sessions, meta-session-resume, meta-skill-creator, meta-create-workspace-agents-md, meta-generate-context-test, meta-generate-handoff-prompt, meta-load-prompting-docs, meta-optimize-prompt |
+| version-control-and-forge (8) | stable | jj-git-interactive-rebase-to-jj, jj-history-cleanup, jj-summary, jj-version-control, jj-workflow, gitbutler-but-cli, git-commit-prompt, github-browse |
+| document-authoring-and-visualization (6) | stable | doc-to-md, doc-to-md-cmd, web-to-markdown, knowledge-graph, scientific-visualization, text-to-visual-iteration |
+| event-modeling-workflow (4) | stable | event-modeling-brownfield, event-modeling-greenfield, event-modeling-qlerify-session, event-modeling-to-eventcatalog |
+| nix-build-operations (4) | stable | nix-flake-pr-cycle, nixpkgs-broken-package, process-compose-init, worktree-sparsity-eval |
+
+Counts reconcile as preferences 6+4+4+7+5+6+6+5+5 = 48 and non-preferences 14+2+3+15+8+6+4+4 = 56, totaling 104 (93 formerly under `src/core`, 11 under `src/claude`).

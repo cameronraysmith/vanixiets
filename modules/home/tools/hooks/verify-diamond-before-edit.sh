@@ -2,7 +2,7 @@
 # Hook: Verify development-join integrity before edit-class tool operations.
 # Tier-aware: only fires when a multi-parent join (description "join N=...") is
 # present in mutable() history. Tier 1 (anonymous chain on @) and tier 2 (single
-# named bookmark) are no-ops per modules/home/ai/skills/src/core/jj-version-control/tiered-ceremony.md.
+# named bookmark) are no-ops per modules/home/ai/plugins/version-control-and-forge/.apm/skills/jj-version-control/tiered-ceremony.md.
 # Note: the "join N=k: ..." description prefix is a project convention used in
 # this repo's diamond-workflow tooling; see ~/.claude/skills/jj-version-control/SKILL.md.
 # Tier 3 (development join present) runs the diamond-health invariant checklist:

@@ -13,12 +13,12 @@
 
 ## 2. Phase 2 — Taxonomy + bulk restructure
 
-- [ ] 2.1 Define the package grouping for the ~104 skills
-- [ ] 2.2 Run `apm marketplace init`
-- [ ] 2.3 For each package, run `apm plugin init <pkg>` and `apm marketplace package add ... --subdir modules/home/ai/plugins/<pkg>`
-- [ ] 2.4 Move skills into `.apm/skills/`
-- [ ] 2.5 Commit the producer root `apm.yml`
-- [ ] 2.6 Confirm `apm marketplace check` passes and `apm pack` is clean
+- [x] 2.1 Define the package grouping for the ~104 skills
+- [x] 2.2 Run `apm marketplace init`
+- [x] 2.3 For each package, run `apm plugin init <pkg>` and `apm marketplace package add ... --subdir modules/home/ai/plugins/<pkg>`
+- [x] 2.4 Move skills into `.apm/skills/`
+- [x] 2.5 Commit the producer root `apm.yml`
+- [x] 2.6 Confirm `apm marketplace check` passes and `apm pack` is clean
 
 ## 3. Phase 3 — nix compose + typed HM module
 

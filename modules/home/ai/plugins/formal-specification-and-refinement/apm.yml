@@ -1,3 +1,11 @@
 name: formal-specification-and-refinement
 version: 0.0.0
 description: Formal specification and refinement skills — Nucleus platform, refinement-driven development.
+devDependencies:
+  apm:
+    # Intra-marketplace edge: refinement-driven-development builds on the
+    # functional-programming-theory preferences. Expressed as a marketplace-ref
+    # (NAME@MARKETPLACE) under devDependencies, which apm classifies as a
+    # marketplace dependency (not a git-clone bypass) and does NOT walk during the
+    # offline `apm pack` build, so it records the edge without forcing resolution.
+    - preferences-functional-programming-theory@vanixiets-skills-marketplace

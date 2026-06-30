@@ -29,8 +29,9 @@ let
       # store path; its top-level skills/ dir is read by readSkillsFrom in the ai
       # module, which finds the single subdir linear-cli/.
       #
-      # Discoverability: the all-agents src/core skill openspec-linear-sync softly
-      # depends on this user-scoped linear-cli skill for its Linear verbs; it is
+      # Discoverability: the all-agents skill openspec-linear-sync (in
+      # modules/home/ai/plugins/planning-and-development/.apm/skills/openspec-linear-sync)
+      # softly depends on this user-scoped linear-cli skill for its Linear verbs; it is
       # co-delivered only for this user and no-ops gracefully when absent. If a
       # non-crs58 user is added, move this injection into the shared ai module.
       aiSkills.extraSkillDirs = [

@@ -1,6 +1,7 @@
 name: vanixiets-skills-marketplace
 version: 0.0.0
 description: First-party AI-agent skills marketplace for vanixiets (17 packages, 104 skills).
+license: MIT
 marketplace:
   owner:
     name: cameronraysmith

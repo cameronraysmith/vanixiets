@@ -1,3 +1,14 @@
 name: planning-and-development
 version: 0.0.0
 description: Planning and development skills — agentic planning-and-development workflow, OpenSpec/Linear sync, project management.
+devDependencies:
+  apm:
+    # Upstream publishability annotation (design.md D6). Remote refs under
+    # devDependencies are NOT walked by apm's offline resolver, so this imposes
+    # no fetch at `apm pack` or hermetic-compose time; it co-ships superpowers
+    # alongside the agentic planning workflow at install time.
+    - obra/superpowers
+# Soft coupling (agentic planning Manual execution mode): this package pairs with
+# beads-issue-tracking-and-session-workflow@vanixiets-skills-marketplace. It is
+# deliberately a comment, not a hard dependency — Manual mode must not force beads
+# co-presence on consumers that do not want the beads issue tracker.
