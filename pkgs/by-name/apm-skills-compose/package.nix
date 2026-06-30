@@ -4,36 +4,41 @@
   stdenv,
   runCommandLocal,
   writeText,
+
+  # Auto-discover every apm package dir (one containing .apm/skills) under the
+  # plugins root. readDir over a source path → no IFD. Sorted == alphabetical,
+  # reproducing the prior hardcoded order.
+  firstPartyPackages ?
+    let
+      root = ../../../modules/home/ai/plugins;
+    in
+    lib.attrNames (
+      lib.filterAttrs (n: t: t == "directory" && builtins.pathExists (root + "/${n}/.apm/skills")) (
+        builtins.readDir root
+      )
+    ),
+
+  # Upstream additive co-ship deps; Phase 4 appends the bridge fork.
+  upstreamDeps ? [
+    {
+      name = "superpowers-src";
+      src = inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-superpowers;
+    }
+  ],
+
+  targets ? [
+    "agent-skills"
+    "claude"
+  ],
 }:
 let
   system = stdenv.hostPlatform.system;
   apm = inputs.llm-agents.packages.${system}.apm;
-  superpowers = inputs.self.packages.${system}.agent-plugins-superpowers;
 
   pluginsDir = ../../../modules/home/ai/plugins;
 
-  firstPartyPackages = [
-    "agent-orchestration-and-meta-tooling"
-    "beads-issue-tracking-and-session-workflow"
-    "document-authoring-and-visualization"
-    "event-modeling-workflow"
-    "formal-specification-and-refinement"
-    "nix-build-operations"
-    "planning-and-development"
-    "preferences-code-and-collaboration-conventions"
-    "preferences-data-and-scientific-computing"
-    "preferences-domain-driven-architecture"
-    "preferences-event-driven-systems"
-    "preferences-functional-programming-theory"
-    "preferences-nix-and-secrets"
-    "preferences-operations-and-reliability"
-    "preferences-programming-languages"
-    "preferences-web-platform-and-deployment"
-    "version-control-and-forge"
-  ];
-
   consumerApmDeps = lib.concatStringsSep "\n" (
-    map (n: "    - ./${n}") firstPartyPackages ++ [ "    - ./superpowers-src" ]
+    map (n: "    - ./${n}") firstPartyPackages ++ map (d: "    - ./${d.name}") upstreamDeps
   );
 
   rootConsumerManifest = writeText "apm-skills-consumer.yml" ''
@@ -49,6 +54,10 @@ let
   copyFirstPartyPackages = lib.concatMapStringsSep "\n" (n: ''
     cp -RL ${pluginsDir + "/${n}"} ./${n}
     chmod -R u+w ./${n}'') firstPartyPackages;
+
+  copyUpstreamDeps = lib.concatMapStringsSep "\n" (d: ''
+    cp -RL ${d.src} ./${d.name}
+    chmod -R u+w ./${d.name}'') upstreamDeps;
 in
 runCommandLocal "apm-skills-compose"
   {
@@ -69,13 +78,12 @@ runCommandLocal "apm-skills-compose"
     # permission before composing.
     ${copyFirstPartyPackages}
 
-    cp -RL ${superpowers} ./superpowers-src
-    chmod -R u+w ./superpowers-src
+    ${copyUpstreamDeps}
 
     cp ${rootConsumerManifest} ./apm.yml
     # agent-skills,claude only: the codex/hermes/opencode/droid harnesses are
     # fanned out nix-side from this composed $out in a later task, not by apm.
-    apm install --root "$out" -t agent-skills,claude
+    apm install --root "$out" -t ${lib.concatStringsSep "," targets}
 
     # generated_at and apm_version are nondeterministic; strip both so $out is
     # byte-reproducible across builds.
