@@ -38,11 +38,11 @@ Supersedes the original "Upstream deps + bridge fork" Phase 4 (fork the bridge +
 - [x] 4.3 Vendor openspec skills into the package: move the 11 `openspec-*/` dirs into `planning-and-development/.apm/skills/`; drop `aiSkills.extraSkillDirs`; retarget the refresh app per-skill, preserving the 3 authored skills
 - [x] 4.4 superpowers cache-warm: add the regular full-SHA dep to `planning-and-development/apm.yml`; in `apm-skills-compose/package.nix` add `superpowersSrc`/`superpowersRev` + the cache pre-warm, drop `superpowers-src` from `upstreamDeps`, and add a superpowers skill to the assertion list; in `compose.nix` default `upstreamDeps` to `[]` and thread the args; thread the SHA from one nix source
 - [x] 4.5 Command-drop ripple: rewrite `agentic-planning-development-workflow/SKILL.md` + `references/{collaborators,delegation,execution-modes,hil-isolation}.md` + `openspec-linear-sync/SKILL.md` to skill-form; set `openspec/config.yaml` default schema to `superpowers-bridge`; rewrite the bridge `README.md` + `templates/adopters/CLAUDE.md.fragment.md` to skill-form (`schema.yaml` unchanged)
-- [ ] 4.6 Verify:
+- [x] 4.6 Verify:
   - [x] `nix build .#checks.aarch64-darwin.home-manager-crs58` → exit 0
   - [x] `$out/apm.lock.yaml` superpowers `resolved_commit` confirmed (4.4)
   - [x] flat skill set + the openspec skills now arriving via apm + no `/opsx:*` commands
-  - [ ] (deferred) linux x86_64 no-network sandbox build confirms the cache-warm at buildbot
+  - [x] linux x86_64 no-network sandbox build confirms the cache-warm at buildbot (home-manager-cameron built on magnetite x86_64-linux, network-blocked sandbox — fresh un-cacheable compose ⟹ cache-warm resolved offline)
 
 ## 5. Phase 5 — Integrate + deploy
 
@@ -51,4 +51,6 @@ Supersedes the original "Upstream deps + bridge fork" Phase 4 (fork the bridge +
 - [ ] 5.3 Confirm `apm.lock` present and store-symlink immutability intact
 - [ ] 5.4 Confirm activation succeeded and all harnesses see the skills
 
-A consumer-path validation flake-app (an external, non-nix apm consumer resolving `planning-and-development` and its superpowers dep offline) is a follow-on, out of scope for this change.
+A consumer-path validation flake-app — an apm-native consumer that registers this marketplace and installs every published package in a fully isolated throwaway environment that never touches the real `$HOME` / `~/.claude` — is implemented as `modules/apps/apm-marketplace-validate.{nix,sh}` (`nix run .#apm-marketplace-validate`).
+The `--local` path is proven: all 17 packages install (`APM-VALIDATE-SUMMARY: passed=17 failed=0 total=17`), coverage matches the published set, the 16 first-party packages resolve offline, and `planning-and-development`'s `obra/superpowers` transitive dep fetches from github over https (the reason the app ships cacert + `GIT_SSL_CAINFO`).
+The `--remote` path (github `cameronraysmith/vanixiets` source) is implemented but pends a branch push, so it is not yet exercised.
