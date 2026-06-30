@@ -77,6 +77,53 @@ A per-package intra-marketplace edge must therefore be an inert comment (as `pla
 
 - **Choice**: `apm.lock` is a flat list (transitive deps recorded via `discovered_via`); upstream deps lock `resolved_commit` + per-file content hashes; local deps lock content hashes only. `flake.lock` owns the upstream version pins.
 
+### D8: OpenSpec delivery=skills — drop the redundant `/opsx:*` commands
+
+- **Context**: OpenSpec generates 11 `openspec-*` skills and 11 `/opsx:*` slash commands as 1:1 duplicate front-ends; harness command support varies (codex, opencode, droid, and hermes consume skills, not commands), so the command tree is redundant.
+- **Choice**: set OpenSpec `delivery = "skills"` (a global config key; values `both` | `skills` | `commands`, default `both`); a single `openspec init` under `delivery=skills` emits only the 11 skills and creates no `commands/` tree (verified on OpenSpec 1.5.0).
+- **Implementation**: set `programs.openspec.delivery = "skills"`; rework `modules/apps/openspec-refresh-vendored-artifacts.sh` to remove the command directory-existence check, the `cmd_count` assertion, and the command `rm`/`mkdir`/`cp`, keeping the exactly-11-skills assertion as the core-profile-fallback guard; remove the committed `modules/home/ai/openspec/assets/commands/` tree; remove the openspec module's `programs.claude-code.commandsDir` wiring.
+- **Note**: OpenSpec 1.5.0 init also writes a per-project `openspec/config.yaml`, unrelated to `delivery`.
+
+### D9: OpenSpec 1.4.1 → 1.5.0
+
+- **Choice**: the `llm-agents` flake input was bumped to provide OpenSpec 1.5.0 (and apm 0.23.0); it landed at the diamond base commit.
+- **Rationale**: the `delivery` config and the 11-skill/11-command machinery are byte-identical between v1.4.1 and v1.5.0; 1.5.0 adds only "stores (early beta)" store-selection guidance to the skill bodies plus config and YAML-parsing fixes.
+- **Implementation**: the 11 vendored skills are regenerated at 1.5.0 (`generatedBy: 1.5.0`) under `delivery=skills`.
+
+### D10: vendor the 11 `openspec-*` skills into the `planning-and-development` apm package
+
+- **Context**: the 11 generated `openspec-*` skills currently reach the deployed tree via the openspec home-manager module's `aiSkills.extraSkillDirs` side-channel, unioned with the apm-composed tree only at the final sinks; they are NOT part of any apm package and do not ship to a non-nix apm consumer.
+- **Choice**: move the 11 `openspec-*` skills INTO `modules/home/ai/plugins/planning-and-development/.apm/skills/` (the package grows from 3 hand-authored skills to 14) so they flow through `apm-skills-compose` and ship transitively to consumers; drop `aiSkills.extraSkillDirs` from the openspec module, which then retains only the schema bundle, `config.json`, and the CLI.
+- **Cost**: generated (do-not-edit, `generatedBy` frontmatter) and hand-authored skills co-mingle in one package dir; the refresh app is retargeted from a wholesale `rm -rf assets/skills` to per-skill (`openspec-*`) targeting that preserves the 3 authored skills.
+
+### D11: superpowers as a regular remote apm dependency resolved offline via git-cache pre-warm
+
+- **Context**: to make `planning-and-development` self-describing and give a downstream apm consumer supply-chain coverage over superpowers, superpowers must be a regular (walked) remote dependency; apm's audit, scan, and executable gate cover only walked regular deps, while transitive `devDependencies` are validated but never resolved or scanned. A published per-package manifest cannot carry a local-path dep (see D5).
+- **Constraint**: apm dedups by path/URL not name, and a regular remote ref in a copied sub-package is walked and fetched, which would break the hermetic offline compose (see D6: declare each upstream exactly one way; no remote→local remap).
+- **Choice**: declare superpowers ONCE as a regular remote dep pinned to the FULL 40-char SHA in `planning-and-development/apm.yml` (`obra/superpowers#f2cbfbefebbfef77321e4c9abc9e949826bea9d7`); keep the nix compose offline by PRE-SEEDING apm's git checkout cache from the flake-pinned `fetchFromGitHub` tree before `apm install`, so apm resolves the remote ref from cache with zero network and records a remote-style `resolved_commit` lock — identical for the fleet build and an external consumer.
+- **Implementation**: drop the separate `superpowers-src` local co-ship (single declaration, honors D6); the flake-pinned package remains as the offline cache feed; the three SHA copies (the `apm.yml` pin, the feed package rev in `pkgs/by-name/agent-plugins/superpowers`, and the compose `superpowersRev`) must stay in sync, threaded from one nix source.
+
+**Cache-warm recipe (proven on apm 0.23.0, the live compose version)**: seed `$APM_CACHE_DIR/git/checkouts_v1/8c6014a36ca90e3f/<full-sha>/full/` with the source tree (`cp -RL`, `chmod u+w`) plus a stub `.git/HEAD` containing the 40-hex SHA followed by a newline.
+The FULL SHA is required; a short ref forces network.
+A blackholed-network, no-token install resolved in sub-second with a Cache HIT, `git/db_v1` empty (zero network), and `resolved_commit` equal to the full SHA.
+
+**Pending**: a true linux no-network sandbox build (buildbot) as the final confirmation.
+
+**Security-scan honesty**: the consumer-side value is real but shallow — the executable deny-by-default gate over superpowers' hooks plus the content-hash / `resolved_commit` pin; apm has no native CVE, malware, or signature scanning (only an optional, experimental external SARIF / SkillSpector seam).
+
+### D12: drop the `/opsx:*` command references; route bridge schema selection through `openspec-new-change`
+
+- **Context**: because `delivery=skills` removes the `/opsx:*` commands, the hand-authored router (`agentic-planning-development-workflow/SKILL.md` + its `references/`) and `openspec-linear-sync` are rewritten from `/opsx:*` invocation to the `openspec-*` skill forms.
+- **Constraint**: there is no `ff` CLI command, and `--schema` is honored only by `openspec new change`; the schema is sticky (written once to the change's `.openspec.yaml` at creation and auto-detected downstream), so bridge schema selection routes through the `openspec-new-change` skill.
+- **Choice**: set `openspec/config.yaml` project default schema to `superpowers-bridge` (the router's stated spec-first default) so the `openspec-ff-change` skill works one-shot without a per-invocation flag (tradeoff: non-bridge changes then need an explicit `--schema spec-driven`).
+- **Implementation**: the bridge `schema.yaml` needs no edit; its hand-maintained `README.md` and `templates/adopters/CLAUDE.md.fragment.md` are rewritten to skill-form.
+- **Note**: the upstream-generated `openspec-*` skill bodies still embed `/opsx:` prose (regenerates regardless of `delivery`) — an accepted upstream wart, out of scope.
+
+### D13: supersession — the original Phase 4 (bridge fork + apm packaging signal)
+
+- **Choice**: the originally-planned Phase 4 — `fetchFromGitHub`-fork the `openspec-schemas-superpowers-bridge` and add a packaging signal so the bridge becomes apm-installable (the D6 "Bridge fork" bullet) — is SUPERSEDED.
+- **Rationale**: the `superpowers-bridge` stays an OpenSpec *schema* delivered via its own home-manager module (`schemaDir` → `~/.local/share/openspec/schemas/`); it is not forked and not given an apm packaging signal, because it is a schema (consumed by the OpenSpec CLI), not a skill, and forcing it through the apm skills marketplace is an impedance mismatch.
+
 ## Risks / Trade-offs
 
 - [Risk] apm hard-errors on symlinked/out-of-`$HOME` skill destinations → Mitigation: never run apm at activation; compose at build time into `$out`, then HM symlinks (D1).
