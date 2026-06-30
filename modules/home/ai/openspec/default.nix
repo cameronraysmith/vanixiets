@@ -1,13 +1,18 @@
-# User-level install of the vendored OpenSpec 1.4.1 Claude assets:
-#   - 11 skills (assets/skills/openspec-*/SKILL.md) into all agent destinations
+# User-level install of the vendored OpenSpec Claude assets:
 #   - the superpowers-bridge schema bundle, delivered user-global
 #   - the global openspec config.json pinned to the 11-workflow custom profile
 #   - the OpenSpec CLI itself (programs.openspec.package)
 #
+# The 11 generated openspec-* skills are NOT delivered by this module. They live
+# in the planning-and-development apm package
+# (modules/home/ai/plugins/planning-and-development/.apm/skills/) and ship through
+# apm-skills-compose alongside the other first-party skills, so this module no
+# longer contributes an aiSkills.extraSkillDirs entry.
+#
 # Opt-in member of the homeManager.ai aggregate: the config applies only to
-# users who set programs.openspec.enable = true (e.g. crs58). The assets are
-# committed generated output, regenerated via the openspec-refresh-vendored-artifacts
-# flake app (nix run .#openspec-refresh-vendored-artifacts).
+# users who set programs.openspec.enable = true (e.g. crs58). The schema bundle is
+# committed generated output; it and the in-package skills are regenerated via the
+# openspec-refresh-vendored-artifacts flake app (nix run .#openspec-refresh-vendored-artifacts).
 { ... }:
 {
   flake.modules.homeManager.ai =
@@ -155,11 +160,6 @@
         # The OpenSpec CLI. Owned here (not development-packages) now that a module
         # exists; null disables installing it.
         home.packages = lib.mkIf (cfg.package != null) [ cfg.package ];
-
-        # Inject the vendored OpenSpec skills into all agent destinations. Merges
-        # with other aiSkills.extraSkillDirs contributors (e.g. crs58's linear-cli
-        # skills) via the list-merge in modules/home/ai/skills/default.nix.
-        aiSkills.extraSkillDirs = [ (assetsDir + "/skills") ];
 
         # Deliver the schema bundle user-global. recursive = true is REQUIRED:
         # OpenSpec's schema discovery skips directory SYMLINKS (listSchemas gates on

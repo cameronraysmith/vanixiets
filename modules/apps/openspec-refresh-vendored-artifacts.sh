@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
-# regenerate the vendored openspec claude assets under assets/.
+# regenerate the vendored openspec claude skills into the planning-and-development
+# apm package.
 #
 # openspec stores its skill bodies as compiled javascript, not as static files,
 # so the markdown payloads must be produced by running `openspec init`. this
-# script captures that generated output so it can be committed and injected at
-# the user level without a per-project init. delivery=skills emits only the 11
+# script captures that generated output so it can be committed and shipped through
+# apm-skills-compose without a per-project init. delivery=skills emits only the 11
 # openspec-* skills and no commands/ tree (the /opsx:* commands were 1:1 skill
 # duplicates).
 #
@@ -14,22 +15,29 @@
 # frontmatter line on each SKILL.md, which records the openspec version.
 #
 # regenerate after an `llm-agents` flake input bump (which is the source of the
-# pinned openspec version) so the committed assets track the cli on path.
+# pinned openspec version) so the committed skills track the cli on path.
 #
 # the script is idempotent: it runs `openspec init` in a fully sandboxed temp
-# directory (no real $HOME is touched), then replaces the contents of assets/.
-#
+# directory (no real $HOME is touched), then replaces ONLY the generated
+# openspec-* skills in the package, per-skill, leaving the hand-authored skills
+# in the same directory untouched.
 set -euo pipefail
 
 # locate the repo via git so the script is location-independent: it can be
 # embedded into a nix store path (the openspec-refresh-vendored-artifacts flake
-# app) and still rewrite the committed assets in the user's worktree.
+# app) and still rewrite the committed skills in the user's worktree.
 repo_root="$(git rev-parse --show-toplevel)"
-assets_dir="${repo_root}/modules/home/ai/openspec/assets"
+
+# the 11 generated openspec-* skills are vendored into the planning-and-development
+# apm package so they ship through apm-skills-compose; this directory ALSO holds
+# hand-authored skills (agentic-planning-development-workflow, openspec-linear-sync,
+# project-management) which this script must never touch. the openspec module's
+# assets/ tree now holds only the superpowers-bridge schema bundle (no skills/).
+skills_target="${repo_root}/modules/home/ai/plugins/planning-and-development/.apm/skills"
 
 # the pinned openspec version is injected by the flake app via runtimeEnv; when
 # running this script standalone, set it explicitly, e.g.
-#   OPENSPEC_VERSION=1.4.1 bash modules/apps/openspec-refresh-vendored-artifacts.sh
+#   OPENSPEC_VERSION=1.5.0 bash modules/apps/openspec-refresh-vendored-artifacts.sh
 ver="${OPENSPEC_VERSION:?set OPENSPEC_VERSION (injected by the flake app)}"
 echo "openspec version: ${ver}"
 
@@ -62,7 +70,7 @@ JSON
     bunx "@fission-ai/openspec@${ver}" init --tools claude --force --profile custom </dev/null
 )
 
-# verify the expected layout before clobbering the committed assets.
+# verify the expected layout before clobbering the committed skills.
 generated_skills="${proj}/.claude/skills"
 if [[ ! -d "${generated_skills}" ]]; then
   echo "error: expected .claude/skills in generated output" >&2
@@ -77,21 +85,36 @@ if [[ "${skill_count}" -ne 11 ]]; then
   exit 1
 fi
 
-# replace the committed asset tree.
-rm -rf "${assets_dir}/skills"
-mkdir -p "${assets_dir}/skills"
-cp -R "${generated_skills}/." "${assets_dir}/skills/"
+# replace ONLY the generated openspec-* skills in the target package, per-skill.
+# iterate over the names this run actually produced (never a static `openspec-*`
+# glob against the package) so the hand-authored skills sharing this directory are
+# never removed or overwritten. openspec-linear-sync is hand-authored despite its
+# prefix and is not produced by `openspec init`, so it never appears in
+# ${generated_skills} and is therefore never a member of this loop.
+generated_names=()
+for skill_path in "${generated_skills}"/*/; do
+  skill_name="$(basename "${skill_path}")"
+  generated_names+=("${skill_name}")
+  rm -rf "${skills_target:?}/${skill_name}"
+  cp -R "${skill_path%/}" "${skills_target}/${skill_name}"
+done
 
-# portability guard: fail if any sandbox path leaked into the assets.
-if rg -q -e "${proj}" -e "/tmp/openspec-gen" "${assets_dir}"; then
-  echo "error: sandbox path leaked into generated assets" >&2
-  exit 1
-fi
+# portability guard: fail if any sandbox path leaked into the regenerated skills.
+for skill_name in "${generated_names[@]}"; do
+  if rg -q -e "${proj}" -e "/tmp/openspec-gen" "${skills_target}/${skill_name}"; then
+    echo "error: sandbox path leaked into ${skill_name}" >&2
+    exit 1
+  fi
+done
 
 # summary.
 echo ""
-echo "regenerated openspec assets (version ${ver}):"
-fd -H -t f . "${assets_dir}" | sort | sed "s#${assets_dir}/#  #"
+echo "regenerated ${#generated_names[@]} openspec skills (version ${ver}) into ${skills_target}:"
+for skill_name in "${generated_names[@]}"; do
+  fd -H -t f . "${skills_target}/${skill_name}" | sort | sed "s#${skills_target}/#  #"
+done
 echo ""
 echo "generatedBy frontmatter:"
-rg -n 'generatedBy' "${assets_dir}/skills"
+for skill_name in "${generated_names[@]}"; do
+  rg -n 'generatedBy' "${skills_target}/${skill_name}"
+done

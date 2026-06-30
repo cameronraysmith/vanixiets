@@ -31,11 +31,11 @@
 
 Supersedes the original "Upstream deps + bridge fork" Phase 4 (fork the bridge + add an apm packaging signal), now superseded per design.md decision D13.
 
-- [ ] 4.1 `delivery=skills`: set `programs.openspec.delivery = "skills"`; rework the refresh sidecar (remove the command path, keep the exactly-11-skills assertion); remove the `assets/commands/` tree; remove the `commandsDir` wiring; update the affected doc-comments
-- [ ] 4.2 OpenSpec 1.5.0:
+- [x] 4.1 `delivery=skills`: set `programs.openspec.delivery = "skills"`; rework the refresh sidecar (remove the command path, keep the exactly-11-skills assertion); remove the `assets/commands/` tree; remove the `commandsDir` wiring; update the affected doc-comments
+- [x] 4.2 OpenSpec 1.5.0:
   - [x] bump `llm-agents` to OpenSpec 1.5.0 + apm 0.23.0 (landed at the diamond base)
-  - [ ] regenerate the 11 `openspec-*` skills at 1.5.0 under `delivery=skills`
-- [ ] 4.3 Vendor openspec skills into the package: move the 11 `openspec-*/` dirs into `planning-and-development/.apm/skills/`; drop `aiSkills.extraSkillDirs`; retarget the refresh app per-skill, preserving the 3 authored skills
+  - [x] regenerate the 11 `openspec-*` skills at 1.5.0 under `delivery=skills`
+- [x] 4.3 Vendor openspec skills into the package: move the 11 `openspec-*/` dirs into `planning-and-development/.apm/skills/`; drop `aiSkills.extraSkillDirs`; retarget the refresh app per-skill, preserving the 3 authored skills
 - [ ] 4.4 superpowers cache-warm: add the regular full-SHA dep to `planning-and-development/apm.yml`; in `apm-skills-compose/package.nix` add `superpowersSrc`/`superpowersRev` + the cache pre-warm, drop `superpowers-src` from `upstreamDeps`, and add a superpowers skill to the assertion list; in `compose.nix` default `upstreamDeps` to `[]` and thread the args; thread the SHA from one nix source
 - [ ] 4.5 Command-drop ripple: rewrite `agentic-planning-development-workflow/SKILL.md` + `references/{collaborators,delegation,execution-modes,hil-isolation}.md` + `openspec-linear-sync/SKILL.md` to skill-form; set `openspec/config.yaml` default schema to `superpowers-bridge`; rewrite the bridge `README.md` + `templates/adopters/CLAUDE.md.fragment.md` to skill-form (`schema.yaml` unchanged)
 - [ ] 4.6 Verify: `nix build .#checks.aarch64-darwin.home-manager-crs58` → exit 0; inspect `$out/apm.lock.yaml` for the superpowers `resolved_commit` entry; confirm the flat skill set + the openspec skills now arriving via apm + no `/opsx:*` commands; (deferred) a linux x86_64 no-network sandbox build confirms the cache-warm at buildbot
