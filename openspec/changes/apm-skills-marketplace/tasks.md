@@ -46,10 +46,10 @@ Supersedes the original "Upstream deps + bridge fork" Phase 4 (fork the bridge +
 
 ## 5. Phase 5 — Integrate + deploy
 
-- [ ] 5.1 `darwin-rebuild switch` on stibnite
-- [ ] 5.2 Confirm flat skills + merged superpowers content across harnesses
-- [ ] 5.3 Confirm `apm.lock` present and store-symlink immutability intact
-- [ ] 5.4 Confirm activation succeeded and all harnesses see the skills
+- [x] 5.1 `darwin-rebuild switch` on stibnite
+- [x] 5.2 Confirm flat skills + merged superpowers content across harnesses
+- [x] 5.3 Confirm `apm.lock` present and store-symlink immutability intact
+- [x] 5.4 Confirm activation succeeded and all harnesses see the skills
 
 A consumer-path validation flake-app — an apm-native consumer that registers this marketplace and installs every published package in a fully isolated throwaway environment that never touches the real `$HOME` / `~/.claude` — is implemented as `modules/apps/apm-marketplace-validate.{nix,sh}` (`nix run .#apm-marketplace-validate`).
 The `--local` path is proven: all 17 packages install (`APM-VALIDATE-SUMMARY: passed=17 failed=0 total=17`), coverage matches the published set, the 16 first-party packages resolve offline, and `planning-and-development`'s `obra/superpowers` transitive dep fetches from github over https (the reason the app ships cacert + `GIT_SSL_CAINFO`).

@@ -27,10 +27,10 @@ A dependency source that lacks any packaging signal MUST gain one before it can 
 - **WHEN** a first-party package declares a dependency on `obra/superpowers`
 - **THEN** apm auto-detects it as a `MARKETPLACE_PLUGIN` and composes its skills with no fork required
 
-#### Scenario: bridge fork consumed after adding a packaging signal
+#### Scenario: superpowers consumed as a regular remote dependency resolved offline; bridge stays an OpenSpec schema
 
-- **WHEN** the `openspec-schemas-superpowers-bridge` fork (originally schema.yaml + templates/ only, with no `SKILL.md`/`.claude-plugin/`/`apm.yml`) adds exactly one packaging signal (a `SKILL.md` or `apm.yml`)
-- **THEN** a first-party `agentic-planning-development-workflow` package can declare dependencies on both superpowers and the bridge fork and apm resolves the graph
+- **WHEN** `planning-and-development` declares `obra/superpowers` as a regular (walked) remote apm dependency pinned to its full 40-char SHA, and the nix compose pre-seeds apm's git checkout cache from the flake-pinned `fetchFromGitHub` tree before `apm install`
+- **THEN** apm resolves the remote ref from the warmed cache with zero network and records a remote-style `resolved_commit` lock, while the `openspec-schemas-superpowers-bridge` is NOT forked or given an apm packaging signal — it stays an OpenSpec schema delivered by its own home-manager module
 
 #### Scenario: additive co-ship with no patch or override
 
