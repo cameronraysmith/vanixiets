@@ -316,11 +316,13 @@ just check-fast x86_64-linux
 
 **Symptom:** Playwright browsers not found
 
+**Context:** Browsers are provided by the nix devShell via `PLAYWRIGHT_BROWSERS_PATH`; CDN downloads are disabled (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`), so there is no manual install step.
+
+**Solution:** Enter the devShell (or let direnv load it) so the browser path is set:
+
 ```bash
-# Install Playwright browsers
-just playwright-install
-# or
-cd packages/docs && bunx playwright install --with-deps
+nix develop
+echo $PLAYWRIGHT_BROWSERS_PATH   # points to the flake-provided browsers
 ```
 
 **Symptom:** Port 4321 already in use
