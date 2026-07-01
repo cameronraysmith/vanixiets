@@ -29,9 +29,21 @@
       devShells.default = pkgs.mkShell {
         inputsFrom = [
           config.pre-commit.devShell
-          # Inherit playwright browser setup (sets PLAYWRIGHT_BROWSERS_PATH, etc.)
-          inputs'.playwright-web-flake.devShells.default
         ];
+
+        # The playwright-web-flake default devShell is intentionally not inherited;
+        # select the browser set per platform instead. On darwin the full flake set
+        # (chromium, firefox, webkit, headless-shell) builds via fetchzip, restoring
+        # the all-browser local `just docs-test`. On Linux the flake's webkit is
+        # unbuildable (webkit.nix omits libenchant) and CI is chromium-only anyway,
+        # so use the chromium-only subset — byte-identical to the prior value, so the
+        # Linux buildbot checks are unchanged.
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+        PLAYWRIGHT_BROWSERS_PATH =
+          if pkgs.stdenv.isDarwin then
+            "${inputs'.playwright-web-flake.packages.playwright-driver.browsers}"
+          else
+            "${inputs'.playwright-web-flake.packages.playwright-driver.passthru.browsers-chromium}";
 
         packages = [
           python
