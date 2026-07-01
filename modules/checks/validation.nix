@@ -495,18 +495,18 @@
               fi
 
               # Compare inventory machines to registered machines
-              echo "$inventoryMachines" | ${pkgs.jq}/bin/jq -r '.[]' | sort > /tmp/inventory.txt
-              echo "$registeredMachines" | ${pkgs.jq}/bin/jq -r '.[]' | sort > /tmp/registered.txt
+              echo "$inventoryMachines" | ${pkgs.jq}/bin/jq -r '.[]' | sort > "$TMPDIR/inventory.txt"
+              echo "$registeredMachines" | ${pkgs.jq}/bin/jq -r '.[]' | sort > "$TMPDIR/registered.txt"
 
               # Check that all inventory machines exist in registered machines
               while read -r machine; do
-                if grep -qx "$machine" /tmp/registered.txt; then
+                if grep -qx "$machine" "$TMPDIR/registered.txt"; then
                   echo "OK: Inventory machine '$machine' is registered"
                 else
                   echo "ERROR: Inventory machine '$machine' not found in clan.machines" >&2
                   exit 1
                 fi
-              done < /tmp/inventory.txt
+              done < "$TMPDIR/inventory.txt"
 
               echo "OK: All inventory machines match registered machines"
               touch $out
