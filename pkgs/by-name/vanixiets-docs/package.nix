@@ -158,9 +158,12 @@ stdenv.mkDerivation (finalAttrs: {
     # downstream — wrangler.unstable_readConfig rederives them from the file path
     # it is handed — but stripping the build-time /nix/var/nix/builds/... strings
     # makes the derivation output bit-identical across rebuilds.
+    # @astrojs/cloudflare 14.x drives a static (assets-only) build, so
+    # @cloudflare/vite-plugin emits wrangler.json into the client output dir
+    # (dist/client) rather than the server dir it used pre-14.
     jq '.configPath = "./wrangler.jsonc" | .userConfigPath = "./wrangler.jsonc"' \
-      $out/dist/server/wrangler.json > $out/dist/server/wrangler.json.tmp
-    mv $out/dist/server/wrangler.json.tmp $out/dist/server/wrangler.json
+      $out/dist/client/wrangler.json > $out/dist/client/wrangler.json.tmp
+    mv $out/dist/client/wrangler.json.tmp $out/dist/client/wrangler.json
     runHook postInstall
   '';
 
@@ -171,6 +174,7 @@ stdenv.mkDerivation (finalAttrs: {
 
     nativeBuildInputs = [
       bun2nix.hook
+      nodejs-slim
     ];
 
     bunDeps = finalAttrs.bunDeps;
@@ -181,7 +185,7 @@ stdenv.mkDerivation (finalAttrs: {
     buildPhase = ''
       runHook preBuild
       cd packages/docs
-      bun run test:unit
+      node ./node_modules/.bin/vitest run
       cd ../..
       runHook postBuild
     '';
@@ -236,9 +240,9 @@ stdenv.mkDerivation (finalAttrs: {
       ${patchBundledWorkerd}
       # Provide pre-built CF Worker bundle for the CI webServer (astro preview →
       # miniflare/workerd). finalPackage has a nested layout ({dist/client/,
-      # dist/server/, .wrangler/, wrangler.jsonc}); astro preview reads
-      # .wrangler/deploy/config.json to locate dist/server/wrangler.json via
-      # @cloudflare/vite-plugin's getWorkerConfigs().
+      # .wrangler/, wrangler.jsonc}); astro preview reads
+      # .wrangler/deploy/config.json to locate dist/client/wrangler.json via
+      # @cloudflare/vite-plugin's getWorkerConfigs() (assets-only static build).
       mkdir -p packages/docs
       cp -r ${finalAttrs.finalPackage}/dist packages/docs/dist
       cp -r ${finalAttrs.finalPackage}/.wrangler packages/docs/.wrangler

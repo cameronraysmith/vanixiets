@@ -146,13 +146,14 @@ fi
 cp -R "$DOCS_PAYLOAD"/. "$tmpdir/"
 chmod -R u+w "$tmpdir"
 
-# Astro generates dist/server/wrangler.json with real resolved relative paths
-# (main: "entry.mjs", assets.directory: "../client") during build.
-# .wrangler/deploy/config.json in the payload explicitly references this as the
-# deploy-time config. Use it directly — no jq rewrite needed, and no dependency
-# on node_modules to resolve the @astrojs/cloudflare/entrypoints/server specifier
-# present in the source wrangler.jsonc.
-wrangler_config="$tmpdir/dist/server/wrangler.json"
+# @astrojs/cloudflare 14's assets-only static build generates the resolved
+# wrangler config at dist/client/wrangler.json during build; the payload's
+# .wrangler/deploy/config.json configPath references it
+# (../../dist/client/wrangler.json) as the deploy-time config. Use it directly
+# — no jq rewrite needed, and no dependency on node_modules to resolve the
+# @astrojs/cloudflare/entrypoints/server specifier present in the source
+# wrangler.jsonc.
+wrangler_config="$tmpdir/dist/client/wrangler.json"
 
 # Commit metadata: env-first with errexit-tolerant git fallback so a
 # missing .git (bwrap sandbox) surfaces as empty strings rather than
