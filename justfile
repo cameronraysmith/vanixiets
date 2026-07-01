@@ -475,13 +475,13 @@ regenerate-bun-nix:
   bun2nix --lock-file bun.lock --output-file bun.nix
   treefmt bun.nix
 
-# Fail if the npm playwright version drifts from the playwright-web-flake tag.
+# Fail if the npm playwright version drifts from the flake-provided playwright version.
 # Run standalone as a sanity check or let the composite gate on it.
 [group('bun')]
 bun-drift-check:
   #!/usr/bin/env bash
   set -euo pipefail
-  FLAKE_PW=$(jq -r '.nodes."playwright-web-flake".original.ref' flake.lock)
+  FLAKE_PW=$(nix eval --raw --inputs-from . "playwright-web-flake#packages.$(nix eval --impure --raw --expr builtins.currentSystem).playwright-driver.version")
   NPM_PW=$(jq -r '.devDependencies."playwright"' packages/docs/package.json)
   NPM_PWT=$(jq -r '.devDependencies."@playwright/test"' packages/docs/package.json)
   if [[ "$NPM_PW" != "$FLAKE_PW" || "$NPM_PWT" != "$FLAKE_PW" ]]; then
@@ -511,7 +511,7 @@ bun-bump-all:
 bun-repin-playwright:
   #!/usr/bin/env bash
   set -euo pipefail
-  FLAKE_PW=$(jq -r '.nodes."playwright-web-flake".original.ref' flake.lock)
+  FLAKE_PW=$(nix eval --raw --inputs-from . "playwright-web-flake#packages.$(nix eval --impure --raw --expr builtins.currentSystem).playwright-driver.version")
   pkg=packages/docs/package.json
   tmp=$(mktemp)
   jq --arg v "$FLAKE_PW" '

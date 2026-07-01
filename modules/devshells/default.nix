@@ -32,12 +32,13 @@
         ];
 
         # The playwright-web-flake default devShell is intentionally not inherited;
-        # select the browser set per platform instead. On darwin the full flake set
-        # (chromium, firefox, webkit, headless-shell) builds via fetchzip, restoring
-        # the all-browser local `just docs-test`. On Linux the flake's webkit is
-        # unbuildable (webkit.nix omits libenchant) and CI is chromium-only anyway,
-        # so use the chromium-only subset — byte-identical to the prior value, so the
-        # Linux buildbot checks are unchanged.
+        # select the browser set per platform instead. On darwin use the full flake
+        # set (chromium, firefox, webkit): the fork now carries a working macOS-15
+        # webkit build (rev 2311), so the all-browser local `just docs-test` passes.
+        # On Linux use the chromium-only subset because the flake's Linux webkit is
+        # unbuildable and the post-PR#18 Chrome-for-Testing chromium crashes the nix
+        # sandbox; this value is byte-identical to the prior one, so the Linux
+        # buildbot checks are unchanged.
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
         PLAYWRIGHT_BROWSERS_PATH =
           if pkgs.stdenv.isDarwin then
