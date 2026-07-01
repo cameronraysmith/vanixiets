@@ -32,19 +32,14 @@
         ];
 
         # The playwright-web-flake default devShell is intentionally not inherited;
-        # select the browser set per platform instead. On darwin use the full flake
-        # set (chromium, firefox, webkit): the fork now carries a working macOS-15
-        # webkit build (rev 2311), so the all-browser local `just docs-test` passes.
-        # On Linux use the chromium-only subset because the flake's Linux webkit is
-        # unbuildable and the post-PR#18 Chrome-for-Testing chromium crashes the nix
-        # sandbox; this value is byte-identical to the prior one, so the Linux
-        # buildbot checks are unchanged.
+        # select the browser set explicitly. Use the full flake set (chromium,
+        # firefox, webkit) on both platforms: the fork carries working macOS-15
+        # (rev 2311) and Linux webkit builds, so the all-browser local `just
+        # docs-test` passes. The Chrome-for-Testing sandbox crash that forces the
+        # nixpkgs-chromium wrapper is specific to the hermetic e2e check in
+        # pkgs/by-name/vanixiets-docs/package.nix, not this interactive devShell.
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
-        PLAYWRIGHT_BROWSERS_PATH =
-          if pkgs.stdenv.isDarwin then
-            "${inputs'.playwright-web-flake.packages.playwright-driver.browsers}"
-          else
-            "${inputs'.playwright-web-flake.packages.playwright-driver.passthru.browsers-chromium}";
+        PLAYWRIGHT_BROWSERS_PATH = "${inputs'.playwright-web-flake.packages.playwright-driver.browsers}";
 
         packages = [
           python

@@ -1422,11 +1422,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1782914808,
-        "narHash": "sha256-mZ8eedFqyc2hhKkXpGkfeksUXjWcCe3R9JcTPUkr1gE=",
+        "lastModified": 1782917215,
+        "narHash": "sha256-FveqhmyDOis+IvWkR2k7zX29EaY0Qra5VwIdgVqwjIg=",
         "owner": "cameronraysmith",
         "repo": "playwright-web-flake",
-        "rev": "aec6b1d623493a3a1110b7b6ee26f8ca819d855a",
+        "rev": "ebd814a0a742d274507c211b1aa21e83136be69d",
         "type": "github"
       },
       "original": {
