@@ -1,0 +1,36 @@
+[global]
+remove_todos = false
+remove_fixme = false
+remove_docs = false
+preserve_patterns = ["HACK", "WORKAROUND", "NOTE"]
+use_default_ignores = true
+respect_gitignore = true
+traverse_git_repos = false
+
+[languages.nix]
+name = "Nix"
+extensions = [".nix"]
+comment_nodes = ["comment"]
+
+[languages.xml]
+name = "XML"
+extensions = [".xml", ".xsd", ".xsl", ".xslt", ".svg"]
+comment_nodes = ["Comment"]
+
+[languages.typescript]
+name = "TypeScript"
+extensions = [".ts", ".tsx", ".mts", ".cts", ".d.ts"]
+comment_nodes = ["comment"]
+preserve_patterns = ["@ts-expect-error", "@ts-ignore", "eslint-"]
+
+[patterns."tests/**/*"]
+remove_todos = true
+
+[patterns."**/*.spec.*"]
+remove_docs = true
+remove_todos = true
+
+[patterns."**/*.generated.*"]
+remove_docs = true
+remove_todos = true
+preserve_patterns = []
