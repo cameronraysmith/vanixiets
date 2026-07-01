@@ -25,11 +25,6 @@
         program = "${config.packages.beads-ui.updateScript}";
       };
 
-      apps.update-dolt = {
-        type = "app";
-        program = "${config.packages.dolt.updateScript}";
-      };
-
       apps.update-git-xet = {
         type = "app";
         program = "${config.packages.git-xet.updateScript}";
