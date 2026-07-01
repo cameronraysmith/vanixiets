@@ -21,7 +21,7 @@
     "build": "astro build",
     "build:clean": "bun run clean && bun run build",
     "preview": "bun run build && wrangler dev",
-    "preview:ci": "astro preview --host 127.0.0.1 --port 4321",
+    "preview:ci": "node ./node_modules/.bin/astro preview --host 127.0.0.1 --port 4321",
     "deploy": "bun run build && wrangler deploy",
     "linkcheck": "CHECK_LINKS=true bun run build",
     "cf-typegen": "wrangler types",
@@ -38,26 +38,27 @@
     "test-release": "semantic-release --dry-run --no-ci"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "13.5.1",
-    "@astrojs/starlight": "0.39.3",
-    "astro": "6.3.3"
+    "@astrojs/cloudflare": "14.0.2",
+    "@astrojs/markdown-remark": "^7.2.0",
+    "@astrojs/starlight": "0.41.1",
+    "astro": "7.0.4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.1",
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.61.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^12.0.8",
     "@types/node": "^26.0.1",
     "@vitest/coverage-v8": "^4.1.9",
     "conventional-changelog-conventionalcommits": "^9.3.1",
-    "playwright": "1.60.0",
+    "playwright": "1.61.1",
     "semantic-release": "25.0.5",
     "semantic-release-major-tag": "^0.3.2",
     "semantic-release-monorepo": "^8.0.2",
     "sharp": "^0.35.2",
     "starlight-katex": "^0.0.4",
-    "starlight-links-validator": "^0.24.1",
+    "starlight-links-validator": "0.25.2",
     "vitest": "^4.1.9",
     "wrangler": "^4.106.0"
   },
