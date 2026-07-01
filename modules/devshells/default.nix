@@ -53,6 +53,7 @@
           pkgs.nix-update
           pkgs.nix-prefetch-github
           self'.packages.gastown
+          self'.packages.uncomment-bin
           # Tools required by Makefile verify target
           pkgs.age
           pkgs.ssh-to-age

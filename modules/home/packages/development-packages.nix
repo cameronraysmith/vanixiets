@@ -113,6 +113,7 @@
           golem-binary
           linear-cli
           ouroboros
+          uncomment-bin
           #------
           plantuml-c4
           ratchet
