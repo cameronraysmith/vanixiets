@@ -47,7 +47,12 @@
               autoDreamEnabled = true;
               spinnerTipsEnabled = false;
               cleanupPeriodDays = 1100;
-              includeCoAuthoredBy = false;
+              attribution = {
+                commit = "";
+                pr = "";
+                sessionUrl = false;
+              };
+              includeGitInstructions = false;
               enableAllProjectMcpServers = false;
               extraKnownMarketplaces = {
                 # reserved Anthropic marketplace name: github source mandated; upstream has no tags so no pin anchor exists (CC marketplace refs are branch/tag only, not shas)
