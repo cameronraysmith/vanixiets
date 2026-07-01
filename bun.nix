@@ -29,9 +29,9 @@
     url = "https://registry.npmjs.org/@actions/io/-/io-1.1.3.tgz";
     hash = "sha512-wi9JjgKLYS7U/z8PPbco+PvTb/nRWjeoFlJ1Qer83k/3C5PHQi28hiVdeE2kHXmIL99mQFawx8qt/JPjZilJ8Q==";
   };
-  "@astrojs/cloudflare@14.0.2" = fetchurl {
-    url = "https://registry.npmjs.org/@astrojs/cloudflare/-/cloudflare-14.0.2.tgz";
-    hash = "sha512-FWEMvaIvRiv3tLwX1km3ghI1kQJHzj7cuvflXshKw7A5HocdL7w4hoCphejl7LNg3qAONOkqrrnVNBz2qBQ/2g==";
+  "@astrojs/cloudflare@14.1.0" = fetchurl {
+    url = "https://registry.npmjs.org/@astrojs/cloudflare/-/cloudflare-14.1.0.tgz";
+    hash = "sha512-m4G525DhigQagfA0KHwi/hl6KIgG748u49OQXojp3b+6Mgb7/a5Om9b4LWytDg23fpf5RHxOqzR8js5wUFalbQ==";
   };
   "@astrojs/compiler-binding-darwin-arm64@0.3.0" = fetchurl {
     url = "https://registry.npmjs.org/@astrojs/compiler-binding-darwin-arm64/-/compiler-binding-darwin-arm64-0.3.0.tgz";
@@ -1658,9 +1658,9 @@
     url = "https://registry.npmjs.org/astro/-/astro-5.16.0.tgz";
     hash = "sha512-GaDRs2Mngpw3dr2vc085GnORh98NiXxwIjg/EoQQQl/icZt3Z7s0BRsYHDZ8swkZbOA6wZsqWJdrNirl+iKcDg==";
   };
-  "astro@7.0.4" = fetchurl {
-    url = "https://registry.npmjs.org/astro/-/astro-7.0.4.tgz";
-    hash = "sha512-6DSiJ4CT69vngNlwEKec7nGOJHcPzc95lX7E6qkUhAt6drGYzUdf0KTJToswu3vFp3lTCGnNDCzBi/5aW8tTPA==";
+  "astro@7.0.5" = fetchurl {
+    url = "https://registry.npmjs.org/astro/-/astro-7.0.5.tgz";
+    hash = "sha512-KR/zBBgU6I+F5vDoTsuTbXbBmI565CToDOgPr0pPiL2Hgrvx4CV8Cg2wtT6VqqyOS7BIfBkdagKD+40SojGl7w==";
   };
   "axobject-query@4.1.0" = fetchurl {
     url = "https://registry.npmjs.org/axobject-query/-/axobject-query-4.1.0.tgz";
