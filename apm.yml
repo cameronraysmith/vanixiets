@@ -59,3 +59,6 @@ marketplace:
     - name: nix-build-operations
       source: ./modules/home/ai/plugins/nix-build-operations
       version: 0.0.0
+    - name: testing-and-quality
+      source: ./modules/home/ai/plugins/testing-and-quality
+      version: 0.0.0

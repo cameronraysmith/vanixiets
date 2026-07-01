@@ -1,0 +1,5 @@
+{
+  "name": "testing-and-quality",
+  "version": "0.0.0",
+  "description": "Testing and quality skills — acceptance-test-driven outer loop, BDD Gherkin formulation as living documentation, and native BDD step-definition runners (pytest-bdd, cucumber-rs, cucumber-js)."
+}

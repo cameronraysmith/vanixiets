@@ -106,6 +106,12 @@
       "description": "Nix build-operations skills — flake PR cycle, broken-package handling, process-compose init, worktree-sparsity eval.",
       "version": "0.0.0",
       "source": "./modules/home/ai/plugins/nix-build-operations"
+    },
+    {
+      "name": "testing-and-quality",
+      "description": "Testing and quality skills — acceptance-test-driven outer loop, BDD Gherkin formulation as living documentation, and native BDD step-definition runners (pytest-bdd, cucumber-rs, cucumber-js).",
+      "version": "0.0.0",
+      "source": "./modules/home/ai/plugins/testing-and-quality"
     }
   ]
 }

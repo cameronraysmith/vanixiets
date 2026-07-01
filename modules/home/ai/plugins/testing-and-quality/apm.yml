@@ -1,0 +1,13 @@
+name: testing-and-quality
+version: 0.0.0
+description: Testing and quality skills — acceptance-test-driven outer loop, BDD Gherkin formulation as living documentation, and native BDD step-definition runners (pytest-bdd, cucumber-rs, cucumber-js).
+devDependencies:
+  apm:
+    # Intra-marketplace edges are recorded as inert comments, never active apm
+    # dependencies: apm install validates every transitive apm.yml and rejects the
+    # NAME@MARKETPLACE shorthand, which would break the hermetic offline nix compose.
+    # All packages co-install via the nix-generated root consumer manifest.
+    # atdd-outer-loop references (does not restate) test-driven-development,
+    # subagent-driven-development, preferences-validation-assurance,
+    # preferences-collaborative-modeling, refinement-driven-development.
+    # bdd-step-definitions points one-directionally up to the two concept skills.
