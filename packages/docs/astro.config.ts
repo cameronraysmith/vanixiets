@@ -2,6 +2,7 @@ import cloudflare from "@astrojs/cloudflare";
 import starlight from "@astrojs/starlight";
 import starlightLinksValidator from "starlight-links-validator";
 import { starlightKatex } from "starlight-katex";
+import { unified } from "@astrojs/markdown-remark";
 import { defineConfig } from "astro/config";
 import justGrammar from "./src/grammars/just.tmLanguage.json";
 // ROLLDOWN INTEGRATION (DISABLED) - Uncomment when re-enabling (see ROLLDOWN.md)
@@ -128,6 +129,7 @@ export default defineConfig({
   },
 
   markdown: {
+    processor: unified(),
     syntaxHighlight: {
       type: "shiki",
       // math is excluded for KaTeX compatibility
