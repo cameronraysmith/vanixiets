@@ -293,6 +293,10 @@
     url = "https://registry.npmjs.org/@colors/colors/-/colors-1.5.0.tgz";
     hash = "sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==";
   };
+  "@conventional-changelog/template@1.2.0" = fetchurl {
+    url = "https://registry.npmjs.org/@conventional-changelog/template/-/template-1.2.0.tgz";
+    hash = "sha512-12qHxvlKjHmP0PQ+17EREgC7lWyLwbph1RKcZQZ7k7ZWGmrxfxC9gadHGfvzr0g0u8BhiBGg3tks93txodlyRQ==";
+  };
   "@cspotcode/source-map-support@0.8.1" = fetchurl {
     url = "https://registry.npmjs.org/@cspotcode/source-map-support/-/source-map-support-0.8.1.tgz";
     hash = "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==";
@@ -1910,9 +1914,9 @@
     url = "https://registry.npmjs.org/conventional-changelog-angular/-/conventional-changelog-angular-8.1.0.tgz";
     hash = "sha512-GGf2Nipn1RUCAktxuVauVr1e3r8QrLP/B0lEUsFktmGqc3ddbQkhoJZHJctVU829U1c6mTSWftrVOCHaL85Q3w==";
   };
-  "conventional-changelog-conventionalcommits@9.3.1" = fetchurl {
-    url = "https://registry.npmjs.org/conventional-changelog-conventionalcommits/-/conventional-changelog-conventionalcommits-9.3.1.tgz";
-    hash = "sha512-dTYtpIacRpcZgrvBYvBfArMmK2xvIpv2TaxM0/ZI5CBtNUzvF2x0t15HsbRABWprS6UPmvj+PzHVjSx4qAVKyw==";
+  "conventional-changelog-conventionalcommits@10.2.0" = fetchurl {
+    url = "https://registry.npmjs.org/conventional-changelog-conventionalcommits/-/conventional-changelog-conventionalcommits-10.2.0.tgz";
+    hash = "sha512-UtlM9GqolY7OmlQh5L/UEVoKsTUpTgUVy1PU8JN5gl5Ydaejb7WRklGliG1SKPxxj7hzA173eG3Kt5fYWE2pmg==";
   };
   "conventional-changelog-writer@8.2.0" = fetchurl {
     url = "https://registry.npmjs.org/conventional-changelog-writer/-/conventional-changelog-writer-8.2.0.tgz";
