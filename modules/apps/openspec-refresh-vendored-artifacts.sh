@@ -30,9 +30,10 @@ repo_root="$(git rev-parse --show-toplevel)"
 
 # the 11 generated openspec-* skills are vendored into the planning-and-development
 # apm package so they ship through apm-skills-compose; this directory ALSO holds
-# hand-authored skills (agentic-planning-development-workflow, openspec-linear-sync,
-# project-management) which this script must never touch. the openspec module's
-# assets/ tree now holds only the superpowers-bridge schema bundle (no skills/).
+# four hand-authored skills (agentic-planning-development-workflow,
+# openspec-bdd-bridge, openspec-linear-sync, project-management) which this script
+# must never touch. the openspec module's assets/ tree now holds only the
+# superpowers-bridge schema bundle (no skills/).
 skills_target="${repo_root}/modules/home/ai/plugins/planning-and-development/.apm/skills"
 
 # the pinned openspec version is injected by the flake app via runtimeEnv; when
@@ -88,9 +89,10 @@ fi
 # replace ONLY the generated openspec-* skills in the target package, per-skill.
 # iterate over the names this run actually produced (never a static `openspec-*`
 # glob against the package) so the hand-authored skills sharing this directory are
-# never removed or overwritten. openspec-linear-sync is hand-authored despite its
-# prefix and is not produced by `openspec init`, so it never appears in
-# ${generated_skills} and is therefore never a member of this loop.
+# never removed or overwritten. openspec-bdd-bridge and openspec-linear-sync are
+# hand-authored despite their openspec- prefix and are not produced by
+# `openspec init`, so they never appear in ${generated_skills} and are therefore
+# never members of this loop.
 generated_names=()
 for skill_path in "${generated_skills}"/*/; do
   skill_name="$(basename "${skill_path}")"
