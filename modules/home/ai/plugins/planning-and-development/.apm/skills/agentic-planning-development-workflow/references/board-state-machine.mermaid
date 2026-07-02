@@ -14,6 +14,15 @@ stateDiagram-v2
     %% readiness gate: proposal.md committed (brainstorm.md alone keeps the unit in Backlog).
     Backlog --> Todo: readiness gate / proposal.md committed
 
+    %% Pre-apply spec-and-feature alignment sub-gate: mode-agnostic, sits just below
+    %% the apply gate, no-ops when no delta spec carries behavioral requirements.
+    note right of Todo
+        Pre-apply alignment sub-gate (before the apply gate):
+        align delta specs with Gherkin ".feature" files;
+        route each requirement through Gate 1; no-op when
+        no delta spec carries behavioral requirements.
+    end note
+
     %% apply gate fires at the Todo to In Progress boundary, which is also where the
     %% human picks the per-issue execution mode. The mode fork is the same apply gate
     %% regardless of mode; all three modes converge on In Review.

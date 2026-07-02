@@ -125,6 +125,15 @@ The archive gate fires In Review to Done; the review-round counter resets.
 A rejection variant: had the human rejected at roborev, the router would route the unit into the shared re-queue (In Review to In Progress, above the fork); the unit would re-select its mode, defaulting to HIL, the review-round counter incrementing once.
 Three exhausted rounds would escalate to the human PM layer and park the unit.
 
+## Spec and feature alignment (pre-apply)
+
+At the Todo to In Progress boundary, upstream of the apply gate and symmetric to the two In-Review sub-gates, a mode-agnostic pre-apply gate aligns spec and feature encodings when the change carries behavioral requirements.
+When a change's delta specs contain behavioral requirements, the delta specs and the corresponding Gherkin `.feature` files are laid out and aligned per the openspec-bdd-bridge skill before the apply-change executor starts working tasks.md; the gate no-ops when no delta spec carries behavioral requirements, so AFK and Manual paths without specs are unaffected.
+That same skill owns the modality routing, the tag-and-guard traceability convention, the per-runner feature and step-definition conventions, and the spec-to-Gherkin mapping.
+See ../../openspec-bdd-bridge/SKILL.md for the substance.
+
+The correspondence is maintained rather than established once, and it is reconciled before archive per the same openspec-bdd-bridge skill, which frames that reconciliation as a soft guidance layer on top of openspec-verify-change's existing non-blocking Scenario Coverage check rather than a new blocking gate.
+
 ## Future automation extension point
 
 Automation hooks may trigger the right tools at each sub-gate (code-review automation for roborev; doc-generation and review automation for documenter), composing into the existing abstract gates without introducing a fourth agent; the board structure, the two sub-gates, and the shared re-queue are unchanged.

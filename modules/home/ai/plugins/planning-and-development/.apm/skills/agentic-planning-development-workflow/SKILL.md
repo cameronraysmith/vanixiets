@@ -67,6 +67,7 @@ The apply gate fires Todo to In Progress on the first tasks.md `- [x]` checkbox.
 The In-Review gate fires In Progress to In Review when verify.md exists.
 The archive gate fires In Review to Done when the change is archived.
 
+A mode-agnostic pre-apply alignment sub-gate sits just below the apply gate at the Todo to In Progress boundary, symmetric to the In-Review sub-gates but checking spec-against-intended-feature before implementation; it lays out and aligns the change's delta specs with their Gherkin `.feature` files, no-ops when no delta spec carries behavioral requirements, and is detailed in references/board-and-gates.md.
 In Review internally decomposes into two ordered human-steered sub-gates, roborev (code review) first and documenter (docs and handbook review) second, whose joint approval is the precondition for the archive gate that fires Done.
 A single shared re-queue node receives both sub-gate rejections and a verify.md checked-FAIL, re-queuing into In Progress above the mode fork so a bounced unit re-selects its execution mode.
 A bounded-retries policy escalates to the human PM layer on exhaustion, giving the board a documented counter-backed termination guarantee in the modes whose ledger carries the review-round counter (HIL, and AFK where the plan file backs it).
@@ -119,6 +120,7 @@ Defer the full canon to jj-version-control/SKILL.md invariant (iii-b)/(vi).
 |---|---|
 | references/execution-modes.md | AFK/HIL/Manual entry criteria, the per-mode authoritative ledger, and the re-queue-defaults-to-original-mode rule |
 | references/board-and-gates.md | The seven Linear-canonical states, the four forward transitions, the In-Review sub-gates, the shared re-queue, the bounded-retries policy, and the router walkthrough |
+| references/board-and-gates.md#spec-and-feature-alignment-pre-apply | The mode-agnostic pre-apply spec-and-feature alignment sub-gate at Todo to In Progress, its stepped-versus-fast-forward trigger, Gate 1 modality routing, the recommended safeadt tag-and-guard convention, and the before-archive reconciliation owned by openspec-verify-change |
 | references/board-state-machine.mermaid | The stateDiagram-v2 rendering of the seven-state board, its four file-anchored forward transitions, the execution-mode fork, the two ordered In-Review sub-gates, the shared re-queue, and the inert terminals |
 | references/hil-isolation.md | The jj diamond development join as the worktree substitute and the CLAUDE_JJ_WORKSPACE_ISOLATION hatch, confirmed at the apply gate |
 | references/delegation.md | The compose-by-delegation contract, the abstract In-Review gates, and the statement that the router re-implements none of orient/plan/review/checkpoint |
