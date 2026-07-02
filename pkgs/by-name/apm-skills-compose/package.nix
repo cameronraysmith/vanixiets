@@ -30,6 +30,13 @@
   superpowersSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-superpowers,
   superpowersRev ? superpowersSrc.rev,
 
+  # Flake-pinned agency tree feeding apm's git checkout cache so the skills-subset
+  # remote dep resolves with zero network. agencyRev is the single SHA source of
+  # truth (the fetchFromGitHub rev), reconciled against the apm.yml pin by the
+  # drift guard in the build script.
+  agencySrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-agency,
+  agencyRev ? agencySrc.rev,
+
   targets ? [
     "agent-skills"
     "claude"
@@ -101,6 +108,21 @@ runCommandLocal "apm-skills-compose"
     # declared SHA, breaking the hermetic offline compose; fail loudly instead.
     if ! grep -q "$SP_SHA" ./planning-and-development/apm.yml; then
       echo "apm-skills-compose: superpowers SHA drift — planning-and-development/apm.yml does not pin $SP_SHA" >&2
+      exit 1
+    fi
+
+    # Same offline pre-seed for the agency skills-subset remote dep.
+    AG_SHA=${agencyRev}
+    SHARD_AG=$(printf '%s' 'https://github.com/srid/agency' | sha256sum | cut -c1-16)
+    CK_AG="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_AG/$AG_SHA/full"
+    mkdir -p "$CK_AG"
+    cp -RL ${agencySrc}/. "$CK_AG"/
+    chmod -R u+w "$CK_AG"
+    mkdir -p "$CK_AG/.git"
+    printf '%s\n' "$AG_SHA" > "$CK_AG/.git/HEAD"
+
+    if ! grep -q "$AG_SHA" ./planning-and-development/apm.yml; then
+      echo "apm-skills-compose: agency SHA drift — planning-and-development/apm.yml does not pin $AG_SHA" >&2
       exit 1
     fi
 

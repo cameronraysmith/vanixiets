@@ -11,3 +11,16 @@ dependencies:
   package_type: marketplace_plugin
   content_hash: sha256:80b2465c39c33ef93b5a1ee1a95ed4158dcc2a78440108d676072c4d7c083aa8
   declared_license: MIT
+- repo_url: srid/agency
+  name: agency
+  host: github.com
+  resolved_commit: 81455051ccca654c57ad6088838c85e7248ac159
+  resolved_ref: 81455051ccca654c57ad6088838c85e7248ac159
+  version: 1.0.0
+  package_type: apm_package
+  content_hash: sha256:e2144eca9c2932044bde96b74db5a546a2cec052f747be926abfc638ab684db9
+  skill_subset:
+  - fact-check
+  - hickey
+  - lowy
+  declared_license: MIT

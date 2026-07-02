@@ -9,6 +9,9 @@ dependencies:
     # records a remote-style resolved_commit lock with zero network. The full SHA
     # is required; a short ref forces a network fetch.
     - obra/superpowers#f268f7c953744036f0fa7e9d4b73535c04e57cb8
+    - git: srid/agency
+      ref: 81455051ccca654c57ad6088838c85e7248ac159
+      skills: [hickey, lowy, fact-check]
 # Soft coupling (agentic planning Manual execution mode): this package pairs with
 # beads-issue-tracking-and-session-workflow@vanixiets. It is
 # deliberately a comment, not a hard dependency — Manual mode must not force beads

@@ -50,6 +50,18 @@
           description = "Full 40-char superpowers commit SHA; the single source of truth reconciled against the planning-and-development/apm.yml pin by the compose drift guard (design D11).";
         };
 
+        agencySrc = lib.mkOption {
+          type = lib.types.package;
+          default = pkgs.agent-plugins-agency;
+          description = "Flake-pinned agency tree feeding apm's git checkout cache so the skills-subset remote agency dep resolves offline.";
+        };
+
+        agencyRev = lib.mkOption {
+          type = lib.types.str;
+          default = pkgs.agent-plugins-agency.rev;
+          description = "Full 40-char agency commit SHA; the source of truth reconciled against the planning-and-development/apm.yml pin by the compose drift guard.";
+        };
+
         apmTargets = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [
@@ -71,6 +83,8 @@
         upstreamDeps = config.aiSkills.upstreamDeps;
         superpowersSrc = config.aiSkills.superpowersSrc;
         superpowersRev = config.aiSkills.superpowersRev;
+        agencySrc = config.aiSkills.agencySrc;
+        agencyRev = config.aiSkills.agencyRev;
         targets = config.aiSkills.apmTargets;
       };
     };
