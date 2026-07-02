@@ -1281,6 +1281,10 @@
     url = "https://registry.npmjs.org/@semantic-release/github/-/github-12.0.8.tgz";
     hash = "sha512-tej5AAgK5X9wHRoDmYhecMXEHEkFeGOY1XsEblKxu8pIQwahzf1STYyr7iPU6Lpbg6C5I3N2w/ocXrBo+L7jhw==";
   };
+  "@semantic-release/github@12.0.9" = fetchurl {
+    url = "https://registry.npmjs.org/@semantic-release/github/-/github-12.0.9.tgz";
+    hash = "sha512-ODIqb0V3QqndipryEEiaBxUQCFjvv7Oese5Dt4omMGa60YRNEW0Sx3K+zri0uac2Y6S9nOlMehciWIzvvRCTGQ==";
+  };
   "@semantic-release/npm@13.1.2" = fetchurl {
     url = "https://registry.npmjs.org/@semantic-release/npm/-/npm-13.1.2.tgz";
     hash = "sha512-9rtshDTNlzYrC7uSBtB1vHqFzFZaNHigqkkCH5Ls4N/BSlVOenN5vtwHYxjAR4jf1hNvWSVwL4eIFTHONYckkw==";
