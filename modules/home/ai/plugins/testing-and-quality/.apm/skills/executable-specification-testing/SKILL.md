@@ -51,6 +51,12 @@ It is not the "capability interface" of `preferences-theoretical-foundations`, w
 And it is not the "operating envelope" of `preferences-compositional-continuous-verification`, which is the precondition half of a regulator pair at the system level.
 Design by contract here is specifically the Meyer runtime `require`/`ensure`/`invariant` on a routine, and holding those five senses apart is part of what this rung owns.
 
+A contract is a proof obligation, and its runtime check is only the lowest rung that can discharge it; the DbC-along-the-ladder discipline is to discharge each contract as high on the verification ladder as the language allows, keeping the runtime assertion enabled exactly when nothing higher subsumes it.
+In a dynamically or weakly typed language the runtime check stays enabled as the load-bearing safety net: Python's type system cannot discharge the `@require`/`@ensure` predicate statically, so the icontract runtime check is the enforcement of last resort — the same reason beartype's runtime type enforcement is enabled beside a static checker rather than trusted to it.
+In a compiled, statically verifiable language the same predicate can be discharged higher: once Creusot, Kani, or Prusti proves the contract (or a refinement type carries it), the compile-time guarantee subsumes the runtime assertion, which the compiler may then safely *elide* — the runtime `assert!` remains only as the executable fallback for when static discharge is unavailable.
+LiquidHaskell refinement types and Lean's dependent types are discharged statically with no runtime check at all.
+The runtime-enablement of a contract is therefore verification-tier-dependent, not absolute.
+
 ## The SMT/concolic rung
 
 The rung above contracts is bounded model checking and concolic execution backed by an SMT solver: Z3 or CVC5 (and, through CBMC, a SAT layer) searching a symbolic input space for a concrete witness that satisfies the preconditions and breaks a postcondition.
@@ -119,6 +125,10 @@ Grades and coeffects themselves stay orthogonal and unconnected to the three too
 The ladder raises Mayo-severity toward the machine-checked proof that `refinement-driven-development` names as the precise ideal, not a requirement — and that skill already sanctions property-based testing as an honest weaker stand-in in its three-tier degradation (mechanical proof, then differential/PBT, then LLM comparison), which is the standing sanction this skill relies on rather than re-teaching the round trip.
 Each technique here is expressible as a first-class regulator in the sense of `preferences-compositional-continuous-verification`, composing with the others into a single closure operator over the codebase.
 And each narrows the structural holonomy that `nucleus-platform` measures without paying for the full mechanical Lean-to-Rust round trip — a partial reduction bought cheaply.
+
+An EST pass composes as one such first-class regulator *alongside* the baseline RED-GREEN-REFACTOR cycle that `atdd-outer-loop` delegates to `test-driven-development`; it is never a hard dependency or gate of that cycle.
+Because this skill owns no firing signal of its own and loads only when Gate 1 routes a universal, contract-shaped, or symbolic proposition here, a change carrying no property, contract, or SMT-shaped proposition matches zero EST rows and the baseline cycle runs exactly as it does today — the enrichment is strictly additive by construction, not by an added guard.
+This holds *a fortiori* because that baseline cycle lives in the read-only upstream `test-driven-development` skill, which this skill cannot edit and therefore cannot gate.
 
 ## Cross-references
 

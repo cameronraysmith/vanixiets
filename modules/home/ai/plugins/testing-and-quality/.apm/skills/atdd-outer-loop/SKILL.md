@@ -48,6 +48,10 @@ A dependency-compatibility or import-smoke proposition routes to a regression or
 | Symbolic edge exploration | Symbolic (CrossHair/SMT) or property test | `executable-specification-testing` |
 | Dependency compatibility, import smoke | Regression / smoke test | `references/fix-defect-loop.md` |
 
+The EST routes in this table — the property, design-by-contract, and symbolic/SMT rows owned by `executable-specification-testing` — are additive enrichment that composes alongside, and never gates, the inner `test-driven-development` loop that P5 delegates to.
+A property or contract test for an EST-routed proposition is written RED-first and driven to GREEN as one lane within that same red-green cycle, per-proposition, while an optional symbolic or SMT sweep runs as a non-blocking pass after GREEN at P8.
+Because these routes fire only when a proposition matches an EST row, a change carrying none of them adds no EST activity and the inner loop runs exactly as it does for a purely behavioral or internal change.
+
 The `safeadt` behavioral-acceptance specification is the canonical exemplar of this boundary drawn cleanly.
 Its behavioral-surface-boundary requirement scopes into BDD only the ledger Decider lifecycle and invariant rejections, the service and projection observable behavior, the observable effect and coeffect grading of a concrete operation, the geometry runtime behavior, and the shim-import acceptance criterion, and it scopes out static exhaustiveness, the Lean proofs, CrossHair symbolic checking, and the pure algebraic monoid, semiring, and homomorphism laws — each left on its existing gate of basedpyright strict, `lake build`, the CrossHair backend, or a Hypothesis property test respectively (behavioral-acceptance `spec.md`, the "Behavioral surface boundary" requirement and its "stay on their existing gates" scenario).
 The spec also records the witnessing spectrum a scenario sits in: a Lean proof witnesses more than a Hypothesis property, which witnesses more than a Gherkin scenario, so a scenario is a high-legibility, low-rigor example certificate that complements but never substitutes for a property or proof.

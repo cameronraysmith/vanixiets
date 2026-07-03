@@ -10,11 +10,16 @@ Local clones read for this matrix live under `/Users/crs58/projects/rust-workspa
 
 | Language | PBT | DbC / refinement | SMT / concolic |
 |---|---|---|---|
-| Python | Hypothesis (strategies; icontract-hypothesis infers a strategy from `@require` bounds) | icontract (`@require`/`@ensure`/`@invariant`, runtime); deal as a peer dialect | CrossHair (concolic, Z3-backed `StateSpace`) |
-| Rust | proptest (`Strategy`/`ValueTree`, integrated shrinking); proptest-state-machine (stateful) | `contracts` crate (runtime `assert!`); nutype (refinement newtypes / smart constructors) | Kani (CBMC, SAT/SMT), Creusot (Why3→SMT), Prusti (Viper→Z3) — **not Aeneas** |
-| Haskell | QuickCheck (manual/separate shrink); Hedgehog (integrated shrink) | LiquidHaskell (`{-@ ... @-}` refinement types) | SBV (symbolic values → SMT-LIB2, `prove`/`sat`) |
-| Lean 4 | Plausible (`Testable`/`SampleableExt`/`Shrinkable`, the `plausible` tactic) | dependent/refinement types native to the type theory (subtypes `{x // p x}`) | SMT tactics via external solver *(model knowledge)* — the Charon/Aeneas path is **functional translation, not SMT** (a `refinement-driven-development` handoff) |
+| Python | Hypothesis (strategies; icontract-hypothesis infers a strategy from `@require` bounds) | icontract (`@require`/`@ensure`/`@invariant`, runtime — stays enabled, load-bearing since the type system cannot discharge the predicate); deal as a peer dialect | CrossHair (concolic, Z3-backed `StateSpace`) |
+| Rust | proptest (`Strategy`/`ValueTree`, integrated shrinking); proptest-state-machine (stateful) | `contracts` crate (runtime `assert!`, elidable once the contract is statically discharged by the SMT column); nutype (refinement newtypes / smart constructors) | Kani (CBMC, SAT/SMT), Creusot (Why3→SMT), Prusti (Viper→Z3) — **not Aeneas** |
+| Haskell | QuickCheck (manual/separate shrink); Hedgehog (integrated shrink) | LiquidHaskell (`{-@ ... @-}` refinement types, statically SMT-discharged — no runtime check) | SBV (symbolic values → SMT-LIB2, `prove`/`sat`) |
+| Lean 4 | Plausible (`Testable`/`SampleableExt`/`Shrinkable`, the `plausible` tactic) | dependent/refinement types native to the type theory (subtypes `{x // p x}`, static — no runtime check) | SMT tactics via external solver *(model knowledge)* — the Charon/Aeneas path is **functional translation, not SMT** (a `refinement-driven-development` handoff) |
 | TypeScript | fast-check *(model knowledge)* | runtime validators / smart constructors, e.g. zod, io-ts *(model knowledge)* | research gap: ExpoSE, SymJS *(model knowledge)* |
+
+The DbC/refinement column reads along a verification tier: a contract is a proof obligation discharged as high on the ladder as the language allows, and its runtime check is enabled exactly when nothing higher subsumes it.
+Python's icontract check stays enabled as the load-bearing net because the type system cannot discharge the predicate statically — the same rationale that keeps beartype's runtime enforcement on.
+Rust's `contracts` runtime `assert!` is the executable fallback: once Creusot, Kani, or Prusti (the SMT/concolic column) statically discharges the contract, the compile-time guarantee subsumes the assertion and the compiler may elide it.
+Haskell's LiquidHaskell and Lean's dependent/refinement types are discharged statically with no runtime check at all.
 
 ## Python
 
