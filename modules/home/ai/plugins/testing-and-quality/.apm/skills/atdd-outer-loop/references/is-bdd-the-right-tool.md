@@ -18,7 +18,9 @@ If the proposition is instead quantified over all inputs, discharged by a proof 
 | Observable effect / coeffect | That a concrete operation incurs a specific observable effect grade or demands a specific input | BDD scenario | `bdd-gherkin-formulation` |
 | Observable runtime computation | A computed observation (an area uses π; a runtime type is rejected at a boundary) | BDD scenario | `bdd-gherkin-formulation` |
 | Universal / algebraic law | A monoid, semiring, or homomorphism law, a functor or monad law — anything ∀-quantified | Property / law test | `preferences-algebraic-laws` |
-| Symbolic edge exploration | Coverage of a symbolic input space beyond example rows | Symbolic (CrossHair) or property test | `preferences-algebraic-laws` |
+| General / metamorphic / model-based property | A ∀-quantified property, a metamorphic relation between two runs, or a stateful model-based invariant that is not a named algebraic law | Property test | `executable-specification-testing` |
+| Design-by-contract precondition / postcondition / invariant | That a concrete operation's checked pre/post-condition or a class/type invariant holds at runtime | Contract check (runtime assertion) | `executable-specification-testing` |
+| Symbolic edge exploration | Coverage of a symbolic input space beyond example rows | Symbolic (CrossHair/SMT) or property test | `executable-specification-testing` |
 | Proof obligation | A theorem about the model that must hold by construction | Formal proof and round trip | `refinement-driven-development` |
 | Static exhaustiveness | That a match or type is total, caught before runtime | Type checker / build gate | its existing gate |
 | Dependency compatibility / import smoke | That a module imports or an upstream API still fits | Regression / smoke test | `references/fix-defect-loop.md` |

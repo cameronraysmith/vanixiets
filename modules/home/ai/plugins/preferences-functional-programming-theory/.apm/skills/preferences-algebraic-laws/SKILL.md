@@ -34,6 +34,7 @@ Refactoring becomes mechanical: if it type-checks and passes law tests, it prese
 - See preferences-theoretical-foundations for categorical foundations of these laws
 - See preferences-domain-modeling for applying law-governed abstractions to domain design
 - See preferences-railway-oriented-programming for Result and Either laws in error handling contexts
+- See executable-specification-testing for the generative property-based-testing mechanics — generator and strategy design, shrinking, stateful/model-based testing, and metamorphic relations — that turn the laws catalogued here into runnable properties; that skill points back here for the algebraic law catalog, the abstraction hierarchy, and parametricity/free-theorem reasoning it verifies
 - See preferences-rust-development/05-testing.md, preferences-python-development, preferences-typescript-nodejs-development for language-specific property testing examples
 
 ## Monoid and semigroup laws
@@ -938,4 +939,5 @@ For domain types, implement `__eq__` and `__hash__` properly to enable shrinking
 - See preferences-domain-modeling for applying law-governed abstractions to domain design, especially Pattern 4 (workflows as pipelines)
 - See preferences-railway-oriented-programming for Result and Either monad laws in error handling contexts
 - Philip Wadler, "Theorems for Free!" (1989), functional programming conference
+- See executable-specification-testing for the generative property-based-testing mechanics — generator and strategy design, shrinking, stateful/model-based testing, and metamorphic relations — that turn the laws catalogued here into runnable properties; that skill points back here for the algebraic law catalog, the abstraction hierarchy, and parametricity/free-theorem reasoning it verifies
 - Language-specific testing guides in preferences-rust-development/05-testing.md, preferences-python-development, preferences-typescript-nodejs-development

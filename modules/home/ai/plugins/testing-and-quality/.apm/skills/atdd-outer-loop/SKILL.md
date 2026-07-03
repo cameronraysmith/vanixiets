@@ -34,7 +34,7 @@ The tell that the outer loop is being forced is a scenario whose steps name func
 Even inside the outer loop, a single proposition may not belong in a behavioral scenario.
 This gate routes each proposition to the modality that can actually witness it, along a behavioral-surface boundary.
 A behavioral proposition — a lifecycle a user drives, an invariant the system enforces at its surface, an observable effect or coeffect of a concrete operation, an observable runtime computation — routes to a BDD scenario.
-A universal or algebraic law — a monoid, semiring, or homomorphism law, a functor or monad law, anything quantified over all inputs — routes to a property or law test; see `preferences-algebraic-laws`.
+A named algebraic law — a monoid, semiring, or homomorphism law, a functor or monad law — routes to a law test owned by `preferences-algebraic-laws`; a general, metamorphic, or model-based property that is quantified over all inputs but is not a named algebraic law routes to a property test owned by `executable-specification-testing`, which also owns the design-by-contract precondition, postcondition, and invariant obligations checked at runtime and the symbolic or SMT edge exploration of an input space.
 A proof obligation or a static-exhaustiveness claim routes to a formal check: a Lean proof and its round trip through `refinement-driven-development`, or the type checker and build gate that already discharge it.
 A dependency-compatibility or import-smoke proposition routes to a regression or smoke test, not to Gherkin, because dressing an import check as a scenario yields a vacuous `Given` and a `Then` that swallows the very error it should surface.
 
@@ -42,8 +42,10 @@ A dependency-compatibility or import-smoke proposition routes to a regression or
 |---|---|---|
 | Domain lifecycle, invariant rejection, observable effect/coeffect, runtime computation | BDD scenario | this skill → `bdd-gherkin-formulation` |
 | Universal / algebraic law (monoid, semiring, homomorphism, functor, monad) | Property / law test | `preferences-algebraic-laws` |
+| General / metamorphic / model-based property (∀-quantified, not a named algebraic law) | Property test | `executable-specification-testing` |
+| Design-by-contract precondition / postcondition / invariant | Contract check (runtime assertion) | `executable-specification-testing` |
 | Proof obligation, static exhaustiveness | Formal proof / type-and-build gate | `refinement-driven-development` |
-| Symbolic edge exploration | Symbolic (CrossHair) or property test | `preferences-algebraic-laws` |
+| Symbolic edge exploration | Symbolic (CrossHair/SMT) or property test | `executable-specification-testing` |
 | Dependency compatibility, import smoke | Regression / smoke test | `references/fix-defect-loop.md` |
 
 The `safeadt` behavioral-acceptance specification is the canonical exemplar of this boundary drawn cleanly.
@@ -131,5 +133,6 @@ The two-axis split, the discovery-to-artifact gradient, the per-runner triad, th
 - `subagent-driven-development` — fresh-agent dispatch for the independent audit and verification.
 - `preferences-validation-assurance` — severity, evidence quality, confidence, and test adequacy for the verify and mutation phases.
 - `refinement-driven-development` — the formal-proof oracle Gate 1 routes proof obligations to.
-- `preferences-algebraic-laws` — the property/law-test route for universal propositions.
+- `preferences-algebraic-laws` — the law-test route for named algebraic-law propositions.
+- `executable-specification-testing` — the property/contract/symbolic route for general, metamorphic, or model-based properties, design-by-contract obligations, and symbolic/SMT edge exploration.
 - `preferences-domain-modeling` — the ubiquitous language and the algebraic-data-type literals the observable oracle asserts against.
