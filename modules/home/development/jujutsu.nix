@@ -166,7 +166,7 @@
               default-command = [ "log" ];
               diff-editor = ":builtin";
               diff-formatter = ":git";
-              pager = "delta";
+              pager = lib.mkDefault "delta";
 
               # Show signature status in log output
               show-cryptographic-signatures = true;

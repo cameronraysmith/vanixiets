@@ -106,6 +106,10 @@
 
     llm-agents.url = "github:numtide/llm-agents.nix";
 
+    hunk.url = "github:modem-dev/hunk";
+    hunk.inputs.nixpkgs.follows = "nixpkgs";
+    hunk.inputs.bun2nix.follows = "bun2nix";
+
     aeneas.url = "github:AeneasVerif/aeneas";
 
     hermes-agent.url = "github:NousResearch/hermes-agent/main";

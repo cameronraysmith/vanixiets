@@ -845,6 +845,29 @@
         "type": "github"
       }
     },
+    "hunk": {
+      "inputs": {
+        "bun2nix": [
+          "bun2nix"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1783102256,
+        "narHash": "sha256-XaOuOAAdSXrzVD/qoGwggtLQbSHKvUphKVjFZA8Mijs=",
+        "owner": "modem-dev",
+        "repo": "hunk",
+        "rev": "f2f555e95bd5540d5e6bbecd61bdd097ecebfd7f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "modem-dev",
+        "repo": "hunk",
+        "type": "github"
+      }
+    },
     "import-tree": {
       "locked": {
         "lastModified": 1778781969,
@@ -1594,6 +1617,7 @@
         "hercules-ci-effects": "hercules-ci-effects",
         "hermes-agent": "hermes-agent",
         "home-manager": "home-manager",
+        "hunk": "hunk",
         "import-tree": "import-tree",
         "lazyvim-nix": "lazyvim-nix",
         "llm-agents": "llm-agents",
