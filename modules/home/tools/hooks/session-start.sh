@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Hook: Lightweight session start grounding
-# Surfaces uncommitted changes, open PRs, and recent knowledge entries.
+# Surfaces uncommitted changes and open PRs.
 # SessionStart (sync) -- reads JSON context from stdin, outputs plain text to stdout.
 
 set -euo pipefail
@@ -18,16 +18,12 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 REPO_ROOT=""
-HAS_BEADS=false
 if [ "$IN_GIT_REPO" = true ]; then
   REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
-  if [ -n "$REPO_ROOT" ] && [ -d "$REPO_ROOT/.beads" ]; then
-    HAS_BEADS=true
-  fi
 fi
 
-# If neither git repo nor beads, nothing to report
-if [ "$IN_GIT_REPO" = false ] && [ "$HAS_BEADS" = false ]; then
+# Not inside a git repo: nothing to report
+if [ "$IN_GIT_REPO" = false ]; then
   exit 0
 fi
 
@@ -63,33 +59,6 @@ if [ "$IN_GIT_REPO" = true ] && command -v gh >/dev/null 2>&1; then
     echo "Open PRs:"
     echo "$OPEN_PRS"
     HAS_OUTPUT=true
-  fi
-fi
-
-# === Recent knowledge entries ===
-if [ "$HAS_BEADS" = true ]; then
-  KNOWLEDGE_FILE="$REPO_ROOT/.beads/memory/knowledge.jsonl"
-  if [ -f "$KNOWLEDGE_FILE" ] && [ -s "$KNOWLEDGE_FILE" ]; then
-    TOTAL=$(wc -l < "$KNOWLEDGE_FILE" | tr -d ' ')
-
-    # Deduplicate by key (most recent wins) and show top 3
-    RECENT=$(tail -n 50 "$KNOWLEDGE_FILE" | jq -s '
-      [.[] | select(.key != null)] |
-      group_by(.key) |
-      map(last) |
-      sort_by(.timestamp // "") |
-      reverse |
-      .[0:3] |
-      .[] |
-      "  \(.key): \(.value // .summary // "(no value)")"
-    ' -r 2>/dev/null || echo "")
-
-    if [ -n "$RECENT" ]; then
-      if [ "$HAS_OUTPUT" = true ]; then echo ""; fi
-      echo "Recent knowledge ($TOTAL total entries):"
-      echo "$RECENT"
-      HAS_OUTPUT=true
-    fi
   fi
 fi
 

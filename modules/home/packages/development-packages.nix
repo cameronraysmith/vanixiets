@@ -103,12 +103,10 @@
           mkcert
           # from llm-agents via modules/nixpkgs/overlays/beads.nix
           apm
-          beads
           cursor-agent
           droid
           gemini-cli
           # from pkgs/by-name
-          dolt
           gastown
           golem-binary
           linear-cli

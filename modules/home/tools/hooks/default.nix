@@ -28,31 +28,6 @@
           in
           "(https?://|[[:space:]])(${alternation})(/|:|[[:space:]]|$)";
 
-      validate-epic-close = pkgs.writeShellApplication {
-        name = "validate-epic-close";
-        runtimeInputs = with pkgs; [
-          beads
-          gh
-          git
-          jq
-          gnused
-          gnugrep
-        ];
-        text = builtins.readFile ./validate-epic-close.sh;
-      };
-
-      log-dispatch-prompt = pkgs.writeShellApplication {
-        name = "log-dispatch-prompt";
-        runtimeInputs = with pkgs; [
-          beads
-          jq
-          git
-          gnugrep
-          gnused
-        ];
-        text = builtins.readFile ./log-dispatch-prompt.sh;
-      };
-
       memory-capture = pkgs.writeShellApplication {
         name = "memory-capture";
         runtimeInputs = with pkgs; [
@@ -85,25 +60,12 @@
         text = builtins.readFile ./enforce-branch-before-edit.sh;
       };
 
-      enforce-sequential-dispatch = pkgs.writeShellApplication {
-        name = "enforce-sequential-dispatch";
-        runtimeInputs = with pkgs; [
-          beads
-          jq
-          git
-          gnused
-          gnugrep
-        ];
-        text = builtins.readFile ./enforce-sequential-dispatch.sh;
-      };
-
       session-start = pkgs.writeShellApplication {
         name = "session-start";
         runtimeInputs = with pkgs; [
           git
           gh
           jq
-          beads
           coreutils
         ];
         text = builtins.readFile ./session-start.sh;
@@ -115,18 +77,6 @@
           jq
         ];
         text = builtins.readFile ./clarify-vague-request.sh;
-      };
-
-      validate-completion = pkgs.writeShellApplication {
-        name = "validate-completion";
-        runtimeInputs = with pkgs; [
-          git
-          beads
-          jq
-          coreutils
-          gnugrep
-        ];
-        text = builtins.readFile ./validate-completion.sh;
       };
 
       redirect-rm-to-rip = pkgs.writeShellApplication {
@@ -222,46 +172,6 @@
         text = builtins.readFile ./gate-dangerous-commands.sh;
       };
 
-      gate-issue-close = pkgs.writeShellApplication {
-        name = "gate-issue-close";
-        runtimeInputs = with pkgs; [
-          beads
-          curl
-          git
-          jq
-          gnused
-          gnugrep
-          bash
-          coreutils
-        ];
-        text = builtins.readFile ./gate-issue-close.sh;
-      };
-
-      notify-escalation = pkgs.writeShellApplication {
-        name = "notify-escalation";
-        runtimeInputs = with pkgs; [
-          beads
-          curl
-          git
-          jq
-          gnused
-          gnugrep
-          coreutils
-        ];
-        text = builtins.readFile ./notify-escalation.sh;
-      };
-
-      bulk-signal-init = pkgs.writeShellApplication {
-        name = "bulk-signal-init";
-        runtimeInputs = with pkgs; [
-          beads
-          jq
-          coreutils
-          gnugrep
-        ];
-        text = builtins.readFile ./bulk-signal-init.sh;
-      };
-
       notify-permission-prompt = pkgs.writeShellApplication {
         name = "notify-permission-prompt";
         runtimeInputs = with pkgs; [
@@ -272,32 +182,14 @@
         ];
         text = builtins.readFile ./notify-permission-prompt.sh;
       };
-
-      notify-epic-completion = pkgs.writeShellApplication {
-        name = "notify-epic-completion";
-        runtimeInputs = with pkgs; [
-          beads
-          curl
-          git
-          jq
-          coreutils
-          gnugrep
-          gnused
-        ];
-        text = builtins.readFile ./notify-epic-completion.sh;
-      };
     in
     {
       home.packages = [
-        validate-epic-close
-        log-dispatch-prompt
         memory-capture
         nudge-claude-md-update
         enforce-branch-before-edit
-        enforce-sequential-dispatch
         session-start
         clarify-vague-request
-        validate-completion
         redirect-rm-to-rip
         notify-permission-wait
         gate-mutating-http
@@ -307,11 +199,7 @@
         gate-git-worktree
         verify-diamond-before-edit
         gate-dangerous-commands
-        gate-issue-close
-        notify-escalation
-        bulk-signal-init
         notify-permission-prompt
-        notify-epic-completion
       ];
     };
 }
