@@ -49,5 +49,10 @@
         type = "app";
         program = "${config.packages.quarto-bin.updateScript}";
       };
+
+      apps.update-worktrunk-bin = {
+        type = "app";
+        program = "${config.packages.worktrunk-bin.updateScript}";
+      };
     };
 }
