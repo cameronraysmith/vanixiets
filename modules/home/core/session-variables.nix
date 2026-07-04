@@ -7,6 +7,9 @@
     {
       home.sessionVariables = {
         EDITOR = "nvim";
+        # Colorize man pages via bat (applies across zsh, fish, and bash).
+        MANPAGER = "sh -c 'col -bx | bat -l man -p'";
+        MANROFFOPT = "-c";
         # Suppress the optional .git/index stat-cache writeback that git status-class
         # pollers (ccstatusline, Zed, shell prompts) perform and that can race jj's
         # colocated index export. Performance-only (git recomputes when stat info is
