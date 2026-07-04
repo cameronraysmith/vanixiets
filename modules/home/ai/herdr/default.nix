@@ -5,6 +5,7 @@
       pkgs,
       lib,
       config,
+      flake,
       ...
     }:
     let
@@ -25,7 +26,7 @@
       home.packages = [ htab ];
       programs.herdr = {
         enable = true;
-        package = pkgs.herdr-bin;
+        package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr;
         # https://herdr.dev/docs/configuration/ — ported from modules/home/shell/tmux.nix
         settings = {
           theme = {
