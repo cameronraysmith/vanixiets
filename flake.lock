@@ -809,11 +809,11 @@
         "uv2nix": "uv2nix_2"
       },
       "locked": {
-        "lastModified": 1783111440,
-        "narHash": "sha256-6PAkxOkXPGTGv4yMjHFyt+NSBOUGUxHudmZrXAZsMtw=",
+        "lastModified": 1783168390,
+        "narHash": "sha256-4QiFu3B0NSQn4nNEetkhTVQeHomVv9nInu4NfUw0YbI=",
         "owner": "NousResearch",
         "repo": "hermes-agent",
-        "rev": "19d4174454624a1ca91bc47b8f2a7ae8c3b4b5d3",
+        "rev": "e02fc282807352141600307e23a87fdb7782b825",
         "type": "github"
       },
       "original": {
