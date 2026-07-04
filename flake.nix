@@ -58,7 +58,6 @@
     niks3.inputs.treefmt-nix.follows = "treefmt-nix";
 
     cognee-nix.url = "github:cameronraysmith/cognee-nix/cognee-v112";
-    cognee-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     buildbot-nix.url = "github:nix-community/buildbot-nix";
     buildbot-nix.inputs.nixpkgs.follows = "nixpkgs";
