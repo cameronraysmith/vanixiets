@@ -112,7 +112,8 @@
     worktrunk.url = "github:max-sixty/worktrunk/v0.65.0";
     worktrunk.inputs.nixpkgs.follows = "nixpkgs";
 
-    aeneas.url = "github:AeneasVerif/aeneas";
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
 
     hermes-agent.url = "github:NousResearch/hermes-agent/main";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
