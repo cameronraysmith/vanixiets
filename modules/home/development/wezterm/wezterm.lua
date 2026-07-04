@@ -1,7 +1,7 @@
 local wezterm = require("wezterm")
 
 return {
-	font = wezterm.font("Monaspace Neon Nerd Font"),
+	font = wezterm.font("MonaspiceNe Nerd Font"),
 	color_scheme = "Catppuccin Mocha",
 	window_decorations = "RESIZE",
 	font_size = 14,

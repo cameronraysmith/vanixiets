@@ -16,7 +16,7 @@
           auto-update = "download";
           auto-update-channel = "stable";
           cursor-click-to-move = true;
-          font-family = "Monaspace Neon Nerd Font";
+          font-family = "MonaspiceNe Nerd Font";
           font-size = if pkgs.stdenv.isDarwin then 13 else 11;
           font-thicken = false;
           quick-terminal-position = "center";

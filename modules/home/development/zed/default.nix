@@ -69,11 +69,11 @@
             ui_font_size = 14;
             ui_font_family = "Zed Sans";
             buffer_font_size = 12;
-            buffer_font_family = "Monaspace Neon Nerd Font";
+            buffer_font_family = "MonaspiceNe Nerd Font";
             icon_theme = "Catppuccin Mocha";
 
             terminal = {
-              font_family = "Monaspace Neon Nerd Font";
+              font_family = "MonaspiceNe Nerd Font";
             };
 
             theme = {
