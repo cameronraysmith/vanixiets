@@ -16,6 +16,8 @@
           { lib, ... }:
           {
             options = {
+              enable = lib.mkEnableOption "beads-ui server";
+
               host = lib.mkOption {
                 type = lib.types.str;
                 default = "0.0.0.0";
@@ -59,7 +61,7 @@
                   description = "The beads-ui package";
                 };
 
-                config = {
+                config = lib.mkIf settings.enable {
                   systemd.services."beads-ui" = {
                     description = "Beads UI Server";
                     after = [ "network-online.target" ];

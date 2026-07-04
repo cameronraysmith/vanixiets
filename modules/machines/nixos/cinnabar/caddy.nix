@@ -19,13 +19,6 @@
               reverse_proxy localhost:3008
             '';
           };
-          "beads.zt" = {
-            listenAddresses = meshListenAddrs;
-            extraConfig = ''
-              tls internal
-              reverse_proxy localhost:3009
-            '';
-          };
           "matrix.zt" = {
             listenAddresses = meshListenAddrs;
             extraConfig = ''

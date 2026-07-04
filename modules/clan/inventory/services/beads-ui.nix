@@ -6,6 +6,7 @@
     };
     roles.default.machines."cinnabar" = {
       settings = {
+        enable = false;
         port = 3009;
       };
     };

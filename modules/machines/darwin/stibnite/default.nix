@@ -282,7 +282,7 @@ in
       };
 
       # Beads UI web interface (localhost-only)
-      services.beads-ui.enable = true;
+      services.beads-ui.enable = false;
 
       services.zt-services-trust.enable = true;
 
