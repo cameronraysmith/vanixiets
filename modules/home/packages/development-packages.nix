@@ -107,7 +107,6 @@
           droid
           gemini-cli
           # from pkgs/by-name
-          gastown
           golem-binary
           linear-cli
           ouroboros
