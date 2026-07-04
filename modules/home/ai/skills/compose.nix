@@ -62,6 +62,18 @@
           description = "Full 40-char agency commit SHA; the source of truth reconciled against the planning-and-development/apm.yml pin by the compose drift guard.";
         };
 
+        worktrunkSrc = lib.mkOption {
+          type = lib.types.package;
+          default = pkgs.agent-plugins-worktrunk;
+          description = "Flake-pinned worktrunk tree feeding apm's git checkout cache so the skills-subset remote worktrunk dep resolves offline.";
+        };
+
+        worktrunkRev = lib.mkOption {
+          type = lib.types.str;
+          default = pkgs.agent-plugins-worktrunk.rev;
+          description = "Full 40-char worktrunk commit SHA; the source of truth reconciled against the version-control-and-forge/apm.yml pin by the compose drift guard.";
+        };
+
         apmTargets = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [
@@ -85,6 +97,8 @@
         superpowersRev = config.aiSkills.superpowersRev;
         agencySrc = config.aiSkills.agencySrc;
         agencyRev = config.aiSkills.agencyRev;
+        worktrunkSrc = config.aiSkills.worktrunkSrc;
+        worktrunkRev = config.aiSkills.worktrunkRev;
         targets = config.aiSkills.apmTargets;
       };
     };

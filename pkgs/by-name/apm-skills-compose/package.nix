@@ -37,6 +37,13 @@
   agencySrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-agency,
   agencyRev ? agencySrc.rev,
 
+  # Flake-pinned worktrunk tree feeding apm's git checkout cache so the skills-subset
+  # remote dep resolves with zero network. worktrunkRev is the single SHA source of
+  # truth (the fetchFromGitHub rev), reconciled against the apm.yml pin by the drift
+  # guard in the build script.
+  worktrunkSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-worktrunk,
+  worktrunkRev ? worktrunkSrc.rev,
+
   targets ? [
     "agent-skills"
     "claude"
@@ -126,6 +133,22 @@ runCommandLocal "apm-skills-compose"
       exit 1
     fi
 
+    # Same offline pre-seed for the worktrunk skills-subset remote dep declared in
+    # version-control-and-forge/apm.yml.
+    WT_SHA=${worktrunkRev}
+    SHARD_WT=$(printf '%s' 'https://github.com/max-sixty/worktrunk' | sha256sum | cut -c1-16)
+    CK_WT="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_WT/$WT_SHA/full"
+    mkdir -p "$CK_WT"
+    cp -RL ${worktrunkSrc}/. "$CK_WT"/
+    chmod -R u+w "$CK_WT"
+    mkdir -p "$CK_WT/.git"
+    printf '%s\n' "$WT_SHA" > "$CK_WT/.git/HEAD"
+
+    if ! grep -q "$WT_SHA" ./version-control-and-forge/apm.yml; then
+      echo "apm-skills-compose: worktrunk SHA drift — version-control-and-forge/apm.yml does not pin $WT_SHA" >&2
+      exit 1
+    fi
+
     cp ${rootConsumerManifest} ./apm.yml
     # agent-skills,claude only: the codex/hermes/opencode/droid harnesses are
     # fanned out nix-side from this composed $out in a later task, not by apm.
@@ -142,7 +165,9 @@ runCommandLocal "apm-skills-compose"
       "$out/.agents/skills/nix-flake-pr-cycle/SKILL.md" \
       "$out/.claude/skills/systematic-debugging/SKILL.md" \
       "$out/.claude/skills/brainstorming/SKILL.md" \
-      "$out/.agents/skills/brainstorming/SKILL.md"; do
+      "$out/.agents/skills/brainstorming/SKILL.md" \
+      "$out/.claude/skills/worktrunk/SKILL.md" \
+      "$out/.claude/skills/wt-switch-create/SKILL.md"; do
       if [ ! -f "$expected" ]; then
         echo "apm-skills-compose assertion failed: missing $expected" >&2
         exit 1

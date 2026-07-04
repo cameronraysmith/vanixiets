@@ -1,3 +1,13 @@
 name: version-control-and-forge
 version: 0.0.0
 description: Version-control and forge skills — jj workflow and history, GitButler, git commit, GitHub browse.
+dependencies:
+  apm:
+    # worktrunk distributes two agent skills (worktrunk, wt-switch-create) as a
+    # github-hosted apm dependency in object form. The nix compose resolves this
+    # offline by pre-seeding apm's git checkout cache from the flake-pinned tree
+    # before `apm install`, recording a remote-style resolved_commit lock with zero
+    # network. The full 40-char SHA is required; a short ref forces a network fetch.
+    - git: max-sixty/worktrunk
+      ref: 5175153b39d2737b4c35810fc58b0fd1a58ee609
+      skills: [worktrunk, wt-switch-create]
