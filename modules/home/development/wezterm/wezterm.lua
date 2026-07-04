@@ -1,11 +1,10 @@
 local wezterm = require("wezterm")
 
 return {
-	font = wezterm.font("MonaspiceNe Nerd Font Mono"),
 	color_scheme = "Catppuccin Mocha",
 	window_decorations = "RESIZE",
-	font_size = 14,
-	line_height = 1.1,
+	font_size = 12.0,
+	line_height = 1.0,
 	hide_tab_bar_if_only_one_tab = true,
 	keys = {
 		-- Emulate other programs (Zed, VSCode, ...)
