@@ -274,7 +274,7 @@ in
 
       # Dolt SQL server for beads issue tracking
       services.dolt-sql-server = {
-        enable = true;
+        enable = false;
         environmentVariables.SSH_AUTH_SOCK = inputs.self.lib.bitwardenSocketPath {
           homeDirectory = "/Users/${config.system.primaryUser}";
           isDarwin = true;

@@ -4,7 +4,7 @@
     { config, ... }:
     {
       services.dolt-sql-server = {
-        enable = true;
+        enable = false;
         user = config.users.users.cameron.name;
         group = "users";
       };
