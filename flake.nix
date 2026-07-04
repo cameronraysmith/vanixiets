@@ -109,6 +109,9 @@
     hunk.inputs.nixpkgs.follows = "nixpkgs";
     hunk.inputs.bun2nix.follows = "bun2nix";
 
+    worktrunk.url = "github:max-sixty/worktrunk/v0.65.0";
+    worktrunk.inputs.nixpkgs.follows = "nixpkgs";
+
     aeneas.url = "github:AeneasVerif/aeneas";
 
     hermes-agent.url = "github:NousResearch/hermes-agent/main";
