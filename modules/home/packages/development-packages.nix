@@ -167,8 +167,8 @@
           opam
 
           # elixir
-          elixir
-          elixir-ls
+          beamPackages.elixir
+          beamPackages.elixir-ls
 
           # dependently typed / proof assistants
           idris2
