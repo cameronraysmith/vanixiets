@@ -99,6 +99,12 @@
                 command = "htab nvim";
                 description = "nvim in a new tab";
               }
+              {
+                key = "prefix+!";
+                type = "shell";
+                command = ''"$HERDR_BIN_PATH" pane move "$HERDR_ACTIVE_PANE_ID" --new-tab --focus'';
+                description = "break pane out to new tab";
+              }
             ];
           };
         };
