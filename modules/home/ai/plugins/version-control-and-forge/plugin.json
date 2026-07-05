@@ -1,5 +1,5 @@
 {
   "name": "version-control-and-forge",
   "version": "0.0.0",
-  "description": "Version-control and forge skills — jj workflow and history, GitButler, git commit, GitHub browse."
+  "description": "Version-control and forge skills — jj workflow and history, GitButler, git commit, GitHub browse, dependency source acquisition."
 }

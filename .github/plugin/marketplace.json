@@ -85,7 +85,7 @@
     },
     {
       "name": "version-control-and-forge",
-      "description": "Version-control and forge skills — jj workflow and history, GitButler, git commit, GitHub browse.",
+      "description": "Version-control and forge skills — jj workflow and history, GitButler, git commit, GitHub browse, dependency source acquisition.",
       "version": "0.0.0",
       "source": "./modules/home/ai/plugins/version-control-and-forge"
     },
