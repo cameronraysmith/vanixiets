@@ -36,7 +36,6 @@
         # io
         aria2
         curl
-        rclone
         restic
         autorestic
         wget
