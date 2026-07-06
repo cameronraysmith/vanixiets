@@ -40,11 +40,15 @@ ghq get --shallow --partial blobless --no-recursive <host>/<owner>/<repo>
 
 `--shallow` is depth-1, `--partial blobless` is a blobless partial clone, and `--no-recursive` skips submodules.
 
-When the review needs full history, blame, or submodule contents, escalate by dropping the filters:
+When the review needs full history, blame, or submodule contents, promote the lazy clone to a full one.
+`ghq get -u` only updates the existing clone in place — it runs a fast-forward pull or fetch and leaves the clone grafted (shallow) and blobless — so it does not promote a lazy clone to full.
+Use the `ghq-sync` sibling tool instead, which unshallows the clone, removes the partial-clone filter, backfills the missing objects with `--refetch`, and initializes submodules:
 
 ```bash
-ghq get -u <host>/<owner>/<repo>   # update in place; a full clone gives full history/blame/submodules
+ghq-sync --full <host>/<owner>/<repo>   # git unshallow + partial-filter removal + --refetch backfill + submodule init
 ```
+
+The in-place promotion it performs is: unset `remote.origin.partialclonefilter`, set an all-branches fetch refspec, `git fetch --unshallow`, `git fetch --refetch`, unset `remote.origin.promisor` then gc, fast-forward to `@{u}`, and `git submodule update`.
 
 ## Resolving a source URL
 
