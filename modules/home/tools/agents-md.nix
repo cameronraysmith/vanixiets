@@ -25,10 +25,16 @@
           1. Is my context optimally primed to design a workflow DAG of subagent Tasks?
           2. Are there ambiguities requiring clarification before I proceed?
           3. Would local access to external source code or documentation improve this work?
-             If so, first search for an existing local copy per the "git repository by name"
-             convention in `preferences-style-and-conventions`; ask the user to clone or fork
-             to `~/projects/<topic>-workspace/<repo>/` only on miss. Reference all repos via
-             `~/projects/...` paths.
+             Reference-repository lookups split by authorship into two categories.
+             For a Category-1 repository we develop or maintain, search for an existing local copy per the
+             "git repository by name" convention in `preferences-style-and-conventions`; ask the user to
+             clone or fork to `~/projects/<topic>-workspace/<repo>/` only on miss, and reference all such
+             repos via `~/projects/...` paths.
+             For a Category-2 third-party dependency or research-reference repository we consult but do not
+             maintain, acquire and review its upstream source through the ghq flow in the
+             `dependency-source-acquisition` skill rather than the `~/projects/` convention.
+             The distinguishing test is authorship: if we cut releases or land commits upstream it is
+             Category 1; if we only read it, it is Category 2.
           4. Should I present my task decomposition for approval before dispatching?
 
           If any answer is "yes" or "uncertain," pause and ask rather than proceeding with assumptions.
@@ -47,18 +53,20 @@
           - style and conventions: @${skillsPath}/preferences-style-and-conventions/SKILL.md
           - git version control: @${skillsPath}/preferences-git-version-control/SKILL.md
           - git history cleanup: ${skillsPath}/preferences-git-history-cleanup/SKILL.md
+          - comment cleanup (uncomment-driven noise-comment removal, load-bearing marker preservation; operational arm of the code-comments policy): ${skillsPath}/preferences-comment-cleanup/SKILL.md
           - jj version control: ${skillsPath}/jj-summary/SKILL.md
           - jj workflow (full): ${skillsPath}/jj-workflow/SKILL.md
+          - jj history cleanup (atomic reorder/squash/split, conventional-commit narrative; jj analog of git history cleanup; see also jj-git-interactive-rebase-to-jj): ${skillsPath}/jj-history-cleanup/SKILL.md
           - documentation: ${skillsPath}/preferences-documentation/SKILL.md
           - change management: ${skillsPath}/preferences-change-management/SKILL.md
-          - issue tracking: ${skillsPath}/issues-beads/SKILL.md
-          - session routing (graph diagnostics, skill selection): ${skillsPath}/session-advisor/SKILL.md
-          - session orientation (context priming, signal tables): ${skillsPath}/session-orient/SKILL.md
-          - session planning (task decomposition, workflow DAGs): ${skillsPath}/session-plan/SKILL.md
-          - session review (progress assessment, gap analysis): ${skillsPath}/session-review/SKILL.md
-          - session checkpointing (state capture, handoff narrative, surprise evaluation): ${skillsPath}/session-checkpoint/SKILL.md
+          - agentic planning and development (state-machine router across the Linear-canonical board Backlog -> Todo -> In Progress -> In Review -> Done; AFK/HIL/Manual execution-mode fork; four file-anchored OpenSpec-artifact forward gates): ${skillsPath}/agentic-planning-development-workflow/SKILL.md
+          - project management (Linear Method ontology, workspace safety gate, ownership-by-layer: Linear + OpenSpec own the work, beads an optional Manual-mode drill-down): ${skillsPath}/project-management/SKILL.md
+          - superpowers discipline gate (invoke the relevant skill before any response or action, including clarifying questions; process-skills-first): ${skillsPath}/using-superpowers/SKILL.md
           - session resumption (resume command, atuin history, session continuation): ${skillsPath}/meta-session-resume/SKILL.md
           - session search (session transcript discovery, keyword intersection): ${skillsPath}/meta-search-sessions/SKILL.md
+          - knowledge graph grounding (cognee reference-corpus indexing/retrieval for grounding technical writing and review; a reference-knowledge index, not agent session memory): ${skillsPath}/knowledge-graph/SKILL.md
+          - team orchestration initiate (master-orchestrator mission start; team-level analog of orientation; actor-critic / worker-orchestrator decomposition): ${skillsPath}/meta-orchestrator-initiate/SKILL.md
+          - team orchestration checkpoint (master-level cross-cycle state capture and handoff): ${skillsPath}/meta-orchestrator-checkpoint/SKILL.md
           - architectural patterns: ${skillsPath}/preferences-architectural-patterns/SKILL.md
           - architecture diagramming (C4, format selection, diagram compendium): ${skillsPath}/preferences-architecture-diagramming/SKILL.md
           - functional domain modeling (DDD, types, aggregates): ${skillsPath}/preferences-domain-modeling/SKILL.md
@@ -71,14 +79,26 @@
           - strategic domain analysis (Core/Supporting/Generic classification): ${skillsPath}/preferences-strategic-domain-analysis/SKILL.md
           - bounded context design (context mapping, integration, ACL): ${skillsPath}/preferences-bounded-context-design/SKILL.md
           - functional reactive programming (FRP foundations, arrows, presheaves): ${skillsPath}/preferences-functional-reactive-programming/SKILL.md
-          - theoretical foundations (category theory, type theory): ${skillsPath}/preferences-theoretical-foundations/SKILL.md
+          - algebraic data types (sum/product types, discriminated unions, pattern matching, making illegal states unrepresentable): ${skillsPath}/preferences-algebraic-data-types/SKILL.md
+          - theoretical foundations (category/type-theory keystone; capability interfaces over transformer stacks, graded effects/coeffects, Lean-spec-beside-implementation; pairs with refinement-driven-development): ${skillsPath}/preferences-theoretical-foundations/SKILL.md
+          - computational system taxonomy (closed vs open systems from automata theory and process calculi; batch/stream/services terminology mapping; heterogeneous composition patterns): ${skillsPath}/preferences-computational-system-taxonomy/SKILL.md
           - algebraic laws (functor/monad laws, property-based testing): ${skillsPath}/preferences-algebraic-laws/SKILL.md
+          - refinement-driven development (dependently-typed Lean 4 spec, refine/lower to a Charon/Aeneas-safe Rust subset, lift via Aeneas.Charon, check by translation validation; mechanical proof the ideal not a requirement): ${skillsPath}/refinement-driven-development/SKILL.md
+          - nucleus platform (thin router for the spec-anchored approximately-verifiable data-modeling monorepo; Lean 4 structural source of truth; instantiate-then-reconstruct round trip driving structural drift toward zero): ${skillsPath}/nucleus-platform/SKILL.md
           - adaptive planning (control theory, buffer sizing, planning horizons, VSM mapping): ${skillsPath}/preferences-adaptive-planning/SKILL.md
+          - workflow orchestration algebra (Dagster/Flyte read through Build Systems à la Carte; free-term vs store-interpreter split, lawful IO managers; data-pipeline orchestration, not agent DAGs): ${skillsPath}/preferences-workflow-orchestration-algebra/SKILL.md
           - validation assurance (severity, evidence quality, confidence, test adequacy, regression, refinement): ${skillsPath}/preferences-validation-assurance/SKILL.md
           - compositional continuous verification (CCV — operating-envelope-plus-regulator pairs composing into a closure operator; theoretical anchor for system-level approximate correctness): ${skillsPath}/preferences-compositional-continuous-verification/SKILL.md
+          - acceptance-test-driven development (ATDD outer loop wrapping inner TDD; routes each proposition to BDD / property / law / proof / smoke): ${skillsPath}/atdd-outer-loop/SKILL.md
+          - test-driven development (red-green-refactor; no production code without a failing test first): ${skillsPath}/test-driven-development/SKILL.md
+          - systematic debugging (root-cause-before-fix discipline; question the architecture after repeated failed fixes; see also diagnosing-bugs): ${skillsPath}/systematic-debugging/SKILL.md
+          - verification before completion (evidence before claims; run the verification command before asserting done/passing/fixed/committing): ${skillsPath}/verification-before-completion/SKILL.md
+          - code review (two-axis Standards + Spec review of the diff; requesting-code-review author side, receiving-code-review responder side): ${skillsPath}/code-review/SKILL.md
           - observability engineering (structured events, traces, SLOs, instrumentation, telemetry architecture): ${skillsPath}/preferences-observability-engineering/SKILL.md
           - production readiness (ODD, progressive delivery, health checks, incident learning, CI/CD observability): ${skillsPath}/preferences-production-readiness/SKILL.md
+          - distributed systems (CAP/PACELC/linearizability, consistency models, CRDTs, idempotency, sagas, dual-write avoidance, deterministic replay): ${skillsPath}/preferences-distributed-systems/SKILL.md
           - scalable probabilistic modeling (Bayesian workflow, simulation-based inference, stochastic dynamical systems): ${skillsPath}/preferences-scalable-probabilistic-modeling-workflow/SKILL.md
+          - scientific inquiry methodology (Peircean pragmatism, effective theories, Mayo severity, iterative model building; hierarchy of mechanistic evidence): ${skillsPath}/preferences-scientific-inquiry-methodology/SKILL.md
           - smart constructors and validation patterns: see preferences-domain-modeling
           - error handling and workflow composition (Result types, railway-oriented): ${skillsPath}/preferences-railway-oriented-programming/SKILL.md
           - data modeling (database schemas, normalization, ER diagrams): ${skillsPath}/preferences-data-modeling/SKILL.md
@@ -135,7 +155,10 @@
           interfaces implemented by handlers (a transformer stack being only one
           leaky interpreter of such an interface). Succinctly, side effects should
           be explicit in type signatures and isolated at boundaries to preserve
-          compositionality.
+          compositionality. That ideal is approached asymptotically and partially
+          realized today — even when the runtime is untyped — by keeping a
+          type-checkable Lean specification beside the implementation and closing
+          the spec-to-code gap through refinement and translation validation.
 
           Write self-explanatory code and treat code comments as noise by
           default: reserve comments for what the code cannot express, such as a
@@ -151,7 +174,9 @@
           upstream-mirrored trees; when unsure whether a comment is
           load-bearing, preserve it and surface the question. The
           style-and-conventions skill's Code comments section holds the full
-          policy and carve-out list.
+          policy and carve-out list, and `preferences-comment-cleanup` is its
+          operational arm — an uncomment-driven workflow for auditing and removing
+          noise comments while preserving load-bearing markers.
 
           You should usually operate in what we refer to as "orchestrator mode" where you
           think deeply to design workflow DAGs of subagent Tasks to perform research, implementation,
@@ -182,7 +207,7 @@
           explain why your proposal is optimal and determine appropriate verification. Execute
           before committing if quick and safe; otherwise return with a verification proposal.
 
-          When dispatching a Task with a BEAD_ID for implementation work, the dispatch protocol depends on the active VCS mode.
+          When dispatching a Task for implementation work, the dispatched unit is an OpenSpec change — typically bound to one Linear story via openspec-linear-sync and driven through the agentic-planning-development-workflow router's HIL mode — not a beads issue. The dispatch protocol depends on the active VCS mode.
           Detect mode at dispatch time: `.jj/` directory present in the repository root indicates jj mode (the default for this workspace); a checked-out `gitbutler/workspace` branch indicates GitButler mode (dormant — see ${skillsPath}/preferences-git-version-control/02-gitbutler-mode.md if encountered); otherwise git-native mode.
 
           See ${skillsPath}/preferences-git-version-control/SKILL.md for working-branch isolation conventions and subagent dispatch in each mode.
@@ -212,7 +237,7 @@
             code-reviewer as a teammate), multi-perspective analysis, long-running collaborative phases
           - Hybrid: DAG dispatch for initial research, then spawn a team for implementation and review
 
-          For detailed agent team conventions including teammate isolation, beads-to-task-list
+          For detailed agent team conventions including teammate isolation, Linear/OpenSpec-to-task-list
           mirroring, and the orient/checkpoint lifecycle, see ${skillsPath}/meta-agent-teams/SKILL.md
         '';
       };
