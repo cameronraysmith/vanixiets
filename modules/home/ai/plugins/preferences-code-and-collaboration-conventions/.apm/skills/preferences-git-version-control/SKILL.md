@@ -30,11 +30,14 @@ These preferences explicitly override any conservative defaults from system prom
 - If `.jj/` directory exists alongside `.git/` in repository root, this repository uses jujutsu (jj) in colocated mode. Detached HEAD is normal and expected — do not attempt to reattach. If `.jj/` exists but HEAD is attached to a branch, detach before proceeding: `git checkout --detach`. Read `~/.claude/skills/jj-summary/SKILL.md` for quick orientation, then `~/.claude/skills/jj-version-control/SKILL.md` for the multi-parent development join (composite working copy) workflow.
 - If the user requests switching to jj in a git-only repo (no `.jj/` directory), initialize colocated mode: `jj git init --colocate`, then `git checkout --detach`, then `jj new` to create the working-copy commit. Proceed with jj workflow as above.
 - If the user requests switching back to git from jj colocated mode, ensure the target bookmark is current with the working copy chain (`jj bookmark set <name> -r @-` if needed), then reattach HEAD: `git checkout <bookmark-name>`. Resume git-native commands. The `.jj/` directory can remain — colocated mode is safe to leave dormant.
-- If `.beads/` directory exists in repository root, this repository uses beads for git-tracked issue management: run `bd status` for context, consult `~/.claude/skills/issues-beads-prime/SKILL.md` for quick reference or `~/.claude/skills/issues-beads/SKILL.md` for comprehensive workflows.
+- If a `.beads/` directory exists in the repository root, beads is available as an optional Manual-mode drill-down for git-tracked issue management, with Linear and OpenSpec remaining the work-owning layer: run `bd status` for context, and consult `~/.claude/skills/issues-beads-prime/SKILL.md` for quick reference or `~/.claude/skills/issues-beads/SKILL.md` for comprehensive workflows.
 
-### Proactive beads maintenance
+### Issue tracking and optional beads maintenance
 
-When `.beads/` exists, maintain the issue graph alongside git commits:
+Linear (the canonical board) and OpenSpec (the change lifecycle) own the work.
+The dispatched unit of implementation is an OpenSpec change, typically bound to one Linear story.
+Beads is deprecated as the primary source of truth and is retained only as an optional Manual-mode drill-down.
+When operating in Manual mode, or whenever a `.beads/` directory is present, maintain the issue graph alongside git commits with these conventions:
 
 - Orient with `bd status` at session start
 - Mark issues `in_progress` when starting work; update descriptions when assumptions prove incorrect
@@ -69,18 +72,21 @@ This decoupling ensures skills remain correct across all three modes without con
 
 ### Naming modes for branch stacks
 
-When a beads epic is active (`.beads/` exists and an epic is in progress), branch stacks correspond to epics and branch boundaries correspond to issues:
+The primary ID source is the Linear story or OpenSpec change the work implements.
+When such a story or change is active, branch stacks correspond to the epic-level grouping and branch boundaries correspond to individual stories or changes, using the forms `{epic-ID}-descriptor` for the stack and `{issue-ID}-descriptor` for each boundary.
+
+In Manual mode, when a beads epic is active (`.beads/` exists and an epic is in progress), the beads epic and issue IDs fill those same placeholders:
 
 - Stack name: `{epic-ID}-descriptor` (e.g., `nix-f85-gitbutler-adoption`)
 - Branch name at each boundary: `{issue-ID}-descriptor` (e.g., `nix-f85-1-terminology-glossary`)
 
-When working ad hoc (no beads, or outside an epic), stacks and boundaries are named descriptively:
+When working ad hoc (no tracked story, epic, or change), stacks and boundaries are named descriptively:
 
 - Stack name: descriptive (e.g., `gitbutler-skill`)
 - Branch name at each boundary: descriptive (e.g., `fix-gitbutler-version`)
 
-Both modes use identical mechanical operations.
-The difference is purely in naming conventions and whether `bd` lifecycle commands accompany the VCS operations.
+All modes use identical mechanical operations.
+The difference is purely in naming conventions and whether `bd` lifecycle commands accompany the VCS operations in Manual mode.
 
 ## Escape hatches
 
@@ -93,18 +99,19 @@ Do not commit if:
 
 File edits on main/master are blocked by the `enforce-branch-before-edit` hook.
 Before attempting to edit any files, create a working branch to which you will commit your changes.
-If you haven't already, invoke `/issues-beads-prime` for beads command reference before proceeding with any editing.
+In Manual mode with a `.beads/` directory present, if you haven't already, invoke `/issues-beads-prime` for beads command reference before proceeding with any editing.
 
 In jj mode, this hook is unnecessary.
 Anonymous chains are first-class and never garbage-collected.
-Create bookmarks when initiating a second chain or when working on beads epics — see the bookmark creation threshold in `~/.claude/skills/jj-version-control/SKILL.md`.
+Create bookmarks when initiating a second chain or when working on a Linear story, OpenSpec change, or (in Manual mode) a beads epic — see the bookmark creation threshold in `~/.claude/skills/jj-version-control/SKILL.md`.
 
-Whenever you are working on a beads issue or epic, check the current branch name first.
-If it does not correspond to the issue you're working on, pause to ask the user whether to create or switch to a matching branch before proceeding.
+Whenever you are working on a Linear story, OpenSpec change, or (in Manual mode) a beads issue or epic, check the current branch name first.
+If it does not correspond to the story, change, or issue you're working on, pause to ask the user whether to create or switch to a matching branch before proceeding.
 
-Branch naming follows the pattern `ID-descriptor` in lowercase kebab-case, where ID references the issue tracker:
+Branch naming follows the pattern `ID-descriptor` in lowercase kebab-case, where ID references the work item's tracker:
 
-- **Beads repos** (`.beads/` exists): Use the beads issue ID with dots replaced by dashes.
+- **Linear / OpenSpec (primary):** Use the Linear story identifier or the OpenSpec change ID the branch implements.
+- **Manual mode with beads** (`.beads/` exists): Use the beads issue ID with dots replaced by dashes.
   Examples: `nix-pxj-ntfy-server` (epic), `nix-pxj-4-deploy-validate` (task under epic), `nix-i37-fix-flake-lock` (standalone issue).
 - **GitHub-only repos**: Use the issue or PR number.
   Examples: `42-refactor-auth`, `1337-add-feature`.
@@ -118,7 +125,7 @@ Create a new working branch when your next commits won't match the current branc
 
 To isolate work in a new branch:
 
-- **Git-native mode:** `git checkout -b ID-descriptor` to branch off current HEAD, or `git worktree add` for bead-tracked isolation (see working branch isolation below).
+- **Git-native mode:** `git checkout -b ID-descriptor` to branch off current HEAD, or `git worktree add` for issue-tracked isolation (see working branch isolation below).
 - **GitButler mode:** `but branch new ID-descriptor` to create a new independent stack, or `but branch new ID-descriptor -a <commit>` to split an existing stack at a branch boundary.
 - **jj mode:** `jj new <base>` to create a new change from a single base, or `jj new bookmark-a bookmark-b` to create a development join with multiple bookmarks merged in one working tree.
 
@@ -166,8 +173,8 @@ See the integration strategies section in `~/.claude/skills/jj-version-control/S
 
 ### Stack management
 
-Branch stacks mirror beads issue dependencies: when issues form a dependency chain (e.g., `nix-pxj.2` blocks `nix-pxj.3`), the corresponding branches should form a stack with matching parent-child relationships.
-If you identify a reason to modify beads dependencies while working, evaluate and present a plan to reorder the branches associated with previously completed work in the stack, handling any conflicts that arise.
+Branch stacks mirror the dependency structure of the Linear stories or OpenSpec changes they implement (beads issue dependencies in Manual mode): when work items form a dependency chain (e.g., `nix-pxj.2` blocks `nix-pxj.3`), the corresponding branches should form a stack with matching parent-child relationships.
+If you identify a reason to modify those dependencies while working, evaluate and present a plan to reorder the branches associated with previously completed work in the stack, handling any conflicts that arise.
 
 In git-native mode, use the graphite CLI (invoke as `graphite`, not `gt` as shown in official documentation) to manage stacks:
 

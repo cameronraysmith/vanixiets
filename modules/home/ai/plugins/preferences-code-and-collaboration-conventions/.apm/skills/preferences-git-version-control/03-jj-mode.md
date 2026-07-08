@@ -130,7 +130,8 @@ See the parallel agent coordination protocol in `~/.claude/skills/jj-version-con
 
 ## Completing issues and epics
 
-When an issue is complete, close the bead:
+When a work item is complete, advance its state in the owning layer: mark the Linear story Done and archive the OpenSpec change.
+In Manual mode, also close the corresponding bead:
 
 ```bash
 bd close {issue-ID} --reason "Implemented in $(jj log -r '{epic-ID}-descriptor' --no-graph -T 'commit_id.short(8)')"
@@ -163,9 +164,9 @@ jj development joins operate in a single working tree, so the repository root's 
 
 ## Diamond workflow
 
-When `.beads/` exists and an epic is active, epic-scoped work uses the diamond workflow's four phases (diverge, develop, converge, serialize) to map the issue dependency graph onto jj bookmark chain topology.
+When epic-scoped work spans multiple parallel streams — a Linear initiative or project, an OpenSpec change group, or (in Manual mode) a beads epic — it uses the diamond workflow's four phases (diverge, develop, converge, serialize) to map the dependency graph onto jj bookmark chain topology.
 The mechanical implementation leverages jj's multi-parent working copy; the pattern generalizes conceptually to GitButler's applied-branches model and git-native worktrees.
-For the canonical operational recipe, theoretical foundations, and beads-to-jj mapping, see `~/.claude/skills/jj-version-control/diamond-workflow.md`.
+For the canonical operational recipe, theoretical foundations, and dependency-graph-to-jj mapping (including the beads-to-jj mapping used in Manual mode), see `~/.claude/skills/jj-version-control/diamond-workflow.md`.
 
 The sibling tools `jj-linearize-join` and `jj-stack-submit` are the canonical tooling for the diamond → linearized-chain → N+1 PR submission path: the former linearizes a development join into a stacked-base chain, the latter handles forge submission (push + N+1 PR creation via `gh`/`tea`).
 See `~/.claude/skills/jj-version-control/diamond-workflow.md` Phase 4 for the operational recipe.
