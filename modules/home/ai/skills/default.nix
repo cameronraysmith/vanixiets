@@ -48,7 +48,14 @@
       #
       # readDir over a derivation output is import-from-derivation: evaluating the
       # skills attrset realizes aiSkills.composed.
-      allSkills = readSkillsFrom "${config.aiSkills.composed}/.claude/skills";
+      #
+      # mattpocock/skills is adopted whole-plugin; its bare-named `tdd` shadows our
+      # atdd-outer-loop -> test-driven-development ecosystem at model-selection time and
+      # would bypass ATDD routing, so it is withheld from delivery here. The compose
+      # still builds it; only the harness symlink is dropped. Remove the name to re-include.
+      excludedUpstreamSkills = [ "tdd" ];
+
+      allSkills = removeAttrs (readSkillsFrom "${config.aiSkills.composed}/.claude/skills") excludedUpstreamSkills;
 
       # Third-party skill directories supplied via aiSkills.extraSkillDirs.
       # Each entry is a directory (often a nix store path string) holding
