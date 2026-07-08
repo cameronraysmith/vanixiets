@@ -9,6 +9,12 @@ dependencies:
     # records a remote-style resolved_commit lock with zero network. The full SHA
     # is required; a short ref forces a network fetch.
     - obra/superpowers#f268f7c953744036f0fa7e9d4b73535c04e57cb8
+    # mattpocock/skills as a walked whole-plugin remote dep (claude-plugin repo:
+    # plugin.json, no apm.yml). apm normalizes its 21 plugin.json-declared skills
+    # (16 engineering + 5 productivity) into flat skills at install; the nix compose
+    # pre-seeds the git checkout cache from the flake-pinned tree for zero-network
+    # resolution. Full 40-char SHA required.
+    - mattpocock/skills#d574778f94cf620fcc8ce741584093bc650a61d3
     - git: srid/agency
       ref: 81455051ccca654c57ad6088838c85e7248ac159
       skills: [hickey, lowy, fact-check]
