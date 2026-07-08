@@ -44,6 +44,13 @@
   worktrunkSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-worktrunk,
   worktrunkRev ? worktrunkSrc.rev,
 
+  # Flake-pinned mattpocock/skills tree feeding apm's git checkout cache so the
+  # whole-plugin remote dep resolves with zero network. mattpocockRev is the single
+  # SHA source of truth (the fetchFromGitHub rev), reconciled against the apm.yml pin
+  # by the drift guard in the build script.
+  mattpocockSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-mattpocock-skills,
+  mattpocockRev ? mattpocockSrc.rev,
+
   targets ? [
     "agent-skills"
     "claude"
@@ -149,6 +156,24 @@ runCommandLocal "apm-skills-compose"
       exit 1
     fi
 
+    # Same offline pre-seed for the mattpocock/skills whole-plugin remote dep declared
+    # in planning-and-development/apm.yml. apm types it MARKETPLACE_PLUGIN (plugin.json,
+    # no apm.yml) and normalizes its plugin.json-declared skills into .apm/skills/ at
+    # install time.
+    MP_SHA=${mattpocockRev}
+    SHARD_MP=$(printf '%s' 'https://github.com/mattpocock/skills' | sha256sum | cut -c1-16)
+    CK_MP="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_MP/$MP_SHA/full"
+    mkdir -p "$CK_MP"
+    cp -RL ${mattpocockSrc}/. "$CK_MP"/
+    chmod -R u+w "$CK_MP"
+    mkdir -p "$CK_MP/.git"
+    printf '%s\n' "$MP_SHA" > "$CK_MP/.git/HEAD"
+
+    if ! grep -q "$MP_SHA" ./planning-and-development/apm.yml; then
+      echo "apm-skills-compose: mattpocock SHA drift — planning-and-development/apm.yml does not pin $MP_SHA" >&2
+      exit 1
+    fi
+
     cp ${rootConsumerManifest} ./apm.yml
     # agent-skills,claude only: the codex/hermes/opencode/droid harnesses are
     # fanned out nix-side from this composed $out in a later task, not by apm.
@@ -167,7 +192,9 @@ runCommandLocal "apm-skills-compose"
       "$out/.claude/skills/brainstorming/SKILL.md" \
       "$out/.agents/skills/brainstorming/SKILL.md" \
       "$out/.claude/skills/worktrunk/SKILL.md" \
-      "$out/.claude/skills/wt-switch-create/SKILL.md"; do
+      "$out/.claude/skills/wt-switch-create/SKILL.md" \
+      "$out/.claude/skills/tdd/SKILL.md" \
+      "$out/.claude/skills/code-review/SKILL.md"; do
       if [ ! -f "$expected" ]; then
         echo "apm-skills-compose assertion failed: missing $expected" >&2
         exit 1
