@@ -90,7 +90,6 @@
           gh-dash
           git-filter-repo
           git-machete
-          git-repo-manager
           git-revise
           git-xet
           gitmux
