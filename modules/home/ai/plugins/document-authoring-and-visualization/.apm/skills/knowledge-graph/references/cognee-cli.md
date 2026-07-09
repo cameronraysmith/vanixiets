@@ -65,14 +65,18 @@ cognee improve -d modeling-references --feedback-alpha 0.8 -s <session-id>
 
 Flags: `-d/--dataset-name` (default `main_dataset`), `--dataset-id`, `--node-name`, `-s/--session-ids`, `--feedback-alpha` (default 0.1), `-b/--background`.
 
-`forget` removes data from the graph.
+`forget` removes data from the graph at either dataset or single-item granularity.
 
 ```
 cognee forget --dataset engineering-references
-cognee forget --data-id <id>
+cognee forget --dataset-id <dataset_id> --data-id <data_id>
 ```
 
-Flags: `--dataset`, `--dataset-id`, `--data-id`, `--everything`.
+Flags: `--dataset` (dataset name), `--dataset-id` (dataset UUID), `--data-id` (UUID of one data item), `--everything`.
+Pass `--dataset` or `--dataset-id` alone to delete a whole dataset, add `--data-id` to that to delete a single item within it, or pass `--everything` to delete all of the user's data.
+`--data-id` is the CLI's only per-item deletion path (`delete` has no item-level flag) and it requires `--dataset` or `--dataset-id`, since the item is addressed within a dataset; passing `--data-id` on its own errors.
+Recover a `data_id` from `cognee datasets data <dataset_id>`, whose ID column is exactly the per-item UUID that `forget --data-id` consumes.
+A targeted `cognee forget --dataset-id <dataset_id> --data-id <data_id>` removes only that one item and leaves the dataset's other items intact.
 The README shows `forget --all`, but the real flag is `--everything`; never pass it without explicit instruction (see Hygiene below).
 
 ## lower-level ingest/build
@@ -88,6 +92,9 @@ cognee add ./engineering-references/b.md -d engineering-references
 ```
 
 Flags: `-d/--dataset-name`.
+Each `add` reports its ingested items inline, and every item carries a content-addressed `data_id` (a uuid5 over the item's content) at `data_ingestion_info[].data_id` in the response.
+Because the id is content-addressed, re-adding byte-identical content is a no-op that returns the same `data_id`, while changed content yields a new `data_id` and leaves the prior item in place until it is forgotten.
+That `data_id` is what `forget --data-id` targets for a single-item delete, and it can also be recovered later from `cognee datasets data <dataset_id>`.
 
 `cognify` transforms the ingested data into the knowledge graph, over one or more datasets at once.
 
@@ -132,6 +139,8 @@ cognee datasets delete <dataset_id>
 Subcommands: `list`, `create`, `data`, `status`, `graph`, `delete`.
 Only `create` takes a dataset name; `data`, `status`, `graph`, and `delete` take a dataset UUID (`dataset_id`), not a name, so obtain the id with `cognee datasets list` first and pass it in place of `<dataset_id>`.
 `status` accepts one or more ids; `graph` takes `-o/--output` to write the JSON export to a file; `delete` takes `-f/--force` to skip confirmation.
+`data` lists a dataset's items as rows with an ID column (the per-item `data_id` UUID), a Name column (the source filename), and Type and Created columns, so it is how you map a source filename back to the `data_id` that a targeted `forget --data-id` needs.
+Under the wrapped SaaS surface the Type and Created columns come back empty and no content-hash column is exposed, so an item's content-addressed identity is visible only through its `data_id`.
 See references/datasets.md for naming and when to create versus reuse.
 
 `config` manages configuration settings.
@@ -156,6 +165,7 @@ cognee delete --all
 ```
 
 Flags: `-d/--dataset-name`, `--all`, `-f/--force`.
+`delete` operates at dataset granularity only — a named dataset, or every dataset with `--all` — and has no per-item flag; single-item removal lives under `forget --data-id` instead.
 `--all` deletes all data across every dataset and requires confirmation; treat it with the same caution as `forget --everything` and never pass it without explicit instruction (see Hygiene below).
 
 `serve` connects to a cognee instance, cloud or local.
