@@ -122,7 +122,7 @@
 
             # apply --no-quarantine to all casks
             caskArgs = {
-              no_quarantine = true;
+              no_quarantine = false;
             };
 
             taps = [
