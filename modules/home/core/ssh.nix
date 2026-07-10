@@ -69,7 +69,7 @@
           };
 
           "stibnite.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:933e:1059:d43a";
+            HostName = "fddb:4344:343b:14b9:399:9324:19d9:3451";
             User = "crs58";
             HostKeyAlias = "stibnite.zt";
           };

@@ -45,7 +45,7 @@
             "/electrum.zt/fddb:4344:343b:14b9:399:93d1:7e6d:27cc"
             "/galena.zt/fddb:4344:343b:14b9:399:9315:c67a:dec9"
             "/scheelite.zt/fddb:4344:343b:14b9:399:9380:46d5:3400"
-            "/stibnite.zt/fddb:4344:343b:14b9:399:933e:1059:d43a"
+            "/stibnite.zt/fddb:4344:343b:14b9:399:9324:19d9:3451"
             "/blackphos.zt/fddb:4344:343b:14b9:399:930e:e971:d9e0"
             "/argentum.zt/fddb:4344:343b:14b9:399:93f7:54d5:ad7e"
             "/rosegold.zt/fddb:4344:343b:14b9:399:9315:3431:ee8"
