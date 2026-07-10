@@ -78,6 +78,14 @@ in
         "b4aacd0a9881fcfa9b2f943a1dbc0982f27bab041c124a7982458a00cb54fd48"
       ];
 
+      # Migrate trusted-users from /etc/nix/nix.custom.conf to nix-darwin
+      # Required for accepting flake-specified substituters without prompts
+      nix.settings.trusted-users = [
+        "root"
+        "@admin"
+        "@wheel"
+      ];
+
       # Primary user for homebrew and system-level user operations
       # crs58 is both admin and primary user on stibnite
       system.primaryUser = "crs58";
