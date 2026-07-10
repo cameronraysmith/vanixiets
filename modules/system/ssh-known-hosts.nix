@@ -82,11 +82,11 @@ let
       "stibnite.zt" = {
         hostNames = [
           "stibnite.zt"
-          "fddb:4344:343b:14b9:399:933e:1059:d43a" # Zerotier IPv6
+          "fddb:4344:343b:14b9:399:9324:19d9:3451" # Zerotier IPv6
         ];
         # Static key from /etc/ssh/ssh_host_ed25519_key.pub
-        # Verified 2025-11-29
-        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+1b1qqnXJNhxANDyc17VqKo3SzDZSn+QlgLbh7sV2e";
+        # Verified 2026-07-10 (rehomed to new hardware)
+        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA7eyzXKTI0pjLl1hbU8UuM3VFWq2NqYdf7cBPCcC638";
       };
 
       "argentum.zt" = {
