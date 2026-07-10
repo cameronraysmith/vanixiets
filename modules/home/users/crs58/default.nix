@@ -54,6 +54,7 @@ let
           };
           ssh-public-key = { }; # For allowed_signers generation
           glm-api-key = { };
+          tm-source-drive-data-root = { };
           firecrawl-api-key = { };
           huggingface-token = { };
           cerebras-api-key = { };
