@@ -43,6 +43,7 @@
               ultracode = true;
               forceLoginMethod = "claudeai";
               theme = "dark";
+              editorMode = "vim";
               autoCompactEnabled = false;
               autoDreamEnabled = true;
               spinnerTipsEnabled = false;
