@@ -100,15 +100,13 @@ in
         enable = true;
 
         additionalCasks = [
+          "steipete/tap/codexbar"
           "dbeaver-community"
-          # "docker-desktop" # defer to orbstack and colima/incus
-          "gitbutler"
           "gpg-suite"
           "inkscape"
           "keycastr"
           "meld"
           "postgres-app"
-          "steipete/tap/codexbar"
           "zerotier-one"
         ];
 
