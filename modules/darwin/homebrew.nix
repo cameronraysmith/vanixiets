@@ -15,6 +15,7 @@
 
         # Core GUI applications managed via homebrew casks
         baseCaskApps = [
+          "agentsview"
           "aldente"
           "alt-tab"
           "betterdisplay"
@@ -33,6 +34,7 @@
           "logseq"
           "neohtop"
           "obs"
+          "obsidian"
           "orbstack"
           "podman-desktop"
           "raindropio"
