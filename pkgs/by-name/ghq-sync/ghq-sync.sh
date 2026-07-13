@@ -12,6 +12,8 @@ Usage:
   ghq-sync -u|--update [TARGET...]  lazy fetch, then ghq's native update per repo
   ghq-sync --deepen N [TARGET...]   deepen history by N commits in place
   ghq-sync --full [TARGET...]       promote a lazy clone to a full clone in place
+  ghq-sync --seed-zoxide [QUERY]    register `ghq list -p [QUERY]` repos with
+                                    zoxide, no network access
   ghq-sync --all [QUERY]            operate over `ghq list [QUERY]` (implies -u
                                     when fetching); combinable with --deepen/--full
 
@@ -26,17 +28,27 @@ Options:
                    keeping the blobless partial filter.
   --full           Promote each resolved lazy clone to a full clone in place. A
                    target that is not yet cloned is cloned fully (plain ghq get).
+  --seed-zoxide [QUERY]
+                   Register every repo in `ghq list -p [QUERY]` with zoxide
+                   without any network access, printing one `added: <path>` line
+                   per repo. Bulk-seeds the directory index from the local tree.
   --all [QUERY]    Use `ghq list [QUERY]` as the target set. The single optional
                    positional is the ghq list QUERY.
   -u, --update     Pass ghq's -u to update already-cloned repos (fetch mode).
   -j, --jobs N     Bounded concurrency for --deepen/--full (default: 6).
-  -n, --dry-run    Print intended actions for --deepen/--full/--all; no mutation.
+  -n, --dry-run    Print intended actions for --deepen/--full/--all/--seed-zoxide;
+                   no mutation.
   -h, --help       Show this help and exit.
 
 Fetch mode is a transparent pass-through to `ghq get --shallow --partial blobless
 --no-recursive -P [-u]`; ghq's own output and exit status are preserved. The
 --deepen and --full modes print exactly one status line per repo (deepened:,
 promoted to full:, skip: <reason>, or failed:) and continue past per-repo errors.
+
+Repositories fetched, updated, deepened, or promoted are also registered with
+zoxide as a silent side effect; fetch mode stays output-transparent, so
+`ghq-sync ... | cb copy` still captures exactly ghq's own output. --seed-zoxide
+prints one `added: <path>` line per indexed repo.
 USAGE
 }
 
@@ -61,6 +73,25 @@ resolve_repo() {
     printf '%s\n' "$path"
   fi
   return 0
+}
+
+register_targets() {
+  # Batch-register the on-disk paths of the given targets with zoxide in a single
+  # `zoxide add` (its multi-path form), run once after the work completes. The
+  # single call both uses the list form and avoids zoxide's lockless
+  # read-modify-write lost-update race when deepen/full workers run in parallel.
+  # Silent: stdout stays empty so fetch mode's `... | cb copy` pipe is
+  # unaffected, and a zoxide failure never aborts ghq-sync.
+  if [ "$dry_run" = 1 ]; then return 0; fi
+  local target path
+  local paths=()
+  for target in "$@"; do
+    path="$(resolve_repo "$target")"
+    if [ -n "$path" ] && [ -d "$path" ]; then paths+=("$path"); fi
+  done
+  if [ "${#paths[@]}" -gt 0 ]; then
+    zoxide add "${paths[@]}" >/dev/null 2>&1 || true
+  fi
 }
 
 deepen_one() {
@@ -163,6 +194,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     -u | --update) update=1 ;;
     --full) mode=full ;;
+    --seed-zoxide) mode=seed ;;
     --all) all=1 ;;
     -n | --dry-run) dry_run=1 ;;
     --deepen=*)
@@ -218,7 +250,7 @@ if [ "$all" = 1 ]; then
     mapfile -t targets < <(ghq list)
   fi
   if [ "$mode" = fetch ]; then update=1; fi
-elif [ "$mode" != fetch ] && [ "${#targets[@]}" -eq 0 ]; then
+elif [ "$mode" != fetch ] && [ "$mode" != seed ] && [ "${#targets[@]}" -eq 0 ]; then
   mapfile -t targets
 fi
 
@@ -237,12 +269,42 @@ case "$mode" in
       fi
       exit 0
     fi
-    exec ghq "${getflags[@]}" "${targets[@]}"
+    # Run ghq (not exec) so each resolved clone path can be registered with
+    # zoxide afterward. ghq's stdout/stderr/exit status pass through untouched;
+    # resolution uses command substitution and zoxide is silent, so fetch mode's
+    # `… | cb copy` pipe still sees exactly ghq's own output.
+    if [ "${#targets[@]}" -eq 0 ]; then
+      mapfile -t targets
+    fi
+    rc=0
+    ghq "${getflags[@]}" "${targets[@]}" || rc=$?
+    register_targets "${targets[@]}"
+    exit "$rc"
     ;;
   deepen)
     run_pool deepen_one "${targets[@]}"
+    register_targets "${targets[@]}"
     ;;
   full)
     run_pool full_one "${targets[@]}"
+    register_targets "${targets[@]}"
+    ;;
+  seed)
+    if [ "${#targets[@]}" -gt 1 ]; then
+      die "--seed-zoxide accepts at most one QUERY argument"
+    fi
+    listargs=(list -p)
+    if [ -n "${targets[0]:-}" ]; then listargs+=("${targets[0]}"); fi
+    mapfile -t paths < <(ghq "${listargs[@]}")
+    if [ "${#paths[@]}" -eq 0 ]; then exit 0; fi
+    if [ "$dry_run" = 1 ]; then
+      printf 'would add: %s\n' "${paths[@]}"
+      exit 0
+    fi
+    if zoxide add "${paths[@]}" >/dev/null 2>&1; then
+      printf 'added: %s\n' "${paths[@]}"
+    else
+      printf 'failed: %s\n' "${paths[@]}"
+    fi
     ;;
 esac

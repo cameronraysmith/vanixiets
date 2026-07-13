@@ -4,6 +4,7 @@
   ghq,
   git,
   coreutils,
+  zoxide,
 }:
 writeShellApplication {
   name = "ghq-sync";
@@ -11,6 +12,7 @@ writeShellApplication {
     ghq
     git
     coreutils
+    zoxide
   ];
   text = builtins.readFile ./ghq-sync.sh;
   meta = {
