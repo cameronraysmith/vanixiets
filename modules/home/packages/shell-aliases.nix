@@ -11,6 +11,7 @@
         bazel = "bazelisk";
         npmbw = "bunx -p @bitwarden/cli bw";
         c = "claude";
+        ca = "claude attach";
         ccd = "claude";
         cnb = "claude-name-background";
         cod = "codex";
