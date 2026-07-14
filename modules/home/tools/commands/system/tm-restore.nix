@@ -19,6 +19,7 @@
           runtimeInputs = with pkgs; [
             rsync
             coreutils
+            zoxide
           ];
           text = ''
             export TM_DATA_ROOT_FILE=${

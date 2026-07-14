@@ -19,7 +19,8 @@ Usage: tm-restore [options] <live-abs-path>...
 
 Restore one or more absolute paths from the archival Time Machine source drive
 to their equivalent locations on this disk. Directories sync recursively with
-trailing-slash-correct rsync constructed for you.
+trailing-slash-correct rsync constructed for you. Successful directory restores
+are registered with the zoxide directory index.
 
 Options:
   -n, --dry-run    Preview only (rsync -n -i); write nothing.
@@ -122,6 +123,7 @@ if [ "$mirror" -eq 1 ]; then rsync_opts+=(--delete); fi
 if [ "$dry" -eq 1 ]; then rsync_opts+=(-n -i); fi
 
 status=0
+zpaths=()
 for src_path in "${paths[@]}"; do
   case "$src_path" in
     /*) : ;;
@@ -139,7 +141,11 @@ for src_path in "${paths[@]}"; do
   fi
   if [ -d "$src" ]; then
     printf '== %s\n   <- %s/\n' "$out" "$src" >&2
-    rsync "${rsync_opts[@]}" "$src/" "$out/" || status=1
+    if rsync "${rsync_opts[@]}" "$src/" "$out/"; then
+      zpaths+=("$out")
+    else
+      status=1
+    fi
   elif [ -e "$src" ]; then
     printf '== %s\n   <- %s\n' "$out" "$src" >&2
     rsync "${rsync_opts[@]}" "$src" "$out" || status=1
@@ -148,5 +154,12 @@ for src_path in "${paths[@]}"; do
     status=4
   fi
 done
+
+# Register successfully-restored destination directories with zoxide (silent side
+# effect, skipped under --dry-run since nothing is written). zoxide indexes
+# directories, so only directory restores register a path.
+if [ "$dry" -ne 1 ] && [ "${#zpaths[@]}" -gt 0 ]; then
+  zoxide add "${zpaths[@]}" >/dev/null 2>&1 || true
+fi
 
 exit "$status"
