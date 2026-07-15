@@ -6,7 +6,7 @@
 # openspec stores its skill bodies as compiled javascript, not as static files,
 # so the markdown payloads must be produced by running `openspec init`. this
 # script captures that generated output so it can be committed and shipped through
-# apm-skills-compose without a per-project init. delivery=skills emits only the 11
+# apm-skills-compose without a per-project init. delivery=skills emits only the 12
 # openspec-* skills and no commands/ tree (the /opsx:* commands were 1:1 skill
 # duplicates).
 #
@@ -28,7 +28,7 @@ set -euo pipefail
 # app) and still rewrite the committed skills in the user's worktree.
 repo_root="$(git rev-parse --show-toplevel)"
 
-# the 11 generated openspec-* skills are vendored into the planning-and-development
+# the 12 generated openspec-* skills are vendored into the planning-and-development
 # apm package so they ship through apm-skills-compose; this directory ALSO holds
 # four hand-authored skills (agentic-planning-development-workflow,
 # openspec-bdd-bridge, openspec-linear-sync, project-management) which this script
@@ -50,7 +50,7 @@ home="${work}/home"
 mkdir -p "${proj}" "${home}"
 
 # `openspec init` defaults to the `core` profile (4 workflows). the full set of
-# 11 workflows requires a global config selecting profile=custom plus the
+# 12 workflows requires a global config selecting profile=custom plus the
 # explicit workflows array; init exposes no --workflows flag, so the array can
 # only come from the config file. point XDG_CONFIG_HOME at an isolated dir so
 # this config never touches the real environment.
@@ -61,7 +61,7 @@ cat > "${xdg}/openspec/config.json" <<'JSON'
   "featureFlags": {},
   "profile": "custom",
   "delivery": "skills",
-  "workflows": ["propose","explore","new","continue","apply","ff","sync","archive","bulk-archive","verify","onboard"]
+  "workflows": ["propose","explore","new","continue","apply","update","ff","sync","archive","bulk-archive","verify","onboard"]
 }
 JSON
 
@@ -81,8 +81,8 @@ fi
 # assert the full custom-profile set was generated, so a silent core-profile
 # fallback (4 workflows) or partial generation fails loudly here.
 skill_count=$(fd -t d -d 1 . "${generated_skills}" | wc -l | tr -d ' ')
-if [[ "${skill_count}" -ne 11 ]]; then
-  echo "error: expected 11 skills, got ${skill_count} skills" >&2
+if [[ "${skill_count}" -ne 12 ]]; then
+  echo "error: expected 12 skills, got ${skill_count} skills" >&2
   exit 1
 fi
 

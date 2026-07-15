@@ -1,9 +1,9 @@
 # User-level install of the vendored OpenSpec Claude assets:
 #   - the superpowers-bridge schema bundle, delivered user-global
-#   - the global openspec config.json pinned to the 11-workflow custom profile
+#   - the global openspec config.json pinned to the 12-workflow custom profile
 #   - the OpenSpec CLI itself (programs.openspec.package)
 #
-# The 11 generated openspec-* skills are NOT delivered by this module. They live
+# The 12 generated openspec-* skills are NOT delivered by this module. They live
 # in the planning-and-development apm package
 # (modules/home/ai/plugins/planning-and-development/.apm/skills/) and ship through
 # apm-skills-compose alongside the other first-party skills, so this module no
@@ -83,6 +83,7 @@
             "new"
             "continue"
             "apply"
+            "update"
             "ff"
             "sync"
             "archive"
@@ -90,7 +91,7 @@
             "verify"
             "onboard"
           ];
-          defaultText = lib.literalExpression ''[ "propose" "explore" "new" "continue" "apply" "ff" "sync" "archive" "bulk-archive" "verify" "onboard" ]'';
+          defaultText = lib.literalExpression ''[ "propose" "explore" "new" "continue" "apply" "update" "ff" "sync" "archive" "bulk-archive" "verify" "onboard" ]'';
           example = lib.literalExpression ''[ "propose" "apply" "archive" ]'';
           description = ''
             Workflow ids baked into the custom profile. Must stay in sync with the
