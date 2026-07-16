@@ -4,14 +4,21 @@
 
 A bare-metal install path SHALL be recorded in the repository as a runnable artifact, not performed ad hoc.
 It targets a stock NixOS installer ISO booted on the machine with sshd reachable, and it MUST be safe to run more than once.
-It SHALL wipe the disk's existing partition table explicitly before invoking `clan machines install`.
+It SHALL discard the disk explicitly, at every offset rather than only at the partition table, before invoking `clan machines install`.
 
-#### Scenario: the disk is wiped explicitly because disko's create phase will not do it
+#### Scenario: the wipe is blkdiscard, because zapping the GPT first disables disko's own pool destroy
 
-- **WHEN** disko's `lib/types/gpt.nix:282-284` runs `sgdisk --clear` only `if ! blkid "${config.device}"`, and pyrite ships with an Apple GPT so `blkid` succeeds
-- **THEN** the recorded path wipes the disk explicitly on the installer — `sgdisk --zap-all` and `wipefs -a` against the namespace-explicit `_1` path — before invoking `clan machines install`
-- **AND** the wipe is required rather than defensive, because without it the subsequent `sgdisk --new` calls merely re-typecode Apple's existing partitions in place while `lib/types/filesystem.nix:54-58` skips `mkfs.vfat` on Apple's ESP, which already reports a `TYPE=`, so the machine would boot Apple's 300 MiB ESP rather than the declared layout
-- **AND** the explicit wipe is chosen over relying on a disko mode, because `clan_lib/machines/install.py:158-190` passes no `--disko-mode` to `nixos-anywhere` and that tool's default was not verified against its source
+- **WHEN** the recorded path wipes the disk on the installer before invoking `clan machines install`
+- **THEN** it uses `blkdiscard` against the namespace-explicit `_1` path, following the form clan-core's own encrypted-root guide prescribes at `docs/src/guides/disk-encryption.md:84-88`
+- **AND** it MUST NOT use `sgdisk --zap-all` or `wipefs -a` on the whole disk for this purpose, because disko's `disk-deactivate/disk-deactivate.jq:7-9` reaches `zpool destroy -f` and `zpool labelclear -f` only through a node whose `fstype` is `zfs_member`, and `:71-78` enumerates those nodes as children reported by `lsblk`, so a disk whose partition table was already zapped presents no children, the partition-level wipe never runs, the whole-disk `wipefs` at `:38` and `dd bs=440` at `:40` touch disk offsets while the ZFS labels live inside p2, disko recreates its deterministic layout so p2 reappears at the same offset with labels intact, and `lib/types/zpool.nix:298`'s `zpool import -N -f "zroot"` then succeeds and `:299` reports "not creating zpool as a pool with that name already exists" — reusing the old pool under the old passphrase, which is precisely the tautological green the re-runnability requirement below forbids
+- **AND** if `blkdiscard` is unavailable, the fallback order is `zpool labelclear -f <device>-part2`, then `sgdisk --zap-all`, then `wipefs -a`, in that order, because the labelclear depends on the partition table the zap destroys
+
+#### Scenario: the wipe is retained even though the default disko mode already destroys
+
+- **WHEN** `clan_lib/machines/install.py` passes no `--disko-mode` — zero hits across clan-core at rev `d332b69` — so `src/nixos-anywhere.sh:419` sets `diskoMode=disko`, `:422` forms `diskoAttr="${diskoMode}Script"`, and disko's `lib/default.nix:889-894` `diskoScript` runs `_disko`, which `lib/default.nix:1094-1098` composes as `_legacyDestroy` then `_create` then `_mount`
+- **THEN** the wipe is belt-and-braces on the happy path rather than load-bearing, and it is retained anyway
+- **AND** it is retained because `_legacyDestroy` runs without `set -e`, so a destroy that fails silently falls through to `_create`, where `lib/types/gpt.nix:282-284` skips `sgdisk --clear` on a surviving Apple GPT because `blkid` succeeds, the subsequent `sgdisk --new` calls re-typecode Apple's partitions in place, `lib/types/filesystem.nix:54-58` skips `mkfs.vfat` on an ESP already reporting a `TYPE=`, and the machine boots Apple's 300 MiB ESP rather than the declared layout
+- **AND** it is retained because the explicit wipe is the only step whose success the operator can independently observe before committing to an irreversible install
 
 #### Scenario: the recorded path replaces the terranix invocation that does not apply
 

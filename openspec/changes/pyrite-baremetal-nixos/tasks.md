@@ -49,8 +49,8 @@
 
 ## 6. Phase 6 — The recorded install path
 
-- [ ] 6.1 Write the install path as a recorded, re-runnable artifact (justfile recipe and/or a documented runbook), whose first step wipes the disk (`sgdisk --zap-all` then `wipefs -a` against the `_1` by-id path) and which then invokes `clan machines install pyrite --target-host root@<installer-ip> -i <key> --yes` with `--update-hardware-config` left at its default of `none`
-- [ ] 6.2 Record why the wipe is a step rather than an assumption: disko's create phase skips `sgdisk --clear` when `blkid` succeeds, and pyrite has an Apple GPT today
+- [ ] 6.1 Write the install path as a recorded, re-runnable artifact (justfile recipe and/or a documented runbook), whose first step discards the disk with `blkdiscard` against the `_1` by-id path — following clan-core's own form at `docs/src/guides/disk-encryption.md:84-88` — and which then invokes `clan machines install pyrite --target-host root@<installer-ip> -i <key> --yes` with `--update-hardware-config` left at its default of `none`. Use `blkdiscard`, not `sgdisk --zap-all`: zapping the GPT first leaves the disk with no children for `lsblk` to report, which is the only way disko's `disk-deactivate.jq:7-9` reaches `zpool labelclear`, so the ZFS labels inside p2 survive the wipe and the next install silently reuses the old pool. If `blkdiscard` proves unavailable, the fallback order is absolute — `zpool labelclear -f <device>-part2`, then `sgdisk --zap-all`, then `wipefs -a` — because the labelclear needs the partition table the zap destroys
+- [ ] 6.2 Record why the wipe is a step rather than an assumption. It is not, as an earlier revision claimed, because the run is create-only — the default disko mode destroys first (D8). It is belt-and-braces on the happy path, retained because the happy path is not guaranteed: `_legacyDestroy` runs without `set -e` so a failed destroy falls through to `_create` and lands in the boot-Apple's-ESP end state anyway; the wipe is the only step whose success the operator can observe before committing to an irreversible install; and clan-core's own encrypted-root guide prescribes a manual `blkdiscard` pre-wipe for exactly this scenario
 - [ ] 6.3 Document that `--disk-encryption-keys` is appended automatically by clan-cli from the `neededFor = "partitioning"` generator and is not passed by hand
 - [ ] 6.4 Document the ISO-boot prerequisites in the runbook: Option-key boot, sshd reachable, and that key authorization does not survive rebooting the installer
 - [ ] 6.5 Document that `clan init`, `clan machines create`, and `clan templates apply disk` are all skipped, and why
@@ -59,16 +59,19 @@
 
 ## 7. Phase 7 — Install and post-install
 
-- [ ] 7.1 Boot the stock installer ISO, authorize a key, and run the recorded install path — this wipes macOS and is irreversible
-- [ ] 7.2 Confirm the machine boots, the stage-1 passphrase prompt appears on the internal keyboard, and the root unlocks with the generated passphrase
-- [ ] 7.3 Confirm `zfs get keylocation zroot/root` returns `prompt`, `zfs get keyformat zroot/root` returns `passphrase`, and `zpool get ashift zroot` returns `12`
-- [ ] 7.4 Confirm `wlp2s0` associates and the machine joins the ZeroTier mesh
-- [ ] 7.5 Confirm no tor daemon is running (`systemctl status tor` inactive), and that sshd host certificates are present
-- [ ] 7.6 Add the `/pyrite.zt/<address>` record to `modules/machines/nixos/cinnabar/zt-dns.nix` and redeploy cinnabar
-- [ ] 7.7 Add the `pyrite.zt` entries to `modules/system/ssh-known-hosts.nix` (public key resolves automatically from the flake for NixOS machines; only the address literal is hand-written) and `modules/home/core/ssh.nix`
-- [ ] 7.8 Commit `inventory.json` if clan wrote `installedAt`
-- [ ] 7.9 Re-run the install path a second time from a fresh ISO boot, including the wipe, and repeat 7.3 — a re-run against a surviving pool reuses it and skips the create path entirely, so it would go green without proving anything
+- [ ] 7.1 Boot the stock installer ISO and authorize a key
+- [ ] 7.2 Confirm `blkdiscard` and `blockdev` are on the installer's PATH, and record `blockdev --getss /dev/nvme0n1` — the logical sector size the `ashift = "12"` decision assumes. This is a two-command check on a machine that is about to be destroyed irreversibly, and it forecloses the `dd bs=440` question in D8 rather than reasoning about it
+- [ ] 7.3 Run the wipe, then `clan machines install pyrite ... --phases disko` alone, then check `sgdisk -p /dev/nvme0n1` shows the declared geometry (1G EF00 ESP plus a 100% sibling) and a bare `zpool import` with no arguments reports no importable pool. Declared geometry present and no pool importable validates the disk story before the install commits to it — this is the cheapest severe test available and it MUST precede the irreversible step
+- [ ] 7.4 Run the full recorded install path — this wipes macOS and is irreversible
+- [ ] 7.5 Confirm the machine boots, the stage-1 passphrase prompt appears on the internal keyboard, and the root unlocks with the generated passphrase
+- [ ] 7.6 Confirm `zfs get keylocation zroot/root` returns `prompt`, `zfs get keyformat zroot/root` returns `passphrase`, and `zpool get ashift zroot` returns `12`
+- [ ] 7.7 Confirm `wlp2s0` associates and the machine joins the ZeroTier mesh
+- [ ] 7.8 Confirm no tor daemon is running (`systemctl status tor` inactive), and that sshd host certificates are present
+- [ ] 7.9 Add the `/pyrite.zt/<address>` record to `modules/machines/nixos/cinnabar/zt-dns.nix` and redeploy cinnabar
+- [ ] 7.10 Add the `pyrite.zt` entries to `modules/system/ssh-known-hosts.nix` (public key resolves automatically from the flake for NixOS machines; only the address literal is hand-written) and `modules/home/core/ssh.nix`
+- [ ] 7.11 Commit `inventory.json` if clan wrote `installedAt`
+- [ ] 7.12 Re-run the install path a second time from a fresh ISO boot, including the `blkdiscard` and the 7.3 check, and repeat 7.6 — a re-run against a surviving pool reuses it and skips the create path entirely, so it would go green without proving anything
 
-## 8. Phase 8 — Open question to close before Phase 7
+## 8. Phase 8 — Do not update the flake before Phase 7
 
-- [ ] 8.1 Acquire `nix-community/nixos-anywhere` per the `dependency-source-acquisition` ghq flow and establish its default `--disko-mode`, since `clan_lib/machines/install.py` passes none. The explicit wipe in 6.1 makes the install correct either way; this determines whether the wipe is belt-and-braces or load-bearing, and the answer belongs in design.md
+- [ ] 8.1 Do not run `nix flake update` between now and the install. `flake.nix:70` floats `clan-core` on `main.tar.gz`, so an update can move the transitive `nixpkgs_2` node and with it nixos-anywhere's version — currently 1.13.0, the version every mechanic in D13 was verified against — while no `nixos-anywhere` node appears in the diff, because `flake.lock` has none to move. If the flake must be updated first, re-verify D8 and D13 against the new version before Phase 7

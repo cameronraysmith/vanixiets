@@ -202,12 +202,13 @@ The runbook carries this, along with the fact that a MacBookPro14,1 has USB-C po
 - **Alternatives considered**: pin a pyrite-specific hostid, as disko's own `tests/zfs-encrypted-root.nix:8-9` does on both installer and system. Rejected: that test pins the same value on both sides precisely to keep them matched, which is what the clan-core default already achieves fleet-wide without a per-machine literal. Mic92's two laptops pin nothing and lean on `forceImportRoot`, which is the same posture this arrives at with the additional safety of a matched hostid.
 - **Relationship to D6**: these are belt and braces, not redundancy. The matched hostid means force-import is not needed in the ordinary case; `forceImportRoot` covers the unclean-export case and any rescue environment that does not share the default.
 
-### D8: a recorded, re-runnable install path that destroys the existing partition table
+### D8: a recorded, re-runnable install path that discards the disk at every offset
 
-- **Choice**: the install path is `clan machines install` against a booted stock installer ISO with sshd, with `--update-hardware-config` left at its default of `none` and the pre-generated report committed instead. The path is recorded in the repository, not performed ad hoc. It is preceded by an explicit, recorded disk-wipe step.
+- **Choice**: the install path is `clan machines install` against a booted stock installer ISO with sshd, with `--update-hardware-config` left at its default of `none` and the pre-generated report committed instead. The path is recorded in the repository, not performed ad hoc. It is preceded by an explicit, recorded `blkdiscard` of the target disk. `blkdiscard` is on the installer's PATH: it ships in `util-linux.bin`, and nixpkgs' `nixos/modules/config/system-path.nix:38` lists `util-linux` among `corePackageNames`, which `:184-186` folds unconditionally into `environment.systemPackages` on every NixOS system, the installer ISO included. Phase 7 confirms this on the machine before relying on it.
 - **Rationale**: the binding requirement is that the path run repeatedly. terranix's `null_resource` local-exec is the only recorded invocation in the repository and it is cloud-only; without a recorded analog, pyrite ships as a one-off manual install.
-- **The wipe is not optional, and disko's create phase will not do it**: `lib/types/gpt.nix:282-284` runs `sgdisk --clear` only `if ! blkid "${config.device}"` — that is, only when the device has no recognizable signature. pyrite ships with an Apple GPT today, so `blkid` succeeds and the clear is skipped; the subsequent `sgdisk --new` calls then merely re-typecode Apple's existing partitions in place. `lib/types/filesystem.nix:54-58` compounds it, skipping `mkfs.vfat` when `blkid` already reports a `TYPE=`, which Apple's existing ESP does. The net effect of a create-only run against an unwiped disk is booting Apple's 300 MiB ESP rather than the declared layout. The recorded path therefore wipes the disk explicitly on the installer (`sgdisk --zap-all` plus `wipefs -a` against the `_1` namespace path from D3) before invoking `clan machines install`, which is deterministic and does not depend on any tool's default mode.
-- **Unresolved and carried as a task**: `clan_lib/machines/install.py:158-190` builds the `nixos-anywhere` argv without passing `--disko-mode`, so nixos-anywhere's default applies. disko itself supports `destroy`, `format`, `mount`, `unmount`, `format,mount`, and `destroy,format,mount` (`disko:29-34,139-146`), and only the `destroy,` prefixed mode wipes. Which of these nixos-anywhere defaults to could not be verified: there is no local clone of `nix-community/nixos-anywhere`. The explicit wipe above makes the answer non-load-bearing for correctness, but it should be established rather than assumed. See the open questions.
+- **The default disko mode destroys, so the run is not create-only**: `clan_lib/machines/install.py` passes no `--disko-mode` — zero hits across clan-core at the pinned rev `d332b69` — so nixos-anywhere's default governs. `src/nixos-anywhere.sh:419` sets `diskoMode=disko` when the flag is unset and `:422` forms `diskoAttr="${diskoMode}Script"`, selecting disko's `diskoScript`, whose body at `lib/default.nix:889-894` is `_disko`, which `lib/default.nix:1094-1098` composes as `_legacyDestroy` then `_create` then `_mount`. The happy-path run therefore destroys before it creates. An earlier revision of this design asserted the opposite and built the wipe's justification on it; the mechanism it described was real but its premise was not, and both are corrected here.
+- **The wipe is belt-and-braces on the happy path, retained because the happy path is not guaranteed**: `_legacyDestroy` runs without `set -e`, so a destroy that fails silently falls through to `_create`, which lands in exactly the end state the earlier revision feared — `lib/types/gpt.nix:282-284` runs `sgdisk --clear` only `if ! blkid "${config.device}"`, so an Apple GPT that survived the destroy causes the clear to be skipped and the subsequent `sgdisk --new` calls to re-typecode Apple's partitions in place, while `lib/types/filesystem.nix:54-58` skips `mkfs.vfat` on an ESP that already reports a `TYPE=`, and the machine boots Apple's 300 MiB ESP rather than the declared layout. The explicit wipe is also the only step whose success the operator can independently observe before committing to an irreversible install, and clan-core's own encrypted-root guide at `docs/src/guides/disk-encryption.md:84-88` prescribes a manual `blkdiscard` before `clan machines install`, so upstream treats a pre-wipe as normal practice for this scenario rather than as belt-and-braces.
+- **The wipe is `blkdiscard`, not `sgdisk --zap-all`**: zapping the GPT before `clan machines install` is actively harmful on a re-run. disko's `disk-deactivate/disk-deactivate.jq:7-9` reaches `zpool destroy -f` and `zpool labelclear -f` only through a node whose `fstype` is `zfs_member` — a child partition — and `:71-78` enumerates children from `lsblk`. A disk with no partition table has no children, so the partition-level `wipefs` and `labelclear` never run; the whole-disk `wipefs` at `:38` and `dd bs=440` at `:40` touch disk offsets only, while ZFS labels live inside p2. disko then recreates its deterministic layout, p2 reappears at the same offset with its labels intact, `lib/types/zpool.nix:298`'s `zpool import -N -f "zroot"` succeeds, and `:299` reports "not creating zpool as a pool with that name already exists" — the run goes green while reusing the old pool under the old passphrase, which is the tautological green the re-runnability requirement forbids, produced by the step meant to prevent it. `blkdiscard` against the `_1` namespace path from D3 destroys labels at every offset and has no such hole. If `blkdiscard` is ever unavailable, the fallback order is absolute: `zpool labelclear -f <device>-part2`, then `sgdisk --zap-all`, then `wipefs -a`.
 
 ### D9: ZeroTier peer, with the cinnabar redeploy as an explicit step
 
@@ -234,6 +235,15 @@ The runbook carries this, along with the fact that a MacBookPro14,1 has USB-C po
 - **Choice**: no new configuration. stibnite already provisions two x86_64-linux builders — `nix-rosetta-builder` locally and `magnetite-builder` natively, the latter preferred by speed factor.
 - **Travel caveat**: magnetite is reachable only over the ZeroTier mesh, so an install performed away from the mesh falls back to the Rosetta-translated local builder. Slower, always available, and it does not block. Stated because travel-readiness is an acceptance criterion.
 
+### D13: the install mechanics, as they actually resolve
+
+- **nixos-anywhere is 1.13.0, resolved through `clan-core.inputs.nixpkgs`**: it is neither vendored, nor run via `nix run`, nor taken from `PATH`. `flake.lock` resolves `clan-core` to `d332b69` and its `nixpkgs` input to the `nixpkgs_2` node at rev `173d0ad7a974`, whose `nixos-anywhere` is version `1.13.0` (upstream rev `bad98b0`). Every behaviour recorded in D8 and here was read from that version's `src/nixos-anywhere.sh`, not from upstream `main`, and the two differ.
+- **Do not run `nix flake update` between now and the install**: `flake.nix:70` floats `clan-core` on `https://git.clan.lol/clan/clan-core/archive/main.tar.gz`. Any update can move `clan-core`, and with it the transitive `nixpkgs_2` node and nixos-anywhere's version, without a `nixos-anywhere` entry appearing in the diff — there is no such node in `flake.lock` to inspect. The mechanics recorded here hold for 1.13.0 and are not carried by the lock in a form a reviewer can see.
+- **clan invokes nixos-anywhere four times, once per phase**: `clan_lib/machines/install.py:227-254` defines `run_phase`, which appends `--phases <phase>` to the assembled argv, and calls it in turn for `kexec`, `disko`, `install`, and `reboot`. The earlier `--phases` append at `:187-188` is dead code — the per-phase append comes last and bash last-wins resolves it.
+- **Keep the default phases**: `kexec` is a no-op against an installer ISO, since `src/nixos-anywhere.sh:694-697` returns immediately from `runKexec` when `isInstaller == "y"`. Dropping it is not free: `:978-983` rewrites `sshConnection` to `root@${sshHost}` whenever the `kexec` phase is absent, and does so before `uploadSshKey` at `:983`, which breaks sudo escalation from a non-root installer session.
+- **Omitting `--update-hardware-config` is safe**: clan's `--update-hardware-config` defaults to `none` (`clan_cli/machines/install.py:280`) and clan appends `--generate-hardware-config` only when it is not `none`. nixos-anywhere's own `hardwareConfigBackend` also defaults to `none` (`src/nixos-anywhere.sh:32`). The two interactive prompts that would otherwise offer to generate a report both short-circuit on `args.yes`, so `--yes` bypasses them. facter never runs on the target and the pre-committed report is what the build consumes.
+- **Do not pass `--force-kexec`**: the flag does not exist at 1.13.0, so passing it aborts. It exists on upstream `main`, where `src/nixos-anywhere.sh:280-283` pairs `forceKexec=true` with a `shift` that a boolean flag does not need, consuming the following argument. It is unusable in both directions.
+
 ## Invariants
 
 ### pyrite MUST NOT `mkForce` `boot.initrd.kernelModules`
@@ -247,21 +257,16 @@ The virtio entries are inert on bare metal: they modprobe, find no matching devi
 They are left alone.
 What pyrite overrides is `boot.initrd.network.ssh`, which is a distinct option and can be disabled without touching the module list.
 
-## Open questions
-
-### nixos-anywhere's default disko mode is unverified
-
-`clan_lib/machines/install.py` passes no `--disko-mode`, so whichever mode nixos-anywhere defaults to is what runs.
-This could not be checked: `nix-community/nixos-anywhere` has no local clone, and the style conventions forbid substituting a web fetch for reading the source when a clone is the authoritative path.
-D8's explicit wipe step makes the install correct regardless of the answer, so this is not a blocker, but the answer determines whether the wipe is belt-and-braces or the only thing standing between the install and a boot from Apple's ESP.
-
-Resolution requires acquiring the source per the `dependency-source-acquisition` skill's ghq flow, as a Category-2 reference repository:
-
-```
-ghq get https://github.com/nix-community/nixos-anywhere
-```
-
 ## Open risks
+
+### Whether disko's destroy phase reports failure reliably on this disk is unestablished
+
+A candidate reason to distrust the destroy phase's exit status on this specific device was considered and could not be established.
+The conjecture is that `disk-deactivate.jq:40`'s `dd if=/dev/zero of=<disk> bs=440 count=1` cannot write a partial sector on a 4096-byte-logical-sector disk, and so fails or misreports.
+It is recorded here as unverified rather than as a rationale, because the reasoning runs the other way: `dd` opens the block device buffered, not `O_DIRECT`, and Linux services a sub-sector buffered write to a block device by read-modify-write of the containing block, which is why the `bs=440` MBR-zeroing idiom is used ubiquitously against 4Kn disks.
+No 4Kn device was available to test against, and the facter report records no logical sector size for `nvme0n1`, so neither direction was confirmed by observation.
+Nothing depends on the answer: the `blkdiscard` step in D8 stands on `_legacyDestroy`'s missing `set -e` and on operator-observability, both of which hold regardless, and Phase 7 records `blockdev --getss /dev/nvme0n1` on the installer, which settles the sector size by observation at a cost of one command.
+If that check returns 4096 and a destroy-phase failure is then actually observed, the conjecture becomes worth filing upstream against disko; until then it is not.
 
 ### The linear binding is unverified
 

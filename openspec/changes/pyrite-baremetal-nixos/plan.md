@@ -70,19 +70,21 @@ Out of scope: audio (a binding decision, not a deferral), hibernation (deferred,
 
 ## Task 6: The recorded install path (tasks.md §6)
 
-- [ ] **Step 1:** Write the install artifact: wipe first (`sgdisk --zap-all`, `wipefs -a` on the `_1` path), then `clan machines install` with `--update-hardware-config` at its default.
+- [ ] **Step 1:** Write the install artifact: `blkdiscard` the `_1` path first, then `clan machines install` with `--update-hardware-config` at its default. Not `sgdisk --zap-all` — see design.md D8.
 - [ ] **Step 2:** Document why the wipe is a step, that `--disk-encryption-keys` is appended automatically, the ISO prerequisites, the skipped clan subcommands, the build-host fallback, and the USB-C keyboard prerequisite.
 - [ ] **Step 3:** Route the commit onto the chain.
 
 ## Task 7: Install and post-install (tasks.md §7)
 
-- [ ] **Step 1:** Boot the ISO, authorize a key, run the recorded path. Irreversible — wipes macOS.
-- [ ] **Step 2:** Confirm boot, the stage-1 prompt on the internal keyboard, and root unlock; verify `keylocation=prompt`, `keyformat=passphrase`, `ashift=12`.
-- [ ] **Step 3:** Confirm `wlp2s0` associates, the mesh is joined, no tor daemon runs, and sshd host certificates are present.
-- [ ] **Step 4:** Add the `.zt` records to `cinnabar/zt-dns.nix`, `ssh-known-hosts.nix`, and `home/core/ssh.nix`; redeploy cinnabar; commit `inventory.json`.
-- [ ] **Step 5:** Re-run the install from a fresh ISO boot including the wipe, and repeat the Step 2 property checks.
+- [ ] **Step 1:** Boot the ISO and authorize a key; confirm `blkdiscard` is present and record `blockdev --getss /dev/nvme0n1`.
+- [ ] **Step 2:** Wipe, run `--phases disko` alone, and check `sgdisk -p` shows the declared geometry while a bare `zpool import` finds no pool. This is the severe test and it precedes the irreversible step.
+- [ ] **Step 3:** Run the full recorded path. Irreversible — wipes macOS.
+- [ ] **Step 4:** Confirm boot, the stage-1 prompt on the internal keyboard, and root unlock; verify `keylocation=prompt`, `keyformat=passphrase`, `ashift=12`.
+- [ ] **Step 5:** Confirm `wlp2s0` associates, the mesh is joined, no tor daemon runs, and sshd host certificates are present.
+- [ ] **Step 6:** Add the `.zt` records to `cinnabar/zt-dns.nix`, `ssh-known-hosts.nix`, and `home/core/ssh.nix`; redeploy cinnabar; commit `inventory.json`.
+- [ ] **Step 7:** Re-run the install from a fresh ISO boot including the wipe, and repeat the Step 4 property checks.
 
-## Task 8: Close the nixos-anywhere disko-mode question (tasks.md §8)
+## Task 8: Hold the flake steady until the install lands (tasks.md §8)
 
-- [ ] **Step 1:** `ghq get https://github.com/nix-community/nixos-anywhere` per the dependency-source-acquisition flow.
-- [ ] **Step 2:** Establish its default `--disko-mode` and record the answer in design.md, resolving the open question.
+- [ ] **Step 1:** Do not `nix flake update` before Phase 7. `clan-core` floats on `main.tar.gz` and carries nixos-anywhere's version transitively, with no node in `flake.lock` to make the move visible.
+- [ ] **Step 2:** If the flake must move first, re-verify design.md D8 and D13 against the resulting nixos-anywhere version.

@@ -38,7 +38,7 @@ This change adds the machine and, more durably, the bare-metal install path itse
 **A bare-metal install path**
 - From: the only recorded install invocation lives in `modules/terranix/{hetzner,gcp}.nix` as a `null_resource` local-exec.
 - To: a documented, re-runnable procedure that wipes the disk explicitly and then targets a booted stock installer ISO with sshd, plus the hardware report committed as static data rather than regenerated on the target.
-- Reason: `--update-hardware-config nixos-facter` fails on this machine with `unsupported bus type: Spi`; disko's create phase does not clear an existing partition table, and pyrite carries an Apple GPT today; a one-off manual install is not an acceptable deliverable.
+- Reason: `--update-hardware-config nixos-facter` fails on this machine with `unsupported bus type: Spi`; disko's destroy phase runs without `set -e`, so a failed destroy falls through to a create phase that will not clear the Apple GPT pyrite carries today; a one-off manual install is not an acceptable deliverable.
 - Impact: additive; no cloud machine's path changes.
 
 **Fleet registration**
