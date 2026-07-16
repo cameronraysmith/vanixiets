@@ -42,6 +42,7 @@
           "skim"
           "slack"
           "soundsource"
+          "spotify"
           "stats"
           "tableplus"
           "visual-studio-code"
