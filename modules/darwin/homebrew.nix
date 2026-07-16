@@ -55,6 +55,7 @@
         # Mac App Store applications (ID mapping)
         baseMasApps = {
           bitwarden = 1352778147;
+          flighty-live-flight-tracker = 1358823008;
           livepdfviewer = 1477861108;
           whatsapp = 310633997;
         };
