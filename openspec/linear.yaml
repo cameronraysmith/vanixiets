@@ -15,3 +15,11 @@ projects:
     name: "Use knowledge graph for agent memory layer"
     teams: ["CAM"]
     archive_documents: {}
+  "pyrite-baremetal-nixos":
+    # The `id` below is the project slug fragment supplied at bind time, not a
+    # verified Linear project UUID. The sibling entry carries a UUID. Reconcile
+    # before the first archive-time document upsert, which resolves by id.
+    id: "48b4123d589b"
+    name: "Provision NixOS on bare-metal Apple hardware (pyrite)"
+    teams: ["CAM"]
+    archive_documents: {}
