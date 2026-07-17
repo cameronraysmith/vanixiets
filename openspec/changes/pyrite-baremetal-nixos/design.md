@@ -9,7 +9,7 @@ Live reconnaissance on 2026-07-16 (Linear CAM-31, complete) established the hard
 `docs/notes/development/hardware/mbp141-nixos-clan-research.md` records the prior inference-based research, and its own provenance header names the three places the live recon supersedes it.
 
 This change implements CAM-32.
-It adds the machine, and it adds the bare-metal install path — which is the more durable of the two, because the repository presently has no install path that does not route through terranix.
+It adds the machine, and it adds the bare-metal install path, because the repository presently has no install path that does not route through terranix.
 
 ## Adversarial verdicts that change the design
 
@@ -41,7 +41,7 @@ The generalization is wrong, and disko refutes it directly.
 `lib/types/zfs_fs.nix:80-91` enumerates the properties ZFS treats as `PROP_ONETIME` — `encryption`, `casesensitivity`, `utf8only`, `normalization`, `volblocksize`, `pbkdf2iters`, `pbkdf2salt`, `keyformat`.
 `keylocation` is deliberately absent from that list, which is what makes it settable after creation.
 disko then documents the resulting idiom in its own encrypted-root example at `example/zfs.nix:104-113`: create the dataset with `keylocation = "file:///tmp/secret.key"`, and flip it with a `postCreateHook` running `zfs set keylocation="prompt"`.
-`postCreateHook` is a real option declared at `lib/default.nix:476` and spliced after the create body at `lib/default.nix:507-511`, so the flip is ordinary supported disko, not a trick.
+`postCreateHook` is a real option declared at `lib/default.nix:476` and spliced after the create body at `lib/default.nix:507-511`, so the flip is ordinary supported disko.
 
 The key material never changes across that flip; only the location from which ZFS reads it does.
 This is the exact ZFS-native analog of LUKS's `passwordFile`, and it dissolves the only advantage LUKS had.
