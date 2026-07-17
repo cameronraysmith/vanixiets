@@ -31,9 +31,11 @@ No `allowUnfree` setting is required for this machine's networking, and none SHA
 
 #### Scenario: the profile is imported rather than replaced by a hand-copied module list
 
-- **WHEN** an alternative of setting the four SPI initrd modules directly and skipping the profile is considered
-- **THEN** it is rejected rather than held as a fallback, because `i915` reaches the initrd only through the profile's import chain (`apple/macbook-pro/14-1` imports `common/cpu/intel/kaby-lake`, reaching `common/gpu/intel`, whose `default.nix:90` adds the driver to `boot.initrd.kernelModules`)
-- **AND** dropping `i915` would remove the framebuffer console that renders the passphrase prompt, producing a configuration that evaluates and builds cleanly but whose prompt is invisible
+- **WHEN** an alternative of setting the four SPI/SMC initrd modules directly and skipping the profile is considered
+- **THEN** it is rejected rather than held as a fallback, because the profile is what puts `applespi`, `spi_pxa2xx_platform`, `intel_lpss_pci`, and `applesmc` into `boot.initrd.kernelModules` (`apple/macbook-pro/14-1/default.nix:19-24`) and nothing else in the machine's module set puts any of them there
+- **AND** `hardware.intelgpu` cannot be hand-copied at all, because nixpkgs declares no such option — `nixos-hardware` declares it at `common/gpu/intel/default.nix:8-54` and `common/gpu/intel/kaby-lake/default.nix:10-13` sets it — so copying its effect means re-deriving a package-selection module to its concrete answer, three `extraPackages` on this machine, and maintaining that answer by hand
+- **AND** it is NOT rejected on the ground that `i915` reaches the initrd only through the profile's import chain, which is false: `nixos/modules/module-list.nix:70` imports `hardware/facter` into every NixOS configuration and `nixos/modules/hardware/facter/graphics/default.nix:33` assigns the report's graphics driver modules into `boot.initrd.kernelModules` at plain priority, so skipping the profile leaves `i915` in place and produces a prompt that renders and cannot be typed into rather than one that is invisible
+- **AND** the rejection is decidable by `nix eval` of `.#nixosConfigurations.pyrite.config.boot.initrd.kernelModules`, which contains all four SPI/SMC modules with the profile imported
 
 ---
 
@@ -64,15 +66,17 @@ Every scenario below is decidable by `nix eval` against the built configuration;
 
 ---
 
-### Requirement: The stage-1 initrd carries the SPI input modules that make the passphrase prompt reachable
+### Requirement: The stage-1 initrd force-loads the four SPI/SMC modules that make the passphrase prompt answerable
 
-The initrd SHALL force-load `applespi`, `spi_pxa2xx_platform`, and `intel_lpss_pci` via `boot.initrd.kernelModules`, which the imported profile supplies.
+The initrd SHALL force-load `applespi`, `spi_pxa2xx_platform`, `intel_lpss_pci`, and `applesmc` via `boot.initrd.kernelModules`, which the imported profile supplies at `apple/macbook-pro/14-1/default.nix:19-24`.
 The facter report MUST NOT be relied upon for these, and the fleet's `base` module MUST NOT be relied upon for these.
+The requirement is decidable by `nix eval` of `.#nixosConfigurations.pyrite.config.boot.initrd.kernelModules` against the built configuration and does not require the hardware.
 
 #### Scenario: the profile supplies the modules that base does not
 
 - **WHEN** `modules/system/initrd-networking.nix:33-37` contributes only `virtio_pci` and `virtio_net` to `boot.initrd.kernelModules` for every NixOS machine
 - **THEN** the SPI modules arrive from the imported profile instead, which sets `boot.initrd.kernelModules` — the option that force-loads — rather than `availableKernelModules`, which only makes a module present
+- **AND** a two-way evaluation carrying the facter report and differing only by the import gives `["dm_mod" "i915"]` without the profile and `["applesmc" "applespi" "dm_mod" "i915" "intel_lpss_pci" "spi_pxa2xx_platform"]` with it, so all four are the profile's marginal contribution and none is supplied elsewhere
 
 #### Scenario: facter supplies no SPI keyboard modules
 
@@ -89,7 +93,10 @@ The virtio entries `base` contributes SHALL be left in place.
 #### Scenario: mkForce on the module list is a lockout, not a cleanup
 
 - **WHEN** the intent is to drop `base`'s cloud-VM `virtio_pci` and `virtio_net` entries, for which `lib.mkForce [ ... ]` is the natural-looking mechanism
-- **THEN** it MUST NOT be used, because the option accumulates from four sources — `base`'s virtio pair, the profile's `applespi`/`spi_pxa2xx_platform`/`intel_lpss_pci`/`applesmc`, `common/gpu/intel`'s `i915`, and facter's `brcmfmac` — and `mkForce` discards every definition it does not name
+- **THEN** it MUST NOT be used, because the option accumulates from an open set of sources this specification does not close over — `base`'s virtio pair, the profile's `applespi`/`spi_pxa2xx_platform`/`intel_lpss_pci`/`applesmc`, `common/gpu/intel`'s `i915`, facter's `brcmfmac`, facter's own `i915` (`nixos/modules/hardware/facter/graphics/default.nix:33`), and stock nixpkgs modules that no configuration imports deliberately, among them `dm_mod` (`nixos/modules/system/boot/kernel.nix:379`), `af_packet` (`nixos/modules/system/boot/initrd-network.nix:124`), and `zfs` (`nixos/modules/tasks/filesystems/zfs.nix:726`) — and `mkForce` discards every definition it does not name
+- **AND** the openness of that set is the ground for the prohibition rather than a gap in it, since a prohibition that does not depend on enumerating the contributors cannot be defeated by finding another one, and the enumeration has already been wrong twice
+- **AND** the stock contributions are decidable by `nix eval` without pyrite's hardware: `nix eval --json .#nixosConfigurations.cinnabar.config.boot.initrd.kernelModules` returns `["af_packet","dm_mod","virtio_balloon","virtio_console","virtio_gpu","virtio_net","virtio_pci","virtio_rng","zfs"]` on a machine that imports no nixos-hardware profile
+- **AND** compliance is decidable by `nix eval` of `.#nixosConfigurations.pyrite.config.boot.initrd.kernelModules` against the built configuration, which SHALL contain the four SPI/SMC modules, `i915`, and `base`'s virtio pair
 - **AND** the resulting configuration would evaluate cleanly, build cleanly, and boot to a passphrase prompt that is invisible or unanswerable, on a machine with no macOS to fall back to
 - **AND** the virtio entries are left alone because on bare metal they modprobe, find no matching device, and cost a few kilobytes of initrd
 
