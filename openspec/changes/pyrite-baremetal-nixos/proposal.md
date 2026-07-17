@@ -11,7 +11,7 @@ last_synced_at: "2026-07-16T00:00:00Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
-  - { at: "2026-07-16T00:00:00Z", transition: "Backlog->Todo", outcome: "deferred", note: "artifacts authored offline; T1 bind not posted (no network in authoring session). Linear story UUID and project id unverified — see linear.yaml comment and design.md open risks." }
+  - { at: "2026-07-16T00:00:00Z", transition: "Backlog->Todo", outcome: "dropped", note: "artifacts authored offline; T1 bind not posted (no network in authoring session)." }
 ---
 
 ## Why

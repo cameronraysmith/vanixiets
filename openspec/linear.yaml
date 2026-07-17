@@ -16,9 +16,12 @@ projects:
     teams: ["CAM"]
     archive_documents: {}
   "pyrite-baremetal-nixos":
-    # The `id` below is the project slug fragment supplied at bind time, not a
-    # verified Linear project UUID. The sibling entry carries a UUID. Reconcile
-    # before the first archive-time document upsert, which resolves by id.
+    # The `id` below is the project slugId, and it must stay a slugId: the
+    # archive-time document UPSERT resolves it via `linear document list
+    # --project`, which resolves slugIds but silently returns zero nodes with
+    # exit 0 for a project UUID. Substituting the UUID
+    # (690ae4e7-f038-4ee4-bd7e-83557a68fb7c) makes the UPSERT's title scan miss
+    # and duplicate every document on every archive, with no error to notice.
     id: "48b4123d589b"
     name: "Provision NixOS on bare-metal Apple hardware (pyrite)"
     teams: ["CAM"]

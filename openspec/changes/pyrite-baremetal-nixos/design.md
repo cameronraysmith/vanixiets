@@ -347,12 +347,19 @@ No 4Kn device was available to test against, and the facter report records no lo
 Nothing depends on the answer: the `blkdiscard` step in D8 stands on `_legacyDestroy`'s missing `set -e` and on operator-observability, both of which hold regardless, and Phase 7 records `blockdev --getss /dev/nvme0n1` on the installer, which settles the sector size by observation at a cost of one command.
 If that check returns 4096 and a destroy-phase failure is then actually observed, the conjecture becomes worth filing upstream against disko; until then it is not.
 
-### The linear binding is unverified
+### The registry id is a slugId by necessity, and the linear_story_id form is unsettled
 
-The registry entry in `openspec/linear.yaml` records `id: "48b4123d589b"`, which is the project slug fragment supplied at bind time rather than a verified Linear project UUID; the sibling `cognee-memory-layer` entry carries a UUID.
-The existing bound changes also disagree on `linear_story_id`: `apm-skills-marketplace` uses the identifier `CAM-30` while `declarative-cognee-endpoint` uses a UUID.
-This change follows the identifier form.
-Both must be reconciled before the archive-time document upsert, which resolves by id.
+The registry entry in `openspec/linear.yaml` records `id: "48b4123d589b"`, which is this project's slugId; its UUID is `690ae4e7-f038-4ee4-bd7e-83557a68fb7c`.
+That is not a defect to reconcile but the only form that works, because the archive-time document UPSERT resolves the id through `linear document list --project`, and that command resolves slugIds while returning zero nodes with exit 0 for a UUID.
+The failure is silent, so the UPSERT's title scan would find nothing, fall through to create, and duplicate every capability document on every archive.
+
+The entry that actually needs reconciling is the sibling `cognee-memory-layer`, which carries the UUID `40537fb1-dadc-4405-ad3c-e5ed5dd7b66d` rather than its slugId `5c2059d671db`.
+It is registered exactly as the `openspec-linear-sync` skill prescribes — the schema calls the field `<linear-project-id>` and the setup recipe writes the choice taken from `linear project list`, whose `id` is the UUID — so the skill's own instructions produce an entry that silently fails at archive time.
+That is a fleet-wide skill defect rather than a pyrite blocker, and it belongs upstream in the skill, not in this change.
+
+The bound changes separately disagree on `linear_story_id`: `apm-skills-marketplace` uses the identifier `CAM-30` while `declarative-cognee-endpoint` uses a UUID.
+This change follows the identifier form with `CAM-32`.
+Which form is canonical is unsettled and is not settled here.
 
 ### Regeneration stays broken until nixos-facter#672 merges
 
