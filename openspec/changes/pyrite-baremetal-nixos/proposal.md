@@ -3,15 +3,16 @@ linear_story_id: CAM-32
 linear_story_identifier: CAM-32
 linear_story_title: "Bare-metal install path for the vanixiets clan"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-32
-linear_story_state: Backlog
+linear_story_state: Todo
 linear_team: CAM
 linear_project: pyrite-baremetal-nixos
-last_synced_state: Backlog
-last_synced_at: "2026-07-16T00:00:00Z"
+last_synced_state: Todo
+last_synced_at: "2026-07-17T22:06:54Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-07-16T00:00:00Z", transition: "Backlog->Todo", outcome: "dropped", note: "artifacts authored offline; T1 bind not posted (no network in authoring session)." }
+  - { at: "2026-07-17T22:06:54Z", transition: "Backlog->Todo", outcome: "posted", note: "T1 bind posted; CAM-32 description seeded from proposal.md business content, state Backlog->Todo." }
 ---
 
 ## Why
