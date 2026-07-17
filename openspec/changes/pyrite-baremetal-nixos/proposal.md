@@ -16,10 +16,13 @@ attempt_log:
 
 ## Why
 
-Every NixOS machine in this fleet is a cloud VM provisioned by terranix, which supplies machine existence, an IPv4, a DNS record, and the only recorded `clan machines install` invocation in the repository.
-pyrite is an Apple MacBookPro14,1 with none of those, and the repository has no install path that does not route through terranix.
-CAM-31 established the hardware surface by live recon and disproved the firmware-extraction risk that gated wiping macOS.
-This change adds the machine and, more durably, the bare-metal install path itself, written to be re-runnable rather than performed once by hand.
+Every NixOS machine in this fleet is a cloud VM provisioned by terranix, supplying its existence, an IPv4, a DNS record, and the repository's only recorded `clan machines install` invocation.
+pyrite is an Apple MacBookPro14,1 with none of those, and no install path here avoids terranix.
+CAM-31's live recon established the hardware surface and disproved the firmware-extraction risk that gated wiping macOS.
+pyrite is wanted as a working laptop, not a demonstration: a full laptop hardware surface, encrypted at rest, usable away from the mesh and from a build host.
+Travel-readiness is the acceptance criterion; test-bench tolerance holds only during construction.
+Reaching it takes several installs, not one, which makes the install path the durable deliverable and a one-off manual sequence unacceptable.
+This change adds the machine and, more durably, the re-runnable bare-metal install path — the reusable half of the epic, inherited by every future physical machine.
 
 ## What Changes
 
@@ -64,3 +67,14 @@ Suspend/resume (the `d3cold` workaround) and the correction of `base`'s cloud-VM
 
 ### Modified Capabilities
 <!-- None. `openspec/specs/` does not exist, so all three capabilities above are new; no existing capability's requirements change. -->
+
+## Impact
+
+Files added: `modules/machines/nixos/pyrite/{default.nix,disko.nix}` and `modules/clan/inventory/services/wifi.nix` (import-tree discovers both; no import line is added), plus `machines/pyrite/facter.json` — which must land in the same commit as the module and the registrations, never before them, because clan-core `readDir`-scans `machines/` and the bare directory materializes a `nixosConfigurations.pyrite` with no filesystems and no boot loader.
+Files updated: `modules/clan/machines.nix`, `modules/clan/inventory/machines.nix`, `modules/clan/inventory/services/users/cameron.nix`, both hardcoded lists in `modules/checks/structure/flake-shape.nix`, `.sops.yaml` (the `&pyrite` anchor and the `secrets/bridge/.*` rule), and `modules/machines/nixos/cinnabar/zt-dns.nix` (the `/pyrite.zt/<address>` record).
+`nixos-hardware` becomes a new flake input: it appears in neither `flake.nix` nor `flake.lock` today, so this change owns both its addition and its lock entry.
+pyrite becomes the fleet's first bare-metal machine, its first encrypted root, and its first NetworkManager host — each a first for this repository rather than for nixpkgs, and the NetworkManager module's transitive effects arrive with it.
+Two effects reach past pyrite: the wifi service's `share = true` makes the fleet SSID's credential a clan-wide identity that any future wireless machine takes by name, and cinnabar is redeployed twice, once to admit the ZeroTier peer and once for the `.zt` record.
+One prerequisite lives outside the repository: the operator must stand up the fleet SSID on the router before `clan vars generate pyrite` can be answered.
+No cloud machine's install path changes, and `modules/clan/inventory/services/tor.nix`'s `nixos` selector is deliberately left alone.
+Out of scope: audio, suspend/resume and the `d3cold` workaround, hibernation, a terranix entry for pyrite, and correcting `base`'s cloud-VM initrd assumptions for the fleet — pyrite overrides those per-machine and the correction touches five machines in its own change.
