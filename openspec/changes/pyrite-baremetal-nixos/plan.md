@@ -56,11 +56,10 @@ Out of scope: audio (a binding decision, not a deferral), hibernation (deferred,
 ## Task 4: Registration (tasks.md §4)
 
 - [ ] **Step 1:** Edit `modules/clan/machines.nix`, `modules/clan/inventory/machines.nix`, and `modules/clan/inventory/services/users/cameron.nix`.
-- [ ] **Step 2:** Change `tor.nix`'s selector from the `nixos` tag to the five explicitly-named cloud hosts.
-- [ ] **Step 3:** Create `modules/clan/inventory/services/wifi.nix` instancing clan-core's wifi service for pyrite, after `zerotier.nix`'s shape. import-tree discovers the file, so no import line is added.
-- [ ] **Step 4:** Add `"pyrite"` alphabetically to both hardcoded lists in `modules/checks/structure/flake-shape.nix`.
-- [ ] **Step 5:** Move the staged `pyrite-facter.json` to `machines/pyrite/facter.json` and git-track it, in one commit with Tasks 2, 3, and Steps 1, 2, and 4 above.
-- [ ] **Step 6:** Run `nix flake check`, confirming the auto-emitted `nixos-pyrite` check builds and the five cloud hosts' tor evaluation is unchanged.
+- [ ] **Step 2:** Create `modules/clan/inventory/services/wifi.nix` instancing clan-core's wifi service for pyrite, after `zerotier.nix`'s shape. import-tree discovers the file, so no import line is added.
+- [ ] **Step 3:** Add `"pyrite"` alphabetically to both hardcoded lists in `modules/checks/structure/flake-shape.nix`.
+- [ ] **Step 4:** Move the staged `pyrite-facter.json` to `machines/pyrite/facter.json` and git-track it, in one commit with Tasks 2, 3, and Steps 1 and 3 above.
+- [ ] **Step 5:** Run `nix flake check`, confirming the auto-emitted `nixos-pyrite` check builds.
 
 ## Task 5: Secrets and ZeroTier vars (tasks.md §5)
 
@@ -82,7 +81,7 @@ Out of scope: audio (a binding decision, not a deferral), hibernation (deferred,
 - [ ] **Step 2:** Wipe, run `--phases disko` alone, and check `sgdisk -p` shows the declared geometry while a bare `zpool import` finds no pool. This is the severe test and it precedes the irreversible step.
 - [ ] **Step 3:** Run the full recorded path. Irreversible — wipes macOS.
 - [ ] **Step 4:** Confirm boot, the stage-1 prompt on the internal keyboard, and root unlock; verify `keylocation=prompt`, `keyformat=passphrase`, `ashift=12`.
-- [ ] **Step 5:** Confirm `wlp2s0` associated unattended with no credential typed into the installed system, the mesh is joined, no tor daemon runs, and sshd host certificates are present. The vars carry the credentials, so the association holds only if Task 5's Step 2 ran and was committed before the deploy; without it the profile interpolates empty strings and association fails silently.
+- [ ] **Step 5:** Confirm `wlp2s0` associated unattended with no credential typed into the installed system, the mesh is joined, the onion service is published, and sshd host certificates are present. The vars carry the credentials, so the association holds only if Task 5's Step 2 ran and was committed before the deploy; without it the profile interpolates empty strings and association fails silently. The onion service has the same dependency on Step 2, through a different var.
 - [ ] **Step 6:** Add the `.zt` records to `cinnabar/zt-dns.nix`, `ssh-known-hosts.nix`, and `home/core/ssh.nix`; redeploy cinnabar; commit `inventory.json`.
 - [ ] **Step 7:** Re-run the install from a fresh ISO boot including the wipe, and repeat the Step 4 property checks.
 

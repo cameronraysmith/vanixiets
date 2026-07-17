@@ -61,32 +61,6 @@ A re-run against a surviving pool MUST NOT be accepted as evidence.
 
 ---
 
-### Requirement: The tor onion service is declined by making its selector explicit
-
-`modules/clan/inventory/services/tor.nix` SHALL target `roles.server.machines` naming the five cloud hosts rather than `roles.server.tags."nixos"`.
-pyrite MUST NOT run a tor onion service.
-
-#### Scenario: the nixos tag cannot simply be dropped
-
-- **WHEN** `modules/clan/inventory/services/tor.nix` targets `roles.server.tags."nixos"` and `modules/clan/inventory/services/sshd.nix` targets the same tag for both its server and client roles
-- **THEN** the tag is kept on pyrite and the tor selector is changed instead, because dropping the tag would silently forfeit persistent sshd host keys and CA-signed host certificates
-- **AND** clan-core's inventory offers no per-machine exclusion from a tag-selected role, so changing the selector is the only available mechanism
-
-#### Scenario: what is declined is an onion service, not a relay
-
-- **WHEN** the clan-core tor server role's `nixosModule` sets `services.tor.enable = true` and `services.tor.relay.onionServices."clan_<instance>"` with a default `portMapping` exposing port 22
-- **THEN** it is recorded that this publishes a v3 onion service exposing the machine's sshd to the Tor network, plus a `tor_<instance>` onion secret-key generator
-- **AND** it is recorded that this is NOT a Tor relay, because `services.tor.relay.enable` — "Whether to enable relaying of Tor traffic for others" — is a separate `mkEnableOption` at `nixos/modules/services/security/tor.nix:531-545` that defaults false and is not set, so nothing forwards other people's traffic
-- **AND** it is declined anyway, because an always-on daemon publishing an ssh endpoint of a laptop that moves between untrusted networks is not wanted
-
-#### Scenario: the five cloud hosts keep the service unchanged
-
-- **WHEN** the selector changes from tag-based to name-based
-- **THEN** cinnabar, electrum, galena, magnetite, and scheelite are named explicitly and their behaviour is identical
-- **AND** the cost is recorded: a future NixOS machine must be added to the list to gain the onion service, which is the same hand-maintained-list burden `modules/checks/structure/flake-shape.nix` already imposes
-
----
-
 ### Requirement: The hardware report is committed as static data and never regenerated on the target
 
 `machines/pyrite/facter.json` SHALL be committed, git-tracked, with no import line and no flake input.
