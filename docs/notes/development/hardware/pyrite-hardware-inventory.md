@@ -11,6 +11,11 @@ source-issue: CAM-31
 This note records what was observed on the machine designated `pyrite`, an Apple MacBookPro14,1, during live reconnaissance on 2026-07-16.
 Everything below was read from the running machine over ssh while it was booted from a stock NixOS 26.05 installer ISO on kernel 7.1.3, with no configuration applied and macOS still resident on the internal disk.
 
+Two different kernels are in play throughout this note, and statements about them are not in conflict.
+The 7.1.3 above is the installer ISO's: `nixos/modules/installer/cd-dvd/latest-kernel.nix:3` sets `boot.kernelPackages = pkgs.linuxPackages_latest`.
+An installed pyrite instead takes the `boot.kernelPackages` default, which resolves through `linuxPackages` to `pkgs/top-level/linux-kernels.nix:745` (`linux_default = linux_6_18`) and lands on 6.18.37 in this repository's pinned nixpkgs.
+No module pyrite imports overrides that default — the repository's one `boot.kernelPackages` assignment, at `modules/nixos/k3s-server/kernel.nix:19`, is gated on `config.k3s-server.enable` and never reaches this machine — and the nixos-hardware profile's own `linuxPackages_latest` at `apple/macbook-pro/14-1/default.nix:26` is gated on `lib.versionOlder pkgs.linux.version "6.0"` and so is dead code at 6.18.37.
+
 The distinction between this note and `mbp141-nixos-clan-research.md` is authorship of the evidence.
 That report reasons from a third-party dump corpus and from kernel source; this note reports the unit itself.
 Where the two disagree, this note is the authority.
@@ -91,15 +96,15 @@ Its driver, `facetimehd`, is unfree and out-of-tree, and the camera was not exer
 
 ## Audio
 
-Audio is not a work item, by binding decision.
+Audio is not a work item, by binding decision, recorded at `pyrite-baremetal-nixos/design.md:145` under Non-Goals.
 It is recorded here as a hardware fact rather than as a defect to fix.
 
 The codec is a Cirrus Logic CS8409, vendor ID `0x10138409`, subsystem ID `0x106b3300`, on an Intel Sunrise Point-LP HD Audio controller at `8086:9d71`.
-On kernel 7.1.3 the mainline `snd_hda_codec_cs8409` driver binds and autoconfigures — line outs 2 of type speaker, one headphone out, internal mic at `0x44`, mic at `0x3c` — and the PCM reaches state RUNNING with advancing `hw_ptr` and `appl_ptr`, while producing no audible sound.
+On the ISO's 7.1.3 the mainline `snd_hda_codec_cs8409` driver binds and autoconfigures — line outs 2 of type speaker, one headphone out, internal mic at `0x44`, mic at `0x3c` — and the PCM reaches state RUNNING with advancing `hw_ptr` and `appl_ptr`, while producing no audible sound.
 Silence was confirmed by a human listening to the machine.
 
 The amplifier initialization sequence is not upstream, which is what the running-but-silent PCM reflects.
-The out-of-tree module that does carry it has a tested ceiling of kernel 6.17 against a nixpkgs default of 6.18.38, and pinning the kernel backward is ruled out.
+The out-of-tree module that does carry it has a tested ceiling of kernel 6.17 against the 6.18.37 an installed pyrite takes from this repository's pinned nixpkgs, and pinning the kernel backward is ruled out.
 Audio is therefore a watch-item on upstream: if mainline ever lands the amplifier init, it arrives on a kernel bump at no cost.
 
 ## Corrections to prior inference
@@ -111,6 +116,9 @@ It fails only under `allowUnfree = false`, and `modules/nixpkgs/base-defaults.ni
 The b43 pull remains a misdetection — b43 firmware is for entirely different silicon than the BCM4350 this machine carries — and is worth disabling as a correction, but it is not an evaluation blocker.
 
 The audio conclusion is superseded by the binding decision above.
+
+Every nixos-hardware claim in this note is provisional on a reading that is not pinned.
+The input does not appear in `flake.nix` or `flake.lock`, so no locked revision exists to read it at; the readings here come from a local checkout at HEAD `fccfa90` (2026-07-15) and can drift from whatever revision an evaluation actually resolves.
 
 nixos-facter versions 0.4.4 and 0.4.5-dev both fail on this machine with `unsupported bus type: Spi`, which is `applespi`.
 PR nix-community/nixos-facter#672 (branch `fix/spi-touchpad-bus`, open and mergeable as of 2026-07-15, fixing issue #339 which was filed against this exact model) does work: it produced a valid 80 KB report on this machine.
