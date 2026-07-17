@@ -146,7 +146,7 @@ The runbook carries this, along with the fact that a MacBookPro14,1 has USB-C po
 - Suspend/resume and the `d3cold` workaround. Deferred to a separate change; necessity unverified on this unit.
 - Hibernation. Deferred, which is what makes D6 costless today.
 - Correcting `base`'s cloud-VM initrd assumptions for the fleet. pyrite overrides per-machine; gating the shared module is a separate change touching five machines.
-- Regenerating facter reports on this hardware. Blocked upstream on nixos-facter#672; consuming a static report is not blocked.
+- Regenerating facter reports on this hardware. This change consumes a static report and does not regenerate one; regeneration itself is no longer blocked, now that `modules/nixpkgs/overlays/nixos-facter.nix` ships the nixos-facter#672 fix (see Open risks).
 - A terranix entry for pyrite. Nothing reads one.
 - Fixing the pre-existing justfile defects a new machine walks into (`check-uncached-machine` hardcodes four hosts and already omits magnetite).
 
@@ -369,11 +369,11 @@ The bound changes separately disagree on `linear_story_id`: `apm-skills-marketpl
 This change follows the identifier form with `CAM-32`.
 Which form is canonical is unsettled and is not settled here.
 
-### Regeneration stays broken until nixos-facter#672 merges
+### The committed facter report came from an unreleased upstream fix, now carried by a shipped overlay
 
-Consuming a static report is not blocked and nothing in the evaluation path needs a facter binary.
-Regenerating one is blocked, including via `clan machines update-hardware-config`.
-This is worth documenting rather than solving; the PR is open and mergeable and fixes an issue filed against this exact model.
+The report this change consumes was captured with a nixos-facter build carrying nix-community/nixos-facter PR #672 (issue #339, commit `4f27becd`), which fixes the `unsupported bus type: Spi` abort on this exact model and is unreleased as of the pinned 0.4.4.
+Three things hold together. The install is clean without it: `clan machines install` runs with `--update-hardware-config` at its default of `none`, so it consumes the committed `machines/pyrite/facter.json` (task 4.7) as static data and never invokes a facter binary. This change does not regenerate the report: regenerating on this hardware stays a Non-Goal. And regeneration is no longer blocked: `modules/nixpkgs/overlays/nixos-facter.nix` ships nixos-facter 0.4.4 with the #672 patch applied fleet-wide, so a later `clan machines update-hardware-config` on pyrite runs the patched binary rather than aborting.
+The consumer applies no version gate — nothing in the evaluation path checks which facter version produced the report — so the committed report and any later overlay-built regeneration agree on the SPI classification because both carry the #339 fix, not because of a version handshake.
 
 ### `base`'s cloud-VM initrd assumptions are overridden per-machine, not corrected
 
@@ -398,3 +398,11 @@ Upstream does no such thing.
 That is the affirmation D15 makes deliberately, not a b43 pull; `networking.enableB43Firmware` is a different option, declared in `b43.nix`, and it appears nowhere in `nixos-generate-config.pl`.
 There is no second route and no misdetection by `nixos-generate-config`: it identifies this chip correctly and asks for exactly the right firmware.
 D5's use of the word stays scoped to the nixos-hardware profile's `mkDefault true`, which is a different option in a different file.
+
+### `canTouchEfiVariables = true` writes Apple firmware NVRAM and is untested against it
+
+`boot.loader.efi.canTouchEfiVariables = true` (task 2.3) is the only step in this change that writes firmware NVRAM, and on this machine that NVRAM is an 8 MiB SPI ROM on the logic board (facter `smbios` `rom_size` 8388608), not on the disk the install wipes.
+Every fleet machine carrying the setting — electrum (`:48`), scheelite (`:50`), galena (`:46`) — is a cloud VM on virtual OVMF firmware, so it is exercised nowhere against Apple firmware, and it appears in no decision and, until now, no open risk.
+It is not a brick vector: the boot ROM, the Option-key picker, and firmware recovery are independent of the disk, so the worst case is an EFI write failing, recoverable by an NVRAM reset (Cmd-Opt-P-R, itself a boot-ROM feature).
+If writes do fail on Apple firmware, the fallback is `canTouchEfiVariables = false`, which stops the install touching NVRAM at the cost of leaving boot-entry management to the firmware's own ESP fallback path.
+The recovery floor is unchanged either way: the LaCie live ISO remains re-bootable from the Option-key picker on the internal keyboard (D18).
