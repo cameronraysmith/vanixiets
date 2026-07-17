@@ -21,7 +21,7 @@ Task 5 runs before Task 7 because the machine age key, the ZeroTier address, and
 
 Task 6 produces the deliverable that outlives this machine. The repository's only recorded `clan machines install` invocation lives in terranix as a cloud-only `null_resource`, so without Task 6 pyrite ships as a manual install and the next bare-metal host starts from nothing. Its first step is a disk wipe, which is a step rather than an assumption because disko's create phase skips `sgdisk --clear` when `blkid` succeeds and pyrite carries an Apple GPT today.
 
-Task 7 is the only irreversible step and it wipes macOS. The firmware-extraction risk that once gated this is disproven: no component's firmware comes from the local macOS install. Step 7.9 re-runs the install including the wipe, which is what converts "it installed" into "the install path works" — a re-run against a surviving pool reuses the pool and skips every dataset create, so it would go green while proving nothing.
+Task 7 is the only irreversible step and it wipes macOS. The firmware-extraction risk that once gated this is disproven: no component's firmware comes from the local macOS install. Step 7.12 re-runs the install including the wipe, which is what converts "it installed" into "the install path works" — a re-run against a surviving pool reuses the pool and skips every dataset create, so it would go green while proving nothing.
 
 Task 8 closes the one open question. It does not block Tasks 1 through 6 and should be resolved before Task 7; the explicit wipe makes the install correct regardless of its answer.
 
