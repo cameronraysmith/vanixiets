@@ -17,7 +17,7 @@ The change's former highest-risk unknown — whether a passphrase-prompted datas
 
 Tasks 1 through 4 are pure evaluation work and produce no irreversible effects. The machine must evaluate — module, disko, and registration complete — before any install or hardware detection runs. Task 4's ordering is load-bearing in a way that is easy to get wrong: `machines/pyrite/` is not an inert data directory, because clan-core `readDir`-scans it and injects an inventory machine per subdirectory, so the facter report must land in the same commit as the module and the registrations rather than ahead of them. This is why the report is staged inside this change directory while the change is in flight.
 
-Task 5 runs before Task 7 because the machine age key, the ZeroTier address, and the disk passphrase do not exist until `clan vars generate` has run, and the `.sops.yaml` bridge recipient depends on the first. Step 5.2 is not bookkeeping: the operator types the generated passphrase at first boot, and ZFS has one key per encryption root with no escrow, so an unrecorded passphrase is an unrecoverable pool.
+Task 5 runs before Task 7 because the machine age key, the ZeroTier address, and the disk passphrase do not exist until `clan vars generate` has run, and the `.sops.yaml` bridge recipient depends on the first. Step 5.3 is not bookkeeping: the operator types the generated passphrase at every boot, and although Step 5.2 commits it as a sops-encrypted var, that var is encrypted to exactly one human key — so the pool is lost only if that key is lost together with every copy held outside the repository, and Step 5.3 is what keeps the second term of that conjunction non-empty.
 
 Task 6 produces the deliverable that outlives this machine. The repository's only recorded `clan machines install` invocation lives in terranix as a cloud-only `null_resource`, so without Task 6 pyrite ships as a manual install and the next bare-metal host starts from nothing. Its first step is a disk wipe, which is a step rather than an assumption because disko's create phase skips `sgdisk --clear` when `blkid` succeeds and pyrite carries an Apple GPT today.
 
@@ -27,7 +27,7 @@ Task 8 closes the one open question. It does not block Tasks 1 through 6 and sho
 
 Integration is jj-native onto the `pyrite-baremetal-nixos` chain in a development join — no git worktree, no autonomous PR; commits are routed onto the chain by the orchestrator.
 
-Out of scope: audio (a binding decision, not a deferral), hibernation (deferred, which is what makes keeping `forceImportRoot = true` costless), the `d3cold` suspend workaround, gating `base`'s cloud-VM initrd assumptions fleet-wide, regenerating facter reports on this hardware, a terranix entry, and the pre-existing justfile defects a new machine walks into.
+Out of scope: audio (not a deferred work item; revisit if mainline lands the amplifier init, since pinning the kernel backward for it is ruled out), hibernation (deferred, which is what makes keeping `forceImportRoot = true` costless), the `d3cold` suspend workaround, gating `base`'s cloud-VM initrd assumptions fleet-wide, regenerating facter reports on this hardware, a terranix entry, and the pre-existing justfile defects a new machine walks into.
 
 ---
 
@@ -65,7 +65,7 @@ Out of scope: audio (a binding decision, not a deferral), hibernation (deferred,
 
 - [ ] **Step 1:** Stand up the dedicated fleet SSID on the router. An operator action outside the repository, and a prerequisite rather than a parallel step: Step 2's prompts take their values from it. Generate the PSK with `xkcdpass` on the admin box, configure the router to serve a distinct SSID with `wpa-psk` security and that PSK, and confirm it is broadcasting.
 - [ ] **Step 2:** `clan vars generate pyrite`; commit vars, sops machine key, ZeroTier identity/IP, the zfs passphrase, and the fleet SSID and PSK. The wifi service adds two prompts, which take Step 1's values and do not generate them; a re-run does not re-prompt without `--regenerate`.
-- [ ] **Step 3:** Record the generated passphrase where the operator can read it before first boot. One key, no escrow.
+- [ ] **Step 3:** Record the generated passphrase in the password manager under `pyrite/zfs-root` before first boot, and verify the entry against `clan vars get pyrite zfs/key`. The committed var is encrypted to exactly one human key, so a copy outside the repository is what keeps a lost age key from being a lost pool.
 - [ ] **Step 4:** Add the `&pyrite` anchor and the `*pyrite` bridge recipient to `.sops.yaml`; `just update-all-keys`; confirm existing machines still decrypt the bridge secret.
 - [ ] **Step 5:** `clan machines update cinnabar` to admit the peer. This touches the fleet coordinator.
 

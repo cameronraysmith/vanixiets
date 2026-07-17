@@ -119,7 +119,7 @@ Decision: `/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1`, the name
 
 ### Q7 — Audio
 
-Out of scope by binding decision, and not a deferred work item.
+Out of scope, and not a deferred work item.
 Recorded in the hardware inventory note as a hardware fact and an upstream watch-item.
 
 ### Q8 — Does the `nixos` tag make pyrite a Tor relay?
