@@ -21,7 +21,7 @@ Task 5 runs before Task 7 because the machine age key, the ZeroTier address, and
 
 Task 6 produces the deliverable that outlives this machine. The repository's only recorded `clan machines install` invocation lives in terranix as a cloud-only `null_resource`, so without Task 6 pyrite ships as a manual install and the next bare-metal host starts from nothing. Its first step is a disk wipe, which is a step rather than an assumption because disko's create phase skips `sgdisk --clear` when `blkid` succeeds and pyrite carries an Apple GPT today.
 
-Task 7 is the only irreversible step and it wipes macOS. The firmware-extraction risk that once gated this is disproven: no component's firmware comes from the local macOS install. Step 7.12 re-runs the install including the wipe, which is what converts "it installed" into "the install path works" — a re-run against a surviving pool reuses the pool and skips every dataset create, so it would go green while proving nothing.
+Task 7 is the only irreversible task, and its point of no return is the `blkdiscard` wipe that opens 7.3, not 7.4: by 7.4 macOS is already gone. The firmware-extraction risk that once gated this is disproven: no component's firmware comes from the local macOS install. Step 7.12 re-runs the install including the wipe, which is what converts "it installed" into "the install path works" — a re-run against a surviving pool reuses the pool and skips every dataset create, so it would go green while proving nothing.
 
 Task 8 is a standing constraint rather than a step: the flake does not move between now and the install. `flake.nix:70` floats `clan-core` on `main.tar.gz`, so an update can move the transitive `nixpkgs_2` node and with it nixos-anywhere's version — currently 1.13.0, the version every mechanic in D13 was verified against — while no `nixos-anywhere` node appears in the diff, because `flake.lock` has none to move. If the flake must move first, re-verify D8 and D13 against the resulting version before Task 7.
 
@@ -78,8 +78,8 @@ Out of scope: audio (not a deferred work item; revisit if mainline lands the amp
 ## Task 7: Install and post-install (tasks.md §7)
 
 - [ ] **Step 1:** Boot the ISO and authorize a key; confirm `blkdiscard` is present and record `blockdev --getss /dev/nvme0n1`.
-- [ ] **Step 2:** Wipe, run `--phases disko` alone, and check `sgdisk -p` shows the declared geometry while a bare `zpool import` finds no pool. This is the severe test and it precedes the irreversible step.
-- [ ] **Step 3:** Run the full recorded path. Irreversible — wipes macOS.
+- [ ] **Step 2:** This is the point of no return: it opens with the wipe, then runs `--phases disko` alone (`_legacyDestroy → _create → _mount` per D8, so macOS is destroyed here), and checks `sgdisk -p` shows the declared geometry while a bare `zpool import` finds no pool. The geometry check is the severe test of the disko declaration, run against the already-wiped disk rather than as a safeguard for macOS.
+- [ ] **Step 3:** Run the full recorded path. macOS is already gone from Step 2's wipe; this completes the install.
 - [ ] **Step 4:** Confirm boot, the stage-1 prompt on the internal keyboard, and root unlock; verify `keylocation=prompt`, `keyformat=passphrase`, `ashift=12`.
 - [ ] **Step 5:** Confirm `wlp2s0` associated unattended with no credential typed into the installed system, the mesh is joined, the onion service is published, and sshd host certificates are present. The vars carry the credentials, so the association holds only if Task 5's Step 2 ran and was committed before the deploy; without it the profile interpolates empty strings and association fails silently. The onion service has the same dependency on Step 2, through a different var.
 - [ ] **Step 6:** Add the `.zt` records to `cinnabar/zt-dns.nix`, `ssh-known-hosts.nix`, and `home/core/ssh.nix`; redeploy cinnabar; commit `inventory.json`.
