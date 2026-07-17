@@ -146,7 +146,7 @@ The design SHALL record the properties ZFS native encryption does not offer, bec
 - **WHEN** the encryption root is created with a single passphrase
 - **THEN** it is recorded that ZFS permits exactly one key per encryption root and that `zfs change-key` replaces the key rather than adding one
 - **AND** it is recorded that there is consequently no recovery passphrase, no escrow key, and no future `systemd-cryptenroll` path to a TPM or FIDO2 token, because those are LUKS keyslot features and ZFS has no keyslots
-- **AND** these costs were accepted knowingly rather than overlooked
+- **AND** it is recorded that these costs were put against the LUKS alternative, which offers keyslots and metadata encryption, and that the alternative was considered and rejected
 
 #### Scenario: pool and dataset metadata are not encrypted
 
