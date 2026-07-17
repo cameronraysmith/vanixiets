@@ -5,7 +5,7 @@
 
 **Goal:** Add pyrite, an Apple MacBookPro14,1, to the vanixiets clan as the fleet's first bare-metal NixOS machine with a natively-encrypted ZFS root unlocked by a passphrase typed on the internal keyboard, and produce a bare-metal install path that is re-runnable rather than a one-off manual sequence.
 
-**Architecture:** A per-host deferred module at `modules/machines/nixos/pyrite/` importing `nixos-hardware.nixosModules.apple-macbook-pro-14-1` with two unwanted firmware pulls disabled, a sibling `disko.nix` declaring a `zroot` pool with an explicit `ashift` on a namespace-explicit by-id device and an `aes-256-gcm` root dataset created from a clan partitioning secret and flipped to a boot-time prompt, a static facter report at `machines/pyrite/facter.json`, and `clan machines install` against a booted stock installer ISO preceded by an explicit disk wipe. See `design.md` for the decisions (D1-D12), the adversarial verdicts, the mkForce invariant, and the open question; see `specs/` for the requirements.
+**Architecture:** A per-host deferred module at `modules/machines/nixos/pyrite/` importing `nixos-hardware.nixosModules.apple-macbook-pro-14-1` with two unwanted firmware pulls disabled, a sibling `disko.nix` declaring a `zroot` pool with an explicit `ashift` on a namespace-explicit by-id device and an `aes-256-gcm` root dataset created from a clan partitioning secret and flipped to a boot-time prompt, a static facter report at `machines/pyrite/facter.json`, a `modules/clan/inventory/services/wifi.nix` instance carrying the fleet SSID and PSK as sops-encrypted clan vars, and `clan machines install` against a booted stock installer ISO preceded by an explicit disk wipe. See `design.md` for the decisions, the adversarial verdicts, the mkForce invariant, and the open risks; see `specs/` for the requirements.
 
 **Tech Stack:** nix (flake-parts, import-tree, deferred module composition), clan-core, disko, ZFS native encryption, nixos-facter (consumed statically), jj (development join).
 
@@ -23,7 +23,7 @@ Task 6 produces the deliverable that outlives this machine. The repository's onl
 
 Task 7 is the only irreversible step and it wipes macOS. The firmware-extraction risk that once gated this is disproven: no component's firmware comes from the local macOS install. Step 7.12 re-runs the install including the wipe, which is what converts "it installed" into "the install path works" — a re-run against a surviving pool reuses the pool and skips every dataset create, so it would go green while proving nothing.
 
-Task 8 closes the one open question. It does not block Tasks 1 through 6 and should be resolved before Task 7; the explicit wipe makes the install correct regardless of its answer.
+Task 8 is a standing constraint rather than a step: the flake does not move between now and the install. `flake.nix:70` floats `clan-core` on `main.tar.gz`, so an update can move the transitive `nixpkgs_2` node and with it nixos-anywhere's version — currently 1.13.0, the version every mechanic in D13 was verified against — while no `nixos-anywhere` node appears in the diff, because `flake.lock` has none to move. If the flake must move first, re-verify D8 and D13 against the resulting version before Task 7.
 
 Integration is jj-native onto the `pyrite-baremetal-nixos` chain in a development join — no git worktree, no autonomous PR; commits are routed onto the chain by the orchestrator.
 
@@ -42,7 +42,7 @@ Out of scope: audio (not a deferred work item; revisit if mainline lands the amp
 - [ ] **Step 1:** Write `modules/machines/nixos/pyrite/default.nix` after the electrum shape, importing the nixos-hardware profile.
 - [ ] **Step 2:** Disable `networking.enableB43Firmware` and `hardware.facetimehd.enable` with plain `false`, commenting the b43 misdetection.
 - [ ] **Step 3:** Set the bootloader, `boot.zfs.devNodes = "/dev/disk/by-id"`, hostname, stateVersion, and the `cameron` user wiring.
-- [ ] **Step 4:** Disable `boot.initrd.network.ssh` only — never `mkForce` `boot.initrd.kernelModules`. State `hardware.enableRedistributableFirmware = true` and `hardware.cpu.intel.updateMicrocode = true` explicitly rather than inheriting facter's bare-metal `mkDefault`s, keep `forceImportRoot = true` with its comment, set no `hostId`, and enable no plymouth.
+- [ ] **Step 4:** Disable `boot.initrd.network.ssh` only — never `mkForce` `boot.initrd.kernelModules`. State `hardware.enableRedistributableFirmware = true` and `hardware.cpu.intel.updateMicrocode = true` explicitly rather than inheriting facter's bare-metal `mkDefault`s, keep `forceImportRoot = true` with its comment, set no `hostId`, and enable no plymouth. Set `services.mbpfan.aggressive = false`; the `mbpfan` and `tlp` enables stay at the profile's `mkDefault true` and are deliberately not restated in the module.
 - [ ] **Step 5:** Route the commit onto the chain.
 
 ## Task 3: The disko layout (tasks.md §3)
