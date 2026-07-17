@@ -10,11 +10,10 @@
 - [ ] 2.3 Set `boot.loader.systemd-boot.enable = true`, `boot.loader.efi.canTouchEfiVariables = true`, `boot.zfs.devNodes = "/dev/disk/by-id"`, `networking.hostName = "pyrite"`, and `system.stateVersion`
 - [ ] 2.4 Wire the admin user `cameron` exactly as electrum does: `hm-sops-bridge.users.cameron = { };` and `home-manager.users.cameron = { imports = flakeUsers.cameron.modules; };` — cameron is the preferred username on new machines and folds to crs58 by alias
 - [ ] 2.5 Disable `boot.initrd.network.ssh`, which cannot function on a `brcmfmac`-only machine. Do NOT touch `boot.initrd.kernelModules`: `lib.mkForce` on that list would discard the profile's SPI modules and `i915` and render the passphrase prompt unanswerable. `base`'s virtio entries are inert on bare metal and are left alone
-- [ ] 2.6 State `hardware.enableRedistributableFirmware` and `hardware.cpu.intel.updateMicrocode` explicitly rather than inheriting the facter bare-metal branch's `mkDefault` values, which are dead on every existing machine
+- [ ] 2.6 Set `hardware.enableRedistributableFirmware = true` and `hardware.cpu.intel.updateMicrocode = true` explicitly, rather than inheriting the `mkDefault` values facter's bare-metal branch supplies, which are dead on every existing machine. Both are `true` deliberately, and neither is a candidate for the closure-minimization 2.2 applies to b43 and facetimehd: `enableRedistributableFirmware` is what puts `linux-firmware` into `hardware.firmware` (`nixos/modules/hardware/all-firmware.nix:71-86`, linux-firmware at `:75`), and `linux-firmware` carries the `brcm/brcmfmac4350*-pcie.bin` blobs this machine's only NIC needs in order to probe — setting it false darkens the WiFi, and its own default is `config.hardware.enableAllFirmware`, i.e. false, so nothing else stops that. The comment must record that the axis is redistributability and not freeness — `linux-firmware` is a proprietary blob that caches serve — so a later reader does not read 2.2 as a rule against firmware. See D15
 - [ ] 2.7 Keep `base`'s `boot.zfs.forceImportRoot = true` and comment why it is load-bearing for a re-runnable install: an install re-run touches the pool from the installer, and importing without force after that lands the next boot in an emergency shell
 - [ ] 2.8 Set no `networking.hostId`; clan-core's `mkDefault "8425e349"` matches the installer and nixos-anywhere by design
 - [ ] 2.9 Do not enable `boot.plymouth`; it swaps the ask-password agent away from the verified console path
-- [ ] 2.10 Add the networkd config for `wlp2s0`, the machine's only non-loopback interface (the cloud hosts' `matchConfig.Name = "en*"` does not match it)
 
 ## 3. Phase 3 — The disko layout
 
@@ -35,17 +34,35 @@
 - [ ] 4.2 Add the `pyrite` entry to `modules/clan/inventory/machines.nix` with `machineClass = "nixos"`, `deploy.targetHost = "root@pyrite.zt"`, and tags `nixos`, `laptop`, `peer`
 - [ ] 4.3 Change `modules/clan/inventory/services/tor.nix` from `roles.server.tags."nixos"` to `roles.server.machines` naming cinnabar, electrum, galena, magnetite, and scheelite, so pyrite keeps sshd but publishes no onion service. The file's header comment must accurately describe the server role as a v3 onion service and disclaim Tor relaying — it read "Tor relay service for NixOS machines", which is false and is the likely seed of the refuted relay claim; confirm the corrected wording survives the selector edit and no longer says "for NixOS machines", which the explicit machine list falsifies
 - [ ] 4.4 Add `roles.default.machines."pyrite" = { };` to `modules/clan/inventory/services/users/cameron.nix`
-- [ ] 4.5 Add `"pyrite"` alphabetically to both hardcoded lists in `modules/checks/structure/flake-shape.nix` (after `magnetite`, before `rosegold` in the inventory list; after `magnetite`, before `scheelite` in the nixosConfigurations list)
-- [ ] 4.6 Move `openspec/changes/pyrite-baremetal-nixos/pyrite-facter.json` to `machines/pyrite/facter.json` and git-track it — in the same commit as 2.1, 3.1, 4.1, 4.2, and 4.5, never before them, because creating `machines/pyrite/` alone injects an unconfigured inventory machine via clan-core's readDir scan
-- [ ] 4.7 Confirm `nix flake check` passes, including the auto-emitted `nixos-pyrite` toplevel build and the unchanged tor evaluation for the five cloud hosts
+- [ ] 4.5 Create `modules/clan/inventory/services/wifi.nix` instancing clan-core's wifi service for pyrite. import-tree discovers the file, so no import line is added; follow `modules/clan/inventory/services/zerotier.nix`'s shape, including a header comment describing the service. The content is:
+
+  ```nix
+  {
+    clan.inventory.instances.wifi = {
+      module = {
+        name = "wifi";
+        input = "clan-core";
+      };
+      roles.default.machines."pyrite" = {
+        settings.networks.fleet = { };
+      };
+    };
+  }
+  ```
+
+  The attribute name under `networks` is an internal identifier and not the SSID — the SSID is a prompted var (`clanServices/wifi/default.nix:76-90`), because the NetworkManager profile is a world-readable store path and upstream cannot inline it. `fleet` names the dedicated network this repository stands up for the fleet, which is what makes committing its credential admissible; it is not the household network, whose PSK is never committed. The name is a clan-wide identity rather than a per-machine one — the generator it produces carries `share = true` (`:88`), so `wifi.fleet` names exactly one credential across the clan — which is the intent here and is why a future machine on a different network takes a differently-named network rather than a different value under this name. Targeting is machine-scoped rather than tag-scoped because no `wireless` tag exists and pyrite is the sole taker. This supersedes the `wlp2s0` networkd unit an earlier revision carried as 2.10: NetworkManager manages the interface and forces `networking.useDHCP = false` (`nixos/modules/services/networking/networkmanager.nix:690`), so a hand-written `.network` for the same link would compete with it. No edit to `users/cameron.nix`'s `groups` list is needed — `networkmanager` is already there (`:25-28`) and 4.4 already adds pyrite to that instance. See D14
+- [ ] 4.6 Add `"pyrite"` alphabetically to both hardcoded lists in `modules/checks/structure/flake-shape.nix` (after `magnetite`, before `rosegold` in the inventory list; after `magnetite`, before `scheelite` in the nixosConfigurations list)
+- [ ] 4.7 Move `openspec/changes/pyrite-baremetal-nixos/pyrite-facter.json` to `machines/pyrite/facter.json` and git-track it — in the same commit as 2.1, 3.1, 4.1, 4.2, and 4.6, never before them, because creating `machines/pyrite/` alone injects an unconfigured inventory machine via clan-core's readDir scan
+- [ ] 4.8 Confirm `nix flake check` passes, including the auto-emitted `nixos-pyrite` toplevel build and the unchanged tor evaluation for the five cloud hosts
 
 ## 5. Phase 5 — Secrets and ZeroTier vars
 
-- [ ] 5.1 Run `clan vars generate pyrite` and commit the generated vars, sops machine key, ZeroTier identity/IP, and the zfs passphrase
-- [ ] 5.2 Record the generated passphrase somewhere the operator can read it before the first boot — the install writes it, but a person types it, and it is unrecoverable if lost (one key per encryption root, no escrow)
-- [ ] 5.3 Add the `&pyrite` age anchor to `.sops.yaml` and `*pyrite` to the `secrets/bridge/.*` creation rule
-- [ ] 5.4 Run `just update-all-keys` to re-encrypt, and confirm the existing machines can still decrypt the bridge secret
-- [ ] 5.5 Run `clan machines update cinnabar` so the controller's autoaccept unit admits the new peer
+- [ ] 5.1 Stand up the dedicated fleet SSID on the router — an operator action outside this repository that no task here can execute, and a prerequisite of 5.2 rather than a parallel step, because 5.2's prompts take their values from it. Generate the PSK on the admin box first with `nix run nixpkgs#xkcdpass -- --numwords 6 --random-delimiters --case random`: the same generator 3.7's disk-passphrase script uses, invoked from an operator shell because 3.7's `runtimeInputs` reaches only inside the generator sandbox. Any WPA2 or WPA3-personal PSK is 8 to 63 printable ASCII characters and a six-word xkcdpass output sits inside that range. Then create a wireless network on the household router or a second access point, broadcasting an SSID distinct from the household network's, with security set to WPA2-PSK or WPA2/WPA3-personal — matching the service's `keyMgmt` default of `wpa-psk`, which `clanServices/wifi/default.nix:35-43` describes as "WPA2 + WPA3 personal" — and its PSK set to the generated value. The network needs internet egress. It must be broadcasting before 5.2 runs, because the operator types the SSID from the router's own configuration and nothing downstream catches a typo: a wrong SSID surfaces at 7.7 as an unassociated interface with no diagnostic distinguishing it from a radio failure. Record the PSK in a password manager as well as in the vars — the router holds it, and adding a second device to the fleet SSID later means reading it back. See D14
+- [ ] 5.2 Run `clan vars generate pyrite` and commit the generated vars, sops machine key, ZeroTier identity/IP, and the zfs passphrase. The wifi service adds two interactive prompts to this command: `network-name` (`type = "line"`, echoed) and `password` (`type = "hidden"`), declared at `clanServices/wifi/default.nix:76-90`. Both take the fleet SSID and PSK that 5.1 put on the router; neither is generated here, because the service declares prompts with `persist = true` and no script, which `modules/clan/export-modules/generic-generator.nix:239-245` documents as equivalent to `files.<name>.secret = true` plus `script = "cp $prompts/<name> $out/<name>"`. Both prompts belong to one per-network generator, `wifi.fleet`, carrying `share = true` (`:88`), so they land under `vars/shared/wifi.fleet/` rather than `vars/per-machine/pyrite/` and name one credential clan-wide. Get them right on the first pass: a re-run does not re-prompt, because `clan_cli/vars/generate.py:32` sets `auto_accept_prompts = not args.regenerate if args.regenerate is not None else True` and `clan_lib/vars/generate.py:247` then reuses the previous value, so correcting a mistyped SSID or PSK requires `--regenerate`
+- [ ] 5.3 Record the generated passphrase somewhere the operator can read it before the first boot — the install writes it, but a person types it, and it is unrecoverable if lost (one key per encryption root, no escrow)
+- [ ] 5.4 Add the `&pyrite` age anchor to `.sops.yaml` and `*pyrite` to the `secrets/bridge/.*` creation rule
+- [ ] 5.5 Run `just update-all-keys` to re-encrypt, and confirm the existing machines can still decrypt the bridge secret
+- [ ] 5.6 Run `clan machines update cinnabar` so the controller's autoaccept unit admits the new peer
 
 ## 6. Phase 6 — The recorded install path
 
@@ -65,7 +82,7 @@
 - [ ] 7.4 Run the full recorded install path — this wipes macOS and is irreversible
 - [ ] 7.5 Confirm the machine boots, the stage-1 passphrase prompt appears on the internal keyboard, and the root unlocks with the generated passphrase
 - [ ] 7.6 Confirm `zfs get keylocation zroot/root` returns `prompt`, `zfs get keyformat zroot/root` returns `passphrase`, and `zpool get ashift zroot` returns `12`
-- [ ] 7.7 Confirm `wlp2s0` associates and the machine joins the ZeroTier mesh
+- [ ] 7.7 Confirm `wlp2s0` associated unattended with the fleet SSID, with no credential typed into the installed system, and that the machine joins the ZeroTier mesh. This is an observation and it can fail: the vars carry the credentials, so nothing in this step supplies them. It holds only if 5.1 put the SSID on the router and 5.2 ran and its output was committed before the deploy — if the vars are absent the NetworkManager profile interpolates empty strings and association fails silently, with no assertion and no eval-time error that would have caught it earlier, and if the SSID is wrong or the network is not broadcasting the interface simply never associates. `nmcli connection show --active` and `nmcli device wifi list` separate a credential failure from an absent network, and `journalctl -u NetworkManager-setup-secrets-wifi` distinguishes both from a radio or firmware failure
 - [ ] 7.8 Confirm no tor daemon is running (`systemctl status tor` inactive), and that sshd host certificates are present
 - [ ] 7.9 Add the `/pyrite.zt/<address>` record to `modules/machines/nixos/cinnabar/zt-dns.nix` and redeploy cinnabar
 - [ ] 7.10 Add the `pyrite.zt` entries to `modules/system/ssh-known-hosts.nix` (public key resolves automatically from the flake for NixOS machines; only the address literal is hand-written) and `modules/home/core/ssh.nix`

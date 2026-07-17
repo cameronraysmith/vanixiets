@@ -26,7 +26,7 @@ This change adds the machine and, more durably, the bare-metal install path itse
 **The pyrite machine module**
 - From: no bare-metal NixOS machine exists; `nixos-hardware` is not a flake input.
 - To: `modules/machines/nixos/pyrite/` defines the host, importing `nixos-hardware.nixosModules.apple-macbook-pro-14-1` with `networking.enableB43Firmware` and `hardware.facetimehd.enable` set false.
-- Reason: the profile supplies the stage-1 `applespi` initrd module list that makes a passphrase prompt on the internal keyboard work, and the `i915` that renders it; the two disabled pulls are unwanted unfree firmware, one of them a misdetection for this silicon.
+- Reason: the profile supplies the stage-1 `applespi` initrd module list that makes a passphrase prompt on the internal keyboard work, and the `i915` that renders it; the two disabled pulls are firmware this machine has no use for — b43 serves BCM43xx silicon it does not have, and facetimehd drives a camera that is out of scope. Neither is declined for being unfree, and the machine separately affirms the redistributable firmware its only NIC needs.
 - Impact: additive. `nixos-hardware` is a new flake input; no existing machine imports the profile.
 
 **Encrypted ZFS root**
@@ -43,6 +43,12 @@ This change adds the machine and, more durably, the bare-metal install path itse
 
 **Fleet registration**
 - clan machine binding, inventory entry, sops bridge recipient, ZeroTier enrollment against cinnabar, and the post-install address records.
+
+**Network association**
+- From: every NixOS machine in the fleet is a cloud VM with a wired interface; no machine enables NetworkManager, and clan-core's wifi service is unused.
+- To: `modules/clan/inventory/services/wifi.nix` instances clan-core's first-party wifi service for pyrite against a dedicated fleet SSID this repository stands up, whose SSID and PSK become sops-encrypted clan vars prompted by `clan vars generate pyrite` alongside the disk passphrase. The household network's PSK is not committed; if pyrite joins that network it associates interactively through `nmcli`.
+- Reason: the install path is re-runnable and its first step `blkdiscard`s the disk, so credentials entered interactively on the machine die on every re-install — and worse, they would turn the post-install association check into a step that produces its own result rather than a test that can fail. Credentials held as clan vars are repository state and survive the wipe. Which credentials may be held that way is decided by origination: this repository commits secrets it originates, as clan-infra does for the disk keys it generates and Mic92 does for his own access point's key, and withholds secrets it borrows, as Mic92 does for every network his laptops merely join. A fleet SSID is originated; the household network is not.
+- Impact: pyrite becomes the fleet's first NetworkManager host, which brings the nixpkgs module's transitive effects with it — `networking.useDHCP` forced false, wpa_supplicant enabled under NetworkManager's control, and a modemmanager `mkDefault` on a laptop with no WWAN radio. It also adds an operator prerequisite outside the repository: the router must serve the fleet SSID before the vars can be generated. `share = true` on the credential generator is not overridable, which is the intent rather than a cost, since the fleet SSID exists to serve the fleet; it does not widen the recipient set, and its one residual is that a network's attribute name is a clan-wide identity, so a machine on a different network takes a differently-named network. clan-core's zerotier `unmanaged` rule becomes live and is correct as written.
 
 **Tor selector narrowed**
 - From: `modules/clan/inventory/services/tor.nix` selects `roles.server.tags."nixos"`.

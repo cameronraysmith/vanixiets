@@ -42,7 +42,7 @@ Out of scope: audio (a binding decision, not a deferral), hibernation (deferred,
 - [ ] **Step 1:** Write `modules/machines/nixos/pyrite/default.nix` after the electrum shape, importing the nixos-hardware profile.
 - [ ] **Step 2:** Disable `networking.enableB43Firmware` and `hardware.facetimehd.enable` with plain `false`, commenting the b43 misdetection.
 - [ ] **Step 3:** Set the bootloader, `boot.zfs.devNodes = "/dev/disk/by-id"`, hostname, stateVersion, and the `cameron` user wiring.
-- [ ] **Step 4:** Disable `boot.initrd.network.ssh` only — never `mkForce` `boot.initrd.kernelModules`. State the facter bare-metal branch's values explicitly, keep `forceImportRoot = true` with its comment, set no `hostId`, enable no plymouth, and add the `wlp2s0` networkd config.
+- [ ] **Step 4:** Disable `boot.initrd.network.ssh` only — never `mkForce` `boot.initrd.kernelModules`. State `hardware.enableRedistributableFirmware = true` and `hardware.cpu.intel.updateMicrocode = true` explicitly rather than inheriting facter's bare-metal `mkDefault`s, keep `forceImportRoot = true` with its comment, set no `hostId`, and enable no plymouth.
 - [ ] **Step 5:** Route the commit onto the chain.
 
 ## Task 3: The disko layout (tasks.md §3)
@@ -57,16 +57,18 @@ Out of scope: audio (a binding decision, not a deferral), hibernation (deferred,
 
 - [ ] **Step 1:** Edit `modules/clan/machines.nix`, `modules/clan/inventory/machines.nix`, and `modules/clan/inventory/services/users/cameron.nix`.
 - [ ] **Step 2:** Change `tor.nix`'s selector from the `nixos` tag to the five explicitly-named cloud hosts.
-- [ ] **Step 3:** Add `"pyrite"` alphabetically to both hardcoded lists in `modules/checks/structure/flake-shape.nix`.
-- [ ] **Step 4:** Move the staged `pyrite-facter.json` to `machines/pyrite/facter.json` and git-track it, in one commit with Tasks 2, 3, and Steps 1-3 above.
-- [ ] **Step 5:** Run `nix flake check`, confirming the auto-emitted `nixos-pyrite` check builds and the five cloud hosts' tor evaluation is unchanged.
+- [ ] **Step 3:** Create `modules/clan/inventory/services/wifi.nix` instancing clan-core's wifi service for pyrite, after `zerotier.nix`'s shape. import-tree discovers the file, so no import line is added.
+- [ ] **Step 4:** Add `"pyrite"` alphabetically to both hardcoded lists in `modules/checks/structure/flake-shape.nix`.
+- [ ] **Step 5:** Move the staged `pyrite-facter.json` to `machines/pyrite/facter.json` and git-track it, in one commit with Tasks 2, 3, and Steps 1, 2, and 4 above.
+- [ ] **Step 6:** Run `nix flake check`, confirming the auto-emitted `nixos-pyrite` check builds and the five cloud hosts' tor evaluation is unchanged.
 
 ## Task 5: Secrets and ZeroTier vars (tasks.md §5)
 
-- [ ] **Step 1:** `clan vars generate pyrite`; commit vars, sops machine key, ZeroTier identity/IP, and the zfs passphrase.
-- [ ] **Step 2:** Record the generated passphrase where the operator can read it before first boot. One key, no escrow.
-- [ ] **Step 3:** Add the `&pyrite` anchor and the `*pyrite` bridge recipient to `.sops.yaml`; `just update-all-keys`; confirm existing machines still decrypt the bridge secret.
-- [ ] **Step 4:** `clan machines update cinnabar` to admit the peer. This touches the fleet coordinator.
+- [ ] **Step 1:** Stand up the dedicated fleet SSID on the router. An operator action outside the repository, and a prerequisite rather than a parallel step: Step 2's prompts take their values from it. Generate the PSK with `xkcdpass` on the admin box, configure the router to serve a distinct SSID with `wpa-psk` security and that PSK, and confirm it is broadcasting.
+- [ ] **Step 2:** `clan vars generate pyrite`; commit vars, sops machine key, ZeroTier identity/IP, the zfs passphrase, and the fleet SSID and PSK. The wifi service adds two prompts, which take Step 1's values and do not generate them; a re-run does not re-prompt without `--regenerate`.
+- [ ] **Step 3:** Record the generated passphrase where the operator can read it before first boot. One key, no escrow.
+- [ ] **Step 4:** Add the `&pyrite` anchor and the `*pyrite` bridge recipient to `.sops.yaml`; `just update-all-keys`; confirm existing machines still decrypt the bridge secret.
+- [ ] **Step 5:** `clan machines update cinnabar` to admit the peer. This touches the fleet coordinator.
 
 ## Task 6: The recorded install path (tasks.md §6)
 
@@ -80,7 +82,7 @@ Out of scope: audio (a binding decision, not a deferral), hibernation (deferred,
 - [ ] **Step 2:** Wipe, run `--phases disko` alone, and check `sgdisk -p` shows the declared geometry while a bare `zpool import` finds no pool. This is the severe test and it precedes the irreversible step.
 - [ ] **Step 3:** Run the full recorded path. Irreversible — wipes macOS.
 - [ ] **Step 4:** Confirm boot, the stage-1 prompt on the internal keyboard, and root unlock; verify `keylocation=prompt`, `keyformat=passphrase`, `ashift=12`.
-- [ ] **Step 5:** Confirm `wlp2s0` associates, the mesh is joined, no tor daemon runs, and sshd host certificates are present.
+- [ ] **Step 5:** Confirm `wlp2s0` associated unattended with no credential typed into the installed system, the mesh is joined, no tor daemon runs, and sshd host certificates are present. The vars carry the credentials, so the association holds only if Task 5's Step 2 ran and was committed before the deploy; without it the profile interpolates empty strings and association fails silently.
 - [ ] **Step 6:** Add the `.zt` records to `cinnabar/zt-dns.nix`, `ssh-known-hosts.nix`, and `home/core/ssh.nix`; redeploy cinnabar; commit `inventory.json`.
 - [ ] **Step 7:** Re-run the install from a fresh ISO boot including the wipe, and repeat the Step 4 property checks.
 
