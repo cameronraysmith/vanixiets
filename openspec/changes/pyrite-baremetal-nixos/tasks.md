@@ -32,10 +32,10 @@
 
 ## 4. Phase 4 — Registration
 
-- [ ] 4.1 Add `pyrite` to `modules/clan/machines.nix`
-- [ ] 4.2 Add the `pyrite` entry to `modules/clan/inventory/machines.nix` with `machineClass = "nixos"`, `deploy.targetHost = "root@pyrite.zt"`, and tags `nixos`, `laptop`, `peer`
-- [ ] 4.4 Add `roles.default.machines."pyrite" = { };` to `modules/clan/inventory/services/users/cameron.nix`
-- [ ] 4.5 Create `modules/clan/inventory/services/wifi.nix` instancing clan-core's wifi service for pyrite. import-tree discovers the file, so no import line is added; follow `modules/clan/inventory/services/zerotier.nix`'s shape, including a header comment describing the service. The content is:
+- [x] 4.1 Add `pyrite` to `modules/clan/machines.nix`
+- [x] 4.2 Add the `pyrite` entry to `modules/clan/inventory/machines.nix` with `machineClass = "nixos"`, `deploy.targetHost = "root@pyrite.zt"`, and tags `nixos`, `laptop`, `peer`
+- [x] 4.4 Add `roles.default.machines."pyrite" = { };` to `modules/clan/inventory/services/users/cameron.nix`
+- [x] 4.5 Create `modules/clan/inventory/services/wifi.nix` instancing clan-core's wifi service for pyrite. import-tree discovers the file, so no import line is added; follow `modules/clan/inventory/services/zerotier.nix`'s shape, including a header comment describing the service. The content is:
 
   ```nix
   {
@@ -52,8 +52,8 @@
   ```
 
   The attribute name under `networks` is an internal identifier and not the SSID — the SSID is a prompted var (`clanServices/wifi/default.nix:76-90`), because the NetworkManager profile is a world-readable store path and upstream cannot inline it. `fleet` names the dedicated network this repository stands up for the fleet, which is what makes committing its credential admissible; it is not the household network, whose PSK is never committed. The name is a clan-wide identity rather than a per-machine one — the generator it produces carries `share = true` (`:88`), so `wifi.fleet` names exactly one credential across the clan — which is the intent here and is why a future machine on a different network takes a differently-named network rather than a different value under this name. Targeting is machine-scoped rather than tag-scoped because no `wireless` tag exists and pyrite is the sole taker. This supersedes the `wlp2s0` networkd unit an earlier revision carried as 2.10: NetworkManager manages the interface and forces `networking.useDHCP = false` (`nixos/modules/services/networking/networkmanager.nix:690`), so a hand-written `.network` for the same link would compete with it. No edit to `users/cameron.nix`'s `groups` list is needed — `networkmanager` is already there (`:25-28`) and 4.4 already adds pyrite to that instance. See D14
-- [ ] 4.6 Add `"pyrite"` alphabetically to both hardcoded lists in `modules/checks/structure/flake-shape.nix` (after `magnetite`, before `rosegold` in the inventory list; after `magnetite`, before `scheelite` in the nixosConfigurations list)
-- [ ] 4.7 Move `openspec/changes/pyrite-baremetal-nixos/pyrite-facter.json` to `machines/pyrite/facter.json` and git-track it — in the same commit as 2.1, 3.1, 4.1, 4.2, and 4.6, never before them, because creating `machines/pyrite/` alone injects an unconfigured inventory machine via clan-core's readDir scan
+- [x] 4.6 Add `"pyrite"` alphabetically to both hardcoded lists in `modules/checks/structure/flake-shape.nix` (after `magnetite`, before `rosegold` in the inventory list; after `magnetite`, before `scheelite` in the nixosConfigurations list)
+- [x] 4.7 Move `openspec/changes/pyrite-baremetal-nixos/pyrite-facter.json` to `machines/pyrite/facter.json` and git-track it — in the same commit as 2.1, 3.1, 4.1, 4.2, and 4.6, never before them, because creating `machines/pyrite/` alone injects an unconfigured inventory machine via clan-core's readDir scan
 - [ ] 4.8 Confirm `nix flake check` passes, including the auto-emitted `nixos-pyrite` toplevel build
 
 ## 5. Phase 5 — Secrets and ZeroTier vars
