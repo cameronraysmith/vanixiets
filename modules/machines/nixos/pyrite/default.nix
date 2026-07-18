@@ -98,14 +98,17 @@ in
       hardware.enableRedistributableFirmware = true;
       hardware.cpu.intel.updateMicrocode = true;
 
-      # The model profile already sets services.mbpfan.enable and services.tlp.enable via
-      # mkDefault true, and both daemons are wanted (D16); restating a plain true would
-      # only echo the default. The one line the module needs is the quieter fan curve:
-      # mbpfan's own aggressive default is true (thresholds 55/58/78); false takes them to
-      # 63/66/86 and is the only user-visible consequence of the daemon. mbpfan is not a
-      # 2.2-style decline: its license is gpl3 (free, redistributable, in-tree,
-      # cache-served), and beyond the applesmc the profile already force-loads it adds
-      # only coretemp.
+      # The model profile sets services.mbpfan.enable via mkDefault true, and mbpfan is
+      # wanted (D16); restating a plain true would only echo the default. The profile also
+      # sets services.tlp.enable = mkDefault (!config.services.power-profiles-daemon.enable),
+      # and the GNOME desktop below enables power-profiles-daemon (D19), so tlp evaluates
+      # false and power-profiles-daemon is this machine's power-management governor. The
+      # module writes neither enable, forcing tlp neither on nor off. The one line the
+      # module needs is the quieter fan curve: mbpfan's own aggressive default is true
+      # (thresholds 55/58/78); false takes them to 63/66/86 and is the only user-visible
+      # consequence of the daemon. mbpfan is not a 2.2-style decline: its license is gpl3
+      # (free, redistributable, in-tree, cache-served), and beyond the applesmc the profile
+      # already force-loads it adds only coretemp.
       services.mbpfan.aggressive = false;
 
       # Local GNOME desktop under GDM (D19), the two lines nixpkgs seeds into
