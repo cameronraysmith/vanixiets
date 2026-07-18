@@ -34,6 +34,7 @@
             "electrum"
             "galena"
             "magnetite"
+            "pyrite"
             "rosegold"
             "scheelite"
             "stibnite"
@@ -48,6 +49,7 @@
             "electrum"
             "galena"
             "magnetite"
+            "pyrite"
             "scheelite"
           ];
         };

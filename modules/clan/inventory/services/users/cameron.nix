@@ -19,6 +19,7 @@
     roles.default.machines."galena" = { };
     roles.default.machines."scheelite" = { };
     roles.default.machines."magnetite" = { };
+    roles.default.machines."pyrite" = { };
 
     roles.default.settings = {
       user = "cameron";
