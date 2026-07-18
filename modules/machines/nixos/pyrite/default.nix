@@ -48,7 +48,12 @@ in
 
       networking.hostName = "pyrite";
 
-      system.stateVersion = "25.05";
+      # Matches the 26.05 installer ISO release this machine is installed from. Never
+      # change after install. This plain assignment overrides clan-core's state-version
+      # module, which sets system.stateVersion at mkDefault priority from the stored var
+      # (clan-core nixosModules/clanCore/state-version/default.nix:18), so the committed
+      # vars/per-machine/pyrite/state-version/version/value does not affect evaluation.
+      system.stateVersion = "26.05";
 
       # Kept from base as a deliberate decision, not an inheritance (D6): an install
       # re-run touches the pool from the installer environment, and importing without
