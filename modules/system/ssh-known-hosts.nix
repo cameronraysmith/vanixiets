@@ -63,6 +63,15 @@ let
           flake.nixosConfigurations.magnetite.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
       };
 
+      "pyrite.zt" = {
+        hostNames = [
+          "pyrite.zt"
+          "fddb:4344:343b:14b9:399:937e:8067:8028" # Zerotier IPv6
+        ];
+        publicKey =
+          flake.nixosConfigurations.pyrite.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
+      };
+
       # ====================
       # Darwin Machines (static SSH host keys)
       # ====================

@@ -104,6 +104,12 @@
             HostKeyAlias = "magnetite.zt";
           };
 
+          "pyrite.zt" = {
+            HostName = "fddb:4344:343b:14b9:399:937e:8067:8028";
+            User = "cameron";
+            HostKeyAlias = "pyrite.zt";
+          };
+
           "pixel7.zt" = {
             HostName = "fddb:4344:343b:14b9:399:939f:c45d:577c";
             Port = 8022; # Termux sshd default
