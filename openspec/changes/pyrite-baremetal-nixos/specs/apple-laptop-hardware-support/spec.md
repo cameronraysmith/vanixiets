@@ -54,8 +54,8 @@ Every scenario below is decidable by `nix eval` against the built configuration;
 
 #### Scenario: linux-firmware is in the machine's firmware closure
 
-- **WHEN** `nix eval --json .#nixosConfigurations.pyrite.config.hardware.firmware --apply 'map (p: p.pname or p.name)'` is evaluated
-- **THEN** the result contains `linux-firmware`, which `nixos/modules/hardware/all-firmware.nix:75` adds to `hardware.firmware` inside the config block `:71-86` that `enableRedistributableFirmware` gates
+- **WHEN** `nix eval .#nixosConfigurations.pyrite.config.hardware.firmware.paths --apply 'ps: builtins.any (p: (builtins.match "linux-firmware.*" (p.pname or p.name)) != null) ps'` is evaluated — on the pinned nixpkgs (26.11pre) `hardware.firmware` resolves to a single merged derivation rather than a list, so the closure is read through its `.paths` attribute, the list of firmware packages the merge unions, and `map (p: p.pname or p.name)` over `hardware.firmware` itself fails with "expected a list but found a set"
+- **THEN** it returns `true`, because `linux-firmware` is one of those packages, which `nixos/modules/hardware/all-firmware.nix:75` adds to `hardware.firmware` inside the config block `:71-86` that `enableRedistributableFirmware` gates
 - **AND** that package is what carries the BCM4350's `brcm/brcmfmac4350-pcie.bin` and `brcm/brcmfmac4350c2-pcie.bin`, both listed in its `WHENCE` under `Driver: brcmfmac` with "Licence: Redistributable"
 
 #### Scenario: b43 false and enableRedistributableFirmware true are consistent, not contradictory
