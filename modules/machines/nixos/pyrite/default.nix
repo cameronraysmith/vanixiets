@@ -108,6 +108,17 @@ in
       # only coretemp.
       services.mbpfan.aggressive = false;
 
+      # Local GNOME desktop under GDM (D19), the two lines nixpkgs seeds into
+      # nixos-generate-config. They are system-level and self-contained: they cascade
+      # the display manager, XDG portals, the graphical polkit agent, gnome-keyring,
+      # dconf, gnome-settings-daemon, gnome-control-center, the NetworkManager applet,
+      # and gnome-shell, and a stock GNOME session needs nothing from cameron's
+      # home-manager. GDM is a stage-2 display manager ordered after the root mount, so
+      # it does not touch the initrd passphrase path, and it enables no plymouth
+      # (2.9/D11 stand). niri is out of scope, deferred to a reversible follow-up.
+      services.displayManager.gdm.enable = true;
+      services.desktopManager.gnome.enable = true;
+
       # Bridge NixOS-level sops to home-manager for user secret key delivery.
       # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
       # ("crs58" via alias-fold inheritance).
