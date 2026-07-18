@@ -1,7 +1,7 @@
 ## 1. Phase 1 — Flake input scaffolding
 
-- [ ] 1.1 Add `nixos-hardware` to `flake.nix` inputs with `inputs.nixpkgs.follows = "nixpkgs"`, mirroring the disko declaration at `flake.nix:83-84`
-- [ ] 1.2 Confirm `nix flake check` still passes with the input added and unused, before any machine imports it
+- [x] 1.1 Add `nixos-hardware` to `flake.nix` inputs with `inputs.nixpkgs.follows = "nixpkgs"`, mirroring the disko declaration at `flake.nix:83-84`
+- [x] 1.2 Confirm `nix flake check` still passes with the input added and unused, before any machine imports it
 
 ## 2. Phase 2 — The pyrite host module
 
