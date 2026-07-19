@@ -143,6 +143,72 @@ in
         HandleLidSwitchDocked = "ignore";
       };
 
+      # NVMe d3cold workaround (D21). The nixos-hardware profile ships this service
+      # commented out under "[Enable only if needed!]" (apple/macbook-pro/14-1/default.nix:60-68),
+      # so importing the profile does not activate it; pyrite defines its own. The
+      # observable is that /sys/.../0000:01:00.0/d3cold_allowed reads 0, not the oneshot's
+      # is-active state. The upstream script runs unmodified: its :5-7 exits 1 (logged) when
+      # 0000:01:00.0 is absent, the failure worth having. Its :12 driver guard is inert
+      # (`[[ "$driver" -ne "nvme" ]]` is bash arithmetic, 0 -ne 0, always false), so it never
+      # fires and is not relied upon; only the :5-7 address check is.
+      systemd.services.disable-nvme-d3cold = {
+        description = "Disables d3cold on the NVME controller";
+        before = [ "suspend.target" ];
+        path = [
+          pkgs.bash
+          pkgs.coreutils
+        ];
+        serviceConfig.Type = "oneshot";
+        serviceConfig.ExecStart = "${inputs.nixos-hardware}/apple/macbook-pro/14-1/disable-nvme-d3cold.sh";
+        serviceConfig.TimeoutSec = 0;
+        wantedBy = [
+          "multi-user.target"
+          "suspend.target"
+        ];
+      };
+
+      # Suspend interlock, fail-closed: a failed Requires dependency aborts the requiring
+      # unit's start job, so a nonzero exit here aborts systemd-suspend.service (and the
+      # hybrid variants with an S3 leg) rather than letting the machine suspend with the
+      # workaround inactive and hang.
+      systemd.services.nvme-d3cold-suspend-guard =
+        let
+          sleepUnits = [
+            "systemd-suspend.service"
+            "systemd-hybrid-sleep.service"
+            "systemd-suspend-then-hibernate.service"
+          ];
+        in
+        {
+          description = "Refuse suspend unless NVMe d3cold is disabled";
+          before = sleepUnits;
+          requiredBy = sleepUnits;
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = pkgs.writeShellScript "nvme-d3cold-suspend-guard" ''
+              d3cold=/sys/bus/pci/devices/0000:01:00.0/d3cold_allowed
+              if [[ "$(cat "$d3cold" 2>/dev/null)" != 0 ]]; then
+                echo "refusing suspend: $d3cold is not 0, d3cold workaround is inactive" >&2
+                exit 1
+              fi
+            '';
+          };
+        };
+
+      # Panic-reboot fallback (D22). Auto-reboot 20 s after a kernel panic returns this
+      # machine, which cannot be power-cycled or rebooted remotely, to the stage-1 unlock
+      # prompt instead of leaving it dark. The panic-on-hang knobs (kernel.hung_task_panic,
+      # softlockup_panic, hardlockup_panic) are deliberately NOT permanent: they
+      # false-positive on ZFS scrubs and long nix builds and would spuriously reboot a daily
+      # driver. Enable them only around a supervised suspend test, e.g.
+      # `sysctl -w kernel.hung_task_panic=1 kernel.hung_task_timeout_secs=30`. efi_pstore
+      # records the panic to EFI variables in the SPI boot ROM, surviving the dead NVMe that
+      # erases the journal; systemd-pstore.service is wantedBy sysinit.target by default, so
+      # the archive path needs no config here. mem_sleep_default is deliberately left
+      # unpinned: s2idle was tested and also hung, so the failure is storage, not
+      # sleep-state selection.
+      boot.kernel.sysctl."kernel.panic" = 20;
+
       # Local GNOME desktop under GDM (D19), the two lines nixpkgs seeds into
       # nixos-generate-config. They are system-level and self-contained: they cascade
       # the display manager, XDG portals, the graphical polkit agent, gnome-keyring,
