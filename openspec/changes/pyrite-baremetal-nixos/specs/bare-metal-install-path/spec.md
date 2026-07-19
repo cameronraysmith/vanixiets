@@ -10,8 +10,11 @@ It SHALL discard the disk explicitly, at every offset rather than only at the pa
 
 - **WHEN** the recorded path wipes the disk on the installer before invoking `clan machines install`
 - **THEN** it uses `blkdiscard` against the namespace-explicit `_1` path, following the form clan-core's own encrypted-root guide prescribes at `docs/src/guides/disk-encryption.md:84-88`
-- **AND** it MUST NOT use `sgdisk --zap-all` or `wipefs -a` on the whole disk for this purpose, because disko's `disk-deactivate/disk-deactivate.jq:7-9` reaches `zpool destroy -f` and `zpool labelclear -f` only through a node whose `fstype` is `zfs_member`, and `:71-78` enumerates those nodes as children reported by `lsblk`, so a disk whose partition table was already zapped presents no children, the partition-level wipe never runs, the whole-disk `wipefs` at `:38` and `dd bs=440` at `:40` touch disk offsets while the ZFS labels live inside p2, disko recreates its deterministic layout so p2 reappears at the same offset with labels intact, and `lib/types/zpool.nix:298`'s `zpool import -N -f "zroot"` then succeeds and `:299` reports "not creating zpool as a pool with that name already exists" — reusing the old pool under the old passphrase, which is precisely the tautological green the re-runnability requirement below forbids
-- **AND** if `blkdiscard` is unavailable, the fallback order is `zpool labelclear -f <device>-part2`, then `sgdisk --zap-all`, then `wipefs -a`, in that order, because the labelclear depends on the partition table the zap destroys
+- **AND** it MUST NOT use `sgdisk --zap-all` or `wipefs -a` on the whole disk for this purpose, and the ground is restated under LUKS rather than carried over: with the pool inside a LUKS2 container, p2's `fstype` is `crypto_LUKS`, not `zfs_member`, so disko's `disk-deactivate/disk-deactivate.jq` `remove` falls through to `[]` at `:26-27` and the `zpool destroy -f` / `zpool labelclear -f` branch at `:7-9` is unreachable for p2 by type rather than by absence of children
+- **AND** what runs against p2 instead is `deactivate`'s partition arm at `:42-45`, a bare `wipefs --all -f`, which erases the primary LUKS2 signature while the secondary header and the whole default 16 MiB keyslot area are left in place, so the old keyslots — the clan-vars passphrase and the enrolled FIDO2 credential — survive a wipe an operator would read as complete
+- **AND** a disk whose partition table was zapped first is worse still, because `:71-78` enumerates the nodes `deactivate` visits as children reported by `lsblk`, so with no partition table there are no children, the p2 arm never runs at all, and the whole-disk `wipefs` at `:38` and `dd bs=440` at `:40` touch only disk offsets — after which disko recreates its deterministic layout, p2 reappears at the same offset with its header intact, `lib/types/luks.nix:202`'s `if ! blkid "$dev" || ! cryptsetup isLuks "$dev"` guard finds a valid container and skips `luksFormat`, and `:275-276`'s `if ! systemd-cryptenroll "$dev" | grep -qw fido2` finds the surviving enrollment and skips that too, so the install reuses the old container under the old credentials, which is precisely the tautological green the re-runnability requirement below forbids
+- **AND** if `blkdiscard` is unavailable, the fallback order is `cryptsetup luksErase --batch-mode <device>-part2`, then `dd if=/dev/zero of=<device>-part2 bs=1M count=32`, then `sgdisk --zap-all`, then `wipefs -a`, in that order — `luksErase` first because it needs a header that still probes and every step below it destroys the magic, the 32 MiB overwrite next because it covers both LUKS2 headers and the whole default 16 MiB keyslot area rather than the primary signature alone, and the zap before the whole-disk `wipefs` for the reason the previous fallback recorded, that a partition-scoped step depends on the partition table the zap destroys
+- **AND** `zpool labelclear -f <device>-part2` is removed from the fallback order rather than reordered, because under a LUKS container p2 holds no ZFS labels to clear — they live inside the container and are unreachable without opening it — so the command that used to be the first fallback would now succeed at nothing and read as progress
 
 #### Scenario: the wipe is retained even though the default disko mode already destroys
 
@@ -44,20 +47,22 @@ It SHALL discard the disk explicitly, at every offset rather than only at the pa
 
 ### Requirement: Re-runnability is demonstrated by an install that exercises the create path, not by one that skips it
 
-The acceptance criterion for re-runnability SHALL be a second install that destroys the pool and recreates it.
-A re-run against a surviving pool MUST NOT be accepted as evidence.
+The acceptance criterion for re-runnability SHALL be a second install that destroys the LUKS container and the pool inside it and recreates both.
+A re-run against a surviving container, or against a surviving pool, MUST NOT be accepted as evidence.
 
-#### Scenario: a re-run against a surviving pool proves nothing
+#### Scenario: a re-run against a surviving container or pool proves nothing
 
-- **WHEN** disko's `lib/types/zpool.nix:298` reuses a pool that already imports, logging "not creating zpool as a pool with that name already exists", and `lib/types/zfs_fs.nix:94`'s `zfs get type` probe skips creation of datasets that already exist
-- **THEN** a re-run against a surviving pool never re-applies `ashift`, `encryption`, or `keyformat`, so it goes green without exercising the create path at all
+- **WHEN** disko's `lib/types/luks.nix:202` guard `if ! blkid "$dev" || ! cryptsetup isLuks "$dev"` finds a valid container and skips `luksFormat`, `:275-276`'s `if ! systemd-cryptenroll "$dev" | grep -qw fido2` finds a surviving enrollment and skips the FIDO2 enrollment, `:257-258`'s `cryptsetup open --test-passphrase` finds the passphrase already accepted and adds no key, `lib/types/zpool.nix:298` reuses a pool that already imports, logging "not creating zpool as a pool with that name already exists", and `lib/types/zfs_fs.nix:94`'s `zfs get type` probe skips creation of datasets that already exist
+- **THEN** the run re-applies neither the container's format nor any of its keyslots nor `ashift` nor any create-time dataset property, so it goes green having exercised no create path at all
 - **AND** such a run is NOT accepted as evidence of re-runnability, because the criterion would be satisfied tautologically
+- **AND** the FIDO2 skip is the sharpest instance, because a surviving enrollment makes the second install appear to have enrolled a token it never touched, which is a false green about the machine's own unlock credential
 
 #### Scenario: the second install destroys the pool first
 
 - **WHEN** the re-runnability criterion is exercised
-- **THEN** the disk is wiped as the recorded path's first step, per the wipe requirement above, so the second install creates the pool and datasets from scratch
-- **AND** the check confirms that `ashift` is `12`, that the `root` dataset is encrypted with `keyformat = "passphrase"`, and that `keylocation` resolves to `prompt` after the run, since those are the properties a skipped create path would silently leave unverified
+- **THEN** the disk is wiped as the recorded path's first step, per the wipe requirement above, so the second install formats a new LUKS container and creates the pool and datasets from scratch
+- **AND** the check confirms that `cryptsetup luksUUID <device>-part2` differs from the UUID recorded after the first install, that `cryptsetup luksDump <device>-part2` shows exactly one `systemd-fido2` token and no surviving keyslot 0 from the throwaway `openssl rand` key disko wipes, that `zpool get -H -o value guid zroot` differs from the guid recorded after the first install, and that `zpool get ashift zroot` returns `12`, since those are the properties a skipped create path would silently leave unverified
+- **AND** the second token's enrollment and the LUKS2 header backup are both destroyed by this re-run and MUST be redone against the new container afterward, because disko enrolls only the first token and a header backup taken against the previous container decrypts nothing and restores nothing
 
 ---
 
@@ -170,3 +175,28 @@ cinnabar MUST be redeployed after pyrite's ZeroTier IP var exists.
 
 - **WHEN** pyrite's `zerotier-ip-pyrite-zerotier` var is generated and committed
 - **THEN** `clan machines update cinnabar` runs to regenerate and re-run the autoaccept unit, because without it the new peer is never admitted
+
+---
+
+### Requirement: A FIDO2 token is verified present before the wipe, because this machine defeats disko's own guard
+
+The recorded install path SHALL verify that a FIDO2 token is seated and answering before the `blkdiscard` that opens the point of no return.
+Disko's `wait_for_token` MUST NOT be relied upon as that verification.
+
+#### Scenario: the internal SPI keyboard satisfies disko's guard with no token seated
+
+- **WHEN** disko's `wait_for_token` at `lib/types/luks.nix:277-292` polls `if ls /dev/hidraw* &>/dev/null` at `:283` and breaks on the first match
+- **THEN** the guard passes immediately on this machine with no token present, because the internal Apple SPI keyboard registers a `hidraw` node of its own independently of any token, so the guard tests for the wrong thing here
+- **AND** `systemd-cryptenroll --fido2-device=auto` at `:295-300` then finds nothing, the script exits under `set -e`, and it does so after the `luksFormat` at `:244` has already replaced the container — on a machine with no fallback OS, which makes it an unrecoverable post-wipe abort rather than a failed step
+
+#### Scenario: the verification names the token rather than counting hidraw nodes
+
+- **WHEN** the pre-wipe check runs
+- **THEN** it enumerates FIDO2 tokens specifically — `fido2-token -L` listing at least one device, or `ykman fido info` returning a PIN-attempt count — rather than testing `ls /dev/hidraw*`, which the keyboard already satisfies
+- **AND** it confirms exactly one token is seated, because `--fido2-device=auto` requires exactly one and disko passes no device path
+
+#### Scenario: the second token is a post-install step, not part of the install
+
+- **WHEN** two tokens are to be enrolled
+- **THEN** the install enrolls only the first, because `:276`'s guard skips enrollment once any `fido2` slot exists and `--fido2-device=auto` requires exactly one token plugged in, so the second is enrolled by hand afterward with the first removed
+- **AND** the LUKS slot index each token occupies is recorded at enrollment, because both report the same AAGUID and nothing distinguishes them afterward

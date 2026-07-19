@@ -4,6 +4,7 @@
 
 The disko layout SHALL declare a `zroot` pool with `options.ashift = "12"` and the fleet's dataset layout (`root`, `root/nixos` at `/`, `root/home` at `/home`, `root/nix` at `/nix`).
 `ashift` MUST be set explicitly rather than left to ZFS autodetection.
+`rootFsOptions` SHALL additionally carry `xattr = "sa"` and `acltype = "posixacl"`, and `normalization` MUST NOT be set.
 
 #### Scenario: ashift is the caller's responsibility
 
@@ -16,7 +17,15 @@ The disko layout SHALL declare a `zroot` pool with `options.ashift = "12"` and t
 - **WHEN** the filesystem choice is justified
 - **THEN** the justification is that all five existing NixOS machines root on ZFS with a `zroot` pool and none has a non-ZFS root
 - **AND** the justification is NOT that `base` sets `boot.zfs.forceImportRoot = true`, which is an unconditional defensive setting inert on a machine with no pool and which proves nothing about ZFS usage
-- **AND** the encryption layer is acknowledged as having no in-repo precedent, since no machine in this repository encrypts a disk by any mechanism
+- **AND** the encryption layer is acknowledged as having no in-repo precedent, since no machine in this repository encrypts a disk by any mechanism, and the FIDO2 enrollment has no precedent in clan-infra either — `machines/build01/disko.nix:90-97` is LUKS opened by a passphrase with no token
+
+#### Scenario: the properties whose window closes at creation are decided in this window
+
+- **WHEN** the pool and its root dataset are created, which the destroy-and-recreate re-runnability check is the last scheduled occasion to influence
+- **THEN** `rootFsOptions` carries `xattr = "sa"`, storing extended attributes inline in the dnode rather than in a hidden per-file directory, and `acltype = "posixacl"`, because journald applies POSIX ACLs to the per-user journals it creates under `/var/log/journal` and a pool without `acltype` set drops them
+- **AND** these two are decided here rather than deferred, because `zfs set` applies each only to attributes and ACLs written after the change and leaves everything already on disk in the old form, so a retrofit on a populated root is partial in a way the reported property value does not reveal
+- **AND** `normalization` is NOT set, and the decline is recorded: it is settable only at creation, and any value other than `none` implicitly sets `utf8only=on`, which makes the filesystem reject filenames that are not valid UTF-8 — a failure mode with no in-repo precedent to justify accepting
+- **AND** `ashift` is distinguished from all of the above as the one property with no post-create remedy at all, partial or otherwise
 
 ---
 
@@ -41,13 +50,15 @@ The partition type MUST be stated explicitly.
 
 ### Requirement: A sibling partition carries the ZFS content that becomes the pool's vdev
 
-The disko layout SHALL declare, alongside the ESP, a second GPT partition with `size = "100%"` whose content is `{ type = "zfs"; pool = "zroot"; }`, matching the fleet's form at `modules/machines/nixos/electrum/disko.nix:22-28`.
-The pool declared by the `zpool.zroot` block MUST have a partition contributing a vdev to it.
+The disko layout SHALL declare, alongside the ESP, a second GPT partition with `size = "100%"` whose content is `{ type = "luks"; }` and whose nested `content` is `{ type = "zfs"; pool = "zroot"; }`, so the pool's vdev is the `/dev/mapper` device rather than the partition.
+The fleet's unencrypted form at `modules/machines/nixos/electrum/disko.nix:22-28` names the zfs content directly on the partition; pyrite interposes the LUKS layer and is otherwise identical.
+The pool declared by the `zpool.zroot` block MUST have a device contributing a vdev to it.
 
 #### Scenario: the pool has a device to be created on
 
 - **WHEN** the layout declares a `zpool.zroot` block with its options and datasets
-- **THEN** a sibling partition of the ESP declares `content = { type = "zfs"; pool = "zroot"; }`, because that content type's `_create` at disko `lib/types/zfs.nix:39-43` is the only thing that appends the partition's device to `$disko_devices_dir/zfs_zroot`, which `lib/types/zpool.nix:291` reads back with `readarray` to build the `zpool create` vdev list
+- **THEN** a sibling partition of the ESP carries a LUKS content whose own `content` declares `{ type = "zfs"; pool = "zroot"; }`, because that content type's `_create` at disko `lib/types/zfs.nix:39-43` is the only thing that appends a device to `$disko_devices_dir/zfs_zroot`, which `lib/types/zpool.nix:291` reads back with `readarray` to build the `zpool create` vdev list
+- **AND** the device it appends is `/dev/mapper/<name>`, because the LUKS type fixes its nested content's `device` to exactly that at disko `lib/types/luks.nix:184-187` and splices that content's `_create` after the container has been formatted and opened (`lib/types/luks.nix:303`)
 - **AND** the partition takes `size = "100%"`, consuming the disk remaining after the 1G ESP
 
 #### Scenario: an ESP-only layout fails after the disk is already destroyed
@@ -77,49 +88,56 @@ The device MUST NOT be named by any prefix or glob over the by-id family.
 
 ---
 
-### Requirement: The root dataset uses ZFS native encryption, created from a keyfile and flipped to a boot-time prompt
+### Requirement: The pool sits inside a LUKS2 container unlocked by a FIDO2 token, with a clan-vars passphrase in a second keyslot
 
-The `root` dataset SHALL carry `encryption = "aes-256-gcm"` and `keyformat = "passphrase"`.
-It SHALL be created with `keylocation` pointing at a clan vars partitioning secret, and a `postCreateHook` SHALL run `zfs set keylocation="prompt" zroot/root` so that every subsequent boot prompts locally.
-LUKS MUST NOT be used at any layer.
-`zfs change-key` MUST NOT be used.
+The disko layout SHALL wrap the 100% partition in `content = { type = "luks"; }` carrying `enrollFido2 = true`, and the `zroot` pool SHALL take the resulting `/dev/mapper` device as its vdev.
+The container SHALL hold at least two keyslots: one enrolled to a FIDO2 token by `systemd-cryptenroll`, and one holding a human-typeable passphrase supplied as a clan vars partitioning secret through disko's `additionalKeyFiles`.
+`settings.allowDiscards` and `settings.bypassWorkqueues` SHALL both be `true`, and `enrollRecovery` SHALL be `false`.
+ZFS native encryption MUST NOT be used: no dataset carries `encryption`, `keyformat`, or `keylocation`, and no `postCreateHook` flips a key location.
 
 #### Scenario: the create-time key arrives through clan's partitioning-secrets channel
 
 - **WHEN** `clan.core.vars.generators.zfs` declares `files.key.neededFor = "partitioning"`
 - **THEN** clan-core resolves that file's `path` to `/run/partitioning-secrets/zfs/key`, per `nixosModules/clanCore/vars/secret/sops/default.nix:30-32`
 - **AND** `clan machines install` places the file there automatically, because `pkgs/clan-cli/clan_lib/machines/install.py:171-182` rglob-walks the generated partitioning-secrets tree and appends one `--disk-encryption-keys <remote path> <local path>` pair per file to the `nixos-anywhere` invocation
-- **AND** the dataset's create-time `keylocation` is `file://` that generator path, following clan-infra `machines/web01/disko.nix:96`
+- **AND** the LUKS content names that same generator path in both `passwordFile` and `additionalKeyFiles`, following clan-infra `machines/build01/disko.nix:93`'s `passwordFile` form, so the file that opens the container during the install is also the file added as a persistent keyslot
 
 #### Scenario: the generated key is a human-typeable passphrase, not hex
 
 - **WHEN** the vars generator script produces the key
-- **THEN** it emits a human-typeable passphrase in the spirit of clan-infra `machines/build01/disko.nix:71-80`'s `xkcdpass --numwords 6 --random-delimiters --case random`
-- **AND** it MUST NOT emit hex via `dd if=/dev/urandom | xxd` as clan-infra `web01` does, because `web01` is a server unlocked over the network by another machine while pyrite's key is typed by a person at a boot prompt
+- **THEN** it emits a human-typeable passphrase in the spirit of clan-infra `machines/build01/disko.nix:71-80`'s `xkcdpass --numwords 6 --random-delimiters --case random`, which is the same generator shape build01 feeds to its own LUKS `passwordFile` at `machines/build01/disko.nix:93`
+- **AND** it MUST NOT emit hex via `dd if=/dev/urandom | xxd` as clan-infra `web01` does, because `web01` is a server unlocked over the network by another machine while pyrite's passphrase is typed by a person standing at the machine whenever the token is absent, forgotten, or broken
+- **AND** this passphrase is the recovery credential of record, which is why disko's `enrollRecovery` is declined rather than used in its place: the passphrase already exists, is already replicated in sops, and is already transcribable, whereas disko's recovery key is shown once as a QR code on the console behind a `read -p` (`lib/types/luks.nix:264-274`) that would block a non-interactive install outright
 
-#### Scenario: the keylocation flip is mechanically supported by disko
+#### Scenario: the passphrase keyslot survives the slot-zero wipe because of the order disko runs in
 
-- **WHEN** the dataset is created with `keylocation` set to a `file://` path
-- **THEN** a `postCreateHook` running `zfs set keylocation="prompt" zroot/root` flips it, because `keylocation` is deliberately absent from disko's `onetimeProperties` list at `lib/types/zfs_fs.nix:80-91` while `encryption` and `keyformat` are present and could not be changed after creation
-- **AND** `postCreateHook` is a declared option (`lib/default.nix:476`) spliced after the create body (`lib/default.nix:507-511`), and the flip is disko's own documented idiom at `example/zfs.nix:104-113`
-- **AND** the key material is unchanged by the flip; only the location ZFS reads it from changes, making this the ZFS-native analog of LUKS's `passwordFile`
+- **WHEN** `enrollFido2 = true` sets disko's `autogeneratedPassword` at `lib/types/luks.nix:12`, so `_create` mints a throwaway key with `openssl rand -hex 32` and exports `SLOT_ZERO_TO_DELETE=true` (`lib/types/luks.nix:232-243`), formats the container with it (`:244`), and opens it (`:246-247`)
+- **THEN** the clan-vars passphrase named in `additionalKeyFiles` is added as a further keyslot at `lib/types/luks.nix:256-262`, by a `cryptsetup luksAddKey` that unlocks with the throwaway key and adds the passphrase file
+- **AND** only afterwards does `lib/types/luks.nix:275-302` run `systemd-cryptenroll --fido2-device=auto --wipe-slot=0`, so the wipe removes the throwaway slot and leaves the FIDO2 slot and the passphrase slot standing
+- **AND** the ordering is load-bearing rather than incidental: `additionalKeyFiles` omitted, or an equivalent enrollment performed after the wipe, yields a container whose only credential is the token, on a machine with no fallback OS from which to add another
 
-#### Scenario: the flip is required for the machine to boot at all
+#### Scenario: the generator strips the trailing newline, because disko's two key paths disagree about it
 
-- **WHEN** the `/run/partitioning-secrets/zfs/key` path exists only during the install, because nixos-anywhere places it there and nothing recreates it at boot
-- **THEN** the flip to `prompt` is load-bearing rather than cosmetic, because a dataset left at the `file://` value would boot unable to find its key
-- **AND** clan-infra `web01` does not flip precisely because a separate mechanism supplies its key at boot — `machines/web01/disko.nix:63-67` runs an initrd unit spinning until the file appears — which is a server posture pyrite does not share
+- **WHEN** the same generator file is named in both `passwordFile` and `additionalKeyFiles`
+- **THEN** the generator script appends `| tr -d "\n"`, matching clan-infra `machines/build01/disko.nix:78`
+- **AND** the reason is that disko reads the file two different ways: `passwordFile` is dereferenced through a command substitution at `lib/types/luks.nix:23`, `<(set +x; echo -n "$(cat ...)"; set -x)`, which drops trailing newlines, while `additionalKeyFiles` is handed to `cryptsetup luksAddKey` as a bare path at `lib/types/luks.nix:259`, and cryptsetup reads a regular key file verbatim including its final byte
+- **AND** without the trim the enrolled keyslot holds the passphrase followed by a newline while every path that presents it — the `passwordFile` open, and a person typing at the boot prompt — presents it without one, so the passphrase slot exists and unlocks nothing
+- **AND** this reverses the guidance the ZFS-native design recorded, which forbade the trim on the ground that ZFS strips one trailing newline itself for non-RAW keyformats; that reasoning was specific to ZFS keyformat handling and does not survive the move to LUKS
 
-#### Scenario: a re-run of the install path leaves keylocation at prompt
+#### Scenario: a re-run of the install path re-formats the container rather than reusing it
 
-- **WHEN** the install path runs a second time against a pool whose `root` dataset already exists
-- **THEN** disko's else branch at `lib/types/zfs_fs.nix:109-114` runs `zfs set -u <updateOptions>`, which still contains `keylocation=file://...` because `updateOptions` is the create options minus the one-time properties
-- **AND** the `postCreateHook` runs afterward regardless of which branch was taken and sets `keylocation=prompt`, so the net state is `prompt` on both the create path and the re-run path
+- **WHEN** the install path runs a second time after the recorded `blkdiscard`
+- **THEN** disko's guard at `lib/types/luks.nix:202`, `if ! blkid "<device>" >/dev/null || ! cryptsetup isLuks "<device>"`, finds no LUKS header on the discarded disk and re-runs the whole format-add-enroll sequence, so the second install exercises the create path rather than skipping it
+- **AND** a re-run against a container that survived the wipe would skip the format entirely, and the FIDO2 guard at `lib/types/luks.nix:276` — `systemd-cryptenroll <device> | grep -qw fido2` — would skip the enrollment too, which is the same tautological green the re-runnability requirement in `bare-metal-install-path` forbids for the pool
+- **AND** the check after the re-run is therefore that `cryptsetup luksDump` reports a LUKS2 UUID differing from the one the previous run recorded, alongside the pool GUID comparison already required
 
-#### Scenario: the boot-time prompt reaches the console
+#### Scenario: the boot-time unlock reaches the console and needs no new stage-1 options
 
-- **WHEN** the machine boots with `boot.initrd.systemd.enable = true`, which `base` already sets
-- **THEN** the `zfs-import-zroot` initrd unit issues `systemd-ask-password --timeout=${passwordTimeout}` (`nixos/modules/tasks/filesystems/zfs.nix:227`), where `boot.zfs.passwordTimeout` defaults to `0` — "waits forever" — at `zfs.nix:402-410`, after `systemd-modules-load.service` (`zfs.nix:159-165`), which is the ordering that matters because it guarantees the SPI input modules are modprobed before the prompt is issued
+- **WHEN** the machine boots with `boot.initrd.systemd.enable = true`, which `base` already sets at `modules/system/initrd-networking.nix:7` and which disko would set anyway for a FIDO2 container (`lib/types/luks.nix:354`)
+- **THEN** disko's `_config` emits a `boot.initrd.luks.devices.<name>` entry carrying `crypttabExtraOpts = [ "fido2-device=auto" ]` (`lib/types/luks.nix:348`), nixpkgs renders it into the stage-1 crypttab at `nixos/modules/system/boot/luksroot.nix:590-598` and installs that file as `/etc/crypttab` at `:1221`, and `systemd-cryptsetup` unlocks the container before ZFS is asked to import anything
+- **AND** no stage-1 option is added for this: `boot.initrd.systemd.fido2.enable` defaults to `config.boot.initrd.systemd.package.withFido2` at `nixos/modules/system/boot/systemd/fido2.nix:12-15`, and its config block at `:19-30` already places `60-fido-id.rules`, `fido_id`, `libcryptsetup-token-systemd-fido2.so`, and `libfido2.so.1` inside the initrd — all four confirmed present by extracting the deployed initrd, whose `/init` symlinks to systemd
+- **AND** `settings.allowDiscards` and `settings.bypassWorkqueues` reach the running system rather than only the install, because `luksroot.nix:590-598` folds them into the crypttab options as `discard`, `no-read-workqueue`, and `no-write-workqueue`
+- **AND** both tokens carry a FIDO2 client PIN, so `systemd-cryptenroll`'s default `--fido2-with-client-pin=yes` applies and the unlock is a typed PIN followed by a physical touch, which keeps the SPI keyboard requirement recorded in `apple-laptop-hardware-support` load-bearing rather than retiring it
 - **AND** the prompt is rendered by `systemd-ask-password-console.service`, which is started by `systemd-ask-password-console.path`'s level-triggered `DirectoryNotEmpty=/run/systemd/ask-password` rather than by the unit's `After=` on it — that `After=` edge is vacuous because the service is not in the boot transaction, and nothing in this design depends on it
 - **AND** `i915` in initrd provides the framebuffer console that displays it
 
@@ -137,18 +155,58 @@ LUKS MUST NOT be used at any layer.
 
 ---
 
-### Requirement: The accepted costs of ZFS native encryption are recorded rather than discovered later
+### Requirement: The costs and the gains of the LUKS layer are both recorded rather than discovered later
 
-The design SHALL record the properties ZFS native encryption does not offer, because they are structural and not remediable by configuration.
+The design SHALL record what moving from ZFS native encryption to a LUKS2 container costs and what it gains, because both are structural and neither is remediable by configuration.
 
-#### Scenario: there is exactly one key and no recovery path
+#### Scenario: there are several keyslots and a defined recovery path
 
-- **WHEN** the encryption root is created with a single passphrase
-- **THEN** it is recorded that ZFS permits exactly one key per encryption root and that `zfs change-key` replaces the key rather than adding one
-- **AND** it is recorded that there is consequently no recovery passphrase, no escrow key, and no future `systemd-cryptenroll` path to a TPM or FIDO2 token, because those are LUKS keyslot features and ZFS has no keyslots
-- **AND** it is recorded that these costs were put against the LUKS alternative, which offers keyslots and metadata encryption, and that the alternative was considered and rejected
+- **WHEN** the container is created and enrolled
+- **THEN** it is recorded that LUKS2 holds several independent keyslots, and that this design occupies at least two of them — a FIDO2 token and the clan-vars passphrase — so losing one credential does not lose the disk
+- **AND** it is recorded that the passphrase is a committed, sops-encrypted clan var, which makes it the recovery credential and closes the escrow gap the ZFS-native design accepted
+- **AND** it is recorded that the second YubiKey, and any later TPM enrollment on a machine that had one, are `systemd-cryptenroll` operations against the existing container requiring no re-install, which is exactly the property ZFS native encryption structurally could not offer, since it permits one key per encryption root and `zfs change-key` replaces rather than adds
 
-#### Scenario: pool and dataset metadata are not encrypted
+#### Scenario: pool and dataset metadata are encrypted
 
 - **WHEN** an attacker obtains the disk
-- **THEN** it is recorded that ZFS native encryption leaves pool layout, dataset names, and snapshot names readable, and that only dataset contents are protected
+- **THEN** it is recorded that the container encrypts everything above it, so pool layout, dataset names, and snapshot names are unreadable, and only the LUKS header and the 1G ESP remain legible
+- **AND** it is recorded that this inverts the cost the ZFS-native design accepted, under which those names were readable and only dataset contents were protected
+
+#### Scenario: dm-crypt's AES-XTS is unauthenticated, where ZFS native aes-256-gcm was not
+
+- **WHEN** a byte on the disk is altered, by a fault or by an adversary with write access
+- **THEN** it is recorded that LUKS2's default `aes-xts-plain64` provides confidentiality without integrity, so the block layer decrypts altered ciphertext into altered plaintext and raises nothing on its own
+- **AND** it is recorded that ZFS's `aes-256-gcm` was authenticated, and that this design gives that property up deliberately rather than by oversight
+- **AND** it is recorded that ZFS checksums above the container still detect the resulting corruption, so the data is not silently served, while nothing distinguishes a deliberate modification from bit rot — the detection survives the change, the attribution does not
+
+---
+
+### Requirement: The LUKS header and the keyslot inventory are maintained artifacts, not install-time byproducts
+
+A LUKS2 header backup SHALL be taken once the container's keyslots reach their intended state, stored off the machine, and handled as key material.
+The slot index each credential occupies SHALL be recorded at the time it is enrolled.
+Revoking a credential SHALL wipe its slot and re-take the header backup.
+
+#### Scenario: a lost header loses the pool regardless of which credentials are held
+
+- **WHEN** the LUKS2 header at the head of the partition is corrupted or overwritten
+- **THEN** it is recorded that no enrolled credential recovers the pool, because every keyslot lives inside that header, and that this is a failure mode the ZFS-native design did not have — there was no header to lose
+- **AND** the header is backed up with `cryptsetup luksHeaderBackup` once enrollment settles, and the backup is stored off the machine and handled as key material, because it contains the keyslots themselves
+
+#### Scenario: a stale header backup silently restores a revoked credential
+
+- **WHEN** a header backup is taken, a credential is later revoked, and the old backup is then restored
+- **THEN** it is recorded that the restore reinstates the revoked keyslot verbatim, because a header backup freezes the keyslot set as of the moment it was taken and carries no notion of a later revocation
+- **AND** the procedure is therefore to re-take the backup after every enrollment change and destroy the superseded copy, rather than to accumulate backups
+
+#### Scenario: the two tokens are indistinguishable after enrollment unless the slot index is written down
+
+- **WHEN** both YubiKey 5C Nano tokens are enrolled and `systemd-cryptenroll <device>` lists the resulting slots
+- **THEN** the slot index each token occupies is recorded as it is enrolled, because the two report the same AAGUID and the listing offers nothing else that tells them apart
+- **AND** without that record, revoking one lost token means revoking both and re-enrolling the survivor, or guessing
+
+#### Scenario: revocation is a slot wipe followed by a fresh header backup
+
+- **WHEN** a token is lost or a credential is to be retired
+- **THEN** the procedure is to list slots with `systemd-cryptenroll <device>`, wipe the identified one with `systemd-cryptenroll --wipe-slot=<n> <device>`, enroll the replacement with only that token seated, and re-take the header backup
+- **AND** the passphrase slot is not wiped as part of this, because it is the credential that makes the sequence survivable if the replacement enrollment fails partway

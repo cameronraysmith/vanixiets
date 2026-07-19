@@ -20,13 +20,15 @@ niri and its Wayland shell assembly are NOT part of this capability; niri is the
 
 #### Scenario: the machine reaches a graphical login
 
-- **WHEN** the installed machine boots, the ZFS root is unlocked at the stage-1 passphrase prompt, and boot completes
+- **WHEN** the installed machine boots, the LUKS container holding the ZFS root is unlocked at the stage-1 prompt, and boot completes
 - **THEN** the GDM greeter renders on the internal Retina panel, and an operator authenticating as cameron with the clan-generated user password (`clan vars get pyrite user-password-cameron/user-password`) reaches an interactive GNOME shell whose Activities overview responds
 - **AND** `systemctl is-active display-manager` returning `active` is necessary but NOT sufficient evidence, because GDM reports `active` while `i915` KMS leaves the panel blank on the installed 6.18.37 kernel and while a session restart-loops back to the greeter — so the criterion is discharged only by a rendered greeter plus a reached, interactive shell observed at the machine
 - **AND** the check depends on no audio, which is a Non-Goal, and on no network, since the login is local — which is what travel-readiness requires
+- **AND** travel-readiness now also depends on a physical credential, because reaching this login means first passing the stage-1 unlock: an enrolled token seated with its client PIN typed, or the committed clan-vars passphrase typed as fallback
 
-#### Scenario: enabling GDM does not perturb the stage-1 passphrase prompt
+#### Scenario: enabling GDM does not perturb the stage-1 unlock prompt
 
-- **WHEN** GDM is enabled on a machine whose ZFS root is unlocked by a stage-1 initrd passphrase prompt (D1, D11)
-- **THEN** the passphrase prompt remains a stage-1 initrd event that unlocks the root before any graphical target starts, because `systemd.services.display-manager` is a stage-2 unit ordered after `systemd-user-sessions.service` (`nixos/modules/services/display-managers/gdm.nix:294-300`) and is reached only after the root the prompt gates is mounted
-- **AND** GDM enables no plymouth: its only plymouth definition is guarded by `lib.mkIf config.boot.plymouth.enable` (`gdm.nix:313`), so with plymouth off per D11 the console ask-password path is unchanged, decidable by `nix eval .#nixosConfigurations.pyrite.config.boot.plymouth.enable` returning `false`
+- **WHEN** GDM is enabled on a machine whose root is unlocked by a stage-1 initrd prompt against a LUKS container (D1, D11)
+- **THEN** the unlock prompt remains a stage-1 initrd event that unlocks the root before any graphical target starts, because `systemd.services.display-manager` is a stage-2 unit ordered after `systemd-user-sessions.service` (`nixos/modules/services/display-managers/gdm.nix:294-300`) and is reached only after the root the prompt gates is mounted
+- **AND** GDM enables no plymouth: its only plymouth definition is guarded by `lib.mkIf config.boot.plymouth.enable` (`gdm.nix:313`), so with plymouth off per D11 the console ask-password path `systemd-cryptsetup` uses is unchanged, decidable by `nix eval .#nixosConfigurations.pyrite.config.boot.plymouth.enable` returning `false`
+- **AND** the stage-1/stage-2 separation is unaffected by the FIDO2 enrollment, because disko forces `boot.initrd.systemd.enable = true` (`lib/types/luks.nix:354`) and that option was already true on this machine through `modules/system/initrd-networking.nix:7`, so the initrd's agent stack does not change
