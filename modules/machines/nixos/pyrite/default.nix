@@ -220,6 +220,24 @@ in
       # sleep-state selection.
       boot.kernel.sysctl."kernel.panic" = 20;
 
+      # Suspend/resume kernel params for the s2idle/display half (untested; documented
+      # 14,1 recipe, validated on the same reboot as the Layer 1 d3cold hook). lib.mkAfter
+      # (merge order 1500) concatenates these AFTER the nixos-hardware kaby-lake GPU
+      # profile's plain-assignment boot.kernelParams (order 1000), so for the i915 params
+      # the profile also sets, this later occurrence is the one the kernel's module-param
+      # parser keeps (last wins). The profile ships i915.enable_psr=2 / enable_fbc=1;
+      # PSR/FBC/DC across resume are the documented cause of the "display never returns"
+      # variant. The nvme params disable APST and the ACPI D3 path; pci=noaer keeps the
+      # D3cold->D0 restore log readable.
+      boot.kernelParams = lib.mkAfter [
+        "i915.enable_psr=0"
+        "i915.enable_fbc=0"
+        "i915.enable_dc=0"
+        "nvme_core.default_ps_max_latency_us=0"
+        "nvme.noacpi=1"
+        "pci=noaer"
+      ];
+
       # Local GNOME desktop under GDM (D19), the two lines nixpkgs seeds into
       # nixos-generate-config. They are system-level and self-contained: they cascade
       # the display manager, XDG portals, the graphical polkit agent, gnome-keyring,
