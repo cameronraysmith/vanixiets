@@ -105,7 +105,7 @@ ZFS native encryption MUST NOT be used: no dataset carries `encryption`, `keyfor
 #### Scenario: the generated key is a human-typeable passphrase, not hex
 
 - **WHEN** the vars generator script produces the key
-- **THEN** it emits a human-typeable passphrase in the spirit of clan-infra `machines/build01/disko.nix:71-80`'s `xkcdpass --numwords 6 --random-delimiters --case random`, which is the same generator shape build01 feeds to its own LUKS `passwordFile` at `machines/build01/disko.nix:93`
+- **THEN** it emits a human-typeable passphrase with `xkcdpass --numwords 6 --delimiter - --case random`, adapting clan-infra `machines/build01/disko.nix:71-80`'s `xkcdpass --numwords 6 --random-delimiters --case random` (the same generator shape build01 feeds to its own LUKS `passwordFile` at `machines/build01/disko.nix:93`) by fixing the delimiter to a layout-stable hyphen per D27
 - **AND** it MUST NOT emit hex via `dd if=/dev/urandom | xxd` as clan-infra `web01` does, because `web01` is a server unlocked over the network by another machine while pyrite's passphrase is typed by a person standing at the machine whenever the token is absent, forgotten, or broken
 - **AND** this passphrase is the recovery credential of record, which is why disko's `enrollRecovery` is declined rather than used in its place: the passphrase already exists, is already replicated in sops, and is already transcribable, whereas disko's recovery key is shown once as a QR code on the console behind a `read -p` (`lib/types/luks.nix:264-274`) that would block a non-interactive install outright
 
