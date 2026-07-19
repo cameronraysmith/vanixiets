@@ -174,3 +174,17 @@ A MacBookPro14,1 has USB-C ports only and no USB-A port.
 A USB-C keyboard, or a USB-C-to-USB-A adapter for a USB-A keyboard, must be physically present before the first boot after the install, not sourced after a failed boot.
 The internal keyboard is SPI-attached and reaches the stage-1 passphrase prompt through the profile's force-loaded SPI modules; if that path does not bind on the first boot, an external USB keyboard answers the prompt through `usbhid`, `hid-generic`, and `hid-apple`, which reach the initrd through udev autoloading rather than force-loading.
 The prompt waits with an unbounded timeout, so the recovery path is available — but only if the adapter or keyboard is already on hand, which on a USB-C-only machine cannot be improvised at the prompt.
+
+## Verifying what is inside an initrd, and why the obvious check silently lies
+
+Checking for a module's presence inside a NixOS initrd by piping it to `cpio -t` and grepping fails silently.
+NixOS initrds are multi-segment: an uncompressed early cpio carrying CPU microcode, followed by the compressed main archive.
+A naive `zstdcat … | cpio -t` reads only the first segment and lists a single entry, so a grep for an absent module returns zero hits — indistinguishable from a genuine absence.
+This produced two near-miss false conclusions during the initrd-networking diagnosis and will recur at task 7.12.
+
+Two disciplines defeat it.
+Always include a positive control: grep for a module that must be present, such as `applespi`, and treat a zero-hit control as proof the listing itself failed rather than as evidence about the module under test.
+And prefer the authoritative artifact over the archive — the `initrd-nixos.conf` the initrd derivation actually consumes, located via `nix derivation show` on the `drvPath` from `config.system.build.initialRamdisk`, then tied to the deployed system by comparing that derivation's output path against `readlink -f /run/current-system/initrd`.
+
+The same class of error also reached a store path that had not been realised locally, where `find` and `ls` returned empty and read as evidence of absence.
+The general rule is that an empty result is evidence only once the query itself has been shown to work.

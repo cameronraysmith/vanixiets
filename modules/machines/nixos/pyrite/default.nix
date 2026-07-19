@@ -79,7 +79,7 @@ in
       # its boot.initrd.kernelModules assignment on boot.initrd.network.enable, and it is the
       # sole definition site injecting this machine's NIC driver there. Force-loading
       # brcmfmac in stage 1 against the shrunken module tree leaves the request_module for
-      # the per-vendor brcmfmac-bca sub-module unsatisfiable, and brcmf_fwvid_attach's error
+      # the per-vendor brcmfmac-wcc sub-module unsatisfiable, and brcmf_fwvid_attach's error
       # path then calls device_release_driver, unbinding the PCI device permanently — the
       # machine boots with no wifi device at all, and it has no other NIC. mkForce because
       # base sets enable = true plainly. This subsumes ssh.enable: initrd-ssh.nix's `enabled`

@@ -423,12 +423,17 @@ That module is the sole definition site putting this machine's NIC driver into t
 The machine's first boot had no wifi device at all: `wlp2s0` was absent from both `nmcli device status` and `ip -br link`, and the BCM4350 is its only NIC.
 
 The mechanism is a kernel-side change the earlier reasoning had no occasion to consider.
-In 6.18 `brcmfmac` is split into a core module plus per-vendor sub-modules, and this chip (PCI `14e4:43a3`) resolves to the `bca` vendor — its `pci_device_id` entry decodes to vendor `14e4`, device `43a3`, `driver_data = 2`, and index 2 of the module's three-entry `fwvid_list` is `bca`.
-The core module calls `request_module("brcmfmac-bca")` during attach.
+In 6.18 `brcmfmac` is split into a core module plus per-vendor sub-modules, and this chip (PCI `14e4:43a3`) resolves to the `wcc` vendor.
+The core module calls `request_module("brcmfmac-wcc")` during attach.
+
+The vendor identity was misattributed when this section was first written, and the correction came from the machine rather than from the binary.
+That revision read `14e4:43a3`'s `pci_device_id` entry, found `driver_data = 2`, indexed the module's three-entry `fwvid_list` — whose order is `wcc`, `cyw`, `bca` — and concluded `bca`.
+`driver_data` is not the fwvid. `brcmf_pcie_probe` uses it to index a separate four-entry table (`.rodata+0xa420` in `brcmfmac.ko`, stride 8) and reads the fwvid from that table's byte at `+4`; index 2's byte is `0`, and `brcmfmac-wcc.ko`'s `init_module` registers vendor `0`, against `1` for `brcmfmac-cyw.ko` and `2` for `brcmfmac-bca.ko`.
+Runtime evidence on the fixed initrd agrees and is what prompted the recheck: after a cold boot `lsmod` reports `brcmfmac_wcc` alone, `brcmfmac` at refcount 1 held by it, no `brcmfmac_bca` loaded, and `wlp2s0` up and associated.
 The initrd's module tree carries `brcmfmac.ko.xz` and no `bca/`, `cyw/`, or `wcc/` directory, because `makeModulesClosure` walks forward dependencies and the vendor modules are reverse dependencies in `modules.dep` with no `brcmfmac` entry in `modules.softdep` to pull them in.
 The request therefore fails in stage 1, `brcmf_fwvid_attach` fails, and its error path calls `device_release_driver`, unbinding the PCI device.
 The unbind is permanent for that boot and stage 2 never repairs it: `boot.kernelModules` does not list `brcmfmac`, so stage-2 loading relies on udev modalias autoloading, which is a no-op for a module already loaded.
-The installer ISO is unaffected because it force-loads nothing — `all-hardware.nix` sets only `hardware.enableRedistributableFirmware`, and its `brcmfmac` loads in stage 2 against the full module tree where `brcmfmac-bca` exists.
+The installer ISO is unaffected because it force-loads nothing — `all-hardware.nix` sets only `hardware.enableRedistributableFirmware`, and its `brcmfmac` loads in stage 2 against the full module tree where `brcmfmac-wcc` exists.
 
 `boot.initrd.network.enable = lib.mkForce false` is the correct predicate, and it subsumes rather than accompanies the ssh line.
 `nixos/modules/system/boot/initrd-ssh.nix:16` defines `enabled` as `(initrd.network.enable || initrd.systemd.network.enable) && cfg.enable`; pyrite evaluates both disjuncts false, so initrd ssh stays off and `boot.initrd.systemd.services` contains no ssh unit.
@@ -439,7 +444,8 @@ The resulting `boot.initrd.kernelModules` is `["applesmc" "applespi" "dm_mod" "i
 Firmware is not implicated and D15 is untouched.
 `brcmfmac4350-pcie.bin.zst` and `brcmfmac4350c2-pcie.bin.zst` are present in the initrd and in the stage-2 firmware environment, and 26.05 and 26.11 ship the identical linux-firmware 20260622.
 D5's two declines are likewise not implicated: `networking.enableB43Firmware` and `hardware.facetimehd.enable` bear on different silicon and a different device.
-The runtime confirmation isolates the cause to the module split — `lsmod` showed `brcmfmac` loaded with no `brcmfmac_bca`, and `modprobe brcmfmac_bca` followed by rebinding `0000:02:00.0` brought `wlp2s0` up immediately, whereupon NetworkManager associated with the fleet SSID from the committed vars with no credential typed by hand.
+The runtime confirmation isolates the cause to the module split — `lsmod` showed `brcmfmac` loaded with no vendor sub-module, and rebinding `0000:02:00.0` brought `wlp2s0` up immediately, whereupon NetworkManager associated with the fleet SSID from the committed vars with no credential typed by hand.
+A `modprobe brcmfmac_bca` was issued by hand before that rebind, under the mistaken vendor attribution corrected above; it is the rebind that restored the device, by letting the core module's `request_module` for its real vendor sub-module succeed in stage 2 where the full module tree exists.
 That bind is manual and does not survive a reboot, which is what task 7.16 exists to discharge.
 
 ### `hardware-configuration.nix` must never be created
