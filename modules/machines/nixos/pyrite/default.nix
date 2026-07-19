@@ -126,6 +126,23 @@ in
       # already force-loads it adds only coretemp.
       services.mbpfan.aggressive = false;
 
+      # Suspend is broken on this hardware in both available sleep states, so the lid must
+      # not reach the suspend path. Deep S3 (the kernel default here) hangs immediately:
+      # two recorded attempts each ended their boot at "PM: suspend entry (deep)" with no
+      # resume line. s2idle resumes the kernel and briefly restores networking, but the
+      # display never comes back and the machine dies about a minute later. This machine's
+      # only remote access is ZeroTier over WiFi and it cannot be rebooted remotely
+      # (initrd networking is disabled above and the ZFS root needs a typed passphrase at
+      # stage 1), so a lid-triggered suspend costs physical intervention. lock keeps the
+      # session locked while the machine stays up. These are the current option names;
+      # services.logind.lidSwitch* are settingsRename aliases (nixpkgs
+      # nixos/modules/system/boot/systemd/logind.nix:104-106).
+      services.logind.settings.Login = {
+        HandleLidSwitch = "lock";
+        HandleLidSwitchExternalPower = "lock";
+        HandleLidSwitchDocked = "ignore";
+      };
+
       # Local GNOME desktop under GDM (D19), the two lines nixpkgs seeds into
       # nixos-generate-config. They are system-level and self-contained: they cascade
       # the display manager, XDG portals, the graphical polkit agent, gnome-keyring,
