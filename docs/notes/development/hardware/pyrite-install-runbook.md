@@ -104,6 +104,13 @@ So on the happy path the wipe is belt-and-braces, and it is retained anyway for 
 The explicit wipe is also the only step whose success the operator can independently observe before committing to an irreversible install.
 And clan-core's own encrypted-root guide prescribes a manual `blkdiscard` before `clan machines install` for exactly this scenario, so upstream treats a pre-wipe as normal practice here rather than as belt-and-braces.
 
+There is a fourth reason, and on the LTS boot entry it is stronger than the three above.
+ZFS is live on that entry, so a `zroot` surviving on the disk is importable, and disko's `lib/types/zpool.nix:298` tries `zpool import -N -f "zroot"` before it considers creating anything.
+If that import succeeds, `:299` logs "not creating zpool zroot as a pool with that name already exists" and pool creation is skipped entirely — the run goes green while reusing the old pool under the old passphrase, never re-applying `ashift`, `encryption`, or `keyformat`.
+That is the tautological green the re-runnability criterion forbids, and it is the exact failure task 7.12's second install exists to detect.
+The wipe is what forecloses it, which makes it load-bearing rather than belt-and-braces on any run where a pool could survive.
+This matters most for 7.12 and not for the first install: the disk currently holds APFS and carries no ZFS pool, so there is nothing for the first run's import to find.
+
 ### What `--yes` does and does not do, and how the keys are supplied
 
 `--disk-encryption-keys` is not passed by hand.
