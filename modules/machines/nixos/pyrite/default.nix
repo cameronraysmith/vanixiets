@@ -74,12 +74,22 @@ in
       # a graphical stack whose interaction with i915 on this model is unverified. The
       # prompt is this machine's safety-critical path.
 
-      # brcmfmac will not associate in initrd, so remote unlock over initrd SSH cannot
-      # function; disabling it removes an advertised path that cannot work. mkForce
-      # because base sets ssh.enable = true plainly. This is a distinct option from
-      # boot.initrd.kernelModules, which MUST NOT be mkForce'd (see the design's
-      # invariant): base's inert virtio pair is left alone.
-      boot.initrd.network.ssh.enable = lib.mkForce false;
+      # Disabling initrd networking itself, not just its ssh sub-option, is what keeps
+      # brcmfmac out of the initrd: nixpkgs' hardware/facter/networking/initrd.nix:18 gates
+      # its boot.initrd.kernelModules assignment on boot.initrd.network.enable, and it is the
+      # sole definition site injecting this machine's NIC driver there. Force-loading
+      # brcmfmac in stage 1 against the shrunken module tree leaves the request_module for
+      # the per-vendor brcmfmac-bca sub-module unsatisfiable, and brcmf_fwvid_attach's error
+      # path then calls device_release_driver, unbinding the PCI device permanently — the
+      # machine boots with no wifi device at all, and it has no other NIC. mkForce because
+      # base sets enable = true plainly. This subsumes ssh.enable: initrd-ssh.nix's `enabled`
+      # is (network.enable || systemd.network.enable) && cfg.enable, so initrd ssh stays off,
+      # which is what the design's base-initrd-assumptions section wanted and what its
+      # ssh-only override failed to reach. This is a distinct option from
+      # boot.initrd.kernelModules, which MUST NOT be mkForce'd (see the design's invariant):
+      # the SPI keyboard and i915 modules carrying the stage-1 passphrase prompt must
+      # survive.
+      boot.initrd.network.enable = lib.mkForce false;
 
       # b43 is a silicon misdetection, not an evaluation workaround: enableB43Firmware
       # pulls b43Firmware_5_1_138 for the SoftMAC BCM43xx parts, but this machine's NIC
