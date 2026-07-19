@@ -57,8 +57,25 @@ From the admin box, authorize a key against the running installer session:
 ssh-copy-id nixos@<installer-ip>
 ```
 
-This writes `/home/nixos/.ssh/authorized_keys` and authorizes the key for the running installer session only.
-It is not written to the installer media, so it must be repeated if the installer is rebooted.
+Appending the public key directly is equivalent and is the form the recorded run used, from the machine's own GNOME session rather than from the admin box:
+
+```bash
+curl -sSL https://github.com/cameronraysmith.keys >> ~/.ssh/authorized_keys
+```
+
+Either writes `/home/nixos/.ssh/authorized_keys` and authorizes the key for the running installer session only.
+It is not written to the installer media, so it must be repeated if the installer is rebooted — including the reboot onto the LTS entry, if the machine came up on a `7.1.3` entry first.
+
+Then place the same key for root:
+
+```bash
+sudo mkdir -p /root/.ssh && sudo cp ~/.ssh/authorized_keys /root/.ssh/
+```
+
+This is a standing prerequisite rather than a contingency for a particular invocation.
+It defuses the `root@` rewrite failure mode described below: `src/nixos-anywhere.sh:978-983` rewrites `sshConnection` to `root@${sshHost}` whenever the `kexec` phase is absent, and it does so before `uploadSshKey` at `:983`, which wraps `ssh-copy-id` in an `until ... sleep 3` loop with no abort — so against a root account that has an empty password sshd refuses (`installation-device.nix:48`) and no authorized_keys, the install hangs indefinitely on "Uploading install SSH keys" rather than failing.
+Authorizing root up front means that path terminates even if a `--phases` flag is ever passed by accident, which is a cheap hedge against a hang that would otherwise land after the irreversible wipe.
+Like the `nixos` authorization, it does not persist to the media and must be repeated after any installer reboot.
 
 The install targets `nixos@<installer-ip>`, not `root@`.
 The stock installer autologins the `nixos` user, places it in `wheel`, and gives it passwordless sudo, while both `nixos` and `root` ship empty passwords that sshd refuses for password auth.
