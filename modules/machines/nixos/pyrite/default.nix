@@ -143,34 +143,44 @@ in
         HandleLidSwitchDocked = "ignore";
       };
 
-      # NVMe d3cold workaround (D21). The nixos-hardware profile ships this service
-      # commented out under "[Enable only if needed!]" (apple/macbook-pro/14-1/default.nix:60-68),
-      # so importing the profile does not activate it; pyrite defines its own. The
-      # observable is that /sys/.../0000:01:00.0/d3cold_allowed reads 0, not the oneshot's
-      # is-active state. The upstream script runs unmodified: its :5-7 exits 1 (logged) when
-      # 0000:01:00.0 is absent, the failure worth having. Its :12 driver guard is inert
-      # (`[[ "$driver" -ne "nvme" ]]` is bash arithmetic, 0 -ne 0, always false), so it never
-      # fires and is not relied upon; only the :5-7 address check is.
-      systemd.services.disable-nvme-d3cold = {
-        description = "Disables d3cold on the NVME controller";
-        before = [ "suspend.target" ];
-        path = [
-          pkgs.bash
-          pkgs.coreutils
-        ];
-        serviceConfig.Type = "oneshot";
-        serviceConfig.ExecStart = "${inputs.nixos-hardware}/apple/macbook-pro/14-1/disable-nvme-d3cold.sh";
-        serviceConfig.TimeoutSec = 0;
-        wantedBy = [
-          "multi-user.target"
-          "suspend.target"
-        ];
-      };
+      # Bulk PCIe d3cold disable before every sleep (D21, generalized). A live test
+      # confirmed the deep-S3 hang is a device under the Apple PCIe switch failing
+      # D3cold->D0 restore on resume: with the whole Alpine Ridge Thunderbolt switch
+      # (0000:04:00.0 and its 05:0x.0 bridges) plus the BCM4350 WiFi still at
+      # d3cold_allowed=1, resume wedged; bulk-disabling d3cold on every PCI device let it
+      # resume cleanly. Disabling only the NVMe endpoint (the prior form) was insufficient.
+      # Iterating the sysfs tree at suspend time (not a fixed address) covers all endpoints
+      # and survives PCI renumbering. Best-effort: a node that rejects the write is logged
+      # and skipped; the fail-closed guard below, not this unit, refuses an unsafe suspend.
+      systemd.services.disable-d3cold-all =
+        let
+          sleepUnits = [
+            "systemd-suspend.service"
+            "systemd-hybrid-sleep.service"
+            "systemd-suspend-then-hibernate.service"
+          ];
+        in
+        {
+          description = "Disable PCIe d3cold on all devices before sleep";
+          before = sleepUnits;
+          wantedBy = sleepUnits;
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = pkgs.writeShellScript "disable-d3cold-all" ''
+              shopt -s nullglob
+              for f in /sys/bus/pci/devices/*/d3cold_allowed; do
+                echo 0 > "$f" 2>/dev/null || echo "d3cold: could not write $f" >&2
+              done
+            '';
+          };
+        };
 
-      # Suspend interlock, fail-closed: a failed Requires dependency aborts the requiring
-      # unit's start job, so a nonzero exit here aborts systemd-suspend.service (and the
-      # hybrid variants with an S3 leg) rather than letting the machine suspend with the
-      # workaround inactive and hang.
+      # Suspend interlock, fail-closed, scoped to the storage controller (the only
+      # unrecoverable failure): a nonzero exit aborts the requiring sleep unit rather than
+      # letting the machine suspend with the NVMe still able to enter d3cold and hang dark.
+      # Ordered after the bulk disabler so it validates the post-disable state. Kept on the
+      # fixed on-board NVMe address (soldered, stable) deliberately: a whole-tree assertion
+      # would let any transiently-unwritable non-critical node permanently block suspend.
       systemd.services.nvme-d3cold-suspend-guard =
         let
           sleepUnits = [
@@ -182,6 +192,7 @@ in
         {
           description = "Refuse suspend unless NVMe d3cold is disabled";
           before = sleepUnits;
+          after = [ "disable-d3cold-all.service" ];
           requiredBy = sleepUnits;
           serviceConfig = {
             Type = "oneshot";
