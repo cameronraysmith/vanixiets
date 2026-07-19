@@ -206,6 +206,33 @@ in
           };
         };
 
+      # Disable the lid switch (LID0 / PNP0C0D:00) as an S3 wake source. On this MacBook
+      # the ACPI lid device fires spurious wake events ~5s after a lid-open suspend,
+      # auto-resuming the machine; confirmed as the sole active source via
+      # /sys/kernel/debug/wakeup_sources (the SPI trackpad was ruled out). Power button and
+      # keyboard still wake it. Writing "disabled" to the device power/wakeup attribute is
+      # the idempotent equivalent of the toggle-based /proc/acpi/wakeup interface. Set once
+      # at boot; the setting persists until the next boot.
+      systemd.services.disable-lid-wakeup = {
+        description = "Disable the lid switch as an S3 wake source";
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = pkgs.writeShellScript "disable-lid-wakeup" ''
+            shopt -s nullglob
+            found=
+            for p in /sys/devices/platform/PNP0C0D:00/power/wakeup /sys/bus/acpi/devices/PNP0C0D:00/power/wakeup; do
+              if [ -e "$p" ]; then echo disabled > "$p" && found=1; fi
+            done
+            if [ -z "$found" ]; then
+              echo "disable-lid-wakeup: PNP0C0D:00 power/wakeup not found" >&2
+              exit 1
+            fi
+          '';
+        };
+      };
+
       # Panic-reboot fallback (D22). Auto-reboot 20 s after a kernel panic returns this
       # machine, which cannot be power-cycled or rebooted remotely, to the stage-1 unlock
       # prompt instead of leaving it dark. The panic-on-hang knobs (kernel.hung_task_panic,
