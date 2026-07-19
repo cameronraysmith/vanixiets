@@ -66,7 +66,9 @@ This is why the report is staged inside this change directory rather than in `ma
 The report is also a superset, not a match.
 pyrite's carries a `uefi` key the five lack, and reports `virtualisation = "none"` against their `kvm` and `google`.
 Three nixpkgs facter code paths that are dead on every existing machine become live: `hardware/facter/boot.nix` reads `uefi.supported` and sets `boot.loader.grub.efiSupport` (inert under systemd-boot); `hardware/facter/firmware.nix` gates its entire block on bare-metal detection and newly sets `hardware.enableRedistributableFirmware` and `hardware.cpu.intel.updateMicrocode`, both `mkDefault`; and `hardware/facter/networking/initrd.nix` injects `brcmfmac` into `boot.initrd.kernelModules` because `base` sets `boot.initrd.network.enable = true`.
-None of these is harmful, but they are unreviewed defaults no one in this fleet has evaluated, and the design asserts what it wants rather than inheriting them.
+The third is harmful, and this sentence read "none of these is harmful" until the machine booted with no network device: force-loading `brcmfmac` in stage 1 against the shrunken initrd module tree unbinds the PCI device permanently, for the reasons the `base`-initrd-assumptions section below now records.
+pyrite sets `boot.initrd.network.enable = lib.mkForce false`, which falsifies that module's gate.
+The other two are inert, but all three are unreviewed defaults no one in this fleet had evaluated, and the design asserts what it wants rather than inheriting them.
 
 Note what facter does not supply: `hardware/facter/keyboard.nix` sources initrd keyboard modules from the USB controller report only, and `applespi` is SPI.
 The stage-1 passphrase prompt gains nothing from facter and must carry its own modules.
@@ -357,7 +359,9 @@ The failure envelope is strictly larger than the one D5's withdrawn fallback car
 
 The virtio entries are inert on bare metal: they modprobe, find no matching device, and cost a few kilobytes of initrd.
 They are left alone.
-What pyrite overrides is `boot.initrd.network.ssh`, which is a distinct option and can be disabled without touching the module list.
+What pyrite overrides is `boot.initrd.network.enable`, which is a distinct option and can be disabled without touching the module list.
+That override does remove one entry from the list, but by falsifying the predicate a contributing module gates on rather than by outranking any definition: `hardware/facter/networking/initrd.nix:18` stops contributing `brcmfmac`, and every other contributor named above is unaffected.
+This is the distinction the invariant turns on — declining a gate is not the same act as `mkForce`, which discards definitions it cannot enumerate.
 
 ## Open risks
 
@@ -412,6 +416,31 @@ On pyrite the virtio modules are inert and the SSH server cannot function, becau
 Leaving the SSH server enabled is arguably worse than inert: it advertises a remote-unlock path that cannot work.
 Gating the module behind an option is the correction and touches five machines; this change takes the per-machine override and leaves the correction to a separate change, which means the next bare-metal host rediscovers this.
 The virtio half is not overridden at all, for the reason the invariant above gives.
+
+The override this reasoning produced was `boot.initrd.network.ssh.enable = lib.mkForce false`, and it did not achieve the intent.
+Turning off the ssh sub-option leaves `boot.initrd.network.enable` at the `true` `base` assigns, and that option — not the ssh one — is the predicate `nixos/modules/hardware/facter/networking/initrd.nix:18` gates on when it assigns `boot.initrd.kernelModules = config.hardware.facter.detected.boot.initrd.networking.kernelModules`.
+That module is the sole definition site putting this machine's NIC driver into the initrd, so the override removed the unusable service and kept the force-load that broke the device.
+The machine's first boot had no wifi device at all: `wlp2s0` was absent from both `nmcli device status` and `ip -br link`, and the BCM4350 is its only NIC.
+
+The mechanism is a kernel-side change the earlier reasoning had no occasion to consider.
+In 6.18 `brcmfmac` is split into a core module plus per-vendor sub-modules, and this chip (PCI `14e4:43a3`) resolves to the `bca` vendor — its `pci_device_id` entry decodes to vendor `14e4`, device `43a3`, `driver_data = 2`, and index 2 of the module's three-entry `fwvid_list` is `bca`.
+The core module calls `request_module("brcmfmac-bca")` during attach.
+The initrd's module tree carries `brcmfmac.ko.xz` and no `bca/`, `cyw/`, or `wcc/` directory, because `makeModulesClosure` walks forward dependencies and the vendor modules are reverse dependencies in `modules.dep` with no `brcmfmac` entry in `modules.softdep` to pull them in.
+The request therefore fails in stage 1, `brcmf_fwvid_attach` fails, and its error path calls `device_release_driver`, unbinding the PCI device.
+The unbind is permanent for that boot and stage 2 never repairs it: `boot.kernelModules` does not list `brcmfmac`, so stage-2 loading relies on udev modalias autoloading, which is a no-op for a module already loaded.
+The installer ISO is unaffected because it force-loads nothing — `all-hardware.nix` sets only `hardware.enableRedistributableFirmware`, and its `brcmfmac` loads in stage 2 against the full module tree where `brcmfmac-bca` exists.
+
+`boot.initrd.network.enable = lib.mkForce false` is the correct predicate, and it subsumes rather than accompanies the ssh line.
+`nixos/modules/system/boot/initrd-ssh.nix:16` defines `enabled` as `(initrd.network.enable || initrd.systemd.network.enable) && cfg.enable`; pyrite evaluates both disjuncts false, so initrd ssh stays off and `boot.initrd.systemd.services` contains no ssh unit.
+`mkForce` is required because `base` assigns `enable = true` plainly.
+The machine has no ethernet port at all, so initrd networking is dead weight on it independent of the driver question.
+The resulting `boot.initrd.kernelModules` is `["applesmc" "applespi" "dm_mod" "i915" "intel_lpss_pci" "spi_pxa2xx_platform" "virtio_net" "virtio_pci" "zfs"]` — `brcmfmac` gone, and the SPI input modules and `i915` that carry the stage-1 passphrase prompt intact, which is why the fix is this option and not the `mkForce` on `boot.initrd.kernelModules` the invariant above forbids.
+
+Firmware is not implicated and D15 is untouched.
+`brcmfmac4350-pcie.bin.zst` and `brcmfmac4350c2-pcie.bin.zst` are present in the initrd and in the stage-2 firmware environment, and 26.05 and 26.11 ship the identical linux-firmware 20260622.
+D5's two declines are likewise not implicated: `networking.enableB43Firmware` and `hardware.facetimehd.enable` bear on different silicon and a different device.
+The runtime confirmation isolates the cause to the module split — `lsmod` showed `brcmfmac` loaded with no `brcmfmac_bca`, and `modprobe brcmfmac_bca` followed by rebinding `0000:02:00.0` brought `wlp2s0` up immediately, whereupon NetworkManager associated with the fleet SSID from the committed vars with no credential typed by hand.
+That bind is manual and does not survive a reboot, which is what task 7.16 exists to discharge.
 
 ### `hardware-configuration.nix` must never be created
 

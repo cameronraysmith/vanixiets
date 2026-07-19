@@ -117,6 +117,13 @@ A network failure at that moment would land after macOS is already destroyed, on
 
 `blkdiscard` is on the installer's PATH (it ships in `util-linux`, folded into every NixOS system's `environment.systemPackages`); Phase 7 confirms this on the machine with a two-command check before relying on it, together with `blockdev --getss /dev/nvme0n1` to record the logical sector size the `ashift = "12"` decision assumes.
 
+`blkdiscard` from util-linux 2.42 prints `/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1: contains existing partition (gpt).` and then performs the discard.
+This is a warning, not a refusal, and it reads exactly like one — the message names the obstacle and offers no result, so an operator reasonably reads it as the reason nothing happened.
+It was observed on the install and the wipe was verified complete afterward: zero non-zero bytes in the first 64 MiB, no filesystem or pool signatures, no GPT, and the offset the old APFS container occupied reading zeros.
+Do not go looking for a `--force` flag on the strength of this message.
+There is nothing to force and re-running the command changes nothing.
+The check that settles it is the post-wipe verification above, not the command's output; task 7.12's re-run will print the same line against whatever the previous install left behind.
+
 The wipe uses `blkdiscard`, not `sgdisk --zap-all` and not `wipefs -a` on the whole disk.
 This follows the form clan-core's own encrypted-root guide prescribes at `docs/src/guides/disk-encryption.md:84-88`.
 Zapping the GPT first is actively harmful on a re-run: disko's `disk-deactivate.jq` reaches `zpool destroy -f` and `zpool labelclear -f` only through partition-level children reported by `lsblk`, so a disk with no partition table presents no children, the partition-level wipe never runs, the whole-disk `wipefs` and `dd bs=440` touch disk offsets only while the ZFS labels live inside the second partition, disko then recreates its deterministic layout so that partition reappears at the same offset with its labels intact, and `zpool import -N -f "zroot"` reuses the old pool under the old passphrase — the tautological green the re-runnability criterion forbids, produced by the step meant to prevent it.
