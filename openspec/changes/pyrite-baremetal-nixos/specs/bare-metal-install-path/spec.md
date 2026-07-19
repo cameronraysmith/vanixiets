@@ -107,14 +107,14 @@ Registration SHALL cover the clan machine binding, the inventory entry, both har
 
 ---
 
-### Requirement: Network association is declarative, and the committed credential is a network this repository originates
+### Requirement: Network association is declarative, and the credentials are sops-encrypted clan vars
 
-pyrite SHALL associate with a dedicated fleet SSID — a wireless network this repository stands up for the fleet — through clan-core's wifi clanService, instanced in `modules/clan/inventory/services/wifi.nix` and targeting `roles.default.machines."pyrite"`.
+pyrite SHALL associate with the fleet's wireless network through clan-core's wifi clanService, instanced in `modules/clan/inventory/services/wifi.nix` and targeting `roles.default.machines."pyrite"`, so that the machine associates with no operator typing credentials into the installed system.
 That network's SSID and PSK SHALL be clan vars, sops-encrypted and committed, and MUST NOT be entered interactively on the machine nor stored only in its `/var/lib`.
-The household network's PSK MUST NOT appear in this repository in any form, because `github.com/cameronraysmith/vanixiets` is public and the credential is not solely this operator's to publish; if pyrite joins that network it does so interactively through `nmcli`.
-The admitting test for any network is origination: a network this repository defines MAY have its credential committed, and a network this repository merely joins MUST NOT.
-The credentials are shared clan vars — `clanServices/wifi/default.nix:88` sets `share = true` on the per-network generator carrying both prompts, and `roles.default.interface` exposes no setting through which an instance declines it — which is the intent here, since the fleet SSID exists to serve the fleet.
-The first and third scenarios below are decidable by `nix eval` against the built configuration; the second and fifth are observed at install and first boot; the fourth is decidable by inspection of the repository.
+Neither value may appear as plaintext in this repository or in a world-readable store path; the SSID is a var for the same reason the PSK is, since the NetworkManager profile the service emits is world-readable.
+The credentials are shared clan vars — `clanServices/wifi/default.nix:88` sets `share = true` on the per-network generator carrying both prompts, and `roles.default.interface` exposes no setting through which an instance declines it — so both land under `vars/shared/wifi.<name>/` rather than `vars/per-machine/pyrite/`, which is the intent here, since the network exists to serve the fleet.
+Which network the `fleet` identifier denotes, and the origination reasoning that the choice of the pre-existing household network supersedes, are settled in design.md's D14 and are recorded there rather than imposed here.
+The first and third scenarios below are decidable by `nix eval` against the built configuration; the second, fourth, and fifth are observed at install and first boot.
 
 #### Scenario: the built configuration carries NetworkManager and the declared profile
 
@@ -134,17 +134,17 @@ The first and third scenarios below are decidable by `nix eval` against the buil
 - **THEN** it contains `interface-name:zt*`, which `clanServices/zerotier/default.nix:461` sets unconditionally and which has been inert fleet-wide because no machine enabled NetworkManager
 - **AND** this change declares no additional `unmanaged` entry, because zerotier's `systemd.network.networks."09-zerotier"` (`:450-457`) means networkd is intended to own `zt*` and the existing entry is what keeps NetworkManager off it
 
-#### Scenario: the committed credential is a network this repository originates
+#### Scenario: the association is declarative, from committed vars, with nothing typed into the installed system
 
-- **WHEN** the repository's committed vars are inspected
-- **THEN** every committed wifi credential belongs to a network this repository defines, held as a `wifi.<name>` generator whose files land under `vars/shared/` rather than `vars/per-machine/pyrite/`, per the `shared` path fragment `clan_lib/vars/_types.py:41-49` returns
-- **AND** the household network's SSID and PSK appear nowhere in the repository, as plaintext or as sops ciphertext, because the repository is public, the ciphertext is therefore permanent and world-readable, and the credential is borrowed rather than originated
-- **AND** the test is the one both reference repositories follow: clan-infra commits the disk secrets it generates (`machines/web01/disko.nix:49-58`, `machines/build01/disko.nix:71-80`) and Mic92 commits his OpenWRT access point's own key (`openwrt/example.nix:91-108`, `openwrt/secrets.yml:1`) while committing no credential for any network his four NixOS laptops merely join
-- **AND** a future network is admitted to this treatment only under the same test, so a borrowed network is added by interactive `nmcli` association with its credential kept in a password manager, never as a second entry under `settings.networks`
+- **WHEN** the installed machine is cold-booted and its wireless state is inspected
+- **THEN** the active connection is the fleet network on `wlp2s0`, reached unattended across the boot, with no operator having entered an SSID or a PSK into the installed system at any point
+- **AND** the profile backing it is `/var/run/NetworkManager/system-connections/fleet.nmconnection` — the path `ensureProfiles` writes, under `/run` — so the profile came from the built configuration rather than from the machine
+- **AND** `/etc/NetworkManager/system-connections/` is empty, which is what separates a declared profile from one an operator added by hand through `nmcli` after the fact
+- **AND** the SSID and PSK it interpolates come from the sops-encrypted `wifi.fleet` generator's files under `vars/shared/`, per the `shared` path fragment `clan_lib/vars/_types.py:41-49` returns, so neither value exists as plaintext in the repository or in the world-readable store path holding the profile
 
 #### Scenario: unattended association depends on the router serving the SSID and the vars existing before the deploy
 
-- **WHEN** the fleet SSID is broadcasting with the PSK the operator generated, and `clan vars generate pyrite` has run against those values and its output has been committed before `clan machines install`
+- **WHEN** the fleet SSID is broadcasting with the PSK the router serves, and `clan vars generate pyrite` has run against those values and its output has been committed before `clan machines install`
 - **THEN** the machine associates unattended at first boot, because `autoConnect` defaults true (`clanServices/wifi/default.nix:30-33`) and lands as `connection.autoconnect` in the profile (`:107`)
 - **AND** if the vars do not exist the profile interpolates empty strings and association fails silently, because no assertion and no eval-time error guards the condition
 - **AND** if the SSID recorded in the var is not the one the router serves the interface never associates, which is equally unguarded, because the SSID reaches the var through a prompt the operator types and nothing compares it against the network
