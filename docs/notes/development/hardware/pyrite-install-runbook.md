@@ -20,8 +20,9 @@ Phase 7 of the change is where this path is executed and its re-runnability demo
 
 ## Prerequisites before the first install
 
-The dedicated fleet SSID must be broadcasting and the machine's clan vars must be generated and committed before the install runs.
-Phase 5 covers this: stand up the fleet SSID on the router, then run `clan vars generate pyrite` from the admin box and commit the generated vars — the sops machine key, the ZeroTier identity and IP, the ZFS root passphrase, and the wifi SSID and PSK — along with the sops recipient changes.
+The fleet SSID must be broadcasting and the machine's clan vars must be generated and committed before the install runs.
+The fleet network is the pre-existing household network `furtadosmith`, which the operator decided to use as the fleet network rather than standing up a distinct SSID (D14), so no router work is required and the network is already broadcasting.
+Phase 5 covers the rest: run `clan vars generate pyrite` from the admin box and commit the generated vars — the sops machine key, the ZeroTier identity and IP, the ZFS root passphrase, and the wifi SSID and PSK — along with the sops recipient changes.
 The wifi credentials are shared clan vars under `vars/shared/wifi.fleet/`, so the reinstalled machine associates with no operator typing credentials into it; if the vars are absent the NetworkManager profile interpolates empty strings and association fails silently at first boot, with nothing at eval time to catch it.
 
 A USB-C keyboard or a USB-C-to-USB-A adapter must be physically on hand before the first boot.
@@ -91,6 +92,11 @@ Keep nixos-anywhere's default phases; do not drop `kexec`, because dropping it r
 The path's first step wipes the disk explicitly, at every offset rather than only at the partition table, and only then invokes `clan machines install`.
 
 ```bash
+# 0. Realise nixos-anywhere on the admin box BEFORE the wipe. Substitutable
+#    from cache.nixos.org: 22 paths, 78.9 MiB.
+nix build --no-link /nix/store/2svzjf9qgwn6m2i69mqpjlb5n94dgm5g-nixos-anywhere-1.13.0
+nix path-info /nix/store/2svzjf9qgwn6m2i69mqpjlb5n94dgm5g-nixos-anywhere-1.13.0
+
 # 1. Wipe the target disk at every offset. THIS IS THE POINT OF NO RETURN:
 #    macOS on the internal disk is destroyed here. This is the last step
 #    whose success the operator can observe before the install commits.
@@ -103,6 +109,11 @@ clan machines install pyrite \
   -i ~/.ssh/id_ed25519 \
   --yes
 ```
+
+Step 0 is ordered ahead of the wipe rather than left to the install to resolve, because nixos-anywhere is fetched lazily and is first needed strictly after the point of no return.
+clan resolves it at install time from a runtime-deps flake vendored inside the clan-cli derivation, not from the admin box's environment — `CLAN_PROVIDED_PACKAGES` is `age:git:nix` and does not include it — and the store path was not realised locally when this was checked.
+A network failure at that moment would land after macOS is already destroyed, on a machine whose only NIC is wireless, which is a worse place to discover a missing 78.9 MiB than before the wipe.
+`nix path-info` exiting 0 against the path is the confirmation; the operator realised it ahead of the install, so this is a recorded step of the path rather than an open action.
 
 `blkdiscard` is on the installer's PATH (it ships in `util-linux`, folded into every NixOS system's `environment.systemPackages`); Phase 7 confirms this on the machine with a two-command check before relying on it, together with `blockdev --getss /dev/nvme0n1` to record the logical sector size the `ashift = "12"` decision assumes.
 
