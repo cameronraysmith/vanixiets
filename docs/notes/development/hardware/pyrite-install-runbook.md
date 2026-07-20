@@ -588,6 +588,10 @@ Do not count on the prompt waiting indefinitely while the keyboard is fetched �
 
 Then shut down, physically remove YubiKey-A — and the installer SSD, if it is still attached — and boot a second time with no token seated at all.
 Stage 1 asks for a passphrase, and the clan-vars ZFS root passphrase must unlock the container.
+The passphrase prompt does not arrive immediately, and the wait before it is expected rather than a fault.
+The crypttab entry carries `fido2-device=auto`, so with no token seated `systemd-cryptsetup` first waits on a udev monitor for a security device to appear, for `arg_token_timeout_usec` — default `30*USEC_PER_SEC` (`src/cryptsetup/cryptsetup.c:124`).
+When that expires it logs "Timed out waiting for security device, aborting security device based authentication attempt." (`:1467`) and returns `EAGAIN`; the main loop then clears `arg_fido2_device_auto` and retries (`:2815-2819`), and that retry is what produces the passphrase prompt.
+So roughly half a minute of silence followed by a message reading as an abort is the fallback working, not failing.
 This boot is not optional and it is not a formality.
 The passphrase is the only recovery credential this machine has — a token can be lost, and the header holds nothing else a person can supply — so an unverified fallback is indistinguishable from an absent one until the token is gone, at which point the pool is unrecoverable.
 The failure class is concrete rather than hypothetical: D27's trailing-newline defect lands exactly here, and the VM test in "Validating the LUKS2 layout in a VM" above exercises it only against the harness's own key file, never against the clan var that is actually in slot 1 of this container.
