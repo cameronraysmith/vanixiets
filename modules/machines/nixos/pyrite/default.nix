@@ -55,11 +55,12 @@ in
       # vars/per-machine/pyrite/state-version/version/value does not affect evaluation.
       system.stateVersion = "26.05";
 
-      # Kept from base as a deliberate decision, not an inheritance (D6): an install
-      # re-run touches the pool from the installer environment, and importing without
-      # force after that lands the next boot in an emergency shell, which would defeat
-      # this change's re-runnable-install acceptance criterion. Value equals base's, so
-      # this restatement conflicts with nothing.
+      # Kept from base as a deliberate decision, not an inheritance (D6): the install
+      # touches the pool from the installer environment under a different hostid, so
+      # importing without force lands the machine's first boot in an emergency shell.
+      # The standing case is the same one — an unclean shutdown on a laptop would
+      # otherwise block boot until someone types zfs_force=1 at the console. Value
+      # equals base's, so this restatement conflicts with nothing.
       boot.zfs.forceImportRoot = true;
 
       # Order the initrd pool import after the LUKS unlock (D24). nixpkgs'
