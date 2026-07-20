@@ -255,6 +255,75 @@ A non-zero exit, or an `ssh: connect to host` line, means there is no reachable 
 This is checked rather than assumed because the failure is silent in the expensive direction: nixos-anywhere runs at `--build-on auto`, so with no builder answering it does not fail, it falls back to building pyrite's entire closure on the installer ISO — on the machine whose disk has just been discarded, over WiFi, in a tmpfs-backed live environment.
 `ping6 -c 3 fddb:4344:343b:14b9:399:930f:39db:40d2` is a cheaper liveness check that needs no sudo, but ICMP does not prove the store is answering and does not replace the probe above.
 
+Two further gates precede the wipe, and both are hard stops rather than advisories: if either does not pass, do not run the `blkdiscard`.
+They are stated here in full because the operator standing at the machine is reading this page and nothing else.
+
+The first confirms that exactly one FIDO2 token is seated and answering:
+
+```bash
+# host: pyrite (installer)
+# The stock graphical ISO ships neither libfido2 nor yubikey-manager, so the
+# tools are fetched into a shell. This needs network but no experimental-features
+# flag. `nix run nixpkgs#libfido2` does not work at all -- the package declares no
+# meta.mainProgram; the flake form is `nix shell nixpkgs#libfido2 -c fido2-token -L`.
+nix-shell -p libfido2 yubikey-manager --run 'fido2-token -L; ykman fido info'
+```
+
+Require `fido2-token -L` to list exactly one device, and `ykman fido info` to report a PIN-attempt count, which is what confirms the client PIN is set.
+Exactly one, because disko passes no device path and `systemd-cryptenroll --fido2-device=auto` resolves only where the choice is unambiguous; the second token is enrolled after the install, in the key-lifecycle section below.
+With no network on the installer, `systemd-cryptenroll --fido2-device=list` is the in-closure substitute, since systemd is built `withFido2` and the call needs no privilege.
+It answers the device-presence half and not the client-PIN half, so a pass on it alone leaves the PIN unverified and has to be recorded as such.
+
+This is checked positively, and checked here, because disko's own guard does not hold on this machine and it fails in the direction that looks like success.
+`wait_for_token` (`lib/types/luks.nix:277-292`) gates on `ls /dev/hidraw* &>/dev/null` at `:283`, a bare node-existence test with no capability check of any kind, and this machine's internal Apple SPI keyboard registers a `hidraw` node independently of any token — so the guard passes immediately with nothing seated at all.
+`systemd-cryptenroll --fido2-device=auto` at `:295-300` then resolves nothing, and because that call is a body command rather than a condition, the script exits under the `set -efux` established at disko `lib/default.nix:1012` — after the `luksFormat` at `:244` has already replaced the container.
+On a machine with no fallback OS that is an unrecoverable post-wipe abort, produced by the guard that appears to prevent it.
+
+The second proves on the admin box that every secret whose silent absence costs pyrite its network or its remote access is present, decryptable, and encrypted to pyrite:
+
+```bash
+# host: stibnite, from the repository root
+bash <<'SH'
+set -u
+PYRITE_AGE_PUB=age1eajmgz9zvq639zjnmqcaklst6u3s7un8k68nd4klnnlswgtrnylq7twk4v
+
+test -f sops/secrets/pyrite-age.key/secret
+sops decrypt --input-type json --output-type binary sops/secrets/pyrite-age.key/secret >/dev/null
+test "$(sops decrypt --input-type json --output-type binary sops/secrets/pyrite-age.key/secret | age-keygen -y /dev/stdin)" \
+   = "$(jq -r '.[0].publickey' sops/machines/pyrite/key.json)"
+
+for f in vars/shared/wifi.fleet/network-name \
+         vars/shared/wifi.fleet/password \
+         vars/shared/zerotier-identity-pyrite/identity-secret \
+         vars/shared/user-password-cameron/user-password-hash \
+         vars/per-machine/pyrite/openssh/ssh.id_ed25519 \
+         vars/per-machine/pyrite/zfs/key; do
+  test -f "$f/secret" || { echo "missing: $f/secret"; exit 1; }
+  sops decrypt --input-type json --output-type binary "$f/secret" >/dev/null || { echo "undecryptable: $f"; exit 1; }
+  test "$(jq -r --arg k "$PYRITE_AGE_PUB" '[.sops.age[]|select(.recipient==$k)]|length' "$f/secret")" = 1 \
+    || { echo "pyrite not a recipient: $f"; exit 1; }
+done
+
+clan vars check pyrite
+SH
+echo "exit=$?"
+```
+
+The heredoc is what keeps the `exit 1` arms from closing the operator's own shell when the block is pasted interactively; `exit=0` is the pass.
+
+The machine age key is the branch this gate exists to close.
+clan supplies `--extra-files` itself — `clan_lib/machines/install.py:162-168` passes it unconditionally, populated at `:141-147` into the machine's `clan.core.vars.sops.secretUploadDirectory`, which pyrite evaluates to `/var/lib/sops-nix`, the same path `config.sops.age.keyFile` reads `key.txt` from — so the delivery is by construction.
+What is not by construction is the one branch that skips it without raising: `clan_lib/vars/secret_modules/sops.py:250-260` returns early when `has_secret` is false, and `has_secret` is the literal predicate `(secret_path / "secret").exists()` (`clan_cli/secrets/secrets.py:371-372`), so a missing or misnamed `sops/secrets/pyrite-age.key/secret` writes no `key.txt`, raises nothing, and takes the install green.
+With no `key.txt` on the installed machine sops-nix decrypts nothing: the deployed ZeroTier identity secret is unreadable, so `zerotierone` starts with no identity and mints a fresh one that cinnabar has not authorized, and `pyrite.zt` resolves to an address no live node holds.
+The fleet WiFi vars fail by the same silent path and compound it, because WiFi is this machine's only NIC — `clanServices/wifi/default.nix:126-141` reads the sops-nix paths at runtime into the NetworkManager secrets file, an unreadable file yields empty strings, and the interface never associates with no assertion and no eval-time error.
+The machine is then console-only, with no route to it but its own keyboard.
+A file that exists but does not decrypt is loud instead, since `decrypt_secret` raises and the install aborts before nixos-anywhere runs, which is why the file test is the arm that closes the silent branch and the decrypt arms cover the rest.
+
+The recipient arm is not redundant with the decrypt arm, and that distinction is the point of the check rather than a flourish: a var the operator can read but pyrite cannot is exactly the shape of the WiFi failure above, and only the recipient arm catches it.
+Two secrets correctly lack `pyrite` as a recipient and must not be added to one to make a naive sweep pass — `sops/secrets/pyrite-age.key` is admin-only by design, which is the chicken-and-egg `--extra-files` exists to break, and `vars/per-machine/pyrite/emergency-access/password` carries `deploy = false`.
+`zfs/key` is in the list for a different reason than the others: it travels the separate automatic `--disk-encryption-keys` channel (`install.py:170-182`), and if it is absent `run_generators` mints a fresh passphrase, so the container is created under a credential the operator never recorded and cannot type at the initrd prompt.
+`openssh/ssh.id_ed25519` is in the list because `modules/system/ssh-known-hosts.nix:66-72` and `modules/home/core/ssh.nix:107-110` both pin `pyrite.zt` to the public half read back out of the flake, so a host key that fails to land yields a machine that is up and on the mesh and that the admin box refuses on key mismatch.
+
 ```bash
 # host: stibnite
 # 0. Realise nixos-anywhere BEFORE the wipe. Substitutable from
