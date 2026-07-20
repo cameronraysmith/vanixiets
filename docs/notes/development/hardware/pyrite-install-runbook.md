@@ -396,7 +396,10 @@ clan resolves it at install time from a runtime-deps flake vendored inside the c
 A network failure at that moment would land after macOS is already destroyed, on a machine whose only NIC is wireless, which is a worse place to discover a missing 78.9 MiB than before the wipe.
 `nix path-info` exiting 0 against the path is the confirmation; the operator realised it ahead of the install, so this is a recorded step of the path rather than an open action.
 
-`blkdiscard` is on the installer's PATH (it ships in `util-linux`, folded into every NixOS system's `environment.systemPackages`); Phase 7 confirms this on the machine with a two-command check before relying on it, together with `blockdev --getss /dev/nvme0n1` to record the logical sector size the `ashift = "12"` decision assumes.
+`blkdiscard` is on the installer's PATH (it ships in `util-linux`, folded into every NixOS system's `environment.systemPackages`); Phase 7 confirms this on the machine with a two-command check before relying on it, together with `blockdev --getss /dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1` to record the logical sector size the `ashift = "12"` decision assumes.
+The by-id form is used there as everywhere else in this note, including for the reads.
+`/dev/nvme0n1` and `/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1` name the same device on pyrite, but the short name is a kernel enumeration order rather than an identity, it resolves on stibnite to a different disk entirely, and the controller exposes a second namespace whose by-id name ends `_2` and must never be written.
+A measurement taken against a name that does not identify the disk is not evidence about the disk, even when it is read-only.
 
 `blkdiscard` from util-linux 2.42 prints `/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1: contains existing partition (gpt).` and then performs the discard.
 This is a warning, not a refusal, and it reads exactly like one — the message names the obstacle and offers no result, so an operator reasonably reads it as the reason nothing happened.
@@ -451,7 +454,7 @@ So the second install can appear to have enrolled a token it never touched, whic
 Only once the container opens does the pool question arise at all — the vdev is `/dev/mapper/cryptroot`, which does not exist while the container is closed — and there disko's `lib/types/zpool.nix:298` tries `zpool import -N -f "zroot"` before it considers creating anything, and `:299` logs "not creating zpool zroot as a pool with that name already exists" while never re-applying `ashift`.
 The wipe is what forecloses the whole chain, which makes it load-bearing rather than belt-and-braces on any run that follows an earlier install.
 This matters most for 7.12 and not for the first install: the disk currently holds APFS and carries neither a container nor a pool, so there is nothing for the first run to find.
-The discriminating check is `cryptsetup luksUUID <device>-part2` differing from the UUID task 7.6 recorded, since a re-format mints a new one.
+The discriminating check is `cryptsetup luksUUID /dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2` differing from the UUID task 7.6 recorded, since a re-format mints a new one.
 
 ### What `--yes` does and does not do, and how the keys are supplied
 
