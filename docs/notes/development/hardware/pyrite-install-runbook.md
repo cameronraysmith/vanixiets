@@ -188,3 +188,82 @@ And prefer the authoritative artifact over the archive — the `initrd-nixos.con
 
 The same class of error also reached a store path that had not been realised locally, where `find` and `ls` returned empty and read as evidence of absence.
 The general rule is that an empty result is evidence only once the query itself has been shown to work.
+
+## Key lifecycle: header backup, YubiKey enrollment, and revocation
+
+D1's move to a LUKS2 container places a discrete header at the head of the container partition, and that header holds every keyslot, so losing or corrupting it loses the pool no matter how many credentials are enrolled or how many tokens are in hand (D26).
+Under the prior ZFS-native encryption there was no such header to lose, so this maintenance is new material rather than an inherited practice.
+The container is partition 2 of the internal disk, so every command below targets the by-id `-part2` path the install's other `cryptsetup` steps use:
+
+```bash
+part2=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2
+```
+
+### Capturing and storing the header backup
+
+The backup is roughly 16 MiB — the LUKS2 header and its keyslot area — and it is key material, because it contains the keyslots themselves.
+Capture it to RAM-backed tmpfs, encrypt the copy that leaves the machine to the `&admin-user` recovery recipient, then remove the plaintext:
+
+```bash
+uuid=$(cryptsetup luksUUID "$part2")   # provenance: the container UUID
+today=$(date +%F)                      # provenance: the capture date, YYYY-MM-DD
+
+# cryptsetup opens the backup target with O_CREAT|O_EXCL and refuses a path that
+# already exists, so the target must not pre-exist -- which rules out /dev/stdout.
+# /dev/shm is tmpfs, so the plaintext header never touches persistent storage.
+tmp=/dev/shm/pyrite-luks-header.$$.img
+cryptsetup luksHeaderBackup "$part2" --header-backup-file "$tmp"
+
+age -r age1vn8fpkmkzkjttcuc3prq3jrp7t5fsrdqey74ydu5p88keqmcupvs8jtmv8 \
+  -o "$HOME/pyrite-luks-header-$today-$uuid.age" "$tmp"
+
+shred -u "$tmp"
+```
+
+The recipient is the `&admin-user` recovery key, the same human key that decrypts the machine's vars and that task 5.3 records as the sole human recipient of the passphrase var.
+A header backup is worthless unless it can be decrypted, and the `&admin-user` private half is the one demonstrably in our custody, while the offline `&admin` key's private half is not reliably held.
+Encrypting to `&admin-user` puts the header backup and the passphrase var under one key, which is acceptable here: an `&admin-user` compromise already yields the passphrase directly, the passphrase is itself a full unlock credential, so the header backup adds no incremental exposure.
+On tmpfs the RAM backing is the real protection and `shred` is belt-and-suspenders — a plain `rm` would remove it as well — but the plaintext is gone before the operator moves on either way.
+The capture date and container UUID travel in the filename so a stale backup is identifiable without decrypting it, and the UUID ties the backup to one `luksFormat`: a re-install mints a new UUID (task 7.6 records it), so a backup whose UUID no longer matches the live container restores nothing.
+
+The `.age` file is ciphertext and can sit in the operator's home directory until it is uploaded.
+Upload it to the machine's Bitwarden entry — the same `pyrite/zfs-root` entry that holds the passphrase — as a file attachment, so that entry holds only ciphertext; the header is never committed to this repository and never placed in sops.
+Bitwarden file attachments require a paid plan and the ~16 MiB backup is well within the per-attachment size limit, so confirm the account allows attachments before relying on this path.
+Delete the local `.age` once the upload succeeds — it is only ciphertext, so this is tidiness rather than a security step.
+
+### Restoring the header
+
+Restoration reverses the capture and keeps the same tmpfs hygiene, since the decrypted header is again key material.
+It needs the `&admin-user` identity, the same key that decrypts the machine's vars, and a tmpfs mount, which `/dev/shm` and `/run` both provide on any NixOS or rescue environment:
+
+```bash
+age -d -i <admin-user-identity> pyrite-luks-header-<YYYY-MM-DD>-<luksUUID>.age \
+  > /dev/shm/pyrite-luks-header.img
+cryptsetup luksHeaderRestore "$part2" --header-backup-file /dev/shm/pyrite-luks-header.img
+shred -u /dev/shm/pyrite-luks-header.img
+```
+
+`luksHeaderRestore` reads the backup file rather than creating it, so it carries none of the `O_EXCL` constraint the capture does, and it prompts before it overwrites the live header.
+
+### The slot inventory and its provenance
+
+Both YubiKey 5C Nano tokens report the same AAGUID and are physically identical, so once both are enrolled `systemd-cryptenroll "$part2"` lists two `fido2` slots with nothing in the header telling them apart (D25).
+The slot index is therefore the only discriminator, and it cannot be reconstructed after the fact.
+Record in the same `pyrite/zfs-root` Bitwarden entry the mapping from slot index to credential — YubiKey-A's serial, YubiKey-B's serial, and the passphrase slot — reading the actual indices back from `systemd-cryptenroll "$part2"` at the moment each is enrolled.
+Record alongside it the capture date and container UUID of the header backup currently attached, so the entry names both which credential occupies which slot and which `luksFormat` the stored backup belongs to.
+
+### Re-taking after enrollment changes, and revocation
+
+A header backup freezes the keyslot set exactly as it stood when taken, so restoring one that predates a revocation reinstates the revoked slot verbatim and decrypts the disk again (D26).
+The backup is thus itself an enrolled credential, and the retention rule is not "keep them all": after any change to the enrolled set, take a fresh backup, upload it, and delete the superseded Bitwarden attachment, because a stale attachment is an un-revoked credential sitting in storage.
+The triggers are every enrollment change without exception — the second-YubiKey enrollment in task 7.12a, any revocation, and any future token added — and each re-runs the capture above and updates the slot inventory.
+
+Revocation removes one slot from the live header:
+
+```bash
+systemd-cryptenroll "$part2"                 # list the occupied slots and their types
+systemd-cryptenroll "$part2" --wipe-slot=<n> # remove slot n, the lost credential
+```
+
+Replacing a lost token means wiping its slot, seating the replacement alone, re-enrolling with `systemd-cryptenroll "$part2" --fido2-device=auto`, then re-taking the header backup and destroying the previous one.
+The passphrase slot is not wiped as part of this: it keeps the sequence survivable if the replacement enrollment fails partway, and it is what makes the procedure performable at all while no valid token is enrolled.
