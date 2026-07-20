@@ -21,7 +21,7 @@ The disko layout SHALL declare a `zroot` pool with `options.ashift = "12"` and t
 
 #### Scenario: the properties whose window closes at creation are decided in this window
 
-- **WHEN** the pool and its root dataset are created, which the destroy-and-recreate re-runnability check is the last scheduled occasion to influence
+- **WHEN** the pool and its root dataset are created by the single destructive install, which is the only scheduled occasion to influence them
 - **THEN** `rootFsOptions` carries `xattr = "sa"`, storing extended attributes inline in the dnode rather than in a hidden per-file directory, and `acltype = "posixacl"`, because journald applies POSIX ACLs to the per-user journals it creates under `/var/log/journal` and a pool without `acltype` set drops them
 - **AND** these two are decided here rather than deferred, because `zfs set` applies each only to attributes and ACLs written after the change and leaves everything already on disk in the old form, so a retrofit on a populated root is partial in a way the reported property value does not reveal
 - **AND** `normalization` is NOT set, and the decline is recorded: it is settable only at creation, and any value other than `none` implicitly sets `utf8only=on`, which makes the filesystem reject filenames that are not valid UTF-8 — a failure mode with no in-repo precedent to justify accepting
@@ -124,12 +124,12 @@ ZFS native encryption MUST NOT be used: no dataset carries `encryption`, `keyfor
 - **AND** without the trim the enrolled keyslot holds the passphrase followed by a newline while every path that presents it — the `passwordFile` open, and a person typing at the boot prompt — presents it without one, so the passphrase slot exists and unlocks nothing
 - **AND** this reverses the guidance the ZFS-native design recorded, which forbade the trim on the ground that ZFS strips one trailing newline itself for non-RAW keyformats; that reasoning was specific to ZFS keyformat handling and does not survive the move to LUKS
 
-#### Scenario: a re-run of the install path re-formats the container rather than reusing it
+#### Scenario: the layout re-formats the container rather than reusing it on any later reinstall
 
-- **WHEN** the install path runs a second time after the recorded `blkdiscard`
-- **THEN** disko's guard at `lib/types/luks.nix:202`, `if ! blkid "<device>" >/dev/null || ! cryptsetup isLuks "<device>"`, finds no LUKS header on the discarded disk and re-runs the whole format-add-enroll sequence, so the second install exercises the create path rather than skipping it
-- **AND** a re-run against a container that survived the wipe would skip the format entirely, and the FIDO2 guard at `lib/types/luks.nix:276` — `systemd-cryptenroll <device> | grep -qw fido2` — would skip the enrollment too, which is the same tautological green the re-runnability requirement in `bare-metal-install-path` forbids for the pool
-- **AND** the check after the re-run is therefore that `cryptsetup luksDump` reports a LUKS2 UUID differing from the one the previous run recorded, alongside the pool GUID comparison already required
+- **WHEN** the install path is run against a disk that already holds a LUKS container
+- **THEN** disko's guard at `lib/types/luks.nix:202`, `if ! blkid "<device>" >/dev/null || ! cryptsetup isLuks "<device>"`, finds no LUKS header on a disk the recorded `blkdiscard` has discarded, and re-runs the whole format-add-enroll sequence
+- **AND** against a container that survived the wipe it would skip the format entirely, and the FIDO2 guard at `lib/types/luks.nix:276` — `systemd-cryptenroll <device> | grep -qw fido2` — would skip the enrollment too, which is the same tautological green the create-path requirement in `bare-metal-install-path` forbids for the pool
+- **AND** this is recorded as a property of the layout for any future reinstall rather than as an acceptance criterion of this change, because this machine's disk carries no LUKS header before its single install and there is therefore no earlier container UUID to compare against
 
 #### Scenario: the boot-time unlock reaches the console and needs no new stage-1 options
 
@@ -150,7 +150,7 @@ ZFS native encryption MUST NOT be used: no dataset carries `encryption`, `keyfor
 #### Scenario: forceImportRoot is kept as a deliberate decision
 
 - **WHEN** `base` supplies `boot.zfs.forceImportRoot = true`
-- **THEN** pyrite keeps it, because a re-run of the install path touches the pool from a rescue or installer environment and, per Mic92's `nixosModules/zfs.nix:16-18`, importing without force after such a touch lands the next boot in an emergency shell — which would defeat the re-runnability acceptance criterion
+- **THEN** pyrite keeps it, because the install path touches the pool from the installer environment and, per Mic92's `nixosModules/zfs.nix:16-18`, importing without force after such a touch lands the next boot in an emergency shell
 - **AND** its known cost, that the nixpkgs assertion `unsafeAllowHibernation -> !forceImportRoot` forecloses ZFS hibernation at evaluation time, is accepted because hibernation is a non-goal of this change
 
 ---

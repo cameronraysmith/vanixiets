@@ -12,7 +12,7 @@ It SHALL discard the disk explicitly, at every offset rather than only at the pa
 - **THEN** it uses `blkdiscard` against the namespace-explicit `_1` path, following the form clan-core's own encrypted-root guide prescribes at `docs/src/guides/disk-encryption.md:84-88`
 - **AND** it MUST NOT use `sgdisk --zap-all` or `wipefs -a` on the whole disk for this purpose, and the ground is restated under LUKS rather than carried over: with the pool inside a LUKS2 container, p2's `fstype` is `crypto_LUKS`, not `zfs_member`, so disko's `disk-deactivate/disk-deactivate.jq` `remove` falls through to `[]` at `:26-27` and the `zpool destroy -f` / `zpool labelclear -f` branch at `:7-9` is unreachable for p2 by type rather than by absence of children
 - **AND** what runs against p2 instead is `deactivate`'s partition arm at `:42-45`, a bare `wipefs --all -f`, which erases the primary LUKS2 signature while the secondary header and the whole default 16 MiB keyslot area are left in place, so the old keyslots — the clan-vars passphrase and the enrolled FIDO2 credential — survive a wipe an operator would read as complete
-- **AND** a disk whose partition table was zapped first is worse still, because `:71-78` enumerates the nodes `deactivate` visits as children reported by `lsblk`, so with no partition table there are no children, the p2 arm never runs at all, and the whole-disk `wipefs` at `:38` and `dd bs=440` at `:40` touch only disk offsets — after which disko recreates its deterministic layout, p2 reappears at the same offset with its header intact, `lib/types/luks.nix:202`'s `if ! blkid "$dev" || ! cryptsetup isLuks "$dev"` guard finds a valid container and skips `luksFormat`, and `:275-276`'s `if ! systemd-cryptenroll "$dev" | grep -qw fido2` finds the surviving enrollment and skips that too, so the install reuses the old container under the old credentials, which is precisely the tautological green the re-runnability requirement below forbids
+- **AND** a disk whose partition table was zapped first is worse still, because `:71-78` enumerates the nodes `deactivate` visits as children reported by `lsblk`, so with no partition table there are no children, the p2 arm never runs at all, and the whole-disk `wipefs` at `:38` and `dd bs=440` at `:40` touch only disk offsets — after which disko recreates its deterministic layout, p2 reappears at the same offset with its header intact, `lib/types/luks.nix:202`'s `if ! blkid "$dev" || ! cryptsetup isLuks "$dev"` guard finds a valid container and skips `luksFormat`, and `:275-276`'s `if ! systemd-cryptenroll "$dev" | grep -qw fido2` finds the surviving enrollment and skips that too, so the install reuses the old container under the old credentials, which is precisely the tautological green the create-path requirement below forbids
 - **AND** if `blkdiscard` is unavailable, the fallback order is `cryptsetup luksErase --batch-mode <device>-part2`, then `dd if=/dev/zero of=<device>-part2 bs=1M count=32`, then `sgdisk --zap-all`, then `wipefs -a`, in that order — `luksErase` first because it needs a header that still probes and every step below it destroys the magic, the 32 MiB overwrite next because it covers both LUKS2 headers and the whole default 16 MiB keyslot area rather than the primary signature alone, and the zap before the whole-disk `wipefs` for the reason the previous fallback recorded, that a partition-scoped step depends on the partition table the zap destroys
 - **AND** `zpool labelclear -f <device>-part2` is removed from the fallback order rather than reordered, because under a LUKS container p2 holds no ZFS labels to clear — they live inside the container and are unreachable without opening it — so the command that used to be the first fallback would now succeed at nothing and read as progress
 
@@ -45,24 +45,29 @@ It SHALL discard the disk explicitly, at every offset rather than only at the pa
 
 ---
 
-### Requirement: Re-runnability is demonstrated by an install that exercises the create path, not by one that skips it
+### Requirement: An install is accepted as evidence only if it exercised the create path
 
-The acceptance criterion for re-runnability SHALL be a second install that destroys the LUKS container and the pool inside it and recreates both.
-A re-run against a surviving container, or against a surviving pool, MUST NOT be accepted as evidence.
+The install SHALL be verified to have exercised the create path rather than reused what was on the disk, and the verification SHALL be made from inside the run rather than by comparison with a later one.
+`zpool history zroot` MUST open with a `zpool create` entry timestamped inside the install session, and `zpool get -H -o value guid zroot` MUST differ from the pool GUID recorded before the wipe.
+A run that reused a surviving pool MUST NOT be accepted as evidence, whatever else it reports.
+No second install is performed to establish this: the ISO-boot-to-installed-machine path was demonstrated by the install of 2026-07-19, and re-proving it would cost another irreversible destroy-and-recreate cycle while establishing nothing new.
 
-#### Scenario: a re-run against a surviving container or pool proves nothing
+#### Scenario: a run that reuses what is on the disk proves nothing
 
-- **WHEN** disko's `lib/types/luks.nix:202` guard `if ! blkid "$dev" || ! cryptsetup isLuks "$dev"` finds a valid container and skips `luksFormat`, `:275-276`'s `if ! systemd-cryptenroll "$dev" | grep -qw fido2` finds a surviving enrollment and skips the FIDO2 enrollment, `:257-258`'s `cryptsetup open --test-passphrase` finds the passphrase already accepted and adds no key, `lib/types/zpool.nix:298` reuses a pool that already imports, logging "not creating zpool as a pool with that name already exists", and `lib/types/zfs_fs.nix:94`'s `zfs get type` probe skips creation of datasets that already exist
+- **WHEN** disko's `lib/types/zpool.nix:298` reuses a pool that already imports, logging "not creating zpool as a pool with that name already exists", `lib/types/zfs_fs.nix:94`'s `zfs get type` probe skips creation of datasets that already exist, and — on any disk carrying a LUKS header — `lib/types/luks.nix:202`'s `if ! blkid "$dev" || ! cryptsetup isLuks "$dev"` skips `luksFormat`, `:275-276`'s `if ! systemd-cryptenroll "$dev" | grep -qw fido2` skips the FIDO2 enrollment, and `:257-258`'s `cryptsetup open --test-passphrase` adds no key
 - **THEN** the run re-applies neither the container's format nor any of its keyslots nor `ashift` nor any create-time dataset property, so it goes green having exercised no create path at all
-- **AND** such a run is NOT accepted as evidence of re-runnability, because the criterion would be satisfied tautologically
-- **AND** the FIDO2 skip is the sharpest instance, because a surviving enrollment makes the second install appear to have enrolled a token it never touched, which is a false green about the machine's own unlock credential
+- **AND** such a run is NOT accepted, because the criterion would be satisfied tautologically
+- **AND** the pool arm is the one live on this machine, because the disk carries a pre-D1 `zroot` whose ZFS labels a `blkdiscard` that did not reach the media would leave in place
+- **AND** the three LUKS arms are recorded as a property of the layout for any future reinstall rather than as an acceptance criterion of this change, because this disk carries no LUKS header before the install and no surviving-header skip can occur — the FIDO2 arm is the sharpest of them, since a surviving enrollment would make an install appear to have enrolled a token it never touched
 
-#### Scenario: the second install destroys the pool first
+#### Scenario: the wipe precedes the install so the create path runs
 
-- **WHEN** the re-runnability criterion is exercised
-- **THEN** the disk is wiped as the recorded path's first step, per the wipe requirement above, so the second install formats a new LUKS container and creates the pool and datasets from scratch
-- **AND** the check confirms that `cryptsetup luksUUID <device>-part2` differs from the UUID recorded after the first install, that `cryptsetup luksDump <device>-part2` shows exactly one `systemd-fido2` token and no surviving keyslot 0 from the throwaway `openssl rand` key disko wipes, that `zpool get -H -o value guid zroot` differs from the guid recorded after the first install, and that `zpool get ashift zroot` returns `12`, since those are the properties a skipped create path would silently leave unverified
-- **AND** the second token's enrollment and the LUKS2 header backup are both destroyed by this re-run and MUST be redone against the new container afterward, because disko enrolls only the first token and a header backup taken against the previous container decrypts nothing and restores nothing
+- **WHEN** the recorded path is executed
+- **THEN** the disk is wiped as its first step, per the wipe requirement above, so the install formats a new LUKS container and creates the pool and datasets from scratch
+- **AND** the pool GUID is recorded before the wipe, from `zpool import`'s listing on the installer, because after the wipe there is nothing left to read a baseline from
+- **AND** the checks after the install confirm that `zpool history zroot` opens with a create entry inside the session, that the pool GUID differs from that baseline, that `cryptsetup luksDump <device>-part2` shows exactly one `systemd-fido2` token and no surviving keyslot 0 from the throwaway `openssl rand` key disko wipes, and that `zpool get ashift zroot` returns `12`, since those are the properties a skipped create path would silently leave unverified
+- **AND** `cryptsetup luksUUID <device>-part2` is recorded as the container's identity for the header-backup filename rather than as a discriminator, because no earlier UUID exists on this disk for it to differ from
+- **AND** the second token's enrollment and the LUKS2 header backup are created against this container afterward, because disko enrolls only the first token and no header backup can predate the container
 
 ---
 
@@ -129,9 +134,9 @@ The first and third scenarios below are decidable by `nix eval` against the buil
 
 #### Scenario: the credentials survive the wipe because they are repository state
 
-- **WHEN** the recorded install path is re-run from a fresh ISO boot and its `blkdiscard` first step destroys `/var/lib` along with the rest of the disk
+- **WHEN** the recorded install path runs from a fresh ISO boot and its `blkdiscard` first step destroys `/var/lib` along with the rest of the disk
 - **THEN** the SSID and the PSK are unaffected, because they are sops-encrypted clan vars in the repository rather than state on the machine
-- **AND** the reinstalled machine associates with no operator entering credentials, which is what makes the post-install association check an observation that can fail rather than a step that produces its own result
+- **AND** the installed machine associates with no operator entering credentials, which is what makes the post-install association check an observation that can fail rather than a step that produces its own result
 
 #### Scenario: the zerotier unmanaged rule is already correct and nothing is added for it
 
