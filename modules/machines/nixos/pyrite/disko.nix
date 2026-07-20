@@ -1,4 +1,17 @@
 # Disko disk configuration for pyrite (Apple MacBookPro14,1, UEFI boot, LUKS2-encrypted ZFS root)
+#
+# Do not run `clan machines update pyrite` while this D1 layout is in the tree and
+# the machine still carries its pre-D1 ZFS-native root. Nothing here destroys data:
+# disko's destructive scripts are system.build.* outputs no activation path invokes,
+# and the update runs only switch-to-configuration boot then switch. The hazard is a
+# boot hazard. The new generation becomes the default systemd-boot entry and its
+# initrd waits on a LUKS container this disk does not have, so the machine stops at
+# an unlock that cannot be satisfied. Recovery is selecting an earlier generation at
+# the boot menu, and it is physical-only: boot.initrd.network.enable is false, so
+# there is no initrd SSH, and there is no TPM. Two settings compound it --
+# boot.loader.timeout is 5, and kernel.panic is 20, so an unattended panic reboots
+# straight back into the same failing entry indefinitely. The rule lifts once the
+# Phase 7 reinstall has actually created the container.
 { ... }:
 {
   # Sibling-file auto-merge into the pyrite host module (no import statement), the
