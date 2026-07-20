@@ -584,3 +584,20 @@ Third, whether `systemd-cryptsetup@cryptroot.service` is ordered after `systemd-
 Under the ZFS path that edge was explicit at `zfs.nix:162-165` and is what guaranteed the SPI keyboard modules were modprobed before the prompt was issued.
 The cryptsetup unit is generator-produced and its ordering has not been read, so the stage-1 verdict records this as a residual rather than a settled property.
 If the edge is absent the prompt can be issued before the keyboard is live, which the unbounded ZFS timeout previously made harmless and which `systemd-cryptsetup`'s own timeout behaviour may not.
+
+### Predicted: pyrite cannot boot unattended after this change
+
+This is a prediction about the enrollment task 7.3 will perform, not an observed property of a container that does not exist yet, and it is recorded here rather than as a decision for that reason.
+Both unlock paths D1 specifies require a person at the machine.
+The token path is a FIDO2 client PIN typed on the internal keyboard followed by a physical touch, because `systemd-cryptenroll` defaults to `--fido2-with-client-pin=yes` and both tokens carry a PIN (D25), and the touch is a user-presence assertion the token will not waive.
+The passphrase path is a roughly 45-character string typed blind at a stage-1 prompt.
+There is no third path: `boot.initrd.network.enable` is forced false (task 2.5), so there is no initrd SSH to answer the prompt over, and this machine has no TPM to unlock against.
+Every boot therefore stops until someone is physically present, which is a change in kind from the fleet's five cloud machines, all of which boot to a reachable state with nobody watching.
+
+This matters operationally rather than only as a property, because reboots are reachable from the mesh while the unlock is not.
+`clan machines update pyrite` installs a generation whose kernel and initrd take effect on the next boot, an operator can issue `systemctl reboot` over ZeroTier, and D22's `kernel.panic = 20` reboots the machine on a hung task with no operator involved at all.
+Any of those leaves a machine that was administrable a moment earlier sitting at an unlock prompt until a person reaches it.
+
+The confirming check after the install, which does not depend on any of the above being right: `cryptsetup luksDump --dump-json-metadata <device>-part2` and read the `systemd-fido2` token object's user-presence and client-PIN-required fields.
+Those two fields are what decide whether the token unlock is interactive, and they are recorded by the enrollment rather than by this document.
+If either reads false the prediction is wrong in that direction and the note is corrected against the header rather than argued about.
