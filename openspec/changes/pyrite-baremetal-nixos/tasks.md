@@ -147,8 +147,11 @@ The rule therefore holds until 7.3's reinstall has actually created the containe
   There is then no route to the machine at all except its own console.
   Run from the repository root, as a saved script or the heredoc below rather than as a paste:
 
+  Save it to a file and run it as `bash /tmp/pyrite-secrets-gate.sh` from the repository root; do not paste it. stibnite's interactive shell is fish, which supports neither the `<<'SH'` heredoc an earlier form of this task used nor `$?`, so a pasted form errors on its first line and an exit-status line reports nothing.
+
   ```bash
-  bash <<'SH'
+  # /tmp/pyrite-secrets-gate.sh -- run from the repository root as:
+  #   bash /tmp/pyrite-secrets-gate.sh
   set -euo pipefail
   PYRITE_AGE_PUB=age1eajmgz9zvq639zjnmqcaklst6u3s7un8k68nd4klnnlswgtrnylq7twk4v
 
@@ -171,13 +174,11 @@ The rule therefore holds until 7.3's reinstall has actually created the containe
 
   clan vars check pyrite
   echo "PRE-INSTALL SECRETS GATE: PASS"
-  SH
-  echo "exit=$?"
   ```
 
   Three properties of that block are load-bearing and were absent from the form this task first carried, which could pass while the gate it names had failed.
   `set -euo pipefail` is what makes the first three statements stop the run: they carry no `|| exit` of their own, so without it a missing or misnamed `sops/secrets/pyrite-age.key/secret` printed one error line, fell through into the loop, and terminated on `clan vars check pyrite`, whose exit status is independent of `sops/secrets/` — leaving the operator looking at a successful last command having just walked through the early-return branch this check exists to close.
-  The heredoc is what keeps the loop's `exit 1` arms from closing an interactive shell, which is the shell the operator needs in order to read the failure.
+  Running it as a saved script rather than a paste is what keeps the loop's `exit 1` arms from closing an interactive shell, which is the shell the operator needs in order to read the failure.
   And the trailing `PASS` line makes a pass affirmative rather than the absence of a visible error; `exit=0` alone is what the defective form also printed.
 
   The recipient arm is not redundant with the decrypt arm, and that distinction is the point of the check rather than a flourish: a var the operator can read but pyrite cannot is exactly the shape of the WiFi failure above, and only the recipient arm catches it.
