@@ -32,6 +32,15 @@ The install is driven from the admin box (stibnite).
 The internal disk's namespace-explicit device path is `/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1` — the `_1` namespace, matching the disko layout's `device`.
 Substitute `<installer-ip>` throughout with the address the booted installer reports for its wireless interface.
 
+## Which host runs which command
+
+Every command block in this note opens with a `# host:` comment naming the machine that command runs on, and no block mixes hosts.
+Three hosts appear: `stibnite` is the admin box, `pyrite (installer)` is pyrite running the booted installer ISO, and `pyrite (installed)` is pyrite running its own installed system.
+The distinction is load-bearing rather than bookkeeping.
+`blkdiscard` and every `/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_...` path below name pyrite's internal disk, and stibnite has a device namespace of its own in which the same commands run against stibnite's disk without complaint.
+The install steps that bracket the wipe run on stibnite, so an operator working down the page without reading the host lines is one paste away from discarding the wrong machine's disk.
+Read the `# host:` line before typing anything.
+
 ## Boot the installer and authorize a key
 
 The install artifact is an upstream stock NixOS graphical installer ISO, `dd`-written to external media, carrying no key, credential, or machine closure (D18).
@@ -55,12 +64,14 @@ sshd is already running on the stock installer; no `systemctl start sshd` is nee
 From the admin box, authorize a key against the running installer session:
 
 ```bash
+# host: stibnite
 ssh-copy-id nixos@<installer-ip>
 ```
 
 Appending the public key directly is equivalent and is the form the recorded run used, from the machine's own GNOME session rather than from the admin box:
 
 ```bash
+# host: pyrite (installer), from the GNOME session on the machine itself
 curl -sSL https://github.com/cameronraysmith.keys >> ~/.ssh/authorized_keys
 ```
 
@@ -70,6 +81,7 @@ It is not written to the installer media, so it must be repeated if the installe
 Then place the same key for root:
 
 ```bash
+# host: pyrite (installer)
 sudo mkdir -p /root/.ssh && sudo cp ~/.ssh/authorized_keys /root/.ssh/
 ```
 
@@ -90,18 +102,31 @@ Keep nixos-anywhere's default phases; do not drop `kexec`, because dropping it r
 ## The recorded install path
 
 The path's first step wipes the disk explicitly, at every offset rather than only at the partition table, and only then invokes `clan machines install`.
+The three steps do not run on one host: step 0 and step 2 run on stibnite, and step 1 runs on pyrite's booted installer.
+They are written as three blocks for that reason, and the middle one is the one that destroys a disk.
 
 ```bash
-# 0. Realise nixos-anywhere on the admin box BEFORE the wipe. Substitutable
-#    from cache.nixos.org: 22 paths, 78.9 MiB.
+# host: stibnite
+# 0. Realise nixos-anywhere BEFORE the wipe. Substitutable from
+#    cache.nixos.org: 22 paths, 78.9 MiB.
 nix build --no-link /nix/store/2svzjf9qgwn6m2i69mqpjlb5n94dgm5g-nixos-anywhere-1.13.0
 nix path-info /nix/store/2svzjf9qgwn6m2i69mqpjlb5n94dgm5g-nixos-anywhere-1.13.0
+```
 
+```bash
+# host: pyrite (installer)
 # 1. Wipe the target disk at every offset. THIS IS THE POINT OF NO RETURN:
 #    macOS on the internal disk is destroyed here. This is the last step
 #    whose success the operator can observe before the install commits.
+#    This by-id path names pyrite's internal NVMe. Run it in a shell on
+#    the booted installer -- over ssh from stibnite or at pyrite's own
+#    console -- never in a stibnite shell, where the same command finds
+#    stibnite's own devices.
 blkdiscard /dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1
+```
 
+```bash
+# host: stibnite
 # 2. Install. --update-hardware-config is left at its default of `none`;
 #    the committed machines/pyrite/facter.json is what the build consumes.
 clan machines install pyrite \
@@ -196,8 +221,11 @@ Under the prior ZFS-native encryption there was no such header to lose, so this 
 The container is partition 2 of the internal disk, so every command below targets the by-id `-part2` path the install's other `cryptsetup` steps use:
 
 ```bash
+# host: pyrite (installed)
 part2=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2
 ```
+
+Every block in this section runs on pyrite, on the installed system, against that path — with the single exception of the Bitwarden upload, which happens at stibnite and is called out where it appears.
 
 ### Capturing and storing the header backup
 
@@ -205,6 +233,7 @@ The backup is roughly 16 MiB — the LUKS2 header and its keyslot area — and i
 Capture it to RAM-backed tmpfs, encrypt the copy that leaves the machine to the `&admin-user` recovery recipient, then remove the plaintext:
 
 ```bash
+# host: pyrite (installed)
 uuid=$(cryptsetup luksUUID "$part2")   # provenance: the container UUID
 today=$(date +%F)                      # provenance: the capture date, YYYY-MM-DD
 
@@ -237,6 +266,7 @@ Restoration reverses the capture and keeps the same tmpfs hygiene, since the dec
 It needs the `&admin-user` identity, the same key that decrypts the machine's vars, and a tmpfs mount, which `/dev/shm` and `/run` both provide on any NixOS or rescue environment:
 
 ```bash
+# host: pyrite (installed), or whatever rescue environment holds the container
 age -d -i <admin-user-identity> pyrite-luks-header-<YYYY-MM-DD>-<luksUUID>.age \
   > /dev/shm/pyrite-luks-header.img
 cryptsetup luksHeaderRestore "$part2" --header-backup-file /dev/shm/pyrite-luks-header.img
@@ -261,6 +291,7 @@ The triggers are every enrollment change without exception — the second-YubiKe
 Revocation removes one slot from the live header:
 
 ```bash
+# host: pyrite (installed)
 systemd-cryptenroll "$part2"                 # list the occupied slots and their types
 systemd-cryptenroll "$part2" --wipe-slot=<n> # remove slot n, the lost credential
 ```
