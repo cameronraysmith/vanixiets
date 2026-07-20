@@ -41,6 +41,108 @@ The distinction is load-bearing rather than bookkeeping.
 The install steps that bracket the wipe run on stibnite, so an operator working down the page without reading the host lines is one paste away from discarding the wrong machine's disk.
 Read the `# host:` line before typing anything.
 
+## Validating the LUKS2 layout in a VM before the install
+
+The container layout is exercised end to end in a QEMU VM before any hardware step, because the machine has no fallback OS and every mechanic D1 introduced is one whose omission is silent.
+disko emits `system.build.installTest` for every machine that declares a layout: it formats the declared devices inside a test VM, mounts and unmounts them, destroys and recreates them, installs the bootloader, and boots the result.
+The test runs on pyrite itself, against the currently installed system, and touches neither `zroot` nor the ESP — it builds derivations and runs QEMU against qcow2 files inside the build sandbox.
+It must run before the installer ISO is booted, since booting the ISO takes away the machine that runs it.
+
+pyrite is the only host in the fleet that can run it.
+The derivation carries `requiredSystemFeatures = kvm nixos-test` and builds for `x86_64-linux`; `modules/system/magnetite-builder.nix:31-41` deliberately does not advertise `kvm`, so the scheduler will not route there, and the rosetta builder is an aarch64 VM that cannot KVM-accelerate an x86_64 guest.
+
+The naive invocation does not work, and the reason is worth recording because three of the four obstacles are silent rather than loud.
+`nix build .#nixosConfigurations.pyrite.config.system.build.installTest` fails at evaluation on a `boot.zfs.devNodes` conflict — `disko/lib/tests.nix:201` sets `/dev` at normal priority against the host module's `/dev/disk/by-id`.
+Behind that, `passwordFile` and `additionalKeyFiles` both name `/run/partitioning-secrets/zfs/key`, which clan-cli materialises only during a real install, so `cryptsetup luksAddKey` would read a file that does not exist.
+And `enrollFido2 = true` sends `disko/lib/types/luks.nix:275-302` into `wait_for_token`, which polls `ls /dev/hidraw*` forever; `installTest` passes no `enableCanokey`, so the test VM has no token to find and the run hangs rather than failing.
+disko's own FIDO2 coverage sets `enableCanokey = true` explicitly and `installTest` has no way to.
+
+The test therefore runs against a configuration that overrides exactly those four things and nothing else.
+pyrite has no checkout of this repository, so the tree has to be put there first — pushing the bookmark and cloning it is what leaves a revision the runbook can name, which `rsync` does not:
+
+```bash
+# host: stibnite
+jj git push -b pyrite-baremetal-nixos
+```
+
+```bash
+# host: pyrite (installed)
+git clone --branch pyrite-baremetal-nixos --single-branch \
+  https://github.com/cameronraysmith/vanixiets.git /root/vanixiets
+cd /root/vanixiets
+git rev-parse HEAD
+sha256sum modules/machines/nixos/pyrite/disko.nix flake.lock
+```
+
+Confirm the two hashes match stibnite's before going further; they, and not the derivation path, are what establish that the tree under test is the tree that was written.
+The derivation path differs legitimately between a dirty colocated worktree and a clean checkout, so a mismatch there is a prompt to diff rather than a failure.
+
+Write the test expression outside the repository:
+
+```nix
+# host: pyrite (installed) -- /root/pyrite-luks-vmtest.nix
+let
+  flake = builtins.getFlake (toString /root/vanixiets);
+  lib = flake.inputs.nixpkgs.lib;
+in
+(flake.nixosConfigurations.pyrite.extendModules {
+  modules = [
+    {
+      boot.zfs.devNodes = lib.mkForce "/dev/disk/by-id";
+      disko.devices.disk.primary.content.partitions.zfs.content = {
+        enrollFido2 = lib.mkForce false;
+        passwordFile = lib.mkForce "/tmp/secret.key";
+        additionalKeyFiles = lib.mkForce [ "/tmp/additionalSecret.key" ];
+      };
+      boot.initrd.systemd.enable = true;
+      disko.tests.enableOCR = true;
+      disko.tests.bootCommands = ''
+        machine.wait_for_text("[Pp]assphrase for")
+        machine.send_chars("secretsecret\n")
+      '';
+      disko.tests.extraChecks = ''
+        machine.succeed("cryptsetup isLuks /dev/vda2")
+        machine.succeed("test -e /dev/disk/by-id/dm-name-cryptroot")
+        machine.succeed("zpool get -H -o value ashift zroot | grep -x 12")
+        machine.succeed("zfs get -H -o value encryption zroot/root | grep -x off")
+        machine.succeed("zfs get -H -o value xattr zroot/root | grep -x sa")
+        machine.succeed("zfs get -H -o value acltype zroot/root | grep -x posixacl")
+        machine.succeed("echo -n additionalSecret > /tmp/additionalSecret.key")
+        machine.succeed("cryptsetup open --test-passphrase --key-file=/tmp/additionalSecret.key /dev/vda2")
+      '';
+    }
+  ];
+}).config.system.build.installTest
+```
+
+```bash
+# host: pyrite (installed)
+nix build --impure --expr 'import /root/pyrite-luks-vmtest.nix' -L \
+  --out-link /root/pyrite-luks-vmtest-result 2>&1 | tee /root/pyrite-luks-vmtest.log
+echo "exit=${PIPESTATUS[0]}"
+```
+
+The criterion is `exit=0` with `/root/pyrite-luks-vmtest-result` resolving to a store path containing `log.html`.
+The test driver aborts the derivation on the first failing step, so a non-zero exit names the failing command in the log and there is nothing to interpret in a green run.
+`meta.timeout = 600` in disko's harness is a Hydra hint that `nix build` does not enforce; the enforced limits are the driver's 900-second per-command defaults, so an OCR misread of the passphrase prompt surfaces as a fifteen-minute hang rather than an error.
+
+Each override is a stated divergence rather than a convenience.
+`boot.zfs.devNodes` resolves the conflict in pyrite's favour and not the harness's, which is the point: keeping `/dev/disk/by-id` is what forces the booted VM's `zfs-import-zroot` to find the pool through the dm udev rules' `dm-name-cryptroot` symlink, and forcing the harness value `/dev` would sidestep the mechanism the test exists to check.
+disko justifies `/dev` on the grounds that `/dev/disk/by-id` is empty in QEMU VMs, which holds for virtio disks, whose by-id entries QEMU does not supply, and not for device-mapper nodes, whose symlinks the dm udev rules produce.
+`boot.initrd.systemd.enable` is restored explicitly because `enrollFido2` was the only thing setting it, and the prompt under test is systemd's `systemd-ask-password` rather than the scripted initrd's.
+The two key files are deliberately different so that the `cryptsetup luksAddKey` branch stays live instead of short-circuiting on `--test-passphrase`; the harness writes both with `echo -n`, which is what makes the post-boot `--test-passphrase` check severe against the trailing-newline failure D27 turns on.
+
+What a green run establishes is bounded, and the boundary matters.
+It establishes that the LUKS2 container is created on the ESP's sibling with the nested `zfs` content registering `/dev/mapper/cryptroot` as the pool's vdev, that a passphrase slot added through `additionalKeyFiles` opens the container, that stage 1 renders the prompt and the typed passphrase unlocks it, that `zpool import -d /dev/disk/by-id` finds the pool, and that `ashift`, `xattr`, `acltype`, and `encryption=off` read back as declared.
+It establishes nothing about the FIDO2 tap: `enrollFido2` is off, so `systemd-cryptenroll`, the `--wipe-slot=0` that removes the throwaway format key, and the `fido2-device=auto` crypttab option are all absent, and because `enrollFido2` is what turns on the autogenerated format password, the test formats directly with the passphrase and never exercises the format-then-add-then-wipe ordering.
+It establishes nothing about the clan vars path, since `passwordFile` is redirected away from it, nor about the `_1` namespace, Apple's ESP-by-type discovery, the SPI keyboard, the i915 framebuffer, `blkdiscard`, or the 4096-byte sector premise behind `ashift = 12` — QEMU reports 512-byte sectors and the check passes only because the value is explicit.
+One reading is actively misleading: the harness asserts that a second format against a surviving container leaves the data intact, which is the same `luks.nix:202` skip task 7.12 exists to catch, asserted here as a pass.
+A green run is not evidence for 7.12 and points the wrong way if read as such.
+
+Memory is the only tight resource on pyrite: 16 G total against 4 concurrent build jobs, a live GNOME session, and ZFS ARC.
+Run it with the desktop idle, or stop `display-manager` first, and drop to `-j 2` if the machine starts swapping.
+Plan on 20 to 45 minutes, dominated by fetching the flake's input sources — pyrite holds its own system closure but none of the lock's sources, because that closure was built on stibnite and pushed.
+
 ## Boot the installer and authorize a key
 
 The install artifact is an upstream stock NixOS graphical installer ISO, `dd`-written to external media, carrying no key, credential, or machine closure (D18).
