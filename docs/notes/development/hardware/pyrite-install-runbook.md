@@ -489,21 +489,26 @@ Under the prior ZFS-native encryption there was no such header to lose, so this 
 The container is partition 2 of the internal disk, so every command below targets the by-id `-part2` path the install's other `cryptsetup` steps use:
 
 ```bash
-# host: pyrite (installed)
+# host: pyrite (installed), in a root shell (sudo -i)
 part2=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2
 ```
 
-Every block in this section runs on pyrite, on the installed system, against that path — with the single exception of the Bitwarden upload, which happens at stibnite and is called out where it appears.
+Every block in this section runs on pyrite, on the installed system, against that path — with the single exception of the Bitwarden upload and the transfer that feeds it, which happen at stibnite and are called out where they appear.
+Every `cryptsetup` and `systemd-cryptenroll` call below requires root, so enter a root shell once with `sudo -i` and run the pyrite blocks inside it; `$part2` is a shell variable and does not survive a change of shell, and neither does the `$HOME` these paths would otherwise resolve against.
 
 ### Capturing and storing the header backup
 
 The backup is roughly 16 MiB — the LUKS2 header and its keyslot area — and it is key material, because it contains the keyslots themselves.
-Capture it to RAM-backed tmpfs, encrypt the copy that leaves the machine to the `&admin-user` recovery recipient, then remove the plaintext:
+Capture it to RAM-backed tmpfs, encrypt the copy that leaves the machine to the `&admin-user` recovery recipient, then remove the plaintext.
+The whole block runs in a root shell — enter one with `sudo -i` first and stay in it for the entire block — rather than under per-command `sudo`.
+`luksUUID`, `luksHeaderBackup`, and `shred` all require root, so per-command `sudo` would run them correctly and still leave `$HOME` bound to the operator's own home, writing the `.age` to `/home/cameron` while every later step in this section reaches for `/root`.
+The destination is written out as a literal `/root` path rather than left to `$HOME` so that the block is correct even if it is run some other way:
 
 ```bash
-# host: pyrite (installed)
+# host: pyrite (installed), in a root shell (sudo -i)
 uuid=$(cryptsetup luksUUID "$part2")   # provenance: the container UUID
 today=$(date +%F)                      # provenance: the capture date, YYYY-MM-DD
+backup=/root/pyrite-luks-header-$today-$uuid.age
 
 # cryptsetup opens the backup target with O_CREAT|O_EXCL and refuses a path that
 # already exists, so the target must not pre-exist -- which rules out /dev/stdout.
@@ -512,10 +517,14 @@ tmp=/dev/shm/pyrite-luks-header.$$.img
 cryptsetup luksHeaderBackup "$part2" --header-backup-file "$tmp"
 
 age -r age1vn8fpkmkzkjttcuc3prq3jrp7t5fsrdqey74ydu5p88keqmcupvs8jtmv8 \
-  -o "$HOME/pyrite-luks-header-$today-$uuid.age" "$tmp"
+  -o "$backup" "$tmp"
 
 shred -u "$tmp"
+ls -l "$backup"
 ```
+
+The trailing `ls -l` is the check that the file landed where the transfer below will look for it.
+It is worth the one line because the failure it catches is quiet and its consequence is not: a `.age` written to `/home/cameron` leaves the `scp` failing against `/root`, and the `rm` at the end of this section then deletes from whichever home the operator was not in, retiring a file that is still on the disk.
 
 The recipient is the `&admin-user` recovery key, the same human key that decrypts the machine's vars and that task 5.3 records as the sole human recipient of the passphrase var.
 A header backup is worthless unless it can be decrypted, and the `&admin-user` private half is the one demonstrably in our custody, while the offline `&admin` key's private half is not reliably held.
@@ -527,8 +536,10 @@ The `.age` is written on pyrite, and the Bitwarden upload happens at stibnite, s
 
 ```bash
 # host: stibnite
-scp root@pyrite.zt:'~/pyrite-luks-header-*.age' ~/
+scp 'root@pyrite.zt:/root/pyrite-luks-header-*.age' ~/
 ```
+
+The remote path is spelled out as `/root` rather than `~` because the shell that expands it is root's on pyrite and the two only agree when the capture block above ran in a root shell, which is the condition its own `ls -l` established.
 
 The `.age` file is ciphertext, so an ordinary copy over the mesh is sufficient and it can sit in the operator's home directory on stibnite until it is uploaded.
 Upload it to the machine's Bitwarden entry — the same `pyrite/zfs-root` entry that holds the passphrase — as a file attachment, so that entry holds only ciphertext; the header is never committed to this repository and never placed in sops.
@@ -542,8 +553,8 @@ rm ~/pyrite-luks-header-*.age
 ```
 
 ```bash
-# host: pyrite (installed)
-rm ~/pyrite-luks-header-*.age
+# host: pyrite (installed), in a root shell (sudo -i)
+rm /root/pyrite-luks-header-*.age
 ```
 
 Both deletions are tidiness rather than a security step, since the `.age` is ciphertext throughout; the plaintext was already destroyed by the `shred` above, on tmpfs, before the file left the machine.
