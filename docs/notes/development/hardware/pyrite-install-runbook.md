@@ -148,6 +148,15 @@ Plan on 20 to 45 minutes, dominated by fetching the flake's input sources — py
 The install artifact is an upstream stock NixOS graphical installer ISO, `dd`-written to external media, carrying no key, credential, or machine closure (D18).
 The image whose behaviour was measured on this unit is `nixos-graphical-26.05.5092.4382ed2b7a68-x86_64-linux.iso`, sha256 `61f409eeabb54d5289b91ce384cc33a7b1f82ac1cb22707407bf56f8bc4b9758`; the machine's only NIC is a BCM4350 driven by `brcmfmac`, and this image was observed loading that firmware unaided, which is why it is preferred over an unverified image at the one moment the disk is about to be destroyed.
 
+Boot media is required, and the reason is specific to this machine rather than general practice.
+nixos-anywhere can kexec into its own installer from a running NixOS system, which would ordinarily make an ISO unnecessary, and a reader who knows that will otherwise read this step as superstition and skip it.
+It is necessary here because pyrite's only physical NIC is WiFi — `wlp2s0`, with no ethernet port on the machine — and the kexec installer image cannot hold an 802.11 association.
+Its network restoration is layer 3 only: `nix/kexec-installer/module.nix` runs `restore-network`, built from `restore_routes.py`, which replays the addresses and routes captured by `ip --json` into systemd-networkd units matched on MAC address, and nothing more.
+The image force-disables NetworkManager (`nix/kexec-installer/module.nix:37`) and ships neither wpa_supplicant nor iwd — nixos-images' iwd configuration lives in `nix/image-installer/wifi.nix`, which the kexec installer does not import.
+Kexecing therefore drops the association and leaves the machine with no path back onto the network, stranding the install.
+The mesh is not an alternate route back in either: the kexec image carries none of pyrite's clan vars, including its ZeroTier identity.
+The USB installer gives an environment with NetworkManager and `nmtui`, in which the operator re-associates by hand before the install begins.
+
 Boot it with the Option key held at power-on; there is no firmware password.
 
 Select `NixOS 26.05.5092.4382ed2b7a68 Installer GNOME (Linux LTS)` at the GRUB menu.
