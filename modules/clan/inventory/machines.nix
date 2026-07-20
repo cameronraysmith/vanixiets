@@ -61,6 +61,17 @@
       deploy.targetHost = "root@magnetite.zt";
     };
 
+    pyrite = {
+      tags = [
+        "nixos"
+        "laptop"
+        "peer"
+      ];
+      machineClass = "nixos";
+      description = "Apple MacBookPro14,1 bare-metal NixOS laptop, zerotier peer";
+      deploy.targetHost = "root@pyrite.zt";
+    };
+
     blackphos = {
       tags = [
         "darwin"

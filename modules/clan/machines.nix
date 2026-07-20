@@ -21,6 +21,10 @@
       imports = [ config.flake.modules.nixos."machines/nixos/magnetite" ];
     };
 
+    pyrite = {
+      imports = [ config.flake.modules.nixos."machines/nixos/pyrite" ];
+    };
+
     blackphos = {
       imports = [ config.flake.modules.darwin."machines/darwin/blackphos" ];
     };

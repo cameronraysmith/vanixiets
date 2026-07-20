@@ -282,6 +282,14 @@ in
         ];
       };
 
+      # An untrusted remote-build account cannot push unsigned store paths: the
+      # daemon rejects them with "lacks a signature by a trusted key", which
+      # fails any derivation whose input is evaluated locally on stibnite and so
+      # exists nowhere a signature could come from. Deploys are unaffected
+      # because they connect as root. This list appends to the fleet-wide
+      # root/@wheel set in modules/system/nix-settings.nix.
+      nix.settings.trusted-users = [ "builder" ];
+
       # Bridge NixOS-level sops to home-manager for user secret key delivery.
       # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
       # ("crs58" via alias-fold inheritance).

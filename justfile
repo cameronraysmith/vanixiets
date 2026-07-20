@@ -1679,7 +1679,7 @@ sops-rotate:
 # Update keys for all encrypted files in secrets directory
 [group('sops')]
 update-all-keys:
-  fd -e yaml -e json . secrets/ -x sops updatekeys -y {}
+  fd -e yaml -e json -e enc . secrets/ -x sops updatekeys -y {}
 
 # Provision a bridge secret for NixOS HM key delivery
 # Usage: just provision-bridge-key <sops-identity> [bw-item-name]
