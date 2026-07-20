@@ -54,6 +54,8 @@ The install SHALL be verified to have exercised the create path rather than reus
 `zpool history zroot` MUST open with a `zpool create` entry timestamped inside the install session, and `zpool get -H -o value guid zroot` MUST differ from the pool GUID recorded before the wipe.
 A run that reused a surviving pool MUST NOT be accepted as evidence, whatever else it reports.
 No second install is performed to establish this: the ISO-boot-to-installed-machine path was demonstrated by the install of 2026-07-19, and re-proving it would cost another irreversible destroy-and-recreate cycle while establishing nothing new.
+That install ran the pre-D1 ZFS-native layout, so it is evidence for the ISO-boot-to-installed-machine path and for nothing about the LUKS2 container, the FIDO2 enrollment, or `additionalKeyFiles` (D29).
+The install this change performs is therefore the first exercise of the LUKS create path on this machine, not a repeat of one, and it runs on a machine with no fallback operating system.
 
 #### Scenario: a run that reuses what is on the disk proves nothing
 
