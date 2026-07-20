@@ -62,6 +62,22 @@ in
       # this restatement conflicts with nothing.
       boot.zfs.forceImportRoot = true;
 
+      # Order the initrd pool import after the LUKS unlock (D24). nixpkgs'
+      # createImportService gives zfs-import-zroot only
+      # after = [ systemd-modules-load systemd-ask-password-console ] and no ordering on
+      # cryptsetup of any kind, because it is written for pools whose vdevs are ordinary
+      # partitions; here the vdev is /dev/mapper/cryptroot, produced by
+      # systemd-cryptsetup@cryptroot.service. wants (not requires) so a wrong instance name
+      # degrades to the import script's own ~60s poll loop rather than failing the boot.
+      # The container is named cryptroot in disko.nix, which is what fixes this unit name.
+      # boot.initrd.luks.fido2Support is deliberately NOT set: it selects the legacy
+      # fido2luks path and luksroot.nix asserts systemd.enable -> !fido2Support, failing
+      # eval; systemd-cryptsetup detects the FIDO2 slot from the header with no option.
+      boot.initrd.systemd.services."zfs-import-zroot" = {
+        after = [ "systemd-cryptsetup@cryptroot.service" ];
+        wants = [ "cryptsetup.target" ];
+      };
+
       # networking.hostId: deliberately unset (D7). Inherit clan-core's
       # mkDefault "8425e349" (nixosModules/clanCore/zfs.nix:10), which matches the
       # install ISO and nixos-anywhere so the installer that creates the pool and the
