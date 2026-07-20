@@ -107,6 +107,17 @@
 
 ## 7. Phase 7 — Install and post-install
 
+Standing rule for the whole of Phase 7: do not run `clan machines update pyrite` while the D1 disko restructure is in the tree and the machine still carries the pre-D1 ZFS-native root.
+The framing that circulated earlier — that such an update would brick pyrite — is wrong and must not be reproduced.
+Adversarial verification established the mechanism: disko's destructive scripts are `system.build.*` outputs that no activation path invokes, and `clan machines update` runs `switch-to-configuration boot` followed by `switch` and nothing else.
+The running system is untouched, no data is at risk, the pool is not destroyed, and the partitioning passphrase var is not regenerated.
+The actual hazard is narrower and is a boot hazard rather than a data one: the new generation is installed as the default systemd-boot entry, and its initrd waits on a LUKS container that does not exist on this disk, so the machine stops at an unlock that can never be satisfied.
+Recovery is selecting an earlier generation at the systemd-boot menu, and it is physical-only — there is no initrd network (`boot.initrd.network.enable` evaluates false, task 2.5), therefore no initrd SSH, and no TPM to unlock without a person present.
+Two settings compound it.
+`boot.loader.timeout` is 5, so the menu is a five-second window rather than a wait.
+`boot.kernel.sysctl."kernel.panic"` is 20 (task 9.2), so an unattended machine that panics reboots itself in twenty seconds straight back into the same failing default entry, and does so indefinitely.
+The rule therefore holds until 7.3's reinstall has actually created the container.
+
 - [ ] 7.1 Boot the stock installer ISO on the `NixOS 26.05.5092.4382ed2b7a68 Installer GNOME (Linux LTS)` entry and authorize a key for the `nixos` account — `ssh-copy-id nixos@<installer-ip>` from the running GNOME session, which writes `/home/nixos/.ssh/authorized_keys`; the authorization does not survive an installer reboot. The entry is not interchangeable with the others the menu offers: the two `*_latest_kernel` specialisations import `nixos/modules/installer/cd-dvd/latest-kernel.nix`, whose `:4` sets `boot.supportedFilesystems.zfs = false`, so booting one of them and proceeding runs 7.3's `blkdiscard`, destroys macOS, and then fails at `zpool create`. See D18 and the runbook's boot section.
   Performed once already, by appending https://github.com/cameronraysmith.keys to `/home/nixos/.ssh/authorized_keys` with `curl` from the machine's own session rather than by `ssh-copy-id` from the admin box; both forms write the same file and either discharges the step.
   It stays unchecked because that authorization was made on a `7.1.3` entry and does not survive the reboot onto the LTS entry this task now requires — the key lives in the live filesystem and is not written to the installer media — so it must be redone after that reboot, together with the root authorization the runbook adds
