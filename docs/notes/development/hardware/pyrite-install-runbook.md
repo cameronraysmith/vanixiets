@@ -553,13 +553,29 @@ clan-cli appends it automatically from the `neededFor = "partitioning"` generato
 The install path calls `run_generators` without `auto_accept_prompts`, whose default is `False`, so an install run with Phase 5 incomplete stops interactively on the admin box asking for the fleet SSID and PSK rather than failing.
 Phase 5.2 front-loads vars generation precisely so this ordering is already right and the install does not stop to prompt.
 
+### The install ends by rebooting pyrite
+
+The last phase of the install reboots the machine, and it does so on its own rather than on the operator's initiative.
+`clan machines install` passes `--no-reboot` only when it is asked for: `no_reboot` defaults to `False` (`clan_lib/machines/install.py:53`) and the flag is appended only when it is set (`:162-163`).
+With no `--phases` given either, clan runs `kexec`, `disko`, `install`, `reboot` in turn as four separate invocations (`:224`), so the reboot phase is part of every install this path performs.
+nixos-anywhere's reboot phase (`src/nixos-anywhere.sh:915-929` at 1.13.0) unmounts `/mnt`, disables swap, exports the pools so the next boot needs no forced import, then backgrounds `nohup sh -c 'sleep 6 && reboot'` at `:924` and blocks until the machine stops answering ssh.
+About six seconds after the install phase reports done, therefore, pyrite reboots itself, and stibnite prints "Waiting for the machine to become unreachable due to reboot" and then "Done!" for a machine that is already booting.
+That reboot is the first boot, and it is what the next section is about.
+
 ## The first boot, and proving both unlock paths
 
 The install leaves behind a machine that has never been unlocked, and both of its unlock paths have to be exercised before anything in the key-lifecycle section below is run (task 7.5).
 This section is two boots, not one, and the second is the one that matters.
 
-Remove the external installer SSD before powering the machine on, so that the boot under test is the installed system's rather than the installer's.
-Seat YubiKey-A — serial `32720759`, the token that was in the machine across the install — and leave it seated for this first boot.
+The first of the two has already started by the time this section is read.
+The install's reboot phase fires it about six seconds after the install phase completes, unattended, with YubiKey-A still seated and the external installer SSD still attached — so when stibnite prints "Done!" the operator's next move is to go to the machine, not to power anything on.
+The installer SSD cannot be removed before this boot, because the ISO on it is the running root right up to the reboot.
+Which device the machine comes back on is therefore not settled in advance.
+If it reaches the stage-1 unlock prompt on its own panel, that is the installed system and the boot under test; answer the prompt as below.
+If it returns to the installer's GNOME session instead, that is a boot-device selection rather than a failed install: shut down, remove the SSD, and boot again, and the choice is then unambiguous.
+The SSD comes out at the shutdown between the two boots either way.
+
+YubiKey-A — serial `32720759`, the token that was in the machine across the install — stays seated for this first boot.
 
 Stage 1 renders a `systemd-ask-password` prompt on the internal panel, and answering it takes two things in sequence.
 First the token's FIDO2 client PIN, typed at the keyboard; the PIN is asked for because the pre-wipe `ykman fido info` gate confirmed a client PIN is set on this token, and `libfido2-util.c:802-804` drops the PIN requirement only for a token that reports `clientPin` false.
@@ -567,7 +583,7 @@ Then a physical touch on the token itself.
 The touch is not announced and the prompt does not change when the PIN is accepted, so a boot that appears to hang after the PIN is a boot waiting for a finger.
 The prompt waits with an unbounded timeout, which is why the USB-C keyboard or adapter has to be in the room already rather than sourced now: if the internal SPI keyboard does not bind on this boot, the external keyboard is the only way to answer the prompt, and until it is answered the machine has no reachable state at all.
 
-Then shut down, physically remove YubiKey-A, and boot a second time with no token seated at all.
+Then shut down, physically remove YubiKey-A — and the installer SSD, if it is still attached — and boot a second time with no token seated at all.
 Stage 1 asks for a passphrase, and the clan-vars ZFS root passphrase must unlock the container.
 This boot is not optional and it is not a formality.
 The passphrase is the only recovery credential this machine has — a token can be lost, and the header holds nothing else a person can supply — so an unverified fallback is indistinguishable from an absent one until the token is gone, at which point the pool is unrecoverable.
