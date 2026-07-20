@@ -225,6 +225,8 @@ The rule therefore holds until 7.3's reinstall has actually created the containe
   clan wrote it during the install and the update is committed
 - [ ] 7.12a Once 7.5's two unlock paths have both been exercised and 7.6 has read the container back, complete the credential set against the container 7.3 produced: enroll the second YubiKey with the first removed, and take a `cryptsetup luksHeaderBackup`. Both are additions to that container rather than replacements of an earlier one — disko enrolls only the first token (D25), so the second is an operation on the running system, and no header backup exists before this step because no container did.
   There is deliberately no second install behind this task; D29 records why, and the numbering gap at 7.12 is where the dropped one stood.
+  Carry the clan-vars passphrase to the machine before starting: `systemd-cryptenroll --fido2-device=auto` must first unlock the container with an existing credential and prompts for one, and this procedure removes YubiKey-A precisely so the `auto` resolution is unambiguous — which leaves the passphrase as the only credential still able to satisfy that unlock.
+  It is readable from stibnite with `clan vars get pyrite zfs/key` and typed at pyrite's console, so an operator who arrives with both tokens and no passphrase cannot perform the step at all.
 
   Write down a serial → slot-index map at the moment of each enrollment, not afterward.
   The two tokens are designated: YubiKey-A is serial `32720759`, the token seated in pyrite today, which disko enrolls during 7.3; YubiKey-B is the token resident in stibnite, enrolled here at 7.12a with A physically removed so `--fido2-device=auto` resolves unambiguously.
