@@ -151,9 +151,17 @@ The check that settles it is the post-wipe verification above, not the command's
 
 The wipe uses `blkdiscard`, not `sgdisk --zap-all` and not `wipefs -a` on the whole disk.
 This follows the form clan-core's own encrypted-root guide prescribes at `docs/src/guides/disk-encryption.md:84-88`.
-Zapping the GPT first is actively harmful on a re-run: disko's `disk-deactivate.jq` reaches `zpool destroy -f` and `zpool labelclear -f` only through partition-level children reported by `lsblk`, so a disk with no partition table presents no children, the partition-level wipe never runs, the whole-disk `wipefs` and `dd bs=440` touch disk offsets only while the ZFS labels live inside the second partition, disko then recreates its deterministic layout so that partition reappears at the same offset with its labels intact, and `zpool import -N -f "zroot"` reuses the old pool under the old passphrase — the tautological green the re-runnability criterion forbids, produced by the step meant to prevent it.
-`blkdiscard` against the `_1` namespace path destroys labels at every offset and has no such hole.
-If `blkdiscard` is ever unavailable, the fallback order is absolute: `zpool labelclear -f <device>-part2`, then `sgdisk --zap-all`, then `wipefs -a`, in that order, because the labelclear depends on the partition table the zap destroys.
+Under D1's container the reason is restated rather than carried across from the ZFS-native layout, because what survives a partial wipe is no longer a pool.
+Partition 2's `fstype` is now `crypto_LUKS` and not `zfs_member`, so disko's `disk-deactivate.jq` cannot reach its `zpool destroy -f` and `zpool labelclear -f` branch at `:7-9` for that partition at all — the branch is unreachable by type.
+What runs instead is the bare `wipefs --all -f` partition arm at `:42-45`, which erases the primary LUKS2 signature while leaving the secondary header and the whole 16 MiB keyslot area intact, so the old passphrase and the old FIDO2 enrollment survive a wipe that reads as complete.
+Zapping the GPT first is worse still: with no partition table there are no children for `lsblk` to report, so even that arm never runs, and the next install finds a valid header, skips `luksFormat` (`lib/types/luks.nix:202`), and skips the FIDO2 enrollment (`:276`) — the tautological green the re-runnability criterion forbids, produced by the step meant to prevent it.
+`blkdiscard` against the `_1` namespace path destroys the header, the keyslot area, and every label at every offset, and has no such hole.
+
+If `blkdiscard` is ever unavailable, the fallback order is absolute, and under D1's container it is no longer the ZFS one: `cryptsetup luksErase --batch-mode <device>-part2` first, then `dd if=/dev/zero of=<device>-part2 bs=1M count=32`, then `sgdisk --zap-all`, then `wipefs -a`.
+`luksErase` goes first because it needs a header that still probes, and every step below it destroys the magic that probe depends on.
+The 32 MiB overwrite follows because it covers both LUKS2 headers and the whole default 16 MiB keyslot area, rather than the primary signature alone.
+The zap precedes the whole-disk `wipefs` for the reason the ZFS-era order recorded, that a partition-scoped step depends on the partition table the zap destroys.
+`zpool labelclear -f <device>-part2` is dropped from the order rather than reordered: under a container p2 holds no ZFS labels to clear, because they live inside the container and are unreachable without opening it, so the command that used to open this list would now succeed at nothing and read as progress.
 
 ### Why the wipe is a step, not an assumption
 
