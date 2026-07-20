@@ -37,6 +37,15 @@ disko enrolls it during the install itself, at an unannounced moment inside the 
 The pre-wipe gate confirms it is the only token seated and that its client PIN is set; the second token stays in stibnite and is not brought near pyrite until the post-install enrollment.
 An install started with no token seated does not fail early — disko's own guard passes on this machine's SPI keyboard alone — it fails after `luksFormat` has already replaced the container, on a machine with no fallback OS.
 
+YubiKey-A's FIDO2 client PIN must be in the operator's possession before the disko phase begins, and this is a gate of the same order as the token and the keyboard.
+The pre-wipe `ykman fido info` gate establishes that a PIN is set on the token; it does not establish that the person at the machine knows it, and those are different facts.
+Nothing in this repository records the PIN itself: it is not a clan var, and the `pyrite/zfs-root` password-manager entry holds the ZFS passphrase, the slot inventory, and the header backup rather than the token's PIN.
+The PIN is the operator's to bring, and there is no place to look it up once the install has started.
+The prompt for it lands on stibnite in the middle of the disko phase, after the wipe, so an operator who set that PIN months ago and did not carry it to the install reaches the prompt with macOS already gone: `systemd-cryptenroll` cannot enroll, disko exits under the `set -efux` established at `lib/default.nix:1012` with `luksFormat` (`lib/types/luks.nix:244`) having already replaced the container, and recovery is a second `blkdiscard` and a full reinstall over WiFi.
+Wrong guesses are budgeted rather than free.
+The attempt count `ykman fido info` prints at the pre-wipe gate is that budget — read as eight remaining on both tokens — and exhausting it blocks the token's FIDO2 application, after which the token can satisfy neither this enrollment nor a later unlock until that application is reset, which erases the credentials it holds.
+The same PIN is typed again at the first boot, on pyrite's own keyboard, so it has to survive the install rather than only reach it.
+
 The install is driven from the admin box (stibnite).
 The internal disk's namespace-explicit device path is `/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1` — the `_1` namespace, matching the disko layout's `device`.
 Substitute `<installer-ip>` throughout with the address the booted installer reports for its wireless interface.
