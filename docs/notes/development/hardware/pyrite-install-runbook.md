@@ -307,9 +307,13 @@ On a machine with no fallback OS that is an unrecoverable post-wipe abort, produ
 
 The second proves on the admin box that every secret whose silent absence costs pyrite its network or its remote access is present, decryptable, and encrypted to pyrite:
 
+Save it to a file and run it with an explicit `bash`; do not paste it into the shell.
+stibnite's interactive shell is fish, which supports neither the `<<'SH'` heredoc an earlier revision of this block used nor `$?`, so a pasted form errors on its first line and a `$?` result line reports nothing.
+Writing it to `/tmp/pyrite-secrets-gate.sh` and invoking `bash /tmp/pyrite-secrets-gate.sh` from the repository root is correct under any interactive shell, and it is also what keeps the loop's `exit 1` arms from closing the operator's own shell — the shell needed to read the failure.
+
 ```bash
-# host: stibnite, from the repository root
-bash <<'SH'
+# host: stibnite -- /tmp/pyrite-secrets-gate.sh, run from the repository root
+#   as: bash /tmp/pyrite-secrets-gate.sh
 set -euo pipefail
 PYRITE_AGE_PUB=age1eajmgz9zvq639zjnmqcaklst6u3s7un8k68nd4klnnlswgtrnylq7twk4v
 
@@ -332,15 +336,11 @@ done
 
 clan vars check pyrite
 echo "PRE-INSTALL SECRETS GATE: PASS"
-SH
-echo "exit=$?"
 ```
 
-Run it as a saved script or as the heredoc above, not as a paste, and take the `PASS` line as the pass rather than the absence of a visible error.
-Three properties of the block are load-bearing.
+The single line `PRE-INSTALL SECRETS GATE: PASS` is the pass, and nothing else is.
+Do not read the absence of a visible error as the pass, and do not add an exit-status line: a status echoed after the `bash` invocation reports the wrapper rather than the gate, and in fish it reports nothing at all.
 `set -euo pipefail` is what makes the first three statements stop the run: they carry no `|| exit` of their own, so without it a missing or misnamed `sops/secrets/pyrite-age.key/secret` prints one error line, falls through into the loop, and terminates on `clan vars check pyrite`, whose exit status is independent of `sops/secrets/` — leaving the operator looking at a successful last command having just walked through the early-return branch this gate exists to close.
-The heredoc is what keeps the loop's `exit 1` arms from closing the operator's own shell, which is the shell needed to read the failure.
-And the trailing `PASS` line is the affirmative signal; `exit=0` alone is what the failing form also prints.
 
 The machine age key is the branch this gate exists to close.
 clan supplies `--extra-files` itself — `clan_lib/machines/install.py:162-168` passes it unconditionally, populated at `:141-147` into the machine's `clan.core.vars.sops.secretUploadDirectory`, which pyrite evaluates to `/var/lib/sops-nix`, the same path `config.sops.age.keyFile` reads `key.txt` from — so the delivery is by construction.
@@ -774,7 +774,11 @@ Restoration reverses the capture and keeps the same tmpfs hygiene, since the dec
 It needs the `&admin-user` identity, the same key that decrypts the machine's vars, and a tmpfs mount, which `/dev/shm` and `/run` both provide on any NixOS or rescue environment:
 
 ```bash
-# host: pyrite (installed), or whatever rescue environment holds the container
+# host: pyrite (installed), or whatever rescue environment holds the container.
+# The assignment is repeated here rather than inherited: this block can run in a
+# rescue shell in which the section's opening block never ran.
+part2=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2
+
 age -d -i <admin-user-identity> pyrite-luks-header-<YYYY-MM-DD>-<luksUUID>.age \
   > /dev/shm/pyrite-luks-header.img
 cryptsetup luksHeaderRestore "$part2" --header-backup-file /dev/shm/pyrite-luks-header.img
