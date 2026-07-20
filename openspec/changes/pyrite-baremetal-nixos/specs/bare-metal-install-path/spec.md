@@ -202,7 +202,7 @@ Disko's `wait_for_token` MUST NOT be relied upon as that verification.
 #### Scenario: the verification names the token rather than counting hidraw nodes
 
 - **WHEN** the pre-wipe check runs
-- **THEN** it enumerates FIDO2 tokens specifically — `fido2-token -L` listing at least one device, or `ykman fido info` returning a PIN-attempt count — rather than testing `ls /dev/hidraw*`, which the keyboard already satisfies
+- **THEN** it enumerates FIDO2 tokens specifically — `fido2-token -L` listing exactly one device, or `ykman fido info` returning a PIN-attempt count — rather than testing `ls /dev/hidraw*`, which the keyboard already satisfies
 - **AND** it confirms exactly one token is seated, because `--fido2-device=auto` requires exactly one and disko passes no device path
 
 #### Scenario: the second token is a post-install step, not part of the install
