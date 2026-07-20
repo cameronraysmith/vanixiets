@@ -274,7 +274,7 @@ The two mechanism-independent facts carry over unchanged: the ask-password conso
 ### D12: build host
 
 - **Choice**: no new configuration. stibnite already provisions two x86_64-linux builders — `nix-rosetta-builder` locally and `magnetite-builder` natively, the latter preferred by speed factor.
-- **Travel caveat**: magnetite is reachable only over the ZeroTier mesh, so an install performed away from the mesh falls back to the Rosetta-translated local builder. Slower, always available, and it does not block. Stated because travel-readiness is an acceptance criterion.
+- **Travel caveat, corrected**: magnetite is reachable only over the ZeroTier mesh, and an install performed away from the mesh does *not* silently fall back to the Rosetta-translated local builder. `nix-rosetta-builder` advertises `x86_64-linux` (`modules/machines/darwin/stibnite/default.nix:205-207`) but is stopped by default on stibnite and the install does not start it, so `checkBuildLocally`'s trivial-derivation probe finds no answering builder, `buildOn` resolves to `remote`, and in nixos-anywhere `remote` means the target machine — the installer ISO, over WiFi, in tmpfs, whose disk has just been discarded. The pre-wipe builder gate is what catches this, and it is a hard stop: if it fails, start the Rosetta builder and confirm it answers before proceeding. An earlier revision of this decision said the local builder is "always available" and "does not block"; that reading is what would invite an operator to reason past the gate, and it is corrected here. Stated because travel-readiness is an acceptance criterion.
 
 ### D13: the install mechanics, as they actually resolve
 
