@@ -292,6 +292,22 @@ in
       services.displayManager.gdm.enable = true;
       services.desktopManager.gnome.enable = true;
 
+      # Encrypted-root administration tools, in the closure rather than fetched on demand.
+      # The reinstall is the deploy, so a tool absent here is absent on the machine that
+      # comes back, and every post-install check (sgdisk -p, cryptsetup luksDump, the
+      # luksUUID discriminator, the systemd-cryptenroll readback) plus the recurring
+      # `cryptsetup luksHeaderBackup | age -r` lifecycle runs on pyrite itself, whose only
+      # NIC is the WiFi the install can plausibly have broken. libfido2 supplies
+      # fido2-token for identifying the seated token; yubikey-manager is deliberately
+      # omitted, since its distinct capabilities (serial, FIDO PIN retries) are vendor
+      # administration outside the unlock and verification path.
+      environment.systemPackages = with pkgs; [
+        cryptsetup
+        gptfdisk
+        age
+        libfido2
+      ];
+
       # Bridge NixOS-level sops to home-manager for user secret key delivery.
       # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
       # ("crs58" via alias-fold inheritance).
