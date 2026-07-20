@@ -65,8 +65,14 @@ pyrite has no checkout of this repository, so the tree has to be put there first
 
 ```bash
 # host: stibnite
+jj bookmark set pyrite-baremetal-nixos -r @-
 jj git push -b pyrite-baremetal-nixos
+jj log -r @- --no-graph -T 'commit_id'   # the revision the clone must land on
 ```
+
+The bookmark move is not optional and it is the step most easily skipped.
+`jj git push -b` pushes wherever the bookmark points; it does not advance the bookmark to the chain tip, so a bookmark left where it was last set publishes a revision that predates every change since, and the clone below then puts that stale tree on pyrite as the tree under test.
+Setting it to `@-` immediately before the push is what makes the pushed revision the one being read.
 
 ```bash
 # host: pyrite (installed)
@@ -77,8 +83,9 @@ git rev-parse HEAD
 sha256sum modules/machines/nixos/pyrite/disko.nix flake.lock
 ```
 
-Confirm the two hashes match stibnite's before going further; they, and not the derivation path, are what establish that the tree under test is the tree that was written.
-The derivation path differs legitimately between a dirty colocated worktree and a clean checkout, so a mismatch there is a prompt to diff rather than a failure.
+Confirm three things match stibnite's before going further: the two hashes, and `git rev-parse HEAD` equal to the commit id `jj log -r @-` printed on stibnite.
+The hashes establish that the layout and the lock are the ones that were written; the commit-id equality is what catches the whole tree being stale, which the hashes cannot, since a bookmark left behind can still carry a matching `disko.nix`.
+Neither is the derivation path, which differs legitimately between a dirty colocated worktree and a clean checkout, so a mismatch there is a prompt to diff rather than a failure.
 
 Write the test expression outside the repository:
 
