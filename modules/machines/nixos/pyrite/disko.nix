@@ -116,8 +116,9 @@
           rootFsOptions = {
             compression = "lz4";
             "com.sun:auto-snapshot" = "true";
-            # Both inherit to every dataset and are settled in this create window (7.12's
-            # reinstall is the last scheduled occasion to influence root-dataset creation).
+            # Both inherit to every dataset and are settled in this create window (7.3's
+            # destroy-and-recreate is the only scheduled occasion to influence
+            # root-dataset creation; D29).
             # xattr=sa stores extended attributes inline in the dnode; acltype=posixacl is
             # needed because journald applies POSIX ACLs to the per-user journals under
             # /var/log/journal and a pool without it drops them silently. Both are settable

@@ -31,6 +31,12 @@ The moment it is needed is the stage-1 passphrase prompt, which waits with an un
 Confirm the keyboard or adapter is on hand before booting the installer, not after a prompt goes unanswered.
 The mechanism, and why the two keyboards reach the initrd by different routes, is in "USB-C keyboard is a first-boot prerequisite" below.
 
+YubiKey-A — serial `32720759` — must be seated in pyrite before the disko phase begins and must stay seated through it, and this is as hard a gate as the keyboard.
+It is named here rather than only at the enrollment section four hundred lines below because the token has to be in the machine long before that section is reached.
+disko enrolls it during the install itself, at an unannounced moment inside the disko phase, and the touch it asks for is a physical press on the token in the machine.
+The pre-wipe gate confirms it is the only token seated and that its client PIN is set; the second token stays in stibnite and is not brought near pyrite until the post-install enrollment.
+An install started with no token seated does not fail early — disko's own guard passes on this machine's SPI keyboard alone — it fails after `luksFormat` has already replaced the container, on a machine with no fallback OS.
+
 The install is driven from the admin box (stibnite).
 The internal disk's namespace-explicit device path is `/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1` — the `_1` namespace, matching the disko layout's `device`.
 Substitute `<installer-ip>` throughout with the address the booted installer reports for its wireless interface.
@@ -258,7 +264,7 @@ Launch the install from an attended terminal and neither question arises.
 Whether a PIN is asked for at all depends on the token rather than on the configuration.
 `cryptenroll.c:62` requests PIN and user presence both, and the layout passes no `extraFido2EnrollArgs` to change it, but `libfido2-util.c:802-804` clears the PIN requirement when the token reports its `clientPin` option false — which is what an authenticator that supports PINs but has none set reports.
 A token with no client PIN set therefore prompts only for the touch.
-This runs in the safe direction, one fewer blocking prompt rather than one more, and the pre-wipe `ykman fido info` gate above is what settles it in advance: it is there to confirm the PIN is set, and its answer is also the answer to how many prompts to expect.
+This runs in the safe direction, one fewer blocking prompt rather than one more, and the pre-wipe `ykman fido info` gate below is what settles it in advance: it is there to confirm the PIN is set, and its answer is also the answer to how many prompts to expect.
 
 The touch is unconditional.
 It is a physical press on the token seated in pyrite, at a moment that depends on how long `luksFormat` takes and is not announced in advance.
@@ -455,7 +461,8 @@ A measurement taken against a name that does not identify the disk is not eviden
 
 `blkdiscard` from util-linux 2.42 prints `/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1: contains existing partition (gpt).` and then performs the discard.
 This is a warning, not a refusal, and it reads exactly like one — the message names the obstacle and offers no result, so an operator reasonably reads it as the reason nothing happened.
-It was observed on the install and the wipe was verified complete afterward: zero non-zero bytes in the first 64 MiB, no filesystem or pool signatures, no GPT, and the offset the old APFS container occupied reading zeros.
+It was observed on the install of 2026-07-19 and the wipe was verified complete afterward: zero non-zero bytes in the first 64 MiB, no filesystem or pool signatures, no GPT, and the offset that run's APFS container occupied reading zeros.
+That APFS observation describes the disk as it stood before that install and not as it stands now — that install is what replaced APFS, and what p2 holds today is stated under "Why the wipe is a step, not an assumption" below.
 Do not go looking for a `--force` flag on the strength of this message.
 There is nothing to force and re-running the command changes nothing.
 The check that settles it is the post-wipe verification above, not the command's output.
@@ -812,7 +819,7 @@ Task 7.12a's second-YubiKey enrollment is not among them, because the ordering a
 Revocation removes one slot from the live header:
 
 ```bash
-# host: pyrite (installed)
+# host: pyrite (installed), in a root shell (sudo -i)
 systemd-cryptenroll "$part2"                 # list the occupied slots and their types
 systemd-cryptenroll "$part2" --wipe-slot=<n> # remove slot n, the lost credential
 ```
