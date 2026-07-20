@@ -223,7 +223,13 @@ The installed system's `deploy.targetHost = "root@pyrite.zt"` (registration task
 
 The live ISO is itself the installer environment (`VARIANT_ID=installer`), so nixos-anywhere's kexec phase is a no-op: it returns immediately when the target is already an installer, and the running live-CD ssh access is exactly and sufficiently what the install consumes.
 This forecloses any "physical install, then update over the network" misconception — there is no second step.
-Keep nixos-anywhere's default phases; do not drop `kexec`, because dropping it rewrites the ssh connection to `root@` before the key is uploaded and breaks sudo escalation from the non-root installer session (D13).
+
+Do not pass a `--phases` flag by hand, in any form, for any reason.
+The prohibition is on operator-supplied flags only, and the distinction is not pedantry: clan itself passes phases one at a time internally, so a reader watching the install and seeing `--phases` on the wire must not conclude the rule is wrong or that the same flag is safe to add.
+The mechanism is that any operator-supplied `--phases` value zeroes `phases[kexec]`, and `src/nixos-anywhere.sh:978-983` then rewrites `sshConnection` to `root@${sshHost}` whenever the `kexec` phase is absent.
+It does so before `uploadSshKey` at `:983`, which wraps `ssh-copy-id` in an `until ... sleep 3` loop with no abort condition, against a root account whose empty password sshd refuses (`installation-device.nix:48`).
+The result is an unbounded hang on "Uploading install SSH keys" rather than a failure, and it lands after the irreversible wipe, on a machine that no longer has an operating system to fall back to (D13).
+Authorizing root up front, as above, is what makes that path terminate if the flag is ever passed by accident; it is a hedge, not a licence to pass one.
 
 ## The recorded install path
 
