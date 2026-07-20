@@ -415,10 +415,31 @@ Encrypting to `&admin-user` puts the header backup and the passphrase var under 
 On tmpfs the RAM backing is the real protection and `shred` is belt-and-suspenders — a plain `rm` would remove it as well — but the plaintext is gone before the operator moves on either way.
 The capture date and container UUID travel in the filename so a stale backup is identifiable without decrypting it, and the UUID ties the backup to one `luksFormat`: a re-install mints a new UUID (task 7.6 records it), so a backup whose UUID no longer matches the live container restores nothing.
 
-The `.age` file is ciphertext and can sit in the operator's home directory until it is uploaded.
+The `.age` is written on pyrite, and the Bitwarden upload happens at stibnite, so the file has to cross between the two hosts before anything can be uploaded or deleted:
+
+```bash
+# host: stibnite
+scp root@pyrite.zt:'~/pyrite-luks-header-*.age' ~/
+```
+
+The `.age` file is ciphertext, so an ordinary copy over the mesh is sufficient and it can sit in the operator's home directory on stibnite until it is uploaded.
 Upload it to the machine's Bitwarden entry — the same `pyrite/zfs-root` entry that holds the passphrase — as a file attachment, so that entry holds only ciphertext; the header is never committed to this repository and never placed in sops.
 Bitwarden file attachments require a paid plan and the ~16 MiB backup is well within the per-attachment size limit, so confirm the account allows attachments before relying on this path.
-Delete the local `.age` once the upload succeeds — it is only ciphertext, so this is tidiness rather than a security step.
+
+Once the upload succeeds, delete the `.age` on both hosts — the copy on stibnite and the original on pyrite:
+
+```bash
+# host: stibnite
+rm ~/pyrite-luks-header-*.age
+```
+
+```bash
+# host: pyrite (installed)
+rm ~/pyrite-luks-header-*.age
+```
+
+Both deletions are tidiness rather than a security step, since the `.age` is ciphertext throughout; the plaintext was already destroyed by the `shred` above, on tmpfs, before the file left the machine.
+Stating both is what keeps a stray copy from being left on whichever host the operator was not thinking about.
 
 ### Restoring the header
 
