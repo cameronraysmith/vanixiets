@@ -237,6 +237,24 @@ The path's first step wipes the disk explicitly, at every offset rather than onl
 The three steps do not run on one host: step 0 and step 2 run on stibnite, and step 1 runs on pyrite's booted installer.
 They are written as three blocks for that reason, and the middle one is the one that destroys a disk.
 
+This install cannot be driven hands-off, and the operator has to plan on being at the machine for the whole disko phase rather than starting it and walking away.
+Two prompts land in the middle of it and neither can be scheduled.
+The FIDO2 enrollment asks for the token's PIN, and it asks on stibnite, over the `-t` ssh tty the install holds open — so the terminal that started the install has to stay attended.
+It then requires a physical touch on the token seated in pyrite, at a moment that depends on how long `luksFormat` takes and is not announced in advance.
+Both fall after the wipe.
+An unattended run reaches the touch, waits, and leaves the machine with a formatted container, no enrolled token, and no operating system.
+
+```bash
+# host: stibnite
+# Confirm an x86_64-linux builder answers, BEFORE the wipe.
+sudo nix store info --store ssh-ng://builder@magnetite
+```
+
+Require the `Version:` and `Trusted:` lines to appear.
+A non-zero exit, or an `ssh: connect to host` line, means there is no reachable x86_64-linux builder; restore ZeroTier connectivity to magnetite before proceeding.
+This is checked rather than assumed because the failure is silent in the expensive direction: nixos-anywhere runs at `--build-on auto`, so with no builder answering it does not fail, it falls back to building pyrite's entire closure on the installer ISO — on the machine whose disk has just been discarded, over WiFi, in a tmpfs-backed live environment.
+`ping6 -c 3 fddb:4344:343b:14b9:399:930f:39db:40d2` is a cheaper liveness check that needs no sudo, but ICMP does not prove the store is answering and does not replace the probe above.
+
 ```bash
 # host: stibnite
 # 0. Realise nixos-anywhere BEFORE the wipe. Substitutable from
