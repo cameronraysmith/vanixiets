@@ -235,7 +235,7 @@ Authorizing root up front, as above, is what makes that path terminate if the fl
 
 The path's first step wipes the disk explicitly, at every offset rather than only at the partition table, and only then invokes `clan machines install`.
 The three steps do not run on one host: step 0 and step 2 run on stibnite, and step 1 runs on pyrite's booted installer.
-They are written as three blocks for that reason, and the middle one is the one that destroys a disk.
+They are written as separate blocks for that reason, and step 1 — together with the post-wipe verification that immediately follows it, which also runs on the installer — is the part that destroys a disk.
 
 This install cannot be driven hands-off, and the operator has to plan on being at the machine for the whole disko phase rather than starting it and walking away.
 Two prompts land in the middle of it and neither can be scheduled.
@@ -343,6 +343,29 @@ nix path-info /nix/store/2svzjf9qgwn6m2i69mqpjlb5n94dgm5g-nixos-anywhere-1.13.0
 #    stibnite's own devices.
 blkdiscard /dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1
 ```
+
+Verify the wipe took, before running the install and while the machine can still be looked at:
+
+```bash
+# host: pyrite (installer)
+disk=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1
+
+# 1a. First 64 MiB reads as zeroes. Must print 0.
+dd if="$disk" bs=1M count=64 status=none | tr -d '\0' | wc -c
+
+# 1b. No filesystem, RAID, or partition-table signature anywhere. Must print nothing.
+wipefs -n "$disk"
+
+# 1c. No partition table. Must open with "Creating new GPT entries in memory."
+#     and list no partitions. -p reads and reports only; it writes nothing.
+sgdisk -p "$disk"
+```
+
+All three are required, because each is blind to what the others catch.
+The `dd` arm covers the offsets the old APFS container occupied and is the only one that speaks to bulk content, but it reads the head of the disk alone and says nothing about the secondary GPT at the tail.
+`wipefs -n` probes every signature offset libblkid knows, including that secondary header, and reports magic rather than content, so it passes over a region that is nonzero but carries no recognised signature.
+`sgdisk -p` is the arm that names a surviving partition table outright; on a wiped disk it announces that it is inventing GPT entries in memory, which is the pass, and a printed geometry with partitions listed is the failure.
+A `blkdiscard` that reported success and left any of the three failing means the discard did not reach the media, and the install must not be started.
 
 ```bash
 # host: stibnite
