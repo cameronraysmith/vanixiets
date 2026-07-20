@@ -613,7 +613,7 @@ And prefer the authoritative artifact over the archive — the `initrd-nixos.con
 The same class of error also reached a store path that had not been realised locally, where `find` and `ls` returned empty and read as evidence of absence.
 The general rule is that an empty result is evidence only once the query itself has been shown to work.
 
-## Key lifecycle: header backup, YubiKey enrollment, and revocation
+## Key lifecycle: YubiKey enrollment, header backup, and revocation
 
 D1's move to a LUKS2 container places a discrete header at the head of the container partition, and that header holds every keyslot, so losing or corrupting it loses the pool no matter how many credentials are enrolled or how many tokens are in hand (D26).
 Under the prior ZFS-native encryption there was no such header to lose, so this maintenance is new material rather than an inherited practice.
@@ -627,8 +627,53 @@ part2=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2
 Every block in this section runs on pyrite, on the installed system, against that path — with the single exception of the Bitwarden upload and the transfer that feeds it, which happen at stibnite and are called out where they appear.
 Every `cryptsetup` and `systemd-cryptenroll` call below requires root, so enter a root shell once with `sudo -i` and run the pyrite blocks inside it; `$part2` is a shell variable and does not survive a change of shell, and neither does the `$HOME` these paths would otherwise resolve against.
 
+The order of the two subsections that follow is normative rather than editorial, and it is stated in `specs/encrypted-zfs-root/spec.md`: the header backup is taken once the container's keyslots reach their intended state, which is after the second token is enrolled and not before.
+A backup frozen ahead of that enrollment records a two-slot container, and restoring it later silently un-enrolls YubiKey-B (D26) while the `pyrite/zfs-root` slot inventory continues to describe a container the attached backup does not match.
+Enroll first, then capture.
+
+### Enrolling the second token
+
+Two YubiKey 5C Nano tokens unlock this container, and they are designated here so the slot inventory below has names to record against.
+YubiKey-A is serial `32720759`, the token seated in pyrite across the install, which disko enrolls during the install itself.
+YubiKey-B is the token resident in stibnite, which the install never touches and which is enrolled by the block below afterward.
+The install enrolls only the first, because disko's guard at `lib/types/luks.nix:276` skips enrollment once any `fido2` slot exists, so this is an operation on the running system rather than a step of the install.
+
+This is not the "Replacing a lost token" procedure below, and that procedure's `--wipe-slot` must not be run here.
+Nothing is being revoked at this point, and wiping YubiKey-A's slot to make room for B destroys a working credential.
+
+Three preconditions hold before the block runs, and each is a stop rather than an advisory.
+The container exists and both of its unlock paths have been exercised: the token path and the passphrase path, on the two boots "The first boot, and proving both unlock paths" above requires, and `## Verifying the install` has passed against the container those boots opened.
+This one is first because the block below asks the operator to remove their only proven credential, and it is only proven if the second of those boots actually happened.
+YubiKey-A is physically removed and YubiKey-B is the only token seated, because `systemd-cryptenroll --fido2-device=auto` resolves only where exactly one token answers and this layout passes no device path; with both seated the enrollment either refuses or lands against whichever token it resolved, and the slot map is then recorded wrong in a way the header cannot be re-read to correct (D25).
+The clan-vars passphrase is in hand, at the machine, before the block starts: `--fido2-device=auto` does not add a slot to a container it cannot open, it prompts for an existing credential first, and with A removed the passphrase is the only credential still able to authorize the enrollment.
+It is readable from stibnite with `clan vars get pyrite zfs/key` and from the `pyrite/zfs-root` password-manager entry, but it is typed at pyrite's own console, so it has to be carried there deliberately rather than looked up from the console after the prompt appears.
+
+```bash
+# host: pyrite (installed), in a root shell (sudo -i), with YubiKey-A removed
+# and YubiKey-B the only token seated.
+part2=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2
+
+# Read B's serial while it is the only token answering. This is the value the
+# slot inventory records against the index the enrollment returns.
+nix-shell -p yubikey-manager --run 'ykman list'
+
+# Enroll it. This prompts for an existing credential first -- the passphrase --
+# and then for a touch on B.
+systemd-cryptenroll "$part2" --fido2-device=auto
+
+# Read the slot set back. Two fido2 slots must now be listed where one was
+# before, and the newly-appeared index is YubiKey-B's.
+systemd-cryptenroll "$part2"
+```
+
+The read-back is what produces the record rather than what confirms it.
+Both tokens report the same AAGUID, so once B is enrolled the header says nothing about which index holds which serial, and an index not written down at this moment cannot be recovered afterward.
+Record the index against B's serial in the `pyrite/zfs-root` entry per the slot inventory below.
+The keyslots have now reached their intended state, which is the condition the header backup waits on, so the capture section that follows runs next.
+
 ### Capturing and storing the header backup
 
+This runs after the enrollment above, never before it, so that the captured header is the three-credential one — YubiKey-A, YubiKey-B, and the passphrase — rather than a two-slot snapshot that a later restore would un-enroll B from.
 The backup is roughly 16 MiB — the LUKS2 header and its keyslot area — and it is key material, because it contains the keyslots themselves.
 Capture it to RAM-backed tmpfs, encrypt the copy that leaves the machine to the `&admin-user` recovery recipient, then remove the plaintext.
 The whole block runs in a root shell — enter one with `sudo -i` first and stay in it for the entire block — rather than under per-command `sudo`.
@@ -706,43 +751,6 @@ shred -u /dev/shm/pyrite-luks-header.img
 
 `luksHeaderRestore` reads the backup file rather than creating it, so it carries none of the `O_EXCL` constraint the capture does, and it prompts before it overwrites the live header.
 
-### Enrolling the second token
-
-Two YubiKey 5C Nano tokens unlock this container, and they are designated here so the slot inventory below has names to record against.
-YubiKey-A is serial `32720759`, the token seated in pyrite across the install, which disko enrolls during the install itself.
-YubiKey-B is the token resident in stibnite, which the install never touches and which is enrolled by the block below afterward.
-The install enrolls only the first, because disko's guard at `lib/types/luks.nix:276` skips enrollment once any `fido2` slot exists, so this is an operation on the running system rather than a step of the install.
-
-This is not the "Replacing a lost token" procedure below, and that procedure's `--wipe-slot` must not be run here.
-Nothing is being revoked at this point, and wiping YubiKey-A's slot to make room for B destroys a working credential.
-
-Three preconditions hold before the block runs, and each is a stop rather than an advisory.
-YubiKey-A is physically removed and YubiKey-B is the only token seated, because `systemd-cryptenroll --fido2-device=auto` resolves only where exactly one token answers and this layout passes no device path; with both seated the enrollment either refuses or lands against whichever token it resolved, and the slot map is then recorded wrong in a way the header cannot be re-read to correct (D25).
-The clan-vars passphrase is in hand, at the machine, before the block starts: `--fido2-device=auto` does not add a slot to a container it cannot open, it prompts for an existing credential first, and with A removed the passphrase is the only credential still able to authorize the enrollment.
-It is readable from stibnite with `clan vars get pyrite zfs/key` and from the `pyrite/zfs-root` password-manager entry, but it is typed at pyrite's own console, so it has to be carried there deliberately rather than looked up from the console after the prompt appears.
-
-```bash
-# host: pyrite (installed), in a root shell (sudo -i), with YubiKey-A removed
-# and YubiKey-B the only token seated.
-part2=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2
-
-# Read B's serial while it is the only token answering. This is the value the
-# slot inventory records against the index the enrollment returns.
-nix-shell -p yubikey-manager --run 'ykman list'
-
-# Enroll it. This prompts for an existing credential first -- the passphrase --
-# and then for a touch on B.
-systemd-cryptenroll "$part2" --fido2-device=auto
-
-# Read the slot set back. Two fido2 slots must now be listed where one was
-# before, and the newly-appeared index is YubiKey-B's.
-systemd-cryptenroll "$part2"
-```
-
-The read-back is what produces the record rather than what confirms it.
-Both tokens report the same AAGUID, so once B is enrolled the header says nothing about which index holds which serial, and an index not written down at this moment cannot be recovered afterward.
-Record the index against B's serial in the `pyrite/zfs-root` entry per the slot inventory below, then re-take the header backup, because a backup captured before this enrollment freezes a keyslot set the container no longer has.
-
 ### The slot inventory and its provenance
 
 Both YubiKey 5C Nano tokens report the same AAGUID and are physically identical, so once both are enrolled `systemd-cryptenroll "$part2"` lists two `fido2` slots with nothing in the header telling them apart (D25).
@@ -754,7 +762,8 @@ Record alongside it the capture date and container UUID of the header backup cur
 
 A header backup freezes the keyslot set exactly as it stood when taken, so restoring one that predates a revocation reinstates the revoked slot verbatim and decrypts the disk again (D26).
 The backup is thus itself an enrolled credential, and the retention rule is not "keep them all": after any change to the enrolled set, take a fresh backup, upload it, and delete the superseded Bitwarden attachment, because a stale attachment is an un-revoked credential sitting in storage.
-The triggers are every enrollment change without exception — the second-YubiKey enrollment in task 7.12a, taken against the container the single install produces, any revocation, and any future token added — and each re-runs the capture above and updates the slot inventory.
+The triggers are every enrollment change without exception — any revocation, any future token added, and any credential removed — and each re-runs the capture above and updates the slot inventory.
+Task 7.12a's second-YubiKey enrollment is not among them, because the ordering above puts that enrollment ahead of the first capture: the initial backup already records both tokens and the passphrase, so there is nothing to re-take for it.
 
 Revocation removes one slot from the live header:
 
