@@ -239,9 +239,23 @@ They are written as separate blocks for that reason, and step 1 — together wit
 
 This install cannot be driven hands-off, and the operator has to plan on being at the machine for the whole disko phase rather than starting it and walking away.
 Two prompts land in the middle of it and neither can be scheduled.
-The FIDO2 enrollment asks for the token's PIN, and it asks on stibnite, over the `-t` ssh tty the install holds open — so the terminal that started the install has to stay attended.
-It then requires a physical touch on the token seated in pyrite, at a moment that depends on how long `luksFormat` takes and is not announced in advance.
-Both fall after the wipe.
+The FIDO2 enrollment asks for the token's PIN, and it asks on stibnite, over the pty `ssh -t` allocates for the disko phase — so the terminal that started the install has to stay attended.
+That routing is conditional in two ways, and both are worth stating rather than assuming.
+
+nixos-anywhere decides the flag once at startup from `[ -t 0 ]` (`src/nixos-anywhere.sh:35-38`) and re-passes it on every `runSsh` (`:472-482`), which is what carries the disko script at `:854`; clan inherits its own fd 0 into that process, since `clan_lib/cmd/__init__.py:388-399` leaves `input` at `None` and sets `needs_user_terminal=True`.
+So the prompt lands on stibnite only while the install is launched from an interactive terminal.
+Under `nohup`, a redirect, a `tmux send-keys` pipeline, or a CI runner, the flag becomes `-T` and `systemd-cryptenroll` falls through `ask_password_auto` (`ask-password-api.c:1141-1145`) to the ask-password agent, which prompts on pyrite's own console and waits with `until = USEC_INFINITY` rather than returning an error.
+Neither branch aborts the script: a missing tty produces the same indefinite wait the touch does, not a post-wipe exit under `set -efux`.
+Launch the install from an attended terminal and neither question arises.
+
+Whether a PIN is asked for at all depends on the token rather than on the configuration.
+`cryptenroll.c:62` requests PIN and user presence both, and the layout passes no `extraFido2EnrollArgs` to change it, but `libfido2-util.c:802-804` clears the PIN requirement when the token reports its `clientPin` option false — which is what an authenticator that supports PINs but has none set reports.
+A token with no client PIN set therefore prompts only for the touch.
+This runs in the safe direction, one fewer blocking prompt rather than one more, and the pre-wipe `ykman fido info` gate above is what settles it in advance: it is there to confirm the PIN is set, and its answer is also the answer to how many prompts to expect.
+
+The touch is unconditional.
+It is a physical press on the token seated in pyrite, at a moment that depends on how long `luksFormat` takes and is not announced in advance.
+Both prompts fall after the wipe.
 An unattended run reaches the touch, waits, and leaves the machine with a formatted container, no enrolled token, and no operating system.
 
 ```bash
