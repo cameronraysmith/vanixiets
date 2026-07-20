@@ -27,7 +27,9 @@ The wifi credentials are shared clan vars under `vars/shared/wifi.fleet/`, so th
 
 A USB-C keyboard, or a USB-C-to-USB-A adapter for a USB-A keyboard, must be physically in the room before any boot in this procedure, and this is a gate rather than a recommendation.
 A MacBookPro14,1 has USB-C ports only and no USB-A port, so an adapter cannot be improvised at the moment it is needed.
-The moment it is needed is the stage-1 passphrase prompt, which waits with an unbounded timeout: if the internal SPI keyboard does not bind on a given boot, the external keyboard is the only way to answer it, and until it is answered the machine has no reachable state at all.
+The moment it is needed is the stage-1 unlock prompt: if the internal SPI keyboard does not bind on a given boot, the external keyboard is the only way to answer it, and until it is answered the machine has no reachable state at all — no network, no shell, and no initrd ssh, since `boot.initrd.network.enable` is forced false.
+How long that prompt waits before giving up is not established: the `boot.zfs.passwordTimeout = 0` unbounded wait belonged to the ZFS-native design and does not carry over to `systemd-cryptsetup`, whose query timeout under this configuration was not verified (D1's design records the same non-claim).
+The gate does not rest on the answer, and it holds harder if the wait turns out to be bounded rather than infinite.
 Confirm the keyboard or adapter is on hand before booting the installer, not after a prompt goes unanswered.
 The mechanism, and why the two keyboards reach the initrd by different routes, is in "USB-C keyboard is a first-boot prerequisite" below.
 
@@ -581,7 +583,8 @@ Stage 1 renders a `systemd-ask-password` prompt on the internal panel, and answe
 First the token's FIDO2 client PIN, typed at the keyboard; the PIN is asked for because the pre-wipe `ykman fido info` gate confirmed a client PIN is set on this token, and `libfido2-util.c:802-804` drops the PIN requirement only for a token that reports `clientPin` false.
 Then a physical touch on the token itself.
 The touch is not announced and the prompt does not change when the PIN is accepted, so a boot that appears to hang after the PIN is a boot waiting for a finger.
-The prompt waits with an unbounded timeout, which is why the USB-C keyboard or adapter has to be in the room already rather than sourced now: if the internal SPI keyboard does not bind on this boot, the external keyboard is the only way to answer the prompt, and until it is answered the machine has no reachable state at all.
+The USB-C keyboard or adapter has to be in the room already rather than sourced now: if the internal SPI keyboard does not bind on this boot, the external keyboard is the only way to answer the prompt, and until it is answered the machine has no reachable state at all.
+Do not count on the prompt waiting indefinitely while the keyboard is fetched — how long `systemd-cryptsetup` waits under this configuration was never measured, and the ZFS-native design's unbounded wait does not carry over to it.
 
 Then shut down, physically remove YubiKey-A — and the installer SSD, if it is still attached — and boot a second time with no token seated at all.
 Stage 1 asks for a passphrase, and the clan-vars ZFS root passphrase must unlock the container.
@@ -669,7 +672,7 @@ Wherever it is built, the closure is what nixos-anywhere pushes to the target; t
 A MacBookPro14,1 has USB-C ports only and no USB-A port.
 A USB-C keyboard, or a USB-C-to-USB-A adapter for a USB-A keyboard, must be physically present before the first boot after the install, not sourced after a failed boot.
 The internal keyboard is SPI-attached and reaches the stage-1 passphrase prompt through the profile's force-loaded SPI modules; if that path does not bind on the first boot, an external USB keyboard answers the prompt through `usbhid`, `hid-generic`, and `hid-apple`, which reach the initrd through udev autoloading rather than force-loading.
-The prompt waits with an unbounded timeout, so the recovery path is available — but only if the adapter or keyboard is already on hand, which on a USB-C-only machine cannot be improvised at the prompt.
+That recovery path is available only if the adapter or keyboard is already on hand, which on a USB-C-only machine cannot be improvised at the prompt, and it is not underwritten by any measured prompt timeout: `systemd-cryptsetup`'s query timeout under this configuration was not verified, so the keyboard being in the room is the whole of the guarantee.
 
 ## Verifying what is inside an initrd, and why the obvious check silently lies
 
