@@ -466,17 +466,34 @@ It is written out here as a labelled block for the same reason every other destr
 # depends on.
 disk=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1
 
+zpool labelclear -f "$disk-part2"
+zpool import                                    # must now list no zroot
 cryptsetup luksErase --batch-mode "$disk-part2"
 dd if=/dev/zero of="$disk-part2" bs=1M count=32
 sgdisk --zap-all "$disk"
 wipefs -a "$disk"
 ```
 
-Then run the post-wipe verification above against `$disk`, which is what settles whether the fallback took; the four commands report their own success and not the disk's state.
-`luksErase` goes first because it needs a header that still probes, and every step below it destroys the magic that probe depends on.
+The block serves two disk states and only one of them is the disk in front of the operator today, so two of its steps are each a no-op in the other's state and that is deliberate rather than redundant.
+On this install p2 holds a live pre-D1 `zroot` with ZFS labels and no LUKS header (task 7.16), so `labelclear` is the live arm and `luksErase` reports that the device is not a valid LUKS device.
+On any later reinstall p2 holds a LUKS2 container instead, so `luksErase` is the live arm and `labelclear` finds no label — the pool's labels are then inside the container and unreachable without opening it.
+Run both in the order given; neither destroys the magic the other probes for, because the two states are mutually exclusive.
+
+`labelclear` is first because it is the only step in this block that reaches the tail of the partition, and it is the step whose omission produces the failure the wipe exists to foreclose.
+ZFS writes four vdev labels: L0 and L1 at the head, L2 and L3 at the tail.
+`vdev_label_offset` (`module/zfs/vdev_label.c:163-171`) places labels 2 and 3 at `psize - VDEV_LABELS * sizeof(vdev_label_t) + l * sizeof(vdev_label_t)`, and with `vdev_label_t` at 256 KiB (`include/sys/vdev_impl.h:537-543`) and `VDEV_LABEL_END_SIZE = 2 * sizeof(vdev_label_t)` (`:561`), that is the last 512 KiB of the partition.
+The 32 MiB overwrite below covers the head and cannot reach them, `wipefs -a` on the whole disk reports and erases signatures at offsets libblkid knows and does not touch partition-interior ones, and disko then recreates a deterministic layout at identical offsets — so `zpool import -N -f "zroot"` at `lib/types/zpool.nix:298` finds the surviving tail labels, succeeds, and `:299` logs "not creating zpool zroot as a pool with that name already exists" while never applying `ashift`.
+That is the surviving-pool skip, produced by a fallback that reported success at every step.
+The `zpool import` on the line after `labelclear` is what settles it, and it has to run there rather than at the end: after `sgdisk --zap-all` there is no `$disk-part2` node left to read.
+
+`luksErase` precedes the overwrite because it needs a header that still probes, and every step below it destroys the magic that probe depends on.
 The 32 MiB overwrite follows because it covers both LUKS2 headers and the whole default 16 MiB keyslot area, rather than the primary signature alone.
-The zap precedes the whole-disk `wipefs` for the reason the ZFS-era order recorded, that a partition-scoped step depends on the partition table the zap destroys.
-`zpool labelclear -f "$disk-part2"` is dropped from the order rather than reordered: under a container p2 holds no ZFS labels to clear, because they live inside the container and are unreachable without opening it, so the command that used to open this list would now succeed at nothing and read as progress.
+Both partition-scoped steps precede the zap for the reason the ZFS-era order recorded, that a partition-scoped step depends on the partition table the zap destroys, and the zap precedes the whole-disk `wipefs` for the same reason.
+
+The fallback's pass criterion is not the post-wipe verification above, and running arm 1a against it produces a false failure.
+Arm 1a requires the disk's first 64 MiB to read as zeroes, which a `blkdiscard` achieves and this sequence does not: it zeroes p2's head, not the ESP region, so on a correctly-executed fallback arm 1a fails and the operator either halts on a successful wipe or concludes the criterion does not apply and proceeds with no check at all.
+The criterion for this block is instead its own three readings: `zpool import` listing no `zroot` immediately after `labelclear`, then `wipefs -n "$disk"` printing nothing, then `sgdisk -p "$disk"` opening with "Creating new GPT entries in memory." and listing no partitions.
+Arms 1b and 1c are those last two; arm 1a is the one that does not carry over.
 
 ### Why the wipe is a step, not an assumption
 
