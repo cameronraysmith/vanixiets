@@ -479,3 +479,9 @@ systemd-cryptenroll "$part2" --wipe-slot=<n> # remove slot n, the lost credentia
 
 Replacing a lost token means wiping its slot, seating the replacement alone, re-enrolling with `systemd-cryptenroll "$part2" --fido2-device=auto`, then re-taking the header backup and destroying the previous one.
 The passphrase slot is not wiped as part of this: it keeps the sequence survivable if the replacement enrollment fails partway, and it is what makes the procedure performable at all while no valid token is enrolled.
+
+Have the clan-vars passphrase in hand, at the machine, before starting any enrollment.
+`systemd-cryptenroll --fido2-device=auto` does not add a slot to a container it cannot open: it must first unlock the container with an existing credential, and it prompts for one.
+This binds hardest at task 7.12a, whose whole procedure removes YubiKey-A so that `--fido2-device=auto` resolves unambiguously to YubiKey-B — which leaves the passphrase as the only credential still available to satisfy that unlock.
+The passphrase lives in the `pyrite/zfs-root` password-manager entry (task 5.3) and is readable from stibnite with `clan vars get pyrite zfs/key`, but the enrollment is typed at pyrite's console, so it has to be carried there deliberately.
+An operator who arrives at the console with both tokens and no passphrase cannot perform the step at all.
