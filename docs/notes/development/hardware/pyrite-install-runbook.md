@@ -284,7 +284,7 @@ nix-shell -p libfido2 yubikey-manager --run 'fido2-token -L; ykman fido info'
 ```
 
 Require `fido2-token -L` to list exactly one device, and `ykman fido info` to report a PIN-attempt count, which is what confirms the client PIN is set.
-Exactly one, because disko passes no device path and `systemd-cryptenroll --fido2-device=auto` resolves only where the choice is unambiguous; the second token is enrolled after the install, in the key-lifecycle section below.
+Exactly one, because disko passes no device path and `systemd-cryptenroll --fido2-device=auto` resolves only where the choice is unambiguous; the second token is enrolled after the install, by the "Enrolling the second token" block in the key-lifecycle section below, and not by the "Replacing a lost token" procedure beside it, whose `--wipe-slot` prerequisite must not run here.
 With no network on the installer, `systemd-cryptenroll --fido2-device=list` is the in-closure substitute, since systemd is built `withFido2` and the call needs no privilege.
 It answers the device-presence half and not the client-PIN half, so a pass on it alone leaves the PIN unverified and has to be recorded as such.
 
@@ -631,6 +631,43 @@ shred -u /dev/shm/pyrite-luks-header.img
 ```
 
 `luksHeaderRestore` reads the backup file rather than creating it, so it carries none of the `O_EXCL` constraint the capture does, and it prompts before it overwrites the live header.
+
+### Enrolling the second token
+
+Two YubiKey 5C Nano tokens unlock this container, and they are designated here so the slot inventory below has names to record against.
+YubiKey-A is serial `32720759`, the token seated in pyrite across the install, which disko enrolls during the install itself.
+YubiKey-B is the token resident in stibnite, which the install never touches and which is enrolled by the block below afterward.
+The install enrolls only the first, because disko's guard at `lib/types/luks.nix:276` skips enrollment once any `fido2` slot exists, so this is an operation on the running system rather than a step of the install.
+
+This is not the "Replacing a lost token" procedure below, and that procedure's `--wipe-slot` must not be run here.
+Nothing is being revoked at this point, and wiping YubiKey-A's slot to make room for B destroys a working credential.
+
+Three preconditions hold before the block runs, and each is a stop rather than an advisory.
+YubiKey-A is physically removed and YubiKey-B is the only token seated, because `systemd-cryptenroll --fido2-device=auto` resolves only where exactly one token answers and this layout passes no device path; with both seated the enrollment either refuses or lands against whichever token it resolved, and the slot map is then recorded wrong in a way the header cannot be re-read to correct (D25).
+The clan-vars passphrase is in hand, at the machine, before the block starts: `--fido2-device=auto` does not add a slot to a container it cannot open, it prompts for an existing credential first, and with A removed the passphrase is the only credential still able to authorize the enrollment.
+It is readable from stibnite with `clan vars get pyrite zfs/key` and from the `pyrite/zfs-root` password-manager entry, but it is typed at pyrite's own console, so it has to be carried there deliberately rather than looked up from the console after the prompt appears.
+
+```bash
+# host: pyrite (installed), in a root shell (sudo -i), with YubiKey-A removed
+# and YubiKey-B the only token seated.
+part2=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2
+
+# Read B's serial while it is the only token answering. This is the value the
+# slot inventory records against the index the enrollment returns.
+nix-shell -p yubikey-manager --run 'ykman list'
+
+# Enroll it. This prompts for an existing credential first -- the passphrase --
+# and then for a touch on B.
+systemd-cryptenroll "$part2" --fido2-device=auto
+
+# Read the slot set back. Two fido2 slots must now be listed where one was
+# before, and the newly-appeared index is YubiKey-B's.
+systemd-cryptenroll "$part2"
+```
+
+The read-back is what produces the record rather than what confirms it.
+Both tokens report the same AAGUID, so once B is enrolled the header says nothing about which index holds which serial, and an index not written down at this moment cannot be recovered afterward.
+Record the index against B's serial in the `pyrite/zfs-root` entry per the slot inventory below, then re-take the header backup, because a backup captured before this enrollment freezes a keyslot set the container no longer has.
 
 ### The slot inventory and its provenance
 
