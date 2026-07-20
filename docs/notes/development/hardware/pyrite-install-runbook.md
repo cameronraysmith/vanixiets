@@ -34,7 +34,7 @@ Confirm the keyboard or adapter is on hand before booting the installer, not aft
 The mechanism, and why the two keyboards reach the initrd by different routes, is in "USB-C keyboard is a first-boot prerequisite" below.
 
 YubiKey-A — serial `32720759` — must be seated in pyrite before the disko phase begins and must stay seated through it, and this is as hard a gate as the keyboard.
-It is named here rather than only at the enrollment section four hundred lines below because the token has to be in the machine long before that section is reached.
+It is named here rather than only in "Key lifecycle: YubiKey enrollment, header backup, and revocation" — the last section of this note — because the token has to be in the machine long before that section is reached.
 disko enrolls it during the install itself, at an unannounced moment inside the disko phase, and the touch it asks for is a physical press on the token in the machine.
 The pre-wipe gate confirms it is the only token seated and that its client PIN is set; the second token stays in stibnite and is not brought near pyrite until the post-install enrollment.
 An install started with no token seated does not fail early — disko's own guard passes on this machine's SPI keyboard alone — it fails after `luksFormat` has already replaced the container, on a machine with no fallback OS.
@@ -512,7 +512,7 @@ Run both in the order given; neither destroys the magic the other probes for, be
 `labelclear` is first because it is the only step in this block that reaches the tail of the partition, and it is the step whose omission produces the failure the wipe exists to foreclose.
 ZFS writes four vdev labels: L0 and L1 at the head, L2 and L3 at the tail.
 `vdev_label_offset` (`module/zfs/vdev_label.c:163-171`) places labels 2 and 3 at `psize - VDEV_LABELS * sizeof(vdev_label_t) + l * sizeof(vdev_label_t)`, and with `vdev_label_t` at 256 KiB (`include/sys/vdev_impl.h:537-543`) and `VDEV_LABEL_END_SIZE = 2 * sizeof(vdev_label_t)` (`:561`), that is the last 512 KiB of the partition.
-The 32 MiB overwrite below covers the head and cannot reach them, `wipefs -a` on the whole disk reports and erases signatures at offsets libblkid knows and does not touch partition-interior ones, and disko then recreates a deterministic layout at identical offsets — so `zpool import -N -f "zroot"` at `lib/types/zpool.nix:298` finds the surviving tail labels, succeeds, and `:299` logs "not creating zpool zroot as a pool with that name already exists" while never applying `ashift`.
+The `dd` step in the block above covers the head of the partition and cannot reach them, `wipefs -a` on the whole disk reports and erases signatures at offsets libblkid knows and does not touch partition-interior ones, and disko then recreates a deterministic layout at identical offsets — so `zpool import -N -f "zroot"` at `lib/types/zpool.nix:298` finds the surviving tail labels, succeeds, and `:299` logs "not creating zpool zroot as a pool with that name already exists" while never applying `ashift`.
 That is the surviving-pool skip, produced by a fallback that reported success at every step.
 The `zpool import` on the line after `labelclear` is what settles it, and it has to run there rather than at the end: after `sgdisk --zap-all` there is no `$disk-part2` node left to read.
 
@@ -852,6 +852,10 @@ Revocation removes one slot from the live header:
 
 ```bash
 # host: pyrite (installed), in a root shell (sudo -i)
+# The assignment is repeated here rather than inherited: this block is the one
+# most likely to be run months later, in a shell where nothing above it ran.
+part2=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1-part2
+
 systemd-cryptenroll "$part2"                 # list the occupied slots and their types
 systemd-cryptenroll "$part2" --wipe-slot=<n> # remove slot n, the lost credential
 ```

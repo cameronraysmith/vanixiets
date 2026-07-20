@@ -145,7 +145,7 @@ The rule therefore holds until 7.3's reinstall has actually created the containe
   With no `key.txt` on the installed machine, sops-nix decrypts nothing: the deployed ZeroTier identity secret is unreadable, so `zerotierone` starts with no identity and mints a fresh one that cinnabar has not authorized, and `pyrite.zt` resolves to an address no live node holds.
   The fleet WiFi vars fail by the same silent path and compound it, because WiFi is this machine's only NIC — `clanServices/wifi/default.nix:126-141` reads the sops-nix paths at runtime into the NetworkManager secrets file, an unreadable file yields empty strings, and the interface never associates with no assertion and no eval-time error.
   There is then no route to the machine at all except its own console.
-  Run from the repository root, as a saved script or the heredoc below rather than as a paste:
+  Run from the repository root, as a saved script rather than as a paste:
 
   Save it to a file and run it as `bash /tmp/pyrite-secrets-gate.sh` from the repository root; do not paste it. stibnite's interactive shell is fish, which supports neither the `<<'SH'` heredoc an earlier form of this task used nor `$?`, so a pasted form errors on its first line and an exit-status line reports nothing.
 
