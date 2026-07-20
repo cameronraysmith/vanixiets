@@ -399,11 +399,27 @@ What runs instead is the bare `wipefs --all -f` partition arm at `:42-45`, which
 Zapping the GPT first is worse still: with no partition table there are no children for `lsblk` to report, so even that arm never runs, and the next install finds a valid header, skips `luksFormat` (`lib/types/luks.nix:202`), and skips the FIDO2 enrollment (`:276`) — the tautological green the re-runnability criterion forbids, produced by the step meant to prevent it.
 `blkdiscard` against the `_1` namespace path destroys the header, the keyslot area, and every label at every offset, and has no such hole.
 
-If `blkdiscard` is ever unavailable, the fallback order is absolute, and under D1's container it is no longer the ZFS one: `cryptsetup luksErase --batch-mode <device>-part2` first, then `dd if=/dev/zero of=<device>-part2 bs=1M count=32`, then `sgdisk --zap-all`, then `wipefs -a`.
+If `blkdiscard` is ever unavailable, the fallback order is absolute, and under D1's container it is no longer the ZFS one.
+It is written out here as a labelled block for the same reason every other destructive step is: it names pyrite's internal disk, it runs on the installer and nowhere else, and stibnite has a device namespace of its own in which the same commands find stibnite's disk without complaint.
+
+```bash
+# host: pyrite (installer)
+# FALLBACK ONLY, if blkdiscard is unavailable. Destroys the same disk blkdiscard
+# does. The order is absolute: each step destroys the magic the step above it
+# depends on.
+disk=/dev/disk/by-id/nvme-APPLE_SSD_AP0512J_C08843605KKHV4MAK_1
+
+cryptsetup luksErase --batch-mode "$disk-part2"
+dd if=/dev/zero of="$disk-part2" bs=1M count=32
+sgdisk --zap-all "$disk"
+wipefs -a "$disk"
+```
+
+Then run the post-wipe verification above against `$disk`, which is what settles whether the fallback took; the four commands report their own success and not the disk's state.
 `luksErase` goes first because it needs a header that still probes, and every step below it destroys the magic that probe depends on.
 The 32 MiB overwrite follows because it covers both LUKS2 headers and the whole default 16 MiB keyslot area, rather than the primary signature alone.
 The zap precedes the whole-disk `wipefs` for the reason the ZFS-era order recorded, that a partition-scoped step depends on the partition table the zap destroys.
-`zpool labelclear -f <device>-part2` is dropped from the order rather than reordered: under a container p2 holds no ZFS labels to clear, because they live inside the container and are unreachable without opening it, so the command that used to open this list would now succeed at nothing and read as progress.
+`zpool labelclear -f "$disk-part2"` is dropped from the order rather than reordered: under a container p2 holds no ZFS labels to clear, because they live inside the container and are unreachable without opening it, so the command that used to open this list would now succeed at nothing and read as progress.
 
 ### Why the wipe is a step, not an assumption
 
