@@ -1,9 +1,12 @@
 ## ADDED Requirements
 
-### Requirement: The install path is recorded in the repository and is re-runnable
+### Requirement: The install path is recorded in the repository, and is written to be re-runnable without being shown to be
 
 A bare-metal install path SHALL be recorded in the repository as a runnable artifact, not performed ad hoc.
-It targets a stock NixOS installer ISO booted on the machine with sshd reachable, and it MUST be safe to run more than once.
+It targets a stock NixOS installer ISO booted on the machine with sshd reachable.
+It SHALL be written so that running it a second time destroys and recreates rather than reusing what an earlier run left behind, and that property is NOT demonstrated by this change.
+D29 drops the second proving install, so the path is executed exactly once here: re-runnability is a property of the recorded text and not a claim discharged by evidence, and a later reader MUST NOT treat it as established when planning a reinstall of this machine or an install of a sibling MacBook.
+What the change does establish about surviving artifacts is narrower and is recorded in the create-path requirement below: the surviving-pool arm is live on this disk and is checked, while the three surviving-LUKS-header arms are recorded as properties of the layout for a future reinstall rather than as acceptance criteria.
 It SHALL discard the disk explicitly, at every offset rather than only at the partition table, before invoking `clan machines install`.
 
 #### Scenario: the wipe is blkdiscard, because zapping the GPT first disables disko's own pool destroy
