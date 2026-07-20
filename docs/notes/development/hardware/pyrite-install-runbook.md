@@ -266,7 +266,12 @@ sudo nix store info --store ssh-ng://builder@magnetite
 
 Require the `Version:` and `Trusted:` lines to appear.
 A non-zero exit, or an `ssh: connect to host` line, means there is no reachable x86_64-linux builder; restore ZeroTier connectivity to magnetite before proceeding.
-This is checked rather than assumed because the failure is silent in the expensive direction: nixos-anywhere runs at `--build-on auto`, so with no builder answering it does not fail, it falls back to building pyrite's entire closure on the installer ISO — on the machine whose disk has just been discarded, over WiFi, in a tmpfs-backed live environment.
+This is checked rather than assumed because the failure is silent in the expensive direction, and the mechanism is worth stating exactly, since the fallback is decided by a probe rather than by a setting.
+clan passes no `--build-on` unless the operator supplies one (`clan_lib/machines/install.py:193-194`), so nixos-anywhere runs at its default `auto`, and `checkBuildLocally` (`src/nixos-anywhere.sh:611-652` at 1.13.0) resolves it by attempting a trivial `x86_64-linux` derivation on stibnite.
+If any x86_64-linux builder answers that attempt the mode becomes `local`; if none does, it becomes `remote`, which in nixos-anywhere means the target machine — the installer ISO, whose disk has just been discarded, over WiFi, in a tmpfs-backed live environment, fetching pyrite's entire closure.
+Two builders can satisfy the probe: magnetite over the mesh, which this gate checks, and stibnite's local `nix-rosetta-builder`, which advertises `x86_64-linux` but is stopped by default on this machine and is not started by the install.
+So with magnetite unreachable and the Rosetta builder stopped, the fallback is the ISO and not stibnite.
+If this gate fails and the install is to proceed anyway, start the Rosetta builder first and confirm it answers; do not reason past the gate on the assumption that stibnite will build it locally regardless.
 `ping6 -c 3 fddb:4344:343b:14b9:399:930f:39db:40d2` is a cheaper liveness check that needs no sudo, but ICMP does not prove the store is answering and does not replace the probe above.
 
 Four further gates precede the wipe, and all four are hard stops rather than advisories: if any does not pass, do not run the `blkdiscard`.
@@ -606,8 +611,11 @@ The machine is fully declared in nix, so none of the three has anything to add a
 ## Build host behaviour
 
 stibnite's remote linux builder `magnetite-builder` is preferred, but it is reachable only over the ZeroTier mesh.
-An install driven from off the mesh therefore falls back to stibnite's local Rosetta builder, which builds the x86_64-linux closure locally under emulation.
-Either way the closure is what nixos-anywhere pushes to the target; the build-host choice affects only where it is built.
+Where the build lands when it is not reachable is decided by nixos-anywhere's `--build-on auto` probe rather than by a preference order, and the resolution is in the pre-wipe builder gate above.
+In short: `checkBuildLocally` attempts a trivial `x86_64-linux` derivation on stibnite, and any x86_64-linux builder that answers — magnetite over the mesh, or the local `nix-rosetta-builder` while it is running — makes the mode `local`, while none answering makes it `remote`, which is the target machine rather than stibnite.
+The Rosetta builder advertises `x86_64-linux` (`modules/machines/darwin/stibnite/default.nix:205-207`) but is stopped by default, so off the mesh with it stopped the closure is built on the installer ISO.
+That is the outcome the pre-wipe gate exists to prevent, and it is why the gate is a stop rather than an advisory.
+Wherever it is built, the closure is what nixos-anywhere pushes to the target; the build-host choice affects only where it is built.
 
 ## USB-C keyboard is a first-boot prerequisite
 
