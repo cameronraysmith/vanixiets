@@ -508,6 +508,32 @@ clan-cli appends it automatically from the `neededFor = "partitioning"` generato
 The install path calls `run_generators` without `auto_accept_prompts`, whose default is `False`, so an install run with Phase 5 incomplete stops interactively on the admin box asking for the fleet SSID and PSK rather than failing.
 Phase 5.2 front-loads vars generation precisely so this ordering is already right and the install does not stop to prompt.
 
+## The first boot, and proving both unlock paths
+
+The install leaves behind a machine that has never been unlocked, and both of its unlock paths have to be exercised before anything in the key-lifecycle section below is run (task 7.5).
+This section is two boots, not one, and the second is the one that matters.
+
+Remove the external installer SSD before powering the machine on, so that the boot under test is the installed system's rather than the installer's.
+Seat YubiKey-A — serial `32720759`, the token that was in the machine across the install — and leave it seated for this first boot.
+
+Stage 1 renders a `systemd-ask-password` prompt on the internal panel, and answering it takes two things in sequence.
+First the token's FIDO2 client PIN, typed at the keyboard; the PIN is asked for because the pre-wipe `ykman fido info` gate confirmed a client PIN is set on this token, and `libfido2-util.c:802-804` drops the PIN requirement only for a token that reports `clientPin` false.
+Then a physical touch on the token itself.
+The touch is not announced and the prompt does not change when the PIN is accepted, so a boot that appears to hang after the PIN is a boot waiting for a finger.
+The prompt waits with an unbounded timeout, which is why the USB-C keyboard or adapter has to be in the room already rather than sourced now: if the internal SPI keyboard does not bind on this boot, the external keyboard is the only way to answer the prompt, and until it is answered the machine has no reachable state at all.
+
+Then shut down, physically remove YubiKey-A, and boot a second time with no token seated at all.
+Stage 1 asks for a passphrase, and the clan-vars ZFS root passphrase must unlock the container.
+This boot is not optional and it is not a formality.
+The passphrase is the only recovery credential this machine has — a token can be lost, and the header holds nothing else a person can supply — so an unverified fallback is indistinguishable from an absent one until the token is gone, at which point the pool is unrecoverable.
+The failure class is concrete rather than hypothetical: D27's trailing-newline defect lands exactly here, and the VM test in "Validating the LUKS2 layout in a VM" above exercises it only against the harness's own key file, never against the clan var that is actually in slot 1 of this container.
+
+Carry the passphrase to the machine before starting this second boot rather than looking it up once the prompt is on screen: a machine sitting at the stage-1 prompt has no network, no shell, and no way to read anything off itself.
+It is readable from stibnite with `clan vars get pyrite zfs/key` and from the `pyrite/zfs-root` password-manager entry.
+
+Both boots must have succeeded before `## Verifying the install` is read as a pass, and before any block in "Key lifecycle" below is run.
+The enrollment block in that section removes YubiKey-A and leaves the passphrase as the only credential able to authorize the enrollment, so an operator who reaches it without having exercised the passphrase here is giving up a proven credential for an unproven one.
+
 ## Verifying the install
 
 These checks run on the installed machine after the first boot, and they are what decides whether the install is accepted at all.
