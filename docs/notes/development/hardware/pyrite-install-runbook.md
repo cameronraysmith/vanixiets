@@ -160,6 +160,18 @@ The GNOME LTS entry is GRUB's default — the config sets no `set default`, so e
 The Plasma LTS entry would also pass the ZFS check; it is not chosen because it changes the desktop the recon was performed under for no gain.
 Selecting LTS does not put the NIC at risk: the firmware closure is the identical store path across both specialisations and `brcmfmac` is present in the 6.18.38 `modules.dep`.
 
+The menu label is gone once the machine has booted, so the selection is re-confirmed from inside the running installer, and this check is a hard gate on everything destructive that follows:
+
+```bash
+# host: pyrite (installer)
+uname -r      # must report 6.18.38 -- NOT 7.1.3
+```
+
+`6.18.38` is the LTS entry and is the only value that permits the operator to continue.
+`7.1.3` means the machine came up on a `*_latest_kernel` specialisation, on which `boot.supportedFilesystems.zfs = false` leaves no `zfs` module and no `zpool`: proceeding from there runs the `blkdiscard`, destroys macOS, and then fails at `zpool create` on a machine with no fallback OS and nothing to boot.
+If `uname -r` reports `7.1.3`, reboot onto the LTS entry and repeat the key authorization below, which does not survive the reboot.
+This one command stands in for the two positive checks it implies, `modprobe zfs` succeeding and `command -v zpool` resolving, and it is cheaper than either.
+
 In the GNOME session the ISO presents, join the fleet SSID through the NetworkManager applet (or `nmtui`), and set a password for the `nixos` account with `passwd nixos` — the profile ships empty passwords and sshd refuses empty-password auth, so a password is required before ssh works.
 sshd is already running on the stock installer; no `systemctl start sshd` is needed.
 
