@@ -145,9 +145,13 @@ The rule therefore holds until 7.3's reinstall has actually created the containe
   With no `key.txt` on the installed machine, sops-nix decrypts nothing: the deployed ZeroTier identity secret is unreadable, so `zerotierone` starts with no identity and mints a fresh one that cinnabar has not authorized, and `pyrite.zt` resolves to an address no live node holds.
   The fleet WiFi vars fail by the same silent path and compound it, because WiFi is this machine's only NIC — `clanServices/wifi/default.nix:126-141` reads the sops-nix paths at runtime into the NetworkManager secrets file, an unreadable file yields empty strings, and the interface never associates with no assertion and no eval-time error.
   There is then no route to the machine at all except its own console.
-  Run from the repository root, with `PYRITE_AGE_PUB=age1eajmgz9zvq639zjnmqcaklst6u3s7un8k68nd4klnnlswgtrnylq7twk4v`:
+  Run from the repository root, as a saved script or the heredoc below rather than as a paste:
 
   ```bash
+  bash <<'SH'
+  set -euo pipefail
+  PYRITE_AGE_PUB=age1eajmgz9zvq639zjnmqcaklst6u3s7un8k68nd4klnnlswgtrnylq7twk4v
+
   test -f sops/secrets/pyrite-age.key/secret
   sops decrypt --input-type json --output-type binary sops/secrets/pyrite-age.key/secret >/dev/null
   test "$(sops decrypt --input-type json --output-type binary sops/secrets/pyrite-age.key/secret | age-keygen -y /dev/stdin)" \
@@ -166,7 +170,15 @@ The rule therefore holds until 7.3's reinstall has actually created the containe
   done
 
   clan vars check pyrite
+  echo "PRE-INSTALL SECRETS GATE: PASS"
+  SH
+  echo "exit=$?"
   ```
+
+  Three properties of that block are load-bearing and were absent from the form this task first carried, which could pass while the gate it names had failed.
+  `set -euo pipefail` is what makes the first three statements stop the run: they carry no `|| exit` of their own, so without it a missing or misnamed `sops/secrets/pyrite-age.key/secret` printed one error line, fell through into the loop, and terminated on `clan vars check pyrite`, whose exit status is independent of `sops/secrets/` — leaving the operator looking at a successful last command having just walked through the early-return branch this check exists to close.
+  The heredoc is what keeps the loop's `exit 1` arms from closing an interactive shell, which is the shell the operator needs in order to read the failure.
+  And the trailing `PASS` line makes a pass affirmative rather than the absence of a visible error; `exit=0` alone is what the defective form also printed.
 
   The recipient arm is not redundant with the decrypt arm, and that distinction is the point of the check rather than a flourish: a var the operator can read but pyrite cannot is exactly the shape of the WiFi failure above, and only the recipient arm catches it.
   Two secrets correctly lack `pyrite` as a recipient and MUST NOT be added to one to make a naive sweep pass — `sops/secrets/pyrite-age.key` is admin-only by design, which is the chicken-and-egg `--extra-files` exists to break, and `vars/per-machine/pyrite/emergency-access/password` carries `deploy = false`.

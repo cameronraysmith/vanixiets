@@ -298,7 +298,7 @@ The second proves on the admin box that every secret whose silent absence costs 
 ```bash
 # host: stibnite, from the repository root
 bash <<'SH'
-set -u
+set -euo pipefail
 PYRITE_AGE_PUB=age1eajmgz9zvq639zjnmqcaklst6u3s7un8k68nd4klnnlswgtrnylq7twk4v
 
 test -f sops/secrets/pyrite-age.key/secret
@@ -319,11 +319,16 @@ for f in vars/shared/wifi.fleet/network-name \
 done
 
 clan vars check pyrite
+echo "PRE-INSTALL SECRETS GATE: PASS"
 SH
 echo "exit=$?"
 ```
 
-The heredoc is what keeps the `exit 1` arms from closing the operator's own shell when the block is pasted interactively; `exit=0` is the pass.
+Run it as a saved script or as the heredoc above, not as a paste, and take the `PASS` line as the pass rather than the absence of a visible error.
+Three properties of the block are load-bearing.
+`set -euo pipefail` is what makes the first three statements stop the run: they carry no `|| exit` of their own, so without it a missing or misnamed `sops/secrets/pyrite-age.key/secret` prints one error line, falls through into the loop, and terminates on `clan vars check pyrite`, whose exit status is independent of `sops/secrets/` — leaving the operator looking at a successful last command having just walked through the early-return branch this gate exists to close.
+The heredoc is what keeps the loop's `exit 1` arms from closing the operator's own shell, which is the shell needed to read the failure.
+And the trailing `PASS` line is the affirmative signal; `exit=0` alone is what the failing form also prints.
 
 The machine age key is the branch this gate exists to close.
 clan supplies `--extra-files` itself — `clan_lib/machines/install.py:162-168` passes it unconditionally, populated at `:141-147` into the machine's `clan.core.vars.sops.secretUploadDirectory`, which pyrite evaluates to `/var/lib/sops-nix`, the same path `config.sops.age.keyFile` reads `key.txt` from — so the delivery is by construction.
