@@ -44,7 +44,7 @@
     "astro": "7.0.6"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.2",
+    "@biomejs/biome": "^2.5.5",
     "@playwright/test": "1.61.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
