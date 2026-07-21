@@ -754,6 +754,21 @@
         "type": "github"
       }
     },
+    "import-tree_2": {
+      "locked": {
+        "lastModified": 1784254960,
+        "narHash": "sha256-iI88R3wHz8wTKQb5orvpc51L/Xr64AJyxid/0MKa/b8=",
+        "owner": "vic",
+        "repo": "import-tree",
+        "rev": "4ebb10ae17d5f1ad366e7aef5b92cb8eecf24f69",
+        "type": "github"
+      },
+      "original": {
+        "owner": "vic",
+        "repo": "import-tree",
+        "type": "github"
+      }
+    },
     "lazyvim-nix": {
       "inputs": {
         "flake-utils": "flake-utils",
@@ -1807,6 +1822,7 @@
         "flake-parts": [
           "flake-parts"
         ],
+        "import-tree": "import-tree_2",
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -1815,11 +1831,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1779965098,
-        "narHash": "sha256-Jh0Zk+g0pEbNopADEtqvrnhrl83rlNFHpn3Zhz4s+VM=",
+        "lastModified": 1784465933,
+        "narHash": "sha256-5fZTF5lCVnHisTmXICtIIjHAEsqDXx3RgD+Q/r5Bxpg=",
         "owner": "terranix",
         "repo": "terranix",
-        "rev": "36ed5bdee452978d0e9c4450de872483ab541006",
+        "rev": "f2f0ca1895f15e18e308769bdae77030ae093b8c",
         "type": "github"
       },
       "original": {
