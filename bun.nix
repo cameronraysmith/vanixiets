@@ -1309,10 +1309,6 @@
     url = "https://registry.npmjs.org/@semantic-release/git/-/git-10.0.1.tgz";
     hash = "sha512-eWrx5KguUcU2wUPaO6sfvZI0wPafUKAMNC18aXY4EnNcrZL86dEmpNVnC9uMpGZkmZJ9EfCVJBQx4pV4EMGT1w==";
   };
-  "@semantic-release/github@12.0.8" = fetchurl {
-    url = "https://registry.npmjs.org/@semantic-release/github/-/github-12.0.8.tgz";
-    hash = "sha512-tej5AAgK5X9wHRoDmYhecMXEHEkFeGOY1XsEblKxu8pIQwahzf1STYyr7iPU6Lpbg6C5I3N2w/ocXrBo+L7jhw==";
-  };
   "@semantic-release/github@12.0.9" = fetchurl {
     url = "https://registry.npmjs.org/@semantic-release/github/-/github-12.0.9.tgz";
     hash = "sha512-ODIqb0V3QqndipryEEiaBxUQCFjvv7Oese5Dt4omMGa60YRNEW0Sx3K+zri0uac2Y6S9nOlMehciWIzvvRCTGQ==";
@@ -4258,9 +4254,9 @@
     url = "https://registry.npmjs.org/semantic-release-plugin-decorators/-/semantic-release-plugin-decorators-4.0.0.tgz";
     hash = "sha512-5eqaITbgGJu7AWCqY/ZwDh3TCS84Q9i470AImwP9vw3YcFRyR8sEb499Zbnqa076bv02yFUn88GtloQMXQsBrg==";
   };
-  "semantic-release@25.0.5" = fetchurl {
-    url = "https://registry.npmjs.org/semantic-release/-/semantic-release-25.0.5.tgz";
-    hash = "sha512-mn61SUJwtM8ThrWn2WmgLVpwVJeG/hPSupua1psdMoufmwRIPyvRLkRkL0JDXkP67OntlLWUYnBnfVc8EDO3/g==";
+  "semantic-release@25.0.8" = fetchurl {
+    url = "https://registry.npmjs.org/semantic-release/-/semantic-release-25.0.8.tgz";
+    hash = "sha512-w/iZ0bur36rKffXZYmIUmy068eoBY3Ij1DCCddx2JwWEM5Tg+eU9ld/E9qSInVvPASyyR2Ln/XGfQ9OZrMlhtw==";
   };
   "semver-regex@4.0.5" = fetchurl {
     url = "https://registry.npmjs.org/semver-regex/-/semver-regex-4.0.5.tgz";
@@ -4273,10 +4269,6 @@
   "semver@7.7.3" = fetchurl {
     url = "https://registry.npmjs.org/semver/-/semver-7.7.3.tgz";
     hash = "sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==";
-  };
-  "semver@7.8.4" = fetchurl {
-    url = "https://registry.npmjs.org/semver/-/semver-7.8.4.tgz";
-    hash = "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==";
   };
   "semver@7.8.5" = fetchurl {
     url = "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz";
@@ -4709,10 +4701,6 @@
   "undici@5.29.0" = fetchurl {
     url = "https://registry.npmjs.org/undici/-/undici-5.29.0.tgz";
     hash = "sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg==";
-  };
-  "undici@7.24.8" = fetchurl {
-    url = "https://registry.npmjs.org/undici/-/undici-7.24.8.tgz";
-    hash = "sha512-6KQ/+QxK49Z/p3HO6E5ZCZWNnCasyZLa5ExaVYyvPxUwKtbCPMKELJOqh7EqOle0t9cH/7d2TaaTRRa6Nhs4YQ==";
   };
   "undici@7.28.0" = fetchurl {
     url = "https://registry.npmjs.org/undici/-/undici-7.28.0.tgz";
