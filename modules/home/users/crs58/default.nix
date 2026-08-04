@@ -8,6 +8,7 @@ let
       # INNER: Home-manager module signature
       config,
       pkgs,
+      lib,
       flake, # from extraSpecialArgs
       ...
     }:
@@ -134,6 +135,20 @@ let
       programs.git.settings = {
         user.name = flake.users.crs58.meta.fullname;
         user.email = flake.users.crs58.meta.email;
+      }
+      // lib.optionalAttrs pkgs.stdenv.isDarwin {
+        nostr.keyfile = config.sops.secrets.buzz-nsec.path;
+        # `*` matches exactly one label, so this covers every community on
+        # communities.buzz.xyz. The leading "" clears the inherited generic
+        # helper chain from development/git.nix, whose `store --file` helper is
+        # fatal against the read-only sops-rendered ~/.git-credentials.
+        credential."https://*.communities.buzz.xyz/git" = {
+          helper = [
+            ""
+            "/Applications/Buzz.app/Contents/MacOS/git-credential-nostr"
+          ];
+          useHttpPath = true;
+        };
       };
 
       programs.jujutsu.settings.user = {
