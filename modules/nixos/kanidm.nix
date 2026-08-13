@@ -145,6 +145,13 @@ in
           # matches clan-infra/web02 and jfly-clan-snow/fflewddur.
           tls_chain = "${certs.directory}/fullchain.pem";
           tls_key = "${certs.directory}/key.pem";
+
+          # nixpkgs already emits path and schedule, but defaults versions to 0,
+          # which the module treats as "backups disabled".
+          online_backup.versions = 7;
+
+          # Temporary until the first backup lands; reverted by the 1.11 bump.
+          online_backup.schedule = "00 * * * *";
         };
 
         provision = {
@@ -234,7 +241,9 @@ in
         wants = [ "kanidm.service" ];
         wantedBy = [ "multi-user.target" ];
         path = [
-          pkgs.kanidmWithSecretProvisioning_1_10
+          # Upstream requires the CLI to match the server minor exactly, so this
+          # derives from the server package rather than pinning independently.
+          config.services.kanidm.package
           pkgs.curl
         ];
         environment = {
