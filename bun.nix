@@ -81,10 +81,6 @@
     url = "https://registry.npmjs.org/@astrojs/compiler/-/compiler-2.13.0.tgz";
     hash = "sha512-mqVORhUJViA28fwHYaWmsXSzLO9osbdZ5ImUfxBarqsYdMlPbqAqGJCxsNzvppp1BEzc1mJNjOVvQqeDN8Vspw==";
   };
-  "@astrojs/internal-helpers@0.10.0" = fetchurl {
-    url = "https://registry.npmjs.org/@astrojs/internal-helpers/-/internal-helpers-0.10.0.tgz";
-    hash = "sha512-Ry2R3VPeIN4uPCSA4xQc+e+vsJXkalKpEbDc07hV+a/o5Bs2N/s/uDcPJH/05L19DKh9tAy7e6JM3YZ6Cxfezw==";
-  };
   "@astrojs/internal-helpers@0.10.2" = fetchurl {
     url = "https://registry.npmjs.org/@astrojs/internal-helpers/-/internal-helpers-0.10.2.tgz";
     hash = "sha512-yt7fMgPYqSM4Tmr+taTW6Per+hjJ8Pk6lA1PAcDyqzOt8HzJ6Kje5WzCxA2Sd+9wsUW7uhkLeoTMK0cXPwH9rQ==";
@@ -100,10 +96,6 @@
   "@astrojs/markdown-remark@7.2.2" = fetchurl {
     url = "https://registry.npmjs.org/@astrojs/markdown-remark/-/markdown-remark-7.2.2.tgz";
     hash = "sha512-FGfmK84zSNcrsBd0dl1gXE9JvZYElp8EXQa2jpHVAxG4deGKAp43wspxFupjADJX7MSsMRHwYCnfT6EyVmgeFQ==";
-  };
-  "@astrojs/markdown-satteri@0.3.2" = fetchurl {
-    url = "https://registry.npmjs.org/@astrojs/markdown-satteri/-/markdown-satteri-0.3.2.tgz";
-    hash = "sha512-feXuUPy41gVfeM7EHT1ciUim8ozGr+YHXab9uUBc1Hk8y60DQosO8ldL+AoPXnCAoGj1OChwHfvXmmJ6XVnY9A==";
   };
   "@astrojs/markdown-satteri@0.3.5" = fetchurl {
     url = "https://registry.npmjs.org/@astrojs/markdown-satteri/-/markdown-satteri-0.3.5.tgz";
@@ -4386,9 +4378,9 @@
     url = "https://registry.npmjs.org/starlight-katex/-/starlight-katex-0.0.4.tgz";
     hash = "sha512-bb2oR/K4+wK61tZvOTSo9/zH7FI/+guwGLGgIuJSld8vKmcxeAG1kmde8CfH0IKohXlSwUYE3YCR/r6qd0jIEA==";
   };
-  "starlight-links-validator@0.25.2" = fetchurl {
-    url = "https://registry.npmjs.org/starlight-links-validator/-/starlight-links-validator-0.25.2.tgz";
-    hash = "sha512-RQiHkM8FHKermsjMkSb+uS/q50Dv5P0O0ECWKxJyTv4stuO8QTorIEKnITDDLEf9/xyg7M69arxiK2ola3OMqA==";
+  "starlight-links-validator@0.25.3" = fetchurl {
+    url = "https://registry.npmjs.org/starlight-links-validator/-/starlight-links-validator-0.25.3.tgz";
+    hash = "sha512-kNE2F8fwdq7r8l6Zx2nH3SDnLlVu2VRmbmyV/nSpbtWzf9+S81H2VBZ6GRevIKbm8qOoYSZvXzNATT8ZXw9bmw==";
   };
   "std-env@4.0.0" = fetchurl {
     url = "https://registry.npmjs.org/std-env/-/std-env-4.0.0.tgz";
