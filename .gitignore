@@ -27,6 +27,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Python bytecode
+__pycache__/
+*.pyc
+
 # wrangler (Cloudflare Workers)
 .wrangler/
 .dev.vars*
