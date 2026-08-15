@@ -1,6 +1,6 @@
 ---
 name: harborize
-version: 0.2.0
+version: 0.2.1
 description: Compile an existing agent skill, a plugin of skills, or several co-present
   plugins into a complete, runnable evaluation package — Harbor task + SkillsBench/BenchFlow
   task package, verifier, oracle, condition lattice, run manifest, and analysis scripts.
@@ -122,7 +122,8 @@ Two of the three packages this skill emitted in iteration 1 required shared mode
 
 Defaults, always:
 - Agent env `network_mode = "no-network"` unless the task genuinely needs the
-  network; verifier env `"public"` only if a judge or fetch is required.
+  network; verifier env `"public"` only if a judge or fetch is required. Both
+  prerequisites in Phase 3 apply to that default before it can be relied on.
 - Prefer exact-set assertions (the full expected commit-message list, the
   complete file inventory) over negative greps for forbidden substrings —
   negative patterns are brittle against paraphrase and reward wording
@@ -148,13 +149,33 @@ If it fires, redesign the task by parameterizing inputs, or accept that the skil
 
 ## Phase 3 — Environment and oracle
 
+Two prerequisites hold before authoring, and both surface as failures that read as authoring errors.
+
+Harbor's `network_mode = "no-network"` is rejected at environment start when the Docker daemon's kernel lacks `CONFIG_NFT_FIB_INET`.
+The kernel probe is `environments/docker/docker.py:113-117`; on failure `_enable_egress_control` goes false (`:188-193`), which zeroes `capabilities.disable_internet` (`:289-293`), and `environments/base.py:772-781` then raises "network_mode='no-network' is not supported by ... environment".
+Probe a new daemon before authoring anything:
+
+```
+docker run --rm alpine sh -c 'zcat /proc/config.gz | grep NFT_FIB_INET'
+```
+
+Expect `CONFIG_NFT_FIB_INET=y` or `=m`.
+Harbor's own probe passes when `/proc/config.gz` is absent, so the hand probe is stricter than Harbor is: an absent config file means unknown here and supported there.
+
+claude-code's install fetches from the network during agent setup, which the agent-phase network policy does not cover.
+`install()` at `claude_code.py:425-449` curls `https://downloads.claude.ai/claude-code-releases/bootstrap.sh` (or npm-installs on Alpine) unless the image already carries the requested version.
+`_prepare` runs `_setup_agent` at `trial.py:408-414` with no policy wrapper, while only `_run_agent_phase` (`trial.py:465-469`) and the verifier phases enter `_phase_network_policy`.
+So a no-network claude-code cell fails during agent install, and at the reward level that failure is indistinguishable from an injection failure.
+Bake the agent into the environment image at a pinned version, which makes `_installed_claude_satisfies_version` return early and never reach the fetch.
+
 - `environment/Dockerfile`: task dependencies only — never the solution, never
   the skills. Skills are injected at runtime per condition; baking them in
   destroys the on/off toggle.
-- Oracle (`oracle/solve.sh` ≡ `solution/solve.sh`): a script that actually
-  solves the task. It must pass the verifier 100% — run it 5× before anything
-  else counts. The oracle may consult the skill's content while you write it;
-  the point is inhabitation, not independence.
+- Oracle (`oracle/solve.sh`; the export lands it at `solution/solve.sh`, so
+  write it once): a script that actually solves the task. It must pass the
+  verifier 100% — run it 5× before anything else counts. The oracle may
+  consult the skill's content while you write it; the point is inhabitation,
+  not independence.
 - Generate fixtures (repos, datasets, broken states) with a dedicated
   python script COPY'd and RUN in the Dockerfile — never nested shell
   heredocs, whose escaping is fragile and whose failures are silent. Freeze
@@ -165,32 +186,52 @@ If it fires, redesign the task by parameterizing inputs, or accept that the skil
 
 ## Phase 4 — Dual emission
 
-One canonical package, two thin metadata heads over shared content:
+Author BenchFlow-native, then derive the Harbor head into a separate sibling
+directory with `bench tasks export`. The two heads cannot share a directory:
 
 ```
-<task-id>/
-├── task.md          # BenchFlow head: YAML frontmatter (schema 1.3 vocab) + body
-├── task.toml        # Harbor head: [task], [verifier], [environment]
-├── instruction.md   # single source; task.md body generated from it
-├── environment/     #   Dockerfile only; skills/ exists in the SkillsBench
-│   └── skills/      #   copy and stays EMPTY (dir(C) lives outside the package)
-├── oracle/solve.sh  # = solution/solve.sh (Harbor name; emit both, same file)
-└── verifier/        # = tests/ (Harbor name); test.sh + checks.py/judge.toml
-                     #   + Dockerfile when the verifier runs in separate mode
+<task-id>/                 # authored; the source of truth
+├── task.md                #   YAML frontmatter (schema 1.3 vocab) + body
+├── environment/           #   Dockerfile only; skills/ stays EMPTY
+│   └── skills/            #   (dir(C) lives outside the package)
+├── oracle/solve.sh
+└── verifier/              #   test.sh + checks.py/judge.toml
+                           #   + Dockerfile when the verifier runs separate
+
+<task-id>-harbor/          # generated; never hand-edited
+├── task.toml              #   [task], [verifier], [environment]
+├── instruction.md         #   from task.md's body
+├── environment/           #   copied verbatim
+├── solution/solve.sh      #   from oracle/
+├── tests/                 #   from verifier/
+└── compatibility/export-report.json
 ```
 
+```
+bench tasks export <task-id> <task-id>-harbor --target harbor
+```
+
+Three independent validators force the split.
+BenchFlow's `--level publication-grade` rejects a `task.toml` or `instruction.md` beside `task.md` (benchflow `_utils/task_authoring/structural_checks.py:208-212`) and rejects `solution/` in favour of `oracle/` (`:218-222`).
+SkillsBench's corpus gate forbids exactly `instruction.md`, `task.toml`, `solution` and `tests` (skillsbench `.github/scripts/validate_tasks.py:21-26`), which is the set Harbor requires.
+All 87 tasks under skillsbench `tasks/` are native, with zero `task.toml` and zero `solution/`, as are the 14 under `tasks-extra/`.
+The export also refuses a destination overlapping its source in either direction (benchflow `task/export.py:242-251`), so the Harbor head is a sibling and never a subdirectory.
+
+Re-export after every edit to the native tree.
 `references/emitters.md` holds the exact field mappings, frontmatter vocabulary, injection flags and wrapper `test.sh` for each runner.
 
 Validate both heads before any oracle run: one static gate per head, plus one authoring-time check that spawns a metered job.
 
 `harbor tasks check` no longer exists.
 At the harbor revision recorded under instrument versioning below, `tasks` is a hidden backwards-compatible alias of the same typer app as `task`, so both spellings reach one command that prints an error and raises `SystemExit(1)` unconditionally (harbor `src/harbor/cli/tasks.py:476-487`); a pipeline that calls it fails rather than validates.
-The Harbor head's static gate is schema-level: construct `harbor.models.task.task.Task(<task-dir>)`, which parses `task.toml` through `TaskConfig` and asserts `instruction.md` is present.
+The Harbor head's static gate is schema-level and runs against the exported `<task-id>-harbor`: construct `harbor.models.task.task.Task(<task-id>-harbor)`, which parses `task.toml` through `TaskConfig` and asserts `instruction.md` is present.
 It verifies field names, types and enum membership, and nothing about behaviour.
 It does not catch the separate-mode trap either, because `Task._validate_tests` returns early whenever a verifier environment is configured, so a separate-mode task whose verifier image has no `/tests/test.sh` passes schema validation and fails at run time.
 
-The BenchFlow head's static gate is `bench tasks check <task-dir> --level structural`, raised to `--level publication-grade` before publishing.
+The BenchFlow head's static gate is `bench tasks check <task-id> --level structural`, raised to `--level publication-grade` before publishing.
 It validates directory layout and frontmatter against the SkillsBench schema, exits 1 with one line per issue, and executes nothing.
+It runs against the authored native tree only.
+Pointing publication-grade at the exported Harbor head fails by construction, because that head is the split layout the level exists to reject.
 
 `harbor check` is the named replacement for the removed command and is a different instrument, not a drop-in substitute.
 It spawns a full Harbor job that runs an LLM agent against a task-quality rubric — default `claude-code` with `claude-sonnet-4-6` — so it is metered per invocation, and its exit code reflects only whether a task errored: rubric failures are printed and ignored (harbor `src/harbor/cli/analyze.py:206-207`).
@@ -211,9 +252,22 @@ The agent kwarg `--ak skills_dir=<path>` is a different field: a container-side 
 BenchFlow takes `--skills-dir <dir>`, a host path validated on the host and mounted into the sandbox at `/skills`, with `--skill-mode no-skill` for C = ∅.
 Field-level detail is in `references/emitters.md`.
 
+Uploading and registering are separate steps, and the gap between them holds a whole class of silent nulls.
+Harbor uploads the skills for every agent, and of the 39 agents its factory registers, 22 read the injected directory and 17 ignore it with no error, no warning and no log line.
+`scripts/design_matrix.py` carries the consuming set as `HARBOR_SKILL_CONSUMING_AGENTS` and refuses to emit a manifest for a `cells.json` naming anything else, including any `acp:` shorthand, since `factory.py:167-175` routes those through the non-consuming `acp` adapter.
+That refusal is the only cheap gate for this class: it runs before any container starts, and nothing written after a run distinguishes a non-consuming adapter from a working one.
+Per-adapter destinations differ as well, so no single canary assertion covers a grid; `references/emitters.md` carries the destination table and the cells where Harbor and BenchFlow do not agree on where skills land.
+
+One free delivery gate exists, on the BenchFlow arm.
+`bench eval run --agent oracle --skill-mode with-skill --skills-dir <dir(C)>` runs the whole deployment path with no model call and asserts in the container that the skill catalogue at each discovery path matches the catalogue the host counted, raising `experiment_fidelity/skill_deployment_missing` on a mismatch.
+Run it once per distinct dir(C) shape before any metered batch.
+Harbor has no free equivalent, because every adapter's registration copy is built in `run()` rather than `setup()` and `--install-only` skips the agent run.
+
 Present the menu with arithmetic filled in — runs = |C| × k × cells — and let the user choose.
 Cost every figure at metered API rates.
 Subscription-authenticated cells are permitted for interactive exploration and are never used for a run batch whose numbers are reported: metered costing is robust to the unresolved credential-use-policy question in either direction, and a subscription cell confounds the measurement independently, because rate-limit throttling is nondeterministic and single-account auth caps concurrency.
+Enforcing that rule takes an explicit environment scrub rather than merely withholding a flag.
+Claude Code and Codex gate subscription auth behind `CLAUDE_FORCE_OAUTH` and `CODEX_FORCE_AUTH_JSON`, but Pi injects `ANTHROPIC_OAUTH_TOKEN` whenever the variable is present (`pi.py:102-105`), so a Pi cell in a reported batch must declare `ANTHROPIC_OAUTH_TOKEN=""` in its `env` block or run from a shell where it is unset.
 No per-run cost figure exists yet, so derive one from a calibration batch before presenting any budget table.
 Do not silently default:
 
@@ -242,6 +296,9 @@ job will land. It carries whatever concurrency and environment variables each
 cell declares in `cells.json` and knows nothing about authentication pools;
 which cells may appear in a batch whose numbers are reported is the metered-rate
 rule above. k ≥ 3.
+It refuses outright on one thing only, the non-consuming Harbor adapter above,
+and it sets `HARBOR_TELEMETRY=0` on every Harbor line unless a cell overrides
+it, for the reason given in Phase 6.
 
 Selection-competition evals (does the RIGHT unit win when many are loaded) are
 **off by default**. Offer them once when |𝒫| > 1; if accepted, see the
@@ -254,8 +311,19 @@ Run oracle everywhere first; then the manifest.
 
 `scripts/collect_rewards.py --conditions design/conditions.json --harbor-jobs runs/harbor --benchflow-jobs runs/bench --out results.json` walks both runners' job trees and emits the `{condition, cell, task, trial, reward}` rows the analyzer reads.
 Those two roots are what `design_matrix.py --jobs-root runs` lays down, and `design/jobs.json` records the same mapping in the `{runner, cell, condition, path}` shape `--job-index` consumes when a job name cannot carry its condition.
-It refuses rather than guesses: an unresolvable condition, an ambiguous reward dict, unscored rollouts with no `--errors-as` choice, or a failed injection check all exit 2, so a run batch whose skills never arrived cannot be silently analyzed as if they had.
+It refuses rather than guesses: an unresolvable condition, an ambiguous reward dict, unscored rollouts with no `--errors-as` choice, or a failed injection check all exit 2.
 The Harbor injection check reads each trial's `lock.json`, whose `skills` list carries a content digest per skill, and falls back to the requested `config.agent.skills` only when a trial wrote no lock; the BenchFlow check requires a non-null `effective_skills_dir` under `with-skill` rather than trusting `skill_mode` alone.
+
+Read that check for what it proves, which is resolution and request, not delivery.
+`_write_trial_lock` runs inside `Trial.__init__` at harbor `trial.py:104`, before `_resolve_injected_skills` at `:107` and long before `_upload_injected_skills` at `:411`, and `_build_agent_skill_locks` (`models/job/lock.py:462-475`) calls only host-side functions.
+So a populated `lock.json` says the paths resolved on the host and pins their digests, and says nothing about what reached the container.
+It stays fully populated through an upload failure, a permissions failure, or an adapter that never reads the injected directory, and a 17-adapter batch that delivered nothing writes a clean lock and passes this check.
+The check is one-sided: a disagreement proves the lattice did not vary as designed, and agreement proves only that the request and the host-side resolution matched.
+Delivery is covered before the run instead, by the adapter allowlist and the BenchFlow oracle canary in Phase 5.
+
+Harbor's own telemetry is a third surface not to consume in analysis.
+`telemetry.py:239` sets `uses_skills=any(agent.skills for agent in config.agents)` from the requested list, never consulting the effective directory or the adapter, so it classifies a voided run as skill-bearing.
+The emitted manifest sets `HARBOR_TELEMETRY=0` (`telemetry.py:40`, `:45`) rather than publishing that classification.
 
 Feed `results.json` to `scripts/analyze_lattice.py`:
 
@@ -301,18 +369,18 @@ Two stages of that program are named and not yet built.
 Both are static, near-free and 100-percent coverage, which is why they gate all container spend.
 `lint` is a per-skill static pass: YAML-parse the frontmatter, score description quality against the trigger methodology, list environment couplings for remediation, and check progressive-disclosure structure.
 `selection-sim` is the same shape one level up: simulate everything-on triggering across the full deployed description set and adjudicate the flagged competition pairs, with no container and no task execution.
-Neither exists in `scripts/` at instrument version 0.2.0, so read the stage ordering as a plan rather than as inherited implementation, and do not go looking for a script that is not there.
+Neither exists in `scripts/` at instrument version 0.2.1, so read the stage ordering as a plan rather than as inherited implementation, and do not go looking for a script that is not there.
 
 ## Instrument versioning
 
 This skill is the instrument, and results are comparable only within one version of it.
-`0.1.0` is the as-authored baseline; this repair round is `0.2.0`; the frontmatter `version` field is the authority and `CHANGELOG.md` records what moved between them.
+`0.1.0` is the as-authored baseline, `0.2.0` was the contract-repair round, and `0.2.1` corrects the claims in it that landed on the wrong side of the container boundary; the frontmatter `version` field is the authority and `CHANGELOG.md` records what moved between them.
 Stamp the instrument version into every package README and every results file, and index evaluation results by it so a cross-version comparison has to be made deliberately.
 Do not modify the instrument while an evaluation is being authored or run.
 Revising harborize itself is in scope and is the intended path for defects found mid-round: record the defect, finish the round, then apply the change and bump the version.
 
 Every upstream claim here is anchored to a revision, because the 0.1.0 text cited a harbor command that has since been removed and a benchflow flag that does not exist.
-Version 0.2.0 was written against harbor at `ac398bbda7c4c1073461797d3b95c2455cc671b5`, benchflow at `d30527b82027a416e72014920cdf43a534967ad3`, and skillsbench at `9a1f4dd5f7659f75707435da3ce854b6e48321d1`, read from the local clones under `~/ghq/github.com/`.
+Versions 0.2.0 and 0.2.1 were both written against harbor at `ac398bbda7c4c1073461797d3b95c2455cc671b5`, benchflow at `d30527b82027a416e72014920cdf43a534967ad3`, and skillsbench at `9a1f4dd5f7659f75707435da3ce854b6e48321d1`, read from the local clones under `~/ghq/github.com/`.
 Those clones sit at their own HEAD rather than at a project-wide pin, so re-read any cited file and line before relying on it.
 
 ## Review gate

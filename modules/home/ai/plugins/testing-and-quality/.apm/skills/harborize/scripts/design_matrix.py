@@ -40,6 +40,11 @@ silently against a host one. BenchFlow takes `--skills-dir <host-path>` under
 `--skill-mode with-skill`, and `--skill-mode no-skill` alone for C = empty.
 See references/emitters.md for the contract and the upstream anchors.
 
+A cells.json naming a Harbor adapter that does not read the injected directory
+is refused here rather than run: that failure is invisible at every later
+stage, so the allowlist below is the only gate that catches it, and it costs
+nothing because it runs before any container starts.
+
 Invariant (grade discipline): conditions differ only in dir(C); the manifest
 varies only the injected directory and the ablation id.
 """
@@ -105,12 +110,82 @@ def cond_dir(ident):
 
 RUNNERS = ("harbor", "benchflow")
 
+# Registered Harbor agents whose adapter reads the injected skills directory
+# and registers it into a discovery path. Regenerate at a new harbor revision
+# by intersecting the factory registry with the adapters that read the dir:
+#   rg -n 'AgentName\.[A-Z_0-9]+: ' src/harbor/agents/factory.py
+#   rg -l 'self\.skills_dir' src/harbor/agents/ --type py
+# The second command yields module paths; map each back to its registry name
+# through factory.py and drop agents/base.py, which is the definition site.
+# Derived at harbor ac398bbda7c4c1073461797d3b95c2455cc671b5: 39 registered,
+# 22 consuming, 17 that accept the upload and never register it.
+HARBOR_SKILL_CONSUMING_AGENTS = frozenset({
+    "antigravity-cli", "antigravity-sdk", "claude-code", "cline-cli", "codex",
+    "copilot-cli", "cursor-cli", "eve", "fx", "gemini-cli", "goose",
+    "grok-build", "hermes", "kimi-cli", "kimi-code", "mimo", "openclaw",
+    "opencode", "pi", "qwen-coder", "terminus-2", "vibe",
+})
+
+# Harbor routes every agent name carrying this prefix through AgentName.ACP
+# (src/harbor/agents/factory.py:167-175), and acp is one of the 17.
+ACP_SHORTHAND_PREFIX = "acp:"
+
+
+def check_harbor_agents(cells, path):
+    """Refuse a cell whose Harbor adapter would drop the injected skills.
+
+    Harbor uploads the skills per trial regardless of adapter, and a
+    non-consuming adapter never registers them into a discovery path. Nothing
+    raises, the run exits 0, and every condition in that cell collapses to the
+    empty condition.
+
+    lock.json cannot detect this. The lock is written in Trial.__init__ (harbor
+    src/harbor/trial/trial.py:104), before the skills are resolved at :107 and
+    long before they are uploaded at :411, and _build_agent_skill_locks
+    (src/harbor/models/job/lock.py:462-475) calls only host-side functions, so
+    a cell that delivers nothing still writes a fully populated lock. Nothing
+    written after the run separates this failure from a real negative result
+    either, so refusing here, before any container starts, is the only cheap
+    place it can be caught.
+    """
+    problems = []
+    for i, cell in enumerate(cells):
+        if cell["runner"] != "harbor":
+            continue
+        agent = str(cell["agent"])
+        if agent.startswith(ACP_SHORTHAND_PREFIX):
+            problems.append(
+                f"entry {i} ({cell['name']!r}) names harbor agent {agent!r}: "
+                "harbor routes every acp: shorthand through AgentName.ACP, "
+                "which does not read the injected skills directory, so this "
+                "cell drops skills on the harbor arm while a benchflow arm "
+                "for the same agent works"
+            )
+        elif agent not in HARBOR_SKILL_CONSUMING_AGENTS:
+            problems.append(
+                f"entry {i} ({cell['name']!r}) names harbor agent {agent!r}, "
+                "whose adapter does not read the injected skills directory: "
+                "harbor uploads the skills and nothing registers them, with "
+                "no error and no log line, so every condition in this cell "
+                "collapses to the empty condition"
+            )
+    if problems:
+        raise SystemExit(
+            f"cells {path}: refusing to emit a manifest.\n"
+            + "\n".join(f"  {problem}" for problem in problems)
+            + "\nAdapters that consume injected skills at harbor "
+            "ac398bbda7c4c1073461797d3b95c2455cc671b5: "
+            + ", ".join(sorted(HARBOR_SKILL_CONSUMING_AGENTS))
+        )
+
 
 def load_cells(path):
     """Read cells.json, refusing a shape design/jobs.json could not describe.
 
     `runner` is restricted to the two spellings collect_rewards.py accepts, so
     design/jobs.json can be handed to it as --job-index without translation.
+    The adapter gate in check_harbor_agents runs from here rather than from
+    main, so no caller can reach a manifest without passing it.
     """
     cells = json.loads(pathlib.Path(path).read_text())
     if not isinstance(cells, list) or not cells:
@@ -132,6 +207,7 @@ def load_cells(path):
         if cell["name"] in names:
             raise SystemExit(f"cells {path}: duplicate cell name {cell['name']!r}")
         names.add(cell["name"])
+    check_harbor_agents(cells, path)
     return cells
 
 
@@ -267,7 +343,14 @@ def runner_jobs_dir(jobs_root, runner):
 
 
 def build_manifest(conds, cells, a, membership):
-    """Manifest lines plus the job index describing where each job will land."""
+    """Manifest lines plus the job index describing where each job will land.
+
+    Harbor lines carry HARBOR_TELEMETRY=0 unless the cell sets it. Harbor's
+    telemetry derives uses_skills from the requested skill list
+    (src/harbor/telemetry.py:239) without consulting the effective directory or
+    the adapter, so it reports a run that delivered nothing as skill-bearing;
+    the manifest declines to publish that classification rather than correct it.
+    """
     mem = f" --membership {shlex.quote(membership)}" if membership else ""
     lines = [
         "#!/bin/bash",
@@ -278,9 +361,10 @@ def build_manifest(conds, cells, a, membership):
     ]
     jobs = []
     for cell in cells:
-        env = "".join(
-            f"{k}={shlex.quote(v)} " for k, v in cell.get("env", {}).items()
-        )
+        cell_env = cell.get("env", {})
+        if cell["runner"] == "harbor":
+            cell_env = {"HARBOR_TELEMETRY": "0", **cell_env}
+        env = "".join(f"{k}={shlex.quote(v)} " for k, v in cell_env.items())
         jobs_dir = runner_jobs_dir(a.jobs_root, cell["runner"])
         for c in conds:
             ident = cid(c)

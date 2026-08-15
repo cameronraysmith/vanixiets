@@ -1,8 +1,9 @@
-# Dual emission: one package, two heads
+# Dual emission: one authored tree, one exported head
 
-Canonical content: `instruction.md`, `environment/Dockerfile`, one solver script, one verifier script and its checks.
-The heads are metadata plus naming shims.
-Emit both, validate both, and keep content byte-identical so the heads never drift.
+Canonical content: the instruction body, `environment/Dockerfile`, one solver script, one verifier script and its checks.
+The Harbor head is metadata plus naming shims over that content.
+Author the BenchFlow-native tree, derive the Harbor head with `bench tasks export` into a sibling directory, and validate each head with the gate that can run against its layout.
+Deriving rather than maintaining two trees is what keeps the heads from drifting; the two cannot share a directory, for the reasons under "Two heads, two directories" below.
 
 ## Verified against
 
@@ -22,15 +23,24 @@ Harbor's `TaskConfig.schema_version` defaults to `"1.4"` (`src/harbor/models/tas
 Harbor's own example packages still declare `schema_version = "1.3"` (`examples/tasks/separate-verifier-environment/task.toml:1`), and all 87 shipped SkillsBench tasks declare `schema_version: '1.3'` in their `task.md` frontmatter.
 Emitting 1.3 against a 1.4 Harbor is therefore valid and matches the SkillsBench corpus.
 
-## Keeping the heads identical
+## Two heads, two directories
 
-`bench tasks export <task-dir> <out-dir> --target harbor` derives the Harbor head from a SkillsBench-native package (benchflow `src/benchflow/cli/tasks.py:281`, `src/benchflow/task/export.py:266-286`).
+Author the package BenchFlow-native and derive the Harbor head into a separate sibling directory.
+This is the sanctioned route rather than one option among several, because the two heads cannot share a directory.
+
+Three independent validators forbid the co-present form.
+BenchFlow's `--level publication-grade` rejects a `task.toml` or `instruction.md` beside `task.md` (`src/benchflow/_utils/task_authoring/structural_checks.py:208-212`) and rejects `solution/` in favour of `oracle/` (`:218-222`).
+SkillsBench's corpus gate forbids exactly `instruction.md`, `task.toml`, `solution` and `tests` (`.github/scripts/validate_tasks.py:21-26`), which is precisely the set Harbor requires.
+And the corpus itself is uniformly native: all 87 tasks under `tasks/` carry `task.md` and `oracle/solve.sh` with zero `task.toml` and zero `solution/`, as do the 14 under `tasks-extra/`.
+
+`bench tasks export <task-dir> <out-dir> --target harbor` performs the derivation (benchflow `src/benchflow/cli/tasks.py:281`, `src/benchflow/task/export.py:266-286`).
 It writes `task.toml` and `instruction.md` from `task.md`, copies `oracle/` to `solution/`, copies `verifier/` to `tests/`, copies `environment/` verbatim, and emits `compatibility/export-report.json` naming everything that did not survive the conversion.
-`--report-only` prints that report without writing files.
-The destination may not overlap the source in either direction; the export refuses rather than deleting source trees it has not yet copied.
+`--report-only` prints that report without writing files, and `--overwrite` replaces an existing export directory.
+The destination may not overlap the source in either direction (`export.py:242-251`); the export refuses rather than deleting source trees it has not yet copied, which is also why the Harbor head is a sibling and never a subdirectory.
 
-Authoring the BenchFlow head and exporting the Harbor head gives one source of truth and a machine-readable loss report.
-Hardlinks or a sync step remain the fallback for a package authored Harbor-first.
+So the native tree is the single source of truth, the export is a build product, and the loss report is machine-readable.
+Re-export after every edit to the native tree and never hand-edit the Harbor head, whose contents are overwritten.
+Hardlinks or a sync step remain the fallback only for a package inherited Harbor-first.
 
 The export copies `environment/` verbatim, `environment/skills/` included.
 Keep that directory empty in the canonical package: conditions are injected at run time, and a populated `environment/skills/` bakes one condition into the image.
@@ -102,7 +112,7 @@ COPY checks.py judge.toml /tests/
 For a pytest verifier, swap the install line for `RUN pip install --no-cache-dir pytest==8.4.1`, drop the second `COPY`, and add `test_outputs.py` to the first.
 Harbor's own separate-verifier examples take the same shape from the other direction: `examples/tasks/separate-verifier-environment/tests/Dockerfile` pairs `FROM ubuntu:24.04` with a pure-bash `test.sh` that invokes no interpreter at all.
 
-When the package is authored BenchFlow-first, this file lives at `verifier/Dockerfile`, which `bench tasks export` lands at `tests/Dockerfile`.
+Author this file at `verifier/Dockerfile` in the native tree; `bench tasks export` lands it at `tests/Dockerfile`.
 
 ## Skill injection under Harbor
 
@@ -117,6 +127,10 @@ Skill names come from directory basenames and duplicates resolve last-wins.
 The flag populates `AgentConfig.skills`, which the trial resolves (`trial.py:1142-1145`) and uploads per trial into `<skills-dir>/<skill-name>/` (`trial.py:1179-1204`).
 The destination defaults to `/harbor/skills` (`src/harbor/models/trial/paths.py:41`) unless the task sets `[environment].skills_dir`, which must then be absolute or the trial raises (`trial.py:1162-1177`).
 Injection also SHA-pins each skill into the trial's lock, recording name, source, content digest, and the git URL and commit id when the source sits in a repository (`src/harbor/models/job/lock.py:141-146`, `:462-475`), which is provenance worth having on its own.
+The lock records the host, not the container.
+`_write_trial_lock` runs in `Trial.__init__` at `trial.py:104`, ahead of `_resolve_injected_skills` at `:107` and far ahead of `_upload_injected_skills` at `:411`, and `_build_agent_skill_locks` calls only host-side functions.
+So the lock is written before anything is uploaded and stays fully populated through an upload failure, a permissions failure, or an adapter that never reads the directory.
+What it proves is that the paths resolved on the host and what their contents digested to.
 
 `--ak skills_dir=<path>` is not an injection mechanism and must never be used as one.
 `skills_dir` is an agent constructor kwarg documented as "Skills directory path in the environment" (`src/harbor/agents/base.py:75`), meaning container-side.
@@ -125,16 +139,59 @@ Passing a host path there names a directory that does not exist inside the conta
 
 The failure signature is that every condition becomes identical to the empty condition.
 All first differences collapse toward zero, second differences follow, nothing in the pipeline raises, and the numbers look like a real negative result.
-Check for it by reading the trial lock: a run with genuine injection carries a populated top-level `skills` list with digests, and a run without it carries an empty one.
+The trial lock catches this particular defect, because `--ak skills_dir=` never populates `AgentConfig.skills` and the lock's `skills` list therefore comes out empty while the condition asked for units.
 `scripts/collect_rewards.py` reads that list per trial and refuses the batch when it disagrees with the condition.
+The check is one-sided, for the reason given above: a populated lock is host-side resolution, so it rules out this defect and not the delivery failures that follow it.
 
 The two settings can also collide.
 The trial passes its own resolved `skills_dir` into the agent constructor (`trial.py:838-839`) and the factory merges with trial kwargs last (`src/harbor/agents/factory.py:183`), so whenever real injection or a task-level `environment.skills_dir` is in play, an `--ak skills_dir=` value is silently overridden.
 
+## The silent-adapter class
+
 Injection uploads regardless of adapter, but registration is adapter-specific.
-Twenty adapter modules reference `skills_dir` at this revision, enumerated by `rg -l 'skills_dir' src/harbor/agents/installed/*.py`, among them claude_code, codex, opencode, gemini_cli, qwen_code, cursor_cli, copilot_cli, pi and goose.
-Adapters including aider, mini_swe_agent, openhands and swe_agent never read it, so the files land at `/harbor/skills/<name>/` and are never registered into a discovery path.
-That is a second silent-null path: confirm the target adapter is skills-aware before spending a batch on it.
+Of the 39 agents the factory registers, 22 read the injected directory and 17 ignore it with no error, no warning and no log line.
+The two commands that establish those figures:
+
+```
+rg -c 'AgentName\.[A-Z_0-9]+: ' src/harbor/agents/factory.py       # 39
+rg -l 'self\.skills_dir' src/harbor/agents/ --type py              # 23
+```
+
+The second returns 23 files, being the 22 adapters plus `agents/base.py:85`, which is the definition site.
+Map each module back to its registry name through `factory.py`, because the two differ: `qwen_code.py` is registered as `qwen-coder` and `installed/cline/cline.py` as `cline-cli`.
+
+Consuming: antigravity-cli, antigravity-sdk, claude-code, cline-cli, codex, copilot-cli, cursor-cli, eve, fx, gemini-cli, goose, grok-build, hermes, kimi-cli, kimi-code, mimo, openclaw, opencode, pi, qwen-coder, terminus-2, vibe.
+
+Non-consuming: acp, aider, computer-1, cortex-code, deerflow, devin, dspy-rlm, langgraph, mini-swe-agent, nemo-agent, nop, openhands, openhands-sdk, oracle, rovodev-cli, swe-agent, trae-agent.
+
+The narrower glob `rg -l 'skills_dir' src/harbor/agents/installed/*.py` returns twenty and reads as if it were the answer.
+It is not the adapter set: it misses `installed/cline/cline.py`, which sits in a subdirectory, and `terminus_2/terminus_2.py`, which sits outside `installed/`, and it counts modules where the question is registry entries.
+
+`acp` is a non-consumer and also a router.
+`factory.py:167-175` sends any name matching `is_acp_registry_shorthand`, meaning any name prefixed `acp:`, through `AgentName.ACP`, so an ACP-shorthand cell drops skills on the Harbor arm while the BenchFlow arm for the same agent works.
+
+`scripts/design_matrix.py` refuses to emit a manifest for a cells.json naming a non-consuming Harbor adapter or an `acp:` shorthand, and carries the allowlist as `HARBOR_SKILL_CONSUMING_AGENTS` with the regenerating commands beside it.
+That gate is where this class has to be caught: it costs nothing, it runs before any container starts, and no artifact written after the run distinguishes a non-consuming adapter from a working one.
+
+## Where each adapter puts the skills
+
+The destination differs per adapter, so no single canary assertion covers a grid.
+
+| adapter | destination in the container | anchor |
+|---|---|---|
+| claude-code | `$CLAUDE_CONFIG_DIR/skills/<name>/`, and `CLAUDE_CONFIG_DIR` is `/logs/agent/sessions` | `claude_code.py:1530-1542`, `:1718`; `models/trial/paths.py:36` |
+| codex | `$HOME/.agents/skills/<name>/` | `codex.py:1199-1207` |
+| pi | `$HOME/.agents/skills/<name>/` | `pi.py:75-83` |
+| opencode | `~/.config/opencode/skills/<name>/` | `opencode.py:425-433` |
+
+claude-code's destination is the one with a free consequence: `/logs/agent` is bind-mounted from the trial directory (`trial.py:1284-1288`), so whatever the adapter registered is readable on the host after the run with no verifier code at all.
+
+The two runners do not agree on these paths, so a cell's cross-runner comparability is a per-adapter question.
+BenchFlow declares `skill_paths` per agent in `src/benchflow/agents/registry.py`: `codex-acp` at `:604` declares `["$HOME/.agents/skills"]`, which is exactly Harbor's codex destination, so codex is the one cell where both agree.
+`pi-acp` at `:560` declares `["$HOME/.pi/agent/skills", "$HOME/.agents/skills"]`, a superset of Harbor's single path.
+`opencode` at `:700` declares `["$HOME/.opencode/skills"]`, which does not overlap the `~/.config/opencode/skills` Harbor writes.
+`claude-agent-acp` at `:518` declares `["$HOME/.claude/skills"]`, where Harbor redirects `CLAUDE_CONFIG_DIR` away from `~/.claude` entirely.
+Whether a skill that loads under one runner loads under the other for pi, opencode and claude is an open question this instrument has not settled; do not report a cross-runner contrast on those cells as though it were.
 
 ## Shared to BenchFlow head (SkillsBench layout)
 
@@ -175,6 +232,30 @@ The asymmetry is the reason the Harbor defect survived.
 Both runners want the same host directory, but they name the argument differently, and the one whose name reads like a host path is the one that is not.
 `--skills-dir` is a host path and fails loudly on a bad one; `skills_dir` under `--ak` is a container path and fails silently on a host one.
 A generator that carries the argument across from the bench arm to the Harbor arm produces a run that exits 0 and measures nothing.
+
+## The free delivery canary
+
+BenchFlow's oracle path proves skill delivery end to end and makes no model call.
+`rollout/__init__.py:1160` takes the `primary_agent == "oracle"` branch and still calls `deploy_skills` at `:1174`, so the whole deployment path runs while the agent is a shell script.
+
+The assertion is in the container.
+`deploy_skills` computes the expected catalogue on the host as `Path(skills_dir).glob("*/SKILL.md")` (`agents/install.py:313-314`) and, with no `agent_cfg` on the oracle path, distributes to `_ORACLE_SKILL_PATHS` — the five discovery paths at `install.py:30-36` covering the claude, codex, opencode, agents and workspace conventions (`:350`).
+`_link_skill_paths` then runs one command in the sandbox that links the tree into each path, enumerates `SKILL.md` at depth 2 under both the source and each destination, asserts the two catalogues are equal, and asserts the source catalogue equals the host-computed expected names (`install.py:146-161`).
+A mismatch raises `experiment_fidelity/skill_deployment_missing`, naming the expected set (`:176-179`).
+
+```
+bench eval run --tasks-dir <task-dir> --agent oracle \
+  --skill-mode with-skill --skills-dir /tmp/cond-<id> \
+  --sandbox docker --jobs-dir runs/canary/<id>
+```
+
+Pass criterion: the run exits 0, no rollout carries `experiment_fidelity/skill_deployment_missing`, and each rollout's `effective_skills_dir` is the host `dir(C)` that was passed.
+Run it once per distinct dir(C) shape before any metered batch.
+
+Harbor has no free equivalent.
+`--install-only` (`src/harbor/cli/jobs.py:901-910`) runs agent setup and exits, and setup does reach `_upload_injected_skills`, which sits in `_prepare` at `trial.py:411`.
+But every adapter's registration copy is built inside `run()`, not `setup()` — `claude_code.py:1733`, `codex.py:1413`, `opencode.py:499`, `pi.py:116` — and `--install-only` skips the agent run.
+So the cheapest Harbor evidence still costs a real agent invocation, which is why the adapter allowlist in `design_matrix.py` is a gate rather than a convenience.
 
 ## Run lines
 
@@ -240,7 +321,11 @@ A hand-written manifest must do the same.
 Auth per adapter.
 Claude Code subscription auth is `CLAUDE_FORCE_OAUTH=1` plus `CLAUDE_CODE_OAUTH_TOKEN`, and Harbor raises if the first is set without the second (`claude_code.py:1587-1633`).
 Codex takes `CODEX_FORCE_AUTH_JSON=1` or `CODEX_AUTH_JSON_PATH=<path>` (`codex.py:1305-1325`).
-Pi's OAuth escape hatch reads `ANTHROPIC_OAUTH_TOKEN` and is gated on the resolved provider being anthropic (`pi.py:101-104`), so any other provider falls through to the providers table and Pi on an OpenAI model bills `OPENAI_API_KEY`.
+Pi's OAuth escape hatch reads `ANTHROPIC_OAUTH_TOKEN` and is gated only on the resolved provider being anthropic (`pi.py:102-105`), so any other provider falls through to the providers table and Pi on an OpenAI model bills `OPENAI_API_KEY`.
+
+Pi has no force flag.
+Claude Code requires `CLAUDE_FORCE_OAUTH` before it will drop the API key (`claude_code.py:1587-1597`) and Codex requires `CODEX_FORCE_AUTH_JSON` or `CODEX_AUTH_JSON_PATH` (`codex.py:1301-1329`), but Pi injects `ANTHROPIC_OAUTH_TOKEN` whenever the variable is present in the resolved environment.
+SKILL.md Phase 5 bars subscription-authenticated cells from any reported run batch, and on a Pi cell that rule is enforced by scrubbing the variable, not by withholding a flag: declare `ANTHROPIC_OAUTH_TOKEN=""` in the cell's `env` block or unset it in the shell the manifest runs in.
 
 ## Verifier scripts
 

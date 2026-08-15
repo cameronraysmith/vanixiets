@@ -5,6 +5,60 @@ The format follows Keep a Changelog, and the version numbers apply to this skill
 Evaluation results are indexed by the instrument version that produced them, so a comparison spanning versions has to be made deliberately.
 The instrument is not modified while an evaluation is being authored or run; revisions happen between rounds.
 
+## 0.2.1 — 2026-08-14
+
+Container-boundary round.
+Every entry below corrects a 0.2.0 claim that was true on the host and asserted about the container, or records a consequence of that boundary the text did not carry.
+0.2.0 repaired the instructions that could not run; this version repairs the evidence they produce.
+No package layout, estimator or budget option changed, so a package built under 0.2.0 remains readable, and no results exist under either version.
+
+Written against the same upstream revisions as 0.2.0: harbor `ac398bbda7c4c1073461797d3b95c2455cc671b5`, benchflow `d30527b82027a416e72014920cdf43a534967ad3`, skillsbench `9a1f4dd5f7659f75707435da3ce854b6e48321d1`.
+Every anchor cited in this entry was read at those revisions.
+
+### Fixed
+
+- The instrument claimed delivery where only resolution is proven.
+  `_write_trial_lock` runs inside `Trial.__init__` at harbor `trial.py:104`, before `_resolve_injected_skills` at `:107` and long before `_upload_injected_skills` at `:411`, and `_build_agent_skill_locks` (`models/job/lock.py:462-475`) calls only host-side functions.
+  So `lock.json` records host-side resolution and pins digests, and proves nothing about what reached the container: it stays fully populated through an upload failure, a permissions failure, or an adapter that never reads the injected directory.
+  `scripts/collect_rewards.py` said the lock's `skills` list records every skill "actually resolved and uploaded"; the upload half was false.
+  SKILL.md said a run batch whose skills never arrived cannot be silently analyzed as if they had; that was false for the 17-adapter class below, which writes a fully populated lock and passes `harbor_injection`.
+  Both are narrowed to resolution and request, with what the lock cannot see stated beside them, and the check is now documented as one-sided: a disagreement proves the lattice did not vary, agreement proves only that request and resolution matched.
+- The adapter enumeration in `references/emitters.md` was wrong in a way that read as correct.
+  It stated twenty adapters, which is exactly what `rg -l 'skills_dir' src/harbor/agents/installed/*.py` returns, but that glob is not the adapter set: it misses `installed/cline/cline.py` in a subdirectory and `terminus_2/terminus_2.py` outside `installed/`, and it counts modules where the question is registry entries.
+  Every adapter it named was correct.
+  The figure is 22 of 39 registered agents, from `rg -c 'AgentName\.[A-Z_0-9]+: ' src/harbor/agents/factory.py` and `rg -l 'self\.skills_dir' src/harbor/agents/ --type py`, the latter returning 23 files being 22 adapters plus the `agents/base.py:85` definition site.
+  Both full lists are now enumerated rather than sampled.
+- The canonical package layout and the publication-grade instruction disagreed.
+  The layout placed `task.md`, `task.toml` and `instruction.md` in one directory, which `bench tasks check --level publication-grade` rejects: benchflow `_utils/task_authoring/structural_checks.py:208-212` refuses a co-present `task.toml`/`instruction.md`, and `:218-222` refuses `solution/` in favour of `oracle/`.
+  skillsbench `.github/scripts/validate_tasks.py:21-26` forbids exactly `instruction.md`, `task.toml`, `solution` and `tests`, which is the set Harbor requires, and all 87 tasks under `tasks/` plus the 14 under `tasks-extra/` are native, with zero `task.toml` and zero `solution/`.
+  The layout is now two directories: an authored BenchFlow-native tree and a generated `<task-id>-harbor` sibling, with `bench tasks export` as the sanctioned route rather than an aside, and each static gate named against the directory it can run in.
+- Pi's subscription-auth exposure was understated.
+  `pi.py:102-105` injects `ANTHROPIC_OAUTH_TOKEN` merely because the variable is present in the resolved environment, with no force flag, unlike claude-code (`claude_code.py:1587-1597`) and codex (`codex.py:1301-1329`).
+  Since Phase 5 bars subscription-authenticated cells from a reported batch, enforcement on a Pi cell requires an explicit scrub rather than withholding a flag.
+
+### Added
+
+- A hard-fail adapter allowlist in `scripts/design_matrix.py`.
+  Of the 39 factory-registered Harbor agents, 22 consume the injected skills and 17 ignore them with no error, no warning and no log line, so a cell naming one of the 17 uploads the skills, registers nothing, exits 0 and collapses every condition to the empty condition.
+  `HARBOR_SKILL_CONSUMING_AGENTS` carries the consuming set with the commands that regenerate it and the revision it was derived from; `check_harbor_agents` runs from `load_cells`, so no caller reaches a manifest without passing it, and it refuses with a nonzero exit naming the adapter and why.
+  Any `acp:` shorthand is refused for the same reason: `factory.py:167-175` routes every such name through `AgentName.ACP`, which is a non-consumer, so an ACP-shorthand cell drops skills on the Harbor arm while the BenchFlow arm works.
+  The gate runs before any container starts, and no artifact written after a run distinguishes this failure, which is why it is a gate rather than a runtime canary.
+- The per-adapter destination table, because no single canary assertion covers a grid.
+  claude-code copies to `$CLAUDE_CONFIG_DIR/skills/<name>/` with `CLAUDE_CONFIG_DIR` set to `/logs/agent/sessions` (`claude_code.py:1530-1542`, `:1718`; `models/trial/paths.py:36`), codex and pi both write `$HOME/.agents/skills/<name>/` (`codex.py:1199-1207`, `pi.py:75-83`), and opencode writes `~/.config/opencode/skills/<name>/` (`opencode.py:425-433`).
+  claude-code's destination sits inside the `/logs/agent` bind mount (`trial.py:1284-1288`), so it is readable on the host after a run with no verifier code at all.
+  Harbor and BenchFlow declare the same path only for codex; `pi-acp` declares a superset (benchflow `agents/registry.py:560`), and `opencode` (`:700`) and `claude-agent-acp` (`:518`) declare paths Harbor does not write.
+  Those three cells' cross-runner comparability is recorded as an open question rather than resolved.
+- The free delivery canary, which already exists upstream.
+  BenchFlow's oracle path proves delivery end to end with no model call: `rollout/__init__.py:1160` takes the `primary_agent == "oracle"` branch and still calls `deploy_skills` at `:1174`, `agents/install.py:313-314` computes the expected catalogue from `Path(skills_dir).glob("*/SKILL.md")`, `:350` falls back to the five `_ORACLE_SKILL_PATHS` at `install.py:30-36`, and `_link_skill_paths` asserts in the container that the catalogue at each discovery path equals the host's before raising `experiment_fidelity/skill_deployment_missing` at `:176-179`.
+  The command and pass criterion are documented, along with the fact that Harbor has no free equivalent: every adapter's registration copy is built in `run()` rather than `setup()`, so `--install-only` (`cli/jobs.py:901-910`) reaches the upload and never the registration.
+- Two blocking prerequisites in Phase 3, where an author hits them.
+  Harbor's default `network_mode = "no-network"` is rejected at environment start when the daemon's kernel lacks `CONFIG_NFT_FIB_INET`: the probe is `environments/docker/docker.py:113-117`, failure zeroes `capabilities.disable_internet` (`:188-193`, `:289-293`), and `environments/base.py:772-781` raises.
+  The one-line daemon probe is given, along with the note that Harbor's own probe passes when `/proc/config.gz` is absent and the hand probe does not.
+  claude-code's `install()` curls its bootstrap from the network (`claude_code.py:425-449`) during `_prepare`/`_setup_agent` (`trial.py:408-414`), which is outside the agent-phase network policy that wraps only `_run_agent_phase` (`trial.py:465-469`) and the verifier phases, so a no-network cell fails during agent install indistinguishably from an injection failure at the reward level.
+- `HARBOR_TELEMETRY=0` on every emitted Harbor line, overridable per cell.
+  `telemetry.py:239` sets `uses_skills` from the requested list without consulting the effective directory or the adapter, so it classifies a voided run as skill-bearing.
+  That is a third silent-null surface, recorded as one not to consume in analysis.
+
 ## 0.2.0 — 2026-08-14
 
 Contract repair round.
