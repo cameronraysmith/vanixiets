@@ -23,10 +23,20 @@ Harbor (ac398bbda7c4c1073461797d3b95c2455cc671b5)
 
     The injection check reads the sibling lock.json
     (src/harbor/models/trial/paths.py:182-183), whose top-level `skills` list
-    records the name, source and content digest of every skill actually
-    resolved and uploaded (src/harbor/models/job/lock.py:141-146, :462-475).
-    config.agent.skills in result.json is the request rather than the outcome
-    and is used only when a trial wrote no lock.
+    records the name, source and content digest of every skill the HOST
+    resolved (src/harbor/models/job/lock.py:141-146, :462-475).
+
+    That is resolution, not delivery. The lock is written in Trial.__init__
+    (src/harbor/trial/trial.py:104), before _resolve_injected_skills at :107
+    and long before _upload_injected_skills at :411, and
+    _build_agent_skill_locks calls only host-side functions. So a populated
+    lock proves the paths resolved and pins their digests, and proves nothing
+    about what reached the container: it stays fully populated through an
+    upload failure, a permissions failure, or an adapter that reads the
+    injected directory not at all. That last class is refused before the run
+    by design_matrix.check_harbor_agents, because no artifact written after
+    the run distinguishes it. config.agent.skills in result.json is the
+    request as written and is used only when a trial wrote no lock.
 
 BenchFlow (d30527b82027a416e72014920cdf43a534967ad3)
     <bench-jobs>/<cell>__<condition>/.../<job-name>/<rollout-name>/result.json
@@ -174,7 +184,7 @@ def benchflow_rollout_dirs(job_dir):
 
 
 def harbor_lock_skills(trial_dir):
-    """Digest-bearing skill records from a trial's lock, or None if unlocked."""
+    """Host-resolved skill records from a trial's lock, or None if unlocked."""
     lock_path = trial_dir / "lock.json"
     if not lock_path.is_file():
         return None
@@ -269,10 +279,16 @@ def reduce_reward(rewards, reward_key, path):
 
 
 def check_injection(job, rollout, path):
+    """Flag a rollout whose recorded skill request disagrees with its condition.
+
+    One-sided. A disagreement proves the lattice did not vary as designed;
+    agreement proves only that the request and the host-side resolution
+    matched, which is all either runner records post hoc on the Harbor arm.
+    """
     expected = job["condition"] != EMPTY_CONDITION
     if rollout["injected"] == expected:
         return None
-    verb = "carries no injected skills" if expected else "carries injected skills"
+    verb = "resolved no skills" if expected else "resolved skills"
     return (
         f"{path}: condition {job['condition']!r} {verb} "
         f"({rollout['injection_evidence']})"
