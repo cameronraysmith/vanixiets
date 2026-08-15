@@ -42,3 +42,13 @@ projects:
         id: "ba0ffa20-a82b-40db-b292-d04f6a83eed2"
       "graphical-desktop-session":
         id: "8cf07dd5-2a48-4f45-bcd4-1add748aee46"
+  "skill-evaluation":
+    # The `id` below is the project slugId, and it must stay a slugId.
+    # The archive-time UPSERT resolves it via `linear document list --project`.
+    # It returns zero nodes with exit 0 for a project UUID, without erroring.
+    # The UPSERT's title scan then misses and duplicates every document.
+    # Nothing errors, so the duplication is only visible later in Linear.
+    id: "88879c3180bd"
+    name: "Skill evaluation"
+    teams: ["CAM"]
+    archive_documents: {}
