@@ -38,15 +38,24 @@ script still requires correct invocation, adaptation, or composition.
 
 Failure mode: measurement is vacuous — you measured copying.
 
-## 4. Coupling — paired evaluation shares the randomness object
+## 4. Coupling — paired evaluation shares the task, not the randomness
 
 Form: contrasts are estimated under a coupling in the Markov category: joint
-over (task, trial-seed) marginalized to conditions.
+over tasks, marginalized to conditions.
+
+The coupling is exact at the task level and positional within a task. Neither
+Harbor nor BenchFlow exposes a per-trial seed at the revisions this skill pins,
+so replicate k of one condition and replicate k of another share the task and
+the ordinal, not a randomness object. Trial ordinals are assigned by
+`collect_rewards.py`. Do not claim a shared seed; state the pairing that
+actually holds.
 
 Check: every reported delta is computed per-(task, trial) then aggregated;
 identical instructions, images, and verifier across conditions; conditions
 differ ONLY in the materialized skills directory. Never compare condition means
-computed over different task subsets.
+computed over different task subsets. `analyze_lattice.py` intersects the
+(task, trial) keys of every arm and prints what each arm contributed and what
+was dropped; that line is the evidence this invariant cites.
 
 ## 5. Grade discipline — conditions are points of the lattice, nothing more
 
@@ -58,6 +67,24 @@ Non-monotonicity is expected, not an anomaly: never infer E(A∪B) from E(A),
 E(B). Second difference Δ_uv = E({u,v}) − E({u}) − E({v}) + E(∅) is the
 interaction; Möbius inversion over observed subsets gives attribution when the
 design covers them.
+
+Two structural facts about the units and about dir(C) hold this invariant up.
+
+A plugin unit is derived through the skill-to-plugin membership map the census
+emits, never by directory structure: the deployed tree a harness reads is flat,
+one directory per skill, with no plugin directories and no `.apm/` paths, so a
+plugin unit has no directory to point at. A design that resolves plugin units
+by walking the filesystem silently gets a different unit set on the deployed
+tree than on the source tree.
+
+dir(C) must contain skill directories and nothing else. Harbor's
+`_find_skill_dirs` raises on a root holding a non-hidden child directory
+without a `SKILL.md` (harbor `src/harbor/skills.py:382-416`), so a stray
+directory turns the whole condition into a hard error. `materialize_conditions.py`
+refuses to replace a destination holding anything but skill folders for this
+reason, and refuses a destination a Dockerfile above it would COPY into an
+image, since baking dir(C) into a build context makes the image vary with the
+condition.
 
 ## 6. Empirical naturality — portability as uniformity over cells
 
