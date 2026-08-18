@@ -123,8 +123,13 @@ The canary that carries this proof MUST route its oracle-to-verifier channel thr
 
 #### Scenario: the canary's channel survives both runners
 
-- **WHEN** the injection canary's verifier environment fork is chosen
-- **THEN** it is shared and its oracle writes into the verifier log directory rather than the agent workspace, because one runner parses a separate verifier sandbox without executing it while the other gives a separate verifier container only the verifier log directory and no workspace mount, so a workspace path would pass under one runner and fail under the other
+- **WHEN** a task package's verifier environment fork is chosen
+- **THEN** it is shared and the package writes its deliverable into the verifier log directory rather than the agent workspace, because one runner refuses at launch to run a package declaring a separate verifier sandbox rather than falling back to shared, and the other empties the verifier log directory before a separate verifier runs, so a package declaring separate either does not launch or scores every agent zero, and a workspace path would in addition pass under one runner and fail under the other
+
+#### Scenario: the recorded fork is verified against the exported head
+
+- **WHEN** a package README records its verifier fork
+- **THEN** the fork is confirmed by resolving the mode from the exported Harbor head's declared keys rather than inferred from the source directory layout, because the resolver reads only the verifier environment mode and the verifier environment table, so shipping a verifier Dockerfile alone leaves the package resolving to shared
 
 #### Scenario: oracle rollout delivers the declared skills
 
@@ -203,7 +208,12 @@ The change SHALL record one measured per-run cost constant together with the con
 #### Scenario: cost constant carries its conditions
 
 - **WHEN** the metered rung completes
-- **THEN** the recorded figure names the cell, the model, the task, the trial length, the auth mode and the instrument version, and the record states that a cost per run is a function of the cell and the task
+- **THEN** the recorded figure names the cell, the model, the task, the trial length, the auth mode, the pricing basis and the instrument version, and the record states that a cost per run is a function of the cell and the task
+
+#### Scenario: the figure is a rate computation, not a billed charge
+
+- **WHEN** the metered cell's adapter has no billed-cost field of its own and derives the figure from token counts against a pricing table
+- **THEN** the record says so, the figure is still reported as a metered-rate figure because the pricing table carries metered list rates and does not vary with how the trial authenticated, and an absent pricing entry yields no number rather than a zero
 
 #### Scenario: no budget is derived here
 
