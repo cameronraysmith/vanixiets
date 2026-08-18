@@ -118,3 +118,27 @@ nix eval .#nixosConfigurations --apply builtins.attrNames
 
 Result at rung 0 close: no `.nix` file found, eval exit 0, attribute list
 printed.
+
+### Canary condition directory (tasks 2.1-2.4)
+
+`conditions/canary/` is `dir(C)`: exactly one skill directory,
+`harborize-injection-canary`, carrying the token `HARBORIZE-CANARY-9F3A21`.
+The name collides with none of the deployed skill directories, and the
+directory holds nothing else, because a stray non-hidden child without a
+`SKILL.md` turns the whole condition into a hard error at resolution
+(`_find_skill_dirs`, `skills.py:382-416`).
+
+Leakage-audit expectation (task 2.3): the asserted literal appears in both the
+verifier and the `SKILL.md` by design, and `audit_leakage.py` check 1 flags
+exactly that pattern (`MIN_LITERAL_LENGTH` at `:44`, `check_literals` at
+`:96`). The flag is correct on its own terms — the canary's mechanism is its
+answer key — and the instrument is not edited to exempt it because it is frozen
+at 0.2.1.
+
+Second consequence of the shared verifier fork chosen for the canary package
+(task 2.4): a real agent in the metered rung can read the token out of the
+verifier script without the skill ever being delivered. That costs nothing
+here, because rung 6's pass criterion is the adapter's registration directory
+rather than the reward (task 9.4), and the falsifiability control in task 7.3
+runs under the oracle, which greps skill directories and never reads the
+verifier.

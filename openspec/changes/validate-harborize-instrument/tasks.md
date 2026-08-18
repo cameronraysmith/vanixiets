@@ -27,10 +27,10 @@ docker run --rm alpine sh -c '
 
 ## 2. Canary skill and condition directory (free)
 
-- [ ] 2.1 Author the canary skill directory: one `SKILL.md` carrying the asserted token, named so it cannot collide with a deployed skill name
-- [ ] 2.2 Materialize the condition directory `dir(C)` containing that skill directory and nothing else; a stray non-hidden child without a `SKILL.md` turns the whole condition into a hard error at resolution
-- [ ] 2.3 Record in the canary README that the asserted literal appears in both the verifier and the `SKILL.md` by design, that `audit_leakage.py` check 1 flags it by construction (`MIN_LITERAL_LENGTH` at `:44`, `check_literals` at `:96`), and that the instrument is not edited to exempt it because it is frozen at 0.2.1
-- [ ] 2.4 Record the second consequence of the shared verifier fork chosen in task 5.2: a real agent in the metered rung can read the token out of the verifier script without the skill ever being delivered. That costs nothing here, because rung 6's pass criterion is the adapter's registration directory rather than the reward (task 9.4), and the falsifiability control in task 7.3 runs under the oracle, which greps skill directories and never reads the verifier
+- [x] 2.1 Author the canary skill directory: one `SKILL.md` carrying the asserted token, named so it cannot collide with a deployed skill name
+- [x] 2.2 Materialize the condition directory `dir(C)` containing that skill directory and nothing else; a stray non-hidden child without a `SKILL.md` turns the whole condition into a hard error at resolution
+- [x] 2.3 Record in the canary README that the asserted literal appears in both the verifier and the `SKILL.md` by design, that `audit_leakage.py` check 1 flags it by construction (`MIN_LITERAL_LENGTH` at `:44`, `check_literals` at `:96`), and that the instrument is not edited to exempt it because it is frozen at 0.2.1
+- [x] 2.4 Record the second consequence of the shared verifier fork chosen in task 5.2: a real agent in the metered rung can read the token out of the verifier script without the skill ever being delivered. That costs nothing here, because rung 6's pass criterion is the adapter's registration directory rather than the reward (task 9.4), and the falsifiability control in task 7.3 runs under the oracle, which greps skill directories and never reads the verifier
 
 ## 3. Rung 1 — adapter allowlist (free, already implemented at 0.2.1)
 
