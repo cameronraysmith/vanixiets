@@ -1,34 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 mkdir -p /logs/verifier
-SD=$(cd "$(dirname "$0")" && pwd)
-python3 - "$SD/_deps/build-events.jsonl" <<'EOF'
+python3 - <<'EOF'
 import json
-import sys
 
-fixture = sys.argv[1]
-
-events = []
-with open(fixture) as fh:
-    for line in fh:
-        line = line.strip()
-        if line:
-            events.append(json.loads(line))
-
-pipelines = {}
-for event in events:
-    stats = pipelines.setdefault(event['pipeline'], {'events': 0, 'failed': 0})
-    stats['events'] += 1
-    if event['status'] == 'failed':
-        stats['failed'] += 1
-
-durations = sorted(event['duration_ms'] for event in events)
-
+# Hand-derived by reading environment/build-events.jsonl record by record, and
+# deliberately not recomputed here: a verifier that reruns the oracle's own
+# algorithm agrees with a wrong oracle and cannot fail on one.
 expected = {
-    'total_events': len(events),
-    'failed_events': sum(1 for e in events if e['status'] == 'failed'),
-    'per_pipeline': pipelines,
-    'median_duration_ms': durations[len(durations) // 2],
+    'total_events': 15,
+    'failed_events': 5,
+    'per_pipeline': {
+        'alpha': {'events': 6, 'failed': 2},
+        'beta': {'events': 5, 'failed': 2},
+        'gamma': {'events': 4, 'failed': 1},
+    },
+    'median_duration_ms': 450,
 }
 
 

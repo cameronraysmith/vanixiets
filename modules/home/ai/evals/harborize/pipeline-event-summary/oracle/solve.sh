@@ -19,7 +19,11 @@ for event in events:
         stats['failed'] += 1
 
 durations = sorted(event['duration_ms'] for event in events)
-median = durations[len(durations) // 2]
+mid = len(durations) // 2
+if len(durations) % 2:
+    median = durations[mid]
+else:
+    median = (durations[mid - 1] + durations[mid]) // 2
 
 summary = {
     'total_events': len(events),

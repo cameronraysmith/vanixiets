@@ -6,31 +6,25 @@
     "instruction.md",
     "solution/solve.sh",
     "task.toml",
-    "tests/Dockerfile",
-    "tests/_deps/build-events.jsonl",
     "tests/test.sh"
   ],
   "input_hashes": {
-    "environment/Dockerfile": "3b45f9fda93ec8b38d3a78377f94408836b64d81235c5083b389cefc7e78f73e",
+    "environment/Dockerfile": "a01ec6eddaa1a340c47a64713645465c07aac07480ef6567716409c103dfff61",
     "environment/build-events.jsonl": "1101fcf99801cfa569b02fc23a941fea9f483a00d15f5c984d1bb1ffd03727be",
     "environment/skills/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "oracle/solve.sh": "25bc51e85cec455c1699f57b9f83e215d2a4d802811c09dcfd58abbd26b92a25",
-    "task.md": "07eeb3ca08751c1af5da0bbd0a228edd75e787450015bcd92f681981fed99a7f",
-    "verifier/Dockerfile": "49658d0d628add33a522fb25bd6f8fe7504fa067ded6480504e15ac1d5a1fc5f",
-    "verifier/_deps/build-events.jsonl": "1101fcf99801cfa569b02fc23a941fea9f483a00d15f5c984d1bb1ffd03727be",
-    "verifier/test.sh": "b400297ee9b0fde1fc76abf0076819627404e30d03faa01aba78ea67500f7ff7"
+    "oracle/solve.sh": "c55bfaf06776ff30c26332c8610b5b113a82fa13b2224a4917945b6d7fe0759e",
+    "task.md": "3084e89f0f17a31e0019c2ec87bd482005005f1655d7124edf81c533ef9b467b",
+    "verifier/test.sh": "0e52b0823ff3839f91f119bb2a4fcbcb9d4788774e38e672f9466060cb74d95e"
   },
   "losses": [],
   "output_hashes": {
-    "environment/Dockerfile": "3b45f9fda93ec8b38d3a78377f94408836b64d81235c5083b389cefc7e78f73e",
+    "environment/Dockerfile": "a01ec6eddaa1a340c47a64713645465c07aac07480ef6567716409c103dfff61",
     "environment/build-events.jsonl": "1101fcf99801cfa569b02fc23a941fea9f483a00d15f5c984d1bb1ffd03727be",
     "environment/skills/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "instruction.md": "8735b2d351204f4f6ad66a5d1eafaac499f227f51f4ec7d253bccb701112cd37",
-    "solution/solve.sh": "25bc51e85cec455c1699f57b9f83e215d2a4d802811c09dcfd58abbd26b92a25",
+    "instruction.md": "e6ffbf566624cd0273e480de47ccf9c20e4ec1750d061af70ea2efe8b9559046",
+    "solution/solve.sh": "c55bfaf06776ff30c26332c8610b5b113a82fa13b2224a4917945b6d7fe0759e",
     "task.toml": "d05d8c5c4286c33af00119b4841655b10846634a0378f8afddb8995d76faf104",
-    "tests/Dockerfile": "49658d0d628add33a522fb25bd6f8fe7504fa067ded6480504e15ac1d5a1fc5f",
-    "tests/_deps/build-events.jsonl": "1101fcf99801cfa569b02fc23a941fea9f483a00d15f5c984d1bb1ffd03727be",
-    "tests/test.sh": "b400297ee9b0fde1fc76abf0076819627404e30d03faa01aba78ea67500f7ff7"
+    "tests/test.sh": "0e52b0823ff3839f91f119bb2a4fcbcb9d4788774e38e672f9466060cb74d95e"
   },
   "restored_extension_paths": [],
   "selected_entrypoint": "task.md",

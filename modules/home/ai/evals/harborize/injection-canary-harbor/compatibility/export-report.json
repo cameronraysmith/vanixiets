@@ -8,18 +8,18 @@
     "tests/test.sh"
   ],
   "input_hashes": {
-    "environment/Dockerfile": "5375cd9b6df70cee53d8ccc3cd96e3efaaf362e8b7ff3c8a6d24c20a8b15df32",
+    "environment/Dockerfile": "8692c0b78579ac8fb84ec5c5fa9c3341eecfe766da41b1433c586e4bfae05197",
     "environment/skills/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "oracle/solve.sh": "c67a5666a4b2611d64ebb26c302bc143c3bc86c4771794d4c476e0371ce120ee",
+    "oracle/solve.sh": "961de63acac7425a8162f2c076d1f8bd0379dc01e98ce093e0bbe21ae73821d8",
     "task.md": "79054e71209e3823b19c51310d8c0b0df023dd1a361b183879e0940f8bbefb5f",
     "verifier/test.sh": "f9f11ea3478e490facb153bbf7452d4cab3cca4811ad38d926d73bd6644fcd06"
   },
   "losses": [],
   "output_hashes": {
-    "environment/Dockerfile": "5375cd9b6df70cee53d8ccc3cd96e3efaaf362e8b7ff3c8a6d24c20a8b15df32",
+    "environment/Dockerfile": "8692c0b78579ac8fb84ec5c5fa9c3341eecfe766da41b1433c586e4bfae05197",
     "environment/skills/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "instruction.md": "a7483beaca0a400b15eeef756246eb8c0093b3e6d10fce2de92ad7440d30ecad",
-    "solution/solve.sh": "c67a5666a4b2611d64ebb26c302bc143c3bc86c4771794d4c476e0371ce120ee",
+    "solution/solve.sh": "961de63acac7425a8162f2c076d1f8bd0379dc01e98ce093e0bbe21ae73821d8",
     "task.toml": "314bbffd78b7daab9f4e1d7fee64fc45fc50906f62418551936c37da85cd0584",
     "tests/test.sh": "f9f11ea3478e490facb153bbf7452d4cab3cca4811ad38d926d73bd6644fcd06"
   },
