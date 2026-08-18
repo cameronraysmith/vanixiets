@@ -181,3 +181,34 @@ trial's `lock.json` cannot substitute for delivery evidence, because
 `_resolve_injected_skills` at `:107` and long before `_upload_injected_skills`
 at `:411`, and `_build_agent_skill_locks` (`models/job/lock.py:462-475`) calls
 only host-side functions.
+
+### Task package authoring, dual head (tasks 5.1-5.10)
+
+Two authored BenchFlow-native trees and two derived Harbor heads:
+
+- `injection-canary/`: shared verifier fork (no `verifier/Dockerfile`, no
+  `[verifier.sandbox]` table), oracle output at `/logs/verifier/canary-output.txt`,
+  `environment/skills/` empty with a `.gitkeep`, `sandbox.network_mode: public`
+  baseline with the `no-network` override on `[agent]` only (probe exit 0
+  permits it).
+- `pipeline-event-summary/`: the mechanical package sampling the
+  `preferences-json-querying` skill's claimed contract, single binary reward
+  key, separate verifier fork whose Dockerfile installs its own python and
+  places `/tests/test.sh` beside its own `_deps` fixture copy; fork choice and
+  channel recorded in its README.
+- Both heads exported with `bench tasks export ... --target harbor --overwrite`,
+  status lossless, 0 losses, reports under `compatibility/export-report.json`;
+  the exported `task.toml` carries `[environment] network_mode = "public"` with
+  the `[agent]` phase override, and the heads are never hand-edited.
+- Leakage audit (task 5.8): mechanical exit 0 — after renaming the summary key
+  `pipelines` to `per_pipeline`, because the skill's prose contains the word
+  `pipelines` and the frozen check 1 flags any quoted verifier literal of eight
+  characters or more recoverable from skill content; canary exit 1 with exactly
+  the expected check-1 literal flag naming the token, justification in the
+  package README.
+- Extension audit and flake-evaluation guard re-run after export (task 5.10):
+  no `.nix` file inside the corpus, `nixosConfigurations` eval exit 0.
+- Host-side container dry runs beyond the task list, proving each oracle and
+  verifier pair under `ubuntu:24.04` before any runner touches them: canary
+  with-skill reward 1 and no-skill reward 0; mechanical correct summary reward 1
+  on both fork layouts (`/tests` and `/verifier`) and wrong summary reward 0.
