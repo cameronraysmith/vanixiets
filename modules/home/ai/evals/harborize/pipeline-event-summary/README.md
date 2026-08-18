@@ -34,12 +34,13 @@ Harbor's separate verifier would also destroy this package's agent-to-verifier c
 `_run_separate_verifier` empties `/logs/verifier` before the verifier runs (`trial.py:599`, `environments/base.py:626-638`), and that path is bind-mounted from the host (`trial.py:686-692`), so `summary.json` is deleted and every agent including the oracle scores 0.
 Surviving it would mean moving the deliverable to `/logs/artifacts/`, which the artifact re-upload restores after the wipe (`trial.py:601-607`, `artifact_handler.py:210-254`) — a different task contract, not a fork choice.
 
-`_run_shared_verifier` (`trial.py:536-567`) performs no such wipe, which is why `/logs/verifier/summary.json` is a sound channel under the fork actually used.
+`_run_shared_verifier` (`trial.py:536-567`) performs no wipe, and both packages are single-step, which is the precondition that claim needs: the multi-step path calls `_reset_shared_step_verifier_dirs` (`multi_step.py:202`, defined at `:338-342`) before every shared step verifier, so a package that ever grows `[[steps]]` loses this channel. `SingleStepTrial.__init__` raises on a stepped task (`single_step.py:28-29`), so the two cannot be confused silently.
+That is why `/logs/verifier/summary.json` is a sound channel under the fork actually used.
 
 ## What the agent can and cannot see
 
 The verifier's expectation is a literal, so it is worth stating why that is not a leak.
-On both runners the verifier's own directory is uploaded during the verification phase, after the agent phase has ended — Harbor at `verifier/verifier.py:147-153`, reached from `_run_shared_verifier`, with the phase order fixed at `trial/single_step.py:41` then `:52`; BenchFlow at `task/verifier_core.py:385`, inside `verify()`.
+On both runners the verifier's own directory is uploaded during the verification phase, after the agent phase has ended — Harbor at `verifier/verifier.py:147-153`, reached from `_run_shared_verifier`, with the phase order fixed at `trial/single_step.py:41` then `:52`; BenchFlow at `task/verifier_core.py:385` in `_verify_test_script` (`:346`), reached from `verify()` (`:260`).
 No agent phase ever observes `test.sh`, under either fork.
 
 ## Leakage audit

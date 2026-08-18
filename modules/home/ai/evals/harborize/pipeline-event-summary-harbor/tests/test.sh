@@ -18,6 +18,13 @@ expected = {
     'median_duration_ms': 450,
 }
 
+# Write the failing reward before reading anything. A verifier that dies partway
+# leaves no reward file, and both runners treat that as a trial-level crash
+# rather than as a score, so a hostile or oversized submission would void the
+# trial instead of scoring 0.
+with open('/logs/verifier/reward.txt', 'w') as fh:
+    fh.write('0\n')
+
 
 def integers_only(node):
     if isinstance(node, bool):
@@ -32,10 +39,13 @@ def integers_only(node):
 try:
     with open('/logs/verifier/summary.json') as fh:
         actual = json.load(fh)
+    # Inside the guard on purpose: integers_only recurses, so a deeply nested
+    # submission raises RecursionError here rather than at the parse.
+    ok = integers_only(actual) and actual == expected
 except Exception:
-    actual = None
+    ok = False
 
-ok = actual is not None and integers_only(actual) and actual == expected
-with open('/logs/verifier/reward.txt', 'w') as fh:
-    fh.write('1\n' if ok else '0\n')
+if ok:
+    with open('/logs/verifier/reward.txt', 'w') as fh:
+        fh.write('1\n')
 EOF

@@ -30,7 +30,7 @@ Each package is authored BenchFlow-native and exported to a sibling Harbor head,
   `flake.nix:6` calls `inputs.import-tree ./modules` bare with no custom filter, so import-tree's default `nixFilter = andNot (hasInfix "/_") (hasSuffix ".nix")` (import-tree `default.nix:50`, rev `4ebb10ae17d5f1ad366e7aef5b92cb8eecf24f69`) imports every `*.nix` file anywhere under `modules/` and evaluates it as a flake-parts module.
   A fixture named `expected.nix` is the realistic trap, and it would break the flake rather than fail as a fixture.
   Two escapes exist and either one is sufficient: **never give a fixture the `.nix` extension**, or place it under a `_`-prefixed directory, which is this repository's documented exclusion convention (ADR-0018, `packages/docs/src/content/docs/development/architecture/adrs/0018-deferred-module-composition-architecture.md:311`).
-  Everything else is safe by construction, because non-nix files are enumerated and then dropped before anything reads them with no warning and no error, which is why `modules/` already carries 444 non-nix files and the flake still evaluates.
+  Everything else is safe by construction, because non-nix files are enumerated and then dropped before anything reads them with no warning and no error, which is why `modules/` already carries hundreds of non-nix files — 433 at `origin/main` `25d10e7c` and 480 at this change's tip, of which 34 are this corpus — and the flake still evaluates.
   This constraint is checked rather than trusted: Task 1 Step 7 runs the flake-evaluation guard as soon as the corpus root exists, and Task 5 Step 8 re-runs it with an extension audit once the package directories and the generated Harbor heads exist.
 - Integration is jj-native onto the existing `harborize-instrument` bookmark, which is already a parent of the development join.
   Routing a change onto that chain is orchestrator-owned; an implementing subagent leaves its work in the working copy and names what it touched.
@@ -132,8 +132,9 @@ Expected: both print nothing.
 
 ```bash
 jj log --ignore-working-copy -r @ -T 'change_id.short()'
+git rev-parse 'HEAD:modules/home/ai/plugins/testing-and-quality/.apm/skills/harborize'
 find modules/home/ai/plugins/testing-and-quality/.apm/skills/harborize -type f \
-  -exec shasum -a 256 {} + | LC_ALL=C sort | shasum -a 256
+  -not -path '*/__pycache__/*' -exec shasum -a 256 {} + | LC_ALL=C sort | shasum -a 256
 ```
 
 Write both values into the workspace README before any other task runs.
@@ -202,7 +203,7 @@ Harbor's `_find_skill_dirs` raises on a root holding a non-hidden child director
 - [ ] **Step 3: Record the leakage-audit expectation in the canary README section**
 
 Write into `modules/home/ai/evals/harborize/README.md` that the token appears in both the canary `SKILL.md` and the canary verifier by design, that `audit_leakage.py` check 1 flags exactly that pattern (`MIN_LITERAL_LENGTH = 8` at `:44`, `check_literals` at `:96`), that the flag is correct on its own terms, and that the instrument is not edited to exempt it because D5 freezes it at 0.2.1.
-Record in the same place that the consequence originally anticipated does not arise: both runners upload the verifier's own directory during the verification phase, after the agent phase has ended (Harbor `verifier/verifier.py:147-153`, phase order `trial/single_step.py:41` then `:52`; BenchFlow `task/verifier_core.py:385`), so no agent phase observes `test.sh` under either fork.
+Record in the same place that the consequence originally anticipated does not arise: both runners upload the verifier's own directory during the verification phase, after the agent phase has ended (Harbor `verifier/verifier.py:147-153`, phase order `trial/single_step.py:41` then `:52`; BenchFlow `task/verifier_core.py:385` in `_verify_test_script` (`:346`), reached from `verify()` (`:260`)), so no agent phase observes `test.sh` under either fork.
 That costs nothing, because the metered rung's pass criterion is the adapter's registration directory rather than the reward, and the falsifiability control in Task 7 Step 3 runs under the oracle, which greps skill directories and never reads the verifier.
 
 - [ ] **Step 4: Check off tasks.md §2 and hand the working copy back for routing**
@@ -670,7 +671,7 @@ This is the only rung that reaches the registration copy, and `--install-only` p
 
 codex registers at `$HOME/.agents/skills/<name>/` (`codex.py:1199-1207`), and that destination sits in no bind mount (`trial.py:1284-1288` binds only `/logs/agent`), so the assertion is made from inside the trial container while it still exists rather than as a host read after the run.
 The criterion is the directory listing alone and deliberately not the reward.
-The canary's verifier is shared (Task 5 Step 2), so a real agent can reach the token without the skill being delivered, and this trial's reward therefore carries no injection information in either direction.
+The reward is not read as the criterion, for the reason recorded at Task 2 Step 4 rather than the one originally given: a model-driven trial's reward conflates delivery with the model's own behaviour, since a model that never greps the discovery roots scores 0 with the skill perfectly delivered.
 
 - [ ] **Step 5: For any additional cell, assert that adapter's own destination**
 
@@ -704,7 +705,7 @@ echo "per-run cost: $cost"
 ```
 
 Read the job's own accounting field rather than computing one here.
-The field is `cost_usd`, not `cost` or `usage`: `JobResult.cost_usd` (`models/job/result.py:41`) accumulates at `:169` from the per-trial `AgentContext.cost_usd` that the adapter sets from `metrics.total_cost_usd`.
+The field is `cost_usd`, not `cost` or `usage`, and it sits on `JobStats` (`models/job/result.py:28`, field at `:41`) rather than on `JobResult` (`:236`), which reaches it through `stats` at `:242` — so the accessor is `result.stats.cost_usd`. It accumulates at `:169` from the per-trial `AgentContext.cost_usd` that the adapter sets from `metrics.total_cost_usd`.
 What fills that field differs by adapter, and Step 3 runs codex.
 Claude Code parses an authoritative `total_cost_usd` from its own stdout stream (`claude_code.py:858-879`, `:1463`, set at `:1525`).
 Codex has no such field — its CLI does not report cost in `token_count` events — and derives the figure from token counts against LiteLLM's pricing table (`codex.py:724-780`, resolved at `:1120-1124`, set at `:1194`), returning `None` when LiteLLM cannot price the resolved model.
@@ -744,8 +745,9 @@ Write into the workspace README that Task 7 Step 1 is re-run at the start of eve
 - [ ] **Step 4: Confirm the instrument is unmodified**
 
 ```bash
+git rev-parse 'HEAD:modules/home/ai/plugins/testing-and-quality/.apm/skills/harborize'
 find modules/home/ai/plugins/testing-and-quality/.apm/skills/harborize -type f \
-  -exec shasum -a 256 {} + | LC_ALL=C sort | shasum -a 256
+  -not -path '*/__pycache__/*' -exec shasum -a 256 {} + | LC_ALL=C sort | shasum -a 256
 ```
 
 Expected: the digest equals the baseline Task 1 Step 5 recorded in the workspace README.

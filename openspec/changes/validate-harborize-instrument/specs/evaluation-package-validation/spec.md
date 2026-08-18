@@ -119,9 +119,9 @@ Each task package SHALL be authored BenchFlow-native and exported to a sibling H
 ### Requirement: Skill delivery is proven in the container with no model call
 
 Every distinct condition-directory shape SHALL be proven to deliver its skills inside the container through an oracle run that materializes no model, before any metered batch uses that shape.
-The canary that carries this proof MUST route its oracle-to-verifier channel through a surface both runners execute identically.
+Every package this change authors, including the canary that carries this proof, MUST route its agent-to-verifier channel through a surface both runners execute identically.
 
-#### Scenario: the canary's channel survives both runners
+#### Scenario: the verifier fork is the one both runners execute
 
 - **WHEN** a task package's verifier environment fork is chosen
 - **THEN** it is shared and the package writes its deliverable into the verifier log directory rather than the agent workspace, because one runner refuses at launch to run a package declaring a separate verifier sandbox rather than falling back to shared, and the other empties the verifier log directory before a separate verifier runs, so a package declaring separate either does not launch or scores every agent zero, and a workspace path would in addition pass under one runner and fail under the other

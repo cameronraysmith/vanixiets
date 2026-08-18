@@ -46,7 +46,7 @@ Validating it now yields a permanent injection regression test, one working mech
 - From: an implicit assumption that a package is validated by running it.
 - To: seven rungs run in order, six of them free of model spend, each with an exact command and an executable pass criterion, with the metered rung last and reduced to one short trial per cell.
 - Reason: only the adapter registration copy requires a real agent invocation to witness; everything upstream of it is detectable at zero marginal cost.
-- Impact: the prerequisites rung is currently unmet, so the ladder starts with real setup tasks rather than assumptions.
+- Impact: the prerequisites rung was unmet when this change was written, so the ladder starts with real setup tasks rather than assumptions; section 1 has since run and the corpus README records the installed versions.
 
 ## Non-goals
 

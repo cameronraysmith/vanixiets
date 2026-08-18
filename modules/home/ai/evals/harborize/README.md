@@ -30,26 +30,37 @@ Where an anchor was re-read in the installed tree rather than the pin, the text 
 
 Instrument version: 0.2.1, frozen for the duration of the change.
 
-Baseline start revision: git `5f33c36e23e2d4f36b23aefe7b9217c4d22ff3f6`, the tip of `harborize-instrument` this change baselines from, recorded as a git commit because this rung executed in a plain git worktree without jj metadata; the chain's jj change id lives in the primary checkout and the digest below is the authoritative freeze check either way.
+The freeze anchor is the git tree object the instrument path resolves to:
 
-Content digest over `modules/home/ai/plugins/testing-and-quality/.apm/skills/harborize` (13 files):
+```
+64bc599cba1680db3678b67aea187bb3da0f6d20
+```
+
+Recompute and compare it with `git rev-parse 'HEAD:modules/home/ai/plugins/testing-and-quality/.apm/skills/harborize'`.
+This is the primary check because it records file modes and symlinks, is immune to untracked files and to how the path was spelled on the command line, and is stable across a rebase of the base branch — it is identical at the pre-rebase tip `5f33c36e`, at the current `harborize-instrument` tip, and at this branch's head, where a commit id is not.
+A commit id is deliberately not the anchor for that last reason; the baseline this change started from has already been rebased once.
+
+A `jj diff -r @` cannot substitute, because it reports only what the working-copy commit changed against its parents and would show nothing for an edit squashed into the `harborize-instrument` chain.
+
+Secondary working-tree check, over the same path (13 files):
 
 ```
 3fdd30d1fa2a69a5e53c8d34474c107a516c32e29dcc5087b9bd7738b22ccd4e
 ```
-
-The recipe lives here rather than only in the change's tasks.md, because the digest outlives the change while tasks.md archives:
 
 ```
 find modules/home/ai/plugins/testing-and-quality/.apm/skills/harborize -type f \
   -not -path '*/__pycache__/*' -exec shasum -a 256 {} + | LC_ALL=C sort | shasum -a 256
 ```
 
-Two properties of that recipe are load-bearing.
-The `__pycache__` exclusion is required because the change is obliged to run the instrument's own `scripts/*.py` and CPython writes bytecode beside them, which `.gitignore` then hides — without the exclusion, complying with one task makes another report a freeze violation that never happened.
-And the digest is a function of the path string `find` was given, because each `shasum` line embeds it: the value above is what this exact invocation produces **from the repository root**. A trailing slash, a `./` prefix, an absolute path, or a `cd` into the directory each produce a different digest from an unchanged tree.
+Both this recipe and the digest live here rather than only in the change's tasks.md, because they outlive the change while tasks.md archives.
+Three limits are worth stating, because each was reproduced rather than predicted, and together they are why this is the secondary check.
+It hashes regular files only, so a mode change, a new symlink or a new empty directory inside the instrument leaves it invariant.
+It covers every file present rather than every file tracked, so any untracked file inside the directory flips it, and several such classes are gitignored and so invisible to `git status` too — `.DS_Store` is the sharpest on macOS, where one Finder visit plants one, and `*.log`, `result*`, `*~`, `*.swp` and a `.pyc` outside a `__pycache__` directory behave the same.
+And it is a function of the path string `find` was given, because each `shasum` line embeds it: the value above is what this exact invocation produces from the repository root, while a `./` prefix, an absolute path, or a `cd` into the directory each produce a different digest from an unchanged tree.
+A trailing slash does not, because `find` normalizes it.
 
-Task 10.3 recomputes this digest rather than trusting a `jj diff -r @`, which cannot see an edit squashed into the `harborize-instrument` chain.
+The `__pycache__` exclusion is still required: the change is obliged to run the instrument's own `scripts/*.py`, CPython writes bytecode beside them, and `.gitignore` then hides it, so without the exclusion complying with one task makes another report a freeze violation that never happened.
 
 ## Kernel probe outcome
 
@@ -126,6 +137,14 @@ Separate mode is exercised nowhere in this corpus.
 Record a fork by resolving it from the exported head rather than by reading the source layout.
 Harbor derives the mode from `verifier.environment_mode` or `[verifier.environment]` and from nothing else (`models/task/verifier_mode.py:10-21`), so a `verifier/Dockerfile` on its own infers nothing.
 
+## What `bench tasks check` does and does not clear
+
+Both packages pass `--level schema`, `--level structural` and `--level runtime-capability --sandbox docker`.
+Neither passes `--level publication-grade`, and the reason is unrelated to the co-present-head argument design decision D7 makes.
+D7's checks do pass: `structural_checks.py:208-212` (no `task.toml` or `instruction.md` beside `task.md`) and `:218-222` (no `solution/`) both hold, because each Harbor head is a sibling directory rather than co-present.
+The failing check is `:224-226`, which requires a native `verifier/` package carrying `verifier.md` and `rubrics/` — a verifier-strategy document neither package authors.
+Recorded so publication-grade is not later cited as a standard this corpus meets.
+
 ## Harbor's static gate and its blind spot
 
 `Task._validate_tests` returns early whenever a verifier environment is configured (`models/task/task.py:126-144`, early return at `:134-135`), so it structurally cannot catch a separate-mode package missing `/tests/test.sh`.
@@ -156,13 +175,14 @@ Task 10.6 migrates this section into `verify.md` and deletes it at archive time.
 ## Canary skill and condition directory (tasks 2.1-2.4)
 
 `conditions/canary/` is `dir(C)`: exactly one skill directory, `harborize-injection-canary`, carrying the token `HARBORIZE-CANARY-9F3A21`.
-The name collides with none of the deployed skill directories, and the directory holds nothing else, because a stray non-hidden child without a `SKILL.md` turns the whole condition into a hard error at resolution (`_find_skill_dirs`, `skills.py:382-416`).
+The name collides with none of the deployed skill directories, and the directory holds nothing else.
+A stray non-hidden child *directory* without a `SKILL.md` turns the whole condition into a hard error at resolution (`_find_skill_dirs`, `skills.py:382-416`), which is the case that motivated keeping it empty; a stray *file* is filtered out silently by the `child.is_dir()` test at `skills.py:396`, so the emptiness is maintained rather than enforced.
 
 Leakage-audit expectation (task 2.3): the asserted literal appears in both the verifier and the `SKILL.md` by design, and `audit_leakage.py` check 1 flags exactly that pattern (`MIN_LITERAL_LENGTH` at `:44`, `check_literals` at `:96`).
 The flag is correct on its own terms — the canary's mechanism is its answer key — and the instrument is not edited to exempt it because it is frozen at 0.2.1.
 
 Exposure of the shared fork (task 2.4), corrected in the review round: the consequence originally recorded — that a real agent could read the token out of the verifier script — does not arise.
-Both runners upload the verifier's own directory during the verification phase, after the agent phase has ended (Harbor `verifier/verifier.py:147-153` reached from `_run_shared_verifier`, phase order fixed at `trial/single_step.py:41` then `:52`; BenchFlow `task/verifier_core.py:385` inside `verify()`).
+Both runners upload the verifier's own directory during the verification phase, after the agent phase has ended (Harbor `verifier/verifier.py:147-153` reached from `_run_shared_verifier`, phase order fixed at `trial/single_step.py:41` then `:52`; BenchFlow `task/verifier_core.py:385` in `_verify_test_script` (`:346`), reached from `verify()` (`:260`)).
 Rung 6's criterion is unchanged and rests on a different reason: a model-driven trial's reward conflates delivery with the model's own behaviour, so the adapter's registration directory is the deterministic witness.
 
 ## Rung 1 — adapter allowlist gate (tasks 3.1-3.3)
