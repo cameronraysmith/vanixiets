@@ -212,3 +212,19 @@ Two authored BenchFlow-native trees and two derived Harbor heads:
   verifier pair under `ubuntu:24.04` before any runner touches them: canary
   with-skill reward 1 and no-skill reward 0; mechanical correct summary reward 1
   on both fork layouts (`/tests` and `/verifier`) and wrong summary reward 0.
+
+### Rung 3 — static task validation (tasks 6.1-6.3)
+
+- `bench tasks check <native> --level structural`: exit 0, no issues, on both
+  `injection-canary` and `pipeline-event-summary`.
+- `harbor.models.task.task.Task(<head>)` constructed both exported heads
+  successfully (exit 0 each), using the installed CLI's tool-environment
+  python. The stub `harbor task(s) check` and its redirect to the metered
+  `harbor check` LLM-rubric were not invoked.
+- Harbor gate blind spot (task 6.3): `Task._validate_tests` returns early
+  whenever a verifier environment is configured, so it structurally cannot
+  catch a separate-mode package missing `/tests/test.sh`. The anchor
+  (`models/task/task.py:126-144`, early return at `:134-135`) is at the
+  reading pin; the behavior was re-confirmed in the installed 0.21.0 tree,
+  where `_validate_tests` resolves the effective verifier env config and
+  returns before `discovered_test_path_for` is consulted.

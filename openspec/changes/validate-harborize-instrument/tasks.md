@@ -78,9 +78,9 @@ It prints "Use 'harbor check <task-dir>' instead" (`cli/tasks.py:483-486`), and 
 bench tasks check <task-dir> --level structural
 ```
 
-- [ ] 6.1 Run the command above against each authored native tree; pass is exit 0 with no issues reported (`benchflow cli/tasks.py:93-115`, default level `structural`)
-- [ ] 6.2 Construct `harbor.models.task.task.Task(<task-id>-harbor)` in Python for each exported head; pass is that construction succeeds
-- [ ] 6.3 Record the Harbor gate's blind spot in the workspace README: `Task._validate_tests` returns early whenever a verifier environment is configured (`models/task/task.py:126-144`, early return at `:134-135`), so it structurally cannot catch a separate-mode package missing `/tests/test.sh`
+- [x] 6.1 Run the command above against each authored native tree; pass is exit 0 with no issues reported (`benchflow cli/tasks.py:93-115`, default level `structural`)
+- [x] 6.2 Construct `harbor.models.task.task.Task(<task-id>-harbor)` in Python for each exported head; pass is that construction succeeds
+- [x] 6.3 Record the Harbor gate's blind spot in the workspace README: `Task._validate_tests` returns early whenever a verifier environment is configured (`models/task/task.py:126-144`, early return at `:134-135`), so it structurally cannot catch a separate-mode package missing `/tests/test.sh`
 
 ## 7. Rung 4 — delivery proof (Docker time, zero model calls)
 
