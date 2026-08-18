@@ -63,6 +63,17 @@
       excludedSkills = [
         "tdd"
         "harborize"
+        # Beads retired as a work-owning layer (Linear/OpenSpec own the work);
+        # issues-beads* withheld from delivery pending post-migration source
+        # cleanup of remaining bd references.
+        "issues-beads"
+        "issues-beads-seed"
+        "issues-beads-init"
+        "issues-beads-orient"
+        "issues-beads-prime"
+        "issues-beads-checkpoint"
+        "issues-beads-evolve"
+        "issues-beads-audit"
       ];
 
       allSkills = removeAttrs (readSkillsFrom "${config.aiSkills.composed}/.claude/skills") excludedSkills;
