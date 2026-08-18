@@ -45,9 +45,9 @@ The gate is `check_harbor_agents` in the instrument's `scripts/design_matrix.py`
 
 This rung replaces a refuted idea: `lock.json` cannot prove delivery, because `_write_trial_lock` runs at `trial.py:104` inside `__init__`, before `_resolve_injected_skills` at `:107` and long before `_upload_injected_skills` at `:411`, and `_build_agent_skill_locks` (`models/job/lock.py:462-475`) calls only host-side functions.
 
-- [ ] 4.1 Call `harbor.skills.resolve_skills` (`skills.py:111-123`) over `dir(C)`; pass is one entry per expected skill name, each carrying a sha256 from `compute_skill_digest` (`skills.py:200-209`)
-- [ ] 4.2 Call it over a deliberately malformed root — a missing path, a file rather than a directory, and a child directory without a `SKILL.md`; pass is that each raises on the host before any container starts (`_find_skill_dirs`, `skills.py:382-416`)
-- [ ] 4.3 Record this rung's evidence as host-side resolution and request, never as delivery
+- [x] 4.1 Call `harbor.skills.resolve_skills` (`skills.py:111-123`) over `dir(C)`; pass is one entry per expected skill name, each carrying a sha256 from `compute_skill_digest` (`skills.py:200-209`)
+- [x] 4.2 Call it over a deliberately malformed root — a missing path, a file rather than a directory, and a child directory without a `SKILL.md`; pass is that each raises on the host before any container starts (`_find_skill_dirs`, `skills.py:382-416`)
+- [x] 4.3 Record this rung's evidence as host-side resolution and request, never as delivery
 
 ## 5. Task package authoring, dual head (free)
 

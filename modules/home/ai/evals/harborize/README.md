@@ -157,3 +157,27 @@ marginals`, three runs against throwaway `/tmp` outputs:
   and then discarded — nothing the gate emitted was executed, committed or
   consumed by a later rung, keeping the whole rung inside the proposal's
   condition-lattice Non-goal.
+
+### Rung 2 — host-side resolution (tasks 4.1-4.3)
+
+`checks/resolve_check.py` calls `harbor.skills.resolve_skills`
+(`skills.py:111-123`) and `compute_skill_digest` (`skills.py:200-209`) against
+`conditions/canary`, using the installed CLI's tool-environment python.
+
+- `dir(C)`: exactly one entry, `name` `harborize-injection-canary`, `digest`
+  `sha256:47016a2e2b3f220c90fc183411a8ae8dbd2f37c4c6becc268460a5588ba85cd9`.
+- Missing path: `FileNotFoundError` on the host, exit 1.
+- A file rather than a directory: `ValueError: Skill path must be a directory`,
+  exit 1.
+- A child directory without a `SKILL.md`: `ValueError` naming `not-a-skill`,
+  exit 1.
+
+Each raise happened on the host before any container started
+(`_find_skill_dirs`, `skills.py:382-416`).
+
+What this rung proves is host-side resolution and request, never delivery: a
+trial's `lock.json` cannot substitute for delivery evidence, because
+`_write_trial_lock` runs at `trial.py:104` inside `Trial.__init__`, before
+`_resolve_injected_skills` at `:107` and long before `_upload_injected_skills`
+at `:411`, and `_build_agent_skill_locks` (`models/job/lock.py:462-475`) calls
+only host-side functions.
