@@ -16,7 +16,7 @@ Each package is authored BenchFlow-native and exported to a sibling Harbor head,
   A defect found mid-change is recorded and deferred.
 - Upstream pins, and every anchor is valid only at these revisions: harbor `ac398bbda7c4c1073461797d3b95c2455cc671b5`, benchflow `d30527b82027a416e72014920cdf43a534967ad3`, skillsbench `9a1f4dd5f7659f75707435da3ce854b6e48321d1`.
 - The three ghq clones at `~/ghq/github.com/harbor-framework/harbor`, `~/ghq/github.com/benchflow-ai/benchflow` and `~/ghq/github.com/benchflow-ai/skillsbench` are read-only reference trees.
-  Never run `uv sync` inside them; install CLIs with `uv tool install` or a scratch `UV_PROJECT_ENVIRONMENT` outside the clone.
+  Never run `uv sync` inside them; install the CLIs from PyPI latest stable with `uv tool install` (settled 2026-08-15 — installs track PyPI releases, not sha-pinned source checkouts), so the clones are never install sources, only reading trees for the pinned anchors.
 - Every package carries a single binary reward key.
   A multi-dimensional rubric silently disables Harbor's pass@k and makes BenchFlow's compare-lift count only `reward == 1.0` as passed.
 - Every Harbor run line sets `HARBOR_TELEMETRY=0`.
@@ -103,21 +103,17 @@ What the probe gates is enforcement, not the default.
 `no-network` is the harborize instrument's authoring default (`SKILL.md:124`, `references/emitters.md:74`), while Harbor's own default is `public` (`models/task/config.py:249-252`, `NetworkPolicy` at `:66`), BenchFlow's is the same (`task/config.py:720-723`), and 86 of the 87 SkillsBench corpus tasks declare `network_mode: public`.
 When the option is missing, `_enable_egress_control` goes false (`docker.py:188-195`), which zeroes `capabilities.disable_internet` (`:289-293`), and `environments/base.py:773-781` raises at environment start for any `no-network` policy — baseline or phase.
 
-- [ ] **Step 3: Install the two CLIs outside the reference clones**
+- [ ] **Step 3: Install the two CLIs from PyPI latest stable**
 
 ```bash
-uv tool install --from ~/ghq/github.com/harbor-framework/harbor harbor
-uv tool install --from ~/ghq/github.com/benchflow-ai/benchflow benchflow
+uv tool install harbor
+uv tool install benchflow
 harbor --version
 bench --version
 ```
 
-Expected: both commands print a version.
-If `uv tool install` refuses the local path form, use a scratch environment instead and keep it outside the clone:
-
-```bash
-UV_PROJECT_ENVIRONMENT=~/.cache/harborize-venvs/harbor uv sync --project ~/ghq/github.com/harbor-framework/harbor
-```
+Expected: both commands print a version, and neither ghq clone is read or written during the install.
+Settled 2026-08-15: the installs track PyPI, and the Global Constraints' pins remain reading pins for source anchors, so record both installed versions in the workspace README — every executed-command anchor in Tasks 6 through 9 is valid at the installed version, not at the pin.
 
 - [ ] **Step 4: Verify the reference clones are unmodified**
 
@@ -253,8 +249,10 @@ Expected: a nonzero exit, because `factory.py:167-175` routes every `acp:`-prefi
 - [ ] **Step 4: Write the real cells file and confirm it passes**
 
 ```json
-[{"name": "cc-opus", "runner": "harbor", "agent": "claude-code", "model": "anthropic/claude-opus-5", "env": {"HARBOR_TELEMETRY": "0", "ANTHROPIC_OAUTH_TOKEN": ""}}]
+[{"name": "codex-sol", "runner": "harbor", "agent": "codex", "model": "gpt-5.6-sol", "env": {"HARBOR_TELEMETRY": "0", "CODEX_FORCE_AUTH_JSON": "1"}}]
 ```
+
+The cell is codex on the ChatGPT-subscription path (settled decision; the metered adapter, its auth variables, and the model naming are recorded on-branch at the instrument's `references/marketplace-program.md:46`), which is why the env block carries `CODEX_FORCE_AUTH_JSON=1` and no Anthropic variables; the exact Harbor model string is confirmed against the installed codex adapter when rung 6 runs.
 
 Run the same command with `--cells modules/home/ai/evals/harborize/cells/cells.json --out /tmp/design-ok`.
 Expected: exit 0 and a printed conditions-and-jobs summary.
@@ -642,28 +640,23 @@ rg -n 'network_mode' modules/home/ai/evals/harborize/injection-canary-harbor/tas
 Expected: `network_mode = "public"` under `[environment]`, and `no-network` only under `[agent]` if Task 1 Step 2 permitted it.
 A `no-network` baseline makes the next step fail during claude-code's install fetch rather than at the registration copy, which is the failure design.md's risk register predicts and the one this ordering exists to avoid.
 
-- [ ] **Step 3: Run one short metered trial on the claude-code cell**
+- [ ] **Step 3: Run one short metered trial on the codex cell**
 
 ```bash
-HARBOR_TELEMETRY=0 ANTHROPIC_OAUTH_TOKEN="" harbor run \
+HARBOR_TELEMETRY=0 CODEX_FORCE_AUTH_JSON=1 harbor run \
   -p modules/home/ai/evals/harborize/injection-canary-harbor \
-  -a claude-code -m anthropic/claude-opus-5 -k 1 \
+  -a codex -m gpt-5.6-sol -k 1 \
   --skill ./modules/home/ai/evals/harborize/conditions/canary \
-  -o logs/harborize/gate1 --job-name cc-registration -y
+  -o logs/harborize/gate1 --job-name codex-registration -y
 ```
 
-This is the only rung that reaches the registration copy.
-`--install-only` cannot substitute: `_build_register_skills_command` (`claude_code.py:1530-1542`) is appended to `setup_command` at `:1733-1735`, both inside `async def run` beginning at `:1601`; `Trial.run` guards `_run()` on `not install_only` (`trial.py:375-378`); and `TrialConfig._install_only_disables_verification` (`models/trial/config.py:484-494`) disables the verifier too.
+The metered adapter is codex via the ChatGPT-subscription path (settled decision; `CODEX_FORCE_AUTH_JSON=1` or `CODEX_AUTH_JSON_PATH=<path>` at `codex.py:1305-1325`, recorded on-branch at `references/marketplace-program.md:46`), superseding the earlier claude-code first-cell choice.
+This is the only rung that reaches the registration copy, and `--install-only` provably cannot substitute for the reasons carried in tasks.md §9's preamble.
 
-- [ ] **Step 4: Assert the registration destination from the host**
+- [ ] **Step 4: Assert the registration destination in-container**
 
-```bash
-fd -H -t d 'harborize-injection-canary' logs/harborize/gate1/cc-registration
-```
-
-Expected: a path under the trial's `agent/sessions/skills/` directory.
-`CLAUDE_CONFIG_DIR` is set to `EnvironmentPaths.agent_dir / "sessions"` (`claude_code.py:1718`), which is `/logs/agent/sessions` because `agent_dir` is `logs_dir / "agent"` (`models/trial/paths.py:36`), and `/logs/agent` is bind-mounted from the trial directory (`trial.py:1284-1288`), so what the adapter registered is readable on the host with no verifier code.
-The criterion is the directory alone and deliberately not the reward.
+codex registers at `$HOME/.agents/skills/<name>/` (`codex.py:1199-1207`), and that destination sits in no bind mount (`trial.py:1284-1288` binds only `/logs/agent`), so the assertion is made from inside the trial container while it still exists rather than as a host read after the run.
+The criterion is the directory listing alone and deliberately not the reward.
 The canary's verifier is shared (Task 5 Step 2), so a real agent can reach the token without the skill being delivered, and this trial's reward therefore carries no injection information in either direction.
 
 - [ ] **Step 5: For any additional cell, assert that adapter's own destination**
@@ -707,10 +700,10 @@ The non-empty assertion is required: an empty extraction must fail this task rat
 ```json
 {
   "per_run_cost_usd": null,
-  "cell": "claude-code + anthropic/claude-opus-5",
+  "cell": "codex + gpt-5.6-sol",
   "task": "injection-canary",
   "trials": 1,
-  "auth_mode": "metered-api-key",
+  "auth_mode": "chatgpt-subscription",
   "instrument_version": "0.2.1",
   "harbor_rev": "ac398bbda7c4c1073461797d3b95c2455cc671b5",
   "note": "a cost per run is a function of the cell and the task, not of the runner"

@@ -163,20 +163,20 @@ Each task package's oracle SHALL pass the verifier under Harbor across five tria
 
 For each metered cell, the change SHALL assert that the adapter registered the injected skill at that adapter's own destination, and it MUST NOT substitute an install-only run for that assertion.
 
-#### Scenario: claude-code registration is read from the host
+#### Scenario: codex registration is asserted in-container
 
-- **WHEN** one short metered trial completes on a claude-code cell
-- **THEN** the skill directory is present under the adapter's configured skills destination inside the agent log bind mount, readable on the host with no verifier code
+- **WHEN** one short metered trial completes on the codex cell via the ChatGPT-subscription path
+- **THEN** the skill directory is present under the adapter's configured skills destination (`$HOME/.agents/skills/<name>/`), asserted from inside the container because that destination sits in no host bind mount
 
 #### Scenario: install-only is rejected as a substitute
 
 - **WHEN** an install-only run is proposed as evidence of registration
 - **THEN** it is rejected, because every adapter's registration command is built inside the agent's run path and install-only skips the agent run and disables the verifier
 
-#### Scenario: metered cells run at metered rates
+#### Scenario: the metered cell's auth mode follows the settled decision
 
 - **WHEN** a metered trial is run on a cell whose adapter would accept a subscription token
-- **THEN** the subscription variable is set to the empty string or unset rather than merely left unflagged, and Harbor telemetry is disabled for the run
+- **THEN** the trial authenticates through the settled codex ChatGPT-subscription path (`CODEX_FORCE_AUTH_JSON` or `CODEX_AUTH_JSON_PATH`), any Pi cell in the same batch still scrubs `ANTHROPIC_OAUTH_TOKEN` to the empty string or unset rather than merely leaving it unflagged, and Harbor telemetry is disabled for the run
 
 #### Scenario: the metered cell's environment baseline permits the agent install
 
