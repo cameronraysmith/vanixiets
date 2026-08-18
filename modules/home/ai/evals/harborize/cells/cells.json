@@ -1,0 +1,1 @@
+[{"name": "codex-sol", "runner": "harbor", "agent": "codex", "model": "gpt-5.6-sol", "env": {"HARBOR_TELEMETRY": "0", "CODEX_FORCE_AUTH_JSON": "1"}}]

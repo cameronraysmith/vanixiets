@@ -142,3 +142,18 @@ here, because rung 6's pass criterion is the adapter's registration directory
 rather than the reward (task 9.4), and the falsifiability control in task 7.3
 runs under the oracle, which greps skill directories and never reads the
 verifier.
+
+### Rung 1 — adapter allowlist gate (tasks 3.1-3.3)
+
+`scripts/design_matrix.py` with `--units harborize-injection-canary --design
+marginals`, three runs against throwaway `/tmp` outputs:
+
+- `cells/cells-nonconsuming.json` (agent `aider`): exit 1 naming `aider` and
+  the reason, `/tmp/design-neg` never created.
+- `cells/cells-acp.json` (agent `acp:claude-agent`): exit 1 on the ACP
+  shorthand, `/tmp/design-acp` never created.
+- `cells/cells.json` (the codex cell this change will use): exit 0,
+  `conditions.json`, `manifest.sh`, `jobs.json` written to `/tmp/design-ok`
+  and then discarded — nothing the gate emitted was executed, committed or
+  consumed by a later rung, keeping the whole rung inside the proposal's
+  condition-lattice Non-goal.

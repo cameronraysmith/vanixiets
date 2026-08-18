@@ -37,9 +37,9 @@ docker run --rm alpine sh -c '
 The gate is `check_harbor_agents` in the instrument's `scripts/design_matrix.py`, called from `load_cells`, carrying `HARBOR_SKILL_CONSUMING_AGENTS`.
 22 of the 39 factory-registered Harbor adapters consume an injected skill and 17 ignore it with no error, warning or log line.
 
-- [ ] 3.1 Run the gate against a cells file naming a non-consuming adapter; pass is a nonzero exit naming the adapter and the reason, with no manifest emitted
-- [ ] 3.2 Run the gate against a cells file naming an `acp:` registry shorthand; pass is a nonzero exit, since `factory.py:167-175` routes every such name through the non-consuming ACP adapter
-- [ ] 3.3 Run the gate against the cells file this change will actually use, writing to a throwaway `--out` under `/tmp`; pass is exit 0 and a manifest emitted there. The emitted design is discarded rather than executed or committed, which is what keeps this rung inside the proposal's condition-lattice Non-goal; `design_matrix.py:442-466` writes `conditions.json`, `manifest.sh` and `jobs.json` into `--out`, and `:439-440` runs `load_cells` before `out.mkdir` at `:442`, so a refused cells file leaves the directory uncreated
+- [x] 3.1 Run the gate against a cells file naming a non-consuming adapter; pass is a nonzero exit naming the adapter and the reason, with no manifest emitted
+- [x] 3.2 Run the gate against a cells file naming an `acp:` registry shorthand; pass is a nonzero exit, since `factory.py:167-175` routes every such name through the non-consuming ACP adapter
+- [x] 3.3 Run the gate against the cells file this change will actually use, writing to a throwaway `--out` under `/tmp`; pass is exit 0 and a manifest emitted there. The emitted design is discarded rather than executed or committed, which is what keeps this rung inside the proposal's condition-lattice Non-goal; `design_matrix.py:442-466` writes `conditions.json`, `manifest.sh` and `jobs.json` into `--out`, and `:439-440` runs `load_cells` before `out.mkdir` at `:442`, so a refused cells file leaves the directory uncreated
 
 ## 4. Rung 2 — host-side resolution (free, no daemon required)
 

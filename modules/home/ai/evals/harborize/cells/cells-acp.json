@@ -1,0 +1,1 @@
+[{"name": "neg-acp", "runner": "harbor", "agent": "acp:claude-agent", "model": "anthropic/claude-opus-5"}]
