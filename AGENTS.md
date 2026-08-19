@@ -116,8 +116,8 @@ Any clone or worktree of this repository is context-primed from these two commit
 [ADR-0022](packages/docs/src/content/docs/development/architecture/adrs/0022-committed-per-repository-agent-context.md) records why the context is committed rather than provisioned per machine.
 
 `CLAUDE.md` must stay a real file rather than a symlink to `AGENTS.md`.
-OpenWiki maintains a managed block in both files independently, and writing through a symlink would deliver the `CLAUDE.md` block into `AGENTS.md`, leaving two marker pairs in one file; OpenWiki then refuses to update that file at all.
-For the same reason, OpenWiki's literal marker strings must not appear in this file outside the block OpenWiki owns, since it locates its block with a first-and-last-occurrence match and treats a second pair as malformed.
+OpenWiki maintains a managed block in each file independently and writes both in the same pass, so through a symlink the two writes land on `AGENTS.md`: the block meant for `AGENTS.md` is lost, the file is left with unbalanced markers, and every later refresh refuses to touch it.
+For the same reason, OpenWiki's literal marker strings must not appear in this file outside the block it owns, because it locates that block by first and last occurrence and treats a second pair as malformed.
 
 Repository-specific direction for OpenWiki lives in `openwiki/INSTRUCTIONS.md`, which is user-authored and is never rewritten by a normal run.
 The scheduled refresh is `.github/workflows/openwiki-update.yml`.
