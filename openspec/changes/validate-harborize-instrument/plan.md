@@ -343,8 +343,8 @@ Write into the workspace README that this is host-side resolution only, and that
 ```bash
 #!/bin/bash
 set -euo pipefail
-out=/logs/verifier/canary-output.txt
-mkdir -p /logs/verifier
+out=/logs/artifacts/canary-output.txt
+mkdir -p /logs/artifacts
 : > "$out"
 for root in /harbor/skills "$HOME/.claude/skills" "$HOME/.codex/skills" \
             "$HOME/.opencode/skills" "$HOME/.agents/skills" /skills; do
@@ -359,22 +359,22 @@ sort -u -o "$out" "$out"
 
 The search covers Harbor's upload destination, which defaults to `/harbor/skills` (`models/trial/paths.py:41`) and is populated for every agent by `_upload_injected_skills` in `_prepare` (`trial.py:411`), BenchFlow's five oracle discovery paths (`agents/install.py:30-36`), and BenchFlow's sandbox mount at `/skills`.
 
-The output path is `/logs/verifier/`, not the agent workspace, and the choice is load-bearing.
-Under Harbor that directory is bind-mounted into the agent environment (`trial.py:1279-1283`), and `_run_shared_verifier` (`trial.py:536-567`) does not clear it, which is what makes it a sound channel under the fork this change uses; a workspace path such as `/app` is not, because `_verifier_env_mounts` returns exactly one bind and no agent-workspace mount.
-The channel does not survive a change of fork, contrary to the original reading: a separate verifier empties the same directory at `trial.py:599` before running.
-Harbor's verifier does not clear the directory before reading the reward (`verifier/verifier.py:199-236`), and BenchFlow treats `/logs/verifier/` as its standard verifier contract path.
+The output path is `/logs/artifacts/`, not `/logs/verifier/` and not the agent workspace, and the choice is load-bearing.
+The original choice of `/logs/verifier/` was read off Harbor alone and the rung-4 run refuted it: BenchFlow clears that directory's contents on the agent container immediately before the verifier runs, unconditionally (`sandbox/lockdown.py:775-784`, called from `harden_before_verify` at `:1205-1212`), so the canary written that way scored 1 under Harbor and 0 under BenchFlow with no diagnostic beyond a `grep` miss.
+`/logs/artifacts/` is bind-mounted for the whole trial by both runners (`sandbox/docker.py:186-201`; `models/trial/paths.py:38`, `:195-202`), no hardening step touches it, and it is the one path that would also survive Harbor's separate fork, whose wipe at `trial.py:599` is followed by an artifact re-upload (`trial.py:601-607`).
+`/logs/verifier/` keeps its one role under both runners: the reward file the verifier writes after that clear.
 
 - [ ] **Step 2: Fix the canary's verifier fork as shared, and write the verifier**
 
 The canary ships no `verifier/Dockerfile` and declares no `verifier.sandbox_mode`, so it runs shared.
 The fork is forced rather than preferred, and both runners force it. BenchFlow refuses to launch a package declaring separate rather than falling back to shared: `runtime_capabilities.py:186-192` raises an unsupported-feature issue whose reason string reads "separate verifier sandboxes are parsed but not executed", and `raise_for_task_runtime_support` is a fail-closed pre-launch gate (`sandbox/setup.py:676`, `:819-842`).
-Harbor's separate verifier empties `/logs/verifier` before running (`trial.py:599`), through the same host bind it mounts at `:686-692`, so the channel a shared fork relies on does not survive it.
+Harbor's separate verifier empties `/logs/verifier` before running (`trial.py:599`), through the same host bind it mounts at `:686-692`, so no reward-adjacent state written before verification survives it.
 Both packages therefore run shared, and separate mode is exercised nowhere in this change; D11 records why.
 
 ```bash
 #!/bin/bash
 mkdir -p /logs/verifier
-if grep -qx 'HARBORIZE-CANARY-9F3A21' /logs/verifier/canary-output.txt; then
+if grep -qx 'HARBORIZE-CANARY-9F3A21' /logs/artifacts/canary-output.txt; then
   echo 1 > /logs/verifier/reward.txt
 else
   echo 0 > /logs/verifier/reward.txt
@@ -387,7 +387,7 @@ Harbor parses `reward.txt` into a one-key `rewards` dict whose key is the litera
 - [ ] **Step 3: Write the canary `task.md` frontmatter and body**
 
 Frontmatter carries `schema_version: '1.3'`, a `metadata` block, `verifier.type: test-script`, `agent.timeout_sec`, and the `sandbox` spec per Step 4.
-The body states the end state — that `/logs/verifier/canary-output.txt` holds the canary token — in imperative prose with absolute paths, and never mentions skills.
+The body states the end state — that `/logs/artifacts/canary-output.txt` holds the canary token — in imperative prose with absolute paths, and never mentions skills.
 The body does not name the token: only the injected `SKILL.md` carries it, which is what makes the oracle's pass evidence of delivery.
 
 - [ ] **Step 4: Declare the network policy on every package**
@@ -414,7 +414,7 @@ Keep the reward binary.
 Record the verifier fork in the package README with its justification, and record it as what the tree declares rather than as what its layout suggests.
 The declaration is `verifier.sandbox_mode` in the native frontmatter, which the exporter renames to Harbor's `verifier.environment_mode` (`benchflow/task/config.py:83-94`, applied at `task/export.py:383-387`); a `verifier.sandbox` block exports to `[verifier.environment]` and also implies separate.
 Harbor resolves the mode from those two keys and from nothing else (`models/task/verifier_mode.py:10-21`), so a `verifier/Dockerfile` alone infers nothing and the package resolves to `SHARED`.
-This package's fork is shared, for the two reasons in Step 2: BenchFlow refuses to launch a package declaring separate, and Harbor's separate verifier empties `/logs/verifier` and would destroy this package's `summary.json` channel.
+This package's fork is shared, for the two reasons in Step 2: BenchFlow refuses to launch a package declaring separate, and Harbor's separate verifier empties `/logs/verifier`, which is why neither package puts a deliverable there.
 Verify the recorded fork against the exported head — `resolve_task_verifier_mode(Task(<head>).config)` — rather than against the source directory listing.
 
 - [ ] **Step 6: Export both Harbor heads**

@@ -108,6 +108,18 @@ It is therefore not evidence that the nix skill composition or its exclusion lis
 The eval that would exercise those is `.#homeConfigurations."crs58@<system>".config.programs.claude-code.skills`, which triggers an import-from-derivation and is out of scope for a no-build guard.
 The darwin arm has the identical scope.
 
+## Deliverable channel
+
+Both packages route their oracle-to-verifier deliverable through `/logs/artifacts/`, and neither uses `/logs/verifier/` for anything but the reward file the verifier itself writes.
+
+`/logs/verifier/` is not usable as that channel, which the rung-4 run established as a fact rather than a reading.
+BenchFlow wipes the directory's contents immediately before the verifier runs: `harden_before_verify` executes `_CLEAR_VERIFIER_DIR_CMD` (`sandbox/lockdown.py:775-784`, called at `:1205-1212`) unconditionally on the agent container, so the bind mount survives and the content does not.
+`_verify_test_script`'s own conditional clear (`task/verifier_core.py:360-372`) is the branch that does respect a mount, and it is not the branch that removes the file.
+Under Harbor a shared verifier performs no wipe, so a package written against Harbor alone passes there and scores 0 under BenchFlow with no error and no diagnostic beyond a `grep` miss.
+
+`/logs/artifacts/` is bind-mounted by both runners for the whole trial — BenchFlow at `sandbox/docker.py:186-201`, Harbor at `models/trial/paths.py:38`, `:195-202` — and neither hardening step touches it.
+It is also the one channel that would survive Harbor's separate fork, whose wipe is followed by an artifact re-upload (`trial.py:601-607`, `artifact_handler.py:210-254`); that is a property of the path, not a fork this corpus exercises.
+
 ## Generated Harbor heads
 
 Each `<task-id>-harbor/` directory is emitted by `bench tasks export` and is never hand-edited; re-export after every edit to the authored tree.
@@ -277,3 +289,62 @@ These are not a rung's pass criterion; they are the re-verification of the artif
   output file, where it previously aborted under `set -u` before writing
   anything — a failure the verifier could not distinguish from a genuine
   injection failure.
+
+## Rung 4 — delivery proof under BenchFlow (tasks 7.1-7.5)
+
+Every run below is `--agent oracle --sandbox docker` with zero model calls, against benchflow 0.7.4.
+Each run uses its own `--jobs-dir`: `bench eval run` resumes a completed rollout found in an existing jobs directory and reports the cached result (`1 resumed` in the progress line), so reusing one directory across runs silently re-reports the earlier score.
+
+- 7.1 canary, `--skill-mode with-skill --skills-dir conditions/canary`: reward 1,
+  0 errored. The first attempt scored 0 and is what uncovered the
+  `/logs/verifier` channel defect recorded above; the run recorded here is
+  against the corrected package.
+- 7.2 same rollout: `effective_skills_dir` and `requested_skills_dir` both equal
+  the host `conditions/canary` that was passed, `error` null, and no rollout
+  raised `experiment_fidelity/skill_deployment_missing`.
+- 7.3 falsifiability control, `--skill-mode no-skill` and no `--skills-dir`:
+  reward 0, with `skill_source` `none` and both skills-dir fields null. The
+  canary can fail, so 7.1 is evidence rather than a constant.
+- 7.4 fidelity control: `experiment_fidelity/skill_deployment_missing` raised,
+  naming `expected=extra-skill,harborize-injection-canary`. The construction the
+  task prescribed — a hand-authored `environment/_deps/skills/` plus a
+  hand-written `COPY _deps/skills /skills/` — cannot provoke the assertion at
+  0.7.4, and that is the finding rather than an execution detail. BenchFlow
+  itself stages the host skills directory into `environment/_deps/skills` and
+  appends the `COPY` line, working on a temp copy of the task
+  (`sandbox/setup.py:529-568`, `rollout/__init__.py:979-1016`), so a
+  hand-authored baked set is overwritten before the build. The runtime link step
+  then runs `rm -rf <dest> && ln -sfn /skills <dest>`
+  (`agents/install.py:61-90`), which destroys a pre-baked discovery directory
+  too: a second attempt that baked a decoy at `/root/.claude/skills` also scored
+  1. The control that does provoke it puts a symlinked skill directory in the
+  condition directory: `deploy_skills` computes `expected` from the host glob,
+  which follows the symlink, while the staging copy drops symlinked entries by
+  design (`_stage_ignore`, `sandbox/setup.py:44-53`, the #411 fix), so the
+  in-container catalogue is genuinely short one skill and
+  `_link_skill_paths` (`:139-181`) raises.
+- 7.5 one `dir(C)` shape exists in this corpus, `conditions/canary`, so 7.1
+  covers it.
+
+Beyond the task list, the mechanical package was re-run the same way after the channel change (`--skill-mode no-skill`, which is its condition): reward 1, 0 errored.
+The throwaway packages and condition directories built for 7.4 lived outside the repository and were deleted after the runs.
+
+Candidate instrument-defect entry for task 10.4, recorded here because section 10 is a later task: `references/emitters.md:330-340` presents `/logs/verifier` only as the reward-file path, which is correct, and the instrument nowhere warns that the same directory is cleared before the verifier under BenchFlow. An emitted task that used it as a deliverable channel would score 0 under one runner and 1 under the other.
+
+## Rung 5 — Harbor oracle inhabitation (tasks 8.1-8.3)
+
+`harbor run -p <head> -k 5 -o logs/harborize/gate1 --job-name <name> -y`, harbor 0.21.0, oracle by default, zero model calls.
+
+- 8.1 `pipeline-event-summary-harbor`: 5 trials, reward 1.0 on all five,
+  `n_errored_trials` 0, pass@2/4/5 all 1.0.
+- 8.1 `injection-canary-harbor`: 5 trials, reward 1.0 on all five,
+  `n_errored_trials` 0. The canary head needs the condition directory on the
+  command line (`--skill conditions/canary`); without it the same head scores 0
+  across five trials, which is the Harbor-side counterpart of the 7.3 control
+  and was run first.
+- 8.2 no `agent/exit-code.txt` exists under any of the fifteen trial
+  directories. Absence is the passing reading: `OracleAgent.run` writes that file
+  only when `result.return_code != 0` (`agents/oracle.py:149-151`).
+- 8.3 no trial errored in any of the three jobs, so the triage path was never
+  entered and no exception name was read. Recorded as vacuous rather than as
+  performed.

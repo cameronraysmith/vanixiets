@@ -31,11 +31,14 @@ Reproduced: `bench tasks check <pkg> --level runtime-capability --sandbox docker
 The proposal requires this package to pass under both runners, so a Harbor-only fork is not available to it.
 
 Harbor's separate verifier would also destroy this package's agent-to-verifier channel.
-`_run_separate_verifier` empties `/logs/verifier` before the verifier runs (`trial.py:599`, `environments/base.py:626-638`), and that path is bind-mounted from the host (`trial.py:686-692`), so `summary.json` is deleted and every agent including the oracle scores 0.
-Surviving it would mean moving the deliverable to `/logs/artifacts/`, which the artifact re-upload restores after the wipe (`trial.py:601-607`, `artifact_handler.py:210-254`) — a different task contract, not a fork choice.
+`_run_separate_verifier` empties `/logs/verifier` before the verifier runs (`trial.py:599`, `environments/base.py:626-638`), and that path is bind-mounted from the host (`trial.py:686-692`), so a deliverable written there would be deleted and every agent including the oracle would score 0.
+The deliverable is `/logs/artifacts/summary.json`, which the artifact re-upload restores even after that wipe (`trial.py:601-607`, `artifact_handler.py:210-254`), so the fork choice below is decided by the two reasons that remain rather than by this one.
 
 `_run_shared_verifier` (`trial.py:536-567`) performs no wipe, and both packages are single-step, which is the precondition that claim needs: the multi-step path calls `_reset_shared_step_verifier_dirs` (`multi_step.py:202`, defined at `:338-342`) before every shared step verifier, so a package that ever grows `[[steps]]` loses this channel. `SingleStepTrial.__init__` raises on a stepped task (`single_step.py:28-29`), so the two cannot be confused silently.
-That is why `/logs/verifier/summary.json` is a sound channel under the fork actually used.
+The channel is `/logs/artifacts/`, not `/logs/verifier/`, and under BenchFlow that is forced.
+BenchFlow clears `/logs/verifier` on the agent container immediately before the verifier runs, unconditionally (`sandbox/lockdown.py:775-784` from `harden_before_verify` at `:1205-1212`), so a `summary.json` written there is present for Harbor's shared verifier and gone for BenchFlow's — a silent runner-dependent 0.
+`/logs/artifacts/` is bind-mounted by both runners for the whole trial (`sandbox/docker.py:186-201`, `models/trial/paths.py:38`, `:195-202`) and no hardening step touches it; the workspace README's channel section carries the rung-4 evidence.
+`/logs/verifier/reward.txt` remains what it is under both runners: the file the verifier itself writes, after the clear.
 
 ## What the agent can and cannot see
 
