@@ -1,4 +1,4 @@
-Summarize the newline-delimited JSON build event log at `/root/build-events.jsonl` and write the result to `/logs/verifier/summary.json`.
+Summarize the newline-delimited JSON build event log at `/root/build-events.jsonl` and write the result to `/logs/artifacts/summary.json`.
 
 The summary object carries exactly these keys, every value an integer:
 

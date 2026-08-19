@@ -37,7 +37,7 @@ def integers_only(node):
 
 
 try:
-    with open('/logs/verifier/summary.json') as fh:
+    with open('/logs/artifacts/summary.json') as fh:
         actual = json.load(fh)
     # Inside the guard on purpose: integers_only recurses, so a deeply nested
     # submission raises RecursionError here rather than at the parse.

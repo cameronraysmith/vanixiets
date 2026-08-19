@@ -10,25 +10,25 @@
   "input_hashes": {
     "environment/Dockerfile": "8692c0b78579ac8fb84ec5c5fa9c3341eecfe766da41b1433c586e4bfae05197",
     "environment/skills/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "oracle/solve.sh": "961de63acac7425a8162f2c076d1f8bd0379dc01e98ce093e0bbe21ae73821d8",
-    "task.md": "79054e71209e3823b19c51310d8c0b0df023dd1a361b183879e0940f8bbefb5f",
-    "verifier/test.sh": "f9f11ea3478e490facb153bbf7452d4cab3cca4811ad38d926d73bd6644fcd06"
+    "oracle/solve.sh": "b08466724dd8c2719dd74faab2a8c05a1eced3f26fa3ede48befa6f0752fa16f",
+    "task.md": "13d6b3e3fdebd7c71d3e4c234935575190d822ca45396af5ddd00a19829af347",
+    "verifier/test.sh": "452e9202c46294f89e839395a8634505d6c8b1189d461ea348c5a3de6efedf75"
   },
   "losses": [],
   "output_hashes": {
     "environment/Dockerfile": "8692c0b78579ac8fb84ec5c5fa9c3341eecfe766da41b1433c586e4bfae05197",
     "environment/skills/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "instruction.md": "a7483beaca0a400b15eeef756246eb8c0093b3e6d10fce2de92ad7440d30ecad",
-    "solution/solve.sh": "961de63acac7425a8162f2c076d1f8bd0379dc01e98ce093e0bbe21ae73821d8",
+    "instruction.md": "7b950b03fd156f60ab8e54f47bdc2831d652ce8eecb0483348f9ac8af6fdda3a",
+    "solution/solve.sh": "b08466724dd8c2719dd74faab2a8c05a1eced3f26fa3ede48befa6f0752fa16f",
     "task.toml": "314bbffd78b7daab9f4e1d7fee64fc45fc50906f62418551936c37da85cd0584",
-    "tests/test.sh": "f9f11ea3478e490facb153bbf7452d4cab3cca4811ad38d926d73bd6644fcd06"
+    "tests/test.sh": "452e9202c46294f89e839395a8634505d6c8b1189d461ea348c5a3de6efedf75"
   },
   "restored_extension_paths": [],
   "selected_entrypoint": "task.md",
   "selected_oracle_dir": "oracle",
   "selected_prompt": "instruction.md",
   "selected_verifier_dir": "verifier",
-  "source_task_dir": "/Users/crs58/.treehouse/vanixiets-22808a/4/vanixiets/modules/home/ai/evals/harborize/injection-canary",
+  "source_task_dir": "/Users/crs58/.treehouse/vanixiets-22808a/6/vanixiets/modules/home/ai/evals/harborize/injection-canary",
   "status": "lossless",
   "target": "harbor"
 }

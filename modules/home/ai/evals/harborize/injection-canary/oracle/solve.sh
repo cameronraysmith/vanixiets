@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
-out=/logs/verifier/canary-output.txt
-mkdir -p /logs/verifier
+out=/logs/artifacts/canary-output.txt
+mkdir -p /logs/artifacts
 : > "$out"
 # These roots are the oracle discovery-path union, not the adapter registration
 # destinations; no adapter registration runs on the oracle path.

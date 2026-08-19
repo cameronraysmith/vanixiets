@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-mkdir -p /logs/verifier
+mkdir -p /logs/artifacts
 python3 - <<'EOF'
 import json
 
@@ -32,7 +32,7 @@ summary = {
     'median_duration_ms': median,
 }
 
-with open('/logs/verifier/summary.json', 'w') as fh:
+with open('/logs/artifacts/summary.json', 'w') as fh:
     json.dump(summary, fh, indent=2, sort_keys=True)
     fh.write('\n')
 EOF

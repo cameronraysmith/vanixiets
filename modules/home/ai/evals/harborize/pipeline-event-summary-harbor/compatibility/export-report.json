@@ -12,26 +12,26 @@
     "environment/Dockerfile": "a01ec6eddaa1a340c47a64713645465c07aac07480ef6567716409c103dfff61",
     "environment/build-events.jsonl": "1101fcf99801cfa569b02fc23a941fea9f483a00d15f5c984d1bb1ffd03727be",
     "environment/skills/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "oracle/solve.sh": "c55bfaf06776ff30c26332c8610b5b113a82fa13b2224a4917945b6d7fe0759e",
-    "task.md": "3084e89f0f17a31e0019c2ec87bd482005005f1655d7124edf81c533ef9b467b",
-    "verifier/test.sh": "2fbcda2592f0af8ea7cf13d33c21f57717673ec2e0894fe388d5eb218dd1d1af"
+    "oracle/solve.sh": "f56198fbc2f37b281464c233d3a94f3895469d313753a53d61a2dea1233a4519",
+    "task.md": "80a9af1f2b6d417a2b194dbd2b75a40b6c49b9342669d3e66d5974dc9abc4747",
+    "verifier/test.sh": "d0911278b112af23a9a6ec9794f8e71dbab79f47d9e6e025b4f8ba04ea799cb2"
   },
   "losses": [],
   "output_hashes": {
     "environment/Dockerfile": "a01ec6eddaa1a340c47a64713645465c07aac07480ef6567716409c103dfff61",
     "environment/build-events.jsonl": "1101fcf99801cfa569b02fc23a941fea9f483a00d15f5c984d1bb1ffd03727be",
     "environment/skills/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "instruction.md": "e6ffbf566624cd0273e480de47ccf9c20e4ec1750d061af70ea2efe8b9559046",
-    "solution/solve.sh": "c55bfaf06776ff30c26332c8610b5b113a82fa13b2224a4917945b6d7fe0759e",
+    "instruction.md": "e5fd5660c1ff8755b1525ba89da8c0d03e152a7d8c601588db045af36242b44d",
+    "solution/solve.sh": "f56198fbc2f37b281464c233d3a94f3895469d313753a53d61a2dea1233a4519",
     "task.toml": "d05d8c5c4286c33af00119b4841655b10846634a0378f8afddb8995d76faf104",
-    "tests/test.sh": "2fbcda2592f0af8ea7cf13d33c21f57717673ec2e0894fe388d5eb218dd1d1af"
+    "tests/test.sh": "d0911278b112af23a9a6ec9794f8e71dbab79f47d9e6e025b4f8ba04ea799cb2"
   },
   "restored_extension_paths": [],
   "selected_entrypoint": "task.md",
   "selected_oracle_dir": "oracle",
   "selected_prompt": "instruction.md",
   "selected_verifier_dir": "verifier",
-  "source_task_dir": "/Users/crs58/.treehouse/vanixiets-22808a/4/vanixiets/modules/home/ai/evals/harborize/pipeline-event-summary",
+  "source_task_dir": "/Users/crs58/.treehouse/vanixiets-22808a/6/vanixiets/modules/home/ai/evals/harborize/pipeline-event-summary",
   "status": "lossless",
   "target": "harbor"
 }
