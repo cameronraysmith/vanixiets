@@ -53,9 +53,30 @@
       # atdd-outer-loop -> test-driven-development ecosystem at model-selection time and
       # would bypass ATDD routing, so it is withheld from delivery here. The compose
       # still builds it; only the harness symlink is dropped. Remove the name to re-include.
-      excludedUpstreamSkills = [ "tdd" ];
+      #
+      # harborize is iterated in place through a hand-made ~/.claude/skills/harborize
+      # symlink into this repository. Delivering it while that symlink exists makes
+      # home-manager's backup pass move the repository's own sources to
+      # *.before-home-manager and replace them with store symlinks, because the symlink
+      # is an intermediate path component and the pre-link move resolves through it.
+      # Remove the symlink before removing this exclusion.
+      excludedSkills = [
+        "tdd"
+        "harborize"
+        # Beads retired as a work-owning layer (Linear/OpenSpec own the work);
+        # issues-beads* withheld from delivery pending post-migration source
+        # cleanup of remaining bd references.
+        "issues-beads"
+        "issues-beads-seed"
+        "issues-beads-init"
+        "issues-beads-orient"
+        "issues-beads-prime"
+        "issues-beads-checkpoint"
+        "issues-beads-evolve"
+        "issues-beads-audit"
+      ];
 
-      allSkills = removeAttrs (readSkillsFrom "${config.aiSkills.composed}/.claude/skills") excludedUpstreamSkills;
+      allSkills = removeAttrs (readSkillsFrom "${config.aiSkills.composed}/.claude/skills") excludedSkills;
 
       # Third-party skill directories supplied via aiSkills.extraSkillDirs.
       # Each entry is a directory (often a nix store path string) holding

@@ -1,0 +1,350 @@
+# Harborize evaluation workspace
+
+Change-owned corpus for the `validate-harborize-instrument` OpenSpec change.
+It validates the harborize instrument at version 0.2.1 by producing evaluation packages whose skill injection is proven at each level it can fail, and it stays in the repository after the change closes as the permanent home of the injection canary and the evaluation corpus.
+
+This file has two halves and they have different lifetimes.
+Everything down to "Change-scoped rung evidence" outlives the change.
+Everything below that heading is execution evidence for one change and is migrated into `verify.md` and deleted when the change archives, which task 10.6 carries.
+
+## Upstream pins and installed versions
+
+Every source anchor in the change documents is read at these pinned revisions in the local ghq clones, whose HEADs were confirmed equal to the pins:
+
+| repo | path | pin |
+|---|---|---|
+| Harbor | `~/ghq/github.com/harbor-framework/harbor` | `ac398bbda7c4c1073461797d3b95c2455cc671b5` |
+| BenchFlow | `~/ghq/github.com/benchflow-ai/benchflow` | `d30527b82027a416e72014920cdf43a534967ad3` |
+| SkillsBench | `~/ghq/github.com/benchflow-ai/skillsbench` | `9a1f4dd5f7659f75707435da3ce854b6e48321d1` |
+
+The pins are reading pins, not install pins: CLI installs track PyPI latest stable (settled 2026-08-15), so the executed CLIs may drift from the anchors.
+
+| CLI | installed | pin's version |
+|---|---|---|
+| `harbor` | 0.21.0 | 0.21.0 (equal at rung 0 time) |
+| `bench` | benchflow 0.7.4 | 0.6.8.dev0 (drifted; anchors cite the pin) |
+
+Where an anchor was re-read in the installed tree rather than the pin, the text citing it says so.
+
+## Instrument freeze baseline
+
+Instrument version: 0.2.1, frozen for the duration of the change.
+
+The freeze anchor is the git tree object the instrument path resolves to:
+
+```
+64bc599cba1680db3678b67aea187bb3da0f6d20
+```
+
+Recompute and compare it with `git rev-parse 'HEAD:modules/home/ai/plugins/testing-and-quality/.apm/skills/harborize'`.
+This is the primary check because it records file modes and symlinks, is immune to untracked files and to how the path was spelled on the command line, and is stable across a rebase of the base branch — it is identical at the pre-rebase tip `5f33c36e`, at the current `harborize-instrument` tip, and at this branch's head, where a commit id is not.
+A commit id is deliberately not the anchor for that last reason; the baseline this change started from has already been rebased once.
+
+A `jj diff -r @` cannot substitute, because it reports only what the working-copy commit changed against its parents and would show nothing for an edit squashed into the `harborize-instrument` chain.
+
+Secondary working-tree check, over the same path (13 files):
+
+```
+3fdd30d1fa2a69a5e53c8d34474c107a516c32e29dcc5087b9bd7738b22ccd4e
+```
+
+```
+find modules/home/ai/plugins/testing-and-quality/.apm/skills/harborize -type f \
+  -not -path '*/__pycache__/*' -exec shasum -a 256 {} + | LC_ALL=C sort | shasum -a 256
+```
+
+Both this recipe and the digest live here rather than only in the change's tasks.md, because they outlive the change while tasks.md archives.
+Three limits are worth stating, because each was reproduced rather than predicted, and together they are why this is the secondary check.
+It hashes regular files only, so a mode change, a new symlink or a new empty directory inside the instrument leaves it invariant.
+It covers every file present rather than every file tracked, so any untracked file inside the directory flips it, and several such classes are gitignored and so invisible to `git status` too — `.DS_Store` is the sharpest on macOS, where one Finder visit plants one, and `*.log`, `result*`, `*~`, `*.swp` and a `.pyc` outside a `__pycache__` directory behave the same.
+And it is a function of the path string `find` was given, because each `shasum` line embeds it: the value above is what this exact invocation produces from the repository root, while a `./` prefix, an absolute path, or a `cd` into the directory each produce a different digest from an unchanged tree.
+A trailing slash does not, because `find` normalizes it.
+
+The `__pycache__` exclusion is still required: the change is obliged to run the instrument's own `scripts/*.py`, CPython writes bytecode beside them, and `.gitignore` then hides it, so without the exclusion complying with one task makes another report a freeze violation that never happened.
+
+## Kernel probe outcome
+
+Probe command, run immediately after the daemon started and before any task was authored, with the anchored `grep -qE` whose exit status is the criterion:
+
+```
+docker run --rm alpine sh -c '
+  [ -f /proc/config.gz ] || exit 2
+  zcat /proc/config.gz | grep -qE "^CONFIG_NFT_FIB_INET=[ym]"'
+```
+
+Exit status: 0, on 2026-08-18.
+
+Branch taken (task 1.3, exit-0 arm): egress control is available, so `no-network` may be declared anywhere the change declares it.
+Every package keeps `network_mode = "public"` at the environment baseline and carries the `no-network` override on the `[agent]` phase only, per task 5.4.
+
+Attribution recorded with the result (task 1.4): `no-network` is the harborize instrument's own authoring default (`SKILL.md:124`, `references/emitters.md:74`), not Harbor's.
+Harbor's default is `public` (`models/task/config.py:249-252`, `NetworkPolicy` at `:66`), BenchFlow's is the same (`task/config.py:720-723`), and 86 of the 87 SkillsBench corpus tasks declare `network_mode: public`.
+What the probe gates is whether a `no-network` declaration can be enforced at all: on failure `_enable_egress_control` goes false (`docker.py:188-195`), which zeroes `capabilities.disable_internet` (`:289-293`), and `environments/base.py:773-781` raises at environment start.
+
+## Agent install caveat
+
+`install()` curls its bootstrap (`claude_code.py:425-449`) during `_prepare`/`_setup_agent` (`trial.py:408-414`), which no network policy wraps, while only `_run_agent_phase` (`trial.py:465-469`) and the verifier phases enter `_phase_network_policy`.
+A cell whose environment baseline is `no-network` therefore fails during agent install indistinguishably from an injection failure at the reward level, which is why task 5.4 puts `no-network` on the `[agent]` phase rather than on the baseline.
+The anchors above are claude-code's, but the mechanism is the phase boundary rather than the adapter: every installed adapter's install runs inside `_prepare`/`_setup_agent`.
+
+## Layout
+
+Job output goes to `logs/harborize/` at the repository root, which `.gitignore:57` already excludes; nothing under this workspace writes logs inside the corpus.
+No file in this workspace carries the `.nix` extension, because `flake.nix:6` calls `inputs.import-tree ./modules` bare and every `*.nix` file under `modules/` is evaluated as a flake-parts module — a corpus fixture with that extension would break the flake rather than fail as a fixture.
+
+### Flake-evaluation guard
+
+Run whenever a task writes new corpus files (tasks 1.11, 5.10):
+
+```
+if fd -H -e nix . modules/home/ai/evals/harborize | rg -q .; then
+  echo "FAIL: a .nix file is inside the corpus"; exit 1
+fi
+nix eval .#nixosConfigurations --apply builtins.attrNames
+```
+
+What the eval proves and does not prove: `builtins.attrNames` forces the attrset spine and never the values, so it proves that import-tree's enumeration over `modules/` still succeeds and that every module file parses — which is exactly the hazard the extension audit guards — and it evaluates no module body.
+It is therefore not evidence that the nix skill composition or its exclusion list evaluates.
+The eval that would exercise those is `.#homeConfigurations."crs58@<system>".config.programs.claude-code.skills`, which triggers an import-from-derivation and is out of scope for a no-build guard.
+The darwin arm has the identical scope.
+
+## Deliverable channel
+
+Both packages route their oracle-to-verifier deliverable through `/logs/artifacts/`, and neither uses `/logs/verifier/` for anything but the reward file the verifier itself writes.
+
+`/logs/verifier/` is not usable as that channel, which the rung-4 run established as a fact rather than a reading.
+BenchFlow wipes the directory's contents immediately before the verifier runs: `harden_before_verify` executes `_CLEAR_VERIFIER_DIR_CMD` (`sandbox/lockdown.py:775-784`, called at `:1205-1212`) unconditionally on the agent container, so the bind mount survives and the content does not.
+`_verify_test_script`'s own conditional clear (`task/verifier_core.py:360-372`) is the branch that does respect a mount, and it is not the branch that removes the file.
+Under Harbor a shared verifier performs no wipe, so a package written against Harbor alone passes there and scores 0 under BenchFlow with no error and no diagnostic beyond a `grep` miss.
+
+`/logs/artifacts/` is bind-mounted by both runners for the whole trial — BenchFlow at `sandbox/docker.py:186-201`, Harbor at `models/trial/paths.py:38`, `:195-202` — and neither hardening step touches it.
+It is also the one channel that would survive Harbor's separate fork, whose wipe is followed by an artifact re-upload (`trial.py:601-607`, `artifact_handler.py:210-254`); that is a property of the path, not a fork this corpus exercises.
+
+## Generated Harbor heads
+
+Each `<task-id>-harbor/` directory is emitted by `bench tasks export` and is never hand-edited; re-export after every edit to the authored tree.
+Two properties of the exporter are worth knowing before reading one of them.
+
+No generation marker can be written into the emitted files.
+The exporter copies `environment/`, `oracle/` and `verifier/` verbatim and rebuilds `task.toml` with `tomli_w`, which emits no comments (`benchflow/task/export.py:268-273`, `:367-388`), so a header would vanish on the next export and the committed tree would stop equalling a fresh one.
+The marker therefore lives outside the emitted content, as `.gitattributes` `linguist-generated=true`, alongside this repository's other machine-emitted files.
+
+`compatibility/export-report.json` records `source_task_dir` as the exporting checkout's absolute path and cannot be made relative: `TaskPaths.__init__` calls `Path(task_dir).resolve()` (`benchflow/task/paths.py:55-56`) and no CLI flag controls it.
+That field is provenance of one export run on one machine, not a portable reference, and re-exporting from a different checkout rewrites it.
+The `losses: []` beside it means lossless over the contract files the exporter enumerates, which does not include the authored package README.
+
+## Base image pinning
+
+Every Dockerfile in the corpus pins its base by index digest, `ubuntu:24.04@sha256:561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea`, which is the image the recorded evidence below was produced against.
+The pin is not decorative: at rung-0 time the floating `ubuntu:24.04` tag had already moved to a later build than the one this host held, so an unpinned instrument would compare measurements taken in different environments.
+The multi-arch index digest is pinned rather than a platform manifest, so the same line resolves correctly on `linux/arm64` and `linux/amd64`; a platform digest carries one architecture only and would either fail to resolve or silently emulate.
+
+## Verifier forks
+
+Both packages run a shared verifier.
+Neither declares `verifier.sandbox_mode` and neither ships a `verifier/Dockerfile`, and the choice is forced rather than preferred — see design decision D11 and each package README for the evidence.
+The short form: BenchFlow refuses at launch to run a package declaring separate rather than falling back to shared (`runtime_capabilities.py:186-192`, `sandbox/setup.py:676`, `:819-842`), and Harbor's separate verifier empties `/logs/verifier` before running (`trial.py:599`), which destroys the channel both packages use.
+Separate mode is exercised nowhere in this corpus.
+
+Record a fork by resolving it from the exported head rather than by reading the source layout.
+Harbor derives the mode from `verifier.environment_mode` or `[verifier.environment]` and from nothing else (`models/task/verifier_mode.py:10-21`), so a `verifier/Dockerfile` on its own infers nothing.
+
+## What `bench tasks check` does and does not clear
+
+Both packages pass `--level schema`, `--level structural` and `--level runtime-capability --sandbox docker`.
+Neither passes `--level publication-grade`, and the reason is unrelated to the co-present-head argument design decision D7 makes.
+D7's checks do pass: `structural_checks.py:208-212` (no `task.toml` or `instruction.md` beside `task.md`) and `:218-222` (no `solution/`) both hold, because each Harbor head is a sibling directory rather than co-present.
+The failing check is `:224-226`, which requires a native `verifier/` package carrying `verifier.md` and `rubrics/` — a verifier-strategy document neither package authors.
+Recorded so publication-grade is not later cited as a standard this corpus meets.
+
+## Harbor's static gate and its blind spot
+
+`Task._validate_tests` returns early whenever a verifier environment is configured (`models/task/task.py:126-144`, early return at `:134-135`), so it structurally cannot catch a separate-mode package missing `/tests/test.sh`.
+Both heads in this corpus resolve to shared and therefore do not reach that early return; the record is a source reading against harbor 0.21.0, kept because it bounds what `Task()` construction is evidence of.
+
+## Standing precondition
+
+The injection canary is re-run at the start of every later evaluation round, before any metered batch.
+It is a positive control for skill delivery, and every silent-null class the instrument documents produces a clean run and a plausible negative result without it.
+
+---
+
+# Change-scoped rung evidence
+
+Records for the `validate-harborize-instrument` change only.
+Task 10.6 migrates this section into `verify.md` and deletes it at archive time.
+
+## Rung 0 — prerequisites (complete)
+
+- Docker daemon: answering (`docker info` exit 0) before the probe ran.
+- Kernel probe: exit 0, recorded above with its branch and attribution.
+- CLIs: `harbor` 0.21.0 and `bench` (benchflow 0.7.4) on `PATH` from PyPI, with
+  all three ghq clones verified clean at their pins after install.
+- Flake-evaluation guard: run at this rung's close, after this README became the
+  first corpus file under `modules/`. Result: no `.nix` file found, `nix eval`
+  exit 0 on both `nixosConfigurations` and `darwinConfigurations`.
+
+## Canary skill and condition directory (tasks 2.1-2.4)
+
+`conditions/canary/` is `dir(C)`: exactly one skill directory, `harborize-injection-canary`, carrying the token `HARBORIZE-CANARY-9F3A21`.
+The name collides with none of the deployed skill directories, and the directory holds nothing else.
+A stray non-hidden child *directory* without a `SKILL.md` turns the whole condition into a hard error at resolution (`_find_skill_dirs`, `skills.py:382-416`), which is the case that motivated keeping it empty; a stray *file* is filtered out silently by the `child.is_dir()` test at `skills.py:396`, so the emptiness is maintained rather than enforced.
+
+Leakage-audit expectation (task 2.3): the asserted literal appears in both the verifier and the `SKILL.md` by design, and `audit_leakage.py` check 1 flags exactly that pattern (`MIN_LITERAL_LENGTH` at `:44`, `check_literals` at `:96`).
+The flag is correct on its own terms — the canary's mechanism is its answer key — and the instrument is not edited to exempt it because it is frozen at 0.2.1.
+
+Exposure of the shared fork (task 2.4), corrected in the review round: the consequence originally recorded — that a real agent could read the token out of the verifier script — does not arise.
+Both runners upload the verifier's own directory during the verification phase, after the agent phase has ended (Harbor `verifier/verifier.py:147-153` reached from `_run_shared_verifier`, phase order fixed at `trial/single_step.py:41` then `:52`; BenchFlow `task/verifier_core.py:385` in `_verify_test_script` (`:346`), reached from `verify()` (`:260`)).
+Rung 6's criterion is unchanged and rests on a different reason: a model-driven trial's reward conflates delivery with the model's own behaviour, so the adapter's registration directory is the deterministic witness.
+
+## Rung 1 — adapter allowlist gate (tasks 3.1-3.3)
+
+`scripts/design_matrix.py` with `--units harborize-injection-canary --design marginals`, three runs against throwaway `/tmp` outputs:
+
+- `cells/cells-nonconsuming.json` (agent `aider`): exit 1 naming `aider` and
+  the reason, `/tmp/design-neg` never created.
+- `cells/cells-acp.json` (agent `acp:claude-agent`): exit 1 on the ACP
+  shorthand, `/tmp/design-acp` never created.
+- `cells/cells.json` (the codex cell this change will use): exit 0,
+  `conditions.json`, `manifest.sh`, `jobs.json` written to `/tmp/design-ok`
+  and then discarded — nothing the gate emitted was executed, committed or
+  consumed by a later rung, keeping the whole rung inside the proposal's
+  condition-lattice Non-goal.
+
+## Rung 2 — host-side resolution (tasks 4.1-4.3)
+
+`checks/resolve_check.py` calls `harbor.skills.resolve_skills` (`skills.py:111-123`) and `compute_skill_digest` (`skills.py:200-209`) against `conditions/canary`, run with the interpreter backing the `harbor` entrypoint:
+
+```
+HARBOR_PY=$(sed -n '1s|^#!||p' "$(command -v harbor)")
+"$HARBOR_PY" modules/home/ai/evals/harborize/checks/resolve_check.py <dir>
+```
+
+- `dir(C)`: exactly one entry, `name` `harborize-injection-canary`, `digest`
+  `sha256:47016a2e2b3f220c90fc183411a8ae8dbd2f37c4c6becc268460a5588ba85cd9`.
+- Missing path: `FileNotFoundError` on the host, exit 1.
+- A file rather than a directory: `ValueError: Skill path must be a directory`,
+  exit 1.
+- A child directory without a `SKILL.md`: `ValueError` naming `not-a-skill`,
+  exit 1.
+- No argument: a usage line on stderr, exit 2.
+
+Each raise happened on the host before any container started (`_find_skill_dirs`, `skills.py:382-416`).
+
+What this rung proves is host-side resolution and request, never delivery: a trial's `lock.json` cannot substitute for delivery evidence, because `_write_trial_lock` runs at `trial.py:104` inside `Trial.__init__`, before `_resolve_injected_skills` at `:107` and long before `_upload_injected_skills` at `:411`, and `_build_agent_skill_locks` (`models/job/lock.py:462-475`) calls only host-side functions.
+
+## Task package authoring, dual head (tasks 5.1-5.10)
+
+Two authored BenchFlow-native trees and two derived Harbor heads:
+
+- `injection-canary/`: shared verifier fork, oracle output at
+  `/logs/verifier/canary-output.txt`, `environment/skills/` empty with a
+  `.gitkeep`, `sandbox.network_mode: public` baseline with the `no-network`
+  override on `[agent]` only (probe exit 0 permits it).
+- `pipeline-event-summary/`: the mechanical package sampling the
+  `preferences-json-querying` skill's claimed contract, single binary reward
+  key, shared verifier fork, verifier expectation held as a hand-derived literal
+  rather than recomputed from a fixture copy; fork choice and reward channel
+  recorded in its README.
+- Both heads exported with `bench tasks export ... --target harbor --overwrite`,
+  status lossless, 0 losses, reports under `compatibility/export-report.json`;
+  the exported `task.toml` carries `[environment] network_mode = "public"` with
+  the `[agent]` phase override, and the heads are never hand-edited.
+- Fork verified from the heads rather than the layout:
+  `resolve_task_verifier_mode(Task(<head>).config)` is
+  `VerifierEnvironmentMode.SHARED` for both, matching what each README records.
+- Leakage audit (task 5.8): mechanical exit 0 — after renaming the summary key
+  `pipelines` to `per_pipeline`, because the skill's prose contains the word
+  `pipelines` and the frozen check 1 flags any quoted verifier literal of eight
+  characters or more recoverable from skill content; canary exit 1 with exactly
+  the expected check-1 literal flag naming the token, justification in the
+  package README.
+- Extension audit and flake-evaluation guard re-run after export (task 5.10):
+  no `.nix` file inside the corpus, `nixosConfigurations` and
+  `darwinConfigurations` eval exit 0.
+
+## Rung 3 — static task validation (tasks 6.1-6.3)
+
+- `bench tasks check <native> --level structural`: exit 0, no issues, on both
+  `injection-canary` and `pipeline-event-summary`.
+- `bench tasks check <native> --level runtime-capability --sandbox docker`: exit
+  0 on both, which is what establishes that neither package declares a feature
+  BenchFlow would refuse to launch.
+- `harbor.models.task.task.Task(<head>)` constructed both exported heads
+  successfully (exit 0 each). The stub `harbor task(s) check` and its redirect
+  to the metered `harbor check` LLM-rubric were not invoked.
+- Harbor gate blind spot (task 6.3): recorded above as a permanent note, with
+  the correction that neither head in this corpus reaches the early return.
+
+## Host-side container dry runs, beyond the task list
+
+Each oracle and verifier pair run under the pinned base image before any runner touches them.
+These are not a rung's pass criterion; they are the re-verification of the artifacts the review round changed.
+
+- Mechanical, shared-fork layout: oracle output scores 1; a summary with one
+  digit of the median altered scores 0; a missing `summary.json` scores 0.
+- Canary: with `dir(C)` mounted at `/harbor/skills` reward 1 and the token
+  written; with no skill mounted reward 0 and an empty output file.
+- Canary with `HOME` unset in the container: the oracle exits 0 and writes its
+  output file, where it previously aborted under `set -u` before writing
+  anything — a failure the verifier could not distinguish from a genuine
+  injection failure.
+
+## Rung 4 — delivery proof under BenchFlow (tasks 7.1-7.5)
+
+Every run below is `--agent oracle --sandbox docker` with zero model calls, against benchflow 0.7.4.
+Each run uses its own `--jobs-dir`: `bench eval run` resumes a completed rollout found in an existing jobs directory and reports the cached result (`1 resumed` in the progress line), so reusing one directory across runs silently re-reports the earlier score.
+
+- 7.1 canary, `--skill-mode with-skill --skills-dir conditions/canary`: reward 1,
+  0 errored. The first attempt scored 0 and is what uncovered the
+  `/logs/verifier` channel defect recorded above; the run recorded here is
+  against the corrected package.
+- 7.2 same rollout: `effective_skills_dir` and `requested_skills_dir` both equal
+  the host `conditions/canary` that was passed, `error` null, and no rollout
+  raised `experiment_fidelity/skill_deployment_missing`.
+- 7.3 falsifiability control, `--skill-mode no-skill` and no `--skills-dir`:
+  reward 0, with `skill_source` `none` and both skills-dir fields null. The
+  canary can fail, so 7.1 is evidence rather than a constant.
+- 7.4 fidelity control: `experiment_fidelity/skill_deployment_missing` raised,
+  naming `expected=extra-skill,harborize-injection-canary`. The construction the
+  task prescribed — a hand-authored `environment/_deps/skills/` plus a
+  hand-written `COPY _deps/skills /skills/` — cannot provoke the assertion at
+  0.7.4, and that is the finding rather than an execution detail. BenchFlow
+  itself stages the host skills directory into `environment/_deps/skills` and
+  appends the `COPY` line, working on a temp copy of the task
+  (`sandbox/setup.py:529-568`, `rollout/__init__.py:979-1016`), so a
+  hand-authored baked set is overwritten before the build. The runtime link step
+  then runs `rm -rf <dest> && ln -sfn /skills <dest>`
+  (`agents/install.py:61-90`), which destroys a pre-baked discovery directory
+  too: a second attempt that baked a decoy at `/root/.claude/skills` also scored
+  1. The control that does provoke it puts a symlinked skill directory in the
+  condition directory: `deploy_skills` computes `expected` from the host glob,
+  which follows the symlink, while the staging copy drops symlinked entries by
+  design (`_stage_ignore`, `sandbox/setup.py:44-53`, the #411 fix), so the
+  in-container catalogue is genuinely short one skill and
+  `_link_skill_paths` (`:139-181`) raises.
+- 7.5 one `dir(C)` shape exists in this corpus, `conditions/canary`, so 7.1
+  covers it.
+
+Beyond the task list, the mechanical package was re-run the same way after the channel change (`--skill-mode no-skill`, which is its condition): reward 1, 0 errored.
+The throwaway packages and condition directories built for 7.4 lived outside the repository and were deleted after the runs.
+
+Candidate instrument-defect entry for task 10.4, recorded here because section 10 is a later task: `references/emitters.md:330-340` presents `/logs/verifier` only as the reward-file path, which is correct, and the instrument nowhere warns that the same directory is cleared before the verifier under BenchFlow. An emitted task that used it as a deliverable channel would score 0 under one runner and 1 under the other.
+
+## Rung 5 — Harbor oracle inhabitation (tasks 8.1-8.3)
+
+`harbor run -p <head> -k 5 -o logs/harborize/gate1 --job-name <name> -y`, harbor 0.21.0, oracle by default, zero model calls.
+
+- 8.1 `pipeline-event-summary-harbor`: 5 trials, reward 1.0 on all five,
+  `n_errored_trials` 0, pass@2/4/5 all 1.0.
+- 8.1 `injection-canary-harbor`: 5 trials, reward 1.0 on all five,
+  `n_errored_trials` 0. The canary head needs the condition directory on the
+  command line (`--skill conditions/canary`); without it the same head scores 0
+  across five trials, which is the Harbor-side counterpart of the 7.3 control
+  and was run first.
+- 8.2 no `agent/exit-code.txt` exists under any of the fifteen trial
+  directories. Absence is the passing reading: `OracleAgent.run` writes that file
+  only when `result.return_code != 0` (`agents/oracle.py:149-151`).
+- 8.3 no trial errored in any of the three jobs, so the triage path was never
+  entered and no exception name was read. Recorded as vacuous rather than as
+  performed.
