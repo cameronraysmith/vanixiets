@@ -18,6 +18,7 @@
       core
       development
       herdr
+      languages
       packages
       shell
       terminal

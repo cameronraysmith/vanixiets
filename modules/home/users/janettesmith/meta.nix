@@ -15,6 +15,7 @@
       base-sops
       core
       development
+      languages
       packages
       shell
       terminal
