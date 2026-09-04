@@ -91,7 +91,6 @@
           git-revise
           git-xet
           gitmux
-          ttyd
           d2
           graphviz
           jc

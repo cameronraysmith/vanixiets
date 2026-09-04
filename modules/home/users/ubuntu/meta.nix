@@ -19,7 +19,9 @@
 
     aggregates = with config.flake.modules.homeManager; [
       base-sops
+      core
       development
+      herdr
       shell
       terminal
     ];

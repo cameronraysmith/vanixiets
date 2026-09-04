@@ -1,6 +1,6 @@
 { ... }:
 {
-  flake.modules.homeManager.ai =
+  flake.modules.homeManager.herdr =
     {
       pkgs,
       lib,

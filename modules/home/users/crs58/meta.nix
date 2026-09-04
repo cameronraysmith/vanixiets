@@ -17,6 +17,7 @@
       ai
       core
       development
+      herdr
       packages
       shell
       terminal
