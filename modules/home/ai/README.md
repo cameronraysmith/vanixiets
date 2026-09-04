@@ -26,4 +26,4 @@ Verify an edit against the source tree and treat delivered content as generated 
 
 Harness-specific modules, each configuring one agent's settings, hooks, MCP servers, and wrappers: `atomic/`, `claude-code/`, `codex/`, `firstmate/`, `omp/`, `opencode/`, `pi/`.
 
-Supporting tools these harnesses invoke: `cognee/` (memory layer), `herdr/` and `moshi/` (session multiplexing), `hunk/` and `tuicr/` (interactive diff review), `worktrunk/` (worktree management).
+Supporting tools these harnesses invoke: `cognee/` (memory layer), `moshi/` (session multiplexing), `hunk/` and `tuicr/` (interactive diff review), `worktrunk/` (worktree management).
