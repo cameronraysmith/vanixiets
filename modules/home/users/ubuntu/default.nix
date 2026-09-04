@@ -34,6 +34,10 @@ let
       # configuration is unreachable here and only collides with them.
       programs.bash.enable = lib.mkForce false;
 
+      # `core/bitwarden.nix` starts ssh-agent as a systemd user service on
+      # Linux, and the sandbox has no systemd user manager to run it.
+      services.ssh-agent.enable = lib.mkForce false;
+
       # The sandbox runs standalone home-manager with no session bus and no
       # systemd user manager, so sops-nix's user unit never starts and its
       # secrets would never be installed.
