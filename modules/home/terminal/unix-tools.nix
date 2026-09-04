@@ -1,10 +1,9 @@
 { ... }:
 {
-  flake.modules.homeManager.packages =
+  flake.modules.homeManager.terminal =
     { pkgs, ... }:
     {
       home.packages = with pkgs; [
-        # unix tools
         b3sum
         coreutils # many (non-)overlapping tools in toybox
         diskus
@@ -32,27 +31,6 @@
         rip2
         tree
         unison
-
-        # io
-        aria2
-        curl
-        restic
-        autorestic
-        wget
-
-        # compression
-        zstd
-        # snzip
-
-        # fonts
-        noto-fonts-color-emoji
-        fira-code
-        cascadia-code
-        monaspace
-        nerd-fonts.monaspace
-        inconsolata
-        nerd-fonts.inconsolata
-        # jetbrains-mono and nerd-fonts.jetbrains-mono installed via homebrew casks
       ];
     };
 }
