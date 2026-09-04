@@ -132,9 +132,15 @@ knowledge:
       direnv exec . just docs-dev  # astro dev server for packages/docs
   - name: terminal
     contents: |
-      Ensure the user has access to an interactive terminal shell regardless of built-in Editor state: after the ubuntu profile is activated, start `browser-terminal` in the background (`setsid browser-terminal > logs/browser-terminal.log 2>&1 &` from the repository, or with `nohup`) and expose port 7681 through the app-preview tunnel (the `browser_preview` tool). It serves ttyd with herdr as the entrypoint; the xterm.js font list is set client-side in the wrapper because browser glyph rendering uses the user's fonts, not this VM's.
-      setsid browser-terminal > logs/browser-terminal.log 2>&1 &   # from the repository root, after activation
-      browser_preview 7681                                          # expose the port through the app-preview tunnel
+      Ensure the user has access to an interactive terminal shell regardless of
+      built-in Editor state: after the ubuntu profile is activated, start
+      `browser-terminal` in the background and expose port 7681 through the
+      app-preview tunnel (the browser_preview tool), from the repository root:
+      mkdir -p logs && setsid browser-terminal > logs/browser-terminal.log 2>&1 &
+      It serves ttyd with herdr as the entrypoint. Start it on demand only: it is
+      writable and unauthenticated behind the tunnel. The xterm.js font list is
+      set in the wrapper because the browser renders glyphs with the user's own
+      fonts, not this VM's.
   - name: notes
     contents: |
       Run everything through `direnv exec . <cmd>` (or `nix develop -c`): just/prek/bun exist only in the devshell.

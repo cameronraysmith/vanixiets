@@ -27,7 +27,7 @@
     # under missingkey=error. So the target is the checkout-independent
     # `owner/repo#N` form tuicr accepts (src/app/init.rs).
     #
-    # `htab` (modules/home/ai/herdr) is the herdr analogue of `tmux new-window`:
+    # `htab` (modules/home/herdr) is the herdr analogue of `tmux new-window`:
     # it creates the tab, runs the command in it over the socket, and exits, so
     # gh-dash's tea.ExecProcess resumes immediately. The command runs under
     # `$SHELL -c` (internal/shell/shell.go), so it stays free of substitutions
