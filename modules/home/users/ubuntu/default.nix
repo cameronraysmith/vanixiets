@@ -38,6 +38,14 @@ let
       # Linux, and the sandbox has no systemd user manager to run it.
       services.ssh-agent.enable = lib.mkForce false;
 
+      # The sandbox image ships only the C.UTF-8 locale, so core's en_US.UTF-8
+      # would make every shell warn from hm-session-vars.sh.
+      home.sessionVariables = {
+        LANG = lib.mkForce "C.UTF-8";
+        LC_ALL = lib.mkForce "C.UTF-8";
+        LC_CTYPE = lib.mkForce "C.UTF-8";
+      };
+
       # The sandbox runs standalone home-manager with no session bus and no
       # systemd user manager, so sops-nix's user unit never starts and its
       # secrets would never be installed.
