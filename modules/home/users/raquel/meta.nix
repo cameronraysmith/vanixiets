@@ -19,8 +19,8 @@
       database
       development
       languages
-      packages
       publishing
+      security
       shell
       terminal
       tools

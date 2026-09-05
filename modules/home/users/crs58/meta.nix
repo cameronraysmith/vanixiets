@@ -22,8 +22,8 @@
       development
       herdr
       languages
-      packages
       publishing
+      security
       shell
       terminal
       tools
