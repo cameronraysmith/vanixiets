@@ -38,6 +38,8 @@ For production deployment:
 | Testing | [workflows/06-testing.md](workflows/06-testing.md) | Chainsaw integration tests and CI workflow |
 | ADR-001 | [decisions/ADR-001-local-dev-architecture.md](decisions/ADR-001-local-dev-architecture.md) | Local development architecture decision |
 | ADR-007 | [decisions/ADR-007-nixos-vm-tests-for-k3s.md](decisions/ADR-007-nixos-vm-tests-for-k3s.md) | NixOS VM tests for the k3s substrate and platform stack (proposed) |
+| ADR-008 | [decisions/ADR-008-reconciler-and-artifact-transport.md](decisions/ADR-008-reconciler-and-artifact-transport.md) | Flux reconciler, OCI artifact transport, and image producers (proposed) |
+| ADR-009 | [decisions/ADR-009-capi-node-management-and-networking.md](decisions/ADR-009-capi-node-management-and-networking.md) | Cluster API node management, multi-cloud seam, and networking (proposed) |
 
 ## Architecture overview
 
@@ -85,6 +87,8 @@ See [reference architecture](architecture/reference-architecture.md) for the com
 - [ADR-001: Local development architecture](decisions/ADR-001-local-dev-architecture.md) - Original local development architecture (historical)
 - [ADR-005: Local cluster architecture revision](decisions/ADR-005-local-cluster-architecture-revision.md) - k3d + ctlptl via OrbStack (current approach)
 - [ADR-007: NixOS VM tests for k3s](decisions/ADR-007-nixos-vm-tests-for-k3s.md) - Proposed migration of the k3d CI workflow to NixOS VM tests and pure checks
+- [ADR-008: Reconciler and artifact transport](decisions/ADR-008-reconciler-and-artifact-transport.md) - Flux from a digest-pinned OCI artifact; reverses ADR-006
+- [ADR-009: CAPI node management and networking](decisions/ADR-009-capi-node-management-and-networking.md) - cluster-api-k3s + CAPH nodes, typed platform seam, Clan WireGuard admin plane
 
 ## Key commands quick reference
 
