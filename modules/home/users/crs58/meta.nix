@@ -23,6 +23,7 @@
       herdr
       languages
       packages
+      publishing
       shell
       terminal
       tools

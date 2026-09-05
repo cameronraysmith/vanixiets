@@ -20,6 +20,7 @@
       development
       languages
       packages
+      publishing
       shell
       terminal
       tools

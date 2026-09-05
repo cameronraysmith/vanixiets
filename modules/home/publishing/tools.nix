@@ -1,10 +1,9 @@
 { ... }:
 {
-  flake.modules.homeManager.packages =
+  flake.modules.homeManager.publishing =
     { pkgs, ... }:
     {
       home.packages = with pkgs; [
-        # publishing
         asciinema
         asciinema-agg
         exiftool
