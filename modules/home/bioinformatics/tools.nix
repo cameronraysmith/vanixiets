@@ -1,10 +1,9 @@
 { ... }:
 {
-  flake.modules.homeManager.packages =
+  flake.modules.homeManager.bioinformatics =
     { pkgs, ... }:
     {
       home.packages = with pkgs; [
-        # bioinformatics
         minimap2
         star
         xsra

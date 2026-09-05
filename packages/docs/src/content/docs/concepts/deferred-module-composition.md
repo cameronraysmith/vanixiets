@@ -243,13 +243,18 @@ Machine configurations import aggregates by referencing the auto-merged namespac
     flakeModulesHome.base-sops
     # Import aggregate modules for crs58
     # All aggregates via auto-merge
-    flakeModulesHome.ai          # All files from modules/home/ai/*
-    flakeModulesHome.core        # All files from modules/home/core/*
-    flakeModulesHome.development # All files from modules/home/development/*
-    flakeModulesHome.packages    # All files from modules/home/packages/*
-    flakeModulesHome.shell       # All files from modules/home/shell/*
-    flakeModulesHome.terminal    # All files from modules/home/terminal/*
-    flakeModulesHome.tools       # All files from modules/home/tools/*
+    flakeModulesHome.ai             # All files from modules/home/ai/*
+    flakeModulesHome.bioinformatics # All files from modules/home/bioinformatics/*
+    flakeModulesHome.compute        # All files from modules/home/compute/*
+    flakeModulesHome.core           # All files from modules/home/core/*
+    flakeModulesHome.database       # All files from modules/home/database/*
+    flakeModulesHome.development    # All files from modules/home/development/*
+    flakeModulesHome.languages      # All files from modules/home/languages/*
+    flakeModulesHome.publishing     # All files from modules/home/publishing/*
+    flakeModulesHome.security       # All files from modules/home/security/*
+    flakeModulesHome.shell          # All files from modules/home/shell/*
+    flakeModulesHome.terminal       # All files from modules/home/terminal/*
+    flakeModulesHome.tools          # All files from modules/home/tools/*
   ];
 }
 ```

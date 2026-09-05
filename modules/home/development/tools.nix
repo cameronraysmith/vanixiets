@@ -1,6 +1,6 @@
 { ... }:
 {
-  flake.modules.homeManager.packages =
+  flake.modules.homeManager.development =
     {
       pkgs,
       lib,
@@ -8,23 +8,12 @@
       ...
     }:
     let
-      python = pkgs.python3.withPackages (
-        ps: with ps; [
-          duckdb
-          huggingface-hub
-          pip
-          trafilatura
-        ]
-      );
       dvcWithOptionalRemotes = pkgs.dvc.override {
         enableGoogle = true;
         enableAWS = true;
         enableAzure = true;
         enableSSH = true;
       };
-      # scala - pin sbt to specific JDK
-      jdk = pkgs.temurin-bin-21;
-      sbtWithJdk = pkgs.sbt.override { jre = jdk; };
       # gitmux wrapper: in jj-colocated repos, redirect gitmux's git calls onto a reused
       # per-repo shadow index so `git diff --shortstat` never rewrites .git/index and races
       # jj's colocated export. Fixed reused path overwritten via reflink-clone => no rm/trap/mktemp.
@@ -61,21 +50,6 @@
       home.packages =
         with pkgs;
         [
-          # nix dev
-          cachix
-          deadnix
-          nil
-          nix-eval-jobs
-          nix-info
-          nix-output-monitor
-          nix-prefetch-scripts
-          nix-update
-          nixd
-          nixfmt
-          nixpkgs-reviewFull
-          statix
-
-          # dev
           act
           bazelisk
           bazel-buildtools
@@ -118,61 +92,6 @@
           tree-sitter
           jaq
           yq
-
-          # Note: for quick experiments with different versions
-          # of language toolchains, use proto as a dynamic version manager
-          # versus a reproducible language-specific flake.
-          # Versions installed below will be latest stable from nixpkgs.
-
-          # rust
-          dioxus-cli
-          rustup
-
-          # typescript
-          bun
-          nodejs_22
-          pnpm
-          tailwindcss_4
-          yarn-berry
-
-          # go
-          go
-
-          # scala
-          sbtWithJdk
-
-          # python
-          # Disabled: dotnet-sdk requires Swift which has not been cached on
-          # Hydra for aarch64-darwin since Dec 30, 2025. Monitor build status:
-          #   https://hydra.nixos.org/job/nixpkgs/trunk/swiftPackages.swift.aarch64-darwin
-          #   https://hydra.nixos.org/job/nixpkgs/trunk/dotnet-sdk.aarch64-darwin
-          # dotnet-sdk_8 # for fable transpiler
-          pixi
-          poethepoet
-          pydeps
-          pylint
-          pyright
-          python
-          ruff
-          uv
-
-          # haskell
-          ghc
-          cabal-install
-
-          # ocaml
-          ocaml
-          dune_3
-          opam
-
-          # elixir
-          beamPackages.elixir
-          beamPackages.elixir-ls
-
-          # dependently typed / proof assistants
-          idris2
-          idris2Packages.idris2Lsp
-          rocq-core
         ]
         # backlog-md disabled: auto-patchelf fails on rosetta-builder (elftools issue)
         # ++ lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [

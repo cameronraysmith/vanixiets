@@ -13,9 +13,14 @@
     };
     aggregates = with config.flake.modules.homeManager; [
       base-sops
+      bioinformatics
+      compute
       core
+      database
       development
-      packages
+      languages
+      publishing
+      security
       shell
       terminal
       tools

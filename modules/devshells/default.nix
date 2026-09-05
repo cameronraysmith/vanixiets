@@ -9,7 +9,7 @@
       ...
     }:
     let
-      # Match the home-manager python environment from development-packages.nix.
+      # Match the home-manager python environment from modules/home/languages/python.nix.
       # duckdb routes to nixpkgs' python3Packages.duckdb here because the
       # perSystem pkgs overlay does not include customPackages from compose.nix.
       # The local duckdb/python-duckdb pair lives in pkgs/by-name/ with the

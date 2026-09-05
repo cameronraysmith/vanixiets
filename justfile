@@ -278,6 +278,20 @@ check:
   echo "Running nix flake check..."
   {{nix_cmd}} flake check -L --show-trace
 
+# Regenerate the current system's entries (or SYSTEM's, given a builder that can realise them) in the golden pinned by structure-home-package-names
+[group('nix')]
+home-package-names-golden system="":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  system="{{system}}"
+  [ -n "$system" ] || system=$(nix eval --impure --raw --expr builtins.currentSystem)
+  golden=modules/checks/structure/home-package-names.json
+  trap 'rm -f "$golden.tmp"' EXIT
+  {{nix_cmd}} eval --json .#lib.homePackageNames --apply "f: f \"$system\"" \
+    | jq --sort-keys --slurp --arg system "$system" \
+        '(.[0] | with_entries(select(.key | endswith("@" + $system) | not))) + .[1]' "$golden" - > "$golden.tmp"
+  mv "$golden.tmp" "$golden"
+
 # Validate flake checks via nix-fast-build (failure isolation, parallel eval+build, nom output)
 # --eval-workers 4: reduces SQLite eval-cache contention (harmless but noisy at default=ncpus)
 # nom=auto|on|off: auto disables nom when stdout is not a TTY (e.g., piped to tee)

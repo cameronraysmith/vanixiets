@@ -171,7 +171,7 @@
       };
 
       config = lib.mkIf cfg.enable {
-        # The OpenSpec CLI. Owned here (not development-packages) now that a module
+        # The OpenSpec CLI. Owned here (not development/tools.nix) now that a module
         # exists; null disables installing it.
         home.packages = lib.mkIf (cfg.package != null) [ cfg.package ];
 

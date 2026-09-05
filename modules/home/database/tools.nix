@@ -1,10 +1,9 @@
 { ... }:
 {
-  flake.modules.homeManager.packages =
+  flake.modules.homeManager.database =
     { pkgs, ... }:
     {
       home.packages = with pkgs; [
-        # db
         datafusion-cli
         duckdb
         turso

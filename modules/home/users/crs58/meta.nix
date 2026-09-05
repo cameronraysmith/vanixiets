@@ -15,10 +15,15 @@
     aggregates = with config.flake.modules.homeManager; [
       base-sops
       ai
+      bioinformatics
+      compute
       core
+      database
       development
       herdr
-      packages
+      languages
+      publishing
+      security
       shell
       terminal
       tools

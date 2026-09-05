@@ -410,7 +410,7 @@
                 };
 
                 # Voice extra (faster-whisper STT + sounddevice) native runtime
-                # deps, scoped to the service (NOT modules/home/packages): this is
+                # deps, scoped to the service (NOT a home-manager aggregate): this is
                 # a SYSTEM unit and does not inherit the user's home-manager
                 # profile. ffmpeg-headless backs faster-whisper's audio-decode
                 # subprocess (headless = same codecs, no X11/SDL). portaudio is a

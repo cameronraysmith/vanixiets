@@ -1,12 +1,11 @@
 { ... }:
 {
-  flake.modules.homeManager.packages =
+  flake.modules.homeManager.security =
     { pkgs, lib, ... }:
     {
       home.packages =
         with pkgs;
         [
-          # sec
           age
           aws-vault
           bitwarden-cli

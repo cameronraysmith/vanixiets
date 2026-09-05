@@ -318,8 +318,8 @@ duckdb -c "SELECT * FROM 'large.parquet' WHERE condition"
 ## Tool availability
 
 Both tools are available in the nix configuration:
-- `duckdb` via `database-packages.nix`
-- `jaq` via `development-packages.nix`
+- `duckdb` via `database/tools.nix`
+- `jaq` via `development/tools.nix`
 - `jq` via `programs.jq.enable` (jaq is drop-in compatible)
 
 jaq uses identical syntax to jq but runs 5-10x faster.

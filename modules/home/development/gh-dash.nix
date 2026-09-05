@@ -1,5 +1,5 @@
 # gh-dash, a GitHub dashboard TUI. Enabling the home-manager module rather than
-# listing the package in modules/home/packages/development-packages.nix
+# listing the package in modules/home/development/tools.nix
 # nix-manages $XDG_CONFIG_HOME/gh-dash/config.yml — until now gh-dash's own
 # default dump, written by createConfigFileIfMissing on first run — and registers
 # gh-dash as a `gh` extension. Keys left unset stay at gh-dash's compiled-in
