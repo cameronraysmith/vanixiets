@@ -278,8 +278,7 @@ check:
   echo "Running nix flake check..."
   {{nix_cmd}} flake check -L --show-trace
 
-# Regenerate one system's entries in the golden that structure-home-package-names pins
-# (defaults to the current system; other systems need a builder that can realise them)
+# Regenerate the current system's entries (or SYSTEM's, given a builder that can realise them) in the golden pinned by structure-home-package-names
 [group('nix')]
 home-package-names-golden system="":
   #!/usr/bin/env bash
@@ -289,7 +288,8 @@ home-package-names-golden system="":
   golden=modules/checks/structure/home-package-names.json
   trap 'rm -f "$golden.tmp"' EXIT
   {{nix_cmd}} eval --json .#lib.homePackageNames --apply "f: f \"$system\"" \
-    | jq --sort-keys --slurp '.[0] + .[1]' "$golden" - > "$golden.tmp"
+    | jq --sort-keys --slurp --arg system "$system" \
+        '(.[0] | with_entries(select(.key | endswith("@" + $system) | not))) + .[1]' "$golden" - > "$golden.tmp"
   mv "$golden.tmp" "$golden"
 
 # Validate flake checks via nix-fast-build (failure isolation, parallel eval+build, nom output)
