@@ -15,6 +15,7 @@
     aggregates = with config.flake.modules.homeManager; [
       base-sops
       ai
+      bioinformatics
       compute
       core
       database
