@@ -15,6 +15,7 @@
     aggregates = with config.flake.modules.homeManager; [
       base-sops
       ai
+      compute
       core
       development
       herdr

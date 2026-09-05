@@ -13,6 +13,7 @@
     };
     aggregates = with config.flake.modules.homeManager; [
       base-sops
+      compute
       core
       development
       languages

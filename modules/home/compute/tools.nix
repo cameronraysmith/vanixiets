@@ -1,6 +1,6 @@
 { ... }:
 {
-  flake.modules.homeManager.packages =
+  flake.modules.homeManager.compute =
     { pkgs, flake, ... }:
     let
       # nix2container's patched skopeo with nix: transport for container manifest operations
@@ -9,7 +9,6 @@
     in
     {
       home.packages = with pkgs; [
-        # compute
         argo-workflows
         argocd
         argocd-autopilot
