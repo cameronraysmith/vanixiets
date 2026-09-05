@@ -7,7 +7,10 @@
 # version nixpkgs currently ships, so a flake update leaves it valid.
 # Only the current system's configurations are evaluated here; the golden holds
 # every system's entries and `just home-package-names-golden` regenerates the
-# current system's.
+# current system's while keeping the others. Entries for another system are
+# produced on a host of that system (some configurations import from
+# derivations only that platform can realise); a configuration for this system
+# with no golden entry fails the diff rather than being skipped.
 { self, lib, ... }:
 let
   golden = builtins.fromJSON (builtins.readFile ./home-package-names.json);
