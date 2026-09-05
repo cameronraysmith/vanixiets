@@ -9,6 +9,12 @@ produced. Answers fixed by the brief are marked `[given]`; answers taken from re
 evidence are marked `[decided]`, with the evidence in ADR-007 cited by section; answers
 that require the human are marked `[open]` and appear as D-codes in the ADR and as
 Open Questions in design.md.
+
+Second pass (2026-09-04): the human resolved the open questions and the wider design space
+in a design review recorded in four notes (k3s-nixkube-decisions, k8s-architecture-current-
+vs-nixified, oci-caph-timoni-decisions, cross-cloud-node-management). Answers taken from
+those notes are marked `[reviewed]`; the original Q1-Q10 entries are kept as history and
+annotated where superseded.
 -->
 
 # Background
@@ -85,15 +91,63 @@ Stage 4 begins with a manually dispatched job on `ubuntu-latest` that grants `/d
 Only a repeatedly passing probe promotes the VM leaves into the workflow; a failing probe routes to D-C1.
 Evidence: ADR-007 F3, Q6.
 
-## Q9 [decided]: is a VM-specific nixidy environment required?
+## Q9 [decided, superseded by Q11]: is a VM-specific nixidy environment required?
 
-Yes, pending D-P2.
-Three things differ from `local-k3d-ci`: the hostnames embed the VM node address rather than `192.168.100.3`; CoreDNS must answer the `sslip.io` names itself instead of forwarding to `1.1.1.1`; `SopsSecret` payloads are encrypted to the test key.
-Evidence: ADR-007 Q4 B3, Q5.
+Originally yes, pending D-P2.
+Superseded: nixidy is retired; the VM variant is a `target` of the easykubenix cluster module (design D9).
 
-## Q10 [open]: which decisions must the human take before stage 1?
+## Q10 [resolved]: which decisions must the human take before stage 1?
 
-D-S1 whether fleet k3s nodes import `base`; D-S2 whether a shared `k3s-token` generator is the production token path; D-P1 how production assigns Gateway LoadBalancer addresses; D-P2 whether a `local-vm` nixidy environment is acceptable; D-C1 the fallback runner if the `ubuntu-latest` probe fails; D-C2 whether `kubernetes/clusters/local-k3d/` survives for Darwin developers; D-M1 whether the inert containerd block is fixed before stage 1 or exposed by it.
+All seven were answered in the design review: D-S1 yes (`base` is imported); D-S2 not now (store-path token; production paths are named by the bootstrap seam, ADR-009 D9.8); D-P1 Cilium LB-IPAM; D-P2 superseded by easykubenix-only; D-C1 developer-KVM-only until a runner exists; D-C2 `local-k3d/` survives as management handler B; D-M1 re-scoped to delete the dead block and use `containerdConfigTemplate` only if NRI proves disabled.
+
+## Q11 [reviewed]: which reconciler and which manifest framework?
+
+Flux consuming a digest-pinned OCI artifact, bootstrapped from `services.k3s.manifests`; easykubenix is the only rendering framework, nixidy and the Phase-3/4 adoption split are retired, ADR-006 is reversed.
+ArgoCD needs a git source and cannot pin by digest; Flux installs offline from `pkgs.fluxcd` and verifies signatures with a key from the closure.
+Evidence: ADR-008 F8.1, D8.1, D8.10.
+
+## Q12 [reviewed]: how are images and configuration packaged?
+
+By consumer: `nix-snapshotter.buildImage` for Nix-native workloads on `nix`-snapshotter nodes; nix2container for portable images; a Nix derivation emitting an OCI image layout for Flux configuration, digest known in the sandbox, pushed by an `apps` effect that asserts digest equality.
+Tags are the flake revision and are aliases only; every consumer uses a digest or a store path.
+Evidence: ADR-008 F8.2, D8.4, D8.5, D8.7.
+
+## Q13 [reviewed]: how does the VM leaf obtain the Flux artifact without a network?
+
+An in-guest registry seeded from the store-resident OCI layout, as nix-snapshotter's push-and-pull test does; images are preloaded through `services.k3s.images` and never traverse the registry.
+Evidence: ADR-008 F8.3, D8.6.
+
+## Q14 [reviewed]: which container snapshotter?
+
+k3s's embedded `--snapshotter nix` (nix-snapshotter is vendored in k3s); the production module gains `k3s-server.snapshotter` defaulting to `"nix"`; nixkube is not a flake input; runtime `flakeRef`/`nixExpr` are forbidden and rejected by the S0 purity leaf.
+NRI behaviour is asserted in the substrate leaf, not assumed.
+Evidence: ADR-007 F6, D7.1, D7.2, D7.8.
+
+## Q15 [reviewed]: who manages nodes?
+
+Cluster API with cluster-api-k3s and CAPH from day one; Terranix is only the seed/management-host provisioner (the interim Terranix-as-node-manager position is reversed).
+Remote nodes boot a NixOS Hetzner snapshot labelled by flake revision in `airGapped` mode; a Nix-written `/opt/install.sh` shim starts `k3s.service` from `services.k3s.configPath`; no kubeadm.
+The management cluster is a capability with two handlers (NixOS QEMU VM; k3d via ctlptl) behind one contract.
+Evidence: ADR-009 F9.1–F9.4, D9.1–D9.7.
+
+## Q16 [reviewed]: how is multi-cloud declared?
+
+One easykubenix cluster module: cloud-invariant core plus a `platform` sum over `hetzner | gcp | aws | kubevirt` that alone owns `*Cluster`, `*MachineTemplate`, node image, CCM, optional CSI; unhandled provider is an evaluation error; a per-cloud CCM is mandatory because cluster-api-k3s defaults `cloud-provider=external`.
+Evidence: ADR-009 D9.10, D9.11.
+
+## Q17 [reviewed]: how are the networks arranged?
+
+ZeroTier untouched and k8s nodes never join it; a dedicated Clan `wireguard` instance is the admin plane (API server, SSH, deploys, ClusterMesh API reachability, node join); Cilium WireGuard is the dataplane directly between node IPs with UDP 51871 allowlisted; cross-cloud is ClusterMesh between per-cloud clusters with disjoint PodCIDRs and never stretched etcd; no Crossplane, no Anthos.
+Evidence: ADR-009 F9.6, F9.7, D9.12–D9.14.
+
+## Q18 [reviewed]: how many stages?
+
+Six: S0 purity/provenance (KVM-free), S1 substrate and snapshotter leaves, S2 `vm-k3s-platform`, S3 management handlers and the NoCloud-seeded bootstrap leaf, S4 two Hetzner nodes on explicit spend approval, S5 gcp/aws render-only variants.
+Evidence: ADR-007 Q6.
+
+## Q19 [open]: ambiguities found while folding the review in
+
+Listed as A1–A9 in design.md Open Questions with recommendations; A9 (S4 spend) is never adopted by silence.
 
 # Design trade-offs recorded
 
@@ -101,3 +155,6 @@ D-S1 whether fleet k3s nodes import `base`; D-S2 whether a shared `k3s-token` ge
 - The O-a `NotReady` assertion is narrow by intent (reason and message), accepting brittleness against kubelet message wording in exchange for non-vacuity.
 - The single platform leaf trades granular failure attribution for one envelope and one image closure; Chainsaw's own step names recover most of the attribution.
 - Store-path tokens are world-readable in the store; acceptable only because the value authorizes nothing outside the sandbox, and stated as such.
+- The `platform` sum is declared from day one but only `hetzner` executes; the render-only `gcp`/`aws` variants buy a stable seam at the cost of untested runtime differences until a second cloud is deployed.
+- Delivering the root `OCIRepository` digest through `KThreesConfig.spec.files` keeps configuration changes off the snapshot at the cost of a control-plane machine rollout per digest bump (design A1).
+- Keyed cosign is chosen over keyless because verification must work in a sandbox without Fulcio or Rekor; key rotation becomes a Clan vars concern.
