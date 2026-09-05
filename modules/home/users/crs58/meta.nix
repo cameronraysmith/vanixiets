@@ -17,6 +17,7 @@
       ai
       compute
       core
+      database
       development
       herdr
       languages

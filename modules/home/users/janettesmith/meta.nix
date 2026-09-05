@@ -15,6 +15,7 @@
       base-sops
       compute
       core
+      database
       development
       languages
       packages
