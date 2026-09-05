@@ -9,4 +9,4 @@ Do not assume that pattern holds for every entry without checking its own packag
 `git-repo-manager`'s move landed in a commit titled `fix(pkgs): disable git-repo-manager` with no further explanation recorded, so its status is unverified rather than confirmed working.
 
 Restore an entry with `mv pkgs/disabled/<name> pkgs/by-name/<name>`.
-Check the entry's move commit first: several also need a commented-out or removed consumer reinstated elsewhere in `modules/` (for example `modules/home/packages/development-packages.nix`), and restoring the package alone does not bring that consumer back.
+Check the entry's move commit first: several also need a commented-out or removed consumer reinstated elsewhere in `modules/` (for example `modules/home/development/tools.nix`), and restoring the package alone does not bring that consumer back.

@@ -38,9 +38,12 @@ An untracked file is invisible to `nix flake check`, so run `git add` before eva
 
 A user's evaluated package set is a contract for that user.
 Moving a declaration between files must not change `home.packages` for any user unless the change is the point.
-`checks.structure-home-package-names` (`modules/checks/structure/home-package-names.nix`) pins the sorted package names of every `homeConfigurations` entry on the current system to `modules/checks/structure/home-package-names.json`, so such a move fails `nix flake check` unless the golden changes in the same commit.
-`just home-package-names-golden` regenerates the current system's entries and leaves the other systems' entries in place.
-Entries for another system are produced on a host of that system, because some configurations import from derivations that only a builder for that platform can realise; a configuration whose system matches the host but has no golden entry fails the check rather than being skipped.
+`checks.structure-home-package-names` (`modules/checks/structure/home-package-names.nix`) pins the sorted package names of every `homeConfigurations` entry on the current system to the golden file `modules/checks/structure/home-package-names.json`, so such a move fails `nix flake check` unless that file changes in the same commit.
+`just home-package-names-golden` evaluates every configuration for one system, the current one by default, and replaces that system's entries in the golden while leaving the other systems' entries in place.
+A configuration that imports from a derivation can only be evaluated by a host that can realise it, so its entry is produced on such a host; today this is `crs58` and `cameron` on aarch64-darwin and aarch64-linux, through `apm-skills-compose` in the `ai` aggregate.
+A configuration for the current system with no golden entry fails the check rather than being skipped.
+
+The `<aggregate>/tools.nix` files hold raw packages that no home-manager module owns yet; they are split into per-program files as modules are adopted.
 
 `users/ubuntu` is the profile activated inside a Devin sandbox VM, which has no systemd user manager and no AI secrets.
 Modules that start user services or read sops secrets fail there and must be overridable as described above.
@@ -51,14 +54,18 @@ Modules that start user services or read sops secrets fail there and must be ove
 direnv exec . nix flake check --accept-flake-config
 direnv exec . nix build --accept-flake-config .#checks.x86_64-linux.structure-home-package-names
 direnv exec . just home-package-names-golden
+direnv exec . nix eval --accept-flake-config --json .#lib.homePackageNames --apply 'f: (f "aarch64-darwin")."tara@aarch64-darwin"'
 direnv exec . nix eval --accept-flake-config --json '.#homeConfigurations."crs58@x86_64-linux".config.home.packages' --apply 'ps: builtins.sort builtins.lessThan (map (p: p.name) ps)'
 direnv exec . nix build --accept-flake-config '.#homeConfigurations."ubuntu@x86_64-linux".activationPackage'
 ```
 
 The first is the closure operator every change must pass.
-The second is the per-user package contract on this host; it fails on any added or removed name until the third refreshes the golden's entries for this host's system, and a reviewer reads the golden diff as the intended delta.
-The fourth shows one user's versioned package names; compare it against the base branch when a change claims to be a relocation.
-The fifth builds the sandbox profile that the Devin snapshot activates.
+The second is the per-user package contract on this host; it fails on any added or removed name until the third refreshes the golden's entries for this host's system.
+A reviewer reads the golden diff as the intended delta.
+The fourth produces one entry for another system from a host that can evaluate that configuration.
+The eight aarch64 entries in the golden were produced this way on an x86_64-linux host, one configuration at a time, and merged into the golden by hand.
+The fifth shows one user's versioned package names; compare it against the base branch when a change claims to be a relocation.
+The sixth builds the sandbox profile that the Devin snapshot activates.
 
 ## Children
 
@@ -70,7 +77,8 @@ The fifth builds the sandbox profile that the Devin snapshot activates.
 - `database/` — database engines and clients (PostgreSQL, SQLite, DuckDB, DataFusion, Turso, Supabase).
 - `development/` — editors (LazyVim neovim, helix), version control (git, jujutsu, radicle), terminal emulators (ghostty), general and Nix development tools, and their configuration.
 - `herdr/` — the herdr terminal multiplexer and `browser-terminal`, its ttyd front end for the sandbox; secret-free.
-- `languages/` — one file per language toolchain (Rust, TypeScript, Go, Scala, Python, Haskell, OCaml, Elixir, proof assistants) at the latest stable version nixpkgs ships; for quick experiments with other versions, use proto as a dynamic version manager or a reproducible language-specific flake instead of editing these files.
+- `languages/` — one file per language toolchain (Rust, TypeScript, Go, Scala, Python, Haskell, OCaml, Elixir, proof assistants) at the latest stable version nixpkgs ships.
+  For quick experiments with other versions, use proto as a dynamic version manager or a reproducible language-specific flake instead of editing these files.
 - `modules/` — option-declaring home-manager modules consumed by aggregates (`agents-md`).
 - `publishing/` — document and media production (Quarto, ImageMagick, PDF tools, SVG tools, mermaid, asciinema).
 - `security/` — secrets and key handling (age, sops, ssh-to-age, Bitwarden CLI, YubiKey, gitleaks, aws-vault).
