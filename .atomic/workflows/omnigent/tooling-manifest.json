@@ -1,0 +1,23 @@
+{
+  "version": "0.13.0",
+  "upstreamRevision": "eebef804e1fe4beddc61ea232b951cddddd7f890",
+  "runner": {
+    "gh": "runner/github_resource.py:111,145-163; host/connect.py:2981-2982",
+    "git": "runner/github_resource.py:136-137; host/git_worktree.py:111-120",
+    "tmux": "harnesses/codex_native/process_registry.py:393-421",
+    "ps": "runner/native/orchestration.py:4013-4017; harnesses/codex_native/process_registry.py:454-455",
+    "lsof": "runner/_entry.py:1356,1501; runtime/harnesses/process_manager.py:1645-1650",
+    "bash": "_platform.py:207-211",
+    "sh": "_platform.py:207-211",
+    "python3": "runner/environment_filesystem.py:583,738,965,1151,1183"
+  },
+  "server": {
+    "lsof": "server/app.py:1347-1348; runtime/harnesses/process_manager.py:1645-1650"
+  },
+  "excluded": {
+    "curl/npm vendor installers": "Optional imperative UI installation is unsupported; onboarding/harness_install.py:174-183,979-1000.",
+    "optional harness and shell catalog": "Only configured harnesses are supported; onboarding/harness_install.py:872-897; _platform.py:249-270.",
+    "Kubernetes/Microsandbox CLIs": "SDK or guest execution, not supported host argv; onboarding/sandboxes/kubernetes.py:1191; microsandbox.py:31-35,1089."
+  },
+  "upgradeReview": "Re-audit subprocess/probe literals, helper callers and shell strings at every package-version change; update this revision and classify added call sites. This is a reviewed manifest, not exhaustive call-graph inference."
+}
