@@ -373,6 +373,8 @@ in
       # database, which is exactly what GNOME Settings did on 2026-09-08
       # (logs/pyrite-graphical-session-idle-evidence.md §5). idle-delay stays 1800: the panel
       # must still blank and lock at 30 minutes; only suspend is disabled.
+      # gsd-media-keys intercepts the power key with a block inhibitor, bypassing
+      # logind's HandlePowerKey; GNOME needs its own power-button-action = "nothing".
       #
       # settings carries no locks attribute, deliberately: locking these keys would grey
       # out the matching GNOME Settings controls, and a change made there has to win over
@@ -390,6 +392,7 @@ in
           settings = {
             "org/gnome/desktop/session".idle-delay = lib.gvariant.mkUint32 1800;
             "org/gnome/settings-daemon/plugins/power" = {
+              power-button-action = "nothing";
               sleep-inactive-ac-timeout = lib.gvariant.mkInt32 0;
               sleep-inactive-battery-timeout = lib.gvariant.mkInt32 0;
               sleep-inactive-ac-type = "nothing";

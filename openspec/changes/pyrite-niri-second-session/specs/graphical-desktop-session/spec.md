@@ -69,7 +69,7 @@ A person's own choice SHALL persist across logins for that person alone, and SHA
 
 A desktop newly offered at this host's login screen SHALL NOT cause the host to enter a suspended state on account of inactivity alone, whether the host is running on mains power or on its battery.
 This SHALL be established for that desktop in its own right, and SHALL NOT be inferred from the fact that another desktop on the same host does not suspend it, because a property established for one desktop is a property of that desktop and not of the host.
-A person SHALL remain able to suspend the host deliberately from the newly offered desktop. An ordinary press and release of the physical control that is this host's only wake source (A13), while using that desktop, SHALL NOT suspend or power off the host. That control SHALL remain a wake source; preventing an accidental suspend SHALL NOT prevent a person from waking the host after a deliberate one.
+A person SHALL remain able to suspend the host deliberately from the newly offered desktop. An ordinary press and release of the physical control that is this host's only wake source (A13), while using either the newly offered desktop or the established GNOME desktop session, SHALL NOT suspend or power off the host. That control SHALL remain a wake source; preventing an accidental suspend SHALL NOT prevent a person from waking the host after a deliberate one.
 
 **Discharged by**: world assumption `A13 — Resuming this laptop from a suspended state is unreliable, and recovering a failed resume requires a person at the machine`. A13 is what makes an unattended suspend a cost rather than a convenience, and it applies to every desktop this host offers, not to the one it happened to be written about.
 
@@ -86,7 +86,7 @@ A person SHALL remain able to suspend the host deliberately from the newly offer
 
 #### Scenario: a person presses the host's only wake source while the host is awake
 
-- **WHEN** a person makes an ordinary press and release of the physical control that is this host's only wake source while using the newly offered desktop
+- **WHEN** a person makes an ordinary press and release of the physical control that is this host's only wake source while using either the newly offered desktop or the established GNOME desktop session
 - **THEN** the host neither suspends nor powers off, and the desktop remains usable
 - **AND** a person can still deliberately suspend the host from that desktop and use that same wake source afterwards, without any promise that this unreliable host will successfully resume
 

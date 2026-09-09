@@ -8,6 +8,8 @@
 
 Evidence attribution: **[inherited execution]** means the predecessor/ledger actually ran the cited command; **[verified here]** means this worker read the host or exact source; **[operator]** means physical observation supplied by the operator. Those are not interchangeable. No deployment, restart, reload, suspend, button test, source edit, writing git/jj command or `just lint` was performed here. First action was `pwd` → `/Users/crs58/projects/vanixiets`.
 
+**GNOME power-button amendment:** the no-source-edit statement above describes the original runtime verification pass. The follow-up edits only pyrite's dconf/comment and this change's tasks/design/delta/verification artifacts, evaluates and builds the fix, and leaves the verdict unchanged. New evidence is labelled **[amendment execution/source]** in §9.6; no deploy, restart, reload, suspend or physical press was performed by that worker.
+
 ## 1. Structural Validation (`openspec validate --all --json`)
 
 - [x] All items report `"valid": true`.
@@ -33,7 +35,7 @@ Exit 0. No failed structural item. **This checks Markdown structure and delta we
 
 ## 2. Task Completion (`tasks.md`)
 
-- [ ] All tasks complete — **23 checked / 9 unchecked**, 32 total including new task 6.5.
+- [ ] All tasks complete — **24 checked / 10 unchecked**, 34 total after GNOME amendment tasks 4.5 and 6.6. Historical runtime verification closed 23/32; only new evaluated task 4.5 is discharged by this amendment, not its deployment or physical tests.
 
 Five existing tasks were newly discharged: **4.1, 4.4, 6.3, 6.4, 8.8**; new **6.5** records the already-performed manual logind reload plus live verification. Prior 17 checked tasks retain the ledger's actual evaluation/build evidence, not claimed re-execution here.
 
@@ -50,13 +52,14 @@ Five existing tasks were newly discharged: **4.1, 4.4, 6.3, 6.4, 8.8**; new **6.
 |---|---|---|
 | 2.3 | `includes=[]`; explicitly vacuously satisfied, not exercised. Task itself forbids checking an empty-list branch. | No; no artificial include needed. |
 | 4.2 | No in-niri process/user-service/autostart snapshot. | Yes: D7 explicitly requires runtime evidence, not source absence. |
+| 6.6 (amendment) | New GNOME dconf value built/evaluated but not redeployed; GNOME session restart and effective `'nothing'` readback unperformed. | Yes: deploy alone does not refresh the existing daemon's store-backed dconf source. |
 | 8.1 | Niri login/terminal/exit observed; new interactive GNOME fallback login not observed. | Yes: both desktops/fallback must work. |
 | 8.2 | Session=niri persisted; no no-history GNOME login, next-login preselection/relogin, or post-selection restart comparison. | Yes for full scenario verification; persistence itself is no longer missing. |
 | 8.3 | Only 2min 33.945s interactive niri use; no 35-minute untouched AC interval. | Yes: independent inactivity guarantee unestablished. |
 | 8.4 | No battery idle window; task explicitly refuses configuration-only discharge. | Yes. |
 | 8.5 | No repeated GNOME and greeter idle windows for this deployment. | Open regression coverage; must be completed or explicitly dispositioned before full acceptance. |
 | 8.6 | No separately consented deliberate suspend/guard-unit/entry/wake observation. | Open explicit behavioral scenario; do not perform without separate risk consent. |
-| 8.7 | No ordinary power-key press test; wake unobserved. | Open explicit D9 behavioral scenario; live configuration is not a physical test. |
+| 8.7 | No protected ordinary-press test in either fresh GNOME or fresh niri; the supplied GNOME press used the unprotected configuration (§9.6). Wake unobserved. | Open amended D9 scenario in both desktops; live configuration is not a physical test. |
 
 ## 3. Delta Spec Sync State
 
@@ -74,8 +77,8 @@ CLI-resolved delta (`openspec status --change pyrite-niri-second-session --json`
 | D1/D4, additive niri and explicit null | 39–66, two choices; never-chosen GNOME; prior choice persists | Mechanism matches scenarios. **Not unconditional GNOME on every login.** §9.1. |
 | D3/D6, exact validator and immutable includes | 103–124 | Same niri store path plus positive/negative builds establish validation; includes are vacuous. |
 | D7, desktop-independent idle protection | 68–85 | Source reasoning and live logind agree; promised runtime absence-of-idle-manager and AC/battery observation remain missing. |
-| D9, paired power-key policy | 72,87–96 | Correct delivered config only became daemon policy after manual reload. New task 6.5 closes the operational omission; physical scenarios remain untested. |
-| D8, preserve GNOME/GDM power configuration | 81–85 | Actual baseline/evaluated-byte comparison passed; repeated behavioral windows not run. |
+| D9, paired policy plus GNOME amendment | 72,87–96 | Logind needed manual reload (6.5); new GNOME dconf requires session restart/readback (6.6). Task 8.7 remains open in both GNOME and niri. |
+| D8, preserve existing GNOME/GDM inactivity configuration | 81–85 | Historical baseline comparison passed; the amendment adds only GNOME's power-button key, preserving all existing settings. Repeated behavioral windows remain open. |
 | OQ2, portal sufficiency | Not a separate behavioral acceptance requirement | Installed/started backends verified, functional transactions not exercised; qualification and B-portal follow-up added. |
 
 Drift warnings: design's shorthand “still the default” needs the never-chosen qualification, now explicit; its migration prose does not mean no user state exists. The pin at former `design.md:121` and `tasks.md:7` was wrong and is corrected (§9.5). No acceptance requirement was rewritten to fit the observed smoke test. Bare compositor, no shell/locker, and no X11 support remain the declared slice boundary, not newly supplied features.
@@ -106,9 +109,9 @@ $ ls docs/superpowers/specs/*.md 2>/dev/null
 | 8.1 both interactive desktops | Niri operator smoke plus registered GNOME entry | No; observe interactive GNOME after choosing it at the cog. |
 | 8.2 never-chosen/relogin/restart memory | Pinned GDM source, persisted Session=niri, empty evaluated preStart | No; observe the remaining sequence without unauthorized state clearing. |
 | 8.3/8.4 niri AC/battery idle | Zero whole-boot suspend counts, 2m33.945s niri session | No; two untouched 35-minute intervals and continuity evidence. |
-| 8.5 GNOME/greeter regression | Byte-identical dconf against actual baseline | No; repeat required windows. |
+| 8.5 GNOME/greeter regression | Existing inactivity settings unchanged; power-button key newly added | No; repeat required windows. |
 | 8.6 deliberate suspend/wake | No blanket block in protected source; existing CAM-59 | No; only separately consented physically supervised test; resume failure remains known risk, not this change's promised fix. |
-| 8.7 ordinary key | Live ignore/ignore and built disabled niri handling | No; operator ordinary press, usability/SSH and scoped journal; no prolonged hold. |
+| 8.7 ordinary key in GNOME and niri | Live ignore/ignore, built disabled niri handling; new evaluated GNOME `'nothing'` | No; redeploy, restart GNOME (6.6), then operator ordinary press in each fresh desktop, usability/SSH and separate scoped journals; no prolonged hold. |
 
 Carry these into retrospective **Misses**, with these task IDs as follow-up references; no retrospective exists yet and none is claimed written. §7 recording itself is non-blocking. The overall incomplete-acceptance finding rests on the delta's explicit requirements to establish independent behavior and observe the working fallback, not on a rule that every optional dogfood gap automatically fails a change.
 
@@ -244,6 +247,24 @@ Root lock follows **`nixpkgs_9 → 85f62611fa3f3eacbcfe3bc7a6d6518b443ca442`**, 
 Do not redo or conflate prior output paths: ledger builds at immutable wip produced pure `7gb7…` and impure `l4is…`; actual deployed current generation is **najhrzgayg05kd8bzm5g7n8rj74b7f80**, corroborated by successful activation journal. Full derivation equality of these differing generations is not claimed. Relevant delivered niri binary remains **`/nix/store/y32xfvyx99qp91s2g3d2dr8wsx7k3gb0-niri-26.04/bin/niri`** and KDL is store-backed (runtime log 49–88), matching ledger validator identity.
 
 [inherited execution] niri opened IPC `/run/user/1000/niri.wayland-1.112705.sock`, consumed **1.020s CPU over 2min 33.945s wall time, 189.7M peak**, and exited after confirmation. The socket is a historical opening, not claimed still open. Whole-boot suspend counters were **0 / 0**, not proof of 35-minute niri AC/battery windows (runtime log 210–237). [operator] cog selection, Important Hotkeys overlay, Ghostty bind/command and clean return to GDM establish a usable bare-compositor smoke test, not a complete desktop assembly.
+
+### 9.6 GNOME power-button protection added; redeployment and both physical tests remain open
+
+**[operator/supplied evidence, not independently replayed]** At 21:16:36 UTC, `suspend requested from client PID 124058 ('.gsd-media-keys') (unit user@1000.service)` was followed by `PM: suspend entry (deep)` while the operator was in GNOME. That press used the configuration without GNOME protection and tested nothing about our niri/logind design. The prior ordinary-press requirement explicitly covered only the newly offered desktop; this is a genuine amendment to include the established GNOME desktop session, not a retrospective assertion that the old clause already covered it.
+
+**[inherited source, completed by amendment source]** gsd **50.1**, commit `ec681847221cf44e658363b9d8137b4cbae7b321`: [power schema:39–43](https://gitlab.gnome.org/GNOME/gnome-settings-daemon/-/blob/ec681847221cf44e658363b9d8137b4cbae7b321/data/org.gnome.settings-daemon.plugins.power.gschema.xml.in#L39-43) defaults to `'suspend'` and explicitly lists enum nick `'nothing'`. [Media-keys:2142](https://gitlab.gnome.org/GNOME/gnome-settings-daemon/-/blob/ec681847221cf44e658363b9d8137b4cbae7b321/plugins/media-keys/gsd-media-keys-manager.c#L2142) reads the enum; **:2174 dispatches**, while the `NOTHING` branch returns. [3430–3444](https://gitlab.gnome.org/GNOME/gnome-settings-daemon/-/blob/ec681847221cf44e658363b9d8137b4cbae7b321/plugins/media-keys/gsd-media-keys-manager.c#L3430-3444) requests the `handle-power-key` block inhibitor. [systemd v261.1 logind.conf:258–267](https://github.com/systemd/systemd/blob/v261.1/man/logind.conf.xml#L258-L267) says this makes `Handle*` settings irrelevant; GNOME dispatches its own suspend request. Full citations and patch audit: `logs/niri-slice-a-powerbutton-gnome-final.md`.
+
+**[amendment execution]** Added only `power-button-action = "nothing"` and the concise inhibitor rationale in pyrite's module. Resolved evaluation (exit 0, `logs/niri-powerbutton-after-dconf-20260909-193100.log`) returns:
+
+```json
+[{"lockAll":false,"locks":[],"settings":{"org/gnome/desktop/session":{"idle-delay":"@u 1800"},"org/gnome/settings-daemon/plugins/power":{"power-button-action":"nothing","sleep-inactive-ac-timeout":"0","sleep-inactive-ac-type":"nothing","sleep-inactive-battery-timeout":"0","sleep-inactive-battery-type":"nothing"}}}]
+```
+
+Five power keys plus idle-delay; no locks declaration, empty resolved locks, idle delay unchanged. Full toplevel `nix build .#nixosConfigurations.pyrite.config.system.build.toplevel --no-link` succeeded (exit 0) at `/nix/store/akq1sxw1bisvqhsbz5j5ik245zpky2xk-nixos-system-pyrite-26.11.20260804.85f6261`; first attempt timed out at 120 seconds, retry completed (`logs/niri-powerbutton-toplevel-build-retry-20260909-193307.log`). This is a shared-working-copy build, not a new deployed generation. Current strict validation and scoped-diff output are in `logs/niri-slice-a-powerbutton-gnome-final.md`.
+
+**[amendment source; runtime unverified]** Pinned nixpkgs [dconf.nix:96–105](https://github.com/NixOS/nixpkgs/blob/85f62611fa3f3eacbcfe3bc7a6d6518b443ca442/nixos/modules/programs/dconf.nix#L96-L105) writes a store-backed `file-db` after `user-db:user`. dconf **0.49.0** [engine creation:329](https://gitlab.gnome.org/GNOME/dconf/-/blob/0.49.0/engine/dconf-engine.c#L329) opens the profile, and [file source:29–49](https://gitlab.gnome.org/GNOME/dconf/-/blob/0.49.0/engine/dconf-engine-source-file.c#L29-49) has no bus and reopens only if no values were loaded. **This database change requires the GNOME session to restart after redeployment — logout/login, or an authorized display-manager restart — before existing `gsd-media-keys` observes it. A deploy alone is insufficient.** New task **6.6** requires fresh daemon identity plus effective `gsettings get … power-button-action` returning `'nothing'`, not merely a new CLI reading the right file. This is the third deploy/reload gate after display-manager **6.4** and logind **6.5**. User overrides intentionally win; no reset is authorized if readback differs.
+
+Task **8.7 must now be exercised in both GNOME and niri** after redeployment and the relevant restart/reload gates. Record an ordinary press/release, usability, reachability and neither suspend nor shutdown in each desktop's test window. No extra suspend or prolonged hold is authorized. All other outstanding acceptance gaps remain; the **FAIL — acceptance verification incomplete** verdict is unchanged.
 
 ## Overall Decision
 
