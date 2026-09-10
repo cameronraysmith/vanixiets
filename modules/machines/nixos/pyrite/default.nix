@@ -349,6 +349,7 @@ in
       services.desktopManager.gnome.enable = true;
 
       programs.niri.enable = true;
+      security.pam.services.dankshell = { };
 
       # Explicit null beats niri.nix's mkDefault "niri"; the option default does not.
       # "gnome" would also rewrite every user's saved AccountsService session on each
@@ -433,7 +434,10 @@ in
       # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) are provided by
       # the cameron inventory service.
       home-manager.users.cameron = {
-        imports = flakeUsers.cameron.modules ++ [ flakeHomeModules.niri ];
+        imports = flakeUsers.cameron.modules ++ [
+          flakeHomeModules.niri
+          flakeHomeModules.dms
+        ];
         # Validate with the exact derivation installed by nixpkgs' NixOS module.
         programs.niri.package = config.programs.niri.package;
       };

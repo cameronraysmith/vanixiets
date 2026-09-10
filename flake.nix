@@ -31,6 +31,11 @@
     niri-flake.inputs.nixpkgs.follows = "nixpkgs";
     niri-flake.inputs.nixpkgs-stable.follows = "nixpkgs";
 
+    dms-src = {
+      url = "github:AvengeMedia/DankMaterialShell/069ddab041c738236a8910e4c39b65d9628d3018";
+      flake = false;
+    };
+
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 

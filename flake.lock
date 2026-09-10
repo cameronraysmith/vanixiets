@@ -322,6 +322,23 @@
         "type": "github"
       }
     },
+    "dms-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785111455,
+        "narHash": "sha256-aTNuC9NDBnYAeEtFsleeUwmGX3AZlKOutbl+LQRPkmQ=",
+        "owner": "AvengeMedia",
+        "repo": "DankMaterialShell",
+        "rev": "069ddab041c738236a8910e4c39b65d9628d3018",
+        "type": "github"
+      },
+      "original": {
+        "owner": "AvengeMedia",
+        "repo": "DankMaterialShell",
+        "rev": "069ddab041c738236a8910e4c39b65d9628d3018",
+        "type": "github"
+      }
+    },
     "easykubenix": {
       "flake": false,
       "locked": {
@@ -1567,6 +1584,7 @@
         "cognee-nix": "cognee-nix",
         "direnv-instant": "direnv-instant",
         "disko": "disko",
+        "dms-src": "dms-src",
         "easykubenix": "easykubenix",
         "flake-parts": "flake-parts_2",
         "gateway-api-src": "gateway-api-src",
