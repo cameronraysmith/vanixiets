@@ -25,7 +25,7 @@ preflight
   → documentation/evidence child
 ```
 
-Each implementation child runs `baseline → implement → attributed route → immutable-source gates → fresh review`.
+Each implementation child runs `paired immutable baselines / owned-byte capture → implement → pre-route context check → attributed chain route → paired immutable preservation and chain gates → fresh review / provenance readback`.
 A repair adds new suffixed nodes downstream; it never reopens an ancestor.
 Each migration runs `observe integrated join → prepare disabled accounts → enroll humans → enablement child → integrated gates → activate → runtime probes → human acceptance`.
 An already-enabled host skips account preparation, verifies its current configuration and rechecks enrollment.
@@ -48,11 +48,32 @@ Reviews must inspect the actual checks, their negative controls and realized art
 A successful model review cannot override a failed tool gate.
 Structured review decisions are persisted separately from prose, because Atomic's schema-output artifact may contain no prose.
 
+Chain source C0/C1 and integrated source J0/J1 have separate roles.
+The default source and squash destination remain the `omnigent-magnetite` authoring tip; the shared filesystem is the integrated context, not an isolated-chain baseline.
+One read-only jj observation captures the working-copy change, join and direct parent change/commit pairs; pinned Git objects supply trees and parent commits, and repeat observations reject drift.
+The initial owned bytes must match both the stored join and the isolated chain before writing: matching two versions already contaminated by foreign contributions does not authorize a whole-file squash.
+Both baseline projections stay fixed through forward repairs, with private projection/expression files, digests, source roles, controller digest and exact evaluation commands.
+The capabilities phase requires matched C0/C1 and J0/J1 human equality; every slice also requires matched server equality.
+Later account/enablement phases do not require whole-home equality because they intentionally change homes.
+Writer and reviewer reads name both contexts; pre-existing integrated Niri behavior is protected even though it is absent from the isolated chain.
+Neither cross-context equality nor replacing the chain URL with the filesystem URL is a valid local pre-edit check.
+
 `operations.ts` reuses the repository's process receipts, bounded logs and byte/mode snapshots.
 It refuses pre-existing in-scope edits, detects foreign changes and routes only attributed paths using `jj new --no-edit`, path-scoped squash with `--keep-emptied`, and a chain bookmark advance.
 The working-copy change ID and the development join's other chains must survive routing.
 These checks detect observed drift; they do not lock concurrent writers.
 An interrupted splice before bookmark advancement blocks for explicit topology reconciliation rather than creating another change blindly.
+
+Before routing, the clean stored join is pinned again while attributed edits remain unlanded.
+A changed integrated tree is compared once against the original integrated projection; relevant protected drift blocks for reconciliation, not automatic rebaselining.
+Tree-identical parent metadata changes need no new content comparison.
+Actual unsnapshotted foreign inputs are checked separately: a clean `@-` cannot stand for relevant dirty filesystem bytes.
+The conservative relevance rule covers every Git-visible path except foreign working-note Markdown under `docs/notes/`; shipped module assets and non-Nix inputs remain covered.
+That exception relies on the current protected human/server compositions not consuming working notes; the separate Pi environment check's note reference is not part of this projection or these named worker checks.
+If a future composition consumes notes or ignored inputs, reconcile and revise this boundary before running; this is not a Nix dependency solver or a filesystem lock.
+Routing rechecks stored owned bytes, observed writer output and immutable foreign-parent continuity, and binds the result to both C1 and J1.
+Acceptance rechecks authoring identity, owned bytes and integrated context without relabelling J1 when a later unrelated join advances.
+An old integrated preservation receipt never certifies a later deployment source: migration still observes, gates, builds and activates its fresh exact `@-` source with operator approval.
 
 Every deployment builds and activates the exact gated integrated system; Darwin reconciles both the persistent system profile and active generation, completing only missing steps after interruption.
 The source's join parents are recorded; the operator must still examine other chains' activation effects and coordinate deployers outside this workflow's Intercom group.
@@ -109,4 +130,9 @@ For the offline model boundary alone, append `--model-only`.
 The checker executes the installed catalog factory and successful-attempt metadata writer in isolation, without extension registration or model dispatch; controller fixtures reuse those values.
 
 Controller fixtures use mocked VCS/model/host boundaries; the human-preservation lane additionally runs bounded offline Nix evaluations with IFD disabled and no builds.
+The differentiated controller fixtures execute the actual projection/comparison and source/attribution/routing callbacks, while replacing model, command and filesystem boundaries where needed.
+They cover integrated-only failure despite chain equality, fixed baselines through repairs, relevant foreign drift, owned overlap, byte/mode/symlink drift, tree-identical metadata changes, unrelated working notes and source-bound reviewer receipts.
+For this repair's separately recorded immutable real-source probes, `--provenance-artifacts` reuses the private ignored C0/J0 and complete archive-movement outputs rather than evaluating the mutable fleet.
+That optional lane retains real projection contents but uses explicitly synthetic routed commit labels; it does not create Git objects or route real changes.
+The separate probe logs, immutable source URLs and projection hashes establish the real Nix semantics, not the controller mocks.
 These checks do not replace real-fleet or real-user acceptance.

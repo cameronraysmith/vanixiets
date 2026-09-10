@@ -100,8 +100,9 @@ assert.throws(() => operations.modelEvidence({ modelAttempts: [{ model: contract
 assert.equal(operations.modelEvidence({ modelAttempts: [{ model: contracts.model, reasoningLevel: "high", success: false }, { model: contracts.model, reasoningLevel: "high", success: true }] }).attempts.length, 2);
 console.log("PASS closed schema rejection and requested/observed same-model high policy");
 if (process.argv.includes("--model-only")) process.exit(0);
-const id = "k".repeat(32), sha = "a".repeat(40);
-const source = { change: id, workingCopy: "l".repeat(32), joinParents: [id, "m".repeat(32)], sha, source: `git+file:///fixture?rev=${sha}` };
+const id = "yorumuppwtkpnzkupmnzsrnvtwkpnkwz", sha = "25c19d1e7b3e4abbfe44d38f64e531d23cc6b658";
+const parents = [{ change: "qwoplmqryvuwkzwmsvruprkqqrpylknp", sha: "1c31c2ab6e827758303b58875daddd8d10a704f7" }, { change: id, sha }, { change: "tktswmrxouprvuwmrulyvqurpvuzsyou", sha: "d84dec452c6b630a866a9d2079989fb0677282be" }, { change: "uyxmwsspwktuqzkwwzlpnwwsmvmtxxlu", sha: "56e67b9ea6ad0e0f63930d678fd98b5f10bdfd7d" }];
+const source = contracts.parse(contracts.Source, { role: "chain", chain: contracts.chain, change: id, workingCopy: "osurqvnxwxruvlyzuvrqoknknunrzvxp", parents: ["310e53f3bf4571fd76a36d5d0bb76965259f4f59"], joinParents: parents.map((p) => p.change), sha, tree: "6f710318f3bbbad9f2bad7ec210fbcc4fd189c35", source: `git+file://${contracts.repository}?rev=${sha}`, join: { change: "ulrosuppkwlrmpszvkzpknnvmxmrtwxo", sha: "10220daf6bb26340de6ec77aef3387df14a7edaa", tree: "698b0780037d7a2751957248aca7db30ed6795c8", parents } });
 assert.throws(() => operations.routeCommand(id, ["../outside"], ["."]));
 assert.throws(() => operations.routeCommand(id, ["modules/foreign"], ["modules/owned"]));
 assert.match(operations.routeCommand(id, ["modules/owned/test.nix"], ["modules/owned"]), /--use-destination-message --keep-emptied --/);
@@ -115,9 +116,10 @@ for (const phase of contracts.phases) {
 console.log("PASS scope/squash constraints and pinned gate targets");
 execFileSync("python3", ["-c", `import ast; ast.parse(open('${root}/live.py').read()); print('PASS Python parse')`], { stdio: "inherit" });
 console.log("PASS definition import and shape (no registry reload, models, VCS or host effects)");
-const sliceDefinition = (await import(moduleUrl(`${root}/slice.ts`))).default;
+const sliceModule = await import(moduleUrl(`${root}/slice.ts`));
+const sliceDefinition = sliceModule.default;
 const compact = (await import(moduleUrl(".atomic/workflows/bump/tools.ts"))).assertCompactCheckpoint;
-await (await import("./controller-checks.mjs")).controllerChecks({ definition, sliceDefinition, migrationDefinition: migration.default, Operations: operations.Operations, contracts, source, compact, models, modelResult });
+await (await import("./controller-checks.mjs")).controllerChecks({ definition, sliceDefinition, sliceModule, migrationDefinition: migration.default, Operations: operations.Operations, operations, contracts, source, compact, models, modelResult, realArtifacts: process.argv.includes("--provenance-artifacts") });
 for (const expression of [gates.baselineExpr(source.source), gates.stateExpr(source.source, ["magnetite"]), gates.workersExpr(source.source, "stibnite")]) {
   execFileSync("nix-instantiate", ["--parse", "--expr", expression], { stdio: ["ignore", "pipe", "pipe"] });
 }

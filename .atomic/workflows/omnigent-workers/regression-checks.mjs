@@ -74,7 +74,7 @@ export async function regressionChecks({ definition, sliceDefinition, migrationD
       let stdout;
       if (command === "jj --ignore-working-copy diff -r @ --name-only") stdout = "";
       else if (command.includes("commit_id")) stdout = source.sha;
-      else if (command.startsWith("git ls-tree")) stdout = `100644 blob ${oid(bytes)}\t${owned}\0` + `120000 blob ${oid("original")}\t${link}\0`;
+      else if (command.startsWith("git ls-tree")) stdout = `100644 blob ${oid(bytes)}\t${owned}\0` + `120000 blob ${oid("original")}\t${link}\0` + (command.endsWith("-- ") ? `100644 blob ${oid("foreign edit\n")}\t${foreign}\0` : "");
       else if (command.startsWith("git ls-files")) stdout = `${owned}\0${foreign}\0${link}\0`;
       else throw Error(`Unexpected command (no mutations allowed): ${command}`);
       return { stdout, stderr: "", exitCode: 0, command, state: "exited", terminationSignal: null, logPath: "fixture", tail: "" };
@@ -113,6 +113,7 @@ export async function regressionChecks({ definition, sliceDefinition, migrationD
     });
     routeOps.healthy = async () => source.workingCopy;
     routeOps.id = async () => source.change;
+    routeOps.source = async () => source;
     await assert.rejects(routeOps.route("wrong-destination", spec, cleanBefore, writerAfter, source), /Attributed destination differs/);
     assert.equal(simulatedSquashes, 1, "actual route callback must read back the attributed destination, not just the filesystem");
     console.log("PASS F2 actual clean/snapshot/route callbacks: pre-existing bytes/mode/link edits and later drift rejected before routing; wrong destination rejected after simulated squash; foreign file preserved");
@@ -123,7 +124,7 @@ export async function regressionChecks({ definition, sliceDefinition, migrationD
       const controller = new AbortController(); controller.abort(control);
       for (const [definitionToRun, inputs, boundary] of [
         [definition, { ...ctx.inputs, start_at: 0 }, "preflight"],
-        [sliceDefinition, { phase: "linux", root: ".atomic/workflows/runs/fixture", timeout: 1000, max_repairs: 2, verify_only: false, reads: [] }, "before-linux-0"],
+        [sliceDefinition, { phase: "linux", root: ".atomic/workflows/runs/fixture", timeout: 1000, max_repairs: 2, verify_only: false, reads: [] }, "baseline-owned"],
         [migrationDefinition, { host: "stibnite", root: ".atomic/workflows/runs/fixture", timeout: 1000, max_repairs: 2, reads: [] }, "prepare-join"],
       ]) {
         let exits = 0;
