@@ -41,20 +41,7 @@ let
         pkgs.buzz-git-sign-nostr
       ];
 
-      # Inject linear-cli's bundled skill (a single linear-cli/ dir with one
-      # SKILL.md and 16 reference subfiles under references/) into all agent
-      # destinations, scoped to this user. linear-cli .src is the fetchFromGitHub
-      # store path; its top-level skills/ dir is read by readSkillsFrom in the ai
-      # module, which finds the single subdir linear-cli/.
-      #
-      # Discoverability: the all-agents skill openspec-linear-sync (in
-      # modules/home/ai/plugins/planning-and-development/.apm/skills/openspec-linear-sync)
-      # softly depends on this user-scoped linear-cli skill for its Linear verbs; it is
-      # co-delivered only for this user and no-ops gracefully when absent. If a
-      # non-crs58 user is added, move this injection into the shared ai module.
-      aiSkills.extraSkillDirs = [
-        "${pkgs.linear-cli.src}/skills"
-      ];
+      aiSkills.extraSkillDirs = flake.lib.linearSkillDirs pkgs;
 
       # User-level OpenSpec install (skills, schema bundle, and the global
       # config.json) is provided by the opt-in programs.openspec module in

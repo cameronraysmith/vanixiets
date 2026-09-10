@@ -12,8 +12,8 @@
 # here as its own option rather than patched into a consumer, so that one file
 # still answers what each agent is given and why.
 { ... }:
-{
-  flake.modules.homeManager.ai =
+let
+  content =
     {
       config,
       pkgs,
@@ -225,4 +225,8 @@
         };
       };
     };
+in
+{
+  flake.modules.homeManager.ai = content;
+  flake.modules.homeManager.agent-settings = content;
 }

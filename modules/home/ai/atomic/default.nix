@@ -29,8 +29,8 @@
 # settings file naming it, and only this key can refuse it. See
 # aiAgentSettings.piOnlyExtensions for the mechanism.
 { ... }:
-{
-  flake.modules.homeManager.ai =
+let
+  content =
     {
       config,
       pkgs,
@@ -125,4 +125,8 @@
         );
       };
     };
+in
+{
+  flake.modules.homeManager.ai = content;
+  flake.modules.homeManager.atomic = content;
 }

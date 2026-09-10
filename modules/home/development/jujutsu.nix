@@ -1,233 +1,240 @@
 { ... }:
-{
-  flake.modules = {
-    homeManager.development =
-      {
-        pkgs,
-        config,
-        lib,
-        flake,
-        ...
-      }:
-      let
-        trunk =
-          lib.pipe
-            {
-              bookmark = [
-                "main"
-                "master"
-                "develop"
-              ];
-              remote = [
-                "rad"
-                "origin"
-                "upstream"
-              ];
-            }
-            [
-              lib.cartesianProduct
-              (lib.concatMapStrings (
-                { bookmark, remote }:
-                "remote_bookmarks(exact:${builtins.toJSON bookmark}, exact:${builtins.toJSON remote}) | "
-              ))
-              (x: "latest(${x}root())")
+let
+  content =
+    personal:
+    {
+      pkgs,
+      config,
+      lib,
+      flake,
+      ...
+    }:
+    let
+      trunk =
+        lib.pipe
+          {
+            bookmark = [
+              "main"
+              "master"
+              "develop"
             ];
-      in
-      {
-        programs.jujutsu = {
-          enable = true;
+            remote = [
+              "rad"
+              "origin"
+              "upstream"
+            ];
+          }
+          [
+            lib.cartesianProduct
+            (lib.concatMapStrings (
+              { bookmark, remote }:
+              "remote_bookmarks(exact:${builtins.toJSON bookmark}, exact:${builtins.toJSON remote}) | "
+            ))
+            (x: "latest(${x}root())")
+          ];
+    in
+    {
+      programs.jujutsu = {
+        enable = true;
 
-          # User-specific values (name, email, signing key) should be set in user modules
-          settings = {
-            aliases = {
-              # Diagnostic: show divergent, orphaned, and dangling changes
-              orphans = [
-                "log"
-                "-r"
-                "divergent() | (heads(all()) ~ visible_heads() ~ bookmarks())"
-              ];
-              # Cleanup: abandon all mutable changes not in main's ancestry or current @
-              tidy = [
-                "abandon"
-                "mutable() ~ @ ~ ::main"
-              ];
-              # Convenience: run git garbage collection to reclaim disk space
-              gc = [
-                "util"
-                "gc"
-              ];
-              # Advance bookmarks behind @ to latest meaningful commit in @'s ancestry
-              tug = [
-                "bookmark"
-                "move"
-                "--from=heads(::@ & bookmarks())"
-                "--to=heads(::@ ~ description(exact:\"\") ~ (empty() ~ merges()))"
-              ];
-              # Cherry-pick with provenance trailer, inserting before working copy
-              cherry-pick = [
-                "duplicate"
-                "--config=templates.duplicate_description=cherry_pick_description"
-                "--insert-before=@"
-              ];
-              # Batch-sign all unsigned mutable ancestors of working copy
-              fsign = [
-                "sign"
-                "--revisions=mutable()::@ ~ @::"
-              ];
-              # Park current changes by creating new empty commit at parent
-              stash = [
-                "new"
-                "@-"
-              ];
-              # Force rewrite commit metadata to trigger descendant rebases
-              touch = [
-                "metaedit"
-                "--ignore-immutable"
-                "--force-rewrite"
-                "-r"
-              ];
-            };
+        # User-specific values (name, email, signing key) should be set in user modules
+        settings = {
+          aliases = {
+            # Diagnostic: show divergent, orphaned, and dangling changes
+            orphans = [
+              "log"
+              "-r"
+              "divergent() | (heads(all()) ~ visible_heads() ~ bookmarks())"
+            ];
+            # Cleanup: abandon all mutable changes not in main's ancestry or current @
+            tidy = [
+              "abandon"
+              "mutable() ~ @ ~ ::main"
+            ];
+            # Convenience: run git garbage collection to reclaim disk space
+            gc = [
+              "util"
+              "gc"
+            ];
+            # Advance bookmarks behind @ to latest meaningful commit in @'s ancestry
+            tug = [
+              "bookmark"
+              "move"
+              "--from=heads(::@ & bookmarks())"
+              "--to=heads(::@ ~ description(exact:\"\") ~ (empty() ~ merges()))"
+            ];
+            # Cherry-pick with provenance trailer, inserting before working copy
+            cherry-pick = [
+              "duplicate"
+              "--config=templates.duplicate_description=cherry_pick_description"
+              "--insert-before=@"
+            ];
+            # Batch-sign all unsigned mutable ancestors of working copy
+            fsign = [
+              "sign"
+              "--revisions=mutable()::@ ~ @::"
+            ];
+            # Park current changes by creating new empty commit at parent
+            stash = [
+              "new"
+              "@-"
+            ];
+            # Force rewrite commit metadata to trigger descendant rebases
+            touch = [
+              "metaedit"
+              "--ignore-immutable"
+              "--force-rewrite"
+              "-r"
+            ];
+          };
 
-            revset-aliases = {
-              "trunk()" = trunk;
-              "private()" = ''subject(regex:"^(private|wip)(:|$)") | conflicts()'';
-              "merged(x)" = "first_parent(x)..x-";
-              "sign(x)" = "(mutable() ~ signed())::x ~ @::";
-              # The default log revset caps ancestor depth below the mutable
-              # frontier, so a borrowed immutable join leg renders as one tip
-              # plus "(elided revisions)". This shows every commit between
-              # trunk and each join parent regardless of mutability.
-              "diamond()" = "present(@) | @- | trunk() | trunk()..parents(@-)";
-            };
+          revset-aliases = {
+            "trunk()" = trunk;
+            "private()" = ''subject(regex:"^(private|wip)(:|$)") | conflicts()'';
+            "merged(x)" = "first_parent(x)..x-";
+            "sign(x)" = "(mutable() ~ signed())::x ~ @::";
+            # The default log revset caps ancestor depth below the mutable
+            # frontier, so a borrowed immutable join leg renders as one tip
+            # plus "(elided revisions)". This shows every commit between
+            # trunk and each join parent regardless of mutability.
+            "diamond()" = "present(@) | @- | trunk() | trunk()..parents(@-)";
+          };
 
-            revsets = {
-              sign = "sign(@)";
-            };
+          revsets = {
+            sign = "sign(@)";
+          };
 
-            templates = {
-              log = "builtin_log_comfortable";
-              op_log = "builtin_op_log_comfortable";
-              evolog = "builtin_evolog_compact ++ \"\n\"";
-              draft_commit_description = ''
-                concat(
-                  coalesce(description, default_commit_description, "\n"),
-                  "\n",
-                  "JJ: Change ID: " ++ format_short_change_id(change_id),
-                  "\n",
-                  surround(
-                    "JJ: This commit contains the following changes:\n", "",
-                    indent("JJ:     ", diff.summary()),
-                  ),
-                  "\nJJ: ignore-rest\n" ++ diff.git(),
-                )
-              '';
+          templates = {
+            log = "builtin_log_comfortable";
+            op_log = "builtin_op_log_comfortable";
+            evolog = "builtin_evolog_compact ++ \"\n\"";
+            draft_commit_description = ''
+              concat(
+                coalesce(description, default_commit_description, "\n"),
+                "\n",
+                "JJ: Change ID: " ++ format_short_change_id(change_id),
+                "\n",
+                surround(
+                  "JJ: This commit contains the following changes:\n", "",
+                  indent("JJ:     ", diff.summary()),
+                ),
+                "\nJJ: ignore-rest\n" ++ diff.git(),
+              )
+            '';
 
-              # mergify-cli's stack machinery and pkgs/by-name/stack-land both
-              # identify a change by its Gerrit-style Change-Id trailer, and jj runs
-              # no git hooks and pushes with --no-verify, so mergify's commit-msg
-              # hook never mints one here. The trailer has to come from this
-              # template instead. Padding to Gerrit's 40 hex is jj's own: the
-              # 32-hex change id followed by the constant 6a6a6964.
-              #
-              # The contains_key guard is load-bearing. Without it jj dedups on the
-              # whole trailer line, so a commit already carrying a differently
-              # valued Change-Id gains a second one, and stack-land asserts exactly
-              # one.
-              commit_trailers = ''
-                if(!trailers.contains_key("Change-Id"), format_gerrit_change_id_trailer(self))
-              '';
+            # mergify-cli's stack machinery and pkgs/by-name/stack-land both
+            # identify a change by its Gerrit-style Change-Id trailer, and jj runs
+            # no git hooks and pushes with --no-verify, so mergify's commit-msg
+            # hook never mints one here. The trailer has to come from this
+            # template instead. Padding to Gerrit's 40 hex is jj's own: the
+            # 32-hex change id followed by the constant 6a6a6964.
+            #
+            # The contains_key guard is load-bearing. Without it jj dedups on the
+            # whole trailer line, so a commit already carrying a differently
+            # valued Change-Id gains a second one, and stack-land asserts exactly
+            # one.
+            commit_trailers = ''
+              if(!trailers.contains_key("Change-Id"), format_gerrit_change_id_trailer(self))
+            '';
 
-              # jj duplicate copies a description verbatim onto a commit with a new
-              # change id and applies no trailer template, which would leave two
-              # live commits sharing one Change-Id and therefore one stack branch.
-              # Strip it and let the next describe mint a fresh one.
-              duplicate_description = ''
-                description.replace(regex:"Change-Id: I[0-9a-f]{40}\n?", "")
-              '';
-            };
+            # jj duplicate copies a description verbatim onto a commit with a new
+            # change id and applies no trailer template, which would leave two
+            # live commits sharing one Change-Id and therefore one stack branch.
+            # Strip it and let the next describe mint a fresh one.
+            duplicate_description = ''
+              description.replace(regex:"Change-Id: I[0-9a-f]{40}\n?", "")
+            '';
+          };
 
-            template-aliases = {
-              cherry_pick_description = "description.trim_end() ++ \"\n\n(cherry picked from commit \" ++ commit_id ++ \")\n\"";
-              "format_short_cryptographic_signature(signature)" = ''
-                if(signature,
-                  label("signature status", concat(
-                    "[",
-                    label(signature.status(), concat(
-                      coalesce(
-                        if(signature.status() == "good", "✓︎"),
-                        if(signature.status() == "unknown", "?"),
-                        "x",
-                      ),
-                      if(signature.display(),
-                        " " ++ stringify(signature.display()).replace(regex:" <(.+)>$", "")),
-                    )),
-                    "]",
-                  ))
-                )
-              '';
-            };
+          template-aliases = {
+            cherry_pick_description = "description.trim_end() ++ \"\n\n(cherry picked from commit \" ++ commit_id ++ \")\n\"";
+            "format_short_cryptographic_signature(signature)" = ''
+              if(signature,
+                label("signature status", concat(
+                  "[",
+                  label(signature.status(), concat(
+                    coalesce(
+                      if(signature.status() == "good", "✓︎"),
+                      if(signature.status() == "unknown", "?"),
+                      "x",
+                    ),
+                    if(signature.display(),
+                      " " ++ stringify(signature.display()).replace(regex:" <(.+)>$", "")),
+                  )),
+                  "]",
+                ))
+              )
+            '';
+          };
 
-            user = {
-              name = lib.mkDefault "";
-              email = lib.mkDefault "";
-            };
+          user = {
+            name = lib.mkDefault "";
+            email = lib.mkDefault "";
+          };
 
-            signing = {
-              # Sign own commits, drop existing signatures
-              behavior = "own";
+          signing =
+            if personal then
+              {
+                # Sign own commits, drop existing signatures
+                behavior = "own";
 
-              # Use ssh backend as opposed to GPG
-              backend = "ssh";
+                # Use ssh backend as opposed to GPG
+                backend = "ssh";
 
-              # Reuse git's allowedSignersFile for signature verification
-              # to enable unified signature verification across git and jujutsu
-              backends.ssh.allowed-signers = lib.mkDefault "${config.home.homeDirectory}/.config/git/allowed_signers";
+                # Reuse git's allowedSignersFile for signature verification
+                # to enable unified signature verification across git and jujutsu
+                backends.ssh.allowed-signers = lib.mkDefault "${config.home.homeDirectory}/.config/git/allowed_signers";
 
-              # sops-nix manages user-level secrets for home-manager
-              # private key stored in encrypted secrets/home-manager/users/{user}/secrets.yaml
-              key = lib.mkDefault config.sops.secrets.ssh-signing-key.path;
-            };
+                # sops-nix manages user-level secrets for home-manager
+                # private key stored in encrypted secrets/home-manager/users/{user}/secrets.yaml
+                key = lib.mkDefault config.sops.secrets.ssh-signing-key.path;
+              }
+            else
+              { behavior = "drop"; };
 
-            ui = {
-              editor = "nvim";
-              color = "auto";
-              default-command = [ "log" ];
-              diff-editor = ":builtin";
-              diff-formatter = ":git";
-              pager = lib.mkDefault "delta";
+          ui = {
+            editor = "nvim";
+            color = "auto";
+            default-command = [ "log" ];
+            diff-editor = ":builtin";
+            diff-formatter = ":git";
+            pager = lib.mkDefault "delta";
 
-              # Show signature status in log output
-              show-cryptographic-signatures = true;
-            };
+            # Show signature status in log output
+            show-cryptographic-signatures = true;
+          };
 
-            git = {
-              # Enable git colocate mode
-              colocate = true;
+          git = {
+            # Enable git colocate mode
+            colocate = true;
 
-              # Block push of WIP, private, or conflicted commits
-              private-commits = "private()";
+            # Block push of WIP, private, or conflicted commits
+            private-commits = "private()";
 
-              # Sign commits before pushing (upstream jujutsu supports revset syntax)
-              # Options: true, false, "mine()", "~signed()", "~signed() & mine()", etc.
-              sign-on-push = true;
+            # Sign commits before pushing (upstream jujutsu supports revset syntax)
+            # Options: true, false, "mine()", "~signed()", "~signed() & mine()", etc.
+            sign-on-push = personal;
 
-              # Write Jujutsu change IDs to git commit headers for radicle integration
-              # Enables Radicle to track change identity across patch revisions
-              # See: https://radicle.xyz/2025/08/14/jujutsu-with-radicle.html
-              write-change-id-header = true;
-            };
+            # Write Jujutsu change IDs to git commit headers for radicle integration
+            # Enables Radicle to track change identity across patch revisions
+            # See: https://radicle.xyz/2025/08/14/jujutsu-with-radicle.html
+            write-change-id-header = true;
+          };
 
-            # Snapshot settings control automatic file tracking and size limits
-            # auto-track options:
-            #   "all()" - automatically track all new files (default, like git without .gitignore)
-            #   "none()" - require explicit `jj file track <file>` for each file (like git add)
-            #   "glob:pattern" - only track files matching pattern
-            snapshot = {
-              max-new-file-size = "300KiB"; # Reject new files larger than 300KiB (default: 1MiB)
-              auto-track = "all()";
-            };
+          # Snapshot settings control automatic file tracking and size limits
+          # auto-track options:
+          #   "all()" - automatically track all new files (default, like git without .gitignore)
+          #   "none()" - require explicit `jj file track <file>` for each file (like git add)
+          #   "glob:pattern" - only track files matching pattern
+          snapshot = {
+            max-new-file-size = "300KiB"; # Reject new files larger than 300KiB (default: 1MiB)
+            auto-track = "all()";
           };
         };
       };
-  };
+    };
+in
+{
+  flake.modules.homeManager.development = content true;
+  flake.modules.homeManager.jujutsu = content false;
 }

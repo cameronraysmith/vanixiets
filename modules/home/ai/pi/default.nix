@@ -9,8 +9,8 @@
 # modules/home/ai/skills/default.nix populates; a second sink under
 # ~/.pi/agent/skills would take precedence over it and shadow the real tree.
 { ... }:
-{
-  flake.modules.homeManager.ai =
+let
+  content =
     {
       pkgs,
       config,
@@ -107,4 +107,8 @@
         );
       };
     };
+in
+{
+  flake.modules.homeManager.ai = content;
+  flake.modules.homeManager.pi = content;
 }

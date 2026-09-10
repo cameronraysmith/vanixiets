@@ -40,8 +40,8 @@
 # launched with. Pinning it would mean an lsp.yml, which unlike config.yml omp
 # only ever reads, so it would not need this merge.
 { ... }:
-{
-  flake.modules.homeManager.ai =
+let
+  content =
     {
       pkgs,
       lib,
@@ -315,4 +315,8 @@
         );
       };
     };
+in
+{
+  flake.modules.homeManager.ai = content;
+  flake.modules.homeManager.omp = content;
 }

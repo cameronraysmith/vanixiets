@@ -1,4 +1,9 @@
-{ inputs, lib, ... }:
+{
+  config,
+  inputs,
+  lib,
+  ...
+}:
 {
   flake.lib.omnigentRuntimePackages =
     pkgs:
@@ -28,4 +33,14 @@
       pkgs.procps
       pkgs.lsof
     ];
+
+  flake.lib.omnigentWorkerPath =
+    {
+      pkgs,
+      home,
+      extraPackages ? [ ],
+    }:
+    lib.makeBinPath (
+      config.flake.lib.omnigentRuntimePackages pkgs ++ [ home.home.path ] ++ extraPackages
+    );
 }

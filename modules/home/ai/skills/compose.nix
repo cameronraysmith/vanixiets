@@ -1,6 +1,6 @@
 { ... }:
-{
-  flake.modules.homeManager.ai =
+let
+  content =
     {
       config,
       lib,
@@ -102,4 +102,8 @@
         targets = config.aiSkills.apmTargets;
       };
     };
+in
+{
+  flake.modules.homeManager.ai = content;
+  flake.modules.homeManager.ai-skills-compose = content;
 }

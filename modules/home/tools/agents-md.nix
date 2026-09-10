@@ -4,8 +4,8 @@
 # ~/.config/opencode/AGENTS.md (plus pi via programs.pi-coding-agent.context)
 # from shared configuration with references to preference documents
 { ... }:
-{
-  flake.modules.homeManager.tools =
+let
+  content =
     { lib, ... }:
     let
       # Strip an *.instructions.md fragment's leading YAML frontmatter block
@@ -76,4 +76,8 @@
         settings.body = lib.concatMapStringsSep "\n" stripFrontmatter fragments;
       };
     };
+in
+{
+  flake.modules.homeManager.tools = content;
+  flake.modules.homeManager.agent-context = content;
 }

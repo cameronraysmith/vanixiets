@@ -4,8 +4,8 @@
 # asynchronously in a daemon. When builds take longer than mux_delay, it
 # spawns a tmux pane showing progress.
 { ... }:
-{
-  flake.modules.homeManager.terminal =
+let
+  content =
     { flake, pkgs, ... }:
     {
       # Import direnv-instant home-manager module
@@ -40,4 +40,8 @@
         };
       };
     };
+in
+{
+  flake.modules.homeManager.terminal = content;
+  flake.modules.homeManager.direnv = content;
 }

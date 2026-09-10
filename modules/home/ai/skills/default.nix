@@ -22,8 +22,8 @@
 # slash-command invocation of external skills to fail with "Failed to load
 # skill" while discovery (via bare names) still works.
 { ... }:
-{
-  flake.modules.homeManager.ai =
+let
+  content =
     {
       config,
       lib,
@@ -148,4 +148,8 @@
         '';
       };
     };
+in
+{
+  flake.modules.homeManager.ai = content;
+  flake.modules.homeManager.ai-skills = content;
 }

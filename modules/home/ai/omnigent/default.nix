@@ -1,9 +1,15 @@
 { config, ... }:
 let
   acp = config.flake.lib.omnigentACP;
-in
-{
-  flake.modules.homeManager.ai =
+  merge =
+    pkgs:
+    pkgs.writeShellApplication {
+      name = "omnigent-merge-config";
+      runtimeInputs = [ pkgs.yq-go ];
+      text = builtins.readFile ./merge-config.sh;
+    };
+  content =
+    legacy:
     {
       config,
       lib,
@@ -14,13 +20,9 @@ in
     let
       cfg = config.programs.omnigent;
       yamlFormat = pkgs.formats.yaml { };
-      hostName = if osConfig == null then null else osConfig.networking.hostName;
-      runner = if osConfig == null then { } else osConfig.services.omnigent-host or { };
-      mergeConfig = pkgs.writeShellApplication {
-        name = "omnigent-merge-config";
-        runtimeInputs = [ pkgs.yq-go ];
-        text = builtins.readFile ./merge-config.sh;
-      };
+      hostName = if !legacy || osConfig == null then null else osConfig.networking.hostName;
+      runner = if !legacy || osConfig == null then { } else osConfig.services.omnigent-host or { };
+      mergeConfig = merge pkgs;
       declared = yamlFormat.generate "omnigent-config.yaml" cfg.settings;
     in
     {
@@ -63,4 +65,9 @@ in
         );
       };
     };
+in
+{
+  flake.lib.omnigentMergeConfig = merge;
+  flake.modules.homeManager.ai = content true;
+  flake.modules.homeManager.omnigent = content false;
 }
