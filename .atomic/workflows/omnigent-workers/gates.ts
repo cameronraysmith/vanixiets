@@ -18,7 +18,8 @@ export const baselineExpr = (source: string) => `let
       location = lib.removePrefix (toString f.outPath + "/") (toString p);
       content = toString (canonical p);
     };
-    sourceFiles = h: lib.filterAttrs (_: file: rooted file.source) h.home.file;
+    # Home Manager permits disabled files without a source (including XDG forwards).
+    sourceFiles = h: lib.filterAttrs (_: file: file.enable && rooted file.source) h.home.file;
     secretFiles = h: lib.filterAttrs (_: secret: rooted secret.sopsFile) (h.sops.secrets or {});
     overrides = builtins.mapAttrs (_: h: { lib, ... }: {
       home.file = builtins.mapAttrs (_: file: { source = lib.mkForce (canonical file.source); }) (sourceFiles h);
@@ -44,7 +45,8 @@ export const baselineExpr = (source: string) => `let
       profile = h.home.path.drvPath;
       activation = h.home.activation;
       files = builtins.mapAttrs (_: file: {
-        inherit (file) target executable recursive force onChange;
+        inherit (file) enable target executable recursive force onChange;
+      } // lib.optionalAttrs file.enable {
         source = toString file.source;
       }) h.home.file;
     };

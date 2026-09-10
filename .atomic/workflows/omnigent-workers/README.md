@@ -41,6 +41,9 @@ It never restores execution under a privileged human account automatically.
 `contract.ts` owns slice objectives, scopes and the exact named checks the implementation must introduce alongside behavior.
 `gates.ts` executes those checks at immutable source URLs, checks the current five-worker enable map and rejects root/human/admin/trusted-user assignments.
 The first extraction compares an independently captured human package/artifact projection, canonicalizing only self-root sops and home-file inputs by content while retaining original relative-path/content witnesses; each slice separately compares the shared server unit derivation.
+Home-file source canonicalization and source witnesses follow Home Manager's `enable` boundary, including files forwarded from XDG; disabled entries may legitimately have no source.
+The projection retains every entry's enable flag and file properties, enabled text/source artifacts, and the complete generation and activation DAG, including activation-owned mutable settings.
+Disabled, undelivered source/text definitions are not compared as artifacts; enabling an undefined source still fails evaluation.
 Reviews must inspect the actual checks, their negative controls and realized artifacts, not infer coverage from a check name or successful exit.
 A successful model review cannot override a failed tool gate.
 Structured review decisions are persisted separately from prose, because Atomic's schema-output artifact may contain no prose.

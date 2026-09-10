@@ -13,8 +13,9 @@ export async function humanChecks(gates) {
     await mkdir(dir, { recursive: true });
     await writeFile(`${dir}/public-sops.yaml`, changes.ciphertext ?? "canary: public fixture, never a credential\n");
     await writeFile(`${dir}/unrelated`, name);
-    await mkdir(`${dir}/schema`, { recursive: true });
-    await writeFile(`${dir}/schema/schema.yaml`, changes.schema ?? "name: preserved-schema\n");
+    const schemaPath = changes.schemaPath ?? "schema";
+    await mkdir(`${dir}/${schemaPath}`, { recursive: true });
+    await writeFile(`${dir}/${schemaPath}/schema.yaml`, changes.schema ?? "name: preserved-schema\n");
     await writeFile(`${dir}/flake.nix`, `{
       outputs = { self }: let
         nixpkgs = ${inputs.nixpkgs};
@@ -28,7 +29,13 @@ export async function humanChecks(gates) {
               imports = [ ${inputs.sops}/modules/home-manager/sops.nix ];
               home.username = "fixture"; home.homeDirectory = "/home/fixture"; home.stateVersion = "25.11";
               home.packages = [ pkgs.${changes.package ?? "hello"} ];
-              home.file."approved-schema".source = self + "/schema";
+              home.file."approved-schema".source = self + "/${schemaPath}";
+              xdg.configFile."claude-cerebras/settings.json".enable = ${changes.enableUndefined ?? false};
+              xdg.configFile."human-settings".text = "${changes.text ?? "preserved human settings"}";
+              xdg.configFile."human-schema".source = self + "/${schemaPath}";
+              home.activation.mutableSettings = let settings = pkgs.writeText "mutable-settings.json" "${changes.mutableText ?? "preserved mutable settings"}"; in {
+                after = [ "writeBoundary" ]; before = []; data = "install -Dm644 \${settings} /home/fixture/.config/claude-cerebras/settings.json";
+              };
               programs.git = { enable = true; settings.user.name = "${changes.gitName ?? "Fixture Human"}"; };
               sops.defaultSopsFile = self + "/public-sops.yaml";
               sops.age.keyFile = "/home/fixture/private-age-key";
@@ -47,8 +54,9 @@ export async function humanChecks(gates) {
   };
   const before = await fixture("before"), relocated = await fixture("relocated");
   assert.deepEqual(relocated.humans, before.humans, "F1 identical human behavior must survive source-root-only relocation");
-  for (const [name, changes] of Object.entries({ package: { package: "jq" }, git: { gitName: "Changed Human" }, service: { service: "/bin/false" }, ciphertext: { ciphertext: "canary: changed public fixture\n" }, schema: { schema: "name: changed-schema\n" } })) {
+  for (const [name, changes] of Object.entries({ package: { package: "jq" }, git: { gitName: "Changed Human" }, service: { service: "/bin/false" }, ciphertext: { ciphertext: "canary: changed public fixture\n" }, schema: { schema: "name: changed-schema\n" }, text: { text: "changed human settings" }, mutable: { mutableText: "changed mutable settings" }, location: { schemaPath: "moved/schema" } })) {
     assert.notDeepEqual((await fixture(name, changes)).humans, before.humans, `F1 must reject actual ${name} behavior/input change`);
   }
-  console.log("PASS F1 actual pinned HM/sops module evaluation: relocation accepted; package, Git settings, human service and source-content controls rejected (no builds)");
+  await assert.rejects(fixture("enabled-undefined", { enableUndefined: true }), /source.*accessed but has no value defined/s, "Enabled files without a source must still fail");
+  console.log("PASS F1 pinned HM/sops: disabled XDG source accepted; relocation accepted; package, Git, service, input content/location, XDG text and mutable activation changes rejected; enabled undefined source rejected (no builds)");
 }
