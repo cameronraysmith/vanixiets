@@ -13,8 +13,13 @@ export async function currentModel(ctx: object): Promise<string> {
   const catalog: unknown = Reflect.get(ctx, "models");
   if (!catalog || typeof catalog !== "object") throw new Stop("model", "Atomic current-model catalog unavailable; select the requested model before launch");
   const selected: unknown = Reflect.get(catalog, "currentModel");
-  if (selected !== model && selected !== `${model}:high`) throw new Stop("model", `Configured current model is not ${model}`);
-  return selected;
+  if (selected === undefined) throw new Stop("model", "Atomic current-model metadata missing; select the requested model before launch");
+  const provider: unknown = selected && typeof selected === "object" ? Reflect.get(selected, "provider") : undefined;
+  const id: unknown = selected && typeof selected === "object" ? Reflect.get(selected, "id") : undefined;
+  const fullId = typeof selected === "string" ? selected : typeof provider === "string" && typeof id === "string" ? `${provider}/${id}` : undefined;
+  if (!fullId || !/^[^/\s]+\/\S+$/.test(fullId)) throw new Stop("model", "Atomic current-model metadata malformed; expected provider/id model identity");
+  if (fullId !== model && fullId !== `${model}:high`) throw new Stop("model", `Configured current model is not ${model}`);
+  return fullId;
 }
 export function modelEvidence(result: WorkflowTaskResult) {
   const attempts = result.modelAttempts ?? [];

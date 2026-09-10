@@ -89,6 +89,8 @@ All implementation, repair, review and coordination stages request `openai-codex
 Atomic 0.9.18 implicitly appends the current model despite the empty list.
 The compatibility thinking option applies high effort to that unsuffixed candidate; same-model retries are authorized.
 The workflow checks the current model before stage creation and persists observed attempt metadata after each successful stage return.
+The installed catalog's `currentModel` is the session model object, identified by its `provider` and `id`; declared string identities are also accepted.
+Missing or malformed identity metadata blocks separately from a genuinely different selection.
 An off-policy model/effort or missing successful high-effort metadata blocks further progress.
 Missing effort metadata on unsuccessful attempts is preserved as unknown, not claimed verified.
 These observations are not atomic session/model locks and cannot prevent an engine race or attest an attempt for which the SDK returns no result.
@@ -99,6 +101,9 @@ No Atomic patch or alternate model/provider is introduced.
 ```sh
 node .atomic/workflows/omnigent-workers/check.mjs
 ```
+
+For the offline model boundary alone, append `--model-only`.
+The checker executes the installed catalog factory and successful-attempt metadata writer in isolation, without extension registration or model dispatch; controller fixtures reuse those values.
 
 Controller fixtures use mocked VCS/model/host boundaries; the human-preservation lane additionally runs bounded offline Nix evaluations with IFD disabled and no builds.
 These checks do not replace real-fleet or real-user acceptance.

@@ -4,10 +4,10 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { humanChecks } from "./human-checks.mjs";
 
-export async function regressionChecks({ definition, sliceDefinition, migrationDefinition, migration, contracts, operations, gates, source }, only) {
+export async function regressionChecks({ definition, sliceDefinition, migrationDefinition, migration, contracts, operations, gates, source, models }, only) {
   if (!only || only === "F1") await humanChecks(gates);
   const ctx = {
-    cwd: contracts.repository, inputs: { start_at: 4, deploy: false, max_repairs: 2, build_timeout_minutes: 1 }, models: { currentModel: contracts.model },
+    cwd: contracts.repository, inputs: { start_at: 4, deploy: false, max_repairs: 2, build_timeout_minutes: 1 }, models,
     tool: async (name) => name === "allocate-evidence" ? ".atomic/workflows/runs/fixture" : { ok: true, value: { receipt: [], evidence: source } },
     workflow: async () => { throw Error("unexpected child"); }, exit: (value) => value,
   };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 
-export async function controllerChecks({ definition, sliceDefinition, migrationDefinition, Operations, contracts, source, compact }) {
+export async function controllerChecks({ definition, sliceDefinition, migrationDefinition, Operations, contracts, source, compact, models, modelResult }) {
   const root = `.atomic/workflows/runs/omnigent-workers-tests/${Date.now()}`;
   await mkdir(root, { recursive: true });
   const tree = `${root}/tree.json`;
@@ -13,7 +13,7 @@ export async function controllerChecks({ definition, sliceDefinition, migrationD
     let review = 0;
     const node = (name) => { assert(!seen.has(name), `reopened DAG ancestor ${name}`); seen.add(name); events.push(name); };
     const ctx = {
-      cwd: contracts.repository, inputs, models: { currentModel: contracts.model }, events,
+      cwd: contracts.repository, inputs, models, events,
       exit: (value) => { throw new Exit(value); },
       ui: { confirm: async () => config.confirm ?? true, editor: async () => config.editor ?? "fixture human receipt", select: async () => "passed" },
       task: async (name, opts) => {
@@ -26,7 +26,7 @@ export async function controllerChecks({ definition, sliceDefinition, migrationD
           review++;
           structured = config.contractFault ? { kind: "contract_defect", reason: "gate cannot check required property" } : { kind: "approved", evidence: [tree] };
         }
-        return { structured, modelAttempts: [{ model: contracts.model, reasoningLevel: "high", success: true }] };
+        return { structured, ...modelResult() };
       },
       tool: async (name, args, callback, options) => {
         node(name);

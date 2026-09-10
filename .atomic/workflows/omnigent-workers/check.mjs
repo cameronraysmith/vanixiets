@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { dirname, resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { runInNewContext } from "node:vm";
 const require = createRequire(import.meta.url);
 const atomic = resolve(dirname(realpathSync(execFileSync("bash", ["-c", "command -v atomic"], { encoding: "utf8" }).trim())), "../lib/node_modules/@bastani/atomic");
 const compiler = execFileSync("bash", ["-c", "printf '%s\\n' /nix/store/*typescript*/lib/node_modules/typescript/lib/typescript.js | head -1"], { encoding: "utf8" }).trim();
@@ -33,6 +34,57 @@ const operations = await import(moduleUrl(`${root}/operations.ts`));
 const gates = await import(moduleUrl(`${root}/gates.ts`));
 const migration = await import(moduleUrl(`${root}/migration.ts`));
 const definition = (await import(moduleUrl(`${root}.ts`))).default;
+// Evaluate only the installed pure factory, never the extension's registration code.
+const catalogSource = ts.createSourceFile("catalog.mjs", readFileSync(join(atomic, "dist/builtin/workflows/src/extension/index.bundle.mjs"), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+const catalogFactory = catalogSource.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "workflowModelCatalogFromContext");
+assert(catalogFactory, "Installed Atomic catalog factory must be inspectable");
+const makeCatalog = runInNewContext(`(${catalogFactory.getText(catalogSource)})`);
+const selectedModel = { provider: "openai-codex", id: "gpt-6-astra" };
+const models = makeCatalog({ model: selectedModel });
+assert.equal(models.currentModel, selectedModel);
+assert.equal(await operations.currentModel({ models }), contracts.model);
+await assert.rejects(operations.currentModel({ models: makeCatalog({ modelRegistry: { getAvailable: () => [] } }) }), /current-model metadata missing/);
+for (const currentModel of [null, {}, { provider: "openai-codex" }, { provider: 1, id: "gpt-6-astra" }, { provider: "openai-codex", id: "" }, "", "gpt-6-astra", []]) {
+  await assert.rejects(operations.currentModel({ models: { currentModel } }), /current-model metadata malformed/);
+}
+for (const [catalog, reason] of [
+  [makeCatalog({ model: { provider: "fixture", id: "gpt-6-astra" } }), /Configured current model is not/],
+  [makeCatalog({ model: { provider: "openai-codex", id: "foreign" } }), /Configured current model is not/],
+  [makeCatalog({}), /catalog unavailable/],
+  [makeCatalog({ modelRegistry: { getAvailable: () => [] } }), /current-model metadata missing/],
+  [{ currentModel: { fullId: contracts.model } }, /current-model metadata malformed/],
+]) {
+  let effects = 0;
+  const ctx = { cwd: contracts.repository, models: catalog, task: async () => { effects++; }, tool: async () => { effects++; } };
+  await assert.rejects(operations.currentModel(ctx), reason);
+  await assert.rejects(definition.run(ctx), reason);
+  await assert.rejects(new operations.Operations(ctx, "fixture", 1000).stage("fixture", {}), reason);
+  assert.equal(effects, 0);
+}
+assert.equal(await operations.currentModel({ models: { currentModel: `${contracts.model}:high` } }), `${contracts.model}:high`);
+for (const catalog of [undefined, null, false, "invalid"]) await assert.rejects(operations.currentModel({ models: catalog }), /catalog unavailable/);
+const sdkSource = ts.createSourceFile("sdk.js", readFileSync(join(atomic, "dist/builtin/workflows/src/index.js"), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+const reasoning = ["effectiveCandidateReasoning", "modelAttemptReasoning"].map((name) => {
+  const fn = sdkSource.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === name);
+  assert(fn, `Installed Atomic ${name} must be inspectable`);
+  return fn.getText(sdkSource);
+}).join("\n");
+const controller = sdkSource.statements.find((n) => ts.isClassDeclaration(n) && n.name?.text === "StageSessionController");
+const record = controller?.members.find((n) => ts.isMethodDeclaration(n) && n.name?.getText(sdkSource) === "recordSuccessfulAttempt");
+assert(record, "Installed Atomic result metadata writer must be inspectable");
+const recordSuccess = runInNewContext(`${reasoning}\n({ ${record.getText(sdkSource)} }).recordSuccessfulAttempt`);
+function modelResult(candidate = { id: contracts.model }, options = contracts.modelOptions) {
+  const state = { modelAttempts: [], effectiveStageOptions: options, pendingFallbackWarnings: [], takeAttemptUsage: () => undefined, notifySuccessfulModelFallbackMeta: () => {} };
+  recordSuccess.call(state, candidate);
+  return { modelAttempts: state.modelAttempts };
+}
+for (const candidate of [{ id: contracts.model, reasoningLevel: "high" }, { id: contracts.model }]) {
+  assert.equal(operations.modelEvidence(modelResult(candidate)).attempts[0].thinking, "high");
+}
+assert.throws(() => operations.modelEvidence(modelResult({ id: "fixture/foreign" })), /off-policy model/);
+assert.throws(() => operations.modelEvidence(modelResult({ id: contracts.model, reasoningLevel: "medium" })), /off-policy thinking/);
+assert.throws(() => operations.modelEvidence(modelResult({ id: contracts.model }, {})), /lacks observed high-thinking metadata/);
+console.log("PASS installed catalog factory object identity, fail-closed preflight/stage guards and SDK-created primary/compatibility high attempt metadata");
 assert.equal(definition.name, "omnigent-workers");
 assert.equal(typeof definition.run, "function");
 assert.throws(() => contracts.parse(contracts.Review, { kind: "approved", evidence: [] }));
@@ -47,6 +99,7 @@ assert.throws(() => operations.modelEvidence({ modelAttempts: [{ model: contract
 assert.throws(() => operations.modelEvidence({ modelAttempts: [{ model: contracts.model, reasoningLevel: "medium", success: true }] }));
 assert.equal(operations.modelEvidence({ modelAttempts: [{ model: contracts.model, reasoningLevel: "high", success: false }, { model: contracts.model, reasoningLevel: "high", success: true }] }).attempts.length, 2);
 console.log("PASS closed schema rejection and requested/observed same-model high policy");
+if (process.argv.includes("--model-only")) process.exit(0);
 const id = "k".repeat(32), sha = "a".repeat(40);
 const source = { change: id, workingCopy: "l".repeat(32), joinParents: [id, "m".repeat(32)], sha, source: `git+file:///fixture?rev=${sha}` };
 assert.throws(() => operations.routeCommand(id, ["../outside"], ["."]));
@@ -64,11 +117,11 @@ execFileSync("python3", ["-c", `import ast; ast.parse(open('${root}/live.py').re
 console.log("PASS definition import and shape (no registry reload, models, VCS or host effects)");
 const sliceDefinition = (await import(moduleUrl(`${root}/slice.ts`))).default;
 const compact = (await import(moduleUrl(".atomic/workflows/bump/tools.ts"))).assertCompactCheckpoint;
-await (await import("./controller-checks.mjs")).controllerChecks({ definition, sliceDefinition, migrationDefinition: migration.default, Operations: operations.Operations, contracts, source, compact });
+await (await import("./controller-checks.mjs")).controllerChecks({ definition, sliceDefinition, migrationDefinition: migration.default, Operations: operations.Operations, contracts, source, compact, models, modelResult });
 for (const expression of [gates.baselineExpr(source.source), gates.stateExpr(source.source, ["magnetite"]), gates.workersExpr(source.source, "stibnite")]) {
   execFileSync("nix-instantiate", ["--parse", "--expr", expression], { stdio: ["ignore", "pipe", "pipe"] });
 }
 for (const host of contracts.hosts) execFileSync("bash", ["-n", "-c", migration.hostCommand(host, "readlink /run/current-system")]);
 console.log("PASS generated Nix parsing and shell syntax (no evaluation or host execution)");
 execFileSync("python3", ["-B", `${root}/live-checks.py`], { stdio: "inherit" });
-await (await import("./regression-checks.mjs")).regressionChecks({ definition, sliceDefinition, migrationDefinition: migration.default, migration, contracts, operations, gates, source });
+await (await import("./regression-checks.mjs")).regressionChecks({ definition, sliceDefinition, migrationDefinition: migration.default, migration, contracts, operations, gates, source, models });
