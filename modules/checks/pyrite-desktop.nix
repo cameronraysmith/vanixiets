@@ -1,5 +1,37 @@
-{ inputs, ... }:
 {
+  inputs,
+  config,
+  lib,
+  ...
+}:
+{
+  perSystem =
+    { system, ... }:
+    lib.mkIf (system == "x86_64-linux") {
+      checks.pyrite-dankgreeter-config =
+        let
+          machine = config.flake.nixosConfigurations.pyrite;
+          cfg = machine.config;
+          pkgs = machine.pkgs;
+          greeter = cfg.services.displayManager.dms-greeter;
+          configuration = pkgs.writeText "pyrite-dankgreeter.kdl" greeter.compositor.customConfig;
+          launcher = cfg.services.greetd.settings.default_session.command;
+          assets = "${greeter.package}/share/quickshell/dms";
+        in
+        pkgs.runCommand "pyrite-dankgreeter-config" { } ''
+          ${lib.getExe cfg.programs.niri.package} validate -c ${configuration}
+          test -x ${launcher}
+          test -f ${assets}/Modules/Greetd/assets/dms-greeter
+          test -f ${assets}/shell.qml
+          ${pkgs.gnugrep}/bin/grep -F -- '${assets}/Modules/Greetd/assets/dms-greeter' ${launcher}
+          ${pkgs.gnugrep}/bin/grep -F -- '${cfg.programs.niri.package}/bin' ${launcher}
+          ${pkgs.gnugrep}/bin/grep -F -- '${greeter.quickshell.package}/bin' ${launcher}
+          ${pkgs.gnugrep}/bin/grep -F -- ' -C ' ${launcher}
+          mkdir -p "$out"
+          cp ${configuration} "$out/config.kdl"
+          cp ${launcher} "$out/launcher"
+        '';
+    };
   flake.modules.nixos."machines/nixos/pyrite" =
     {
       config,
@@ -117,8 +149,13 @@
       ];
       bar = builtins.head settings.barConfigs;
       widgets = bar.leftWidgets ++ bar.centerWidgets ++ bar.rightWidgets;
-      gnomeSettings = (builtins.head config.programs.dconf.profiles.user.databases).settings;
-      power = gnomeSettings."org/gnome/settings-daemon/plugins/power";
+      greeter = config.services.displayManager.dms-greeter;
+      greetd = config.services.greetd;
+      loginPam = config.security.pam.services.login;
+      greeterPam = config.security.pam.services.dms-greeter;
+      greetdPam = config.security.pam.services.greetd;
+      nativeGreeterModule = "${inputs.nixpkgs}/nixos/modules/services/display-managers/dms-greeter.nix";
+      enabledRules = rules: lib.filterAttrs (_: rule: rule.enable) rules;
     in
     {
       assertions = [
@@ -276,26 +313,108 @@
             && config.security.rtkit.enable;
         }
         {
-          message = "pyrite desktop: GNOME and GDM selection and inactivity are preserved";
+          message = "pyrite desktop: native DankGreeter declaration provenance";
+          assertion = lib.all (option: map toString option.declarations == [ nativeGreeterModule ]) [
+            options.services.displayManager.dms-greeter.enable
+            options.services.displayManager.dms-greeter.package
+            options.services.displayManager.dms-greeter.compositor.name
+          ];
+        }
+        {
+          message = "pyrite desktop: native greeter isolation without autologin";
           assertion =
-            config.services.displayManager.gdm.enable
-            && config.services.desktopManager.gnome.enable
-            && !config.services.displayManager.gdm.autoSuspend
+            greeter.enable
+            && greetd.enable
+            && !config.services.displayManager.gdm.enable
+            && !config.services.desktopManager.gnome.enable
+            && config.services.displayManager.sessionData.sessionNames == [ "niri" ]
             && config.services.displayManager.defaultSession == null
-            &&
-              config.services.displayManager.sessionData.sessionNames == [
-                "gnome"
-                "niri"
-              ]
             && !config.services.displayManager.autoLogin.enable
-            && !config.services.greetd.enable
-            && !config.services.displayManager.dms-greeter.enable
-            && toString power.sleep-inactive-ac-timeout == "0"
-            && toString power.sleep-inactive-battery-timeout == "0"
-            && power.sleep-inactive-ac-type == "nothing"
-            && power.sleep-inactive-battery-type == "nothing"
-            && power.power-button-action == "nothing"
-            && toString gnomeSettings."org/gnome/desktop/session".idle-delay == "@u 1800";
+            && !(greetd.settings ? initial_session)
+            && greetd.settings.default_session.user == "dms-greeter"
+            && lib.hasSuffix "/bin/dms-greeter-start" greetd.settings.default_session.command
+            && greeter.compositor.name == "niri"
+            && toString greeter.package == toString pkgs.dms-shell
+            && toString greeter.quickshell.package == toString pkgs.quickshell
+            && greeter.configHome == null
+            && greeter.configFiles == [ ]
+            && config.systemd.services.greetd.preStart == ""
+            && (config.systemd.services.greetd.serviceConfig.ExecStartPre or [ ]) == [ ]
+            && !greeter.logs.save
+            && lib.hasInfix "disable-power-key-handling" greeter.compositor.customConfig
+            && lib.hasInfix ''"DMS_RUN_GREETER" "1"'' greeter.compositor.customConfig
+            && lib.all (token: !lib.hasInfix token greeter.compositor.customConfig) [
+              "include "
+              "spawn"
+              "binds"
+            ]
+            && !(config.environment.etc ? "greetd/niri_overrides.kdl")
+            && config.users.users.dms-greeter.isSystemUser
+            && config.users.users.dms-greeter.home == "/var/lib/dms-greeter"
+            && config.users.users.dms-greeter.createHome
+            && config.systemd.tmpfiles.settings."10-dms-greeter"."/var/lib/dms-greeter".d.user == "dms-greeter"
+            && !(config.systemd.services.greetd.serviceConfig ? User)
+            && !(config.home-manager.users ? dms-greeter)
+            && config.systemd.services.greetd.aliases == [ "display-manager.service" ]
+            && !config.systemd.services.greetd.restartIfChanged;
+        }
+        {
+          message = "pyrite desktop: native greetd and greeter PAM wiring";
+          assertion =
+            greetd.settings.general.service == "greetd"
+            && greetd.settings.default_session.service == "dms-greeter"
+            && !greetdPam.useDefaultRules
+            &&
+              lib.all
+                (
+                  kind:
+                  builtins.attrNames (enabledRules greetdPam.rules.${kind}) == [ "login" ]
+                  && greetdPam.rules.${kind}.login.modulePath == "login"
+                  &&
+                    greetdPam.rules.${kind}.login.control == (
+                      if
+                        lib.elem kind [
+                          "auth"
+                          "password"
+                        ]
+                      then
+                        "substack"
+                      else
+                        "include"
+                    )
+                )
+                [
+                  "auth"
+                  "account"
+                  "password"
+                  "session"
+                ]
+            && greeterPam.useDefaultRules
+            && greeterPam.rules.account.unix.enable
+            && greeterPam.rules.session.unix.enable
+            && greeterPam.startSession
+            && greeterPam.rules.session.systemd.enable
+            && greeterPam.rules.session.systemd.control == "optional"
+            &&
+              greeterPam.rules.session.systemd.modulePath
+              == "${config.systemd.package}/lib/security/pam_systemd.so"
+            && loginPam.useDefaultRules
+            && loginPam.unixAuth
+            && !loginPam.allowNullPassword
+            && lib.all (line: !(lib.hasPrefix "auth " line) || !lib.hasInfix " nullok" line) (
+              lib.splitString "\n" loginPam.text
+            )
+            && !loginPam.rootOK
+            && !loginPam.fprintAuth
+            && !loginPam.u2f.enable
+            && loginPam.rules.auth.unix.enable
+            && loginPam.rules.auth.unix.modulePath == "${pkgs.pam}/lib/security/pam_unix.so"
+            && loginPam.rules.auth.deny.enable
+            && loginPam.rules.auth.deny.control == "required"
+            && loginPam.rules.auth.deny.modulePath == "${pkgs.pam}/lib/security/pam_deny.so"
+            && loginPam.enableGnomeKeyring
+            && loginPam.rules.auth.gnome_keyring.enable
+            && loginPam.rules.session.gnome_keyring.enable;
         }
       ];
     };
