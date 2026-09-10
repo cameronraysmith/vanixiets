@@ -39,8 +39,9 @@ niri IS part of this capability, as a second desktop a person may choose at the 
 ### Requirement: A person at the panel can choose between two desktops, and the established one is what they get if they do not choose
 
 The pyrite host SHALL offer more than one desktop at its login screen, so that a person standing at the machine may sign in to either.
-The desktop that was already there SHALL remain what a person gets when they express no choice, and SHALL remain reachable at every login regardless of what happened in any earlier session, so that a newly offered desktop is something a person tries rather than something they are moved to.
+The established GNOME desktop SHALL remain registered and selectable at the greeter, and SHALL remain the default for users with no recorded session choice, so that a newly offered desktop is something a person tries rather than something they are moved to.
 A person's own choice SHALL persist across logins for that person alone, and SHALL NOT be overwritten on the host's behalf.
+The sign-in and recovery guarantees of this requirement and its scenarios exclude the state caused by restarting display-manager while a niri session is live: GNOME reachability does not hold in that case (CAM-66), and repair may be required. The operator MUST quit niri before restarting display-manager and confirm the affected user's niri.service is inactive.
 
 #### Scenario: two desktops are offered where one was offered before
 
@@ -61,7 +62,7 @@ A person's own choice SHALL persist across logins for that person alone, and SHA
 
 #### Scenario: the newly offered desktop is unusable at the panel
 
-- **WHEN** a person signs in to the newly offered desktop and finds it unusable at the machine's own panel
+- **WHEN** a person signs in to the newly offered desktop and finds it unusable at the machine's own panel, without display-manager having been restarted while niri was live (the CAM-66 exception)
 - **THEN** the established desktop is still offered at the next login and still works, so recovering costs a sign-out rather than a repair
 - **AND** this remains true without anyone being at the machine having done anything to prepare for it
 
@@ -122,3 +123,7 @@ Every file those settings draw in SHALL be fixed at the time of the check and un
 - **WHEN** the settings draw in a further file
 - **THEN** that file is fixed at the time of the check and cannot be altered afterwards
 - **AND** a file that could be altered afterwards would mean the settings in force are not the settings that were checked, however well the check went
+
+## Verification follow-up (non-normative)
+
+The two-desktop requirement and unusable-desktop recovery scenario above were **amended after the demonstrated counterexample**, by spec-owner decision (task 9.4). Narrowed: unconditional reachability regardless of earlier sessions, and only the recovery scenario's WHEN, to exclude restarting display-manager while niri is live. Left standing: GNOME registration/greeter selectability, default for users with no recorded choice, per-user choice persistence/no host overwrite, and the scenario's unchanged THEN/AND promises of working next-login GNOME, sign-out rather than repair, and no advance preparation outside that explicit exception. This corrects a promise of upstream session-lifecycle behavior that our configuration cannot supply: niri v26.04 lacks the leader-death bridge GNOME 50.1 implements; it is not an omitted available configuration fix. **[CAM-66 — Correct password returns to GDM: niri survives a display-manager restart](https://linear.app/cameronraysmith/issue/CAM-66/correct-password-returns-to-gdm-niri-survives-a-display-manager)** tracks the excluded, unrepaired case. [U-niri-fallback and F-niri-upstream / CAM-66](../../known-limitations.md#verification-lesson-and-decided-undischarged-requirement) retain the incident, exact-pin sources, historical unsatisfied requirement and amendment rationale. This note records the amendment; it no longer asserts that no requirement was amended. The amendment is not a lifecycle repair or evidence that unperformed checks ran; current verdict and coverage boundaries are in `../../verify.md` §9.10.

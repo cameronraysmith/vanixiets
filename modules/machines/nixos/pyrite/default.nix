@@ -349,6 +349,7 @@ in
       services.desktopManager.gnome.enable = true;
 
       programs.niri.enable = true;
+
       # Explicit null beats niri.nix's mkDefault "niri"; the option default does not.
       # "gnome" would also rewrite every user's saved AccountsService session on each
       # GDM start. null leaves that history intact and lets GDM fall back to GNOME.

@@ -18,7 +18,9 @@ attempt_log:
 
 pyrite has one desktop and no way to try another. The operator wants niri, and the research says the whole niri assembly is three changes, not one: the compositor and its session, the shell that makes it usable, and the replacement of the login screen. Taken together they would remove the only desktop that is known to work on this hardware in the same step that introduces its replacement.
 
-This change takes the first slice and only the first. niri becomes a second entry at the login screen. GNOME under GDM stays exactly as it is, stays the default, and stays the fallback: if niri is unusable at the panel, the operator picks GNOME at the next login and nothing has been lost.
+This change takes the first slice only: niri is a second login-screen entry; GNOME/GDM remain installed, GNOME registered/selectable at the greeter, default for users without saved choice and the designated fallback. **Amended after a demonstrated counterexample:** reachability does not hold when `display-manager` is restarted while niri is live; the requirement now explicitly excludes that state (task 9.4). Only the recovery scenario's WHEN is narrowed; working next-login GNOME, sign-out rather than repair and no advance preparation remain promised outside that exception. This corrects an upstream lifecycle promise our configuration cannot deliver: niri v26.04 lacks GNOME 50.1's leader-death bridge, not an available configuration fix deliberately omitted. [U-niri-fallback](known-limitations.md#verification-lesson-and-decided-undischarged-requirement) preserves the counterexample and historical FAIL. **F-niri-upstream = [CAM-66](https://linear.app/cameronraysmith/issue/CAM-66/correct-password-returns-to-gdm-niri-survives-a-display-manager)** / open 9.3 tracks the excluded case, not proof of upstream submission or repair. Independent current verdict: **PASS WITH WARNINGS against the amended requirement**, with incomplete observations retained (`verify.md` §9.10), not fully verified/archive-ready.
+
+**Operational limitation and explicit requirement exception, not a repair:** never restart display-manager with live niri. Quit with `Mod+Shift+E`, confirm, and require cameron's `systemctl --user is-active niri.service` to report `inactive` before an authorized restart; being at the greeter or on SSH alone is insufficient. If already stranded, coordinated SSH recovery stops `niri.service graphical-session.target` in cameron's user manager, verifies both inactive, then retries GNOME. This ends any active graphical session for that user. Full commands, primary sources and evidence boundaries: `known-limitations.md`. The local C monitor was declined and removed, not deferred for deployment.
 
 Two things make this less trivial than "turn niri on". The nixpkgs module pins itself as the default session, and under GDM that rewrites every user's saved session on every display-manager start — so enabling niri without care flips the default away from the working desktop. And yesterday's never-suspend work does not carry: all of it is `gsd-power` and dconf, which a niri session does not run. On a host where roughly one resume in five fails and the power button is the only wake source, a niri session that suspends itself unattended costs a physical trip to the machine. Both are designed against here rather than discovered later.
 
@@ -26,19 +28,19 @@ Two things make this less trivial than "turn niri on". The nixpkgs module pins i
 
 **niri appears as a second session at the login screen**
 - From: one session is registered, so GDM's picker hides itself — the chooser is gated on `ids.length <= 1` in gnome-shell's login dialog, not on any NixOS option.
-- To: niri's nixpkgs package registers a second session, the picker appears on its own, and an operator can sign in to either desktop.
+- To: niri's nixpkgs package registers a second session and the picker appears on its own. Task **8.1 is discharged** by inherited niri panel smoke and the operator's recovered GNOME login, independently corroborated by live session/shell/user-unit readback (`verify.md` §9.8). GNOME reachability after the live-niri display-manager-restart trigger remains broken and is now explicitly excluded, not repaired (§9.10); this recovered login does not erase that defect.
 - Reason: the session registry is `services.displayManager.sessionPackages` and nothing else; niri's nixpkgs package already satisfies its contract, so this is enabling an existing mechanism rather than building one.
 - Impact: a choice at the login screen, and a per-person memory of which one was chosen last.
 
-**GNOME stays the default, and each person's own choice is remembered**
+**GNOME stays the default for users with no saved choice, and each person's own choice is remembered**
 - From: `programs.niri` sets the default session to niri by default; under GDM that runs `set-session niri` before every start, which rewrites every non-system user's saved session and, in its own comment, "basically ignore[s] session history".
 - To: the default session is pinned explicitly to the value that leaves saved sessions alone, so a person who has never chosen gets GNOME and a person who has chosen gets what they chose.
 - Reason: the fallback has to be the desktop that works, and per-user memory is the mechanism that makes the choice stick.
-- Impact: nothing is rewritten on the machine on any start.
+- Impact: the configuration does not rewrite saved session choices on display-manager starts; GDM still persists the user's selection. This selection mechanism does not establish unconditional GNOME reachability (**U-niri-fallback**).
 
 **The niri session never suspends the host on its own**
 - From: the host does not suspend itself on inactivity — but that protection is entirely GNOME-specific, and a niri session runs none of it.
-- To: the same guarantee holds for a niri session, established from source in its own right and verified by leaving the machine alone on mains power and on battery.
+- To: the same guarantee holds for a niri session, established independently by evaluation under the operator's explicit 8.3/8.4 method decision, **not** by untouched mains/battery observation. Corrected task 4.2 remains open for an actual in-niri idle-consumer snapshot, not a deploy.
 - Reason: resuming this host is unreliable and recovering a failed resume needs a person at the machine (world assumption A13). An unattended suspend under a desktop nobody checked is a trip to wherever the laptop is.
 - Impact: the never-suspends property becomes a property of the host rather than of one desktop.
 
