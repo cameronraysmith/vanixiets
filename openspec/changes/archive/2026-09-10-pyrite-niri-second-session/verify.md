@@ -1,10 +1,10 @@
 # Verification Report
 
 **Change**: `pyrite-niri-second-session` (CAM-63)
-**Verified at**: 2026-09-09; physical-test/evaluation/declination verdict 2026-09-10 UTC (§9.9); subsequent documentation-only narrow amendment and independent verdict (§9.10).
-**Verifier**: inherited runtime/research workers, followed by amendment worker; schema `superpowers-bridge-wrspm`, numbered manual fallback (skill tool unavailable in the original pass).
+**Verified at**: 2026-09-09; physical-test/evaluation/declination and amendment 2026-09-10 UTC; inherited 4.2 observation 03:13:54; final 6.6/8.2 live observation **03:22:14 UTC**, final independent verdict §9.12.
+**Verifier**: inherited runtime/research and amendment workers, followed by this read-only runtime/finalisation worker; schema `superpowers-bridge-wrspm`.
 
-**Final verdict: PASS WITH WARNINGS against the explicitly amended requirement — not fully verified or archive-ready. 32 checked / 6 unchecked.** The amendment was made **after** the CAM-66 counterexample: it replaces unconditional reachability with GNOME registered/selectable at the greeter and default for users with no recorded choice, and explicitly excludes restarting display-manager while niri is live. Only recovery WHEN is narrowed; THEN/AND remain standing outside that exception. This corrects a promise of unavailable upstream lifecycle behavior — niri v26.04 lacks GNOME 50.1's leader-death bridge, which our configuration cannot supply — not an available configuration fix deliberately omitted. **CAM-66 remains unrepaired and tracked.** Independent criterion/evidence comparison is §9.10, not an assumption that amendment means PASS. **8.3/8.4/8.5 discharged by evaluation, not observation; 8.6 declined under CAM-59; 8.7 physically discharged in both desktops with same-boot controls; whole-boot suspend totals 1/1, not zero. Corrected 4.2 remains open for an actual in-niri runtime observation, not a deploy. Task 8.1 was the test that would have caught the session-strand defect; the checklist's deploy → restart display-manager sequence itself caused lockout from inside live niri.** The pre-amendment FAIL remains correct historical evidence, not erased by this verdict.
+**Final archive-gate verdict: PASS WITH WARNINGS — archive-ready against the amended requirement; 34 checked / 4 unchecked.** **6.6 runtime-discharged; 8.2 remembered choice discharged, but its no-history half remains a METHOD LIMITATION, source-read only, NOT discharged by evaluation.** The operator declined destroying their real AccountsService preference to demonstrate a default; a disposable no-history account can close this bounded gap safely. **The requirement amendment is legitimate and explicit:** after CAM-66, unconditional GNOME reachability was narrowed to registration/selectability/default without recorded choice, excluding display-manager restart while niri is live; only recovery WHEN narrows, THEN/AND stand outside the exception. Niri v26.04 lacks GNOME 50.1's leader-death bridge; no configuration of ours supplies it. This is not omission of an available configuration fix. **CAM-66 remains unrepaired. 8.3/8.4/8.5 discharged by evaluation, not observation; 8.6 declined under CAM-59; 8.7 physically discharged with same-boot positive/negative controls; whole-boot suspend totals 1/1, not zero. Task 8.1 was the test that would have caught the session-strand defect; the checklist's deploy → restart display-manager sequence itself caused the lockout inside live niri.** §9.12 independently compares all retained criteria and the ledger; no retained-domain counterexample or remaining undispositioned blocker is established. Earlier FAIL/BLOCKED verdicts remain historical, not erased.
 
 Evidence attribution: **[inherited execution]** means the predecessor/ledger actually ran the cited command; **[verified here]** means this worker read the host or exact source; **[operator]** means physical observation supplied by the operator. Those are not interchangeable. No deployment, restart, reload, suspend, button test, source edit, writing git/jj command or `just lint` was performed here. First action was `pwd` → `/Users/crs58/projects/vanixiets`.
 
@@ -18,7 +18,7 @@ Evidence attribution: **[inherited execution]** means the predecessor/ledger act
 
 **Final verdict follow-up:** documentation-only, read-only SSH/source research, no Nix changes, deployment, restart, reload or suspend. The operator's physical tests are independently journal-grounded in §9.9; the operator's evaluation substitution and deliberate-suspend declination are recorded explicitly. Prior temporal claims below are historical where superseded by §9.9. Toplevel rebuild skipped. Findings/command logs: `logs/niri-slice-a-final-verdict.md` and `logs/niri-final-verdict-*-20260910.log`.
 
-**Current amendment pass / attribution boundary:** all §9.1–§9.9 runtime/source execution and physical tests below are inherited, even where their original authors label them `[verified here]` or “fresh.” This worker re-read every current change artifact and both predecessor reports before editing, read the preserved pinned primary-source transcripts, applied the exact draft, corrected 4.2 without checking it, and independently compared the amended criteria to that accumulated evidence (§9.10). Only local structural validation and scoped checks are new execution. No host query or mutation, Nix edit or rebuild. Historical “unchanged requirement / FAIL” statements below describe their pre-amendment pass; current dispositions are §9.10 and Overall Decision.
+**Attribution boundary:** §§9.1–9.11 describe earlier passes; their “[verified here]” and “current” refer to those authors/times. This final worker newly executed only read-only SSH observations and exact-version source reads in §9.12, then local documentation/archive and authorized Linear operations. Earlier build/evaluation/physical evidence and 4.2's complete observation are inherited, not rerun. No host mutation or Nix source edit. §9.12 and Overall Decision supersede earlier current-verdict language.
 
 ## 1. Structural Validation (`openspec validate --all --json`)
 
@@ -45,7 +45,7 @@ Exit 0. No failed structural item. **This checks Markdown structure and delta we
 
 ## 2. Task Completion (`tasks.md`)
 
-- [ ] All tasks complete — **32 checked / 6 unchecked**, 38 total. Checked **8.3, 8.4, 8.5** are evaluation discharges under explicit operator decision, **not untouched wall-clock observations**; **8.7** is physical testing plus journal/session corroboration. Unchecked: **2.3** vacuous by its explicit rule; **8.6 declined**; **4.2, 6.6, 8.2** remaining prescribed runtime coverage; **9.3** upstream submission. Decision 9.4 now applies the narrow amendment; neither it nor recovered usability 8.1 repairs the excluded CAM-66 case. No check is relabelled as re-executed.
+- [ ] All tasks complete — **34 checked / 4 unchecked**, 38 total. 6.6 is now runtime-discharged under explicit operator disposition; 8.2 stays unchecked because only its remembered-choice half is discharged and no-history is a source-read-only method limitation. 2.3 remains vacuous/unchecked by its rule, 8.6 declined, 9.3 upstream follow-up. Checked 8.3/8.4/8.5 are evaluation, not wall-clock observation; 8.7 is physical testing. No unresolved execution obligation is silently waived; no full-verification claim.
 
 Five existing tasks were newly discharged: **4.1, 4.4, 6.3, 6.4, 8.8**; new **6.5** records the already-performed manual logind reload plus live verification. Prior 17 checked tasks retain the ledger's actual evaluation/build evidence, not claimed re-execution here.
 
@@ -64,9 +64,9 @@ Five existing tasks were newly discharged: **4.1, 4.4, 6.3, 6.4, 8.8**; new **6.
 | Incomplete task | Reason | Blocks complete acceptance/archive now? |
 |---|---|---|
 | 2.3 | `includes=[]`; explicitly vacuously satisfied, not exercised. Task itself forbids checking an empty-list branch. | No; no artificial include needed. |
-| 4.2 | Corrected to **no idle consumer**, not no autostart. Delivered pinned unit `Wants=xdg-desktop-autostart.target`; old `xdg-autostart*` misses it and `app-…@autostart` services. Complete in-niri process/service snapshot not recovered (§§9.9–9.10). | Retained runtime coverage gap per D7: **seen, not deduced**. Needs only an attributed in-niri observation, not a deploy; configuration/dependency evidence does not close it. |
-| 6.6 (amendment) | Fix deployed and post-deploy daemon loaded its file-db. Physical tests now pass, but prescribed in-session desktop/gsettings/inhibitor transcript remains missing. | Retained collection gap, not a need to redeploy/restart or deny the physical result. |
-| 8.2 | Session=niri persisted; no no-history GNOME login, next-login preselection/relogin, or post-selection restart comparison. | Yes for full scenario verification; persistence itself is no longer missing. |
+| 4.2 (now complete) | Live niri session 238, uid 1000/seat0, PID 158454; full processes/services/actual autostart target inspected; no idle consumer (§9.11). | No remaining 4.2 gap; observed, not deduced. |
+| 6.6 (now complete) | Inherited mapped GNOME file-db adoption plus new live-niri environment/gsettings/inhibitor transcript, explicitly dispositioned by operator (§9.12). | No; runtime-discharged, not a claim the original GNOME collection sequence ran. |
+| 8.2 (split) | Remembered choice discharged; no-history GNOME is a source-read-only method limitation, NOT evaluation discharge. Operator declined deleting real saved preference. | Explicitly non-blocking method limitation; disposable no-history user is the safe future observation. |
 | 8.6 | **DECLINED by operator**: CAM-59 historical 8/38 failure cohort, physical-power-cycle risk; re-proving the defect buys this change nothing. | Explicit deliberate-suspend/guard/wake coverage limitation, not a passed test or a future scheduling request. |
 | 9.3 | Upstream niri submission not established; prototype/research preserved in logs. **F-niri-upstream = CAM-66** is the real Linear follow-up (operator metadata, not independently API-queried). | Follow-up for the explicitly excluded, unrepaired U-niri-fallback case, not a local-daemon shipping requirement; reporting alone cannot repair it. |
 
@@ -77,16 +77,16 @@ CLI-resolved delta (`openspec status --change pyrite-niri-second-session --json`
 
 | Capability | Sync status | Notes |
 |---|---|---|
-| graphical-desktop-session | Pending sync | Main spec still excludes niri and says home-manager has no desktop toggle. Delta modifies that requirement and adds the choice/persistence, independent inactivity/power-control, and same-program settings-check requirements. Expected unarchived state; no main-spec edit here. |
+| graphical-desktop-session | **Synced before archive** | All four delta requirement/scenario blocks match the main corpus exactly; existing CAM-62 inactivity requirement preserved byte-for-byte. Purpose scoped to GNOME plus niri; non-normative follow-up records CAM-66 and final method boundaries. Strict main-spec check exits 0. Wholesale satisfaction regeneration completed while change folder still active: 105 total rows, 92 undischarged requirement rows, 3 narrow interface discharges, 10 self-attested world rows. `logs/niri-final-sync-projection-20260909-233253.log` records exact sync and world-assumptions unchanged hash; final archive receipt is in `logs/niri-slice-a-archive-final.md`. |
 
 ## 4. Design / Specs Coherence Spot Check
 
 | Decision | Requirement correspondence (delta spec lines) | Result |
 |---|---|---|
-| D1/D4, additive niri and explicit null | 39–67, amended choice/default/history and recovery | Registry/history evidence and panel usability support the retained semantics (§§9.1,9.8–9.10). The proven live-niri display-manager-restart failure is now explicitly excluded, still unrepaired (CAM-66), not a failing test inside the amended domain. 8.2 remains an observation gap. |
+| D1/D4, additive niri and explicit null | 39–67, amended choice/default/history and recovery | Registry/history evidence and panel usability support retained semantics; remembered-choice half discharged (§9.12). Demonstrated live-niri display-manager restart failure is explicitly excluded, still unrepaired (CAM-66). No-history GNOME remains a source-read-only method limitation. |
 | D3/D6, exact validator and immutable includes | 103–124 | Same niri store path plus positive/negative builds establish validation; includes are vacuous. |
-| D7, desktop-independent idle protection | 68–85 | **Discharged by evaluation**, per operator decision for 8.3/8.4: no configured idle consumer and live logind ignore. No untouched AC/battery observation; 4.2's process snapshot still missing (§9.9). |
-| D9, paired policy plus GNOME amendment | 72,87–96 | Protected ordinary presses in both desktops pass by operator testing and journal controls (8.7). 6.6's prescribed transcript remains missing; deliberate suspend/wake **declined** (8.6). |
+| D7, desktop-independent idle protection | 68–85 | **Discharged by evaluation**, per operator decision for 8.3/8.4: no configured idle consumer and live logind ignore. No untouched AC/battery observation; separate 4.2 process snapshot now actually observed (§9.11). |
+| D9, paired policy plus GNOME amendment | 72,87–96 | Protected ordinary presses in both desktops pass by operator testing/journal controls (8.7); 6.6 now runtime-discharged (§9.12). Deliberate suspend/wake declined (8.6). |
 | D8, preserve existing GNOME/GDM inactivity configuration | 81–85 | Baseline comparison plus both delivered file-db readbacks and exact gsd guards support **evaluation discharge** (8.5), not repeated behavioral windows. |
 | OQ2, portal sufficiency | Not a separate behavioral acceptance requirement | Installed/started backends verified, functional transactions not exercised; qualification and B-portal follow-up added. |
 
@@ -114,15 +114,15 @@ $ ls docs/superpowers/specs/*.md 2>/dev/null
 
 | Manual check | Closest executed evidence | Equivalent? / follow-up |
 |---|---|---|
-| 4.2 idle consumers | Delivered unit/autostart evaluation and journal startup sequence; current post-exit process snapshot | No equivalence to an in-niri process snapshot; retained open. Benign autostarts are not idle consumers. |
+| 4.2 idle consumers | New full affected-user process/services/autostart snapshot during active niri session 238 (§9.11) | Discharged by live observation, not automated-test equivalence. Benign autostarts are not idle consumers. |
 | 8.1 both interactive desktops | Inherited niri operator smoke plus recovered GNOME operator login and live session/shell/user-unit readback (§9.8) | Discharged by actual runtime evidence, not automated-test equivalence. Does not repair U-niri-fallback. |
-| 8.2 never-chosen/relogin/restart memory | Pinned GDM source, persisted Session=niri, empty evaluated preStart | No; observe the remaining sequence without unauthorized state clearing. |
+| 8.2 never-chosen/relogin/restart memory | Exact GDM 50.1 source, persisted Session=niri at later login, evaluated empty preStart | Remembered choice discharged by explicit disposition; no-history is a method limitation, source-read only, not equivalent. Operator declines destroying saved preference; disposable user is future safe discharge. |
 | 8.3/8.4 niri AC/battery idle | Exact-tag absence of idle configuration, delivered no-consumer configuration, live logind ignore | **Evaluation discharge explicitly chosen by operator**, replacing the former method/refusal. Not a 35-minute untouched AC/battery observation. |
 | 8.5 GNOME/greeter regression | Both delivered file-db profiles, effective user readback, exact gsd idle-watch guards | **Evaluation discharge explicitly chosen by operator**, not repeated regression windows. |
 | 8.6 deliberate suspend/wake | Existing CAM-59, no blanket block (4.3) | **Declined by operator** due physical recovery risk; no behavioral equivalence or future test request. |
 | 8.7 ordinary key in GNOME and niri | Three actual presses, session attribution, 0 suspend/PM/shutdown per window; positive pre-fix and negative post-fix controls | Physical test discharged, **not** automated equivalence; operator owns panel usability observation. Wake declined with 8.6. |
 
-Carry these into retrospective **Misses**, with these task IDs as follow-up references; no retrospective exists yet and none is claimed written. §7 recording itself is non-blocking. Complete acceptance/archive readiness remains unclaimed because prescribed observations are incomplete; the current qualified verdict distinguishes those gaps from demonstrated failures against the amended criteria (§9.10).
+Coverage residuals are carried into `retrospective.md` Misses and §6 follow-ups. The final operator dispositions resolve 6.6 and split 8.2 (§9.12), without pretending their original sequences ran. This is not an ungrounded blanket waiver.
 
 ## 8. Designation Lint and Discharge Coherence (agent-executed; warning, non-blocking)
 
@@ -159,7 +159,7 @@ The known OQ6 gaps are not the only lexer findings. Related action nouns such as
 | Requirement | Discharged by (S) | Under (W) | Status |
 |---|---|---|---|
 | MODIFIED local GNOME under GDM | No named interface requirement; implementation options and boot ordering embedded directly in behavioral text | No explicit named world discharger; retained D1/D11 references are design, not W | **Undischarged (no named S)**; follow-up V-interface. Runtime/policy evidence does not supply a named S. |
-| ADDED two desktops/default/history | No named S; GDM registry/history mechanism exists only in design/tasks | No named W | **Undischarged (no named S), V-interface.** Historical unconditional U-niri-fallback failed; the current requirement explicitly excludes live-niri display-manager restart, tracked as unrepaired **CAM-66 / F-niri-upstream**, open 9.3. Applied decision 9.4 and independent amended behavioral verdict are §9.10. Recovered GNOME usability closes 8.1, not the defect or separate 8.2 history/relogin gaps. |
+| ADDED two desktops/default/history | No named S; GDM registry/history mechanism exists only in design/tasks | No named W | **Undischarged (no named S), V-interface.** Historical unconditional U-niri-fallback failed; current requirement excludes live-niri display-manager restart, tracked as unrepaired **CAM-66 / F-niri-upstream**, open 9.3. Recovered usability closes 8.1, remembered choice closes half of 8.2; no-history remains a source-read-only method limitation (§9.12). |
 | ADDED independent inactivity/power policy | No named S; niri/logind mechanisms described in design/tasks | Explicit A13, still applicable; no new resume experiment | **Undischarged (no named S)**; V-interface. Separately: idle tasks discharged by evaluation, ordinary-key test physically discharged, deliberate suspend/wake declined (§9.9). |
 | ADDED same-program settings check | No named S; actual config derivation/binary equality and negative build are evidence, not a named interface spec | No named W | **Undischarged (no named S)**; V-interface. Executed build layer passes; includes vacuous. |
 
@@ -367,7 +367,7 @@ shutdown/poweroff_requests=0
 
 **Inherited CAM-66 cross-check:** read-only journal retrieval reproduced switch **00:12:03.093473**, restart command **00:12:06.532360**, session-157 removal **00:12:06.648563**, surviving niri pausing **00:12:06.703987**, three GNOME “A graphical session is already running!” failures and niri SIGTERM **00:15:16.671788** (`logs/niri-final-verdict-cam66-20260910.log:1–8`). This grounds the pre-amendment FAIL in an actual violation, not checklist arithmetic. The command sequence's origin as the supplied checklist is operator attribution (§9.7); trigger/order and failure are journal facts. The current amendment (§9.10) explicitly excludes that exact state, not a finding that the incident was harmless.
 
-### 9.10 Applied narrow CAM-66 amendment and independent verdict
+### 9.10 Applied narrow CAM-66 amendment and independent verdict (historical; finalisation in §9.11)
 
 **Scope and provenance:** this worker read both terminal predecessor reports and every current change artifact before editing; merged rather than replaced §§9.7–9.9, preserving physical/session evidence and the process finding. No runtime investigation was redone. Pinned primary-source contents were re-read from `logs/niri-limitation-primary-sources-20260909-212206.log:4–115,155–187`: niri **v26.04 / 8ed0da44d974c32c6877d2f4630c314da0717ecb**, full `resources/niri-session` and unit; GNOME **50.1**, `leader-systemd.c:246–277`. Their stable upstream URLs are in `known-limitations.md:70–74`. Inherited evaluations/builds/delivered queries remain attributed to their executing workers; physical use remains operator observation. New execution is local strict validation and scoped checks only.
 
@@ -395,14 +395,117 @@ shutdown/poweroff_requests=0
 
 **New local verification:** `openspec validate pyrite-niri-second-session --strict` reports `Change 'pyrite-niri-second-session' is valid` (exit 0), output `logs/niri-amend-applied-strict.log`. Scoped diffs, byte comparison of all 506 Nix files against this worker's entry and exact draft/THEN/AND/ledger checks: `logs/niri-amend-applied-scope.log`. Report with exact before/after: `logs/niri-slice-a-amend-applied-verdict.md`. Toplevel rebuild skipped: documentation-only changes. Concurrent `modules/nixos/gitea-mq.nix` diff is other work, untouched and not a defect; no aggregate clean-Nix-worktree claim.
 
+### 9.11 Final live observation, corrected counts and archive gate (historical; superseded by §9.12)
+
+**[New execution]** First action `pwd` → `/Users/crs58/projects/vanixiets`. Read-only `ssh pyrite.zt` found niri still live, so the inherited `logs/pyrite-niri-4.2-snapshot-20260909-231119.log` was **not** used as the discharge substitute. New complete snapshot: `logs/niri-archive-live-snapshot-20260909-231353.log:1–272` (UTC timestamp **03:13:54**); initial gate: `logs/niri-archive-session-gate-20260909-231339.log`.
+
+```text
+User=1000 Name=cameron Seat=seat0 TTY=tty2 Service=gdm-password
+Desktop= Type=wayland Class=user Active=yes State=active
+Linger=yes
+niri.service: active/running MainPID=158454, active since 03:08:18 UTC
+gnome-session-manager@gnome.service: inactive/dead MainPID=0
+IdleAction: s "ignore"
+failed user units: 0 loaded units listed.
+FINAL SESSION GUARD: Active=yes State=active ActiveState=active MainPID=158454
+```
+
+The full affected-user `ps -u cameron -ww -o pid,ppid,lstart,args` and 18 running services contain **no GNOME Shell, gsd-power, swayidle, hypridle, xss-lock, xidlehook or gsd-media-keys** (snapshot:26–95). The actual `xdg-desktop-autostart.target` is active, with IBus running and keyring/user-directory/DiskUtility helpers in its generated dependencies (:96–258); these are not idle consumers. **Task 4.2 is closed against the corrected no-idle-consumer predicate**, satisfying D7's seen-not-deduced method. No claim covers a 35-minute untouched window or future manually started consumers.
+
+**Two non-blocking incidental observations:**
+
+- **Empty `Desktop=`:** observed at snapshot:8 although niri's desktop entry declares `DesktopNames=niri` (inherited built-entry evidence, task 6.2). Exact **GDM 50.1**, `daemon/gdm-session.c:2765–2784,2831–2849`, maps `DesktopNames` to `XDG_CURRENT_DESKTOP`, while separately assigning `XDG_SESSION_DESKTOP` from the session name ([source](https://gitlab.gnome.org/GNOME/gdm/-/blob/50.1/daemon/gdm-session.c#L2831)). Exact **systemd v261.1**, `src/login/pam_systemd.c:1789–1793`, reads `XDG_SESSION_DESKTOP`/the `desktop=` PAM parameter ([source](https://github.com/systemd/systemd/blob/v261.1/src/login/pam_systemd.c#L1789-L1793)); `man/pam_systemd.xml:192–203,370–374` documents optional supplied desktop metadata. Thus `DesktopNames` alone is not a direct logind population contract. The complete GDM environment/PAM ordering on this host was **not** settled cheaply; whether the empty field is expected here remains an **unresolved minor propagation observation**, not a guessed root cause or failed niri attribution. Executed exact-version reads: `logs/niri-archive-desktop-primary-20260909-231434.log`. Local systemd tag lookup failed; tagged upstream source was fetched successfully instead.
+- **Stale GNOME-named slices:** separately listing all user slices shows 39 loaded, including old `app-dbus-…org.gnome.*` slices (`logs/niri-archive-suspend-journal-20260909-231405.log:1–47`). The first narrow glob missed escaped `\\x2d` names, so its empty result was not used. These slices are not running idle processes; the complete process listing is the discriminator. `Linger=yes` and user-manager PID 1133 alive since Sep 9 03:18:38 are independently observed. Persistent `user@1000.service` explains retention across desktop sessions and is the **same lingering condition underlying CAM-66**, not a new strand or a reason to disable deliberate lingering/`moshi-hook` policy.
+
+**Corrected whole-boot totals independently verified: 1 requested / 1 entry.** Retrieved JSON from `journalctl -b -u systemd-logind` and `journalctl -b -k`; counted actual message prefixes and owning unit/transport, not unscoped grep text. Boot remains **55dc8d7c-66ba-4b7f-b160-e6459e3c61d0**. Raw evidence: `logs/niri-archive-suspend-journal-20260909-231405.log:501,1862`:
+
+```text
+2026-09-09T21:16:36.392309+00:00 suspend requested from client PID 124058 ('.gsd-media-keys') (unit user@1000.service)...
+2026-09-09T21:16:37.863260+00:00 PM: suspend entry (deep)
+TOTALS {'requested': 1, 'entry': 1}
+```
+
+The first time above is journal receipt `__REALTIME_TIMESTAMP`; the inherited physical-control trace uses source timestamp 21:16:36.392292 for that same event. The supposed second request was `_COMM=sudo` auditing `journalctl ... '--grep=suspend requested|PM: suspend entry|PM: suspend exit'`, not a logind event (independently retrieved in `logs/niri-archive-desktop-sudo-source-20260909-231426.log`). Corrected the historical capture's erroneous `suspend requested (boot): 2` at line 162 explicitly, retaining provenance of the original erroneous count. No whole-boot zero claim; only the one pre-fix media-keys event.
+
+**Independent final comparison:** §9.10's retained-criterion comparison still holds; the only newly closed evidence obligation is 4.2. Registered desktops, source/evaluated default/history mechanism, clean exit and recovered GNOME, actual validator equality/negative build, evaluation-only idle protection and physical protected presses supply positive evidence. CAM-66 remains the explicit upstream lifecycle exception, not a repair. **No new retained-domain counterexample is found.** However the ledger does not say 4.2 is its only non-waived observation: **8.2** still explicitly requires a never-chosen GNOME login, next-login remembered niri and safely gated restart-memory comparison; **6.6** still requires its original in-session transcript. §2 already marks 8.2 as blocking full scenario verification, and §9.10 explicitly says these gaps are not waived. Their missing evidence cannot be inferred from an idle-consumer snapshot.
+
+**New local structural check:** `openspec validate pyrite-niri-second-session --strict` → `Change 'pyrite-niri-second-session' is valid`, exit **0**. Executed task count: **33 checked / 5 unchecked** (`2.3, 6.6, 8.2, 8.6, 9.3`). Exactly one delta exists, `graphical-desktop-session`; no `world-assumptions` delta. Output: `logs/niri-archive-final-checks-20260909-231812.log:1–6`. Structure is clean, not behavioral validation and not an override of the evidence gate.
+
+**Final gate: BLOCKED — no archive-ready PASS.** This is an acceptance-evidence/decision block, not a fabricated compositor failure and not §8 lint promoted into validation. Current count **33 checked / 5 unchecked**: 2.3 vacuous; 6.6/8.2 genuinely missing coverage; 8.6 declined; 9.3 CAM-66 upstream follow-up. **Question for the operator/spec owner:** can the missing 8.2 sequence and 6.6 transcript be supplied, or is their remaining verification obligation explicitly dispositioned as accepted non-blocking coverage (with the evidence/method boundary retained)? The existing 8.3–8.5 substitution and 8.6 declination do not answer this. No unsafe test, restart or state clearing is requested or authorized. Stop before retrospective, sync, archive, projection regeneration, Linear document updates and CAM-63 Done.
+
+### 9.12 Final operator dispositions and independent archive-ready verdict
+
+**[Executed here, read-only]** `ssh pyrite.zt`, **2026-09-10 03:22:14.927511 UTC**, `logs/niri-final-session-observation-20260909-232214.log:1–44`.
+The niri compositor PID **158454** still belongs to session **238**, active at both guards; logind's distinct session leader is **158370** (do not conflate compositor MainPID with logind Leader).
+The probe reads `/proc/158454/environ`, then executes `gsettings` with that exact environment as uid 1000, rather than using an SSH shell's schema search path.
+
+```text
+XDG_CURRENT_DESKTOP=niri
+XDG_SESSION_ID=238
+XDG_SESSION_DESKTOP=niri
+Desktop=
+org.gnome.desktop.session idle-delay -> uint32 1800 (exit 0)
+org.gnome.settings-daemon.plugins.power ALL KEYS -> No such schema (exit 1)
+4 inhibitors: ModemManager, NetworkManager, rtkit-daemon, upowerd
+all WHAT=sleep MODE=delay; no block handle-power-key inhibitor
+/etc/dconf/profile/user:
+user-db:user
+file-db:/nix/store/6gz8yrljg6p5ljydb40y3ijqc9ikzcg4-dconf-db
+/var/lib/AccountsService/users/cameron:
+[User]
+Session=niri
+Modify: 2026-09-10 03:08:17.355065691 +0000
+```
+
+**6.6: DISCHARGED by runtime observation under the explicit operator disposition.** The gsd power schema is not present on this niri session's `XDG_DATA_DIRS` at all: its settings are **structurally inapplicable**, stronger than merely unread by an absent daemon.
+The missing block-mode `handle-power-key` inhibitor independently corroborates 8.7's niri half; GNOME's `gsd-media-keys` instead holds that inhibitor and bypasses logind (§9.6 exact gsd 50.1 source and §9.9 physical/journal attribution).
+GNOME's post-deploy adoption remains grounded by `/proc/148129/maps`, not timing alone (`logs/niri-cam66-final-daemon-20260910.log`).
+This new niri transcript does not fabricate the original GNOME prerequisite collection order.
+`Desktop=` remains **unresolved** despite both desktop environment variables being `niri` and the entry declaring `DesktopNames=niri`; §9.11's GDM/PAM source distinction does not settle this host's ordering.
+
+**8.2: SPLIT, not fully checked.** The remembered-choice half is discharged: privileged reads show the saved niri choice at the original operator login (`logs/niri-verify-discrepancies-20260909.log:1–13`) and at the subsequent niri login above, surviving subsequent logins under the operator's supplied disposition.
+The current file was written at **03:08:17**, not still the original inode/mtime; deliberate intervening GNOME/niri selections are not a host overwrite defect.
+No new controlled before/after restart comparison was performed.
+**The no-history half is a METHOD LIMITATION, source-read only, not discharged by evaluation and not an unverified omission.** The operator declined deleting their real AccountsService session preference to demonstrate a default; no such test was attempted.
+GNOME default-for-no-history rests on **GDM 50.1** `daemon/gdm-session.c:621–625,687–694` (hardcoded GNOME fallback, saved choice wins) and `services.displayManager.defaultSession = null` (inherited evaluation confirms no preStart rewrite, task 3.2), **not observation**.
+Exact source freshly fetched, not default branch: `logs/niri-final-primary-sources-20260909-232259.log:4–46`; [GDM 50.1](https://github.com/GNOME/gdm/blob/50.1/daemon/gdm-session.c#L621-L625).
+**Cheap safe future discharge: a second disposable account with no session history, then no-cog login.** This known bounded gap is explicitly accepted as non-blocking; the requirement is retained, not silently narrowed to existing users.
+
+#### Independent criterion-to-evidence comparison
+
+| Retained requirement / ledger | Evidence and current disposition |
+|---|---|
+| Stock GNOME/GDM and two selectable, usable desktops (3.1, 6.2, 8.1) | Inherited native evaluation/build, actual cog/terminal/clean quit and recovered GNOME operator observation with session-176 corroboration; no retained-domain counterexample. Boot/unlock clauses unchanged, no fresh boot claimed. |
+| GNOME no-history default; personal remembered choice/no host overwrite (3.2, 8.2) | Live saved choice plus supplied persistence disposition discharges memory. GDM 50.1 hardcoded fallback and null/empty preStart support no-history only at source/evaluation layer; explicitly non-blocking METHOD LIMITATION, NOT a behavioral discharge. |
+| GNOME recovery by sign-out, without preparation, outside CAM-66 | Inherited clean niri exit and usable GNOME support retained recovery; proven repair-required event is precisely the now-excluded live-niri display-manager restart, not ordinary sign-out. |
+| Independent idle protection and unchanged GNOME/greeter (4.2, 8.3–8.5) | Inherit predecessor's complete 4.2 live snapshot without rerunning it. 8.3/8.4/8.5 explicitly evaluation, NOT untouched wall-clock observation. |
+| Ordinary press safe in BOTH desktops (6.6, 8.7) | 6.6 observation above; inherited physical tests with logged GNOME 176 press at 02:02:54.328864 and niri 209 presses at 02:03:39.311662/02:03:41.429194. All logged, no suspend/shutdown in protected windows. |
+| Deliberate suspension/wake retained (4.3, 8.6) | No blanket block; behavioral execution DECLINED under CAM-59 (historical 8 failures/38 cycles, physical-recovery risk), not a passed niri suspend/guard/wake test. |
+| Exact runtime validator, negative config rejection, fixed includes (2.1–2.4) | Inherited actual store-path equality and positive/negative builds; includes=[] vacuous, deliberately unchecked. No mismatched binary or mutable used include established. |
+
+**Independent verdict: PASS WITH WARNINGS, archive-ready, not fully observed or formally discharged.** With 6.6's live observation and 8.2's explicit split, the ledger contains no undispositioned blocker: **34 checked / 4 unchecked** (2.3 vacuous, 8.2 half-method-limited, 8.6 declined, 9.3 upstream follow-up).
+The result follows from the retained-domain comparison, not from assuming the supplied decisions imply PASS or that unchecked boxes are failures.
+**FAIL would follow** from absent/unselectable GNOME, wrong no-history fallback, host-overwritten choice, repair-required recovery outside the named exception, idle-attributed suspend, protected ordinary press causing suspend/poweroff, blanket deliberate-suspend/wake prohibition, wrong validator binary, accepted invalid config, or mutable used include.
+No such retained-domain counterexample is established; any later one overrides this verdict regardless of structure/checkbox counts.
+
+**Amendment qualification:** unconditional reachability and recovery WHEN were narrowed after the demonstrated counterexample; recovery THEN/AND remain unchanged outside that exception.
+Fresh exact-pin reads reproduce niri **v26.04 / 8ed0da44d974c32c6877d2f4630c314da0717ecb**, complete `resources/niri-session:1–95` (wait before cleanup, no independent leader-death bridge), and **GNOME 50.1**, `leader-systemd.c:246–277` (FIFO EOF/HUP monitor); `logs/niri-final-primary-sources-20260909-232259.log:48–175`.
+This promised upstream lifecycle behavior no configuration of ours supplies, not a configuration defect we could fix but chose to tolerate; adding a new C monitor is different machinery, deliberately not carried and unverified end-to-end.
+**CAM-66 tracks the excluded, unrepaired case**; upstream submission remains unestablished.
+
+**Physical controls and totals remain prominent:** same-boot pre-fix GNOME press **21:16:36.327747 → .gsd-media-keys request 21:16:36.392292 → PM entry 21:16:37.863260** is the positive control; the three protected logged presses are negative controls.
+Whole-boot authentic totals are **1 requested / 1 entry**, inherited from §9.11, not zero and not the false grep-derived two.
+**Task 8.1 would have caught the session-strand defect. The post-deploy checklist itself caused the lockout when executed from inside niri; corrected order quits niri and requires its service inactive before any display-manager restart.**
+§8 remains agent-executed/non-blocking, NEVER validation; designation and no-named-S findings must remain in the regenerated projection with V-interface/V-vocabulary follow-ups.
+
 ## Overall Decision
 
-- [ ] PASS — fully verified, archive-ready.
-- [x] **PASS WITH WARNINGS — against the explicitly amended requirement, not fully verified/archive-ready.** **32 checked / 6 unchecked.** Narrow post-counterexample CAM-66 amendment, evaluation-only 8.3/8.4/8.5, declined 8.6, physical/session-attributed 8.7 with same-boot controls and whole-boot **1/1**, corrected/open 4.2, missing 6.6/8.2 observations and upstream 9.3 all remain visible in §9.10.
-- [ ] FAIL — the former unconditional requirement did fail; that is retained history, not the current criterion. A retained-domain violation listed in §9.10 would restore FAIL.
+- [ ] PASS — fully verified.
+- [x] **PASS WITH WARNINGS — archive-ready with explicit dispositions, 34 checked / 4 unchecked (§9.12).** 8.2 no-history remains source-read-only METHOD LIMITATION; 8.3/8.4/8.5 evaluation, 8.6 declined, 8.7 physical with controls, CAM-66 excluded/unrepaired.
+- [ ] BLOCKED / FAIL — historical §9.11 block is resolved by the supplied operator dispositions and new observation, not erased; no retained-domain counterexample is established.
 
 **Verification-process finding:** task **8.1** was the runtime GNOME fallback check that would have caught the defect in the affected post-restart state; it sat unchecked while other tasks were discharged by evaluation. A clean quit-only smoke need not reproduce this defect. Closing the recovered GNOME login, physical power tests, idle evaluation or amending the requirement cannot erase that counterexample. The original post-deploy **deploy → restart display-manager ordering caused the lockout inside live niri**, not an unrelated operator mistake. All future restart instructions retain the no-live-niri gate; no host action is authorized here.
 
 **§8 is agent-executed, non-blocking and NEVER validation** (`openspec/config.yaml:49–51`). Its designation, alphabet and no-named-interface discharge findings remain open, including machine vocabulary added by the amendment; no ungrounded clean lint. `openspec validate` checks structure only. Retain undischarged formal rows and follow-ups in the regenerated archive projection rather than silently accepting them. Bare-compositor portal/cursor/X11 limitations remain bounded slice-B work.
 
-**Remaining evidence questions, not resolved by interpretation:** can an actual attributed in-niri snapshot be supplied to close 4.2; can the missing 6.6 in-session transcript and 8.2 no-history/relogin/safely-gated restart-memory sequence be supplied; and what is the upstream report URL/status if 9.3 has been submitted? These remain open, with no inferred waiver, deploy or risky test authorized. 8.6's declination and the amendment decision are settled, not reopened.
+**No remaining decision is needed for this archive.** No-history GNOME and empty Desktop metadata remain bounded slice-B questions, not fabricated answers; CAM-66 upstream submission remains a follow-up, not a claimed submission. Archive and Linear results are recorded in `logs/niri-slice-a-archive-final.md`.

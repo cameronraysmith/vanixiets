@@ -3,7 +3,7 @@
 ## Purpose
 
 This capability covers a graphical desktop reachable on the machine's own panel with no network involved, which is what travel-readiness amounts to for a laptop.
-It governs a stock GNOME session under GDM enabled at system level, so the desktop is complete with no home-manager desktop configuration on the user side.
+It governs a stock GNOME session under GDM enabled at system level, complete without GNOME home-manager configuration, and a second selectable niri session with typed home-manager settings; niri's shell assembly remains outside this slice.
 The criterion it holds is a rendered greeter and a reached, interactive shell observed at the machine, since a display manager reporting active is compatible with a blank panel and with a session that restart-loops back to the greeter.
 Enabling the display manager leaves the stage-1 unlock prompt a stage-1 event, so reaching the desktop still begins with a credential typed before any graphical target starts.
 Among the fleet's NixOS hosts pyrite carries this capability; the other laptops run nix-darwin and the servers are headless.
@@ -14,7 +14,7 @@ Among the fleet's NixOS hosts pyrite carries this capability; the other laptops 
 
 The pyrite host module SHALL enable a stock GNOME desktop with `services.displayManager.gdm.enable = true` and `services.desktopManager.gnome.enable = true`, the two options nixpkgs seeds into `nixos-generate-config` at `nixos/modules/services/desktop-managers/gnome.nix:250-251`.
 The desktop SHALL be system-level: no home-manager desktop configuration is required, because a stock GNOME session takes nothing from the admin user's already-imported home-manager.
-niri and its Wayland shell assembly are NOT part of this capability.
+niri IS part of this capability, as a second desktop a person may choose at the login screen; its Wayland shell assembly — bar, launcher, notification daemon, lock screen, wallpaper, clipboard manager — is NOT.
 
 #### Scenario: the two GNOME system options are set
 
@@ -24,9 +24,9 @@ niri and its Wayland shell assembly are NOT part of this capability.
 
 #### Scenario: no home-manager desktop configuration is required
 
-- **WHEN** the admin user cameron's home-manager is imported at the machine level and carries no desktop module
+- **WHEN** the admin user cameron's home-manager is imported at the machine level and carries no GNOME desktop module
 - **THEN** the GNOME session is nonetheless complete, because `services.desktopManager.gnome.enable` supplies the shell, portals, polkit agent, keyring, dconf, settings daemon, applet, and control center at system level
-- **AND** the user side of the desktop is therefore near-zero, since home-manager carries no desktop toggle
+- **AND** the GNOME side of the desktop is therefore near-zero on the user side, since home-manager carries no GNOME desktop toggle; home-manager now carries desktop configuration for the second desktop only, and that configuration has no effect on the GNOME session
 
 #### Scenario: the machine reaches a graphical login
 
@@ -73,3 +73,102 @@ This requirement is harm reduction and not a repair. It reduces how often the ho
 - **WHEN** a person sets an automatic-suspend policy through the desktop's settings panel
 - **THEN** that person's choice takes effect over the declared fleet policy, because the fleet deliberately leaves these settings changeable at the machine
 - **AND** the declared policy is therefore what the host does absent such a change, not a guarantee about what it does
+
+### Requirement: A person at the panel can choose between two desktops, and the established one is what they get if they do not choose
+
+The pyrite host SHALL offer more than one desktop at its login screen, so that a person standing at the machine may sign in to either.
+The established GNOME desktop SHALL remain registered and selectable at the greeter, and SHALL remain the default for users with no recorded session choice, so that a newly offered desktop is something a person tries rather than something they are moved to.
+A person's own choice SHALL persist across logins for that person alone, and SHALL NOT be overwritten on the host's behalf.
+The sign-in and recovery guarantees of this requirement and its scenarios exclude the state caused by restarting display-manager while a niri session is live: GNOME reachability does not hold in that case (CAM-66), and repair may be required. The operator MUST quit niri before restarting display-manager and confirm the affected user's niri.service is inactive.
+
+#### Scenario: two desktops are offered where one was offered before
+
+- **WHEN** a person is at the login screen of a host that offers two desktops
+- **THEN** both are presented as choices and the person can sign in to either
+- **AND** the choice is presented without anyone having asked for it to be presented, because a login screen that has only one desktop to offer does not offer a choice at all
+
+#### Scenario: a person signs in without choosing
+
+- **WHEN** a person who has never chosen a desktop on this host signs in
+- **THEN** they reach the desktop that was established before the second one was offered
+
+#### Scenario: a person's own choice is remembered, and nothing else changes it
+
+- **WHEN** a person chooses a desktop, signs in, and later signs in again
+- **THEN** they reach the desktop they chose
+- **AND** no other person's choice is altered by that, and no person's recorded choice is replaced on the host's behalf when the host next presents its login screen
+
+#### Scenario: the newly offered desktop is unusable at the panel
+
+- **WHEN** a person signs in to the newly offered desktop and finds it unusable at the machine's own panel, without display-manager having been restarted while niri was live (the CAM-66 exception)
+- **THEN** the established desktop is still offered at the next login and still works, so recovering costs a sign-out rather than a repair
+- **AND** this remains true without anyone being at the machine having done anything to prepare for it
+
+### Requirement: A newly offered desktop does not suspend the host when nobody is using it
+
+A desktop newly offered at this host's login screen SHALL NOT cause the host to enter a suspended state on account of inactivity alone, whether the host is running on mains power or on its battery.
+This SHALL be established for that desktop in its own right, and SHALL NOT be inferred from the fact that another desktop on the same host does not suspend it, because a property established for one desktop is a property of that desktop and not of the host.
+A person SHALL remain able to suspend the host deliberately from the newly offered desktop. An ordinary press and release of the physical control that is this host's only wake source (A13), while using either the newly offered desktop or the established GNOME desktop session, SHALL NOT suspend or power off the host. That control SHALL remain a wake source; preventing an accidental suspend SHALL NOT prevent a person from waking the host after a deliberate one.
+
+**Discharged by**: world assumption `A13 — Resuming this laptop from a suspended state is unreliable, and recovering a failed resume requires a person at the machine`. A13 is what makes an unattended suspend a cost rather than a convenience, and it applies to every desktop this host offers, not to the one it happened to be written about.
+
+#### Scenario: nobody touches the machine during a session on the newly offered desktop
+
+- **WHEN** a person signs in to the newly offered desktop and stops interacting with the host for any length of time, on mains power or on battery
+- **THEN** the host stays awake and remains reachable over the network, rather than suspending itself and requiring a person to be present at the machine to wake it
+
+#### Scenario: the established desktop and the login screen are unaffected
+
+- **WHEN** the second desktop is offered
+- **THEN** the established desktop still does not suspend the host on inactivity, and the login screen still does not, exactly as before
+- **AND** neither behaves differently on mains power than on battery, in either direction
+
+#### Scenario: a person presses the host's only wake source while the host is awake
+
+- **WHEN** a person makes an ordinary press and release of the physical control that is this host's only wake source while using either the newly offered desktop or the established GNOME desktop session
+- **THEN** the host neither suspends nor powers off, and the desktop remains usable
+- **AND** a person can still deliberately suspend the host from that desktop and use that same wake source afterwards, without any promise that this unreliable host will successfully resume
+
+#### Scenario: the operator suspends the host on purpose from the newly offered desktop
+
+- **WHEN** an operator deliberately chooses to suspend the host from the newly offered desktop, rather than by pressing the physical control that is its wake source
+- **THEN** the host suspends, and the operator accepts the resume risk knowingly on that occasion, as they would from any other desktop
+
+#### Scenario: the reason the guarantee had to be re-established is that it did not carry
+
+- **WHEN** the mechanism that keeps one desktop from suspending the host is one that only that desktop runs
+- **THEN** a second desktop inherits nothing from it, and stating the guarantee for the host as a whole without checking the second desktop would assert something nobody established
+
+### Requirement: A desktop is not offered until the settings it will start with have been checked by the program that will start it
+
+Where this host generates the settings a desktop starts with, those settings SHALL be checked before the desktop is offered, and SHALL be checked by the very program that will start the desktop rather than by another copy or another version of it.
+Every file those settings draw in SHALL be fixed at the time of the check and unchangeable afterwards, so that what was checked is what is used.
+
+#### Scenario: settings that would be rejected are caught before anyone can select the desktop
+
+- **WHEN** settings are generated for a desktop and the program that starts that desktop would reject them
+- **THEN** the rejection surfaces while the host's configuration is being prepared, not at the moment a person selects the desktop at the login screen
+- **AND** the failure is therefore recoverable from anywhere, rather than only by a person standing at the machine
+
+#### Scenario: the checking program and the running program are the same
+
+- **WHEN** settings are checked and the desktop is later started
+- **THEN** the program that performed the check and the program that starts the desktop are the same one
+- **AND** a check performed by a different copy would be a guarantee that looks present and is hollow, so it does not count as having checked
+
+#### Scenario: a drawn-in file cannot change after the check
+
+- **WHEN** the settings draw in a further file
+- **THEN** that file is fixed at the time of the check and cannot be altered afterwards
+- **AND** a file that could be altered afterwards would mean the settings in force are not the settings that were checked, however well the check went
+
+## Verification follow-up (non-normative)
+
+The two-desktop requirement and unusable-desktop recovery scenario were **amended after the demonstrated counterexample**, by spec-owner decision (CAM-63 task 9.4).
+Narrowed: unconditional reachability regardless of earlier sessions, and only recovery WHEN, to exclude restarting display-manager while niri is live.
+Retained: GNOME registration/selectability, default for no recorded choice, per-user persistence/no host overwrite, and unchanged recovery THEN/AND outside that exception.
+This corrects a promise of upstream behavior no configuration of ours supplies: niri v26.04 lacks GNOME 50.1's leader-death bridge, not an available configuration fix we omitted.
+**[CAM-66](https://linear.app/cameronraysmith/issue/CAM-66)** tracks the excluded, unrepaired case; [incident and exact-pin sources](../../changes/archive/2026-09-10-pyrite-niri-second-session/known-limitations.md#verification-lesson-and-decided-undischarged-requirement) retain the original counterexample and historical FAIL.
+Final [verification §9.12](../../changes/archive/2026-09-10-pyrite-niri-second-session/verify.md#912-final-operator-dispositions-and-independent-archive-ready-verdict) is PASS WITH WARNINGS: **8.2 no-history is a source-read-only method limitation**, not discharged by evaluation; remembered choice is discharged; **8.3/8.4/8.5 evaluation, not observation; 8.6 declined under CAM-59; 8.7 physical tests with same-boot positive/negative controls and whole-boot 1/1**.
+The operator declined deleting their real AccountsService preference; a disposable no-history account is the safe future observation.
+These behavioral dispositions do not discharge the missing named-S formal obligations; [V-interface and V-vocabulary follow-ups](../../changes/archive/2026-09-10-pyrite-niri-second-session/retrospective.md#6-promote-candidates--long-term-learning) remain open.
