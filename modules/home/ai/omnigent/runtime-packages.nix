@@ -21,6 +21,11 @@
       pkgs.which
       pkgs.direnv
       pkgs.nix
+      pkgs.gh
     ]
-    ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.bubblewrap ];
+    ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+      pkgs.bubblewrap
+      pkgs.procps
+      pkgs.lsof
+    ];
 }

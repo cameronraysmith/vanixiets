@@ -708,6 +708,24 @@ Its foreground command must wait for `/nix/store` and `exec` the built Omnigent 
 `LimitLoadToSessionType=Background` is distinct from `ProcessType=Background`; the latter must remain absent.
 These inspections establish rendered configuration only; log-directory ownership and mode after activation, credentials, host identity and laptop recovery remain human checks in D7.
 
+## S11 runtime tooling
+
+The v0.13.0 PATH audit (upstream revision `eebef804e1fe4beddc61ea232b951cddddd7f890`) adds `pkgs.gh` to the shared runner runtime on all three hosts.
+The GitHub resource handler invokes `gh` in the runner environment, not the central server, so the selected user's existing `~/.config/gh/hosts.yml` OAuth state remains imperative and unchanged.
+No token or credential file is copied or declared by this addition.
+Linux runners also receive `pkgs.procps` for the Codex orphan-app-server `ps` probe and `pkgs.lsof` for the harness manager's abandoned-socket sweep.
+These cleanup packages are Linux-only because the declared Darwin system-directory suffix already supplies `/bin/ps` and `/usr/sbin/lsof`.
+The server independently starts the same harness manager and receives its own targeted `path = [ pkgs.lsof ];`, not the runner profile or its harness binaries.
+
+The version-bound executable manifest is `.atomic/workflows/omnigent/tooling-manifest.json`.
+S11 evaluates the unit and plist PATHs with empty extras and checks real executable resolution, including intended gh/procps/lsof identities, without invoking authenticated GitHub operations or cleanup.
+Its complete ordered Darwin PATH and structural carriers replace S10's historical exact-list assertions without changing their bodies or defaults; S7/S8 replacements point directly at the active S11 carrier.
+Executable omission controls reject missing gh, ps and lsof, including the separate server requirement.
+Before accepting a version upgrade, re-audit subprocess/probe literals, helper callers and shell strings and update the manifest's version, revision and exclusions.
+This proves only the reviewed executable set resolves: constructed names, downloaded scripts, SDK internals and later environment rewrites remain outside the audit.
+In this Nix deployment, optional UI vendor installs remain unsupported; do not add curl, Kubernetes/Microsandbox CLIs, extra shells or an ambient profile PATH to make those optional installers appear supported.
+Authenticated panel behavior and orphan cleanup remain live acceptance checks, not claims established by executable presence.
+
 ## Deferred scope
 
 - Managed sandbox providers: freestyle.sh, Modal, Daytona, Blaxel, Kubernetes, and OpenShell.

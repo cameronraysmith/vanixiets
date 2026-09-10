@@ -94,6 +94,7 @@ in
 
         systemd.services.omnigent = {
           description = "Omnigent server";
+          path = [ pkgs.lsof ];
           wantedBy = [ "multi-user.target" ];
           after = [
             "network-online.target"
