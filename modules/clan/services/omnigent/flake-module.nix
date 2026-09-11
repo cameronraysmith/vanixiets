@@ -68,7 +68,7 @@ in
             };
             workers = lib.mkOption {
               default = { };
-              description = "Dedicated Linux workers; account declarations remain separate from enrollment.";
+              description = "Dedicated workers; account declarations remain separate from enrollment.";
               type = lib.types.attrsOf (
                 lib.types.submodule {
                   options = {
@@ -168,8 +168,6 @@ in
               };
             darwinModule =
               { pkgs, ... }:
-              assert lib.assertMsg (settings.workers == { })
-                "Dedicated Darwin workers require the Darwin adapter; this role currently supports dedicated workers only on Linux";
               {
                 imports = [ darwinModules.omnigent-host ];
                 services.omnigent-host = {
@@ -181,6 +179,20 @@ in
                     name: lib.getAttrFromPath (lib.splitString "." name) pkgs
                   ) settings.extraPackages;
                   inherit (settings) environment;
+                  workers = lib.mapAttrs (_: worker: {
+                    inherit (worker)
+                      enable
+                      owner
+                      user
+                      autoApproveDirenv
+                      environment
+                      ;
+                    hostName = lib.mkIf (worker.hostName != null) worker.hostName;
+                    workspaceRoot = lib.mkIf (worker.workspaceRoot != null) worker.workspaceRoot;
+                    extraPackages = map (
+                      name: lib.getAttrFromPath (lib.splitString "." name) pkgs
+                    ) worker.extraPackages;
+                  }) settings.workers;
                 };
               };
           };

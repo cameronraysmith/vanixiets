@@ -753,6 +753,26 @@ Before activating each host, verify actual accounts, groups, trust, private cana
 After activation, test selected native and ACP harnesses, HM-only tools, an approved Nix devshell, cache consumption, hook/auxiliary authority, restart persistence and platform lifecycle behavior.
 Module checks and builds do not attest these live outcomes.
 
+### Dedicated Darwin adapter
+
+The dedicated-worker adapter is additive to the legacy S7 human HM agent described above.
+Inventory migration, account allocation and activation remain separate delivery steps; the adapter alone neither retires that agent nor starts a new worker on stibnite.
+It reuses the common worker options and capabilities, evaluates standalone HM for each declared worker, and retains that generation at `/etc/omnigent/workers/<key>` for authorized onboarding while execution is disabled.
+
+Enabled workers use system-domain launchd jobs with explicit `UserName`.
+System activation runs preparation as the worker to check the account's actual UID/GID and prepare private HOME/log parents before launchd opens the logs.
+The native launcher waits for the Nix store; the worker launcher checks ownership and permissions, runs the selected HM activation as the worker, and starts the host only after success.
+The worker is excluded from integrated HM and user-domain agents, so no second login owns activation.
+PATH includes the same generation's profile between required runtimes and extras, followed by native macOS utilities.
+Standard process QoS, throttled failure restart and ordinary sleep behavior remain unchanged.
+
+The targeted Darwin check inspects the realized plist, its actual launcher and activation-selected profile/YAML, including upstream `sandbox: none` selection and ordinary Nix/profile visibility.
+Disposable-directory tests cover preparation and startup failures; controlled account lookup and HM-activation return values isolate those effects without logging in or activating a host.
+These tests do not attest runtime account isolation or daemon-context credential usability.
+Before enablement, audit actual allocated UID/GID against effective sudo authority, including numeric grants and unmanaged group membership.
+Declarative guards and UID observations are insufficient evidence for that obligation, and arbitrary sudoers parsing is not part of this slice.
+Actual authentication, cached offline activation, protected canaries, logout/reboot and wake recovery remain post-deploy checks.
+
 ## Deferred scope
 
 - Managed sandbox providers: freestyle.sh, Modal, Daytona, Blaxel, Kubernetes, and OpenShell.

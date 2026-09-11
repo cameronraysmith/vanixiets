@@ -506,8 +506,412 @@
             assert spec["os_env"] == {"type": "caller_process", "cwd": ".", "sandbox": {"type": "none"}}
         print("upstream native Pi and configured ACP select sandbox:none; no child path grants")
       '';
+      mkDarwin =
+        extra:
+        inputs.nix-darwin.lib.darwinSystem {
+          modules = [
+            inputs.home-manager.darwinModules.home-manager
+            config.flake.modules.darwin.omnigent-host
+            {
+              nixpkgs.pkgs = pkgs;
+              system.stateVersion = 6;
+              networking.hostName = "fixture";
+              users.knownUsers = [ "omnigent-cameron" ];
+              users.knownGroups = [ "omnigent-cameron" ];
+              users.groups.omnigent-cameron.gid = 22001;
+              users.users.omnigent-cameron = {
+                uid = 22001;
+                gid = 22001;
+                home = "/Users/omnigent-cameron";
+                createHome = true;
+              };
+              services.omnigent-host = {
+                serverUrl = "https://fixture.invalid";
+                workers.cameron = {
+                  enable = true;
+                  owner = "cameron";
+                  user = "omnigent-cameron";
+                  extraHomeModules = [
+                    {
+                      home.packages = [
+                        profileOnly
+                        (lib.hiPrio shadow)
+                      ];
+                    }
+                  ];
+                  extraPackages = [
+                    pkgs.hello
+                    shadow
+                  ];
+                };
+              };
+            }
+          ]
+          ++ extra;
+        };
+      darwin = (mkDarwin [ ]).config;
+      darwinPrepared =
+        (mkDarwin [ { services.omnigent-host.workers.cameron.enable = lib.mkForce false; } ]).config;
+      darwinFailures = c: map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
+      darwinRejects =
+        message: extra:
+        let
+          evaluate =
+            modules:
+            builtins.tryEval (
+              let
+                c = (mkDarwin modules).config;
+              in
+              assert darwinFailures c == [ ];
+              c.networking.hostName
+            );
+          withoutGuard.options.assertions = lib.mkOption {
+            apply = lib.filter (a: a.assertion || a.message != message);
+          };
+        in
+        !(evaluate extra).success && (evaluate (extra ++ [ withoutGuard ])).success;
+      darwinCases = {
+        valid = darwinFailures darwin == [ ];
+        disabledPrepared =
+          !(darwinPrepared.launchd.daemons ? omnigent-host-cameron)
+          && darwinPrepared.environment.etc ? "omnigent/workers/cameron"
+          && darwinPrepared.home-manager.users == { };
+        noLegacyFallback = darwin.home-manager.users == { };
+        root = darwinRejects "Omnigent worker cameron: requires a dedicated non-root managed account." [
+          { users.users.omnigent-cameron.uid = lib.mkForce 0; }
+        ];
+        admin = darwinRejects "Omnigent worker cameron: administrative groups are prohibited." [
+          {
+            users.groups.admin = {
+              gid = 80;
+              members = [ "omnigent-cameron" ];
+            };
+          }
+        ];
+        primaryAdmin = darwinRejects "Omnigent worker cameron: administrative groups are prohibited." [
+          { users.users.omnigent-cameron.gid = lib.mkForce 80; }
+        ];
+        trusted = darwinRejects "Omnigent worker cameron: Nix trusted-user authority is prohibited." [
+          { nix.settings.trusted-users = [ "omnigent-cameron" ]; }
+        ];
+        trustedGroup = darwinRejects "Omnigent worker cameron: Nix trusted-user authority is prohibited." [
+          { nix.settings.trusted-users = [ "@omnigent-cameron" ]; }
+        ];
+        noNix = darwinRejects "Omnigent worker cameron: ordinary Nix daemon access is required." [
+          { nix.settings.allowed-users = lib.mkForce [ "root" ]; }
+        ];
+        duplicateActivation =
+          darwinRejects "Omnigent worker cameron: standalone Home Manager must be the only activation owner."
+            [
+              { home-manager.users.omnigent-cameron.home.stateVersion = "25.11"; }
+            ];
+        workerAgent =
+          darwinRejects "Omnigent worker cameron: worker Home Manager must not require a user launchd domain."
+            [
+              {
+                services.omnigent-host.workers.cameron.extraHomeModules = [
+                  {
+                    launchd.agents.unwanted = {
+                      enable = true;
+                      config.ProgramArguments = [ "/usr/bin/true" ];
+                    };
+                  }
+                ];
+              }
+            ];
+        desktopActivation =
+          darwinRejects
+            "Omnigent worker cameron: worker Home Manager must not require desktop application activation."
+            [
+              {
+                services.omnigent-host.workers.cameron.extraHomeModules = [
+                  { targets.darwin.copyApps.enable = lib.mkForce true; }
+                ];
+              }
+            ];
+        selectors =
+          lib.all
+            (
+              key:
+              darwinRejects
+                "Omnigent worker cameron: environment cannot override identity, state or authority selectors."
+                [
+                  { services.omnigent-host.workers.cameron.environment.${key} = "foreign"; }
+                ]
+            )
+            [
+              "HOME"
+              "PATH"
+              "SSH_AUTH_SOCK"
+              "NIX_CONFIG"
+              "ATOMIC_CODING_AGENT_DIR"
+              "OMP_CODING_AGENT_DIR"
+              "BASH_ENV"
+              "SKIP_SANITY_CHECKS"
+            ];
+      };
+      darwinWrongUser =
+        (mkDarwin [
+          {
+            launchd.daemons.omnigent-host-cameron.serviceConfig.UserName = lib.mkForce "root";
+          }
+        ]).config;
+      darwinWrongDomain =
+        (mkDarwin [
+          {
+            environment.launchDaemons."org.nixos.omnigent-host-cameron.plist".enable = false;
+            environment.launchAgents."org.nixos.omnigent-host-cameron.plist".text =
+              darwin.environment.launchDaemons."org.nixos.omnigent-host-cameron.plist".text;
+          }
+        ]).config;
+      darwinMissingPath =
+        path:
+        (mkDarwin [
+          {
+            launchd.daemons.omnigent-host-cameron.environment.PATH = lib.mkForce path;
+          }
+        ]).config;
+      darwinHostCanary = pkgs.writeShellScriptBin "omnigent" ''
+        set -eu
+        test "$*" = 'host --server https://fixture.invalid'
+        test -e "$HOME/activation-succeeded"
+        test "$(worker-profile-only)" = worker-profile
+        test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node
+        test "$(command -v hello)" = ${pkgs.hello}/bin/hello
+        test "$(umask)" = 0077
+        test -z "''${SSH_AUTH_SOCK-}"
+        printf '%s\n' host-executed > "$HOME/host-executed"
+      '';
+      darwinControl = (mkDarwin [ { services.omnigent-host.package = darwinHostCanary; } ]).config;
+      darwinArtifactTest = pkgs.writeText "omnigent-darwin-artifacts.py" ''
+        import json
+        import os
+        from pathlib import Path
+        import plistlib
+        import re
+        import shlex
+        import shutil
+        import subprocess
+        import sys
+        import tempfile
+        import yaml
+        from omnigent.cli import _materialize_harness_launcher_file
+        from omnigent.onboarding.acp_auth import acp_agents
+        from omnigent.harnesses.pi_native.main import _materialize_pi_agent_spec
+
+        label = "org.nixos.omnigent-host-cameron"
+        worker_home = "/Users/omnigent-cameron"
+        required = ["atomic", "omp", "pi", "claude", "codex", "nix", "direnv", "gh", "linear", "rg", "fd"]
+
+        def inspect(root):
+            root = Path(root)
+            plist = root / "Library/LaunchDaemons" / (label + ".plist")
+            assert plist.is_file(), "wrong domain"
+            assert not (root / "Library/LaunchAgents" / plist.name).exists(), "duplicate agent"
+            p = plistlib.loads(plist.read_bytes())
+            assert p["Label"] == label
+            assert p["UserName"] == "omnigent-cameron", "wrong user"
+            assert p["WorkingDirectory"] == worker_home
+            assert p["Umask"] == 63
+            assert p["ProcessType"] == "Standard"
+            assert p["RunAtLoad"] and p["KeepAlive"] == {"SuccessfulExit": False}
+            assert p["ThrottleInterval"] == 5
+            assert not any(k in p for k in ["LimitLoadToSessionType", "LaunchOnlyOnce", "KeepAlivePathState"])
+            assert p["StandardOutPath"] == p["StandardErrorPath"] == worker_home + "/.omnigent/logs/host/service.log"
+            env = p["EnvironmentVariables"]
+            assert env["HOME"] == worker_home
+            assert env["USER"] == env["LOGNAME"] == "omnigent-cameron"
+            assert env["PI_ACP_PI_COMMAND"] == "atomic"
+            assert env["PI_CODING_AGENT_DIR"] == worker_home + "/.atomic/agent"
+            assert env["OMNIGENT_RUNNER_ENV_PASSTHROUGH"] == "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR"
+            assert "OMP_CODING_AGENT_DIR" not in env and "ATOMIC_CODING_AGENT_DIR" not in env
+            argv = p["ProgramArguments"]
+            assert argv[:2] == ["/bin/sh", "-c"]
+            wait, store, conjunction, execute, launcher = shlex.split(argv[2])
+            assert [wait, store, conjunction, execute] == ["/bin/wait4path", "/nix/store", "&&", "exec"]
+            assert os.access(launcher, os.X_OK)
+            script = Path(launcher).read_text()
+            activations = re.findall(r"^(/nix/store/[^\n ]+/activate)$", script, re.M)
+            assert len(activations) == 1
+            activation = Path(activations[0])
+            assert os.access(activation, os.X_OK)
+            generation = activation.parent
+            profile = (generation / "home-path").resolve(strict=True)
+            assert shutil.which("node", path=env["PATH"]) == "${pkgs.nodejs_22}/bin/node", "missing runtime"
+            assert str(profile / "bin") in env["PATH"].split(":"), "missing profile"
+            assert env["PATH"].split(":").index("${pkgs.nodejs_22}/bin") < env["PATH"].split(":").index(str(profile / "bin"))
+            assert shutil.which("hello", path=env["PATH"]) == "${pkgs.hello}/bin/hello"
+            assert env["PATH"].endswith(":/usr/bin:/bin:/usr/sbin:/sbin")
+            assert subprocess.check_output([str(profile / "bin/worker-profile-only")], text=True).strip() == "worker-profile"
+            for exe in required:
+                resolved = shutil.which(exe, path=env["PATH"])
+                assert resolved and os.access(resolved, os.X_OK), exe
+            assert list((generation / "LaunchAgents").iterdir()) == []
+            actual_activation = activation.read_text()
+            assert "launchctl" not in actual_activation and "sw_vers" not in actual_activation
+            assert "checkStringEq UID" in actual_activation and "22001" in actual_activation
+            merge_lines = [line for line in actual_activation.splitlines() if line.startswith("run ") and line.endswith("/.omnigent/config.yaml")]
+            assert len(merge_lines) == 1
+            run, merger, declaration, destination = shlex.split(merge_lines[0])
+            assert destination == worker_home + "/.omnigent/config.yaml"
+            return p, launcher, str(activation), merger, declaration
+
+        production = inspect(sys.argv[1])
+        for root, reason in zip(sys.argv[2:6], ["wrong user", "wrong domain", "missing runtime", "missing profile"], strict=True):
+            try:
+                inspect(root)
+            except AssertionError as error:
+                assert str(error) == reason, (reason, str(error))
+            else:
+                raise AssertionError("accepted " + reason)
+        control = inspect(sys.argv[6])
+        _, _, activation, merger, declaration = production
+        assert str(Path(activation).parent) == sys.argv[8], "enrollment generation differs from launched generation"
+        settings = yaml.safe_load(Path(declaration).read_text())
+        assert settings["host"]["name"] == "fixture-cameron"
+        target = Path("worker-config.yaml")
+        target.write_text("host:\n  host_id: retained-worker-id\nunknown: retained\n")
+        subprocess.run([merger, declaration, str(target)], check=True)
+        assert yaml.safe_load(target.read_text()) == settings | {"host": settings["host"] | {"host_id": "retained-worker-id"}, "unknown": "retained"}
+        assert target.stat().st_mode & 0o777 == 0o600
+        os.environ["HOME"] = tempfile.mkdtemp()
+        entries = acp_agents(settings)
+        assert [entry.name for entry in entries] == ["Atomic", "Oh My Pi"]
+        assert entries[0].env_passthrough == ("PI_ACP_PI_COMMAND", "PI_CODING_AGENT_DIR")
+        assert entries[1].env_passthrough == ()
+        for entry in entries:
+            generated = _materialize_harness_launcher_file(harness="acp", model=None, system_prompt=None, acp_agent=entry)
+            spec = yaml.safe_load(generated.read_text())
+            assert spec["os_env"] == {"type": "caller_process", "sandbox": {"type": "none"}}
+            assert spec["executor"]["acp_agent"]["command"] == entry.command
+            assert spec["executor"]["acp_agent"].get("env_passthrough", []) == list(entry.env_passthrough)
+        with tempfile.TemporaryDirectory() as directory:
+            spec = yaml.safe_load(_materialize_pi_agent_spec(Path(directory)).read_text())
+            assert spec["os_env"] == {"type": "caller_process", "cwd": ".", "sandbox": {"type": "none"}}
+
+        system_activation = Path(sys.argv[7]).read_text()
+        preparation_lines = [line for line in system_activation.splitlines() if "-omnigent-prepare-darwin-home " in line]
+        assert len(preparation_lines) == 1
+        invocation = shlex.split(preparation_lines[0])
+        assert invocation[:5] == ["/usr/bin/sudo", "-u", "omnigent-cameron", "--set-home", "--"], "preparation must run as the worker"
+        prepare, user, uid, gid, home = invocation[5:]
+        assert [user, uid, gid, home] == ["omnigent-cameron", "22001", "22001", worker_home]
+        assert system_activation.index("setting up users") < system_activation.index(preparation_lines[0])
+        assert system_activation.index(preparation_lines[0]) < system_activation.index("setting up launchd services")
+        preparation_home = Path.cwd() / "prepared-home"
+        actual_user = subprocess.check_output(["${pkgs.coreutils}/bin/id", "-un"], text=True).strip()
+        def prepare_home(uid=os.getuid()):
+            return subprocess.run([prepare, actual_user, str(uid), str(os.getgid()), str(preparation_home)], check=False)
+        assert prepare_home().returncode == 0
+        for suffix in ["", ".omnigent", ".omnigent/logs", ".omnigent/logs/host"]:
+            directory = preparation_home / suffix
+            assert directory.stat().st_mode & 0o777 == 0o700
+            assert directory.stat().st_uid == os.getuid()
+        assert prepare_home().returncode == 0
+        assert prepare_home(os.getuid() + 1).returncode != 0
+        logs = preparation_home / ".omnigent/logs/host"
+        logs.rmdir()
+        logs.symlink_to(preparation_home, target_is_directory=True)
+        assert prepare_home().returncode != 0, "symlink log parent accepted"
+        print("Darwin realized plist/activation/profile, private preparation, and sandbox:none checked")
+        Path("artifacts.json").write_text(json.dumps({"production": production, "control": control}))
+      '';
+      darwinLauncherTest = pkgs.writeText "omnigent-darwin-launcher-test.py" ''
+        import json
+        import os
+        from pathlib import Path
+        import shlex
+        import subprocess
+
+        artifacts = json.loads(Path("artifacts.json").read_text())
+        plist, launcher, activation, _, _ = artifacts["control"]
+        env = os.environ | plist["EnvironmentVariables"]
+        home = Path(os.environ["TMPDIR"]) / "worker-control"
+        home.mkdir(mode=0o700)
+        for suffix in [".omnigent", ".omnigent/logs", ".omnigent/logs/host"]:
+            (home / suffix).mkdir(mode=0o700)
+        env["HOME"] = str(home)
+        env["SSH_AUTH_SOCK"] = "/fixture/no-signer"
+        # Intercept account lookup and HM's effectful activation only; the emitted launcher,
+        # filesystem checks, PATH, and foreground exec run unchanged without enrolling a user.
+        def run(activation_status, selected_uid=os.getuid(), source=launcher):
+            script = f"""
+        ${pkgs.coreutils}/bin/id() {{
+          if test "$*" = '-u omnigent-cameron'; then printf '%s\\n' {selected_uid};
+          else command ${pkgs.coreutils}/bin/id "$@"; fi
+        }}
+        {activation}() {{
+          test {activation_status} = 0 || return {activation_status}
+          command ${pkgs.coreutils}/bin/touch "$HOME/activation-succeeded"
+        }}
+        source {shlex.quote(source)}
+        """
+            return subprocess.run(["${pkgs.bash}/bin/bash", "-c", script], env=env, check=False)
+
+        assert run(0).returncode == 0
+        assert (home / "host-executed").read_text() == "host-executed\n"
+        (home / "host-executed").unlink()
+        # Keep the previous success marker: stale activation must not mask a later failure.
+        assert run(42).returncode == 42
+        assert not (home / "host-executed").exists(), "host executed after failed activation"
+        assert run(0, os.getuid() + 1).returncode != 0
+        assert not (home / "host-executed").exists(), "wrong UID lookup accepted"
+        home.chmod(0o755)
+        assert run(0).returncode != 0
+        assert not (home / "host-executed").exists(), "public home accepted"
+        home.chmod(0o700)
+        logs = home / ".omnigent/logs/host"
+        logs.chmod(0o755)
+        assert run(0).returncode != 0
+        assert not (home / "host-executed").exists(), "public log parent accepted"
+        logs.chmod(0o700)
+        linked = home.parent / "linked-worker"
+        linked.symlink_to(home, target_is_directory=True)
+        env["HOME"] = str(linked)
+        assert run(0).returncode != 0
+        assert not (home / "host-executed").exists(), "symlink home accepted"
+        env["HOME"] = str(home)
+        mutant = home.parent / "unchecked-activation"
+        original = Path(launcher).read_text()
+        assert original.count(activation + "\n") == 1
+        mutant.write_text(original.replace(activation + "\n", activation + " || true\n"))
+        assert run(42, source=str(mutant)).returncode == 0
+        assert (home / "host-executed").exists(), "activation-failure mutant did not discriminate"
+      '';
     in
     {
+      checks.omnigent-worker-darwin = lib.mkIf pkgs.stdenv.isDarwin (
+        assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues darwinCases))
+          "Omnigent Darwin failures: ${
+            builtins.toJSON (lib.attrNames (lib.filterAttrs (_: ok: !ok) darwinCases))
+          }; assertions: ${builtins.toJSON (darwinFailures darwin)}";
+        pkgs.runCommand "omnigent-worker-darwin"
+          {
+            nativeBuildInputs = [
+              pkgs.python3
+              pkgs.coreutils
+            ];
+            passthru.cases = darwinCases;
+          }
+          ''
+            ${pkgs.omnigent.python.interpreter} ${darwinArtifactTest} \
+              ${darwin.system.build.launchd} \
+              ${darwinWrongUser.system.build.launchd} \
+              ${darwinWrongDomain.system.build.launchd} \
+              ${(darwinMissingPath "/usr/bin:/bin").system.build.launchd} \
+              ${
+                (darwinMissingPath (
+                  (lib.makeBinPath (config.flake.lib.omnigentRuntimePackages pkgs)) + ":/usr/bin:/bin:/usr/sbin:/sbin"
+                )).system.build.launchd
+              } \
+              ${darwinControl.system.build.launchd} \
+              ${darwin.system.activationScripts.script.source} \
+              ${darwin.environment.etc."omnigent/workers/cameron".source}
+            python3 ${darwinLauncherTest}
+            mkdir "$out"
+            cp artifacts.json "$out/"
+          ''
+      );
       checks.omnigent-worker-linux = lib.mkIf pkgs.stdenv.isLinux (
         assert lib.assertMsg (linuxFailed == [ ])
           "Omnigent Linux failures: ${lib.concatStringsSep ", " linuxFailed}; module assertions: ${builtins.toJSON (linuxFailures linux)}";

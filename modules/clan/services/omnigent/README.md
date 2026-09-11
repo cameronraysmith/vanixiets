@@ -4,8 +4,8 @@ The `server` role enables the plain Omnigent NixOS module; the `host` role conne
 Magnetite is the only server and the always-on co-located host; stibnite is the Darwin host, and pyrite is the third host, an intermittently available NixOS laptop.
 Each host requires exactly one server in its instance.
 On NixOS, `perMachine` imports both plain modules once even when a machine holds both roles.
-On Darwin, the host role imports `flake.modules.darwin.omnigent-host` and selects the existing primary user by default.
-The legacy host retains its fixed name; dedicated Linux workers use one system unit per worker key within the same clan instance.
+On Darwin, the host role imports `flake.modules.darwin.omnigent-host`; its legacy agent selects the existing primary user by default.
+The legacy host retains its fixed name; dedicated workers use one platform supervisor per worker key within the same clan instance.
 
 The server interface exposes `domain` and `port`.
 It uses the confidential Kanidm client `omnigent`, the `kanidm-oauth2-omnigent` environment file, and an instance-scoped cookie generator.
@@ -57,7 +57,7 @@ There are no sleep conflicts, suspend hooks or inhibitors, and no network `Requi
 The separate `pyrite-never-sleep` change owns machine sleep policy; this runner neither depends on nor changes that policy and must work whether or not pyrite sleeps.
 Authentication expiry is separate from network loss and requires renewed `omnigent login` as the selected user.
 
-## Darwin lifecycle
+## Legacy Darwin lifecycle
 
 Home Manager alone owns `launchd.agents.omnigent-host`, label `org.nix-community.home.omnigent-host`, in the selected user's `user/<uid>` domain.
 It waits for `/nix/store` and executes the foreground argv `[ omnigent host --server <server-url> ]` using the configured package's absolute executable.
@@ -145,5 +145,32 @@ There are no child-sandbox path grants to configure in this mode: normal account
 Additional child sandboxing is deferred and must use a supported upstream policy mechanism, not an unused host setting or an inference from bubblewrap's presence.
 Credential grants and application-admin permissions remain external authority.
 `checks.x86_64-linux.omnigent-worker-linux` covers module composition and configured boundaries; actual selected-harness identity, protected-canary, devshell and lifecycle checks remain required after authorized activation.
+
+## Dedicated Darwin workers
+
+Each enabled worker runs as `system/org.nixos.omnigent-host-<key>`, with the dedicated account in the plist's `UserName`.
+The native `/bin/sh` entry waits for `/nix/store`, then invokes an executable launcher that checks private HOME/log directories, activates standalone Home Manager as the worker, and executes the foreground host only on success.
+An activation failure exits nonzero even if a previous activation succeeded.
+The daemon retains `ProcessType=Standard`, five-second throttling, failure restart and normal sleep behavior.
+It requires no worker graphical login, sleep inhibitor, or network-state load condition.
+
+Account declarations remain separate.
+They must provide a managed non-root UID, home and group without administrative or Nix-trusted membership.
+Before loading launchd jobs, system activation runs preparation as the worker, verifies the allocated UID/GID and creates owner-only HOME, `.omnigent`, `logs`, and `host` parents.
+It refuses mismatched ownership and symlink directories rather than taking them over.
+The generation is retained at `/etc/omnigent/workers/<key>` even while execution is disabled; authorized onboarding can activate that generation as the worker before enrollment.
+The same generation supplies the daemon's activation and profile PATH.
+Do not also register the worker in integrated `home-manager.users` or add worker Home Manager launch agents.
+The adapter suppresses HM's otherwise unconditional Darwin LaunchAgent reconciliation and disables desktop application copying/linking for these standalone homes.
+
+`checks.aarch64-darwin.omnigent-worker-darwin` follows the realized plist to its launcher, activation generation, profile and declared YAML.
+It exercises private-directory preparation and launcher failure handling with disposable state; account lookup and effectful HM activation are controlled test boundaries, not live account tests.
+Wrong-user/domain and missing-runtime/profile module fixtures must fail inspection.
+The upstream native Pi and configured ACP generation checks retain the accepted `sandbox: none` policy, with no child path grants or namespace-confinement claim.
+
+Keep the human HM agent unchanged until explicit inventory migration retires it.
+Before enablement, audit actual UID/GID and effective sudo authority, including numeric grants, aliases and unmanaged macOS memberships that declarations do not resolve.
+Static group/trust guards do not prove runtime privilege exclusion; this adapter does not parse arbitrary sudoers text.
+Daemon-context authentication, offline activation, actual logout/reboot/wake behavior and selected-harness canaries remain post-deploy acceptance checks.
 
 See the [deployment plan](../../../../docs/notes/development/omnigent/deployment-plan.md) for the exact gates and platform acceptance limits.
