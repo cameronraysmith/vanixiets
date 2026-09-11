@@ -71,6 +71,18 @@
           "5"
           ""
         ];
+        "XF86KbdBrightnessUp" = [
+          "brightness"
+          "increment"
+          "5"
+          "leds:spi::kbd_backlight"
+        ];
+        "XF86KbdBrightnessDown" = [
+          "brightness"
+          "decrement"
+          "5"
+          "leds:spi::kbd_backlight"
+        ];
         "XF86AudioPlay" = [
           "mpris"
           "playPause"

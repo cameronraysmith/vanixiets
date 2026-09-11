@@ -88,6 +88,14 @@
                 allow-when-locked = true;
                 action = ipc "brightness" "decrement" "5" "";
               };
+              "XF86KbdBrightnessUp" = {
+                allow-when-locked = true;
+                action = ipc "brightness" "increment" "5" "leds:spi::kbd_backlight";
+              };
+              "XF86KbdBrightnessDown" = {
+                allow-when-locked = true;
+                action = ipc "brightness" "decrement" "5" "leds:spi::kbd_backlight";
+              };
               "XF86AudioPlay" = {
                 allow-when-locked = true;
                 action = ipc "mpris" "playPause";
